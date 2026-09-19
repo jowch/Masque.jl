@@ -1,7 +1,7 @@
 import { hitTest, resolvePayload } from "./geometry"
 import { drawHi, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
-import { isEchoable } from "./selection"
+import { echoHitsFor } from "./selection"
 import { imgPx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
@@ -185,9 +185,8 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
 // identical bond value for a keyboard-focused hit — same highlight draw, same payload
 // resolution, same "input" event.
 export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number): void {
-    // A non-echoable pick clears the echo (a stale echo would misrepresent the current bond
-    // value); must precede drawHi so its already-selected guard sees the new selKeys_ entry.
-    state.echoHits_ = isEchoable(hit) ? [hit] : []
+    // Must precede drawHi so its already-selected guard sees the new selKeys_ entry.
+    state.echoHits_ = echoHitsFor(hit, ctx.manifest_)
     renderSelection(ctx, state)
     drawHi(state, ctx.hiGroup_, hit)
     // Keep keyboard focus in sync with the mouse, but ONLY once keyboard nav is already

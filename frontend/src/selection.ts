@@ -66,11 +66,15 @@ export function computeSelection(
 // Open kinds (segments / polyline) use the selected-ring recipe; closed kinds use the wash.
 export const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline"])
 
-// SELECTED_KINDS gate: grid/axis/threshold/roi/view have no highlight geometry, and an :axis
-// hit's index is always -1, which would collide every axis click onto one hitKey. `links` gate:
-// a legend swatch's click isn't a data pick.
-export function isEchoable(hit: Hit): boolean {
-    return SELECTED_KINDS.has(hit.layer.kind) && !(hit.layer.links && hit.layer.links.length)
+// Order matters: a legend entry is `rects` kind AND carries `links`, so the links branch is
+// tested first, gated at LAYER level — an entry whose own links[index] is empty still must not
+// fall through to pinning the swatch itself. :axis is excluded because its index is always -1,
+// which would collide every axis hit onto one hitKey; :threshold/:roi/:view have no highlight
+// geometry to draw.
+export function echoHitsFor(hit: Hit, manifest: Manifest): Hit[] {
+    if (hit.layer.links && hit.layer.links.length) return linkedHits(manifest, hit.layer, hit.index)
+    if (SELECTED_KINDS.has(hit.layer.kind) || hit.layer.kind === "grid") return [hit]
+    return []
 }
 
 export function layerNElements(layer: HitLayer): number {

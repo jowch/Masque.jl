@@ -95,6 +95,17 @@ describe("legend links: hover", () => {
         expect(linkGroupSize(shadow)).toBe(6)
         expect(shadow.querySelectorAll("g.sel > *").length).toBe(2) // untouched
     })
+
+    it("hovering a legend entry whose linked target is already fully pinned in g.sel draws nothing new in g.link", () => {
+        const pinnedManifest: Manifest = {
+            ...manifest,
+            layers: [manifest.layers[0], { ...manifest.layers[1], selected: [0, 1, 2] }],
+        }
+        const { surface, shadow } = setup(pinnedManifest)
+        expect(shadow.querySelectorAll("g.sel > *").length).toBe(6) // 3 circles × fill + edge
+        move(surface, 50, 50) // hover the legend entry linking to "pts" — every target hit is already selKeys_
+        expect(linkGroupSize(shadow)).toBe(0)
+    })
 })
 
 describe("legend links: no links field at all (ordinary layer) draws nothing", () => {

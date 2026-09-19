@@ -2056,13 +2056,34 @@ describe("click-echo (#103)", () => {
         expect(plainHiGroup(shadow).children.length).toBe(0)
     })
 
-    it("clicking a legend entry (layer.links) draws no echo, and clears a previously-echoed mark", () => {
+    it("clicking a legend entry pins every element of its linked target layer, not the swatch", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20, 620, 420, 20], payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"] },
+                { id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"],
+                    geometry: [100, 100, 40, 20], payloads: [{ name: "a" }], links: [["pts"]] },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        // legend rect image [80,120]x[90,110] -> client center (50,50)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
+        // "pts" has 2 circles, each closed hit splitting into fill + edge -> 2 * 2 = 4
+        expect(selChildren(shadow).length).toBe(4)
+        const cxs = [...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx")).sort()
+        expect(cxs).toEqual(["600", "620"]) // the linked circles, not the legend swatch (which has no cx)
+    })
+
+    it("clicking a legend entry whose own links[index] is empty clears a previously-echoed mark", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
             layers: [
                 { id: "pts", kind: "circles", geometry: [600, 400, 20], payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"] },
                 { id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"],
-                    geometry: [100, 100, 40, 20], payloads: [{ name: "a" }], links: [["pts"]] },
+                    geometry: [100, 100, 40, 20], payloads: [{ name: "a" }], links: [[]] },
             ],
         }
         const { host, script } = setup()
@@ -2076,7 +2097,7 @@ describe("click-echo (#103)", () => {
         expect(selChildren(shadow).length).toBe(0)
     })
 
-    it("clicking a non-echoable kind (e.g. a grid cell) clears a previously-echoed mark", () => {
+    it("clicking a grid cell pins that cell's rect in g.sel, replacing a previously-echoed mark", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,
             transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
@@ -2095,6 +2116,12 @@ describe("click-echo (#103)", () => {
         expect(selChildren(shadow).length).toBe(2)
         // grid cell far from the circle: image (300,600) -> client (150,300)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 150, clientY: 300, bubbles: true }))
-        expect(selChildren(shadow).length).toBe(0)
+        // pts echo gone (last-pick-wins), replaced by the grid cell — a normal closed "rect" wash
+        // (not the box-select "rectfill" union), so it still splits into fill + edge.
+        expect(selChildren(shadow).length).toBe(2)
+        const rect = edgeSelGroup(shadow).firstElementChild as SVGElement
+        expect(rect.tagName.toLowerCase()).toBe("rect")
+        expect(rect.getAttribute("width")).toBe("600")
+        expect(rect.getAttribute("height")).toBe("400")
     })
 })

@@ -39,7 +39,9 @@ Waterfall, CrossBar, BoxPlot (box body), Band, Density, Violin, Contourf, Vorono
 Text/Annotation, Colorbar, Legend, MeshScatter, Wireframe, Arrows3D (#91 tracks the full list);
 explicit constructors for every primitive; `Axis`, `Axis3`, and `PolarAxis` (discrete hits) on both
 backends; tooltips (`masque"…"` templates, auto table, figure-aware theme, mark-anchored
-placement); selection round-trip and re-highlight; box-select via a `selects`-ROI; threshold
+placement); client-side click-echo selection (#103: a click, an Enter/Space, or a `selects`-ROI
+release pins its own highlight in the browser, resetting on remount, with `selected=` left
+purely declarative); selection round-trip and re-highlight; box-select via a `selects`-ROI; threshold
 and ROI drags; drag-to-pan/rotate and slider-driven view changes through `@bind` re-render;
 keyboard navigation and screen-reader announcements; the split-blend highlight (#93: a
 brightening fill plus a darkening stroke, not a mark-derived colour, with `scatter!`'s drawn
@@ -94,8 +96,9 @@ work — #86 corrects an earlier claim, #83 investigated the double remount to a
 
 **#83: the double remount is a consequence of an unsupported self-referencing `@bind` shape.**
 The view-manipulation widget cell both defines the `@bind` and reads its own previous bond value
-back (the camera-`Ref` pattern the steps above build on, and the same shape `selected=`-style
-click persistence relies on) — a cell that does that is not a sanctioned Pluto use case. The
+back (the camera-`Ref` pattern the steps above build on) — a cell that does that is not a
+sanctioned Pluto use case. Click persistence no longer takes that shape at all; #103 moved it
+into the browser, so view manipulation is the only remaining caller. The
 mechanism traces into Pluto's own bond-cache timing (a cached entry is deleted and re-added
 several times within one reactive cascade, and the listener that would skip resending an
 unchanged mount-time value lands in the window where the entry is absent); two candidate
@@ -441,15 +444,6 @@ shipped, which is a better filter than what other libraries happen to have.
   points) whose value falls in the dragged range; the client only needs the range, Julia
   resolves membership.
 - **Lasso / polygon select** beside the box ROI, same `Vector{InteractionEvent}` contract.
-- **Client-side click-echo selection ([#103](https://github.com/jowch/Masque.jl/issues/103)).**
-  Retire the five-cell self-referencing-`selected=` workaround in `selection.md` by having the
-  overlay track "what was clicked" itself, in the browser, so a widget cell never needs its own
-  bond fed back. `selected=` stays purely declarative on the Julia side. Resets on remount by
-  design (a remount means the figure was rebuilt, and indices from before it may no longer mean
-  the same thing); persistence across a rebuild becomes an explicit `selected=` from the user,
-  not an inferred default. Also the reason a self-referencing `selected=` widget and a
-  `with_js_link` gesture channel (#102) don't have to coexist: moving click-echo off the
-  reactive path removes that collision by construction.
 - **Selection persistence across reload.** Rehydrate `selected=` and the last bond from
   `sessionStorage` so a re-opened notebook shows the state the user left.
 - **Nearest-mark snapping.** An opt-in hover mode that picks the nearest mark within a radius

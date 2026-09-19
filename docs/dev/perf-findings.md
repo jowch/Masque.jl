@@ -195,8 +195,7 @@ Measured **2026-09-19 at commit `e9a71f3`**, Julia 1.12.7, Pluto **1.0.3**, Cair
 headless Chromium (Playwright) — a one-off measurement, more so than the round-trip numbers
 above — no committed driver at all (see the header note). Pluto's version is recorded because the
 double remount below depends on it: the scene's widget cell both defines the `@bind` and reads its
-own previous bond value back (the same self-referencing shape `selected=`-style click persistence
-relies on today), and a cell that does that is not a sanctioned Pluto use case
+own previous bond value back, and a cell that does that is not a sanctioned Pluto use case
 ([issue #83](https://github.com/jowch/Masque.jl/issues/83), closed not-planned after the
 mechanism was traced into Pluto's own bond-cache timing). Nothing about that shape is
 contractual, so a different Pluto version can show a different remount count without that being

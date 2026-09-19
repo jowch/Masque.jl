@@ -249,7 +249,10 @@ export function drawLink(state: OverlayState, linkGroups: HiGroups, key: string,
     const cur = linkGroups.fill_.firstElementChild ?? linkGroups.edge_.firstElementChild ?? linkGroups.plain_.firstElementChild
     if (key === state.linkKey_ && cur && !cur.classList.contains("masque-leave")) return
     clearLinkImmediate(state, linkGroups)
+    // A hit already pinned in g.sel would double the fill/stroke opacity if drawn again here
+    // (same reasoning as drawHi's guard).
     for (const h of hits) {
+        if (state.selKeys_.has(hitKey(h))) continue
         const made = makeHiElement(h, "selected")
         if (!made) continue
         if (made.fill) { made.fill.classList.add("masque-enter"); linkGroups.fill_.appendChild(made.fill) }
