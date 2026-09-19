@@ -192,11 +192,10 @@ nothing felt. Two caveats: localhost websocket (no network latency), and Pluto's
 ### `@bind` view-commit baseline (drag-to-orbit release, this commit)
 
 Measured **2026-09-19 at commit `e9a71f3`**, Julia 1.12.7, Pluto **1.0.3**, CairoMakie 0.15.14,
-headless Chromium (Playwright) — a dated snapshot like the round-trip numbers above, and more so:
-its Playwright driver was run inline and never saved as a file, so there is no committed script
-to point to at all (see the header note above). Pluto's version is recorded because the double
-remount below depends on it: the scene's widget cell both defines the `@bind` and reads its own
-previous bond value back (the same self-referencing shape `selected=`-style click persistence
+headless Chromium (Playwright) — a one-off measurement, more so than the round-trip numbers
+above — no committed driver at all (see the header note). Pluto's version is recorded because the
+double remount below depends on it: the scene's widget cell both defines the `@bind` and reads its
+own previous bond value back (the same self-referencing shape `selected=`-style click persistence
 relies on today), and a cell that does that is not a sanctioned Pluto use case
 ([issue #83](https://github.com/jowch/Masque.jl/issues/83), closed not-planned after the
 mechanism was traced into Pluto's own bond-cache timing). Nothing about that shape is
@@ -205,11 +204,15 @@ a regression.
 
 Scene: `Axis3`, a 240-point helix `lines!` + a 12-marker `scatter!`,
 `[ViewInteractable(ax), PointInteractable(ax, pts)]` as the interactable set, figure 480×360 at
-`px_per_unit=2` (today's default). Driven through the real `masque(fig, ints)` with the same
-self-referencing camera-`Ref` shape `examples/demo.jl`'s view-manipulation cells use. Instrumented
-with `performance.now()` at a synthetic `pointerup` dispatch, plus a poll on `.ip-host` node
-identity — identity-diffed every 15 ms (not a fixed-interval `waitChange` poll) so the
-~100–300 ms window isn't buried in coarser polling noise. 12 drag-release trials.
+`px_per_unit=2` (today's default). Driven through the real `masque(fig, ints)` with a deliberately
+constructed self-referencing camera-`Ref` cell — the shape the shipped examples avoid:
+`examples/demo.jl` has no view-manipulation cells at all, and `examples/view_manip.jl` uses the
+opposite, acyclic shape (a plain `orb_seed` tuple, `@bind orb_ev`, and a separate
+`orbit_committed` cell) precisely because Pluto forbids feeding a bond back into the same figure
+cell (`examples/view_manip.jl`'s own markdown cell says so). Instrumented with `performance.now()`
+at a synthetic `pointerup` dispatch, plus a poll on `.ip-host` node identity — identity-diffed
+every 15 ms (not a fixed-interval `waitChange` poll) so the ~100–300 ms window isn't buried in
+coarser polling noise. 12 drag-release trials.
 
 **Reconstruction, not a committed driver** — not runnable as-written; captures the notebook cell
 shape and measurement approach well enough to rebuild by hand:
@@ -246,17 +249,12 @@ end
 |---|---:|---:|
 | release → bond value committed (Julia `masque()` done + Pluto's own reactive-run overhead) | 105.7 ms | 214.6 ms |
 | release → **final** DOM update (last `.ip-host` replacement) | 201.5 ms | 294.6 ms |
-| remounts per single drag-release | **2 / 2** (every one of 12 trials) |
 
 Every one of the 12 trials produced exactly two distinct `.ip-host` node identities for one
 release — the unsupported-shape double remount described in issue #83, reproduced live on this
-Pluto version rather than only inferred from its description. Adding the light-scene
-decode+paint floor measured elsewhere in this file (~31–35 ms, see the round-trip table above)
-to the final remount gives a **derived** (not separately measured) release-to-visible estimate
-of **≈230 ms p50** for today's `@bind` view-commit path on this scene.
+Pluto version rather than only inferred from its description.
 
-This section deliberately does not include any `with_js_link` numbers, and does not repeat the
-~230 ms figure as part of a comparison — those live in
+This section deliberately does not include any `with_js_link` numbers — those live in
 [issue #102](https://github.com/jowch/Masque.jl/issues/102) until a `with_js_link` gesture
 channel actually ships. This file tracks only what Masque does today.
 

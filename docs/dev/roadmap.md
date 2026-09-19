@@ -71,9 +71,9 @@ Runic, and an advisory live kind sweep.
 
 `ViewInteractable` is commit-on-release: nothing moves during the drag, and the commit
 replaces the cell output, which on `:webgl` is a blank canvas plus a scene re-init. Two
-problems and six children: three steps in this order, plus #86, which corrects an earlier
-claim rather than adding work, #83, which investigated the double remount to a close rather
-than a fix, and #102, which reframes the remount problem for gestures generally.
+problems and six children: three steps in this order, plus three issues that are not new
+work — #86 corrects an earlier claim, #83 investigated the double remount to a close, and
+#102 reframes the remount problem for gestures generally.
 
 1. **#84 Last-frame hold.** Park the last painted frame (Cairo PNG `src`, or a bitmap from the
    WGL canvas) and show it until the new base is ready. Hides the remaining remount. Not a
@@ -87,7 +87,7 @@ than a fix, and #102, which reframes the remount problem for gestures generally.
    freezes the overlay or needs 3D coordinates in JS, and neither respects the
    Julia-authored-projection principle this list is written to keep. #102 answers it: route the
    gesture through `with_js_link` and have Julia return a fresh manifest on every frame, so
-   projection stays Julia-authored throughout the drag, not just at commit. `perf-findings.md`'s
+   projection stays Julia-authored throughout the drag, not just at commit. #102's own
    manifest rebuild figure (flat regardless of scene weight) is what makes a fresh manifest per
    frame affordable. Still commit-on-release for the final `@bind`ed value; #102 changes what
    happens *during* the drag, not what gets committed at the end.
@@ -111,10 +111,10 @@ bond in the notebook that uses it. #103 retires the main reason users write that
 
 **Open, deliberately: whether live preview or commit-on-release is the default.** #102's numbers
 bound what is *possible* — viable on a light scene, not on a heavy one at the resolutions
-tested (`perf-findings.md`) — they don't settle what the default should be, per backend and
-possibly per scene weight. That choice is left for when a real implementation exists and can be
-felt, not picked from spike numbers alone. A default right for a 240-point helix may be wrong for
-a large surface; the honest answer may be that it adapts rather than being fixed.
+tested — they don't settle what the default should be, per backend and possibly per scene
+weight. That choice waits for a real implementation people can actually try, not spike numbers
+alone. A default right for a 240-point helix may be wrong for a large surface; it may need to
+adapt per scene rather than stay fixed.
 
 **#86 corrects an earlier roadmap claim.** The camera-only resident-scene patch for `:webgl`
 is gated on DOM identity, not payload size: Pluto destroys the `<canvas>` on every cell
@@ -298,10 +298,8 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
     than *source resolution*: report the one cell (or the aggregate of the cells) under each
     screen pixel, not the whole matrix. This retires the `values[]` cap outright, the same way
     pull would, without giving up static-export safety. The argument isn't just convenience: a
-    cap is an arbitrary size threshold, whereas declining to report per-cell values for cells the
-    user cannot individually point at is a statement about what hovering *means* — a subpixel
-    cell isn't hoverable in any meaningful sense, so shipping it a value was never buying real
-    fidelity.
+    cap is an arbitrary size threshold, but a subpixel cell can't be hovered individually — its
+    value was never something a display-resolution report needed to include.
 
   Subsampling and the gesture channel compound if both ship: with #102 making zoom cheap,
   fidelity under subsampling becomes **navigable rather than fixed** — a user who wants the exact
@@ -309,9 +307,9 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   subsample resolves progressively finer. That turns a fixed contract compromise (pick a
   resolution once, live with it at every zoom level) into an interaction.
 
-  Keep this distinct from the heavy-scene render latency in `perf-findings.md` (an 80×80
-  `surface!` case) — that cost is dominated by Makie's own draw time, not by payload or hit-test,
-  so subsampling what gets *reported* does nothing for it. Decimating what gets *rendered* during
+  Keep this distinct from the heavy-scene render latency in #102 (an 80×80 `surface!` case) —
+  that cost is dominated by Makie's own draw time, not by payload or hit-test, so subsampling
+  what gets *reported* does nothing for it. Decimating what gets *rendered* during
   a gesture — a coarser frame mid-drag, full fidelity on release, in the spirit of #85's already-
   accepted "ticks and decorations move with the photograph until the commit" — is the separate
   companion idea for that cost; named here, not designed.
