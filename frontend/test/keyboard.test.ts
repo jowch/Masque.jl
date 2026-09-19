@@ -412,9 +412,9 @@ describe("keyboard navigation", () => {
     })
 
     it("a pure-mouse click (no prior keyboard focus) pins the click-echo in g.sel, not a fading g.hi ring (#103)", async () => {
-        // Regression guard: syncing focusIdx/focusHit unconditionally on every click broke the
-        // locked hover-fade recipe for a mouse-only user — the sync must only engage once
-        // keyboard nav is already active (state.focusIdx !== null).
+        // This used to guard the focusIdx/focusHit sync (an unconditional sync left a mouse-only
+        // user with a ring that never faded). Since #103 an echoable click draws no g.hi at all,
+        // so that path is unreachable here and the guard now lives in commitClick's own gating.
         const { surface, shadow, host } = setup(manifest)
         // hover then click a[0], via the mouse only — surface.focus() is never called.
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 50, clientY: 50, bubbles: true }))
