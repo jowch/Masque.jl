@@ -32,6 +32,11 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
 - DPI is derived, not fixed: `px_per_unit = 2·min(scene_width, max_width=700)` (Pluto's column).
 - CI is the **sole author** of `assets/overlay.js` and `assets/masque-webgl.js` (rebuilds + commits on `main`); committing your local bundle is optional, but a stale committed bundle fails PR CI.
 
+## GitHub-facing text (issues, comments, PR titles/bodies, reviews)
+- **Never hard-wrap inside a paragraph.** One paragraph is one long line; let the browser wrap it. Hard wraps at ~80–100 chars are right for `.jl`/`.md` files in the repo and wrong on GitHub — they survive into quotes and replies, reflow badly on narrow screens, and turn a one-word edit into a multi-line diff. Blank lines between paragraphs, list items, and fenced code blocks are unaffected; wrap code inside fences as you normally would.
+- Write the **corrected text, not a correction**. Issues and PRs are read as current state, not as a log of what we previously believed. Edit the body or comment in place and delete anything obsolete; don't leave "superseded", "retracting the above", or "correcting my earlier framing" paragraphs — the reader can see the thread, so a stale version plus an apology is worse than the clean version alone.
+- Backtick every macro name (`@bind`, `@htl`, `@testset`, …). A bare `@word` pings the GitHub user of that name.
+
 ## Live verification (standing practice — not optional)
 Unit/frontend tests assert the manifest and the JS in isolation; they don't prove the rendered
 widget behaves for the user. **Any change that can alter what the user interacts with — or
