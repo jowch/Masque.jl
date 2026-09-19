@@ -488,6 +488,25 @@ try {
       passed.push(`${key}/legend-precedence-pixel-contested`);
     }
 
+    // mount.ts used to force host.value = null unconditionally, so the real Pluto bond settled
+    // on `nothing` at mount even with selected= baked in. Read #out_${key} (repr(ev) off the
+    // actual bond) before any click/drag on this widget to catch that directly.
+    const mountBond = await textOf(`#out_${key}`);
+    if (spec.selected) {
+      if (/=\s*nothing$/.test(mountBond)) {
+        throw new Error(`${key}: bond reads "nothing" at mount despite selected= (${JSON.stringify(mountBond)})`);
+      }
+      if (!mountBond.includes(`:${spec.layerId}`)) {
+        throw new Error(`${key}: mount bond ${JSON.stringify(mountBond)} doesn't name layer :${spec.layerId}`);
+      }
+      passed.push(`${key}/hydrated-bond`);
+    } else {
+      if (!/=\s*nothing$/.test(mountBond)) {
+        throw new Error(`${key}: bond is not "nothing" at mount despite no selected= (${JSON.stringify(mountBond)})`);
+      }
+      passed.push(`${key}/hydrated-bond-control`);
+    }
+
     if (spec.mode === "drag") {
       const p = hitPoint(layer, 0);
       const before = await textOf(`#out_${key}`);

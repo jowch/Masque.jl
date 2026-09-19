@@ -215,8 +215,17 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const noop: Mounted = { cleanup: () => {} }
     if (!host || !base) return noop
 
-    // the @bind target is the host element; start with no selection
-    ;(host as unknown as { value: unknown }).value = null
+    // The @bind target is the host element. Seed it with the hydrated selection rather than
+    // null: Pluto reads this at mount, so a null here would overwrite Julia's `initial_value`
+    // and settle the bond on `nothing` while the marks sit highlighted. The `items` shape is
+    // what `transform_value` already maps to a Vector{InteractionEvent}.
+    const hydrated: { layer: string; index: number; payload: unknown }[] = []
+    for (const layer of manifest.layers) {
+        for (const idx of layer.selected ?? []) {
+            hydrated.push({ layer: layer.id, index: idx, payload: layer.payloads[idx] })
+        }
+    }
+    ;(host as unknown as { value: unknown }).value = hydrated.length ? { items: hydrated } : null
 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })

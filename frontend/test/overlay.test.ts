@@ -2147,3 +2147,53 @@ describe("click-echo (#103)", () => {
         expect(rect.getAttribute("height")).toBe("400")
     })
 })
+
+// host.value is what Pluto reads at mount, before any click — mount() used to force it to null
+// unconditionally, overwriting Julia's initial_value and losing the selected= hydration.
+describe("host.value seeded at mount from selected= (bond hydration, not just g.sel)", () => {
+    it("a layer with selected= seeds host.value with one items[] entry per hydrated index", () => {
+        const { host, script } = setup()
+        const selManifest: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{
+                id: "pts", kind: "circles", geometry: [300, 200, 20, 600, 400, 20, 900, 600, 20],
+                payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["click", "hover"],
+                selected: [0, 2],
+            }],
+        }
+        mount(script, selManifest)
+        expect((host as unknown as { value: unknown }).value).toEqual({
+            items: [
+                { layer: "pts", index: 0, payload: { i: 0 } },
+                { layer: "pts", index: 2, payload: { i: 2 } },
+            ],
+        })
+    })
+
+    it("no layer bakes selected= -> host.value stays null (keeps Pluto's first-value dedup working)", () => {
+        const { host, script } = setup()
+        mount(script, manifest) // module-level `manifest`: no selected= anywhere
+        expect((host as unknown as { value: unknown }).value).toBeNull()
+    })
+
+    it("hydration across two layers flattens in manifest layer order", () => {
+        const { host, script } = setup()
+        const twoLayer: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [
+                { id: "a", kind: "circles", geometry: [100, 100, 10, 200, 200, 10],
+                    payloads: [{ v: "a0" }, { v: "a1" }], axis: "ax1", events: ["click", "hover"], selected: [1] },
+                { id: "b", kind: "rects", geometry: [300, 300, 10, 10, 400, 400, 10, 10],
+                    payloads: [{ v: "b0" }, { v: "b1" }], axis: "ax1", events: ["click", "hover"], selected: [0, 1] },
+            ],
+        }
+        mount(script, twoLayer)
+        expect((host as unknown as { value: unknown }).value).toEqual({
+            items: [
+                { layer: "a", index: 1, payload: { v: "a1" } },
+                { layer: "b", index: 0, payload: { v: "b0" } },
+                { layer: "b", index: 1, payload: { v: "b1" } },
+            ],
+        })
+    })
+})

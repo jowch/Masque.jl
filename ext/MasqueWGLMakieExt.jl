@@ -311,7 +311,7 @@ function Base.show(io::IO, m::MIME"text/html", w::WebGLWidget)
 end
 
 # ---- bond plumbing: identical contract to MasqueWidget (same overlay, same events) ----
-APD.Bonds.initial_value(::WebGLWidget) = nothing
+APD.Bonds.initial_value(w::WebGLWidget) = Masque._hydrated_selection(w.manifest)
 function APD.Bonds.transform_value(::WebGLWidget, js)
     js === nothing && return nothing
     if haskey(js, "items")

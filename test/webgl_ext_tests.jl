@@ -269,6 +269,27 @@ end
     @test length(evs) == 2 && evs[1].index == k && evs[2].index == 0
 end
 
+@testset "initial_value hydration parity: :webgl must not drift from :cairo on selected=" begin
+    # WebGLWidget's initial_value previously returned `nothing` unconditionally, so :webgl had no
+    # selected= hydration while :cairo did (both now share src/render.jl's _hydrated_selection).
+    # The control above (no selected=) can't catch that; this case can.
+    import AbstractPlutoDingetjes as APD
+    IE = Masque.InteractionEvent
+
+    fig = Figure(; size = (400, 300)); ax = Axis(fig[1, 1])
+    scatter!(ax, 1:5, (1:5) .^ 2)
+    w = masque(fig; backend = _WGLExt.WebGLBackend(), selected = Dict(:scatter => [1, 3]))
+    layer = only(w.manifest["layers"])
+    @test layer["id"] == "scatter"
+
+    hydrated = APD.Bonds.initial_value(w)
+    @test hydrated isa Vector{IE}
+    @test [ev.layer for ev in hydrated] == [:scatter, :scatter]
+    @test [ev.index for ev in hydrated] == [1, 3]   # 0-based, matches `selected=`
+    @test hydrated[1].payload == layer["payloads"][2]   # payloads are 1-based Julia arrays
+    @test hydrated[2].payload == layer["payloads"][4]
+end
+
 # MUST run last in this file: this loads CairoMakie on top of the already-loaded WGLMakie.
 # After that, implicit masque() defaults to Cairo (sysimage-safe) — nothing after this
 # testset may rely on the WGLMakie-only auto-resolution path.

@@ -410,9 +410,12 @@ end
 
 # Hydration: at mount, `selected=` elements ARE the selection, so the bond must already
 # report them rather than `nothing` (manifest indices are 0-based; `payloads` is 1-based).
-function APD.Bonds.initial_value(w::MasqueWidget)
+# Shared by both widgets' `initial_value` so the backends can't drift on the bond contract;
+# `mount.ts` seeds the same set into `host.value`, or the browser's mount-time report would
+# overwrite this with `nothing`.
+function _hydrated_selection(manifest::Dict{String, Any})
     events = InteractionEvent[]
-    for d in w.manifest["layers"]
+    for d in manifest["layers"]
         idxs = get(d, "selected", nothing)
         idxs === nothing && continue
         payloads = d["payloads"]
@@ -422,6 +425,8 @@ function APD.Bonds.initial_value(w::MasqueWidget)
     end
     return isempty(events) ? nothing : events
 end
+
+APD.Bonds.initial_value(w::MasqueWidget) = _hydrated_selection(w.manifest)
 function APD.Bonds.transform_value(::MasqueWidget, js)
     js === nothing && return nothing
     if haskey(js, "items")   # a selector's declared multi output — always a vector
