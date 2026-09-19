@@ -242,9 +242,9 @@ _transform_dict(t::AxisTransform) = Dict{String, Any}(
 Validate every interactable (fail loud) and assemble the JS-facing manifest. Pure — the unit
 tests call this directly; the Pluto-only `published_to_js` step happens later in `show`.
 
-`selected` pre-highlights elements on mount: a `layer_id => indices` map keyed by the same
-`Symbol` a click returns in `InteractionEvent.layer`. The overlay re-derives highlights from
-it each render, so threading a bond value back keeps a selection flicker-free across re-renders.
+`selected` seeds the selection: a `layer_id => indices` map keyed by the same `Symbol` a click
+returns in `InteractionEvent.layer`. The overlay re-derives the selection from it on every
+mount, so a rebuilt figure comes back selecting what the caller asserts.
 """
 function build_manifest(interactables, ctx::InteractionContext; selected = nothing, tip_style = nothing, background = nothing)
     layers = Any[]
@@ -313,45 +313,30 @@ function _resolve_backend(explicit; max_width)
 end
 
 """
-    masque(fig, interactables; backend=nothing, max_width=700, selected=nothing,
-         tooltip_bg=nothing, tooltip_color=nothing, tooltip_accent=nothing, tooltip_font=nothing,
-         tooltip_font_size=nothing, tooltip_radius=nothing, tooltip_caret=true) -> MasqueWidget
-    masque(fig, interactable; kwargs...)   # single-interactable convenience
+    masque(fig, interactables; kwargs...) -> MasqueWidget
+    masque(fig, interactable; kwargs...)    # single-interactable convenience
 
-Render `fig` and overlay JS hit-testing for the declared `interactables`. Use as a Pluto
-`@bind` source; the bond always reports the current selection — `nothing` if nothing is
-selected, otherwise an [`InteractionEvent`](@ref) (or, for a `ROIInteractable` built with
-`selects` or for `selected=` hydration, a `Vector{InteractionEvent}`). With `selected=`, the
-bond already holds those elements at mount, before any click.
+Overlay `fig` with JS hit-testing and return a Pluto `@bind` source. `fig` is not mutated.
 
-# Arguments
-- `interactables` — a `Vector{AbstractInteractable}` (or a single one, via the second method).
-- `backend` — `nothing` (default) picks the one backend implied by whichever of `CairoMakie` /
-  `WGLMakie` is loaded (`CairoBackend` / `WebGLBackend`); pass one explicitly to be unambiguous
-  or to override its own keywords (e.g. `WebGLBackend(; px_per_unit = 3.0)`). Raises
-  `ArgumentError` if neither is loaded; if both are, `backend=` wins and an implicit call
-  defaults to Cairo.
-- `max_width` — the display width to target (Pluto's column, in px); render resolution is
-  *derived* from it, not a fixed DPI (`CairoBackend` renders at ~2× this width). Default `700`.
-- `selected` — a `layer_id => indices` map (0-based, matching `InteractionEvent.index`) giving
-  the selection's starting value: those elements are highlighted and already in the bond at
-  mount. Supported kinds: `:circles`/`:rects`/`:polygons` (wash) and `:segments`/`:polyline`
-  (ring); any other kind or an out-of-range index raises `ArgumentError`. Feed a bond value
-  back into it (e.g. `Dict(ev.layer => [ev.index])`) to keep the selection flicker-free across
-  re-renders.
-- `tooltip_bg`, `tooltip_color`, `tooltip_accent` — tooltip card colors (a CSS string or any
-  Makie-convertible color). `tooltip_font` — a font-family `String`. `tooltip_font_size`,
-  `tooltip_radius` — a `Real`, rendered as `"<value>px"`. `tooltip_caret` — `Bool`, whether to
-  draw the pointer caret (default `true`). Each defaults to `nothing` (the built-in style);
-  see the Tooltips page of the documentation for the full styling system (including the
-  `--masque-tip-*` CSS escape hatch).
+The bond reports the current selection: `nothing` when nothing is selected, an
+[`InteractionEvent`](@ref) after a click, or a `Vector{InteractionEvent}` for a `selects`
+[`ROIInteractable`](@ref) and for `selected=`.
 
-`Axis3` is supported on both backends; continuous pixel→data readout
-(`AxisInteractable`/`ThresholdInteractable`/`ROIInteractable`) fails loud (`ArgumentError`) on
-a 3D axis, since a screen pixel there is a ray, not a data point.
-
-Restores the figure's background color on return; the only mutation `masque` makes to `fig` is
-forcing it opaque during render (Makie `Figure`s can't be `deepcopy`'d to snapshot/restore).
+# Keywords
+- `selected` — the selection's starting value: a `layer_id => indices` map, 0-based, matching
+  `InteractionEvent.index`. Those elements are highlighted and in the bond at mount. Works on
+  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`; any other kind, or an out-of-range
+  index, raises `ArgumentError`. Clicking replaces the selection, so this is only needed to
+  carry one through a rebuild — and it must come from a cell that doesn't read this widget's
+  own bond, which Pluto rejects as a cyclic reference.
+- `backend` — `CairoBackend()` (static image) or `WebGLBackend()` (live canvas), each with its
+  own keywords. Defaults to whichever of `CairoMakie` / `WGLMakie` is loaded, Cairo if both,
+  `ArgumentError` if neither.
+- `max_width` — target display width in px (Pluto's column). Default `700`.
+- `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`, `tooltip_font_size`,
+  `tooltip_radius`, `tooltip_caret` — tooltip card styling; each defaults to the built-in
+  style. See the Tooltips page for the full system, including the `--masque-tip-*` CSS
+  escape hatch.
 
 # Examples
 ```julia
