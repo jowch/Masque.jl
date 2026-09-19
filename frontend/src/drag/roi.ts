@@ -95,7 +95,7 @@ export function move(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { ki
     setROI(box)
     if (d.target_) {
         const sel = computeSelection(box.g_, d.target_, ctx.manifest_.transforms[d.target_.axis])
-        state.echoHits_ = sel.hits
+        state.selHits_ = sel.hits
         renderSelection(ctx, state)
         return `${sel.items.length} selected`
     }
@@ -110,7 +110,7 @@ export function end(
 ): { items: unknown[] } | { layer: string; index: number; payload: unknown } {
     if (d.target_) {
         const sel = computeSelection(d.box_.g_, d.target_, ctx.manifest_.transforms[d.target_.axis])
-        state.echoHits_ = sel.hits
+        state.selHits_ = sel.hits
         renderSelection(ctx, state)
         return { items: sel.items }
     }

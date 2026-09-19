@@ -283,20 +283,7 @@ export function drawSelection(state: OverlayState, selGroups: HiGroups, hits: Hi
     if (state.hiKey_ !== null && next.has(state.hiKey_)) clearHiImmediate(state, hiGroups)
 }
 
-// preHits_ goes first so a `selected=` index that's also the current echo dedups (by hitKey) to
-// its preHits_ copy. The one path to g.sel — every writer of preHits_/echoHits_ comes through here.
+// The single funnel to g.sel — every writer of state.selHits_ calls this after assigning it.
 export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
-    const seen = new Set<string>()
-    const hits: Hit[] = []
-    for (const h of ctx.preHits_) {
-        const k = hitKey(h)
-        if (seen.has(k)) continue
-        seen.add(k); hits.push(h)
-    }
-    for (const h of state.echoHits_) {
-        const k = hitKey(h)
-        if (seen.has(k)) continue
-        seen.add(k); hits.push(h)
-    }
-    drawSelection(state, ctx.selGroup_, hits, ctx.hiGroup_)
+    drawSelection(state, ctx.selGroup_, state.selHits_, ctx.hiGroup_)
 }

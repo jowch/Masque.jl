@@ -107,9 +107,9 @@ fine. See [Choosing between them](@ref) on the Backends page for the exact rule.
 
 **Cause:** you fed a widget's own bond value into that same `masque(...)` call's `selected=`
 in one cell. Pluto detects the self-reference and refuses to run the cell.
-**Fix:** you don't need to. A click already pins its own highlight in the browser, so
-`selected=` is only for a highlight your Julia code computes — and that has to come from a
-cell that doesn't read this widget's bond. See
+**Fix:** you don't need to. A click already updates the selection on its own, so `selected=`
+is only for a starting value your Julia code computes — and that has to come from a cell
+that doesn't read this widget's bond. See
 [Persisting a selection across re-renders](@ref) in [Selection](@ref).
 
 ### Nothing happens when I click

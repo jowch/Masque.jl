@@ -186,7 +186,7 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
 // resolution, same "input" event.
 export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number): void {
     // Must precede drawHi so its already-selected guard sees the new selKeys_ entry.
-    state.echoHits_ = echoHitsFor(hit, ctx.manifest_)
+    state.selHits_ = echoHitsFor(hit, ctx.manifest_)
     renderSelection(ctx, state)
     drawHi(state, ctx.hiGroup_, hit)
     // Keep keyboard focus in sync with the mouse, but ONLY once keyboard nav is already

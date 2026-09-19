@@ -436,6 +436,11 @@ try {
 
   const expectBase = backend === "webgl" ? "canvas" : "img";
 
+  // Set below when the loop reaches "scatter" — the hover-on-selected-noop check after the loop
+  // needs the INDEX actually clicked (not just spec.clickIndex), since the collision-avoidance
+  // bump a few lines down can move it.
+  let scatterClickIdx = null;
+
   for (const spec of meta) {
     const key = spec.key;
     const wantDark = key === "scatter_dark"; // the only dark-figure case in kind_sweep_figures.jl
@@ -908,6 +913,7 @@ try {
     if (already.test(before) || (spec.layerKind === "grid" && new RegExp(`index[=:]\\s*${clickIdx}\\b`).test(before))) {
       clickIdx = spec.selectedIndex !== clickIdx ? spec.selectedIndex : clickIdx + 1;
     }
+    if (key === "scatter") scatterClickIdx = clickIdx;
     const clickPt = hitPoint(layer, clickIdx);
     let after = before;
     for (let a = 0; a < 3; a++) {
@@ -947,15 +953,15 @@ try {
       }
       passed.push(`${key}/click-echo`);
     } else if (SELF_PIN_KINDS.has(layer.kind)) {
-      // An echoed click draws no hover chrome at all: its key is in selKeys_ by the time drawHi
-      // runs — EXCEPT clicking an index this spec actually BAKES into `selected=`, which dedups
-      // against it (renderSelection keys on hitKey) rather than growing g.sel. `selectedIndex` is
-      // set even on specs that bake nothing (`selected => nothing`, e.g. the grid kinds, where it
-      // just steers hover), so the dedup case has to gate on `selected` too, not the index alone.
+      // Hydration model: a click REPLACES the whole selection, so g.sel after the click holds
+      // exactly the clicked hit's own recipe (2 shapes — fill+edge — for a closed kind, 1 ring
+      // for an open one), independent of whatever `selected=` hydration was there before — a
+      // spec that bakes a `selected=` index no longer "grows" g.sel on click, it's simply reset.
       if (echo.hi !== 0) throw new Error(`${key}/click-echo: hover chrome drawn over the echo (g.hi=${echo.hi})`);
-      const dedups = !!spec.selected && clickIdx === spec.selectedIndex;
-      const grew = dedups ? echo.sel === afterLeave.sel : echo.sel > afterLeave.sel;
-      if (!grew) throw new Error(`${key}/click-echo: g.sel ${afterLeave.sel} -> ${echo.sel} after clicking index ${clickIdx}`);
+      const expectSel = closedHover ? 2 : 1;
+      if (echo.sel !== expectSel) {
+        throw new Error(`${key}/click-echo: g.sel=${echo.sel}, expected ${expectSel} for one echoed ${closedHover ? "closed" : "open"} hit (was ${afterLeave.sel} before the click)`);
+      }
       passed.push(`${key}/click-echo`);
     } else if (echo.sel !== afterLeave.sel) {
       throw new Error(`${key}/click-echo: unpinned ${layer.kind} click changed g.sel ${afterLeave.sel} -> ${echo.sel}`);
@@ -984,23 +990,31 @@ try {
     }
   }
 
-  // Hover-on-selected is a no-op: hovering scatter's baked-selected element (index 1, "beta")
-  // must draw NO highlight at all (fill and edge both empty) — the mark keeps its opaque
-  // selected wash instead, since a 1.5px hover stroke over the 2px selected stroke would read as
-  // *weaker*, not stronger. The tooltip and `@bind` still work for that hit; only the highlight
-  // is skipped.
+  // Hover-on-selected is a no-op: hovering scatter's CURRENTLY-selected element must draw NO
+  // highlight at all (fill and edge both empty) — the mark keeps its opaque selected wash
+  // instead, since a 1.5px hover stroke over the 2px selected stroke would read as *weaker*, not
+  // stronger. The tooltip and `@bind` still work for that hit; only the highlight is skipped.
+  // Under the hydration model, scatter's earlier click-echo (above) REPLACED its baked
+  // `selected=` (spec.selectedIndex, "beta") with the clicked index — so this must target
+  // `scatterClickIdx`, the element that IS selected now, not the no-longer-selected bake.
   {
     const spec = meta.find((s) => s.key === "scatter");
     const layers = await layersOf("scatter");
     const layer = findLayer(layers, spec);
-    const selPt = hitPoint(layer, spec.selectedIndex);
+    const idx = scatterClickIdx ?? spec.clickIndex;
+    // hoverTip is only known to correspond to spec.clickIndex (scatter's hoverIndex/clickIndex
+    // both being 0 by convention) — the click-collision fallback can, in principle, land on a
+    // different index whose tip text this driver doesn't know, so skip the text match then.
+    const expectTip = idx === spec.clickIndex ? spec.hoverTip : null;
+    const tipOk = (t) => !!(t && t.show && (!expectTip || new RegExp(expectTip, "i").test(t.text)));
+    const selPt = hitPoint(layer, idx);
     let noop = null;
     for (let a = 0; a < 8; a++) {
       noop = await dispatchAt("scatter", selPt.x, selPt.y, "pointermove");
-      if (noop.show && /beta/i.test(noop.text)) break;
+      if (tipOk(noop)) break;
       await new Promise((r) => setTimeout(r, 200));
     }
-    if (!noop.show || !/beta/i.test(noop.text)) throw new Error(`scatter/hover-on-selected: tooltip ${JSON.stringify(noop)}`);
+    if (!tipOk(noop)) throw new Error(`scatter/hover-on-selected: tooltip ${JSON.stringify(noop)}`);
     assertNoHighlight(noop.hi, "scatter/hover-on-selected");
     if (noop.sel < 1) throw new Error("scatter/hover-on-selected: g.sel missing while hovering the selected mark");
     passed.push("scatter/hover-on-selected-noop");

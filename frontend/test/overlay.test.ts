@@ -1119,8 +1119,9 @@ describe("tooltips (mount/showTip)", () => {
         expect(() => mount(script, bad)).toThrow(/selected|out of range|index/i)
     })
 
-    it("selected= pre-highlights survive a selects-ROI commit (preHits_ and echoHits_ both render, #103)", () => {
-        // Behaviour change (#103): a selects-ROI commit used to wholesale-replace g.sel.
+    it("a selects-ROI commit REPLACES the selected= hydration with its enclosure (hydration model)", () => {
+        // selected= is pure hydration (an initial value): a selects-ROI move/release sets the
+        // whole selection, it doesn't add to it.
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,
             transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
@@ -1137,12 +1138,12 @@ describe("tooltips (mount/showTip)", () => {
         mount(script, m)
         const shadow = shadowOf(host)
         const sel = edgeSelGroup(shadow) // plain circles, no style.stroke → fill+edge split, one edge shape per selected point
-        expect(sel.children.length).toBe(1)  // pre-highlight alone
+        expect(sel.children.length).toBe(1)  // hydration alone (index 2)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        // commit current ROI enclosure (points 0 and 1) — adds to, not replaces, the index-2 pre-highlight
+        // commit current ROI enclosure (points 0 and 1) — replaces the index-2 hydration outright
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
-        expect(sel.children.length).toBe(3)
+        expect(sel.children.length).toBe(2)  // points 0 and 1 only — index 2 is gone
     })
 
     it("drag-to-pan commits new limits on mouse-up (commit-on-release)", () => {
@@ -2018,7 +2019,7 @@ describe("click-echo (#103)", () => {
         expect(hiChildren(shadow).length).toBe(0)
     })
 
-    it("click mark A then click mark B leaves only B echoed (last pick wins), alongside any selected= pre-highlight", () => {
+    it("click mark A then click mark B leaves only B echoed (last pick wins), replacing the selected= hydration", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
             layers: [{
@@ -2031,14 +2032,35 @@ describe("click-echo (#103)", () => {
         mount(script, m)
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        expect(edgeSelGroup(shadow).children.length).toBe(1) // pre-highlight (index 2) alone
+        expect(edgeSelGroup(shadow).children.length).toBe(1) // hydration (index 2) alone
+        // click index 0: image (200,200) -> client (100,100) — replaces the hydration outright
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 100, bubbles: true }))
+        let cxs = [...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))
+        expect(cxs).toEqual(["200"]) // echo(0) alone, index 2's hydration is gone
+        // click index 1: image (600,400) -> client (300,200) — replaces the echo in turn
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
+        cxs = [...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))
+        expect(cxs).toEqual(["600"]) // echo(1) alone
+    })
+
+    it("mount hydration is replaced, not merged: a click after selected= leaves only the clicked hit", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{
+                id: "pts", kind: "circles", geometry: [200, 200, 20, 600, 400, 20, 900, 600, 20],
+                payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["click", "hover"],
+                selected: [2],
+            }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["900"]) // index 2, from selected=
         // click index 0: image (200,200) -> client (100,100)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 100, bubbles: true }))
-        expect(edgeSelGroup(shadow).children.length).toBe(2) // pre-highlight(2) + echo(0)
-        // click index 1: image (600,400) -> client (300,200) — replaces the echo, not the pre-highlight
-        surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
-        const cxs = [...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx")).sort()
-        expect(cxs).toEqual(["600", "900"]) // pre-highlight(2)=900 + echo(1)=600, index 0 is gone
+        expect(edgeSelGroup(shadow).children.length).toBe(1)
+        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["200"]) // ONLY index 0
     })
 
     it("clicking a mark then re-hovering it later never draws hover chrome (drawHi's selKeys_ guard)", async () => {

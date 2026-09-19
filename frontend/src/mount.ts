@@ -314,20 +314,22 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const roiBoxes = roiDrag.buildROIBoxes(manifest, plainSvg)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
-    // manifest `selected=` hits, computed once here (not per render).
-    const preHits: Hit[] = []
+    // manifest `selected=` hits — hydration for state.selHits_ (the one true selection),
+    // computed once here, not per render.
+    const selHits: Hit[] = []
     for (const layer of manifest.layers) {
         for (const idx of layer.selected ?? []) {
-            preHits.push({ layer, ...hitLayerByIndex(layer, idx) })
+            selHits.push({ layer, ...hitLayerByIndex(layer, idx) })
         }
     }
     const ctx: OverlayCtx = {
         manifest_: manifest, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
-        linkGroup_: linkGroup, preHits_: preHits,
+        linkGroup_: linkGroup,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
     }
     const state = createOverlayState()
+    state.selHits_ = selHits
 
     // Pinned to the base (img/canvas), not the host: WGLMakie can size the <canvas>
     // differently from `.ip-host`, which left g.sel offset when the SVG was `inset:0` on the host.
@@ -380,7 +382,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     // Drawn into g.sel, not g.hi: it must survive hovers (onMove clears g.hi on every miss)
     // and support multiple selected indices (drawHi keeps only the last).
-    if (ctx.preHits_.length) renderSelection(ctx, state)
+    if (state.selHits_.length) renderSelection(ctx, state)
 
     const cleanup = () => {
         surface.removeEventListener("pointerdown", down)

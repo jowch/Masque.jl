@@ -1,7 +1,8 @@
 """
     InteractionEvent(layer, index, payload)
 
-The typed value a `masque` bond returns on a deliberate click (`nothing` until the first one).
+The typed value a `masque` bond holds for one selected element: reported on a deliberate click,
+or, at mount, for each element `selected=` hydrated (`nothing` if there's neither).
 
 # Fields
 - `layer::Symbol` — the hit `HitLayer`'s (i.e. the interactable's) `id`.
@@ -15,7 +16,9 @@ The typed value a `masque` bond returns on a deliberate click (`nothing` until t
 
 A `ROIInteractable` built with `selects` reports differently: the bond value is a
 `Vector{InteractionEvent}` (one entry per element the ROI contains on mouse-up), not a single
-`InteractionEvent`.
+`InteractionEvent`. `selected=` hydration is likewise always a `Vector{InteractionEvent}` (even
+for a single hydrated element), since `selected=` is a set-shaped API; only a click reports a
+scalar `InteractionEvent`.
 """
 struct InteractionEvent
     layer::Symbol
@@ -316,8 +319,10 @@ end
     masque(fig, interactable; kwargs...)   # single-interactable convenience
 
 Render `fig` and overlay JS hit-testing for the declared `interactables`. Use as a Pluto
-`@bind` source; the bond value is `nothing` until a click, then an [`InteractionEvent`](@ref)
-(or, for a `ROIInteractable` built with `selects`, a `Vector{InteractionEvent}`).
+`@bind` source; the bond always reports the current selection — `nothing` if nothing is
+selected, otherwise an [`InteractionEvent`](@ref) (or, for a `ROIInteractable` built with
+`selects` or for `selected=` hydration, a `Vector{InteractionEvent}`). With `selected=`, the
+bond already holds those elements at mount, before any click.
 
 # Arguments
 - `interactables` — a `Vector{AbstractInteractable}` (or a single one, via the second method).
@@ -328,11 +333,12 @@ Render `fig` and overlay JS hit-testing for the declared `interactables`. Use as
   defaults to Cairo.
 - `max_width` — the display width to target (Pluto's column, in px); render resolution is
   *derived* from it, not a fixed DPI (`CairoBackend` renders at ~2× this width). Default `700`.
-- `selected` — a `layer_id => indices` map (0-based, matching `InteractionEvent.index`) that
-  pre-highlights elements on mount. Supported kinds: `:circles`/`:rects`/`:polygons` (wash) and
-  `:segments`/`:polyline` (ring); any other kind or an out-of-range index raises
-  `ArgumentError`. Feed a bond value back into it (e.g. `Dict(ev.layer => [ev.index])`) to keep
-  clicked elements highlighted, flicker-free, across re-renders.
+- `selected` — a `layer_id => indices` map (0-based, matching `InteractionEvent.index`) giving
+  the selection's starting value: those elements are highlighted and already in the bond at
+  mount. Supported kinds: `:circles`/`:rects`/`:polygons` (wash) and `:segments`/`:polyline`
+  (ring); any other kind or an out-of-range index raises `ArgumentError`. Feed a bond value
+  back into it (e.g. `Dict(ev.layer => [ev.index])`) to keep the selection flicker-free across
+  re-renders.
 - `tooltip_bg`, `tooltip_color`, `tooltip_accent` — tooltip card colors (a CSS string or any
   Makie-convertible color). `tooltip_font` — a font-family `String`. `tooltip_font_size`,
   `tooltip_radius` — a `Real`, rendered as `"<value>px"`. `tooltip_caret` — `Bool`, whether to
@@ -417,7 +423,20 @@ function Base.show(io::IO, m::MIME"text/html", w::MasqueWidget)
     return show(io, m, html)
 end
 
-APD.Bonds.initial_value(::MasqueWidget) = nothing
+# Hydration: at mount, `selected=` elements ARE the selection, so the bond must already
+# report them rather than `nothing` (manifest indices are 0-based; `payloads` is 1-based).
+function APD.Bonds.initial_value(w::MasqueWidget)
+    events = InteractionEvent[]
+    for d in w.manifest["layers"]
+        idxs = get(d, "selected", nothing)
+        idxs === nothing && continue
+        payloads = d["payloads"]
+        for idx in idxs
+            push!(events, InteractionEvent(Symbol(d["id"]), idx, payloads[idx + 1]))
+        end
+    end
+    return isempty(events) ? nothing : events
+end
 function APD.Bonds.transform_value(::MasqueWidget, js)
     js === nothing && return nothing
     if haskey(js, "items")   # a selector's declared multi output — always a vector

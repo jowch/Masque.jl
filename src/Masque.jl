@@ -6,7 +6,8 @@ or live Makie `Figure` for use in a [Pluto](https://plutojl.org) notebook.
 
 Declare [`AbstractInteractable`](@ref)s (or call [`masque`](@ref)`(fig)` for zero-config
 auto-extraction via [`auto_interactables`](@ref)) and bind the result with `@bind`; the bond
-value is `nothing` until a click, then an [`InteractionEvent`](@ref). Needs a rendering backend
+reports the current selection — `nothing` when nothing is selected, otherwise an
+[`InteractionEvent`](@ref). Needs a rendering backend
 loaded: `using CairoMakie` for a static image with a JS hit-test overlay, or `using WGLMakie`
 for a live browser-GPU canvas (animation, large/live data, 3D) — both expose the same
 `masque`/`@bind` contract.
