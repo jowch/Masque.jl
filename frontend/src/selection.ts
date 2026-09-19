@@ -64,7 +64,14 @@ export function computeSelection(
 
 // Kinds that can be drawn as a persistent pre-highlight (mirrors Julia `_SELECTED_KINDS`).
 // Open kinds (segments / polyline) use the selected-ring recipe; closed kinds use the wash.
-const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline"])
+export const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline"])
+
+// SELECTED_KINDS gate: grid/axis/threshold/roi/view have no highlight geometry, and an :axis
+// hit's index is always -1, which would collide every axis click onto one hitKey. `links` gate:
+// a legend swatch's click isn't a data pick.
+export function isEchoable(hit: Hit): boolean {
+    return SELECTED_KINDS.has(hit.layer.kind) && !(hit.layer.links && hit.layer.links.length)
+}
 
 export function layerNElements(layer: HitLayer): number {
     const g = layer.geometry

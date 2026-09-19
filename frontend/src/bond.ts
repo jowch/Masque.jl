@@ -1,6 +1,7 @@
 import { hitTest, resolvePayload } from "./geometry"
-import { drawHi } from "./highlight"
+import { drawHi, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
+import { isEchoable } from "./selection"
 import { imgPx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
@@ -32,7 +33,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
     } else if (d.kind === "view") {
         text = viewDrag.tip(d, p)
     } else {
-        text = roiDrag.move(d, state, ctx.selGroup_, ctx.hiGroup_, ctx.manifest_, p)
+        text = roiDrag.move(ctx, state, d, p)
     }
     setMarkAccent(ctx, null) // a drag readout is never a coloured element's tooltip
     setTipText(ctx, state, text)
@@ -141,7 +142,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
             ctx.host_.dispatchEvent(new CustomEvent("input"))
         }
     } else {
-        (ctx.host_ as unknown as { value: unknown }).value = roiDrag.end(d, state, ctx.selGroup_, ctx.hiGroup_, ctx.manifest_)
+        (ctx.host_ as unknown as { value: unknown }).value = roiDrag.end(ctx, state, d)
         ctx.host_.dispatchEvent(new CustomEvent("input"))
     }
     hideTip(ctx, state); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
@@ -184,6 +185,10 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
 // identical bond value for a keyboard-focused hit — same highlight draw, same payload
 // resolution, same "input" event.
 export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number): void {
+    // A non-echoable pick clears the echo (a stale echo would misrepresent the current bond
+    // value); must precede drawHi so its already-selected guard sees the new selKeys_ entry.
+    state.echoHits_ = isEchoable(hit) ? [hit] : []
+    renderSelection(ctx, state)
     drawHi(state, ctx.hiGroup_, hit)
     // Keep keyboard focus in sync with the mouse, but ONLY once keyboard nav is already
     // engaged (state.focusIdx_ !== null) — gating on that, not just "click landed on a

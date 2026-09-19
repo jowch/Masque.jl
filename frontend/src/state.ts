@@ -89,6 +89,7 @@ export interface OverlayCtx {
     hiGroup_: HiGroups
     selGroup_: HiGroups
     linkGroup_: HiGroups // transient legend-linked highlights (g.link), z-ordered between sel and hi
+    preHits_: Hit[] // manifest `selected=` hits, computed once at mount (mount.ts)
     thresholdLines_: Map<string, SVGLineElement>
     roiBoxes_: Map<string, ROIBox>
     shadowRoot_: ShadowRoot // for `shadowRoot.activeElement === surface` focus gating (keyboard.ts)
@@ -102,6 +103,9 @@ export interface OverlayState {
     justDragged_: boolean
     hiKey_: string | null
     selKeys_: Set<string>
+    // The click-echo: the last echoable pick (single element — last pick wins). Reset on
+    // remount falls out of createOverlayState(), not a reset this field needs of its own.
+    echoHits_: Hit[]
     hiLeaveTimer_: ReturnType<typeof setTimeout> | null
     // g.link (legend-linked highlight): keyed by hitKey() of the SOURCE element (the hovered/
     // focused legend entry), not any one target hit — one source can fan out to many target
@@ -139,6 +143,7 @@ export function createOverlayState(): OverlayState {
         justDragged_: false,
         hiKey_: null,
         selKeys_: new Set(),
+        echoHits_: [],
         hiLeaveTimer_: null,
         linkKey_: null,
         linkLeaveTimer_: null,

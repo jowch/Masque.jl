@@ -1,4 +1,4 @@
-import { SVG_NS, drawSelection } from "./highlight"
+import { SVG_NS, renderSelection } from "./highlight"
 import { hitLayerByIndex } from "./selection"
 import { onLeave } from "./hover"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
@@ -314,9 +314,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const roiBoxes = roiDrag.buildROIBoxes(manifest, plainSvg)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
+    // manifest `selected=` hits, computed once here (not per render).
+    const preHits: Hit[] = []
+    for (const layer of manifest.layers) {
+        for (const idx of layer.selected ?? []) {
+            preHits.push({ layer, ...hitLayerByIndex(layer, idx) })
+        }
+    }
     const ctx: OverlayCtx = {
         manifest_: manifest, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
-        linkGroup_: linkGroup,
+        linkGroup_: linkGroup, preHits_: preHits,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
     }
@@ -373,15 +380,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     // Drawn into g.sel, not g.hi: it must survive hovers (onMove clears g.hi on every miss)
     // and support multiple selected indices (drawHi keeps only the last).
-    {
-        const pre: Hit[] = []
-        for (const layer of manifest.layers) {
-            for (const idx of layer.selected ?? []) {
-                pre.push({ layer, ...hitLayerByIndex(layer, idx) })
-            }
-        }
-        if (pre.length) drawSelection(state, selGroup, pre, hiGroup)
-    }
+    if (ctx.preHits_.length) renderSelection(ctx, state)
 
     const cleanup = () => {
         surface.removeEventListener("pointerdown", down)

@@ -20,6 +20,9 @@ import {
 // (geometry.ts's grid case), so its hover is closed/filled the same as circles/rects/polygons.
 const TINT_CHECK_KEYS = new Set(["scatter", "scatter_dark", "barplot", "heatmap", "poly"]);
 
+// Mirrors the frontend's SELECTED_KINDS (selection.ts) — the kinds a click-echo can draw.
+const ECHOABLE_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline"]);
+
 const [base, notebook, backend, artifactDirArg] = process.argv.slice(2);
 if (!base || !notebook || !backend) {
   console.error("usage: node kind_sweep.mjs <base-url> <notebook> <cairo|webgl> [artifact-dir]");
@@ -724,6 +727,25 @@ try {
       }
     }
     passed.push(`${key}/click-bind`);
+
+    // Click-echo (#103): the overlay pins the clicked element in g.sel itself, with no bond fed
+    // back through Julia — so this also proves the echo SURVIVES the reactive round-trip
+    // `waitChange` just awaited (a widget remount would reset it to the baked `selected=` alone,
+    // which is the whole reason the five-cell `selected=` workaround existed). An echoable click
+    // draws no hover chrome at all: its key is in selKeys_ by the time drawHi runs.
+    const echoable = ECHOABLE_KINDS.has(layer.kind) && !(layer.links && layer.links.length);
+    const echo = await inspect(key);
+    if (echoable) {
+      if (echo.hi !== 0) throw new Error(`${key}/click-echo: hover chrome drawn over the echo (g.hi=${echo.hi})`);
+      // Clicking the baked-`selected` index dedups against it (renderSelection keys on hitKey),
+      // so g.sel holds the same count as before rather than one element's worth more.
+      const grew = clickIdx === spec.selectedIndex ? echo.sel === afterLeave.sel : echo.sel > afterLeave.sel;
+      if (!grew) throw new Error(`${key}/click-echo: g.sel ${afterLeave.sel} -> ${echo.sel} after clicking index ${clickIdx}`);
+      passed.push(`${key}/click-echo`);
+    } else if (echo.sel !== afterLeave.sel) {
+      throw new Error(`${key}/click-echo: non-echoable ${layer.kind} click changed g.sel ${afterLeave.sel} -> ${echo.sel}`);
+    }
+
     // `InteractionEvent` has no custom `show`, so `repr(ev)` is Julia's default positional
     // struct print: `InteractionEvent(:legend, 0, …)` — the ":<layerId>," prefix pins which
     // layer actually won the hit-test. Belt-and-suspenders on top of the index regex above:

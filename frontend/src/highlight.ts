@@ -1,5 +1,5 @@
 import { hitKey, prefersReducedMotion, MOTION_MS } from "./state"
-import type { HiGroups, OverlayState } from "./state"
+import type { HiGroups, OverlayCtx, OverlayState } from "./state"
 import type { Hit, LayerStyle } from "./types"
 
 export const SVG_NS = "http://www.w3.org/2000/svg"
@@ -278,4 +278,22 @@ export function drawSelection(state: OverlayState, selGroups: HiGroups, hits: Hi
     // above until the next pointermove self-heals it via drawHi's own guard — clear it now so the
     // stale chrome never paints, mid-sweep included.
     if (state.hiKey_ !== null && next.has(state.hiKey_)) clearHiImmediate(state, hiGroups)
+}
+
+// preHits_ goes first so a `selected=` index that's also the current echo dedups (by hitKey) to
+// its preHits_ copy. The one path to g.sel — every writer of preHits_/echoHits_ comes through here.
+export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
+    const seen = new Set<string>()
+    const hits: Hit[] = []
+    for (const h of ctx.preHits_) {
+        const k = hitKey(h)
+        if (seen.has(k)) continue
+        seen.add(k); hits.push(h)
+    }
+    for (const h of state.echoHits_) {
+        const k = hitKey(h)
+        if (seen.has(k)) continue
+        seen.add(k); hits.push(h)
+    }
+    drawSelection(state, ctx.selGroup_, hits, ctx.hiGroup_)
 }

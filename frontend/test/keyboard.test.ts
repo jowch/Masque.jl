@@ -104,6 +104,18 @@ describe("keyboard navigation", () => {
         expect(kbdValue).toEqual(clickValue)
     })
 
+    it("Enter on a focused element produces the same click-echo as a mouse click (#103)", () => {
+        const { surface, shadow, host } = setup(manifest)
+        surface.focus()
+        down(surface, "ArrowRight") // a[0]
+        down(surface, "Enter")
+        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "a", index: 0 })
+        const echo = shadow.querySelector("g.sel > *") as SVGCircleElement
+        expect(echo).toBeTruthy()
+        expect(echo.getAttribute("cx")).toBe("100") // a[0]'s cx
+        expect(shadow.querySelector("g.hi > *")).toBeFalsy()
+    })
+
     it("Escape clears the ring (fade-out, same as a hover miss) and blurs the surface", () => {
         const { surface, shadow } = setup(manifest)
         surface.focus()
@@ -383,38 +395,40 @@ describe("keyboard navigation", () => {
         expect(enterWithFocus.defaultPrevented).toBe(true)
     })
 
-    it("a mouse click syncs keyboard focus to the clicked element (ring/bond agree)", () => {
+    it("a mouse click syncs keyboard focus to the clicked element (echo/bond agree, #103)", () => {
         const { surface, shadow, host } = setup(manifest)
         surface.focus()
         down(surface, "ArrowRight") // keyboard-focus a[0]
         // mouse-click a[1]: circle at image (300,100), display scale 1200/600=2 -> client (150,50)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 150, clientY: 50, bubbles: true }))
         expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "a", index: 1 })
-        // A later pointer miss must restore a[1]'s ring (the clicked element), not a[0]'s
-        // (the stale keyboard focus commitClick is supposed to overwrite).
+        const echo = shadow.querySelector("g.sel > *") as SVGCircleElement
+        expect(echo).toBeTruthy()
+        expect(echo.getAttribute("cx")).toBe("300") // a[1]'s cx, not a[0]'s (100)
+        expect(shadow.querySelector("g.hi > *")).toBeFalsy()
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 5, clientY: 5, bubbles: true }))
-        const ring = shadow.querySelector(".hi > *") as SVGCircleElement
-        expect(ring).toBeTruthy()
-        expect(ring.getAttribute("cx")).toBe("300") // a[1]'s cx, not a[0]'s (100)
+        expect(shadow.querySelector("g.hi > *")).toBeFalsy()
+        expect((shadow.querySelector("g.sel > *") as SVGCircleElement).getAttribute("cx")).toBe("300")
     })
 
-    it("a pure-mouse click (no prior keyboard focus) does NOT pin the ring — it still fades on a later miss", async () => {
+    it("a pure-mouse click (no prior keyboard focus) pins the click-echo in g.sel, not a fading g.hi ring (#103)", async () => {
         // Regression guard: syncing focusIdx/focusHit unconditionally on every click broke the
-        // locked hover-fade recipe for a mouse-only user — restoreFocus's later redraw is a
-        // no-op when hiKey already matches, so the ring would never fade at all. The sync must
-        // only engage once keyboard nav is already active (state.focusIdx !== null).
+        // locked hover-fade recipe for a mouse-only user — the sync must only engage once
+        // keyboard nav is already active (state.focusIdx !== null).
         const { surface, shadow, host } = setup(manifest)
         // hover then click a[0], via the mouse only — surface.focus() is never called.
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 50, clientY: 50, bubbles: true }))
         await flushFrame() // let onMove's rAF coalescing settle before the next pointermove
         surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
         expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "a", index: 0 })
-        expect(shadow.querySelector(".hi > *")).toBeTruthy()
-        // move to empty canvas — the ring must fade, not persist forever.
+        expect(shadow.querySelector("g.hi > *")).toBeFalsy()
+        expect(shadow.querySelector("g.sel > *")).toBeTruthy()
+        // move to empty canvas — the echo is persistent selection state, not a hover ring: it
+        // must survive the miss unfaded, and g.hi must stay empty throughout.
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 5, clientY: 5, bubbles: true }))
         await flushFrame()
-        const afterMiss = shadow.querySelector(".hi > *")
-        expect(afterMiss === null || afterMiss.classList.contains("masque-leave")).toBe(true)
+        expect(shadow.querySelector("g.sel > *")).toBeTruthy()
+        expect(shadow.querySelector("g.hi > *")).toBeFalsy()
     })
 
     it("a click on a non-focusable kind (e.g. :grid) leaves existing keyboard focus untouched", () => {
