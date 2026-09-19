@@ -63,7 +63,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000013
 pt_sel === nothing ? "point: click a marker" :
-    "point: index=$(pt_sel.index) label=$(pt_sel.payload["label"])"   # payload round-trips as a Dict
+    "point: index=$(pt_sel.index) label=$(pt_sel.payload.label)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000020
 md"## Segment — `SegmentInteractable` (polyline)"
@@ -82,7 +82,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000023
 sg_sel === nothing ? "segment: click a line segment" :
-    "segment: segment_index=$(sg_sel.payload["segment_index"])"
+    "segment: segment_index=$(sg_sel.payload.segment_index)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000030
 md"## Rect (grid) — `RectInteractable(; grid)` (heatmap cells)"
@@ -126,7 +126,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000043
 rl_sel === nothing ? "list: click a box" :
-    "list: index=$(rl_sel.index) name=$(rl_sel.payload["name"])"
+    "list: index=$(rl_sel.index) name=$(rl_sel.payload.name)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000050
 md"## Polygon — `PolygonInteractable` (filled regions)"
@@ -153,7 +153,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000053
 pg_sel === nothing ? "polygon: click a filled region" :
-    "polygon: index=$(pg_sel.index) shape=$(pg_sel.payload["shape"])"
+    "polygon: index=$(pg_sel.index) shape=$(pg_sel.payload.shape)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000060
 md"## Axis readout — `AxisInteractable` (data coordinate under the cursor)"
@@ -204,7 +204,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000083
 tt_sel === nothing ? "tooltip: hover a marker; click to read the payload" :
-    "clicked: $(tt_sel.payload["city"]) (pop $(tt_sel.payload["pop"]))"
+    "clicked: $(tt_sel.payload.city) (pop $(tt_sel.payload.pop))"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000084
 md"""
@@ -370,14 +370,14 @@ end
 @bind tx_sel masque(tx_fig)
 
 # ╔═╡ 40000000-0000-0000-0000-0000000000c3
-# masque(fig) also auto-detects the scatter!, so a marker click round-trips a (; index, x, y)
-# payload with no "text" key — guard the readout rather than assume every click hit a label.
+# masque(fig) also auto-detects the scatter!, so a marker click reports a (; index, x, y)
+# payload with no `text` field — guard the readout rather than assume every click hit a label.
 if tx_sel === nothing
     "text: click a label (try the tilted one, or the annotation)"
-elseif haskey(tx_sel.payload, "text")
-    "text: picked \"$(tx_sel.payload["text"])\" index=$(tx_sel.payload["index"]) at ($(tx_sel.payload["x"]), $(tx_sel.payload["y"]))"
+elseif haskey(tx_sel.payload, :text)
+    "text: picked \"$(tx_sel.payload.text)\" index=$(tx_sel.payload.index) at ($(tx_sel.payload.x), $(tx_sel.payload.y))"
 else
-    "point: index=$(tx_sel.payload["index"]) (that was a marker — click a label instead)"
+    "point: index=$(tx_sel.payload.index) (that was a marker — click a label instead)"
 end
 
 # ╔═╡ Cell order:

@@ -251,22 +251,50 @@ end
     @test layer["id"] == "scatter"
 
     k = 2
-    wire = JSON3.read(JSON3.write(layer["payloads"][k + 1]))   # payloads are 0-based; +1 for Julia
-    js = Dict{String, Any}("layer" => layer["id"], "index" => k, "payload" => wire)
+    # deliberately wrong browser-reported payload — an element kind reconstructs from the
+    # manifest instead, so this must be ignored rather than echoed back.
+    wrong = JSON3.read(JSON3.write(Dict("bogus" => true)))
+    js = Dict{String, Any}("layer" => layer["id"], "index" => k, "payload" => wrong)
 
     ev = APD.Bonds.transform_value(w, js)
     @test ev isa IE
     @test ev.layer === :scatter
     @test ev.index == k
-    @test ev.payload == wire
+    @test ev.payload === layer["payloads"][k + 1]   # reconstructed, not `wrong`
 
     @test APD.Bonds.initial_value(w) === nothing
     @test APD.Bonds.transform_value(w, nothing) === nothing
 
+    # second item has no "payload" key at all — reconstruction doesn't need one
     multi = Dict{String, Any}("items" => [js, Dict{String, Any}("layer" => "scatter", "index" => 0)])
     evs = APD.Bonds.transform_value(w, multi)
     @test evs isa Vector{IE}
     @test length(evs) == 2 && evs[1].index == k && evs[2].index == 0
+    @test evs[1].payload === layer["payloads"][k + 1]
+    @test evs[2].payload === layer["payloads"][1]
+end
+
+@testset "@bind payload reconstruction matches Masque._bond_payload (WGL/Cairo must not drift)" begin
+    import AbstractPlutoDingetjes as APD
+    IE = Masque.InteractionEvent
+
+    fig = Figure(; size = (400, 300)); ax = Axis(fig[1, 1])
+    pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
+    scatter!(ax, first.(pts), last.(pts))
+    payloads = [(; label = "p1"), (; label = "p2"), (; label = "p3")]
+    pt = PointInteractable(ax, pts; id = :scatter, payloads = payloads)
+    w = masque(fig, pt; backend = _WGLExt.WebGLBackend())
+
+    ev = APD.Bonds.transform_value(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "wrong"))
+    @test ev.payload === payloads[2]
+    # same object `MasqueWGLMakieExt.transform_value` delegates to — the shared helper, not a
+    # re-implementation, is what keeps the two backends from drifting.
+    @test ev.payload === Masque._bond_payload(w.manifest, "scatter", 1, "ignored")
+
+    # out-of-range index: same fail-loud contract as the Cairo widget
+    @test_throws ArgumentError APD.Bonds.transform_value(
+        w, Dict{String, Any}("layer" => "scatter", "index" => 99, "payload" => nothing)
+    )
 end
 
 @testset "initial_value hydration parity: :webgl must not drift from :cairo on selected=" begin

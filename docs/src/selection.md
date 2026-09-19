@@ -24,7 +24,7 @@ downstream cells — filter a table, highlight a second plot, recompute a fit. G
 API:
 
 ```julia
-rows = ev === nothing ? data : filter(r -> r.id == ev.payload["id"], data)
+rows = ev === nothing ? data : filter(r -> r.id == ev.payload.id, data)
 ```
 
 ## `selected=` — the selection's starting value

@@ -8,11 +8,12 @@ or, at mount, for each element `selected=` hydrated (`nothing` if there's neithe
 - `layer::Symbol` — the hit `HitLayer`'s (i.e. the interactable's) `id`.
 - `index::Int` — 0-based element index within that layer (meaningless for element-count-free
   kinds like `:axis`, which report `0`).
-- `payload::Any` — the data the interactable attached to that element, or the client-computed
-  value for kinds without static payloads (e.g. `Dict("x" => …, "y" => …)` for
-  [`AxisInteractable`](@ref)). Round-trips through JSON: a Julia `NamedTuple` payload
-  `(; label = "a")` comes back as `Dict{String,Any}("label" => "a")`, not the original
-  `NamedTuple` — index it as `ev.payload["label"]`.
+- `payload::Any` — for an element kind (points/rects/polygons/segments/polyline), the exact
+  object you passed in `payloads=`, looked back up in Julia rather than decoded from what the
+  browser sent: `ev.payload === payloads[i]`, not a JSON-reconstructed copy, so a `NamedTuple`
+  payload stays a `NamedTuple`. Kinds with no Julia-side original — an axis readout, a grid
+  cell, ROI bounds, a threshold value, view limits — still report a browser-computed value
+  (e.g. `Dict("x" => …, "y" => …)` for [`AxisInteractable`](@ref)).
 
 A `ROIInteractable` built with `selects` reports differently: the bond value is a
 `Vector{InteractionEvent}` (one entry per element the ROI contains on mouse-up), not a single
@@ -426,14 +427,44 @@ function _hydrated_selection(manifest::Dict{String, Any})
     return isempty(events) ? nothing : events
 end
 
+# An element kind (`_SELECTED_KINDS`) already has its payload sitting in the manifest Julia
+# built; look it up there instead of trusting whatever the browser echoed back, so a click and
+# `initial_value` hand back the identical object. Other kinds (axis/grid/roi/threshold/view)
+# have no Julia-side original — `resolvePayload` in geometry.ts makes the same split — so
+# `js_payload` (the browser-computed value) passes through unchanged. `manifest` lacking a
+# `"layers"` key at all (a bare test double, never a real widget) also falls through unchanged.
+function _bond_payload(manifest, layer_id::AbstractString, index::Integer, js_payload)
+    layers = get(manifest, "layers", nothing)
+    layers === nothing && return js_payload
+    i = findfirst(d -> d["id"] == layer_id, layers)
+    i === nothing && return js_payload
+    d = layers[i]
+    Symbol(d["kind"]) in _SELECTED_KINDS || return js_payload
+    payloads = d["payloads"]
+    n = length(payloads)
+    (0 <= index < n) || throw(
+        ArgumentError(
+            "bond payload: layer :$(layer_id) index $index out of range for $n elements" *
+                (n > 0 ? " (valid: 0:$(n - 1))" : ""),
+        ),
+    )
+    return payloads[index + 1]
+end
+
 APD.Bonds.initial_value(w::MasqueWidget) = _hydrated_selection(w.manifest)
-function APD.Bonds.transform_value(::MasqueWidget, js)
+function APD.Bonds.transform_value(w::MasqueWidget, js)
     js === nothing && return nothing
     if haskey(js, "items")   # a selector's declared multi output — always a vector
         return InteractionEvent[
-            InteractionEvent(Symbol(it["layer"]), Int(it["index"]), get(it, "payload", nothing))
+            InteractionEvent(
+                Symbol(it["layer"]), Int(it["index"]),
+                _bond_payload(w.manifest, it["layer"], Int(it["index"]), get(it, "payload", nothing)),
+            )
                 for it in js["items"]
         ]
     end
-    return InteractionEvent(Symbol(js["layer"]), Int(js["index"]), get(js, "payload", nothing))
+    return InteractionEvent(
+        Symbol(js["layer"]), Int(js["index"]),
+        _bond_payload(w.manifest, js["layer"], Int(js["index"]), get(js, "payload", nothing)),
+    )
 end

@@ -219,4 +219,60 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test iv_auto[1].layer === :scatter && iv_auto[1].index == 1
         @test iv_auto[1].payload == (; index = 1, x = pts[2][1], y = pts[2][2])
     end
+
+    @testset "transform_value reconstructs the payload from the manifest, not the wire" begin
+        bfig = Figure(size = (600, 400)); bax = Axis(bfig[1, 1])
+        pts = DEFAULT_PTS
+        scatter!(bax, first.(pts), last.(pts))
+        payloads = [(; name = "a"), (; name = "b"), (; name = "c")]
+        w = masque(bfig, PointInteractable(bax, pts; id = :scatter, payloads = payloads))
+        tv = IP.APD.Bonds.transform_value
+
+        # element kind: the identical object comes back, not a JSON-shaped copy of it — a
+        # NamedTuple stays a NamedTuple, and it's the very object passed in `payloads=`.
+        ev = tv(w, Dict("layer" => "scatter", "index" => 1, "payload" => Dict("wrong" => "value")))
+        @test ev.payload isa NamedTuple
+        @test ev.payload === payloads[2]
+
+        # the browser's own reported payload is ignored outright for an element kind
+        ev0 = tv(w, Dict("layer" => "scatter", "index" => 0, "payload" => "anything at all"))
+        @test ev0.payload === payloads[1]
+
+        # a kind with no Julia-side original (axis readout) passes the browser value straight
+        # through, untouched — same object, not a copy
+        w2 = masque(bfig, [PointInteractable(bax, pts; id = :scatter, payloads = payloads), AxisInteractable(bax; id = :readout)])
+        computed = Dict("x" => 1.23, "y" => 4.56)
+        evax = tv(w2, Dict("layer" => "readout", "index" => 0, "payload" => computed))
+        @test evax.payload === computed
+
+        # the `items` branch (a selects-ROI's multi-echo) reconstructs each entry the same way
+        multi = tv(
+            w, Dict(
+                "items" => [
+                    Dict("layer" => "scatter", "index" => 0, "payload" => "garbage"),
+                    Dict("layer" => "scatter", "index" => 2, "payload" => "garbage"),
+                ]
+            )
+        )
+        @test multi isa Vector{InteractionEvent}
+        @test multi[1].payload === payloads[1]
+        @test multi[2].payload === payloads[3]
+
+        # out-of-range index: reconstruction fails loud rather than passing the bad index through
+        @test_throws ArgumentError tv(w, Dict("layer" => "scatter", "index" => 99, "payload" => nothing))
+
+        # the property Pluto's dedup depends on: initial_value's payload is === the object in
+        # `payloads=`, and is == the payload transform_value returns for the same element, so
+        # the hydrated bond and the first click on that same element compare equal.
+        wsel = masque(
+            bfig, PointInteractable(bax, pts; id = :scatter, payloads = payloads);
+            selected = Dict(:scatter => [1]),
+        )
+        iv = IP.APD.Bonds.initial_value(wsel)
+        @test iv[1].payload === payloads[2]
+        ev_same = tv(wsel, Dict("layer" => "scatter", "index" => 1, "payload" => nothing))
+        @test ev_same.payload === iv[1].payload
+        @test ev_same.payload == iv[1].payload
+        @test ev_same == iv[1]
+    end
 end

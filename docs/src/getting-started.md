@@ -76,11 +76,12 @@ struct InteractionEvent
 end
 ```
 
-**The payload comes back as a `Dict`, not the `NamedTuple` (or whatever) you gave it.**
-Julia round-trips it through JSON to the browser and back, and JSON has no `NamedTuple`. A
-payload you built as `(; label = "a")` arrives as `Dict("label" => "a")` — index it as
-`ev.payload["label"]`, not `ev.payload.label`. `AxisInteractable` yields
-`Dict("x" => ..., "y" => ...)` the same way.
+**The payload comes back exactly as you gave it.** A payload you built as `(; label = "a")`
+arrives as that same `NamedTuple` — index it as `ev.payload.label`, not `ev.payload["label"]`.
+This only holds for element kinds (points/rects/polygons/segments/polyline), which Masque
+looks back up in Julia rather than decoding from the browser. Kinds with no Julia-side
+original still report a browser-computed value: `AxisInteractable` yields
+`Dict("x" => ..., "y" => ...)`.
 
 ## 5. Choosing the backend
 
