@@ -703,74 +703,12 @@ try {
     if (spec.selected && afterLeave.sel < 1) throw new Error(`${key}: g.sel dropped on unhover`);
     if (spec.selected) passed.push(`${key}/selected-survives-unhover`);
 
-    let clickIdx = spec.clickIndex;
-    const before = await textOf(`#out_${key}`);
-    const already = new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`);
-    if (already.test(before) || (spec.layerKind === "grid" && new RegExp(`index[=:]\\s*${clickIdx}\\b`).test(before))) {
-      clickIdx = spec.selectedIndex !== clickIdx ? spec.selectedIndex : clickIdx + 1;
-    }
-    const clickPt = hitPoint(layer, clickIdx);
-    let after = before;
-    for (let a = 0; a < 3; a++) {
-      await dispatchAt(key, clickPt.x, clickPt.y, "click");
-      try {
-        after = await waitChange(`#out_${key}`, before, `${key}-click`);
-        break;
-      } catch (e) {
-        if (a === 2) throw e;
-      }
-    }
-    const idRe = new RegExp(`:${spec.layerId}|${spec.layerId}`, "i");
-    if (!idRe.test(after)) throw new Error(`${key}-click: no layer in ${JSON.stringify(after).slice(0, 220)}`);
-    if (spec.layerKind !== "grid") {
-      if (!new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`).test(after)) {
-        throw new Error(`${key}-click: expected index ${clickIdx}: ${after.slice(0, 220)}`);
-      }
-    }
-    passed.push(`${key}/click-bind`);
-
-    // Click-echo (#103/#107): the overlay pins the picked hit(s) in g.sel itself, with no bond
-    // fed back through Julia — so this also proves the echo SURVIVES the reactive round-trip
-    // `waitChange` just awaited (a widget remount would reset it to the baked `selected=` alone,
-    // which is the whole reason the five-cell `selected=` workaround existed).
-    const hasLinks = !!(layer.links && layer.links.length);
-    const echo = await inspect(key);
-    if (hasLinks) {
-      // A legend entry pins its linked series, never the swatch itself — the swatch keeps
-      // whatever hover chrome it earned, so only g.sel's growth is asserted here.
-      const targetIds = layer.links[clickIdx] || [];
-      if (!targetIds.length) {
-        if (echo.sel !== afterLeave.sel) {
-          throw new Error(`${key}/click-echo: legend entry ${clickIdx} has no links but g.sel changed ${afterLeave.sel} -> ${echo.sel}`);
-        }
-      } else if (echo.sel <= afterLeave.sel) {
-        throw new Error(`${key}/click-echo: g.sel ${afterLeave.sel} -> ${echo.sel} after clicking legend entry ${clickIdx}`);
-      }
-      passed.push(`${key}/click-echo`);
-    } else if (SELF_PIN_KINDS.has(layer.kind)) {
-      // An echoed click draws no hover chrome at all: its key is in selKeys_ by the time drawHi
-      // runs — EXCEPT clicking the baked-`selected` index, which dedups against it (renderSelection
-      // keys on hitKey) rather than growing g.sel by one element's worth.
-      if (echo.hi !== 0) throw new Error(`${key}/click-echo: hover chrome drawn over the echo (g.hi=${echo.hi})`);
-      const grew = clickIdx === spec.selectedIndex ? echo.sel === afterLeave.sel : echo.sel > afterLeave.sel;
-      if (!grew) throw new Error(`${key}/click-echo: g.sel ${afterLeave.sel} -> ${echo.sel} after clicking index ${clickIdx}`);
-      passed.push(`${key}/click-echo`);
-    } else if (echo.sel !== afterLeave.sel) {
-      throw new Error(`${key}/click-echo: unpinned ${layer.kind} click changed g.sel ${afterLeave.sel} -> ${echo.sel}`);
-    }
-
-    // `InteractionEvent` has no custom `show`, so `repr(ev)` is Julia's default positional
-    // struct print: `InteractionEvent(:legend, 0, …)` — the ":<layerId>," prefix pins which
-    // layer actually won the hit-test. Belt-and-suspenders on top of the index regex above:
-    // this fails loud specifically on "resolved to the wrong layer", not just "wrong index".
-    if (spec.overlapsGrid && new RegExp(`:${spec.overlapsGrid},\\s*\\d+\\b`).test(after)) {
-      throw new Error(`${key}-click: bond resolved to grid layer "${spec.overlapsGrid}", not legend: ${after.slice(0, 220)}`);
-    }
-    console.error(`OK  ${key} — ${after.slice(0, 110)}`);
-
     // A legend entry's linked highlight (HitLayer.links) draws the SELECTED recipe for every
     // element of the target layer(s) into g.link — distinct from g.sel/g.hi. Generic: skipped
-    // for every spec except the one(s) that carry a "links" meta key.
+    // for every spec except the one(s) that carry a "links" meta key. Runs BEFORE the click
+    // below: a legend click pins its linked series into g.sel (#103) and drawLink deliberately
+    // skips anything already pinned, so hovering the clicked entry afterwards would correctly
+    // draw nothing — these assertions need a pristine selection to mean anything.
     if (spec.links) {
       // g.link exists in ALL THREE sibling svgs (mount.ts's `linkGroup` — fill_/edge_/plain_,
       // same as g.sel/g.hi), and `drawLink` fans a SELECTED-recipe element into whichever
@@ -909,7 +847,7 @@ try {
         if (li.count !== expected) {
           throw new Error(`${key}/links[${c.index}]: g.link has ${li.count} elements, want ${expected} (targets ${JSON.stringify(targetIds)})`);
         }
-        if (li.sel !== 0) throw new Error(`${key}/links[${c.index}]: g.sel changed during legend hover (${li.sel})`);
+        if (li.sel !== afterLeave.sel) throw new Error(`${key}/links[${c.index}]: g.sel changed during legend hover (${li.sel})`);
 
         if (tl0.kind === "circles") {
           const wash = {
@@ -962,7 +900,77 @@ try {
       }
       if (afterLinkLeave.count !== 0) throw new Error(`${key}/links: g.link lingered ${afterLinkLeave.count}`);
       passed.push(`${key}/links-fade`);
+    }
 
+    let clickIdx = spec.clickIndex;
+    const before = await textOf(`#out_${key}`);
+    const already = new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`);
+    if (already.test(before) || (spec.layerKind === "grid" && new RegExp(`index[=:]\\s*${clickIdx}\\b`).test(before))) {
+      clickIdx = spec.selectedIndex !== clickIdx ? spec.selectedIndex : clickIdx + 1;
+    }
+    const clickPt = hitPoint(layer, clickIdx);
+    let after = before;
+    for (let a = 0; a < 3; a++) {
+      await dispatchAt(key, clickPt.x, clickPt.y, "click");
+      try {
+        after = await waitChange(`#out_${key}`, before, `${key}-click`);
+        break;
+      } catch (e) {
+        if (a === 2) throw e;
+      }
+    }
+    const idRe = new RegExp(`:${spec.layerId}|${spec.layerId}`, "i");
+    if (!idRe.test(after)) throw new Error(`${key}-click: no layer in ${JSON.stringify(after).slice(0, 220)}`);
+    if (spec.layerKind !== "grid") {
+      if (!new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`).test(after)) {
+        throw new Error(`${key}-click: expected index ${clickIdx}: ${after.slice(0, 220)}`);
+      }
+    }
+    passed.push(`${key}/click-bind`);
+
+    // Click-echo (#103/#107): the overlay pins the picked hit(s) in g.sel itself, with no bond
+    // fed back through Julia — so this also proves the echo SURVIVES the reactive round-trip
+    // `waitChange` just awaited (a widget remount would reset it to the baked `selected=` alone,
+    // which is the whole reason the five-cell `selected=` workaround existed).
+    const hasLinks = !!(layer.links && layer.links.length);
+    const echo = await inspect(key);
+    if (hasLinks) {
+      // A legend entry pins its linked series, never the swatch itself — the swatch keeps
+      // whatever hover chrome it earned, so only g.sel's growth is asserted here.
+      const targetIds = layer.links[clickIdx] || [];
+      if (!targetIds.length) {
+        if (echo.sel !== afterLeave.sel) {
+          throw new Error(`${key}/click-echo: legend entry ${clickIdx} has no links but g.sel changed ${afterLeave.sel} -> ${echo.sel}`);
+        }
+      } else if (echo.sel <= afterLeave.sel) {
+        throw new Error(`${key}/click-echo: g.sel ${afterLeave.sel} -> ${echo.sel} after clicking legend entry ${clickIdx}`);
+      }
+      passed.push(`${key}/click-echo`);
+    } else if (SELF_PIN_KINDS.has(layer.kind)) {
+      // An echoed click draws no hover chrome at all: its key is in selKeys_ by the time drawHi
+      // runs — EXCEPT clicking an index this spec actually BAKES into `selected=`, which dedups
+      // against it (renderSelection keys on hitKey) rather than growing g.sel. `selectedIndex` is
+      // set even on specs that bake nothing (`selected => nothing`, e.g. the grid kinds, where it
+      // just steers hover), so the dedup case has to gate on `selected` too, not the index alone.
+      if (echo.hi !== 0) throw new Error(`${key}/click-echo: hover chrome drawn over the echo (g.hi=${echo.hi})`);
+      const dedups = !!spec.selected && clickIdx === spec.selectedIndex;
+      const grew = dedups ? echo.sel === afterLeave.sel : echo.sel > afterLeave.sel;
+      if (!grew) throw new Error(`${key}/click-echo: g.sel ${afterLeave.sel} -> ${echo.sel} after clicking index ${clickIdx}`);
+      passed.push(`${key}/click-echo`);
+    } else if (echo.sel !== afterLeave.sel) {
+      throw new Error(`${key}/click-echo: unpinned ${layer.kind} click changed g.sel ${afterLeave.sel} -> ${echo.sel}`);
+    }
+
+    // `InteractionEvent` has no custom `show`, so `repr(ev)` is Julia's default positional
+    // struct print: `InteractionEvent(:legend, 0, …)` — the ":<layerId>," prefix pins which
+    // layer actually won the hit-test. Belt-and-suspenders on top of the index regex above:
+    // this fails loud specifically on "resolved to the wrong layer", not just "wrong index".
+    if (spec.overlapsGrid && new RegExp(`:${spec.overlapsGrid},\\s*\\d+\\b`).test(after)) {
+      throw new Error(`${key}-click: bond resolved to grid layer "${spec.overlapsGrid}", not legend: ${after.slice(0, 220)}`);
+    }
+    console.error(`OK  ${key} — ${after.slice(0, 110)}`);
+
+    if (spec.links) {
       // The click-bind assertion above already confirmed index==clickIdx; here confirm the
       // bond's payload actually carries label/targets (not just the index).
       const clickTargets = (layer.links && layer.links[clickIdx]) || [];
