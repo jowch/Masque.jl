@@ -228,10 +228,9 @@ of them; nothing in v1+v2 needs a seventh. (Text labels — the surface once spe
 `bbox`/degenerate-polygon primitive — turned out not to: `TextInteractable` rides plain `:rects`, with
 a rotated label's box simply expanded to stay axis-aligned; see §3. That premise is retired for text.)
 
-The three M4 drag kinds — `:view`, `:threshold`, `:roi` — are outside this set and do not
-extend it. They are *control* geometry (one draggable region apiece, no elements, no
-`payloads` array) rather than data geometry projected from a Makie surface, and the closed-set
-claim is about the latter. See the table below.
+The three M4 drag kinds — `:view`, `:threshold`, `:roi` — sit outside this set. They are
+*control* geometry: one draggable region apiece, no elements, an empty `payloads`. The closed-set
+claim covers data geometry projected from a Makie surface.
 
 ### Built-in interactables (v1 + M3 + M4 drags + Phase 2 text labels)
 
@@ -354,14 +353,12 @@ into the same `@bind` variable *are* linked brushing — the Pluto reactive grap
 `ColumnDataSource`. No central mutable selection store is introduced; that's the whole point of the
 no-server architecture.
 
-**What no tier supplies: rendering.** All three tiers declare *geometry* — where the regions are
-and what payload each carries. None declares what gets drawn. That has been enough because
-everything drawable is either Makie's job (the base frame) or the overlay's fixed chrome
-(highlights, tooltips, the ROI box — §10). The gesture channel (§12) opens a case no tier
-reaches: an author who wants a preview frame recomputed in Julia during a gesture has to supply
-the rendering, not just the geometry. That would be a fourth tier. It is unbuilt, no API is
-proposed here, and nothing in §12 depends on one existing — but §4 is where it belongs when
-someone builds it, rather than bolted onto §12. See §12.9.
+**No tier supplies rendering.** All three declare *geometry* — where the regions are and what
+payload each carries. What gets drawn belongs to Makie (the base frame) or to the overlay's fixed
+chrome (highlights, tooltips, the ROI box — §10). An interaction that recomputes a preview frame
+in Julia during a gesture (§12) needs a fourth tier supplying rendering as well as geometry. That
+tier is the extension point; no API is specified here, and nothing in §12 depends on one. See
+§12.9.
 
 ## 5. The bond value
 
@@ -830,262 +827,211 @@ a feature with a full mouse/touch path already.
 
 ## 12. The gesture channel (#102)
 
-This section is the contract for frames shipped over
-`AbstractPlutoDingetjes.Display.with_js_link` while an interaction is in progress. It is settled
-before either backend implements it, because `:cairo` and `:webgl` will implement it by
-completely different mechanisms and building one first risks the mechanism getting mistaken for
-the contract. Nothing here changes the committed value's path (§5, §6 Tier 2); it governs only
-the frames shipped while the interaction is under way.
+The contract for frames shipped over `AbstractPlutoDingetjes.Display.with_js_link` while an
+interaction is in progress. It governs those frames only; the committed value's path is §5 and
+§6 Tier 2, unchanged.
 
-**The channel is a general mechanism, not a special case.** View manipulation — drag-to-pan, 3D
-orbit, issue #102 — is what motivated it and is the first worked example below, but nothing in
-the contract is specific to a camera. Anything that satisfies §12.2's routing rule belongs here,
-including an interaction a notebook author writes themselves. What the channel asks in return is
-stated as obligations (§12.4, §12.5), discipline (§12.6), and one hard safety rule (§12.7) —
-the price of a channel that sits outside Pluto's state management. Those clauses get *more*
-load-bearing, not less, once a user can reach the channel directly.
+The channel is general. Any interaction §12.2's rule routes to question 3 belongs on it,
+including one a notebook author writes. Nothing here is specific to a camera — view manipulation
+(#102) is the first case, not the definition. The obligations in §12.4 and §12.5, the discipline
+in §12.6, and the rule in §12.7 bind every caller.
 
-### 12.1 The distinction: gesture vs. data interaction
+### 12.1 Gesture vs. data interaction
 
-A *gesture* is a continuous, in-progress manipulation whose intermediate states are not part of
-the notebook's analysis: nothing downstream reads them, and they exist to be looked at and then
-thrown away. A *data interaction* is a value a downstream cell reads — a click, a keyboard
-commit (§11), a `selects`-ROI release, a bounds-only `ROIInteractable` release, a threshold-drag
-release, or a view-manipulation gesture's own release. These are two different channels, not two
-speeds of one channel: a gesture's in-progress frames never carry a value the notebook can see,
-while producing that value is the entire point of a data interaction.
+A **gesture** is a continuous, in-progress manipulation whose intermediate states no downstream
+cell reads. A **data interaction** is a value a downstream cell reads: a click, a keyboard commit
+(§11), a `selects`-ROI release, a bounds-only `ROIInteractable` release, a threshold-drag
+release, a view gesture's release.
 
-A gesture is identified by where §12.2's rule routes it, not by which interactable produced it
-or by what it manipulates. A pointer drag is the common shape — pan, orbit, a threshold handle —
-but the shape is not the criterion. For every drag interactable Masque ships today, release is a
-data interaction that commits through `@bind`, exactly as a click does (§12.3); only what
-happens *during* the drag differs between them, and §12.2's rule is what decides it.
+These are separate channels, not two speeds of one. A gesture's in-progress frames carry no value
+the notebook can see; producing that value is what a data interaction is for.
+
+Classification follows §12.2's rule — not the interactable that produced the state, and not what
+is being manipulated. For every drag interactable Masque ships, release is a data interaction and
+commits through `@bind` exactly as a click does (§12.3); only the in-drag behaviour differs.
 
 ### 12.2 The routing rule
 
 Where an in-progress state lives is decided by four questions, in order:
 
 0. Can the browser answer it alone from what the manifest already ships? → overlay-local, no
-   channel and no Julia round trip at all (§6 Tier 0).
+   channel and no Julia round trip (§6 Tier 0).
 1. Does the notebook need this value? → `@bind`.
 2. Must it survive static export? → precompute it and ship it via `published_to_js`.
 3. Neither? → `AbstractPlutoDingetjes.Display.with_js_link` — a pull channel outside Pluto's
    state management.
 
-Reaching question 3 means three separate noes: the state must not be answerable in the browser,
-no cell may read it, and it must not need to survive export. That is the entire test. Nothing
-beyond it restricts which interaction, or whose code, may use the channel.
+Question 3 requires three noes: not answerable in the browser, read by no cell, not needed in an
+export. Nothing else restricts which interaction, or whose code, uses the channel.
 
-**Try question 0 harder than feels necessary.** It is cheaper than everything below it by a wide
-margin — no round trip, no latency budget, no backpressure to manage — and it keeps working in a
-static export for free. More is already in the manifest than the instinct suggests:
-`AxisTransform` (so any coordinate readout or inversion is local), per-element `payloads`, and,
-for a grid whose cells are at least one screen pixel, the cell `values[]` themselves
-(`GRID_VALUES_MIN_SCREEN_PX`, `src/interactables.jl`). What blocks a question-0 answer is often
-not missing data but missing *canvas*: the overlay is three sibling SVGs with no raster layer
-(§10's chrome, `frontend/src/`), so an effect needing per-pixel output has nowhere to draw even
-when every number it needs is already in the browser.
+**Exhaust question 0 first.** It costs no round trip, no latency budget and no backpressure, and
+it survives static export. The manifest already carries `AxisTransform` (so any coordinate
+readout or inversion is local), per-element `payloads`, and — for a grid whose cells are at least
+one screen pixel — the cell `values[]` (`GRID_VALUES_MIN_SCREEN_PX`, `src/interactables.jl`).
+What blocks a question-0 answer is more often output surface than data: the overlay is three
+sibling SVGs with no raster layer (§10), so an effect needing per-pixel output has nowhere to
+draw.
 
-**Worked example: view manipulation (#102).** Panning or orbiting changes the image itself, not
-just an overlay drawn on top of it — every hit region's projection depends on the camera — so
-the browser cannot answer alone and question 0 is no. Nothing downstream reads the intermediate
-camera state, and a static export has no kernel to drive a live gesture, so questions 1 and 2
-are no as well. It routes to question 3. Because the camera moved, it also carries the
-projection obligations in §12.4 and §12.5's second list.
+**View manipulation (#102).** Panning or orbiting changes the image, not an overlay drawn over
+it, and every hit region's projection depends on the camera: question 0 is no. No cell reads the
+intermediate camera state, and an export has no kernel to drive a live gesture: questions 1 and 2
+are no. It routes to question 3, and because the camera moves it carries the obligations in §12.4
+and §12.5's second list.
 
-**Worked example: a live threshold preview.** Threshold-based image segmentation — an image plot
-with a hover intensity readout, a colorbar dragged to set a threshold, a live preview of the
-masked image, and the committed threshold bound as output. Four things are happening and they
-route to three different places. The intensity readout and the threshold line are question 0:
-the manifest already carries the transform and, at display resolution, the cell values. The
-committed threshold is question 1 — `@bind` on release, exactly as today. The *preview* is the
-one that reaches question 3: nothing downstream reads the mid-drag mask, an export has no kernel
-to recompute it, and the browser cannot produce it once the mask stops being computable locally.
+**A live threshold preview.** An image plot with a hover intensity readout, a colorbar dragged to
+set a threshold, a live preview of the masked image, and the committed threshold bound as output.
+Its four parts route to three places. Readout and threshold line: question 0 — the manifest
+carries the transform and, at display resolution, the cell values. Committed threshold: question
+1, `@bind` on release. Preview: question 3 — no cell reads the mid-drag mask, an export has no
+kernel to recompute it, and the browser cannot produce it once the mask is not locally
+computable.
 
-Two things take the mask out of question 0: cells going sub-pixel, so Julia drops `values[]` from
-the manifest — which is precisely the full-resolution image someone would want to segment — and
-the mask ceasing to be pointwise, since morphology and connected components are
-neighbourhood-dependent. **Thresholding is question 0; segmentation is question 3.** That split
-is also a concrete argument for #105: display-derived subsampling would put values back in the
-browser at display resolution and pull the thresholding case back down.
+Two conditions take the mask out of question 0: cells going sub-pixel, so Julia drops `values[]`
+from the manifest (the full-resolution case), and the mask ceasing to be pointwise, since
+morphology and connected components are neighbourhood-dependent. **Thresholding is question 0;
+segmentation is question 3.** #105's display-derived subsampling would restore values at display
+resolution and return the thresholding case to question 0.
 
-The threshold preview is *cheaper* than orbit, not a harder version of it. The camera never
-moves, so the projection and every hit region stay valid for the whole drag: it needs a new
-frame and no new manifest, and hit-testing can stay live throughout — so the hover readout keeps
-working mid-drag. §12.4 and §12.5 are split along exactly that line.
+The camera does not move in this case, so the projection and every hit region stay valid for the
+whole drag: a new frame is owed, a new manifest is not, and hit-testing stays live — a hover
+readout keeps working mid-drag. §12.4 and §12.5 divide on that line.
 
-`roadmap.md` states questions 1–3 as its own framing note for this work (question 0 is stated
-here to close the gap the three-question form left open); the two must not diverge on the three
-they share.
+`roadmap.md` states questions 1–3 as its own framing note; question 0 is stated here. The two
+must not diverge on the three they share.
 
 ### 12.3 What commits, and when
 
-In-drag frames never touch the bond. No cell re-execution, no output replacement, no remount —
-producing and displaying a frame during a gesture is invisible to Pluto's reactivity entirely.
-The committed value — a camera/`limits` value, a threshold, whatever the gesture was settling —
-still commits through `@bind` on release, exactly as it does today. Commit-on-release is
-unchanged by this channel; it is only the in-progress frames that move off `@bind`, not the
-committed value's path.
+In-drag frames never touch the bond: no cell re-execution, no output replacement, no remount.
+Producing and displaying a frame during a gesture is invisible to Pluto's reactivity.
 
-### 12.4 The invariant: projection stays Julia-authored on every frame
+The committed value — a camera/`limits` value, a threshold, whatever the gesture settles —
+commits through `@bind` on release. This channel moves the in-progress frames off `@bind` and
+leaves the committed value's path unchanged.
 
-No backend may ship 3D (or 2D) coordinates to JS and reproject them there. That holds
-everywhere, not only on this channel (§2's `InteractionContext`; the client-side-GPU-camera
-non-goal in §7's backend-scope note). What this section adds is that it holds **per frame**, not
-only at commit: if a gesture changes what Julia projected, every frame the user sees during it
-must be accompanied by hit geometry Julia computed for *that same* state.
+### 12.4 Projection stays Julia-authored on every frame
 
-The trigger is a change to the projection, not a change to the picture. A gesture that repaints
-the frame without moving the camera or the limits — the threshold preview in §12.2 — leaves
-every hit region exactly where it was, so it needs a new frame and no new manifest, and there is
-nothing to suspend or rebuild. A gesture that moves the camera invalidates every hit region at
-once, so its frame and its manifest have to travel together.
+No backend ships 3D or 2D coordinates to JS and reprojects them there. That holds everywhere
+(§2's `InteractionContext`; the client-side-GPU-camera non-goal in §7's backend-scope note). On
+this channel it holds **per frame**: a gesture that changes what Julia projected accompanies
+every frame with hit geometry Julia computed for that same state.
 
-A gesture implementation that moves the camera and ships a new frame without a matching
-manifest, or that lets JS derive geometry from a JS-owned camera, is not a conforming
-implementation of this contract, regardless of how it performs. The non-goal itself is untouched
-by this section; this invariant is what keeps a gesture channel from quietly becoming the
-JS-driven camera that non-goal rules out.
+The trigger is a change to the projection, not a change to the picture:
 
-This is what makes #87 (3D orbit preview) buildable at all: #87 is parked today because the
-overlay would be a projection at the stale azimuth/elevation once the camera moves without a
-matching re-projection. A gesture channel that reprojects on every frame removes that
-obstruction.
+- A gesture that repaints without moving the camera or the limits leaves every hit region in
+  place — new frame, same manifest, nothing to suspend or rebuild.
+- A gesture that moves the camera invalidates every hit region at once — frame and manifest
+  travel together.
+
+A gesture that moves the camera and ships a frame without a matching manifest, or that lets JS
+derive geometry from a JS-owned camera, does not conform, whatever its performance.
+
+#87 (3D orbit preview) rests on this clause: without per-frame re-projection an orbit leaves the
+overlay at a stale azimuth/elevation.
 
 ### 12.5 Backend obligations (mechanism-independent)
 
-For **every** frame shipped on this channel, whatever produced it, a backend must:
+For every frame on this channel:
 
 - update the displayed frame;
-- not remount;
-- not re-execute a cell;
+- do not remount;
+- do not re-execute a cell;
 - never leave the overlay live over a frame it no longer describes.
 
-**Additionally**, when the gesture changes what Julia projected (§12.4), it must:
+Additionally, when the gesture changes what Julia projected (§12.4):
 
-- accompany that frame with hit geometry Julia computed for the same state, and swap the frame's
+- accompany the frame with hit geometry Julia computed for the same state, and swap the frame's
   hit manifest atomically with it.
 
-Splitting the lists is not a formality: the second obligation is the expensive one, and a
-gesture that does not move the camera genuinely does not owe it. Reading the manifest rebuild
-and the hit-test suspension as unconditional would make the cheap case pay the cost of the
-expensive one, and would needlessly suspend a hover readout that could safely keep working mid-drag.
+The second list is the expensive one and is owed only by camera-moving gestures. Applied
+unconditionally it charges the cheap case a manifest rebuild it does not need and suspends
+hit-testing that could stay live.
 
-How backends satisfy these obligations differs completely, and that difference is expected, not
-a gap to close: `:cairo` re-renders and ships a fresh PNG plus (when owed) a fresh manifest over
-the channel; `:webgl`'s mechanism is unsettled — #86 gates in-place buffer patching on canvas
-identity (a WebGL context is tied to one `<canvas>`, and Pluto's cell-output replacement
-destroys it, so patching the old context's buffers is not viable until a canvas survives that).
-Separately, #85 proposes a 2D last-frame preview — CSS-transforming the existing frame and
-overlay together, with one Julia commit on release — as an in-gesture path for both backends,
-not a `:webgl`-specific answer to #86's gate. Per the standing principle, **backends differ in
-cost, never in the interaction contract** — a conforming implementation is judged against the
-obligations above, not against `:cairo`'s mechanism, and whichever backend is built first must
-not let its mechanism get mistaken for the contract. A genuinely unsettled second mechanism is
-itself the argument for stating obligations this way rather than after either backend's
-implementation.
+Mechanisms differ by backend and need not converge. `:cairo` re-renders and ships a fresh PNG
+plus, when owed, a fresh manifest. `:webgl` has no settled mechanism: #86 gates in-place buffer
+patching on canvas identity (a WebGL context is tied to one `<canvas>`, which Pluto's cell-output
+replacement destroys). #85 proposes a 2D last-frame preview — CSS-transforming frame and overlay
+together, one Julia commit on release — for both backends, not as a `:webgl`-specific answer to
+#86. **Backends differ in cost, never in the interaction contract:** conformance is judged
+against the obligations above, never against a particular backend's mechanism.
 
 ### 12.6 Request discipline
 
 - One in-flight request per widget.
-- Coalesce intermediate pointer moves rather than queueing them — a burst of moves collapses to
-  the latest one, not a backlog to drain.
-- Always await a round trip before issuing the next one. Never fire-and-forget.
+- Coalesce intermediate pointer moves rather than queueing them — a burst collapses to the latest
+  move, not a backlog to drain.
+- Always await a round trip before issuing the next. Never fire-and-forget.
 - Never a fixed-interval poll. `with_js_link`'s own docstring warns that polling at a fixed
   interval can make a notebook unusable.
 
-These are not tuning suggestions. `@bind` has Pluto's own machinery between the browser and the
-kernel; this channel has nothing, so a caller that ignores the list has no backpressure at all
-and can saturate the kernel from a single pointer drag. If the channel becomes a user-facing
-surface, the discipline has to be enforced by whatever Masque hands the author, not left to the
-author to remember.
+The channel carries no backpressure of its own — `@bind` has Pluto's machinery between browser
+and kernel, this has nothing — so a caller that ignores the list can saturate the kernel from one
+pointer drag. A user-facing surface enforces the discipline in what Masque hands the author
+rather than leaving it to the author.
 
-**A closure on this channel runs outside Pluto's reactive graph.** This is the one hazard
-`@bind` does not have. A `with_js_link` handler is an ordinary Julia closure captured at render
-time. It sees whatever it closed over,
-and when that data is redefined upstream, nothing invalidates the closure, nothing re-runs it,
-and nothing signals that its answers are now stale — the reactive graph that normally makes
-staleness impossible has no edge into it. Frames keep arriving, computed against data the
-notebook no longer has. There is no framework fix for this: it follows from being outside the
-graph, and anyone reaching for the channel has to accept it.
+**A handler on this channel runs outside Pluto's reactive graph.** It is an ordinary Julia
+closure captured at render time. When the data it closed over is redefined upstream, nothing
+invalidates the closure, re-runs it, or signals that its answers are stale: frames keep arriving,
+computed against data the notebook no longer holds. This follows from being outside the graph and
+has no framework fix.
 
 ### 12.7 Nothing carried on this channel is notebook state
 
-`with_js_link` bypasses Pluto's state management by design: nothing it returns is recorded in
-the notebook. That is correct for transient render parameters and wrong for anything the user
-considers part of their analysis. With the channel open as a general mechanism, this stops being
-an observation about how view manipulation happens to use it and becomes the rule that keeps
-the channel safe: a value that rides this channel is not recoverable, not reproducible from the
-saved notebook, and invisible to every downstream cell. If it matters, it commits through
-`@bind`.
+`with_js_link` bypasses Pluto's state management by design: nothing it returns is recorded in the
+notebook. A value that rides this channel is not recoverable, not reproducible from the saved
+notebook, and invisible to every downstream cell. If it matters, it commits through `@bind`.
 
-The filter §12.2's routing rule applies is per *transmission*, not per variable. The same
-quantity legitimately travels both channels at different moments: mid-drag, an azimuth is a
-transient render parameter nothing downstream reads; on release, that same azimuth is a
-committed value a cell reads through `@bind` (§12.3). Orbiting live *and* binding the final
-camera is therefore the ordinary case, not a tension to resolve — "does a cell read this
-variable?" gives the wrong answer for it, because the answer is yes and the mid-drag frames
-still belong here. Ask instead whether a cell reads *this particular send*: if it does, it is a
-commit and goes through `@bind`; if nothing will ever read it, it can ride this channel.
+The rule applies per *transmission*, not per variable. The same quantity travels both channels at
+different moments: mid-drag an azimuth is a transient render parameter no cell reads; on release
+that same azimuth commits through `@bind` (§12.3). Orbiting live and binding the final camera is
+the ordinary case. The question is never "does a cell read this variable?" but "does a cell read
+this send?" — if it does, it is a commit and goes through `@bind`.
 
 ### 12.8 Relationship to #83
 
-A channel that never remounts makes the double-remount described in #83 stop mattering *for
-gestures specifically* — there is no remount to double. It does not fix #83, and #83 is not a
-Pluto defect: a self-referencing `@bind` cell is not a sanctioned Pluto use case. Any path that
-still goes through `@bind` — the committed gesture value, or any other bond — still has #83's
-behaviour.
+A channel that never remounts removes #83's double remount for gestures: there is no remount to
+double. #83 is otherwise unaffected, and is not a Pluto defect — a self-referencing `@bind` cell
+is not a sanctioned Pluto use case. Every path still going through `@bind`, including the
+committed gesture value, retains #83's behaviour.
 
-### 12.9 Prerequisite for a user-facing surface
+### 12.9 Prerequisites for a user-facing surface
 
-One decision is no longer deferrable the moment a notebook author can reach this channel, and it
-is the pair below. An internal-only use could ship without it, because Masque would control every
-caller; a user-facing surface cannot, because an author could build something that silently dies
-on export in exactly the case the capability check cannot detect.
+An internal-only use of the channel can ship without these. A surface a notebook author reaches
+cannot.
 
-- **Static export degradation.** A live-pull widget rendered into a static export has a dead
-  channel — no kernel to answer a `with_js_link` call. Whichever mechanism handles this, it must
-  degrade *loudly* (say so, disable the gesture) and must **never hang** waiting on a response
-  that will never come.
-- **A render-time capability check cannot tell you the channel will still be live.** Exporting
-  does not re-render: `generate_html` serializes the notebook's existing state via
-  `notebook_to_js` (`Pluto/src/notebook/Export.jl`, `Pluto/src/webserver/Dynamic.jl`), so the
-  widget's HTML — and the `is_supported_by_display` decision baked into it — was produced
-  earlier, in a session where the kernel genuinely was live. The export carries that decision
-  forward to a reader who has no kernel. So whatever the static-export answer above turns out to
-  be, it cannot rely on `is_supported_by_display` alone; the widget has to detect a dead channel
-  at use time.
+**Static export degrades loudly.** A live-pull widget in a static export has a dead channel — no
+kernel answers a `with_js_link` call. The widget says so and disables the gesture, and **never
+hangs** waiting on a response that will not come.
 
-These are one decision, not two: the degradation mechanism has to work in exactly the case the
-capability check cannot see.
+**A dead channel is detected at use time.** A render-time capability check cannot establish that
+the channel is still live. Exporting does not re-render: `generate_html` serializes existing
+notebook state via `notebook_to_js` (`Pluto/src/notebook/Export.jl`,
+`Pluto/src/webserver/Dynamic.jl`), so the widget's HTML — and the `is_supported_by_display`
+decision baked into it — was produced in a session where the kernel was live, and carries that
+decision forward to a reader who has none. The degradation above cannot rest on
+`is_supported_by_display`. These two are one decision: the degradation mechanism has to work in
+exactly the case the capability check cannot see.
 
-A second prerequisite is an API question rather than a correctness one. Every interactable
-declares *geometry*; none declares *rendering* (§3, §4). A user supplying a render callback for a
-preview frame is a genuinely new extension point, and §4 — not this section — is where it
-belongs. See §4's closing note.
+**A rendering seam exists.** Every interactable declares geometry; none declares rendering (§3,
+§4). An author supplying a preview frame needs one. §4 holds that extension point; no API is
+specified.
 
-### 12.10 Open questions (left open by design)
+### 12.10 Open questions
 
-The following are constraints a real implementation must satisfy, not answers this document
-supplies. Each is left to whoever picks up #102.
+Constraints a conforming implementation must satisfy. Each is unresolved and left to whoever
+picks up #102.
 
-- **Heavy-scene mitigation beyond `px_per_unit = 1`.** A render-bound heavy scene needs some
-  further mitigation to hit a live-preview budget — a further downscale, a render-quality knob
-  during the drag, or an accepted lower frame rate — but which one, and at what threshold, is
-  unresolved. See issue #102 for the measurements establishing that the heavy scene is
-  render-bound.
-- **`:webgl` parity.** `:webgl`'s mechanism for satisfying §12.5's obligations is not merely
-  unmeasured, it is unsettled: #86 blocks in-place buffer patching on canvas identity (Pluto's
-  cell-output replacement destroys the `<canvas>` a WebGL context is tied to). #85 separately
-  proposes a 2D last-frame preview as an in-gesture path for both backends, not a
-  `:webgl`-specific answer to #86's gate. Whichever mechanism `:webgl` ends up using, the shared
-  thing between the backends is the contract in this section, not any particular implementation
-  of it.
-- **What commits a gesture that has no release.** §12.3's commit-on-release rule is drag-shaped,
-  because pan and orbit are pointer drags with a pointerup to commit on. A wheel zoom has no
-  terminal event, so it needs some other commit rule — an idle debounce, an explicit affordance,
-  something else — before §12.1's "a view-manipulation gesture's own release is a data
-  interaction" means anything for it. `ViewInteractable` is drag-only today (`events` is
-  `(:drag,)`; `mode` is `"pan"` or `"orbit"`; there is no wheel handler in `frontend/src/`), so
-  nothing is blocked right now — but `roadmap.md` plans wheel zoom as part of #85, and #105 would
-  benefit from this channel making zoom cheap, so the rule is needed before either of those lands.
+- **Heavy-scene mitigation beyond `px_per_unit = 1`.** A render-bound heavy scene needs further
+  mitigation to hit a live-preview budget — a further downscale, a render-quality knob during the
+  drag, or an accepted lower frame rate. Which one, and at what threshold, is unresolved. Issue
+  #102 carries the measurements establishing that the heavy scene is render-bound.
+- **`:webgl` parity.** `:webgl` has no settled mechanism for §12.5's obligations, and the gap is
+  in the mechanism, not the measurement: #86 blocks in-place buffer patching on canvas identity,
+  and #85's 2D last-frame preview is an alternative for both backends rather than an answer to
+  #86. Whichever mechanism `:webgl` takes, what the backends share is this section's contract.
+- **What commits a gesture with no release.** §12.3's commit-on-release rule is drag-shaped: pan
+  and orbit are pointer drags with a pointerup to commit on. A wheel zoom has no terminal event
+  and needs another commit rule — an idle debounce, an explicit affordance, something else.
+  `ViewInteractable` is drag-only today (`events` is `(:drag,)`; `mode` is `"pan"` or `"orbit"`;
+  `frontend/src/` has no wheel handler), so nothing is blocked now. `roadmap.md` plans wheel zoom
+  as part of #85 and #105 depends on this channel making zoom cheap, so the rule is needed before
+  either lands.
