@@ -865,9 +865,16 @@ whichever backend is built first must not let its mechanism get mistaken for the
 
 `with_js_link` bypasses Pluto's state management by design: nothing it returns is recorded in the
 notebook. That is correct for transient view parameters and wrong for anything the user considers
-part of their analysis. The filter is the same one §12.2's routing rule already applies: if a
-downstream cell needs to read it, it does not belong on this channel — it belongs on `@bind`
-instead, even if that means it isn't a gesture-channel value at all.
+part of their analysis.
+
+The filter §12.2's routing rule applies is per *transmission*, not per variable. The same
+quantity legitimately travels both channels at different moments: mid-drag, an azimuth is a
+transient render parameter nothing downstream reads; on release, that same azimuth is a
+committed value a cell reads through `@bind` (§12.3). Orbiting live *and* binding the final
+camera is therefore the ordinary case, not a tension to resolve — "does a cell read this
+variable?" gives the wrong answer for it, because the answer is yes and the mid-drag frames
+still belong here. Ask instead whether a cell reads *this particular send*: if it does, it is a
+commit and goes through `@bind`; if nothing will ever read it, it can ride this channel.
 
 ### 12.8 Relationship to #83
 
@@ -892,6 +899,15 @@ contract document should pre-empt.
   obligations is genuinely different from `:cairo`'s (in-place buffer patching, #86) and is
   unmeasured. The shared thing between the backends is the contract in this section, not any
   particular implementation of it.
+- **What commits a gesture that has no release.** Constraint, not an answer: §12.3's
+  commit-on-release rule is drag-shaped, because pan and orbit are pointer drags with a pointerup
+  to commit on. A wheel zoom has no terminal event, so it needs some other commit rule — an idle
+  debounce, an explicit affordance, something else — before §12.1's "a view-manipulation
+  gesture's own release is a data interaction" means anything for it. `ViewInteractable` is
+  drag-only today (`events` is `(:drag,)`; `mode` is `"pan"` or `"orbit"`; there is no wheel
+  handler in `frontend/src/`), so nothing is blocked right now — but `roadmap.md` plans wheel
+  zoom as part of #85, and #105 depends on this channel making zoom cheap, so the rule is needed
+  before either of those lands.
 
 The remaining two are one decision, left to the maintainer, because they interact:
 
