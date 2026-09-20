@@ -311,16 +311,22 @@ function Base.show(io::IO, m::MIME"text/html", w::WebGLWidget)
 end
 
 # ---- bond plumbing: identical contract to MasqueWidget (same overlay, same events) ----
-APD.Bonds.initial_value(::WebGLWidget) = nothing
-function APD.Bonds.transform_value(::WebGLWidget, js)
+APD.Bonds.initial_value(w::WebGLWidget) = Masque._hydrated_selection(w.manifest)
+function APD.Bonds.transform_value(w::WebGLWidget, js)
     js === nothing && return nothing
     if haskey(js, "items")
         return InteractionEvent[
-            InteractionEvent(Symbol(it["layer"]), Int(it["index"]), get(it, "payload", nothing))
+            InteractionEvent(
+                Symbol(it["layer"]), Int(it["index"]),
+                Masque._bond_payload(w.manifest, it["layer"], Int(it["index"]), get(it, "payload", nothing)),
+            )
                 for it in js["items"]
         ]
     end
-    return InteractionEvent(Symbol(js["layer"]), Int(js["index"]), get(js, "payload", nothing))
+    return InteractionEvent(
+        Symbol(js["layer"]), Int(js["index"]),
+        Masque._bond_payload(w.manifest, js["layer"], Int(js["index"]), get(js, "payload", nothing)),
+    )
 end
 
 end # module MasqueWGLMakieExt

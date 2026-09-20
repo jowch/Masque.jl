@@ -168,4 +168,111 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test hs_left >= vp_x          # hspan left edge must not poke left of a4's viewport
         @test hs_right <= vp_x + vp_w  # hspan right edge must not poke right of a4's viewport
     end
+
+    @testset "initial_value hydrates the selection from selected=" begin
+        hfig = Figure(size = (600, 400)); hax = Axis(hfig[1, 1])
+        pts = DEFAULT_PTS
+        scatter!(hax, first.(pts), last.(pts))
+        _, _, hctx = ctx_for(hfig)
+        pts_i = PointInteractable(hax, pts; id = :scatter, payloads = ["a", "b", "c"])
+
+        # no selected= → initial_value is nothing, same as an unselected widget
+        m0 = build_manifest([pts_i], hctx)
+        w0 = MasqueWidget("", m0, 100)
+        @test IP.APD.Bonds.initial_value(w0) === nothing
+
+        # selected = Dict(:scatter => [0, 2]) → a 2-element Vector{InteractionEvent}: 0-based
+        # index, payload pulled from the 1-based slot (idx 0 → payloads[1], idx 2 → payloads[3])
+        m2 = build_manifest([pts_i], hctx; selected = Dict(:scatter => [0, 2]))
+        iv2 = IP.APD.Bonds.initial_value(MasqueWidget("", m2, 100))
+        @test iv2 isa Vector{InteractionEvent}
+        @test length(iv2) == 2
+        @test iv2[1].layer === :scatter && iv2[1].index == 0 && iv2[1].payload == "a"
+        @test iv2[2].layer === :scatter && iv2[2].index == 2 && iv2[2].payload == "c"
+
+        # a single hydrated index still comes back as a Vector (hydration is always set-shaped)
+        m1 = build_manifest([pts_i], hctx; selected = Dict(:scatter => [1]))
+        iv1 = IP.APD.Bonds.initial_value(MasqueWidget("", m1, 100))
+        @test iv1 isa Vector{InteractionEvent}
+        @test length(iv1) == 1
+        @test iv1[1].layer === :scatter && iv1[1].index == 1 && iv1[1].payload == "b"
+
+        # multiple layers each with selected= → flattened in manifest layer order
+        segs_i = SegmentInteractable(
+            hax, [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0)];
+            mode = :pairs, id = :segs, payloads = ["s0", "s1"],
+        )
+        mmulti = build_manifest([pts_i, segs_i], hctx; selected = Dict(:scatter => [0], :segs => [1]))
+        ivmulti = IP.APD.Bonds.initial_value(MasqueWidget("", mmulti, 100))
+        @test ivmulti isa Vector{InteractionEvent}
+        @test length(ivmulti) == 2
+        @test ivmulti[1].layer === :scatter && ivmulti[1].index == 0 && ivmulti[1].payload == "a"
+        @test ivmulti[2].layer === :segs && ivmulti[2].index == 1 && ivmulti[2].payload == "s1"
+
+        # no explicit payloads= (the common case): PointInteractable auto-fills one
+        # `(; index, x, y)` NamedTuple per point, so the 1-based lookup still lands on a
+        # real payload, through the full masque() call (not just build_manifest).
+        w_auto = masque(hfig, PointInteractable(hax, pts; id = :scatter); selected = Dict(:scatter => [1]))
+        iv_auto = IP.APD.Bonds.initial_value(w_auto)
+        @test iv_auto isa Vector{InteractionEvent}
+        @test length(iv_auto) == 1
+        @test iv_auto[1].layer === :scatter && iv_auto[1].index == 1
+        @test iv_auto[1].payload == (; index = 1, x = pts[2][1], y = pts[2][2])
+    end
+
+    @testset "transform_value reconstructs the payload from the manifest, not the wire" begin
+        bfig = Figure(size = (600, 400)); bax = Axis(bfig[1, 1])
+        pts = DEFAULT_PTS
+        scatter!(bax, first.(pts), last.(pts))
+        payloads = [(; name = "a"), (; name = "b"), (; name = "c")]
+        w = masque(bfig, PointInteractable(bax, pts; id = :scatter, payloads = payloads))
+        tv = IP.APD.Bonds.transform_value
+
+        # element kind: the identical object comes back, not a JSON-shaped copy of it — a
+        # NamedTuple stays a NamedTuple, and it's the very object passed in `payloads=`.
+        ev = tv(w, Dict("layer" => "scatter", "index" => 1, "payload" => Dict("wrong" => "value")))
+        @test ev.payload isa NamedTuple
+        @test ev.payload === payloads[2]
+
+        # the browser's own reported payload is ignored outright for an element kind
+        ev0 = tv(w, Dict("layer" => "scatter", "index" => 0, "payload" => "anything at all"))
+        @test ev0.payload === payloads[1]
+
+        # a kind with no Julia-side original (axis readout) passes the browser value straight
+        # through, untouched — same object, not a copy
+        w2 = masque(bfig, [PointInteractable(bax, pts; id = :scatter, payloads = payloads), AxisInteractable(bax; id = :readout)])
+        computed = Dict("x" => 1.23, "y" => 4.56)
+        evax = tv(w2, Dict("layer" => "readout", "index" => 0, "payload" => computed))
+        @test evax.payload === computed
+
+        # the `items` branch (a selects-ROI's multi-echo) reconstructs each entry the same way
+        multi = tv(
+            w, Dict(
+                "items" => [
+                    Dict("layer" => "scatter", "index" => 0, "payload" => "garbage"),
+                    Dict("layer" => "scatter", "index" => 2, "payload" => "garbage"),
+                ]
+            )
+        )
+        @test multi isa Vector{InteractionEvent}
+        @test multi[1].payload === payloads[1]
+        @test multi[2].payload === payloads[3]
+
+        # out-of-range index: reconstruction fails loud rather than passing the bad index through
+        @test_throws ArgumentError tv(w, Dict("layer" => "scatter", "index" => 99, "payload" => nothing))
+
+        # the property Pluto's dedup depends on: initial_value's payload is === the object in
+        # `payloads=`, and is == the payload transform_value returns for the same element, so
+        # the hydrated bond and the first click on that same element compare equal.
+        wsel = masque(
+            bfig, PointInteractable(bax, pts; id = :scatter, payloads = payloads);
+            selected = Dict(:scatter => [1]),
+        )
+        iv = IP.APD.Bonds.initial_value(wsel)
+        @test iv[1].payload === payloads[2]
+        ev_same = tv(wsel, Dict("layer" => "scatter", "index" => 1, "payload" => nothing))
+        @test ev_same.payload === iv[1].payload
+        @test ev_same.payload == iv[1].payload
+        @test ev_same == iv[1]
+    end
 end

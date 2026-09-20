@@ -7,6 +7,18 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Selection is client-side, and `selected=` is its starting value. Clicking a mark selects it
+  in the browser immediately — no bond fed back into the widget, and it works in a static
+  export, where no kernel exists to fire one. `selected=` seeds the selection rather than
+  drawing a separate pre-highlight: a widget given one reports those elements from its
+  `@bind` at mount instead of `nothing`, and the next click or `selects`-ROI release replaces
+  the whole selection, hydration included. A remount re-seeds from `selected=` again, since an
+  index only means something relative to the data that produced it. Clicking a heatmap or
+  image cell selects that cell (even though `selected=` itself does not accept a `:grid`
+  layer), and clicking a legend entry selects the whole series it links to. Together this
+  retires the five-cell `Ref`-accumulator workaround the Selection page used to document for
+  keeping a clicked element highlighted; `examples/demo.jl`'s accumulator remains the way to
+  build up a *growing* set across many clicks, which a single selection is not for.
 - `LegendInteractable`: a `Makie.Legend` block's entries as hit regions. Auto-extracted
   `masque(fig)` legends link each entry to the plot layer(s) it labels (including a compound
   recipe's — e.g. `scatterlines!`/`stem!` — child layers); hovering or keyboard-focusing an
@@ -51,7 +63,9 @@ All notable changes to this project are documented here. The format is based on
   `.github/workflows/Documentation.yml`.
 
 - `masque(fig, interactables)` — a Pluto `@bind` widget that overlays interactivity on a
-  static CairoMakie figure; returns an `InteractionEvent` on click (`nothing` until then).
+  static CairoMakie figure; its bond reports the current selection — an `InteractionEvent`
+  for a click, a `Vector{InteractionEvent}` for `selected=` hydration or a `selects`-ROI, and
+  `nothing` when nothing is selected.
 - `AbstractBackend` seam with `CairoBackend` (PNG; SVG groundwork). DPI derived from the
   display width (≈2× Pluto's 700px column), opaque-background guarantee.
 - `AbstractInteractable` interface (`hitlayers` / `validate` / `events` / `tooltip` /
@@ -82,6 +96,19 @@ All notable changes to this project are documented here. The format is based on
   MeshScatter children live in float32convert space (premise from #36).
 
 ### Changed
+- **An element hit's `@bind` payload is the Julia object you passed, not the browser's copy.**
+  `payloads = [(a = 1,)]` now yields `(a = 1,)` back from a click, where it previously yielded
+  `Dict("a" => 1)` — `ev.payload === payloads[i]`. Julia reconstructs the payload from its own
+  manifest instead of trusting the round trip, so a `NamedTuple` stays a `NamedTuple`. This
+  applies to every click on an element kind, not only to widgets using `selected=`. Code doing
+  `ev.payload["x"]` on an element hit must become `ev.payload.x`.
+
+  The kinds with no Julia-side original are unchanged and still hand back a browser-computed
+  value, indexed as before: an `:axis` readout and a `:grid` cell are computed from the cursor,
+  and `:roi` bounds, `:threshold` values and `:view` limits are drag state Julia cannot know.
+  So `circles`/`rects`/`polygons`/`segments`/`polyline` use `ev.payload.field` and those five
+  use `ev.payload["field"]` — `examples/demo.jl` shows both side by side. An out-of-range
+  index from the browser now raises `ArgumentError` rather than passing through.
 - **Renamed the package from `Holo` to `Masque`** (same UUID). Every public name moves with
   it: the module `Masque`, the entry function `masque`, the `masque"…"` string macro, the
   `MasqueCairoMakieExt` / `MasqueWGLMakieExt` extensions, the `window.Masque` browser global,

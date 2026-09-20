@@ -39,7 +39,7 @@ wash/ring recipe as `selected=` (see [Selection](@ref)). Clicking reports the us
 entry links to, `group` is the entry's group title (`nothing` for an ungrouped legend).
 
 ```julia
-ev === nothing ? "hover/click a legend entry" : "linked layers: $(ev.payload["targets"])"
+ev === nothing ? "hover/click a legend entry" : "linked layers: $(ev.payload.targets)"
 ```
 
 ## Custom legends

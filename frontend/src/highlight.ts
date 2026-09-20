@@ -1,5 +1,5 @@
 import { hitKey, prefersReducedMotion, MOTION_MS } from "./state"
-import type { HiGroups, OverlayState } from "./state"
+import type { HiGroups, OverlayCtx, OverlayState } from "./state"
 import type { Hit, LayerStyle } from "./types"
 
 export const SVG_NS = "http://www.w3.org/2000/svg"
@@ -249,7 +249,10 @@ export function drawLink(state: OverlayState, linkGroups: HiGroups, key: string,
     const cur = linkGroups.fill_.firstElementChild ?? linkGroups.edge_.firstElementChild ?? linkGroups.plain_.firstElementChild
     if (key === state.linkKey_ && cur && !cur.classList.contains("masque-leave")) return
     clearLinkImmediate(state, linkGroups)
+    // A hit already pinned in g.sel would double the fill/stroke opacity if drawn again here
+    // (same reasoning as drawHi's guard).
     for (const h of hits) {
+        if (state.selKeys_.has(hitKey(h))) continue
         const made = makeHiElement(h, "selected")
         if (!made) continue
         if (made.fill) { made.fill.classList.add("masque-enter"); linkGroups.fill_.appendChild(made.fill) }
@@ -278,4 +281,9 @@ export function drawSelection(state: OverlayState, selGroups: HiGroups, hits: Hi
     // above until the next pointermove self-heals it via drawHi's own guard — clear it now so the
     // stale chrome never paints, mid-sweep included.
     if (state.hiKey_ !== null && next.has(state.hiKey_)) clearHiImmediate(state, hiGroups)
+}
+
+// The single funnel to g.sel — every writer of state.selHits_ calls this after assigning it.
+export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
+    drawSelection(state, ctx.selGroup_, state.selHits_, ctx.hiGroup_)
 }

@@ -1119,8 +1119,9 @@ describe("tooltips (mount/showTip)", () => {
         expect(() => mount(script, bad)).toThrow(/selected|out of range|index/i)
     })
 
-    it("selected= pre-highlights are replaced when a selects-ROI commits (one selection at a time)", () => {
-        // mount-time selected= shares g.sel with box-select; ROI drag clears + redraws
+    it("a selects-ROI commit REPLACES the selected= hydration with its enclosure (hydration model)", () => {
+        // selected= is pure hydration (an initial value): a selects-ROI move/release sets the
+        // whole selection, it doesn't add to it.
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,
             transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
@@ -1137,12 +1138,12 @@ describe("tooltips (mount/showTip)", () => {
         mount(script, m)
         const shadow = shadowOf(host)
         const sel = edgeSelGroup(shadow) // plain circles, no style.stroke → fill+edge split, one edge shape per selected point
-        expect(sel.children.length).toBe(1)  // pre-highlight alone
+        expect(sel.children.length).toBe(1)  // hydration alone (index 2)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        // commit current ROI enclosure (points 0 and 1) — replaces pre-selection of index 2
+        // commit current ROI enclosure (points 0 and 1) — replaces the index-2 hydration outright
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
-        expect(sel.children.length).toBe(2)
+        expect(sel.children.length).toBe(2)  // points 0 and 1 only — index 2 is gone
     })
 
     it("drag-to-pan commits new limits on mouse-up (commit-on-release)", () => {
@@ -2001,5 +2002,223 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 50, clientY: 50, bubbles: true }))
         expect(committed!.items).toEqual([])
         expect(selChildren(shadow).length).toBe(0)
+    })
+})
+
+describe("click-echo (#103)", () => {
+    it("clicking an element-indexed mark draws the selected recipe in g.sel; g.hi stays empty", () => {
+        const { host, script } = setup()
+        mount(script, manifest) // module-level `manifest`: one circle at image (600,400), click+hover
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
+        const edge = edgeSelGroup(shadow).firstElementChild as SVGElement
+        expect(edge.classList.contains("masque-wash")).toBe(true)
+        const fill = fillSelGroup(shadow).firstElementChild as SVGElement
+        expect(fill.classList.contains("masque-fillshape")).toBe(true)
+        expect(hiChildren(shadow).length).toBe(0)
+    })
+
+    it("click mark A then click mark B leaves only B echoed (last pick wins), replacing the selected= hydration", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{
+                id: "pts", kind: "circles", geometry: [200, 200, 20, 600, 400, 20, 900, 600, 20],
+                payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["click", "hover"],
+                selected: [2],
+            }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect(edgeSelGroup(shadow).children.length).toBe(1) // hydration (index 2) alone
+        // click index 0: image (200,200) -> client (100,100) — replaces the hydration outright
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 100, bubbles: true }))
+        let cxs = [...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))
+        expect(cxs).toEqual(["200"]) // echo(0) alone, index 2's hydration is gone
+        // click index 1: image (600,400) -> client (300,200) — replaces the echo in turn
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
+        cxs = [...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))
+        expect(cxs).toEqual(["600"]) // echo(1) alone
+    })
+
+    it("mount hydration is replaced, not merged: a click after selected= leaves only the clicked hit", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{
+                id: "pts", kind: "circles", geometry: [200, 200, 20, 600, 400, 20, 900, 600, 20],
+                payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["click", "hover"],
+                selected: [2],
+            }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["900"]) // index 2, from selected=
+        // click index 0: image (200,200) -> client (100,100)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 100, bubbles: true }))
+        expect(edgeSelGroup(shadow).children.length).toBe(1)
+        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["200"]) // ONLY index 0
+    })
+
+    it("clicking an :axis region leaves a hydrated selection untouched (does not participate in the selection model)", () => {
+        // Element layer FIRST: hitTest returns the first matching layer, and the axis's
+        // geometry: null hits the whole viewport, so an axis-first ordering would swallow
+        // clicks meant for the marks.
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 5], ylims: [0, 5], xscale: "identity", yscale: "identity",
+                viewport: [100, 100, 400, 400], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "pts", kind: "circles", geometry: [300, 200, 20, 900, 600, 20],
+                    payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"], selected: [0] },
+                { id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["click", "hover"] },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["300"]) // hydrated index 0
+        // Empty plot area, away from either mark, inside the axis viewport: image (500,500) -> client (250,250)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 250, clientY: 250, bubbles: true }))
+        expect((host as unknown as { value: { layer: string } }).value.layer).toBe("axis") // confirm the click actually hit :axis
+        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["300"]) // untouched
+    })
+
+    it("clicking a mark then re-hovering it later never draws hover chrome (drawHi's selKeys_ guard)", async () => {
+        const { host, script } = setup()
+        mount(script, manifest)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 10, clientY: 10, bubbles: true })) // move away
+        await flushFrame()
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true })) // hover it again
+        await flushFrame()
+        expect(fillHiGroup(shadow).children.length).toBe(0)
+        expect(edgeHiGroup(shadow).children.length).toBe(0)
+        expect(plainHiGroup(shadow).children.length).toBe(0)
+    })
+
+    it("clicking a legend entry pins every element of its linked target layer, not the swatch", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20, 620, 420, 20], payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"] },
+                { id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"],
+                    geometry: [100, 100, 40, 20], payloads: [{ name: "a" }], links: [["pts"]] },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        // legend rect image [80,120]x[90,110] -> client center (50,50)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
+        // "pts" has 2 circles, each closed hit splitting into fill + edge -> 2 * 2 = 4
+        expect(selChildren(shadow).length).toBe(4)
+        const cxs = [...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx")).sort()
+        expect(cxs).toEqual(["600", "620"]) // the linked circles, not the legend swatch (which has no cx)
+    })
+
+    it("clicking a legend entry whose own links[index] is empty clears a previously-echoed mark", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20], payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"] },
+                { id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"],
+                    geometry: [100, 100, 40, 20], payloads: [{ name: "a" }], links: [[]] },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true })) // click pts: echoed
+        expect(selChildren(shadow).length).toBe(2) // fill + edge
+        // legend rect image [80,120]x[90,110] -> client center (50,50)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
+        expect(selChildren(shadow).length).toBe(0)
+    })
+
+    it("clicking a grid cell pins that cell's rect in g.sel, replacing a previously-echoed mark", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20], payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"] },
+                { id: "g", kind: "grid", axis: "ax1", events: ["click", "hover"], payloads: [],
+                    geometry: { xedges: [0, 600, 1200], yedges: [0, 400, 800], ncols: 2, nrows: 2 } },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true })) // click pts: echoed
+        expect(selChildren(shadow).length).toBe(2)
+        // grid cell far from the circle: image (300,600) -> client (150,300)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 150, clientY: 300, bubbles: true }))
+        // pts echo gone (last-pick-wins), replaced by the grid cell — a normal closed "rect" wash
+        // (not the box-select "rectfill" union), so it still splits into fill + edge.
+        expect(selChildren(shadow).length).toBe(2)
+        const rect = edgeSelGroup(shadow).firstElementChild as SVGElement
+        expect(rect.tagName.toLowerCase()).toBe("rect")
+        expect(rect.getAttribute("width")).toBe("600")
+        expect(rect.getAttribute("height")).toBe("400")
+    })
+})
+
+// host.value is what Pluto reads at mount, before any click — mount() used to force it to null
+// unconditionally, overwriting Julia's initial_value and losing the selected= hydration.
+describe("host.value seeded at mount from selected= (bond hydration, not just g.sel)", () => {
+    it("a layer with selected= seeds host.value with one items[] entry per hydrated index", () => {
+        const { host, script } = setup()
+        const selManifest: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{
+                id: "pts", kind: "circles", geometry: [300, 200, 20, 600, 400, 20, 900, 600, 20],
+                payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["click", "hover"],
+                selected: [0, 2],
+            }],
+        }
+        mount(script, selManifest)
+        expect((host as unknown as { value: unknown }).value).toEqual({
+            items: [
+                { layer: "pts", index: 0, payload: { i: 0 } },
+                { layer: "pts", index: 2, payload: { i: 2 } },
+            ],
+        })
+    })
+
+    it("no layer bakes selected= -> host.value stays null (keeps Pluto's first-value dedup working)", () => {
+        const { host, script } = setup()
+        mount(script, manifest) // module-level `manifest`: no selected= anywhere
+        expect((host as unknown as { value: unknown }).value).toBeNull()
+    })
+
+    it("hydration across two layers flattens in manifest layer order", () => {
+        const { host, script } = setup()
+        const twoLayer: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [
+                { id: "a", kind: "circles", geometry: [100, 100, 10, 200, 200, 10],
+                    payloads: [{ v: "a0" }, { v: "a1" }], axis: "ax1", events: ["click", "hover"], selected: [1] },
+                { id: "b", kind: "rects", geometry: [300, 300, 10, 10, 400, 400, 10, 10],
+                    payloads: [{ v: "b0" }, { v: "b1" }], axis: "ax1", events: ["click", "hover"], selected: [0, 1] },
+            ],
+        }
+        mount(script, twoLayer)
+        expect((host as unknown as { value: unknown }).value).toEqual({
+            items: [
+                { layer: "a", index: 1, payload: { v: "a1" } },
+                { layer: "b", index: 0, payload: { v: "b0" } },
+                { layer: "b", index: 1, payload: { v: "b1" } },
+            ],
+        })
     })
 })

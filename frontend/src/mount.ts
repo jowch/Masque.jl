@@ -1,4 +1,4 @@
-import { SVG_NS, drawSelection } from "./highlight"
+import { SVG_NS, renderSelection } from "./highlight"
 import { hitLayerByIndex } from "./selection"
 import { onLeave } from "./hover"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
@@ -215,8 +215,22 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const noop: Mounted = { cleanup: () => {} }
     if (!host || !base) return noop
 
-    // the @bind target is the host element; start with no selection
-    ;(host as unknown as { value: unknown }).value = null
+    // The @bind target is the host element. Seed it with the hydrated selection rather than
+    // null: Pluto reads this at mount, so a null here would overwrite Julia's `initial_value`
+    // and settle the bond on `nothing` while the marks sit highlighted. The `items` shape is
+    // what `transform_value` already maps to a Vector{InteractionEvent}. Built in the same loop
+    // as `selHits` (state.selHits_'s hydration, below) so both read `hitLayerByIndex` — which
+    // throws on an unsupported kind or an out-of-range index — before either is assigned;
+    // splitting them let an invalid manifest set host.value first and throw only later.
+    const hydrated: { layer: string; index: number; payload: unknown }[] = []
+    const selHits: Hit[] = []
+    for (const layer of manifest.layers) {
+        for (const idx of layer.selected ?? []) {
+            selHits.push({ layer, ...hitLayerByIndex(layer, idx) })
+            hydrated.push({ layer: layer.id, index: idx, payload: layer.payloads[idx] })
+        }
+    }
+    ;(host as unknown as { value: unknown }).value = hydrated.length ? { items: hydrated } : null
 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })
@@ -321,6 +335,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
     }
     const state = createOverlayState()
+    state.selHits_ = selHits
 
     // Pinned to the base (img/canvas), not the host: WGLMakie can size the <canvas>
     // differently from `.ip-host`, which left g.sel offset when the SVG was `inset:0` on the host.
@@ -373,15 +388,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     // Drawn into g.sel, not g.hi: it must survive hovers (onMove clears g.hi on every miss)
     // and support multiple selected indices (drawHi keeps only the last).
-    {
-        const pre: Hit[] = []
-        for (const layer of manifest.layers) {
-            for (const idx of layer.selected ?? []) {
-                pre.push({ layer, ...hitLayerByIndex(layer, idx) })
-            }
-        }
-        if (pre.length) drawSelection(state, selGroup, pre, hiGroup)
-    }
+    if (state.selHits_.length) renderSelection(ctx, state)
 
     const cleanup = () => {
         surface.removeEventListener("pointerdown", down)

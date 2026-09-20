@@ -20,6 +20,10 @@ import {
 // (geometry.ts's grid case), so its hover is closed/filled the same as circles/rects/polygons.
 const TINT_CHECK_KEYS = new Set(["scatter", "scatter_dark", "barplot", "heatmap", "poly"]);
 
+// Mirrors selection.ts's selectionFor: these kinds (plus :grid) pin the clicked hit itself; a
+// legend layer (has `links`) pins its linked target(s) instead.
+const SELF_PIN_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "grid"]);
+
 const [base, notebook, backend, artifactDirArg] = process.argv.slice(2);
 if (!base || !notebook || !backend) {
   console.error("usage: node kind_sweep.mjs <base-url> <notebook> <cairo|webgl> [artifact-dir]");
@@ -432,6 +436,11 @@ try {
 
   const expectBase = backend === "webgl" ? "canvas" : "img";
 
+  // Set below when the loop reaches "scatter" — the hover-on-selected-noop check after the loop
+  // needs the INDEX actually clicked (not just spec.clickIndex), since the collision-avoidance
+  // bump a few lines down can move it.
+  let scatterClickIdx = null;
+
   for (const spec of meta) {
     const key = spec.key;
     const wantDark = key === "scatter_dark"; // the only dark-figure case in kind_sweep_figures.jl
@@ -477,6 +486,25 @@ try {
       }
       passed.push(`${key}/legend-precedence-order`);
       passed.push(`${key}/legend-precedence-pixel-contested`);
+    }
+
+    // mount.ts used to force host.value = null unconditionally, so the real Pluto bond settled
+    // on `nothing` at mount even with selected= baked in. Read #out_${key} (repr(ev) off the
+    // actual bond) before any click/drag on this widget to catch that directly.
+    const mountBond = await textOf(`#out_${key}`);
+    if (spec.selected) {
+      if (/=\s*nothing$/.test(mountBond)) {
+        throw new Error(`${key}: bond reads "nothing" at mount despite selected= (${JSON.stringify(mountBond)})`);
+      }
+      if (!mountBond.includes(`:${spec.layerId}`)) {
+        throw new Error(`${key}: mount bond ${JSON.stringify(mountBond)} doesn't name layer :${spec.layerId}`);
+      }
+      passed.push(`${key}/hydrated-bond`);
+    } else {
+      if (!/=\s*nothing$/.test(mountBond)) {
+        throw new Error(`${key}: bond is not "nothing" at mount despite no selected= (${JSON.stringify(mountBond)})`);
+      }
+      passed.push(`${key}/hydrated-bond-control`);
     }
 
     if (spec.mode === "drag") {
@@ -699,43 +727,12 @@ try {
     if (spec.selected && afterLeave.sel < 1) throw new Error(`${key}: g.sel dropped on unhover`);
     if (spec.selected) passed.push(`${key}/selected-survives-unhover`);
 
-    let clickIdx = spec.clickIndex;
-    const before = await textOf(`#out_${key}`);
-    const already = new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`);
-    if (already.test(before) || (spec.layerKind === "grid" && new RegExp(`index[=:]\\s*${clickIdx}\\b`).test(before))) {
-      clickIdx = spec.selectedIndex !== clickIdx ? spec.selectedIndex : clickIdx + 1;
-    }
-    const clickPt = hitPoint(layer, clickIdx);
-    let after = before;
-    for (let a = 0; a < 3; a++) {
-      await dispatchAt(key, clickPt.x, clickPt.y, "click");
-      try {
-        after = await waitChange(`#out_${key}`, before, `${key}-click`);
-        break;
-      } catch (e) {
-        if (a === 2) throw e;
-      }
-    }
-    const idRe = new RegExp(`:${spec.layerId}|${spec.layerId}`, "i");
-    if (!idRe.test(after)) throw new Error(`${key}-click: no layer in ${JSON.stringify(after).slice(0, 220)}`);
-    if (spec.layerKind !== "grid") {
-      if (!new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`).test(after)) {
-        throw new Error(`${key}-click: expected index ${clickIdx}: ${after.slice(0, 220)}`);
-      }
-    }
-    passed.push(`${key}/click-bind`);
-    // `InteractionEvent` has no custom `show`, so `repr(ev)` is Julia's default positional
-    // struct print: `InteractionEvent(:legend, 0, …)` — the ":<layerId>," prefix pins which
-    // layer actually won the hit-test. Belt-and-suspenders on top of the index regex above:
-    // this fails loud specifically on "resolved to the wrong layer", not just "wrong index".
-    if (spec.overlapsGrid && new RegExp(`:${spec.overlapsGrid},\\s*\\d+\\b`).test(after)) {
-      throw new Error(`${key}-click: bond resolved to grid layer "${spec.overlapsGrid}", not legend: ${after.slice(0, 220)}`);
-    }
-    console.error(`OK  ${key} — ${after.slice(0, 110)}`);
-
     // A legend entry's linked highlight (HitLayer.links) draws the SELECTED recipe for every
     // element of the target layer(s) into g.link — distinct from g.sel/g.hi. Generic: skipped
-    // for every spec except the one(s) that carry a "links" meta key.
+    // for every spec except the one(s) that carry a "links" meta key. Runs BEFORE the click
+    // below: a legend click pins its linked series into g.sel (#103) and drawLink deliberately
+    // skips anything already pinned, so hovering the clicked entry afterwards would correctly
+    // draw nothing — these assertions need a pristine selection to mean anything.
     if (spec.links) {
       // g.link exists in ALL THREE sibling svgs (mount.ts's `linkGroup` — fill_/edge_/plain_,
       // same as g.sel/g.hi), and `drawLink` fans a SELECTED-recipe element into whichever
@@ -874,7 +871,7 @@ try {
         if (li.count !== expected) {
           throw new Error(`${key}/links[${c.index}]: g.link has ${li.count} elements, want ${expected} (targets ${JSON.stringify(targetIds)})`);
         }
-        if (li.sel !== 0) throw new Error(`${key}/links[${c.index}]: g.sel changed during legend hover (${li.sel})`);
+        if (li.sel !== afterLeave.sel) throw new Error(`${key}/links[${c.index}]: g.sel changed during legend hover (${li.sel})`);
 
         if (tl0.kind === "circles") {
           const wash = {
@@ -927,7 +924,78 @@ try {
       }
       if (afterLinkLeave.count !== 0) throw new Error(`${key}/links: g.link lingered ${afterLinkLeave.count}`);
       passed.push(`${key}/links-fade`);
+    }
 
+    let clickIdx = spec.clickIndex;
+    const before = await textOf(`#out_${key}`);
+    const already = new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`);
+    if (already.test(before) || (spec.layerKind === "grid" && new RegExp(`index[=:]\\s*${clickIdx}\\b`).test(before))) {
+      clickIdx = spec.selectedIndex !== clickIdx ? spec.selectedIndex : clickIdx + 1;
+    }
+    if (key === "scatter") scatterClickIdx = clickIdx;
+    const clickPt = hitPoint(layer, clickIdx);
+    let after = before;
+    for (let a = 0; a < 3; a++) {
+      await dispatchAt(key, clickPt.x, clickPt.y, "click");
+      try {
+        after = await waitChange(`#out_${key}`, before, `${key}-click`);
+        break;
+      } catch (e) {
+        if (a === 2) throw e;
+      }
+    }
+    const idRe = new RegExp(`:${spec.layerId}|${spec.layerId}`, "i");
+    if (!idRe.test(after)) throw new Error(`${key}-click: no layer in ${JSON.stringify(after).slice(0, 220)}`);
+    if (spec.layerKind !== "grid") {
+      if (!new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`).test(after)) {
+        throw new Error(`${key}-click: expected index ${clickIdx}: ${after.slice(0, 220)}`);
+      }
+    }
+    passed.push(`${key}/click-bind`);
+
+    // Click-echo (#103/#107): the overlay pins the picked hit(s) in g.sel itself, with no bond
+    // fed back through Julia — so this also proves the echo SURVIVES the reactive round-trip
+    // `waitChange` just awaited (a widget remount would reset it to the baked `selected=` alone,
+    // which is the whole reason the five-cell `selected=` workaround existed).
+    const hasLinks = !!(layer.links && layer.links.length);
+    const echo = await inspect(key);
+    if (hasLinks) {
+      // A legend entry pins its linked series, never the swatch itself — the swatch keeps
+      // whatever hover chrome it earned, so only g.sel's growth is asserted here.
+      const targetIds = layer.links[clickIdx] || [];
+      if (!targetIds.length) {
+        if (echo.sel !== afterLeave.sel) {
+          throw new Error(`${key}/click-echo: legend entry ${clickIdx} has no links but g.sel changed ${afterLeave.sel} -> ${echo.sel}`);
+        }
+      } else if (echo.sel <= afterLeave.sel) {
+        throw new Error(`${key}/click-echo: g.sel ${afterLeave.sel} -> ${echo.sel} after clicking legend entry ${clickIdx}`);
+      }
+      passed.push(`${key}/click-echo`);
+    } else if (SELF_PIN_KINDS.has(layer.kind)) {
+      // Hydration model: a click REPLACES the whole selection, so g.sel after the click holds
+      // exactly the clicked hit's own recipe (2 shapes — fill+edge — for a closed kind, 1 ring
+      // for an open one), independent of whatever `selected=` hydration was there before — a
+      // spec that bakes a `selected=` index no longer "grows" g.sel on click, it's simply reset.
+      if (echo.hi !== 0) throw new Error(`${key}/click-echo: hover chrome drawn over the echo (g.hi=${echo.hi})`);
+      const expectSel = closedHover ? 2 : 1;
+      if (echo.sel !== expectSel) {
+        throw new Error(`${key}/click-echo: g.sel=${echo.sel}, expected ${expectSel} for one echoed ${closedHover ? "closed" : "open"} hit (was ${afterLeave.sel} before the click)`);
+      }
+      passed.push(`${key}/click-echo`);
+    } else if (echo.sel !== afterLeave.sel) {
+      throw new Error(`${key}/click-echo: unpinned ${layer.kind} click changed g.sel ${afterLeave.sel} -> ${echo.sel}`);
+    }
+
+    // `InteractionEvent` has no custom `show`, so `repr(ev)` is Julia's default positional
+    // struct print: `InteractionEvent(:legend, 0, …)` — the ":<layerId>," prefix pins which
+    // layer actually won the hit-test. Belt-and-suspenders on top of the index regex above:
+    // this fails loud specifically on "resolved to the wrong layer", not just "wrong index".
+    if (spec.overlapsGrid && new RegExp(`:${spec.overlapsGrid},\\s*\\d+\\b`).test(after)) {
+      throw new Error(`${key}-click: bond resolved to grid layer "${spec.overlapsGrid}", not legend: ${after.slice(0, 220)}`);
+    }
+    console.error(`OK  ${key} — ${after.slice(0, 110)}`);
+
+    if (spec.links) {
       // The click-bind assertion above already confirmed index==clickIdx; here confirm the
       // bond's payload actually carries label/targets (not just the index).
       const clickTargets = (layer.links && layer.links[clickIdx]) || [];
@@ -941,23 +1009,37 @@ try {
     }
   }
 
-  // Hover-on-selected is a no-op: hovering scatter's baked-selected element (index 1, "beta")
-  // must draw NO highlight at all (fill and edge both empty) — the mark keeps its opaque
-  // selected wash instead, since a 1.5px hover stroke over the 2px selected stroke would read as
-  // *weaker*, not stronger. The tooltip and `@bind` still work for that hit; only the highlight
-  // is skipped.
+  // Hover-on-selected is a no-op: hovering scatter's CURRENTLY-selected element must draw NO
+  // highlight at all (fill and edge both empty) — the mark keeps its opaque selected wash
+  // instead, since a 1.5px hover stroke over the 2px selected stroke would read as *weaker*, not
+  // stronger. The tooltip and `@bind` still work for that hit; only the highlight is skipped.
+  // Under the hydration model, scatter's earlier click-echo (above) REPLACED its baked
+  // `selected=` (spec.selectedIndex, "beta") with the clicked index — so this must target
+  // `scatterClickIdx`, the element that IS selected now, not the no-longer-selected bake.
   {
     const spec = meta.find((s) => s.key === "scatter");
     const layers = await layersOf("scatter");
     const layer = findLayer(layers, spec);
-    const selPt = hitPoint(layer, spec.selectedIndex);
+    const idx = scatterClickIdx ?? spec.clickIndex;
+    // hoverTip is only known to correspond to spec.clickIndex (scatter's hoverIndex/clickIndex
+    // both being 0 by convention) — the click-collision fallback can, in principle, land on a
+    // different index, whose tip text this driver has no known value for. Rather than silently
+    // degrading the check to "a tooltip showed, any tooltip", fail loud: today's fixtures never
+    // collide, so this throw should never fire, but a future fixture that does collide must not
+    // let this check quietly accept the wrong tooltip.
+    if (idx !== spec.clickIndex) {
+      throw new Error(`scatter/hover-on-selected: clickIndex collided with hoverIndex (idx=${idx}) — no known tooltip text to assert`);
+    }
+    const expectTip = spec.hoverTip;
+    const tipOk = (t) => !!(t && t.show && new RegExp(expectTip, "i").test(t.text));
+    const selPt = hitPoint(layer, idx);
     let noop = null;
     for (let a = 0; a < 8; a++) {
       noop = await dispatchAt("scatter", selPt.x, selPt.y, "pointermove");
-      if (noop.show && /beta/i.test(noop.text)) break;
+      if (tipOk(noop)) break;
       await new Promise((r) => setTimeout(r, 200));
     }
-    if (!noop.show || !/beta/i.test(noop.text)) throw new Error(`scatter/hover-on-selected: tooltip ${JSON.stringify(noop)}`);
+    if (!tipOk(noop)) throw new Error(`scatter/hover-on-selected: tooltip ${JSON.stringify(noop)}`);
     assertNoHighlight(noop.hi, "scatter/hover-on-selected");
     if (noop.sel < 1) throw new Error("scatter/hover-on-selected: g.sel missing while hovering the selected mark");
     passed.push("scatter/hover-on-selected-noop");
