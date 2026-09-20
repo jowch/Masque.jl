@@ -1,7 +1,7 @@
 # 3. The interactable seam — `AbstractInteractable`
 
 Every interactable — built-in or user-authored — implements one contract. The framework never
-special-cases built-ins; `PointInteractable` is simply the first public implementation.
+special-cases built-ins; `PointInteractable` is the first public implementation.
 
 ```julia
 abstract type AbstractInteractable end
@@ -39,12 +39,13 @@ that a flat per-element list can't give: a 1000×1000 **heatmap grid** (ship edg
 a **polyline** (ship vertices once, hit-test segments in JS). A layer is one geometry *kind* plus the
 data to resolve a hit to an element index and its payload.
 
-> **Caveat (the grid is compact in geometry, not in payload).** The grid *geometry* is O(edges),
-> but to power the client-side `(i,j)=value` readout the layer also ships the full **source-resolution**
-> `values[]` matrix — O(source-cells), the dominant grid term. So a routine 2000²–4000² `heatmap!`/`image!`
-> ships tens of MB of values on top of a display-bounded PNG (4.78 MB measured at 1000²). This is the
-> day-one-reachable face of "the manifest is the scaling wall" ([§8](08-scaling.md#8-payload-scaling--robustness-to-large-inputs)). The committed fix ships `values[]`
-> only when cells are targetable (≥~1 px on the known display) — sub-pixel grids drop it ([§8](08-scaling.md#8-payload-scaling--robustness-to-large-inputs)).
+> **The grid is compact in geometry, not in payload.** The grid *geometry* is O(edges), but to
+> power the client-side `(i,j)=value` readout the layer also ships the full **source-resolution**
+> `values[]` matrix — O(source-cells), the dominant grid term. A routine 2000²–4000² `heatmap!`/`image!`
+> already ships tens of MB of values on top of a display-bounded PNG (4.78 MB measured at 1000²) —
+> this is what [§8](08-scaling.md#8-payload-scaling--robustness-to-large-inputs) calls "the manifest is the scaling wall", reachable on an
+> ordinary call, not only at extreme sizes. The committed fix ships `values[]` only when cells are
+> targetable (≥~1 px on the known display) — sub-pixel grids drop it ([§8](08-scaling.md#8-payload-scaling--robustness-to-large-inputs)).
 
 ```julia
 struct HitLayer
