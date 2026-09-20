@@ -117,13 +117,13 @@ the self-referencing shape is never written. It is still live for every other bo
 notebook that uses it. #103 retires the main reason users write that shape at all
 (the `selected=` self-referencing workaround) — the more durable answer for those callers.
 
-**Open, deliberately: whether live preview or a single frame at gesture end is the default.**
-This is a frame-cadence question; what commits is settled — view manipulation commits nothing
-(#122). #102's numbers bound what is *possible* — viable on a light scene, not on a heavy one at
-the resolutions tested — they don't settle what the default should be, per backend and per scene
-weight. That choice waits for a real implementation people can actually try, not spike numbers
-alone. A default right for a 240-point helix may be wrong for a large surface; it may need to
-adapt per scene rather than stay fixed.
+**Open, deliberately: whether live preview or a single frame at gesture end is the default.** This
+is a frame-cadence question; what commits is settled — view manipulation commits nothing (#122).
+#102's numbers bound what is *possible* — viable on a light scene, not on a heavy one at the
+resolutions tested — they don't settle what the default should be, per backend and possibly per
+scene weight. That choice waits for a real implementation people can actually try, not spike
+numbers alone. A default right for a 240-point helix may be wrong for a large surface; it may need
+to adapt per scene rather than stay fixed.
 
 **#86 corrects an earlier roadmap claim.** The camera-only resident-scene patch for `:webgl`
 is gated on DOM identity, not payload size: Pluto destroys the `<canvas>` on every cell
