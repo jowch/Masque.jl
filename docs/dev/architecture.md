@@ -405,7 +405,10 @@ them cleanly:
   scope on **both** backends for the *committed* value — a click, a keyboard commit, a slider- or
   widget-driven view change, or the final camera/`limits` value released at the end of a
   view-manipulation gesture (drag-to-pan, 3D orbit) — each lands through `@bind` exactly as any
-  other Tier 2 value, backend-symmetric. What differs is
+  other Tier 2 value, backend-symmetric. Landing through `@bind` commits the value; it does not by
+  itself force a server re-render — a click's own selection highlight is drawn client-side with no
+  round trip (§5), so a re-render happens only if the notebook's own reactive graph feeds the
+  committed value into a new cell. What differs when a re-render *does* happen is
   **cost**: `:webgl` re-serializes (~flat) while `:cairo` re-rasterizes (scales with the scene) —
   see `backend-comparison.md`. The **in-drag frames** of a view-manipulation gesture are not Tier 2
   traffic at all — they never touch `@bind`, never re-execute a cell, and the two backends
@@ -785,8 +788,8 @@ between them, and §12.2's rule is what decides it.
 
 ### 12.2 The routing rule
 
-Where a value lives is decided by four questions, in order, regardless of which interactable
-raises it:
+Where a drag interactable's in-progress (mid-drag) state lives is decided by four questions, in
+order:
 
 0. Can the browser answer it alone from what the manifest already ships? → overlay-local, no
    channel and no Julia round trip at all (§6 Tier 0).
@@ -845,11 +848,16 @@ Both backends must, for every frame of a gesture:
 - not re-execute a cell.
 
 How they satisfy these obligations differs completely, and that difference is expected, not a gap
-to close: `:cairo` re-renders and ships a fresh PNG plus a fresh manifest over the channel; `:webgl`
-patches its GPU buffers in place (#86) rather than shipping a new image. Per the standing
-principle, **backends differ in cost, never in the interaction contract** — a conforming
+to close: `:cairo` re-renders and ships a fresh PNG plus a fresh manifest over the channel;
+`:webgl`'s mechanism is unsettled — #86 gates in-place buffer patching on canvas identity (a
+WebGL context is tied to one `<canvas>`, and Pluto's cell-output replacement destroys it, so
+patching the old context's buffers is not viable until a canvas survives that), and #86's own
+in-gesture sketch is a 2D last-frame photographic preview instead, not a live GL patch. Per the
+standing principle, **backends differ in cost, never in the interaction contract** — a conforming
 implementation is judged against the obligations above, not against `:cairo`'s mechanism, and
-whichever backend is built first must not let its mechanism get mistaken for the contract.
+whichever backend is built first must not let its mechanism get mistaken for the contract. A
+genuinely unsettled second mechanism is itself the argument for stating obligations this way
+rather than after either backend's implementation.
 
 ### 12.6 Request discipline
 
@@ -893,17 +901,20 @@ supplies. Each is left to whoever picks up #102.
   during the drag, or an accepted lower frame rate — but which one, and at what threshold, is
   unresolved. See issue #102 for the measurements establishing that the heavy scene is
   render-bound.
-- **`:webgl` parity.** `:webgl`'s mechanism for satisfying §12.5's obligations differs from
-  `:cairo`'s (in-place buffer patching, #86) and is unmeasured. The shared thing between the
-  backends is the contract in this section, not any particular implementation of it.
+- **`:webgl` parity.** `:webgl`'s mechanism for satisfying §12.5's obligations is not merely
+  unmeasured, it is unsettled: #86 blocks in-place buffer patching on canvas identity (Pluto's
+  cell-output replacement destroys the `<canvas>` a WebGL context is tied to), and sketches a 2D
+  last-frame preview as the in-gesture path instead. Whichever mechanism `:webgl` ends up using,
+  the shared thing between the backends is the contract in this section, not any particular
+  implementation of it.
 - **What commits a gesture that has no release.** §12.3's commit-on-release rule is drag-shaped,
   because pan and orbit are pointer drags with a pointerup to commit on. A wheel zoom has no
   terminal event, so it needs some other commit rule — an idle debounce, an explicit affordance,
   something else — before §12.1's "a view-manipulation gesture's own release is a data
   interaction" means anything for it. `ViewInteractable` is drag-only today (`events` is
   `(:drag,)`; `mode` is `"pan"` or `"orbit"`; there is no wheel handler in `frontend/src/`), so
-  nothing is blocked right now — but `roadmap.md` plans wheel zoom as part of #85, and #105
-  depends on this channel making zoom cheap, so the rule is needed before either of those lands.
+  nothing is blocked right now — but `roadmap.md` plans wheel zoom as part of #85, and #105 would
+  benefit from this channel making zoom cheap, so the rule is needed before either of those lands.
 
 The remaining two are one decision, left to the maintainer, because they interact:
 
