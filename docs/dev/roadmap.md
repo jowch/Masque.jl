@@ -21,12 +21,13 @@ PR on `jowch/Masque.jl`.
 - **Live-verify on every backend** (`live-interaction-checklist.md`) before a user-facing
   change is called done. Interaction and visual, across the interactable kinds.
 
-**Where a value lives — three questions, in order** (framing from #102): does the notebook need
-this value (→ `@bind`)? Must it survive static export (→ precompute + `published_to_js`)?
-Neither (→ `AbstractPlutoDingetjes.Display.with_js_link`, a pull channel outside Pluto's state
-management — correct for chrome and transient parameters, wrong for anything the user considers
-part of their analysis, since nothing it returns is recorded in the notebook)? This is the
-general form the view-manipulation work below is the first concrete case of.
+**Where a value lives — four questions, in order.** Can the browser answer it alone from what
+the manifest already ships (→ overlay-local, no channel and no Julia round trip: an in-drag ROI
+box or threshold line)? Does the notebook need this value (→ `@bind`)? Must it survive static
+export (→ precompute + `published_to_js`)? Neither (→
+`AbstractPlutoDingetjes.Display.with_js_link`, a pull channel outside Pluto's state management)?
+`architecture.md` §12.2 is the normative statement and carries the reasoning for each branch;
+this is the framing the view-manipulation work below is the first concrete case of.
 
 ## Where things stand
 
