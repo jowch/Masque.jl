@@ -252,9 +252,24 @@ export function assertRemountStable(info, where) {
   if (!info.firstEnter) throw new Error(`${where}: first hover missing masque-enter fade`);
 }
 
+// `info.preLeave` (added for #99), when present, is the { hi, leaving } snapshot the driver
+// took immediately BEFORE dispatching pointerleave, from the same page.evaluate as `info`
+// itself — so it distinguishes "already gone before we even asked" (preLeave.hi === 0, a
+// lifecycle issue upstream of this check) from "our own leave cleared it with no fade" (a real
+// clearHi/masque-leave regression), instead of both printing the identical, undiagnosable
+// "cleared instantly" this used to throw either way. The genuine-instant-clear branch keeps
+// the exact "cleared instantly (no remount fade)" substring so it still matches every pre-#99
+// CI log and #99's own reviewer technique (diffing --log-failed output across commits); only
+// the newly-distinguished "already gone before we asked" case gets a different message, since
+// nothing before this could tell the two apart anyway.
 export function assertLeaveFade(info, where) {
-  if (info.hi === 0) throw new Error(`${where}: hover cleared instantly (no remount fade)`);
-  if (!info.leaving) throw new Error(`${where}: leave did not apply masque-leave`);
+  const pre = info.preLeave ? ` (pre-leave: hi=${info.preLeave.hi}, leaving=${info.preLeave.leaving})` : "";
+  if (info.hi === 0) {
+    const already = info.preLeave && info.preLeave.hi === 0;
+    const when = already ? "was already gone before pointerleave" : "cleared instantly";
+    throw new Error(`${where}: hover ${when} (no remount fade)${pre}`);
+  }
+  if (!info.leaving) throw new Error(`${where}: leave did not apply masque-leave${pre}`);
 }
 
 // The caret's visible apex — not the box `left`/`top` coordinates an e2e driver already reads

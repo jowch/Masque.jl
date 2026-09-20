@@ -1003,21 +1003,37 @@ try {
     passed.push(`${key}/tooltip`);
     passed.push(`${key}/hover`);
 
+    // #99: capture { hi, leaving } both immediately BEFORE and immediately after dispatching
+    // pointerleave, in this same evaluate — no new page.evaluate call, no requestAnimationFrame
+    // wait added here or anywhere in this file. A prior attempt at this fix drove the sequence
+    // through an explicit in-page rAF flush to make the hiStable block's second dispatch (below)
+    // land before this check; live-testing that on a real WGLMakie kernel showed it was the
+    // wrong direction — forcing a queued pointermove to actually apply (rather than being
+    // cancelled by onLeave's cancelPendingMove, hover.ts) is precisely the condition needed to
+    // arm clearHi's fade-out early and race this very check, and a forced-miss trial reproduced
+    // "cleared instantly" repeatably that way. The unmodified two-`page.evaluate` shape below,
+    // by contrast, never reproduced it even under an artificial 300ms delay standing in for a
+    // slow CDP round trip (headless Chromium does not appear to tick rAF while idle between
+    // evaluates) — so this fix only adds the pre/post snapshot, changing no timing at all.
     const fade = await page.evaluate((k) => {
       const span = document.querySelector(`#coords_${k}`);
       const hosts = [...document.querySelectorAll(".ip-host")];
       const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
-      const hi = sr.querySelector("svg.masque-fill g.hi")?.firstElementChild
-        || sr.querySelector("svg.masque-edge g.hi")?.firstElementChild
-        || sr.querySelector("svg.masque-plain g.hi")?.firstElementChild;
-      return {
-        hi: (sr.querySelector("svg.masque-fill g.hi")?.children.length ?? 0)
-          + (sr.querySelector("svg.masque-edge g.hi")?.children.length ?? 0)
-          + (sr.querySelector("svg.masque-plain g.hi")?.children.length ?? 0),
-        leaving: !!(hi && hi.classList.contains("masque-leave")),
+      const hiState = () => {
+        const hi = sr.querySelector("svg.masque-fill g.hi")?.firstElementChild
+          || sr.querySelector("svg.masque-edge g.hi")?.firstElementChild
+          || sr.querySelector("svg.masque-plain g.hi")?.firstElementChild;
+        return {
+          hi: (sr.querySelector("svg.masque-fill g.hi")?.children.length ?? 0)
+            + (sr.querySelector("svg.masque-edge g.hi")?.children.length ?? 0)
+            + (sr.querySelector("svg.masque-plain g.hi")?.children.length ?? 0),
+          leaving: !!(hi && hi.classList.contains("masque-leave")),
+        };
       };
+      const preLeave = hiState();
+      sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+      return { preLeave, ...hiState() };
     }, key);
     assertLeaveFade(fade, key);
     passed.push(`${key}/remount-fade`);
