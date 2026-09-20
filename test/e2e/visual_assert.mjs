@@ -334,6 +334,22 @@ export function assertLeaveFade(entries, where, group = "hi") {
   if (!removedProperly) {
     throw new Error(`${where}: hover cleared instantly (no remount fade)`);
   }
+  // Ordering alone (class applied, then removed) doesn't check DURATION — highlight.ts's
+  // MOTION_MS is a real ~80-120ms fade (CLAUDE.md's "Overlay recipes" locks 80-120ms), and if
+  // it ever collapsed to near-zero, every check above would still pass (a class WAS applied,
+  // the removed node DID carry it). `id` correlates the `attr` entry that first added
+  // masque-leave to an element with the `remove` entry for that SAME element (elements keep
+  // their assigned id for their whole lifetime — transient_log.mjs), so the actual elapsed fade
+  // time is measurable. Floor only, no ceiling: setTimeout can be delayed by load but never
+  // fires early, so a floor is immune to a contended runner; a ceiling would be flaky there and
+  // must not be added.
+  const FADE_FLOOR_MS = 50;
+  for (const rem of removes) {
+    const armed = entries.find((e) => e.id === rem.id && e.type === "attr" && hasClass(e.classes, "masque-leave"));
+    if (armed && rem.t - armed.t < FADE_FLOOR_MS) {
+      throw new Error(`${where}: fade too short (${(rem.t - armed.t).toFixed(1)}ms, want >= ${FADE_FLOOR_MS}ms)`);
+    }
+  }
 }
 
 // The caret's visible apex — not the box `left`/`top` coordinates an e2e driver already reads
