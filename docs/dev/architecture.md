@@ -780,10 +780,8 @@ speeds of one channel: a gesture's in-drag frames never carry a value the notebo
 producing that value is the entire point of a data interaction.
 
 For every drag interactable — ROI, threshold, view — release is a data interaction that commits
-through `@bind`, exactly as a click does (§12.3). What differs between them is only what happens
-*during* the drag: an in-progress ROI box or threshold line is overlay-local (§6 Tier 0, §12.2);
-an in-progress view-manipulation gesture is the one case that needs a Julia round trip mid-drag,
-and it is what this section's gesture channel is for.
+through `@bind`, exactly as a click does (§12.3). Only what happens *during* the drag differs
+between them, and §12.2's rule is what decides it.
 
 ### 12.2 The routing rule
 
@@ -791,9 +789,7 @@ Where a value lives is decided by four questions, in order, regardless of which 
 raises it:
 
 0. Can the browser answer it alone from what the manifest already ships? → overlay-local, no
-   channel and no Julia round trip at all (§6 Tier 0). An in-drag `ROIInteractable` box and an
-   in-drag threshold line are exactly this: the browser already owns that geometry, and drawing it
-   over an image that hasn't changed needs nothing from Julia mid-drag.
+   channel and no Julia round trip at all (§6 Tier 0).
 1. Does the notebook need this value? → `@bind`.
 2. Must it survive static export? → precompute it and ship it via `published_to_js`.
 3. Neither? → `AbstractPlutoDingetjes.Display.with_js_link` — a pull channel outside Pluto's state
@@ -827,8 +823,8 @@ today. Commit-on-release is unchanged by this channel; it is only the in-drag fr
 
 Because a view-manipulation gesture is the one drag that changes what Julia rendered (§12.2), any
 frame the user sees during it must be accompanied by hit geometry Julia computed for *that same*
-camera state. No backend may ship 3D (or 2D) coordinates to JS and reproject there. This is the existing
-Julia-authored-projection principle (§2's `InteractionContext`; the client-side-GPU-camera
+camera state. No backend may ship 3D (or 2D) coordinates to JS and reproject there. This is the
+existing Julia-authored-projection principle (§2's `InteractionContext`; the client-side-GPU-camera
 non-goal in §7's backend-scope note) extended to hold *per frame*, not only at commit — the
 non-goal itself is untouched, and this invariant is exactly what keeps a gesture channel from
 becoming the JS-driven camera that non-goal rules out. A gesture implementation that ships a new
