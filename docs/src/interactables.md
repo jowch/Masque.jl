@@ -18,8 +18,8 @@ Declare interactables explicitly (geometry in data space):
 - [`ROIInteractable`](@ref) — a draggable + resizable rectangle; drag the interior to move, a
   corner to resize both edges or an edge midpoint to resize just that one edge; commit the
   data-space bounds on mouse-up
-- [`ViewInteractable`](@ref) — drag-to-pan (2D `Axis` → new `limits`) / drag-to-rotate
-  (`Axis3` → `azimuth`/`elevation`); commit on mouse-up; Shift+drag wins over ROI/threshold
+- [`ViewInteractable`](@ref) — drag-to-pan (2D `Axis`) / drag-to-orbit (`Axis3`); commits
+  nothing (a camera isn't an analysis value); Shift+drag wins over ROI/threshold
 - [`RegionInteractable`](@ref) / [`FunctionInteractable`](@ref) — custom interactions, no
   JavaScript required; see [Custom interactions](@ref)
 
@@ -34,11 +34,16 @@ page.
 runnable gallery of the core element/axis/view kinds above plus the selection round-trip;
 see [Legend](@ref) for a runnable [`LegendInteractable`](@ref) example.
 
-**Pan, zoom, and 3D rotation** re-render through the same `@bind` loop as everything else:
-change `limits` (2D) or `azimuth`/`elevation` (`Axis3`) and rebuild the widget — `masque`
-re-projects the overlay, so hit regions stay correct. Drive those params yourself with
-PlutoUI sliders, or drag them with [`ViewInteractable`](@ref) (commit-on-release;
-Shift+drag wins over a `ROIInteractable`/`ThresholdInteractable` on the same axis).
+**Pan, zoom, and 3D rotation via a slider** re-render through the same `@bind` loop as
+everything else: change `limits` (2D) or `azimuth`/`elevation` (`Axis3`) and rebuild the widget
+— `masque` re-projects the overlay, so hit regions stay correct.
+
+**Dragging with [`ViewInteractable`](@ref) is different: it commits nothing.** A camera is
+operational state, not an analysis value the notebook reads. On the `:cairo` backend, in-drag
+frames stream over a `with_js_link` gesture channel instead of a bond — the image and hit
+regions repaint live, with no cell re-execution. `:webgl` has no live-preview mechanism yet: a
+drag there shows a numeric readout but repaints nothing. Shift+drag wins over a
+`ROIInteractable`/`ThresholdInteractable` on the same axis on both backends.
 [`examples/view_manip.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip.jl)
 demonstrates both.
 

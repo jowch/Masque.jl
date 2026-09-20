@@ -65,6 +65,18 @@ end
     @test w.scene isa Dict{String, Any}
     @test (w.width, w.height) == (400, 300)
 
+    # #102's gesture channel is :cairo only (docs/dev/architecture/12-gesture-channel.md
+    # §12.10) — `make_widget`'s shared signature hands WebGLBackend the same fig/interactables/
+    # ppu a ViewInteractable-carrying widget would need, and WebGLWidget has no field for it at
+    # all, so a ViewInteractable must still build without error and just carry no live-preview
+    # mechanism.
+    fig_v = Figure(; size = (400, 300))
+    ax_v = Axis(fig_v[1, 1])
+    scatter!(ax_v, 1:5, rand(5))
+    wv = masque(fig_v, [ViewInteractable(ax_v)]; backend = _WGLExt.WebGLBackend())
+    @test wv isa _WGLExt.WebGLWidget
+    @test !hasfield(_WGLExt.WebGLWidget, :render_frame)
+
     # scene must be JSON3-safe (Makie can emit NaN in transformed-position buffers; _plain scrubs them)
     @test JSON3.write(w.scene) isa String
 

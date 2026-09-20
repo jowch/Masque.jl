@@ -67,17 +67,16 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test L3.geometry["mode"] == "orbit"
         @test L3.geometry["azimuth"] ≈ 0.4
         @test L3.geometry["elevation"] ≈ 0.5
-        # bond payload round-trip (pan + orbit shapes) — a real :view layer entry, not the bare
-        # test double `_bond_payload` passes through unchanged, so the kind dispatch actually runs
-        # and converts the browser Dict to a NamedTuple (#110).
+        # #102/§12.3: a view gesture commits nothing, so the frontend never sends a :view bond
+        # payload anymore — `_computed_payload`'s :view branch retired with it. A caller that
+        # somehow reaches transform_value with one anyway (there is no such path in the shipped
+        # frontend) hits the same unrecognized-computed-payload-shape guard any other untaught
+        # kind/keys combination would, rather than silently converting it.
         tv = Masque.APD.Bonds.transform_value
         vmanifest = Dict{String, Any}("layers" => [Dict{String, Any}("id" => "view", "kind" => "view", "payloads" => Any[])])
         w = Masque.MasqueWidget("", vmanifest, 100)
-        evp = tv(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("xmin" => 1.0, "xmax" => 5.0, "ymin" => 0.0, "ymax" => 10.0)))
-        @test evp isa InteractionEvent && evp.layer === :view
-        @test evp.payload.xmin == 1.0 && evp.payload.ymax == 10.0
-        evo = tv(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("azimuth" => 0.9, "elevation" => 0.3)))
-        @test evo.payload.azimuth == 0.9 && evo.payload.elevation == 0.3
+        @test_throws ArgumentError tv(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("xmin" => 1.0, "xmax" => 5.0, "ymin" => 0.0, "ymax" => 10.0)))
+        @test_throws ArgumentError tv(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("azimuth" => 0.9, "elevation" => 0.3)))
         # PolarAxis / Colorbar: view gestures rejected (no continuous polar inversion; colorbar is 1-D)
         fp = Figure(); axp = PolarAxis(fp[1, 1])
         scatter!(axp, [Point2f(0.0, 1.0), Point2f(π / 2, 2.0)])
@@ -148,9 +147,11 @@ end
 
     @test bp(thrm, "L", 0, 4.5) === 4.5   # bare scalar — nothing to convert, no fields to name
 
-    @test bp(viewm, "L", 0, Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0)) ==
-        (; xmin = 0.0, xmax = 1.0, ymin = 0.0, ymax = 1.0)
-    @test bp(viewm, "L", 0, Dict("azimuth" => 0.1, "elevation" => 0.2)) == (; azimuth = 0.1, elevation = 0.2)
+    # #102/§12.3: a view gesture commits nothing, so :view is no longer a recognized computed
+    # payload kind at all — retired alongside `_computed_payload`'s :view branch. `viewm` is
+    # kept as a fixture only to prove that explicitly, not because any real path reaches it.
+    @test_throws ArgumentError bp(viewm, "L", 0, Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0))
+    @test_throws ArgumentError bp(viewm, "L", 0, Dict("azimuth" => 0.1, "elevation" => 0.2))
 
     # a payload shape none of the branches above recognize fails loud instead of silently
     # passing a raw Dict through — the per-kind enumeration doing its job when a branch grows

@@ -32,6 +32,16 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
         text = thresholdDrag.move(d, p)
     } else if (d.kind === "view") {
         text = viewDrag.tip(d, p)
+        // Tier-0 readout above always works (browser-only) even for a sub-threshold move; the
+        // live preview only kicks in past VIEW_MIN_PX — same "ignore accidental micro-drags"
+        // guard `end`'s old commit check used to apply, now protecting the gesture channel
+        // instead of a bond write, so an ordinary click with a pixel of jitter doesn't spend a
+        // round trip on a frame nobody will see move. ctx.gesture_ is a no-op channel when
+        // there's no mechanism for this widget (:webgl, no ViewInteractable, export, or a
+        // channel that already degraded).
+        if (Math.hypot(p.x - d.x0_, p.y - d.y0_) >= viewDrag.VIEW_MIN_PX) {
+            ctx.gesture_.request(viewDrag.requestInput(d, p, false))
+        }
     } else {
         text = roiDrag.move(ctx, state, d, p)
     }
@@ -136,11 +146,12 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
         (ctx.host_ as unknown as { value: unknown }).value = thresholdDrag.end(d, p)
         ctx.host_.dispatchEvent(new CustomEvent("input"))
     } else if (d.kind === "view") {
-        const value = viewDrag.end(d, p)
-        if (value !== undefined) {
-            (ctx.host_ as unknown as { value: unknown }).value = value
-            ctx.host_.dispatchEvent(new CustomEvent("input"))
-        }
+        // §12.3: a view gesture commits nothing — no bond write, no "input" event. Below
+        // VIEW_MIN_PX this was never more than a click that jittered slightly, so there's
+        // nothing to settle; `justDragged_` below still gates whether the synthesized click
+        // that follows should be swallowed.
+        const dist = Math.hypot(p.x - d.x0_, p.y - d.y0_)
+        if (dist >= viewDrag.VIEW_MIN_PX) ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
     } else {
         (ctx.host_ as unknown as { value: unknown }).value = roiDrag.end(ctx, state, d)
         ctx.host_.dispatchEvent(new CustomEvent("input"))

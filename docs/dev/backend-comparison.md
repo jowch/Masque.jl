@@ -8,8 +8,10 @@
 > contract (parity is CI-enforced by the golden-manifest harness, `test/fixtures/parity/`).
 > Both backends ship `Axis3` overlays (WS-3D core, 2026-07-02) — static base on `:cairo`, live on
 > `:webgl` — with identical manifests (the `axis3` parity goldens are byte-identical). View
-> manipulation **ships** as **backend-symmetric `@bind` re-render** (sliders + `ViewInteractable` drag);
-> only the client-side GPU camera is out of scope (see §1†).
+> manipulation via a **slider** ships as **backend-symmetric `@bind` re-render**.
+> `ViewInteractable` **drag** commits nothing on either backend (#102/§12.3) and has a live
+> gesture-channel preview on `:cairo` only — `:webgl` parity is open (see §1†). The client-side
+> GPU camera is out of scope on both.
 >
 > **Numbers reproduce** via `julia --project=. bench/vs_cairo.jl` (WebGL measured live in this
 > process, both sides `Random.seed!(0)`; Cairo measured in a subprocess, since Masque supports only
@@ -34,8 +36,10 @@ camera is deliberately not client-driven on either backend (§1†).
 
 | interaction | `:cairo` | `:webgl` |
 |---|---|---|
-| pan / zoom | `@bind` re-render of `limits` (sliders + `ViewInteractable` drag) | same — re-render churn is upstream-managed, no context gate |
-| rotate a 3D plot | `@bind` re-render of `azimuth`/`elevation` (sliders + `ViewInteractable` drag) | same — renders `Axis3` live today, same overlays |
+| pan / zoom (slider) | `@bind` re-render of `limits` | same — re-render churn is upstream-managed, no context gate |
+| pan / zoom (`ViewInteractable` drag) | live gesture-channel preview (`with_js_link`, #102); commits nothing | no mechanism yet (§12.10); readout only, commits nothing |
+| rotate a 3D plot (slider) | `@bind` re-render of `azimuth`/`elevation` | same — renders `Axis3` live today, same overlays |
+| rotate a 3D plot (`ViewInteractable` drag) | live gesture-channel preview (`with_js_link`, #102); commits nothing | no mechanism yet (§12.10); readout only, commits nothing |
 | hover tooltip | overlay hit-test (client) | overlay hit-test (client) — same |
 | click → `@bind` | client hit-test + bind | client hit-test + bind — same |
 | data update (`@bind` drives the data) | **full** server render + encode + PNG re-ship | server serialize + client redraw |
@@ -43,8 +47,9 @@ camera is deliberately not client-driven on either backend (§1†).
 
 The rows that **match** are the current story: both backends do hover/click/`@bind` the same way
 (`Axis3` included — same overlays, same `{index,x,y,z}` payloads); `:webgl`'s edge is rendering
-**cost** (cheap re-renders; live rather than static 3D). Live pan/zoom/rotate **ships on both
-backends** as server-authoritative `@bind` re-render (sliders + `ViewInteractable` drag) (†).
+**cost** (cheap re-renders; live rather than static 3D). Slider-driven pan/zoom/rotate **ships on
+both backends** as server-authoritative `@bind` re-render; `ViewInteractable` drag commits
+nothing on either and only has a live preview on `:cairo` (†).
 
 > **(†) View manipulation: shipped as backend-symmetric `@bind` re-render; the client-side GPU
 > camera stays out (a Masque-wide non-goal, alongside GPU-pick occlusion).** What is true today, verified from source: the widget
@@ -59,20 +64,29 @@ backends** as server-authoritative `@bind` re-render (sliders + `ViewInteractabl
 >
 > The **in-scope path** has Julia re-render from new view parameters: 2D `limits` or 3D
 > `azimuth`/`elevation` change → Julia re-renders → fresh base + freshly projected overlay. That is
-> backend-symmetric and drift-free *by construction* (Julia recomputes the overlay every step).
-> (#122 takes view parameters off `@bind` and onto the gesture channel as a contract;
-> `ViewInteractable` still commits through `@bind` until #102 implements it —
-> [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when). The re-render path
-> described here is unchanged either way.)
-> Cost, honestly: `:cairo` re-rasterizes per step (scales with the scene; fine for sliders and
-> commit-on-release drag); `:webgl` re-serializes (~flat, §2) and re-initializes the GL
-> context + scene per step. **The former "gated on GL-context reuse" claim was measured FALSE**
+> drift-free *by construction* (Julia recomputes the overlay every step) — for a **slider**,
+> still backend-symmetric server-authoritative `@bind` re-render on both backends, unchanged by
+> any of the below.
+> `ViewInteractable` **drag** is a separate path since #102/§12.3: it commits nothing on either
+> backend — a camera is operational state, not an analysis value
+> ([§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)). On `:cairo`, in-drag
+> frames stream over the `with_js_link` gesture channel instead of a bond, so the same
+> Julia-authored-projection guarantee holds per frame, not just at commit. `:webgl` has no
+> live-preview mechanism yet (§12.10): a drag there shows only the Tier-0 numeric readout and
+> repaints nothing, so this row is **not** backend-symmetric today.
+> Cost, honestly: `:cairo` re-rasterizes per step (scales with the scene; the gesture channel
+> drops `px_per_unit` to 1 during the drag and restores it on release, see
+> `perf-findings.md`'s "Gesture channel (#102)" section for measured numbers); `:webgl` re-serializes
+> (~flat, §2) and re-initializes the GL context + scene per step FOR A SLIDER re-render — a
+> `ViewInteractable` drag on `:webgl` triggers none of that today, since it produces no frame at
+> all. **The former "gated on GL-context reuse" claim was measured FALSE**
 > (2026-07-02 — figures and mechanism in `perf-findings.md` §"WGL context lifecycle"): re-init
 > per step is a *cost* (the camera-only resident-scene patch is the planned optimization), not
-> a feasibility gate. Continuous *smooth* drag on large scenes remains expensive on both — a
-> shared cost wall, not a capability split. Status: **shipped** — sliders and `ViewInteractable`
-> drag-to-pan/rotate (commit-on-release) on both backends; live drag *preview* deferred with
-> animation.
+> a feasibility gate. Continuous *smooth* drag on large scenes remains expensive on both where a
+> mechanism exists at all — a shared cost wall, not a capability split. Status: sliders
+> ship backend-symmetric `@bind` re-render on both; `ViewInteractable` drag commits nothing on
+> either and has a live gesture-channel preview on `:cairo` only (#102) — `:webgl` parity is
+> open (§12.10).
 
 ## 2. Wire + server cost — the measurable half
 
@@ -179,9 +193,11 @@ identity across Pluto's cell replacement, #86). Both tracked in `roadmap.md` (Ax
 view manipulation via Julia re-render); the client-side GPU camera remains a Masque-wide non-goal
 (alongside GPU-pick occlusion).
 
-**Amended (#122):** the transport above is superseded — view parameters belong on the
-`with_js_link` gesture channel, not `@bind`, because a camera is operational state rather than an
-analysis value ([§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)). That is
-the contract; `ViewInteractable` still binds until #102 implements it. Everything else in this
-decision stands: server-authoritative re-render, backend symmetry, and the client-side GPU camera
-staying out.
+**Amended (#122, implemented #102):** the transport above is superseded — view parameters belong
+on the `with_js_link` gesture channel, not `@bind`, because a camera is operational state rather
+than an analysis value ([§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)).
+`ViewInteractable` commits nothing on either backend. `:cairo` implements the channel: in-drag
+frames stream over `with_js_link` instead of a bond. `:webgl` has no live-preview mechanism yet
+(§12.10) — a drag there shows only the Tier-0 numeric readout and repaints nothing, so the
+backend symmetry this section otherwise describes does not (yet) hold for view manipulation
+specifically. The client-side GPU camera staying out is unaffected by any of this.

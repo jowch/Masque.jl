@@ -12,7 +12,7 @@
   enough to look the object up, so sending the payload back over the wire would be dead weight
   the receiver throws away — and the result is still `ev.payload === payloads[i]`, so a
   `NamedTuple` payload stays a `NamedTuple`. Kinds with no Julia-side original —
-  `:axis`/`:grid`/`:roi`/`:view` — have nothing to look up, so the browser-computed value is
+  `:axis`/`:grid`/`:roi` — have nothing to look up, so the browser-computed value is
   what ships; `_bond_payload` converts it to a flat, non-recursive `NamedTuple`, per kind, so
   `ev.payload.x` reads the same way an element payload does (#110): for `AxisInteractable`,
   `index = -1` (axis hits aren't element-indexed) and `payload` is `(; x, y)` (or `(; value)`

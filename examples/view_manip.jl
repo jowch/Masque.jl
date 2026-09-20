@@ -34,10 +34,16 @@ end
 md"""
 # Masque.jl — view manipulation via `@bind` re-render
 
-Pan, zoom, and 3D rotation use the same server-authoritative `@bind` re-render model:
-change `limits` (2D) or `azimuth`/`elevation` (`Axis3`) and rebuild — `masque` re-projects
-the overlay so hit regions never drift. Drive those params with PlutoUI sliders (no Masque
-API) or with **`ViewInteractable`** drag-to-pan / drag-to-rotate (commit-on-release).
+Pan, zoom, and 3D rotation via a **slider** re-render through the same server-authoritative
+`@bind` loop as everything else: change `limits` (2D) or `azimuth`/`elevation` (`Axis3`) and
+rebuild — `masque` re-projects the overlay so hit regions never drift.
+
+**`ViewInteractable`** (drag-to-pan / drag-to-orbit) is different: it **commits nothing** — a
+camera is operational state, not an analysis value a notebook reads
+(docs/dev/architecture/12-gesture-channel.md §12.3). On `:cairo`, drag frames stream over a
+`with_js_link` gesture channel instead of a bond: the base image and hit manifest repaint live,
+in place, with no cell re-execution and no remount. `:webgl` has no live-preview mechanism yet
+(§12.10) — dragging there shows only a numeric readout and repaints nothing.
 The same notebook runs on `:webgl` (`examples/view_manip_webgl.jl`).
 """
 
@@ -150,12 +156,14 @@ HTML("<span id=\"rotout\">ROT=$(repr(rot_sel)) az=$(rot_az) el=$(rot_el)</span>"
 
 # ╔═╡ 50000000-0000-0000-0000-000000000040
 md"""
-## Drag-to-pan (2D) — commit on release
+## Drag-to-pan (2D) — commits nothing
 
-`ViewInteractable` emits new `limits` on mouse-up. Pluto forbids feeding that bond back
-into the *same* figure cell (cyclic reference), so the **top** plot is a fixed-seed drag
-surface and the **bottom** plot re-renders from the committed bond — same server-authoritative
-contract as the slider. **Shift+drag** forces pan over Tier-0 ROI/threshold.
+`ViewInteractable` no longer emits anything on mouse-up (§12.3) — drag the plot below and
+watch it repaint live on `:cairo` (the gesture channel, not a bond). `pan_ev` still reports the
+**selection** (clicking a point), which this widget never updates via drag; `pan_committed`
+below is therefore always `pan_seed` and the second figure is a static duplicate, kept only to
+show that a `ViewInteractable`'s bond genuinely carries no view payload to drive it from.
+**Shift+drag** forces pan over Tier-0 ROI/threshold.
 """
 
 # ╔═╡ 50000000-0000-0000-0000-000000000041
@@ -174,6 +182,8 @@ end
 @bind pan_ev masque(pan_fig, [pan_pts, pan_view])
 
 # ╔═╡ 50000000-0000-0000-0000-000000000044
+# Always pan_seed: a ViewInteractable's bond never reports `:view` (§12.3), so this branch is
+# dead code kept to make that explicit rather than deleting the demonstration outright.
 pan_committed = begin
     if pan_ev !== nothing && pan_ev isa InteractionEvent && pan_ev.layer === :view
         pl = pan_ev.payload
@@ -198,8 +208,9 @@ end
 md"""
 ## Drag-to-rotate (Axis3) — commit on release
 
-Same split: drag on the seed camera (top); bottom re-renders from committed
-`(azimuth, elevation)`.
+Same shape as the pan demo above: `ViewInteractable` commits nothing (§12.3), so `orbit_committed`
+below is always `orb_seed` and the bottom figure is a static duplicate — drag the top plot to see
+the live gesture-channel preview on `:cairo` instead.
 """
 
 # ╔═╡ 50000000-0000-0000-0000-000000000051
@@ -217,6 +228,7 @@ end
 @bind orb_ev masque(orb_fig, orb_view)
 
 # ╔═╡ 50000000-0000-0000-0000-000000000054
+# Always orb_seed — same dead branch as pan_committed above, for the same reason (§12.3).
 orbit_committed = begin
     if orb_ev !== nothing && orb_ev isa InteractionEvent && orb_ev.layer === :view
         op = orb_ev.payload

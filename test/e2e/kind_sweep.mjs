@@ -589,6 +589,69 @@ try {
       );
     }
 
+    if (spec.mode === "drag" && spec.layerKind === "view") {
+      // #102/§12.3: a view gesture commits nothing anymore — the OLD assertion here waited for
+      // #out_view's bond text to change and would now fail for the right reason (nothing ever
+      // commits) for the WRONG reason (the test still expects a commit). Asserting "the bond
+      // stayed put" alone would pass just as well if the drag did nothing at all — the #99
+      // failure shape (a green assertion unable to fail for the right reason) — so this checks
+      // three things: the bond truly didn't move, AND (on `:cairo`, where the gesture channel is
+      // implemented) mount.ts's `host.dataset.masqueGestureFrame` stamp — written atomically in
+      // the same block that swaps the frame + manifest — advanced with a well-formed new camera,
+      // proving a REAL frame landed from the CURRENT drag rather than sampling stale state. On
+      // `:webgl` (no live-preview mechanism yet, architecture §12.10) the stamp must never
+      // appear at all — the readout still works, but nothing repaints.
+      const p = hitPoint(layer, 0);
+      const before = await textOf(`#out_${key}`);
+      const readStamp = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        return host?.dataset.masqueGestureFrame ?? null;
+      }, key);
+      const stampBefore = await readStamp();
+      await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host?.scrollIntoView({ block: "center", inline: "nearest" });
+      }, key);
+      await drag(key, p.x, p.y, p.x + 80, p.y, true);
+
+      const after = await textOf(`#out_${key}`);
+      if (after !== before) {
+        throw new Error(`${key}-drag: a view gesture must not commit a bond value, but #out_${key} changed ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+      }
+
+      if (backend === "cairo") {
+        let stampAfter = stampBefore;
+        for (let i = 0; i < 25 && stampAfter === stampBefore; i++) {
+          await new Promise((r) => setTimeout(r, 200));
+          stampAfter = await readStamp();
+        }
+        if (!stampAfter || stampAfter === stampBefore) {
+          throw new Error(`${key}-drag: gesture-channel frame never landed (stamp stayed ${JSON.stringify(stampBefore)})`);
+        }
+        const cam = JSON.parse(stampAfter);
+        const nBefore = stampBefore ? JSON.parse(stampBefore).n : 0;
+        if (!(cam.n > nBefore)) throw new Error(`${key}-drag: gesture frame counter did not advance (${nBefore} -> ${cam.n})`);
+        const camKeys = "azimuth" in cam ? ["azimuth", "elevation"] : ["xmin", "xmax", "ymin", "ymax"];
+        if (!camKeys.every((k2) => typeof cam[k2] === "number" && Number.isFinite(cam[k2]))) {
+          throw new Error(`${key}-drag: gesture frame stamp missing camera fields: ${stampAfter}`);
+        }
+        passed.push(`${key}/view-gesture-frame`);
+        console.error(`OK  ${key}/drag — no commit (§12.3), gesture frame ${stampAfter}`);
+      } else {
+        const stampAfter = await readStamp();
+        if (stampAfter !== stampBefore) {
+          throw new Error(`${key}-drag: :webgl produced a gesture-channel frame, but no mechanism is implemented for it (architecture §12.10)`);
+        }
+        passed.push(`${key}/view-no-commit-no-webgl-frame`);
+        console.error(`OK  ${key}/drag — no commit, no frame (webgl has no live-preview mechanism yet)`);
+      }
+      continue;
+    }
+
     if (spec.mode === "drag") {
       const p = hitPoint(layer, 0);
       const before = await textOf(`#out_${key}`);
@@ -610,7 +673,7 @@ try {
           const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
           host?.scrollIntoView({ block: "center", inline: "nearest" });
         }, key);
-        await drag(key, p.x, p.y, x1, y1, spec.layerKind === "view");
+        await drag(key, p.x, p.y, x1, y1, false);
         try {
           after = await waitChange(`#out_${key}`, before, `${key}-drag`, 120);
           break;
@@ -619,9 +682,7 @@ try {
         }
       }
       if (after === before) throw new Error(`${key}-drag: #out_${key} never changed from ${JSON.stringify(before)}`);
-      const re = spec.layerKind === "view" ? /xmin|xmax|:view/i
-        : spec.layerKind === "roi" ? /:roi|InteractionEvent\[/i
-        : /:threshold|:thr/i;
+      const re = spec.layerKind === "roi" ? /:roi|InteractionEvent\[/i : /:threshold|:thr/i;
       if (!re.test(after)) throw new Error(`${key}-drag: readout mismatch ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/drag-bind`);
       console.error(`OK  ${key}/drag — ${after.slice(0, 100)}`);

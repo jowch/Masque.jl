@@ -85,7 +85,11 @@ end
 function render end
 function context end
 function _ppu end         # (backend, fig) -> px_per_unit / device scale
-function make_widget end  # (backend, <backend's RenderResult-like>, manifest, display_css) -> the @bind widget
+# (backend, <backend's RenderResult-like>, manifest, display_css, fig, interactables, ppu) ->
+# the @bind widget. The last three are for the gesture channel (#102, `:cairo`-only today):
+# `CairoBackend`'s method builds a per-frame `with_js_link` callback from them
+# (`Masque._view_render_frame`); `WebGLBackend`'s accepts and ignores them.
+function make_widget end
 
 # `Makie.project` expects post-transform_func coordinates; transform in Float64 first —
 # an early Float32 cast can overflow (e.g. log10(1e39)) or lose precision. DomainError

@@ -5,6 +5,8 @@ import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from ".
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
+import { createGestureChannel } from "./gesture"
+import type { FrameResponse, RenderFrame } from "./gesture"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, MOTION_MS } from "./state"
 import type { HiGroups, OverlayCtx } from "./state"
 import type { Hit, Manifest } from "./types"
@@ -206,8 +208,13 @@ interface Mounted {
  * @param scriptEl  the cell's <script> (its parent is the light-DOM host containing the <img>/<canvas> base)
  * @param manifest  hit-region manifest (from published_to_js or inlined JSON)
  * @param invalidation  Pluto's cleanup promise (resolves on cell re-render)
+ * @param requestFrame  the gesture channel's per-frame callback (#102), or `null`/absent when
+ *   this widget has no live-preview mechanism (`:webgl`, or no `ViewInteractable` at all) —
+ *   `render.jl`'s `Base.show` interpolates `null` in exactly that case, so a WGLWidget's own
+ *   `mount()` call (which never passes this argument) and a Cairo widget with no view drag look
+ *   identical to `createGestureChannel` below.
  */
-export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: Promise<unknown>): Mounted {
+export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: Promise<unknown>, requestFrame?: RenderFrame | null): Mounted {
     const host = scriptEl.parentElement as HTMLElement | null
     // Image-px scale comes from manifest.width, not the element's intrinsic size, so a
     // <canvas> needs no sizer shim. The host is assumed to hold exactly one base element.
@@ -333,14 +340,92 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const roiBoxes = roiDrag.buildROIBoxes(manifest, plainSvg)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
+
+    // #102's gesture channel: a no-op when `requestFrame` is absent (`:webgl`, or no
+    // ViewInteractable), so bond.ts never has to branch on whether a live preview exists.
+    // `applyFrame` is a hoisted function declaration (below) referencing `ctx`/`state` by
+    // closure — it's never CALLED until a real round trip resolves, well after both are
+    // initialized, so the forward reference here is safe despite the textual order.
+    let lastFrameUrl: string | null = null
+    let gestureFrameCount = 0
+    const channel = createGestureChannel(requestFrame ?? null, applyFrame)
+
     const ctx: OverlayCtx = {
         manifest_: manifest, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
         linkGroup_: linkGroup,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
+        gesture_: channel,
     }
     const state = createOverlayState()
     state.selHits_ = selHits
+
+    // Applies one {png, manifest?} response (§12.4/§12.5): swap the frame, and — whenever the
+    // camera moved (always, for a view gesture) — the hit manifest along with it, atomically.
+    // Both writes below happen synchronously in this one call, so a frame and the manifest
+    // describing it are never observably out of sync (#102 tripwire #1).
+    function applyFrame(input: Record<string, unknown>, r: FrameResponse): void {
+        if (base instanceof HTMLImageElement) {
+            // `r.png` decodes off `with_js_link` as a plain (never Shared) ArrayBuffer-backed
+            // Uint8Array, but its TS type is the generic `Uint8Array<ArrayBufferLike>` — narrower
+            // than `BlobPart` wants; the cast reflects that decoded reality, not a bypass of it.
+            const url = URL.createObjectURL(new Blob([r.png as Uint8Array<ArrayBuffer>], { type: "image/png" }))
+            const prev = lastFrameUrl
+            lastFrameUrl = url
+            base.src = url
+            if (prev) URL.revokeObjectURL(prev) // revoke the PREVIOUS url, not this one, mid-gesture
+        }
+        const newManifest = r.manifest as Manifest | undefined
+        if (!newManifest) return
+
+        // Threshold lines / ROI boxes are built once, from the mount manifest, and never
+        // patched in place elsewhere — a camera move invalidates every hit region on the same
+        // axis (§12.4), so anything derived from the OLD manifest is torn down and rebuilt from
+        // the new one rather than mutated.
+        for (const line of ctx.thresholdLines_.values()) line.remove()
+        for (const box of ctx.roiBoxes_.values()) {
+            box.rect_.remove()
+            for (const hdl of box.handles_) hdl.remove()
+        }
+        ctx.manifest_ = newManifest
+        ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(newManifest, plainSvg)
+        ctx.roiBoxes_ = roiDrag.buildROIBoxes(newManifest, plainSvg)
+        ctx.focusable_ = buildFocusable(newManifest)
+        ctx.layerStarts_ = computeLayerStarts(ctx.focusable_)
+
+        // Re-key the LIVE selection against the new layer objects — do NOT re-derive it from
+        // the new manifest's own `selected=` field, which is only the mount-time hydration seed;
+        // reading it here would resurrect that and silently drop every click since (#102
+        // tripwire #3, the #107 regression shape). `selKeys_` is already id-keyed and gets
+        // rebuilt by `renderSelection` itself, so only `selHits_` needs re-keying here.
+        const nextSel: Hit[] = []
+        for (const h of state.selHits_) {
+            const layer = newManifest.layers.find((l) => l.id === h.layer.id)
+            if (!layer) continue
+            try {
+                nextSel.push({ layer, ...hitLayerByIndex(layer, h.index) })
+            } catch {
+                /* index no longer valid against the new geometry — drop rather than throw mid-gesture */
+            }
+        }
+        state.selHits_ = nextSel
+        renderSelection(ctx, state)
+
+        // A paired, atomic stamp — written in the SAME synchronous block as the swap above, not
+        // sampled separately — so an observer (e2e's kind_sweep.mjs) can tell "a frame actually
+        // landed" from "a frame was requested," and read the exact camera it landed at, without
+        // relying on the bond (which §12.3 leaves untouched for a view gesture).
+        const viewLayer = newManifest.layers.find((l) => l.id === input.id)
+        const geom = viewLayer?.geometry as { azimuth?: number; elevation?: number } | undefined
+        const camera: Record<string, number> = "azimuth" in input
+            ? { azimuth: geom?.azimuth ?? NaN, elevation: geom?.elevation ?? NaN }
+            : (() => {
+                const t = viewLayer ? newManifest.transforms[viewLayer.axis] : undefined
+                return { xmin: t?.xlims[0] ?? NaN, xmax: t?.xlims[1] ?? NaN, ymin: t?.ylims[0] ?? NaN, ymax: t?.ylims[1] ?? NaN }
+            })()
+        gestureFrameCount += 1
+        ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueGestureFrame = JSON.stringify({ n: gestureFrameCount, ...camera })
+    }
 
     // Pinned to the base (img/canvas), not the host: WGLMakie can size the <canvas>
     // differently from `.ip-host`, which left g.sel offset when the SVG was `inset:0` on the host.
@@ -414,6 +499,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (state.linkLeaveTimer_ != null) clearTimeout(state.linkLeaveTimer_)
         if (state.tipFlipTimer_ != null) clearTimeout(state.tipFlipTimer_)
         if (state.announceTimer_ != null) clearTimeout(state.announceTimer_)
+        channel.dispose() // abandon anything in flight — a late response must not touch a dead DOM
+        if (lastFrameUrl) URL.revokeObjectURL(lastFrameUrl)
         shadowHost.remove()
     }
     invalidation?.then(cleanup)

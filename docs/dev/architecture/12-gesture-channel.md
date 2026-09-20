@@ -100,9 +100,11 @@ matches every other non-bond display state in Pluto, and [§5](05-bond-value.md)
 every re-render. To persist a view, an author writes the `Ref` + `@bind` pattern explicitly and
 accepts its tradeoffs (§12.8).
 
-*Status:* contract, not implementation. `ViewInteractable` commits `limits`/`azimuth`+`elevation`
-through `@bind` today; moving it onto this channel is #102's work, and `_computed_payload`'s
-`:view` branch (`src/render.jl`) retires with it.
+*Status:* implemented on `:cairo` (#102). `ViewInteractable` commits nothing;
+`_computed_payload`'s `:view` branch (`src/render.jl`) has retired — a `:view` computed payload
+now fails loud (unrecognized shape) rather than converting, since no path ever sends one.
+`:webgl` has no live-preview mechanism (§12.10 remains open for it), but it takes the same
+no-commit contract: a view drag there shows the Tier-0 readout and repaints nothing.
 
 ## 12.4 Projection stays Julia-authored on every frame
 

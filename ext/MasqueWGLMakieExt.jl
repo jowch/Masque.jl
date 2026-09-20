@@ -245,7 +245,12 @@ struct WebGLWidget
     px_per_unit::Float64
 end
 
-Masque.make_widget(b::WebGLBackend, result::WebGLResult, manifest, display_css) =
+# `fig`/`interactables`/`ppu` are accepted, not used: the gesture channel (#102) is `:cairo`
+# only — `:webgl` has no settled live-preview mechanism yet
+# (docs/dev/architecture/12-gesture-channel.md §12.10). `make_widget`'s signature is shared
+# across backends (src/backend.jl), so both extensions take the same arguments even though
+# only one acts on the last three.
+Masque.make_widget(b::WebGLBackend, result::WebGLResult, manifest, display_css, fig, interactables, ppu) =
     WebGLWidget(result.scene, manifest, display_css, result.width, result.height, result.px_per_unit)
 
 # `*_expr`/`*_js` are JS expressions yielding the data/text: published_to_js for Pluto, or

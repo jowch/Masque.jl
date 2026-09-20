@@ -1,4 +1,5 @@
 import type { Anchor } from "./geometry"
+import type { GestureChannel } from "./gesture"
 import type { AxisTransform, FocusRef, Hit, HitLayer, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 export const MOTION_MS = 100 // 80–120 ms window; prefers-reduced-motion disables below
@@ -95,6 +96,13 @@ export interface OverlayCtx {
     focusable_: FocusRef[] // flat, manifest-order list of element-indexed hits — keyboard.ts's nav domain
     layerStarts_: number[] // computeLayerStarts(focusable), cached once — PageUp/PageDown's layer-jump index
     liveRegion_: HTMLElement // visually-hidden aria-live="polite" announcer (NOT the tooltip)
+    // #102's gesture channel — a no-op channel when the widget has no live-preview mechanism
+    // (mount.ts's createGestureChannel(null, …)), so bond.ts never needs to branch on whether
+    // one is actually wired. `manifest_`/`thresholdLines_`/`roiBoxes_`/`focusable_`/
+    // `layerStarts_` above are reassigned in place when a frame swaps in a new manifest (see
+    // mount.ts's applyFrame) — the one exception to "construction-time, read-mostly" this
+    // interface's own doc comment otherwise promises.
+    gesture_: GestureChannel
 }
 
 export interface OverlayState {
