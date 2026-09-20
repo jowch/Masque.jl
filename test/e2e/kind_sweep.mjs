@@ -119,7 +119,13 @@ function invertAxisJs(t, px, py) {
 
 const browser = await chromium.launch({
   headless: true,
-  args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+  // kind_sweep_webgl.jl mounts one live canvas (= one WebGL context) per widget — Chromium's
+  // default active-context cap is 16, and this notebook is at 17 as of #113's `axis` widget.
+  // Past the cap, Chromium silently evicts the OLDEST context ("Too many active WebGL
+  // contexts. Oldest context will be lost."), which reads here as a null host/canvas on
+  // whichever widget got evicted — nondeterministic, and not a Masque bug. Raised well above
+  // the current count so the notebook has headroom to grow further.
+  args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--max-active-webgl-contexts=64"],
 });
 const passed = [];
 const unexpected = [];
