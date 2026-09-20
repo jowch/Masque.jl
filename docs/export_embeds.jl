@@ -341,7 +341,7 @@ html, body {
   font-family: var(--lato-ui-font-stack);
   font-size: 16px;
 }
-pluto-notebook { display: block; background: transparent; }
+pluto-notebook { display: block; background: transparent; padding-left: 8px; }
 pluto-cell {
   display: block;
   position: relative;
