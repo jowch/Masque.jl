@@ -247,14 +247,116 @@ export function assertCircleR(actualR, geomR, where) {
   }
 }
 
-export function assertRemountStable(info, where) {
-  if (!info?.ok) throw new Error(`${where}: hover remounted (${info?.reason || "pulse"})`);
-  if (!info.firstEnter) throw new Error(`${where}: first hover missing masque-enter fade`);
+// #99 round 2: both functions below now read a durable MutationObserver log
+// (transient_log.mjs's logSince/pollLog — an array of { t, type: "add"|"remove"|"attr"|
+// "hostRemount", group, svg, id, classes } entries) instead of a single instant DOM snapshot.
+// The transient they check (masque-enter/masque-leave, 80-120ms) was always racy to *sample*;
+// recording every mutation as it happens and asserting on the recorded SEQUENCE removes that
+// race rather than trying to catch it at exactly the right moment. `entries` is whatever
+// logSince/pollLog returned for the relevant window (kind_sweep.mjs's per-key no-pulse window
+// runs from just before the tooltip-establishing hover to just after the stability nudge;
+// polish_verify.mjs mirrors the same shape for its single scatter check).
+//
+// `hostRemount` entries mean the widget's shadow-hosting element was replaced outright mid-check
+// (mount.ts's mount() running again) — that would otherwise silently orphan the group observers
+// (they'd keep watching a detached subtree that never mutates again), so it's surfaced as its
+// own loud, distinct failure rather than read as "no entries recorded".
+export function assertRemountStable(entries, where) {
+  const hostRemounts = entries.filter((e) => e.type === "hostRemount");
+  if (hostRemounts.length) {
+    // A genuine remount is a failure mode THIS PR added detection for — it isn't one of #99's
+    // two originally-proposed mechanisms (both falsified; see the PR body), so pointing a
+    // future reader at #99 would send them to an issue about a coalesced pointermove and a
+    // marker-radius miss, neither of which is what fired here.
+    throw new Error(`${where}: overlay remounted mid-check (shadow host replaced ${hostRemounts.length}x) — see #129`);
+  }
+  // A closed mark (circle/rect/polygon) draws its hover into BOTH svg.masque-fill's g.hi AND
+  // svg.masque-edge's g.hi (two elements, identical geometry — CLAUDE.md's "Overlay recipes");
+  // an open seg draws edge-only; an explicit-hoverstyle layer draws plain-only. So a single,
+  // un-remounted hover legitimately produces one add PER svg it draws into, not one add total —
+  // "no remount" is a per-svg claim, not a flat count across all three.
+  //
+  // Order matters too, not just count: the window this is asked to check can legitimately open
+  // with a leading `remove` that has nothing to do with the hover being tested — e.g. the
+  // TINT_CHECK_KEYS tint check (kind_sweep.mjs) hovers a DIFFERENT point and leaves it just
+  // before this window opens; clearHi's 100ms removal timer for THAT hover can still be pending
+  // when the window opens, and the very next hover (this check's own) calls clearHiImmediate,
+  // which removes that stale element before appending its own. That remove-then-add is normal
+  // cleanup of an unrelated prior hover, not a remount of this one — only mutations AFTER the
+  // first `add` in a given svg (i.e. after THIS check's own hover actually landed) count.
+  const hiEntries = entries.filter((e) => e.group === "hi" && (e.type === "add" || e.type === "remove"));
+  const bySvg = new Map();
+  for (const e of hiEntries) {
+    if (!bySvg.has(e.svg)) bySvg.set(e.svg, []);
+    bySvg.get(e.svg).push(e);
+  }
+  let sawEnter = false;
+  for (const [svg, seq] of bySvg) {
+    const firstAddIdx = seq.findIndex((e) => e.type === "add");
+    if (firstAddIdx === -1) continue; // nothing but a leading remove in this svg -- unrelated prior-hover cleanup
+    sawEnter = true;
+    const firstAdd = seq[firstAddIdx];
+    if (!hasClass(firstAdd.classes, "masque-enter")) {
+      throw new Error(`${where}: first hover missing masque-enter fade (svg=${svg}, classes=${firstAdd.classes})`);
+    }
+    const after = seq.slice(firstAddIdx + 1);
+    if (after.length) {
+      throw new Error(`${where}: hover remounted (svg=${svg}: ${after.length} mutation(s) recorded after the initial hover — ${JSON.stringify(after)})`);
+    }
+  }
+  if (!sawEnter) throw new Error(`${where}: no hover node ever recorded`);
 }
 
-export function assertLeaveFade(info, where) {
-  if (info.hi === 0) throw new Error(`${where}: hover cleared instantly (no remount fade)`);
-  if (!info.leaving) throw new Error(`${where}: leave did not apply masque-leave`);
+// `group` lets kind_sweep.mjs's links-fade check (g.link, not g.hi) reuse this exact logic —
+// the two used to be separate, hand-duplicated inline checks; consolidating means the links case
+// now also gets a `hostRemount` check and the three-way distinction below, which it didn't have
+// before. The genuine-instant-clear branch keeps the exact "cleared instantly (no remount fade)"
+// substring so it still matches every pre-#99 CI log and #99's own reviewer technique (diffing
+// --log-failed output across commits) for the scatter/hi case that issue is actually about; the
+// links case's message never carried that exact substring historically either (it read
+// "${key}/links: cleared instantly ..." with no "hover"), so gaining the word "hover" here is a
+// harmless, deliberate consolidation, not a regression against any tracked string.
+export function assertLeaveFade(entries, where, group = "hi") {
+  const hostRemounts = entries.filter((e) => e.type === "hostRemount");
+  if (hostRemounts.length) {
+    // Same reasoning as assertRemountStable's hostRemount branch above — point at this PR, not
+    // #99, since a genuine remount is a failure mode this PR added detection for, not one of
+    // #99's originally-proposed (and falsified) mechanisms.
+    throw new Error(`${where}: overlay remounted mid-leave-check (shadow host replaced ${hostRemounts.length}x) — see #129`);
+  }
+  const removes = entries.filter((e) => e.group === group && e.type === "remove");
+  const leaveClassSeen = entries.some((e) => e.group === group && hasClass(e.classes, "masque-leave"));
+  if (!removes.length) {
+    if (!leaveClassSeen) throw new Error(`${where}: leave did not apply masque-leave (no removal or class-add recorded within the wait window)`);
+    // New relative to the pre-#99 behaviour: the class WAS applied (a fade genuinely started)
+    // but the element was never actually removed within the wait window — a real, different
+    // bug from either of the two below, previously indistinguishable from "leave did not apply
+    // masque-leave" because nothing recorded the intermediate state.
+    throw new Error(`${where}: hover started fading (masque-leave applied) but was never removed within the wait window — see #99`);
+  }
+  // A closed mark's remove comes from BOTH svg.masque-fill and svg.masque-edge (same reasoning
+  // as assertRemountStable above) — `every`, not `some`: a fade is only "proper" if every
+  // element that got removed was carrying masque-leave when it went, not just one of them.
+  const removedProperly = removes.every((e) => hasClass(e.classes, "masque-leave"));
+  if (!removedProperly) {
+    throw new Error(`${where}: hover cleared instantly (no remount fade)`);
+  }
+  // Ordering alone (class applied, then removed) doesn't check DURATION — highlight.ts's
+  // MOTION_MS is a real ~80-120ms fade (CLAUDE.md's "Overlay recipes" locks 80-120ms), and if
+  // it ever collapsed to near-zero, every check above would still pass (a class WAS applied,
+  // the removed node DID carry it). `id` correlates the `attr` entry that first added
+  // masque-leave to an element with the `remove` entry for that SAME element (elements keep
+  // their assigned id for their whole lifetime — transient_log.mjs), so the actual elapsed fade
+  // time is measurable. Floor only, no ceiling: setTimeout can be delayed by load but never
+  // fires early, so a floor is immune to a contended runner; a ceiling would be flaky there and
+  // must not be added.
+  const FADE_FLOOR_MS = 50;
+  for (const rem of removes) {
+    const armed = entries.find((e) => e.id === rem.id && e.type === "attr" && hasClass(e.classes, "masque-leave"));
+    if (armed && rem.t - armed.t < FADE_FLOOR_MS) {
+      throw new Error(`${where}: fade too short (${(rem.t - armed.t).toFixed(1)}ms, want >= ${FADE_FLOOR_MS}ms)`);
+    }
+  }
 }
 
 // The caret's visible apex — not the box `left`/`top` coordinates an e2e driver already reads
