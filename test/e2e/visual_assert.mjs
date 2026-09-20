@@ -264,7 +264,11 @@ export function assertCircleR(actualR, geomR, where) {
 export function assertRemountStable(entries, where) {
   const hostRemounts = entries.filter((e) => e.type === "hostRemount");
   if (hostRemounts.length) {
-    throw new Error(`${where}: overlay remounted mid-check (shadow host replaced ${hostRemounts.length}x) — see #99`);
+    // A genuine remount is a failure mode THIS PR added detection for — it isn't one of #99's
+    // two originally-proposed mechanisms (both falsified; see the PR body), so pointing a
+    // future reader at #99 would send them to an issue about a coalesced pointermove and a
+    // marker-radius miss, neither of which is what fired here.
+    throw new Error(`${where}: overlay remounted mid-check (shadow host replaced ${hostRemounts.length}x) — see #129`);
   }
   // A closed mark (circle/rect/polygon) draws its hover into BOTH svg.masque-fill's g.hi AND
   // svg.masque-edge's g.hi (two elements, identical geometry — CLAUDE.md's "Overlay recipes");
@@ -315,7 +319,10 @@ export function assertRemountStable(entries, where) {
 export function assertLeaveFade(entries, where, group = "hi") {
   const hostRemounts = entries.filter((e) => e.type === "hostRemount");
   if (hostRemounts.length) {
-    throw new Error(`${where}: overlay remounted mid-leave-check (shadow host replaced ${hostRemounts.length}x) — see #99`);
+    // Same reasoning as assertRemountStable's hostRemount branch above — point at this PR, not
+    // #99, since a genuine remount is a failure mode this PR added detection for, not one of
+    // #99's originally-proposed (and falsified) mechanisms.
+    throw new Error(`${where}: overlay remounted mid-leave-check (shadow host replaced ${hostRemounts.length}x) — see #129`);
   }
   const removes = entries.filter((e) => e.group === group && e.type === "remove");
   const leaveClassSeen = entries.some((e) => e.group === group && hasClass(e.classes, "masque-leave"));

@@ -103,7 +103,19 @@ export async function installRecorder(page, key) {
         attachGroups();
       }
     });
-    hostObserver.observe(host, { childList: true, subtree: true });
+    // childList only, no subtree: mount.ts always attaches/detaches the shadow-hosting element
+    // as a DIRECT child of `host` (`host.appendChild(shadowHost)` on mount, `shadowHost.remove()`
+    // on cleanup — never replaced in place, never nested under an intermediate wrapper), and a
+    // live DOM check confirms `host`'s actual children are flat (base canvas/img + Pluto's own
+    // script tags + the shadow host, no deeper light-DOM nesting) — so a direct-child-only
+    // observer already sees both halves of a remount (old host removed, new host added).
+    // `subtree: true` bought nothing here: shadow DOM encapsulates its own mutations from an
+    // ancestor-scoped light-DOM observer regardless of `subtree` (verified with a standalone
+    // synthetic-DOM check — a subtree:true observer on a light-DOM ancestor never receives
+    // records for mutations inside an attached shadow root), so it was never actually seeing the
+    // g.hi/g.sel/g.link mutations the group observers below track; it only added unnecessary
+    // traversal scope for no additional signal.
+    hostObserver.observe(host, { childList: true });
   }, key);
 }
 
