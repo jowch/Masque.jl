@@ -238,12 +238,13 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         ev0 = tv(w, Dict("layer" => "scatter", "index" => 0, "payload" => "anything at all"))
         @test ev0.payload === payloads[1]
 
-        # a kind with no Julia-side original (axis readout) passes the browser value straight
-        # through, untouched — same object, not a copy
+        # a kind with no Julia-side original (axis readout) has no manifest object to reconstruct,
+        # but is converted from the browser's Dict to a flat NamedTuple (#110), not passed
+        # through raw — so `ev.payload.x` works here too, not just for element kinds.
         w2 = masque(bfig, [PointInteractable(bax, pts; id = :scatter, payloads = payloads), AxisInteractable(bax; id = :readout)])
         computed = Dict("x" => 1.23, "y" => 4.56)
         evax = tv(w2, Dict("layer" => "readout", "index" => 0, "payload" => computed))
-        @test evax.payload === computed
+        @test evax.payload == (; x = 1.23, y = 4.56)
 
         # the `items` branch (a selects-ROI's multi-echo) reconstructs each entry the same way
         multi = tv(

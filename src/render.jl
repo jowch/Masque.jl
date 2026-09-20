@@ -13,8 +13,15 @@ or, at mount, for each element `selected=` hydrated (`nothing` if there's neithe
   object you passed in `payloads=`, looked back up in Julia rather than decoded from what the
   browser sent: `ev.payload === payloads[i]`, not a JSON-reconstructed copy, so a `NamedTuple`
   payload stays a `NamedTuple`. Kinds with no Julia-side original — an axis readout, a grid
-  cell, ROI bounds, a threshold value, view limits — still report a browser-computed value
-  (e.g. `Dict("x" => …, "y" => …)` for [`AxisInteractable`](@ref)).
+  cell, ROI bounds, view limits — still report a browser-computed value, but converted to a
+  flat (never nested) `NamedTuple` from the fixed field set that kind sends, so `ev.payload.x`
+  works everywhere, not just for element kinds: `(; x, y)` or `(; value)` for
+  [`AxisInteractable`](@ref)/[`ColorbarInteractable`](@ref); `(; i, j)` or `(; i, j, value)`
+  for a `:grid` cell hit, or `(; i0, i1, j0, j1, xmin, xmax, ymin, ymax)` for the cell-range a
+  `selects`-ROI reports over a `:grid` target; `(; xmin, xmax, ymin, ymax)` for `:roi`/2D
+  `:view`; `(; azimuth, elevation)` for 3D (orbit) `:view`. [`ThresholdInteractable`](@ref) is
+  the one exception: its payload is a bare scalar (the data coordinate), since there is no
+  field to name.
 
 A `ROIInteractable` built with `selects` reports differently: the bond value is a
 `Vector{InteractionEvent}` (one entry per element the ROI contains on mouse-up), not a single
@@ -428,12 +435,55 @@ function _hydrated_selection(manifest::Dict{String, Any})
     return isempty(events) ? nothing : events
 end
 
+# A computed kind (axis/grid/roi/view; :threshold is a bare scalar, see below) has no Julia-side
+# original, so there's nothing to reconstruct — but the browser's Dict-shaped value is converted
+# to a NamedTuple here so `ev.payload.x` reads the same way an element payload does. Per-kind
+# enumeration, not a generic `Dict{String,Any}` -> NamedTuple conversion: the generic route would
+# happily build a NamedTuple from keys that aren't identifiers, where this one fails loud (an
+# `ArgumentError` naming the unrecognized keys) the moment a JS-side branch grows a field this
+# hasn't been taught. Every shape here is flat (never nested) because every one of these payloads
+# is flat today — resolvePayload/roiBounds/threshold.ts/view.ts in geometry.ts and drag/*.ts build
+# them and never nest.
+#
+# :grid carries two disjoint shapes under the one kind: `(i, j)`/`(i, j, value)` from a direct
+# cell hit (`resolvePayload`'s `hit.grid_` branch), and `(i0, i1, j0, j1, xmin, xmax, ymin,
+# ymax)` — the clamped cell-index range plus the unclamped drawn-box bounds — from a
+# `selects`-ROI brushing a `:grid` target (`selection.ts`'s `computeSelection`). Both arrive
+# tagged with the same `"grid"` kind, so the dispatch below is on the key set, not just the kind.
+function _computed_payload(kind::Symbol, js_payload)
+    js_payload === nothing && return nothing
+    kind === :threshold && return js_payload   # scalar data coordinate — no fields to name
+    ks = Set(String.(keys(js_payload)))
+    nt(syms...) = NamedTuple{syms}(Tuple(js_payload[String(s)] for s in syms))
+    if kind === :axis
+        ks == Set(("x", "y")) && return nt(:x, :y)
+        ks == Set(("value",)) && return nt(:value)
+    elseif kind === :grid
+        ks == Set(("i", "j")) && return nt(:i, :j)
+        ks == Set(("i", "j", "value")) && return nt(:i, :j, :value)
+        ks == Set(("i0", "i1", "j0", "j1", "xmin", "xmax", "ymin", "ymax")) &&
+            return nt(:i0, :i1, :j0, :j1, :xmin, :xmax, :ymin, :ymax)
+    elseif kind === :roi
+        ks == Set(("xmin", "xmax", "ymin", "ymax")) && return nt(:xmin, :xmax, :ymin, :ymax)
+    elseif kind === :view
+        ks == Set(("xmin", "xmax", "ymin", "ymax")) && return nt(:xmin, :xmax, :ymin, :ymax)
+        ks == Set(("azimuth", "elevation")) && return nt(:azimuth, :elevation)
+    end
+    throw(
+        ArgumentError(
+            "bond payload: layer kind :$(kind) sent an unrecognized computed payload shape " *
+                "(keys: $(sort(collect(ks))))",
+        ),
+    )
+end
+
 # An element kind (`_SELECTED_KINDS`) already has its payload sitting in the manifest Julia
 # built; look it up there instead of trusting whatever the browser echoed back, so a click and
 # `initial_value` hand back the identical object. Other kinds (axis/grid/roi/threshold/view)
 # have no Julia-side original — `resolvePayload` in geometry.ts makes the same split — so
-# `js_payload` (the browser-computed value) passes through unchanged. `manifest` lacking a
-# `"layers"` key at all (a bare test double, never a real widget) also falls through unchanged.
+# `js_payload` (the browser-computed value) is converted by `_computed_payload` instead.
+# `manifest` lacking a `"layers"` key at all (a bare test double, never a real widget) falls
+# through unchanged, as does an unknown `layer_id`.
 #
 # The unknown-`layer_id` and out-of-range-`index` cases below are deliberately asymmetric: an
 # unknown layer id means this manifest doesn't describe the hit at all, so falling back to the
@@ -446,7 +496,8 @@ function _bond_payload(manifest, layer_id::AbstractString, index::Integer, js_pa
     i = findfirst(d -> d["id"] == layer_id, layers)
     i === nothing && return js_payload
     d = layers[i]
-    Symbol(d["kind"]) in _SELECTED_KINDS || return js_payload
+    kind = Symbol(d["kind"])
+    kind in _SELECTED_KINDS || return _computed_payload(kind, js_payload)
     payloads = d["payloads"]
     n = length(payloads)
     (0 <= index < n) || throw(

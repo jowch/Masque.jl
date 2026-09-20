@@ -726,7 +726,7 @@ with `geometry = nothing`.
 - `ax` — a `Makie.Axis` (linear, log, or categorical). `id` — the layer id; becomes
   `InteractionEvent.layer` on a hit. Default `:axis`.
 
-Payload on hit (client-side): `Dict("x" => …, "y" => …)`.
+Payload on hit (client-side): `(; x, y)`.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data point — continuous readout is undefined), a `PolarAxis` (continuous θ/r inversion isn't
@@ -1032,8 +1032,8 @@ hit.
 - `ax` — a `Makie.Axis` (pan) or `Makie.Axis3` (orbit). `id` — the layer id; becomes
   `InteractionEvent.layer` on commit. Default `:view`.
 
-Payload on commit (client-side): 2D — `Dict("xmin"=>…, "xmax"=>…, "ymin"=>…, "ymax"=>…)` (the
-new `limits`); 3D — `Dict("azimuth"=>…, "elevation"=>…)`. Drive the returned value back into
+Payload on commit (client-side): 2D — `(; xmin, xmax, ymin, ymax)` (the new `limits`); 3D —
+`(; azimuth, elevation)`. Drive the returned value back into
 `ax.limits[]` / `ax.azimuth[]`+`ax.elevation[]` and re-render to make the gesture stick.
 
 `masque` raises `ArgumentError` at build time if `ax` is a `PolarAxis` (continuous θ/r view
@@ -1170,9 +1170,11 @@ compatible layer, reporting the contained elements. Produces one `:roi` [`HitLay
   geometry falls inside the ROI are reported. `masque` raises `ArgumentError` at build time if
   `selects` names a layer absent from the same call, or one of an unsupported kind.
 
-Payload on commit (client-side, no `selects`): `Dict("xmin"=>…, "xmax"=>…, "ymin"=>…,
-"ymax"=>…)`. With `selects` set, the bond value instead becomes a `Vector{InteractionEvent}`
-(one per contained element, each layer'd to the target) — see [`InteractionEvent`](@ref).
+Payload on commit (client-side, no `selects`): `(; xmin, xmax, ymin, ymax)`. With `selects`
+set, the bond value instead becomes a `Vector{InteractionEvent}` — one per contained element
+for a `:circles` target (each an element payload, reconstructed like any other), or one entry
+covering the whole cell range for a `:grid` target (`(; i0, i1, j0, j1, xmin, xmax, ymin,
+ymax)`, since a `:grid` layer has no element to index) — see [`InteractionEvent`](@ref).
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data point), a `PolarAxis` (continuous inversion isn't shipped), a categorical axis (bounds
