@@ -65,14 +65,15 @@ vector `masque(fig)` builds internally), tweak it, and pass it back — see
 ev === nothing ? "click a point" : "you picked $(ev.payload)"
 ```
 
-The embed below is that cell series, computed by Pluto at docs build and replayed here with no
-Julia process. Click **a**, **b**, or **c** and the readout swaps. Hover still works on every
-mark. A click that isn't one of those three listed states keeps the overlay alive and leaves
-the readout on the last snapshot.
+The embed below is the same plot as the README demo GIF (`docs/dev/readme-demo/notebook.jl`):
+eight cities, hover for population, click to bind. The listed `@bind` snapshots are the GIF's
+path — **Tokyo**, **Cairo**, and **São Paulo**. Hover still works on every mark. A click that
+isn't one of those three listed states keeps the overlay alive and leaves the readout on the
+last snapshot.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-gs-player" title="Three-point scatter with listed @bind snapshots"
+<iframe id="masque-gs-player" title="README demo cities scatter with listed @bind snapshots"
         style="width:100%;height:480px;border:0;background:transparent;" loading="lazy"></iframe>
 </div>
 <script>
