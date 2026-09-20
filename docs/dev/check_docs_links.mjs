@@ -1,21 +1,24 @@
 #!/usr/bin/env node
-// Link checker for the docs/dev/architecture.md split.
+// Link checker for docs/dev/**/*.md.
 //
-// The architecture doc split converted ~58 prose "§N"/"§N.M" cross-references (plus 13 more in
-// other docs/**/*.md files) into real markdown links so they can be verified mechanically instead
-// of trusted by eye. This script covers every place that can now point into the split:
+// docs/dev is full of relative markdown links and heading-anchor cross-references (the
+// architecture.md split, backend-comparison.md, perf-findings.md, roadmap.md, ...) that were
+// previously only checkable by eye. This script covers every place that can point into docs/dev:
 //
-//   - the entry point, docs/dev/architecture.md (its own "## Sections" map, plus anything else it
-//     links to);
-//   - every file under docs/dev/architecture/ (full link coverage: file existence + anchor); and
+//   - every file under docs/dev/ (full link coverage: file existence + anchor); and
 //   - every other docs/**/*.md file, for any link (relative, or an absolute GitHub blob URL into
-//     this repo) whose target resolves into the entry point or docs/dev/architecture/. Links to
-//     anything else in those files are out of scope for this checker.
+//     this repo) whose target resolves into docs/dev/. Links to anything else in those files are
+//     out of scope for this checker.
+//
+// docs/src/notebooks/ is skipped entirely: it's gitignored and generated at build time by
+// docs/export_notebooks.jl, so a locally-built copy's links are only meaningful post-build, not
+// against the source tree this script walks. Documenter `[Label](@ref)` cross-references are
+// left alone too -- Documenter resolves those itself during the site build, not this script.
 //
 // It fails loud on any in-scope link whose target file or heading anchor does not actually exist.
 //
-// Run in CI by the `architecture-links` job in .github/workflows/CI.yml; runnable locally too:
-// node docs/dev/check_architecture_links.mjs
+// Run in CI by the `docs-links` job in .github/workflows/CI.yml; runnable locally too:
+// node docs/dev/check_docs_links.mjs
 //
 // Anchor slugs are computed with GitHub's own heading-slug algorithm, reproduced here from the
 // `github-slugger` package (MIT licensed, https://github.com/Flet/github-slugger) so this script
@@ -29,8 +32,12 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..", "..");
 const DOCS_ROOT = join(REPO_ROOT, "docs");
-const ARCH_DIR = join(REPO_ROOT, "docs", "dev", "architecture");
-const ENTRY = join(REPO_ROOT, "docs", "dev", "architecture.md");
+const DOCS_DEV_DIR = join(REPO_ROOT, "docs", "dev");
+
+// Directories walkMarkdownFiles never descends into: docs/src/notebooks is gitignored and
+// generated post-build (see header); node_modules is excluded defensively wherever it turns up
+// (there is none under docs/ today, but a link checker should not choke on one appearing).
+const EXCLUDED_DIRS = new Set([join(REPO_ROOT, "docs", "src", "notebooks")]);
 
 // e.g. https://github.com/jowch/Masque.jl/blob/main/docs/dev/architecture/10-tooltips.md#10-tooltips
 // Owner/repo is pinned to this repo, not a wildcard -- a blob URL into some other GitHub repo
@@ -118,7 +125,9 @@ function extractLinks(text) {
 function walkMarkdownFiles(dir) {
   const out = [];
   for (const entry of readdirSync(dir)) {
+    if (entry === "node_modules") continue;
     const full = join(dir, entry);
+    if (EXCLUDED_DIRS.has(full)) continue;
     if (statSync(full).isDirectory()) {
       out.push(...walkMarkdownFiles(full));
     } else if (entry.endsWith(".md")) {
@@ -128,19 +137,21 @@ function walkMarkdownFiles(dir) {
   return out;
 }
 
-function targetsArchitecture(absPath) {
-  if (absPath === ENTRY) return true;
-  const rel = relative(ARCH_DIR, absPath);
+function targetsDocsDev(absPath) {
+  const rel = relative(DOCS_DEV_DIR, absPath);
   return rel !== "" && !rel.startsWith("..") && !rel.startsWith(sep + "..");
 }
 
 // Resolve a link's target to an absolute local file path, or null if it's genuinely out of
-// scope for this checker (external site, or a GitHub blob URL for a different repo/path).
+// scope for this checker (external site, a GitHub blob URL for a different repo/path, or a
+// Documenter `@ref`/`@ref Label` cross-reference -- Documenter resolves those at site-build
+// time against its own anchor registry, not against a file on disk).
 function resolveTarget(target, fromFile) {
+  if (/^@ref(\s|$)/.test(target)) return null;
   const githubMatch = GITHUB_BLOB_RE.exec(target.split("#")[0]);
   if (githubMatch) {
-    // Only resolvable if it points at *this* repo's own docs/dev/architecture tree -- we can't
-    // (and don't need to) verify a blob URL into an unrelated repo or path.
+    // Only resolvable if it points at *this* repo's own tree -- we can't (and don't need to)
+    // verify a blob URL into an unrelated repo or path.
     const repoRelPath = githubMatch[1];
     return join(REPO_ROOT, repoRelPath);
   }
@@ -178,9 +189,8 @@ function checkLink(file, target) {
   }
 }
 
-// Primary files: every link is in scope (the entry point and the section files only ever point
-// at each other).
-const primaryFiles = [ENTRY, ...walkMarkdownFiles(ARCH_DIR)];
+// Primary files: every file under docs/dev/, every link is in scope.
+const primaryFiles = walkMarkdownFiles(DOCS_DEV_DIR);
 for (const file of primaryFiles) {
   const text = readFileSync(file, "utf8");
   for (const target of extractLinks(text)) {
@@ -188,9 +198,9 @@ for (const file of primaryFiles) {
   }
 }
 
-// Secondary files: everything else under docs/**/*.md. Only links that resolve into the entry
-// point or docs/dev/architecture/ are in scope here -- an unrelated link elsewhere in one of
-// these files is not this checker's job.
+// Secondary files: everything else under docs/**/*.md. Only links that resolve into docs/dev/
+// are in scope here -- an unrelated link elsewhere in one of these files is not this checker's
+// job.
 const primarySet = new Set(primaryFiles);
 const secondaryFiles = walkMarkdownFiles(DOCS_ROOT).filter((f) => !primarySet.has(f));
 let secondaryChecked = 0;
@@ -198,7 +208,7 @@ for (const file of secondaryFiles) {
   const text = readFileSync(file, "utf8");
   for (const target of extractLinks(text)) {
     const targetPath = resolveTarget(target, file);
-    if (targetPath === null || !targetsArchitecture(resolve(targetPath))) continue;
+    if (targetPath === null || !targetsDocsDev(resolve(targetPath))) continue;
     const before = checked;
     checkLink(file, target);
     if (checked > before) secondaryChecked++;
@@ -213,6 +223,6 @@ if (failures.length > 0) {
 
 console.log(
   `OK: ${checked} links checked, all resolve ` +
-  `(${checked - secondaryChecked} in docs/dev/architecture.md + docs/dev/architecture/*.md, ` +
+  `(${checked - secondaryChecked} originating in docs/dev/**/*.md, ` +
   `${secondaryChecked} pointing in from ${secondaryFiles.length} other docs/**/*.md files).`
 );
