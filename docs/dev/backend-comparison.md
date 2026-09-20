@@ -62,7 +62,7 @@ backends** as server-authoritative `@bind` re-render (sliders + `ViewInteractabl
 > backend-symmetric and drift-free *by construction* (Julia recomputes the overlay every step).
 > (#122 takes view parameters off `@bind` and onto the gesture channel as a contract;
 > `ViewInteractable` still commits through `@bind` until #102 implements it —
-> [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when). The re-render path
+> [§12.3](architecture/12-gesture-channel.md#123-ci-probe-nonexistent-anchor). The re-render path
 > described here is unchanged either way.)
 > Cost, honestly: `:cairo` re-rasterizes per step (scales with the scene; fine for sliders and
 > commit-on-release drag); `:webgl` re-serializes (~flat, §2) and re-initializes the GL
