@@ -396,6 +396,7 @@ html, body {
   color: var(--pluto-output-color);
   font-family: var(--lato-ui-font-stack);
 }
+body { position: relative; }
 pluto-notebook {
   display: block;
   background: var(--main-bg-color);
@@ -469,6 +470,67 @@ pluto-trafficlight {
   overflow: hidden;
 }
 .ip-host { isolation: isolate; max-width: 100%; }
+.masque-sim-chip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 28%, transparent);
+  background: transparent;
+  color: var(--pluto-output-color);
+  font-family: var(--lato-ui-font-stack);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  cursor: help;
+  user-select: none;
+}
+.masque-sim-chip-icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+.masque-sim-chip-label code {
+  font-family: var(--julia-mono-font-stack);
+  font-size: 0.92em;
+  font-weight: 600;
+}
+.masque-sim-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: max-content;
+  max-width: 16.5rem;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 22%, transparent);
+  background: var(--pluto-output-bg-color);
+  color: var(--pluto-output-color);
+  box-shadow: 0 6px 18px color-mix(in srgb, #000 16%, transparent);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 80ms ease, visibility 80ms ease, transform 80ms ease;
+}
+.masque-sim-chip:hover .masque-sim-tip,
+.masque-sim-chip:focus-visible .masque-sim-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
 .masque-player-caption {
   margin: var(--pluto-cell-spacing) 0 0;
   padding: 0 10px;
@@ -499,6 +561,18 @@ const BOOT_PLUTO_DARK_JS = """
   try { if (isDocDark()) document.documentElement.classList.add("pluto-dark"); } catch (e) {}
 }
 </script>
+"""
+
+const SIM_CHIP_HTML = raw"""
+<div class="masque-sim-chip" tabindex="0" aria-describedby="masque-sim-tip">
+  <svg class="masque-sim-chip-icon" viewBox="0 0 16 16" aria-hidden="true">
+    <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <circle cx="8" cy="5.15" r="1" fill="currentColor"/>
+    <path d="M8 7.4v4.1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+  </svg>
+  <span class="masque-sim-chip-label">Simulating <code>@bind</code></span>
+  <span id="masque-sim-tip" class="masque-sim-tip" role="tooltip">Precomputed snapshots, not a live Julia process.</span>
+</div>
 """
 
 
@@ -574,6 +648,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       </style>
     </head>
     <body>
+      $SIM_CHIP_HTML
       <pluto-notebook class="masque-player">
         <pluto-cell>
           <pluto-trafficlight></pluto-trafficlight>
