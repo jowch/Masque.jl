@@ -506,7 +506,6 @@ pluto-trafficlight {
   top: calc(100% + 6px);
   right: 0;
   width: max-content;
-  max-width: 16.5rem;
   padding: 6px 8px;
   border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--pluto-output-color) 22%, transparent);
@@ -518,7 +517,7 @@ pluto-trafficlight {
   line-height: 1.35;
   letter-spacing: 0;
   text-align: left;
-  white-space: normal;
+  white-space: nowrap;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
