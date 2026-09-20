@@ -113,7 +113,8 @@ function snapshot_key(v)
         end
         return "items:" * join(parts, ",")
     end
-    (haskey(d, "layer") && haskey(d, "index")) && return string(d["layer"], ":", Int(d["index"]))
+    (haskey(d, "layer") && haskey(d, "index")) &&
+        return string(d["layer"], ":", Int(d["index"]))
     return JSON3.write(jsonable(d))
 end
 
@@ -396,7 +397,7 @@ html, body {
   color: var(--pluto-output-color);
   font-family: var(--lato-ui-font-stack);
 }
-body { position: relative; }
+body { position: relative; padding-top: 2.25rem; }
 pluto-notebook {
   display: block;
   background: var(--main-bg-color);
@@ -670,17 +671,37 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       </pluto-notebook>
       <script>
     {
+      function layerIndexKey(layer, index) {
+        return String(layer) + ":" + String(Number(index));
+      }
       function keyOf(v) {
         if (v == null) return "null";
-        if (v.items) return "items:" + v.items.map((it) => it.layer + ":" + it.index).join(",");
-        if (v.layer != null && v.index != null) return String(v.layer) + ":" + String(v.index);
+        if (Array.isArray(v.items)) {
+          return "items:" + v.items.map(function (it) {
+            return layerIndexKey(it.layer, it.index);
+          }).join(",");
+        }
+        if (v.layer != null && v.index != null && v.index !== "") {
+          return layerIndexKey(v.layer, v.index);
+        }
         return JSON.stringify(v);
+      }
+      function snapFor(snaps, v) {
+        const keys = [keyOf(v)];
+        if (v && v.layer != null && v.index != null && v.index !== "") {
+          keys.push(String(v.layer) + ":" + String(v.index));
+          keys.push(String(v.layer) + ":" + String(v.index | 0));
+        }
+        for (let i = 0; i < keys.length; i++) {
+          if (Object.prototype.hasOwnProperty.call(snaps, keys[i])) return snaps[keys[i]];
+        }
+        return null;
       }
       function applyFromHost(host) {
         const man = host && host.masqueManifest;
         const snaps = man && man.snapshots;
         if (!snaps) return false;
-        const snap = snaps[keyOf(host.value)];
+        const snap = snapFor(snaps, host.value);
         if (!snap) return false;
         const out = document.getElementById("masque-out");
         out.innerHTML = snap.cells.join("\\n");
@@ -693,10 +714,31 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       }
       const host = document.querySelector(".ip-host");
       if (host) {
-        host.addEventListener("input", () => {
+        let cur = host.value;
+        Object.defineProperty(host, "value", {
+          configurable: true,
+          enumerable: true,
+          get: function () { return cur; },
+          set: function (v) {
+            cur = v;
+            applyFromHost(host);
+            sizeFrame();
+          },
+        });
+        const dispatch = host.dispatchEvent.bind(host);
+        host.dispatchEvent = function (ev) {
+          const ok = dispatch(ev);
+          if (ev && ev.type === "input") {
+            applyFromHost(host);
+            sizeFrame();
+          }
+          return ok;
+        };
+        host.addEventListener("input", function () {
           applyFromHost(host);
           sizeFrame();
         });
+        applyFromHost(host);
       }
       sizeFrame();
       window.addEventListener("load", sizeFrame);
