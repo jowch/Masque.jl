@@ -439,9 +439,9 @@ survive a rebuild.
 
 **A view-manipulation gesture never produces a bond value.** Frames shipped to update the view
 during an active drag-to-pan or orbit (§12) do not assign `sel` and do not touch this bond, and
-neither does the gesture's release: a camera is operational state, not an analysis value, so it
-never enters notebook state at all (§12.3). A `ThresholdInteractable` or `ROIInteractable` release
-does commit, through the ordinary path above.
+neither does the gesture's release: a camera is operational state, not an analysis value (§12.3).
+A `ThresholdInteractable` or `ROIInteractable` release does commit, through the ordinary path
+above.
 
 ## 6. How it composes — the three interaction tiers
 
@@ -922,23 +922,19 @@ A gesture that settles an **analysis value** — a threshold, an ROI's bounds �
 the committed value's path unchanged.
 
 **A view-manipulation gesture commits nothing.** `@bind` carries values the user asked for; a
-camera position is operational state describing how a plot is being looked at, not a quantity the
-notebook's analysis consumes. Pan, zoom and orbit therefore live entirely on this channel, with no
-bond at the end. A widget carrying a `ViewInteractable` is still bindable — its bond reports the
-*selection* (§5), which a view-only widget simply never updates.
+camera position is operational state, not an analysis value. Pan, zoom and orbit live entirely on
+this channel, with no bond at the end. A widget carrying a `ViewInteractable` is still bindable:
+its bond reports the selection (§5), which a view-only widget never updates.
 
 **View state does not persist across a re-render.** The `with_js_link` closure is recreated when
-the cell re-runs, so an upstream data edit returns the view to the figure's own limits. This is
-intended. No other non-bond display state survives a cell re-run in Pluto either, and it is the
-same reasoning §5 uses to drop the selection on remount: a rebuilt figure is a different figure.
-The alternatives are worse — notebook state is what this rule rejects, and a Masque-side mutable
-store keyed by widget is ruled out by §4. An author who wants a view to persist writes the
-`Ref` + `@bind` pattern explicitly and takes on its tradeoffs, including §12.8's; that removes the
-*automatic* bind, not the capability.
+the cell re-runs, so an upstream data edit returns the view to the figure's own limits. This
+matches every other non-bond display state in Pluto, and §5's rule that a rebuilt figure is a
+different figure. To persist a view, an author writes the `Ref` + `@bind` pattern explicitly and
+accepts its tradeoffs (§12.8).
 
-*Status:* this is the contract, not the current implementation. `ViewInteractable` commits
-`limits`/`azimuth`+`elevation` through `@bind` today; moving it onto this channel is #102's work,
-and `_computed_payload`'s `:view` branch (`src/render.jl`) retires with it.
+*Status:* contract, not implementation. `ViewInteractable` commits `limits`/`azimuth`+`elevation`
+through `@bind` today; moving it onto this channel is #102's work, and `_computed_payload`'s
+`:view` branch (`src/render.jl`) retires with it.
 
 ### 12.4 Projection stays Julia-authored on every frame
 
@@ -1019,14 +1015,14 @@ Previewing live *and* binding the settled value is the ordinary case, not a tens
 The question is never "does a cell read this variable?" but "does a cell read this send?" — if it
 does, it is a commit and goes through `@bind`.
 
-A camera is the case where the answer is *no send ever commits*, which is why §12.3 takes view
-manipulation off `@bind` entirely rather than splitting it per transmission.
+A camera is the case where no send ever commits: §12.3 takes view manipulation off `@bind`
+entirely.
 
 ### 12.8 Relationship to #83
 
 A channel that never remounts removes #83's double remount for gestures: there is no remount to
-double. For view manipulation the claim is stronger than that — with no bond at the end of the
-gesture (§12.3), the self-referencing `@bind` cell that produces #83 is never written at all.
+double. View manipulation also has no bond at the end of the gesture (§12.3), so the
+self-referencing `@bind` cell that produces #83 is never written for it.
 
 #83 is otherwise unaffected, and is not a Pluto defect: a self-referencing `@bind` cell is not a
 sanctioned Pluto use case. Every path still going through `@bind` retains #83's behaviour,
