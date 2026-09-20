@@ -159,6 +159,19 @@ end
     @test_throws ArgumentError bp(gridm, "L", 0, Dict("i" => 1))                             # missing j
     @test_throws ArgumentError bp(axism, "L", -1, Dict("x" => 1.0, "y" => 2.0, "z" => 3.0))  # unexpected extra key
 
+    # a non-dict computed payload (unreachable from the shipped client, but the per-kind
+    # enumeration should still fail loud and legibly rather than a raw MethodError off `keys(...)`)
+    @test_throws ArgumentError bp(axism, "L", -1, "not-a-dict")
+    # the error names the layer id, not just the kind, so it's actionable on a multi-layer widget
+    let err = try
+            bp(axism, "L", -1, "not-a-dict")
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin(":L", err.msg) && occursin(":axis", err.msg)
+    end
+
     # pre-#110 fallback paths are unaffected: no "layers" key, an unknown layer id, or no payload
     @test bp(Dict{String, Any}(), "L", -1, Dict("x" => 1.0)) == Dict("x" => 1.0)
     @test bp(axism, "nope", -1, Dict("x" => 1.0)) == Dict("x" => 1.0)

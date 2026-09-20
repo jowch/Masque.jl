@@ -450,9 +450,15 @@ end
 # ymax)` — the clamped cell-index range plus the unclamped drawn-box bounds — from a
 # `selects`-ROI brushing a `:grid` target (`selection.ts`'s `computeSelection`). Both arrive
 # tagged with the same `"grid"` kind, so the dispatch below is on the key set, not just the kind.
-function _computed_payload(kind::Symbol, js_payload)
+function _computed_payload(layer_id::AbstractString, kind::Symbol, js_payload)
     js_payload === nothing && return nothing
     kind === :threshold && return js_payload   # scalar data coordinate — no fields to name
+    js_payload isa AbstractDict || throw(
+        ArgumentError(
+            "bond payload: layer :$(layer_id) (kind :$(kind)) sent a $(typeof(js_payload)) " *
+                "computed payload, expected a dict-like object with the fields that kind sends",
+        ),
+    )
     ks = Set(String.(keys(js_payload)))
     nt(syms...) = NamedTuple{syms}(Tuple(js_payload[String(s)] for s in syms))
     if kind === :axis
@@ -471,8 +477,8 @@ function _computed_payload(kind::Symbol, js_payload)
     end
     throw(
         ArgumentError(
-            "bond payload: layer kind :$(kind) sent an unrecognized computed payload shape " *
-                "(keys: $(sort(collect(ks))))",
+            "bond payload: layer :$(layer_id) (kind :$(kind)) sent an unrecognized computed " *
+                "payload shape (keys: $(sort(collect(ks))))",
         ),
     )
 end
@@ -497,7 +503,7 @@ function _bond_payload(manifest, layer_id::AbstractString, index::Integer, js_pa
     i === nothing && return js_payload
     d = layers[i]
     kind = Symbol(d["kind"])
-    kind in _SELECTED_KINDS || return _computed_payload(kind, js_payload)
+    kind in _SELECTED_KINDS || return _computed_payload(layer_id, kind, js_payload)
     payloads = d["payloads"]
     n = length(payloads)
     (0 <= index < n) || throw(

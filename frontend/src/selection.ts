@@ -103,7 +103,7 @@ export function hitLayerByIndex(layer: HitLayer, index: number): Omit<Hit, "laye
     if (!SELECTED_KINDS.has(layer.kind)) {
         throw new Error(
             `selected: layer ${layer.id} has kind ${layer.kind}, which does not support pre-highlight ` +
-                `(supported: circles, rects, polygons, segments, polyline)`,
+                `(supported: ${[...SELECTED_KINDS].join(", ")})`,
         )
     }
     const n = layerNElements(layer)

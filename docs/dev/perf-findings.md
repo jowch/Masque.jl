@@ -39,8 +39,10 @@
 > per-layer `"colors"` field (a uniform CSS string, or a shared palette + one index per
 > element for colormap/categorical data), present only on a `PointInteractable(ax,
 > p::Makie.Scatter)`-derived `:circles` layer whose colour resolves. Envelope unchanged at the
-> KB-rounded numbers this file tracks: scatter-1k manifest still 38.1 KB (was 38.0 KB),
-> heatmap-200² still 196.8 KB (`:grid` layers never carry `colors`), 30-frame scrub still
+> KB-rounded numbers this file tracks: scatter-1k manifest still 38.0 KB, the ~50 B added
+> rounding away at this precision (corrected 2026-09-19, PR #116 — this and the blend-highlight
+> entry below previously misstated it as 38.1 KB), heatmap-200² still 196.8 KB (`:grid` layers
+> never carry `colors`), 30-frame scrub still
 > 5.6 MB (PNG-only, untouched by a manifest-only change). Measured the exact delta directly:
 > `background` costs 28 B (key + `"rgb(255,255,255)"` value), once per manifest, not per
 > layer or element; a uniform `colors` costs ~22 B (key + one CSS colour string), once per
@@ -73,7 +75,7 @@
 > stroke is now `nothing`; the highlight split itself — three sibling top-level svgs, `mix-blend-
 > mode` color-dodge/multiply/screen — is CSS/JS-only and adds nothing to the manifest). Envelope
 > unchanged: neither bench fixture sets a custom `hoverstyle`, so re-running reproduces the
-> previous numbers byte-for-byte (scatter-1k manifest still 38.1 KB, heatmap-200² still
+> previous numbers byte-for-byte (scatter-1k manifest still 38.0 KB, heatmap-200² still
 > 196.8 KB). Measured the exact delta the same way as the `tol`/`label`/`links` re-runs above,
 > with `bench/payload_envelope.jl`'s own `mp(...)` byte model: the dropped `"stroke" =>
 > "#3A6F7C"` key+value pair is `_str(6) + _str(7)` = 7 B + 8 B = 15 B, once per layer — 15 B off
