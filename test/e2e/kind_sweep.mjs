@@ -516,14 +516,18 @@ try {
       passed.push(`${key}/hydrated-bond`);
     } else if (/=\s*nothing$/.test(mountBond)) {
       passed.push(`${key}/hydrated-bond-control`);
-    } else if (/InteractionEvent/.test(mountBond) && layers.some((l) => mountBond.includes(`:${l.id}`))) {
+    } else if (/InteractionEvent/.test(mountBond) && layers.some((l) => mountBond.includes(`:${l.id},`))) {
       // A prior kind_sweep.mjs run against this SAME warm Pluto session leaves the bond holding
       // its last value — Pluto's normal reconnect hydration (a bond keeps its value across a
       // page reload), not a regression of the mount.ts "force host.value = null" bug the check
       // above guards against. A `nothing`-baked spec can legitimately mount non-`nothing` on a
       // warm re-run (#114): accept any well-formed leftover naming one of THIS widget's own
       // layers — a `selects`-ROI's bond names its TARGET layer (e.g. `:pts`), never its own
-      // `:roi` id, so this checks membership in `layers`, not `spec.layerId` specifically.
+      // `:roi` id, so this checks membership in `layers`, not `spec.layerId` specifically. The
+      // trailing comma anchors on the id boundary Julia's positional `repr` always emits right
+      // after it (`InteractionEvent(:id, index, …)`) — layer ids can nest (`lines`/`lines_2`,
+      // `scatter`/`scatter_dark`), so an unanchored `includes` could false-match a leftover that
+      // actually names neither this widget's layer nor any real one (e.g. `:linesX,`).
       passed.push(`${key}/hydrated-bond-control-warm`);
     } else {
       throw new Error(
@@ -881,6 +885,10 @@ try {
         for (const tid of targetIds) {
           const tl = layers.find((l) => l.id === tid);
           if (!tl) throw new Error(`${key}/links[${c.index}]: target layer ${tid} missing from manifest`);
+          // layerElementCount's :grid case (ncols*nrows) is untested here — no fixture links a
+          // legend entry to a :grid target today, and the DOM-side count this feeds (`li.count`,
+          // from linkInspect's fill/edge/ring fan-out) has no defined per-cell convention for a
+          // grid hit. If a future fixture adds one, verify that convention before trusting this.
           expected += layerElementCount(tl);
         }
         if (li.count !== expected) {
@@ -952,7 +960,12 @@ try {
     // exists (it can be `null`/`undefined` for a spec with nothing baked) or that `clickIdx + 1`
     // stays in range (a legend's `selectedIndex === clickIndex` case overran a 3-entry layer this
     // way and produced the reported NaN `clientX`). `spec.layerKind === "grid"` shares this same
-    // fallback, so it gets the same fix.
+    // fallback, so it gets the same fix — though its own `index[=:]` disjunct below is dead under
+    // the current payload contract (a :grid bond's `repr` names fields `i`/`j`, never `index`;
+    // `src/render.jl`'s `_computed_payload`). `heatmap`/`image` are still covered, but via the
+    // generic `already` regex on `:cells,\s*idx` above, not via this disjunct. Left in place
+    // rather than removed, since it's harmless and a future payload shape could reintroduce a
+    // field this would catch.
     let skipChangeWait = false;
     if (already.test(before) || (spec.layerKind === "grid" && new RegExp(`index[=:]\\s*${clickIdx}\\b`).test(before))) {
       // layerElementCount throws for a kind with no indexable elements at all (e.g. a future
@@ -972,8 +985,11 @@ try {
       } else if (count === 1) {
         // Exactly one element and the bond already holds it (warm-session carryover): the click
         // is still legitimate, it just can't be proven via a text diff on #out_${key} (same index
-        // in, same index out) — skip the change-wait below and let the post-click index/layer
-        // assertions (and click-echo, further down) carry the check instead.
+        // in, same index out) — skip the change-wait below. The post-click index/layer/payload
+        // assertions read that same stale text, so they can't tell "landed correctly" from
+        // "missed entirely" here and are NOT pushed to `passed` on this path (see the comment
+        // above the change-wait); only click-echo (further down) reads live client-side state
+        // with no kernel round-trip, so it is the one check this path actually carries.
         skipChangeWait = true;
       } else {
         throw new Error(
@@ -987,6 +1003,20 @@ try {
     const clickPt = hitPoint(layer, clickIdx);
     let after = before;
     if (skipChangeWait) {
+      // `after` is read with no settle and no retry: the bond round-trips browser -> kernel ->
+      // reactive re-render, `dispatchAt` returns as soon as the synchronous DOM dispatch is done
+      // (long before that round-trip lands), and even if it DID land in time the text would be
+      // byte-identical to `before` by this branch's own premise (same index in, same index out).
+      // So `after` here is not evidence the click landed correctly — it is effectively always a
+      // copy of `before`. The checks below still run (cheap, harmless, and would catch a
+      // genuinely malformed `before`), but they are NOT pushed to `passed`: they cannot
+      // distinguish "the click hit this element" from "the click missed entirely" when the
+      // bond's text can't move. Only click-echo (below) reads live, client-side shadow-DOM state
+      // with no kernel round-trip, so it is the one signal this branch can actually push. One
+      // dispatch (no retry loop) is deliberate, not an oversight: the retry below exists to
+      // out-wait `waitChange`'s polling for a text change that can happen on any of a few ticks;
+      // there is nothing to retry toward here; a genuine dispatch failure would still throw from
+      // `dispatchAt` itself.
       await dispatchAt(key, clickPt.x, clickPt.y, "click");
       after = await textOf(`#out_${key}`);
     } else {
@@ -1007,7 +1037,7 @@ try {
         throw new Error(`${key}-click: expected index ${clickIdx}: ${after.slice(0, 220)}`);
       }
     }
-    passed.push(`${key}/click-bind`);
+    if (!skipChangeWait) passed.push(`${key}/click-bind`);
 
     // Click-echo (#103/#107): the overlay pins the picked hit(s) in g.sel itself, with no bond
     // fed back through Julia — so this also proves the echo SURVIVES the reactive round-trip
@@ -1046,14 +1076,22 @@ try {
     // struct print: `InteractionEvent(:legend, 0, …)` — the ":<layerId>," prefix pins which
     // layer actually won the hit-test. Belt-and-suspenders on top of the index regex above:
     // this fails loud specifically on "resolved to the wrong layer", not just "wrong index".
+    // On `skipChangeWait`, `after` is stale (see above) so this re-check is vacuous for THIS
+    // click — but the real regression test for `legend`-before-`:grid` layer precedence already
+    // ran once per spec, unconditionally, before any click (`legend-precedence-order`/
+    // `legend-precedence-pixel-contested`, pushed above using `spec.selectedIndex`), so the
+    // structural property this guards is still covered even when this echo of it isn't.
     if (spec.overlapsGrid && new RegExp(`:${spec.overlapsGrid},\\s*\\d+\\b`).test(after)) {
       throw new Error(`${key}-click: bond resolved to grid layer "${spec.overlapsGrid}", not legend: ${after.slice(0, 220)}`);
     }
     console.error(`OK  ${key} — ${after.slice(0, 110)}`);
 
     if (spec.links) {
-      // The click-bind assertion above already confirmed index==clickIdx; here confirm the
-      // bond's payload actually carries label/targets (not just the index).
+      // On a real click-wait, click-bind above already confirmed index==clickIdx; this confirms
+      // the bond's payload actually carries label/targets (not just the index). On
+      // `skipChangeWait`, both `after` and these checks are stale/tautological for the same
+      // reason click-bind's are (see the comment above the change-wait) — pushed only when the
+      // change-wait actually ran, matching click-bind's own gating.
       const clickTargets = (layer.links && layer.links[clickIdx]) || [];
       if (!clickTargets.length || !clickTargets.every((tid) => new RegExp(tid, "i").test(after))) {
         throw new Error(`${key}/links: click payload missing targets ${JSON.stringify(clickTargets)}: ${after.slice(0, 220)}`);
@@ -1071,7 +1109,7 @@ try {
       if (!new RegExp(expectTip, "i").test(after)) {
         throw new Error(`${key}/links: click payload missing label "${expectTip}": ${after.slice(0, 220)}`);
       }
-      passed.push(`${key}/links-click-payload`);
+      if (!skipChangeWait) passed.push(`${key}/links-click-payload`);
     }
   }
 
