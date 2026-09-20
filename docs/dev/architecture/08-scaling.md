@@ -10,7 +10,7 @@ don't restate). A rendered cell ships **two** payloads — the JS→Julia click 
 
 **The manifest is the scaling wall** — not the PNG, not render, not hit-test CPU. A realistic single
 plot is **50–400 KB total and render-bound** (~65 ms round-trip). High element counts reach multi-MB and
-flip to **payload-bound** (~553 ms total measured at a 4.78 MB manifest). Since the `values[]` cap ([§8](#8-payload-scaling--robustness-to-large-inputs))
+flip to **payload-bound** (~553 ms total measured at a 4.78 MB manifest). Since the `values[]` cap (§8)
 keeps even a 1 M-cell heatmap render-bound, the case that reaches this regime by default is now **high-N
 scatter** (200k pts → 7.72 MB manifest). Nothing crashes — it degrades into the half-second range — but
 tens of MB would lag the Pluto editor.

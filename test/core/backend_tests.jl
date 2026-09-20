@@ -124,7 +124,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     end
 
     @testset "geometry quantized to integer pixels" begin
-        # finite per-element geometry ships as Int (1–3 B/coord in MsgPack vs Float32's 5) — docs/dev/architecture/09-wire-encoding.md §9.
+        # finite per-element geometry ships as Int (1–3 B/coord in MsgPack vs Float32's 5) —
+        # docs/dev/architecture/09-wire-encoding.md §9.
         # Containers are Real[] (so non-finite coords can pass through), so assert the *values*, not eltype.
         (; ax, pts, ctx) = default_fixture()
         allint(g) = all(x -> !isfinite(x) || x isa Integer, g)   # finite coords are Int
@@ -143,8 +144,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     end
 
     @testset "non-finite projection degrades, never crashes" begin
-        # element layers are un-gated on scale (docs/dev/architecture/03-interactables.md §3); a log out-of-domain point projects to
-        # NaN/±Inf. `_q` must pass it through (round(Int, NaN) throws) so masque degrades, not crashes.
+        # element layers are un-gated on scale (docs/dev/architecture/03-interactables.md §3); a
+        # log out-of-domain point projects to NaN/±Inf. `_q` must pass it through (round(Int, NaN)
+        # throws) so masque degrades, not crashes.
         (; ax, ctx) = default_fixture()
         finite_int(g) = all(x -> !isfinite(x) || x isa Integer, g)
         flog = Figure(); axlog = Axis(flog[1, 1]; xscale = log10)

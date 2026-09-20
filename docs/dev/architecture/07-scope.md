@@ -68,6 +68,8 @@ hittable, including far-side points on solid objects — first-match-wins resolv
 as in 2D; the upgrade path is a build-time CPU painter's cull in Julia (NDC depth), symmetric by
 construction. `Surface` hit-testing is deferred on both alike (a hit-test-complexity gap —
 unbounded per-cell payload + occlusion — not a backend-capability gap);
-`MeshScatter`/wireframe/arrows are extracted today, not deferred. High-frequency live redraw is the shared cost wall above,
-not a per-backend exclusion. See `backend-comparison.md` and `roadmap.md`.
+`MeshScatter`/wireframe/arrows are extracted today, not deferred. High-frequency live redraw is
+the shared cost wall (see
+[§6](06-composition.md#6-how-it-composes--the-three-interaction-tiers)), not a per-backend
+exclusion. See `backend-comparison.md` and `roadmap.md`.
 

@@ -32,7 +32,9 @@ const ARCH_DIR = join(REPO_ROOT, "docs", "dev", "architecture");
 const ENTRY = join(REPO_ROOT, "docs", "dev", "architecture.md");
 
 // e.g. https://github.com/jowch/Masque.jl/blob/main/docs/dev/architecture/10-tooltips.md#10-tooltips
-const GITHUB_BLOB_RE = /^https?:\/\/github\.com\/[^/]+\/[^/]+\/blob\/[^/]+\/(.+)$/i;
+// Owner/repo is pinned to this repo, not a wildcard -- a blob URL into some other GitHub repo
+// (e.g. a Makie.jl doc link) must NOT be resolved against our own local tree.
+const GITHUB_BLOB_RE = /^https?:\/\/github\.com\/jowch\/Masque\.jl\/blob\/[^/]+\/(.+)$/i;
 
 // Verbatim from github-slugger's regex.js (BananaSlug), covers the Unicode punctuation ranges
 // GitHub strips when computing a heading anchor.
@@ -81,13 +83,32 @@ function anchorsFor(path) {
   return anchorCache.get(path);
 }
 
+// Blank out fenced code blocks (same fence-tracking rule as headingsOf) so a markdown link
+// *inside* a fence is never extracted. GitHub renders such a link as literal text, not a link --
+// counting it as "checked" would let a broken construct read as verified.
+function stripFences(text) {
+  const out = [];
+  let inFence = false;
+  for (const line of text.split("\n")) {
+    if (/^```/.test(line.trim())) {
+      inFence = !inFence;
+      out.push("");
+      continue;
+    }
+    out.push(inFence ? "" : line);
+  }
+  return out.join("\n");
+}
+
 // [label](target) -- ignore image links and autolinks.
 const LINK_RE = /(?<!!)\[[^\]]*\]\(([^)\s]+)\)/g;
 
 function extractLinks(text) {
   const links = [];
   let m;
-  while ((m = LINK_RE.exec(text)) !== null) {
+  LINK_RE.lastIndex = 0;
+  const stripped = stripFences(text);
+  while ((m = LINK_RE.exec(stripped)) !== null) {
     links.push(m[1]);
   }
   return links;

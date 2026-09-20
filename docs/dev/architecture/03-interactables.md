@@ -90,7 +90,7 @@ This is a **closed set of six geometry kinds** (`:circles/:polyline/:segments/:r
 plus the `:axis` continuous channel. The survey confirmed every retained Makie surface projects to one
 of them; nothing in v1+v2 needs a seventh. (Text labels — the surface once speculated to need a new
 `bbox`/degenerate-polygon primitive — turned out not to: `TextInteractable` rides plain `:rects`, with
-a rotated label's box simply expanded to stay axis-aligned; see [§3](#3-the-interactable-seam--abstractinteractable). That premise is retired for text.)
+a rotated label's box simply expanded to stay axis-aligned; see §3. That premise is retired for text.)
 
 The three M4 drag kinds — `:view`, `:threshold`, `:roi` — sit outside this set. They are
 *control* geometry: one draggable region apiece, no elements, an empty `payloads`. The closed-set
