@@ -19,8 +19,8 @@
 > bench's own point; `bench/stress.jl` sweeps 100k too but at `markersize=4` (≈303 KB PNG; see
 > `perf-findings.md`'s stress table for its render time), so it is *not* a corroborating source
 > for the `markersize=6` numbers here — the marker size drives both the PNG and the raster time.
-> **Timings (ms) are wall-clock** (`~` throughout) and vary
-> run-to-run; only sizes are exact. Last run **2026-06-30**, WGLMakie 0.13.12 / CairoMakie 0.15 /
+> **Timings (ms) are wall-clock** (`~` throughout) and vary run-to-run; only sizes are exact.
+> Last run **2026-06-30**, WGLMakie 0.13.12 / CairoMakie 0.15 /
 > Julia 1.12. Size/latency figures reconcile with `perf-findings.md`'s `:webgl` section and its
 > `:cairo` envelope — see that file for the full methodology.
 
