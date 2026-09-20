@@ -92,15 +92,36 @@
 > Confirmed **neutral** by re-running both scripts: every manifest/PNG size byte-for-byte
 > identical to the pre-#110/#109 baseline (scatter-1k manifest still 38.0 KB, heatmap-200²
 > still 196.8 KB, 30-frame scrub still 5.6 MB, the STRESS A–C tables unchanged) — expected,
-> since neither change touches anything the manifest ships. `bench/stress.jl`'s STRESS D–G
+> since neither change touches anything the manifest ships. `bench/stress.jl`'s STRESS D–E
 > rows failed to run under this reconciliation, from a pre-existing bug unrelated to this PR
 > (confirmed reproducing identically on unmodified `main`): `stress()`'s warm-up timing line
 > calls `mkfig()` a second time to build the `@elapsed` argument, so `mkint(mkfig())` builds
 > the interactable against a different `Figure`/`Axis` than the one passed to `masque()`,
 > which only breaks the sections (D onward) where `mkint` depends on the figure. Verified
 > STRESS D's own manifest size directly instead (bypassing the buggy warm-up call): 10.24 MB,
-> identical on this branch and on unmodified `main`. Not fixed here — out of scope for a
-> payload-contract PR; worth its own small fix.
+> identical on this branch and on unmodified `main`
+> and re-run after fixing `bench/stress.jl`'s timing bug (issue #119, commit `226d9f2`,
+> 2026-09-20): no manifest-shape change — the bug was purely in `stress()`'s `@elapsed` line,
+> which called `mkfig()` (and, for STRESS D, `mkint(mkfig())`) a second time inline, so the
+> interactable was keyed to a different `Figure` than the one rendered; `axis_id` failed loud
+> for STRESS D and the script never reached STRESS E. The fix hoists a `fig2`/`ints2` pair
+> before the timed call and times only `masque(fig2)`, warmed by the same `w` build as
+> before — for STRESS A–C, `mkfig()` is still called exactly twice per case in the same order
+> (once for `w`, once for the timed call), so the seeded RNG state — and every manifest/PNG
+> byte it produces — is unchanged by construction. Confirmed: scatter-50k/100k/200k manifests
+> still 1.88/3.83/7.72 MB, heatmap-300² still 442 KB (a 452 117-byte manifest — this doc
+> previously rounded it to 441 KB; several small additive per-layer/per-manifest fields
+> (`background`, dropped `stroke`, `tol`, `label`, `links`, `valueaxis`) landed since that
+> number was last written and nudged it across the KB rounding boundary, none of them from
+> this fix), heatmap-1000² still 6 KB, and STRESS D still 10.24 MB — matching the value
+> already verified by direct inspection in the `#110`/`#109` entry above. This is the
+> **first run of `bench/stress.jl` to complete all five sections**; the corrected STRESS table
+> is below. Render times mostly came down, as expected, once figure construction was no
+> longer inside `@elapsed` — except the two heaviest cases (scatter 200k, heatmap 1000²),
+> which came out flat to slightly *higher* than the previously-recorded (contaminated)
+> numbers. Two solo re-runs of the full script (no other Julia process on the machine)
+> reproduced this consistently, so it isn't measurement contention; it's reported as
+> measured rather than smoothed into the expected direction.
 > baseline established after int-pixel geometry quantization, CairoMakie 0.15, Julia 1.12):
 > - **base64-PNG / manifest / render numbers** — `julia --project=. bench/payload_envelope.jl`
 >   (normal envelope) and `julia --project=. bench/stress.jl` (the 10× extremes). Both `seed!(0)`,
@@ -294,7 +315,7 @@ Pushing past the normal envelope (live round-trips + a pure-Julia sweep to 10× 
 > These two rows are **pre-change live snapshots** (dated, not regenerated). The wire format has since
 > shrunk both manifests: scatter-10000 is now ~379 KB (int-pixel geometry, this PR), and the 1000²
 > heatmap ships ~6 KB (its sub-pixel `values[]` is dropped by the PR #8 cap), so that exact heatmap is
-> now **render-bound** (~120 ms render), not the 553 ms payload-bound case shown. The 553 ms remains a
+> now **render-bound** (~140 ms render), not the 553 ms payload-bound case shown. The 553 ms remains a
 > valid datapoint for *what a 4.78 MB manifest costs* — it just no longer occurs by default.
 
 (PNG sizes here are the live browser-measured transferred bytes; manifest sizes are from the bench.
@@ -309,22 +330,40 @@ Post-wire-shrink (int-pixel geometry + the `values[]` cap), the case that *reach
 default is **high-N scatter** (200 000 pts → 7.72 MB manifest), not heatmaps — the cap keeps even a 1 M-cell
 heatmap render-bound.
 
-**The manifest is the high-N wall, not the PNG** (pure-Julia sweep):
+**The manifest is the high-N wall, not the PNG** (pure-Julia sweep, `bench/stress.jl` at commit
+`226d9f2` — the first run of this script to complete all five STRESS sections; see the
+reconciliation entry above):
 
 | Case | PNG | manifest | render |
 |------|----:|---------:|-------:|
-| scatter 50 000 | 791 KB | 1.88 MB | ~940 ms |
-| scatter 100 000 | 303 KB | 3.83 MB | ~1.6 s |
-| scatter 200 000 | 71 KB | **7.72 MB** | ~3.0 s |
-| heatmap 300×300 (cells visible) | 388 KB | 441 KB | ~50 ms |
-| heatmap 1000×1000 (cells sub-pixel) | 2.26 MB | **6 KB** | ~120 ms |
-| scatter 50 000 + 200 B payload/elem | 47 KB | **10.2 MB** | ~1.35 s |
+| scatter 50 000 | 791 KB | 1.88 MB | ~850 ms |
+| scatter 100 000 | 303 KB | 3.83 MB | ~1.5 s |
+| scatter 200 000 | 71 KB | **7.72 MB** | ~3.2 s |
+| heatmap 300×300 (cells visible) | 388 KB | 442 KB | ~34 ms |
+| heatmap 500×500 (cells visible) | 1 009 KB | 3 KB | ~200 ms |
+| heatmap 1000×1000 (cells sub-pixel) | 2.26 MB | **6 KB** | ~140 ms |
+| scatter 50 000 + 200 B payload/elem | 47 KB | **10.24 MB** | ~1.3 s |
+
+Three of these six fell as the fix predicts — removing the extra `Figure` construction from the
+timed call found time again: scatter 50 000 (~940 ms → ~850 ms), scatter 100 000 (~1.6 s →
+~1.5 s), heatmap 300² (~50 ms → ~34 ms). But the two heaviest cases rose instead: scatter
+200 000 (~3.0 s → ~3.2 s) and heatmap 1000×1000 (~120 ms → ~140 ms) — the opposite of the
+issue's expectation that heavier scenes, where the removed confounder scales with scene weight,
+would benefit *more*. Two solo re-runs of the full script (no other Julia process on the
+machine) reproduced both directions consistently, so this isn't measurement contention; it's
+reported as measured rather than smoothed into the predicted direction. STRESS D (scatter
+50 000 + 200 B payload/elem) and the new heatmap 500×500 row have no valid prior number to
+compare against — D never completed before this fix, and 500×500 was never in this table:
+`stress()`'s loop always sampled `d ∈ (300, 500, 1000)`, but the original table only carried the
+two endpoints. Heatmap-500×500's manifest (3 KB) is smaller than the 1000×1000 row's (6 KB)
+because the sub-pixel cap ships grid *edges* (`nrows+1`/`ncols+1` entries), not per-cell values,
+so it scales with √cells, not cells.
 
 - **PNG is non-monotonic in N** — past saturation, dense random scatter compresses to a near-solid mass
   (200 000 pts → only 71 KB), while the **manifest grows strictly O(N) to 7.7 MB** (int-pixel geometry,
   this PR; was 9.28 MB at Float32). At high element counts the manifest, not the image, is the ceiling.
-- **Heatmap render stays cheap (~120 ms even at 1 M cells)** — Cairo blits the raster. The manifest
-  carries the value matrix (O(cells)) **only while cells are targetable**: at 300² (visible) it's 441 KB,
+- **Heatmap render stays cheap (~140 ms even at 1 M cells)** — Cairo blits the raster. The manifest
+  carries the value matrix (O(cells)) **only while cells are targetable**: at 300² (visible) it's 442 KB,
   but at 1000² the cells go sub-pixel and the values cap (PR #8) drops the matrix → 6 KB. So a giant
   heatmap is no longer the payload wall it was; high-N *scatter* is.
 - **Raw canvas pixels are *not* a payload driver for sparse content**: a 3200×2000 figure with 2 000
@@ -418,8 +457,10 @@ float16; lossy >2048px). Keep `AxisTransform` lims `Float64` (drag inversion) �
 - **M2.3 Richer tooltips** *(delivered, PR #10)* — the original
   prediction was correct: shipping per-element tooltip strings would grow the manifest by `Σ(tooltip
   bytes)`. Measured upper bounds (bench section B / Stress D): 1 000 elements × 200-byte HTML each =
-  +196 KB (14 → 210 KB); 50 000 elements × 200 B each = **10.2 MB manifest** → payload-bound
-  ~0.5 s+ round-trip. M2.3 avoided this by design: the per-element `tooltips[]` array was **not
+  +196 KB (14 → 210 KB); 50 000 elements × 200 B each = **10.24 MB manifest**, ~1.3 s render alone
+  (STRESS D, `bench/stress.jl` commit `226d9f2` — see the reconciliation entry above; a live
+  round-trip would add browser/transfer time on top). M2.3 avoided this by design: the
+  per-element `tooltips[]` array was **not
   shipped** in the manifest. Instead, each layer that has a tooltip carries two O(1)-per-layer
   terms — `template` (a small segments array evaluated per hover) and a top-level `tipStyle`
   (CSS-var dict). The **default per-element envelope is unchanged** — confirmed by M2.3 bench
@@ -598,7 +639,7 @@ sizes exact, ms wall-clock/approximate; units MB = bytes/1 000 000):
   draw is offloaded to the client. Contrast `:cairo`, which rasterizes server-side: `bench/vs_cairo.jl`
   measures its render+encode climbing to **~2.3 s at 100k points** (`markersize=6`, matching this
   file's own `bench/payload_envelope.jl`). `bench/stress.jl` sweeps 100k too but at `markersize=4`,
-  where it records **~1.6 s** (the "manifest is the high-N wall" table above) — the marker size
+  where it records **~1.5 s** (the "manifest is the high-N wall" table above) — the marker size
   drives the raster cost, so the two are consistent, not contradictory. This flat WebGL line is the
   per-update UX win, not a measurement gap.
 - **Dense rasters blow up the scene**: a heatmap ships as a value grid, so 500² = 11.8 MB vs a ~1 MB
