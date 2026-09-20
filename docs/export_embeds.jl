@@ -18,8 +18,9 @@ const GS_FIG_ID = UUID("a1b2c3d4-0001-4000-8000-000000000002")
 const GS_BIND_ID = UUID("a1b2c3d4-0001-4000-8000-000000000003")
 const GS_PICK_ID = UUID("a1b2c3d4-0001-4000-8000-000000000004")
 
-# Listed states: idle plus every city on this README 8-city scatter. Unlisted freeze
-# is for interactable kinds not in the player table, not for omitted cities here.
+# Discrete demo rule: list every city (idle + all eight). The player should read
+# like live `@bind` / autoextraction on this finite scatter. Continuous kinds
+# (ROI, axis, view) stay overlay-only — that freeze is not for omitted cities.
 const GS_PLAYER_SOURCE = """
 PLUTO_PLAYER_TOML_CONTENTS = \"\"\"
 [player]
@@ -650,7 +651,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     caption = html_escape(
         get(
             player, "caption",
-            "Listed clicks update the cell below. An unlisted click keeps the overlay alive; Julia stays on the last snapshot.",
+            "City clicks update the cell below, like live `@bind`. Continuous kinds (ROI, axis, view) stay overlay-only.",
         ),
     )
     player_css = pluto_player_css()

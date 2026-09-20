@@ -66,9 +66,9 @@ ev === nothing ? "click a point" : "you picked $(ev.payload)"
 ```
 
 The embed below is the same plot as the README demo GIF (`docs/dev/readme-demo/notebook.jl`):
-eight cities, hover for population, click to bind. Every city is a listed `@bind` snapshot.
-Hover still works on every mark. Unlisted freeze is for interactable kinds that are not in
-the player table, not for cities omitted from this plot.
+eight cities, hover for population, click to bind. Every city is listed so the readout
+swaps like live `@bind`. Hover still works on every mark. Continuous kinds (ROI, axis,
+view) stay overlay-only — that freeze is not for cities omitted from this plot.
 
 ```@raw html
 <div class="masque-embed-wrap">
