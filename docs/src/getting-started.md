@@ -73,13 +73,21 @@ the readout on the last snapshot.
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-gs-player" title="Three-point scatter with listed @bind snapshots"
-        style="width:100%;height:480px;border:0;" loading="lazy"></iframe>
+        style="width:100%;height:480px;border:0;background:transparent;" loading="lazy"></iframe>
 </div>
 <script>
 (function () {
   var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
   var el = document.getElementById("masque-gs-player");
-  if (el) el.src = (pretty ? "../embeds/" : "embeds/") + "getting_started.html";
+  if (!el) return;
+  function pushTheme() {
+    var doc = el.contentDocument;
+    if (!doc) return;
+    doc.documentElement.className = document.documentElement.className;
+  }
+  el.addEventListener("load", pushTheme);
+  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  el.src = (pretty ? "../embeds/" : "embeds/") + "getting_started.html";
 })();
 </script>
 ```

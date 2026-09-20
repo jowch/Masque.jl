@@ -132,6 +132,9 @@ function wrap_scripts_for_static(html::AbstractString)
                 "const currentScript = document.currentScript;\n",
                 "const invalidation = new Promise(() => {});\n",
                 body, "\n",
+                "if (typeof manifest !== \"undefined\" && currentScript && currentScript.parentElement) {\n",
+                "  currentScript.parentElement.masqueManifest = manifest;\n",
+                "}\n",
                 "}\n",
                 "</script>",
             )
@@ -149,9 +152,9 @@ function cell_output_html(c::Pluto.Cell)
         if mime == "text/plain" && length(s) >= 2 && startswith(s, '"') && endswith(s, '"')
             s = s[2:(end - 1)]
         end
-        "<div class=\"masque-player-text\">$(html_escape(s))</div>", 0
+        "<pre>$(html_escape(s))</pre>", 0
     else
-        "<div class=\"masque-player-text\">$(html_escape(repr(body)))</div>", 0
+        "<pre>$(html_escape(repr(body)))</pre>", 0
     end
     return wrap_scripts_for_static(html), n_inlined
 end
@@ -262,6 +265,143 @@ function record_state(cells)
     return (; htmls, n_inlined, png_b, man_b)
 end
 
+function extract_json_object(s::AbstractString, start::Int)
+    i = start
+    n = ncodeunits(s)
+    while i <= n && s[i] != '{'
+        i = nextind(s, i)
+    end
+    i > n && error("no JSON object at $start")
+    depth = 0
+    in_str = false
+    esc = false
+    j = i
+    while j <= n
+        c = s[j]
+        if in_str
+            if esc
+                esc = false
+            elseif c == '\\'
+                esc = true
+            elseif c == '"'
+                in_str = false
+            end
+        elseif c == '"'
+            in_str = true
+        elseif c == '{'
+            depth += 1
+        elseif c == '}'
+            depth -= 1
+            depth == 0 && return (SubString(s, i, j), i, j)
+        end
+        j = nextind(s, j)
+    end
+    return error("unterminated JSON object")
+end
+
+# Put listed @bind states on the same manifest object the overlay mounts, not a
+# side-channel SNAPSHOTS table. Lookup is still host.value (overlay's existing bond).
+function inject_manifest_snapshots(html::AbstractString, snapshots)
+    needle = "const manifest = "
+    start = findfirst(needle, html)
+    start === nothing && error("no inlined manifest to attach snapshots")
+    json, j0, j1 = extract_json_object(html, last(start))
+    obj = JSON3.read(String(json), Dict{String, Any})
+    obj["snapshots"] = jsonable(snapshots)
+    return html[1:(j0 - 1)] * JSON3.write(obj) * html[(j1 + 1):end]
+end
+
+const PLAYER_CSS = raw"""
+:root {
+  --pluto-cell-spacing: 17px;
+  --julia-mono-font-stack: JuliaMono, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --lato-ui-font-stack: "Lato Medium", Lato, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --doc-fg: #4c4f51;
+  --doc-muted: #6b7280;
+  --normal-cell-color: rgba(0, 0, 0, 0.12);
+  --pluto-output-color: var(--doc-fg);
+  --pluto-output-bg-color: transparent;
+  --main-bg-color: transparent;
+  color-scheme: light;
+}
+html.theme--documenter-dark,
+html.theme--catppuccin-mocha,
+html.theme--catppuccin-macchiato,
+html.theme--catppuccin-frappe {
+  --doc-fg: #dbdbdb;
+  --doc-muted: #9aa0a6;
+  --normal-cell-color: rgba(255, 255, 255, 0.18);
+  color-scheme: dark;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--doc-fg);
+  font-family: var(--lato-ui-font-stack);
+  font-size: 16px;
+}
+pluto-notebook { display: block; background: transparent; }
+pluto-cell {
+  display: block;
+  position: relative;
+  margin-top: var(--pluto-cell-spacing);
+  min-height: 25px;
+}
+pluto-cell:first-child { margin-top: 0; }
+pluto-trafficlight {
+  box-sizing: content-box;
+  width: 4px;
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+  background: var(--normal-cell-color);
+}
+pluto-output {
+  display: block;
+  padding: 3px 10px;
+  background: var(--pluto-output-bg-color);
+  color: var(--pluto-output-color);
+  overflow-x: auto;
+}
+pluto-output:not(.rich_output) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  font-family: var(--julia-mono-font-stack);
+  font-size: 0.875rem;
+  font-variant-ligatures: none;
+}
+pluto-output > assignee {
+  font-family: var(--julia-mono-font-stack);
+  font-size: 0.75rem;
+}
+pluto-output > assignee::after {
+  content: "\a0=\a0";
+  opacity: 0.6;
+}
+pluto-output:not(.rich_output) pre {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  white-space: pre-wrap;
+}
+pluto-output.rich_output { padding-left: 10px; padding-right: 10px; }
+.ip-host { isolation: isolate; max-width: 100%; }
+.masque-player-caption {
+  margin: var(--pluto-cell-spacing) 0 0;
+  padding: 0 10px;
+  font-size: 0.85em;
+  color: var(--doc-muted);
+  line-height: 1.45;
+}
+"""
+
 function emit_player(path, outpath, player, cells, states, bond::Symbol)
     widget = first(cells)
     downstream = cells[2:end]
@@ -297,9 +437,9 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         @warn "embed snapshot cost exceeds budget (warn only)" path = basename(path) n_states cost budget = EMBED_BUDGET manifest_bytes = man_b png_bytes = png_b
     end
 
-    snapshots_json = JSON3.write(snapshots)
-    widget_html = something(idle_html)
+    widget_html = inject_manifest_snapshots(something(idle_html), snapshots)
     down_html = join(idle_down, "\n")
+    bond_name = html_escape(string(bond))
     title = html_escape(get(player, "title", "Masque embed"))
     caption = html_escape(
         get(
@@ -316,36 +456,43 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>$title</title>
       <style>
-        html, body { margin: 0; padding: 0; background: #fff; color: #1a1a1a; }
-        body { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 15px; }
-        .masque-player { padding: 0.15rem 0 0.35rem; }
-        .masque-player-widget .ip-host { max-width: 100%; }
-        .masque-player-out { margin-top: 0.65rem; padding: 0.5rem 0.75rem; background: #f4f4f5;
-          border-radius: 6px; font-variant-numeric: tabular-nums; }
-        .masque-player-caption { margin: 0.65rem 0 0; font-size: 0.85em; color: #52525b; line-height: 1.45; }
+    $PLAYER_CSS
       </style>
     </head>
     <body>
-      <div class="masque-player">
-        <div class="masque-player-widget" id="masque-widget">
-          $widget_html
-        </div>
-        <div class="masque-player-out" id="masque-out">
-          $down_html
-        </div>
+      <pluto-notebook class="masque-player">
+        <pluto-cell>
+          <pluto-trafficlight></pluto-trafficlight>
+          <pluto-output class="rich_output">
+            <div id="masque-widget">
+              $widget_html
+            </div>
+          </pluto-output>
+        </pluto-cell>
+        <pluto-cell>
+          <pluto-trafficlight></pluto-trafficlight>
+          <pluto-output>
+            <assignee>$bond_name</assignee>
+            <div id="masque-out" data-masque-bind>
+              $down_html
+            </div>
+          </pluto-output>
+        </pluto-cell>
         <p class="masque-player-caption">$caption</p>
-      </div>
+      </pluto-notebook>
       <script>
     {
-      const SNAPSHOTS = $snapshots_json;
       function keyOf(v) {
         if (v == null) return "null";
         if (v.items) return "items:" + v.items.map((it) => it.layer + ":" + it.index).join(",");
         if (v.layer != null && v.index != null) return String(v.layer) + ":" + String(v.index);
         return JSON.stringify(v);
       }
-      function applyKey(key) {
-        const snap = SNAPSHOTS[key];
+      function applyFromHost(host) {
+        const man = host && host.masqueManifest;
+        const snaps = man && man.snapshots;
+        if (!snaps) return false;
+        const snap = snaps[keyOf(host.value)];
         if (!snap) return false;
         const out = document.getElementById("masque-out");
         out.innerHTML = snap.cells.join("\\n");
@@ -359,7 +506,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       const host = document.querySelector(".ip-host");
       if (host) {
         host.addEventListener("input", () => {
-          applyKey(keyOf(host.value));
+          applyFromHost(host);
           sizeFrame();
         });
       }
