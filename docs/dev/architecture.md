@@ -437,9 +437,10 @@ feedback loop writing the selection back onto the manifest for a next render —
 re-supplies `selected=` (typically from the prior bond value) if the same selection should
 survive a rebuild.
 
-**In-drag gesture frames never produce a bond value.** A frame shipped to update the view during
-an active drag-to-pan or orbit (§12) does not assign `sel` and does not touch this bond at all —
-only the final, committed camera/`limits` value on gesture release goes through the ordinary path
+**A view-manipulation gesture never produces a bond value.** Frames shipped to update the view
+during an active drag-to-pan or orbit (§12) do not assign `sel` and do not touch this bond, and
+neither does the gesture's release: a camera is operational state, not an analysis value (§12.3).
+A `ThresholdInteractable` or `ROIInteractable` release does commit, through the ordinary path
 above.
 
 ## 6. How it composes — the three interaction tiers
@@ -454,20 +455,20 @@ them cleanly:
   the manifest; the format is designed not to preclude it). **It is the one payload-unbounded feature**
   (total = frames × per-frame PNG): ~5.5 MB (187 KB × 30) to ~22 MB (× 120) for a typical plot, 100s of MB
   at scale. The `frames` slot must shrink per-frame cost (downscale / fewer frames) before it ships — §8.
-- **Tier 2 (round-trip):** `:click` events → `@bind`. Discrete server re-render from new state is in
-  scope on **both** backends for the *committed* value — a click, a keyboard commit, a slider- or
-  widget-driven view change, or the final camera/`limits` value released at the end of a
-  view-manipulation gesture (drag-to-pan, 3D orbit) — each lands through `@bind` exactly as any
-  other Tier 2 value, backend-symmetric. Landing through `@bind` commits the value; it does not by
-  itself force a server re-render — a click's own selection highlight is drawn client-side with no
-  round trip (§5), so a re-render happens only if the notebook's own reactive graph feeds the
-  committed value into a new cell. What differs when a re-render *does* happen is
-  **cost**: `:webgl` re-serializes (~flat) while `:cairo` re-rasterizes (scales with the scene) —
-  see `backend-comparison.md`. The **in-drag frames** of a view-manipulation gesture are not Tier 2
-  traffic at all — they never touch `@bind`, never re-execute a cell, and the two backends
-  implement them by completely different mechanisms; see §12 for the contract those frames follow.
-  *Per-frame* faithful redraw (smooth-drag-as-a-guarantee) is a shared latency wall on both, not a
-  `:cairo`-only exclusion.
+- **Tier 2 (round-trip):** `:click` events → `@bind`. Discrete server re-render from new state is
+  in scope on **both** backends for the *committed* value — a click, a keyboard commit, a slider-
+  or widget-driven view change — each lands through `@bind` exactly as any other Tier 2 value,
+  backend-symmetric. A view-manipulation gesture's own camera/`limits` value is **not** among
+  them: camera state is operational, not analysis, and never enters notebook state (§12.3).
+  Landing through `@bind` commits the value; it does not by itself force a server re-render — a
+  click's own selection highlight is drawn client-side with no round trip (§5), so a re-render
+  happens only if the notebook's own reactive graph feeds the committed value into a new cell.
+  What differs when a re-render *does* happen is **cost**: `:webgl` re-serializes (~flat) while
+  `:cairo` re-rasterizes (scales with the scene) — see `backend-comparison.md`. The **in-drag
+  frames** of a view-manipulation gesture are not Tier 2 traffic at all — they never touch
+  `@bind`, never re-execute a cell, and the two backends implement them by completely different
+  mechanisms; see §12 for the contract those frames follow. *Per-frame* faithful redraw
+  (smooth-drag-as-a-guarantee) is a shared latency wall on both, not a `:cairo`-only exclusion.
 
 **Named tensions (accepted, not bugs):**
 1. `AxisInteractable` returns no region geometry — it rides the `:axis` channel as an unbounded
@@ -844,7 +845,8 @@ in §12.6, and the rule in §12.7 bind every caller.
 A **gesture** is a continuous, in-progress manipulation whose intermediate states no downstream
 cell reads. A **data interaction** is a value a downstream cell reads: a click, a keyboard commit
 (§11), a `selects`-ROI release, a bounds-only `ROIInteractable` release, a threshold-drag
-release, a view gesture's release.
+release. A view-manipulation gesture's release is not one: it settles a camera, and a camera is
+not a value the notebook reads (§12.3).
 
 These are separate channels, not two speeds of one. A gesture's in-progress frames carry no value
 the notebook can see; producing that value is what a data interaction is for.
@@ -854,8 +856,10 @@ gesture and answers question 0, so it never leaves the browser. The channel take
 gestures §12.2 routes to question 3.
 
 Classification follows §12.2's rule — not the interactable that produced the state, and not what
-is being manipulated. For every drag interactable Masque ships, release is a data interaction and
-commits through `@bind` exactly as a click does (§12.3); only the in-drag behaviour differs.
+is being manipulated. For the drag interactables that settle an analysis value — `ROIInteractable`
+and `ThresholdInteractable` — release is a data interaction and commits through `@bind` exactly as
+a click does (§12.3); only the in-drag behaviour differs. `ViewInteractable` settles a camera and
+commits nothing.
 
 ### 12.2 The routing rule
 
@@ -912,9 +916,24 @@ not diverge.
 In-drag frames never touch the bond: no cell re-execution, no output replacement, no remount.
 Producing and displaying a frame during a gesture is invisible to Pluto's reactivity.
 
-The committed value — a camera/`limits` value, a threshold, whatever the gesture settles —
-commits through `@bind` on release. This channel moves the in-progress frames off `@bind` and
-leaves the committed value's path unchanged.
+A gesture that settles an **analysis value** — a threshold, an ROI's bounds — commits it through
+`@bind` on release. For those, this channel moves the in-progress frames off `@bind` and leaves
+the committed value's path unchanged.
+
+**A view-manipulation gesture commits nothing.** `@bind` carries values the user asked for; a
+camera position is operational state, not an analysis value. Pan, zoom and orbit live entirely on
+this channel, with no bond at the end. A widget carrying a `ViewInteractable` is still bindable:
+its bond reports the selection (§5), which a view-only widget never updates.
+
+**View state does not persist across a re-render.** The `with_js_link` closure is recreated when
+the cell re-runs, so an upstream data edit returns the view to the figure's own limits. This
+matches every other non-bond display state in Pluto, and §5's rule that the overlay is wiped on
+every re-render. To persist a view, an author writes the `Ref` + `@bind` pattern explicitly and
+accepts its tradeoffs (§12.8).
+
+*Status:* contract, not implementation. `ViewInteractable` commits `limits`/`azimuth`+`elevation`
+through `@bind` today; moving it onto this channel is #102's work, and `_computed_payload`'s
+`:view` branch (`src/render.jl`) retires with it.
 
 ### 12.4 Projection stays Julia-authored on every frame
 
@@ -958,8 +977,8 @@ Mechanisms differ by backend and need not converge. `:cairo` re-renders and ship
 plus, when owed, a fresh manifest. `:webgl` has no settled mechanism: #86 gates in-place buffer
 patching on canvas identity (a WebGL context is tied to one `<canvas>`, which Pluto's cell-output
 replacement destroys). #85 proposes a 2D last-frame preview — CSS-transforming frame and overlay
-together, one Julia commit on release — for both backends, not as a `:webgl`-specific answer to
-#86. **Backends differ in cost, never in the interaction contract:** conformance is judged
+together while a Julia frame is in flight — for both backends, not as a `:webgl`-specific answer
+to #86. **Backends differ in cost, never in the interaction contract:** conformance is judged
 against the obligations above, never against a particular backend's mechanism.
 
 ### 12.6 Request discipline
@@ -989,17 +1008,23 @@ notebook. A value that rides this channel is not recoverable, not reproducible f
 notebook, and invisible to every downstream cell. If it matters, it commits through `@bind`.
 
 The rule applies per *transmission*, not per variable. The same quantity travels both channels at
-different moments: mid-drag an azimuth is a transient render parameter no cell reads; on release
-that same azimuth commits through `@bind` (§12.3). Orbiting live and binding the final camera is
-the ordinary case. The question is never "does a cell read this variable?" but "does a cell read
-this send?" — if it does, it is a commit and goes through `@bind`.
+different moments: mid-drag a threshold is a transient render parameter driving a preview nothing
+downstream reads (§12.2); on release that same threshold commits through `@bind` (§12.3).
+Previewing live *and* binding the settled value is the ordinary case, not a tension to resolve.
+For a quantity that can commit at all, the question is never "does a cell read this variable?"
+but "does a cell read this send?" — if it does, it is a commit and goes through `@bind`. A camera
+never commits on any send, which is why §12.3 takes view manipulation off `@bind` outright rather
+than splitting it per transmission.
 
 ### 12.8 Relationship to #83
 
 A channel that never remounts removes #83's double remount for gestures: there is no remount to
-double. #83 is otherwise unaffected, and is not a Pluto defect — a self-referencing `@bind` cell
-is not a sanctioned Pluto use case. Every path still going through `@bind`, including the
-committed gesture value, retains #83's behaviour.
+double. View manipulation also has no bond at the end of the gesture (§12.3), so the
+self-referencing `@bind` cell that produces #83 is never written for it.
+
+#83 is otherwise unaffected, and is not a Pluto defect: a self-referencing `@bind` cell is not a
+sanctioned Pluto use case. Every path still going through `@bind` retains #83's behaviour,
+including an author who opts into the `Ref` + `@bind` pattern to persist a view.
 
 ### 12.9 Prerequisites for a user-facing surface
 
@@ -1044,10 +1069,11 @@ picks up #102.
   in the mechanism, not the measurement: #86 blocks in-place buffer patching on canvas identity,
   and #85's 2D last-frame preview is an alternative for both backends rather than an answer to
   #86. Whichever mechanism `:webgl` takes, what the backends share is this section's contract.
-- **What commits a gesture with no release.** §12.3's commit-on-release rule is drag-shaped: pan
-  and orbit are pointer drags with a pointerup to commit on. A wheel zoom has no terminal event
-  and needs another commit rule — an idle debounce, an explicit affordance, something else.
-  `ViewInteractable` is drag-only today (`events` is `(:drag,)`; `mode` is `"pan"` or `"orbit"`;
-  `frontend/src/` has no wheel handler), so nothing is blocked now. `roadmap.md` plans wheel zoom
-  as part of #85, so the rule is needed before #85 lands. #105 does not wait on it: subsampling is
-  worth doing whether or not this channel ships, and the two only compound if both do.
+- **What ends a gesture with no release.** Committing is not the question — view manipulation
+  commits nothing (§12.3) — but a wheel zoom still has no terminal event, so the channel needs a
+  rule for when to stop requesting frames and settle on the last one: an idle debounce, an
+  explicit affordance, something else. `ViewInteractable` is drag-only today (`events` is
+  `(:drag,)`; `mode` is `"pan"` or `"orbit"`; `frontend/src/` has no wheel handler), so nothing is
+  blocked now. `roadmap.md` plans wheel zoom as part of #85, so the rule is needed before #85
+  lands. #105 does not wait on it: subsampling is worth doing whether or not this channel ships,
+  and the two only compound if both do.
