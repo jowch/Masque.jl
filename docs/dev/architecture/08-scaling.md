@@ -20,7 +20,7 @@ would have added O(N × string-bytes) — the dominant inflation term at high el
 `perf-findings.md` §"Scope bounds for downstream phases" for the measured upper bounds). M2.3 avoids
 this: tooltip content ships as two O(1)-per-layer fields — `template` (pre-parsed segments, present when
 `tooltip` is a `Markup`) and a top-level `tipStyle` dict — leaving the per-element envelope unchanged.
-See [§10](10-tooltips.md#10-tooltips) Tooltips, below, for the wire shape and authoring API.
+See [§10](10-tooltips.md#10-tooltips) Tooltips for the wire shape and authoring API.
 
 **Robustness to large inputs (assume a user *will* do this) — implemented.** We ship a tool to
 Pluto/Makie users, so assume someone overlays `masque` on a 2000²–4000² `heatmap!`/`image!` *because they

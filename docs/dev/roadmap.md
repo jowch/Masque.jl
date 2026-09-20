@@ -21,13 +21,14 @@ PR on `jowch/Masque.jl`.
 - **Live-verify on every backend** (`live-interaction-checklist.md`) before a user-facing
   change is called done. Interaction and visual, across the interactable kinds.
 
-**Where a value lives — four questions, in order.** Can the browser answer it alone from what
-the manifest already ships (→ overlay-local, no channel and no Julia round trip: an in-drag ROI
-box or threshold line)? Does the notebook need this value (→ `@bind`)? Must it survive static
-export (→ precompute + `published_to_js`)? Neither (→
-`AbstractPlutoDingetjes.Display.with_js_link`, a pull channel outside Pluto's state management)?
-`architecture/12-gesture-channel.md` §12.2 is the normative statement and carries the reasoning for each branch;
-this is the framing the view-manipulation work below is the first concrete case of.
+**Where a value lives — four questions, in order.** Can the browser answer it alone from what the
+manifest already ships (→ overlay-local, no channel and no Julia round trip: an in-drag ROI box
+or threshold line)? Does the notebook need this value (→ `@bind`)? Must it survive static export
+(→ precompute + `published_to_js`)? Neither (→ `AbstractPlutoDingetjes.Display.with_js_link`, a
+pull channel outside Pluto's state management)?
+[§12.2](architecture/12-gesture-channel.md#122-the-routing-rule) is the normative statement and
+carries the reasoning for each branch; this is the framing the view-manipulation work below is
+the first concrete case of.
 
 ## Where things stand
 
@@ -86,8 +87,8 @@ work — #86 corrects an earlier claim, #83 investigated the double remount to a
    camera. Accepted artifacts: ticks and decorations move with the photograph until a real frame
    replaces it. The gesture commits nothing: #122 takes view manipulation off `@bind` entirely, so
    the CSS transform is latency-hiding for an in-flight frame on #102's channel rather than the
-   interaction itself — one mechanism instead of two that have to agree. `architecture/12-gesture-channel.md` §12.3
-   is normative.
+   interaction itself — one mechanism instead of two that have to agree.
+   [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when) is normative.
 3. **#87 3D orbit preview**: no longer parked — **#102 makes it buildable.** The blocker was
    that the overlay is a projection at the old `azimuth`/`elevation`, so a live orbit either
    freezes the overlay or needs 3D coordinates in JS, and neither respects the
@@ -96,7 +97,8 @@ work — #86 corrects an earlier claim, #83 investigated the double remount to a
    projection stays Julia-authored throughout the drag, not just at commit. #102's own
    manifest rebuild figure (flat regardless of scene weight) is what makes a fresh manifest per
    frame affordable. Nothing is committed at the end: an orbit settles a camera, and a camera never
-   enters notebook state (#122, `architecture/12-gesture-channel.md` §12.3).
+   enters notebook state (#122,
+   [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)).
 
 **#83: the double remount is a consequence of an unsupported self-referencing `@bind` shape.**
 The view-manipulation widget cell both defines the `@bind` and reads its own previous bond value

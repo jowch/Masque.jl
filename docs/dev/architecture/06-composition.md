@@ -33,7 +33,8 @@ them cleanly:
 2. No general z-order/`Consume` model for overlapping custom regions — JS is first-match-wins in
    manifest order. `build_manifest` now imposes one fixed precedence on that order (not a general
    layering model): `LegendInteractable` layers sort first (a legend drawn over plot geometry
-   must win the pixels under it, or it's unhoverable — M3 Legend, §"M3 Legend" below), `:view`
+   must win the pixels under it, or it's unhoverable — M3 Legend,
+   [§7](07-scope.md#7-v1-scope)), `:view`
    layers sort last (an ordinary drag wins over the catch-all pan/orbit gesture without a
    modifier — resolves the v1 ScatterLines points-over-segments collision too), everything else
    keeps its original relative order. We adopt Makie's `events` *vocabulary* now for

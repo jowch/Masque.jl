@@ -27,7 +27,7 @@ FunctionInteractable(ax, f; id, events=(:click,:hover))   # f(ctx)::Vector{HitLa
 struct is *indistinguishable* from a built-in — same manifest path, same overlay, same `@bind`. Tooltip
 content comes from the per-layer `Masque.tooltip_spec(interactable)` seam (built-in interactables expose it
 as a `tooltip=` constructor kwarg; a custom struct overrides `Masque.tooltip_spec`). The `tooltip_*` kwargs
-on `masque()` are styling only. See [§10](10-tooltips.md#10-tooltips) Tooltips, below. Example:
+on `masque()` are styling only. See [§10](10-tooltips.md#10-tooltips) Tooltips. Example:
 
 ```julia
 struct CityInteractable <: AbstractInteractable
@@ -40,7 +40,7 @@ function Masque.hitlayers(c::CityInteractable, ctx)
     [HitLayer(:cities, :circles, coords, [(; name=n) for n in c.names], :main, (:click,:hover))]
 end
 # tooltip content: add a `tooltip` field to CityInteractable and override
-# `Masque.tooltip_spec(c::CityInteractable) = c.tooltip` — see [§10](10-tooltips.md#10-tooltips) Tooltips, below
+# `Masque.tooltip_spec(c::CityInteractable) = c.tooltip` — see §10 Tooltips
 ```
 
 **Linkage = shared payloads through Pluto reactivity.** Two interactables writing the same payload field

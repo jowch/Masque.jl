@@ -40,7 +40,8 @@ cited and linked precisely:
 
 - [2. The backend seam — `AbstractBackend`](architecture/02-backends.md)
 - [3. The interactable seam — `AbstractInteractable`](architecture/03-interactables.md)
-- [4. Custom interactions — same infra, three ergonomic tiers](architecture/04-custom-interactions.md)
+- [4. Custom interactions — same infra, three ergonomic
+  tiers](architecture/04-custom-interactions.md)
 - [5. The bond value](architecture/05-bond-value.md)
 - [6. How it composes — the three interaction tiers](architecture/06-composition.md)
 - [7. v1 scope](architecture/07-scope.md)

@@ -15,7 +15,7 @@ events(::AbstractInteractable)::Tuple = (:click, :hover)   # which events the ov
 # tooltip content is per-LAYER, set via the `tooltip` kwarg on each interactable
 # constructor (nothing → auto-table, Markup → template, false → suppress).
 # The per-element `tooltip(interactable, idx, payload)` dispatch is retired (M2.3).
-# See [§10](10-tooltips.md#10-tooltips) Tooltips, below.
+# See §10 Tooltips.
 # hoverstyle is per-LAYER too — the manifest ships one `style` per layer, not per element.
 # stroke=nothing (default) omits "stroke" from the manifest; the overlay then draws its own
 # split highlight — a color-dodge fill (brightens) plus a multiply/screen edge stroke (darkens
@@ -56,8 +56,8 @@ struct HitLayer
     payloads :: Vector{Any}       # element index -> JSON-serializable payload (the linkage key)
     axis     :: Symbol            # which AxisTransform applies (for data-coord tooltips / inversion)
     events   :: Tuple             # copied from the interactable
-    label    :: Union{Nothing,String}  # optional screen-reader announcement prefix (keyboard nav, [§11](11-keyboard.md#11-keyboard-navigation--aria))
-    colors   :: Any                # optional per-element tooltip accent ([§10.4](10-tooltips.md#104-wire-format))
+    label    :: Union{Nothing,String}  # optional screen-reader announcement prefix (keyboard nav, §11)
+    colors   :: Any                # optional per-element tooltip accent (§10.4)
     links    :: Union{Nothing,Vector{Vector{Symbol}}}  # optional per-element cross-layer highlight (LegendInteractable, M3)
 end
 ```
