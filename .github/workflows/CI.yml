@@ -330,6 +330,22 @@ jobs:
             git push
           fi
 
+  architecture-links:
+    # docs/dev/check_architecture_links.mjs verifies every link into the
+    # docs/dev/architecture.md split (file existence + heading anchor), both from the split
+    # itself and from any other docs/**/*.md file that points in. No npm dependency (the
+    # slugger is vendored in the script), so no `npm install` step — checkout + node is enough.
+    # Deterministic and network-free, unlike `kind-sweep`, so this runs as a normal (non-advisory)
+    # job: a broken link fails the check like any other gate.
+    name: Architecture doc links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node docs/dev/check_architecture_links.mjs
+
   format:
     name: Runic formatting
     runs-on: ubuntu-latest

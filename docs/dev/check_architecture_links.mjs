@@ -14,7 +14,8 @@
 //
 // It fails loud on any in-scope link whose target file or heading anchor does not actually exist.
 //
-// Not wired into CI yet (follow-up) -- run manually: node docs/dev/check_architecture_links.mjs
+// Run in CI by the `architecture-links` job in .github/workflows/CI.yml; runnable locally too:
+// node docs/dev/check_architecture_links.mjs
 //
 // Anchor slugs are computed with GitHub's own heading-slug algorithm, reproduced here from the
 // `github-slugger` package (MIT licensed, https://github.com/Flet/github-slugger) so this script
