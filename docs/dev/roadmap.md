@@ -82,9 +82,13 @@ work — #86 corrects an earlier claim, #83 investigated the double remount to a
    WGL canvas) and show it until the new base is ready. Hides the remaining remount. Not a
    GL-context transfer: a context cannot move to a new canvas.
 2. **#85 2D photographic preview.** During pan and wheel zoom, CSS-transform the host so the
-   base and overlay slide together; commit the existing `limits` payload once on release or
-   wheel idle. Julia authored the frame being slid, so this is not a client camera. Accepted
-   artifacts: ticks and decorations move with the photograph until the commit.
+   base and overlay slide together. Julia authored the frame being slid, so this is not a client
+   camera. Accepted artifacts: ticks and decorations move with the photograph until a real frame
+   replaces it. **Needs a redesign against #122:** this entry was written when `@bind` was the
+   only return path, and it still says the gesture commits a `limits` payload on release or wheel
+   idle. #122 takes view manipulation off `@bind` entirely, which makes the CSS transform
+   latency-hiding for an in-flight frame on #102's channel rather than the interaction itself —
+   one mechanism instead of two that have to agree. `architecture.md` §12.3 is normative.
 3. **#87 3D orbit preview**: no longer parked — **#102 makes it buildable.** The blocker was
    that the overlay is a projection at the old `azimuth`/`elevation`, so a live orbit either
    freezes the overlay or needs 3D coordinates in JS, and neither respects the
