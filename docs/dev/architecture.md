@@ -764,7 +764,7 @@ a feature with a full mouse/touch path already.
 ## 12. Gesture-channel interaction contract (#102)
 
 This section is the contract for view-manipulation gestures — drag-to-pan, 3D orbit — settled
-before either backend implements it, precisely because `:cairo` and `:webgl` will implement it by
+before either backend implements it, because `:cairo` and `:webgl` will implement it by
 completely different mechanisms and building one first risks the mechanism getting mistaken for
 the contract. Nothing here changes the committed value's path (§5, §6 Tier 2); it governs only
 the frames shipped while a gesture is in progress.
@@ -801,12 +801,11 @@ answers no to question 0, because panning or orbiting changes the image itself, 
 overlay drawn on top of it — every hit region's projection depends on the camera, so the browser
 cannot answer alone. It then answers no to questions 1 and 2 as well: nothing downstream reads the
 intermediate camera state, and a static export has no kernel to drive a live gesture anyway. So it
-routes to question 3. This is the reason the gesture channel exists for view manipulation and not
-for ROI/threshold drags, and it is what makes §12.4's invariant a consequence of this rule rather
-than a separate assertion: only a drag that changes what Julia rendered needs Julia to re-author
-projection on every frame.
+routes to question 3. This is why the gesture channel exists for view manipulation and not for
+ROI/threshold drags: only a drag that changes what Julia rendered needs Julia to re-author
+projection on every frame (§12.4).
 
-This four-question form is normative for every gesture, not only the view-manipulation case that
+This four-question form applies to every gesture, not only the view-manipulation case that
 motivated it (issue #102). `roadmap.md` states questions 1–3 as its own framing note for this
 work (question 0 is added here to close the ROI/threshold gap the three-question form left open);
 the two must not diverge on the three they share.
@@ -826,7 +825,7 @@ frame the user sees during it must be accompanied by hit geometry Julia computed
 camera state. No backend may ship 3D (or 2D) coordinates to JS and reproject there. This is the
 existing Julia-authored-projection principle (§2's `InteractionContext`; the client-side-GPU-camera
 non-goal in §7's backend-scope note) extended to hold *per frame*, not only at commit — the
-non-goal itself is untouched, and this invariant is exactly what keeps a gesture channel from
+non-goal itself is untouched, and this invariant is what keeps a gesture channel from
 becoming the JS-driven camera that non-goal rules out. A gesture implementation that ships a new
 frame without a matching manifest, or that lets JS derive geometry from a JS-owned camera, is not
 a conforming implementation of this contract, regardless of how it performs.
@@ -834,7 +833,7 @@ a conforming implementation of this contract, regardless of how it performs.
 This is what makes #87 (3D orbit preview) buildable at all: #87 is parked today because the
 overlay would be a projection at the stale azimuth/elevation once the camera moves without a
 matching re-projection. A gesture channel that reprojects on every frame removes that
-obstruction; a mechanism that doesn't, doesn't satisfy this contract.
+obstruction.
 
 ### 12.5 Backend obligations (mechanism-independent)
 
@@ -846,7 +845,7 @@ Both backends must, for every frame of a gesture:
 - not re-execute a cell.
 
 How they satisfy these obligations differs completely, and that difference is expected, not a gap
-to close: `:cairo` re-renders and ships a fresh PNG plus a fresh manifest over the link; `:webgl`
+to close: `:cairo` re-renders and ships a fresh PNG plus a fresh manifest over the channel; `:webgl`
 patches its GPU buffers in place (#86) rather than shipping a new image. Per the standing
 principle, **backends differ in cost, never in the interaction contract** — a conforming
 implementation is judged against the obligations above, not against `:cairo`'s mechanism, and
@@ -887,41 +886,39 @@ behaviour.
 ### 12.9 Open questions (left open by design)
 
 The following are constraints a real implementation must satisfy, not answers this document
-supplies. Resolving them is implementation work for whoever picks up #102, not something a
-contract document should pre-empt.
+supplies. Each is left to whoever picks up #102.
 
-- **Heavy-scene mitigation beyond `ppu=1`.** Constraint, not an answer: a render-bound heavy scene
-  needs some further mitigation to hit a live-preview budget — a further downscale, a
-  render-quality knob during the drag, or an accepted lower frame rate — but which one, and at
-  what threshold, is unresolved. See issue #102 for the measurements establishing that the heavy
-  scene is render-bound.
-- **`:webgl` parity.** Constraint, not an answer: `:webgl`'s mechanism for satisfying §12.5's
-  obligations is genuinely different from `:cairo`'s (in-place buffer patching, #86) and is
-  unmeasured. The shared thing between the backends is the contract in this section, not any
-  particular implementation of it.
-- **What commits a gesture that has no release.** Constraint, not an answer: §12.3's
-  commit-on-release rule is drag-shaped, because pan and orbit are pointer drags with a pointerup
-  to commit on. A wheel zoom has no terminal event, so it needs some other commit rule — an idle
-  debounce, an explicit affordance, something else — before §12.1's "a view-manipulation
-  gesture's own release is a data interaction" means anything for it. `ViewInteractable` is
-  drag-only today (`events` is `(:drag,)`; `mode` is `"pan"` or `"orbit"`; there is no wheel
-  handler in `frontend/src/`), so nothing is blocked right now — but `roadmap.md` plans wheel
-  zoom as part of #85, and #105 depends on this channel making zoom cheap, so the rule is needed
-  before either of those lands.
+- **Heavy-scene mitigation beyond `px_per_unit = 1`.** A render-bound heavy scene needs some
+  further mitigation to hit a live-preview budget — a further downscale, a render-quality knob
+  during the drag, or an accepted lower frame rate — but which one, and at what threshold, is
+  unresolved. See issue #102 for the measurements establishing that the heavy scene is
+  render-bound.
+- **`:webgl` parity.** `:webgl`'s mechanism for satisfying §12.5's obligations differs from
+  `:cairo`'s (in-place buffer patching, #86) and is unmeasured. The shared thing between the
+  backends is the contract in this section, not any particular implementation of it.
+- **What commits a gesture that has no release.** §12.3's commit-on-release rule is drag-shaped,
+  because pan and orbit are pointer drags with a pointerup to commit on. A wheel zoom has no
+  terminal event, so it needs some other commit rule — an idle debounce, an explicit affordance,
+  something else — before §12.1's "a view-manipulation gesture's own release is a data
+  interaction" means anything for it. `ViewInteractable` is drag-only today (`events` is
+  `(:drag,)`; `mode` is `"pan"` or `"orbit"`; there is no wheel handler in `frontend/src/`), so
+  nothing is blocked right now — but `roadmap.md` plans wheel zoom as part of #85, and #105
+  depends on this channel making zoom cheap, so the rule is needed before either of those lands.
 
 The remaining two are one decision, left to the maintainer, because they interact:
 
-- **Static export degradation.** Constraint, not an answer: a live-pull widget rendered into a
-  static export has a dead link — no kernel to answer a `with_js_link` call. Whichever mechanism
-  handles this, it must degrade *loudly* (say so, disable the gesture) and must **never hang**
-  waiting on a response that will never come.
-- **Capability detection cannot distinguish live-session from export-generation.**
-  `is_supported_by_display` returns `true` *while* a static export is being generated, because a
-  kernel is live at that moment to generate it — so a render-time check alone cannot tell "this
-  will stay live for the reader" from "this is live only for the exporter." Constraint, not an
-  answer: whatever the static-export answer above turns out to be, it cannot rely solely on a
-  render-time `is_supported_by_display` check.
+- **Static export degradation.** A live-pull widget rendered into a static export has a dead
+  channel — no kernel to answer a `with_js_link` call. Whichever mechanism handles this, it must
+  degrade *loudly* (say so, disable the gesture) and must **never hang** waiting on a response
+  that will never come.
+- **A render-time capability check cannot tell you the channel will still be live.** Exporting
+  does not re-render: `generate_html` serializes the notebook's existing state via
+  `notebook_to_js` (`Pluto/src/notebook/Export.jl`, `Pluto/src/webserver/Dynamic.jl`), so the
+  widget's HTML — and the `is_supported_by_display` decision baked into it — was produced earlier,
+  in a session where the kernel genuinely was live. The export carries that decision forward to a
+  reader who has no kernel. So whatever the static-export answer above turns out to be, it cannot
+  rely on `is_supported_by_display` alone; the widget has to detect a dead channel at use time.
 
-These two are flagged together because the export-degradation mechanism has to work correctly
-precisely in the case the capability check cannot detect — so they are one decision, not two
-independent ones.
+These two are flagged together because the export-degradation mechanism has to work in exactly
+the case the capability check cannot detect — so they are one decision, not two independent
+ones.
