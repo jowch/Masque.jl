@@ -138,8 +138,8 @@ let
     else
         (; R, G, B) = img_data
         r = only(region).payload
-        i0, i1 = Int(r["i0"]) + 1, Int(r["i1"]) + 1      # 0-based cell indices → 1-based array
-        j0, j1 = Int(r["j0"]) + 1, Int(r["j1"]) + 1
+        i0, i1 = Int(r.i0) + 1, Int(r.i1) + 1      # 0-based cell indices → 1-based array
+        j0, j1 = Int(r.j0) + 1, Int(r.j1) + 1
         Rs, Gs, Bs = vec(R[i0:i1, j0:j1]), vec(G[i0:i1, j0:j1]), vec(B[i0:i1, j0:j1])
         stat(v) = (min = minimum(v), p1 = quantile(v, 0.01), p50 = quantile(v, 0.5), p99 = quantile(v, 0.99), max = maximum(v))
         sr, sg, sb = stat(Rs), stat(Gs), stat(Bs)

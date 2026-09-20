@@ -67,14 +67,17 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test L3.geometry["mode"] == "orbit"
         @test L3.geometry["azimuth"] ≈ 0.4
         @test L3.geometry["elevation"] ≈ 0.5
-        # bond payload round-trip (pan + orbit shapes)
+        # bond payload round-trip (pan + orbit shapes) — a real :view layer entry, not the bare
+        # test double `_bond_payload` passes through unchanged, so the kind dispatch actually runs
+        # and converts the browser Dict to a NamedTuple (#110).
         tv = Masque.APD.Bonds.transform_value
-        w = Masque.MasqueWidget("", Dict{String, Any}(), 100)
+        vmanifest = Dict{String, Any}("layers" => [Dict{String, Any}("id" => "view", "kind" => "view", "payloads" => Any[])])
+        w = Masque.MasqueWidget("", vmanifest, 100)
         evp = tv(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("xmin" => 1.0, "xmax" => 5.0, "ymin" => 0.0, "ymax" => 10.0)))
         @test evp isa InteractionEvent && evp.layer === :view
-        @test evp.payload["xmin"] == 1.0 && evp.payload["ymax"] == 10.0
+        @test evp.payload.xmin == 1.0 && evp.payload.ymax == 10.0
         evo = tv(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("azimuth" => 0.9, "elevation" => 0.3)))
-        @test evo.payload["azimuth"] == 0.9 && evo.payload["elevation"] == 0.3
+        @test evo.payload.azimuth == 0.9 && evo.payload.elevation == 0.3
         # PolarAxis / Colorbar: view gestures rejected (no continuous polar inversion; colorbar is 1-D)
         fp = Figure(); axp = PolarAxis(fp[1, 1])
         scatter!(axp, [Point2f(0.0, 1.0), Point2f(π / 2, 2.0)])
@@ -124,4 +127,63 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test all(k -> haskey(mr["geometry"], k), ("x", "y", "w", "h", "handle"))
         @test isempty(mr["payloads"]) && !haskey(mr, "tooltips")
     end
+end
+
+@testset "_bond_payload converts computed payloads to NamedTuples (#110)" begin
+    bp = Masque._bond_payload
+    layer(kind) = Dict{String, Any}("layers" => [Dict{String, Any}("id" => "L", "kind" => kind, "payloads" => Any[])])
+    axism, gridm, roim, thrm, viewm = layer("axis"), layer("grid"), layer("roi"), layer("threshold"), layer("view")
+
+    @test bp(axism, "L", -1, Dict("x" => 1.0, "y" => 2.0)) == (; x = 1.0, y = 2.0)
+    @test bp(axism, "L", -1, Dict("value" => 3.0)) == (; value = 3.0)   # colorbar / valueaxis readout
+
+    @test bp(gridm, "L", 0, Dict("i" => 1, "j" => 2)) == (; i = 1, j = 2)
+    @test bp(gridm, "L", 0, Dict("i" => 1, "j" => 2, "value" => 9.5)) == (; i = 1, j = 2, value = 9.5)
+    # selects-ROI-over-grid cell range — a distinct key set arriving under the same "grid" kind
+    rng = bp(gridm, "L", 0, Dict("i0" => 0, "i1" => 1, "j0" => 0, "j1" => 1, "xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0))
+    @test rng == (; i0 = 0, i1 = 1, j0 = 0, j1 = 1, xmin = 0.0, xmax = 1.0, ymin = 0.0, ymax = 1.0)
+
+    @test bp(roim, "L", 0, Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0)) ==
+        (; xmin = 0.0, xmax = 1.0, ymin = 0.0, ymax = 1.0)
+
+    @test bp(thrm, "L", 0, 4.5) === 4.5   # bare scalar — nothing to convert, no fields to name
+
+    @test bp(viewm, "L", 0, Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0)) ==
+        (; xmin = 0.0, xmax = 1.0, ymin = 0.0, ymax = 1.0)
+    @test bp(viewm, "L", 0, Dict("azimuth" => 0.1, "elevation" => 0.2)) == (; azimuth = 0.1, elevation = 0.2)
+
+    # a payload shape none of the branches above recognize fails loud instead of silently
+    # passing a raw Dict through — the per-kind enumeration doing its job when a branch grows
+    # a field this hasn't been taught about yet.
+    @test_throws ArgumentError bp(axism, "L", -1, Dict("x" => 1.0))                          # missing y
+    @test_throws ArgumentError bp(gridm, "L", 0, Dict("i" => 1))                             # missing j
+    @test_throws ArgumentError bp(axism, "L", -1, Dict("x" => 1.0, "y" => 2.0, "z" => 3.0))  # unexpected extra key
+
+    # a non-dict computed payload (unreachable from the shipped client, but the per-kind
+    # enumeration should still fail loud and legibly rather than a raw MethodError off `keys(...)`)
+    @test_throws ArgumentError bp(axism, "L", -1, "not-a-dict")
+    # the error names the layer id, not just the kind, so it's actionable on a multi-layer widget
+    let err = try
+            bp(axism, "L", -1, "not-a-dict")
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin(":L", err.msg) && occursin(":axis", err.msg)
+    end
+
+    # pre-#110 fallback paths are unaffected: no "layers" key, an unknown layer id, or no payload
+    @test bp(Dict{String, Any}(), "L", -1, Dict("x" => 1.0)) == Dict("x" => 1.0)
+    @test bp(axism, "nope", -1, Dict("x" => 1.0)) == Dict("x" => 1.0)
+    @test bp(axism, "L", -1, nothing) === nothing
+end
+
+@testset "SELECTED_KINDS parity: Julia _SELECTED_KINDS matches frontend selection.ts (#109)" begin
+    # After #109, a drift here is no longer cosmetic: the browser would omit a payload for a
+    # kind Julia doesn't think it can reconstruct, and the user would silently get `nothing`.
+    selection_ts = read(joinpath(@__DIR__, "..", "..", "frontend", "src", "selection.ts"), String)
+    m = match(r"SELECTED_KINDS = new Set\(\[(.*?)\]\)", selection_ts)
+    @test m !== nothing
+    js_kinds = Set(Symbol(strip(s, ['"', ' '])) for s in split(m.captures[1], ","))
+    @test js_kinds == Set(Masque._SELECTED_KINDS)
 end

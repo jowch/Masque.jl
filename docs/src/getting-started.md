@@ -77,11 +77,12 @@ end
 ```
 
 **The payload comes back exactly as you gave it.** A payload you built as `(; label = "a")`
-arrives as that same `NamedTuple` — index it as `ev.payload.label`, not `ev.payload["label"]`.
-This only holds for element kinds (points/rects/polygons/segments/polyline), which Masque
-looks back up in Julia rather than decoding from the browser. Kinds with no Julia-side
-original still report a browser-computed value: `AxisInteractable` yields
-`Dict("x" => ..., "y" => ...)`.
+arrives as that same `NamedTuple` — index it as `ev.payload.label`. This holds for element
+kinds (points/rects/polygons/segments/polyline), which Masque looks back up in Julia rather
+than decoding from the browser. Kinds with no Julia-side original still report a
+browser-computed value — `AxisInteractable` yields `(; x, y)` — but it's converted to a flat
+`NamedTuple` too, so `ev.payload.x` reads the same way regardless of kind. The one exception
+is `ThresholdInteractable`, whose payload is a bare scalar — there's no field to name.
 
 ## 5. Choosing the backend
 

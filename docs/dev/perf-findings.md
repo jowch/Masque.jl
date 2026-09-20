@@ -39,8 +39,10 @@
 > per-layer `"colors"` field (a uniform CSS string, or a shared palette + one index per
 > element for colormap/categorical data), present only on a `PointInteractable(ax,
 > p::Makie.Scatter)`-derived `:circles` layer whose colour resolves. Envelope unchanged at the
-> KB-rounded numbers this file tracks: scatter-1k manifest still 38.1 KB (was 38.0 KB),
-> heatmap-200² still 196.8 KB (`:grid` layers never carry `colors`), 30-frame scrub still
+> KB-rounded numbers this file tracks: scatter-1k manifest still 38.0 KB, the ~50 B added
+> rounding away at this precision (corrected 2026-09-19, PR #116 — this and the blend-highlight
+> entry below previously misstated it as 38.1 KB), heatmap-200² still 196.8 KB (`:grid` layers
+> never carry `colors`), 30-frame scrub still
 > 5.6 MB (PNG-only, untouched by a manifest-only change). Measured the exact delta directly:
 > `background` costs 28 B (key + `"rgb(255,255,255)"` value), once per manifest, not per
 > layer or element; a uniform `colors` costs ~22 B (key + one CSS colour string), once per
@@ -73,12 +75,32 @@
 > stroke is now `nothing`; the highlight split itself — three sibling top-level svgs, `mix-blend-
 > mode` color-dodge/multiply/screen — is CSS/JS-only and adds nothing to the manifest). Envelope
 > unchanged: neither bench fixture sets a custom `hoverstyle`, so re-running reproduces the
-> previous numbers byte-for-byte (scatter-1k manifest still 38.1 KB, heatmap-200² still
+> previous numbers byte-for-byte (scatter-1k manifest still 38.0 KB, heatmap-200² still
 > 196.8 KB). Measured the exact delta the same way as the `tol`/`label`/`links` re-runs above,
 > with `bench/payload_envelope.jl`'s own `mp(...)` byte model: the dropped `"stroke" =>
 > "#3A6F7C"` key+value pair is `_str(6) + _str(7)` = 7 B + 8 B = 15 B, once per layer — 15 B off
 > the scatter-1k row's single `:circles` layer and 15 B off the heatmap-200² row's single
 > `:grid` layer, both noise at this scale. Doesn't scale with plot size — negligible at any N.
+> and re-run for the bond payload contract cleanup (#110/#109, this PR, 2026-09-19): #110
+> changes an `InteractionEvent.payload`'s Julia *type* after `transform_value` has already
+> received it — no manifest-shape change, no bench gate. #109 removes the element hit's
+> `payload` from the upload (`layer`/`index` already let Julia recover it from its own
+> manifest), which is the JS→Julia direction neither `bench/payload_envelope.jl` nor
+> `bench/stress.jl` measures at all (both scripts say so in their header comments — they cover
+> only the outbound base64/manifest terms; the "Full click round-trip" numbers below are the
+> only ones that touch the upload, and are one-off Playwright measurements, not re-run here).
+> Confirmed **neutral** by re-running both scripts: every manifest/PNG size byte-for-byte
+> identical to the pre-#110/#109 baseline (scatter-1k manifest still 38.0 KB, heatmap-200²
+> still 196.8 KB, 30-frame scrub still 5.6 MB, the STRESS A–C tables unchanged) — expected,
+> since neither change touches anything the manifest ships. `bench/stress.jl`'s STRESS D–G
+> rows failed to run under this reconciliation, from a pre-existing bug unrelated to this PR
+> (confirmed reproducing identically on unmodified `main`): `stress()`'s warm-up timing line
+> calls `mkfig()` a second time to build the `@elapsed` argument, so `mkint(mkfig())` builds
+> the interactable against a different `Figure`/`Axis` than the one passed to `masque()`,
+> which only breaks the sections (D onward) where `mkint` depends on the figure. Verified
+> STRESS D's own manifest size directly instead (bypassing the buggy warm-up call): 10.24 MB,
+> identical on this branch and on unmodified `main`. Not fixed here — out of scope for a
+> payload-contract PR; worth its own small fix.
 > baseline established after int-pixel geometry quantization, CairoMakie 0.15, Julia 1.12):
 > - **base64-PNG / manifest / render numbers** — `julia --project=. bench/payload_envelope.jl`
 >   (normal envelope) and `julia --project=. bench/stress.jl` (the 10× extremes). Both `seed!(0)`,
@@ -225,7 +247,7 @@ cam = Ref((0.4, 0.5))
 # and reads back its own previous value, which is the shape issue #83 investigated.
 begin
     if @isdefined(ev) && ev !== nothing && ev isa InteractionEvent && ev.layer === :view
-        cam[] = (Float64(ev.payload["azimuth"]), Float64(ev.payload["elevation"]))
+        cam[] = (Float64(ev.payload.azimuth), Float64(ev.payload.elevation))
     end
     fig = Figure(; size = (480, 360))
     ax = Axis3(fig[1, 1]; azimuth = cam[][1], elevation = cam[][2])

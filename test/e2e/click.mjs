@@ -1,6 +1,7 @@
 // Real-browser E2E for the :webgl @bind round-trip. Loads the self-contained widget pages
 // (test/e2e/make_page.jl), clicks scatter marker 0 in a real headless Chromium, and asserts the
-// overlay emits the correct bond value — host.value = {layer, index, payload} + an `input` event
+// overlay emits the correct bond value — host.value = {layer, index} (an element kind carries no
+// `payload` on the wire; Julia reconstructs it from its own manifest, #109) + an `input` event
 // (the Pluto @bind contract, overlay.ts:273-274). This is the BROWSER half a unit test can't
 // reach (real overlay JS, real shadow-DOM hit-test, real click on the :webgl <canvas> base); the
 // Julia half (runtests.jl "@bind round-trip contract") asserts transform_value rebuilds the

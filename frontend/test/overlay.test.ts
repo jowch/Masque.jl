@@ -70,7 +70,10 @@ describe("mount", () => {
         // circle center image-px (600,400); display scale = 1200/600 = 2 → client (300,200)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
         expect(fired).toBe(true)
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "pts", index: 0 })
+        // exact shape, not toMatchObject: an element hit carries no `payload` key on the wire
+        // (#109) — Julia reconstructs it from `layer`/`index` — and toMatchObject would still
+        // pass if a `payload` key crept back in.
+        expect((host as unknown as { value: unknown }).value).toEqual({ layer: "pts", index: 0 })
     })
 
     it("mounts on a <canvas> base (no naturalWidth) and scales via manifest.width", () => {
@@ -426,8 +429,10 @@ describe("mount", () => {
         // grab the box interior (image 400,400 = client 200,200), release without moving → emit current enclosure
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
-        expect(committed!.items.map((e) => e.index)).toEqual([0, 1])
-        expect(committed!.items.every((e) => e.layer === "pts")).toBe(true)
+        // exact shape, not just index/layer: a selects-ROI item over an element (circles) target
+        // carries no `payload` key on the wire (#109) — `.map`/`.every` above would still pass if
+        // one crept back in.
+        expect(committed!.items).toEqual([{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }])
         // two persistent selection highlights drawn, each split into a fill + an edge shape
         expect(selChildren(shadow).length).toBe(4)
     })
@@ -2187,10 +2192,11 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
             }],
         }
         mount(script, selManifest)
+        // no `payload`: Julia reconstructs an element hit's payload from its own manifest (#109)
         expect((host as unknown as { value: unknown }).value).toEqual({
             items: [
-                { layer: "pts", index: 0, payload: { i: 0 } },
-                { layer: "pts", index: 2, payload: { i: 2 } },
+                { layer: "pts", index: 0 },
+                { layer: "pts", index: 2 },
             ],
         })
     })
@@ -2215,9 +2221,9 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
         mount(script, twoLayer)
         expect((host as unknown as { value: unknown }).value).toEqual({
             items: [
-                { layer: "a", index: 1, payload: { v: "a1" } },
-                { layer: "b", index: 0, payload: { v: "b0" } },
-                { layer: "b", index: 1, payload: { v: "b1" } },
+                { layer: "a", index: 1 },
+                { layer: "b", index: 0 },
+                { layer: "b", index: 1 },
             ],
         })
     })

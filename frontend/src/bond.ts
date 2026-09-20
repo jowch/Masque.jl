@@ -1,7 +1,7 @@
 import { hitTest, resolvePayload } from "./geometry"
 import { drawHi, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
-import { selectionFor } from "./selection"
+import { selectionFor, SELECTED_KINDS } from "./selection"
 import { imgPx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
@@ -212,7 +212,13 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
             state.focusTipCss_ = null
         }
     }
-    ;(ctx.host_ as unknown as { value: unknown }).value = { layer: hit.layer.id, index: hit.index, payload: resolvePayload(hit, ctx.manifest_, px, py) }
+    // No `payload` for an element kind: Julia already reconstructs it from the manifest
+    // (`_bond_payload`), so uploading it here is dead weight the receiver discards (#109).
+    // `resolvePayload` still resolves it for hover.ts's tooltip templates, which need it for
+    // every kind including element ones — only the wire value skips it.
+    const value: { layer: string; index: number; payload?: unknown } = { layer: hit.layer.id, index: hit.index }
+    if (!SELECTED_KINDS.has(hit.layer.kind)) value.payload = resolvePayload(hit, ctx.manifest_, px, py)
+    ;(ctx.host_ as unknown as { value: unknown }).value = value
     ctx.host_.dispatchEvent(new CustomEvent("input"))
 }
 

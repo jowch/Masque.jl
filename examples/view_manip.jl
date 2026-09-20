@@ -177,7 +177,7 @@ end
 pan_committed = begin
     if pan_ev !== nothing && pan_ev isa InteractionEvent && pan_ev.layer === :view
         pl = pan_ev.payload
-        (Float64(pl["xmin"]), Float64(pl["xmax"]), Float64(pl["ymin"]), Float64(pl["ymax"]))
+        (Float64(pl.xmin), Float64(pl.xmax), Float64(pl.ymin), Float64(pl.ymax))
     else
         pan_seed
     end
@@ -220,7 +220,7 @@ end
 orbit_committed = begin
     if orb_ev !== nothing && orb_ev isa InteractionEvent && orb_ev.layer === :view
         op = orb_ev.payload
-        (Float64(op["azimuth"]), Float64(op["elevation"]))
+        (Float64(op.azimuth), Float64(op.elevation))
     else
         orb_seed
     end

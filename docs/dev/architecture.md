@@ -348,12 +348,22 @@ no-server architecture.
 - On click: `sel` is an `InteractionEvent(layer, index, payload)`. For an element kind
   (`:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`), `payload` is the exact object passed
   in `payloads=` for that element, looked up in the manifest rather than decoded from what the
-  browser sent (`_bond_payload` in `render.jl`) — the browser's own copy is discarded outright,
-  so a `NamedTuple` payload stays a `NamedTuple`. Kinds with no Julia-side original —
-  `:axis`/`:grid`/`:roi`/`:threshold`/`:view` — still report the browser-computed value
-  unchanged: for `AxisInteractable`, `index = -1` (axis hits aren't element-indexed) and
-  `payload` is a `Dict` (`Dict("x" => …, "y" => …)`, or `Dict("value" => …)` for a `Colorbar`)
-  inverted from the axis transform in JS.
+  browser sent (`_bond_payload` in `render.jl`). There is no browser copy to discard: the click
+  upload carries only `{layer, index}` for these kinds (#109) — `layer`/`index` are already
+  enough to look the object up, so sending the payload back over the wire would be dead weight
+  the receiver throws away — and the result is still `ev.payload === payloads[i]`, so a
+  `NamedTuple` payload stays a `NamedTuple`. Kinds with no Julia-side original —
+  `:axis`/`:grid`/`:roi`/`:view` — have nothing to look up, so the browser-computed value is
+  what ships; `_bond_payload` converts it to a flat, non-recursive `NamedTuple`, per kind, so
+  `ev.payload.x` reads the same way an element payload does (#110): for `AxisInteractable`,
+  `index = -1` (axis hits aren't element-indexed) and `payload` is `(; x, y)` (or `(; value)`
+  for a `Colorbar`, via `AxisTransform.valueaxis`), inverted from the axis transform in JS. A
+  `:grid` hit carries two disjoint shapes under the one kind tag — `(; i, j)` / `(; i, j,
+  value)` from a direct cell hit, or the `selects`-ROI region descriptor below — so
+  `_bond_payload`'s `:grid` branch dispatches on which keys are actually present, not on the
+  kind alone. `ThresholdInteractable` is the one exception to the NamedTuple conversion: its
+  payload is a bare scalar (the dragged data coordinate), so there's no field to name and
+  nothing to convert.
 - Hover **never** sets `sel` — it is overlay-local. Only `events` containing `:click` round-trip.
 
 A typed `InteractionEvent` is shipped via `AbstractPlutoDingetjes.Bonds.transform_value`, which
@@ -374,7 +384,9 @@ selector (a `ROIInteractable` with `selects=:layer_id` set) or not:
   - **Grid target** (`:grid` kind) → a 1-element vector holding a **region descriptor**
     `(; i0, i1, j0, j1, xmin, xmax, ymin, ymax)` — 0-based inclusive cell indices plus
     data-space bounds — for server-side aggregate statistics. The browser never needs `values[]`
-    for box-selection.
+    for box-selection. This shares the `"grid"` kind tag with a direct cell hit's `(; i, j)` /
+    `(; i, j, value)` (above) — the two are disjoint key sets, not a kind-level distinction, so
+    `_bond_payload` tells them apart by which keys the browser actually sent.
   - **Empty box** → `InteractionEvent[]` (never `nothing`).
 
 **`AbstractSelector`** is the selector sub-interface (`selects(sel)::Symbol` returning the target
@@ -492,8 +504,9 @@ highlight and `host.value` at mount (via `initial_value`/`_hydrated_selection`) 
 further role afterward, so a rebuild — the overlay being wiped every re-render — restarts from
 whatever `selected=` says this time. The other half of #103: an element hit's `payload` is now
 reconstructed from the widget's own manifest for every element kind, not only `selected=`
-widgets (`_bond_payload`, §5) — `ev.payload === payloads[i]`, the browser's copy discarded
-outright.
+widgets (`_bond_payload`, §5) — `ev.payload === payloads[i]`. As of #109 there is no browser
+copy left to discard: the upload for these kinds carries only `{layer, index}` in the first
+place.
 
 **v2:** plot-object introspection constructors; ABLines/Arc,
 `TextLabel` (Block) support, animation frames, SVG-overlay annotations, spatial hit-test acceleration.

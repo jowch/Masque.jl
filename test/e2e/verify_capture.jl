@@ -8,16 +8,16 @@
 #
 # `payload` is deliberately NOT checked against the capture for an element kind: since
 # `_bond_payload` (render.jl), the payload is reconstructed from the widget's own manifest —
-# `ev.payload === payloads[i]` — and the browser's copy is discarded outright, so a captured
-# payload proves nothing about reconstruction regardless of what it contains. What we assert
-# instead is the contract itself: overwrite the parsed capture's `"payload"` with a sentinel and
-# confirm the reconstructed event is unaffected. The z-carrying property this file used to pin via
-# the 3D capture is already covered where it now lives, at the level that actually consumes it —
-# `test/core/axis3_polar_tests.jl:124` and `:152` assert a 3-D scatter's payload is
-# `(; index, x, y, z)` — so dropping that check here loses no coverage. Nothing *consumes* the
-# wire payload for an element kind any more (the tooltip renders client-side from the same
-# manifest payload, not from the wire), so a browser that stopped shipping `z` would go unnoticed
-# here; removing that now-dead field from the upload is filed as #109.
+# `ev.payload === payloads[i]` — and as of #109 there is no browser copy left to discard: a
+# real click no longer puts a `"payload"` key on the wire for these kinds at all, so a captured
+# payload proves nothing about reconstruction regardless of what it contains (or whether it's
+# present). What we assert instead is the contract itself: overwrite the parsed capture's
+# `"payload"` with a sentinel and confirm the reconstructed event is unaffected. This also makes
+# this file, incidentally, the one place in CI that feeds a real no-`payload` browser capture
+# through `transform_value` — the unit tests only ever synthesize one. The z-carrying property
+# this file used to pin via the 3D capture is already covered where it now lives, at the level
+# that actually consumes it — `test/core/axis3_polar_tests.jl:124` and `:152` assert a 3-D
+# scatter's payload is `(; index, x, y, z)` — so dropping that check here loses no coverage.
 #
 #   julia test/e2e/verify_capture.jl <artifact-dir>
 #
