@@ -33,8 +33,10 @@ nhits(L) = (g = L["geometry"]; g isa AbstractDict ? get(g, "ncols", 0) * get(g, 
 function stress(label, mkfig, mkint = fig -> nothing)
     fig = mkfig()
     ints = mkint(fig)
-    w = ints === nothing ? masque(fig) : masque(fig, ints)
-    t = @elapsed(ints === nothing ? masque(mkfig()) : masque(mkfig(), mkint(mkfig())))   # warmed by `w`
+    w = ints === nothing ? masque(fig) : masque(fig, ints)   # warms the timed call below
+    fig2 = mkfig()
+    ints2 = mkint(fig2)
+    t = @elapsed(ints2 === nothing ? masque(fig2) : masque(fig2, ints2))
     nelem = sum(nhits, w.manifest["layers"]; init = 0)
     @printf(
         "  %-32s  png=%s  manifest=%s  render=%6.0f ms  elems/cells=%8d\n",
