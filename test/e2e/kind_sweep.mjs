@@ -536,11 +536,28 @@ try {
     // on `nothing` at mount even with selected= baked in. Read #out_${key} (repr(ev) off the
     // actual bond) before any click/drag on this widget to catch that directly.
     const mountBond = await textOf(`#out_${key}`);
-    if (spec.selected) {
+    // `pinLayerId` (the `axis` spec, #113) means this widget bakes a REAL `selected=` too, just
+    // on a layer other than `spec.layerId` — it must not fall through to the "no selection was
+    // ever expected" branch below, or a mount.ts regression (bond forced to `nothing` despite
+    // `selected=`) reports as `hydrated-bond-control` instead of failing loud.
+    if (spec.selected || spec.pinLayerId) {
       if (/=\s*nothing$/.test(mountBond)) {
         throw new Error(`${key}: bond reads "nothing" at mount despite selected= (${JSON.stringify(mountBond)})`);
       }
-      if (!mountBond.includes(`:${spec.layerId}`)) {
+      if (spec.pinLayerId) {
+        // Unlike a single-layer spec (checked below via the strict `:${spec.layerId}` match),
+        // this widget's bond can legitimately mount naming ANY of its own layers, not only the
+        // one `selected=` bakes on a cold start: confirmed empirically that a warm re-run's
+        // leftover value (Pluto keeps a bond's last value across a page reload, #114) can name
+        // `:colorbar` or `:axis` here just as easily as `:pts`, depending which this block
+        // clicked last, last time it ran against this same server. The invariant actually being
+        // guarded — never literally `nothing` when a real selection is baked — is already
+        // checked above; which of the widget's OWN layers a non-`nothing` value names is not
+        // itself a regression.
+        if (!layers.some((l) => mountBond.includes(`:${l.id},`))) {
+          throw new Error(`${key}: mount bond ${JSON.stringify(mountBond)} doesn't name any of this widget's own layers`);
+        }
+      } else if (!mountBond.includes(`:${spec.layerId}`)) {
         throw new Error(`${key}: mount bond ${JSON.stringify(mountBond)} doesn't name layer :${spec.layerId}`);
       }
       passed.push(`${key}/hydrated-bond`);
@@ -649,9 +666,14 @@ try {
       const cbPt = { x: cvx + cvw / 2, y: cvy + cvh / 2 };
       // A pixel between the main axis and the colorbar, outside the colorbar's own bbox — proves
       // ColorbarInteractable's hit test is genuinely BOUNDED (geometry.ts's bbox branch actually
-      // returns null outside it), not a second catch-all.
-      let gapX = (avx + avw + cvx) / 2;
-      if (!(gapX > avx + avw && gapX < cvx)) gapX = cvx - 10;
+      // returns null outside it), not a second catch-all. The midpoint of the gap is used rather
+      // than a fixed offset so this doesn't need its own `:pts`-mark-proximity guard (unlike
+      // `axisPt` above): fail loud if a future layout ever closes the gap to nothing, rather than
+      // silently falling back to an unguarded pixel that could land on a mark.
+      const gapX = (avx + avw + cvx) / 2;
+      if (!(gapX > avx + avw && gapX < cvx)) {
+        throw new Error(`${key}: no gap between the axis viewport (right edge ${avx + avw}) and the colorbar bbox (left edge ${cvx}) to place a bounded-bbox-exclusion test pixel in`);
+      }
       const gapPt = { x: gapX, y: cvy + cvh / 2 };
 
       // --- item 3: hover shows a coordinate readout inverted from the axis transform ---
@@ -735,42 +757,65 @@ try {
       // selection untouched (the #107 round-1 regression) ---
       //
       // This widget's own precondition — a REAL :pts selection to click past — is checked here
-      // explicitly, not via the generic mount-bond chain above: that chain is keyed to
-      // `spec.layerId` naming the ONE layer whose hydration it can vouch for, but this widget
-      // has three (`pts`/`colorbar`/`axis`), and a warm re-run is free to leave the BOND naming
-      // `:axis` or `:colorbar` instead of `:pts` (#114 — whichever this block clicked last, last
-      // time it ran against this same server) even though the render is still correct. What item
-      // 1 actually needs is a VISUAL fact — `g.sel` reflects `manifest["layers"]["selected"]`,
-      // which `masque()` bakes fresh into the mount HTML every time, independent of bond
-      // history — not a bond-text fact, so it holds cold or warm.
+      // explicitly, not inferred from the generic mount-bond chain above: that chain (with the
+      // `pinLayerId` branch) now vouches that the BOND is a real, non-`nothing` value naming one
+      // of this widget's own layers, but on a warm re-run that value can legitimately be `:axis`
+      // or `:colorbar` rather than `:pts` (#114 — whichever this block clicked last, last time it
+      // ran against this same server), so bond text alone can't confirm `:pts` is what's
+      // currently selected. What item 1 actually needs is a VISUAL fact — `g.sel` reflects
+      // `manifest["layers"]["selected"]`, which `masque()` bakes fresh into the mount HTML every
+      // time, independent of bond history — not a bond-text fact, so it holds cold or warm.
       const beforeClicks = await inspect(key);
       if (beforeClicks.sel < 1) throw new Error(`${key}: expected a baked :pts selection before any click, got g.sel=${beforeClicks.sel}`);
       passed.push(`${key}/pts-selection-rendered-at-mount`);
 
-      // Match-based, not diff-based (see the block comment above): dispatch, then poll for the
-      // bond to CONTAIN the expected shape, retrying the dispatch a few times in case an event
-      // is dropped. A warm-session re-run whose click computes the identical value the bond
-      // already holds satisfies this on the very first poll — there is nothing to wait for.
-      const clickAndMatch = async (px, py, re, what) => {
+      // Match-based, not diff-based (see the block comment above): dispatch, then poll until
+      // `matchFn` accepts the bond text, retrying the dispatch a few times in case an event is
+      // dropped. A warm-session re-run whose click computes the identical value the bond already
+      // holds satisfies this on the very first poll — there is nothing to wait for. `matchFn`
+      // checks the parsed VALUE against the same `exp*`/`tol*` the hover check above uses (not
+      // just that the payload has the right shape) — a click and a hover are separate call sites
+      // into `resolvePayload` (`geometry.ts`), so a coordinate regression specific to the click
+      // path (unscaled `clientX`/`clientY`, stale `pointerdown` coordinates, a dropped viewport
+      // origin, …) would otherwise produce a well-formed but WRONG `(x = …, y = …)` that a
+      // shape-only regex can't tell from a correct one, while the hover check — which never
+      // exercises that call site — stayed green.
+      const clickAndMatch = async (px, py, matchFn, what) => {
+        let last = null;
         for (let attempt = 0; attempt < 3; attempt++) {
           await dispatchAt(key, px, py, "click");
           for (let i = 0; i < 30; i++) {
             const t = await textOf(`#out_${key}`);
-            if (re.test(t)) return t;
+            last = t;
+            if (matchFn(t)) return t;
             await new Promise((r) => setTimeout(r, 200));
           }
         }
-        throw new Error(`${what}: #out_${key} never matched ${re}`);
+        throw new Error(`${what}: #out_${key} never matched (last seen: ${JSON.stringify(last)})`);
       };
 
       // --- item 2: the payload is the browser-computed value, converted Julia-side into a flat
       // NamedTuple — (; x, y) for AxisInteractable, index -1 ---
+      // `[^)]*?`, not `[\s\S]*?`, between `-1` and the field it's paired with: this bond text is
+      // a single flat span with no `$`-anchor to stop at, and a `:grid` payload's own `value =`
+      // field (`(i = …, j = …, value = …)`, `_computed_payload`) has the identical field name —
+      // stopping at the payload's own closing paren keeps this from ever crossing into a
+      // DIFFERENT tuple's fields, even though nothing in this fixture reaches that today.
+      const parseBondAxisXY = (t) => {
+        const m = new RegExp(`:${spec.layerId},\\s*-1\\b[^)]*?x\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)\\s*,\\s*y\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)`).exec(t);
+        if (!m) return null;
+        const x = Number(m[1]), y = Number(m[2]);
+        return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+      };
       const axisAfter = await clickAndMatch(
         axisPt.x, axisPt.y,
-        new RegExp(`:${spec.layerId},\\s*-1\\b[\\s\\S]*x\\s*=\\s*-?[\\d.]+(?:e-?\\d+)?,\\s*y\\s*=\\s*-?[\\d.]+(?:e-?\\d+)?`),
+        (t) => {
+          const got = parseBondAxisXY(t);
+          return !!got && Math.abs(got.x - expAxis.x) <= tolX && Math.abs(got.y - expAxis.y) <= tolY;
+        },
         `${key}/axis-click`,
       );
-      passed.push(`${key}/axis-click-payload-namedtuple`);
+      passed.push(`${key}/axis-click-payload-value`);
       const afterAxisClick = await inspect(key);
       if (afterAxisClick.sel !== beforeClicks.sel) {
         throw new Error(`${key}/axis-click-preserves-selection: g.sel ${beforeClicks.sel} -> ${afterAxisClick.sel} after an axis click (#107 regression)`);
@@ -780,12 +825,21 @@ try {
 
       // --- item 4: ColorbarInteractable's bounded bbox is a different hit-test branch from the
       // axis catch-all, but the same conversion applies — (; value), index -1 ---
+      const parseBondValue = (t) => {
+        const m = new RegExp(`:${spec.colorbarLayerId},\\s*-1\\b[^)]*?value\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)`).exec(t);
+        if (!m) return null;
+        const v = Number(m[1]);
+        return Number.isFinite(v) ? v : null;
+      };
       const cbAfter = await clickAndMatch(
         cbPt.x, cbPt.y,
-        new RegExp(`:${spec.colorbarLayerId},\\s*-1\\b[\\s\\S]*value\\s*=\\s*-?[\\d.]+(?:e-?\\d+)?`),
+        (t) => {
+          const got = parseBondValue(t);
+          return got !== null && Math.abs(got - expCbVal) <= tolCb;
+        },
         `${key}/colorbar-click`,
       );
-      passed.push(`${key}/colorbar-click-payload-namedtuple`);
+      passed.push(`${key}/colorbar-click-payload-value`);
       const afterCbClick = await inspect(key);
       if (afterCbClick.sel !== beforeClicks.sel) {
         throw new Error(`${key}/colorbar-click-preserves-selection: g.sel ${beforeClicks.sel} -> ${afterCbClick.sel} after a colorbar click`);
