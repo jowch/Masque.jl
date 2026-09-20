@@ -1,32 +1,55 @@
 #!/usr/bin/env bash
 # SessionStart hook for Claude Code on the web.
 #
-# Provisions the halves of this repo's toolchain independently, because in a cloud
-# session they are not equally reachable:
+# Provisions the two halves of this repo's toolchain independently:
 #
-#   frontend/ (TypeScript)  — npm registry is in the proxy's no_proxy list, so
-#                             `npm install` works and lint/typecheck/test all run.
-#   Julia                   — needs *.julialang.org, which the default cloud network
-#                             policy denies (403 at CONNECT). The Julia block below
-#                             probes first and provisions only if the policy allows it,
-#                             so widening the policy is the only change required to get
-#                             `julia --project=. test/runtests.jl` and Runic working.
+#   frontend/ (TypeScript)  — npm registry is in the proxy's no_proxy list. ~4s.
+#   Julia                   — needs *.julialang.org to be allowed by the environment's
+#                             network policy. The block below probes first, so if the
+#                             policy is ever narrowed the hook degrades to a precise
+#                             diagnostic instead of a wall of Pkg errors.
 #
-# Deliberately NOT done here (see .cursor/cloud-agent-install.sh for the heavier setup):
-#   - PackageCompiler sysimage: a 20min+ build, far too slow for a synchronous hook, and
-#     it only buys ~20s per invocation once the depot is precompiled.
-#   - `npm run build`: CI is the sole author of assets/*.js; building here would leave
-#     the working tree dirty at session start.
+# Scope is deliberately LEAN, from measured costs on a cold container (4 cores):
+#
+#   juliaup + Pkg.instantiate() + precompile   6m22s   <- done here
+#   @masque-dev (CairoMakie+WGLMakie+Pluto)    5m38s   <- NOT done here
+#   first Pkg.test()                           9m37s   <- NOT done here
+#   every Pkg.test() after the first           2m54s
+#
+# Two things are therefore left to pay for on demand, on purpose:
+#
+#   1. The first `Pkg.test()` in a fresh container costs 9m37s, because Pkg.test() builds
+#      its own env from [targets] and precompile caches are keyed by the resolved
+#      dependency set. Measured: warming a *different* env (@masque-dev, which also holds
+#      Pluto and so resolves differently) does NOT warm it -- run 1 precompiled 285
+#      packages, run 2 precompiled 0. Only Pkg.test() itself warms Pkg.test().
+#   2. The live-verification sweep (docs/dev/live-interaction-checklist.md) needs Pluto
+#      plus both backends in one env. Build it when a sweep is actually needed:
+#
+#        julia --project=@masque-dev -e 'using Pkg; Pkg.develop(path=pwd()); \
+#          Pkg.add(["CairoMakie","WGLMakie","JSON3","Pluto"]); Pkg.precompile()'
+#
+# Also not done here: the PackageCompiler sysimage (a 20min+ build that saves ~20s per
+# invocation once the depot is precompiled), and `npm run build` (CI is the sole author of
+# assets/*.js, so building would leave the working tree dirty at session start). Both live
+# in .cursor/cloud-agent-install.sh.
 #
 # Contract: idempotent, non-interactive, and never fatal. A component that cannot be
-# provisioned warns and the hook still exits 0 — a blocked Julia must not cost you the
-# frontend toolchain that did install.
+# provisioned warns and the hook still exits 0 — a failure in one half must not cost you
+# the other half.
 set -uo pipefail
 
 # Local checkouts are already set up by their owner; only provision cloud sessions.
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
+
+# Async: the session starts immediately and this keeps running in the background. At ~6.5
+# minutes cold, blocking session start is not a reasonable trade. The cost is a race —
+# anything that shells out to julia before this finishes will not find it — so the log
+# lines below matter: they are how you tell whether provisioning has landed yet.
+# Timeout is 20min, ~3x the measured cold run, to absorb a slow registry or a loaded host.
+echo '{"async": true, "asyncTimeout": 1200000}'
 
 ROOT="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$ROOT"
@@ -41,7 +64,7 @@ persist_env() {
 }
 
 # --------------------------------------------------------------------------
-# 1. Frontend (TypeScript) — always available.
+# 1. Frontend (TypeScript)
 # --------------------------------------------------------------------------
 setup_frontend() {
   command -v npm >/dev/null 2>&1 || { warn "npm not found; skipping frontend/"; return 1; }
@@ -56,7 +79,7 @@ setup_frontend() {
 }
 
 # --------------------------------------------------------------------------
-# 2. Julia — gated on the network policy actually permitting it.
+# 2. Julia
 # --------------------------------------------------------------------------
 JULIA_CHANNEL="${MASQUE_JULIA_CHANNEL:-1.10}"   # matches the compat floor CI pins
 
@@ -81,36 +104,13 @@ install_julia() {
 
 setup_julia_project() {
   # Resolves the package's own deps only. NOTE: this does NOT install CairoMakie or
-  # WGLMakie -- they are declared under [weakdeps]/[extras], so Pkg.instantiate() skips
-  # them, and every file in test/ loads one or both. Pkg.test() builds the [targets] env
-  # that does have them; setup_test_env below precompiles that stack so it is not slow.
-  log "instantiating + precompiling the Masque project (Makie stack; several minutes)"
+  # WGLMakie — they are declared under [weakdeps]/[extras], so Pkg.instantiate() skips
+  # them, which is exactly why `julia --project=. test/runtests.jl` fails with
+  # "Package CairoMakie not found". Pkg.test() builds the [targets] env that has them.
+  log "instantiating + precompiling the Masque project (Makie stack; ~6 min cold)"
   julia --project="$ROOT" -e '
     using Pkg
     Pkg.instantiate()
-    Pkg.precompile()
-  ' || return 1
-}
-
-setup_test_env() {
-  # @masque-dev: Masque developed from this checkout, plus the backends and the packages
-  # test/ and test/e2e/ load. It is NOT a second way to run the suite -- Pkg.test() is the
-  # single sanctioned command (CLAUDE.md), because it is what all four CI jobs run, so the
-  # command run here is the command that gates the PR. This env exists to:
-  #   1. Warm the depot. Precompile caches are keyed by package version, not by
-  #      environment, so precompiling the Makie stack here is what makes Pkg.test()'s
-  #      throwaway env start in seconds instead of rebuilding it on first call.
-  #   2. Host the live-verification sweep (docs/dev/live-interaction-checklist.md,
-  #      test/e2e/serve.jl), which needs Pluto plus both backends in one env -- the same
-  #      set CI's kind-sweep job assembles. CLAUDE.md treats that sweep as mandatory for
-  #      user-facing changes, so an env without Pluto strands an agent mid-task.
-  # masque() defaults to Cairo when both backends are loaded; the dual-backend caveat in
-  # .cursor/ is about the sysimage, not about an env like this one.
-  log "provisioning @masque-dev (depot warm-up + live-verification env)"
-  MASQUE_ROOT="$ROOT" julia --project=@masque-dev -e '
-    using Pkg
-    Pkg.develop(path=ENV["MASQUE_ROOT"])
-    Pkg.add(["CairoMakie", "WGLMakie", "JSON3", "Pluto"])
     Pkg.precompile()
   ' || return 1
 }
@@ -124,7 +124,8 @@ setup_runic() {
 
 setup_e2e() {
   # Playwright drivers for the live-verification sweep. Chromium is baked into the image
-  # at $PLAYWRIGHT_BROWSERS_PATH, so only the npm packages are needed.
+  # at $PLAYWRIGHT_BROWSERS_PATH, so only the npm packages are needed (seconds). The
+  # sweep also needs the @masque-dev env — see the header for the on-demand command.
   command -v npm >/dev/null 2>&1 || return 0
   log "installing test/e2e Playwright drivers"
   ( cd "$ROOT/test/e2e" && npm install --no-audit --no-fund ) || {
@@ -136,8 +137,8 @@ setup_e2e() {
 setup_julia() {
   if ! julia_reachable; then
     warn "Julia toolchain NOT installed — this environment's network policy denies *.julialang.org (403 at CONNECT)."
-    warn "Consequence: julia, Pkg, the test suite (test/runtests.jl), Runic formatting and the"
-    warn "Pluto/Playwright live-verification sweep are all unavailable in this session."
+    warn "Consequence: julia, Pkg, Pkg.test(), Runic formatting and the Pluto/Playwright"
+    warn "live-verification sweep are all unavailable in this session."
     warn "Fix: allow *.julialang.org on the environment's network policy, then start a new session"
     warn "     (https://code.claude.com/docs/en/claude-code-on-the-web). This hook needs no edit."
     warn "The frontend (TypeScript) toolchain is unaffected and was set up above."
@@ -148,13 +149,12 @@ setup_julia() {
   install_julia          || { warn "juliaup install failed"; return 1; }
   persist_env 'export PATH="$HOME/.juliaup/bin:$PATH"'
   setup_julia_project    || { warn "Pkg.instantiate/precompile failed"; return 1; }
-  setup_test_env         || warn "@masque-dev provisioning failed; Pkg.test() will be slow on first call and the live-verification sweep will not run"
   setup_runic            || warn "Runic install failed; 'julia -e \"using Runic\"' will not work"
   setup_e2e              || true
-  persist_env 'export MASQUE_DEV_ENV="$HOME/.julia/environments/masque-dev"'
   log "julia ready. Tests:  GROUP=Core julia --project=. -e 'using Pkg; Pkg.test()'"
   log "  GROUP is Core|NoBackend|WebGL (default Core) and is inherited by the subprocess."
-  log "  NB: 'julia --project=. test/runtests.jl' does NOT work -- CairoMakie is a weakdep."
+  log "  First call in a fresh container costs ~9.5 min (it precompiles its own env); ~3 min after."
+  log "  NB: 'julia --project=. test/runtests.jl' does NOT work — CairoMakie is a weakdep."
 }
 
 # --------------------------------------------------------------------------

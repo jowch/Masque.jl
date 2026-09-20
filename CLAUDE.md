@@ -151,20 +151,36 @@ Profiling exists to inform the design, not to sit in a file. The loop is anchore
 
 ## Cloud sessions (Claude Code on the web)
 `.claude/hooks/session-start.sh` (registered in `.claude/settings.json`, remote-only via
-`$CLAUDE_CODE_REMOTE`) provisions the container at session start. It is idempotent and never
-fatal — a component it can't provision warns and the hook still exits 0.
-- **`frontend/` works out of the box.** The npm registry is in the proxy's `no_proxy` list, so
-  the hook runs `npm install` and the whole TS gate (`lint`, `typecheck`, `test`, `build`) runs.
-- **Julia does NOT, under the default cloud network policy.** Every `*.julialang.org` host is
-  denied at CONNECT (403), `JuliaLang/julia` GitHub release assets 404, and there is no apt
-  candidate — so `julia`, `Pkg`, `Pkg.test()`, Runic and the Pluto/Playwright
-  live-verification sweep are all unavailable. `git clone` of third-party repos *does* work,
-  but that yields no Julia binary. Don't burn a session rediscovering this, and don't try to
-  route around the policy. **Fix:** allow `*.julialang.org` on the environment's network policy
-  ([docs](https://code.claude.com/docs/en/claude-code-on-the-web)), then start a fresh session —
-  the hook probes for reachability and provisions juliaup + `Pkg.instantiate()` + Runic on its
-  own, with no edit.
-- The hook deliberately skips the PackageCompiler sysimage and the Pluto `@masque-dev` env
-  (too slow for a synchronous hook, and live-verification rather than test rig) and never runs
-  `npm run build` (CI is the sole author of `assets/*.js`; building would dirty the tree at
-  session start). The heavier setup lives in `.cursor/cloud-agent-install.sh`.
+`$CLAUDE_CODE_REMOTE`) provisions the container. It runs **async** — the session starts
+immediately and provisioning continues in the background — so a `julia` invocation in the first
+few minutes may not find it yet; the `[masque-setup]` log lines are how you tell whether it has
+landed. It is idempotent and never fatal: a component it can't provision warns and the hook
+still exits 0.
+- **`frontend/` works out of the box** (~4s). The npm registry is in the proxy's `no_proxy`
+  list, so the hook runs `npm install` and the whole TS gate (`lint`, `typecheck`, `test`,
+  `build`) runs.
+- **Julia depends on the environment's network policy.** If `*.julialang.org` is denied (the
+  default was, at one point: 403 at CONNECT, `JuliaLang/julia` GitHub release assets 404, no apt
+  candidate), then `julia`, `Pkg`, `Pkg.test()`, Runic and the live-verification sweep are all
+  unavailable. `git clone` of third-party repos *does* work, but that yields no Julia binary.
+  Don't burn a session rediscovering this, and don't try to route around the policy. **Fix:**
+  allow `*.julialang.org` on the environment's network policy
+  ([docs](https://code.claude.com/docs/en/claude-code-on-the-web)). The hook probes for
+  reachability and provisions juliaup + `Pkg.instantiate()` + Runic on its own, with no edit.
+- **Scope is deliberately lean**, from measured cold costs on 4 cores: juliaup +
+  `Pkg.instantiate()` + precompile **6m22s** (done by the hook); `@masque-dev` **5m38s** and the
+  first `Pkg.test()` **9m37s** (both left on demand); every `Pkg.test()` after the first
+  **2m54s**.
+- **Only `Pkg.test()` warms `Pkg.test()`.** It builds its own env from `[targets]`, and
+  precompile caches are keyed by the resolved dependency set — so warming a *different* env does
+  not help. Measured: `@masque-dev` (which also holds Pluto, so it resolves differently) left
+  run 1 precompiling 285 packages; run 2 precompiled 0. Don't "optimise" the first test run by
+  precompiling some other environment.
+- **The live-verification sweep needs an env the hook does not build.** Pluto plus both backends,
+  on demand:
+  ```
+  julia --project=@masque-dev -e 'using Pkg; Pkg.develop(path=pwd()); Pkg.add(["CairoMakie","WGLMakie","JSON3","Pluto"]); Pkg.precompile()'
+  ```
+- Also skipped: the PackageCompiler sysimage (a 20min+ build that saves ~20s per invocation once
+  the depot is precompiled) and `npm run build` (CI is the sole author of `assets/*.js`; building
+  would dirty the tree at session start). Both live in `.cursor/cloud-agent-install.sh`.
