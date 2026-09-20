@@ -36,6 +36,20 @@ const consoleLog = [];
 const SHIM_LEAK = /\b(?:Bonito|comm)\.\w+ is not a function/;
 const ALLOWED = [/Bonito\.decode_binary is not a function/, /Bonito\.fetch_binary is not a function/];
 
+// Element count for a layer's own geometry — the click-collision fallback (below) and the
+// legend links fan-out check both need this to derive an IN-RANGE alternative index rather than
+// assume one exists (#114): grid's count is ncols*nrows, mirroring hitPoint's own i/j decoding.
+function layerElementCount(l) {
+  const g = l.geometry;
+  if (l.kind === "circles") return g.length / 3;
+  if (l.kind === "rects") return g.length / 4;
+  if (l.kind === "segments") return g.length / 4;
+  if (l.kind === "polyline") return Math.max(0, g.length / 2 - 1);
+  if (l.kind === "polygons") return g.length;
+  if (l.kind === "grid") return g.ncols * g.nrows;
+  throw new Error(`layerElementCount: unhandled kind ${l.kind}`);
+}
+
 function hitPoint(layer, index) {
   const k = layer.kind, g = layer.geometry;
   if (k === "circles") {
@@ -500,11 +514,22 @@ try {
         throw new Error(`${key}: mount bond ${JSON.stringify(mountBond)} doesn't name layer :${spec.layerId}`);
       }
       passed.push(`${key}/hydrated-bond`);
-    } else {
-      if (!/=\s*nothing$/.test(mountBond)) {
-        throw new Error(`${key}: bond is not "nothing" at mount despite no selected= (${JSON.stringify(mountBond)})`);
-      }
+    } else if (/=\s*nothing$/.test(mountBond)) {
       passed.push(`${key}/hydrated-bond-control`);
+    } else if (/InteractionEvent/.test(mountBond) && layers.some((l) => mountBond.includes(`:${l.id}`))) {
+      // A prior kind_sweep.mjs run against this SAME warm Pluto session leaves the bond holding
+      // its last value — Pluto's normal reconnect hydration (a bond keeps its value across a
+      // page reload), not a regression of the mount.ts "force host.value = null" bug the check
+      // above guards against. A `nothing`-baked spec can legitimately mount non-`nothing` on a
+      // warm re-run (#114): accept any well-formed leftover naming one of THIS widget's own
+      // layers — a `selects`-ROI's bond names its TARGET layer (e.g. `:pts`), never its own
+      // `:roi` id, so this checks membership in `layers`, not `spec.layerId` specifically.
+      passed.push(`${key}/hydrated-bond-control-warm`);
+    } else {
+      throw new Error(
+        `${key}: mount bond ${JSON.stringify(mountBond)} is neither "nothing" nor a recognizable ` +
+        `leftover naming one of this widget's own layers (warm-session carryover, #114)`,
+      );
     }
 
     if (spec.mode === "drag") {
@@ -785,16 +810,6 @@ try {
         return { count, kids, sel, leaving };
       }, k);
 
-      const layerElementCount = (l) => {
-        const g = l.geometry;
-        if (l.kind === "circles") return g.length / 3;
-        if (l.kind === "rects") return g.length / 4;
-        if (l.kind === "segments") return g.length / 4;
-        if (l.kind === "polyline") return Math.max(0, g.length / 2 - 1);
-        if (l.kind === "polygons") return g.length;
-        throw new Error(`layerElementCount: unhandled kind ${l.kind}`);
-      };
-
       for (const c of spec.links.cases) {
         const targetIds = (layer.links && layer.links[c.index]) || [];
         if (!targetIds.length) throw new Error(`${key}/links[${c.index}]: legend entry "${c.label}" has no links`);
@@ -929,19 +944,60 @@ try {
     let clickIdx = spec.clickIndex;
     const before = await textOf(`#out_${key}`);
     const already = new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`);
+    // Collision-avoidance (#114): re-running this driver against a warm Pluto session (no
+    // restart) can start a spec with its bond ALREADY holding the index we're about to click —
+    // clicking the same index again produces byte-identical `repr(ev)` text, so `waitChange`
+    // below would hang waiting for a change that never comes. The fallback must be TOTAL: derive
+    // an in-range alternative from the layer's OWN element count, never assume `spec.selectedIndex`
+    // exists (it can be `null`/`undefined` for a spec with nothing baked) or that `clickIdx + 1`
+    // stays in range (a legend's `selectedIndex === clickIndex` case overran a 3-entry layer this
+    // way and produced the reported NaN `clientX`). `spec.layerKind === "grid"` shares this same
+    // fallback, so it gets the same fix.
+    let skipChangeWait = false;
     if (already.test(before) || (spec.layerKind === "grid" && new RegExp(`index[=:]\\s*${clickIdx}\\b`).test(before))) {
-      clickIdx = spec.selectedIndex !== clickIdx ? spec.selectedIndex : clickIdx + 1;
+      // layerElementCount throws for a kind with no indexable elements at all (e.g. a future
+      // `:axis` spec, #113) — that isn't a driver bug, it's exactly the "nothing to click"
+      // case below, so treat it as count 0 rather than let its own generic message mask the
+      // actionable one this block is required to give.
+      let count = 0;
+      try {
+        count = layerElementCount(layer);
+      } catch { /* kind has no indexable elements — count stays 0, handled below */ }
+      let alt = null;
+      for (let i = 0; i < count; i++) {
+        if (i !== clickIdx) { alt = i; break; }
+      }
+      if (alt !== null) {
+        clickIdx = alt;
+      } else if (count === 1) {
+        // Exactly one element and the bond already holds it (warm-session carryover): the click
+        // is still legitimate, it just can't be proven via a text diff on #out_${key} (same index
+        // in, same index out) — skip the change-wait below and let the post-click index/layer
+        // assertions (and click-echo, further down) carry the check instead.
+        skipChangeWait = true;
+      } else {
+        throw new Error(
+          `${key}-click: layer "${spec.layerId}" (${layer.kind}, ${count} element${count === 1 ? "" : "s"}) has no ` +
+          `alternative index to click — index ${clickIdx} is already bound from a previous run and there is no ` +
+          `other in-range element on this layer to disambiguate a fresh click (warm-session collision fallback, #114)`,
+        );
+      }
     }
     if (key === "scatter") scatterClickIdx = clickIdx;
     const clickPt = hitPoint(layer, clickIdx);
     let after = before;
-    for (let a = 0; a < 3; a++) {
+    if (skipChangeWait) {
       await dispatchAt(key, clickPt.x, clickPt.y, "click");
-      try {
-        after = await waitChange(`#out_${key}`, before, `${key}-click`);
-        break;
-      } catch (e) {
-        if (a === 2) throw e;
+      after = await textOf(`#out_${key}`);
+    } else {
+      for (let a = 0; a < 3; a++) {
+        await dispatchAt(key, clickPt.x, clickPt.y, "click");
+        try {
+          after = await waitChange(`#out_${key}`, before, `${key}-click`);
+          break;
+        } catch (e) {
+          if (a === 2) throw e;
+        }
       }
     }
     const idRe = new RegExp(`:${spec.layerId}|${spec.layerId}`, "i");
@@ -1002,8 +1058,18 @@ try {
       if (!clickTargets.length || !clickTargets.every((tid) => new RegExp(tid, "i").test(after))) {
         throw new Error(`${key}/links: click payload missing targets ${JSON.stringify(clickTargets)}: ${after.slice(0, 220)}`);
       }
-      if (spec.tip && !new RegExp(spec.tip, "i").test(after)) {
-        throw new Error(`${key}/links: click payload missing label "${spec.tip}": ${after.slice(0, 220)}`);
+      // spec.tip is the label for spec.clickIndex specifically; the collision fallback above can
+      // move the actual click to a different index (#114) — look up the label for the index
+      // ACTUALLY clicked among spec.links.cases instead of assuming clickIdx === spec.clickIndex,
+      // and fail loud (not silently skip) if that index's label isn't known.
+      const expectTip = clickIdx === spec.clickIndex
+        ? spec.tip
+        : spec.links.cases.find((c) => c.index === clickIdx)?.label;
+      if (expectTip == null) {
+        throw new Error(`${key}/links: clickIndex collided and landed on index ${clickIdx}, with no known label to assert (warm-session fallback, #114)`);
+      }
+      if (!new RegExp(expectTip, "i").test(after)) {
+        throw new Error(`${key}/links: click payload missing label "${expectTip}": ${after.slice(0, 220)}`);
       }
       passed.push(`${key}/links-click-payload`);
     }
@@ -1021,16 +1087,19 @@ try {
     const layers = await layersOf("scatter");
     const layer = findLayer(layers, spec);
     const idx = scatterClickIdx ?? spec.clickIndex;
-    // hoverTip is only known to correspond to spec.clickIndex (scatter's hoverIndex/clickIndex
-    // both being 0 by convention) — the click-collision fallback can, in principle, land on a
-    // different index, whose tip text this driver has no known value for. Rather than silently
-    // degrading the check to "a tooltip showed, any tooltip", fail loud: today's fixtures never
-    // collide, so this throw should never fire, but a future fixture that does collide must not
-    // let this check quietly accept the wrong tooltip.
-    if (idx !== spec.clickIndex) {
-      throw new Error(`scatter/hover-on-selected: clickIndex collided with hoverIndex (idx=${idx}) — no known tooltip text to assert`);
+    // hoverTip is the label for spec.clickIndex (scatter's hoverIndex/clickIndex both being 0 by
+    // convention); tip is the label for spec.selectedIndex. A warm-session re-run's collision
+    // fallback (#114) routinely lands the actual click on selectedIndex (the one guaranteed to
+    // differ from a just-clicked clickIndex) — derive the expected tooltip from WHICHEVER of
+    // those two known indices idx actually landed on, rather than assuming clickIndex. Rather
+    // than silently degrading the check to "a tooltip showed, any tooltip", fail loud for any
+    // other index — this driver has no known tip text to assert there.
+    const expectTip = idx === spec.clickIndex ? spec.hoverTip
+      : idx === spec.selectedIndex ? spec.tip
+      : null;
+    if (expectTip == null) {
+      throw new Error(`scatter/hover-on-selected: clickIndex collided and landed on index ${idx} — no known tooltip text to assert`);
     }
-    const expectTip = spec.hoverTip;
     const tipOk = (t) => !!(t && t.show && new RegExp(expectTip, "i").test(t.text));
     const selPt = hitPoint(layer, idx);
     let noop = null;
