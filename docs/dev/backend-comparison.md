@@ -56,9 +56,11 @@ backends** as server-authoritative `@bind` re-render (sliders + `ViewInteractabl
 > `:webgl`-only, which the parity doctrine forbids. It is the **Masque-wide non-goal** (with GPU-pick
 > occlusion), not a deferred feature.
 >
-> The **in-scope path** treats view parameters as ordinary `@bind` state: 2D `limits` or 3D
+> The **in-scope path** has Julia re-render from new view parameters: 2D `limits` or 3D
 > `azimuth`/`elevation` change → Julia re-renders → fresh base + freshly projected overlay. That is
 > backend-symmetric and drift-free *by construction* (Julia recomputes the overlay every step).
+> (Those parameters reached Julia through `@bind` when this was written; #122 moved them onto the
+> gesture channel — `architecture.md` §12.3. The re-render path described here is unchanged.)
 > Cost, honestly: `:cairo` re-rasterizes per step (scales with the scene; fine for sliders and
 > commit-on-release drag); `:webgl` re-serializes (~flat, §2) and re-initializes the GL
 > context + scene per step. **The former "gated on GL-context reuse" claim was measured FALSE**
@@ -170,6 +172,11 @@ re-render gives pan/zoom/rotate on **both** backends with the overlay recomputed
 the backend-asymmetry objection dissolves; what remains is only a per-step **cost** difference
 (the once-suspected `:webgl` GL-context-reuse prerequisite dissolved when measured — see (†)
 and `perf-findings.md` §"WGL context lifecycle"; what does gate a resident scene is canvas
-identity across Pluto's cell replacement, #86). Both tracked in `roadmap.md` (Axis3 coverage + view
-manipulation via `@bind` re-render); the client-side GPU camera remains a Masque-wide non-goal
+identity across Pluto's cell replacement, #86). Both tracked in `roadmap.md` (Axis3 coverage +
+view manipulation via Julia re-render); the client-side GPU camera remains a Masque-wide non-goal
 (alongside GPU-pick occlusion).
+
+**Amended (#122):** the transport above is superseded — view parameters ride the `with_js_link`
+gesture channel, not `@bind`, because a camera is operational state rather than an analysis value
+(`architecture.md` §12.3). Everything else in this decision stands: server-authoritative
+re-render, backend symmetry, and the client-side GPU camera staying out.

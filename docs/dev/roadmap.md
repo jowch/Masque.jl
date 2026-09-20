@@ -84,11 +84,10 @@ work — #86 corrects an earlier claim, #83 investigated the double remount to a
 2. **#85 2D photographic preview.** During pan and wheel zoom, CSS-transform the host so the
    base and overlay slide together. Julia authored the frame being slid, so this is not a client
    camera. Accepted artifacts: ticks and decorations move with the photograph until a real frame
-   replaces it. **Needs a redesign against #122:** this entry was written when `@bind` was the
-   only return path, and it still says the gesture commits a `limits` payload on release or wheel
-   idle. #122 takes view manipulation off `@bind` entirely, which makes the CSS transform
-   latency-hiding for an in-flight frame on #102's channel rather than the interaction itself —
-   one mechanism instead of two that have to agree. `architecture.md` §12.3 is normative.
+   replaces it. The gesture commits nothing: #122 takes view manipulation off `@bind` entirely, so
+   the CSS transform is latency-hiding for an in-flight frame on #102's channel rather than the
+   interaction itself — one mechanism instead of two that have to agree. `architecture.md` §12.3
+   is normative.
 3. **#87 3D orbit preview**: no longer parked — **#102 makes it buildable.** The blocker was
    that the overlay is a projection at the old `azimuth`/`elevation`, so a live orbit either
    freezes the overlay or needs 3D coordinates in JS, and neither respects the
@@ -96,8 +95,8 @@ work — #86 corrects an earlier claim, #83 investigated the double remount to a
    gesture through `with_js_link` and have Julia return a fresh manifest on every frame, so
    projection stays Julia-authored throughout the drag, not just at commit. #102's own
    manifest rebuild figure (flat regardless of scene weight) is what makes a fresh manifest per
-   frame affordable. Still commit-on-release for the final `@bind`ed value; #102 changes what
-   happens *during* the drag, not what gets committed at the end.
+   frame affordable. Nothing is committed at the end: an orbit settles a camera, and a camera never
+   enters notebook state (#122, `architecture.md` §12.3).
 
 **#83: the double remount is a consequence of an unsupported self-referencing `@bind` shape.**
 The view-manipulation widget cell both defines the `@bind` and reads its own previous bond value
@@ -113,11 +112,14 @@ evaluations from a single drag; this figure lives in the issue, not `perf-findin
 about that shape is contractual, so the observed behaviour has no stability guarantee across
 Pluto versions — closed not-planned, nothing left to build. **#102 routes around it rather than
 fixing it**: a gesture channel that never remounts makes the double remount stop mattering for
-view manipulation specifically, but the same self-referencing shape is still live for every other
-bond in the notebook that uses it. #103 retires the main reason users write that shape at all
+gestures, and for view manipulation #122 goes further — with no bond at the end of the gesture
+the self-referencing shape is never written. It is still live for every other bond in the
+notebook that uses it. #103 retires the main reason users write that shape at all
 (the `selected=` self-referencing workaround) — the more durable answer for those callers.
 
-**Open, deliberately: whether live preview or commit-on-release is the default.** #102's numbers
+**Open, deliberately: whether live preview or a single frame at gesture end is the default.**
+This is a frame-cadence question; what commits is settled — view manipulation commits nothing
+(#122). #102's numbers
 bound what is *possible* — viable on a light scene, not on a heavy one at the resolutions
 tested — they don't settle what the default should be, per backend and possibly per scene
 weight. That choice waits for a real implementation people can actually try, not spike numbers
@@ -318,8 +320,9 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   Keep this distinct from the heavy-scene render latency in #102 (an 80×80 `surface!` case) —
   that cost is dominated by Makie's own draw time, not by payload or hit-test, so subsampling
   what gets *reported* does nothing for it. Decimating what gets *rendered* during
-  a gesture — a coarser frame mid-drag, full fidelity on release, in the spirit of #85's already-
-  accepted "ticks and decorations move with the photograph until the commit" — is the separate
+  a gesture — a coarser frame mid-drag, full fidelity once it settles, in the spirit of #85's
+  already-accepted "ticks and decorations move with the photograph until a real frame replaces
+  it" — is the separate
   companion idea for that cost; named here, not designed.
 
   Answer the push/pull/subsample question before any of the three is built on further.
@@ -471,7 +474,7 @@ shipped, which is a better filter than what other libraries happen to have.
 - **High-contrast mode.** Honour `prefers-contrast`, alongside the existing keyboard and
   screen-reader support. `prefers-reduced-motion` already ships.
 - **Touch gestures.** Long-press for tooltip, one-finger pan, pinch to zoom mapped onto the
-  #85 preview and a single commit.
+  #85 preview.
 
 **Coverage and payload**
 - **Level-of-detail hit layers.** For high-N scatter, ship a decimated layer plus per-cell
