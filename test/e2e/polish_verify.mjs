@@ -13,6 +13,7 @@ import {
   assertNoAlertRed, assertNoTeal, assertWash, assertRing, assertHoverRecipe, assertCircleR,
   assertRemountStable, assertLeaveFade, assertTooltipColorScheme, assertCaretAtAnchor,
 } from "./visual_assert.mjs";
+import { installRecorder, logCursor, logSince, pollLog } from "./transient_log.mjs";
 
 const [base, notebook, backend, artifactDirArg] = process.argv.slice(2);
 if (!base || !notebook || !backend) {
@@ -299,6 +300,11 @@ try {
   // hover-on-selected-noop check), so the standard hover-recipe check here needs its own,
   // distinct target to have anything to assert.
   const hx = pts.geometry[0], hy = pts.geometry[1];
+  // #99 round 2: installed before the tooltip-establishing hover below, which is the "enter"
+  // the no-pulse window (further down) is actually about — see kind_sweep.mjs's identical
+  // placement and transient_log.mjs for why.
+  await installRecorder(page, "scatter");
+  const noPulseCursor = await logCursor(page, "scatter");
   let tip = null;
   for (let a = 0; a < 8; a++) {
     tip = await hoverAt("scatter", hx, hy);
@@ -336,7 +342,10 @@ try {
   assertCaretAtAnchor(caret.apexX, caret.anchorX, "scatter/caret");
   passed.push("caret-at-anchor");
 
-  const hiStable = await page.evaluate(([ix, iy]) => {
+  // #99 round 2: the stability nudge itself -- see kind_sweep.mjs's identical block for why
+  // this should add nothing further to the durable log (drawHi's same-key early-return) for
+  // real geometry, and why a snapshot-based compare here was vacuous in the first place.
+  await page.evaluate(([ix, iy]) => {
     const span = document.querySelector("#coords_scatter");
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -349,48 +358,36 @@ try {
       pointerId: 1, pointerType: "mouse", isPrimary: true,
     };
     const surface = sr.querySelector(".surface");
-    // Bare shape in g.hi (fill/edge/plain — see hoverAt above) — no wrapper, so
-    // masque-enter/masque-leave live on the node itself.
-    const hiOf = () => sr.querySelector("svg.masque-fill g.hi")?.firstElementChild
-      || sr.querySelector("svg.masque-edge g.hi")?.firstElementChild
-      || sr.querySelector("svg.masque-plain g.hi")?.firstElementChild;
     surface.dispatchEvent(new PointerEvent("pointermove", o));
-    const first = hiOf();
-    if (!first) return { ok: false, reason: "no hover node", firstEnter: false };
-    surface.dispatchEvent(new PointerEvent("pointermove", {
-      ...o, clientX: o.clientX + 1, clientY: o.clientY + 1,
-    }));
-    const second = hiOf();
-    return {
-      ok: first === second,
-      reason: first === second ? "" : "hover remounted",
-      firstEnter: first.classList.contains("masque-enter"),
-    };
+    surface.dispatchEvent(new PointerEvent("pointermove", { ...o, clientX: o.clientX + 1, clientY: o.clientY + 1 }));
   }, [hx, hy]);
-  assertRemountStable(hiStable, "scatter");
+  assertRemountStable(await logSince(page, "scatter", noPulseCursor), "scatter");
   passed.push("no-pulse");
 
-  const fade = await page.evaluate(() => {
+  // #99 round 2: reads the durable log the same way kind_sweep.mjs's remount-fade check does;
+  // `sel` is stable state (unaffected by the fade), so it stays a plain inline query.
+  const fadeCursor = await logCursor(page, "scatter");
+  await page.evaluate(() => {
     const span = document.querySelector("#coords_scatter");
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
     let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
     sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
-    const hi = sr.querySelector("svg.masque-fill g.hi")?.firstElementChild
-      || sr.querySelector("svg.masque-edge g.hi")?.firstElementChild
-      || sr.querySelector("svg.masque-plain g.hi")?.firstElementChild;
-    return {
-      hi: (sr.querySelector("svg.masque-fill g.hi")?.children.length ?? 0)
-        + (sr.querySelector("svg.masque-edge g.hi")?.children.length ?? 0)
-        + (sr.querySelector("svg.masque-plain g.hi")?.children.length ?? 0),
-      leaving: !!(hi && hi.classList.contains("masque-leave")),
-      sel: (sr.querySelector("svg.masque-fill g.sel")?.children.length ?? 0)
-        + (sr.querySelector("svg.masque-edge g.sel")?.children.length ?? 0)
-        + (sr.querySelector("svg.masque-plain g.sel")?.children.length ?? 0),
-    };
   });
-  assertLeaveFade(fade, "scatter");
-  if (fade.sel < 1) throw new Error(`g.sel dropped on unhover: ${JSON.stringify(fade)}`);
+  const fadeEntries = await pollLog(page, "scatter", fadeCursor, (es) => (
+    es.some((e) => e.group === "hi" && e.type === "remove") || es.some((e) => e.type === "hostRemount")
+  ));
+  assertLeaveFade(fadeEntries, "scatter");
+  const selAfterLeave = await page.evaluate(() => {
+    const span = document.querySelector("#coords_scatter");
+    const hosts = [...document.querySelectorAll(".ip-host")];
+    const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+    let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+    return (sr.querySelector("svg.masque-fill g.sel")?.children.length ?? 0)
+      + (sr.querySelector("svg.masque-edge g.sel")?.children.length ?? 0)
+      + (sr.querySelector("svg.masque-plain g.sel")?.children.length ?? 0);
+  });
+  if (selAfterLeave < 1) throw new Error(`g.sel dropped on unhover: sel=${selAfterLeave}`);
   passed.push("remount-fade");
   let afterLeave = await inspect("scatter");
   for (let a = 0; a < 8 && afterLeave.hi !== 0; a++) {

@@ -14,6 +14,7 @@ import {
   assertCircleR, assertRemountStable, assertLeaveFade, assertTooltipColorScheme,
   meanLuminance, assertTintApplied,
 } from "./visual_assert.mjs";
+import { installRecorder, logCursor, logSince, pollLog } from "./transient_log.mjs";
 
 // Kinds whose hover draws a masque-hi masque-fillshape tint (closed shapes) get the
 // screenshot-based tint-applied check below; :grid (heatmap/image) hits a "rect" geom_ too
@@ -131,6 +132,8 @@ const passed = [];
 const unexpected = [];
 let failed = null;
 let context, page;
+let lastWglChurnAt = 0;
+let wglChurnCount = 0; // #99: surfaced in the failure message below, so a future red run ties directly to this evidence
 try {
   context = await browser.newContext({
     locale: "en-US", timezoneId: "UTC",
@@ -150,13 +153,12 @@ try {
   // cell-busy signal clears — seen in CI (not reproduced locally) as an instant, fade-less hi
   // clear: the churn wipes a host's overlay group between our hover check and the following
   // leave check. Require a quiet window with no such message before calling the page ready.
-  let lastWglChurnAt = 0;
   const WGL_CHURN_RE = /removing WGL context/;
   const WGL_QUIET_MS = 3000;
   page.on("console", (m) => {
     const text = m.text();
     consoleLog.push(`[${m.type()}] ${text}`);
-    if (WGL_CHURN_RE.test(text)) lastWglChurnAt = Date.now();
+    if (WGL_CHURN_RE.test(text)) { lastWglChurnAt = Date.now(); wglChurnCount++; }
   });
 
   await page.goto(`${base}/open?path=${encodeURIComponent(notebook)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -490,6 +492,10 @@ try {
     const wantDark = key === "scatter_dark"; // the only dark-figure case in kind_sweep_figures.jl
     const sh = await shadowOf(key);
     if (!sh?.ok) throw new Error(`${key}: overlay surface missing`);
+    // #99: installed once per widget, before anything below can draw a hover — the no-pulse
+    // window (below) opens at the tooltip-establishing hover, not here, but the recorder has to
+    // already be watching by then to catch that add.
+    await installRecorder(page, key);
     const m = await inspect(key);
     if (m.baseTag !== expectBase) throw new Error(`${key}: expected ${expectBase}, got ${m.baseTag}`);
     for (const [name, svgBox] of [["masque-fill", m.svgFill], ["masque-edge", m.svgEdge], ["masque-plain", m.svgPlain]]) {
@@ -942,6 +948,13 @@ try {
       }, key);
     }
 
+    // #99 round 2: the no-pulse/firstEnter window opens HERE, before the tooltip-establishing
+    // hover just below — that hover is the "enter" this check is actually about. Opening it at
+    // the stability nudge instead (the original placement) finds drawHi's same-key early-return
+    // already taken (already drawn, not leaving) and records zero adds, making "exactly one add"
+    // fail on every key — see transient_log.mjs / assertRemountStable.
+    const noPulseCursor = await logCursor(page, key);
+
     let tip = null;
     for (let a = 0; a < 8; a++) {
       tip = await dispatchAt(key, hoverPt.x, hoverPt.y, "pointermove");
@@ -956,7 +969,13 @@ try {
     assertNoAlertRed(m.kids, `${key}/sel`);
     assertNoTeal(m.kids, `${key}/sel`);
 
-    const hiStable = await page.evaluate(([k, ix, iy]) => {
+    // The stability nudge: real geometry never misses here (scatter's smallest marker draws at
+    // r=16 image px + geometry.ts's 4px HIT_TOL vs. this 1-CSS-px nudge, ~2 image px at this
+    // notebook's px_per_unit — confirmed live against a real WGLMakie kernel), so drawHi's
+    // same-key early-return means this should add nothing further to the log. If it ever does
+    // (a genuine remount, or a miss followed by a re-hover), the read below now sees it instead
+    // of a snapshot silently sampling past it.
+    await page.evaluate(([k, ix, iy]) => {
       const span = document.querySelector(`#coords_${k}`);
       const hosts = [...document.querySelectorAll(".ip-host")];
       const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -970,25 +989,10 @@ try {
         pointerId: 1, pointerType: "mouse", isPrimary: true,
       };
       const surface = sr.querySelector(".surface");
-      // Bare shape in g.hi (fill/edge/plain — see dispatchAt above) — no wrapper, so
-      // masque-enter/masque-leave live on the node itself. Any populated layer proves stability.
-      const hiOf = () => sr.querySelector("svg.masque-fill g.hi")?.firstElementChild
-        || sr.querySelector("svg.masque-edge g.hi")?.firstElementChild
-        || sr.querySelector("svg.masque-plain g.hi")?.firstElementChild;
       surface.dispatchEvent(new PointerEvent("pointermove", o));
-      const first = hiOf();
-      if (!first) return { ok: false, reason: "no hover node", firstEnter: false };
-      surface.dispatchEvent(new PointerEvent("pointermove", {
-        ...o, clientX: o.clientX + 1, clientY: o.clientY + 1,
-      }));
-      const second = hiOf();
-      return {
-        ok: first === second,
-        reason: first === second ? "" : "hover remounted",
-        firstEnter: first.classList.contains("masque-enter"),
-      };
+      surface.dispatchEvent(new PointerEvent("pointermove", { ...o, clientX: o.clientX + 1, clientY: o.clientY + 1 }));
     }, [key, hoverPt.x, hoverPt.y]);
-    assertRemountStable(hiStable, key);
+    assertRemountStable(await logSince(page, key, noPulseCursor), key);
     passed.push(`${key}/no-pulse`);
     if (spec.circle) {
       const hp = hitPoint(layer, hoverIndex);
@@ -1003,39 +1007,24 @@ try {
     passed.push(`${key}/tooltip`);
     passed.push(`${key}/hover`);
 
-    // #99: capture { hi, leaving } both immediately BEFORE and immediately after dispatching
-    // pointerleave, in this same evaluate — no new page.evaluate call, no requestAnimationFrame
-    // wait added here or anywhere in this file. A prior attempt at this fix drove the sequence
-    // through an explicit in-page rAF flush to make the hiStable block's second dispatch (below)
-    // land before this check; live-testing that on a real WGLMakie kernel showed it was the
-    // wrong direction — forcing a queued pointermove to actually apply (rather than being
-    // cancelled by onLeave's cancelPendingMove, hover.ts) is precisely the condition needed to
-    // arm clearHi's fade-out early and race this very check, and a forced-miss trial reproduced
-    // "cleared instantly" repeatably that way. The unmodified two-`page.evaluate` shape below,
-    // by contrast, never reproduced it even under an artificial 300ms delay standing in for a
-    // slow CDP round trip (headless Chromium does not appear to tick rAF while idle between
-    // evaluates) — so this fix only adds the pre/post snapshot, changing no timing at all.
-    const fade = await page.evaluate((k) => {
+    // #99 round 2: read the durable log instead of an instant DOM snapshot right after
+    // dispatching the leave (see transient_log.mjs / assertLeaveFade's header comment for why —
+    // the earlier round-1 fix of this PR added a pre/post snapshot pair here, which is now
+    // superseded: the log records everything that snapshot pair could show and more). pollLog
+    // waits, bounded, for a removal (or a hostRemount) to actually land before assertLeaveFade
+    // decides, rather than reading whatever DOM state happens to exist right after dispatch.
+    const fadeCursor = await logCursor(page, key);
+    await page.evaluate((k) => {
       const span = document.querySelector(`#coords_${k}`);
       const hosts = [...document.querySelectorAll(".ip-host")];
       const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      const hiState = () => {
-        const hi = sr.querySelector("svg.masque-fill g.hi")?.firstElementChild
-          || sr.querySelector("svg.masque-edge g.hi")?.firstElementChild
-          || sr.querySelector("svg.masque-plain g.hi")?.firstElementChild;
-        return {
-          hi: (sr.querySelector("svg.masque-fill g.hi")?.children.length ?? 0)
-            + (sr.querySelector("svg.masque-edge g.hi")?.children.length ?? 0)
-            + (sr.querySelector("svg.masque-plain g.hi")?.children.length ?? 0),
-          leaving: !!(hi && hi.classList.contains("masque-leave")),
-        };
-      };
-      const preLeave = hiState();
       sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
-      return { preLeave, ...hiState() };
     }, key);
-    assertLeaveFade(fade, key);
+    const fadeEntries = await pollLog(page, key, fadeCursor, (es) => (
+      es.some((e) => e.group === "hi" && e.type === "remove") || es.some((e) => e.type === "hostRemount")
+    ));
+    assertLeaveFade(fadeEntries, key);
     passed.push(`${key}/remount-fade`);
     let afterLeave = await inspect(key);
     for (let a = 0; a < 8 && afterLeave.hi !== 0; a++) {
@@ -1216,20 +1205,21 @@ try {
       }
 
       // Moving off the last-hovered legend entry fades g.link (not an instant clear), same
-      // contract as g.hi — fanned across all three svgs, same reasoning as linkInspect above.
-      const fadeLink = await page.evaluate((k) => {
+      // contract as g.hi. #99 round 2: reads the durable log (group: "link") the same way the
+      // g.hi remount-fade check above does, via the shared assertLeaveFade(entries, where,
+      // group) — see transient_log.mjs / visual_assert.mjs.
+      const linkFadeCursor = await logCursor(page, key);
+      await page.evaluate((k) => {
         const span = document.querySelector(`#coords_${k}`);
         const hosts = [...document.querySelectorAll(".ip-host")];
         const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
-        const groups = ["svg.masque-fill", "svg.masque-edge", "svg.masque-plain"].map((sel) => sr.querySelector(sel)?.querySelector("g.link"));
-        const count = groups.reduce((n, g) => n + (g?.children.length ?? 0), 0);
-        const firstPopulated = groups.find((g) => g && g.children.length > 0);
-        return { count, leaving: !!(firstPopulated && firstPopulated.firstElementChild.classList.contains("masque-leave")) };
       }, key);
-      if (fadeLink.count === 0) throw new Error(`${key}/links: cleared instantly (no remount fade)`);
-      if (!fadeLink.leaving) throw new Error(`${key}/links: leave did not apply masque-leave`);
+      const linkFadeEntries = await pollLog(page, key, linkFadeCursor, (es) => (
+        es.some((e) => e.group === "link" && e.type === "remove") || es.some((e) => e.type === "hostRemount")
+      ));
+      assertLeaveFade(linkFadeEntries, `${key}/links`, "link");
       let afterLinkLeave = await linkInspect(key);
       for (let a = 0; a < 8 && afterLinkLeave.count !== 0; a++) {
         await new Promise((r) => setTimeout(r, 25));
@@ -1510,6 +1500,12 @@ try {
   await browser.close();
 }
 if (failed) {
-  console.error(`KIND SWEEP FAIL (${backend}, after ${passed.join(", ")}):`, failed.message);
+  // #99: WGLMakie/Bonito canvas churn ("removing WGL context...") is the leading suspect for
+  // this job's flake (5/5 historical failing-run artifacts showed it; see the PR body) — ties
+  // any future failure to that evidence directly, without a separate artifact download.
+  const churnNote = wglChurnCount
+    ? ` [wgl churn: ${wglChurnCount}x, last ${Date.now() - lastWglChurnAt}ms before this failure]`
+    : " [wgl churn: none observed this run]";
+  console.error(`KIND SWEEP FAIL (${backend}, after ${passed.join(", ")}):`, failed.message + churnNote);
   process.exit(1);
 }
