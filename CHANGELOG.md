@@ -96,19 +96,23 @@ All notable changes to this project are documented here. The format is based on
   MeshScatter children live in float32convert space (premise from #36).
 
 ### Changed
-- **An element hit's `@bind` payload is the Julia object you passed, not the browser's copy.**
-  `payloads = [(a = 1,)]` now yields `(a = 1,)` back from a click, where it previously yielded
-  `Dict("a" => 1)` — `ev.payload === payloads[i]`. Julia reconstructs the payload from its own
-  manifest instead of trusting the round trip, so a `NamedTuple` stays a `NamedTuple`. This
-  applies to every click on an element kind, not only to widgets using `selected=`. Code doing
-  `ev.payload["x"]` on an element hit must become `ev.payload.x`.
+- **There is one way to read a `@bind` payload now: `ev.payload.field`, for every
+  interactable kind.** An element hit's payload is the exact Julia object you passed, looked
+  back up in Julia rather than decoded from the browser — `payloads = [(a = 1,)]` yields
+  `(a = 1,)` back from a click, `ev.payload === payloads[i]`, so a `NamedTuple` stays a
+  `NamedTuple`. This applies to every click on an element kind (`circles`/`rects`/`polygons`/
+  `segments`/`polyline`), not only to widgets using `selected=`, and it means the element
+  hit's payload is no longer part of the upload at all — `layer` + `index` are already enough
+  for Julia to recover it, so a click, a `selected=` hydration, and a `selects`-ROI item no
+  longer carry one on the wire. An out-of-range index now raises `ArgumentError` rather than
+  passing through.
 
-  The kinds with no Julia-side original are unchanged and still hand back a browser-computed
-  value, indexed as before: an `:axis` readout and a `:grid` cell are computed from the cursor,
-  and `:roi` bounds, `:threshold` values and `:view` limits are drag state Julia cannot know.
-  So `circles`/`rects`/`polygons`/`segments`/`polyline` use `ev.payload.field` and those five
-  use `ev.payload["field"]` — `examples/demo.jl` shows both side by side. An out-of-range
-  index from the browser now raises `ArgumentError` rather than passing through.
+  Kinds with no Julia-side original — an `:axis` readout, a `:grid` cell, `:roi` bounds, and
+  `:view` limits, all drag/cursor state only the browser computed — are converted to a flat
+  `NamedTuple` too, so `ev.payload.x` works there as well instead of the old
+  `ev.payload["x"]`. `ThresholdInteractable` is the one exception: its payload is a bare
+  scalar, since there's no field to name. `examples/demo.jl`'s `:axis` cell and
+  `docs/dev/perf-findings.md`'s `:view` reconstruction move with this.
 - **Renamed the package from `Holo` to `Masque`** (same UUID). Every public name moves with
   it: the module `Masque`, the entry function `masque`, the `masque"…"` string macro, the
   `MasqueCairoMakieExt` / `MasqueWGLMakieExt` extensions, the `window.Masque` browser global,

@@ -171,7 +171,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000063
 ar_sel === nothing ? "axis: click in the plot area" :
-    "axis: x=$(round(ar_sel.payload["x"]; digits = 3)) y=$(round(ar_sel.payload["y"]; digits = 3))"
+    "axis: x=$(round(ar_sel.payload.x; digits = 3)) y=$(round(ar_sel.payload.y; digits = 3))"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000080
 md"""

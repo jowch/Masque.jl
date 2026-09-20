@@ -222,12 +222,17 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // as `selHits` (state.selHits_'s hydration, below) so both read `hitLayerByIndex` — which
     // throws on an unsupported kind or an out-of-range index — before either is assigned;
     // splitting them let an invalid manifest set host.value first and throw only later.
-    const hydrated: { layer: string; index: number; payload: unknown }[] = []
+    //
+    // No `payload` key: `selected=` only ever hydrates a SELECTED_KINDS layer (hitLayerByIndex
+    // throws otherwise), and Julia already reconstructs an element hit's payload from its own
+    // manifest (`_bond_payload`) rather than trusting the upload — sending one here would just
+    // be dead weight Julia discards, and would diverge from the click path's shape (#109).
+    const hydrated: { layer: string; index: number }[] = []
     const selHits: Hit[] = []
     for (const layer of manifest.layers) {
         for (const idx of layer.selected ?? []) {
             selHits.push({ layer, ...hitLayerByIndex(layer, idx) })
-            hydrated.push({ layer: layer.id, index: idx, payload: layer.payloads[idx] })
+            hydrated.push({ layer: layer.id, index: idx })
         }
     }
     ;(host as unknown as { value: unknown }).value = hydrated.length ? { items: hydrated } : null

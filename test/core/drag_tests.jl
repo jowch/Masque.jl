@@ -164,3 +164,13 @@ end
     @test bp(axism, "nope", -1, Dict("x" => 1.0)) == Dict("x" => 1.0)
     @test bp(axism, "L", -1, nothing) === nothing
 end
+
+@testset "SELECTED_KINDS parity: Julia _SELECTED_KINDS matches frontend selection.ts (#109)" begin
+    # After #109, a drift here is no longer cosmetic: the browser would omit a payload for a
+    # kind Julia doesn't think it can reconstruct, and the user would silently get `nothing`.
+    selection_ts = read(joinpath(@__DIR__, "..", "..", "frontend", "src", "selection.ts"), String)
+    m = match(r"SELECTED_KINDS = new Set\(\[(.*?)\]\)", selection_ts)
+    @test m !== nothing
+    js_kinds = Set(Symbol(strip(s, ['"', ' '])) for s in split(m.captures[1], ","))
+    @test js_kinds == Set(Masque._SELECTED_KINDS)
+end

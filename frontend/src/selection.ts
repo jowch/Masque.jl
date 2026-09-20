@@ -1,8 +1,11 @@
 import { findBin, invertAxis } from "./geometry"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest } from "./types"
 
-// Bond item shape emitted per contained element in a selects-ROI { items: SelectionItem[] }
-export type SelectionItem = { layer: string; index: number; payload: unknown }
+// Bond item shape emitted per contained element in a selects-ROI { items: SelectionItem[] }.
+// `payload` is present only for a computed (non-element) target — a `:grid` cell range, since
+// `:circles` is an element kind and Julia already reconstructs its payload from the manifest
+// (#109); omitted rather than sent and discarded.
+export type SelectionItem = { layer: string; index: number; payload?: unknown }
 export type SelectionResult = { items: SelectionItem[]; hits: Hit[] }
 
 // [lo,hi] pixel span over an edge array → inclusive cell-index range clamped to the grid, or null if no overlap.
@@ -28,7 +31,8 @@ export function computeSelection(
         for (let k = 0; k < Math.floor(a.length / 3); k++) {
             const cx = a[3 * k], cy = a[3 * k + 1]
             if (cx >= xlo && cx <= xhi && cy >= ylo && cy <= yhi) {
-                items.push({ layer: target.id, index: k, payload: target.payloads[k] })
+                // no payload: an element hit, Julia reconstructs it from the manifest (#109)
+                items.push({ layer: target.id, index: k })
                 hits.push({ layer: target, index: k, geom_: ["circle", cx, cy, a[3 * k + 2]] })
             }
         }

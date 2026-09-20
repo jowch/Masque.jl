@@ -2187,10 +2187,11 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
             }],
         }
         mount(script, selManifest)
+        // no `payload`: Julia reconstructs an element hit's payload from its own manifest (#109)
         expect((host as unknown as { value: unknown }).value).toEqual({
             items: [
-                { layer: "pts", index: 0, payload: { i: 0 } },
-                { layer: "pts", index: 2, payload: { i: 2 } },
+                { layer: "pts", index: 0 },
+                { layer: "pts", index: 2 },
             ],
         })
     })
@@ -2215,9 +2216,9 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
         mount(script, twoLayer)
         expect((host as unknown as { value: unknown }).value).toEqual({
             items: [
-                { layer: "a", index: 1, payload: { v: "a1" } },
-                { layer: "b", index: 0, payload: { v: "b0" } },
-                { layer: "b", index: 1, payload: { v: "b1" } },
+                { layer: "a", index: 1 },
+                { layer: "b", index: 0 },
+                { layer: "b", index: 1 },
             ],
         })
     })
