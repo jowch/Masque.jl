@@ -24,14 +24,12 @@ events(::AbstractInteractable)::Tuple = (:click, :hover)   # which events the ov
 hoverstyle(::AbstractInteractable)::NamedTuple = (; stroke=nothing, width=2)
 ```
 
-**`validate` is per-capability, not a global scale gate** (fixes a latent silent-coordinate bug).
-Element interactables (Point/Segment/Rect/Polygon) are projected **in Julia** via `Makie.project`,
-so they impose **no axis-scale restriction** — they work on any scale Makie can project (linear, log,
-symlog, …). Only `AxisInteractable` and `ColorbarInteractable` rely on **client-side** pixel→data
-inversion, so they alone restrict to scales the JS `invert` implements (identity, log10/log, +
-categorical via the shipped category map). A blanket `_OK_SCALES` gate would be both too strict
-(rejecting element types that work) and too loose (passing `AxisInteractable` on a scale the JS
-inverts wrong). Default `validate` stays permissive; `AxisInteractable.validate` and
+**`validate` is per-capability, not a global scale gate.** Element interactables
+(Point/Segment/Rect/Polygon) are projected **in Julia** via `Makie.project`, so they impose **no
+axis-scale restriction** — they work on any scale Makie can project (linear, log, symlog, …). Only
+`AxisInteractable` and `ColorbarInteractable` rely on **client-side** pixel→data inversion, so they
+alone restrict to scales the JS `invert` implements (identity, log10/log, + categorical via the
+shipped category map). Default `validate` stays permissive; `AxisInteractable.validate` and
 `ColorbarInteractable.validate` are the ones that gate.
 
 ## `HitLayer` — the serialized unit (per interactable, per kind)
@@ -87,10 +85,8 @@ omitted from the manifest entirely when unset (same idiom as `selects`/`tol` abo
 `perf-findings.md` for the measured per-layer wire cost.
 
 This is a **closed set of six geometry kinds** (`:circles/:polyline/:segments/:rects/:grid/:polygons`)
-plus the `:axis` continuous channel. The survey confirmed every retained Makie surface projects to one
-of them; nothing in v1+v2 needs a seventh. (Text labels — the surface once speculated to need a new
-`bbox`/degenerate-polygon primitive — turned out not to: `TextInteractable` rides plain `:rects`, with
-a rotated label's box simply expanded to stay axis-aligned; see §3. That premise is retired for text.)
+plus the `:axis` continuous channel. Every retained Makie surface projects to one of them; v1+v2
+needs no seventh — text labels (`TextInteractable`) ride plain `:rects`.
 
 The three M4 drag kinds — `:view`, `:threshold`, `:roi` — sit outside this set. They are
 *control* geometry: one draggable region apiece, no elements, an empty `payloads`. The closed-set
@@ -161,10 +157,10 @@ drawn from Makie's computed-stats node. **Principle:** hit geometry comes from r
 Makie's computed values (not the raw input data).
 
 **Declaration is the contract; plot-introspection is v2 sugar.** v1 constructors take explicit
-data-space geometry (`PointInteractable(ax, points; payloads)`), which the survey confirmed is the
-robust path — extracting geometry from live `Scatter`/`Heatmap`/`BarPlot` objects is the genuinely
-hard part (markersize units, endpoint half-steps, dodge/stack math) and is deferred. A future
-`PointInteractable(scatterplot)` will produce the *same* struct, not a different code path.
+data-space geometry (`PointInteractable(ax, points; payloads)`). Extracting geometry from live
+`Scatter`/`Heatmap`/`BarPlot` objects requires resolving markersize units, endpoint half-steps, and
+dodge/stack math; that work is deferred. A future `PointInteractable(scatterplot)` will produce the
+*same* struct, not a different code path.
 
 **Composites emit multiple layers.** `ScatterLines` → one `:circles` layer + one `:polyline` layer,
 hit-tested points-first (within marker radius) then segment. This is the model for any composite recipe.
