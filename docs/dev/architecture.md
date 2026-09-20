@@ -773,26 +773,47 @@ the frames shipped while a gesture is in progress.
 
 A *gesture* is a continuous, in-progress manipulation of the view — drag-to-pan, 3D orbit — whose
 intermediate states are not part of the notebook's analysis; nothing downstream reads the camera
-position mid-drag. A *data interaction* is a click, a keyboard commit (§11), or a `selects`-ROI
-release — a value a downstream cell reads. These are two different channels, not two speeds of one
-channel: a gesture's in-drag frames never carry a value the notebook can see, while producing that
-value is the entire point of a data interaction.
+position mid-drag. A *data interaction* is a value a downstream cell reads: a click, a keyboard
+commit (§11), a `selects`-ROI release, a bounds-only `ROIInteractable` release, a threshold-drag
+release, or a view-manipulation gesture's own release. These are two different channels, not two
+speeds of one channel: a gesture's in-drag frames never carry a value the notebook can see, while
+producing that value is the entire point of a data interaction.
+
+For every drag interactable — ROI, threshold, view — release is a data interaction that commits
+through `@bind`, exactly as a click does (§12.3). What differs between them is only what happens
+*during* the drag: an in-progress ROI box or threshold line is overlay-local (§6 Tier 0, §12.2);
+an in-progress view-manipulation gesture is the one case that needs a Julia round trip mid-drag,
+and it is what this section's gesture channel is for.
 
 ### 12.2 The routing rule
 
-Where a value lives is decided by three questions, in order, regardless of which interactable
+Where a value lives is decided by four questions, in order, regardless of which interactable
 raises it:
 
+0. Can the browser answer it alone from what the manifest already ships? → overlay-local, no
+   channel and no Julia round trip at all (§6 Tier 0). An in-drag `ROIInteractable` box and an
+   in-drag threshold line are exactly this: the browser already owns that geometry, and drawing it
+   over an image that hasn't changed needs nothing from Julia mid-drag.
 1. Does the notebook need this value? → `@bind`.
 2. Must it survive static export? → precompute it and ship it via `published_to_js`.
 3. Neither? → `AbstractPlutoDingetjes.Display.with_js_link` — a pull channel outside Pluto's state
    management.
 
-An in-drag gesture frame answers no to the first two: nothing downstream reads the intermediate
-camera state, and a static export has no kernel to drive a live gesture anyway. So it routes to
-question 3. This rule is normative for every gesture, not only the view-manipulation case that
-motivated it (issue #102). `roadmap.md` states the same split as its own framing note for this
-work; the two must not diverge.
+Among the drag interactables, only a view-manipulation gesture reaches question 3. An in-drag ROI
+box or threshold line answers yes to question 0 and stops there. A view-manipulation gesture
+answers no to question 0, because panning or orbiting changes the image itself, not just an
+overlay drawn on top of it — every hit region's projection depends on the camera, so the browser
+cannot answer alone. It then answers no to questions 1 and 2 as well: nothing downstream reads the
+intermediate camera state, and a static export has no kernel to drive a live gesture anyway. So it
+routes to question 3. This is the reason the gesture channel exists for view manipulation and not
+for ROI/threshold drags, and it is what makes §12.4's invariant a consequence of this rule rather
+than a separate assertion: only a drag that changes what Julia rendered needs Julia to re-author
+projection on every frame.
+
+This four-question form is normative for every gesture, not only the view-manipulation case that
+motivated it (issue #102). `roadmap.md` states questions 1–3 as its own framing note for this
+work (question 0 is added here to close the ROI/threshold gap the three-question form left open);
+the two must not diverge on the three they share.
 
 ### 12.3 What commits, and when
 
@@ -804,8 +825,9 @@ today. Commit-on-release is unchanged by this channel; it is only the in-drag fr
 
 ### 12.4 The invariant: projection stays Julia-authored on every frame
 
-Any frame the user sees must be accompanied by hit geometry Julia computed for *that same* camera
-state. No backend may ship 3D (or 2D) coordinates to JS and reproject there. This is the existing
+Because a view-manipulation gesture is the one drag that changes what Julia rendered (§12.2), any
+frame the user sees during it must be accompanied by hit geometry Julia computed for *that same*
+camera state. No backend may ship 3D (or 2D) coordinates to JS and reproject there. This is the existing
 Julia-authored-projection principle (§2's `InteractionContext`; the client-side-GPU-camera
 non-goal in §7's backend-scope note) extended to hold *per frame*, not only at commit — the
 non-goal itself is untouched, and this invariant is exactly what keeps a gesture channel from
