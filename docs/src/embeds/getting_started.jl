@@ -40,11 +40,14 @@ begin
 
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "Population (millions)", ylabel = "GDP (US\$bn)")
-    scatter!(ax, xs, ys; color = city_colors, markersize = 18)
-
+    markersize = 18
+    scatter!(ax, xs, ys; color = city_colors, markersize)
+    # From the Scatter plot: default `:circle` draws at ≈0.3525×markersize, not the points-
+    # constructor default radius=9. `colors` is tooltip accent only (highlight is split-blend).
     cities = PointInteractable(
         ax, collect(zip(xs, ys));
         id = :cities,
+        radius = 0.3525 * markersize,
         payloads = [(; city = c.city, pop = c.pop) for c in cities_data],
         colors = (; palette = city_colors, index = collect(0:(length(cities_data) - 1))),
         tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
