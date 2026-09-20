@@ -13,8 +13,8 @@
 #                             `julia --project=. test/runtests.jl` and Runic working.
 #
 # Deliberately NOT done here (see .cursor/cloud-agent-install.sh for the heavier setup):
-#   - PackageCompiler sysimage: a 20min+ build, far too slow for a synchronous hook.
-#   - @masque-dev env with Pluto: that is the live-verification rig, not the test rig.
+#   - PackageCompiler sysimage: a 20min+ build, far too slow for a synchronous hook, and
+#     it only buys ~20s per invocation once the depot is precompiled.
 #   - `npm run build`: CI is the sole author of assets/*.js; building here would leave
 #     the working tree dirty at session start.
 #
@@ -80,13 +80,35 @@ install_julia() {
 }
 
 setup_julia_project() {
-  # Resolves the package plus its test target (CairoMakie, WGLMakie, JSON3, Statistics),
-  # then precompiles so the first `julia --project=. test/runtests.jl` is not also paying
-  # for the whole Makie stack.
+  # Resolves the package's own deps only. NOTE: this does NOT install CairoMakie or
+  # WGLMakie -- they are declared under [weakdeps]/[extras], so Pkg.instantiate() skips
+  # them, and every file in test/ loads one or both. setup_test_env below covers that.
   log "instantiating + precompiling the Masque project (Makie stack; several minutes)"
   julia --project="$ROOT" -e '
     using Pkg
     Pkg.instantiate()
+    Pkg.precompile()
+  ' || return 1
+}
+
+setup_test_env() {
+  # @masque-dev: Masque developed from this checkout, plus the backends and the packages
+  # test/ and test/e2e/ load. Two reasons it is worth the minutes:
+  #   1. It is the only env in which `julia --project=@masque-dev test/runtests.jl` runs --
+  #      `--project=.` cannot, for the [weakdeps] reason above.
+  #   2. Precompile caches are keyed by package version, not by environment, so warming
+  #      them here means CI's actual command, Pkg.test(), starts in seconds rather than
+  #      rebuilding the whole Makie stack on its first call.
+  # Pluto is included so the live-verification sweep (docs/dev/live-interaction-checklist.md,
+  # test/e2e/serve.jl) can run -- CLAUDE.md treats that sweep as mandatory for user-facing
+  # changes, so an env without it strands an agent mid-task.
+  # Both backends in one env matches CI's kind-sweep job; masque() defaults to Cairo when
+  # both are loaded. (The dual-backend caveat in .cursor/ is about the sysimage, not this.)
+  log "provisioning @masque-dev (Masque + CairoMakie + WGLMakie + JSON3 + Pluto)"
+  MASQUE_ROOT="$ROOT" julia --project=@masque-dev -e '
+    using Pkg
+    Pkg.develop(path=ENV["MASQUE_ROOT"])
+    Pkg.add(["CairoMakie", "WGLMakie", "JSON3", "Pluto"])
     Pkg.precompile()
   ' || return 1
 }
@@ -124,9 +146,14 @@ setup_julia() {
   install_julia          || { warn "juliaup install failed"; return 1; }
   persist_env 'export PATH="$HOME/.juliaup/bin:$PATH"'
   setup_julia_project    || { warn "Pkg.instantiate/precompile failed"; return 1; }
+  setup_test_env         || warn "@masque-dev provisioning failed; the test suite will not run"
   setup_runic            || warn "Runic install failed; 'julia -e \"using Runic\"' will not work"
   setup_e2e              || true
-  log "julia ready — julia --project=. test/runtests.jl  (GROUP=Core|NoBackend|WebGL)"
+  persist_env 'export MASQUE_DEV_ENV="$HOME/.julia/environments/masque-dev"'
+  log "julia ready. Tests (GROUP=Core|NoBackend|WebGL):"
+  log "  GROUP=Core julia --project=. -e 'using Pkg; Pkg.test()'   # what CI runs"
+  log "  GROUP=Core julia --project=@masque-dev test/runtests.jl   # faster, no temp env"
+  log "  NB: 'julia --project=. test/runtests.jl' does NOT work -- CairoMakie is a weakdep."
 }
 
 # --------------------------------------------------------------------------
