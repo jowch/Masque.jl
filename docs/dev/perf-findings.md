@@ -380,20 +380,22 @@ The heatmap rows deserve the longer explanation, because an earlier version of t
 them wrong. A first pass reported three runs each and called heatmap-300² and heatmap-500² tight
 resolved improvements; two independently-run samples posted during round-1 review broke both
 claims immediately — heatmap-300² came back at 34 ms and 77 ms (77 ms is *above* the ~50 ms
-figure it was supposedly beating), and heatmap-500² came back at 47 ms and 201 ms (47 ms an
-order of magnitude off the "tight" 201–203 ms this doc had just reported). Four more of my own
+figure it was supposedly beating), and heatmap-500² came back at 47 ms and 201 ms (a 4.3× miss
+off the "tight" 201–203 ms this doc had just reported, 201 ÷ 47 ≈ 4.3). Four more of my own
 runs confirmed the reviewer's numbers were not a fluke of their machine: heatmap-300² across my
-seven runs spans 33–84 ms, and heatmap-1000² spans 97–142 ms even before counting the
-reviewer's own 129 ms and 227 ms samples, both above my entire seven-run range. Heatmap-500² is
-the strangest: six of my seven runs land tightly in 201–206 ms, and the seventh (run under
-incidental load from a concurrent test suite) plus the reviewer's independent run both landed
-near 47–57 ms — two low outliers from two different environments, not one fluke. Something
+seven runs spans 33–84 ms, and heatmap-1000² spans 97–142 ms; the reviewer's 129 ms sample for
+that row falls inside my seven-run range, but the reviewer's other sample, 227 ms, sits above
+it. Heatmap-500² is the strangest: six of my seven runs land tightly in 201–206 ms, and the
+seventh (run under incidental load from a concurrent test suite) plus the reviewer's
+independent run both landed near 47–57 ms — two low outliers from two different environments,
+not one fluke. Something
 about this specific case has (at least) two distinct regimes, and *this bench does not measure
 what causes it* — no hypothesis (contention, GC, cache state) is asserted here, because none has
 been tested. The table above reports my own seven-run range for each heatmap row; counting the
-reviewer's independent samples too widens heatmap-500² down to 47 ms (1 ms below my own low
-outlier) and heatmap-1000² up to 227 ms (85 ms above my own high end). Treat every heatmap
-render number here as **not resolved**, full stop, not as a point estimate with error bars.
+reviewer's independent samples too widens heatmap-500² down to 47 ms (10 ms below my own low
+outlier, 57 ms) and heatmap-1000² up to 227 ms (85 ms above my own high end). Treat every
+heatmap render number here as **not resolved**, full stop, not as a point estimate with error
+bars.
 
 STRESS D (scatter 50 000 + 200 B payload/elem) and the new heatmap 500×500 row have no valid
 prior number to compare against — D never completed before this fix, and 500×500 was never in
