@@ -851,13 +851,15 @@ How they satisfy these obligations differs completely, and that difference is ex
 to close: `:cairo` re-renders and ships a fresh PNG plus a fresh manifest over the channel;
 `:webgl`'s mechanism is unsettled — #86 gates in-place buffer patching on canvas identity (a
 WebGL context is tied to one `<canvas>`, and Pluto's cell-output replacement destroys it, so
-patching the old context's buffers is not viable until a canvas survives that), and #86's own
-in-gesture sketch is a 2D last-frame photographic preview instead, not a live GL patch. Per the
-standing principle, **backends differ in cost, never in the interaction contract** — a conforming
-implementation is judged against the obligations above, not against `:cairo`'s mechanism, and
-whichever backend is built first must not let its mechanism get mistaken for the contract. A
-genuinely unsettled second mechanism is itself the argument for stating obligations this way
-rather than after either backend's implementation.
+patching the old context's buffers is not viable until a canvas survives that). Separately, #85
+proposes a 2D last-frame preview — CSS-transforming the existing frame and overlay together,
+with one Julia commit on release — as an in-gesture path for both backends, not a
+`:webgl`-specific answer to #86's gate. Per the standing principle, **backends differ in cost,
+never in the interaction contract** — a conforming implementation is judged against the
+obligations above, not against `:cairo`'s mechanism, and whichever backend is built first must
+not let its mechanism get mistaken for the contract. A genuinely unsettled second mechanism is
+itself the argument for stating obligations this way rather than after either backend's
+implementation.
 
 ### 12.6 Request discipline
 
@@ -903,10 +905,11 @@ supplies. Each is left to whoever picks up #102.
   render-bound.
 - **`:webgl` parity.** `:webgl`'s mechanism for satisfying §12.5's obligations is not merely
   unmeasured, it is unsettled: #86 blocks in-place buffer patching on canvas identity (Pluto's
-  cell-output replacement destroys the `<canvas>` a WebGL context is tied to), and sketches a 2D
-  last-frame preview as the in-gesture path instead. Whichever mechanism `:webgl` ends up using,
-  the shared thing between the backends is the contract in this section, not any particular
-  implementation of it.
+  cell-output replacement destroys the `<canvas>` a WebGL context is tied to). #85 separately
+  proposes a 2D last-frame preview as an in-gesture path for both backends, not a
+  `:webgl`-specific answer to #86's gate. Whichever mechanism `:webgl` ends up using, the shared
+  thing between the backends is the contract in this section, not any particular implementation
+  of it.
 - **What commits a gesture that has no release.** §12.3's commit-on-release rule is drag-shaped,
   because pan and orbit are pointer drags with a pointerup to commit on. A wheel zoom has no
   terminal event, so it needs some other commit rule — an idle debounce, an explicit affordance,
