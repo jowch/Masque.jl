@@ -228,10 +228,17 @@ of them; nothing in v1+v2 needs a seventh. (Text labels — the surface once spe
 `bbox`/degenerate-polygon primitive — turned out not to: `TextInteractable` rides plain `:rects`, with
 a rotated label's box simply expanded to stay axis-aligned; see §3. That premise is retired for text.)
 
-### Built-in interactables (v1 + M3 + Phase 2 text labels)
+The three M4 drag kinds — `:view`, `:threshold`, `:roi` — are outside this set and do not
+extend it. They are *control* geometry (one draggable region apiece, no elements, no
+`payloads` array) rather than data geometry projected from a Makie surface, and the closed-set
+claim is about the latter. See the table below.
 
-Five v1 types plus `ColorbarInteractable` (M3) and `TextInteractable` (Phase 2 text labels), one
-per hit primitive (`:axis` shared by two; `TextInteractable` reuses `:rects`, no new primitive):
+### Built-in interactables (v1 + M3 + M4 drags + Phase 2 text labels)
+
+Five v1 types, plus `ColorbarInteractable` and `LegendInteractable` (M3), the three drag
+interactables (M4), and `TextInteractable` (Phase 2 text labels). Roughly one type per hit
+primitive, with the exceptions noted inline: `:axis` is shared by two, `LegendInteractable` and
+`TextInteractable` reuse `:rects`, and the three drags each own a kind no other type produces.
 
 | Type | kind(s) | Makie surfaces | payload |
 |---|---|---|---|
@@ -243,9 +250,17 @@ per hit primitive (`:axis` shared by two; `TextInteractable` reuses `:rects`, no
 | `ColorbarInteractable` *(M3)* | `:axis` (bounded bbox) | Colorbar — auto-extracted from `fig.content` | `(; value)` inverted client-side via `AxisTransform.valueaxis` |
 | `LegendInteractable` *(M3)* | `:rects` | Legend — auto-extracted from `fig.content` | `(; label, group, targets)` — `targets` also ships as `HitLayer.links` |
 | `TextInteractable` *(Phase 2 text labels)* | `:rects` | Text, Annotation (via `_descendant(p, Makie.Text)`) — data-space only | `(; text, index, x, y)` |
+| `ViewInteractable` *(M4)* | `:view` | the Axis/Axis3 view itself — declared, never auto-extracted | 2D pan `(; xmin, xmax, ymin, ymax)`; 3D orbit `(; azimuth, elevation)` |
+| `ThresholdInteractable` *(M4)* | `:threshold` | a draggable horizontal/vertical line on an Axis — declared | a bare data scalar, not a `NamedTuple` (nothing to name) |
+| `ROIInteractable` *(M4)* | `:roi` | a draggable box on an Axis — declared; an `AbstractSelector` | `(; xmin, xmax, ymin, ymax)`, or a `Vector{InteractionEvent}` of enclosed elements when `selects=` is set (§5) |
 
 `SegmentInteractable` carries `mode ∈ {:polyline,:pairs}`; `RectInteractable` carries
-`layout ∈ {:grid,:list}`. Same JS test, different Julia extractor.
+`layout ∈ {:grid,:list}`. Same JS test, different Julia extractor. The three M4 drags are
+declared against an axis rather than extracted from a plot, they are the only types whose
+`events` is `(:drag,)`, and their payloads are computed in the browser and converted Julia-side
+rather than looked up in the manifest (`_computed_payload`, §5). `:view` layers sort last in the
+manifest so an ordinary drag wins over the catch-all pan/orbit gesture (§6, tension 2), and what
+happens during any of these drags — as opposed to on release — is §12's contract.
 
 **Text labels as click-to-pick buttons.** `TextInteractable` geometry comes from Makie's own
 `Makie.string_boundingboxes(p)` — scene-local pixel space, y-up, bottom-left origin — converted
