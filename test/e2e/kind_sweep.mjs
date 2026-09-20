@@ -98,6 +98,25 @@ function hitPoint(layer, index) {
   throw new Error(`no hitPoint for kind=${k}`);
 }
 
+// Mirrors geometry.ts's invertAxis/mapAxis for the identity/log10/log, non-categorical case —
+// every fixture axis here is linear and non-reversed, so this only needs to match those branches,
+// not the categorical/reversed ones.
+function invertAxisJs(t, px, py) {
+  const [vx, vy, vw, vh] = t.viewport;
+  let fx = (px - vx) / vw;
+  if (t.xreversed) fx = 1 - fx;
+  let fy = 1 - (py - vy) / vh;
+  if (t.yreversed) fy = 1 - fy;
+  const mapAxis = (lims, scale, f) => {
+    if (scale === "log10" || scale === "log") {
+      const a = Math.log10(lims[0]), b = Math.log10(lims[1]);
+      return Math.pow(10, a + f * (b - a));
+    }
+    return lims[0] + f * (lims[1] - lims[0]);
+  };
+  return { x: mapAxis(t.xlims, t.xscale, fx), y: mapAxis(t.ylims, t.yscale, fy) };
+}
+
 const browser = await chromium.launch({
   headless: true,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
@@ -266,6 +285,11 @@ try {
     if (!L) throw new Error(`${spec.key}: no layer ${spec.layerId}/${spec.layerKind} in ${layers.map((l) => l.id + ":" + l.kind)}`);
     return L;
   };
+  // Manifest `transforms` dict for the `axis` widget only (#axes_axis, kind_sweep_figures.jl) —
+  // an `:axis`-kind layer's geometry is `nothing` (AxisInteractable) or a bbox with no lims of
+  // its own, so hitting/verifying it needs the AxisTransform (viewport + lims), not just the
+  // layer dict every other kind gets by from `layersOf`.
+  const transformsOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#axes_${k}`).textContent), key);
 
   const dispatchAt = async (key, x, y, type) => page.evaluate(([k, ix, iy, typ]) => {
     const span = document.querySelector(`#coords_${k}`);
@@ -572,6 +596,196 @@ try {
       if (!re.test(after)) throw new Error(`${key}-drag: readout mismatch ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/drag-bind`);
       console.error(`OK  ${key}/drag — ${after.slice(0, 100)}`);
+      continue;
+    }
+
+    // #113: :axis is the one clickable kind whose click is NOT a selection gesture — an
+    // AxisInteractable's whole-image catch-all and a ColorbarInteractable's bounded bbox share
+    // this widget with a real, pre-existing `:pts` selection so a click on either can be proven
+    // not to clear it (the #107 round-1 regression). No highlight geometry, no element index
+    // (always -1) and no collision-avoidance guard applies here (layerElementCount has nothing
+    // to count for a catch-all/bbox layer) — a click's outcome is checked by MATCHING the bond
+    // text against a value computed the same way the browser computes it, not by requiring the
+    // text to CHANGE, so a warm-session re-run whose click reproduces byte-identical geometry
+    // and hence a byte-identical payload (#114's collision hazard, deliberately sidestepped
+    // rather than hit) still passes.
+    if (spec.mode === "axis") {
+      const axisLayer = layers.find((l) => l.id === spec.layerId && l.kind === "axis");
+      const cbLayer = layers.find((l) => l.id === spec.colorbarLayerId && l.kind === "axis");
+      const ptsLayer = layers.find((l) => l.id === spec.pinLayerId);
+      if (!axisLayer || !cbLayer || !ptsLayer) {
+        throw new Error(`${key}: missing axis/colorbar/pin layers in ${JSON.stringify(layers.map((l) => l.id + ":" + l.kind))}`);
+      }
+      const axes = await transformsOf(key);
+      const axisT = axes[axisLayer.axis], cbT = axes[cbLayer.axis];
+      if (!axisT || !cbT) throw new Error(`${key}: missing transforms for axis(${axisLayer.axis})/colorbar(${cbLayer.axis})`);
+
+      const leave = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+      }, key);
+
+      // A pixel inside the axis viewport but well clear of every `:pts` mark, so it is
+      // unambiguously an axis-catch-all hit, not a mark hit that happens to sort after it.
+      const [avx, avy, avw, avh] = axisT.viewport;
+      const axisPt = { x: avx + 0.08 * avw, y: avy + 0.08 * avh };
+      const nPts = layerElementCount(ptsLayer);
+      for (let i = 0; i < nPts; i++) {
+        const hp = hitPoint(ptsLayer, i);
+        if (Math.hypot(axisPt.x - hp.x, axisPt.y - hp.y) < (hp.r ?? 0) + 8) {
+          throw new Error(`${key}: axis test pixel ${JSON.stringify(axisPt)} too close to pts[${i}] ${JSON.stringify(hp)}`);
+        }
+      }
+      const [cvx, cvy, cvw, cvh] = cbT.viewport;
+      const cbPt = { x: cvx + cvw / 2, y: cvy + cvh / 2 };
+      // A pixel between the main axis and the colorbar, outside the colorbar's own bbox — proves
+      // ColorbarInteractable's hit test is genuinely BOUNDED (geometry.ts's bbox branch actually
+      // returns null outside it), not a second catch-all.
+      let gapX = (avx + avw + cvx) / 2;
+      if (!(gapX > avx + avw && gapX < cvx)) gapX = cvx - 10;
+      const gapPt = { x: gapX, y: cvy + cvh / 2 };
+
+      // --- item 3: hover shows a coordinate readout inverted from the axis transform ---
+      // `dispatchAt` round-trips image px -> a synthetic event's `clientX`/`clientY` (IDL
+      // `long` — fractional values get rounded on read) -> back to image px in `imgPx`, so the
+      // pixel the browser actually hit-tests at can be off by ~1 CSS px from the one this driver
+      // asked for. A few image px of slack (`AXIS_TOL_PX`, converted to data units via the same
+      // slope `mapAxis` uses) absorbs that without weakening what this check exists to catch: a
+      // wrong viewport, wrong lims, a missing y-flip, a reversed axis, or reading the wrong
+      // transform entirely — all of which are off by far more than a few px.
+      const AXIS_TOL_PX = 3;
+      const parseAxisTip = (s) => {
+        const m = /^x\s*=\s*(-?[\d.eE+-]+)\s*,\s*y\s*=\s*(-?[\d.eE+-]+)$/.exec(String(s || "").trim());
+        if (!m) return null;
+        const x = Number(m[1]), y = Number(m[2]);
+        return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+      };
+      const expAxis = invertAxisJs(axisT, axisPt.x, axisPt.y);
+      const tolX = AXIS_TOL_PX * Math.abs(axisT.xlims[1] - axisT.xlims[0]) / avw;
+      const tolY = AXIS_TOL_PX * Math.abs(axisT.ylims[1] - axisT.ylims[0]) / avh;
+      const axisTipNear = (got) => got && Math.abs(got.x - expAxis.x) <= tolX && Math.abs(got.y - expAxis.y) <= tolY;
+      let axisTip = null, gotAxis = null;
+      for (let a = 0; a < 8; a++) {
+        axisTip = await dispatchAt(key, axisPt.x, axisPt.y, "pointermove");
+        gotAxis = axisTip?.show ? parseAxisTip(axisTip.text) : null;
+        if (axisTipNear(gotAxis)) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (!axisTipNear(gotAxis)) {
+        throw new Error(
+          `${key}/axis-hover: tooltip ${JSON.stringify(axisTip)} parsed=${JSON.stringify(gotAxis)}, ` +
+          `want x≈${expAxis.x} (±${tolX.toFixed(4)}) y≈${expAxis.y} (±${tolY.toFixed(4)})`,
+        );
+      }
+      // An :axis hit has no discrete mark to anchor a highlight on — no shape should draw.
+      if (axisTip.hi.fill || axisTip.hi.edge || axisTip.hi.plain) {
+        throw new Error(`${key}/axis-hover: unexpected highlight ${JSON.stringify(axisTip.hi)}`);
+      }
+      passed.push(`${key}/axis-hover-coords`);
+      await leave();
+
+      // ColorbarInteractable reports a bare 1-D `value` off whichever axis is `valueaxis`
+      // (`:y` for the vertical colorbar this fixture builds) — not hardcoded, so this still
+      // reads correctly if the fixture ever switches to a horizontal one.
+      const cbValKey = cbT.valueaxis;
+      const cbLims = cbValKey === "x" ? cbT.xlims : cbT.ylims;
+      const cbSpan = cbValKey === "x" ? cvw : cvh;
+      const expCbVal = invertAxisJs(cbT, cbPt.x, cbPt.y)[cbValKey];
+      const tolCb = AXIS_TOL_PX * Math.abs(cbLims[1] - cbLims[0]) / cbSpan;
+      const parseValueTip = (s) => {
+        const v = Number(String(s || "").trim());
+        return Number.isFinite(v) ? v : null;
+      };
+      let cbTip = null, gotCb = null;
+      for (let a = 0; a < 8; a++) {
+        cbTip = await dispatchAt(key, cbPt.x, cbPt.y, "pointermove");
+        gotCb = cbTip?.show ? parseValueTip(cbTip.text) : null;
+        if (gotCb !== null && Math.abs(gotCb - expCbVal) <= tolCb) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (gotCb === null || Math.abs(gotCb - expCbVal) > tolCb) {
+        throw new Error(`${key}/colorbar-hover: tooltip ${JSON.stringify(cbTip)} parsed=${gotCb}, want ≈${expCbVal} (±${tolCb.toFixed(4)})`);
+      }
+      passed.push(`${key}/colorbar-hover-coords`);
+
+      // The gap pixel must read as the axis catch-all's 2-D "x=…, y=…" text, not the colorbar's
+      // bare 1-D value — proving the bbox check actually excludes it.
+      let gapTip = null;
+      for (let a = 0; a < 8; a++) {
+        gapTip = await dispatchAt(key, gapPt.x, gapPt.y, "pointermove");
+        if (gapTip?.show && /x\s*=/.test(gapTip.text)) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (!gapTip?.show || !/x\s*=/.test(gapTip.text)) {
+        throw new Error(`${key}/colorbar-bbox-bounded: pixel just outside the colorbar bbox read as ${JSON.stringify(gapTip)}, want the axis catch-all's x=…,y=… form`);
+      }
+      passed.push(`${key}/colorbar-bbox-bounded`);
+      await leave();
+
+      // --- item 1: a click on either :axis-kind layer must leave the pre-existing :pts
+      // selection untouched (the #107 round-1 regression) ---
+      //
+      // This widget's own precondition — a REAL :pts selection to click past — is checked here
+      // explicitly, not via the generic mount-bond chain above: that chain is keyed to
+      // `spec.layerId` naming the ONE layer whose hydration it can vouch for, but this widget
+      // has three (`pts`/`colorbar`/`axis`), and a warm re-run is free to leave the BOND naming
+      // `:axis` or `:colorbar` instead of `:pts` (#114 — whichever this block clicked last, last
+      // time it ran against this same server) even though the render is still correct. What item
+      // 1 actually needs is a VISUAL fact — `g.sel` reflects `manifest["layers"]["selected"]`,
+      // which `masque()` bakes fresh into the mount HTML every time, independent of bond
+      // history — not a bond-text fact, so it holds cold or warm.
+      const beforeClicks = await inspect(key);
+      if (beforeClicks.sel < 1) throw new Error(`${key}: expected a baked :pts selection before any click, got g.sel=${beforeClicks.sel}`);
+      passed.push(`${key}/pts-selection-rendered-at-mount`);
+
+      // Match-based, not diff-based (see the block comment above): dispatch, then poll for the
+      // bond to CONTAIN the expected shape, retrying the dispatch a few times in case an event
+      // is dropped. A warm-session re-run whose click computes the identical value the bond
+      // already holds satisfies this on the very first poll — there is nothing to wait for.
+      const clickAndMatch = async (px, py, re, what) => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          await dispatchAt(key, px, py, "click");
+          for (let i = 0; i < 30; i++) {
+            const t = await textOf(`#out_${key}`);
+            if (re.test(t)) return t;
+            await new Promise((r) => setTimeout(r, 200));
+          }
+        }
+        throw new Error(`${what}: #out_${key} never matched ${re}`);
+      };
+
+      // --- item 2: the payload is the browser-computed value, converted Julia-side into a flat
+      // NamedTuple — (; x, y) for AxisInteractable, index -1 ---
+      const axisAfter = await clickAndMatch(
+        axisPt.x, axisPt.y,
+        new RegExp(`:${spec.layerId},\\s*-1\\b[\\s\\S]*x\\s*=\\s*-?[\\d.]+(?:e-?\\d+)?,\\s*y\\s*=\\s*-?[\\d.]+(?:e-?\\d+)?`),
+        `${key}/axis-click`,
+      );
+      passed.push(`${key}/axis-click-payload-namedtuple`);
+      const afterAxisClick = await inspect(key);
+      if (afterAxisClick.sel !== beforeClicks.sel) {
+        throw new Error(`${key}/axis-click-preserves-selection: g.sel ${beforeClicks.sel} -> ${afterAxisClick.sel} after an axis click (#107 regression)`);
+      }
+      passed.push(`${key}/axis-click-preserves-selection`);
+      console.error(`OK  ${key}/axis-click — ${axisAfter.slice(0, 110)}`);
+
+      // --- item 4: ColorbarInteractable's bounded bbox is a different hit-test branch from the
+      // axis catch-all, but the same conversion applies — (; value), index -1 ---
+      const cbAfter = await clickAndMatch(
+        cbPt.x, cbPt.y,
+        new RegExp(`:${spec.colorbarLayerId},\\s*-1\\b[\\s\\S]*value\\s*=\\s*-?[\\d.]+(?:e-?\\d+)?`),
+        `${key}/colorbar-click`,
+      );
+      passed.push(`${key}/colorbar-click-payload-namedtuple`);
+      const afterCbClick = await inspect(key);
+      if (afterCbClick.sel !== beforeClicks.sel) {
+        throw new Error(`${key}/colorbar-click-preserves-selection: g.sel ${beforeClicks.sel} -> ${afterCbClick.sel} after a colorbar click`);
+      }
+      passed.push(`${key}/colorbar-click-preserves-selection`);
+      console.error(`OK  ${key}/colorbar-click — ${cbAfter.slice(0, 110)}`);
       continue;
     }
 

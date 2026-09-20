@@ -60,7 +60,7 @@ text and the bond payload → it gets a live check on every backend × the kinds
   `docs/dev/live-interaction-checklist.md` via **both** `test/e2e/kind_sweep.mjs` **and**
   `test/e2e/polish_verify.mjs` (Cairo **and** WGL) across scatter, lines/segments,
   heatmap/image, barplot, poly, polar, dark-figure scatter, arrows3d, hlines/vlines,
-  threshold, ROI, and view-pan. Interaction without visual is unfinished; visual chrome
+  threshold, ROI, view-pan, and axis/colorbar. Interaction without visual is unfinished; visual chrome
   without the kind sweep is unfinished. Overlay recipes (locked — cite, do not reopen):
   highlight is a split blend — a brightening fill plus a darkening stroke, not a mark-derived
   colour — `colors` (today `scatter!`'s `color=`) no longer touches the highlight at all, only

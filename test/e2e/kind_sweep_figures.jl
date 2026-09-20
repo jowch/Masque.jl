@@ -149,6 +149,20 @@ kind_sweep_meta() = [
         # `legend` before this grid layer and (b) the hit-test pixel is genuinely contested.
         "overlapsGrid" => "cells",
     ),
+    Dict(
+        "key" => "axis", "layerId" => "axis", "layerKind" => "axis",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "axis",
+        # `AxisInteractable` is the one clickable kind whose click is NOT a selection gesture
+        # (#113) — `pinLayerId` names a REAL, pre-existing selection on a different layer of
+        # this SAME widget that an axis (or colorbar) click must leave untouched (the #107
+        # round-1 regression). `colorbarLayerId` names the sibling `ColorbarInteractable`
+        # layer sharing this bond: same `:axis` kind, but a bounded pixel bbox
+        # (geometry.ts's bounded branch) instead of the axis layer's whole-image catch-all
+        # (geometry.ts's unbounded branch) — a different hit-test code path, exercised in the
+        # same widget so one fixture covers both.
+        "pinLayerId" => "pts", "colorbarLayerId" => "colorbar",
+    ),
 ]
 
 function build_kind_sweep()
@@ -353,8 +367,41 @@ function build_kind_sweep()
         masque(fig)   # zero-config: exercises the real auto-extraction + precedence path
     end
 
+    # AxisInteractable (whole-axis catch-all readout) + ColorbarInteractable (bounded-bbox
+    # readout) sharing one widget/bond with a real, pre-existing selection (`:pts`) alongside
+    # them — the fixture #113 asks for: an axis or colorbar click must leave that selection
+    # untouched (the #107 round-1 regression), and the two `:axis`-kind layers exercise the
+    # catch-all vs. bounded branches of geometry.ts's hit test respectively. `sc`'s continuous
+    # `color=` doubles as the colorbar's own source, so no second, purely-decorative plot is
+    # needed just to hang a `Colorbar` off of.
+    axis = let
+        pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 1.2)]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "axis", limits = (0, 4, 0, 3))
+        sc = scatter!(ax, first.(pts), last.(pts); color = [1.0, 2.0, 3.0], colormap = :viridis, markersize = 22)
+        cb = Colorbar(fig[1, 2], sc)
+        masque(
+            fig,
+            [
+                PointInteractable(
+                    ax, sc; id = :pts,
+                    payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")],
+                ),
+                ColorbarInteractable(cb; id = :colorbar),
+                # Sorted LAST: an `AxisInteractable`'s hit test has no bounding check at all — a
+                # true whole-image catch-all (geometry.ts's "axis" case with `geometry ===
+                # nothing`). Placed before `:pts`/`:colorbar` in `build_manifest`'s stable layer
+                # order, it would win every click meant for the scatter marks or the colorbar
+                # (the layer-ordering hazard #113 calls out).
+                AxisInteractable(ax; id = :axis),
+            ];
+            selected = Dict(:pts => [1]),
+        )
+    end
+
     return (;
         scatter, lines, segments, heatmap, image, barplot, poly,
         polar, scatter_dark, arrows3d, hlines, threshold, roi, view, legend, legend_overlap,
+        axis,
     )
 end
