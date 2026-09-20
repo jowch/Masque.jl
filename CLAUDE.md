@@ -5,7 +5,7 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
 `assets/overlay.js`, read by Julia at `__init__`. Manifest shipped to JS via `published_to_js`.
 
 ## Commands
-- Julia tests: `julia --project=. test/runtests.jl`
+- Julia tests: `GROUP=Core julia --project=. -e 'using Pkg; Pkg.test()'` (GROUP is `Core`|`NoBackend`|`WebGL`, default `Core`; the subprocess inherits it). **Not `julia --project=. test/runtests.jl`** — CairoMakie/WGLMakie are `[weakdeps]`/`[extras]`, so `Pkg.instantiate()` installs neither and the suite dies on `using CairoMakie`. It only appears to work on a machine carrying CairoMakie in its default `@v1.10` env. `Pkg.test()` builds the `[targets]` env itself and is what all four CI jobs run.
 - Frontend gate: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` (build → `../assets/overlay.js` IIFE + `../assets/masque-webgl.js` ESM)
 - Format (Runic, CI-enforced): `julia -e 'using Runic; exit(Runic.main(["--inplace","src","test","bench","gallery","examples","docs"]))'` — pass every dir with `.jl`, since CI formats the whole repo (PR #11 slipped because `gallery/` was omitted here). **CI's `runic-action` has no `paths:` filter → it checks the WHOLE repo** (incl. `bench/`, `gallery/`, `examples/`, `docs/make.jl`), and tracks the latest Runic (1.7+); a locally-old Runic can pass a file CI rejects. Format every `.jl` you add, with current Runic.
 - Registry name-clash check (manual, not `Pkg.test`): packed General (typical
@@ -157,7 +157,7 @@ fatal — a component it can't provision warns and the hook still exits 0.
   the hook runs `npm install` and the whole TS gate (`lint`, `typecheck`, `test`, `build`) runs.
 - **Julia does NOT, under the default cloud network policy.** Every `*.julialang.org` host is
   denied at CONNECT (403), `JuliaLang/julia` GitHub release assets 404, and there is no apt
-  candidate — so `julia`, `Pkg`, `test/runtests.jl`, Runic and the Pluto/Playwright
+  candidate — so `julia`, `Pkg`, `Pkg.test()`, Runic and the Pluto/Playwright
   live-verification sweep are all unavailable. `git clone` of third-party repos *does* work,
   but that yields no Julia binary. Don't burn a session rediscovering this, and don't try to
   route around the policy. **Fix:** allow `*.julialang.org` on the environment's network policy
