@@ -74,12 +74,32 @@ id = "tokyo"
 value = { layer = "cities", index = 0 }
 
 [[player.states]]
-id = "cairo"
-value = { layer = "cities", index = 5 }
+id = "delhi"
+value = { layer = "cities", index = 1 }
+
+[[player.states]]
+id = "shanghai"
+value = { layer = "cities", index = 2 }
 
 [[player.states]]
 id = "sao_paulo"
 value = { layer = "cities", index = 3 }
+
+[[player.states]]
+id = "mexico_city"
+value = { layer = "cities", index = 4 }
+
+[[player.states]]
+id = "cairo"
+value = { layer = "cities", index = 5 }
+
+[[player.states]]
+id = "mumbai"
+value = { layer = "cities", index = 6 }
+
+[[player.states]]
+id = "beijing"
+value = { layer = "cities", index = 7 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

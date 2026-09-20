@@ -66,10 +66,9 @@ ev === nothing ? "click a point" : "you picked $(ev.payload)"
 ```
 
 The embed below is the same plot as the README demo GIF (`docs/dev/readme-demo/notebook.jl`):
-eight cities, hover for population, click to bind. The listed `@bind` snapshots are the GIF's
-path — **Tokyo**, **Cairo**, and **São Paulo**. Hover still works on every mark. A click that
-isn't one of those three listed states keeps the overlay alive and leaves the readout on the
-last snapshot.
+eight cities, hover for population, click to bind. Every city is a listed `@bind` snapshot.
+Hover still works on every mark. Unlisted freeze is for interactable kinds that are not in
+the player table, not for cities omitted from this plot.
 
 ```@raw html
 <div class="masque-embed-wrap">

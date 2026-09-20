@@ -18,8 +18,8 @@ const GS_FIG_ID = UUID("a1b2c3d4-0001-4000-8000-000000000002")
 const GS_BIND_ID = UUID("a1b2c3d4-0001-4000-8000-000000000003")
 const GS_PICK_ID = UUID("a1b2c3d4-0001-4000-8000-000000000004")
 
-# Listed states follow the GIF recorder path in `docs/dev/readme-demo/record.mjs`
-# (hover Tokyo / Cairo, click São Paulo). Other cities stay overlay-only.
+# Listed states: idle plus every city on this README 8-city scatter. Unlisted freeze
+# is for interactable kinds not in the player table, not for omitted cities here.
 const GS_PLAYER_SOURCE = """
 PLUTO_PLAYER_TOML_CONTENTS = \"\"\"
 [player]
@@ -33,12 +33,32 @@ id = "tokyo"
 value = { layer = "cities", index = 0 }
 
 [[player.states]]
-id = "cairo"
-value = { layer = "cities", index = 5 }
+id = "delhi"
+value = { layer = "cities", index = 1 }
+
+[[player.states]]
+id = "shanghai"
+value = { layer = "cities", index = 2 }
 
 [[player.states]]
 id = "sao_paulo"
 value = { layer = "cities", index = 3 }
+
+[[player.states]]
+id = "mexico_city"
+value = { layer = "cities", index = 4 }
+
+[[player.states]]
+id = "cairo"
+value = { layer = "cities", index = 5 }
+
+[[player.states]]
+id = "mumbai"
+value = { layer = "cities", index = 6 }
+
+[[player.states]]
+id = "beijing"
+value = { layer = "cities", index = 7 }
 \"\"\"
 """
 
