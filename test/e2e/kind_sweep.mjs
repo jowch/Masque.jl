@@ -20,7 +20,7 @@ import {
 // (geometry.ts's grid case), so its hover is closed/filled the same as circles/rects/polygons.
 const TINT_CHECK_KEYS = new Set(["scatter", "scatter_dark", "barplot", "heatmap", "poly"]);
 
-// Mirrors selection.ts's echoHitsFor: these kinds (plus :grid) pin the clicked hit itself; a
+// Mirrors selection.ts's selectionFor: these kinds (plus :grid) pin the clicked hit itself; a
 // legend layer (has `links`) pins its linked target(s) instead.
 const SELF_PIN_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "grid"]);
 
@@ -1023,9 +1023,15 @@ try {
     const idx = scatterClickIdx ?? spec.clickIndex;
     // hoverTip is only known to correspond to spec.clickIndex (scatter's hoverIndex/clickIndex
     // both being 0 by convention) — the click-collision fallback can, in principle, land on a
-    // different index whose tip text this driver doesn't know, so skip the text match then.
-    const expectTip = idx === spec.clickIndex ? spec.hoverTip : null;
-    const tipOk = (t) => !!(t && t.show && (!expectTip || new RegExp(expectTip, "i").test(t.text)));
+    // different index, whose tip text this driver has no known value for. Rather than silently
+    // degrading the check to "a tooltip showed, any tooltip", fail loud: today's fixtures never
+    // collide, so this throw should never fire, but a future fixture that does collide must not
+    // let this check quietly accept the wrong tooltip.
+    if (idx !== spec.clickIndex) {
+      throw new Error(`scatter/hover-on-selected: clickIndex collided with hoverIndex (idx=${idx}) — no known tooltip text to assert`);
+    }
+    const expectTip = spec.hoverTip;
+    const tipOk = (t) => !!(t && t.show && new RegExp(expectTip, "i").test(t.text));
     const selPt = hitPoint(layer, idx);
     let noop = null;
     for (let a = 0; a < 8; a++) {

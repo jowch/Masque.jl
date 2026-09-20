@@ -433,6 +433,12 @@ end
 # have no Julia-side original — `resolvePayload` in geometry.ts makes the same split — so
 # `js_payload` (the browser-computed value) passes through unchanged. `manifest` lacking a
 # `"layers"` key at all (a bare test double, never a real widget) also falls through unchanged.
+#
+# The unknown-`layer_id` and out-of-range-`index` cases below are deliberately asymmetric: an
+# unknown layer id means this manifest doesn't describe the hit at all, so falling back to the
+# browser's own value is the safe pre-reconstruction behaviour (and the placeholder manifests in
+# the test suite rely on exactly this fallback); a known layer with an out-of-range index means
+# the manifest DOES describe the layer, so the index is definitely wrong, and that fails loud.
 function _bond_payload(manifest, layer_id::AbstractString, index::Integer, js_payload)
     layers = get(manifest, "layers", nothing)
     layers === nothing && return js_payload

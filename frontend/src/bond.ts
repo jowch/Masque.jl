@@ -1,7 +1,7 @@
 import { hitTest, resolvePayload } from "./geometry"
 import { drawHi, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
-import { echoHitsFor } from "./selection"
+import { selectionFor } from "./selection"
 import { imgPx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
@@ -185,9 +185,11 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
 // identical bond value for a keyboard-focused hit — same highlight draw, same payload
 // resolution, same "input" event.
 export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number): void {
-    // Must precede drawHi so its already-selected guard sees the new selKeys_ entry.
-    state.selHits_ = echoHitsFor(hit, ctx.manifest_)
-    renderSelection(ctx, state)
+    // Must precede drawHi so its already-selected guard sees the new selKeys_ entry. `null`
+    // means this click isn't a selection gesture at all (e.g. an :axis hit) — leave the
+    // selection untouched rather than clearing it.
+    const next = selectionFor(hit, ctx.manifest_)
+    if (next !== null) { state.selHits_ = next; renderSelection(ctx, state) }
     drawHi(state, ctx.hiGroup_, hit)
     // Keep keyboard focus in sync with the mouse, but ONLY once keyboard nav is already
     // engaged (state.focusIdx_ !== null) — gating on that, not just "click landed on a

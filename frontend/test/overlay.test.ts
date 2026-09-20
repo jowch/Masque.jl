@@ -2063,6 +2063,31 @@ describe("click-echo (#103)", () => {
         expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["200"]) // ONLY index 0
     })
 
+    it("clicking an :axis region leaves a hydrated selection untouched (does not participate in the selection model)", () => {
+        // Element layer FIRST: hitTest returns the first matching layer, and the axis's
+        // geometry: null hits the whole viewport, so an axis-first ordering would swallow
+        // clicks meant for the marks.
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 5], ylims: [0, 5], xscale: "identity", yscale: "identity",
+                viewport: [100, 100, 400, 400], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "pts", kind: "circles", geometry: [300, 200, 20, 900, 600, 20],
+                    payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"], selected: [0] },
+                { id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["click", "hover"] },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["300"]) // hydrated index 0
+        // Empty plot area, away from either mark, inside the axis viewport: image (500,500) -> client (250,250)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 250, clientY: 250, bubbles: true }))
+        expect((host as unknown as { value: { layer: string } }).value.layer).toBe("axis") // confirm the click actually hit :axis
+        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["300"]) // untouched
+    })
+
     it("clicking a mark then re-hovering it later never draws hover chrome (drawHi's selKeys_ guard)", async () => {
         const { host, script } = setup()
         mount(script, manifest)

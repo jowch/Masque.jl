@@ -218,10 +218,15 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // The @bind target is the host element. Seed it with the hydrated selection rather than
     // null: Pluto reads this at mount, so a null here would overwrite Julia's `initial_value`
     // and settle the bond on `nothing` while the marks sit highlighted. The `items` shape is
-    // what `transform_value` already maps to a Vector{InteractionEvent}.
+    // what `transform_value` already maps to a Vector{InteractionEvent}. Built in the same loop
+    // as `selHits` (state.selHits_'s hydration, below) so both read `hitLayerByIndex` — which
+    // throws on an unsupported kind or an out-of-range index — before either is assigned;
+    // splitting them let an invalid manifest set host.value first and throw only later.
     const hydrated: { layer: string; index: number; payload: unknown }[] = []
+    const selHits: Hit[] = []
     for (const layer of manifest.layers) {
         for (const idx of layer.selected ?? []) {
+            selHits.push({ layer, ...hitLayerByIndex(layer, idx) })
             hydrated.push({ layer: layer.id, index: idx, payload: layer.payloads[idx] })
         }
     }
@@ -323,14 +328,6 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const roiBoxes = roiDrag.buildROIBoxes(manifest, plainSvg)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
-    // manifest `selected=` hits — hydration for state.selHits_ (the one true selection),
-    // computed once here, not per render.
-    const selHits: Hit[] = []
-    for (const layer of manifest.layers) {
-        for (const idx of layer.selected ?? []) {
-            selHits.push({ layer, ...hitLayerByIndex(layer, idx) })
-        }
-    }
     const ctx: OverlayCtx = {
         manifest_: manifest, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
         linkGroup_: linkGroup,

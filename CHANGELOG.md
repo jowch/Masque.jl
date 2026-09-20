@@ -63,8 +63,9 @@ All notable changes to this project are documented here. The format is based on
   `.github/workflows/Documentation.yml`.
 
 - `masque(fig, interactables)` — a Pluto `@bind` widget that overlays interactivity on a
-  static CairoMakie figure; its bond reports the current selection as an `InteractionEvent`,
-  or `nothing` when nothing is selected.
+  static CairoMakie figure; its bond reports the current selection — an `InteractionEvent`
+  for a click, a `Vector{InteractionEvent}` for `selected=` hydration or a `selects`-ROI, and
+  `nothing` when nothing is selected.
 - `AbstractBackend` seam with `CairoBackend` (PNG; SVG groundwork). DPI derived from the
   display width (≈2× Pluto's 700px column), opaque-background guarantee.
 - `AbstractInteractable` interface (`hitlayers` / `validate` / `events` / `tooltip` /

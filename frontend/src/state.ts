@@ -103,9 +103,13 @@ export interface OverlayState {
     hiKey_: string | null
     selKeys_: Set<string>
     // THE selection. Seeded at mount from the manifest's `selected=` hits (hydration only, an
-    // initial value) — every selection gesture (an echoable click, a selects-ROI move/release)
-    // wholesale-REPLACES this, never unions with what was there. Reset on remount falls out of
-    // createOverlayState() re-running, not a reset this field needs of its own.
+    // initial value). Written by two gestures, both wholesale-REPLACING this, never unioning with
+    // what was there: a click whose hit kind participates in the selection model (selection.ts's
+    // `selectionFor` returns non-null — an element-indexed kind, :grid, or a legend link, which
+    // may itself resolve to `[]`), and a selects-ROI move/release. A click on a kind that does
+    // NOT participate (:axis/:threshold/:roi/:view — `selectionFor` returns `null`) leaves this
+    // field untouched. Reset on remount falls out of createOverlayState() re-running, not a reset
+    // this field needs of its own.
     selHits_: Hit[]
     hiLeaveTimer_: ReturnType<typeof setTimeout> | null
     // g.link (legend-linked highlight): keyed by hitKey() of the SOURCE element (the hovered/

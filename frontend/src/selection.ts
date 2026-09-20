@@ -68,13 +68,15 @@ export const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments
 
 // Order matters: a legend entry is `rects` kind AND carries `links`, so the links branch is
 // tested first, gated at LAYER level — an entry whose own links[index] is empty still must not
-// fall through to pinning the swatch itself. :axis is excluded because its index is always -1,
-// which would collide every axis hit onto one hitKey; :threshold/:roi/:view have no highlight
-// geometry to draw.
-export function echoHitsFor(hit: Hit, manifest: Manifest): Hit[] {
+// fall through to pinning the swatch itself (that's a selection gesture that resolved to
+// nothing: `[]`). :axis/:threshold/:roi/:view return `null`, not `[]` — a click on one of these
+// is not a selection gesture at all (an axis click is a `:click`-kind gesture with nowhere to
+// put a highlight, not a click that selected zero elements), so `commitClick` must leave
+// `state.selHits_` untouched rather than clearing it.
+export function selectionFor(hit: Hit, manifest: Manifest): Hit[] | null {
     if (hit.layer.links && hit.layer.links.length) return linkedHits(manifest, hit.layer, hit.index)
     if (SELECTED_KINDS.has(hit.layer.kind) || hit.layer.kind === "grid") return [hit]
-    return []
+    return null
 }
 
 export function layerNElements(layer: HitLayer): number {

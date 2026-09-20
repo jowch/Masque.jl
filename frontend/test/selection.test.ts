@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { echoHitsFor, layerNElements } from "../src/selection"
+import { layerNElements, selectionFor } from "../src/selection"
 import type { Hit, HitLayer, Manifest } from "../src/types"
 
 // layerNElements' other kind branches (circles/rects/polygons/segments/polyline) are exercised
@@ -16,7 +16,7 @@ describe("layerNElements", () => {
     })
 })
 
-describe("echoHitsFor", () => {
+describe("selectionFor", () => {
     const circles: HitLayer = { id: "pts", kind: "circles", geometry: [0, 0, 5], payloads: [{}], axis: "ax1", events: ["click"] }
     const grid: HitLayer = {
         id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
@@ -29,29 +29,34 @@ describe("echoHitsFor", () => {
     const hit = (layer: HitLayer, index = 0): Hit => ({ layer, index })
 
     it("a plain SELECTED_KINDS layer (no links) pins itself", () => {
-        expect(echoHitsFor(hit(circles), manifest)).toEqual([hit(circles)])
+        expect(selectionFor(hit(circles), manifest)).toEqual([hit(circles)])
     })
 
     it(":grid pins itself", () => {
-        expect(echoHitsFor(hit(grid), manifest)).toEqual([hit(grid)])
+        expect(selectionFor(hit(grid), manifest)).toEqual([hit(grid)])
     })
 
-    it("a kind with no highlight geometry (e.g. :threshold) pins nothing", () => {
-        expect(echoHitsFor(hit(threshold), manifest)).toEqual([])
+    it("a kind not in the selection model (e.g. :threshold) returns null, not []: not a selection gesture at all", () => {
+        expect(selectionFor(hit(threshold), manifest)).toBeNull()
+    })
+
+    it(":axis returns null, not []: not a selection gesture at all", () => {
+        const axis: HitLayer = { id: "ax", kind: "axis", axis: "ax1", events: ["click", "hover"], payloads: [], geometry: null }
+        expect(selectionFor(hit(axis), manifest)).toBeNull()
     })
 
     it("a legend entry (layer.links present and non-empty) pins linkedHits' fan-out, not itself", () => {
-        const result = echoHitsFor({ layer: legend, index: 0 }, manifest)
+        const result = selectionFor({ layer: legend, index: 0 }, manifest)
         expect(result).toEqual([{ layer: circles, index: 0, geom_: ["circle", 0, 0, 5] }])
     })
 
-    it("a legend entry whose own links[index] is empty pins nothing, even though the layer has links", () => {
+    it("a legend entry whose own links[index] is empty returns [] (a selection gesture that resolved to nothing), not null", () => {
         // The guard is on the layer's links field, not legend.links[1]'s own (empty) entry —
         // must not fall through to pinning the swatch itself.
-        expect(echoHitsFor({ layer: legend, index: 1 }, manifest)).toEqual([])
+        expect(selectionFor({ layer: legend, index: 1 }, manifest)).toEqual([])
     })
 
     it("a layer with an empty links array (links: []) pins itself — SELECTED_KINDS with nothing wired as a legend", () => {
-        expect(echoHitsFor(hit({ ...circles, links: [] }), manifest)).toEqual([hit({ ...circles, links: [] })])
+        expect(selectionFor(hit({ ...circles, links: [] }), manifest)).toEqual([hit({ ...circles, links: [] })])
     })
 })
