@@ -195,6 +195,16 @@ HTML(
         "<span id=\"coords_legend_overlap\" style=\"display:none\">$(JSON3.write(sweep.legend_overlap.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000043
+@bind ev_axis sweep.axis
+
+# ╔═╡ d1000000-0000-0000-0000-000000000044
+HTML(
+    "<span id=\"out_axis\">AXIS=$(repr(ev_axis))</span>" *
+        "<span id=\"coords_axis\" style=\"display:none\">$(JSON3.write(sweep.axis.manifest["layers"]))</span>" *
+        "<span id=\"axes_axis\" style=\"display:none\">$(JSON3.write(sweep.axis.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000040
 HTML(
     "<span id=\"kind_meta\" style=\"display:none\">$(JSON3.write(kind_sweep_meta()))</span>" *
@@ -239,4 +249,6 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000039
 # ╠═d1000000-0000-0000-0000-000000000041
 # ╠═d1000000-0000-0000-0000-000000000042
+# ╠═d1000000-0000-0000-0000-000000000043
+# ╠═d1000000-0000-0000-0000-000000000044
 # ╠═d1000000-0000-0000-0000-000000000040

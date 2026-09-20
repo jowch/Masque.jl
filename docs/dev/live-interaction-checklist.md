@@ -117,6 +117,7 @@ bake it; hover/click or drag only.
 | ROI / box-select | `:roi` | none | drag commit → `@bind` (vector if `selects=`; a `selects`-ROI's grid cell-block union rect is fill-layer-only, `"rectfill"`) |
 | View (2D pan) | `:view` | none | drag-to-pan commit → `@bind` (`xmin`/`xmax`). Axis3 orbit is `examples/view_manip*.jl` — skip if it would enlarge the PR |
 | Legend | `:rects` | wash (entry row) | tip = entry label, hover fans out linked layers into `g.link` (wash/ring on the marks, on-mark geometry, fade on leave, `g.sel` untouched), click `@bind` payload carries `targets` |
+| Axis / Colorbar readout | `:axis` | none — a click is NOT a selection gesture; must leave a pre-existing selection on ANOTHER layer of the same widget untouched | hover coordinate readout inverted from the `AxisTransform` (`x=…, y=…`; a `Colorbar`'s tooltip is a bare number, no `x=`/`y=` prefix), click → `@bind` `(index=-1, payload=(;x,y)` or `(;value))`, an axis click and a colorbar click both leave a pre-existing `:pts` selection alone (#107 regression), colorbar's bounded bbox is a different hit-test branch from the axis catch-all (a pixel just outside the bbox reads as the axis catch-all, not the colorbar) |
 
 ### Hover (element kinds)
 
@@ -182,8 +183,8 @@ motion so fade is observable.
 
 ## Done means
 
-- [ ] `kind_sweep.mjs` **PASS** on `:cairo` (every row, including `scatter_dark`, the tint-applied screenshot check on scatter/scatter_dark/barplot/heatmap/poly, and the scatter hover-on-selected no-op)
-- [ ] `kind_sweep.mjs` **PASS** on `:webgl` (every row, including `scatter_dark`, the tint-applied screenshot check on scatter/scatter_dark/barplot/heatmap/poly, and the scatter hover-on-selected no-op)
+- [ ] `kind_sweep.mjs` **PASS** on `:cairo` (every row, including `scatter_dark`, the tint-applied screenshot check on scatter/scatter_dark/barplot/heatmap/poly, the scatter hover-on-selected no-op, and axis/colorbar's click-preserves-selection + payload-shape + bounded-bbox checks)
+- [ ] `kind_sweep.mjs` **PASS** on `:webgl` (every row, including `scatter_dark`, the tint-applied screenshot check on scatter/scatter_dark/barplot/heatmap/poly, the scatter hover-on-selected no-op, and axis/colorbar's click-preserves-selection + payload-shape + bounded-bbox checks)
 - [ ] `polish_verify.mjs` **PASS** on `:cairo` (wash/ring/hover fill+edge/pin + flush-radius pixel check + dark-figure wash + dark-figure hover split-blend + remount fade + color-scheme + no `#ff3b30`)
 - [ ] `polish_verify.mjs` **PASS** on `:webgl` (same boxes except the Cairo-only flush-radius check)
 - [ ] Every row in the table above was exercised (not a subset)
