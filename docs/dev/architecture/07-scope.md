@@ -8,14 +8,14 @@
 typed `InteractionEvent` (`transform_value`); **opaque-bg save/restore** (no figure mutation). Hover tooltips +
 JS highlight; click → `@bind`. **Hit-testing is naive O(n) per pointer move** with a documented
 ceiling (~few-thousand elements/segments); past that, `log()` a notice — no silent degradation. Spatial
-acceleration (bucketing/quadtree) is added only if someone hits the wall — but note ([§8](08-scaling.md#8-payload-scaling--robustness-to-large-inputs)) the wall that
+acceleration (bucketing/quadtree) is added only if someone hits the wall — but note ([§8](08-scaling.md)) the wall that
 bites *first* is manifest **payload size** (serialize + transfer), not hit-test CPU, so the
-higher-leverage lever is wire encoding ([§9](09-wire-encoding.md#9-wire-encoding--precision)), not a quadtree. Spatial acceleration stays YAGNI until a
+higher-leverage lever is wire encoding ([§9](09-wire-encoding.md)), not a quadtree. Spatial acceleration stays YAGNI until a
 profile shows JS hit-test *specifically* is the bottleneck.
 
 **M4 (shipped):** `ThresholdInteractable` (draggable threshold line, Tier 0); `ROIInteractable`
 (draggable + resizable box, Tier 0 bounds + M4 box-select); `AbstractSelector` /
-`selects`-ROI — `Vector{InteractionEvent}` bond, Design-D contract ([§5](05-bond-value.md#5-the-bond-value)); `ViewInteractable`
+`selects`-ROI — `Vector{InteractionEvent}` bond, Design-D contract ([§5](05-bond-value.md)); `ViewInteractable`
 (drag-to-pan / drag-to-orbit, commit-on-release); gallery recipes
 (box-select scatter, image ROI per-channel stats).
 
@@ -25,7 +25,7 @@ profile shows JS hit-test *specifically* is the bottleneck.
 
 **M3 Colorbar (shipped):** `ColorbarInteractable` — hover/click value readout for any `Colorbar` block, auto-extracted by `masque(fig)` via a figure-block walk over `fig.content`. Rides the `:axis` channel with a bounded bbox geometry; `AxisTransform.valueaxis` tags the value axis so JS inverts the cursor pixel to a scalar `(; value)`.
 
-**M3 Legend (shipped):** `LegendInteractable` — a `Makie.Legend` block's entries as `:rects` hit regions, auto-extracted by the same figure-block walk as Colorbar. Each entry's pixel row is recovered by walking `leg.grid` (GridLayoutBase) for the 2-column shade `Box` Makie's own click-to-toggle hit-tests (`makie_compat.jl`'s `_legend_entries`/`_legend_bbox`); the entry↔plot link comes from `Makie.get_plots` on the entry's elements, the same linkage Makie's built-in legend interaction uses. This introduces `HitLayer`'s only cross-layer field, `links :: Union{Nothing, Vector{Vector{Symbol}}}` — one id-list per element, naming other layers to highlight together with the hovered/selected one (serialized as `"links"`, an array of string-id arrays). `build_manifest` validates every `links` id against the manifest's own layers and their `kind` (must be in `_SELECTED_KINDS`, [§5](05-bond-value.md#5-the-bond-value)'s `selected=` list): an explicit `targets=` failing that check is a build-time `ArgumentError` (the caller's own claim); an auto-resolved (plotmap-derived) one is instead warned and dropped, since silently-unlinkable plots (e.g. a heatmap in the same legend) are a normal, not exceptional, shape. Custom legends (`LineElement`/`MarkerElement`/`PolyElement` built without `plots=`) resolve to empty links — still hittable, no highlight — unless the caller passes `targets=` explicitly.
+**M3 Legend (shipped):** `LegendInteractable` — a `Makie.Legend` block's entries as `:rects` hit regions, auto-extracted by the same figure-block walk as Colorbar. Each entry's pixel row is recovered by walking `leg.grid` (GridLayoutBase) for the 2-column shade `Box` Makie's own click-to-toggle hit-tests (`makie_compat.jl`'s `_legend_entries`/`_legend_bbox`); the entry↔plot link comes from `Makie.get_plots` on the entry's elements, the same linkage Makie's built-in legend interaction uses. This introduces `HitLayer`'s only cross-layer field, `links :: Union{Nothing, Vector{Vector{Symbol}}}` — one id-list per element, naming other layers to highlight together with the hovered/selected one (serialized as `"links"`, an array of string-id arrays). `build_manifest` validates every `links` id against the manifest's own layers and their `kind` (must be in `_SELECTED_KINDS`, [§5](05-bond-value.md)'s `selected=` list): an explicit `targets=` failing that check is a build-time `ArgumentError` (the caller's own claim); an auto-resolved (plotmap-derived) one is instead warned and dropped, since silently-unlinkable plots (e.g. a heatmap in the same legend) are a normal, not exceptional, shape. Custom legends (`LineElement`/`MarkerElement`/`PolyElement` built without `plots=`) resolve to empty links — still hittable, no highlight — unless the caller passes `targets=` explicitly.
 
 **Phase 2 text labels (shipped):** `TextInteractable` — `text!` and `annotation!` labels as
 click-to-pick buttons, auto-extracted by `masque(fig)` for data-space text. Rides `:rects`; geometry
@@ -33,14 +33,14 @@ from `Makie.string_boundingboxes` (no font-metric measurement needed — the ori
 `bbox` primitive was never built). `TextLabel` (a `Block`, needs the figure-block walk rather than
 the plot-scene walk) remains deferred.
 
-**Click-echo selection (shipped, #103):** selection moved fully client-side ([§5](05-bond-value.md#5-the-bond-value)) — a click sets
+**Click-echo selection (shipped, #103):** selection moved fully client-side ([§5](05-bond-value.md)) — a click sets
 `OverlayState.selHits_` and draws the highlight in the browser, with no bond feedback onto the
 manifest. `selected=` now supplies only the selection's *starting* value: it seeds both the
 highlight and `host.value` at mount (via `initial_value`/`_hydrated_selection`) and plays no
 further role afterward, so a rebuild — the overlay being wiped every re-render — restarts from
 whatever `selected=` says this time. The other half of #103: an element hit's `payload` is now
 reconstructed from the widget's own manifest for every element kind, not only `selected=`
-widgets (`_bond_payload`, [§5](05-bond-value.md#5-the-bond-value)) — `ev.payload === payloads[i]`. As of #109 there is no browser
+widgets (`_bond_payload`, [§5](05-bond-value.md)) — `ev.payload === payloads[i]`. As of #109 there is no browser
 copy left to discard: the upload for these kinds carries only `{layer, index}` in the first
 place.
 
@@ -70,6 +70,6 @@ construction. `Surface` hit-testing is deferred on both alike (a hit-test-comple
 unbounded per-cell payload + occlusion — not a backend-capability gap);
 `MeshScatter`/wireframe/arrows are extracted today, not deferred. High-frequency live redraw is
 the shared cost wall (see
-[§6](06-composition.md#6-how-it-composes--the-three-interaction-tiers)), not a per-backend
+[§6](06-composition.md)), not a per-backend
 exclusion. See `backend-comparison.md` and `roadmap.md`.
 

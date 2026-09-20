@@ -148,3 +148,10 @@ Profiling exists to inform the design, not to sit in a file. The loop is anchore
   `spike/` is gitignored scratch; `bench/` holds the committed, re-runnable benchmarks.
 - Process docs (brainstorming specs, implementation plans) go in `.superpowers/` — gitignored, local-only, not part of the package.
 - The package was renamed from `Holo` to `Masque` on 2026-09-17 (same UUID). The local checkout folder and the GitHub remote may still be called `Holo.jl` until renamed; the package, module, and all in-repo references are `Masque`.
+- Cross-references within `docs/dev/**` cite by file, not by heading anchor —
+  `[§5](architecture/05-bond-value.md)`, never `[§5](architecture/05-bond-value.md#5-the-bond-value)`;
+  a reference to a subsection of the *same* file is prose (`§12.3`), never a link. Keep a
+  `#anchor` only when the citation targets one subsection of a genuinely long, multi-section
+  file (today: `architecture/12-gesture-channel.md`, `architecture/10-tooltips.md`) and landing
+  at the top would lose the reader. Rewording a heading breaks every inbound anchor link to
+  it — file-level citations don't have that failure mode, so they're the default.

@@ -27,7 +27,7 @@ FunctionInteractable(ax, f; id, events=(:click,:hover))   # f(ctx)::Vector{HitLa
 struct is *indistinguishable* from a built-in — same manifest path, same overlay, same `@bind`. Tooltip
 content comes from the per-layer `Masque.tooltip_spec(interactable)` seam (built-in interactables expose it
 as a `tooltip=` constructor kwarg; a custom struct overrides `Masque.tooltip_spec`). The `tooltip_*` kwargs
-on `masque()` are styling only. See [§10](10-tooltips.md#10-tooltips) Tooltips. Example:
+on `masque()` are styling only. See [§10](10-tooltips.md) Tooltips. Example:
 
 ```julia
 struct CityInteractable <: AbstractInteractable
@@ -50,9 +50,9 @@ no-server architecture.
 
 **No tier supplies rendering.** All three declare *geometry* — where the regions are and what
 payload each carries. What gets drawn belongs to Makie (the base frame) or to the overlay's fixed
-chrome — highlights and the ROI box (`frontend/src/mount.ts`), tooltips ([§10](10-tooltips.md#10-tooltips)). An interaction
-that recomputes a preview frame in Julia during a gesture ([§12](12-gesture-channel.md#12-the-gesture-channel-102)) needs a fourth tier supplying
+chrome — highlights and the ROI box (`frontend/src/mount.ts`), tooltips ([§10](10-tooltips.md)). An interaction
+that recomputes a preview frame in Julia during a gesture ([§12](12-gesture-channel.md)) needs a fourth tier supplying
 rendering as well as geometry. That
-tier is the extension point; no API is specified here, and nothing in [§12](12-gesture-channel.md#12-the-gesture-channel-102) depends on one. See
+tier is the extension point; no API is specified here, and nothing in [§12](12-gesture-channel.md) depends on one. See
 [§12.9](12-gesture-channel.md#129-prerequisites-for-a-user-facing-surface).
 

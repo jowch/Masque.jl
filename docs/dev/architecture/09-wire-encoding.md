@@ -23,8 +23,8 @@ encoding levers were **de-speculated by a measurement experiment** (`bench/encod
   **`AxisTransform` lims/viewport must stay `Float64`**: the M4 drag path inverts pixel→data through them and
   the error amplifies — and at O(1)/axis the precision costs nothing. Only per-element geometry is quantized.
 
-The other manifest term — heatmap/image `values[]` ([§8](08-scaling.md#8-payload-scaling--robustness-to-large-inputs)) — is bounded not by encoding but by *not shipping
+The other manifest term — heatmap/image `values[]` ([§8](08-scaling.md)) — is bounded not by encoding but by *not shipping
 it*: capping/dropping it measured **499×** smaller (4.78 MB → 9.8 KB at 1000²). Both are now shipped (the
 cap in PR #8, int-pixel coords here); they were the committed manifest-payload work — reach for them before
-a quadtree ([§7](07-scope.md#7-v1-scope)).
+a quadtree ([§7](07-scope.md)).
 

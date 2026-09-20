@@ -33,7 +33,7 @@ non-HTML renderer for the auto-table path — a bare tag-strip over the auto-tab
 announce `"amp;"` for an escaped `&`). `aria-describedby` on the surface points at a static,
 non-live usage hint in the same shadow root (ARIA idrefs don't cross shadow boundaries).
 
-The per-layer `label` field ([§3](03-interactables.md#3-the-interactable-seam--abstractinteractable), `HitLayer`) is the only manifest-shape change here — see
+The per-layer `label` field ([§3](03-interactables.md), `HitLayer`) is the only manifest-shape change here — see
 `perf-findings.md` for its measured wire cost. Keyboard-driving the drag interactables
 (threshold/ROI/view arrow-nudge) is explicitly out of scope: three drag state machines, each
 needing the same live-verification pass across both backends, is a disproportionate v1 cost for

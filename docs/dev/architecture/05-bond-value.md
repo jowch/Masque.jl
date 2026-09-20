@@ -73,7 +73,7 @@ re-supplies `selected=` (typically from the prior bond value) if the same select
 survive a rebuild.
 
 **A view-manipulation gesture never produces a bond value.** Frames shipped to update the view
-during an active drag-to-pan or orbit ([§12](12-gesture-channel.md#12-the-gesture-channel-102)) do not assign `sel` and do not touch this bond, and
+during an active drag-to-pan or orbit ([§12](12-gesture-channel.md)) do not assign `sel` and do not touch this bond, and
 neither does the gesture's release: a camera is operational state, not an analysis value ([§12.3](12-gesture-channel.md#123-what-commits-and-when)).
 A `ThresholdInteractable` or `ROIInteractable` release does commit, through the ordinary path
 above.
