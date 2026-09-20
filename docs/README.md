@@ -6,7 +6,8 @@ User docs are the [Documenter site](https://jowch.github.io/Masque.jl), built fr
 Building the site runs every example notebook (`docs/export_notebooks.jl`) to produce its
 static export, so a local build takes several minutes on a warm depot and longer cold.
 Set `MASQUE_SKIP_NOTEBOOK_EXPORT=true` to reuse the exports already in `docs/src/notebooks/`
-from a previous build when iterating on prose.
+from a previous build when iterating on prose. Set `MASQUE_SKIP_EMBED_EXPORT=true` to reuse
+harvested cell-series players in `docs/src/embeds/`.
 
 | Doc | What it covers |
 |---|---|

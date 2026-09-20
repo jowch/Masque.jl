@@ -65,6 +65,25 @@ vector `masque(fig)` builds internally), tweak it, and pass it back — see
 ev === nothing ? "click a point" : "you picked $(ev.payload)"
 ```
 
+The embed below is that cell series, computed by Pluto at docs build and replayed here with no
+Julia process. Click **a**, **b**, or **c** and the readout swaps. Hover still works on every
+mark. A click that isn't one of those three listed states keeps the overlay alive and leaves
+the readout on the last snapshot.
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-gs-player" title="Three-point scatter with listed @bind snapshots"
+        style="width:100%;height:480px;border:0;" loading="lazy"></iframe>
+</div>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-gs-player");
+  if (el) el.src = (pretty ? "../embeds/" : "embeds/") + "getting_started.html";
+})();
+</script>
+```
+
 Before the first click, `ev` is `nothing`. After a click, `ev` is an
 [`InteractionEvent`](@ref):
 

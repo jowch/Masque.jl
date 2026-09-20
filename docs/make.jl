@@ -4,6 +4,9 @@ using Masque
 include("export_notebooks.jl")
 export_notebooks(joinpath(@__DIR__, "src", "notebooks"))
 
+include("export_embeds.jl")
+export_embeds(joinpath(@__DIR__, "src", "embeds"))
+
 makedocs(;
     modules = [Masque],
     authors = "Jonathan Chen <jwhc@ucla.edu>",
