@@ -148,3 +148,23 @@ Profiling exists to inform the design, not to sit in a file. The loop is anchore
   `spike/` is gitignored scratch; `bench/` holds the committed, re-runnable benchmarks.
 - Process docs (brainstorming specs, implementation plans) go in `.superpowers/` — gitignored, local-only, not part of the package.
 - The package was renamed from `Holo` to `Masque` on 2026-09-17 (same UUID). The local checkout folder and the GitHub remote may still be called `Holo.jl` until renamed; the package, module, and all in-repo references are `Masque`.
+
+## Cloud sessions (Claude Code on the web)
+`.claude/hooks/session-start.sh` (registered in `.claude/settings.json`, remote-only via
+`$CLAUDE_CODE_REMOTE`) provisions the container at session start. It is idempotent and never
+fatal — a component it can't provision warns and the hook still exits 0.
+- **`frontend/` works out of the box.** The npm registry is in the proxy's `no_proxy` list, so
+  the hook runs `npm install` and the whole TS gate (`lint`, `typecheck`, `test`, `build`) runs.
+- **Julia does NOT, under the default cloud network policy.** Every `*.julialang.org` host is
+  denied at CONNECT (403), `JuliaLang/julia` GitHub release assets 404, and there is no apt
+  candidate — so `julia`, `Pkg`, `test/runtests.jl`, Runic and the Pluto/Playwright
+  live-verification sweep are all unavailable. `git clone` of third-party repos *does* work,
+  but that yields no Julia binary. Don't burn a session rediscovering this, and don't try to
+  route around the policy. **Fix:** allow `*.julialang.org` on the environment's network policy
+  ([docs](https://code.claude.com/docs/en/claude-code-on-the-web)), then start a fresh session —
+  the hook probes for reachability and provisions juliaup + `Pkg.instantiate()` + Runic on its
+  own, with no edit.
+- The hook deliberately skips the PackageCompiler sysimage and the Pluto `@masque-dev` env
+  (too slow for a synchronous hook, and live-verification rather than test rig) and never runs
+  `npm run build` (CI is the sole author of `assets/*.js`; building would dirty the tree at
+  session start). The heavier setup lives in `.cursor/cloud-agent-install.sh`.
