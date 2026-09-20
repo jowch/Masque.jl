@@ -194,7 +194,7 @@ base64 PNG decoded size (KB) and manifest MsgPack size (KB), default 700px colum
 | heatmap, 200×200 | 190 | 197 | grid edges are compact, but `values[]` is O(cells) |
 
 (Element geometry ships as `Vector{Int}` — quantized to integer pixels
-([§9](architecture/09-wire-encoding.md#9-wire-encoding--precision)), so the
+([§9](architecture/09-wire-encoding.md)), so the
 msgpack sizer counts each coord at 1–3 B, not Float32's flat 5. This trimmed the geometry term ~17 %
 overall: scatter-1000 46→38 KB, scatter-10000 459→379 KB. Heatmaps barely move — their `values[]`
 are *data* and stay Float32. The remaining per-element cost is now dominated by the payload's
@@ -444,7 +444,7 @@ under each scheme — replacing theoretical byte math with measured wire bytes:
 
 Both wins **shipped**: the `values[]` cap in `52f174c` (PR #8), and **int-pixel geometry quantization
 in PR #9** (element geometry vectors are `Int`,
-[§9](architecture/09-wire-encoding.md#9-wire-encoding--precision)). The
+[§9](architecture/09-wire-encoding.md)). The
 experiment's −58%/2.10-B-per-coord is the *geometry-term* saving; on a whole realistic manifest (where
 the payload's Float64 `x`/`y` dilute it) it lands ~17 % — see the envelope table. AxisTransform stays
 Float64. The measured experiment numbers above are unchanged — they just describe what now ships.
@@ -458,7 +458,7 @@ float16; lossy >2048px). Keep `AxisTransform` lims `Float64` (drag inversion) �
 - **Phase 2a bars/areas/spans** *(delivered, 2026-06-30)* — Hist, Waterfall, CrossBar, HSpan,
   VSpan now auto-extracted as `:rects`. The payload schema grew from `(; index)` to a semantic
   shape per surface type (a few numbers per element — see
-  [§3](architecture/03-interactables.md#3-the-interactable-seam--abstractinteractable) bar
+  [§3](architecture/03-interactables.md) bar
   payload schema). Bars/spans are inherently low-N (tens to low hundreds of elements for any realistic
   chart), so the per-element payload growth has negligible envelope impact. Bench re-run
   (2026-06-30) confirms the §A envelope is unchanged — see §A. No new manifest terms, no new
@@ -470,7 +470,7 @@ float16; lossy >2048px). Keep `AxisTransform` lims `Float64` (drag inversion) �
   un-notched BoxPlot bodies). Ring geometry ships as a `Vector{Vector{Real}}` — one subvector per
   polygon element, flat `[x0,y0,x1,y1,…]` — with vertex coords quantized to integer pixels (the
   same 1–3 B/coord path as scatter; see
-  [§9](architecture/09-wire-encoding.md#9-wire-encoding--precision)). Bench §F (2026-06-30,
+  [§9](architecture/09-wire-encoding.md)). Bench §F (2026-06-30,
   `bench/payload_envelope.jl`):
 
   | Surface | elements | total verts | manifest | ~B/elem | ~B/vert |
