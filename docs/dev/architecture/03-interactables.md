@@ -157,11 +157,12 @@ drawn from Makie's computed-stats node. **Principle:** hit geometry comes from r
 (the actual plotted polygons or rects after Makie lays them out); payload values come from
 Makie's computed values (not the raw input data).
 
-**Declaration is the contract; plot-introspection is v2 sugar.** v1 constructors take explicit
-data-space geometry (`PointInteractable(ax, points; payloads)`). Extracting geometry from live
-`Scatter`/`Heatmap`/`BarPlot` objects requires resolving markersize units, endpoint half-steps, and
-dodge/stack math; that work is deferred. A future `PointInteractable(scatterplot)` will produce the
-*same* struct, not a different code path.
+**Declaration is the contract; plot-introspection is sugar on top of it.** Every interactable has
+an explicit, data-space constructor (`PointInteractable(ax, points; payloads)`) — the contract every
+subtype implements. `src/introspect.jl` adds one introspection constructor per supported Makie plot
+type (`PointInteractable(ax, p::Makie.Scatter)`, `RectInteractable(ax, p::Makie.BarPlot)`), extracting
+geometry and payload from the live plot object and delegating to the same explicit constructor — the
+same struct, not a different code path.
 
 **Composites emit multiple layers.** `ScatterLines` → one `:circles` layer + one `:polyline` layer,
 hit-tested points-first (within marker radius) then segment. This is the model for any composite recipe.
