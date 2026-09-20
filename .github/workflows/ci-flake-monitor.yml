@@ -1,0 +1,66 @@
+# Light flake monitor for issue #99.
+#
+# After each CI / Documentation run, comments on #99 only when there is something
+# to record: an advisory kind-sweep failure (continue-on-error, does not fail the
+# gate) or a required job that failed then passed on the same SHA / retry.
+# A Monday digest edits one rolling 7-day count comment so greens have a
+# denominator without a comment per green run.
+#
+# Does not spam: at most one comment per run, skipped if that run was already
+# posted; cancelled/superseded runs are ignored; kind-sweep vs required are
+# labeled as separate sections.
+name: CI flake monitor
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - Documentation
+    types: [completed]
+  schedule:
+    # Monday 12:17 UTC — off the hour to miss the usual :00 stampede.
+    - cron: "17 12 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: event (inspect one run_id) or digest (7-day counts)
+        type: choice
+        options: [event, digest]
+        default: digest
+      run_id:
+        description: Actions run id (event mode)
+        required: false
+        type: string
+      dry_run:
+        description: Print the comment, do not post to #99
+        type: boolean
+        default: false
+
+permissions:
+  issues: write
+  actions: read
+  contents: read
+
+concurrency:
+  group: flake-monitor-${{ github.event_name }}-${{ github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Report flakes to #99
+    if: github.event.repository.fork == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan CI and comment on #99
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FLAKE_ISSUE: "99"
+          FLAKE_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ (github.event.inputs.dry_run || 'false') == 'true' && '1' || '0' }}
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id || '' }}
+          DISPATCH_MODE: ${{ github.event.inputs.mode || '' }}
+          DISPATCH_RUN_ID: ${{ github.event.inputs.run_id || '' }}
+        run: python3 .github/scripts/ci_flake_monitor.py
