@@ -299,6 +299,179 @@ function extract_json_object(s::AbstractString, start::Int)
     return error("unterminated JSON object")
 end
 
+function _css_brace_inner(css::AbstractString, open::Int)
+    n = ncodeunits(css)
+    depth = 0
+    j = open
+    while j <= n
+        c = css[j]
+        if c == '{'
+            depth += 1
+        elseif c == '}'
+            depth -= 1
+            if depth == 0
+                inner_start = nextind(css, open)
+                inner_end = prevind(css, j)
+                inner_start > inner_end && return ""
+                return String(strip(SubString(css, inner_start, inner_end)))
+            end
+        end
+        j = nextind(css, j)
+    end
+    return error("unterminated CSS brace group")
+end
+
+# Pluto ships palettes as `@media (prefers-color-scheme: …)`. Documenter's toggle is a
+# class, not OS preference, so rewrite those wrappers to `html.pluto-dark`.
+function unwrap_prefers_color_scheme(css::AbstractString, scheme::AbstractString)
+    needle = "@media (prefers-color-scheme: $scheme)"
+    start = findfirst(needle, css)
+    start === nothing && error("expected `$needle` in Pluto theme CSS")
+    i = last(start)
+    n = ncodeunits(css)
+    while i <= n && css[i] != '{'
+        i = nextind(css, i)
+    end
+    i > n && error("no opening brace for $needle")
+    return _css_brace_inner(css, i)
+end
+
+function pluto_theme_css()
+    frontend = joinpath(pkgdir(Pluto), "frontend", "themes")
+    light = unwrap_prefers_color_scheme(read(joinpath(frontend, "light.css"), String), "light")
+    dark = unwrap_prefers_color_scheme(read(joinpath(frontend, "dark.css"), String), "dark")
+    light = replace(light, ":root" => "html:not(.pluto-dark)")
+    dark = replace(dark, ":root" => "html.pluto-dark")
+    return light * "\n" * dark
+end
+
+# Cell chrome copied from Pluto `frontend/editor.css` (variables, notebook, output, cell,
+# trafficlight, assignee). Palette is not redefined here — it comes from the theme files.
+const PLAYER_LAYOUT_CSS = raw"""
+:root {
+  --pluto-cell-spacing: 17px;
+  --pluto-operator-ligatures: none;
+  --julia-mono-font-stack: JuliaMono, Menlo, "Roboto Mono", "Lucida Sans Typewriter", "Source Code Pro", monospace;
+  --lato-ui-font-stack: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Cantarell, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", system-ui, sans-serif;
+  --custom-code-font-stack: "";
+  --code-font-stack: var(--julia-mono-font-stack);
+}
+html:not(.pluto-dark) { color-scheme: light; }
+html.pluto-dark { color-scheme: dark; }
+html { font-size: 16px; }
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background-color: var(--main-bg-color);
+  color: var(--pluto-output-color);
+  font-family: var(--lato-ui-font-stack);
+}
+pluto-notebook {
+  display: block;
+  background: var(--main-bg-color);
+  --code-font-stack: var(--custom-code-font-stack), var(--julia-mono-font-stack);
+  padding-left: 25px;
+  padding-right: 6px;
+}
+pluto-output {
+  font-family: "Alegreya Sans", "Trebuchet MS", sans-serif;
+  font-size: 14.5px;
+  font-weight: 400;
+  color: var(--pluto-output-color);
+  display: block;
+  padding-left: 10px;
+  padding-right: 10px;
+  align-items: baseline;
+  overflow-x: auto;
+  background-color: var(--pluto-output-bg-color);
+}
+pluto-output pre {
+  display: inline-block;
+  margin: 0px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  tab-size: 4;
+  font-family: var(--julia-mono-font-stack);
+  font-size: 0.8rem;
+  font-variant-ligatures: none;
+}
+pluto-cell {
+  display: block;
+  min-height: calc(23px + 1px + 1px);
+  margin-top: var(--pluto-cell-spacing);
+  position: relative;
+}
+pluto-cell:first-child { margin-top: 0; }
+pluto-output:not(.rich_output) {
+  display: flex;
+  flex-wrap: wrap;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+pluto-output > assignee {
+  font-family: var(--julia-mono-font-stack);
+  font-size: 0.75rem;
+  font-variant-ligatures: none;
+  color: var(--cm-color-variable) !important;
+  font-weight: 700;
+}
+pluto-output > assignee::after {
+  content: "\a0=\a0";
+  opacity: 0.6;
+}
+pluto-output > assignee:empty { display: none; }
+pluto-output > div {
+  flex-shrink: 0;
+  overflow-y: hidden;
+}
+pluto-trafficlight {
+  box-sizing: content-box;
+  width: 4px;
+  position: absolute;
+  left: -4px;
+  top: 0px;
+  bottom: 0px;
+  pointer-events: none;
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+  border-left-color: var(--normal-cell-color);
+  background: var(--normal-cell-color);
+  overflow: hidden;
+}
+.ip-host { isolation: isolate; max-width: 100%; }
+.masque-player-caption {
+  margin: var(--pluto-cell-spacing) 0 0;
+  padding: 0 10px;
+  font-family: var(--lato-ui-font-stack);
+  font-size: 0.85em;
+  color: var(--pluto-schema-types-color);
+  line-height: 1.45;
+}
+"""
+
+function pluto_player_css()
+    return PLAYER_LAYOUT_CSS * "\n" * pluto_theme_css()
+end
+
+# Mirrors Documenter `themeswap.js`: `html.className = "theme--" + theme`. Light primary
+# leaves className empty. Anything else with `theme--` is treated as dark (Pluto dark).
+const PARENT_IS_DOC_DARK_JS = raw"""function isDocDark() {
+  var c = (window.parent && window.parent.document.documentElement.className) || "";
+  if (!c) return false;
+  if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+  return /(^|\s)theme--/.test(c);
+}"""
+
+const BOOT_PLUTO_DARK_JS = """
+<script>
+{
+  $PARENT_IS_DOC_DARK_JS
+  try { if (isDocDark()) document.documentElement.classList.add("pluto-dark"); } catch (e) {}
+}
+</script>
+"""
+
+
 # Put listed @bind states on the same manifest object the overlay mounts, not a
 # side-channel SNAPSHOTS table. Lookup is still host.value (overlay's existing bond).
 function inject_manifest_snapshots(html::AbstractString, snapshots)
@@ -310,97 +483,6 @@ function inject_manifest_snapshots(html::AbstractString, snapshots)
     obj["snapshots"] = jsonable(snapshots)
     return html[1:(j0 - 1)] * JSON3.write(obj) * html[(j1 + 1):end]
 end
-
-const PLAYER_CSS = raw"""
-:root {
-  --pluto-cell-spacing: 17px;
-  --julia-mono-font-stack: JuliaMono, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --lato-ui-font-stack: "Lato Medium", Lato, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --doc-fg: #4c4f51;
-  --doc-muted: #6b7280;
-  --normal-cell-color: rgba(0, 0, 0, 0.12);
-  --pluto-output-color: var(--doc-fg);
-  --pluto-output-bg-color: transparent;
-  --main-bg-color: transparent;
-  color-scheme: light;
-}
-html.theme--documenter-dark,
-html.theme--catppuccin-mocha,
-html.theme--catppuccin-macchiato,
-html.theme--catppuccin-frappe {
-  --doc-fg: #dbdbdb;
-  --doc-muted: #9aa0a6;
-  --normal-cell-color: rgba(255, 255, 255, 0.18);
-  color-scheme: dark;
-}
-html, body {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--doc-fg);
-  font-family: var(--lato-ui-font-stack);
-  font-size: 16px;
-}
-pluto-notebook { display: block; background: transparent; padding-left: 8px; }
-pluto-cell {
-  display: block;
-  position: relative;
-  margin-top: var(--pluto-cell-spacing);
-  min-height: 25px;
-}
-pluto-cell:first-child { margin-top: 0; }
-pluto-trafficlight {
-  box-sizing: content-box;
-  width: 4px;
-  position: absolute;
-  left: -4px;
-  top: 0;
-  bottom: 0;
-  pointer-events: none;
-  border-top-left-radius: 4px;
-  border-bottom-left-radius: 4px;
-  background: var(--normal-cell-color);
-}
-pluto-output {
-  display: block;
-  padding: 3px 10px;
-  background: var(--pluto-output-bg-color);
-  color: var(--pluto-output-color);
-  overflow-x: auto;
-}
-pluto-output:not(.rich_output) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  font-family: var(--julia-mono-font-stack);
-  font-size: 0.875rem;
-  font-variant-ligatures: none;
-}
-pluto-output > assignee {
-  font-family: var(--julia-mono-font-stack);
-  font-size: 0.75rem;
-}
-pluto-output > assignee::after {
-  content: "\a0=\a0";
-  opacity: 0.6;
-}
-pluto-output:not(.rich_output) pre {
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  white-space: pre-wrap;
-}
-pluto-output.rich_output { padding-left: 10px; padding-right: 10px; }
-.ip-host { isolation: isolate; max-width: 100%; }
-.masque-player-caption {
-  margin: var(--pluto-cell-spacing) 0 0;
-  padding: 0 10px;
-  font-size: 0.85em;
-  color: var(--doc-muted);
-  line-height: 1.45;
-}
-"""
 
 function emit_player(path, outpath, player, cells, states, bond::Symbol)
     widget = first(cells)
@@ -447,6 +529,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
             "Listed clicks update the cell below. An unlisted click keeps the overlay alive; Julia stays on the last snapshot.",
         ),
     )
+    player_css = pluto_player_css()
 
     html = """
     <!doctype html>
@@ -455,8 +538,9 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>$title</title>
+      $BOOT_PLUTO_DARK_JS
       <style>
-    $PLAYER_CSS
+    $player_css
       </style>
     </head>
     <body>

@@ -80,10 +80,16 @@ the readout on the last snapshot.
   var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
   var el = document.getElementById("masque-gs-player");
   if (!el) return;
+  function isDocDark() {
+    var c = document.documentElement.className || "";
+    if (!c) return false;
+    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+    return /(^|\s)theme--/.test(c);
+  }
   function pushTheme() {
     var doc = el.contentDocument;
     if (!doc) return;
-    doc.documentElement.className = document.documentElement.className;
+    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
   }
   el.addEventListener("load", pushTheme);
   new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
