@@ -1,0 +1,171 @@
+# 3. The interactable seam — `AbstractInteractable`
+
+Every interactable — built-in or user-authored — implements one contract. The framework never
+special-cases built-ins; `PointInteractable` is simply the first public implementation.
+
+```julia
+abstract type AbstractInteractable end
+
+# REQUIRED: compact, image-px hit geometry. Usually one layer; composites (ScatterLines) return more.
+hitlayers(i::AbstractInteractable, ctx::InteractionContext)::Vector{HitLayer}
+
+# OPTIONAL (defaulted):
+validate(::AbstractInteractable, ::InteractionContext)::Union{Nothing,String} = nothing   # fail loud
+events(::AbstractInteractable)::Tuple = (:click, :hover)   # which events the overlay wires
+# tooltip content is per-LAYER, set via the `tooltip` kwarg on each interactable
+# constructor (nothing → auto-table, Markup → template, false → suppress).
+# The per-element `tooltip(interactable, idx, payload)` dispatch is retired (M2.3).
+# See §10 Tooltips.
+# hoverstyle is per-LAYER too — the manifest ships one `style` per layer, not per element.
+# stroke=nothing (default) omits "stroke" from the manifest; the overlay then draws its own
+# split highlight — a color-dodge fill (brightens) plus a multiply/screen edge stroke (darkens
+# on light/dark figures) — instead of a stroke colour. `colors` no longer feeds the highlight,
+# only the tooltip accent. An explicit stroke here is used verbatim (no blend, single element).
+hoverstyle(::AbstractInteractable)::NamedTuple = (; stroke=nothing, width=2)
+```
+
+**`validate` is per-capability, not a global scale gate** (fixes a latent silent-coordinate bug).
+Element interactables (Point/Segment/Rect/Polygon) are projected **in Julia** via `Makie.project`,
+so they impose **no axis-scale restriction** — they work on any scale Makie can project (linear, log,
+symlog, …). Only `AxisInteractable` and `ColorbarInteractable` rely on **client-side** pixel→data
+inversion, so they alone restrict to scales the JS `invert` implements (identity, log10/log, +
+categorical via the shipped category map). A blanket `_OK_SCALES` gate would be both too strict
+(rejecting element types that work) and too loose (passing `AxisInteractable` on a scale the JS
+inverts wrong). Default `validate` stays permissive; `AxisInteractable.validate` and
+`ColorbarInteractable.validate` are the ones that gate.
+
+## `HitLayer` — the serialized unit (per interactable, per kind)
+
+The unit is a **layer**, not a single element, because two v1 surfaces need compact *geometry*
+that a flat per-element list can't give: a 1000×1000 **heatmap grid** (ship edges, not 10⁶ rects) and
+a **polyline** (ship vertices once, hit-test segments in JS). A layer is one geometry *kind* plus the
+data to resolve a hit to an element index and its payload.
+
+> **Caveat (the grid is compact in geometry, not in payload).** The grid *geometry* is O(edges),
+> but to power the client-side `(i,j)=value` readout the layer also ships the full **source-resolution**
+> `values[]` matrix — O(source-cells), the dominant grid term. So a routine 2000²–4000² `heatmap!`/`image!`
+> ships tens of MB of values on top of a display-bounded PNG (4.78 MB measured at 1000²). This is the
+> day-one-reachable face of "the manifest is the scaling wall" ([§8](08-scaling.md#8-payload-scaling--robustness-to-large-inputs)). The committed fix ships `values[]`
+> only when cells are targetable (≥~1 px on the known display) — sub-pixel grids drop it ([§8](08-scaling.md#8-payload-scaling--robustness-to-large-inputs)).
+
+```julia
+struct HitLayer
+    id       :: Symbol            # stable key for this layer (links to events/style)
+    kind     :: Symbol            # :circles | :polyline | :segments | :rects | :grid | :polygons | :axis
+    geometry :: Any               # compact, image-px; layout keyed by `kind` (see below)
+    payloads :: Vector{Any}       # element index -> JSON-serializable payload (the linkage key)
+    axis     :: Symbol            # which AxisTransform applies (for data-coord tooltips / inversion)
+    events   :: Tuple             # copied from the interactable
+    label    :: Union{Nothing,String}  # optional screen-reader announcement prefix (keyboard nav, §11)
+    colors   :: Any                # optional per-element tooltip accent (§10.4)
+    links    :: Union{Nothing,Vector{Vector{Symbol}}}  # optional per-element cross-layer highlight (LegendInteractable, M3)
+end
+```
+
+Geometry layout by `kind` (all coords image-px, top-left origin):
+
+| kind | geometry | JS hit-test | element index |
+|---|---|---|---|
+| `:circles` | `Float32[cx,cy,r, …]` | distance ≤ r | triple index |
+| `:polyline` | `Float32[x,y, …]` (NaN = gap) | nearest segment, dist ≤ tol | segment i = (v[i],v[i+1]) |
+| `:segments` | `Float32[x0,y0,x1,y1, …]` | nearest of disjoint pairs | pair index |
+| `:rects` | `Float32[cx,cy,w,h, …]` | point-in-rect | quad index |
+| `:grid` | `(xedges, yedges, ncols, nrows, values[])` image-px | binary-search bin → (i,j) | `j*ncols+i` (O(1) hit-test; manifest **O(source-cells)** via `values[]`, see [§8](08-scaling.md#8-payload-scaling--robustness-to-large-inputs)) |
+| `:polygons` | `Vector{Vector{Float32}}` rings | even-odd point-in-polygon | ring index |
+| `:axis` | `nothing` (unbounded, `AxisInteractable`) or `Real[x,y,w,h]` bbox (bounded, `ColorbarInteractable`) | absent geometry = always-hit; bbox present = point-in-bbox; invert pixel via `AxisTransform` | `-1` (continuous); `valueaxis ≠ nothing` → 1-D `(; value)` |
+
+`:polyline`/`:segments`' `tol` (the hit-test slack above) is an optional per-layer manifest
+field, `"tol"` (image px) — present only when `hit_tol(i) !== nothing` (`SegmentInteractable`
+sets it from its `tol` keyword, scaled like `radius`); absent, the overlay falls back to its
+own fixed `SEG_TOL`. Every other kind's manifest is untouched by this field.
+
+`label` (optional, per-layer, `String`) is a screen-reader announcement prefix for the
+keyboard-navigation overlay ([§11](11-keyboard.md#11-keyboard-navigation--aria)) — e.g. `"Scatter"` in "Scatter, element 3 of 10: …". Set via
+the `label` keyword on `PointInteractable`/`SegmentInteractable`/`RectInteractable`
+(list form)/`PolygonInteractable` (the kinds keyboard nav visits); absent by default, and
+omitted from the manifest entirely when unset (same idiom as `selects`/`tol` above) — see
+`perf-findings.md` for the measured per-layer wire cost.
+
+This is a **closed set of six geometry kinds** (`:circles/:polyline/:segments/:rects/:grid/:polygons`)
+plus the `:axis` continuous channel. The survey confirmed every retained Makie surface projects to one
+of them; nothing in v1+v2 needs a seventh. (Text labels — the surface once speculated to need a new
+`bbox`/degenerate-polygon primitive — turned out not to: `TextInteractable` rides plain `:rects`, with
+a rotated label's box simply expanded to stay axis-aligned; see §3. That premise is retired for text.)
+
+The three M4 drag kinds — `:view`, `:threshold`, `:roi` — sit outside this set. They are
+*control* geometry: one draggable region apiece, no elements, an empty `payloads`. The closed-set
+claim covers data geometry projected from a Makie surface.
+
+## Built-in interactables (v1 + M3 + M4 drags + Phase 2 text labels)
+
+Five v1 types, plus `ColorbarInteractable` and `LegendInteractable` (M3), the three drag
+interactables (M4), and `TextInteractable` (Phase 2 text labels). Roughly one type per hit
+primitive, with the exceptions noted inline: `:axis` is shared by two, `LegendInteractable` and
+`TextInteractable` reuse `:rects`, and the three drags each own a kind no other type produces.
+
+| Type | kind(s) | Makie surfaces | payload |
+|---|---|---|---|
+| `PointInteractable` | `:circles` | Scatter, Stem, Spy, ScatterLines·pts | `(; index, x, y)` |
+| `SegmentInteractable` | `:polyline` \| `:segments` | Lines, Stairs, ScatterLines·lines (polyline); LineSegments, Errorbars, Rangebars, HLines, VLines (pairs) | `(; segment_index, p0, p1)` |
+| `RectInteractable` | `:rects` \| `:grid` | BarPlot, Hist, Waterfall, CrossBar, HSpan, VSpan (list); Heatmap, Image (grid) | grid `(; i, j, value)`; BarPlot/Waterfall `(; low, high, value)`; Hist `(; value, low, high)`; CrossBar `(; midpoint, low, high)`; HSpan/VSpan `(; low, high)` |
+| `PolygonInteractable` | `:polygons` | Poly, Band, Pie, Density, Contourf, Violin, Voronoiplot | Band/Density/Voronoiplot `(; index)`; Contourf `(; low, high)`; Violin `(; x)` |
+| `AxisInteractable` | `:axis` (unbounded) | the Axis area itself (linear + log) | `(; x, y)` inverted client-side |
+| `ColorbarInteractable` *(M3)* | `:axis` (bounded bbox) | Colorbar — auto-extracted from `fig.content` | `(; value)` inverted client-side via `AxisTransform.valueaxis` |
+| `LegendInteractable` *(M3)* | `:rects` | Legend — auto-extracted from `fig.content` | `(; label, group, targets)` — `targets` also ships as `HitLayer.links` |
+| `TextInteractable` *(Phase 2 text labels)* | `:rects` | Text, Annotation (via `_descendant(p, Makie.Text)`) — data-space only | `(; text, index, x, y)` |
+| `ViewInteractable` *(M4)* | `:view` | the Axis/Axis3 view itself — declared, never auto-extracted | 2D pan `(; xmin, xmax, ymin, ymax)`; 3D orbit `(; azimuth, elevation)` |
+| `ThresholdInteractable` *(M4)* | `:threshold` | a draggable horizontal/vertical line on an Axis — declared | a bare data scalar, not a `NamedTuple` (nothing to name) |
+| `ROIInteractable` *(M4)* | `:roi` | a draggable box on an Axis — declared; an `AbstractSelector` | `(; xmin, xmax, ymin, ymax)`, or a `Vector{InteractionEvent}` of enclosed elements when `selects=` is set ([§5](05-bond-value.md#5-the-bond-value)) |
+
+`SegmentInteractable` carries `mode ∈ {:polyline,:pairs}`; `RectInteractable` carries
+`layout ∈ {:grid,:list}`. Same JS test, different Julia extractor. The three M4 drags are
+declared against an axis rather than extracted from a plot, they are the only types whose
+*declared* `events` is `(:drag,)` (`RegionInteractable`/`LegendInteractable`/`FunctionInteractable`
+take a caller-supplied `events`, so an instance can carry it too), and their payloads are computed
+in the browser and converted Julia-side
+rather than looked up in the manifest (`_computed_payload`, [§5](05-bond-value.md#5-the-bond-value)). `:view` layers sort last in the
+manifest so an ordinary drag wins over the catch-all pan/orbit gesture ([§6](06-composition.md#6-how-it-composes--the-three-interaction-tiers), tension 2), and what
+happens during any of these drags — as opposed to on release — is [§12](12-gesture-channel.md#12-the-gesture-channel-102)'s contract.
+
+**Text labels as click-to-pick buttons.** `TextInteractable` geometry comes from Makie's own
+`Makie.string_boundingboxes(p)` — scene-local pixel space, y-up, bottom-left origin — converted
+*directly* to image px (the same ×scaling + y-flip as `project`, but no `project` call: the boxes
+are already pixel-space, not data-space, so there is nothing to project). A rotated label still
+yields exactly one `:rects` box, expanded to stay axis-aligned (a looser hit target, not a new
+geometry kind). The payload's `text`/`index` are the string and its 0-based per-label index;
+`x`/`y` are the DATA-space anchor (`positions`), not the pixel box — consistent with `PointInteractable`'s
+`(; index, x, y)` shape. `masque(fig)` auto-detects `text!` directly and `annotation!` by reaching
+through to its child `Makie.Text` plot (`_descendant`); only **data-space** text is auto-detected
+(`space === :data`) — pixel/relative-space text (decorative overlays) is skipped with a warning, not
+silently dropped. `TextLabel` (a `Makie.Block`, not a plot) is **not** covered — it needs the
+figure-block walk `ColorbarInteractable` uses, not the plot-scene walk — and remains deferred (see
+`roadmap.md`).
+
+**Bar payload schema (Phase 2a).** All `:rects`-list bar/span surfaces (BarPlot, Waterfall,
+Hist, CrossBar, HSpan, VSpan) use a shared semantic payload — `InteractionEvent.index` carries the element index, so payloads contain only
+domain values (no redundant `index` field). **Span viewport-clamp:** HSpan/VSpan hit-rects are
+clipped to the owning axis's pixel viewport so a span cannot bleed into a neighboring axis in a
+multi-axis figure. **Uniform payload-length validation:** `SegmentInteractable`,
+`RectInteractable`, and `PolygonInteractable` all call `_check_payloads` at construction;
+a `payloads=` vector of the wrong length throws `ArgumentError` immediately (fail-loud, same
+guarantee as `PointInteractable` / `RegionInteractable`).
+
+**Polygon payload schema (Phase 2b).** The six auto-extracted polygon surfaces each carry a
+surface-specific semantic payload. Band, Density, and Voronoiplot use `(; index)` — the element
+index is already carried by `InteractionEvent.index`, so the payload holds only the domain key.
+Contourf carries `(; low, high)` — the data-value bounds of the filled contour level, read from
+Makie's computed level range. Violin carries `(; x)` — the category position. BoxPlot's box body
+is auto-extracted as `:rects` (un-notched) / `:polygons` (notched) with `(; q1, median, q3)`
+drawn from Makie's computed-stats node. **Principle:** hit geometry comes from rendered shapes
+(the actual plotted polygons or rects after Makie lays them out); payload values come from
+Makie's computed values (not the raw input data).
+
+**Declaration is the contract; plot-introspection is v2 sugar.** v1 constructors take explicit
+data-space geometry (`PointInteractable(ax, points; payloads)`), which the survey confirmed is the
+robust path — extracting geometry from live `Scatter`/`Heatmap`/`BarPlot` objects is the genuinely
+hard part (markersize units, endpoint half-steps, dodge/stack math) and is deferred. A future
+`PointInteractable(scatterplot)` will produce the *same* struct, not a different code path.
+
+**Composites emit multiple layers.** `ScatterLines` → one `:circles` layer + one `:polyline` layer,
+hit-tested points-first (within marker radius) then segment. This is the model for any composite recipe.
+

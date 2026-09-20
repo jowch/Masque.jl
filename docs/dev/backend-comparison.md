@@ -61,8 +61,9 @@ backends** as server-authoritative `@bind` re-render (sliders + `ViewInteractabl
 > `azimuth`/`elevation` change → Julia re-renders → fresh base + freshly projected overlay. That is
 > backend-symmetric and drift-free *by construction* (Julia recomputes the overlay every step).
 > (#122 takes view parameters off `@bind` and onto the gesture channel as a contract;
-> `ViewInteractable` still commits through `@bind` until #102 implements it — `architecture.md`
-> §12.3. The re-render path described here is unchanged either way.)
+> `ViewInteractable` still commits through `@bind` until #102 implements it —
+> [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when). The re-render path
+> described here is unchanged either way.)
 > Cost, honestly: `:cairo` re-rasterizes per step (scales with the scene; fine for sliders and
 > commit-on-release drag); `:webgl` re-serializes (~flat, §2) and re-initializes the GL
 > context + scene per step. **The former "gated on GL-context reuse" claim was measured FALSE**
@@ -180,6 +181,7 @@ view manipulation via Julia re-render); the client-side GPU camera remains a Mas
 
 **Amended (#122):** the transport above is superseded — view parameters belong on the
 `with_js_link` gesture channel, not `@bind`, because a camera is operational state rather than an
-analysis value (`architecture.md` §12.3). That is the contract; `ViewInteractable` still binds
-until #102 implements it. Everything else in this decision stands: server-authoritative
-re-render, backend symmetry, and the client-side GPU camera staying out.
+analysis value ([§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)). That is
+the contract; `ViewInteractable` still binds until #102 implements it. Everything else in this
+decision stands: server-authoritative re-render, backend symmetry, and the client-side GPU camera
+staying out.
