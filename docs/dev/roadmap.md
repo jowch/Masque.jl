@@ -119,9 +119,8 @@ notebook that uses it. #103 retires the main reason users write that shape at al
 
 **Open, deliberately: whether live preview or a single frame at gesture end is the default.**
 This is a frame-cadence question; what commits is settled — view manipulation commits nothing
-(#122). #102's numbers
-bound what is *possible* — viable on a light scene, not on a heavy one at the resolutions
-tested — they don't settle what the default should be, per backend and possibly per scene
+(#122). #102's numbers bound what is *possible* — viable on a light scene, not on a heavy one at
+the resolutions tested — they don't settle what the default should be, per backend and per scene
 weight. That choice waits for a real implementation people can actually try, not spike numbers
 alone. A default right for a 240-point helix may be wrong for a large surface; it may need to
 adapt per scene rather than stay fixed.
@@ -322,8 +321,7 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   what gets *reported* does nothing for it. Decimating what gets *rendered* during
   a gesture — a coarser frame mid-drag, full fidelity once it settles, in the spirit of #85's
   already-accepted "ticks and decorations move with the photograph until a real frame replaces
-  it" — is the separate
-  companion idea for that cost; named here, not designed.
+  it" — is the separate companion idea for that cost; named here, not designed.
 
   Answer the push/pull/subsample question before any of the three is built on further.
 

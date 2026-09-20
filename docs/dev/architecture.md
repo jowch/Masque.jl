@@ -455,21 +455,20 @@ them cleanly:
   the manifest; the format is designed not to preclude it). **It is the one payload-unbounded feature**
   (total = frames × per-frame PNG): ~5.5 MB (187 KB × 30) to ~22 MB (× 120) for a typical plot, 100s of MB
   at scale. The `frames` slot must shrink per-frame cost (downscale / fewer frames) before it ships — §8.
-- **Tier 2 (round-trip):** `:click` events → `@bind`. Discrete server re-render from new state is in
-  scope on **both** backends for the *committed* value — a click, a keyboard commit, a slider- or
-  widget-driven view change — each lands through `@bind` exactly as any other Tier 2 value,
-  backend-symmetric. A view-manipulation gesture's own camera/`limits` value is **not** among them:
-  camera state is operational, not analysis, and never enters notebook state (§12.3). Landing
-  through `@bind` commits the value; it does not by itself force a server re-render — a click's
-  own selection highlight is drawn client-side with no
-  round trip (§5), so a re-render happens only if the notebook's own reactive graph feeds the
-  committed value into a new cell. What differs when a re-render *does* happen is
-  **cost**: `:webgl` re-serializes (~flat) while `:cairo` re-rasterizes (scales with the scene) —
-  see `backend-comparison.md`. The **in-drag frames** of a view-manipulation gesture are not Tier 2
-  traffic at all — they never touch `@bind`, never re-execute a cell, and the two backends
-  implement them by completely different mechanisms; see §12 for the contract those frames follow.
-  *Per-frame* faithful redraw (smooth-drag-as-a-guarantee) is a shared latency wall on both, not a
-  `:cairo`-only exclusion.
+- **Tier 2 (round-trip):** `:click` events → `@bind`. Discrete server re-render from new state is
+  in scope on **both** backends for the *committed* value — a click, a keyboard commit, a slider-
+  or widget-driven view change — each lands through `@bind` exactly as any other Tier 2 value,
+  backend-symmetric. A view-manipulation gesture's own camera/`limits` value is **not** among
+  them: camera state is operational, not analysis, and never enters notebook state (§12.3).
+  Landing through `@bind` commits the value; it does not by itself force a server re-render — a
+  click's own selection highlight is drawn client-side with no round trip (§5), so a re-render
+  happens only if the notebook's own reactive graph feeds the committed value into a new cell.
+  What differs when a re-render *does* happen is **cost**: `:webgl` re-serializes (~flat) while
+  `:cairo` re-rasterizes (scales with the scene) — see `backend-comparison.md`. The **in-drag
+  frames** of a view-manipulation gesture are not Tier 2 traffic at all — they never touch
+  `@bind`, never re-execute a cell, and the two backends implement them by completely different
+  mechanisms; see §12 for the contract those frames follow. *Per-frame* faithful redraw
+  (smooth-drag-as-a-guarantee) is a shared latency wall on both, not a `:cairo`-only exclusion.
 
 **Named tensions (accepted, not bugs):**
 1. `AxisInteractable` returns no region geometry — it rides the `:axis` channel as an unbounded
@@ -1075,6 +1074,6 @@ picks up #102.
   rule for when to stop requesting frames and settle on the last one: an idle debounce, an
   explicit affordance, something else. `ViewInteractable` is drag-only today (`events` is
   `(:drag,)`; `mode` is `"pan"` or `"orbit"`; `frontend/src/` has no wheel handler), so nothing is
-  blocked now. `roadmap.md` plans wheel zoom
-  as part of #85, so the rule is needed before #85 lands. #105 does not wait on it: subsampling is
-  worth doing whether or not this channel ships, and the two only compound if both do.
+  blocked now. `roadmap.md` plans wheel zoom as part of #85, so the rule is needed before #85
+  lands. #105 does not wait on it: subsampling is worth doing whether or not this channel ships,
+  and the two only compound if both do.
