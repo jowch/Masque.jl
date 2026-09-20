@@ -6,8 +6,9 @@ or, at mount, for each element `selected=` hydrated (`nothing` if there's neithe
 
 # Fields
 - `layer::Symbol` — the hit `HitLayer`'s (i.e. the interactable's) `id`.
-- `index::Int` — 0-based element index within that layer (meaningless for element-count-free
-  kinds like `:axis`, which report `0`).
+- `index::Int` — 0-based element index within that layer; for a `:grid` that is the linear
+  cell index. An `:axis` hit has no element to index and reports `-1`
+  (`AxisInteractable`, `ColorbarInteractable`); `:roi`/`:threshold`/`:view` report `0`.
 - `payload::Any` — for an element kind (points/rects/polygons/segments/polyline), the exact
   object you passed in `payloads=`, looked back up in Julia rather than decoded from what the
   browser sent: `ev.payload === payloads[i]`, not a JSON-reconstructed copy, so a `NamedTuple`

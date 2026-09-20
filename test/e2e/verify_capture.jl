@@ -1,9 +1,23 @@
 # Seam closure for the @bind round-trip: feed the value the browser ACTUALLY emitted
 # (captured.json, written by click.mjs from the real host.value) through the real Julia
 # `transform_value` and assert the typed InteractionEvent. The runtests.jl contract test
-# proves transform_value against a payload synthesized from the manifest; this proves it
-# against the byte-for-byte browser emission — stitching emit→consume with no synthesized
-# middle (the closest we get to the Pluto round-trip without launching a Pluto kernel).
+# proves transform_value against a payload synthesized from the manifest; this proves
+# `layer`/`index` against the byte-for-byte browser emission — stitching emit→consume with no
+# synthesized middle (the closest we get to the Pluto round-trip without launching a Pluto
+# kernel).
+#
+# `payload` is deliberately NOT checked against the capture for an element kind: since
+# `_bond_payload` (render.jl), the payload is reconstructed from the widget's own manifest —
+# `ev.payload === payloads[i]` — and the browser's copy is discarded outright, so a captured
+# payload proves nothing about reconstruction regardless of what it contains. What we assert
+# instead is the contract itself: overwrite the parsed capture's `"payload"` with a sentinel and
+# confirm the reconstructed event is unaffected. The z-carrying property this file used to pin via
+# the 3D capture is already covered where it now lives, at the level that actually consumes it —
+# `test/core/axis3_polar_tests.jl:124` and `:152` assert a 3-D scatter's payload is
+# `(; index, x, y, z)` — so dropping that check here loses no coverage. Nothing *consumes* the
+# wire payload for an element kind any more (the tooltip renders client-side from the same
+# manifest payload, not from the wire), so a browser that stopped shipping `z` would go unnoticed
+# here; removing that now-dead field from the upload is filed as #109.
 #
 #   julia test/e2e/verify_capture.jl <artifact-dir>
 #
@@ -47,30 +61,53 @@ scatter!(
 )
 wp = masque(figp)
 
+# The manifest's own payload object for a given layer/index — the value reconstruction must
+# produce regardless of what the capture says.
+manifest_payload(w, layer_id::Symbol, index::Integer) =
+    only(filter(d -> d["id"] == string(layer_id), w.manifest["layers"]))["payloads"][index + 1]
+
+# Proves the payload half of the contract: copy the parsed capture, overwrite its "payload" with
+# an obviously-wrong sentinel, and confirm transform_value still returns the manifest's own
+# object — unchanged from what an untouched capture reconstructs. Never touches the .json files
+# on disk (`copy` is on the parsed Dict).
+function assert_payload_ignored(w, captured, layer_id::Symbol, index::Integer, label::AbstractString)
+    poisoned = copy(captured)
+    poisoned["payload"] = "SENTINEL-must-never-surface"
+    ev_poisoned = APD.Bonds.transform_value(w, poisoned)
+    want = manifest_payload(w, layer_id, index)
+    ev_poisoned.payload === want ||
+        error("$label: payload not reconstructed from the manifest (got $(ev_poisoned.payload), want $want)")
+    ev_untouched = APD.Bonds.transform_value(w, captured)
+    return ev_untouched.payload === ev_poisoned.payload ||
+        error("$label: poisoning the capture's payload changed the reconstructed result")
+end
+
 ev = APD.Bonds.transform_value(w, captured)   # the REAL browser emission -> InteractionEvent
 
 ev isa Masque.InteractionEvent || error("transform_value did not return an InteractionEvent: $(typeof(ev))")
 ev.layer === :scatter || error("layer mismatch: $(ev.layer)")
 ev.index == 0 || error("index mismatch: $(ev.index)")
-ev.payload === nothing && error("payload dropped (browser emitted one)")
+assert_payload_ignored(w, captured, :scatter, 0, "scatter")
 
 println("seam OK — browser host.value -> ", ev)
 
-# Axis3 case (WS-3D): same seam, and the payload must carry the z the 3D scatter shipped.
+# Axis3 case (WS-3D): same seam. The z-carrying payload shape is pinned in
+# test/core/axis3_polar_tests.jl (lines 124, 152), not here — see the header comment.
 captured3 = JSON3.read(read(joinpath(dir, "captured3d.json"), String), Dict{String, Any})
 ev3 = APD.Bonds.transform_value(w3, captured3)
 ev3 isa Masque.InteractionEvent || error("transform_value (3D) did not return an InteractionEvent: $(typeof(ev3))")
 ev3.layer === :scatter || error("3D layer mismatch: $(ev3.layer)")
 ev3.index == 0 || error("3D index mismatch: $(ev3.index)")
-haskey(ev3.payload, :z) ||
-    error("Axis3 payload missing z (got $(ev3.payload)) — the {index,x,y,z} payload was dropped")
+assert_payload_ignored(w3, captured3, :scatter, 0, "Axis3")
 
 println("seam OK (Axis3) — browser host.value -> ", ev3)
 
-# PolarAxis case: same seam; payload is 2-D {index,x,y} (θ,r as x,y) — no continuous inversion.
+# PolarAxis case: same seam.
 capturedp = JSON3.read(read(joinpath(dir, "capturedpolar.json"), String), Dict{String, Any})
 evp = APD.Bonds.transform_value(wp, capturedp)
 evp isa Masque.InteractionEvent || error("transform_value (polar) did not return an InteractionEvent: $(typeof(evp))")
 evp.layer === :scatter || error("polar layer mismatch: $(evp.layer)")
 evp.index == 0 || error("polar index mismatch: $(evp.index)")
+assert_payload_ignored(wp, capturedp, :scatter, 0, "PolarAxis")
+
 println("seam OK (PolarAxis) — browser host.value -> ", evp)

@@ -342,13 +342,23 @@ no-server architecture.
 ## 5. The bond value
 
 `@bind sel masque(fig, interactables)`:
-- `sel === nothing` until the first deliberate click (clicks outside all layers are a no-op — by design).
-- On click: `sel = (; layer, index, payload)` (a `Dict` Julia-side). For `AxisInteractable`,
-  `index = -1` and `payload = (; x, y)` inverted from the axis transform in JS.
+- `sel === nothing` at mount, unless the widget carries `selected=`, in which case the bond is
+  already hydrated to those elements before any click (see "Selected-state…", below). Clicks
+  outside all layers are still a no-op — by design — and leave `sel` unchanged.
+- On click: `sel` is an `InteractionEvent(layer, index, payload)`. For an element kind
+  (`:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`), `payload` is the exact object passed
+  in `payloads=` for that element, looked up in the manifest rather than decoded from what the
+  browser sent (`_bond_payload` in `render.jl`) — the browser's own copy is discarded outright,
+  so a `NamedTuple` payload stays a `NamedTuple`. Kinds with no Julia-side original —
+  `:axis`/`:grid`/`:roi`/`:threshold`/`:view` — still report the browser-computed value
+  unchanged: for `AxisInteractable`, `index = -1` (axis hits aren't element-indexed) and
+  `payload` is a `Dict` (`Dict("x" => …, "y" => …)`, or `Dict("value" => …)` for a `Colorbar`)
+  inverted from the axis transform in JS.
 - Hover **never** sets `sel` — it is overlay-local. Only `events` containing `:click` round-trip.
 
-A typed `InteractionEvent` wrapper over the dict is shipped via
-`AbstractPlutoDingetjes.Bonds.transform_value`; the raw NamedTuple/Dict is the underlying value.
+A typed `InteractionEvent` is shipped via `AbstractPlutoDingetjes.Bonds.transform_value`, which
+reconstructs it from the raw JS emission — a `Dict` (or, for a selector's multi-echo, a vector of
+them) — rather than trusting the browser's payload for an element kind.
 
 **M4 selector contract — Design D.** The bond value depends on whether the interactable is a
 selector (a `ROIInteractable` with `selects=:layer_id` set) or not:
@@ -376,13 +386,20 @@ target kind from the looked-up layer, and `transform_value` detects the `{ items
 return envelope shape to produce the vector (versus the flat `{layer,index,payload}` dict for
 single events).
 
-**Selected-state lives in the manifest, not a `previous=` kwarg.** Because the overlay is wiped on
-every re-render, a *persistent* "this element is selected" highlight must be re-derived each render.
-The mechanism: the bond value flows back into Julia, Julia marks selected indices as a field **on the
-manifest** for the next render, and JS draws them highlighted on mount. There is no `previous=selection`
-argument (the earlier sketch is dropped) — selection is reconstructed from the bond, carried in the
-manifest, and the round-trip stays flicker-free because the *image* doesn't change, only an overlay
-flag does.
+**Selected-state lives in client-side overlay state, not a `previous=` kwarg or a bond round-trip
+(#103).** A click (or Enter/Space on a keyboard-focused element, or a `selects`-ROI release) sets
+`OverlayState.selHits_` directly in the browser and draws the highlight from it — no bond write
+drives the highlight, and Julia never sees a "mark this selected" instruction back. `selected=`
+supplies only the selection's *starting* value: `build_manifest` stamps a `"selected"` index list
+onto each named layer, and `mount.ts` reads it once at mount to seed both `state.selHits_` (the
+highlight) and `host.value` (the bond, via `initial_value`/`_hydrated_selection` on the Julia
+side) — after that seeding `selected=` plays no further role for that widget instance, and the
+next click replaces the whole selection, hydration included (single-select — a growing set is
+still the `Ref`-accumulator pattern in `demo.jl`). Because the overlay is wiped on every
+re-render, a rebuild always restarts from `selected=`; there is no `previous=` argument and no
+feedback loop writing the selection back onto the manifest for a next render — the caller
+re-supplies `selected=` (typically from the prior bond value) if the same selection should
+survive a rebuild.
 
 ## 6. How it composes — the three interaction tiers
 
@@ -454,6 +471,16 @@ click-to-pick buttons, auto-extracted by `masque(fig)` for data-space text. Ride
 from `Makie.string_boundingboxes` (no font-metric measurement needed — the originally-speculated
 `bbox` primitive was never built). `TextLabel` (a `Block`, needs the figure-block walk rather than
 the plot-scene walk) remains deferred.
+
+**Click-echo selection (shipped, #103):** selection moved fully client-side (§5) — a click sets
+`OverlayState.selHits_` and draws the highlight in the browser, with no bond feedback onto the
+manifest. `selected=` now supplies only the selection's *starting* value: it seeds both the
+highlight and `host.value` at mount (via `initial_value`/`_hydrated_selection`) and plays no
+further role afterward, so a rebuild — the overlay being wiped every re-render — restarts from
+whatever `selected=` says this time. The other half of #103: an element hit's `payload` is now
+reconstructed from the widget's own manifest for every element kind, not only `selected=`
+widgets (`_bond_payload`, §5) — `ev.payload === payloads[i]`, the browser's copy discarded
+outright.
 
 **v2:** plot-object introspection constructors; ABLines/Arc,
 `TextLabel` (Block) support, animation frames, SVG-overlay annotations, spatial hit-test acceleration.
