@@ -256,7 +256,9 @@ primitive, with the exceptions noted inline: `:axis` is shared by two, `LegendIn
 `SegmentInteractable` carries `mode ∈ {:polyline,:pairs}`; `RectInteractable` carries
 `layout ∈ {:grid,:list}`. Same JS test, different Julia extractor. The three M4 drags are
 declared against an axis rather than extracted from a plot, they are the only types whose
-`events` is `(:drag,)`, and their payloads are computed in the browser and converted Julia-side
+*declared* `events` is `(:drag,)` (`RegionInteractable`/`LegendInteractable`/`FunctionInteractable`
+take a caller-supplied `events`, so an instance can carry it too), and their payloads are computed
+in the browser and converted Julia-side
 rather than looked up in the manifest (`_computed_payload`, §5). `:view` layers sort last in the
 manifest so an ordinary drag wins over the catch-all pan/orbit gesture (§6, tension 2), and what
 happens during any of these drags — as opposed to on release — is §12's contract.
@@ -355,8 +357,9 @@ no-server architecture.
 
 **No tier supplies rendering.** All three declare *geometry* — where the regions are and what
 payload each carries. What gets drawn belongs to Makie (the base frame) or to the overlay's fixed
-chrome (highlights, tooltips, the ROI box — §10). An interaction that recomputes a preview frame
-in Julia during a gesture (§12) needs a fourth tier supplying rendering as well as geometry. That
+chrome — highlights and the ROI box (`frontend/src/mount.ts`), tooltips (§10). An interaction
+that recomputes a preview frame in Julia during a gesture (§12) needs a fourth tier supplying
+rendering as well as geometry. That
 tier is the extension point; no API is specified here, and nothing in §12 depends on one. See
 §12.9.
 
@@ -846,6 +849,10 @@ release, a view gesture's release.
 These are separate channels, not two speeds of one. A gesture's in-progress frames carry no value
 the notebook can see; producing that value is what a data interaction is for.
 
+Not every gesture rides this channel. "Gesture" is the larger set: an in-drag ROI box is a
+gesture and answers question 0, so it never leaves the browser. The channel takes only those
+gestures §12.2 routes to question 3.
+
 Classification follows §12.2's rule — not the interactable that produced the state, and not what
 is being manipulated. For every drag interactable Masque ships, release is a data interaction and
 commits through `@bind` exactly as a click does (§12.3); only the in-drag behaviour differs.
@@ -869,8 +876,8 @@ it survives static export. The manifest already carries `AxisTransform` (so any 
 readout or inversion is local), per-element `payloads`, and — for a grid whose cells are at least
 one screen pixel — the cell `values[]` (`GRID_VALUES_MIN_SCREEN_PX`, `src/interactables.jl`).
 What blocks a question-0 answer is more often output surface than data: the overlay is three
-sibling SVGs with no raster layer (§10), so an effect needing per-pixel output has nowhere to
-draw.
+sibling SVGs with no raster layer (`frontend/src/mount.ts`), so an effect needing per-pixel output
+has nowhere to draw.
 
 **View manipulation (#102).** Panning or orbiting changes the image, not an overlay drawn over
 it, and every hit region's projection depends on the camera: question 0 is no. No cell reads the
@@ -896,8 +903,9 @@ The camera does not move in this case, so the projection and every hit region st
 whole drag: a new frame is owed, a new manifest is not, and hit-testing stays live — a hover
 readout keeps working mid-drag. §12.4 and §12.5 divide on that line.
 
-`roadmap.md` states questions 1–3 as its own framing note; question 0 is stated here. The two
-must not diverge on the three they share.
+`roadmap.md` states the same four questions as its own framing note ("Where a value lives").
+This section is the normative statement and carries the reasoning for each branch; the two must
+not diverge.
 
 ### 12.3 What commits, and when
 
@@ -999,8 +1007,16 @@ An internal-only use of the channel can ship without these. A surface a notebook
 cannot.
 
 **Static export degrades loudly.** A live-pull widget in a static export has a dead channel — no
-kernel answers a `with_js_link` call. The widget says so and disables the gesture, and **never
-hangs** waiting on a response that will not come.
+kernel answers a `with_js_link` call. The widget says so and disables the gesture rather than
+failing silently.
+
+Hanging is not the failure mode to design against: Pluto swaps `pluto_actions` for
+`nothing_actions` in a static export, and `request_js_link_response` is not in its `actions_to_keep`
+list, so the call returns `undefined` and Pluto's own `.then` on it throws synchronously on the
+first request (`frontend/common/SliderServerClient.js`, `frontend/components/CellOutput.js`). A
+`with_js_link` call in an export fails fast and loudly by construction. PlutoSliderServer takes the
+same branch, so it does not rescue the case. What the widget owes is catching that throw and
+degrading deliberately, not a timeout.
 
 **A dead channel is detected at use time.** A render-time capability check cannot establish that
 the channel is still live. Exporting does not re-render: `generate_html` serializes existing
@@ -1033,5 +1049,5 @@ picks up #102.
   and needs another commit rule — an idle debounce, an explicit affordance, something else.
   `ViewInteractable` is drag-only today (`events` is `(:drag,)`; `mode` is `"pan"` or `"orbit"`;
   `frontend/src/` has no wheel handler), so nothing is blocked now. `roadmap.md` plans wheel zoom
-  as part of #85 and #105 depends on this channel making zoom cheap, so the rule is needed before
-  either lands.
+  as part of #85, so the rule is needed before #85 lands. #105 does not wait on it: subsampling is
+  worth doing whether or not this channel ships, and the two only compound if both do.
