@@ -384,6 +384,11 @@ argument (the earlier sketch is dropped) — selection is reconstructed from the
 manifest, and the round-trip stays flicker-free because the *image* doesn't change, only an overlay
 flag does.
 
+**In-drag gesture frames never produce a bond value.** A frame shipped to update the view during
+an active drag-to-pan or orbit (§12) does not assign `sel` and does not touch this bond at all —
+only the final, committed camera/`limits` value on gesture release goes through the ordinary path
+above.
+
 ## 6. How it composes — the three interaction tiers
 
 This architecture supports exactly the three tiers from the latency analysis, and the interface maps to
@@ -397,11 +402,16 @@ them cleanly:
   (total = frames × per-frame PNG): ~5.5 MB (187 KB × 30) to ~22 MB (× 120) for a typical plot, 100s of MB
   at scale. The `frames` slot must shrink per-frame cost (downscale / fewer frames) before it ships — §8.
 - **Tier 2 (round-trip):** `:click` events → `@bind`. Discrete server re-render from new state is in
-  scope on **both** backends — it is the substrate of the planned view-manipulation arc (`@bind`
-  re-render of 2D `limits` / 3D `azimuth`/`elevation`, backend-symmetric). What differs is **cost**:
-  `:webgl` re-serializes (~flat) while `:cairo` re-rasterizes (scales with the scene) — see
-  `backend-comparison.md`. *Per-frame* faithful redraw (smooth-drag-as-a-guarantee) is a shared
-  latency wall on both, not a `:cairo`-only exclusion.
+  scope on **both** backends for the *committed* value — a click, a keyboard commit, a slider- or
+  widget-driven view change, or the final camera/`limits` value released at the end of a
+  view-manipulation gesture (drag-to-pan, 3D orbit) — each lands through `@bind` exactly as any
+  other Tier 2 value, backend-symmetric. What differs is
+  **cost**: `:webgl` re-serializes (~flat) while `:cairo` re-rasterizes (scales with the scene) —
+  see `backend-comparison.md`. The **in-drag frames** of a view-manipulation gesture are not Tier 2
+  traffic at all — they never touch `@bind`, never re-execute a cell, and the two backends
+  implement them by completely different mechanisms; see §12 for the contract those frames follow.
+  *Per-frame* faithful redraw (smooth-drag-as-a-guarantee) is a shared latency wall on both, not a
+  `:cairo`-only exclusion.
 
 **Named tensions (accepted, not bugs):**
 1. `AxisInteractable` returns no region geometry — it rides the `:axis` channel as an unbounded
@@ -750,3 +760,134 @@ The per-layer `label` field (§3, `HitLayer`) is the only manifest-shape change 
 (threshold/ROI/view arrow-nudge) is explicitly out of scope: three drag state machines, each
 needing the same live-verification pass across both backends, is a disproportionate v1 cost for
 a feature with a full mouse/touch path already.
+
+## 12. Gesture-channel interaction contract (#102)
+
+This section is the contract for view-manipulation gestures — drag-to-pan, 3D orbit — settled
+before either backend implements it, precisely because `:cairo` and `:webgl` will implement it by
+completely different mechanisms and building one first risks the mechanism getting mistaken for
+the contract. Nothing here changes the committed value's path (§5, §6 Tier 2); it governs only
+the frames shipped while a gesture is in progress.
+
+### 12.1 The distinction: gesture vs. data interaction
+
+A *gesture* is a continuous, in-progress manipulation of the view — drag-to-pan, 3D orbit — whose
+intermediate states are not part of the notebook's analysis; nothing downstream reads the camera
+position mid-drag. A *data interaction* is a click, a keyboard commit (§11), or a `selects`-ROI
+release — a value a downstream cell reads. These are two different channels, not two speeds of one
+channel: a gesture's in-drag frames never carry a value the notebook can see, while producing that
+value is the entire point of a data interaction.
+
+### 12.2 The routing rule
+
+Where a value lives is decided by three questions, in order, regardless of which interactable
+raises it:
+
+1. Does the notebook need this value? → `@bind`.
+2. Must it survive static export? → precompute it and ship it via `published_to_js`.
+3. Neither? → `AbstractPlutoDingetjes.Display.with_js_link` — a pull channel outside Pluto's state
+   management.
+
+An in-drag gesture frame answers no to the first two: nothing downstream reads the intermediate
+camera state, and a static export has no kernel to drive a live gesture anyway. So it routes to
+question 3. This rule is normative for every gesture, not only the view-manipulation case that
+motivated it (issue #102). `roadmap.md` states the same split as its own framing note for this
+work; the two must not diverge.
+
+### 12.3 What commits, and when
+
+In-drag frames never touch the bond. No cell re-execution, no output replacement, no remount —
+producing and displaying a frame during a drag is invisible to Pluto's reactivity entirely. The
+final camera/`limits` value still commits through `@bind` on gesture release, exactly as it does
+today. Commit-on-release is unchanged by this channel; it is only the in-drag frames that move off
+`@bind`, not the committed value's path.
+
+### 12.4 The invariant: projection stays Julia-authored on every frame
+
+Any frame the user sees must be accompanied by hit geometry Julia computed for *that same* camera
+state. No backend may ship 3D (or 2D) coordinates to JS and reproject there. This is the existing
+Julia-authored-projection principle (§2's `InteractionContext`; the client-side-GPU-camera
+non-goal in §7's backend-scope note) extended to hold *per frame*, not only at commit — the
+non-goal itself is untouched, and this invariant is exactly what keeps a gesture channel from
+becoming the JS-driven camera that non-goal rules out. A gesture implementation that ships a new
+frame without a matching manifest, or that lets JS derive geometry from a JS-owned camera, is not
+a conforming implementation of this contract, regardless of how it performs.
+
+This is what makes #87 (3D orbit preview) buildable at all: #87 is parked today because the
+overlay would be a projection at the stale azimuth/elevation once the camera moves without a
+matching re-projection. A gesture channel that reprojects on every frame removes that
+obstruction; a mechanism that doesn't, doesn't satisfy this contract.
+
+### 12.5 Backend obligations (mechanism-independent)
+
+Both backends must, for every frame of a gesture:
+
+- update the displayed frame;
+- replace that frame's hit manifest atomically, so the overlay is never live over a stale frame;
+- not remount;
+- not re-execute a cell.
+
+How they satisfy these obligations differs completely, and that difference is expected, not a gap
+to close: `:cairo` re-renders and ships a fresh PNG plus a fresh manifest over the link; `:webgl`
+patches its GPU buffers in place (#86) rather than shipping a new image. Per the standing
+principle, **backends differ in cost, never in the interaction contract** — a conforming
+implementation is judged against the obligations above, not against `:cairo`'s mechanism, and
+whichever backend is built first must not let its mechanism get mistaken for the contract.
+
+### 12.6 Request discipline
+
+- One in-flight request per widget.
+- Coalesce intermediate pointer moves rather than queueing them — a burst of moves collapses to
+  the latest one, not a backlog to drain.
+- Always await a round trip before issuing the next one. Never fire-and-forget.
+- Never a fixed-interval poll. `with_js_link`'s own docstring warns that polling at a fixed
+  interval can make a notebook unusable.
+
+### 12.7 Nothing carried on this channel is notebook state
+
+`with_js_link` bypasses Pluto's state management by design: nothing it returns is recorded in the
+notebook. That is correct for transient view parameters and wrong for anything the user considers
+part of their analysis. The filter is the same one §12.2's routing rule already applies: if a
+downstream cell needs to read it, it does not belong on this channel — it belongs on `@bind`
+instead, even if that means it isn't a gesture-channel value at all.
+
+### 12.8 Relationship to #83
+
+A channel that never remounts makes the double-remount described in #83 stop mattering *for
+gestures specifically* — there is no remount to double. It does not fix #83, and #83 is not a
+Pluto defect: a self-referencing `@bind` cell is not a sanctioned Pluto use case. Any path that
+still goes through `@bind` — the committed gesture value, or any other bond — still has #83's
+behaviour.
+
+### 12.9 Open questions (left open by design)
+
+The following are constraints a real implementation must satisfy, not answers this document
+supplies. Resolving them is implementation work for whoever picks up #102, not something a
+contract document should pre-empt.
+
+- **Heavy-scene mitigation beyond `ppu=1`.** Constraint, not an answer: a render-bound heavy scene
+  needs some further mitigation to hit a live-preview budget — a further downscale, a
+  render-quality knob during the drag, or an accepted lower frame rate — but which one, and at
+  what threshold, is unresolved. See issue #102 for the measurements establishing that the heavy
+  scene is render-bound.
+- **`:webgl` parity.** Constraint, not an answer: `:webgl`'s mechanism for satisfying §12.5's
+  obligations is genuinely different from `:cairo`'s (in-place buffer patching, #86) and is
+  unmeasured. The shared thing between the backends is the contract in this section, not any
+  particular implementation of it.
+
+The remaining two are one decision, left to the maintainer, because they interact:
+
+- **Static export degradation.** Constraint, not an answer: a live-pull widget rendered into a
+  static export has a dead link — no kernel to answer a `with_js_link` call. Whichever mechanism
+  handles this, it must degrade *loudly* (say so, disable the gesture) and must **never hang**
+  waiting on a response that will never come.
+- **Capability detection cannot distinguish live-session from export-generation.**
+  `is_supported_by_display` returns `true` *while* a static export is being generated, because a
+  kernel is live at that moment to generate it — so a render-time check alone cannot tell "this
+  will stay live for the reader" from "this is live only for the exporter." Constraint, not an
+  answer: whatever the static-export answer above turns out to be, it cannot rely solely on a
+  render-time `is_supported_by_display` check.
+
+These two are flagged together because the export-degradation mechanism has to work correctly
+precisely in the case the capability check cannot detect — so they are one decision, not two
+independent ones.
