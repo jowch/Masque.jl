@@ -37,7 +37,7 @@ Markup
 @masque_str
 ```
 
-See [Tooltips](@ref) for usage and [`architecture.md` §10](https://github.com/jowch/Masque.jl/blob/main/docs/dev/architecture.md)
+See [Tooltips](@ref) for usage and [`architecture/10-tooltips.md` §10](https://github.com/jowch/Masque.jl/blob/main/docs/dev/architecture/10-tooltips.md)
 for the wire format.
 
 ## Custom-interaction interface

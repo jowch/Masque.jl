@@ -174,5 +174,5 @@ the anchor described above. For the mark-anchored kinds the caret sits at the bo
 centre (or top centre, when flipped below); for the cursor-following kinds (axis/threshold/
 ROI/view) it keeps the previous cursor-relative offset and edge-clamping behavior.
 
-See [`architecture.md` §10](https://github.com/jowch/Masque.jl/blob/main/docs/dev/architecture.md)
+See [`architecture/10-tooltips.md` §10](https://github.com/jowch/Masque.jl/blob/main/docs/dev/architecture/10-tooltips.md)
 for the wire format behind all of this.
