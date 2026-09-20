@@ -73,7 +73,8 @@ view) stay overlay-only — that freeze is not for cities omitted from this plot
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-gs-player" title="README demo cities scatter with listed @bind snapshots"
-        style="width:100%;height:480px;border:0;background:transparent;" loading="lazy"></iframe>
+        style="width:100%;height:480px;border:0;background:transparent;overflow:hidden;"
+        scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
 (function () {

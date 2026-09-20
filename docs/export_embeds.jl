@@ -414,6 +414,7 @@ html { font-size: 16px; }
 * { box-sizing: border-box; }
 html, body {
   margin: 0;
+  overflow: hidden;
   background-color: var(--main-bg-color);
   color: var(--pluto-output-color);
   font-family: var(--lato-ui-font-stack);
@@ -552,14 +553,6 @@ pluto-trafficlight {
   visibility: visible;
   transform: none;
 }
-.masque-player-caption {
-  margin: var(--pluto-cell-spacing) 0 0;
-  padding: 0 10px;
-  font-family: var(--lato-ui-font-stack);
-  font-size: 0.85em;
-  color: var(--pluto-schema-types-color);
-  line-height: 1.45;
-}
 """
 
 function pluto_player_css()
@@ -648,12 +641,6 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     down_html = join(idle_down, "\n")
     bond_name = html_escape(string(bond))
     title = html_escape(get(player, "title", "Masque embed"))
-    caption = html_escape(
-        get(
-            player, "caption",
-            "City clicks update the cell below, like live `@bind`. Continuous kinds (ROI, axis, view) stay overlay-only.",
-        ),
-    )
     player_css = pluto_player_css()
 
     html = """
@@ -688,7 +675,6 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
             </div>
           </pluto-output>
         </pluto-cell>
-        <p class="masque-player-caption">$caption</p>
       </pluto-notebook>
       <script>
     {
@@ -730,8 +716,10 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       }
       function sizeFrame() {
         if (!window.frameElement) return;
-        const h = Math.ceil(document.documentElement.scrollHeight);
-        window.frameElement.style.height = h + "px";
+        window.frameElement.style.overflow = "hidden";
+        const nb = document.querySelector("pluto-notebook");
+        const bottom = nb ? nb.getBoundingClientRect().bottom : document.documentElement.scrollHeight;
+        window.frameElement.style.height = Math.max(1, Math.ceil(bottom)) + "px";
       }
       const host = document.querySelector(".ip-host");
       if (host) {
