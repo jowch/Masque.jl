@@ -419,7 +419,7 @@ html, body {
   color: var(--pluto-output-color);
   font-family: var(--lato-ui-font-stack);
 }
-body { position: relative; padding-top: 2.25rem; }
+body { position: relative; padding: 2.25rem 0; }
 pluto-notebook {
   display: block;
   overflow: hidden;
@@ -720,7 +720,8 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         window.frameElement.style.overflow = "hidden";
         window.frameElement.setAttribute("scrolling", "no");
         const nb = document.querySelector("pluto-notebook");
-        const bottom = nb ? nb.getBoundingClientRect().bottom : document.documentElement.scrollHeight;
+        const padBottom = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+        const bottom = (nb ? nb.getBoundingClientRect().bottom : document.documentElement.scrollHeight) + padBottom;
         window.frameElement.style.height = Math.max(1, Math.ceil(bottom)) + "px";
       }
       const host = document.querySelector(".ip-host");

@@ -1,8 +1,11 @@
 /* Clip the iframe to Documenter's code-block radius so it stays an
-   implementation detail (no inner scrollbars). */
+   implementation detail (no inner scrollbars). `margin-bottom: 1em` matches
+   `.content p:not(:last-child)` so the wrap sits with equal gaps to the
+   prose above and below. */
 .masque-embed-wrap {
   border-radius: 4px;
   overflow: hidden;
+  margin-bottom: 1em;
 }
 .masque-embed-wrap iframe {
   display: block;
