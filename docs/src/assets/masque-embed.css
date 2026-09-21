@@ -3,7 +3,7 @@
    owned by the wrap (`margin-block: 1em`, same as `.content p:not(:last-child)`),
    not the preceding paragraph's margin-bottom. */
 .content > p:has(+ .masque-embed-wrap) {
-  margin-bottom: 0;
+  margin-bottom: 0 !important;
 }
 .masque-embed-wrap {
   border-radius: 4px;
