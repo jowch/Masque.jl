@@ -2,7 +2,6 @@ import Pkg
 using Pluto
 using TOML
 using UUIDs
-using JSON3
 
 # Homebrew cell-series player harvest. Getting-started embed is the README GIF demo
 # (`docs/dev/readme-demo/notebook.jl`): nbpkg-on, in-process against docs/Project.toml.
@@ -42,7 +41,7 @@ end
 
 function manifest_bytes(published::AbstractDict)
     isempty(published) && return 0
-    return maximum(sizeof(JSON3.write(jsonable(v))) for v in values(published); init = 0)
+    return maximum(sizeof(json_write(jsonable(v))) for v in values(published); init = 0)
 end
 
 function harvest_session(; distributed::Bool)

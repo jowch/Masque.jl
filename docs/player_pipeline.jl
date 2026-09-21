@@ -1,8 +1,14 @@
 # String pipeline for the cell-series player. No Pluto — Core tests include this
 # file; harvest (`export_embeds.jl`) includes it too.
 
-using JSON3
 using TOML
+
+# JSON3 1.14.3 calls Parsers.typeparser / neededdigits (Parsers 2). Documenter's
+# JSON.jl 1.9 loads Parsers 3 into this process, and Julia can only bind one
+# Parsers per UUID, so harvest writes through JSON.jl instead.
+const _JSON = Base.require(Base.PkgId(Base.UUID("682c06a0-de6a-54ab-a142-c8b1cf79cde6"), "JSON"))
+json_write(x) = _JSON.json(x)
+json_read(s::AbstractString) = _JSON.parse(s)
 
 const PLAYER_TOML_RE = r"PLUTO_PLAYER_TOML_CONTENTS\s*=\s*\"\"\"(.*?)\"\"\""s
 const GETPUB_RE = r"getPublishedObject\(\"([^\"]+)\"\)"
@@ -41,7 +47,7 @@ function snapshot_key(v)
     end
     (haskey(d, "layer") && haskey(d, "index")) &&
         return string(d["layer"], ":", Int(d["index"]))
-    return JSON3.write(jsonable(d))
+    return json_write(jsonable(d))
 end
 
 jsonable(::Nothing) = nothing
@@ -71,7 +77,7 @@ function rewrite_published_to_js(html::AbstractString, published::AbstractDict)
             id = match(GETPUB_RE, m).captures[1]
             haskey(published, id) || error("published object $id missing from cell")
             n[] += 1
-            return JSON3.write(jsonable(published[id]))
+            return json_write(jsonable(published[id]))
         end
     )
     return rewritten, n[]
@@ -140,7 +146,7 @@ function inject_manifest_snapshots(html::AbstractString, snapshots)
     start = findfirst(needle, html)
     start === nothing && error("no inlined manifest to attach snapshots")
     json, j0, j1 = extract_json_object(html, last(start))
-    obj = JSON3.read(String(json), Dict{String, Any})
+    obj = json_read(String(json))
     obj["snapshots"] = jsonable(snapshots)
-    return html[1:(j0 - 1)] * JSON3.write(obj) * html[(j1 + 1):end]
+    return html[1:(j0 - 1)] * json_write(obj) * html[(j1 + 1):end]
 end
