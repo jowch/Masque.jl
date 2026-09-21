@@ -126,34 +126,49 @@ try {
     if (!ok) throw new Error(`dragHost(${idx}) failed — no surface`);
   }
 
-  async function waitChange(sel, before, label, ms = 120000) {
+  // #102/§12.3: a view gesture commits nothing — waitChange() used to poll #panout/#orbout for
+  // a bond change that this drag will never produce. gestureStamp() reads mount.ts's
+  // host.dataset.masqueGestureFrame instead: written atomically with every {png, manifest} swap
+  // the gesture channel applies, so its counter advancing is the real "a frame landed" signal,
+  // the same one test/e2e/kind_sweep.mjs's view/view-gesture-frame check uses.
+  async function gestureStamp(idx) {
+    return page.evaluate((i) => {
+      const host = [...document.querySelectorAll(".ip-host")][i];
+      return host?.dataset.masqueGestureFrame ?? null;
+    }, idx);
+  }
+  async function waitStamp(idx, before, label, ms = 120000) {
     const t0 = Date.now();
     while (Date.now() - t0 < ms) {
-      const now = await page.locator(sel).innerText();
-      if (now !== before) return now;
+      const now = await gestureStamp(idx);
+      if (now && now !== before) return now;
       await page.waitForTimeout(500);
     }
-    throw new Error(`${label}: no change from ${JSON.stringify(before)}`);
+    throw new Error(`${label}: gesture-channel frame never landed (stamp stayed ${JSON.stringify(before)})`);
   }
 
   // --- pan (drag surface above #panout) ---
   const panIdx = await hostNear("#panout");
   record("pan-host-index", panIdx >= 0, { panIdx });
   const panBefore = await page.locator("#panout").innerText();
+  const panStampBefore = await gestureStamp(panIdx);
   await dragHost(panIdx, 80, 0);
-  const panAfter = await waitChange("#panout", panBefore, "pan-drag");
-  const panOk = /:view/.test(panAfter) || /InteractionEvent/.test(panAfter);
-  record("drag-pan-bind", panOk, panAfter.slice(0, 160));
+  const panStampAfter = await waitStamp(panIdx, panStampBefore, "pan-drag");
+  const panAfter = await page.locator("#panout").innerText();
+  record("drag-pan-no-commit", panAfter === panBefore, panAfter.slice(0, 160));
+  record("drag-pan-gesture-frame", /"n":\d+/.test(panStampAfter), panStampAfter);
   await page.locator(".ip-host").nth(panIdx).screenshot({ path: path.join(evidence, "02-after-pan.png") });
 
   // --- orbit ---
   const orbIdx = await hostNear("#orbout");
   record("orbit-host-index", orbIdx >= 0, { orbIdx });
   const orbBefore = await page.locator("#orbout").innerText();
+  const orbStampBefore = await gestureStamp(orbIdx);
   await dragHost(orbIdx, 100, 40);
-  const orbAfter = await waitChange("#orbout", orbBefore, "orbit-drag");
-  const orbOk = /:view/.test(orbAfter) || /InteractionEvent/.test(orbAfter);
-  record("drag-orbit-bind", orbOk, orbAfter.slice(0, 160));
+  const orbStampAfter = await waitStamp(orbIdx, orbStampBefore, "orbit-drag");
+  const orbAfter = await page.locator("#orbout").innerText();
+  record("drag-orbit-no-commit", orbAfter === orbBefore, orbAfter.slice(0, 160));
+  record("drag-orbit-gesture-frame", /"n":\d+/.test(orbStampAfter), orbStampAfter);
   await page.locator(".ip-host").nth(orbIdx).screenshot({ path: path.join(evidence, "03-after-orbit.png") });
 
   const interesting = pageErrors.filter((m) => !/ResizeObserver|favicon/i.test(m));

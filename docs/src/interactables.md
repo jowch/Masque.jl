@@ -80,7 +80,7 @@ takes neither an `Axis` nor `id` as constructor arguments at all — see
 | `LegendInteractable(leg; targets = nothing, id = :legend)` | takes a `Makie.Legend` block, not an `Axis`; one hit region per entry, bounded to that entry's row | `targets` — a `Dict{label => id(s)}` or one entry per legend entry; default auto-resolves from the plots each entry's elements were built from | `(; label, group, targets)` — see [Legend](@ref) |
 | `ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold)` | a draggable line (`:horizontal` = constant-y, dragged vertically; `:vertical` = constant-x); live readout while dragging, commit on mouse-up | `orientation`, `value` (initial position) | scalar data coord, on release |
 | `ROIInteractable(ax; bounds = (xmin, xmax, ymin, ymax), selects = nothing, id = :roi)` | a draggable + resizable box; move (interior) / resize (a corner resizes two edges, an edge midpoint resizes just that one); commit on mouse-up | `selects` — another layer's `id`; if set, the box reports every element of that layer it encloses instead of committing its own bounds (`circles`/`grid` layers only — see [Multi-element selectors](@ref)) | `(; xmin, xmax, ymin, ymax)`, on release (or `Vector{InteractionEvent}` with `selects`) |
-| `ViewInteractable(ax; id = :view)` | drag-to-pan (2D) or drag-to-rotate (Axis3); commit on mouse-up; Shift+drag forces view over ROI/threshold | — | 2D: `(; xmin, xmax, ymin, ymax)`; 3D: `(; azimuth, elevation)` |
+| `ViewInteractable(ax; id = :view)` | drag-to-pan (2D) or drag-to-orbit (Axis3); commits nothing; Shift+drag forces view over ROI/threshold | — | none — a camera isn't an analysis value (§12.3); `:cairo` streams a live gesture-channel preview instead |
 
 ## From a plot object
 

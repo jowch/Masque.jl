@@ -172,7 +172,7 @@ pan_seed = (0.0, 8.0, 0.0, 40.0)
 # ╔═╡ 50000000-0000-0000-0000-000000000042
 begin
     pan_fig = Figure(size = (500, 320))
-    pan_ax = Axis(pan_fig[1, 1]; limits = pan_seed, title = "drag to pan — commit on release")
+    pan_ax = Axis(pan_fig[1, 1]; limits = pan_seed, title = "drag to pan — live preview, commits nothing")
     scatter!(pan_ax, first.(zoom_data), last.(zoom_data); color = :dodgerblue, markersize = 18)
     pan_pts = PointInteractable(pan_ax, zoom_data; id = :scatter)
     pan_view = ViewInteractable(pan_ax)
@@ -206,7 +206,7 @@ end
 
 # ╔═╡ 50000000-0000-0000-0000-000000000050
 md"""
-## Drag-to-rotate (Axis3) — commit on release
+## Drag-to-rotate (Axis3) — commits nothing
 
 Same shape as the pan demo above: `ViewInteractable` commits nothing (§12.3), so `orbit_committed`
 below is always `orb_seed` and the bottom figure is a static duplicate — drag the top plot to see

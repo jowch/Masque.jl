@@ -52,14 +52,30 @@ export function createGestureChannel(
     if (!render || uiDisabled()) return noopChannel
     let lock: Promise<void> = Promise.resolve()
     let latest: Record<string, unknown> | null = null // a newer position overwrites an older one still queued
+    // A queued terminal request. Kept in its OWN slot, never `latest` (round-1 review, finding
+    // #1): the caller's `settle()` isn't awaited (a `PointerEvent` handler can't block on one
+    // without going async itself), so nothing stops a second drag's `request()` from arriving
+    // before the round trip ahead of it in `lock` has even started — if that request shared
+    // `latest` with a still-unsent settle, it would silently overwrite it, and the widget would
+    // never see the settle:true frame that restores `px_per_unit` back from the in-drag `1`.
+    // Once this is set it can only be consumed by `runLatest` or cleared by `dispose`/a fresh
+    // `settle` — `request` below refuses to touch it at all.
+    let pendingSettle: Record<string, unknown> | null = null
     let disposed = false
 
-    // Consumes whatever `latest` holds AT THE TIME THIS RUNS — which may already be newer than
-    // whatever position scheduled this call, if further positions arrived while this was
-    // waiting its turn in `lock`. That's the coalescing: only ever the newest position is sent.
+    // Prefers `pendingSettle` over `latest` — a terminal request always wins over a stray
+    // in-drag position still sitting in the coalescing slot. Consumes whichever it picks AT THE
+    // TIME THIS RUNS, which may already be newer than whatever scheduled this call, if further
+    // positions arrived while this was waiting its turn in `lock`.
     const runLatest = (): Promise<void> => {
-        const input = latest
-        latest = null
+        let input: Record<string, unknown> | null
+        if (pendingSettle !== null) {
+            input = pendingSettle
+            pendingSettle = null
+        } else {
+            input = latest
+            latest = null
+        }
         if (!input || disposed) return Promise.resolve()
         let pending: Promise<FrameResponse>
         try {
@@ -74,20 +90,26 @@ export function createGestureChannel(
             return Promise.resolve()
         }
         return pending.then(
-            (r) => { if (!disposed) onFrame(input, r) },
+            (r) => { if (!disposed) onFrame(input as Record<string, unknown>, r) },
             () => { disposed = true }, // a rejected round trip degrades the same way a thrown one does
         )
     }
 
     return {
         request(input) {
-            if (disposed) return
+            // A pending settle always wins. Dropping this request outright (not queueing it
+            // behind the settle) is deliberate: it belongs to a gesture racing a terminal frame
+            // that hasn't even been sent yet, so painting it first would show a preview the
+            // about-to-land settle frame immediately supersedes anyway — the brief gap until the
+            // settle round trip clears is the cost, paid instead of ever losing a terminal frame.
+            if (disposed || pendingSettle !== null) return
             latest = input
             lock = lock.then(runLatest)
         },
         settle(input) {
             if (disposed) return Promise.resolve()
-            latest = input
+            latest = null // a terminal request supersedes anything mid-drag still queued
+            pendingSettle = input
             const done = lock.then(runLatest)
             lock = done
             return done
@@ -95,6 +117,7 @@ export function createGestureChannel(
         dispose() {
             disposed = true
             latest = null
+            pendingSettle = null
         },
     }
 }

@@ -1,6 +1,6 @@
-import { SVG_NS, renderSelection } from "./highlight"
+import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex } from "./selection"
-import { onLeave } from "./hover"
+import { onLeave, hideTip } from "./hover"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import * as thresholdDrag from "./drag/threshold"
@@ -392,6 +392,26 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.roiBoxes_ = roiDrag.buildROIBoxes(newManifest, plainSvg)
         ctx.focusable_ = buildFocusable(newManifest)
         ctx.layerStarts_ = computeLayerStarts(ctx.focusable_)
+
+        // §12.5: never leave the overlay live over a frame it no longer describes. A camera
+        // move invalidates every hit region, so a hover ring (g.hi), a legend-linked highlight
+        // (g.link), or a keyboard-focus ring drawn from the OLD geometry is exactly as stale as
+        // the threshold/ROI DOM torn down above — a full remount used to wipe all of this for
+        // free, and this reproduces that "nothing focused/hovered" baseline by hand (inlined,
+        // not a call to keyboard.ts's focusTo(null), which fades g.hi/g.link out over
+        // MOTION_MS — there is nothing valid to fade FROM here, the shape is simply gone, so
+        // this clears immediately instead). Selection is the one piece of this state that
+        // intentionally does NOT reset here — re-keyed above instead — because masque()'s own
+        // `selected=` hydration promises it survives a rebuild; hover/focus carry no such
+        // promise, and "no focus" is the same safe default a remount produced.
+        state.focusIdx_ = null
+        state.focusHit_ = null
+        state.focusTipHtml_ = null
+        state.focusTipCss_ = null
+        ctx.surface_.classList.remove("kbd-ring")
+        clearHiImmediate(state, ctx.hiGroup_)
+        clearLinkImmediate(state, ctx.linkGroup_)
+        hideTip(ctx, state)
 
         // Re-key the LIVE selection against the new layer objects — do NOT re-derive it from
         // the new manifest's own `selected=` field, which is only the mount-time hydration seed;

@@ -1215,6 +1215,114 @@ describe("tooltips (mount/showTip)", () => {
         expect(last.xmax as number).toBeCloseTo(10 - 10 * 200 / 1200)
     })
 
+    // Round-1 review, finding #2: settle used to be gated on the RELEASE point's own distance
+    // from the drag's start, so a drag that went out past VIEW_MIN_PX (sending ppu=1 in-drag
+    // requests) and drifted back near its start before release read as a micro-drag at release
+    // time and never settled — stranding the widget at ppu=1 forever, since nothing else
+    // re-renders it.
+    it("gesture channel: settles even when the release point drifts back near the drag's start", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [{ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }],
+        }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]) }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 100, bubbles: true })) // out past VIEW_MIN_PX
+        await flushFrame()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        // drift back to within VIEW_MIN_PX (3 image-px = 1.5 client-px at this fixture's 2x scale)
+        // of the drag's start before releasing.
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 101, clientY: 100, bubbles: true }))
+        await flushFrame()
+
+        const calls = requestFrame.mock.calls; const last = calls[calls.length - 1][0]
+        expect(last).toMatchObject({ id: "view", settle: true }) // settled anyway — a request had already gone out
+    })
+
+    // Round-1 review, finding #2 (second half): onCancel/onLostCapture never settled at all, so
+    // an aborted gesture (browser-initiated takeover, stylus leaving range, capture lost some
+    // other way) that had already sent in-drag requests left the widget at ppu=1 permanently.
+    it("gesture channel: pointercancel and lostpointercapture both settle if a request went out", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [{ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }],
+        }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]) }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 100, bubbles: true }))
+        await flushFrame()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        surface.dispatchEvent(new PointerEvent("pointercancel", { clientX: 210, clientY: 100, bubbles: true }))
+        await flushFrame()
+        expect(requestFrame).toHaveBeenCalledTimes(2)
+        expect(requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]).toMatchObject({ id: "view", settle: true })
+
+        // A second drag, ended by lostpointercapture instead (no position available to that
+        // handler at all — it has to resettle with the last request's own camera).
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 250, clientY: 100, bubbles: true }))
+        await flushFrame()
+        expect(requestFrame).toHaveBeenCalledTimes(3)
+        surface.dispatchEvent(new PointerEvent("lostpointercapture", { bubbles: true }))
+        await flushFrame()
+        expect(requestFrame).toHaveBeenCalledTimes(4)
+        expect(requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]).toMatchObject({ id: "view", settle: true })
+    })
+
+    // Round-1 review, finding #3: a manifest-carrying frame swap tore down ROI/threshold and
+    // re-keyed selection, but left g.hi (hover ring) drawn from the OLD geometry — §12.5 forbids
+    // leaving the overlay live over a frame it no longer describes, and a view drag starting
+    // from (or shortly after) a hovered point is a supported path, not an edge case.
+    it("gesture channel: a manifest-swap frame clears the stale hover ring, not just selection", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20], payloads: [{ i: 0 }],
+                    axis: "ax1", events: ["click", "hover"] },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const movedManifest: Manifest = {
+            ...m,
+            layers: [{ ...m.layers[0], geometry: [400, 400, 20] }, m.layers[1]],
+        }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]), manifest: movedManifest }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+
+        // Hover the point first (image px 600,400 -> CSS 300,200 at this fixture's 2x scale).
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+        expect(hiChildren(shadow).length).toBeGreaterThan(0)
+
+        // A view drag elsewhere on the surface — onDown/onPointerMove never re-evaluate hover
+        // once a drag starts, so nothing but applyFrame's own cleanup can clear this ring.
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+
+        expect(hiChildren(shadow).length).toBe(0) // not left describing the point's stale, pre-pan position
+    })
+
     it("points+view: hover and click still work over the full-viewport view layer", async () => {
         // Regression: :view used to win every drag hitTest and suppress element hover/click.
         const m: Manifest = {
@@ -1370,13 +1478,20 @@ describe("tooltips (mount/showTip)", () => {
     // exact spot. The mock response's "pts" layer moves to a NEW position, simulating what a
     // real pan does to every layer on the panned axis; the selection ring has to track it.
     it("a frame swap with a new manifest preserves the live selection at its NEW coordinates", async () => {
+        // Two points, unselected at mount — the test SELECTS index 1 itself (a real click), so
+        // the assertion below can distinguish "applyFrame re-keyed the LIVE selection" from
+        // "applyFrame re-hydrated from the new manifest's own selected=" (round-1 review's
+        // sharpest nit): movedManifest below declares selected: [0] on this layer, a DIFFERENT
+        // index than the one actually clicked. A re-hydration bug would show index 0 at its new
+        // position; re-keying shows index 1 at ITS new position. The original fixture selected
+        // index 0 via selected= in BOTH manifests, so it could not tell the two apart.
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,
             transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
                 viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
             layers: [
-                { id: "pts", kind: "circles", geometry: [600, 400, 20], payloads: [{ i: 0 }],
-                    axis: "ax1", events: ["click", "hover"], selected: [0] },
+                { id: "pts", kind: "circles", geometry: [200, 400, 20, 900, 400, 20], payloads: [{ i: 0 }, { i: 1 }],
+                    axis: "ax1", events: ["click", "hover"] },
                 { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
                     geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
             ],
@@ -1385,7 +1500,9 @@ describe("tooltips (mount/showTip)", () => {
             ...m,
             transforms: { ax1: { ...m.transforms.ax1, xlims: [-10, 0] } },
             layers: [
-                { ...m.layers[0], geometry: [400, 400, 20] }, // the point panned 200px left
+                // both points panned 200px left; selected: [0] is deliberately NOT what the test
+                // clicks (index 1) — see the comment above.
+                { ...m.layers[0], geometry: [0, 400, 20, 700, 400, 20], selected: [0] },
                 m.layers[1],
             ],
         }
@@ -1393,21 +1510,26 @@ describe("tooltips (mount/showTip)", () => {
         const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]), manifest: movedManifest }))
         mount(script, m, undefined, requestFrame)
         const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+
+        // Real click on index 1 (image px 900,400 -> CSS 450,200 at this fixture's 2x scale).
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 200, bubbles: true }))
         expect(selChildren(shadow).length).toBe(2) // closed-shape selection draws BOTH fill+edge halves
 
         let fired = false
         host.addEventListener("input", () => { fired = true })
-        const surface = shadow.querySelector(".surface") as HTMLElement
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
         await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
 
-        expect(fired).toBe(false) // §12.3: still no commit, even once a frame has landed
         expect(selChildren(shadow).length).toBe(2) // selection survived the manifest swap (still fill+edge)
-        // The ring is drawn from the NEW geometry (cx=400), not the stale pre-swap one (cx=600).
+        // The ring is drawn at index 1's NEW position (cx=700) — not its stale pre-swap position
+        // (900), and not index 0's new position (0), which is what a selected= re-hydration bug
+        // would show instead.
         const drawn = selChildren(shadow).find((el) => el.tagName.toLowerCase() === "circle")
-        expect(drawn?.getAttribute("cx")).toBe("400")
+        expect(drawn?.getAttribute("cx")).toBe("700")
+        expect(fired).toBe(false) // §12.3: the DRAG itself still commits nothing, even once a frame has landed
     })
 })
 

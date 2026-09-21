@@ -77,7 +77,16 @@ export type Drag =
         mode_: { corner: number } | { edge: "n" | "s" | "w" | "e" } | { move: true }
         ax_: number; ay_: number; target_?: HitLayer; pointerId_: number
     }
-    | { kind: "view"; id_: string; g_: ViewGeometry; t_: AxisTransform; x0_: number; y0_: number; pointerId_: number }
+    | {
+        kind: "view"; id_: string; g_: ViewGeometry; t_: AxisTransform; x0_: number; y0_: number; pointerId_: number
+        // The last gesture-channel request payload actually sent for this drag (round-1 review,
+        // finding #2) — `undefined` until the first one past VIEW_MIN_PX. bond.ts's terminal
+        // handlers (onUp/onCancel/onLostCapture) gate `settle()` on this, not on the drag's
+        // final release distance: a drag that went out past VIEW_MIN_PX and back below it before
+        // release still owes a settle (ppu=1 was sent at least once and has to be restored), and
+        // onCancel/onLostCapture have no "was this ever a real drag" signal of their own at all.
+        lastInput_?: Record<string, unknown>
+    }
 
 // Construction-time DOM/manifest refs, built once by mount.ts and threaded read-mostly through
 // hover/drag/bond as `ctx`. Distinct from OverlayState, which is the mutable interaction state.

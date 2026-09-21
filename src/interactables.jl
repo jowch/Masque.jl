@@ -1087,7 +1087,9 @@ function hitlayers(i::ViewInteractable, ctx)
         "mode" => t.is3d ? "orbit" : "pan",
     )
     if t.is3d
-        # Current camera — JS computes the committed (azimuth, elevation) from the pixel delta.
+        # Current camera — JS computes the drag's (azimuth, elevation) from the pixel delta, for
+        # the Tier-0 readout and (on :cairo) the gesture-channel request payload. Never committed
+        # (§12.3): a view gesture reports no InteractionEvent at all.
         geom["azimuth"] = Float64(i.ax.azimuth[])
         geom["elevation"] = Float64(i.ax.elevation[])
     end
