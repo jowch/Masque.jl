@@ -982,7 +982,7 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[deps.Masque]]
 deps = ["AbstractPlutoDingetjes", "Base64", "FileIO", "HypertextLiteral", "Makie"]
-path = "/workspace/"
+path = "../../.."
 uuid = "82b01fb5-7eeb-4559-83ea-8d75f85d4328"
 version = "0.1.0"
 

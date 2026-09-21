@@ -9,7 +9,9 @@ using JSON3
 
 const PLAYER_CELL_ID = UUID("e1be0000-0000-4000-8000-000000000001")
 const PLAYER_TOML_RE = r"PLUTO_PLAYER_TOML_CONTENTS\s*=\s*\"\"\"(.*?)\"\"\""s
-const EMBED_BUDGET = 2 * 1024 * 1024 # warn, never fail
+# Extra snapshot bytes (downstream HTML + rebuilt PNG/manifest beyond idle), not
+# n_states × png. Warn only — never fail make.jl, never drop listed cities.
+const EMBED_BUDGET = 2 * 1024 * 1024
 const GETPUB_RE = r"getPublishedObject\(\"([^\"]+)\"\)"
 const SCRIPT_RE = r"<script([^>]*)>(.*?)</script>"s
 
@@ -603,6 +605,31 @@ function inject_manifest_snapshots(html::AbstractString, snapshots)
     return html[1:(j0 - 1)] * JSON3.write(obj) * html[(j1 + 1):end]
 end
 
+# Extra = listed-state payload beyond idle. Idle PNG + overlay IIFE + idle cell HTML
+# are paid once. Each non-idle row adds downstream HTML, plus a rebuilt PNG/manifest
+# only if masque() actually remounted (byte-identical widget HTML is not counted).
+function extra_snapshot_bytes(states, cells)
+    isempty(states) && return 0
+    idle_idx = findfirst(st -> st.key == "null", states)
+    idle = idle_idx === nothing ? first(states) : states[idle_idx]
+    widget_id = string(first(cells).cell_id)
+    idle_widget = get(idle.record.htmls, widget_id, "")
+    extra = 0
+    for st in states
+        st.key == idle.key && continue
+        for c in cells
+            cid = string(c.cell_id)
+            html = st.record.htmls[cid]
+            if cid == widget_id
+                html == idle_widget || (extra += sizeof(html))
+            else
+                extra += sizeof(html)
+            end
+        end
+    end
+    return extra
+end
+
 function emit_player(path, outpath, player, cells, states, bond::Symbol)
     widget = first(cells)
     downstream = cells[2:end]
@@ -633,10 +660,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     end
 
     n_states = length(states)
-    cost = n_states * max(man_b, png_b)
-    if cost > EMBED_BUDGET
-        @warn "embed snapshot cost exceeds budget (warn only)" path = basename(path) n_states cost budget = EMBED_BUDGET manifest_bytes = man_b png_bytes = png_b
-    end
+    extra = extra_snapshot_bytes(states, cells)
 
     widget_html = inject_manifest_snapshots(something(idle_html), snapshots)
     down_html = join(idle_down, "\n")
@@ -761,9 +785,14 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     """
     mkpath(dirname(outpath))
     write(outpath, html)
+    player_bytes = filesize(outpath)
+    idle_paid = sizeof(something(idle_html)) + sum(sizeof, idle_down)
+    if extra > EMBED_BUDGET
+        @warn "embed extra snapshot bytes exceed budget (warn only; not failing)" path = basename(path) n_states extra budget = EMBED_BUDGET png_bytes = png_b manifest_bytes = man_b player_bytes idle_paid
+    end
     return (;
-        outpath, n_states, cost, png_b, man_b, n_inlined_total,
-        size = filesize(outpath),
+        outpath, n_states, extra, png_b, man_b, n_inlined_total,
+        size = player_bytes, idle_paid,
     )
 end
 
@@ -775,6 +804,7 @@ function harvest_one(session, path::AbstractString, outdir::AbstractString; reta
     haskey(player, "states") || error("player TOML missing states in $path")
     bond = Symbol(player["bond"])
     file_hash_before = hash(read(path))
+    assert_embed_masque_path_relative(path)
 
     nb = open_embed(session, path; retarget_docs)
     try
@@ -853,7 +883,8 @@ function export_embeds(outdir = joinpath(@__DIR__, "src", "embeds"))
         info = harvest_embed(path, outdir)
         elapsed = round(time() - t0; digits = 1)
         size_kb = round(info.size / 1024; digits = 1)
-        @info "✓ embed $(basename(path))" harvest = info.harvest elapsed_s = elapsed size_kb = size_kb n_states = info.n_states png_bytes = info.png_b manifest_bytes = info.man_b inlined = info.n_inlined_total
+        extra_kb = round(info.extra / 1024; digits = 1)
+        @info "✓ embed $(basename(path))" harvest = info.harvest elapsed_s = elapsed size_kb = size_kb extra_kb = extra_kb n_states = info.n_states png_bytes = info.png_b manifest_bytes = info.man_b inlined = info.n_inlined_total
     end
     return
 end
@@ -871,11 +902,69 @@ function write_getting_started_notebook(path = joinpath(@__DIR__, "src", "embeds
     return path
 end
 
+# nbpkg `Pkg.develop` records an absolute path. Embeds must ship checkout-relative
+# (`../../..` from `docs/src/embeds/` to the repo root) so they open off this VM.
+const MANIFEST_TOML_RE = r"PLUTO_MANIFEST_TOML_CONTENTS\s*=\s*\"\"\"(.*?)\"\"\""s
+
+function embed_masque_relpath(nb_path::AbstractString, repo = normpath(joinpath(@__DIR__, "..")))
+    return replace(relpath(abspath(repo), abspath(dirname(nb_path))), '\\' => '/')
+end
+
+function embed_manifest_toml(nb_path::AbstractString)
+    src = read(nb_path, String)
+    m = match(MANIFEST_TOML_RE, src)
+    m === nothing && error("embed $(basename(nb_path)): missing PLUTO_MANIFEST_TOML_CONTENTS")
+    return src, m
+end
+
+function _nbpkg_masque_entry(parsed)
+    deps = get(parsed, "deps", nothing)
+    deps isa AbstractDict || return nothing
+    masque = get(deps, "Masque", nothing)
+    masque isa AbstractVector && return only(masque)
+    return masque
+end
+
+function embed_masque_nbpkg_path(nb_path::AbstractString)
+    _, m = embed_manifest_toml(nb_path)
+    parsed = TOML.parse(String(m.captures[1]))
+    masque = _nbpkg_masque_entry(parsed)
+    masque isa AbstractDict && haskey(masque, "path") ||
+        error("embed $(basename(nb_path)): nbpkg Manifest missing [deps.Masque] path")
+    return String(masque["path"])
+end
+
+function assert_embed_masque_path_relative(nb_path::AbstractString)
+    p = embed_masque_nbpkg_path(nb_path)
+    isabspath(p) && error("embed nbpkg Masque path must be checkout-relative, got $(repr(p)) in $(basename(nb_path))")
+    return p
+end
+
+function rewrite_embed_masque_path!(nb_path::AbstractString, repo = normpath(joinpath(@__DIR__, "..")))
+    src, m = embed_manifest_toml(nb_path)
+    rel = embed_masque_relpath(nb_path, repo)
+    old_path = embed_masque_nbpkg_path(nb_path)
+    manifest = String(m.captures[1])
+    needle = "path = \"$old_path\""
+    occursin(needle, manifest) || error("embed $(basename(nb_path)): could not find $needle in nbpkg Manifest")
+    new_manifest = replace(manifest, needle => "path = \"$rel\"", count = 1)
+    i = m.offset
+    j = i + ncodeunits(m.match) - 1
+    new_cell = "PLUTO_MANIFEST_TOML_CONTENTS = \"\"\"$(new_manifest)\"\"\""
+    new_src = src[1:(i - 1)] * new_cell * src[(j + 1):end]
+    if new_src != src
+        write(nb_path, new_src)
+        @info "rewrote nbpkg Masque path to checkout-relative" path = basename(nb_path) masque_path = rel
+    end
+    return assert_embed_masque_path_relative(nb_path)
+end
+
 function fill_embed_nbpkg(path::AbstractString, repo = normpath(joinpath(@__DIR__, "..")))
     Pluto.activate_notebook_environment(path) do
         Pkg.develop(; path = repo)
         Pkg.add("CairoMakie")
     end
     Pluto.will_use_pluto_pkg(path) || error("fill_embed_nbpkg left nbpkg off for $path")
+    rewrite_embed_masque_path!(path, repo)
     return path
 end
