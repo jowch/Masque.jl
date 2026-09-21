@@ -45,17 +45,17 @@ and which stay in the overlay, see [Hover, click, and bind](@ref).
 
 ## Overlay the cities scatter
 
-If this notebook has not loaded Masque yet, paste the [Install](@ref)
-cell first (clone, `Pkg.develop`, then `using Masque, CairoMakie`). Skip
-the load cell if this notebook already ran it. Do not paste `using` twice —
-Pluto reports multiple definitions for CairoMakie and Masque.
+If this notebook has not loaded Masque yet, paste an [Install](@ref)
+load cell first (`Pkg.develop` or `Pkg.add(url=…)`, then
+`using Masque, CairoMakie`). Skip the load cell if this notebook already
+ran it. Do not paste `using` twice — Pluto reports multiple definitions
+for CairoMakie and Masque.
 
 The entry function is lowercase `masque`. A function named `Masque` clashes
 with `module Masque`. With no backend loaded, `masque` raises
 `ArgumentError`.
 
-**1.** Create the cities scatter and its interactable. Pass `radius=` so the
-   highlight sits on the drawn disc:
+**1.** Create the cities scatter and its interactable:
 
 ```julia
 begin
@@ -109,102 +109,45 @@ end
 Pluto rejects two cells that both `@bind` the same name. Replace the bind
 cell; do not add a second.
 
+Hold the pointer over a city. The tooltip shows the name and population.
+That path does not assign `pick` and does not re-run cells that read
+`pick`. Do not write a cell that reads `pick` expecting it to update when
+you hold the pointer over a city.
+
 **3.** Read the pick:
 
 ```julia
 pick === nothing ? "click a city" : "$(pick.payload.city) selected"
 ```
 
-Before a click, `pick` is `nothing` (unless you pass `selected=`). After a
-click, `pick` is an [`InteractionEvent`](@ref): `layer` is `:cities`,
-`index` is 0-based, and `payload` is the Julia object from
-`payloads[index + 1]` (`===`, not a JSON copy). Index it as
-`pick.payload.city`, not `pick.payload.label`. A click in empty space does
-not write the bond and does not clear the selection.
+Click a city. The readout becomes `"Tokyo selected"` (or whichever city
+you clicked). Before a click, `pick` is `nothing`. After a click, `pick`
+is an [`InteractionEvent`](@ref): `layer` is `:cities`, `index` is
+0-based, and `payload` is the Julia object from `payloads[index + 1]`
+(`===`, not a JSON copy). Index it as `pick.payload.city`, not
+`pick.payload.label`. A click in empty space does not write the bond and
+does not clear the selection.
 
 `InteractionEvent` is exported by Masque. Do not redefine it in the
 notebook.
 
-`payloads` length must match the points (`ArgumentError` otherwise). Each
-payload is a NamedTuple `(; city, pop)`. Placeholders in `masque"..."` are
-payload field names, not Julia locals: `\$(city)` reads `payload.city` in the
-browser. `id` becomes `InteractionEvent.layer` (`:cities` here). Bare points
-default to `:points`; introspecting a `Scatter` defaults to `:scatter`.
+## You are done
 
-This plot needs custom `payloads`, `colors=`, and `tooltip=`, so it uses the
-points constructor plus `radius=`. `PointInteractable(ax, p::Makie.Scatter;
-tooltip = masque"…")` is a `MethodError`. Plot-object constructors that take
-`payloads` still do not take `tooltip=` except `TextInteractable`.
-`tooltip = true` raises `ArgumentError`.
+You have an overlay, a hover tooltip, and a click that writes `@bind`.
+The readout cell is the sentence that uses the pick. Stop here.
 
-## Inspect a mark without Julia
+The cities cell passes `radius = 0.3525 * markersize` so the highlight
+sits on the default `:circle` disc. For hug paths, `tooltip=` on a plot
+object, and `auto_interactables`, see [Constructors](@ref).
 
-Holding the pointer over a city shows the tooltip and highlights the mark
-in the overlay. That path does not assign `pick` and does not re-run cells
-that read `pick`. The highlight after a click also runs in the overlay; the
-PNG does not change.
-
-`colors` on the layer is a tooltip accent. `scatter!`'s `color=` does not
-change the overlay highlight. Holding the pointer over a mark that is
-already selected skips the highlight. The tooltip still shows, and a click
-still writes `@bind`. Do not write a cell that reads `pick` expecting it
-to update when you hold the pointer over a city.
-
-## Make the highlight hug the marker
-
-`PointInteractable(ax, points)` defaults `radius` to 9 logical px and never
-reads the marker. Next to `scatter!` with `markersize = 18` and the default
-`:circle`, that is a halo around the disc. The cities cell passes
-`radius = 0.3525 * markersize` so the highlight sits on the drawn disc.
-
-Two hug paths are legal:
-
-- Pass the scatter plot object when you do not need `tooltip=`:
-  `p = scatter!(ax, xs, ys; markersize); PointInteractable(ax, p)`.
-  Radius comes from the drawn marker. Default `:circle` →
-  `r ≈ 0.3525 × markersize`. A `Circle` or `Rect` sprite →
-  `r = markersize / 2`. Anything else → `markersize / 2`. This requires
-  `markerspace = :pixel` (the default); otherwise pass `radius=`.
-- Use the points constructor with `radius = 0.3525 * markersize` for
-  default `:circle`, as in the cities cell, when you need `tooltip=`,
-  `colors=`, or custom `payloads`.
-
-Do not pass `radius = markersize / 2` for default `:circle` (still a halo).
-Do not pass `radius = markersize` for a `Circle` sprite (that value is the
-diameter; the shipped `r` is half). Calling `masque(fig)` uses the Scatter
-constructor and already hugs the marker.
-
-## Use these cells in a larger notebook
-
-Take the cities cells into a larger notebook. Add more plots on the same
-`Figure`. One `masque` call covers every axis: pass a vector of
-interactables. Layer ids must not collide; repeats of a kind in
-`auto_interactables` become `:scatter_2`. A second axis is still one
-overlay, not a second widget. For more information, see
-[Linked views](@ref).
-
-`auto_interactables` walks every `Axis` / `Axis3` / `PolarAxis` plot it
-knows, plus every `Colorbar` and `Legend`. It does not install
-`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, or
-`ViewInteractable`. Unsupported plots are skipped with `@warn`, not an
-error. On huge data, `masque(fig)` allocates one default payload per
-element; pass a lean `payloads=` (or skip the layer) yourself. `max_width`
-defaults to 700 (Pluto's column).
-
-Do not add a second `@bind pick` cell. Do not `deepcopy(fig)` (Makie
-`Figure`s cannot). Do not feed this widget's own bond into the same call's
-`selected=` (Pluto cycle). `masque(fig)` on a large demo figure does not
-install ROI, view, threshold, or a hand-built `LegendInteractable`.
-
-Outside Pluto, inspection still runs in exported HTML. A cell that reads
-`pick` needs a live Pluto session.
+A second axis on the same `Figure` is still one `masque` call. For more
+information, see [Linked views](@ref).
 
 ## Skip the constructor
 
 When you do not need custom `payloads`, `tooltip=`, or `id`, skip
-`PointInteractable` and call `masque(fig)`. That is
-`masque(fig, auto_interactables(fig))` after layout. On this same scatter,
-it uses the plot-object constructor, so the highlight already hugs the
+`PointInteractable` and call `masque(fig)`. On this same scatter, that
+uses the plot-object constructor, so the highlight already hugs the
 marker.
 
 Replace **both** the bind cell and the readout cell. The leftover
@@ -221,12 +164,8 @@ pick === nothing ? "click a point" :
 ```
 
 The default payload is `(; index, x, y)`, not `(; city, pop)`. The layer id
-is `:scatter`, not `:cities`. An empty figure warns "overlaying nothing".
-Auto-extracted layers do not take `tooltip=` or `label=`; build an
-explicit interactable for those.
-
-You can also start from `auto_interactables(fig)`, tweak the vector, and
-pass it back. For more information, see [Constructors](@ref).
+is `:scatter`, not `:cities`. For `auto_interactables` and huge-data
+payloads, see [Constructors](@ref).
 
 ## Choose a backend
 

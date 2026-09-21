@@ -162,6 +162,42 @@ the same way the overlay commits. Exact pixel bounds are not in that
 table. Unlisted box geometry still moves in the overlay; the table stays
 on the last listed set.
 
+## From a table
+
+If the points come from a table, pull columns for `scatter!` and build
+`payloads` as a vector of NamedTuples, one per mark, in the same order.
+Do not pass `eachrow(df)` as `payloads`. Do not pass the `DataFrame`
+itself.
+
+```julia
+xs = Float64[r.x for r in table]
+ys = Float64[r.y for r in table]
+payloads = [(; name = r.name, group = r.group, x = r.x, y = r.y) for r in table]
+```
+
+Filter with payload identity, not `samples[e.index + 1]`. After a
+`selects` release, each event's `payload` is the NamedTuple you passed
+(`===`). An empty box is still `[]`:
+
+```julia
+if picks === nothing
+    md"*Drag the box, then release.*"
+elseif isempty(picks)
+    md"*No stations in the box.*"
+else
+    rows = [e.payload for e in picks]
+    lines = ["| Station | x | y | Group |", "|---|---:|---:|---|"]
+    for r in rows
+        push!(lines, "| $(r.name) | $(r.x) | $(r.y) | $(r.group) |")
+    end
+    Markdown.parse("**$(length(rows)) stations**\n\n" * join(lines, "\n"))
+end
+```
+
+`index` stays 0-based. Slicing the original table with `e.index + 1`
+works only while row order matches the interactable. Payload identity
+survives a reorder. For more information, see [Constructors](@ref).
+
 ## Drag and resize
 
 The box has eight square handles. Corner handles resize two axes. Edge

@@ -108,47 +108,9 @@ explicit AABB would misalign. Do not use a 12-bin histogram as this demo.
 Keyboard arrows reach bars (`:rects` is focusable).
 
 Hist, waterfall, crossbar, hspan, and vspan are also `:rects` list
-layers. Each has its own default payload. For those payloads, see
-[Constructors](@ref).
-
-## Skip the constructor
-
-`masque(fig)` is `masque(fig, auto_interactables(fig))` after layout.
-Unsupported plots are skipped with `@warn`, not an error. An empty figure
-warns "overlaying nothing". Layer ids are the plot kind (`:scatter`,
-`:bars`, `:cells`), not `:heatmap` or `:barplot`. Repeats become
-`:scatter_2`.
-
-`auto_interactables` walks every `Axis` / `Axis3` / `PolarAxis` plot it
-knows, plus every `Colorbar` and `Legend`. It does not install
-`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, or
-`ViewInteractable`. On huge data it allocates one default payload per
-element; pass a lean `payloads=` (or skip the layer) yourself.
-
-Zero-config uses the Scatter constructor, so the highlight in the overlay
-already hugs the drawn mark. Bare points without `radius=` do not. Two
-hug paths are legal:
-
-- Pass the scatter plot object:
-  `p = scatter!(ax, xs, ys; markersize); PointInteractable(ax, p)`.
-  Radius comes from the drawn marker. Default `:circle` →
-  `r ≈ 0.3525 × markersize`. A `Circle` or `Rect` sprite →
-  `r = markersize / 2`. Anything else → `markersize / 2`. This requires
-  `markerspace = :pixel` (the default).
-- Use the points constructor with
-  `radius = 0.3525 * markersize` for default `:circle` when you need
-  `tooltip=`, `colors=`, or custom `payloads`.
-
-Do not pass `radius = markersize / 2` for default `:circle` (still a
-halo). Do not pass `radius = markersize` for a `Circle` sprite (that
-value is the diameter; the shipped `r` is half). Do not expect
-`tooltip=` or `label=` on auto-extracted layers; build an explicit
-interactable for those.
-
-Stem and ScatterLines become two layers when `masque(fig)` walks them.
-There is no `id_stems` or `id_line` keyword. There is no public
-plot-object constructor for Stem, ScatterLines, BoxPlot, or Annotation.
-For `MeshScatter` and `Arrows3D`, see [Backends](@ref).
+layers. Each has its own default payload. For those payloads, hug paths,
+and `auto_interactables`, see [Constructors](@ref). For `MeshScatter`
+and `Arrows3D`, see [Backends](@ref).
 
 ## Click polygons
 

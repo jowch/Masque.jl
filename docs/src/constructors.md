@@ -50,12 +50,19 @@ Zero-config uses the Scatter plot-object constructor, so the highlight
 in the overlay hugs the drawn marker. `PointInteractable(ax, points)`
 defaults `radius=9` and never reads a marker. Pass the `Scatter`, or
 pass `radius=`. Default `:circle` → `r ≈ 0.3525 × markersize`. A
-`Circle` or `Rect` sprite → `r = markersize / 2`. For more information,
-see [Getting started](@ref) and [Click marks](@ref).
+`Circle` or `Rect` sprite → `r = markersize / 2`. The cities overlay
+on [Getting started](@ref) passes `radius=`.
 
 On huge data, auto allocates one default payload per element. Pass a lean
 `payloads=` (or skip the layer) yourself. Auto-extracted layers do not
 take `tooltip=` or `label=`; build an explicit interactable for those.
+`max_width` defaults to 700 (Pluto's column). Do not `deepcopy(fig)`
+(Makie `Figure`s cannot). Do not add a second `@bind pick` cell.
+
+`PointInteractable(ax, p::Makie.Scatter; tooltip = masque"…")` is a
+`MethodError`. Plot-object constructors that take `payloads` still do
+not take `tooltip=` except `TextInteractable`. `tooltip = true` raises
+`ArgumentError`. For more information, see [Tooltips](@ref).
 
 `LegendInteractable` from auto receives `plotmap` so entries link to
 traces. `LegendInteractable(leg)` with no `plotmap` / `targets=` has

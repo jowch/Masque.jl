@@ -27,6 +27,10 @@ did I click?" in Julia. Use WGLMakie without Masque when you need free-form
 camera control, live data updates, or gestures Masque does not send back to
 Julia.
 
+The overlay HTML is Pluto notebook MIME. VS Code's plot pane, the Julia
+REPL, and a Documenter `@example` block do not run `@bind`. GLMakie is
+not a Masque backend; load CairoMakie or WGLMakie.
+
 ## Install
 
 Masque is not in the General registry. `] add Masque` fails.
@@ -53,8 +57,20 @@ begin
 end
 ```
 
-This is the only load cell on the first path. Skip the load cell if this
-notebook already ran it. Do not paste `using` twice.
+**3.** If you do not want a sibling clone, add the GitHub URL instead of
+   `Pkg.develop`:
+
+```julia
+begin
+    using Pkg
+    Pkg.add(url = "https://github.com/jowch/Masque.jl")
+    Pkg.add("CairoMakie")
+    using Masque, CairoMakie
+end
+```
+
+Paste **2.** or **3.**, not both. Skip the load cell if this notebook
+already ran it. Do not paste `using` twice.
 
 `using Masque` with no Makie backend raises `ArgumentError` the first time
 `masque` runs. Loading both CairoMakie and WGLMakie is fine; then `masque`
