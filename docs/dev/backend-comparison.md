@@ -51,8 +51,10 @@ The rows that **match** are the current story: both backends do hover/click/`@bi
 both backends** as server-authoritative `@bind` re-render; `ViewInteractable` drag commits
 nothing on either and only has a live preview on `:cairo` (†).
 
-> **(†) View manipulation: shipped as backend-symmetric `@bind` re-render; the client-side GPU
-> camera stays out (a Masque-wide non-goal, alongside GPU-pick occlusion).** What is true today, verified from source: the widget
+> **(†) View manipulation: a slider ships backend-symmetric `@bind` re-render; `ViewInteractable`
+> drag commits nothing on either backend and has a live preview on `:cairo` only (#102); the
+> client-side GPU camera stays out on both (a Masque-wide non-goal, alongside GPU-pick
+> occlusion).** What is true today, verified from source: the widget
 > deliberately gates the client camera off — the shim sets `can_send_to_julia:()=>true` (needed for
 > the client-side camera/uniform *observable* animation path), so WGLMakie's
 > `use_orbit_cam = ()=>!(Bonito.can_send_to_julia && Bonito.can_send_to_julia())` **disables 3D
