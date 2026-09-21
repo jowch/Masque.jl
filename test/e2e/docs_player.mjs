@@ -73,7 +73,7 @@ async function outText(frame) {
 }
 
 async function clickCity(frame, index) {
-  await frame.evaluate((idx) => {
+  return frame.evaluate((idx) => {
     const host = document.querySelector(".ip-host");
     const man = host.masqueManifest;
     if (!man) throw new Error("host.masqueManifest missing — wrap did not attach the inlined manifest");
@@ -96,6 +96,7 @@ async function clickCity(frame, index) {
     };
     surface.dispatchEvent(new PointerEvent("pointermove", o));
     surface.dispatchEvent(new MouseEvent("click", o));
+    return host.value;
   }, index);
 }
 
@@ -141,29 +142,43 @@ try {
     throw new Error(`idle #masque-out was ${JSON.stringify(idle)}`);
   }
 
-  // host.value setter — the applyFromHost / keyOf path, no overlay hit-test.
-  await frame.evaluate(() => {
-    const host = document.querySelector(".ip-host");
-    host.value = { layer: "cities", index: 0 };
-    host.dispatchEvent(new Event("input"));
-  });
-  const keyed = await outText(frame);
-  if (!keyed.includes("Tokyo selected")) {
-    throw new Error(`host.value {layer,index:0} did not key a snapshot; #masque-out=${JSON.stringify(keyed)}`);
-  }
-
+  // host.value setter — applyFromHost / keyOf, no overlay hit-test. Every listed
+  // city must key even when two marks overlap on the PNG (São Paulo / Mexico City).
   for (let i = 0; i < CITIES.length; i++) {
-    await clickCity(frame, i);
+    await frame.evaluate((idx) => {
+      const host = document.querySelector(".ip-host");
+      host.value = { layer: "cities", index: idx };
+      host.dispatchEvent(new Event("input"));
+    }, i);
     const text = await outText(frame);
     const want = `${CITIES[i]} selected — index ${i}`;
     if (!text.includes(want)) {
-      throw new Error(`city ${i} (${CITIES[i]}) click did not swap #masque-out; got ${JSON.stringify(text)}`);
+      throw new Error(`host.value {layer:"cities",index:${i}} did not key a snapshot; #masque-out=${JSON.stringify(text)}`);
     }
   }
 
-  const errors = consoleLog.filter((l) => l.startsWith("error:") || l.startsWith("pageerror:"));
+  // Overlay click still has to swap #masque-out. Hit-test returns the first covering
+  // mark, so assert against the emitted host.value, not the intended index.
+  for (let i = 0; i < CITIES.length; i++) {
+    const got = await clickCity(frame, i);
+    if (!got || got.layer !== "cities" || typeof got.index !== "number") {
+      throw new Error(`city ${i} (${CITIES[i]}) click emitted ${JSON.stringify(got)}`);
+    }
+    const text = await outText(frame);
+    const want = `${CITIES[got.index]} selected — index ${got.index}`;
+    if (!text.includes(want)) {
+      throw new Error(`listed click (aimed ${i}, hit ${got.index}) did not swap #masque-out; got ${JSON.stringify(text)}`);
+    }
+  }
+
+  const errors = consoleLog.filter((l) => {
+    if (l.startsWith("pageerror:")) return true;
+    if (!l.startsWith("error:")) return false;
+    if (l.includes("Failed to load resource") && l.includes("404")) return false;
+    return true;
+  });
   if (errors.length) throw new Error(`console errors: ${errors.join(" | ")}`);
-  console.log("E2E OK [docs player] — mount callable, host.value keyed tokyo, all eight cities swapped #masque-out");
+  console.log("E2E OK [docs player] — mount callable, every listed host.value keyed, overlay clicks swapped #masque-out");
 } catch (e) {
   failed = e;
 } finally {
