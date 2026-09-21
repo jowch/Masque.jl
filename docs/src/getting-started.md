@@ -67,7 +67,8 @@ ev === nothing ? "click a point" : "you picked $(ev.payload)"
 
 The embed below is the same plot as the README demo GIF (`docs/dev/readme-demo/notebook.jl`):
 eight cities, hover for population, click to bind. Every city is listed so the readout
-swaps like live `@bind`. Hover still works on every mark. Continuous kinds (ROI, axis,
+swaps like live `@bind`. That notebook binds `pick` (same as the GIF source); the walkthrough
+cells above bind `ev`. Hover still works on every mark. Continuous kinds (ROI, axis,
 view) stay overlay-only — that freeze is not for cities omitted from this plot.
 
 ```@raw html

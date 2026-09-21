@@ -6,195 +6,15 @@ using JSON3
 
 # Homebrew cell-series player harvest. Getting-started embed is the README GIF demo
 # (`docs/dev/readme-demo/notebook.jl`): nbpkg-on, in-process against docs/Project.toml.
+# Discrete demo rule: list every city (idle + all eight). The player should read like
+# live `@bind` on this finite scatter. Continuous kinds stay overlay-only.
+
+include("player_pipeline.jl")
 
 const PLAYER_CELL_ID = UUID("e1be0000-0000-4000-8000-000000000001")
-const PLAYER_TOML_RE = r"PLUTO_PLAYER_TOML_CONTENTS\s*=\s*\"\"\"(.*?)\"\"\""s
 # Extra snapshot bytes (downstream HTML + rebuilt PNG/manifest beyond idle), not
 # n_states × png. Warn only — never fail make.jl, never drop listed cities.
 const EMBED_BUDGET = 2 * 1024 * 1024
-const GETPUB_RE = r"getPublishedObject\(\"([^\"]+)\"\)"
-const SCRIPT_RE = r"<script([^>]*)>(.*?)</script>"s
-
-const GS_USING_ID = UUID("a1b2c3d4-0001-4000-8000-000000000001")
-const GS_FIG_ID = UUID("a1b2c3d4-0001-4000-8000-000000000002")
-const GS_BIND_ID = UUID("a1b2c3d4-0001-4000-8000-000000000003")
-const GS_PICK_ID = UUID("a1b2c3d4-0001-4000-8000-000000000004")
-
-# Discrete demo rule: list every city (idle + all eight). The player should read
-# like live `@bind` / autoextraction on this finite scatter. Continuous kinds
-# (ROI, axis, view) stay overlay-only — that freeze is not for omitted cities.
-const GS_PLAYER_SOURCE = """
-PLUTO_PLAYER_TOML_CONTENTS = \"\"\"
-[player]
-bond = "pick"
-
-[[player.states]]
-id = "idle"
-
-[[player.states]]
-id = "tokyo"
-value = { layer = "cities", index = 0 }
-
-[[player.states]]
-id = "delhi"
-value = { layer = "cities", index = 1 }
-
-[[player.states]]
-id = "shanghai"
-value = { layer = "cities", index = 2 }
-
-[[player.states]]
-id = "sao_paulo"
-value = { layer = "cities", index = 3 }
-
-[[player.states]]
-id = "mexico_city"
-value = { layer = "cities", index = 4 }
-
-[[player.states]]
-id = "cairo"
-value = { layer = "cities", index = 5 }
-
-[[player.states]]
-id = "mumbai"
-value = { layer = "cities", index = 6 }
-
-[[player.states]]
-id = "beijing"
-value = { layer = "cities", index = 7 }
-\"\"\"
-"""
-
-const GS_FIG_SOURCE = raw"""
-begin
-    cities_data = [
-        (city = "Tokyo", pop_m = 37.4, pop = 37_400_000, gdp = 1600),
-        (city = "Delhi", pop_m = 32.9, pop = 32_900_000, gdp = 370),
-        (city = "Shanghai", pop_m = 28.5, pop = 28_500_000, gdp = 780),
-        (city = "São Paulo", pop_m = 22.4, pop = 22_400_000, gdp = 430),
-        (city = "Mexico City", pop_m = 22.1, pop = 22_100_000, gdp = 411),
-        (city = "Cairo", pop_m = 21.3, pop = 21_300_000, gdp = 165),
-        (city = "Mumbai", pop_m = 20.7, pop = 20_700_000, gdp = 310),
-        (city = "Beijing", pop_m = 21.5, pop = 21_500_000, gdp = 700),
-    ]
-    city_colors = [
-        "#e6194b", "#3cb44b", "#4363d8", "#f58231",
-        "#911eb4", "#0e9aa7", "#f032e6", "#9a8b00",
-    ]
-    xs = Float64[c.pop_m for c in cities_data]
-    ys = Float64[c.gdp for c in cities_data]
-
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; xlabel = "Population (millions)", ylabel = "GDP (US\$bn)")
-    markersize = 18
-    scatter!(ax, xs, ys; color = city_colors, markersize)
-    # From the Scatter plot: default `:circle` draws at ≈0.3525×markersize, not the points-
-    # constructor default radius=9. `colors` is tooltip accent only (highlight is split-blend).
-    cities = PointInteractable(
-        ax, collect(zip(xs, ys));
-        id = :cities,
-        radius = 0.3525 * markersize,
-        payloads = [(; city = c.city, pop = c.pop) for c in cities_data],
-        colors = (; palette = city_colors, index = collect(0:(length(cities_data) - 1))),
-        tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
-    )
-    nothing
-end
-"""
-
-const GS_BIND_SOURCE = "@bind pick masque(fig, cities)"
-
-const GS_PICK_SOURCE = "pick === nothing ? md\"*Hover a city, then click one.*\" : md\"**\$(pick.payload.city)** selected — index \$(pick.index)\""
-
-function parse_player_toml(path::AbstractString)
-    src = read(path, String)
-    m = match(PLAYER_TOML_RE, src)
-    m === nothing && error("no PLUTO_PLAYER_TOML_CONTENTS cell in $path")
-    parsed = TOML.parse(String(m.captures[1]))
-    haskey(parsed, "player") || error("player TOML in $path has no [player] table")
-    return parsed["player"]
-end
-
-function js_shape_from_toml(state::AbstractDict)
-    haskey(state, "value") || return nothing
-    return _string_keys(state["value"])
-end
-
-function _string_keys(x)
-    x isa AbstractDict || return x
-    return Dict{String, Any}(string(k) => _string_keys(v) for (k, v) in x)
-end
-
-# Key the player lookup on the pre-transform JS shape the overlay posts.
-function snapshot_key(v)
-    v === nothing && return "null"
-    d = v isa AbstractDict ? _string_keys(v) : Dict{String, Any}("value" => v)
-    if haskey(d, "items")
-        parts = String[]
-        for it in d["items"]
-            push!(parts, string(it["layer"], ":", Int(it["index"])))
-        end
-        return "items:" * join(parts, ",")
-    end
-    (haskey(d, "layer") && haskey(d, "index")) &&
-        return string(d["layer"], ":", Int(d["index"]))
-    return JSON3.write(jsonable(d))
-end
-
-jsonable(::Nothing) = nothing
-jsonable(x::Bool) = x
-jsonable(x::Integer) = Int(x)
-jsonable(x::AbstractFloat) = Float64(x)
-jsonable(x::AbstractString) = String(x)
-jsonable(x::Symbol) = String(x)
-jsonable(x::AbstractVector) = Any[jsonable(v) for v in x]
-jsonable(x::Tuple) = Any[jsonable(v) for v in x]
-jsonable(x::NamedTuple) = Dict{String, Any}(string(k) => jsonable(v) for (k, v) in pairs(x))
-jsonable(x::AbstractDict) = Dict{String, Any}(string(k) => jsonable(v) for (k, v) in x)
-jsonable(x) = string(x)
-
-function html_escape(s::AbstractString)
-    s = replace(s, '&' => "&amp;")
-    s = replace(s, '<' => "&lt;")
-    s = replace(s, '>' => "&gt;")
-    s = replace(s, '"' => "&quot;")
-    return s
-end
-
-function rewrite_published_to_js(html::AbstractString, published::AbstractDict)
-    n = Ref(0)
-    rewritten = replace(
-        html, GETPUB_RE => function (m)
-            id = match(GETPUB_RE, m).captures[1]
-            haskey(published, id) || error("published object $id missing from cell")
-            n[] += 1
-            return JSON3.write(jsonable(published[id]))
-        end
-    )
-    return rewritten, n[]
-end
-
-function wrap_scripts_for_static(html::AbstractString)
-    return replace(
-        html, SCRIPT_RE => function (m)
-            mm = match(SCRIPT_RE, m)
-            attrs, body = mm.captures
-            occursin("src=", attrs) && return m
-            return string(
-                "<script", attrs, ">\n",
-                "{\n",
-                "const currentScript = document.currentScript;\n",
-                "const invalidation = new Promise(() => {});\n",
-                body, "\n",
-                "if (typeof manifest !== \"undefined\" && currentScript && currentScript.parentElement) {\n",
-                "  currentScript.parentElement.masqueManifest = manifest;\n",
-                "}\n",
-                "}\n",
-                "</script>",
-            )
-        end
-    )
-end
 
 function cell_output_html(c::Pluto.Cell)
     mime = string(c.output.mime)
@@ -317,40 +137,6 @@ function record_state(cells)
         man_b = max(man_b, manifest_bytes(c.published_objects))
     end
     return (; htmls, n_inlined, png_b, man_b)
-end
-
-function extract_json_object(s::AbstractString, start::Int)
-    i = start
-    n = ncodeunits(s)
-    while i <= n && s[i] != '{'
-        i = nextind(s, i)
-    end
-    i > n && error("no JSON object at $start")
-    depth = 0
-    in_str = false
-    esc = false
-    j = i
-    while j <= n
-        c = s[j]
-        if in_str
-            if esc
-                esc = false
-            elseif c == '\\'
-                esc = true
-            elseif c == '"'
-                in_str = false
-            end
-        elseif c == '"'
-            in_str = true
-        elseif c == '{'
-            depth += 1
-        elseif c == '}'
-            depth -= 1
-            depth == 0 && return (SubString(s, i, j), i, j)
-        end
-        j = nextind(s, j)
-    end
-    return error("unterminated JSON object")
 end
 
 function _css_brace_inner(css::AbstractString, open::Int)
@@ -593,18 +379,6 @@ const SIM_CHIP_HTML = raw"""
 """
 
 
-# Put listed @bind states on the same manifest object the overlay mounts, not a
-# side-channel SNAPSHOTS table. Lookup is still host.value (overlay's existing bond).
-function inject_manifest_snapshots(html::AbstractString, snapshots)
-    needle = "const manifest = "
-    start = findfirst(needle, html)
-    start === nothing && error("no inlined manifest to attach snapshots")
-    json, j0, j1 = extract_json_object(html, last(start))
-    obj = JSON3.read(String(json), Dict{String, Any})
-    obj["snapshots"] = jsonable(snapshots)
-    return html[1:(j0 - 1)] * JSON3.write(obj) * html[(j1 + 1):end]
-end
-
 # Extra = listed-state payload beyond idle. Idle PNG + overlay IIFE + idle cell HTML
 # are paid once. Each non-idle row adds downstream HTML, plus a rebuilt PNG/manifest
 # only if masque() actually remounted (byte-identical widget HTML is not counted).
@@ -655,6 +429,9 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     idle_down = String[]
     idle_state = findfirst(st -> st.key == "null", states)
     src_state = idle_state === nothing ? first(states) : states[idle_state]
+    src_state.record.n_inlined >= 1 || error(
+        "idle masque cell in $(basename(path)) inlined $(src_state.record.n_inlined) published objects; rewrite_published_to_js missed getPublishedObject"
+    )
     for c in downstream
         push!(idle_down, src_state.record.htmls[string(c.cell_id)])
     end
@@ -844,23 +621,18 @@ end
 function harvest_embed(path::AbstractString, outdir::AbstractString)
     path = abspath(path)
     outdir = abspath(outdir)
-    old_cwd = pwd()
     @info "harvesting embed" name = basename(path) in_process = true
-    try
-        session = harvest_session(; distributed = false)
-        result = harvest_one(session, path, outdir; retarget_docs = false)
-        if result.failed_pkg
-            @warn "in-process `using Masque, CairoMakie` failed; retrying with distributed workers + nbpkg_ctx → docs/"
-            session2 = harvest_session(; distributed = true)
-            result = harvest_one(session2, path, outdir; retarget_docs = true)
-            result.failed_pkg && error("embed harvest could not `using Masque, CairoMakie` in-process or via retargeted nbpkg_ctx")
-            return merge(result.info, (; harvest = "distributed-retarget"))
-        end
-        @info "using Masque, CairoMakie resolved in-process"
-        return merge(result.info, (; harvest = "in-process"))
-    finally
-        cd(old_cwd)
+    session = harvest_session(; distributed = false)
+    result = harvest_one(session, path, outdir; retarget_docs = false)
+    if result.failed_pkg
+        @warn "in-process `using Masque, CairoMakie` failed; retrying with distributed workers + nbpkg_ctx → docs/"
+        session2 = harvest_session(; distributed = true)
+        result = harvest_one(session2, path, outdir; retarget_docs = true)
+        result.failed_pkg && error("embed harvest could not `using Masque, CairoMakie` in-process or via retargeted nbpkg_ctx")
+        return merge(result.info, (; harvest = "distributed-retarget"))
     end
+    @info "using Masque, CairoMakie resolved in-process"
+    return merge(result.info, (; harvest = "in-process"))
 end
 
 function find_embed_notebooks()
@@ -887,19 +659,6 @@ function export_embeds(outdir = joinpath(@__DIR__, "src", "embeds"))
         @info "✓ embed $(basename(path))" harvest = info.harvest elapsed_s = elapsed size_kb = size_kb extra_kb = extra_kb n_states = info.n_states png_bytes = info.png_b manifest_bytes = info.man_b inlined = info.n_inlined_total
     end
     return
-end
-
-function write_getting_started_notebook(path = joinpath(@__DIR__, "src", "embeds", "getting_started.jl"))
-    using_cell = Pluto.Cell(GS_USING_ID, "using Masque, CairoMakie")
-    fig_cell = Pluto.Cell(GS_FIG_ID, strip(GS_FIG_SOURCE))
-    bind_cell_ = Pluto.Cell(GS_BIND_ID, GS_BIND_SOURCE)
-    pick_cell = Pluto.Cell(GS_PICK_ID, GS_PICK_SOURCE)
-    player_cell = Pluto.Cell(PLAYER_CELL_ID, strip(GS_PLAYER_SOURCE))
-    player_cell.code_folded = true
-    mkpath(dirname(path))
-    nb = Pluto.Notebook([using_cell, fig_cell, bind_cell_, pick_cell, player_cell], path)
-    Pluto.save_notebook(nb)
-    return path
 end
 
 # nbpkg `Pkg.develop` records an absolute path. Embeds must ship checkout-relative

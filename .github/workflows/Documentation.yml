@@ -39,3 +39,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright + Chromium
+        working-directory: test/e2e
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+      - name: Playwright docs player
+        working-directory: test/e2e
+        run: node docs_player.mjs "$GITHUB_WORKSPACE/docs/build"

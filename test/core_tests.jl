@@ -26,3 +26,4 @@ include("core/colors_tests.jl")
 include("core/legend_tests.jl")
 
 include("docstrings_tests.jl")
+include("export_embeds_tests.jl")
