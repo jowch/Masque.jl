@@ -9,6 +9,9 @@
   border-radius: 4px;
   overflow: hidden;
   margin-block: 1em;
+  /* 1px, mixed toward Pluto/page white so it stays slighter than
+     Documenter's `.content pre` `#dbdbdb`. */
+  border: 1px solid color-mix(in srgb, #fff 55%, #dbdbdb);
 }
 .masque-embed-wrap iframe {
   display: block;
@@ -17,10 +20,8 @@
   overflow: hidden;
 }
 
-/* Dark only. Documenter's `.content pre` stroke (#5e6d6f on documenter-dark)
-   sits lighter than Pluto's cell chrome (`--main-bg-color: hsl(0deg 0% 12%)`),
-   so mix the stroke toward that background instead of reusing the code-block
-   border. Light themes leave the wrap unstroking. */
+/* Dark: same idea, mix Documenter's `#5e6d6f` toward Pluto
+   `--main-bg-color: hsl(0deg 0% 12%)` instead of reusing the code-block stroke. */
 html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-embed-wrap {
   border: 1px solid color-mix(in srgb, hsl(0deg 0% 12%) 55%, #5e6d6f);
 }
