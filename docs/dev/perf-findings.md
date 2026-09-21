@@ -146,15 +146,12 @@
 > script and to the pre-#102 baseline (scatter-1k manifest still 38.0 KB, heatmap-200² still
 > 196.8 KB, 30-frame scrub still 5.6 MB; every STRESS A–D manifest/PNG size identical across
 > both runs). Render timings varied run-to-run as this file already documents for a shared
-> machine, with one exception worth naming rather than folding in silently: heatmap-1000²
-> landed at 302 ms and 316 ms across my two runs — consistently *above* the previously recorded
-> 97–227 ms span for that row, not a one-off outlier. The 500²/1000² ordering stayed correct
-> (56/53 ms vs 302/316 ms) in both runs, so this is not the ordering inversion a previous
-> reconciliation attempt on this file made — but it is a real, reproduced shift this
-> reconciliation does not explain, on top of a row this file already treats as "not resolved,
-> full stop." Not re-opened as a new investigation here; flagged for whoever next touches
-> heatmap rendering or this shared machine's load characteristics. The gesture channel's OWN
-> numbers — the `with_js_link` round trip itself — are new and are in their own section below
+> machine. heatmap-1000² first measured at 302 ms and 316 ms during this reconciliation, above
+> the recorded 97–227 ms span; two further runs on an otherwise-idle machine landed at 143 ms and
+> 99 ms, inside it. The elevated pair was concurrent load from this session's own Pluto servers
+> and kind sweeps, not a shift in the row — the 500²/1000² ordering was correct throughout. The
+> row's 97–227 ms span stands unchanged, still with the "not resolved" caveat this file already
+> carries for it. The gesture channel's OWN numbers — the `with_js_link` round trip itself — are new and are in their own section below
 > ("Gesture channel (#102): the shipped `with_js_link` round trip"), measured directly against
 > `Masque._view_render_frame` (the shipped closure, not the pre-implementation spike issue #102
 > cites) via the new committed `bench/gesture_channel.jl`.
