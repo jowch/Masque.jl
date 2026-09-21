@@ -422,6 +422,7 @@ html, body {
 body { position: relative; padding-top: 2.25rem; }
 pluto-notebook {
   display: block;
+  overflow: hidden;
   background: var(--main-bg-color);
   --code-font-stack: var(--custom-code-font-stack), var(--julia-mono-font-stack);
   padding-left: 25px;
@@ -436,7 +437,7 @@ pluto-output {
   padding-left: 10px;
   padding-right: 10px;
   align-items: baseline;
-  overflow-x: auto;
+  overflow: hidden;
   background-color: var(--pluto-output-bg-color);
 }
 pluto-output pre {
@@ -717,6 +718,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       function sizeFrame() {
         if (!window.frameElement) return;
         window.frameElement.style.overflow = "hidden";
+        window.frameElement.setAttribute("scrolling", "no");
         const nb = document.querySelector("pluto-notebook");
         const bottom = nb ? nb.getBoundingClientRect().bottom : document.documentElement.scrollHeight;
         window.frameElement.style.height = Math.max(1, Math.ceil(bottom)) + "px";
