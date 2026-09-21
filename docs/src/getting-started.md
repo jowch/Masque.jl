@@ -45,17 +45,16 @@ and which stay in the overlay, see [Hover, click, and bind](@ref).
 
 ## Overlay the cities scatter
 
-**1.** Load Masque and a Makie backend:
-
-```julia
-using Masque, CairoMakie
-```
+If this notebook has not loaded Masque yet, paste the [Install](@ref)
+cell first (clone, `Pkg.develop`, then `using Masque, CairoMakie`). Skip
+the load cell if this notebook already ran it. Do not paste `using` twice —
+Pluto reports multiple definitions for CairoMakie and Masque.
 
 The entry function is lowercase `masque`. A function named `Masque` clashes
 with `module Masque`. With no backend loaded, `masque` raises
 `ArgumentError`.
 
-**2.** Create the cities scatter and its interactable. Pass `radius=` so the
+**1.** Create the cities scatter and its interactable. Pass `radius=` so the
    highlight sits on the drawn disc:
 
 ```julia
@@ -100,7 +99,7 @@ nothing
 end
 ```
 
-**3.** Bind a click. A single interactable is legal; a one-element vector is
+**2.** Bind a click. A single interactable is legal; a one-element vector is
    also legal. `masque` does not mutate `fig`:
 
 ```julia
@@ -110,7 +109,7 @@ end
 Pluto rejects two cells that both `@bind` the same name. Replace the bind
 cell; do not add a second.
 
-**4.** Read the pick:
+**3.** Read the pick:
 
 ```julia
 pick === nothing ? "click a city" : "$(pick.payload.city) selected"
@@ -208,24 +207,31 @@ When you do not need custom `payloads`, `tooltip=`, or `id`, skip
 it uses the plot-object constructor, so the highlight already hugs the
 marker.
 
-Replace the `@bind pick masque(fig, cities)` cell with:
+Replace **both** the bind cell and the readout cell. The leftover
+`pick.payload.city` cell raises an error: the default payload has no
+field `city`.
 
 ```julia
 @bind pick masque(fig)
 ```
 
+```julia
+pick === nothing ? "click a point" :
+    "index $(pick.payload.index) / x $(pick.payload.x) / y $(pick.payload.y)"
+```
+
 The default payload is `(; index, x, y)`, not `(; city, pop)`. The layer id
-is `:scatter`, not `:cities`. `pick.payload.city` then raises an error. An
-empty figure warns "overlaying nothing". Auto-extracted layers do not take
-`tooltip=` or `label=`; build an explicit interactable for those.
+is `:scatter`, not `:cities`. An empty figure warns "overlaying nothing".
+Auto-extracted layers do not take `tooltip=` or `label=`; build an
+explicit interactable for those.
 
 You can also start from `auto_interactables(fig)`, tweak the vector, and
 pass it back. For more information, see [Constructors](@ref).
 
 ## Choose a backend
 
-The first cell loaded CairoMakie. Load `WGLMakie` instead for a live GPU
-canvas (experimental). If you load neither, `masque` raises
+The [Install](@ref) cell loaded CairoMakie. Load `WGLMakie` instead for
+a live GPU canvas (experimental). If you load neither, `masque` raises
 `ArgumentError`. If you load both, unqualified `masque` uses CairoMakie.
 The `backend=` keyword takes an extension instance, not a `:cairo` or
 `:webgl` symbol. For more information, see [Backends](@ref).

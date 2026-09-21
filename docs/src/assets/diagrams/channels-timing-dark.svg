@@ -3,16 +3,16 @@
   <title>Four channels against each gesture</title>
   <desc>Swimlanes for overlay chrome, the bind bond, the gesture channel, and a downstream Julia cell. Hover tooltip and highlight, and click-echo wash, use the overlay only. Click or Enter commit echoes in the overlay, writes a scalar InteractionEvent to the bond, and re-runs a cell that reads the bond. ROI or threshold in-drag moves the box or line in the overlay with no bond. ROI or threshold release echoes if selects is set, writes bounds, a scalar, or a Vector, and re-runs a reading cell. View pan or orbit in-drag shows a readout, cairo also new frames, on the gesture channel for cairo and numeric only for webgl, with no bond. View release writes nothing and the channel stops. Empty-space click leaves overlay and bond unchanged.</desc>
   <style>
-    .ink { fill: #1b1f24; }
-    .muted { fill: #5c6570; }
-    .grid { fill: none; stroke: #c8c4bb; }
-    .lane0 { fill: #f4f1ea; }
-    .lane1 { fill: #efe8d8; }
-    .lane2 { fill: #e4eef6; }
-    .lane3 { fill: #e8efe6; }
-    .head { fill: #e7e2d6; stroke: #1b1f24; }
-    .rowalt { fill: #000; opacity: 0.04; }
-    .yes { fill: #1b1f24; font-weight: 600; }
+    .ink { fill: #e8eaed; }
+    .muted { fill: #b0b8c0; }
+    .grid { fill: none; stroke: #5c6570; }
+    .lane0 { fill: #2a3038; }
+    .lane1 { fill: #3a3428; }
+    .lane2 { fill: #243040; }
+    .lane3 { fill: #24332a; }
+    .head { fill: #3a414a; stroke: #e8eaed; }
+    .rowalt { fill: #fff; opacity: 0.06; }
+    .yes { fill: #e8eaed; font-weight: 600; }
   </style>
 
   <text class="ink" x="380" y="22" text-anchor="middle" font-size="14"

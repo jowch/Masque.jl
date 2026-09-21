@@ -47,14 +47,24 @@ Julia runs when you release, not while you drag.
 `masque(fig)` does not install an [`ROIInteractable`](@ref). Pass the box in
 the same `masque` call as the layer it brushes.
 
+This page is a new notebook. It does not reuse `fig` or `pick` from the
+cities scatter. Develop the checkout and load a backend as on
+[Install](@ref), plus `Markdown` for the table cell. Skip the load cell if
+this notebook already ran it. Do not paste `using` twice.
+
 In a Pluto notebook, paste each of the following snippets into its own cell.
 Pluto runs one top-level expression per cell. Wrap multiple statements in
 `begin ... end`.
 
-**1.** Load Masque and a Makie backend:
+**1.** Develop the checkout and load CairoMakie and Markdown:
 
 ```julia
-using Masque, CairoMakie, Markdown
+begin
+    using Pkg
+    Pkg.develop(path = "path/to/Masque.jl")
+    Pkg.add("CairoMakie")
+    using Masque, CairoMakie, Markdown
+end
 ```
 
 **2.** Plot ten stations, a [`PointInteractable`](@ref) with `id = :pts`, and an
@@ -181,8 +191,8 @@ bounds event:
   point, matching the payload that mark's click reports.
 - Grid ([`RectInteractable`](@ref) heatmap or image, kind `:grid`): **one**
   range item `(; i0, i1, j0, j1, xmin, xmax, ymin, ymax)`, not one event per
-  cell. The enclosed cell-block is fill-only (`rectfill`) in the overlay; the
-  ROI box is the outline.
+  cell. The enclosed cell-block is fill-only in the overlay; the ROI box
+  is the outline.
 - Empty: `[]`, never `nothing`.
 
 `selects` names a layer id whose kind is `:circles` or `:grid`. The target

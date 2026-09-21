@@ -6,11 +6,15 @@ There is exactly one selection. Before a click, the `@bind` bond is
 `index`, and `payload`. Click a mark to replace the selection with that
 mark. A cell that reads the bond re-runs.
 
-The highlight in the overlay follows `selectionFor`. It is not a copy of
-the bond.
+The highlight in the overlay is not a copy of the bond.
 
-This page continues the cities scatter from [Getting started](@ref).
-Paste each snippet into its own Pluto cell.
+This page continues the cities scatter from [Getting started](@ref) in
+the same notebook. Do not paste `using` again. `fig`, `cities`, and
+`pick` already exist. There is no Selection player on this page.
+
+Paste each snippet into its own Pluto cell. Pluto rejects two cells that
+both `@bind` the same name. Replace the previous bind cell; do not add a
+second.
 
 ## Click a mark
 
@@ -62,8 +66,7 @@ or `:id_p`, not the base `id`.
 
 ## Bond versus highlight in the overlay
 
-What to highlight in the overlay comes from `selectionFor`. That set is
-not a mirror of the bond.
+The highlight in the overlay is not a copy of the bond.
 
 - A legend click writes the legend entry to `@bind` and highlights the
   linked traces in the overlay. `selected = Dict(:legend => [0])`

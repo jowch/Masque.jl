@@ -214,8 +214,8 @@ in [Selection](@ref).
 
 Check, in order:
 
-1. Is the bond actually read somewhere? `@bind ev masque(...)` with no
-   cell reading `ev` looks like nothing happened.
+1. Is the bond actually read somewhere? `@bind pick masque(...)` with no
+   cell reading `pick` looks like nothing happened.
 2. Did you click empty space? Clicks that do not land on a hit region
    are a no-op, by design. A miss does not clear the selection.
 3. Is the element you clicked actually interactive? An unsupported plot

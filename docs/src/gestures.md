@@ -16,11 +16,31 @@ backend image (PNG or GPU canvas) and hit geometry for every axis, then one
 manifest, then HTML: one image and one overlay. Several axes still share that
 overlay. They are not several `masque` calls.
 
-![At masque time, one Figure plus interactables becomes a backend image
-and hit geometry for every axis, then one manifest, then HTML with one
-image and one overlay. Several axes still make one overlay. The overlay
-is a stateless view. Analysis state is the bind bond in
-Julia.](assets/diagrams/information-flow.svg)
+```@raw html
+<div class="masque-diagram">
+  <img class="masque-diagram-light" src="assets/diagrams/information-flow.svg"
+       alt="At masque time, one Figure plus interactables becomes a backend image and hit geometry for every axis, then one manifest, then HTML with one image and one overlay. Several axes still make one overlay. The overlay is a stateless view. Analysis state is the bind bond in Julia.">
+  <img class="masque-diagram-dark" src="assets/diagrams/information-flow-dark.svg"
+       alt="At masque time, one Figure plus interactables becomes a backend image and hit geometry for every axis, then one manifest, then HTML with one image and one overlay. Several axes still make one overlay. The overlay is a stateless view. Analysis state is the bind bond in Julia.">
+</div>
+<script>
+(function () {
+  var wrap = document.currentScript.previousElementSibling;
+  if (!wrap || !wrap.classList.contains("masque-diagram")) return;
+  var link = document.querySelector('link[href*="masque-embed.css"]');
+  var base = "assets/";
+  if (link) {
+    base = (link.getAttribute("href") || "assets/masque-embed.css")
+      .replace(/masque-embed\.css(?:\?.*)?$/, "");
+  }
+  var imgs = wrap.querySelectorAll("img");
+  for (var i = 0; i < imgs.length; i++) {
+    var src = imgs[i].getAttribute("src") || "";
+    imgs[i].src = base + src.replace(/^.*?assets\//, "");
+  }
+})();
+</script>
+```
 
 One `masque` call produces one image and one overlay from a Makie
 `Figure` and its interactables.
@@ -51,11 +71,31 @@ click also runs in the overlay. The PNG does not change. An in-drag ROI box
 or threshold line stays in the overlay until release. A view drag commits
 nothing: camera state is not analysis data.
 
-![Swimlanes for overlay chrome, the bind bond, the gesture channel, and
-a downstream Julia cell for each gesture: hover tooltip and highlight,
-click-echo wash, click or Enter commit, ROI or threshold in-drag, ROI or
-threshold release, view pan or orbit in-drag, view release, and
-empty-space click.](assets/diagrams/channels-timing.svg)
+```@raw html
+<div class="masque-diagram">
+  <img class="masque-diagram-light" src="assets/diagrams/channels-timing.svg"
+       alt="Swimlanes for overlay chrome, the bind bond, the gesture channel, and a downstream Julia cell for each gesture: hover tooltip and highlight, click-echo wash, click or Enter commit, ROI or threshold in-drag, ROI or threshold release, view pan or orbit in-drag, view release, and empty-space click.">
+  <img class="masque-diagram-dark" src="assets/diagrams/channels-timing-dark.svg"
+       alt="Swimlanes for overlay chrome, the bind bond, the gesture channel, and a downstream Julia cell for each gesture: hover tooltip and highlight, click-echo wash, click or Enter commit, ROI or threshold in-drag, ROI or threshold release, view pan or orbit in-drag, view release, and empty-space click.">
+</div>
+<script>
+(function () {
+  var wrap = document.currentScript.previousElementSibling;
+  if (!wrap || !wrap.classList.contains("masque-diagram")) return;
+  var link = document.querySelector('link[href*="masque-embed.css"]');
+  var base = "assets/";
+  if (link) {
+    base = (link.getAttribute("href") || "assets/masque-embed.css")
+      .replace(/masque-embed\.css(?:\?.*)?$/, "");
+  }
+  var imgs = wrap.querySelectorAll("img");
+  for (var i = 0; i < imgs.length; i++) {
+    var src = imgs[i].getAttribute("src") || "";
+    imgs[i].src = base + src.replace(/^.*?assets\//, "");
+  }
+})();
+</script>
+```
 
 Each pointer gesture uses a different mix of overlay chrome, the `@bind`
 bond, the gesture channel, and a downstream Julia cell.
@@ -68,17 +108,18 @@ source.
 | Hover tooltip / highlight | Yes | No | No | No |
 | Click-echo wash | Yes | No | No | No |
 | Click / Enter commit | Echo yes | Scalar `InteractionEvent` | No | Re-runs if it reads the bond |
-| ROI / threshold **in-drag** | Box / line moves | No | No (question 0) | No |
+| ROI / threshold **in-drag** | Box / line moves | No | No | No |
 | ROI / threshold **release** | Echo if `selects` | Bounds, scalar, or `Vector` | No | Re-runs |
 | View pan / orbit **in-drag** | Readout; cairo also new frames | No | `:cairo` yes; `:webgl` numeric only | No |
 | View **release** | — | **Nothing** | Stops | No |
 | Empty-space click | No | Unchanged | No | No |
 
-Question 0 means the overlay already has what it needs, so the drag never
-leaves the browser. In-drag view frames are not question 0: CairoMakie
-repaints the image over the gesture channel, and WebGL updates a numeric
-readout only. Neither path writes `@bind`. On release the channel stops, and
-the bond still holds **nothing** from the pan.
+ROI and threshold in-drag stay in the overlay: it already has what it
+needs, so the drag never leaves the browser. In-drag view frames still
+leave the overlay: CairoMakie repaints the image over the gesture
+channel, and the WebGL backend updates a numeric readout only. Neither
+path writes `@bind`. On release the channel stops, and the bond still
+holds **nothing** from the pan.
 
 A click in empty space does not write the bond and does not clear a
 selection. Enter or Space on a focused mark commits the same way a click
@@ -93,14 +134,31 @@ cells when a notebook has them. An overlay-only player keeps tooltip and
 highlight chrome. Julia stays at the default bond. Static `generate_html`
 keeps overlay chrome and drops `@bind` and `with_js_link`.
 
-![Four hosts compared: live Pluto, a docs player with listed idle plus N
-or listed items, a docs player that is overlay-only, and static
-generate_html. Hover and click-echo run on every host. Listed element
-bind and listed ROI, axis, or threshold values re-run Julia on live
-Pluto, swap snapshots on a listed player, stay at the default bond on
-overlay-only, and are dead on static HTML. Unlisted drags keep chrome.
-Heatmap inspect and cairo view frames use GIF or MP4 on this site, with
-no bind on view.](assets/diagrams/overlay-vs-host.svg)
+```@raw html
+<div class="masque-diagram">
+  <img class="masque-diagram-light" src="assets/diagrams/overlay-vs-host.svg"
+       alt="Four hosts compared: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect and cairo view frames use GIF or MP4 on this site, with no bind on view.">
+  <img class="masque-diagram-dark" src="assets/diagrams/overlay-vs-host-dark.svg"
+       alt="Four hosts compared: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect and cairo view frames use GIF or MP4 on this site, with no bind on view.">
+</div>
+<script>
+(function () {
+  var wrap = document.currentScript.previousElementSibling;
+  if (!wrap || !wrap.classList.contains("masque-diagram")) return;
+  var link = document.querySelector('link[href*="masque-embed.css"]');
+  var base = "assets/";
+  if (link) {
+    base = (link.getAttribute("href") || "assets/masque-embed.css")
+      .replace(/masque-embed\.css(?:\?.*)?$/, "");
+  }
+  var imgs = wrap.querySelectorAll("img");
+  for (var i = 0; i < imgs.length; i++) {
+    var src = imgs[i].getAttribute("src") || "";
+    imgs[i].src = base + src.replace(/^.*?assets\//, "");
+  }
+})();
+</script>
+```
 
 The same gesture can run in the overlay, write `@bind`, swap a listed
 snapshot, or stay frozen, depending on the host.

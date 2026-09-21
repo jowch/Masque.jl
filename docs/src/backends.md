@@ -73,10 +73,10 @@ end
 ```
 
 ```julia
-@bind ev masque(fig)
+@bind pick masque(fig)
 ```
 
-Use `:webgl` for a live GPU canvas: animation, frequent re-renders, or
+Load WGLMakie for a live GPU canvas: animation, frequent re-renders, or
 large updating data, where per-frame PNG cost dominates.
 For a figure you build once and inspect, CairoMakie's static PNG is
 lighter.
@@ -125,6 +125,6 @@ scene on `:webgl`, redrawn on the reader's GPU with no Julia server).
 The page still loads Pluto's frontend from a CDN.
 
 Lost on either backend: anything that needs Julia to recompute. A click
-that updates `ev` and re-runs downstream cells does nothing without a
+that updates `pick` and re-runs downstream cells does nothing without a
 live kernel. `with_js_link` view frames die. Inspection-without-kernel
 is true on both backends.

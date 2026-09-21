@@ -59,6 +59,20 @@ one top-level expression per cell. Wrap multiple statements in
 `begin ... end`. `masque(fig)` does not install `ViewInteractable`.
 Pass it yourself.
 
+This page is a new notebook. It does not reuse `fig` or `pick` from the
+cities scatter. Develop the checkout and load a backend as on
+[Install](@ref). Skip the load cell if this notebook already ran it. Do not
+paste `using` twice:
+
+```julia
+begin
+    using Pkg
+    Pkg.develop(path = "path/to/Masque.jl")
+    Pkg.add("CairoMakie")
+    using Masque, CairoMakie
+end
+```
+
 ## Pan a 2D axis
 
 **1.** Draw a scatter and pass [`ViewInteractable`](@ref):
@@ -102,6 +116,8 @@ preview. Switching to WGLMakie does not repaint the canvas during a
 pan. For backend tradeoffs, see [Backends](@ref).
 
 ## Orbit an `Axis3`
+
+This demo is another figure. Replace the previous `fig` cell.
 
 `ViewInteractable` on `Axis3` is allowed. Drag orbits azimuth and
 elevation. Masque does not reject a 3D axis for this gesture. It still

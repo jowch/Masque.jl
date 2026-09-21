@@ -1,13 +1,29 @@
 # Click marks
 
-This page continues discrete clicks after the cities scatter: four bars,
-three polygons, and four polar points. Hold the pointer over a mark to
-inspect it. Click a mark to write that pick into Julia through `@bind`.
+This page is four bars, three polygons, and four polar points. Hold the
+pointer over a mark to inspect it. Click a mark to write that pick into
+Julia through `@bind`.
+
+This page is a new notebook. It does not reuse `fig` or `pick` from the
+cities scatter. Develop the checkout and load a backend as on
+[Install](@ref). Skip the load cell if this notebook already ran it. Do not
+paste `using` twice:
+
+```julia
+begin
+    using Pkg
+    Pkg.develop(path = "path/to/Masque.jl")
+    Pkg.add("CairoMakie")
+    using Masque, CairoMakie
+end
+```
 
 In a Pluto notebook, paste each snippet into its own cell. Pluto runs one
 top-level expression per cell. Wrap multiple statements in `begin ... end`.
 Showing `fig` alone does not mount the overlay; `masque` returns the HTML
-that does.
+that does. If a later demo on this page also binds `pick`, replace the
+previous bind cell. Pluto rejects two cells that both `@bind` the same
+name.
 
 Each embed on this docs site lists idle plus every mark. The
 **Simulating `@bind`** chip marks that those clicks are precomputed
@@ -136,6 +152,10 @@ For `MeshScatter` and `Arrows3D`, see [Backends](@ref).
 
 ## Click polygons
 
+This demo is another figure. Replace the previous `fig` cell and the
+`@bind pick` cell. Pluto rejects two cells that both `@bind` the same
+name.
+
 Three filled rings on one `poly!`. `masque(fig)` gives layer `:poly`,
 kind `:polygons`, default payload `(; index)`. `selected=` can hydrate
 those indices. Pass `PolygonInteractable(ax, p)` when you already have
@@ -211,6 +231,9 @@ only, kind `:rects`, default payload `(; text, index, x, y)`.
 
 ### Click a polyline
 
+This demo is another figure. Replace the previous `fig` cell and the
+`@bind pick` cell.
+
 A short polyline is the same click job with a different kind. Four
 vertices give three segments, layer `:lines`, kind `:polyline`, default
 payload `(; segment_index)`.
@@ -236,6 +259,9 @@ Line segments, errorbars, rangebars, hlines, and vlines use kind
 bind-swap a dense `lines!` click by click.
 
 ## Click points on a polar axis
+
+This demo is another figure. Replace the previous `fig` cell and the
+`@bind pick` cell.
 
 Scatter four `Point2f` values on a `PolarAxis`. `@bind pick masque(fig)`
 walks the scatter the same way as on a Cartesian axis. CairoMakie and

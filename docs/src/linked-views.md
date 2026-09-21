@@ -7,12 +7,31 @@ responds on the axis you hit. Adding a second axis is a larger notebook,
 not a second architecture. For the first overlay, see
 [Getting started](@ref).
 
-![One masque call produces one overlay and one manifest. Hits stay
-on the axis you hit. Holding the pointer over the xy legend entry
-highlights every xy mark; xz stays unchanged. Same-index highlight
-between two scatters is not shipped. A listed ROI item set updates
-a harvested table; an unlisted drag moves the box and leaves the
-table unchanged.](assets/diagrams/one-figure-several-axes.svg)
+```@raw html
+<div class="masque-diagram">
+  <img class="masque-diagram-light" src="assets/diagrams/one-figure-several-axes.svg"
+       alt="One masque call produces one overlay and one manifest. Hits stay on the axis you hit. Holding the pointer over the xy legend entry highlights every xy mark; xz stays unchanged. Same-index highlight between two scatters is not shipped. A listed ROI item set updates a harvested table; an unlisted drag moves the box and leaves the table unchanged.">
+  <img class="masque-diagram-dark" src="assets/diagrams/one-figure-several-axes-dark.svg"
+       alt="One masque call produces one overlay and one manifest. Hits stay on the axis you hit. Holding the pointer over the xy legend entry highlights every xy mark; xz stays unchanged. Same-index highlight between two scatters is not shipped. A listed ROI item set updates a harvested table; an unlisted drag moves the box and leaves the table unchanged.">
+</div>
+<script>
+(function () {
+  var wrap = document.currentScript.previousElementSibling;
+  if (!wrap || !wrap.classList.contains("masque-diagram")) return;
+  var link = document.querySelector('link[href*="masque-embed.css"]');
+  var base = "assets/";
+  if (link) {
+    base = (link.getAttribute("href") || "assets/masque-embed.css")
+      .replace(/masque-embed\.css(?:\?.*)?$/, "");
+  }
+  var imgs = wrap.querySelectorAll("img");
+  for (var i = 0; i < imgs.length; i++) {
+    var src = imgs[i].getAttribute("src") || "";
+    imgs[i].src = base + src.replace(/^.*?assets\//, "");
+  }
+})();
+</script>
+```
 
 One `masque` call covers every axis: independent hits, legend whole-layer
 wash, and a listed ROI item set that updates a harvested table.
@@ -62,11 +81,19 @@ Do not use `Axis3` for this job. Two 2D axes are the 2D-of-3D shape.
 ```
 
 This docs embed is overlay-only: hover and click-echo run in the
-browser; Julia stays at the idle bond. In live Pluto, paste each snippet
-into its own cell:
+browser; Julia stays at the idle bond. In live Pluto, this page is a new
+notebook. It does not reuse `fig` or `pick` from the cities scatter.
+Develop the checkout and load a backend as on [Install](@ref). Skip the
+load cell if this notebook already ran it. Do not paste `using` twice.
+Paste each snippet into its own cell:
 
 ```julia
-using Masque, CairoMakie
+begin
+    using Pkg
+    Pkg.develop(path = "path/to/Masque.jl")
+    Pkg.add("CairoMakie")
+    using Masque, CairoMakie
+end
 ```
 
 ```julia
@@ -138,7 +165,10 @@ here.
 </script>
 ```
 
-Hover needs no snapshots. This embed is overlay-only. In live Pluto:
+Hover needs no snapshots. This embed is overlay-only. In live Pluto,
+this is another figure. Replace the previous `fig` cell and the
+`@bind pick` cell. Pluto rejects two cells that both `@bind` the same
+name.
 
 ```julia
 begin

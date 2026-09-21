@@ -55,16 +55,26 @@ highlight in the overlay. On this site, Julia stays at the default bond
 </script>
 ```
 
+This page is a new notebook. It does not reuse `fig` or `pick` from the
+cities scatter. Develop the checkout and load a backend as on
+[Install](@ref). Skip the load cell if this notebook already ran it. Do not
+paste `using` twice.
+
 Paste each of the following snippets into its own Pluto cell. Pluto runs
 one top-level expression per cell. Wrap multiple statements in
 `begin ... end`.
 
 ## Overlay a heatmap
 
-**1.** Load Masque and a Makie backend:
+**1.** Develop the checkout and load CairoMakie:
 
 ```julia
-using Masque, CairoMakie
+begin
+    using Pkg
+    Pkg.develop(path = "path/to/Masque.jl")
+    Pkg.add("CairoMakie")
+    using Masque, CairoMakie
+end
 ```
 
 **2.** Draw a small heatmap and pass the plot object to
@@ -144,8 +154,8 @@ raises `ArgumentError`: `:grid` is not a pre-highlight kind. Do not pass
 Pair [`ROIInteractable`](@ref) with `selects = :cells`. On release, the
 bond is one range event
 `(; i0, i1, j0, j1, xmin, xmax, ymin, ymax)`, not one event per enclosed
-cell. The overlay fills the enclosed block (`"rectfill"`) and leaves
-the ROI box as the outline. An empty box is `Vector()`, never
+cell. The overlay fills the enclosed block and leaves the ROI box as the
+outline. An empty box is `Vector()`, never
 `nothing`.
 
 `selects` accepts `:circles` or `:grid`. Pointing it at a `:rects` bar

@@ -3,16 +3,16 @@
   <title>One Figure becomes one overlay and one bond</title>
   <desc>At masque time, one Makie Figure plus its interactables produces a backend image and hit geometry for every axis, then one manifest, then HTML with one image and one overlay. Several axes still make one overlay. The overlay is a stateless view. Analysis state is the bind bond in Julia.</desc>
   <style>
-    .ink { fill: #1b1f24; }
-    .muted { fill: #5c6570; }
-    .panel { fill: #f4f1ea; stroke: #1b1f24; }
-    .inner { fill: #fff; stroke: #1b1f24; }
-    .accent { fill: #4063D8; }
-    .line { fill: none; stroke: #1b1f24; }
-    .arrowhead { fill: #1b1f24; }
+    .ink { fill: #e8eaed; }
+    .muted { fill: #b0b8c0; }
+    .panel { fill: #2a3038; stroke: #e8eaed; }
+    .inner { fill: #1b1f24; stroke: #e8eaed; }
+    .accent { fill: #7b9cff; }
+    .line { fill: none; stroke: #e8eaed; }
+    .arrowhead { fill: #e8eaed; }
   </style>
   <defs>
-    <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+    <marker id="flow-arrow-dark" viewBox="0 0 10 10" refX="9" refY="5"
             markerWidth="8" markerHeight="8" orient="auto">
       <path d="M 0 1 L 10 5 L 0 9 Z" class="arrowhead"/>
     </marker>
@@ -39,7 +39,7 @@
         font-family="ui-sans-serif, system-ui, sans-serif">declared hits</text>
 
   <line class="line" x1="340" y1="134" x2="340" y2="168" stroke-width="1.5"
-        marker-end="url(#flow-arrow)"/>
+        marker-end="url(#flow-arrow-dark)"/>
   <text class="muted" x="356" y="158" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">masque()</text>
 
@@ -56,7 +56,7 @@
         font-family="ui-sans-serif, system-ui, sans-serif">for every axis</text>
 
   <line class="line" x1="340" y1="260" x2="340" y2="294" stroke-width="1.5"
-        marker-end="url(#flow-arrow)"/>
+        marker-end="url(#flow-arrow-dark)"/>
   <text class="muted" x="356" y="284" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">one manifest</text>
 
@@ -70,9 +70,9 @@
         font-family="ui-sans-serif, system-ui, sans-serif">One masque call, one overlay</text>
 
   <line class="line" x1="210" y1="390" x2="210" y2="424" stroke-width="1.5"
-        marker-end="url(#flow-arrow)"/>
+        marker-end="url(#flow-arrow-dark)"/>
   <line class="line" x1="470" y1="390" x2="470" y2="424" stroke-width="1.5"
-        marker-end="url(#flow-arrow)"/>
+        marker-end="url(#flow-arrow-dark)"/>
 
   <!-- Overlay vs bond -->
   <rect class="panel" x="90" y="432" width="238" height="100" rx="10" stroke-width="1.5"/>

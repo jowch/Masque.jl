@@ -25,3 +25,26 @@
 html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-embed-wrap {
   border: 1px solid color-mix(in srgb, hsl(0deg 0% 12%) 55%, #5e6d6f);
 }
+
+/* Diagrams ship as two <img> files (explicit palettes). Documenter dark is
+   html.theme--*, not prefers-color-scheme, so CSS picks the file. */
+.masque-diagram {
+  margin-block: 1em;
+  width: 100%;
+  max-width: 100%;
+}
+.masque-diagram img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+.masque-diagram .masque-diagram-dark {
+  display: none;
+}
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-diagram .masque-diagram-light {
+  display: none;
+}
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-diagram .masque-diagram-dark {
+  display: block;
+}

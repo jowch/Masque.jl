@@ -53,6 +53,9 @@ begin
 end
 ```
 
+This is the only load cell on the first path. Skip the load cell if this
+notebook already ran it. Do not paste `using` twice.
+
 `using Masque` with no Makie backend raises `ArgumentError` the first time
 `masque` runs. Loading both CairoMakie and WGLMakie is fine; then `masque`
 defaults to CairoMakie. The `backend=` keyword takes an extension instance,
@@ -68,11 +71,31 @@ For your first overlay, see [Getting started](@ref). Holding the pointer
 over a mark does not write `@bind`; a click does. That page shows both on
 one plot.
 
-![At masque time, one Figure plus interactables becomes a backend image
-and hit geometry for every axis, then one manifest, then HTML with one
-image and one overlay. Several axes still make one overlay. The overlay
-is a stateless view. Analysis state is the bind bond in
-Julia.](assets/diagrams/information-flow.svg)
+```@raw html
+<div class="masque-diagram">
+  <img class="masque-diagram-light" src="assets/diagrams/information-flow.svg"
+       alt="At masque time, one Figure plus interactables becomes a backend image and hit geometry for every axis, then one manifest, then HTML with one image and one overlay. Several axes still make one overlay. The overlay is a stateless view. Analysis state is the bind bond in Julia.">
+  <img class="masque-diagram-dark" src="assets/diagrams/information-flow-dark.svg"
+       alt="At masque time, one Figure plus interactables becomes a backend image and hit geometry for every axis, then one manifest, then HTML with one image and one overlay. Several axes still make one overlay. The overlay is a stateless view. Analysis state is the bind bond in Julia.">
+</div>
+<script>
+(function () {
+  var wrap = document.currentScript.previousElementSibling;
+  if (!wrap || !wrap.classList.contains("masque-diagram")) return;
+  var link = document.querySelector('link[href*="masque-embed.css"]');
+  var base = "assets/";
+  if (link) {
+    base = (link.getAttribute("href") || "assets/masque-embed.css")
+      .replace(/masque-embed\.css(?:\?.*)?$/, "");
+  }
+  var imgs = wrap.querySelectorAll("img");
+  for (var i = 0; i < imgs.length; i++) {
+    var src = imgs[i].getAttribute("src") || "";
+    imgs[i].src = base + src.replace(/^.*?assets\//, "");
+  }
+})();
+</script>
+```
 
 One `masque` call produces one image and one overlay from a Makie
 `Figure` and its interactables.
@@ -82,24 +105,9 @@ it. For every channel and host, see [Hover, click, and bind](@ref).
 
 ## Where to go next
 
-The following pages continue from this one:
+Overlay the eight-city scatter next: see [Getting started](@ref). That
+page starts at the cities figure. Skip the install cell on this page if
+that notebook already ran it.
 
-- [Getting started](@ref) — Overlay the cities scatter, bind a click, then skip the constructor
-- [Hover, click, and bind](@ref) — Overlay, `@bind`, gesture channel, and docs-player snapshots
-- [Click marks](@ref) — Bars, polygons, and polar points
-- [Inspect a grid](@ref) — Heatmap and image cells
-- [Selection](@ref) — Clicks, `selected=`, and persisting a highlight
-- [Brush a region](@ref) — Drag a box; listed `items` filter a table
-- [Legend](@ref) — Wash traces from a `Makie.Legend` entry
-- [Tooltips](@ref) — `masque"..."` templates and figure-derived theme
-- [Read coordinates](@ref) — Axis, colorbar, and threshold
-- [Pan and orbit](@ref) — View drag that commits nothing
-- [Linked views](@ref) — One `masque` on several axes
-- [Custom hits](@ref) — `RegionInteractable` / `FunctionInteractable`
-- [Examples](@ref) — Runnable notebooks in the repository
-- [Constructors](@ref) — Signatures, default payloads, and kinds
-- [API](@ref) — Full docstrings
-- [Backends](@ref) — CairoMakie versus WGLMakie
-- [Keyboard and screen readers](@ref) — Tab, arrows, and Enter on the overlay
-- [Troubleshooting](@ref) — Common errors and causes
-- [Development](@ref) — Frontend gate, tests, and this site
+For overlay, `@bind`, and docs-player snapshots, see
+[Hover, click, and bind](@ref).

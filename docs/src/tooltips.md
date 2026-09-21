@@ -50,13 +50,21 @@ In a Pluto notebook, paste each of the following snippets into its own
 cell. Pluto runs one top-level expression per cell. Wrap multiple
 statements in `begin ... end`.
 
-**1.** Load Masque and a Makie backend:
+This page is a new notebook. It does not reuse `fig` or `pick` from the
+cities scatter. Develop the checkout and load a backend as on
+[Install](@ref). Skip the load cell if this notebook already ran it. Do not
+paste `using` twice:
 
 ```julia
-using Masque, CairoMakie
+begin
+    using Pkg
+    Pkg.develop(path = "path/to/Masque.jl")
+    Pkg.add("CairoMakie")
+    using Masque, CairoMakie
+end
 ```
 
-**2.** Plot four cities and a templated [`PointInteractable`](@ref).
+**1.** Plot four cities and a templated [`PointInteractable`](@ref).
    Use the points constructor plus `radius=` when you need a template.
    The Scatter plot-object constructor does not take `tooltip=`
    (`MethodError`):
@@ -80,7 +88,7 @@ begin
 end
 ```
 
-**3.** Mount the overlay:
+**2.** Mount the overlay:
 
 ```julia
 @bind pick masque(fig, tips)

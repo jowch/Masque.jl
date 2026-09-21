@@ -3,15 +3,15 @@
   <title>Overlay versus Julia versus host</title>
   <desc>Four hosts: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind, including extra table cells, re-runs Julia on live Pluto, swaps embed-cell snapshots on a listed player, stays at the default bond on overlay-only, and is dead on static HTML. Listed ROI items or a few axis or threshold values follow the same split. Unlisted continuous drag keeps overlay chrome; Julia stays on the last listed set, the default bond, or dead. Heatmap inspect is live on Pluto, GIF or MP4 on this site, overlay-only tooltip chrome if that player is present, and dead Julia on static HTML. Cairo view frames use the gesture channel on live Pluto, GIF or MP4 on this site, overlay readout with no bind, and a dead gesture channel on static HTML.</desc>
   <style>
-    .ink { fill: #1b1f24; }
-    .muted { fill: #5c6570; }
-    .grid { fill: none; stroke: #c8c4bb; }
-    .h0 { fill: #e8efe6; }
-    .h1 { fill: #e4eef6; }
-    .h2 { fill: #efe8d8; }
-    .h3 { fill: #f4f1ea; }
-    .rowalt { fill: #000; opacity: 0.04; }
-    .yes { fill: #1b1f24; font-weight: 600; }
+    .ink { fill: #e8eaed; }
+    .muted { fill: #b0b8c0; }
+    .grid { fill: none; stroke: #5c6570; }
+    .h0 { fill: #24332a; }
+    .h1 { fill: #243040; }
+    .h2 { fill: #3a3428; }
+    .h3 { fill: #2a3038; }
+    .rowalt { fill: #fff; opacity: 0.06; }
+    .yes { fill: #e8eaed; font-weight: 600; }
   </style>
 
   <text class="ink" x="400" y="22" text-anchor="middle" font-size="14"

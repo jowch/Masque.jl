@@ -44,14 +44,24 @@ and `1` — idle plus both entries.
 
 ## Overlay two series
 
+This page is a new notebook. It does not reuse `fig` or `pick` from the
+cities scatter. Develop the checkout and load a backend as on
+[Install](@ref). Skip the load cell if this notebook already ran it. Do not
+paste `using` twice.
+
 In a Pluto notebook, paste each of the following snippets into its own
 cell. Pluto runs one top-level expression per cell. Wrap multiple
 statements in `begin ... end`.
 
-**1.** Load Masque and a Makie backend:
+**1.** Develop the checkout and load CairoMakie:
 
 ```julia
-using Masque, CairoMakie
+begin
+    using Pkg
+    Pkg.develop(path = "path/to/Masque.jl")
+    Pkg.add("CairoMakie")
+    using Masque, CairoMakie
+end
 ```
 
 **2.** Draw two lines, label them, and add `axislegend`:

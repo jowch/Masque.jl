@@ -65,12 +65,23 @@ Masque groups regions by kind. Base `id = :cells` becomes `:cells_c`
 (circles), `:cells_r` (rects), and `:cells_p` (polygons). Key
 `selected=` on those suffixed ids, not on `:cells`.
 
-In a Pluto notebook, paste each snippet into its own cell:
+In a Pluto notebook, paste each snippet into its own cell. This page is
+a new notebook. It does not reuse `fig` or `pick` from the cities
+scatter. Develop the checkout and load a backend as on [Install](@ref).
+Skip the load cell if this notebook already ran it. Do not paste `using`
+twice:
 
 ```julia
 begin
+    using Pkg
+    Pkg.develop(path = "path/to/Masque.jl")
+    Pkg.add("CairoMakie")
     using Masque, CairoMakie
+end
+```
 
+```julia
+begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
     img = [Float32(sin(i / 12) * cos(j / 10)) for i in 1:100, j in 1:100]
@@ -94,7 +105,7 @@ end
 ```
 
 ```julia
-@bind ev masque(fig, cells)
+@bind pick masque(fig, cells)
 ```
 
 Do not pass `selected = Dict(:cells => [0])`. Use `:cells_c`, `:cells_r`,
@@ -112,6 +123,10 @@ the figure's [`InteractionContext`](@ref) and must return
 Do not copy `FunctionInteractable(ax, f; id)` — that signature is not
 shipped.
 
+This demo is another figure. Replace the previous `fig` cell and the
+`@bind pick` cell. Skip the load cell if this notebook already ran it.
+Do not paste `using` twice.
+
 Project data-space points with [`data_to_image_px`](@ref). Look up an
 axis transform with `Masque.axis_id(ctx, ax)` (not exported — qualify
 it). `:segments` geometry is a flat `[x1, y1, x2, y2, …]` vertex list in
@@ -119,8 +134,6 @@ image pixels, disjoint pairs, one payload per pair.
 
 ```julia
 begin
-    using Masque, CairoMakie
-
     fig = Figure()
     ax = Axis(fig[1, 1])
     verts = [(0.0, 0.0), (2.0, 1.0), (3.0, 2.0), (5.0, 0.5)]
@@ -151,7 +164,7 @@ end
 ```
 
 ```julia
-@bind ev masque(fig, track)
+@bind pick masque(fig, track)
 ```
 
 `f` can emit one `HitLayer` per axis because `ctx` covers the whole
