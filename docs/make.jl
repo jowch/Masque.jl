@@ -15,7 +15,7 @@ makedocs(;
         prettyurls = get(ENV, "CI", "false") == "true",
         canonical = "https://jowch.github.io/Masque.jl",
         edit_link = "main",
-        assets = String[],
+        assets = ["assets/masque-embed.css"],
     ),
     pages = [
         "Home" => "index.md",

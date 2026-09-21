@@ -1,0 +1,20 @@
+/* Clip the iframe to Documenter's code-block radius so it stays an
+   implementation detail (no inner scrollbars). */
+.masque-embed-wrap {
+  border-radius: 4px;
+  overflow: hidden;
+}
+.masque-embed-wrap iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+  overflow: hidden;
+}
+
+/* Dark only. Documenter's `.content pre` stroke (#5e6d6f on documenter-dark)
+   sits lighter than Pluto's cell chrome (`--main-bg-color: hsl(0deg 0% 12%)`),
+   so mix the stroke toward that background instead of reusing the code-block
+   border. Light themes leave the wrap unstroking. */
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-embed-wrap {
+  border: 1px solid color-mix(in srgb, hsl(0deg 0% 12%) 55%, #5e6d6f);
+}
