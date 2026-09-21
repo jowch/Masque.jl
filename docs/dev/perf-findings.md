@@ -151,7 +151,8 @@
 > 99 ms, inside it. The elevated pair was concurrent load from this session's own Pluto servers
 > and kind sweeps, not a shift in the row — the 500²/1000² ordering was correct throughout. The
 > row's 97–227 ms span stands unchanged, still with the "not resolved" caveat this file already
-> carries for it. The gesture channel's OWN numbers — the `with_js_link` round trip itself — are new and are in their own section below
+> carries for it. The gesture channel's OWN numbers — the `with_js_link` round trip itself —
+> are new and are in their own section below
 > ("Gesture channel (#102): the shipped `with_js_link` round trip"), measured directly against
 > `Masque._view_render_frame` (the shipped closure, not the pre-implementation spike issue #102
 > cites) via the new committed `bench/gesture_channel.jl`.
