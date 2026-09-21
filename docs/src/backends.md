@@ -40,7 +40,8 @@ struct's own `max_width`.
 `using CairoMakie` selects it. CairoMakie renders the figure to a PNG
 once. Masque ships a hit-region manifest with that image. A TypeScript
 overlay (`assets/overlay.js`) hit-tests pointer events, draws highlight
-and tooltip locally, and sends a deliberate click back through `@bind`.
+in the overlay and the tooltip locally, and sends a deliberate click
+back through `@bind`.
 
 One render per `masque()` call, independent of how many elements are
 interactive. Cheap for a figure you build once and inspect. Expensive if
@@ -75,8 +76,8 @@ end
 @bind ev masque(fig)
 ```
 
-Reach for `:webgl` for a live GPU canvas: animation, frequent
-re-renders, or large updating data, where per-frame PNG cost dominates.
+Use `:webgl` for a live GPU canvas: animation, frequent re-renders, or
+large updating data, where per-frame PNG cost dominates.
 For a figure you build once and inspect, CairoMakie's static PNG is
 lighter.
 
@@ -112,15 +113,16 @@ overlay.
 
 Persist a camera across remount with an explicit `Ref` plus rebuild, not
 with `selected=`. The slider notebooks under [Examples](@ref) show that
-pattern.
+pattern. For the overlay-only embed and the cairo in-drag clip, see
+[Pan and orbit](@ref).
 
 ## Export static HTML
 
 On either backend, a Pluto notebook exported to static HTML keeps
-pointer inspection (tooltip and highlight): the hit-test manifest is
-baked in, and so is the base (PNG on `:cairo`; serialized scene on
-`:webgl`, redrawn on the reader's GPU with no Julia server). The page
-still loads Pluto's frontend from a CDN.
+pointer inspection (tooltip and highlight in the overlay): the hit-test
+manifest is baked in, and so is the base (PNG on `:cairo`; serialized
+scene on `:webgl`, redrawn on the reader's GPU with no Julia server).
+The page still loads Pluto's frontend from a CDN.
 
 Lost on either backend: anything that needs Julia to recompute. A click
 that updates `ev` and re-runs downstream cells does nothing without a

@@ -6,26 +6,28 @@ There is exactly one selection. Before a click, the `@bind` bond is
 `index`, and `payload`. Click a mark to replace the selection with that
 mark. A cell that reads the bond re-runs.
 
-The overlay highlight follows `selectionFor`. It is not a copy of the
-bond.
+The highlight in the overlay follows `selectionFor`. It is not a copy of
+the bond.
 
 This page continues the cities scatter from [Getting started](@ref).
 Paste each snippet into its own Pluto cell.
 
 ## Click a mark
 
-Bind the widget, then read the pick:
+**1.** Bind the widget:
 
 ```julia
 @bind pick masque(fig, cities)
 ```
+
+**2.** Read the pick:
 
 ```julia
 pick === nothing ? "click a city" : "$(pick.payload.city) selected"
 ```
 
 A click in empty space does not write the bond and does not clear the
-selection. The overlay highlight stays as it is.
+selection. The highlight in the overlay stays as it is.
 
 Enter or Space on a focused mark commits the same way as a click.
 
@@ -58,9 +60,9 @@ omitted from the manifest, so that layer starts with no highlight.
 For a [`RegionInteractable`](@ref), key `selected=` on `:id_c`, `:id_r`,
 or `:id_p`, not the base `id`.
 
-## Bond versus overlay highlight
+## Bond versus highlight in the overlay
 
-The overlay uses `selectionFor` to choose what to highlight. That set is
+What to highlight in the overlay comes from `selectionFor`. That set is
 not a mirror of the bond.
 
 - A legend click writes the legend entry to `@bind` and highlights the
@@ -85,10 +87,14 @@ without a round trip. To persist a highlight across a rebuild, re-assert
 indices with `selected=` from a cell that does **not** read this
 `@bind`.
 
+**1.** Keep the indices in a cell that does not read `pick`:
+
 ```julia
 # Does not read `pick`.
 held = Dict(:cities => [0, 7])
 ```
+
+**2.** Pass them back in as `selected=`:
 
 ```julia
 @bind pick masque(fig, cities; selected = held)
@@ -105,12 +111,12 @@ Do not feed this widget's own bond into the same call. Pluto reports
 @bind pick masque(fig, cities; selected = pick)
 ```
 
-A click already updates the overlay highlight and the bond.
+A click already updates the highlight in the overlay and the bond.
 
 Last pick wins. To accumulate indices across clicks, keep a `Ref` in a
 cell that does not read this `@bind`, then pass the growing set as
-`selected=` to a second `masque` widget. That pattern is in
-[Selection round-trip in `examples/demo.jl`][demo-round-trip]. Do not
+`selected=` to a second `masque` widget. For more information, see the
+[selection round-trip in `examples/demo.jl`][demo-round-trip]. Do not
 copy the whole demo notebook.
 
 To brush a box with `selects` and report several marks, see

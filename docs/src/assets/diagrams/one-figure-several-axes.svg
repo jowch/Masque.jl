@@ -3,10 +3,11 @@
   <title id="d4-title">One masque call, one overlay, several axes</title>
   <desc id="d4-desc">
     One masque call produces one overlay and one manifest over every axis
-    in a figure. Hits are independent per axis. A legend entry can highlight
-    every mark of named layers on both axes. Same-index highlight between
-    two scatters is not shipped. A listed ROI item set updates a harvested
-    table; an unlisted drag moves the box and leaves the table unchanged.
+    in a figure. Hits are independent per axis. Holding the pointer over
+    the xy legend entry highlights every xy mark; xz stays unchanged.
+    Same-index highlight between two scatters is not shipped. A listed ROI
+    item set updates a harvested table; an unlisted drag moves the box and
+    leaves the table unchanged.
   </desc>
   <style>
     .ink { fill: none; stroke: currentColor; stroke-width: 1.5; }
@@ -33,7 +34,8 @@
   <line class="ink" x1="332" y1="34" x2="372" y2="34" marker-end="url(#arr)"/>
   <rect class="ink" x="380" y="16" width="140" height="36" rx="6"/>
   <text class="label" x="450" y="39" text-anchor="middle">one manifest</text>
-  <text class="small" x="660" y="39" text-anchor="middle">hits stay on the axis you hit</text>
+  <text class="small" x="660" y="32" text-anchor="middle">hits stay on the axis you hit</text>
+  <text class="small" x="660" y="48" text-anchor="middle">same-index highlight is not shipped</text>
 
   <rect class="ink" x="24" y="68" width="752" height="236" rx="8"/>
   <text class="small" x="40" y="88">Figure</text>
@@ -46,24 +48,18 @@
   <circle class="fill" cx="150" cy="200" r="7"/>
   <circle class="fill" cx="210" cy="150" r="7"/>
   <circle class="fill" cx="240" cy="230" r="7"/>
-  <path class="ink" d="M118 136 l16 -20" marker-end="url(#arr)"/>
-  <text class="small" x="148" y="122">hit this mark</text>
   <text class="small" x="165" y="270" text-anchor="middle">legend wash: every xy mark</text>
 
   <rect class="panel" x="308" y="100" width="250" height="188" rx="6"/>
   <rect class="ink" x="308" y="100" width="250" height="188" rx="6"/>
   <text class="label" x="433" y="122" text-anchor="middle">xz</text>
-  <rect class="wash" x="336" y="138" width="194" height="112" rx="10"/>
   <circle class="fill" cx="358" cy="160" r="7"/>
   <circle class="fill" cx="418" cy="200" r="7"/>
   <circle class="fill" cx="478" cy="150" r="7"/>
   <circle class="fill" cx="508" cy="230" r="7"/>
-  <text class="small" x="433" y="270" text-anchor="middle">legend wash: every xz mark</text>
-
-  <path class="dash" d="M157 200 C 240 176, 330 176, 411 200"/>
-  <rect class="ink" x="232" y="166" width="104" height="22" rx="4"/>
-  <text class="small" x="284" y="181" text-anchor="middle">Not shipped</text>
-  <text class="small" x="284" y="250" text-anchor="middle">same index</text>
+  <path class="ink" d="M500 178 L482 156" marker-end="url(#arr)"/>
+  <text class="small" x="508" y="192">hit this mark</text>
+  <text class="small" x="433" y="270" text-anchor="middle">xz unchanged</text>
 
   <rect class="ink" x="580" y="100" width="176" height="188" rx="6"/>
   <text class="label" x="668" y="122" text-anchor="middle">Legend</text>

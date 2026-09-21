@@ -61,6 +61,8 @@ Pass it yourself.
 
 ## Pan a 2D axis
 
+**1.** Draw a scatter and pass [`ViewInteractable`](@ref):
+
 ```julia
 begin
     xs = Float64[1, 2, 3, 4, 5, 6]
@@ -72,6 +74,8 @@ begin
     nothing
 end
 ```
+
+**2.** Mount the overlay. Do not `@bind` a camera pose:
 
 ```julia
 masque(fig, v)
@@ -117,8 +121,9 @@ begin
 end
 ```
 
-A static `Axis3` on CairoMakie is valid. Live GPU rotation without
-Masque is a WGLMakie session; see [Backends](@ref).
+A static `Axis3` on CairoMakie is a valid 3D plot. Orbit through Masque
+still commits nothing. For cairo frames versus a WGLMakie numeric
+readout, see [Backends](@ref).
 
 ## What does not pan
 

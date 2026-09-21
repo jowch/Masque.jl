@@ -1,11 +1,11 @@
 # Inspect a grid
 
 Hold the pointer over a heatmap or image cell to read `(i, j)` and its
-value. Click the cell to write that pick into Julia. The overlay highlights
-the cell; the PNG does not change.
+value. Click the cell to write that pick into Julia. The cell is a
+highlight in the overlay; the PNG does not change.
 
-The following clip holds the pointer over cells, then clicks one. The
-tooltip is `(i,j) = value`. The overlay highlights the cell.
+The following clip shows the pointer over cells, then a click. The
+tooltip is `(i,j) = value`.
 
 ```@raw html
 <video id="masque-grids-clip" title="Hold the pointer over heatmap cells, then click one"
@@ -22,8 +22,8 @@ tooltip is `(i,j) = value`. The overlay highlights the cell.
 ```
 
 This docs embed is overlay-only. Hold the pointer over a cell for the
-tooltip and the highlight in the overlay. A click still highlights that
-cell in the overlay. On this site, Julia stays at the default bond
+tooltip and the highlight in the overlay. A click still draws that
+highlight in the overlay. On this site, Julia stays at the default bond
 (`nothing`). In a live Pluto notebook, the same click assigns `@bind`.
 
 ```@raw html
@@ -124,8 +124,9 @@ table used on scatter and bars. For more information, see
 Click the cell. In live Pluto, `pick` is an [`InteractionEvent`](@ref):
 `layer` is `:cells`, `index` is the linear 0-based cell, and `payload`
 is `(; i, j, value)` (or `(; i, j)` when values were dropped from the
-manifest; the click still carries the cell). The overlay highlights that
-cell. A click in empty space does not write the bond.
+manifest; the click still carries the cell). `i` and `j` are 0-based
+(column, then row). The cell is a highlight in the overlay. A click in
+empty space does not write the bond.
 
 Tab and arrow keys skip `:grid`. Keyboard focus walks bars and scatter
 marks, not heatmap cells. For more information, see
@@ -133,8 +134,8 @@ marks, not heatmap cells. For more information, see
 
 ## Skip `selected=` on a grid
 
-Click-echo is overlay-local. `selected = Dict(:cells => [0])` raises
-`ArgumentError`: `:grid` is not a pre-highlight kind. Do not pass
+Click-echo is a highlight in the overlay. `selected = Dict(:cells => [0])`
+raises `ArgumentError`: `:grid` is not a pre-highlight kind. Do not pass
 `selected=` to persist a cell wash. For kinds that do hydrate, see
 [Selection](@ref).
 

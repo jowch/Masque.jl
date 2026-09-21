@@ -14,7 +14,7 @@ loaded, an unqualified `masque` uses CairoMakie.
 
 The following table compares Masque to using a Makie backend with no overlay.
 
-| | CairoMakie alone | WGLMakie alone | Masque |
+| Feature | CairoMakie alone | WGLMakie alone | Masque |
 |---|---|---|---|
 | Output | Static, publication-quality | Live, GPU-rendered | Static image plus overlay (`:cairo`), or live canvas (`:webgl`) |
 | Interactivity | None | Rich (pan, zoom, rotate) | Tooltips, click to select, drag to pan, threshold, or ROI |
@@ -66,8 +66,19 @@ more information, see [Examples](@ref) and [Backends](@ref).
 
 For your first overlay, see [Getting started](@ref). Holding the pointer
 over a mark does not write `@bind`; a click does. That page shows both on
-one plot. For the full channel table, see
-[Hover, click, and bind](@ref).
+one plot.
+
+![At masque time, one Figure plus interactables becomes a backend image
+and hit geometry for every axis, then one manifest, then HTML with one
+image and one overlay. Several axes still make one overlay. The overlay
+is a stateless view. Analysis state is the bind bond in
+Julia.](assets/diagrams/information-flow.svg)
+
+One `masque` call produces one image and one overlay from a Makie
+`Figure` and its interactables.
+
+The overlay is a view. The `@bind` bond is Julia state when a cell reads
+it. For every channel and host, see [Hover, click, and bind](@ref).
 
 ## Where to go next
 

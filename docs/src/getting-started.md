@@ -147,7 +147,9 @@ PNG does not change.
 
 `colors` on the layer is a tooltip accent. `scatter!`'s `color=` does not
 change the overlay highlight. Holding the pointer over a mark that is
-already selected still shows the tooltip and still fires `@bind` on click.
+already selected skips the highlight. The tooltip still shows, and a click
+still writes `@bind`. Do not write a cell that reads `pick` expecting it
+to update when you hold the pointer over a city.
 
 ## Make the highlight hug the marker
 
@@ -178,8 +180,9 @@ constructor and already hugs the marker.
 Take the cities cells into a larger notebook. Add more plots on the same
 `Figure`. One `masque` call covers every axis: pass a vector of
 interactables. Layer ids must not collide; repeats of a kind in
-`auto_interactables` become `:scatter_2`. A second axis is still one overlay, not a second widget. For more
-information, see [Linked views](@ref).
+`auto_interactables` become `:scatter_2`. A second axis is still one
+overlay, not a second widget. For more information, see
+[Linked views](@ref).
 
 `auto_interactables` walks every `Axis` / `Axis3` / `PolarAxis` plot it
 knows, plus every `Colorbar` and `Legend`. It does not install
@@ -217,8 +220,7 @@ empty figure warns "overlaying nothing". Auto-extracted layers do not take
 `tooltip=` or `label=`; build an explicit interactable for those.
 
 You can also start from `auto_interactables(fig)`, tweak the vector, and
-pass it back. For more information, see
-[Zero-config: `masque(fig)`](@ref).
+pass it back. For more information, see [Constructors](@ref).
 
 ## Choose a backend
 

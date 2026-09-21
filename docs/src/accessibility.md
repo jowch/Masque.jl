@@ -23,13 +23,13 @@ and the **first arrow** (either direction) land on index 0. If a legend
 exists, its entries are first in the manifest, so index 0 is the first
 legend entry. Page Down then steps from the legend into the plot
 layers. That order matches the pointer: a legend drawn on top of a plot
-takes the clicks under it. Focusing an entry highlights the trace it
-labels, the same as holding the pointer over it. For more information,
-see [Legend](@ref).
+takes the clicks under it. Focusing an entry draws highlight in the
+overlay on the trace it labels, the same as holding the pointer over
+it. For more information, see [Legend](@ref).
 
-Moving focus draws the same overlay highlight as holding the pointer
-over the mark (there is never a separate focus look) and shows the same
-tooltip, positioned on the focused element.
+Moving focus draws the same highlight in the overlay as holding the
+pointer over the mark (there is never a separate focus look) and shows
+the same tooltip, positioned on the focused element.
 
 Reachable kinds: `:circles`, `:rects`, `:polygons`, `:segments`, and
 `:polyline`. That includes [`TextInteractable`](@ref) (kind `:rects`)

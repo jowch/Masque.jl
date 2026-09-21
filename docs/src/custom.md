@@ -2,7 +2,7 @@
 
 Declare hit regions Makie did not plot as marks: a circle, a rect, and a
 polygon over an image. Hold the pointer over a region to read its name.
-Click-echo highlight runs in the overlay. This docs embed does not swap
+Click-echo is the highlight in the overlay. This docs embed does not swap
 Julia. A live Pluto cell that reads `@bind` does.
 
 For constructor signatures, see [Constructors](@ref).
@@ -61,9 +61,9 @@ auto-generated default. `tooltip` takes the same three forms as other
 element constructors (`nothing` / `masque"..."` / `false`). For more
 information, see [Tooltips](@ref).
 
-Region groups by kind. Base `id = :cells` becomes `:cells_c` (circles),
-`:cells_r` (rects), and `:cells_p` (polygons). Key `selected=` on those
-suffixed ids, not on `:cells`.
+Masque groups regions by kind. Base `id = :cells` becomes `:cells_c`
+(circles), `:cells_r` (rects), and `:cells_p` (polygons). Key
+`selected=` on those suffixed ids, not on `:cells`.
 
 In a Pluto notebook, paste each snippet into its own cell:
 

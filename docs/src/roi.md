@@ -146,10 +146,11 @@ never `nothing`. Index `e.index` is 0-based; `samples[e.index + 1]` is the
 enclosed station. Each event's `layer` is `:pts`. Enclosed points highlight
 in the overlay; the PNG does not change.
 
-On this docs site, the player lists a handful of `{ items }` sets (including
-empty), keyed the same way the overlay commits. Exact pixel bounds are not in
-that table. Unlisted box geometry still moves in the overlay; the table does
-not swap until a listed set matches.
+On this docs site, the player lists a handful of
+`{ items: [{ layer, index }, …] }` sets (including empty `items`), keyed
+the same way the overlay commits. Exact pixel bounds are not in that
+table. Unlisted box geometry still moves in the overlay; the table stays
+on the last listed set.
 
 ## Drag and resize
 

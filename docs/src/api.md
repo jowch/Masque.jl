@@ -51,7 +51,7 @@ For usage, see [Tooltips](@ref).
 
 ## Custom-hit interface
 
-The pieces [Custom hits](@ref) build on:
+For usage, see [Custom hits](@ref).
 
 ```@docs
 AbstractInteractable

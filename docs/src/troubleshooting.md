@@ -94,11 +94,13 @@ interactable (`PointInteractable`, `SegmentInteractable`, …) instead of
 a continuous-readout one.
 
 This is **not** the Axis3 orbit path. `ViewInteractable` on `Axis3`
-does not invert a pixel to data; see the next two headings.
+does not invert a pixel to data. Orbit is allowed; a pixel→data error
+comes from Axis, Threshold, or ROI, not from View.
 
 ### Tried `AxisInteractable`, `ThresholdInteractable`, or `ROIInteractable` on Axis3
 
-**Error prefix:** `continuous pixel→data readout is undefined on an Axis3`
+**Error prefix:** `continuous pixel→data readout is undefined on an Axis3` /
+`undefined on an Axis3`
 
 **Cause:** those three kinds need a 2D pixel→data inverse. A screen
 pixel on `Axis3` is a ray, not a data point.
@@ -121,7 +123,8 @@ only. The bond never carries `:view`. For more information, see
 ### Tried continuous θ/r readout on PolarAxis
 
 **Error prefix:** `continuous θ/r readout on PolarAxis` /
-`PolarAxis view gestures need continuous θ/r`
+`PolarAxis view gestures need continuous θ/r` /
+`PolarAxis continuous θ/r inversion is not yet shipped`
 
 **Cause:** continuous polar inversion is not shipped.
 `AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, and
@@ -164,10 +167,14 @@ overlay. Masque builds no overlay for `LScene` on either backend.
 
 ### Tried `selected=` on a kind that cannot hydrate
 
-**Cause:** the layer id does not support pre-highlight (`:grid`,
-`:axis`, `:threshold`, `:roi`, `:view` cannot; only `:circles` /
-`:rects` / `:polygons` / `:segments` / `:polyline` can), or an index is
-out of range. Region keys are the suffixed ids, not the base `id`.
+**Error prefix:** `does not support pre-highlight` /
+`out of range`
+
+**Cause:** the layer id does not support highlight in the overlay from
+`selected=` (`:grid`, `:axis`, `:threshold`, `:roi`, `:view` cannot;
+only `:circles` / `:rects` / `:polygons` / `:segments` / `:polyline`
+can), or an index is out of range. Region keys are the suffixed ids,
+not the base `id`.
 
 **Fix:** check the layer's kind against [Selection](@ref). Indices are
 0-based and must be less than the element count.

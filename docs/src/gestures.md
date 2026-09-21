@@ -16,11 +16,18 @@ backend image (PNG or GPU canvas) and hit geometry for every axis, then one
 manifest, then HTML: one image and one overlay. Several axes still share that
 overlay. They are not several `masque` calls.
 
-![At masque time, one Figure plus interactables becomes a backend image and hit geometry for every axis, then one manifest, then HTML with one image and one overlay. Several axes still make one overlay. The overlay is a stateless view. Analysis state is the bind bond in Julia.](assets/diagrams/information-flow.svg)
+![At masque time, one Figure plus interactables becomes a backend image
+and hit geometry for every axis, then one manifest, then HTML with one
+image and one overlay. Several axes still make one overlay. The overlay
+is a stateless view. Analysis state is the bind bond in
+Julia.](assets/diagrams/information-flow.svg)
 
-The overlay is a stateless view: tooltips, highlight in the overlay, and drag
-chrome. Authoritative analysis state lives in Julia as the `@bind` bond when
-a cell reads it.
+One `masque` call produces one image and one overlay from a Makie
+`Figure` and its interactables.
+
+The overlay is a stateless view: tooltips, highlight in the overlay, and
+drag chrome. Authoritative analysis state lives in Julia as the `@bind`
+bond when a cell reads it.
 
 ## Four channels
 
@@ -44,10 +51,17 @@ click also runs in the overlay. The PNG does not change. An in-drag ROI box
 or threshold line stays in the overlay until release. A view drag commits
 nothing: camera state is not analysis data.
 
-![Swimlanes for overlay chrome, the bind bond, the gesture channel, and a downstream Julia cell for each gesture: hover tooltip and highlight, click-echo wash, click or Enter commit, ROI or threshold in-drag, ROI or threshold release, view pan or orbit in-drag, view release, and empty-space click.](assets/diagrams/channels-timing.svg)
+![Swimlanes for overlay chrome, the bind bond, the gesture channel, and
+a downstream Julia cell for each gesture: hover tooltip and highlight,
+click-echo wash, click or Enter commit, ROI or threshold in-drag, ROI or
+threshold release, view pan or orbit in-drag, view release, and
+empty-space click.](assets/diagrams/channels-timing.svg)
 
-Each row of the figure is one gesture against the four channels. The
-following table is the same data, so the figure is not the only source.
+Each pointer gesture uses a different mix of overlay chrome, the `@bind`
+bond, the gesture channel, and a downstream Julia cell.
+
+The following table is the same data, so the figure is not the only
+source.
 
 | Gesture | Overlay | Bond | Gesture channel | Downstream cell |
 |---|---|---|---|---|
@@ -79,10 +93,19 @@ cells when a notebook has them. An overlay-only player keeps tooltip and
 highlight chrome. Julia stays at the default bond. Static `generate_html`
 keeps overlay chrome and drops `@bind` and `with_js_link`.
 
-![Four hosts compared: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect and cairo view frames use GIF or MP4 on this site, with no bind on view.](assets/diagrams/overlay-vs-host.svg)
+![Four hosts compared: live Pluto, a docs player with listed idle plus N
+or listed items, a docs player that is overlay-only, and static
+generate_html. Hover and click-echo run on every host. Listed element
+bind and listed ROI, axis, or threshold values re-run Julia on live
+Pluto, swap snapshots on a listed player, stay at the default bond on
+overlay-only, and are dead on static HTML. Unlisted drags keep chrome.
+Heatmap inspect and cairo view frames use GIF or MP4 on this site, with
+no bind on view.](assets/diagrams/overlay-vs-host.svg)
 
-The figure compares one gesture across four hosts. The following table is the
-same split.
+The same gesture can run in the overlay, write `@bind`, swap a listed
+snapshot, or stay frozen, depending on the host.
+
+The following table is that split.
 
 | Gesture | Live Pluto | Docs player (listed idle+N / listed `items`) | Docs player (overlay-only) | Static `generate_html` |
 |---|---|---|---|---|

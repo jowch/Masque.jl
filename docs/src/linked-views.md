@@ -7,7 +7,12 @@ responds on the axis you hit. Adding a second axis is a larger notebook,
 not a second architecture. For the first overlay, see
 [Getting started](@ref).
 
-![One masque call produces one overlay and one manifest. Hits stay on the axis you hit. A legend entry can highlight every mark of named layers on both axes. Same-index highlight between two scatters is not shipped. A listed ROI item set updates a harvested table; an unlisted drag moves the box and leaves the table unchanged.](assets/diagrams/one-figure-several-axes.svg)
+![One masque call produces one overlay and one manifest. Hits stay
+on the axis you hit. Holding the pointer over the xy legend entry
+highlights every xy mark; xz stays unchanged. Same-index highlight
+between two scatters is not shipped. A listed ROI item set updates
+a harvested table; an unlisted drag moves the box and leaves the
+table unchanged.](assets/diagrams/one-figure-several-axes.svg)
 
 One `masque` call covers every axis: independent hits, legend whole-layer
 wash, and a listed ROI item set that updates a harvested table.
@@ -95,10 +100,11 @@ Do not add a second `@bind pick` cell. Do not `deepcopy(fig)`.
 ## Highlight a series across axes
 
 A legend entry highlights every element of the layer or layers it names,
-including layers on other axes. That fan-out is the only shipped
-cross-layer highlight. It is series-shaped, not observation `i`. Hold
-the pointer over **xy** and every mark of that series highlights in the
-overlay. Point 3 in both panels does not.
+including layers on other axes. That wash is client-side: it does not
+write `@bind`. It is the only shipped cross-layer highlight. It is
+series-shaped, not observation `i`. Hold the pointer over **xy** and
+every mark of that series highlights in the overlay. Point 3 in both
+panels does not.
 
 Two lines on one axis stay on [Legend](@ref). The two-panel wash lives
 here.
@@ -154,8 +160,9 @@ end
 
 `masque(fig)` picks up the `Legend`. Click still reports the legend
 entry (`layer === :legend`), not each washed mark. The overlay cannot
-hide Makie traces; wash plus `@bind` so Julia filters. For
-`targets=` and a click readout, see [Legend](@ref).
+hide Makie traces. Use the wash plus `@bind` so a Julia cell can
+filter the series. For `targets=` and a click readout, see
+[Legend](@ref).
 
 ## Same-index highlight is not shipped
 

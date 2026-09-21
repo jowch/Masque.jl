@@ -1,8 +1,8 @@
 # Click marks
 
-This page is discrete clicks after the cities scatter: four bars, three
-polygons, four polar points. Hold the pointer over a mark to inspect it.
-Click a mark to write that pick into Julia through `@bind`.
+This page continues discrete clicks after the cities scatter: four bars,
+three polygons, and four polar points. Hold the pointer over a mark to
+inspect it. Click a mark to write that pick into Julia through `@bind`.
 
 In a Pluto notebook, paste each snippet into its own cell. Pluto runs one
 top-level expression per cell. Wrap multiple statements in `begin ... end`.
@@ -23,42 +23,6 @@ Draw four bars and skip the constructor. The default payload is
 id is `:bars`. The hit kind is `:rects`, so `selected=` can hydrate those
 indices. Heatmap cells are a `:grid` layer — a different job. For more
 information, see [Inspect a grid](@ref).
-
-`barplot!` on a `PolarAxis` is skipped by `masque(fig)` with `@warn`. An
-explicit AABB would misalign. Do not use a 12-bin histogram as this demo.
-Keyboard arrows reach bars (`:rects` is focusable).
-
-```julia
-begin
-    fig = Figure(size = (560, 360))
-    ax = Axis(
-        fig[1, 1];
-        xlabel = "Quarter",
-        ylabel = "Value",
-        xticks = (1:4, ["Q1", "Q2", "Q3", "Q4"]),
-    )
-    barplot!(ax, 1:4, [2.0, 3.0, 1.5, 2.5])
-end
-```
-
-```julia
-@bind pick masque(fig)
-```
-
-```julia
-pick === nothing ? "click a bar" :
-    "value $(pick.payload.value) (low $(pick.payload.low), high $(pick.payload.high))"
-```
-
-`pick.payload.index` raises an error on this zero-config bar plot. There
-is no `index` field. Pass the plot object when you want an explicit
-interactable: `p = barplot!(ax, 1:4, ys); RectInteractable(ax, p)`. That
-method is `RectInteractable(ax, p::BarPlot; id = :bars)`. `direction`
-(`:y` by default) chooses which axis is `low` / `high`.
-
-Hist, waterfall, crossbar, hspan, and vspan are also `:rects` list
-layers. Each has its own default payload. For those payloads, see
-[Constructors](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -89,6 +53,48 @@ layers. Each has its own default payload. For those payloads, see
 </script>
 ```
 
+**1.** Draw four bars:
+
+```julia
+begin
+    fig = Figure(size = (560, 360))
+    ax = Axis(
+        fig[1, 1];
+        xlabel = "Quarter",
+        ylabel = "Value",
+        xticks = (1:4, ["Q1", "Q2", "Q3", "Q4"]),
+    )
+    barplot!(ax, 1:4, [2.0, 3.0, 1.5, 2.5])
+end
+```
+
+**2.** Bind a click:
+
+```julia
+@bind pick masque(fig)
+```
+
+**3.** Read the pick:
+
+```julia
+pick === nothing ? "click a bar" :
+    "value $(pick.payload.value) (low $(pick.payload.low), high $(pick.payload.high))"
+```
+
+`pick.payload.index` raises an error on this zero-config bar plot. There
+is no `index` field. Pass the plot object when you want an explicit
+interactable: `p = barplot!(ax, 1:4, ys); RectInteractable(ax, p)`. That
+method is `RectInteractable(ax, p::BarPlot; id = :bars)`. `direction`
+(`:y` by default) chooses which axis is `low` / `high`.
+
+`barplot!` on a `PolarAxis` is skipped by `masque(fig)` with `@warn`. An
+explicit AABB would misalign. Do not use a 12-bin histogram as this demo.
+Keyboard arrows reach bars (`:rects` is focusable).
+
+Hist, waterfall, crossbar, hspan, and vspan are also `:rects` list
+layers. Each has its own default payload. For those payloads, see
+[Constructors](@ref).
+
 ## Skip the constructor
 
 `masque(fig)` is `masque(fig, auto_interactables(fig))` after layout.
@@ -103,8 +109,9 @@ knows, plus every `Colorbar` and `Legend`. It does not install
 `ViewInteractable`. On huge data it allocates one default payload per
 element; pass a lean `payloads=` (or skip the layer) yourself.
 
-Zero-config already hugs the drawn mark. Bare points without `radius=`
-do not. Two hug paths are legal:
+Zero-config uses the Scatter constructor, so the highlight in the overlay
+already hugs the drawn mark. Bare points without `radius=` do not. Two
+hug paths are legal:
 
 - Pass the scatter plot object:
   `p = scatter!(ax, xs, ys; markersize); PointInteractable(ax, p)`.
@@ -135,58 +142,6 @@ those indices. Pass `PolygonInteractable(ax, p)` when you already have
 the plot object, or `PolygonInteractable(ax, rings)` for explicit
 geometry.
 
-```julia
-begin
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; aspect = DataAspect())
-    poly!(
-        ax,
-        [
-            Point2f[(0.0, 0.0), (1.0, 0.0), (0.5, 0.85)],
-            Point2f[(1.6, 0.0), (2.6, 0.0), (2.6, 1.0), (1.6, 1.0)],
-            Point2f[(0.1, 1.2), (1.1, 1.2), (0.9, 2.0), (0.3, 2.0)],
-        ];
-        color = [:steelblue, :tomato, :seagreen],
-    )
-end
-```
-
-```julia
-@bind pick masque(fig)
-```
-
-```julia
-pick === nothing ? "click a polygon" : "index $(pick.index)"
-```
-
-`poly!` on a `PolarAxis` is skipped by auto with `@warn`. Band, density,
-contourf, violin, and voronoiplot are also `:polygons`; contourf defaults
-to `(; low, high)` and violin to `(; x)`.
-
-`text!` labels are bounding-box hits: `TextInteractable(ax, p::Makie.Text)`
-only, kind `:rects`, default payload `(; text, index, x, y)`.
-`annotation!` is auto-only through its inner `Text`.
-
-A short polyline is the same click job with a different kind. Four
-vertices give three segments, layer `:lines`, kind `:polyline`, default
-payload `(; segment_index)`:
-
-```julia
-begin
-    fig = Figure()
-    ax = Axis(fig[1, 1])
-    lines!(ax, [0, 1, 2, 3], [0, 1, 0, 1])
-end
-```
-
-```julia
-@bind pick masque(fig)
-```
-
-Line segments, errorbars, rangebars, hlines, and vlines use kind
-`:segments` instead. Keep N small enough to list every segment. Do not
-bind-swap a dense `lines!` click by click.
-
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-marks-poly" title="Three polygons with listed @bind snapshots"
@@ -216,6 +171,70 @@ bind-swap a dense `lines!` click by click.
 </script>
 ```
 
+**1.** Draw three polygons:
+
+```julia
+begin
+    fig = Figure(size = (560, 360))
+    ax = Axis(fig[1, 1]; aspect = DataAspect())
+    poly!(
+        ax,
+        [
+            Point2f[(0.0, 0.0), (1.0, 0.0), (0.5, 0.85)],
+            Point2f[(1.6, 0.0), (2.6, 0.0), (2.6, 1.0), (1.6, 1.0)],
+            Point2f[(0.1, 1.2), (1.1, 1.2), (0.9, 2.0), (0.3, 2.0)],
+        ];
+        color = [:steelblue, :tomato, :seagreen],
+    )
+end
+```
+
+**2.** Bind a click:
+
+```julia
+@bind pick masque(fig)
+```
+
+**3.** Read the pick:
+
+```julia
+pick === nothing ? "click a polygon" : "index $(pick.index)"
+```
+
+`poly!` on a `PolarAxis` is skipped by auto with `@warn`. Band, density,
+contourf, violin, and voronoiplot are also `:polygons`; contourf defaults
+to `(; low, high)` and violin to `(; x)`.
+
+`text!` labels are bounding-box hits: `TextInteractable(ax, p::Makie.Text)`
+only, kind `:rects`, default payload `(; text, index, x, y)`.
+`annotation!` is auto-only through its inner `Text`.
+
+### Click a polyline
+
+A short polyline is the same click job with a different kind. Four
+vertices give three segments, layer `:lines`, kind `:polyline`, default
+payload `(; segment_index)`.
+
+**1.** Draw a four-vertex polyline:
+
+```julia
+begin
+    fig = Figure()
+    ax = Axis(fig[1, 1])
+    lines!(ax, [0, 1, 2, 3], [0, 1, 0, 1])
+end
+```
+
+**2.** Bind a click:
+
+```julia
+@bind pick masque(fig)
+```
+
+Line segments, errorbars, rangebars, hlines, and vlines use kind
+`:segments` instead. Keep N small enough to list every segment. Do not
+bind-swap a dense `lines!` click by click.
+
 ## Click points on a polar axis
 
 Scatter four `Point2f` values on a `PolarAxis`. `@bind pick masque(fig)`
@@ -223,34 +242,6 @@ walks the scatter the same way as on a Cartesian axis. CairoMakie and
 WGLMakie both work; polar is not WebGL-only. The default payload is
 `(; index, x, y)` with `x` = θ and `y` = r. The highlight in the overlay
 hugs the marker because zero-config uses the Scatter constructor.
-
-Auto on `PolarAxis` allowlists Scatter, Lines, LineSegments, and
-ScatterLines. Continuous θ/r readout is not shipped.
-`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, and
-`ViewInteractable` on polar raise `ArgumentError`. Use element hits.
-
-```julia
-begin
-    fig = Figure(size = (480, 400))
-    ax = PolarAxis(fig[1, 1])
-    pts = Point2f[(0.0, 1.0), (π / 2, 2.0), (π, 1.5), (3π / 2, 2.5)]
-    scatter!(ax, pts; markersize = 18)
-end
-```
-
-```julia
-@bind pick masque(fig)
-```
-
-```julia
-pick === nothing ? "click a point" :
-    "index $(pick.index) (θ $(pick.payload.x), r $(pick.payload.y))"
-```
-
-Do not put `heatmap!`, `barplot!`, or `poly!` through auto on polar
-(skipped with `@warn`). An explicit AABB construct still misaligns. Do
-not add `ViewInteractable` to spin the polar plot. A notebook that
-loads only WGLMakie is a backend check, not a polar requirement.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -280,3 +271,37 @@ loads only WGLMakie is a backend check, not a polar requirement.
 })();
 </script>
 ```
+
+**1.** Scatter four points on a `PolarAxis`:
+
+```julia
+begin
+    fig = Figure(size = (480, 400))
+    ax = PolarAxis(fig[1, 1])
+    pts = Point2f[(0.0, 1.0), (π / 2, 2.0), (π, 1.5), (3π / 2, 2.5)]
+    scatter!(ax, pts; markersize = 18)
+end
+```
+
+**2.** Bind a click:
+
+```julia
+@bind pick masque(fig)
+```
+
+**3.** Read the pick:
+
+```julia
+pick === nothing ? "click a point" :
+    "index $(pick.index) (θ $(pick.payload.x), r $(pick.payload.y))"
+```
+
+Auto on `PolarAxis` allowlists Scatter, Lines, LineSegments, and
+ScatterLines. Continuous θ/r readout is not shipped.
+`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, and
+`ViewInteractable` on polar raise `ArgumentError`. Use element hits.
+
+Do not put `heatmap!`, `barplot!`, or `poly!` through auto on polar
+(skipped with `@warn`). An explicit AABB construct still misaligns. Do
+not add `ViewInteractable` to spin the polar plot. A notebook that
+loads only WGLMakie is a backend check, not a polar requirement.

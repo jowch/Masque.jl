@@ -6,7 +6,7 @@ read `value`. Drag a threshold line; on release, Julia gets a scalar.
 This docs embed is overlay-only. Hold the pointer over the plot: the
 tooltip follows the pointer with `x=…, y=…`. A click writes the bond in
 live Pluto. On this site, Julia stays at the default bond (`nothing`).
-The overlay does not highlight a mark at the click.
+There is no highlight in the overlay at the click.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -49,6 +49,8 @@ continuous readout: axis, colorbar, and threshold.
 [`AxisInteractable`](@ref) is the whole axis as one hit region.
 `masque(fig)` does **not** install it. Pass it yourself:
 
+**1.** Draw a short sine and an `AxisInteractable`:
+
 ```julia
 begin
     xs = range(0, 2π; length = 80)
@@ -60,6 +62,8 @@ begin
 end
 ```
 
+**2.** Bind a click:
+
 ```julia
 @bind pick masque(fig, axint)
 ```
@@ -69,14 +73,14 @@ After a click, `pick` is an [`InteractionEvent`](@ref): `layer` is
 `pick.payload.x` and `pick.payload.y`.
 
 The tooltip follows the pointer, not a mark. A click writes the bond.
-The overlay does not add a selected wash at that location.
+There is no highlight in the overlay at that location.
 
-Supported scales: `identity`, `log10`, and `log`. Categorical axes are
-fine here. `Makie.pseudolog10` and `Makie.Symlog10` raise
-`ArgumentError` at `masque()` time.
+Supported scales: `identity`, `log10`, and `log`. Categorical axes work
+here. `Makie.pseudolog10` and `Makie.Symlog10` raise `ArgumentError` at
+`masque()` time.
 
 `AxisInteractable` on `Axis3` or `PolarAxis` raises `ArgumentError`. Use
-element hits on those axes instead. `payloads=` and `tooltip=` on
+scatter or lines on those axes instead. `payloads=` and `tooltip=` on
 `AxisInteractable` are a `MethodError`. `selected=` on `:axis` raises
 `ArgumentError`.
 
@@ -89,6 +93,8 @@ Payload is `(; value)`. `index` is `-1`.
 `masque(fig)` **does** install a `Colorbar` block. You can also pass the
 colorbar yourself so the heatmap cells are not in the same widget:
 
+**1.** Draw a small heatmap, a `Colorbar`, and a `ColorbarInteractable`:
+
 ```julia
 begin
     z = [Float64(i + 3j) for i in 1:4, j in 1:3]
@@ -100,6 +106,8 @@ begin
     nothing
 end
 ```
+
+**2.** Bind a click:
 
 ```julia
 @bind pick masque(fig, cbint)
@@ -115,6 +123,8 @@ the axis (`identity`, `log10`, `log`).
 required. `:horizontal` is a constant-y line you drag vertically.
 `:vertical` is a constant-x line you drag horizontally.
 
+**1.** Draw a scatter and a horizontal threshold:
+
 ```julia
 begin
     fig = Figure(size = (560, 320))
@@ -129,6 +139,8 @@ begin
 end
 ```
 
+**2.** Bind the widget:
+
 ```julia
 @bind pick masque(fig, cutoff)
 ```
@@ -139,11 +151,11 @@ pointer, `pick` is an `InteractionEvent`: `layer` is `:threshold`,
 There is no field name. `pick.payload.y` raises an error; use
 `pick.payload`.
 
-This is not a slider of the continuum. Do not list a dense set of
-release values as docs snapshots.
+This is not a slider of the continuum. Release writes one scalar. The
+pointer can stop anywhere on the dragged axis.
 
 The dragged axis must be invertible (`identity` / `log10` / `log`).
-Categorical is fine. `Axis3` and `PolarAxis` raise `ArgumentError`.
+Categorical axes work. `Axis3` and `PolarAxis` raise `ArgumentError`.
 
 If [`ViewInteractable`](@ref) is on the same axis, an ordinary drag
 moves the threshold. **Shift**+drag pans instead. For pan and orbit, see

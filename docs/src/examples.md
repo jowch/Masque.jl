@@ -20,6 +20,10 @@ julia -e 'using Pluto; Pluto.run()'
 **3.** On Pluto's landing page, open the notebook path you want, for
    example `examples/demo.jl`.
 
+These notebooks are larger than the cities scatter on
+[Getting started](@ref). A second axis still uses one `masque` call.
+For more information, see [Linked views](@ref).
+
 Do not paste a notebook's `Pkg.activate(; temp = true)` cell into a
 docs embed or into a notebook that keeps Pluto's package management on.
 
@@ -29,8 +33,8 @@ Each notebook has a static `generate_html` export on this site. Open it
 in the browser with no Julia installed.
 
 What survives without a kernel, on both `:cairo` and `:webgl`: hold the
-pointer over a mark for tooltip and highlight; click-echo wash; a WebGL
-canvas redraw from the serialized scene.
+pointer over a mark for a tooltip and highlight in the overlay;
+click-echo wash; a WebGL canvas redraw from the serialized scene.
 
 What dies: `@bind` downstream cells, `with_js_link` view frames, and
 `selects`-ROI Julia stats. The export still fetches Pluto's frontend
@@ -77,9 +81,14 @@ and [Constructors](@ref).
 ## WGLMakie kitchen-sink
 
 [`examples/webgl_demo.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/webgl_demo.jl)
-is the same kind of tour on `:webgl`: overlay paths on a live GPU
-canvas, including region, threshold, and ROI. Status is experimental.
-For more information, see [Backends](@ref).
+is a feature tour on `:webgl`: 2D scatter, `Axis3`, `masque"..."`
+tooltips, heatmap plus colorbar, polygons, text, region, threshold,
+axis readout, and ROI. Status is experimental.
+
+It is **not** every built-in kind. It does not include
+`SegmentInteractable`, `LegendInteractable`, `ViewInteractable`, or
+`FunctionInteractable`. For those, see the other notebooks on this page
+and [Constructors](@ref). For more information, see [Backends](@ref).
 
 [Open the static export](notebooks/webgl_demo.html)
 

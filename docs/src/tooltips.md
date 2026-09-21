@@ -1,11 +1,11 @@
 # Tooltips
 
-Holding the pointer over a mark shows a tooltip in the overlay. That path
+Hold the pointer over a mark to see a tooltip in the overlay. That path
 never writes `@bind` and never re-runs a Julia cell. A click can still
 write the bond; this page teaches the tooltip. The eight-city scatter on
 [Getting started](@ref) already templates on pointer hold. The embeds
-here are overlay-only: holding the pointer over a mark shows the tooltip;
-Julia stays at the default bond.
+here are overlay-only: the tooltip appears in the overlay; Julia stays at
+the default bond.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -42,6 +42,50 @@ accent. Clicking a city does not swap a Julia cell on this page.
 
 ## Write a template
 
+Pass `tooltip = masque"..."` on the points constructor. Placeholders
+read fields from that mark's payload at pointer-hold time. They do not
+read Julia locals.
+
+In a Pluto notebook, paste each of the following snippets into its own
+cell. Pluto runs one top-level expression per cell. Wrap multiple
+statements in `begin ... end`.
+
+**1.** Load Masque and a Makie backend:
+
+```julia
+using Masque, CairoMakie
+```
+
+**2.** Plot four cities and a templated [`PointInteractable`](@ref).
+   Use the points constructor plus `radius=` when you need a template.
+   The Scatter plot-object constructor does not take `tooltip=`
+   (`MethodError`):
+
+```julia
+begin
+    xy = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0), (4.0, 16.0)]
+    cities = ["Tokyo", "Delhi", "Shanghai", "São Paulo"]
+    pops = [37_400_000, 32_900_000, 28_500_000, 22_400_000]
+    fig = Figure(size = (560, 360))
+    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
+    markersize = 20
+    scatter!(ax, first.(xy), last.(xy); markersize)
+    tips = PointInteractable(
+        ax, xy;
+        radius = 0.3525 * markersize,
+        payloads = [(; city = cities[k], pop = pops[k]) for k in eachindex(cities)],
+        tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
+    )
+    nothing
+end
+```
+
+**3.** Mount the overlay:
+
+```julia
+@bind pick masque(fig, tips)
+```
+
 `tooltip` is accepted by
 [`PointInteractable`](@ref),
 [`SegmentInteractable`](@ref),
@@ -59,17 +103,14 @@ or [`ViewInteractable`](@ref) is a `MethodError`.
 `Masque.tooltip_spec` for that type.
 
 Plot-object constructors that take `payloads` still do not take
-`tooltip=` except [`TextInteractable`](@ref).
-`PointInteractable(ax, p::Makie.Scatter; tooltip = masque"…")` is a
-`MethodError`. Use the points constructor plus `radius=` when you need
-a template, as in the embed. For constructor signatures, see
-[Constructors](@ref).
+`tooltip=` except [`TextInteractable`](@ref). For constructor
+signatures, see [Constructors](@ref).
 
 | Value | Type | Browser behavior |
 |---|---|---|
 | *(omitted / `nothing`)* | `Nothing` | Auto name/value table from the payload |
-| `masque"..."` | `Markup` | Template interpolated against the hovered element's payload |
-| `false` | `Bool` | Tooltip suppressed; the hover highlight still runs |
+| `masque"..."` | `Markup` | Template interpolated against that mark's payload |
+| `false` | `Bool` | Tooltip suppressed; the highlight in the overlay still runs |
 | `true` | `Bool` | `ArgumentError` — not meaningful |
 
 Omit `tooltip` or pass `nothing` for the auto-table, with three
@@ -94,9 +135,9 @@ construction.
 tooltip = masque"<b>$(city)</b><br>pop $(pop:,)"
 ```
 
-`$(field)` is a placeholder resolved in the browser from the hovered
-element's payload at pointer-hold time. It does not read a Julia
-variable. There is no Julia-object interpolation in templates.
+`$(field)` is a placeholder resolved in the browser from the payload of
+the mark under the pointer at pointer-hold time. It does not read a
+Julia variable. There is no Julia-object interpolation in templates.
 `masque"$(city)"` where `city` is a local and the payload has no
 `:city` field is a missing-field error (or an empty card; see
 [Check payload fields](@ref)). Put derived text in the payload:
@@ -144,29 +185,15 @@ pointer-hold instead of erroring.
 
 ## Match a dark figure
 
-The tooltip's light/dark theme comes from the **figure's** background
-(`manifest.background` → `--masque-fig-bg`, CSS relative-color
-syntax), not from OS `prefers-color-scheme`. A
-`Figure(; backgroundcolor = :gray12)` on a light Pluto page gets a
-dark card. A default white figure on a dark OS gets a light card. The
-tooltip matches the plot it is attached to.
+A `Figure(; backgroundcolor = :gray12)` gets a dark tooltip card, from
+the figure's background, not from OS `prefers-color-scheme`.
 
-OS `prefers-color-scheme` is the fallback for browsers without
-`lch(from …)` (older than about 2023): a static light tooltip, dark
-only with that OS signal.
+```julia
+fig = Figure(size = (560, 360); backgroundcolor = :gray12)
+```
 
-`masque` writes an opaque figure background while it builds the overlay,
-then restores `fig.scene.backgroundcolor[]`. The figure you passed in is
-not left mutated.
-
-The `tooltip_*` keywords on `masque` pin card chrome and opt that
-property out of inversion. They are not the dark-figure mechanism.
-`tooltip_bg = :black` on a light figure is a pin, not "dark mode."
-
-Documenter dark and figure dark are different. This site toggles only
-`html.pluto-dark` on the player iframe (Pluto cell chrome). The PNG
-keeps the figure's own background. Do not restyle overlay SVGs with
-Documenter CSS.
+Pass the `Scatter` to `PointInteractable` so `color=` becomes the
+tooltip accent. The following embed is that dark-figure scatter.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -199,17 +226,39 @@ Documenter CSS.
 
 Hold the pointer over a mark. The card is dark because the figure is
 `gray12`, even when this docs page is light. Setting Pluto or the OS
-to dark does not darken a white figure's tooltip. The Scatter
-constructor resolves `color=` into `layer.colors`, so the accent
-border matches each mark.
+to dark does not darken a white figure's tooltip.
+
+The tooltip's light/dark theme comes from the **figure's** background
+(`manifest.background` → `--masque-fig-bg`, CSS relative-color
+syntax), not from OS `prefers-color-scheme`. A
+`Figure(; backgroundcolor = :gray12)` on a light Pluto page gets a
+dark card. A default white figure on a dark OS gets a light card. The
+tooltip matches the plot it is attached to.
+
+OS `prefers-color-scheme` is the fallback for browsers without
+`lch(from …)` (older than about 2023): a static light tooltip, dark
+only with that OS signal.
+
+`masque` writes an opaque figure background while it builds the overlay,
+then restores `fig.scene.backgroundcolor[]`. The figure you passed in is
+not left mutated.
+
+The `tooltip_*` keywords on `masque` pin card chrome and opt that
+property out of inversion. They are not the dark-figure mechanism.
+`tooltip_bg = :black` on a light figure is a pin, not "dark mode."
+
+Documenter dark and figure dark are different. This site toggles only
+`html.pluto-dark` on the player iframe (Pluto cell chrome). The PNG
+keeps the figure's own background. Do not restyle overlay SVGs with
+Documenter CSS.
 
 ## Accent color
 
-When Masque can resolve the hovered element's color into
+When Masque can resolve the color of the mark under the pointer into
 `layer.colors`, the tooltip gets a 3px accent border in that color.
 Tooltip **text stays neutral**. Accent is the border, not the overlay
-highlight. Highlight in the overlay is a separate recipe; `color=` on
-`scatter!` does not change it.
+highlight. Highlight in the overlay is separate; `color=` on `scatter!`
+does not change it.
 
 `layer.colors` is filled from:
 
@@ -276,17 +325,17 @@ relative-color syntax uses instead (static light; dark only from OS
 | `--masque-tip-padding` | `8px 12px` | — (CSS only) |
 | `--masque-tip-shadow` | `0 2px 4px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)` / `0 2px 4px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3)` | — (CSS only) |
 | `--masque-tip-maxwidth` | `320px` | — (CSS only) |
-| `--masque-mark-border` | *(unset — plain 1px border)* | — (from the hovered element's `colors`; see [Accent color](@ref)) |
+| `--masque-mark-border` | *(unset — plain 1px border)* | — (from the mark's `colors`; see [Accent color](@ref)) |
 
 ## Placement
 
-The tooltip is anchored to the hovered **mark**, not the cursor, except
-on axis, threshold, ROI, and view (continuous / drag kinds with no
-discrete mark), where it follows the pointer.
+The tooltip is anchored **above** the mark under the pointer, not to
+the cursor, except on axis, threshold, ROI, and view (continuous /
+drag kinds with no discrete mark), where it follows the pointer.
 
 The anchor depends on the kind:
 
-- Circles: the marker's center; the card sits off the top edge with a
+- Circles: the marker's center; the card sits above the top edge with a
   gap.
 - Rects (bars): the bar's top-center.
 - Segments and polylines: the point on the segment nearest the pointer
@@ -294,14 +343,14 @@ The anchor depends on the kind:
   focus (no pointer) uses the segment's midpoint.
 - Polygons: the centroid, if it lies inside the polygon; otherwise the
   pointer.
-- Grid cells (heatmaps): the cell's center; the card sits off the
+- Grid cells (heatmaps): the cell's center; the card sits above the
   cell's top edge.
 - Axis, threshold, ROI, and view: the pointer position.
 
-If the card would clip the surface's top edge, it flips to the other
-side of the mark. If it would clip a side, it shifts to stay inside
-the surface and the caret moves with it, so the caret still points at
-the anchor when the card is not centered on the mark.
+If the card would clip the surface's top edge, it flips below the mark.
+If it would clip a side, it shifts to stay inside the surface and the
+caret moves with it, so the caret still points at the anchor when the
+card is not centered on the mark.
 
 When `tooltip_caret = true` (the default), a small triangle points from
 the card toward that anchor. For mark-anchored kinds the caret sits on
