@@ -444,6 +444,23 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     bond_name = html_escape(string(bond))
     title = html_escape(get(player, "title", "Masque embed"))
     player_css = pluto_player_css()
+    show_chip = get(player, "chip", true) !== false
+    chip_html = show_chip ? SIM_CHIP_HTML : ""
+    downstream_cell = if isempty(downstream)
+        ""
+    else
+        """
+        <pluto-cell>
+          <pluto-trafficlight></pluto-trafficlight>
+          <pluto-output>
+            <assignee>$bond_name</assignee>
+            <div id="masque-out" data-masque-bind>
+              $down_html
+            </div>
+          </pluto-output>
+        </pluto-cell>
+        """
+    end
 
     html = """
     <!doctype html>
@@ -458,7 +475,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       </style>
     </head>
     <body>
-      $SIM_CHIP_HTML
+      $chip_html
       <pluto-notebook class="masque-player">
         <pluto-cell>
           <pluto-trafficlight></pluto-trafficlight>
@@ -468,15 +485,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
             </div>
           </pluto-output>
         </pluto-cell>
-        <pluto-cell>
-          <pluto-trafficlight></pluto-trafficlight>
-          <pluto-output>
-            <assignee>$bond_name</assignee>
-            <div id="masque-out" data-masque-bind>
-              $down_html
-            </div>
-          </pluto-output>
-        </pluto-cell>
+        $downstream_cell
       </pluto-notebook>
       <script>
     {
@@ -513,6 +522,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         const snap = snapFor(snaps, host.value);
         if (!snap) return false;
         const out = document.getElementById("masque-out");
+        if (!out) return false;
         out.innerHTML = snap.cells.join("\\n");
         return true;
       }
@@ -563,7 +573,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     mkpath(dirname(outpath))
     write(outpath, html)
     player_bytes = filesize(outpath)
-    idle_paid = sizeof(something(idle_html)) + sum(sizeof, idle_down)
+    idle_paid = sizeof(something(idle_html)) + sum(sizeof, idle_down; init = 0)
     if extra > EMBED_BUDGET
         @warn "embed extra snapshot bytes exceed budget (warn only; not failing)" path = basename(path) n_states extra budget = EMBED_BUDGET png_bytes = png_b manifest_bytes = man_b player_bytes idle_paid
     end

@@ -41,6 +41,26 @@ else
         @test keys[1] == "null"
         @test keys[2:end] == ["cities:$i" for i in 0:7]
         @test length(keys) == 9
+        @test get(player, "chip", true) !== false
+    end
+
+    @testset "overlay-only player TOML sets chip = false" begin
+        path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "view_pan.jl")
+        player = parse_player_toml(path)
+        @test player["chip"] == false
+        @test player["bond"] == "pick"
+        keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
+        @test keys == ["null"]
+    end
+
+    @testset "ROI items snapshot keys match overlay commit" begin
+        @test snapshot_key(Dict("items" => Any[])) == "items:"
+        path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "roi_table.jl")
+        player = parse_player_toml(path)
+        @test player["bond"] == "picks"
+        keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
+        @test keys[1] == "null"
+        @test "items:" in keys
     end
 
     @testset "rewrite_published_to_js inlines getPublishedObject" begin
