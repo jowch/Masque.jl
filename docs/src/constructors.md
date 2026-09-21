@@ -1,9 +1,10 @@
 # Constructors
 
-Lookup for built-in constructors: the signature that matters, the default
-payload, the `HitLayer` kind, and the Guide that teaches the job.
-Signatures and payloads come from `src/interactables.jl` and
-`src/introspect.jl`. This page has no player.
+Read [Getting started](@ref) before this page. Lookup for built-in
+constructors: the signature that matters, the default payload, the
+`HitLayer` kind, and the Guide that teaches the job. Signatures and
+payloads come from `src/interactables.jl` and `src/introspect.jl`. This
+page has no player.
 
 Element constructors also take `id`, `payloads` (except heatmap/image),
 and `tooltip` (`nothing` / `masque"..."` / `false`) unless the plot-object

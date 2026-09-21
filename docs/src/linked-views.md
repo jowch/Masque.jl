@@ -80,21 +80,11 @@ Do not use `Axis3` for this job. Two 2D axes are the 2D-of-3D shape.
 </script>
 ```
 
-This docs embed is overlay-only: hover and click-echo run in the
-browser; Julia stays at the idle bond. In live Pluto, this page is a new
-notebook. It does not reuse `fig` or `pick` from the cities scatter.
-Develop the checkout and load a backend as on [Install](@ref). Skip the
-load cell if this notebook already ran it. Do not paste `using` twice.
-Paste each snippet into its own cell:
+**On this site:** overlay-only. For overlay versus `@bind` versus the
+docs player, see [Overlay, Julia, and the host](@ref).
 
-```julia
-begin
-    using Pkg
-    Pkg.develop(path = "path/to/Masque.jl")
-    Pkg.add("CairoMakie")
-    using Masque, CairoMakie
-end
-```
+Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
+notebook.
 
 ```julia
 begin
@@ -165,10 +155,8 @@ here.
 </script>
 ```
 
-Hover needs no snapshots. This embed is overlay-only. In live Pluto,
-this is another figure. Replace the previous `fig` cell and the
-`@bind pick` cell. Pluto rejects two cells that both `@bind` the same
-name.
+Hover needs no snapshots. **On this site:** overlay-only. Replace the
+previous `fig` and `@bind pick` cells.
 
 ```julia
 begin
@@ -255,13 +243,11 @@ rebuild Julia. For `selected=` kinds and persist, see [Selection](@ref).
 
 ## What is not shipped
 
-Masque has no shared `ColumnDataSource`. It does not highlight the same
-observation in two scatters in the browser. It does not echo a hit onto
-a second axis automatically. There is no lasso. There is no scatter-plot
-matrix (SPLOM) AND of several brushes: one ROI, one target.
+- No shared `ColumnDataSource`.
+- No same-index highlight between two scatters.
+- No automatic echo onto a second axis.
+- No lasso.
+- No SPLOM or crossfilter of several brushes (one ROI, one target).
 
-Dash "Update Graphs on Hover" is a Masque **click**. Hover never writes
-the bond.
-
-A SPLOM or Dash-style crossfilter is not a listed player. For kitchen-sink
-notebooks you can inspect, see [Examples](@ref).
+For overlay versus `@bind` timing, see [Hover, click, and bind](@ref).
+For kitchen-sink notebooks, see [Examples](@ref).

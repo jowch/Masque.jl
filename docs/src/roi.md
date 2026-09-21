@@ -3,11 +3,12 @@
 Drag a rectangle on a 2D scatter. When you release, Julia sees either the box
 bounds or the points the box enclosed.
 
-The following embed is that brush on this docs site. The
-**Simulating `@bind`** chip marks that listed enclosed-point sets are
-precomputed snapshots, not a live Julia process. Dragging the box to a listed
-set swaps the table. Dragging to any other geometry still moves the box in the
-overlay; the table stays on the last listed set.
+The following embed is that brush on this docs site.
+
+**On this site:** listed snapshots. For overlay versus `@bind` versus the
+docs player, see [Overlay, Julia, and the host](@ref). Dragging the box
+to a listed set swaps the table. Dragging to any other geometry still
+moves the box in the overlay; the table stays on the last listed set.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -47,27 +48,10 @@ Julia runs when you release, not while you drag.
 `masque(fig)` does not install an [`ROIInteractable`](@ref). Pass the box in
 the same `masque` call as the layer it brushes.
 
-This page is a new notebook. It does not reuse `fig` or `pick` from the
-cities scatter. Develop the checkout and load a backend as on
-[Install](@ref), plus `Markdown` for the table cell. Skip the load cell if
-this notebook already ran it. Do not paste `using` twice.
+Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
+notebook, plus `Markdown` for the table cell.
 
-In a Pluto notebook, paste each of the following snippets into its own cell.
-Pluto runs one top-level expression per cell. Wrap multiple statements in
-`begin ... end`.
-
-**1.** Develop the checkout and load CairoMakie and Markdown:
-
-```julia
-begin
-    using Pkg
-    Pkg.develop(path = "path/to/Masque.jl")
-    Pkg.add("CairoMakie")
-    using Masque, CairoMakie, Markdown
-end
-```
-
-**2.** Plot ten stations, a [`PointInteractable`](@ref) with `id = :pts`, and an
+**1.** Plot ten stations, a [`PointInteractable`](@ref) with `id = :pts`, and an
    `ROIInteractable` whose `selects` names that layer. `bounds` is required:
    `(xmin, xmax, ymin, ymax)` in data space, with `xmin < xmax` and
    `ymin < ymax` (`ArgumentError` otherwise):
@@ -123,7 +107,7 @@ begin
 end
 ```
 
-**3.** Bind the widget. A vector of interactables is required here, because the
+**2.** Bind the widget. A vector of interactables is required here, because the
    box is not part of `auto_interactables`:
 
 ```julia
@@ -133,7 +117,7 @@ end
 Pluto rejects two cells that both `@bind` the same name. Replace the bind
 cell; do not add a second. `masque` does not mutate `fig`.
 
-**4.** Filter a table from `picks`:
+**3.** Filter a table from `picks`:
 
 ```julia
 if picks === nothing
@@ -162,7 +146,7 @@ the same way the overlay commits. Exact pixel bounds are not in that
 table. Unlisted box geometry still moves in the overlay; the table stays
 on the last listed set.
 
-## From a table
+## If your rows are NamedTuples
 
 If the points come from a table, pull columns for `scatter!` and build
 `payloads` as a vector of NamedTuples, one per mark, in the same order.

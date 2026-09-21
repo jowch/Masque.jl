@@ -9,12 +9,14 @@ mark. A cell that reads the bond re-runs.
 The highlight in the overlay is not a copy of the bond.
 
 This page continues the cities scatter from [Getting started](@ref) in
-the same notebook. Do not paste `using` again. `fig`, `cities`, and
-`pick` already exist. There is no Selection player on this page.
+the same notebook. Skip the load cell; `fig`, `cities`, and `pick`
+already exist. There is no Selection player on this page.
 
-Paste each snippet into its own Pluto cell. Pluto rejects two cells that
-both `@bind` the same name. Replace the previous bind cell; do not add a
-second.
+Paste each snippet into its own Pluto cell. Replace the previous bind
+cell instead of adding a second `@bind pick`.
+
+**On this site:** this page has no player. For overlay versus `@bind`
+versus the docs player, see [Overlay, Julia, and the host](@ref).
 
 ## Click a mark
 
@@ -30,8 +32,8 @@ second.
 pick === nothing ? "click a city" : "$(pick.payload.city) selected"
 ```
 
-A click in empty space does not write the bond and does not clear the
-selection. The highlight in the overlay stays as it is.
+A click in empty space leaves the current selection in place. The bond
+does not change. The highlight in the overlay stays as it is.
 
 Enter or Space on a focused mark commits the same way as a click.
 
@@ -66,17 +68,10 @@ or `:id_p`, not the base `id`.
 
 ## Bond versus highlight in the overlay
 
-The highlight in the overlay is not a copy of the bond.
-
-- A legend click writes the legend entry to `@bind` and highlights the
-  linked traces in the overlay. `selected = Dict(:legend => [0])`
-  hydrates the **swatch** (legend is `:rects`), not the series. To
-  persist a series highlight, hydrate the target layer ids. For more
-  information, see [Legend](@ref).
-- A heatmap click highlights the cell in the overlay. `selected=` on
-  `:grid` (for example `Dict(:cells => [0])`) raises `ArgumentError`.
-- `selected=` on `:axis`, `:roi`, `:view`, or `:threshold` also raises
-  `ArgumentError`.
+The highlight in the overlay is not a copy of the bond. Legend wash and
+heatmap cells have their own hydration rules; see [Legend](@ref) and
+[Inspect a grid](@ref). `selected=` on `:axis`, `:roi`, `:view`, or
+`:threshold` raises `ArgumentError`.
 
 ## Keep a selection when the figure rebuilds
 

@@ -1,5 +1,9 @@
 # Examples
 
+Use [Getting started](@ref) for one plot. Open `examples/demo.jl` when
+you need many kinds in one notebook. Open `gallery/gallery.jl` for an
+ROI-plus-image application shape.
+
 Clone the repository, start Pluto, and open a notebook from Pluto's
 landing page. Each notebook `Pkg.develop`s the checkout and adds the
 Makie backend it needs, so it runs from a fresh clone once Pluto is
@@ -45,9 +49,9 @@ A cell that prints "you picked …" does not change on a static export.
 That needs a live Pluto session. For more information, see
 [Backends](@ref).
 
-The following iframes are those full exports (hybrid inspection pages),
-not cell-series players. Do not copy `PLUTO_PLAYER_TOML_CONTENTS` into a
-real notebook.
+The following iframe is the cairo kitchen-sink export (a hybrid
+inspection page), not a cell-series player. Do not copy
+`PLUTO_PLAYER_TOML_CONTENTS` into a real notebook.
 
 ## CairoMakie kitchen-sink
 
@@ -91,20 +95,6 @@ It is **not** every built-in kind. It does not include
 and [Constructors](@ref). For more information, see [Backends](@ref).
 
 [Open the static export](notebooks/webgl_demo.html)
-
-```@raw html
-<iframe id="masque-ex-webgl" title="Static export of examples/webgl_demo.jl"
-        style="width:100%;height:720px;border:1px solid #ccc;background:#fff;"
-        loading="lazy"></iframe>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-ex-webgl");
-  if (!el) return;
-  el.src = (pretty ? "../notebooks/" : "notebooks/") + "webgl_demo.html";
-})();
-</script>
-```
 
 ## View with sliders
 

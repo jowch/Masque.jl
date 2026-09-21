@@ -5,9 +5,8 @@ pointer over a mark to inspect it. Click a mark to write that pick into
 Julia through `@bind`.
 
 This page is a new notebook. It does not reuse `fig` or `pick` from the
-cities scatter. Develop the checkout and load a backend as on
-[Install](@ref). Skip the load cell if this notebook already ran it. Do not
-paste `using` twice:
+cities scatter. Prerequisites: [Install](@ref) and
+[Getting started](@ref) cells in your notebook.
 
 ```julia
 begin
@@ -18,16 +17,11 @@ begin
 end
 ```
 
-In a Pluto notebook, paste each snippet into its own cell. Pluto runs one
-top-level expression per cell. Wrap multiple statements in `begin ... end`.
-Showing `fig` alone does not mount the overlay; `masque` returns the HTML
-that does. If a later demo on this page also binds `pick`, replace the
-previous bind cell. Pluto rejects two cells that both `@bind` the same
-name.
+Paste each snippet into its own Pluto cell. If a later demo on this page
+also binds `pick`, replace the previous bind cell.
 
-Each embed on this docs site lists idle plus every mark. The
-**Simulating `@bind`** chip marks that those clicks are precomputed
-snapshots, not a live Julia process.
+**On this site:** listed snapshots. For overlay versus `@bind` versus the
+docs player, see [Overlay, Julia, and the host](@ref).
 
 For the eight-city scatter, see [Getting started](@ref). For constructor
 signatures and default payloads, see [Constructors](@ref).
@@ -107,16 +101,12 @@ method is `RectInteractable(ax, p::BarPlot; id = :bars)`. `direction`
 explicit AABB would misalign. Do not use a 12-bin histogram as this demo.
 Keyboard arrows reach bars (`:rects` is focusable).
 
-Hist, waterfall, crossbar, hspan, and vspan are also `:rects` list
-layers. Each has its own default payload. For those payloads, hug paths,
-and `auto_interactables`, see [Constructors](@ref). For `MeshScatter`
-and `Arrows3D`, see [Backends](@ref).
+For other `:rects` payloads, see [Constructors](@ref).
 
 ## Click polygons
 
 This demo is another figure. Replace the previous `fig` cell and the
-`@bind pick` cell. Pluto rejects two cells that both `@bind` the same
-name.
+`@bind pick` cell.
 
 Three filled rings on one `poly!`. `masque(fig)` gives layer `:poly`,
 kind `:polygons`, default payload `(; index)`. `selected=` can hydrate
@@ -191,6 +181,8 @@ to `(; low, high)` and violin to `(; x)`.
 only, kind `:rects`, default payload `(; text, index, x, y)`.
 `annotation!` is auto-only through its inner `Text`.
 
+## Other geometries
+
 ### Click a polyline
 
 This demo is another figure. Replace the previous `fig` cell and the
@@ -220,7 +212,7 @@ Line segments, errorbars, rangebars, hlines, and vlines use kind
 `:segments` instead. Keep N small enough to list every segment. Do not
 bind-swap a dense `lines!` click by click.
 
-## Click points on a polar axis
+### Click points on a polar axis
 
 This demo is another figure. Replace the previous `fig` cell and the
 `@bind pick` cell.

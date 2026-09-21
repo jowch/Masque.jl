@@ -21,10 +21,8 @@ tooltip is `(i,j) = value`.
 </script>
 ```
 
-This docs embed is overlay-only. Hold the pointer over a cell for the
-tooltip and the highlight in the overlay. A click still draws that
-highlight in the overlay. On this site, Julia stays at the default bond
-(`nothing`). In a live Pluto notebook, the same click assigns `@bind`.
+**On this site:** GIF/MP4 plus overlay-only. For overlay versus `@bind`
+versus the docs player, see [Overlay, Julia, and the host](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -55,29 +53,13 @@ highlight in the overlay. On this site, Julia stays at the default bond
 </script>
 ```
 
-This page is a new notebook. It does not reuse `fig` or `pick` from the
-cities scatter. Develop the checkout and load a backend as on
-[Install](@ref). Skip the load cell if this notebook already ran it. Do not
-paste `using` twice.
-
-Paste each of the following snippets into its own Pluto cell. Pluto runs
-one top-level expression per cell. Wrap multiple statements in
-`begin ... end`.
+Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
+notebook. The layer kind is `:grid`, not `:rects`. Bars from `barplot!`
+are `:rects` and are a different job.
 
 ## Overlay a heatmap
 
-**1.** Develop the checkout and load CairoMakie:
-
-```julia
-begin
-    using Pkg
-    Pkg.develop(path = "path/to/Masque.jl")
-    Pkg.add("CairoMakie")
-    using Masque, CairoMakie
-end
-```
-
-**2.** Draw a small heatmap and pass the plot object to
+**1.** Draw a small heatmap and pass the plot object to
    [`RectInteractable`](@ref). The plot-object method takes `id` only
    (default `:cells`):
 
@@ -95,7 +77,7 @@ end
 `image!` uses the same method. `masque(fig)` walks a `Heatmap` or
 `Image` and installs this layer for you.
 
-**3.** Bind a click:
+**2.** Bind a click:
 
 ```julia
 @bind pick masque(fig, cells)
@@ -111,9 +93,6 @@ cells = RectInteractable(
     id = :cells,
 )
 ```
-
-The layer kind is `:grid`, not `:rects`. Bars from `barplot!` are
-`:rects` and are a different job.
 
 `payloads=` on the `grid=` constructor is accepted and discarded. Cell
 payloads are always `(; i, j, value)` in the browser, not a Julia lookup
@@ -142,12 +121,8 @@ Tab and arrow keys skip `:grid`. Keyboard focus walks bars and scatter
 marks, not heatmap cells. For more information, see
 [Keyboard and screen readers](@ref).
 
-## Skip `selected=` on a grid
-
-Click-echo is a highlight in the overlay. `selected = Dict(:cells => [0])`
-raises `ArgumentError`: `:grid` is not a pre-highlight kind. Do not pass
-`selected=` to persist a cell wash. For kinds that do hydrate, see
-[Selection](@ref).
+For `selected=` on `:grid`, see
+[Tried `selected=` on a kind that cannot hydrate](@ref).
 
 ## Brush cells with an ROI
 

@@ -2,10 +2,10 @@
 
 Declare hit regions Makie did not plot as marks: a circle, a rect, and a
 polygon over an image. Hold the pointer over a region to read its name.
-Click-echo is the highlight in the overlay. This docs embed does not swap
-Julia. A live Pluto cell that reads `@bind` does.
 
-For constructor signatures, see [Constructors](@ref).
+**On this site:** overlay-only. For overlay versus `@bind` versus the
+docs player, see [Overlay, Julia, and the host](@ref). For constructor
+signatures, see [Constructors](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -65,20 +65,8 @@ Masque groups regions by kind. Base `id = :cells` becomes `:cells_c`
 (circles), `:cells_r` (rects), and `:cells_p` (polygons). Key
 `selected=` on those suffixed ids, not on `:cells`.
 
-In a Pluto notebook, paste each snippet into its own cell. This page is
-a new notebook. It does not reuse `fig` or `pick` from the cities
-scatter. Develop the checkout and load a backend as on [Install](@ref).
-Skip the load cell if this notebook already ran it. Do not paste `using`
-twice:
-
-```julia
-begin
-    using Pkg
-    Pkg.develop(path = "path/to/Masque.jl")
-    Pkg.add("CairoMakie")
-    using Masque, CairoMakie
-end
-```
+Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
+notebook.
 
 ```julia
 begin
@@ -111,11 +99,11 @@ end
 Do not pass `selected = Dict(:cells => [0])`. Use `:cells_c`, `:cells_r`,
 or `:cells_p` for the kind you hydrated.
 
-## Cover a kind Region cannot express
+## FunctionInteractable
 
-[`FunctionInteractable`](@ref) is the escape hatch for a geometry kind
-`RegionInteractable` cannot express: `:segments`, `:grid`, or layers on
-more than one axis. The constructor is `FunctionInteractable(f;
+Use this after [Constructors](@ref), when [`RegionInteractable`](@ref)
+cannot express the geometry (`:segments`, `:grid`, or layers on more
+than one axis). The constructor is `FunctionInteractable(f;
 events = (:click, :hover))`. There is no `ax` and no `id`. `f` receives
 the figure's [`InteractionContext`](@ref) and must return
 `Vector{HitLayer}`. Layer ids live on those [`HitLayer`](@ref)s.
@@ -123,9 +111,7 @@ the figure's [`InteractionContext`](@ref) and must return
 Do not copy `FunctionInteractable(ax, f; id)` — that signature is not
 shipped.
 
-This demo is another figure. Replace the previous `fig` cell and the
-`@bind pick` cell. Skip the load cell if this notebook already ran it.
-Do not paste `using` twice.
+Replace the previous `fig` and `@bind pick` cells.
 
 Project data-space points with [`data_to_image_px`](@ref). Look up an
 axis transform with `Masque.axis_id(ctx, ax)` (not exported — qualify

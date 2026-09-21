@@ -3,10 +3,9 @@
 Click anywhere in a 2D axis to read data `(x, y)`. Click a colorbar to
 read `value`. Drag a threshold line; on release, Julia gets a scalar.
 
-This docs embed is overlay-only. Hold the pointer over the plot: the
-tooltip follows the pointer with `x=…, y=…`. A click writes the bond in
-live Pluto. On this site, Julia stays at the default bond (`nothing`).
-There is no highlight in the overlay at the click.
+**On this site:** overlay-only. For overlay versus `@bind` versus the
+docs player, see [Overlay, Julia, and the host](@ref). There is no
+highlight in the overlay at the click.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -37,28 +36,10 @@ There is no highlight in the overlay at the click.
 </script>
 ```
 
-Paste each of the following snippets into its own Pluto cell. Pluto runs
-one top-level expression per cell. Wrap multiple statements in
-`begin ... end`.
-
-This page is a new notebook. It does not reuse `fig` or `pick` from the
-cities scatter. Develop the checkout and load a backend as on
-[Install](@ref). Skip the load cell if this notebook already ran it. Do not
-paste `using` twice:
-
-```julia
-begin
-    using Pkg
-    Pkg.develop(path = "path/to/Masque.jl")
-    Pkg.add("CairoMakie")
-    using Masque, CairoMakie
-end
-```
-
-Heatmap *cells* stay on [Inspect a grid](@ref). This page is the
-continuous readout: axis, colorbar, and threshold. If a later demo on
-this page also binds `pick`, replace the previous bind cell. Pluto
-rejects two cells that both `@bind` the same name.
+Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
+notebook. Heatmap *cells* stay on [Inspect a grid](@ref). This page is
+the continuous readout: axis, colorbar, and threshold. If a later demo
+on this page also binds `pick`, replace the previous bind cell.
 
 ## Read `(x, y)` from the axis
 
@@ -102,8 +83,7 @@ scatter or lines on those axes instead. `payloads=` and `tooltip=` on
 
 ## Read a colorbar value
 
-This demo is another figure. Replace the previous `fig` cell and the
-`@bind pick` cell.
+Replace the previous `fig` and `@bind pick` cells.
 
 [`ColorbarInteractable`](@ref) is one hit region on the bar's pixel box.
 The layer kind is `:axis` with a bbox. Default `id` is `:colorbar`.
@@ -138,8 +118,7 @@ the axis (`identity`, `log10`, `log`).
 
 ## Drag a threshold
 
-This demo is another figure. Replace the previous `fig` cell and the
-`@bind pick` cell.
+Replace the previous `fig` and `@bind pick` cells.
 
 [`ThresholdInteractable`](@ref) is a draggable line. `value` is
 required. `:horizontal` is a constant-y line you drag vertically.

@@ -2,14 +2,12 @@
 
 Drag a 2D axis to pan, or an `Axis3` to orbit. The camera is operational
 state, not analysis data. [`ViewInteractable`](@ref) **commits
-nothing**. The bond never carries a `:view` event. Do not read `pick`
-after a pan.
+nothing**. The bond never carries a `:view` event.
 
-This docs embed is overlay-only. Drag the scatter to see grab chrome.
-Live CairoMakie frames need a Pluto kernel, so this static page does not
-repaint the PNG while you drag. The following clip is those cairo
-in-drag frames: the axis limits move; `@bind` does not. Altair
-`.interactive()` pan is the same shape: overlay motion, not `@bind`.
+**On this site:** GIF/MP4 plus overlay-only. For overlay versus `@bind`
+versus the docs player, see [Overlay, Julia, and the host](@ref). The
+following clip is cairo in-drag frames: the axis limits move; `@bind`
+does not.
 
 ```@raw html
 <video id="masque-view-clip" title="CairoMakie in-drag pan frames on a 2D scatter"
@@ -54,24 +52,9 @@ in-drag frames: the axis limits move; `@bind` does not. Altair
 </script>
 ```
 
-Paste each of the following snippets into its own Pluto cell. Pluto runs
-one top-level expression per cell. Wrap multiple statements in
-`begin ... end`. `masque(fig)` does not install `ViewInteractable`.
-Pass it yourself.
-
-This page is a new notebook. It does not reuse `fig` or `pick` from the
-cities scatter. Develop the checkout and load a backend as on
-[Install](@ref). Skip the load cell if this notebook already ran it. Do not
-paste `using` twice:
-
-```julia
-begin
-    using Pkg
-    Pkg.develop(path = "path/to/Masque.jl")
-    Pkg.add("CairoMakie")
-    using Masque, CairoMakie
-end
-```
+Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
+notebook. `masque(fig)` does not install `ViewInteractable`. Pass it
+yourself.
 
 ## Pan a 2D axis
 
@@ -102,22 +85,15 @@ camera NamedTuple on the bond.
 If a threshold or ROI shares the axis, an ordinary drag moves that
 handle. **Shift**+drag pans.
 
-## CairoMakie live frames
+## Preview while you drag
 
-On CairoMakie, each in-drag frame streams a new PNG over Pluto's
-`with_js_link` channel. That needs a live kernel. Static HTML export
-does not replay those frames. This docs page is static export, so the
-embed shows overlay chrome, not a live pull of the camera.
-
-## WGLMakie numeric readout
-
-On WGLMakie, drag shows a numeric readout only. There is no live
-preview. Switching to WGLMakie does not repaint the canvas during a
-pan. For backend tradeoffs, see [Backends](@ref).
+CairoMakie streams PNG frames over `with_js_link` (live kernel).
+WGLMakie shows a numeric readout only. For more information, see
+[Backends](@ref).
 
 ## Orbit an `Axis3`
 
-This demo is another figure. Replace the previous `fig` cell.
+Replace the previous `fig` cell.
 
 `ViewInteractable` on `Axis3` is allowed. Drag orbits azimuth and
 elevation. Masque does not reject a 3D axis for this gesture. It still

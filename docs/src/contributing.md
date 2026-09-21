@@ -1,4 +1,4 @@
-# Development
+# Contributing
 
 The overlay and the `:webgl` shim are one TypeScript project in
 `frontend/`. `npm run build` writes both committed bundles:
@@ -44,11 +44,6 @@ and tags).
 
 ## Live verification
 
-Unit and frontend tests check the manifest and the JS in isolation; they
-do not prove the rendered widget behaves for a user. Any change that can
-alter what a user interacts with or sees — including a Julia-only change
-to the manifest shape, hit-test geometry, or tooltip text — needs to be
-checked live in a real Pluto + browser, on every supported backend, for
-every interactable kind it touches. This is the gate before a
-user-facing change is done. The full playbook is
+User-facing overlay changes need a live Pluto check on each backend.
+The playbook is
 [`docs/dev/live-interaction-checklist.md`](https://github.com/jowch/Masque.jl/blob/main/docs/dev/live-interaction-checklist.md).

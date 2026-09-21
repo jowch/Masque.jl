@@ -1,18 +1,14 @@
 # Getting started
 
-This page overlays one Makie figure: an eight-city scatter. Hold the pointer
-over a city to read its population. Click a city to write that pick into
-Julia.
-
-In a Pluto notebook, paste each of the following snippets into its own cell.
-Pluto runs one top-level expression per cell. Wrap multiple statements in
-`begin ... end`. Showing `fig` alone does not mount the overlay; `masque`
-returns the HTML that does.
+This page overlays one Makie figure: an eight-city scatter. Hold the
+pointer over a city to read its population. Click a city to write that
+pick into Julia.
 
 The following embed is that scatter on this docs site. The
-**Simulating `@bind`** chip marks that listed city clicks are precomputed
-snapshots, not a live Julia process. For which gestures write `@bind`
-and which stay in the overlay, see [Hover, click, and bind](@ref).
+**Simulating `@bind`** chip marks that listed city clicks are
+precomputed snapshots, not a live Julia process. For which gestures
+write `@bind` and which stay in the overlay, see
+[Hover, click, and bind](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -43,17 +39,71 @@ and which stay in the overlay, see [Hover, click, and bind](@ref).
 </script>
 ```
 
+In the iframe, hold the pointer over Tokyo to read the population, then
+click a city and watch the **Simulating `@bind`** chip.
+
+## Install
+
+Masque is not in the General registry. `] add Masque` fails.
+
+In a Pluto notebook, paste each snippet from these docs into its own
+cell. Pluto runs one top-level expression per cell. Wrap multiple
+statements in `begin ... end`, which counts as one expression. Showing
+`fig` alone does not mount the overlay; `masque` returns the HTML that
+does. Later pages link here instead of repeating those rules; see
+[Pluto cells in these docs](@ref).
+
+**1.** In a terminal, clone the repository:
+
+```bash
+git clone https://github.com/jowch/Masque.jl
+```
+
+**2.** In a Pluto cell, develop the checkout and load a backend. Replace
+   `path/to/Masque.jl` with your clone:
+
+```julia
+begin
+    using Pkg
+    Pkg.develop(path = "path/to/Masque.jl")
+    Pkg.add("CairoMakie")
+    using Masque, CairoMakie
+end
+```
+
+**3.** If you do not want a sibling clone, add the GitHub URL instead of
+   `Pkg.develop`:
+
+```julia
+begin
+    using Pkg
+    Pkg.add(url = "https://github.com/jowch/Masque.jl")
+    Pkg.add("CairoMakie")
+    using Masque, CairoMakie
+end
+```
+
+Paste **2.** or **3.**, not both. Skip the load cell if this notebook
+already ran it. Pluto reports multiple definitions if you paste
+`using` twice.
+
+`using Masque` with no Makie backend raises `ArgumentError` the first
+time `masque` runs. Loading both CairoMakie and WGLMakie is fine; then
+`masque` defaults to CairoMakie. The `backend=` keyword takes an
+extension instance, not a `:cairo` or `:webgl` symbol. `masque` does not
+mutate the `Figure`.
+
+The example notebooks in this repository each `Pkg.develop` the checkout
+themselves. They use a temporary environment, which turns Pluto's
+notebook package management off. Do not copy a
+`Pkg.activate(; temp = true)` cell into your own notebook unless you
+want Pluto's package management off. For more information, see
+[Examples](@ref).
+
 ## Overlay the cities scatter
 
-If this notebook has not loaded Masque yet, paste an [Install](@ref)
-load cell first (`Pkg.develop` or `Pkg.add(url=…)`, then
-`using Masque, CairoMakie`). Skip the load cell if this notebook already
-ran it. Do not paste `using` twice — Pluto reports multiple definitions
-for CairoMakie and Masque.
-
-The entry function is lowercase `masque`. A function named `Masque` clashes
-with `module Masque`. With no backend loaded, `masque` raises
-`ArgumentError`.
+The entry function is lowercase `masque`. A function named `Masque`
+clashes with `module Masque`.
 
 **1.** Create the cities scatter and its interactable:
 
@@ -99,20 +149,19 @@ nothing
 end
 ```
 
-**2.** Bind a click. A single interactable is legal; a one-element vector is
-   also legal. `masque` does not mutate `fig`:
+**2.** Bind a click. A single interactable is legal; a one-element vector
+   is also legal. `masque` does not mutate `fig`:
 
 ```julia
 @bind pick masque(fig, cities)
 ```
 
-Pluto rejects two cells that both `@bind` the same name. Replace the bind
-cell; do not add a second.
+Pluto rejects two cells that both `@bind` the same name. Replace the
+bind cell; do not add a second.
 
 Hold the pointer over a city. The tooltip shows the name and population.
-That path does not assign `pick` and does not re-run cells that read
-`pick`. Do not write a cell that reads `pick` expecting it to update when
-you hold the pointer over a city.
+Downstream cells re-run when `pick` changes. Holding the pointer over a
+mark does not change `pick`.
 
 **3.** Read the pick:
 
@@ -125,8 +174,8 @@ you clicked). Before a click, `pick` is `nothing`. After a click, `pick`
 is an [`InteractionEvent`](@ref): `layer` is `:cities`, `index` is
 0-based, and `payload` is the Julia object from `payloads[index + 1]`
 (`===`, not a JSON copy). Index it as `pick.payload.city`, not
-`pick.payload.label`. A click in empty space does not write the bond and
-does not clear the selection.
+`pick.payload.label`. The selection stays on the last mark clicked. A
+click in empty space does not write the bond.
 
 `InteractionEvent` is exported by Masque. Do not redefine it in the
 notebook.
@@ -134,7 +183,8 @@ notebook.
 ## You are done
 
 You have an overlay, a hover tooltip, and a click that writes `@bind`.
-The readout cell is the sentence that uses the pick. Stop here.
+The readout cell is the sentence that uses the pick. The sections that
+follow are optional.
 
 The cities cell passes `radius = 0.3525 * markersize` so the highlight
 sits on the default `:circle` disc. For hug paths, `tooltip=` on a plot
@@ -163,14 +213,8 @@ pick === nothing ? "click a point" :
     "index $(pick.payload.index) / x $(pick.payload.x) / y $(pick.payload.y)"
 ```
 
-The default payload is `(; index, x, y)`, not `(; city, pop)`. The layer id
-is `:scatter`, not `:cities`. For `auto_interactables` and huge-data
+The default payload is `(; index, x, y)`, not `(; city, pop)`. The layer
+id is `:scatter`, not `:cities`. For `auto_interactables` and huge-data
 payloads, see [Constructors](@ref).
 
-## Choose a backend
-
-The [Install](@ref) cell loaded CairoMakie. Load `WGLMakie` instead for
-a live GPU canvas (experimental). If you load neither, `masque` raises
-`ArgumentError`. If you load both, unqualified `masque` uses CairoMakie.
-The `backend=` keyword takes an extension instance, not a `:cairo` or
-`:webgl` symbol. For more information, see [Backends](@ref).
+The default path is CairoMakie. For WebGL, see [Backends](@ref).

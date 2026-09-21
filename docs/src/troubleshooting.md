@@ -3,6 +3,15 @@
 Each heading is the failed try or the error prefix you searched for. For
 constructor signatures, see [Constructors](@ref).
 
+## Most common
+
+- No Makie backend loaded: see
+  [Tried `masque` with no Makie backend](@ref).
+- Cyclic `@bind` / `selected=pick`: see
+  [Tried feeding this widget's bond into the same call's `selected=`](@ref).
+- Hover does not update `pick`: see
+  [Tried reading pick on hover](@ref).
+
 ## Errors from `masque()` / interactable constructors
 
 ### Tried `masque` with no Makie backend
@@ -209,6 +218,14 @@ refuses to run the cell.
 that has to come from a cell that does not read this widget's bond. For
 more information, see [Keep a selection when the figure rebuilds](@ref)
 in [Selection](@ref).
+
+### Tried reading pick on hover
+
+**Cause:** hover is overlay-only. The tooltip and highlight run in the
+browser. They do not assign `@bind`.
+
+**Fix:** read `pick` after a click (or Enter on a focused mark). For
+channel timing, see [Hover, click, and bind](@ref).
 
 ### Tried a click and nothing happened
 

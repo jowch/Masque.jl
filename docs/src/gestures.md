@@ -4,46 +4,33 @@ Masque splits pointer work across four channels: overlay chrome, the `@bind`
 bond, the gesture channel, and a downstream Julia cell. Holding the pointer
 over a mark is not a click. A click is not a pan.
 
+!!! note
+
+    Hover stays in the overlay. A click writes `@bind`. Pan uses the
+    gesture channel and does not write `@bind`. This docs site swaps
+    listed snapshots; it does not run a Julia kernel. A static
+    `generate_html` export keeps overlay inspection only.
+
 The eight-city scatter on [Getting started](@ref) already shows two of those
 channels on one plot. Holding the pointer over a city reads population in the
 overlay. A click writes `pick`. This page names every channel so a docs-site
 embed or a static export is not a Masque bug.
+
+## Pluto cells in these docs
+
+Paste each snippet into its own Pluto cell. Pluto runs one top-level
+expression per cell. Wrap multiple statements in `begin ... end`. Showing
+`fig` alone does not mount the overlay; `masque` returns the HTML that
+does. For clone, `Pkg.develop`, and `Pkg.add(url=…)` cells, see
+[Install](@ref).
 
 ## One figure, one overlay
 
 At `masque()` time, one Makie `Figure` plus its interactables produces a
 backend image (PNG or GPU canvas) and hit geometry for every axis, then one
 manifest, then HTML: one image and one overlay. Several axes still share that
-overlay. They are not several `masque` calls.
-
-```@raw html
-<div class="masque-diagram">
-  <img class="masque-diagram-light" src="assets/diagrams/information-flow.svg"
-       alt="At masque time, one Figure plus interactables becomes a backend image and hit geometry for every axis, then one manifest, then HTML with one image and one overlay. Several axes still make one overlay. The overlay is a stateless view. Analysis state is the bind bond in Julia.">
-  <img class="masque-diagram-dark" src="assets/diagrams/information-flow-dark.svg"
-       alt="At masque time, one Figure plus interactables becomes a backend image and hit geometry for every axis, then one manifest, then HTML with one image and one overlay. Several axes still make one overlay. The overlay is a stateless view. Analysis state is the bind bond in Julia.">
-</div>
-<script>
-(function () {
-  var wrap = document.currentScript.previousElementSibling;
-  if (!wrap || !wrap.classList.contains("masque-diagram")) return;
-  var link = document.querySelector('link[href*="masque-embed.css"]');
-  var base = "assets/";
-  if (link) {
-    base = (link.getAttribute("href") || "assets/masque-embed.css")
-      .replace(/masque-embed\.css(?:\?.*)?$/, "");
-  }
-  var imgs = wrap.querySelectorAll("img");
-  for (var i = 0; i < imgs.length; i++) {
-    var src = imgs[i].getAttribute("src") || "";
-    imgs[i].src = base + src.replace(/^.*?assets\//, "");
-  }
-})();
-</script>
-```
-
-One `masque` call produces one image and one overlay from a Makie
-`Figure` and its interactables.
+overlay. They are not several `masque` calls. For the information-flow
+diagram, see [Masque.jl](@ref).
 
 The overlay is a stateless view: tooltips, highlight in the overlay, and
 drag chrome. Authoritative analysis state lives in Julia as the `@bind`
@@ -61,8 +48,9 @@ These four are separate channels, not speeds of one channel.
   orbit. Not a bond. Not a faster `@bind`.
 - **Downstream Julia cell.** Re-runs only when it reads a bond that changed.
 
-A Dash hover callback is a **click** in Masque. Holding the pointer over a
-mark never writes `@bind`.
+A Dash hover callback is a **click** in Masque. Altair `.interactive()`
+pan is overlay motion, not `@bind`. Holding the pointer over a mark
+never writes `@bind`.
 
 ## Gesture timing
 

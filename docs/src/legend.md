@@ -6,12 +6,8 @@ Click the entry to write that pick into Julia.
 The overlay cannot hide Makie traces. Use the wash plus `@bind` so a Julia
 cell can filter the series.
 
-The following embed is two `lines!` with labels `"a"` and `"b"`, plus
-`axislegend`, on this docs site. The **Simulating `@bind`** chip marks that
-listed legend clicks are precomputed snapshots, not a live Julia process.
-Hold the pointer over an entry to wash its line. Click **a** or **b** to
-swap the Julia readout. Listed clicks are `{layer: "legend", index}` `0`
-and `1` — idle plus both entries.
+**On this site:** listed snapshots. For overlay versus `@bind` versus the
+docs player, see [Overlay, Julia, and the host](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -44,27 +40,10 @@ and `1` — idle plus both entries.
 
 ## Overlay two series
 
-This page is a new notebook. It does not reuse `fig` or `pick` from the
-cities scatter. Develop the checkout and load a backend as on
-[Install](@ref). Skip the load cell if this notebook already ran it. Do not
-paste `using` twice.
+Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
+notebook.
 
-In a Pluto notebook, paste each of the following snippets into its own
-cell. Pluto runs one top-level expression per cell. Wrap multiple
-statements in `begin ... end`.
-
-**1.** Develop the checkout and load CairoMakie:
-
-```julia
-begin
-    using Pkg
-    Pkg.develop(path = "path/to/Masque.jl")
-    Pkg.add("CairoMakie")
-    using Masque, CairoMakie
-end
-```
-
-**2.** Draw two lines, label them, and add `axislegend`:
+**1.** Draw two lines, label them, and add `axislegend`:
 
 ```julia
 begin
@@ -78,7 +57,7 @@ begin
 end
 ```
 
-**3.** Bind a click. `masque(fig)` walks the figure and installs a
+**2.** Bind a click. `masque(fig)` walks the figure and installs a
    [`LegendInteractable`](@ref) from `auto_interactables` with
    `plotmap`, which links each entry to its traces:
 
@@ -86,7 +65,7 @@ end
 @bind pick masque(fig)
 ```
 
-**4.** Read the pick:
+**3.** Read the pick:
 
 ```julia
 pick === nothing ? "click a legend entry" : "$(pick.payload.label) → $(pick.payload.targets)"
@@ -109,17 +88,7 @@ layer is `:rects`. To keep a series washed across a remount, hydrate the
 **target** layer ids instead. For more information, see
 [Selection](@ref).
 
-## Empty links
-
-A legend with no links is still hittable. The tooltip still shows the
-label, and a click still fires. The visual echo **clears**.
-
-`LegendInteractable(leg)` on a custom `LineElement` legend with no
-`plots=` and no `targets=` has empty links. Pass `plots=` on the
-element (Makie's own keyword) or pass `targets=` on
-[`LegendInteractable`](@ref).
-
-## Supply explicit targets
+## Targets and empty links
 
 Pass `targets=` when auto-link is not enough:
 
@@ -136,6 +105,13 @@ build time.
 
 An explicit `targets=` is fail-loud. The auto path drops unhighlightable
 kinds (`:grid`) with `@warn` and keeps the rest.
+
+A legend with no links is still hittable. The tooltip still shows the
+label, and a click still fires. The visual echo **clears**.
+`LegendInteractable(leg)` on a custom `LineElement` legend with no
+`plots=` and no `targets=` has empty links. Pass `plots=` on the
+element (Makie's own keyword) or pass `targets=` on
+[`LegendInteractable`](@ref).
 
 `scatterlines!` and `stem!` auto-link both of their layers. With
 `merge = true`, one legend entry names several ids. A second legend in
