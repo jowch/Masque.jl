@@ -35,9 +35,10 @@ WebGL canvas instead of a static PNG.
 
 ## [`examples/view_manip.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip.jl)
 
-Pan, zoom, and 3D rotation via the `@bind` re-render model: a `limits` slider, `azimuth`/
-`elevation` sliders for `Axis3`, selection surviving a view re-render, and
-[`ViewInteractable`](@ref) drag-to-pan / drag-to-rotate with commit-on-release.
+Pan, zoom, and 3D rotation via a **slider** using the `@bind` re-render model: a `limits`
+slider, `azimuth`/`elevation` sliders for `Axis3`, and selection surviving a view re-render.
+[`ViewInteractable`](@ref) **drag** (pan / orbit) is separate: it commits nothing, with a live
+gesture-channel preview on `:cairo`.
 
 [Open the static export](notebooks/view_manip.html)
 

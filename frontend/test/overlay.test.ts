@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
 import type { HitLayer, Manifest } from "../src/types"
 
@@ -1151,7 +1151,13 @@ describe("tooltips (mount/showTip)", () => {
         expect(sel.children.length).toBe(2)  // points 0 and 1 only — index 2 is gone
     })
 
-    it("drag-to-pan commits new limits on mouse-up (commit-on-release)", () => {
+    // #102/§12.3: a view gesture commits nothing — the drag readout still lives entirely in
+    // the browser (Tier 0), but nothing writes host.value or fires "input" for it anymore. This
+    // used to be "drag-to-pan commits new limits on mouse-up (commit-on-release)"; changing what
+    // it asserts is deliberate (docs/dev/architecture/12-gesture-channel.md §12.3), not a test
+    // that quietly stopped testing — see the paired gesture-channel test below for what DOES
+    // fire on this same drag.
+    it("drag-to-pan keeps the live readout but commits nothing", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,
             transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
@@ -1161,21 +1167,22 @@ describe("tooltips (mount/showTip)", () => {
         }
         const { host, script } = setup()
         mount(script, m)
-        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
-        let committed: { layer: string; payload: { xmin: number; xmax: number; ymin: number; ymax: number } } | null = null
-        host.addEventListener("input", () => {
-            committed = (host as unknown as { value: typeof committed }).value
-        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        let fired = false
+        host.addEventListener("input", () => { fired = true })
         // display scale 2: client Δx=100 → image Δx=200 → 200/1200 of lims = 10/6 ≈ 1.667
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        // Tier-0 readout is still live mid-drag, browser-only, no round trip needed for it.
+        expect(tip.textContent).toContain("x:[")
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
-        expect(committed).toMatchObject({ layer: "view" })
-        expect(committed!.payload.xmin).toBeCloseTo(-10 * 200 / 1200)
-        expect(committed!.payload.xmax).toBeCloseTo(10 - 10 * 200 / 1200)
+        expect(fired).toBe(false)
+        expect((host as unknown as { value: unknown }).value).toBeNull()
     })
 
-    it("tiny view drag does not commit", () => {
+    it("gesture channel: a real pan drag requests frames and settles; a micro-drag requests none (VIEW_MIN_PX)", async () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,
             transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
@@ -1184,13 +1191,136 @@ describe("tooltips (mount/showTip)", () => {
                 geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }],
         }
         const { host, script } = setup()
-        mount(script, m)
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]) }))
+        mount(script, m, undefined, requestFrame)
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
-        let fired = false
-        host.addEventListener("input", () => { fired = true })
+
+        // Micro-drag (2 image-px, below VIEW_MIN_PX=3): no request at all — same "ignore
+        // accidental micro-drags" guard the old commit check used, now protecting the channel.
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
-        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 101, clientY: 100, bubbles: true })) // 2 image-px
-        expect(fired).toBe(false)
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 101, clientY: 100, bubbles: true }))
+        await Promise.resolve()
+        expect(requestFrame).not.toHaveBeenCalled()
+
+        // A real drag: at least one in-drag request (settle: false), and a terminal one
+        // (settle: true) on release, carrying the pan payload the old commit used to.
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        await Promise.resolve()
+        expect(requestFrame).toHaveBeenCalled()
+        const calls = requestFrame.mock.calls; const last = calls[calls.length - 1][0]
+        expect(last).toMatchObject({ id: "view", settle: true })
+        expect(last.xmin as number).toBeCloseTo(-10 * 200 / 1200)
+        expect(last.xmax as number).toBeCloseTo(10 - 10 * 200 / 1200)
+    })
+
+    // Round-1 review, finding #2: settle used to be gated on the RELEASE point's own distance
+    // from the drag's start, so a drag that went out past VIEW_MIN_PX (sending ppu=1 in-drag
+    // requests) and drifted back near its start before release read as a micro-drag at release
+    // time and never settled — stranding the widget at ppu=1 forever, since nothing else
+    // re-renders it.
+    it("gesture channel: settles even when the release point drifts back near the drag's start", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [{ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }],
+        }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]) }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 100, bubbles: true })) // out past VIEW_MIN_PX
+        await flushFrame()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        // drift back to within VIEW_MIN_PX (3 image-px = 1.5 client-px at this fixture's 2x scale)
+        // of the drag's start before releasing.
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 101, clientY: 100, bubbles: true }))
+        await flushFrame()
+
+        const calls = requestFrame.mock.calls; const last = calls[calls.length - 1][0]
+        expect(last).toMatchObject({ id: "view", settle: true }) // settled anyway — a request had already gone out
+    })
+
+    // Round-1 review, finding #2 (second half): onCancel/onLostCapture never settled at all, so
+    // an aborted gesture (browser-initiated takeover, stylus leaving range, capture lost some
+    // other way) that had already sent in-drag requests left the widget at ppu=1 permanently.
+    it("gesture channel: pointercancel and lostpointercapture both settle if a request went out", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [{ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }],
+        }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]) }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 100, bubbles: true }))
+        await flushFrame()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        surface.dispatchEvent(new PointerEvent("pointercancel", { clientX: 210, clientY: 100, bubbles: true }))
+        await flushFrame()
+        expect(requestFrame).toHaveBeenCalledTimes(2)
+        expect(requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]).toMatchObject({ id: "view", settle: true })
+
+        // A second drag, ended by lostpointercapture instead (no position available to that
+        // handler at all — it has to resettle with the last request's own camera).
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 250, clientY: 100, bubbles: true }))
+        await flushFrame()
+        expect(requestFrame).toHaveBeenCalledTimes(3)
+        surface.dispatchEvent(new PointerEvent("lostpointercapture", { bubbles: true }))
+        await flushFrame()
+        expect(requestFrame).toHaveBeenCalledTimes(4)
+        expect(requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]).toMatchObject({ id: "view", settle: true })
+    })
+
+    // Round-1 review, finding #3: a manifest-carrying frame swap tore down ROI/threshold and
+    // re-keyed selection, but left g.hi (hover ring) drawn from the OLD geometry — §12.5 forbids
+    // leaving the overlay live over a frame it no longer describes, and a view drag starting
+    // from (or shortly after) a hovered point is a supported path, not an edge case.
+    it("gesture channel: a manifest-swap frame clears the stale hover ring, not just selection", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20], payloads: [{ i: 0 }],
+                    axis: "ax1", events: ["click", "hover"] },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const movedManifest: Manifest = {
+            ...m,
+            layers: [{ ...m.layers[0], geometry: [400, 400, 20] }, m.layers[1]],
+        }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]), manifest: movedManifest }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+
+        // Hover the point first (image px 600,400 -> CSS 300,200 at this fixture's 2x scale).
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+        expect(hiChildren(shadow).length).toBeGreaterThan(0)
+
+        // A view drag elsewhere on the surface — onDown/onPointerMove never re-evaluate hover
+        // once a drag starts, so nothing but applyFrame's own cleanup can clear this ring.
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+
+        expect(hiChildren(shadow).length).toBe(0) // not left describing the point's stale, pre-pan position
     })
 
     it("points+view: hover and click still work over the full-viewport view layer", async () => {
@@ -1291,7 +1421,14 @@ describe("tooltips (mount/showTip)", () => {
         expect(hiChildren(shadow).length).toBe(0)
     })
 
-    it("drag-to-orbit commits azimuth/elevation; Shift+drag beats ROI", () => {
+    // #102/§12.3: Shift+drag still arbitrates to the view layer over an ROI underneath it (the
+    // routing this test's name references) — what changed is that winning the arbitration no
+    // longer means a bond commit. Without a `requestFrame` mock there'd be no observable signal
+    // that Shift actually routed to VIEW rather than just silently doing nothing over the ROI,
+    // so this asserts BOTH: the ROI does NOT commit under Shift, and the gesture channel DOES
+    // receive an orbit request with the expected azimuth/elevation — the only way now to prove
+    // arbitration picked view, not "this drag matched nothing at all."
+    it("drag-to-orbit requests azimuth/elevation frames, commits nothing; Shift+drag beats ROI", async () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,
             transforms: {
@@ -1308,25 +1445,91 @@ describe("tooltips (mount/showTip)", () => {
             ],
         }
         const { host, script } = setup()
-        mount(script, m)
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]) }))
+        mount(script, m, undefined, requestFrame)
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
         let committed: { layer: string; payload: { azimuth: number; elevation: number } } | null = null
         host.addEventListener("input", () => {
             committed = (host as unknown as { value: typeof committed }).value
         })
-        // without Shift: ROI wins over view (layer order)
+        // without Shift: ROI wins over view (layer order) and still commits — ROI settling
+        // bounds is a data interaction (§12.1), unaffected by #102.
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 250, clientY: 200, bubbles: true }))
         expect(committed!.layer).toBe("roi")
-        // with Shift: view orbit wins even over ROI interior
+        expect(requestFrame).not.toHaveBeenCalled()
+        // with Shift: view orbit wins even over ROI interior, but commits nothing.
         committed = null
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true, shiftKey: true }))
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 500, clientY: 200, bubbles: true, shiftKey: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 500, clientY: 200, bubbles: true, shiftKey: true }))
-        expect(committed!.layer).toBe("view")
+        await Promise.resolve()
+        expect(committed).toBeNull()
+        expect(requestFrame).toHaveBeenCalled()
+        const calls = requestFrame.mock.calls; const last = calls[calls.length - 1][0]
+        expect(last).toMatchObject({ id: "view", settle: true })
         // image Δx = 600; sens = π/1200 → Δaz = −π/2
-        expect(committed!.payload.azimuth).toBeCloseTo(0.4 - Math.PI / 2)
-        expect(committed!.payload.elevation).toBeCloseTo(0.5)
+        expect(last.azimuth as number).toBeCloseTo(0.4 - Math.PI / 2)
+        expect(last.elevation as number).toBeCloseTo(0.5)
+    })
+
+    // #102 tripwire #3: a manifest swap mid-gesture must not drop a selection made before (or
+    // even during) the drag — #107's "axis click preserves selection" regression lived in this
+    // exact spot. The mock response's "pts" layer moves to a NEW position, simulating what a
+    // real pan does to every layer on the panned axis; the selection ring has to track it.
+    it("a frame swap with a new manifest preserves the live selection at its NEW coordinates", async () => {
+        // Two points, unselected at mount — the test SELECTS index 1 itself (a real click), so
+        // the assertion below can distinguish "applyFrame re-keyed the LIVE selection" from
+        // "applyFrame re-hydrated from the new manifest's own selected=" (round-1 review's
+        // sharpest nit): movedManifest below declares selected: [0] on this layer, a DIFFERENT
+        // index than the one actually clicked. A re-hydration bug would show index 0 at its new
+        // position; re-keying shows index 1 at ITS new position. The original fixture selected
+        // index 0 via selected= in BOTH manifests, so it could not tell the two apart.
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "pts", kind: "circles", geometry: [200, 400, 20, 900, 400, 20], payloads: [{ i: 0 }, { i: 1 }],
+                    axis: "ax1", events: ["click", "hover"] },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const movedManifest: Manifest = {
+            ...m,
+            transforms: { ax1: { ...m.transforms.ax1, xlims: [-10, 0] } },
+            layers: [
+                // both points panned 200px left; selected: [0] is deliberately NOT what the test
+                // clicks (index 1) — see the comment above.
+                { ...m.layers[0], geometry: [0, 400, 20, 700, 400, 20], selected: [0] },
+                m.layers[1],
+            ],
+        }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]), manifest: movedManifest }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+
+        // Real click on index 1 (image px 900,400 -> CSS 450,200 at this fixture's 2x scale).
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 200, bubbles: true }))
+        expect(selChildren(shadow).length).toBe(2) // closed-shape selection draws BOTH fill+edge halves
+
+        let fired = false
+        host.addEventListener("input", () => { fired = true })
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+
+        expect(selChildren(shadow).length).toBe(2) // selection survived the manifest swap (still fill+edge)
+        // The ring is drawn at index 1's NEW position (cx=700) — not its stale pre-swap position
+        // (900), and not index 0's new position (0), which is what a selected= re-hydration bug
+        // would show instead.
+        const drawn = selChildren(shadow).find((el) => el.tagName.toLowerCase() === "circle")
+        expect(drawn?.getAttribute("cx")).toBe("700")
+        expect(fired).toBe(false) // §12.3: the DRAG itself still commits nothing, even once a frame has landed
     })
 })
 

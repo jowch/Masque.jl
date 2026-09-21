@@ -29,6 +29,12 @@ end
 # ╔═╡ 60000000-0000-0000-0000-000000000010
 md"""
 # ViewManip WebGL — drag-to-pan / drag-to-rotate live-verify
+
+`ViewInteractable` commits nothing (docs/dev/architecture/12-gesture-channel.md §12.3), on
+either backend. `:webgl` additionally has no live-preview mechanism yet (§12.10), so dragging
+here shows only the Tier-0 numeric readout and repaints nothing — `pan_committed`/
+`orbit_committed` below always equal their seed, and the second figure in each pair is a
+static duplicate kept to make that explicit.
 """
 
 # ╔═╡ 60000000-0000-0000-0000-000000000011
@@ -50,6 +56,7 @@ end
 @bind pan_ev masque(pan_fig, [pan_pts, pan_view])
 
 # ╔═╡ 60000000-0000-0000-0000-000000000023
+# Always pan_seed: a ViewInteractable's bond never reports `:view` (§12.3).
 pan_committed = begin
     if pan_ev !== nothing && pan_ev isa InteractionEvent && pan_ev.layer === :view
         pl = pan_ev.payload
@@ -85,6 +92,7 @@ end
 @bind orb_ev masque(orb_fig, orb_view)
 
 # ╔═╡ 60000000-0000-0000-0000-000000000033
+# Always orb_seed — same dead branch as pan_committed above, for the same reason (§12.3).
 orbit_committed = begin
     if orb_ev !== nothing && orb_ev isa InteractionEvent && orb_ev.layer === :view
         op = orb_ev.payload

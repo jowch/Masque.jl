@@ -97,7 +97,10 @@ function Masque.context(b::CairoBackend, fig, ppu)
     return InteractionContext(project, transforms, ids, out_w, out_h, scaling, display_scale)
 end
 
-Masque.make_widget(::CairoBackend, result::RenderResult, manifest, display_css) =
-    Masque.MasqueWidget(Masque.base64encode(result.payload), manifest, display_css)
+Masque.make_widget(b::CairoBackend, result::RenderResult, manifest, display_css, fig, interactables, ppu) =
+    Masque.MasqueWidget(
+    Masque.base64encode(result.payload), manifest, display_css,
+    Masque._view_render_frame(b, fig, interactables, ppu),
+)
 
 end # module MasqueCairoMakieExt

@@ -8,20 +8,21 @@ or, at mount, for each element `selected=` hydrated (`nothing` if there's neithe
 - `layer::Symbol` — the hit `HitLayer`'s (i.e. the interactable's) `id`.
 - `index::Int` — 0-based element index within that layer; for a `:grid` that is the linear
   cell index. An `:axis` hit has no element to index and reports `-1`
-  (`AxisInteractable`, `ColorbarInteractable`); `:roi`/`:threshold`/`:view` report `0`.
+  (`AxisInteractable`, `ColorbarInteractable`); `:roi`/`:threshold` report `0`. A `:view` layer
+  ([`ViewInteractable`](@ref)) never appears here at all — it commits nothing
+  (docs/dev/architecture/12-gesture-channel.md §12.3).
 - `payload::Any` — for an element kind (points/rects/polygons/segments/polyline), the exact
   object you passed in `payloads=`, looked back up in Julia rather than decoded from what the
   browser sent: `ev.payload === payloads[i]`, not a JSON-reconstructed copy, so a `NamedTuple`
   payload stays a `NamedTuple`. Kinds with no Julia-side original — an axis readout, a grid
-  cell, ROI bounds, view limits — still report a browser-computed value, but converted to a
-  flat (never nested) `NamedTuple` from the fixed field set that kind sends, so `ev.payload.x`
-  works everywhere, not just for element kinds: `(; x, y)` or `(; value)` for
+  cell, ROI bounds — still report a browser-computed value, but converted to a flat (never
+  nested) `NamedTuple` from the fixed field set that kind sends, so `ev.payload.x` works
+  everywhere, not just for element kinds: `(; x, y)` or `(; value)` for
   [`AxisInteractable`](@ref)/[`ColorbarInteractable`](@ref); `(; i, j)` or `(; i, j, value)`
   for a `:grid` cell hit, or `(; i0, i1, j0, j1, xmin, xmax, ymin, ymax)` for the cell-range a
-  `selects`-ROI reports over a `:grid` target; `(; xmin, xmax, ymin, ymax)` for `:roi`/2D
-  `:view`; `(; azimuth, elevation)` for 3D (orbit) `:view`. [`ThresholdInteractable`](@ref) is
-  the one exception: its payload is a bare scalar (the data coordinate), since there is no
-  field to name.
+  `selects`-ROI reports over a `:grid` target; `(; xmin, xmax, ymin, ymax)` for `:roi`.
+  [`ThresholdInteractable`](@ref) is the one exception: its payload is a bare scalar (the data
+  coordinate), since there is no field to name.
 
 A `ROIInteractable` built with `selects` reports differently: the bond value is a
 `Vector{InteractionEvent}` (one entry per element the ROI contains on mouse-up), not a single
@@ -300,7 +301,13 @@ struct MasqueWidget
     b64::String
     manifest::Dict{String, Any}
     display_css::Int
+    # Gesture-channel (#102) per-frame callback, `:cairo` only — `nothing` when the widget has
+    # no `ViewInteractable` to drive, or on `:webgl` (no settled live-preview mechanism yet;
+    # docs/dev/architecture/12-gesture-channel.md §12.10). Defaulted below so every existing
+    # 3-arg call site (tests, and any future one) keeps working.
+    render_frame::Union{Nothing, Function}
 end
+MasqueWidget(b64, manifest, display_css) = MasqueWidget(b64, manifest, display_css, nothing)
 
 # Backend choice follows which package extension is loaded, never sniffed from Makie's global
 # `current_backend()` state. `explicit` is the caller's `backend=` override.
@@ -375,7 +382,7 @@ function masque(
         manifest = build_manifest(interactables, ctx; selected, tip_style, background = fig.scene.backgroundcolor[])
         result = render(backend, fig, ppu)
         display_css = round(Int, min(size(fig.scene)[1], backend.max_width))
-        return make_widget(backend, result, manifest, display_css)
+        return make_widget(backend, result, manifest, display_css, fig, interactables, ppu)
     finally
         fig.scene.backgroundcolor[] = bg0
     end
@@ -398,10 +405,67 @@ function masque(fig; kwargs...)
     return masque(fig, ints; kwargs...)
 end
 
+# Builds the gesture channel's per-frame callback for a `ViewInteractable`-carrying widget
+# (`:cairo` only, #102): mutate the dragged axis's camera, rebuild the manifest, re-render, and
+# hand back `{png, manifest}` — frame always, manifest whenever the camera moved (always, for a
+# view gesture specifically; §12.4/§12.5). `nothing` when `interactables` has no
+# `ViewInteractable`, so no in-drag frame can ever be requested and building the closure (and
+# paying `with_js_link`'s per-cell bookkeeping) would be pure cost.
+function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu)
+    view_axes = Dict{Symbol, Any}(i.id => i.ax for i in interactables if i isa ViewInteractable)
+    isempty(view_axes) && return nothing
+    return function (input)
+        id = Symbol(input["id"])
+        ax = get(view_axes, id, nothing)
+        ax === nothing && throw(
+            ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
+        )
+        if haskey(input, "azimuth")
+            ax.azimuth[] = Float64(input["azimuth"])
+            ax.elevation[] = Float64(input["elevation"])
+        else
+            ax.limits[] = (
+                Float64(input["xmin"]), Float64(input["xmax"]),
+                Float64(input["ymin"]), Float64(input["ymax"]),
+            )
+        end
+        # Frame resolution drops to 1x for every in-drag frame and restores to the mount ppu on
+        # release ("settle", the frontend's terminal request) — the MANIFEST always stays in the
+        # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
+        # moves out from under the overlay; only the PNG's own pixel density changes (the <img>
+        # is width:100% CSS-scaled — see frontend-delivery.md — so that's decoupled from its
+        # intrinsic size).
+        render_ppu = get(input, "settle", false) === true ? ppu : 1.0
+        bg0 = fig.scene.backgroundcolor[]
+        try
+            # Same forcing masque() does around its own render — that guard is restored in ITS
+            # `finally` before this closure ever runs, so each frame has to redo it.
+            fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
+            _finalize!(fig)
+            ctx = context(backend, fig, ppu)
+            manifest = build_manifest(interactables, ctx)
+            result = render(backend, fig, render_ppu)
+            return Dict{String, Any}("png" => result.payload, "manifest" => manifest)
+        finally
+            fig.scene.backgroundcolor[] = bg0
+        end
+    end
+end
+
 function Base.show(io::IO, m::MIME"text/html", w::MasqueWidget)
     # Inject unconditionally: wrapping the esbuild IIFE in `if (!window.Masque) {…}` makes it
     # install `{}` instead of `{mount}` (a JS block-scope/strict-mode quirk).
     boot = HypertextLiteral.JavaScript(_OVERLAY_JS[])
+    # Render-time capability question ONLY (§12.9) — NOT how a static export is detected.
+    # Exporting doesn't re-render (`generate_html` serializes existing notebook state), so this
+    # decision gets baked into the exported HTML from a session where a kernel was live and
+    # would read back as stale `true` to a kernel-less reader. The frontend's own
+    # `window.pluto_disable_ui` gate + try/catch backstop (gesture.ts) is what actually degrades
+    # a dead channel at use time; this only decides whether to interpolate a `with_js_link` call
+    # into the page at all.
+    link = w.render_frame === nothing ? nothing :
+        (APD.is_supported_by_display(io, APD.Display.with_js_link) ? APD.Display.with_js_link(w.render_frame) : nothing)
+    request_frame_js = link === nothing ? HypertextLiteral.JavaScript("null") : link
     html = @htl(
         """
         <div class="ip-host" style="position:relative; display:inline-block; width:100%; max-width:$(w.display_css)px;">
@@ -409,7 +473,8 @@ function Base.show(io::IO, m::MIME"text/html", w::MasqueWidget)
           <script>
             $(boot)
             const manifest = $(APD.Display.published_to_js(w.manifest));
-            window.Masque.mount(currentScript, manifest, invalidation);
+            const requestFrame = $(request_frame_js);
+            window.Masque.mount(currentScript, manifest, invalidation, requestFrame);
           </script>
         </div>
         """
@@ -435,15 +500,21 @@ function _hydrated_selection(manifest::Dict{String, Any})
     return isempty(events) ? nothing : events
 end
 
-# A computed kind (axis/grid/roi/view; :threshold is a bare scalar, see below) has no Julia-side
+# A computed kind (axis/grid/roi; :threshold is a bare scalar, see below) has no Julia-side
 # original, so there's nothing to reconstruct — but the browser's Dict-shaped value is converted
 # to a NamedTuple here so `ev.payload.x` reads the same way an element payload does. Per-kind
 # enumeration, not a generic `Dict{String,Any}` -> NamedTuple conversion: the generic route would
 # happily build a NamedTuple from keys that aren't identifiers, where this one fails loud (an
 # `ArgumentError` naming the unrecognized keys) the moment a JS-side branch grows a field this
 # hasn't been taught. Every shape here is flat (never nested) because every one of these payloads
-# is flat today — resolvePayload/roiBounds/threshold.ts/view.ts in geometry.ts and drag/*.ts build
-# them and never nest.
+# is flat today — resolvePayload/roiBounds/threshold.ts in geometry.ts and drag/*.ts build them
+# and never nest.
+#
+# :view is deliberately absent: a view gesture commits nothing (§12.3), so no `js_payload` ever
+# arrives with kind :view — the branch that used to convert one retired with #102. A caller that
+# somehow reaches this with kind :view (there is no such path in the shipped frontend) falls
+# through to the unrecognized-shape throw below, same as any other kind this function hasn't
+# been taught.
 #
 # :grid carries two disjoint shapes under the one kind: `(i, j)`/`(i, j, value)` from a direct
 # cell hit (`resolvePayload`'s `hit.grid_` branch), and `(i0, i1, j0, j1, xmin, xmax, ymin,
@@ -471,9 +542,6 @@ function _computed_payload(layer_id::AbstractString, kind::Symbol, js_payload)
             return nt(:i0, :i1, :j0, :j1, :xmin, :xmax, :ymin, :ymax)
     elseif kind === :roi
         ks == Set(("xmin", "xmax", "ymin", "ymax")) && return nt(:xmin, :xmax, :ymin, :ymax)
-    elseif kind === :view
-        ks == Set(("xmin", "xmax", "ymin", "ymax")) && return nt(:xmin, :xmax, :ymin, :ymax)
-        ks == Set(("azimuth", "elevation")) && return nt(:azimuth, :elevation)
     end
     throw(
         ArgumentError(

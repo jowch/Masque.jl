@@ -1022,19 +1022,26 @@ end
 """
     ViewInteractable(ax; id=:view)
 
-Drag-to-pan (2D `Axis`) or drag-to-rotate (`Axis3`), committed on mouse-up. Produces one
-`:view` [`HitLayer`](@ref) covering `ax`'s whole viewport; it sorts after Tier-0
-`:threshold`/`:roi` layers so an ordinary drag on those wins without a modifier —
-**Shift+drag** forces the view gesture even over a `ThresholdInteractable`/`ROIInteractable`
-hit.
+Drag-to-pan (2D `Axis`) or drag-to-orbit (`Axis3`). Produces one `:view` [`HitLayer`](@ref)
+covering `ax`'s whole viewport; it sorts after Tier-0 `:threshold`/`:roi` layers so an ordinary
+drag on those wins without a modifier — **Shift+drag** forces the view gesture even over a
+`ThresholdInteractable`/`ROIInteractable` hit.
 
 # Arguments
-- `ax` — a `Makie.Axis` (pan) or `Makie.Axis3` (orbit). `id` — the layer id; becomes
-  `InteractionEvent.layer` on commit. Default `:view`.
+- `ax` — a `Makie.Axis` (pan) or `Makie.Axis3` (orbit). `id` — the layer id, used to route
+  gesture-channel frame requests back to this axis. Default `:view`.
 
-Payload on commit (client-side): 2D — `(; xmin, xmax, ymin, ymax)` (the new `limits`); 3D —
-`(; azimuth, elevation)`. Drive the returned value back into
-`ax.limits[]` / `ax.azimuth[]`+`ax.elevation[]` and re-render to make the gesture stick.
+**Commits nothing.** A camera is operational state, not an analysis value a notebook reads
+(docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a
+`:view` [`InteractionEvent`](@ref). On the `:cairo` backend, drag frames stream over a
+`with_js_link` gesture channel instead: Julia mutates `ax.limits[]` (pan) or
+`ax.azimuth[]`/`ax.elevation[]` (orbit), re-renders at `px_per_unit = 1`, and ships a fresh PNG
+plus hit manifest for every frame the camera moves; the release frame renders at the widget's
+own resolution. `:webgl` has no live-preview mechanism yet (§12.10) — the drag still shows a
+numeric readout, but nothing repaints until a future backend catches up. Because nothing
+commits, `ax`'s camera stays wherever the gesture left it until the cell re-runs (a fresh
+`Figure`/`Axis` resets it); to persist a view across re-renders, bind it explicitly with the
+`Ref` + `@bind` pattern (§12.8).
 
 `masque` raises `ArgumentError` at build time if `ax` is a `PolarAxis` (continuous θ/r view
 gestures aren't shipped), a `Colorbar`'s value axis (no pan/orbit view applies), a categorical
@@ -1080,7 +1087,9 @@ function hitlayers(i::ViewInteractable, ctx)
         "mode" => t.is3d ? "orbit" : "pan",
     )
     if t.is3d
-        # Current camera — JS computes the committed (azimuth, elevation) from the pixel delta.
+        # Current camera — JS computes the drag's (azimuth, elevation) from the pixel delta, for
+        # the Tier-0 readout and (on :cairo) the gesture-channel request payload. Never committed
+        # (§12.3): a view gesture reports no InteractionEvent at all.
         geom["azimuth"] = Float64(i.ax.azimuth[])
         geom["elevation"] = Float64(i.ax.elevation[])
     end

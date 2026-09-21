@@ -138,6 +138,24 @@
 > them, which is why those three rows now carry seven runs each instead of three and a longer
 > explanation than the other rows. See the STRESS table below for the exact ranges and that
 > explanation.
+> and re-run for the gesture channel (#102, commit `a9855b4`, 2026-09-20): no manifest-shape
+> change to the STATIC widget — `build_manifest`/`masque()`'s own output is untouched; #102 adds
+> a NEW per-frame response (`{png, manifest}`) on a separate channel (`with_js_link`), not a
+> change to what `show`/`published_to_js` ship at mount. Confirmed by re-running both scripts
+> twice each: every manifest/PNG size byte-for-byte identical between the two runs of each
+> script and to the pre-#102 baseline (scatter-1k manifest still 38.0 KB, heatmap-200² still
+> 196.8 KB, 30-frame scrub still 5.6 MB; every STRESS A–D manifest/PNG size identical across
+> both runs). Render timings varied run-to-run as this file already documents for a shared
+> machine. heatmap-1000² first measured at 302 ms and 316 ms during this reconciliation, above
+> the recorded 97–227 ms span; two further runs on an otherwise-idle machine landed at 143 ms and
+> 99 ms, inside it. The elevated pair was concurrent load from this session's own Pluto servers
+> and kind sweeps, not a shift in the row — the 500²/1000² ordering was correct throughout. The
+> row's 97–227 ms span stands unchanged, still with the "not resolved" caveat this file already
+> carries for it. The gesture channel's OWN numbers — the `with_js_link` round trip itself —
+> are new and are in their own section below
+> ("Gesture channel (#102): the shipped `with_js_link` round trip"), measured directly against
+> `Masque._view_render_frame` (the shipped closure, not the pre-implementation spike issue #102
+> cites) via the new committed `bench/gesture_channel.jl`.
 > baseline established after int-pixel geometry quantization, CairoMakie 0.15, Julia 1.12):
 > - **base64-PNG / manifest / render numbers** — `julia --project=. bench/payload_envelope.jl`
 >   (normal envelope) and `julia --project=. bench/stress.jl` (the 10× extremes). Both `seed!(0)`,
@@ -179,6 +197,14 @@ bytes** (−2 085 B, ~5.9%). `assets/masque-webgl.js` is unaffected (**1 173 byt
 `wgl-shim.ts` has no `OverlayState`-shaped internal properties to mangle, and its two wire-tag
 properties (`__obs__`/`__t__`) are read via bracket notation specifically so `mangleProps` can
 never touch them. Both bundles remain byte-identical across repeated `npm run build` runs.
+
+The gesture channel (#102, commit `a9855b4`) added a new module (`frontend/src/gesture.ts`,
+the request-discipline state machine) plus the frame-swap/manifest-rebuild path in `mount.ts` and
+the request/settle wiring in `bond.ts`/`drag/view.ts`: `assets/overlay.js` **47 702 → 49 088
+bytes** (+1 386 B, ~2.9%). `assets/masque-webgl.js` is unaffected (**1 179 bytes**, unchanged —
+this doc's own count above was stale by 6 B, unrelated to this PR) — the gesture channel is
+`:cairo`-only, and `WebGLWidget`'s `Base.show`/`mount()` call never passes a `requestFrame`, so
+none of the new frontend code paths are exercised for `:webgl`.
 
 ## Measured envelope
 
@@ -313,9 +339,53 @@ Every one of the 12 trials produced exactly two distinct `.ip-host` node identit
 release — the unsupported-shape double remount described in issue #83, reproduced live on this
 Pluto version rather than only inferred from its description.
 
-This section deliberately does not include any `with_js_link` numbers — those live in
-[issue #102](https://github.com/jowch/Masque.jl/issues/102) until a `with_js_link` gesture
-channel actually ships. This file tracks only what Masque does today.
+This section is the `@bind`-commit baseline #102 replaced for view manipulation. The
+`with_js_link` gesture channel now ships (`:cairo` only) — its own numbers are below.
+
+### Gesture channel (#102): the shipped `with_js_link` round trip
+
+Measured **2026-09-20 at commit `a9855b4`**, Julia 1.12.7, CairoMakie 0.15.14, against
+`Masque._view_render_frame` **directly** (no browser, no Pluto kernel) via the new committed
+`bench/gesture_channel.jl` — best-of-20 per phase after one discarded warmup call, `time_ns()`
+around the closure call itself (mirrors issue #102's spike method: JS and Julia share one wall
+clock per round trip in the real implementation, since the closure runs entirely inside the
+kernel process). This is the Julia-side term only — no websocket transfer, no browser decode+
+paint, which issue #102's own numbers put at a ~31–34 ms constant floor on top of whatever's
+below (not re-measured here; `with_js_link`'s browser-side transfer/decode path is unchanged
+from the spike).
+
+Two scenes, matching issue #102's own measurements for direct comparison — `Axis3`, 240-point
+helix `lines!` + 12-marker `scatter!`, `[ViewInteractable(ax), PointInteractable(ax, pts)]`,
+figure 480×360 (light), the same +80×80 `surface!` (heavy) — plus a light 2D pan case (`Axis`,
+6-point scatter, figure 500×320), since #102 ships pan as well as orbit:
+
+| scene | in-drag (`ppu=1`) p50 | settle (mount `ppu`) p50 | PNG in-drag → settle |
+|---|---:|---:|---:|
+| light (helix + 12 markers), orbit | 11.1–11.3 ms | 24.2–25.5 ms | 56.5 KB → 139.2 KB |
+| heavy (+80×80 `surface!`), orbit | 80.8–87.4 ms | 124.7–125.5 ms | 63.0 KB → 161.8 KB |
+| light (scatter-6), 2D pan | 4.1–5.3 ms | 13.2–13.4 ms | 9.0 KB → 19.1 KB |
+
+(ranges are two independent runs of `bench/gesture_channel.jl`, not a single sample.)
+
+The manifest rebuild itself is not broken out separately here the way issue #102's spike did
+(it instrumented `setcam`/`manifest`/`render`/`encode` as four sub-phases) — the shipped
+`_view_render_frame` times the whole closure as one span, matching what `with_js_link` actually
+measures end-to-end. The relative shape matches the spike's finding: `ppu=1` cuts the
+heavy/light gap roughly in half (compare 11 ms/81 ms in-drag to 25 ms/125 ms at the mount ppu),
+so the render term — not the manifest rebuild — is still what the heavy scene pays for, and
+dropping resolution during the gesture is the lever actually being spent. The light scene's
+in-drag numbers here (11 ms orbit, 4–5 ms pan) are close to or faster than issue #102's spike
+total (which additionally paid `published_to_js`-equivalent serialization, browser transfer, and
+`time_ns()`-vs-`performance.now()` clock differences the spike's own numbers folded in) — no
+regression from the pre-implementation estimate.
+
+**Not measured here**: the live Pluto + Chromium round trip (websocket transfer + `with_js_link`'s
+own dispatch overhead + browser PNG decode+paint) — issue #102's spike measured that layer at a
+~31–34 ms floor across all four of its configurations; nothing in `_view_render_frame`'s own
+implementation should change that floor, since the wire shape (`{png, manifest}`, PNG as raw
+bytes not base64) matches what the spike round-tripped. `test/e2e/kind_sweep.mjs`'s
+`view/view-gesture-frame` check confirms a real frame lands end-to-end through an actual Pluto
+kernel + headless Chromium, but does not time it.
 
 ## Stress test — the extremes (where it stops being render-bound)
 

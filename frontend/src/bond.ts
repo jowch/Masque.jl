@@ -32,6 +32,18 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
         text = thresholdDrag.move(d, p)
     } else if (d.kind === "view") {
         text = viewDrag.tip(d, p)
+        // Tier-0 readout above always works (browser-only) even for a sub-threshold move; the
+        // live preview only kicks in past VIEW_MIN_PX — same "ignore accidental micro-drags"
+        // guard `end`'s old commit check used to apply, now protecting the gesture channel
+        // instead of a bond write, so an ordinary click with a pixel of jitter doesn't spend a
+        // round trip on a frame nobody will see move. ctx.gesture_ is a no-op channel when
+        // there's no mechanism for this widget (:webgl, no ViewInteractable, export, or a
+        // channel that already degraded).
+        if (Math.hypot(p.x - d.x0_, p.y - d.y0_) >= viewDrag.VIEW_MIN_PX) {
+            const input = viewDrag.requestInput(d, p, false)
+            ctx.gesture_.request(input)
+            d.lastInput_ = input // marks this drag as owing a settle — see state.ts's Drag doc
+        }
     } else {
         text = roiDrag.move(ctx, state, d, p)
     }
@@ -136,11 +148,14 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
         (ctx.host_ as unknown as { value: unknown }).value = thresholdDrag.end(d, p)
         ctx.host_.dispatchEvent(new CustomEvent("input"))
     } else if (d.kind === "view") {
-        const value = viewDrag.end(d, p)
-        if (value !== undefined) {
-            (ctx.host_ as unknown as { value: unknown }).value = value
-            ctx.host_.dispatchEvent(new CustomEvent("input"))
-        }
+        // §12.3: a view gesture commits nothing — no bond write, no "input" event.
+        // Settle is gated on whether a request actually went out during this drag
+        // (`lastInput_`), NOT on the release point's own distance from x0/y0 (round-1 review,
+        // finding #2): a drag that went out past VIEW_MIN_PX and drifted back near the start
+        // before release still sent ppu=1 frames and owes the ppu restore, even though this
+        // release point alone reads as a micro-drag. The payload itself still uses the fresh
+        // release position `p`, not the (possibly stale) last in-drag one.
+        if (d.lastInput_ !== undefined) ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
     } else {
         (ctx.host_ as unknown as { value: unknown }).value = roiDrag.end(ctx, state, d)
         ctx.host_.dispatchEvent(new CustomEvent("input"))
@@ -163,11 +178,21 @@ export function onCancel(ctx: OverlayCtx, state: OverlayState, e: PointerEvent):
     // Same pointerId gate as onUp — a non-owning pointer's cancel must not touch a drag it
     // didn't start.
     if (!state.drag_ || e.pointerId !== state.drag_.pointerId_) return
+    const d = state.drag_ // claim before nulling, same reentrancy hazard onUp documents
     cancelPendingDrag(state)
     state.drag_ = null // claim before releasePointerCapture, same reentrancy hazard as onUp
     if (ctx.surface_.hasPointerCapture(e.pointerId)) ctx.surface_.releasePointerCapture(e.pointerId)
     ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     hideTip(ctx, state)
+    // §12.5 (round-1 review, finding #2): a cancelled gesture is not a commit, but if it already
+    // sent an in-drag (ppu=1) request it still owes the ppu restore — nothing else ever
+    // re-renders this static widget, so skipping settle here strands it at low resolution
+    // permanently. Unlike onUp this isn't a release in the commit sense, but the cancel event's
+    // own position is the best available stand-in for "where the camera actually is now."
+    if (d.kind === "view" && d.lastInput_ !== undefined) {
+        const p = imgPx(ctx.base_, ctx.manifest_, e)
+        ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
+    }
 }
 
 // lostpointercapture fires after any capture release, including the explicit ones in onUp/
@@ -176,9 +201,15 @@ export function onCancel(ctx: OverlayCtx, state: OverlayState, e: PointerEvent):
 export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
     cancelPendingDrag(state)
     if (!state.drag_) return
+    const d = state.drag_ // claim before nulling, same reentrancy hazard onUp documents
     ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     hideTip(ctx, state)
     state.drag_ = null
+    // Same §12.5 obligation as onCancel — but this handler gets no event/position at all, so the
+    // last camera a request actually carried is the only thing available to resettle with.
+    if (d.kind === "view" && d.lastInput_ !== undefined) {
+        ctx.gesture_.settle({ ...d.lastInput_, settle: true })
+    }
 }
 
 // The click→bond commit, factored out of onClick so keyboard.ts's Enter/Space can dispatch the

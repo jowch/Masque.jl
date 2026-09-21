@@ -73,32 +73,36 @@ Runic, and an advisory live kind sweep.
 
 ### View manipulation and the remount (#82, tracking)
 
-`ViewInteractable` is commit-on-release: nothing moves during the drag, and the commit
-replaces the cell output, which on `:webgl` is a blank canvas plus a scene re-init. Two
-problems and six children: three steps in this order, plus three issues that are not new
-work — #86 corrects an earlier claim, #83 investigated the double remount to a close, and
-#102 reframes the remount problem for gestures generally.
+`ViewInteractable` used to be commit-on-release: nothing moved during the drag, and the commit
+replaced the cell output, which on `:webgl` was a blank canvas plus a scene re-init. #102 (landed,
+`:cairo` only) replaced that: the gesture commits nothing at all
+([§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)), and in-drag frames stream
+over the gesture channel instead — no cell re-execution, no remount, for the backend that has a
+mechanism. `:webgl` takes the same no-commit contract but has no live-preview mechanism yet, so a
+view drag there shows only the Tier-0 readout and repaints nothing (§12.10). What remains open:
 
 1. **#84 Last-frame hold.** Park the last painted frame (Cairo PNG `src`, or a bitmap from the
-   WGL canvas) and show it until the new base is ready. Hides the remaining remount. Not a
-   GL-context transfer: a context cannot move to a new canvas.
+   WGL canvas) and show it until the new base is ready. #102 already does this for `:cairo` (the
+   base image only swaps once the new frame has decoded); #84 is now specifically the `:webgl`
+   gap. Not a GL-context transfer: a context cannot move to a new canvas.
 2. **#85 2D photographic preview.** During pan and wheel zoom, CSS-transform the host so the
    base and overlay slide together. Julia authored the frame being slid, so this is not a client
    camera. Accepted artifacts: ticks and decorations move with the photograph until a real frame
-   replaces it. The gesture commits nothing: #122 takes view manipulation off `@bind` entirely, so
-   the CSS transform is latency-hiding for an in-flight frame on #102's channel rather than the
-   interaction itself — one mechanism instead of two that have to agree.
-   [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when) is normative.
-3. **#87 3D orbit preview**: no longer parked — **#102 makes it buildable.** The blocker was
-   that the overlay is a projection at the old `azimuth`/`elevation`, so a live orbit either
-   freezes the overlay or needs 3D coordinates in JS, and neither respects the
-   Julia-authored-projection principle this list is written to keep. #102 answers it: route the
-   gesture through `with_js_link` and have Julia return a fresh manifest on every frame, so
-   projection stays Julia-authored throughout the drag, not just at commit. #102's own
-   manifest rebuild figure (flat regardless of scene weight) is what makes a fresh manifest per
-   frame affordable. Nothing is committed at the end: an orbit settles a camera, and a camera never
-   enters notebook state (#122,
-   [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)).
+   replaces it. The gesture commits nothing (#122,
+   [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)), so the CSS transform is
+   latency-hiding for an in-flight frame on #102's channel rather than the interaction itself —
+   one mechanism instead of two that have to agree. Still open for both backends.
+3. **#87 3D orbit preview**: no longer parked — **#102 makes it buildable, and implements the
+   `:cairo` half.** The blocker was that the overlay is a projection at the old
+   `azimuth`/`elevation`, so a live orbit either freezes the overlay or needs 3D coordinates in
+   JS, and neither respects the Julia-authored-projection principle this list is written to keep.
+   #102 answers it on `:cairo`: `ViewInteractable`'s `with_js_link` closure mutates `ax.azimuth[]`/
+   `ax.elevation[]` and returns a fresh manifest on every frame, so projection stays
+   Julia-authored throughout the drag, not just at commit — #102's own manifest rebuild figure
+   (flat regardless of scene weight) is what makes a fresh manifest per frame affordable. Nothing
+   commits at the end: an orbit settles a camera, and a camera never enters notebook state (#122,
+   [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)). `:webgl` orbit preview
+   remains open — same #86 mechanism gap as pan.
 
 **#83: the double remount is a consequence of an unsupported self-referencing `@bind` shape.**
 The view-manipulation widget cell both defines the `@bind` and reads its own previous bond value

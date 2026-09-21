@@ -1,4 +1,5 @@
 import type { Anchor } from "./geometry"
+import type { GestureChannel } from "./gesture"
 import type { AxisTransform, FocusRef, Hit, HitLayer, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 export const MOTION_MS = 100 // 80–120 ms window; prefers-reduced-motion disables below
@@ -76,7 +77,16 @@ export type Drag =
         mode_: { corner: number } | { edge: "n" | "s" | "w" | "e" } | { move: true }
         ax_: number; ay_: number; target_?: HitLayer; pointerId_: number
     }
-    | { kind: "view"; id_: string; g_: ViewGeometry; t_: AxisTransform; x0_: number; y0_: number; pointerId_: number }
+    | {
+        kind: "view"; id_: string; g_: ViewGeometry; t_: AxisTransform; x0_: number; y0_: number; pointerId_: number
+        // The last gesture-channel request payload actually sent for this drag (round-1 review,
+        // finding #2) — `undefined` until the first one past VIEW_MIN_PX. bond.ts's terminal
+        // handlers (onUp/onCancel/onLostCapture) gate `settle()` on this, not on the drag's
+        // final release distance: a drag that went out past VIEW_MIN_PX and back below it before
+        // release still owes a settle (ppu=1 was sent at least once and has to be restored), and
+        // onCancel/onLostCapture have no "was this ever a real drag" signal of their own at all.
+        lastInput_?: Record<string, unknown>
+    }
 
 // Construction-time DOM/manifest refs, built once by mount.ts and threaded read-mostly through
 // hover/drag/bond as `ctx`. Distinct from OverlayState, which is the mutable interaction state.
@@ -95,6 +105,13 @@ export interface OverlayCtx {
     focusable_: FocusRef[] // flat, manifest-order list of element-indexed hits — keyboard.ts's nav domain
     layerStarts_: number[] // computeLayerStarts(focusable), cached once — PageUp/PageDown's layer-jump index
     liveRegion_: HTMLElement // visually-hidden aria-live="polite" announcer (NOT the tooltip)
+    // #102's gesture channel — a no-op channel when the widget has no live-preview mechanism
+    // (mount.ts's createGestureChannel(null, …)), so bond.ts never needs to branch on whether
+    // one is actually wired. `manifest_`/`thresholdLines_`/`roiBoxes_`/`focusable_`/
+    // `layerStarts_` above are reassigned in place when a frame swaps in a new manifest (see
+    // mount.ts's applyFrame) — the one exception to "construction-time, read-mostly" this
+    // interface's own doc comment otherwise promises.
+    gesture_: GestureChannel
 }
 
 export interface OverlayState {
