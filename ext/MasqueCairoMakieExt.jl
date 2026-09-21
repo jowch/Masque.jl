@@ -99,8 +99,8 @@ end
 
 Masque.make_widget(b::CairoBackend, result::RenderResult, manifest, display_css, fig, interactables, ppu) =
     Masque.MasqueWidget(
-        Masque.base64encode(result.payload), manifest, display_css,
-        Masque._view_render_frame(b, fig, interactables, ppu),
-    )
+    Masque.base64encode(result.payload), manifest, display_css,
+    Masque._view_render_frame(b, fig, interactables, ppu),
+)
 
 end # module MasqueCairoMakieExt
