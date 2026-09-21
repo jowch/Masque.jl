@@ -24,7 +24,8 @@ rendered by CairoMakie or WGLMakie as usual.
 
 - Points, lines, heatmap cells, bars, polygons, and text, on 2D, polar, and 3D axes.
 - Drag gestures: region of interest, threshold line, pan.
-- Hover and select still work in a static HTML export of the notebook.
+- Holding the pointer over a plot element and selecting it still work in a
+  static HTML export of the notebook.
 
 Tooltips and interactions can be customized.
 
