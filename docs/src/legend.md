@@ -1,85 +1,144 @@
 # Legend
 
-[`LegendInteractable`](@ref) turns a `Makie.Legend`'s entries into hit regions that link back
-to the plot(s) they label: hovering an entry highlights the linked trace(s), and clicking
-fires the usual bond.
+Hold the pointer over a legend entry to wash that series in the overlay.
+Click the entry to write that pick into Julia.
 
-## Auto extraction
+The overlay cannot hide Makie traces. Use the wash plus `@bind` so a Julia
+cell can filter the series.
 
-`masque(fig)` picks up any `Legend` the same way it picks up a `Colorbar` — no extra call
-needed:
+The following embed is two `lines!` with labels `"a"` and `"b"`, plus
+`axislegend`, on this docs site. The **Simulating `@bind`** chip marks that
+listed legend clicks are precomputed snapshots, not a live Julia process.
+Hold the pointer over an entry to wash its line. Click **a** or **b** to
+swap the Julia readout. Listed clicks are `{layer: "legend", index}` `0`
+and `1` — idle plus both entries.
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-legend-lines" title="two-line axislegend with listed @bind snapshots"
+        style="width:100%;height:480px;border:0;background:transparent;overflow:hidden;"
+        scrolling="no" loading="lazy"></iframe>
+</div>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-legend-lines");
+  if (!el) return;
+  function isDocDark() {
+    var c = document.documentElement.className || "";
+    if (!c) return false;
+    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+    return /(^|\s)theme--/.test(c);
+  }
+  function pushTheme() {
+    var doc = el.contentDocument;
+    if (!doc) return;
+    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
+  }
+  el.addEventListener("load", pushTheme);
+  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  el.src = (pretty ? "../embeds/" : "embeds/") + "legend_lines.html";
+})();
+</script>
+```
+
+## Overlay two series
+
+In a Pluto notebook, paste each of the following snippets into its own
+cell. Pluto runs one top-level expression per cell. Wrap multiple
+statements in `begin ... end`.
+
+**1.** Load Masque and a Makie backend:
+
+```julia
+using Masque, CairoMakie
+```
+
+**2.** Draw two lines, label them, and add `axislegend`:
 
 ```julia
 begin
-    fig = Figure()
-    ax = Axis(fig[1, 1])
-    lines!(ax, xs, ys1; label = "a")
-    lines!(ax, xs, ys2; label = "b")
+    xs = range(0, 2π; length = 80)
+    fig = Figure(size = (560, 360))
+    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
+    lines!(ax, xs, sin.(xs); label = "a")
+    lines!(ax, xs, cos.(xs); label = "b")
     axislegend(ax)
+    nothing
 end
 ```
 
+**3.** Bind a click. `masque(fig)` walks the figure and installs a
+   [`LegendInteractable`](@ref) from `auto_interactables` with
+   `plotmap`, which links each entry to its traces:
+
 ```julia
-@bind ev masque(fig)   # entry "a" hovers/clicks -> :lines; "b" -> :lines_2
+@bind pick masque(fig)
 ```
 
-The link is resolved from `Makie.get_plots` on each entry's elements — the same linkage
-Makie's own click-to-toggle legend uses — so it works for any auto-generated legend
-(`axislegend`, `Legend(fig, ax)`, `merge = true`, duplicate labels, …) with no extra
-configuration. An entry whose plot became a layer kind that can't be highlighted (currently
-just heatmap/image `:grid` — see [Selection](@ref) for the full `selected=`-able kind list)
-is dropped from the auto path with a warning, rather than failing the whole build.
-
-## Hovering and clicking
-
-Hovering a legend entry highlights the traces it links to, using the same wash/ring recipe as
-`selected=` (see [Selection](@ref)). A spec is a layer id — every element of that layer — or
-`id:k` pinning element `k` (1-based). Auto-extracted `series!` entries use the pin, so each
-swatch lights one series rather than every trace packed into the parent `:lines` layer. A
-bare `targets = :series` still highlights the whole layer. Clicking reports the usual
-[`LegendEvent`](@ref), `layer = :legend` (or `:legend_2`, … for a second legend).
-`entry.label`, `entry.group`, and `entry.targets` are the entry's fields — `targets` is the
-list of those specs (as strings) the entry links to, `group` is the entry's group title
-(`nothing` for an ungrouped legend). `entry.index` is which entry, not a row of a table.
+**4.** Read the pick:
 
 ```julia
-ev === nothing ? "hover/click a legend entry" : "linked layers: $(ev.targets)"
+pick === nothing ? "click a legend entry" : "$(pick.payload.label) → $(pick.payload.targets)"
 ```
 
-## Custom legends
+Before a click, `pick` is `nothing`. After a click, `pick` is an
+[`InteractionEvent`](@ref): `layer === :legend`, `index` is 0-based in
+the legend, and `payload` is `(; label, group, targets)`. `targets` are
+`String` values (`"lines"`, `"lines_2"`), not `Symbol`s. `group` is the
+entry's group title, or `nothing` on an ungrouped legend.
 
-A legend built from bare `LineElement`/`MarkerElement`/`PolyElement` has nothing to
-auto-link — those elements carry no plot reference unless you give them one. Two ways to
-supply the link:
+The click bond is that legend event. The highlight in the overlay is the
+linked traces, not the swatch. A cell that reads `pick` as a `Vector` of
+series points is looking at the wrong object.
+
+## Persist a series wash
+
+`selected = Dict(:legend => [0])` paints the **swatch** — the legend
+layer is `:rects`. To keep a series washed across a remount, hydrate the
+**target** layer ids instead. For more information, see
+[Selection](@ref).
+
+## Empty links
+
+A legend with no links is still hittable. The tooltip still shows the
+label, and a click still fires. The visual echo **clears**.
+
+`LegendInteractable(leg)` on a custom `LineElement` legend with no
+`plots=` and no `targets=` has empty links. Pass `plots=` on the
+element (Makie's own keyword) or pass `targets=` on
+[`LegendInteractable`](@ref).
+
+## Supply explicit targets
+
+Pass `targets=` when auto-link is not enough:
 
 ```julia
-# Makie's own kwarg: pass the plot the element stands for
-LineElement(color = :red, plots = some_plot)
-```
-
-```julia
-# or tell LegendInteractable directly, keyed by entry label
 LegendInteractable(leg; targets = Dict("a" => :lines, "b" => [:lines_2, :scatter]))
 ```
 
-`targets` also accepts a `Vector` — one entry per legend entry, in order (top-to-bottom,
-matching a titled/grouped legend's flattened `entrygroups`) — `Symbol`/`Vector{Symbol}`/
-`nothing`. A `Dict` key matching no entry label, a wrong-length `Vector`, or (either form) a
-target naming an unknown layer or an unselectable kind raises `ArgumentError` at build time —
-unlike the auto path above, an explicit `targets=` is the caller's own claim, so a bad one
-fails loud rather than being dropped.
+`targets` also accepts a `Vector` — one value per legend entry, in
+order (top to bottom, matching a grouped legend's flattened
+`entrygroups`) — `Symbol` / `Vector{Symbol}` / `nothing`. A `Dict` key
+that matches no label, a wrong-length `Vector`, or a target that names
+an unknown layer or an unhighlightable kind raises `ArgumentError` at
+build time.
 
-A legend with an empty link list is still a set of hit targets. Hover leaves the other
-layers as they are, and a click reports a [`LegendEvent`](@ref).
+An explicit `targets=` is fail-loud. The auto path drops unhighlightable
+kinds (`:grid`) with `@warn` and keeps the rest.
+
+`scatterlines!` and `stem!` auto-link both of their layers. With
+`merge = true`, one legend entry names several ids. A second legend in
+the figure is `:legend_2`. The manifest sorts legend layers first so
+they win pixels under them.
 
 ## Tooltip
 
-Hovering a legend entry does not show a tooltip. The label is already drawn in the row, and a
-card there covers the entries around it. Pass a `masque"..."` template when you want a card
-(fields: `label`, `group`, `targets`). Omitting `tooltip` and `tooltip = false` both leave the
-card off. Moving keyboard focus to an entry still announces that entry's label — see
-[Keyboard and screen readers](@ref).
+The default tooltip is the entry's label (`masque"$(label)"`). Pass your
+own `masque"..."` template (fields: `label`, `group`, `targets`) or
+`tooltip = false` to suppress it. For more information, see
+[Tooltips](@ref).
 
-```julia
-LegendInteractable(leg; tooltip = masque"$(label) — $(group)")
-```
+A whole-layer wash can span axes. That two-panel picture lives on
+[Linked views](@ref). This page is two `lines!` plus `axislegend` on one
+axis.

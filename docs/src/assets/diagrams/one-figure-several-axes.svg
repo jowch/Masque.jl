@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img"
+     aria-labelledby="d4-title d4-desc">
+  <title id="d4-title">One masque call, one overlay, several axes</title>
+  <desc id="d4-desc">
+    One masque call produces one overlay and one manifest over every axis
+    in a figure. Hits are independent per axis. A legend entry can highlight
+    every mark of named layers on both axes. Same-index highlight between
+    two scatters is not shipped. A listed ROI item set updates a harvested
+    table; an unlisted drag moves the box and leaves the table unchanged.
+  </desc>
+  <style>
+    .ink { fill: none; stroke: currentColor; stroke-width: 1.5; }
+    .fill { fill: currentColor; }
+    .wash { fill: currentColor; opacity: 0.12; }
+    .panel { fill: currentColor; opacity: 0.05; }
+    .label { fill: currentColor; font-family: system-ui, sans-serif; font-size: 13px; }
+    .small { fill: currentColor; font-family: system-ui, sans-serif; font-size: 11px; }
+    .code { fill: currentColor; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+    .dash { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 5 4; }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 1 L9 5 L0 9 z" fill="currentColor"/>
+    </marker>
+  </defs>
+
+  <rect class="ink" x="24" y="16" width="132" height="36" rx="6"/>
+  <text class="code" x="90" y="39" text-anchor="middle">masque(fig)</text>
+  <line class="ink" x1="156" y1="34" x2="196" y2="34" marker-end="url(#arr)"/>
+  <rect class="ink" x="204" y="16" width="128" height="36" rx="6"/>
+  <text class="label" x="268" y="39" text-anchor="middle">one overlay</text>
+  <line class="ink" x1="332" y1="34" x2="372" y2="34" marker-end="url(#arr)"/>
+  <rect class="ink" x="380" y="16" width="140" height="36" rx="6"/>
+  <text class="label" x="450" y="39" text-anchor="middle">one manifest</text>
+  <text class="small" x="660" y="39" text-anchor="middle">hits stay on the axis you hit</text>
+
+  <rect class="ink" x="24" y="68" width="752" height="236" rx="8"/>
+  <text class="small" x="40" y="88">Figure</text>
+
+  <rect class="panel" x="40" y="100" width="250" height="188" rx="6"/>
+  <rect class="ink" x="40" y="100" width="250" height="188" rx="6"/>
+  <text class="label" x="165" y="122" text-anchor="middle">xy</text>
+  <rect class="wash" x="68" y="138" width="194" height="112" rx="10"/>
+  <circle class="fill" cx="90" cy="160" r="7"/>
+  <circle class="fill" cx="150" cy="200" r="7"/>
+  <circle class="fill" cx="210" cy="150" r="7"/>
+  <circle class="fill" cx="240" cy="230" r="7"/>
+  <path class="ink" d="M118 136 l16 -20" marker-end="url(#arr)"/>
+  <text class="small" x="148" y="122">hit this mark</text>
+  <text class="small" x="165" y="270" text-anchor="middle">legend wash: every xy mark</text>
+
+  <rect class="panel" x="308" y="100" width="250" height="188" rx="6"/>
+  <rect class="ink" x="308" y="100" width="250" height="188" rx="6"/>
+  <text class="label" x="433" y="122" text-anchor="middle">xz</text>
+  <rect class="wash" x="336" y="138" width="194" height="112" rx="10"/>
+  <circle class="fill" cx="358" cy="160" r="7"/>
+  <circle class="fill" cx="418" cy="200" r="7"/>
+  <circle class="fill" cx="478" cy="150" r="7"/>
+  <circle class="fill" cx="508" cy="230" r="7"/>
+  <text class="small" x="433" y="270" text-anchor="middle">legend wash: every xz mark</text>
+
+  <path class="dash" d="M157 200 C 240 176, 330 176, 411 200"/>
+  <rect class="ink" x="232" y="166" width="104" height="22" rx="4"/>
+  <text class="small" x="284" y="181" text-anchor="middle">Not shipped</text>
+  <text class="small" x="284" y="250" text-anchor="middle">same index</text>
+
+  <rect class="ink" x="580" y="100" width="176" height="188" rx="6"/>
+  <text class="label" x="668" y="122" text-anchor="middle">Legend</text>
+  <rect class="wash" x="600" y="140" width="136" height="28" rx="4"/>
+  <rect class="ink" x="600" y="140" width="136" height="28" rx="4"/>
+  <text class="label" x="668" y="159" text-anchor="middle">xy</text>
+  <rect class="ink" x="600" y="180" width="136" height="28" rx="4"/>
+  <text class="label" x="668" y="199" text-anchor="middle">xz</text>
+  <text class="small" x="668" y="236" text-anchor="middle">whole-layer wash</text>
+  <text class="small" x="668" y="254" text-anchor="middle">not observation i</text>
+
+  <rect class="ink" x="24" y="324" width="752" height="160" rx="8"/>
+  <text class="small" x="40" y="344">ROI release writes @bind; hover does not</text>
+
+  <rect class="panel" x="40" y="356" width="200" height="112" rx="6"/>
+  <rect class="ink" x="40" y="356" width="200" height="112" rx="6"/>
+  <circle class="fill" cx="70" cy="390" r="5"/>
+  <circle class="fill" cx="110" cy="410" r="5"/>
+  <circle class="fill" cx="160" cy="380" r="5"/>
+  <circle class="fill" cx="200" cy="430" r="5"/>
+  <rect class="dash" x="55" y="372" width="72" height="52" rx="2"/>
+  <text class="small" x="140" y="458" text-anchor="middle">listed box</text>
+
+  <line class="ink" x1="250" y1="412" x2="292" y2="412" marker-end="url(#arr)"/>
+  <rect class="ink" x="300" y="386" width="150" height="52" rx="6"/>
+  <text class="code" x="375" y="408" text-anchor="middle">{ items }</text>
+  <text class="small" x="375" y="426" text-anchor="middle">listed snapshot</text>
+
+  <line class="ink" x1="460" y1="412" x2="502" y2="412" marker-end="url(#arr)"/>
+  <rect class="ink" x="510" y="360" width="120" height="88" rx="6"/>
+  <text class="small" x="570" y="380" text-anchor="middle">table</text>
+  <line class="ink" x1="522" y1="392" x2="618" y2="392"/>
+  <line class="ink" x1="522" y1="408" x2="618" y2="408"/>
+  <line class="ink" x1="522" y1="424" x2="618" y2="424"/>
+  <text class="small" x="570" y="440" text-anchor="middle">harvested</text>
+
+  <rect class="dash" x="648" y="368" width="110" height="72" rx="6"/>
+  <text class="small" x="703" y="396" text-anchor="middle">unlisted drag</text>
+  <text class="small" x="703" y="414" text-anchor="middle">box moves</text>
+  <text class="small" x="703" y="432" text-anchor="middle">table frozen</text>
+</svg>

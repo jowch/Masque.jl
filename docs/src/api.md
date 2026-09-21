@@ -1,7 +1,7 @@
-# API Reference
+# API
 
-Full docstrings for every exported name, grouped by area. Usage guidance and worked
-examples live on the other pages; this page is the reference.
+Full docstrings for every exported name, grouped by area. Usage guidance
+and worked examples live on the other pages; this page is the reference.
 
 ## Entry point
 
@@ -40,19 +40,18 @@ RegionInteractable
 FunctionInteractable
 ```
 
-## Tooltip macro & type
+## Tooltip macro and type
 
 ```@docs
 Markup
 @masque_str
 ```
 
-See [Tooltips](@ref) for usage and [§10](https://github.com/jowch/Masque.jl/blob/main/docs/dev/architecture/10-tooltips.md#10-tooltips)
-for the wire format.
+For usage, see [Tooltips](@ref).
 
-## Custom-interaction interface
+## Custom-hit interface
 
-The pieces [Custom interactions](@ref) build on:
+The pieces [Custom hits](@ref) build on:
 
 ```@docs
 AbstractInteractable
@@ -70,9 +69,12 @@ hitlayers
 AbstractBackend
 ```
 
-`CairoBackend` and `WebGLBackend` are the two concrete backends, but they're defined inside
-Masque's package extensions (`ext/MasqueCairoMakieExt.jl`, `ext/MasqueWGLMakieExt.jl`) rather than
-in `Masque` itself — they only exist once `CairoMakie`/`WGLMakie` is loaded, so Documenter
-can't resolve `@docs` for them without loading both weak dependencies into the docs build
-just to document two structs. They're documented in prose instead: see [Backends](@ref) for
-what each does, and `masque`'s docstring above for the `backend=` keyword both accept.
+`CairoBackend` and `WebGLBackend` are the two concrete backends, but
+they are defined inside Masque's package extensions
+(`ext/MasqueCairoMakieExt.jl`, `ext/MasqueWGLMakieExt.jl`) rather than
+in `Masque` itself — they only exist once `CairoMakie` / `WGLMakie` is
+loaded, so Documenter cannot resolve `@docs` for them without loading
+both weak dependencies into the docs build to document two structs.
+They are documented in prose instead: see [Backends](@ref) for what
+each does, and `masque`'s docstring on this page for the `backend=`
+keyword both accept.

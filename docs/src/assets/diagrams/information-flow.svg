@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 560" width="680" height="560"
+     role="img" color-scheme="light dark">
+  <title>One Figure becomes one overlay and one bond</title>
+  <desc>At masque time, one Makie Figure plus its interactables produces a backend image and hit geometry for every axis, then one manifest, then HTML with one image and one overlay. Several axes still make one overlay. The overlay is a stateless view. Analysis state is the bind bond in Julia.</desc>
+  <style>
+    svg { color-scheme: light dark; }
+    .ink { fill: #1b1f24; }
+    .muted { fill: #5c6570; }
+    .panel { fill: #f4f1ea; stroke: #1b1f24; }
+    .inner { fill: #fff; stroke: #1b1f24; }
+    .accent { fill: #4063D8; }
+    .line { fill: none; stroke: #1b1f24; }
+    .arrowhead { fill: #1b1f24; }
+    @media (prefers-color-scheme: dark) {
+      .ink { fill: #e8eaed; }
+      .muted { fill: #b0b8c0; }
+      .panel { fill: #2a3038; stroke: #e8eaed; }
+      .inner { fill: #1b1f24; stroke: #e8eaed; }
+      .accent { fill: #7b9cff; }
+      .line { stroke: #e8eaed; }
+      .arrowhead { fill: #e8eaed; }
+    }
+  </style>
+  <defs>
+    <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 1 L 10 5 L 0 9 Z" class="arrowhead"/>
+    </marker>
+  </defs>
+
+  <!-- Figure -->
+  <rect class="panel" x="90" y="16" width="500" height="118" rx="10" stroke-width="1.5"/>
+  <text class="ink" x="340" y="40" text-anchor="middle" font-size="15"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">One Figure</text>
+  <rect class="inner" x="112" y="54" width="130" height="62" rx="6" stroke-width="1.25"/>
+  <text class="ink" x="177" y="82" text-anchor="middle" font-size="13"
+        font-family="ui-sans-serif, system-ui, sans-serif">Axis</text>
+  <text class="muted" x="177" y="100" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">marks</text>
+  <rect class="inner" x="258" y="54" width="130" height="62" rx="6" stroke-width="1.25"/>
+  <text class="ink" x="323" y="82" text-anchor="middle" font-size="13"
+        font-family="ui-sans-serif, system-ui, sans-serif">Axis</text>
+  <text class="muted" x="323" y="100" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">marks</text>
+  <rect class="inner" x="404" y="54" width="164" height="62" rx="6" stroke-width="1.25"/>
+  <text class="ink" x="486" y="82" text-anchor="middle" font-size="13"
+        font-family="ui-sans-serif, system-ui, sans-serif">Interactables</text>
+  <text class="muted" x="486" y="100" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">declared hits</text>
+
+  <line class="line" x1="340" y1="134" x2="340" y2="168" stroke-width="1.5"
+        marker-end="url(#flow-arrow)"/>
+  <text class="muted" x="356" y="158" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">masque()</text>
+
+  <!-- Backend products -->
+  <rect class="panel" x="90" y="176" width="238" height="84" rx="10" stroke-width="1.5"/>
+  <text class="ink" x="209" y="212" text-anchor="middle" font-size="13"
+        font-family="ui-sans-serif, system-ui, sans-serif">Backend image</text>
+  <text class="muted" x="209" y="232" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">PNG or GPU canvas</text>
+  <rect class="panel" x="352" y="176" width="238" height="84" rx="10" stroke-width="1.5"/>
+  <text class="ink" x="471" y="212" text-anchor="middle" font-size="13"
+        font-family="ui-sans-serif, system-ui, sans-serif">Hit geometry</text>
+  <text class="muted" x="471" y="232" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">for every axis</text>
+
+  <line class="line" x1="340" y1="260" x2="340" y2="294" stroke-width="1.5"
+        marker-end="url(#flow-arrow)"/>
+  <text class="muted" x="356" y="284" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">one manifest</text>
+
+  <!-- HTML -->
+  <rect class="panel" x="90" y="302" width="500" height="88" rx="10" stroke-width="1.5"/>
+  <text class="ink" x="340" y="334" text-anchor="middle" font-size="15"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">HTML: one image + one overlay</text>
+  <text class="muted" x="340" y="356" text-anchor="middle" font-size="12"
+        font-family="ui-sans-serif, system-ui, sans-serif">Several axes do not mean several overlays</text>
+  <text class="muted" x="340" y="374" text-anchor="middle" font-size="12"
+        font-family="ui-sans-serif, system-ui, sans-serif">One masque call, one overlay</text>
+
+  <line class="line" x1="210" y1="390" x2="210" y2="424" stroke-width="1.5"
+        marker-end="url(#flow-arrow)"/>
+  <line class="line" x1="470" y1="390" x2="470" y2="424" stroke-width="1.5"
+        marker-end="url(#flow-arrow)"/>
+
+  <!-- Overlay vs bond -->
+  <rect class="panel" x="90" y="432" width="238" height="100" rx="10" stroke-width="1.5"/>
+  <circle class="accent" cx="124" cy="462" r="6"/>
+  <text class="ink" x="140" y="467" font-size="14"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Overlay</text>
+  <text class="muted" x="209" y="496" text-anchor="middle" font-size="12"
+        font-family="ui-sans-serif, system-ui, sans-serif">Stateless view</text>
+  <text class="muted" x="209" y="514" text-anchor="middle" font-size="12"
+        font-family="ui-sans-serif, system-ui, sans-serif">tooltip, highlight, chrome</text>
+
+  <rect class="panel" x="352" y="432" width="238" height="100" rx="10" stroke-width="1.5"/>
+  <circle class="accent" cx="386" cy="462" r="6"/>
+  <text class="ink" x="402" y="467" font-size="14"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Bond (@bind)</text>
+  <text class="muted" x="471" y="496" text-anchor="middle" font-size="12"
+        font-family="ui-sans-serif, system-ui, sans-serif">Analysis state in Julia</text>
+  <text class="muted" x="471" y="514" text-anchor="middle" font-size="12"
+        font-family="ui-sans-serif, system-ui, sans-serif">when a cell reads it</text>
+</svg>

@@ -1,138 +1,120 @@
 # Selection
 
-## Reacting to a click
+There is exactly one selection. Before a click, the `@bind` bond is
+`nothing` unless you pass `selected=`. After a click, the bond is one
+[`InteractionEvent`](@ref): `layer` (the interactable `id`), a 0-based
+`index`, and `payload`. Click a mark to replace the selection with that
+mark. A cell that reads the bond re-runs.
 
-There is exactly one selection. A `masque(...)` bond reports it directly: `nothing` when
-nothing is selected, otherwise one event whose type matches the interactable. A point,
-bar, polygon, or segment click is an [`ElementEvent`](@ref): `layer` is the interactable's
-`id`, `index` is 1-based, and the row's fields are read on the event (`ev.city`). Clicking
-an element replaces the selection with that element, and a cell that reads the bond re-runs
-on every click:
+The overlay highlight follows `selectionFor`. It is not a copy of the
+bond.
+
+This page continues the cities scatter from [Getting started](@ref).
+Paste each snippet into its own Pluto cell.
+
+## Click a mark
+
+Bind the widget, then read the pick:
 
 ```julia
-@bind ev masque(fig, PointInteractable(ax, pts; id = :scatter))
+@bind pick masque(fig, cities)
 ```
 
 ```julia
-ev === nothing ? "nothing selected" : "clicked #$(ev.index) in :$(ev.layer)"
+pick === nothing ? "click a city" : "$(pick.payload.city) selected"
 ```
 
-## Linked selection across plots
+A click in empty space does not write the bond and does not clear the
+selection. The overlay highlight stays as it is.
 
-`layer` and `index` are plain data, and an [`ElementEvent`](@ref) is a row index, so one
-click can drive any number of downstream cells — filter a table, highlight a second plot,
-recompute a fit:
+Enter or Space on a focused mark commits the same way as a click.
+
+For the cities figure, `payloads`, and `radius=`, see
+[Getting started](@ref).
+
+## Start with marks already selected
+
+`selected=` is the selection's initial value. Pass a map of
+`layer_id => 0-based indices`. The widget mounts with those marks
+highlighted in the overlay, and the bond already holds them:
 
 ```julia
-row = ev === nothing ? nothing : data[ev, :]
+@bind pick masque(fig, cities; selected = Dict(:cities => [0, 7]))
 ```
 
-## `selected=` — the selection's starting value
+At mount, `pick` is a `Vector{InteractionEvent}` for Tokyo (index 0) and
+Beijing (index 7). The hydrated bond is always a `Vector`, even for one
+index. Do not check `pick === nothing` after hydration, and do not read
+`pick.index` as if the value were a scalar.
 
-`selected=` is nothing more than the selection's initial value. Pass it to any `masque(...)`
-call to say what's selected the moment the widget mounts, before any click:
+A later click is a scalar `InteractionEvent` and replaces that vector
+wholesale. `selected=` does not accumulate with clicks. Last pick wins.
 
-```julia
-masque(fig, PointInteractable(ax, pts; id = :scatter); selected = 2)
-```
+Valid kinds are `:circles`, `:rects`, `:polygons`, `:segments`, and
+`:polyline`. Any other kind, or an out-of-range index, raises
+`ArgumentError` at `masque()` time. An empty index list for a layer is
+omitted from the manifest, so that layer starts with no highlight.
 
-On a point layer, `selected = 2` and `selected = [2]` mount as the same one
-[`ElementEvent`](@ref) a click on that point would produce. `selected = [1, 3]` highlights
-both marks and leaves the bond `nothing`: this interaction returns one element, so a set is
-not a value it can hold. The next click replaces the highlight with that one element.
+For a [`RegionInteractable`](@ref), key `selected=` on `:id_c`, `:id_r`,
+or `:id_p`, not the base `id`.
 
-A `selects` ROI is the interaction that returns a vector. There, `selected = 1` and
-`selected = [1]` both mount as a one-element `Vector{ElementEvent}`, and `selected = [1, 3]`
-mounts as those two. An explicit empty vector (`selected = Int[]`) mounts as `ElementEvent[]`.
-Omitting `selected=` leaves the bond `nothing`.
+## Bond versus overlay highlight
 
-Indices are 1-based. `0` is out of range. With one seedable layer a bare `Int` or
-`AbstractVector{<:Integer}` is enough. Two seedable layers need a name:
-`selected = Dict(:scatter => [1, 3])` or `selected = (; scatter = 1)`. A bare `1` across two
-layers throws, naming the layers. Unknown keys throw. Supported kinds: `circles` / `rects` /
-`polygons` (selected wash) and `segments` / `polyline` / `lines` (selected ring; a `lines`
-element is the whole path). Unsupported kinds
-(`grid`, `axis`, …) or out-of-range indices throw `ArgumentError` at build time — fail loud,
-like a wrong-length `payloads=`. Keys are layer ids: for the single-layer kinds that's the
-interactable's `id`, but [`RegionInteractable`](@ref) splits into suffixed layers (`:id_c`
-circles / `:id_r` rects / `:id_p` polygons) — key on those.
+The overlay uses `selectionFor` to choose what to highlight. That set is
+not a mirror of the bond.
 
-That kind list constrains hydration, not the gesture: clicking a heatmap/image cell selects
-that cell even though `:grid` can't be hydrated via `selected=`, and clicking a legend entry
-selects the traces it links to — every element of a named layer, or the one element an
-`id:k` spec pins — not the legend swatch itself (see [Legend](@ref)).
+- A legend click writes the legend entry to `@bind` and highlights the
+  linked traces in the overlay. `selected = Dict(:legend => [0])`
+  hydrates the **swatch** (legend is `:rects`), not the series. To
+  persist a series highlight, hydrate the target layer ids. For more
+  information, see [Legend](@ref).
+- A heatmap click highlights the cell in the overlay. `selected=` on
+  `:grid` (for example `Dict(:cells => [0])`) raises `ArgumentError`.
+- `selected=` on `:axis`, `:roi`, `:view`, or `:threshold` also raises
+  `ArgumentError`.
 
-## Persisting a selection across re-renders
+## Keep a selection when the figure rebuilds
 
-Clicking an element replaces the selection immediately, in the browser — no round trip
-through Julia, no bond to feed back into anything. Clicking a different element moves it; the
-selection doesn't accumulate, since the echo mirrors the bond value and a click's bond value
-is a single [`ElementEvent`](@ref). Enter/Space on a keyboard-focused element commits
-through the same path as a mouse click. A `selects`-[`ROIInteractable`](@ref)'s release
-replaces the selection with everything its box enclosed, the same way — see
-[Multi-element selectors](@ref) below.
+A remount drops the selection on purpose. An index is meaningful only
+relative to the data that produced it. If the figure rebuilds with
+points reordered, added, or removed, the old indices paint the wrong
+marks.
 
-The selection resets when the widget remounts, by design: an index is only meaningful
-relative to the data that produced it, and a remount means the figure was rebuilt upstream —
-possibly with elements reordered, added, or removed. Restoring the old selection onto
-whatever now sits at that index would be silently wrong; dropping it is the honest behavior.
-
-If you want a selection to survive a rebuild, say so explicitly with `selected=` (above) —
-give it the indices you believe still apply in the new figure. That's necessarily something
-only you, the notebook author, can assert; nothing in the manifest tells Masque whether index
-3 in the rebuilt figure is "the same" point as index 3 in the old one.
-
-One thing you have no reason to try: feeding a widget's own bond value back into that same
-call's `selected=`,
+The highlight after a click needs no Julia: it runs in the overlay
+without a round trip. To persist a highlight across a rebuild, re-assert
+indices with `selected=` from a cell that does **not** read this
+`@bind`.
 
 ```julia
-# DOESN'T WORK — ev and masque(...; selected=...) are in the same cell, feeding each other
-@bind ev masque(fig, PointInteractable(ax, pts; id = :scatter); selected = Dict(:scatter => [ev.index]))
-```
-
-is a Pluto reactive cycle: Pluto detects it and reports **"Cyclic references"** instead of
-running the cell. A click already updates the selection — and the bond that reports it — on
-its own, so this pattern buys you nothing.
-
-A click selects a single element, last pick wins — it's not built for accumulating a
-*growing* set across many clicks. For that, see
-[`examples/demo.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/demo.jl)'s
-"Selection round-trip" cells: a persistent `Ref` accumulates clicked indices across reruns
-and feeds the growing set to a second figure's `selected=`. That's a different job from the
-selection above — accumulation instead of last-pick-wins — and it remains the right tool for
-it.
-
-## Multi-element selectors
-
-[`ROIInteractable`](@ref) is an [`AbstractSelector`](@ref): pair it with a
-`selects = :scatter` keyword pointing at another layer, and its drag box selects every
-element of `:scatter` it currently encloses, rather than the single `{layer, index}` an
-ordinary click reports. `selects` only works when the target layer is a `circles` or `grid`
-kind — i.e. built from [`PointInteractable`](@ref) or the grid form of
-[`RectInteractable`](@ref) — pointing it at any other kind fails loud. Over points the bond
-is a `Vector{ElementEvent}` — one entry per enclosed point, including a click on one of
-those points. Over a grid the bond is one [`GridWindowEvent`](@ref), and `A[win]` is
-`A[win.i1:win.i2, win.j1:win.j2]`. A box that misses the grid has an empty `i1:i2`.
-
-```julia
-begin
-    scatter!(ax, first.(pts), last.(pts))
-    roi = ROIInteractable(ax; bounds = (0.0, 10.0, 0.0, 10.0), selects = :scatter)
-end
+# Does not read `pick`.
+held = Dict(:cities => [0, 7])
 ```
 
 ```julia
-@bind picked masque(fig, [PointInteractable(ax, pts; id = :scatter), roi])
-# picked isa Vector{ElementEvent} once you release a drag, or click one point
+@bind pick masque(fig, cities; selected = held)
 ```
 
-Releasing the drag replaces the selection with every enclosed element, the same click-echo as
-an ordinary click — that `Vector` is "the current bond value" in the same sense a single
-click's `InteractionEvent` is. It replaces whatever was selected before, `selected=`
-hydration included: an ROI release always decides what's highlighted afterward, not a mix of
-the old selection and the new one.
+If a slider rebuilds `fig`, pass the indices you still consider valid.
+Masque does not match a stored `InteractionEvent` by payload identity
+across a reorder.
 
-See [`gallery/gallery.jl`](@ref Examples)'s "Box-select scatter" recipe for the full worked
-example. If you're building a custom interaction that should report more than one element
-per event the same way, see [`AbstractSelector`](@ref) on the [API Reference](@ref) page for
-the extension point.
+Do not feed this widget's own bond into the same call. Pluto reports
+**Cyclic references** and does not run the cell:
+
+```julia
+@bind pick masque(fig, cities; selected = pick)
+```
+
+A click already updates the overlay highlight and the bond.
+
+Last pick wins. To accumulate indices across clicks, keep a `Ref` in a
+cell that does not read this `@bind`, then pass the growing set as
+`selected=` to a second `masque` widget. That pattern is in
+[Selection round-trip in `examples/demo.jl`][demo-round-trip]. Do not
+copy the whole demo notebook.
+
+To brush a box with `selects` and report several marks, see
+[Brush a region](@ref). To drive another cell or plot from a click's
+payload, see [Linked views](@ref).
+
+[demo-round-trip]: https://github.com/jowch/Masque.jl/blob/main/examples/demo.jl

@@ -1,0 +1,209 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" width="800" height="470"
+     role="img" color-scheme="light dark">
+  <title>Overlay versus Julia versus host</title>
+  <desc>Four hosts: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind, including extra table cells, re-runs Julia on live Pluto, swaps embed-cell snapshots on a listed player, stays at the default bond on overlay-only, and is dead on static HTML. Listed ROI items or a few axis or threshold values follow the same split. Unlisted continuous drag keeps overlay chrome; Julia stays on the last listed set, the default bond, or dead. Heatmap inspect is live on Pluto, GIF or MP4 on this site, overlay-only tooltip chrome if that player is present, and dead Julia on static HTML. Cairo view frames use the gesture channel on live Pluto, GIF or MP4 on this site, overlay readout with no bind, and a dead gesture channel on static HTML.</desc>
+  <style>
+    svg { color-scheme: light dark; }
+    .ink { fill: #1b1f24; }
+    .muted { fill: #5c6570; }
+    .grid { fill: none; stroke: #c8c4bb; }
+    .h0 { fill: #e8efe6; }
+    .h1 { fill: #e4eef6; }
+    .h2 { fill: #efe8d8; }
+    .h3 { fill: #f4f1ea; }
+    .rowalt { fill: #000; opacity: 0.04; }
+    .yes { fill: #1b1f24; font-weight: 600; }
+    @media (prefers-color-scheme: dark) {
+      .ink { fill: #e8eaed; }
+      .muted { fill: #b0b8c0; }
+      .grid { stroke: #5c6570; }
+      .h0 { fill: #24332a; }
+      .h1 { fill: #243040; }
+      .h2 { fill: #3a3428; }
+      .h3 { fill: #2a3038; }
+      .rowalt { fill: #fff; opacity: 0.06; }
+      .yes { fill: #e8eaed; }
+    }
+  </style>
+
+  <text class="ink" x="400" y="22" text-anchor="middle" font-size="14"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Overlay, Julia, and the host</text>
+  <text class="muted" x="400" y="40" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Same gesture, four places the figure can run.</text>
+
+  <rect class="h0" x="176" y="52" width="151" height="400" rx="4"/>
+  <rect class="h1" x="327" y="52" width="151" height="400" rx="4"/>
+  <rect class="h2" x="478" y="52" width="151" height="400" rx="4"/>
+  <rect class="h3" x="629" y="52" width="151" height="400" rx="4"/>
+
+  <rect class="rowalt" x="16" y="148" width="764" height="48"/>
+  <rect class="rowalt" x="16" y="244" width="764" height="48"/>
+  <rect class="rowalt" x="16" y="340" width="764" height="48"/>
+
+  <g class="grid" stroke-width="1">
+    <line x1="16" y1="100" x2="780" y2="100"/>
+    <line x1="16" y1="148" x2="780" y2="148"/>
+    <line x1="16" y1="196" x2="780" y2="196"/>
+    <line x1="16" y1="244" x2="780" y2="244"/>
+    <line x1="16" y1="292" x2="780" y2="292"/>
+    <line x1="16" y1="340" x2="780" y2="340"/>
+    <line x1="16" y1="388" x2="780" y2="388"/>
+    <line x1="176" y1="52" x2="176" y2="452"/>
+    <line x1="327" y1="52" x2="327" y2="452"/>
+    <line x1="478" y1="52" x2="478" y2="452"/>
+    <line x1="629" y1="52" x2="629" y2="452"/>
+  </g>
+  <rect class="grid" x="16" y="52" width="764" height="400" rx="4" stroke-width="1.25"/>
+
+  <!-- Headers -->
+  <text class="ink" x="96" y="80" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Gesture</text>
+  <text class="ink" x="251" y="72" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Live Pluto</text>
+  <text class="ink" x="402" y="68" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Docs player</text>
+  <text class="muted" x="402" y="82" text-anchor="middle" font-size="10"
+        font-family="ui-sans-serif, system-ui, sans-serif">listed idle+N /</text>
+  <text class="muted" x="402" y="94" text-anchor="middle" font-size="10"
+        font-family="ui-sans-serif, system-ui, sans-serif">listed items</text>
+  <text class="ink" x="553" y="68" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Docs player</text>
+  <text class="muted" x="553" y="82" text-anchor="middle" font-size="10"
+        font-family="ui-sans-serif, system-ui, sans-serif">overlay-only</text>
+  <text class="ink" x="704" y="68" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Static</text>
+  <text class="muted" x="704" y="82" text-anchor="middle" font-size="10"
+        font-family="ui-sans-serif, system-ui, sans-serif">generate_html</text>
+
+  <!-- Hover -->
+  <text class="ink" x="96" y="128" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Hover</text>
+  <text class="yes" x="251" y="128" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Overlay yes</text>
+  <text class="yes" x="402" y="128" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Overlay yes</text>
+  <text class="yes" x="553" y="128" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Overlay yes</text>
+  <text class="yes" x="704" y="128" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Overlay yes</text>
+
+  <!-- Click-echo -->
+  <text class="ink" x="96" y="176" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Click-echo</text>
+  <text class="yes" x="251" y="176" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Overlay yes</text>
+  <text class="yes" x="402" y="176" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Overlay yes</text>
+  <text class="yes" x="553" y="176" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Overlay yes</text>
+  <text class="yes" x="704" y="176" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Overlay yes</text>
+
+  <!-- Listed element bind -->
+  <text class="ink" x="96" y="216" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Listed element</text>
+  <text class="ink" x="96" y="230" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">@bind + extra cells</text>
+  <text class="yes" x="251" y="216" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Bond writes;</text>
+  <text class="yes" x="251" y="230" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">cells re-run</text>
+  <text class="yes" x="402" y="216" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Snapshot every</text>
+  <text class="yes" x="402" y="230" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">cell in the embed</text>
+  <text class="muted" x="553" y="216" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Chrome; Julia at</text>
+  <text class="muted" x="553" y="230" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">default bond</text>
+  <text class="muted" x="704" y="216" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Chrome;</text>
+  <text class="muted" x="704" y="230" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">@bind dead</text>
+
+  <!-- Listed ROI / axis / threshold -->
+  <text class="ink" x="96" y="264" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Listed ROI items /</text>
+  <text class="ink" x="96" y="278" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">few axis or threshold</text>
+  <text class="yes" x="251" y="271" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Bond on release</text>
+  <text class="yes" x="402" y="264" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Snapshot listed</text>
+  <text class="yes" x="402" y="278" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">sets or values</text>
+  <text class="muted" x="553" y="264" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Chrome; Julia at</text>
+  <text class="muted" x="553" y="278" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">default bond</text>
+  <text class="muted" x="704" y="264" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Chrome;</text>
+  <text class="muted" x="704" y="278" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">@bind dead</text>
+
+  <!-- Unlisted drag -->
+  <text class="ink" x="96" y="312" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Unlisted</text>
+  <text class="ink" x="96" y="326" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">continuous drag</text>
+  <text class="yes" x="251" y="312" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Chrome; Julia on</text>
+  <text class="yes" x="251" y="326" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">ROI/threshold up</text>
+  <text class="muted" x="402" y="312" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Chrome; Julia on</text>
+  <text class="muted" x="402" y="326" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">last listed set</text>
+  <text class="muted" x="553" y="312" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Chrome; Julia at</text>
+  <text class="muted" x="553" y="326" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">default bond</text>
+  <text class="muted" x="704" y="312" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Chrome;</text>
+  <text class="muted" x="704" y="326" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">@bind dead</text>
+
+  <!-- Heatmap -->
+  <text class="ink" x="96" y="360" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Heatmap inspect</text>
+  <text class="ink" x="96" y="374" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">GIF/MP4</text>
+  <text class="yes" x="251" y="360" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Tooltip; Julia</text>
+  <text class="yes" x="251" y="374" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">on click</text>
+  <text class="muted" x="402" y="360" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">GIF/MP4 on site;</text>
+  <text class="muted" x="402" y="374" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">do not list cells</text>
+  <text class="yes" x="553" y="360" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Tooltip chrome</text>
+  <text class="yes" x="553" y="374" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">if that player</text>
+  <text class="muted" x="704" y="360" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Tooltip; click</text>
+  <text class="muted" x="704" y="374" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Julia dead</text>
+
+  <!-- Cairo view -->
+  <text class="ink" x="96" y="416" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Cairo view frames</text>
+  <text class="ink" x="96" y="430" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">GIF/MP4, no @bind</text>
+  <text class="yes" x="251" y="416" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Gesture channel;</text>
+  <text class="yes" x="251" y="430" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">no @bind</text>
+  <text class="muted" x="402" y="416" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">GIF/MP4 on site;</text>
+  <text class="muted" x="402" y="430" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">no @bind</text>
+  <text class="muted" x="553" y="416" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Readout; no</text>
+  <text class="muted" x="553" y="430" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">frames, no @bind</text>
+  <text class="muted" x="704" y="416" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">Channel dead;</text>
+  <text class="muted" x="704" y="430" text-anchor="middle" font-size="11"
+        font-family="ui-sans-serif, system-ui, sans-serif">GIF/MP4 on site</text>
+</svg>

@@ -1,54 +1,121 @@
-# Custom interactions
+# Custom hits
 
-For geometry the built-ins don't cover — no JavaScript required. Two tiers, from
-"declare shapes" to "full control."
+Declare hit regions Makie did not plot as marks: a circle, a rect, and a
+polygon over an image. Hold the pointer over a region to read its name.
+Click-echo highlight runs in the overlay. This docs embed does not swap
+Julia. A live Pluto cell that reads `@bind` does.
 
-## [`RegionInteractable`](@ref) — declarative mixed regions
+For constructor signatures, see [Constructors](@ref).
 
-Mixed-kind regions in data space, grouped into one layer per kind. Each region is one of:
-
-```julia
-(:circle,  (cx, cy), r)            # r in data units
-(:rect,    (cx, cy), w, h)         # w, h in data units
-(:polygon, [(x, y), ...])          # a ring of points
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-custom-regions" title="Three RegionInteractable hits over an image, overlay-only"
+        style="width:100%;height:480px;border:0;background:transparent;overflow:hidden;"
+        scrolling="no" loading="lazy"></iframe>
+</div>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-custom-regions");
+  if (!el) return;
+  function isDocDark() {
+    var c = document.documentElement.className || "";
+    if (!c) return false;
+    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+    return /(^|\s)theme--/.test(c);
+  }
+  function pushTheme() {
+    var doc = el.contentDocument;
+    if (!doc) return;
+    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
+  }
+  el.addEventListener("load", pushTheme);
+  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  el.src = (pretty ? "../embeds/" : "embeds/") + "custom_regions.html";
+})();
+</script>
 ```
 
-Worked example — three arbitrary shapes with a label each, hoverable and clickable:
+## Draw regions Makie did not plot
+
+[`RegionInteractable`](@ref) takes mixed shapes in one call. Each region is
+one of:
+
+```julia
+(:circle,  (cx, cy), r)            # r is logical px × DPI
+(:rect,    (cx, cy), w, h)         # w, h in data space
+(:polygon, [(x, y), ...])          # a ring in data space
+```
+
+A triangle is a `:polygon`. Do not reach for
+[`FunctionInteractable`](@ref) to hit a triangle.
+
+Circle `r` is logical pixels times the figure scale (`r * ctx.scaling`),
+the same formula as [`PointInteractable`](@ref)'s `radius`. It is not a
+projected data-space radius. `r = 8` is eight logical pixels, not eight
+data units on a wide axis. Rect `w`, `h` and polygon rings **are** data
+space: Masque projects their corners.
+
+`payloads` is required and must match `regions` 1:1. There is no
+auto-generated default. `tooltip` takes the same three forms as other
+element constructors (`nothing` / `masque"..."` / `false`). For more
+information, see [Tooltips](@ref).
+
+Region groups by kind. Base `id = :cells` becomes `:cells_c` (circles),
+`:cells_r` (rects), and `:cells_p` (polygons). Key `selected=` on those
+suffixed ids, not on `:cells`.
+
+In a Pluto notebook, paste each snippet into its own cell:
 
 ```julia
 begin
     using Masque, CairoMakie
 
-    fig = Figure()
-    ax = Axis(fig[1, 1])
-    image!(ax, rand(100, 100))   # some backdrop the regions sit over
+    fig = Figure(size = (560, 360))
+    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
+    img = [Float32(sin(i / 12) * cos(j / 10)) for i in 1:100, j in 1:100]
+    image!(ax, img)
 
     regions = [
-        (:circle, (20.0, 20.0), 8.0),
-        (:rect, (60.0, 60.0), 15.0, 10.0),
-        (:polygon, [(30.0, 70.0), (40.0, 90.0), (20.0, 90.0)]),
+        (:circle, (20.0, 20.0), 14.0),
+        (:rect, (60.0, 60.0), 20.0, 14.0),
+        (:polygon, [(30.0, 70.0), (50.0, 90.0), (20.0, 90.0)]),
     ]
-    payloads = [(; name = "cell A"), (; name = "cell B"), (; name = "cell C")]
+    payloads = [
+        (; name = "cell A"),
+        (; name = "cell B"),
+        (; name = "cell C"),
+    ]
+    cells = RegionInteractable(
+        ax; regions, payloads, id = :cells,
+        tooltip = masque"<b>$(name)</b>",
+    )
 end
 ```
 
 ```julia
-@bind ev masque(fig, RegionInteractable(ax; regions, payloads, id = :cells))
+@bind ev masque(fig, cells)
 ```
 
-`payloads` must match `regions` 1:1. `tooltip` takes the same three forms as any other
-interactable (`nothing` / `masque"..."` / `false`) — see [Tooltips](@ref). Because
-`RegionInteractable` groups by kind, its manifest layers are `:cells_c` (circles), `:cells_r`
-(rects), `:cells_p` (polygons) — key `selected=` on those, not on `:cells` itself.
+Do not pass `selected = Dict(:cells => [0])`. Use `:cells_c`, `:cells_r`,
+or `:cells_p` for the kind you hydrated.
 
-## [`FunctionInteractable`](@ref) — full control
+## Cover a kind Region cannot express
 
-The escape hatch for a geometry kind none of the above express: `f(ctx) -> Vector{HitLayer}`.
-You do the projection yourself with [`data_to_image_px`](@ref) and emit one or more
-[`HitLayer`](@ref)s.
+[`FunctionInteractable`](@ref) is the escape hatch for a geometry kind
+`RegionInteractable` cannot express: `:segments`, `:grid`, or layers on
+more than one axis. The constructor is `FunctionInteractable(f;
+events = (:click, :hover))`. There is no `ax` and no `id`. `f` receives
+the figure's [`InteractionContext`](@ref) and must return
+`Vector{HitLayer}`. Layer ids live on those [`HitLayer`](@ref)s.
 
-Worked example — a triangular hit region (not one of the built-in kinds), reusing the
-`:polygon` wire kind `RegionInteractable` would otherwise produce:
+Do not copy `FunctionInteractable(ax, f; id)` — that signature is not
+shipped.
+
+Project data-space points with [`data_to_image_px`](@ref). Look up an
+axis transform with `Masque.axis_id(ctx, ax)` (not exported — qualify
+it). `:segments` geometry is a flat `[x1, y1, x2, y2, …]` vertex list in
+image pixels, disjoint pairs, one payload per pair.
 
 ```julia
 begin
@@ -56,29 +123,38 @@ begin
 
     fig = Figure()
     ax = Axis(fig[1, 1])
-    lines!(ax, [0, 10, 5, 0], [0, 0, 8, 0])   # a triangle drawn by hand
+    verts = [(0.0, 0.0), (2.0, 1.0), (3.0, 2.0), (5.0, 0.5)]
+    linesegments!(
+        ax, first.(verts), last.(verts);
+        color = :firebrick, linewidth = 4,
+    )
 
-    function triangle_layer(ctx)
-        pts = [(0.0, 0.0), (10.0, 0.0), (5.0, 8.0)]
-        ring = Float64[]   # :polygons geometry is one flat [x1,y1,x2,y2,...] vector per ring
-        for p in pts
+    track = FunctionInteractable() do ctx
+        geom = Float64[]
+        for p in verts
             q = data_to_image_px(ctx, ax, p)
-            push!(ring, q[1], q[2])
+            push!(geom, q[1], q[2])
         end
-        HitLayer[
-            HitLayer(:triangle, :polygons, [ring], [(; label = "the triangle")],
-                Masque.axis_id(ctx, ax), (:click, :hover)),
+        nseg = length(verts) ÷ 2
+        [
+            HitLayer(
+                :track,
+                :segments,
+                geom,
+                [(; i = k - 1) for k in 1:nseg],
+                Masque.axis_id(ctx, ax),
+                (:click, :hover),
+            ),
         ]
     end
 end
 ```
 
 ```julia
-@bind ev masque(fig, FunctionInteractable(triangle_layer))
+@bind ev masque(fig, track)
 ```
 
-`f` receives the [`InteractionContext`](@ref) for the whole figure (the same one built-in
-interactables use), so it can key geometry to any `Axis` in `fig` via `Masque.axis_id(ctx, ax)`
-(not exported — qualify it). Use this tier when the shape genuinely isn't a
-circle/rect/polygon/polyline — for anything expressible as one of those,
-[`RegionInteractable`](@ref) is less code.
+`f` can emit one `HitLayer` per axis because `ctx` covers the whole
+figure. Prefer [`RegionInteractable`](@ref) when the shape is a circle,
+rect, or polygon. For the `HitLayer` field list, see
+[API](@ref).

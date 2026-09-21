@@ -35,13 +35,13 @@ In a Pluto notebook, paste each snippet from these docs into its own cell.
 Pluto runs one top-level expression per cell. Wrap multiple statements in
 `begin ... end`, which counts as one expression.
 
-1. In a terminal, clone the repository:
+**1.** In a terminal, clone the repository:
 
 ```bash
 git clone https://github.com/jowch/Masque.jl
 ```
 
-2. In a Pluto cell, develop the checkout and load a backend. Replace
+**2.** In a Pluto cell, develop the checkout and load a backend. Replace
    `path/to/Masque.jl` with your clone:
 
 ```julia
@@ -66,20 +66,29 @@ more information, see [Examples](@ref) and [Backends](@ref).
 
 For your first overlay, see [Getting started](@ref). Holding the pointer
 over a mark does not write `@bind`; a click does. That page shows both on
-one plot.
+one plot. For the full channel table, see
+[Hover, click, and bind](@ref).
 
 ## Where to go next
 
 The following pages continue from this one:
 
 - [Getting started](@ref) — Overlay the cities scatter, bind a click, then skip the constructor
-- [Interactables](@ref) — Built-in kinds, constructors, and default payloads
+- [Hover, click, and bind](@ref) — Overlay, `@bind`, gesture channel, and docs-player snapshots
+- [Click marks](@ref) — Bars, polygons, and polar points
+- [Inspect a grid](@ref) — Heatmap and image cells
 - [Selection](@ref) — Clicks, `selected=`, and persisting a highlight
-- [Legend](@ref) — Highlight traces from a `Makie.Legend` entry
-- [Tooltips](@ref) — `masque"..."` templates and styling
-- [Keyboard and screen readers](@ref) — Tab, arrows, and Enter on the overlay
-- [Custom interactions](@ref) — `RegionInteractable` / `FunctionInteractable`
-- [Backends](@ref) — `:cairo` versus `:webgl`
-- [Troubleshooting](@ref) — Common errors and causes
+- [Brush a region](@ref) — Drag a box; listed `items` filter a table
+- [Legend](@ref) — Wash traces from a `Makie.Legend` entry
+- [Tooltips](@ref) — `masque"..."` templates and figure-derived theme
+- [Read coordinates](@ref) — Axis, colorbar, and threshold
+- [Pan and orbit](@ref) — View drag that commits nothing
+- [Linked views](@ref) — One `masque` on several axes
+- [Custom hits](@ref) — `RegionInteractable` / `FunctionInteractable`
 - [Examples](@ref) — Runnable notebooks in the repository
-- [API Reference](@ref) — Full docstrings
+- [Constructors](@ref) — Signatures, default payloads, and kinds
+- [API](@ref) — Full docstrings
+- [Backends](@ref) — CairoMakie versus WGLMakie
+- [Keyboard and screen readers](@ref) — Tab, arrows, and Enter on the overlay
+- [Troubleshooting](@ref) — Common errors and causes
+- [Development](@ref) — Frontend gate, tests, and this site
