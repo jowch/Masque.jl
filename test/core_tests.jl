@@ -27,3 +27,4 @@ include("core/legend_tests.jl")
 include("core/gesture_channel_tests.jl")
 
 include("docstrings_tests.jl")
+include("export_embeds_tests.jl")

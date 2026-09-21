@@ -65,6 +65,41 @@ vector `masque(fig)` builds internally), tweak it, and pass it back — see
 ev === nothing ? "click a point" : "you picked $(ev.payload)"
 ```
 
+The embed below is the same plot as the README demo GIF (`docs/dev/readme-demo/notebook.jl`):
+eight cities, hover for population, click to bind. Every city is listed so the readout
+swaps like live `@bind`. That notebook binds `pick` (same as the GIF source); the walkthrough
+cells above bind `ev`. Hover still works on every mark. Continuous kinds (ROI, axis,
+view) stay overlay-only — that freeze is not for cities omitted from this plot.
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-gs-player" title="README demo cities scatter with listed @bind snapshots"
+        style="width:100%;height:480px;border:0;background:transparent;overflow:hidden;"
+        scrolling="no" loading="lazy"></iframe>
+</div>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-gs-player");
+  if (!el) return;
+  function isDocDark() {
+    var c = document.documentElement.className || "";
+    if (!c) return false;
+    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+    return /(^|\s)theme--/.test(c);
+  }
+  function pushTheme() {
+    var doc = el.contentDocument;
+    if (!doc) return;
+    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
+  }
+  el.addEventListener("load", pushTheme);
+  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  el.src = (pretty ? "../embeds/" : "embeds/") + "getting_started.html";
+})();
+</script>
+```
+
 Before the first click, `ev` is `nothing`. After a click, `ev` is an
 [`InteractionEvent`](@ref):
 
