@@ -598,8 +598,7 @@ try {
       // three things: the bond truly didn't move, AND mount.ts's `host.dataset.masqueGestureFrame`
       // stamp — written atomically in the same block that swaps the frame + manifest — advanced
       // with a well-formed new camera, proving a REAL frame landed from the CURRENT drag rather
-      // than sampling stale state. Both backends (#102 on `:cairo`, #133 on `:webgl`). `:webgl`
-      // waits longer: the first frame pays scene serialization plus a GPU scene swap.
+      // than sampling stale state.
       const p = hitPoint(layer, 0);
       const before = await textOf(`#out_${key}`);
       const readStamp = () => page.evaluate((k) => {

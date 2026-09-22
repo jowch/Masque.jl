@@ -80,8 +80,6 @@ export interface MountArgs {
     pxPerUnit?: number
 }
 
-// A three.js scene node the gesture channel disposes. Loose on purpose: the shape is
-// WGLMakie's, and the only fields this file touches are the ones named here.
 interface WglScene {
     scene_uuid?: unknown
     scene_children?: WglScene[]
@@ -118,12 +116,8 @@ interface WglCanvas extends HTMLCanvasElement {
     masquePendingScene?: PendingScene | null
 }
 
-// Stop the render loop that closed over `scene` without disposing the real WebGL renderer.
-// WGLMakie's check_screen treats a screen with no renderer as already gone (dispose_screen
-// returns immediately on an empty object), so the loop exits and the context on
-// canvas.wglmakie_screen stays. #86 is a different problem: Pluto replacing cell output
-// destroys the canvas. A view gesture does not replace the cell, so this canvas is stable
-// for the whole drag.
+// An empty screen makes WGLMakie's render loop exit. dispose_screen no-ops on {}, so the
+// canvas's real renderer is not forceContextLoss'd.
 function stopRenderLoop(scene: WglScene | null): void {
     if (scene) scene.screen = {}
 }
@@ -135,11 +129,7 @@ function disposeOrbit(scene: WglScene | null): void {
     for (const child of scene.scene_children ?? []) disposeOrbit(child)
 }
 
-// Swap a Julia-serialized scene onto the canvas's existing renderer (#133, §12.5).
-// Projection stays Julia's: `scene` is a fresh serialize_scene for the camera Julia just
-// set, and the overlay swaps the matching manifest in the same turn (mount.ts). This does
-// not compute a camera in JS, and it does not call setup_scene_init again — a second
-// threejs renderer on this canvas would be a second WebGL context.
+// Do not call setup_scene_init here: that opens a second WebGL context on this canvas.
 function replaceScene(canvas: WglCanvas, WGL: WglBundle, scene: unknown, pxPerUnit?: number, width?: number, height?: number): void {
     const screen = canvas.wglmakie_screen
     if (!screen) throw new Error("Masque: canvas has no WGLMakie screen to update")
@@ -220,7 +210,6 @@ export async function mountWebGL({ canvas, wglBundleUrl, scene, width, height, p
     //  - uniforms/camera: find the live observable in `scene` and .notify(v)
     //  - data (positions): WGL.find_plots([uuid])[0].geometry.attributes.wgl_positions
     //      .array.set(frame); attr.needsUpdate = true;   (smooth, no Julia round-trip)
-    // A gesture frame replaces `scene` (the mount-time object). Drivers that held this
-    // return value are looking at the pre-gesture scene after the first view drag.
+    // After the first gesture frame this `scene` is stale; the live one is on the canvas.
     return { scene: sceneObj, WGL }
 }

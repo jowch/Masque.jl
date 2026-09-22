@@ -1,7 +1,5 @@
 // Stand-in for WGLMakie's real bundle: records what mountWebGL passed it so the test can
 // assert on setup_scene_init's arguments without needing three.js or a real WebGL context.
-// Also the three exports the gesture-channel scene swap calls (deserialize_scene,
-// start_renderloop, delete_scene) — the real bundle exports the same names.
 export let lastCall = null
 export const sceneCalls = { deleted: 0, loops: 0 }
 

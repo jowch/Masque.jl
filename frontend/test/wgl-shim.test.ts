@@ -206,7 +206,6 @@ describe("mountWebGL", () => {
         expect(canvas.height).toBe(50)
         expect(canvas.style.width).toBe("100%")
         expect(canvas.style.height).toBe("auto")
-        // A second frame at the same framebuffer size does not need another context.
         canvas.masqueReplaceScene!({ tag: "settle" }, 2, 100, 50)
         expect(mod.sceneCalls.deleted).toBe(2)
         expect(mod.sceneCalls.loops).toBe(2)

@@ -1,8 +1,5 @@
-// The gesture channel (#102/#133, docs/dev/architecture/12-gesture-channel.md): request
-// discipline (§12.6) for a `with_js_link` round trip that streams frames during a view drag.
-// `render` is `null` when the widget has no `ViewInteractable` (or the channel has degraded),
-// and every method below degrades to a no-op in that case. Both backends use this; the frame
-// body differs — `{png}` on `:cairo`, `{scene, width, height, pxPerUnit}` on `:webgl`.
+// Request discipline for the view-drag `with_js_link` channel (architecture §12.6).
+// `render` is null when there is no callback; every method below no-ops in that case.
 
 export interface FrameResponse {
     png?: Uint8Array

@@ -208,9 +208,7 @@ interface Mounted {
  * @param scriptEl  the cell's <script> (its parent is the light-DOM host containing the <img>/<canvas> base)
  * @param manifest  hit-region manifest (from published_to_js or inlined JSON)
  * @param invalidation  Pluto's cleanup promise (resolves on cell re-render)
- * @param requestFrame  the gesture channel's per-frame callback (#102/#133), or `null`/absent
- *   when this widget has no `ViewInteractable` — `render.jl`'s `Base.show` interpolates `null`
- *   in exactly that case, on either backend.
+ * @param requestFrame  per-frame callback, or null when this widget has none
  */
 export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: Promise<unknown>, requestFrame?: RenderFrame | null): Mounted {
     const host = scriptEl.parentElement as HTMLElement | null
@@ -340,8 +338,6 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
 
-    // #102/#133's gesture channel: a no-op when `requestFrame` is absent (no ViewInteractable),
-    // so bond.ts never has to branch on whether a live preview exists.
     // `applyFrame` is a hoisted function declaration (below) referencing `ctx`/`state` by
     // closure — it's never CALLED until a real round trip resolves, well after both are
     // initialized, so the forward reference here is safe despite the textual order.
@@ -359,13 +355,6 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const state = createOverlayState()
     state.selHits_ = selHits
 
-    // Applies one frame (§12.4/§12.5): swap the picture, and — whenever the camera moved
-    // (always, for a view gesture) — the hit manifest along with it, atomically. `:cairo`'s
-    // picture is a PNG; `:webgl`'s is a serialized scene applied to the existing canvas
-    // (`masqueReplaceScene`, installed by mountWebGL). Both writes below happen synchronously
-    // in this one call, so a frame and the manifest describing it are never observably out of
-    // sync (#102 tripwire #1). A canvas whose replacer isn't installed yet stashes the scene
-    // and does NOT swap the manifest ahead of it.
     function applyFrame(input: Record<string, unknown>, r: FrameResponse): void {
         if (base instanceof HTMLImageElement && r.png) {
             // `r.png` decodes off `with_js_link` as a plain (never Shared) ArrayBuffer-backed

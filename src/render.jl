@@ -272,9 +272,6 @@ struct MasqueWidget
     b64::String
     manifest::Dict{String, Any}
     display_css::Int
-    # Gesture-channel (#102/#133) per-frame callback. `nothing` when the widget has no
-    # `ViewInteractable` to drive — both backends otherwise build one (`_view_render_frame`).
-    # Defaulted below so every existing 3-arg and 4-arg call site keeps working.
     render_frame::Union{Nothing, Function}
     # Layer id → owner. Not published. Empty for hand-built test widgets; built-in bonds then
     # use the layer's `"bond"` stamp.
@@ -394,13 +391,6 @@ function masque(fig; kwargs...)
     return masque(fig, ints; kwargs...)
 end
 
-# Builds the gesture channel's per-frame callback for a `ViewInteractable`-carrying widget
-# (#102/#133, both backends): mutate the dragged axis's camera, rebuild the manifest, re-render,
-# and hand back a frame plus that manifest — the manifest ships on every frame here because a
-# view gesture always moves the camera (§12.4/§12.5). The frame body is backend-specific
-# (`_gesture_frame`): PNG bytes on `:cairo`, a fresh serialized scene on `:webgl`. `nothing`
-# when `interactables` has no `ViewInteractable`, so no in-drag frame can ever be requested and
-# building the closure (and paying `with_js_link`'s per-cell bookkeeping) would be pure cost.
 function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu)
     view_axes = Dict{Symbol, Any}(i.id => i.ax for i in interactables if i isa ViewInteractable)
     isempty(view_axes) && return nothing

@@ -189,7 +189,6 @@ function Masque.render(b::WebGLBackend, fig, ppu)
     return WebGLResult(scene_payload(fig), w, h, Float64(ppu))
 end
 
-# Scene, not a PNG (#133). `pxPerUnit` is 1 in-drag and the mount value on settle.
 function Masque._gesture_frame(result::WebGLResult)
     return Dict{String, Any}(
         "scene" => result.scene,
@@ -253,7 +252,6 @@ struct WebGLWidget
     width::Int
     height::Int
     px_per_unit::Float64
-    # nothing: no ViewInteractable
     render_frame::Union{Nothing, Function}
     owners::Dict{String, Masque.LayerOwner}
 end
@@ -269,10 +267,6 @@ function Masque.with_owners(w::WebGLWidget, owners::Dict{String, Masque.LayerOwn
     )
 end
 
-# `fig`/`interactables`/`ppu` build the gesture-channel callback, same as `CairoBackend`.
-# A view drag does not replace the cell, so the canvas this widget already owns stays put
-# and each frame is applied in place (#133) — that is not the canvas-identity problem #86
-# names, which is Pluto destroying the node on an `@bind` re-render.
 Masque.make_widget(b::WebGLBackend, result::WebGLResult, manifest, display_css, fig, interactables, ppu) =
     WebGLWidget(
     result.scene, manifest, display_css, result.width, result.height, result.px_per_unit,

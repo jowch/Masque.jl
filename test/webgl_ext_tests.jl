@@ -65,8 +65,6 @@ end
     @test w.scene isa Dict{String, Any}
     @test (w.width, w.height) == (400, 300)
 
-    # A ViewInteractable builds the same gesture-channel callback Cairo does (#133). The
-    # closure itself is exercised in the testset below; this only checks the widget carries it.
     fig_v = Figure(; size = (400, 300))
     ax_v = Axis(fig_v[1, 1])
     scatter!(ax_v, 1:5, rand(5))
@@ -93,7 +91,7 @@ end
     @test occursin("createObjectURL", html)      # blob delivery (no server / no file://)
     @test occursin("window.__MasqueWGL", html)     # M2: bundle/shim blob URLs cached once per notebook
     @test occursin("window.Masque.mount", html)    # Masque's overlay reused verbatim
-    @test occursin("requestFrame", html)            # gesture channel, null outside Pluto
+    @test occursin("requestFrame", html)
 end
 
 @testset "PolarAxis scene is JSON3-safe (pagepolar e2e)" begin
@@ -188,8 +186,6 @@ end
     bundle = read(_WGLExt._wgl_bundle_path(), String)
     @test occursin("setup_scene_init", bundle)
     @test occursin("find_plots", bundle)
-    # Gesture-channel scene swap (#133) calls these three by name on the imported bundle.
-    # They are exports of WGLMakie.bundled.js today; a bump that drops one fails here.
     @test occursin("deserialize_scene", bundle)
     @test occursin("start_renderloop", bundle)
     @test occursin("delete_scene", bundle)
@@ -404,7 +400,6 @@ end
     @test t2["xlims"][2] ≈ 9.0 atol = 1.0e-6
     @test t2["ylims"][1] ≈ 0.5 atol = 1.0e-6
     @test t2["ylims"][2] ≈ 4.5 atol = 1.0e-6
-    # The manifest stays in the mount ppu's coordinate space; only the scene's pxPerUnit drops.
     @test m2["width"] == w.manifest["width"] && m2["height"] == w.manifest["height"]
     @test m2["scaling"] == w.manifest["scaling"]
 
@@ -440,7 +435,6 @@ end
     )
     @test w0.render_frame === nothing
 
-    # Outside Pluto the link itself is `null`; the mount call still receives it.
     import HypertextLiteral: JavaScript
     import JSON3
     html = sprint(

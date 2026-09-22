@@ -1,12 +1,6 @@
-# Gesture channel (#133) — measures the SHIPPED `Masque._view_render_frame` closure on
-# `:webgl` directly (no browser, no Pluto). Same three scenes as `bench/gesture_channel.jl`
-# so the two backends can be compared. `:webgl` returns `{scene, width, height, pxPerUnit,
-# manifest}` — there is no PNG. `pxPerUnit` is the framebuffer scale the browser applies;
-# `scene_payload` itself does not resample, so in-drag and settle scene bytes match.
-#
-# WIRE bytes: the binary length of every typed numeric vector in the frame (scene + manifest),
-# the dominant term Pluto's MsgPack puts on the wire. Same definition as
-# `bench/webgl_payload_size.jl`. JSON3 length is an upper-bound proxy only.
+# Same three scenes as bench/gesture_channel.jl, on `:webgl`. Wire bytes match
+# bench/webgl_payload_size.jl (binary length of concrete numeric arrays). JSON3 length
+# is an upper bound.
 #
 # Run: julia --project=. bench/gesture_channel_webgl.jl
 
