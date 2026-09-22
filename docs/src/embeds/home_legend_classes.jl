@@ -19,7 +19,7 @@ end
 # ╔═╡ c0e10002-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
-# ╔═╡ c0e10002-0001-4000-8000-000000000002
+# ╔═╡ c0e10002-0001-4000-8000-000000000010
 begin
     function cluster(cx, cy, sx, sy, n, seed)
         xs = Vector{Float64}(undef, n)
@@ -42,7 +42,16 @@ begin
         (name = "Chinstrap", cx = 48.8, cy = 18.4, sx = 2.6, sy = 0.95, seed = 23, color = "#3d5a80"),
         (name = "Gentoo", cx = 47.5, cy = 15.0, sx = 2.4, sy = 0.85, seed = 41, color = "#2a9d8f"),
     ]
-    selected = pick isa LegendEvent ? String(pick.label) : nothing
+    nothing
+end
+
+# ╔═╡ c0e10002-0001-4000-8000-000000000003
+@bind sel begin
+    selected = try
+        String(getfield(sel, :payload).label)
+    catch
+        nothing
+    end
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "Bill length (mm)", ylabel = "Bill depth (mm)")
     for cls in classes
@@ -51,19 +60,20 @@ begin
         scatter!(ax, xs, ys; color = (cls.color, α), label = cls.name, markersize = 11)
     end
     axislegend(ax)
-    nothing
+    masque(fig)
 end
 
-# ╔═╡ c0e10002-0001-4000-8000-000000000003
-@bind pick masque(fig)
-
 # ╔═╡ c0e10002-0001-4000-8000-000000000004
-pick === nothing ? md"*Click a species in the legend.*" : md"**$(pick.label)**"
+if sel isa Masque.LegendEvent
+    md"**$(getfield(sel, :payload).label)**"
+else
+    md"*Click a species in the legend.*"
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
-bond = "pick"
+bond = "sel"
 title = "Overlapping species scatter; legend click fades the other classes"
 
 [[player.states]]
@@ -1728,7 +1738,7 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═c0e10002-0001-4000-8000-000000000001
-# ╠═c0e10002-0001-4000-8000-000000000002
+# ╠═c0e10002-0001-4000-8000-000000000010
 # ╠═c0e10002-0001-4000-8000-000000000003
 # ╠═c0e10002-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001

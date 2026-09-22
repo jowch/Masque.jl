@@ -162,7 +162,7 @@ end
 @testset "home legend classes TOML lists idle plus three species" begin
     path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_legend_classes.jl")
     player = parse_player_toml(path)
-    @test player["bond"] == "pick"
+    @test player["bond"] == "sel"
     keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
     @test keys == ["null", "legend:0", "legend:1", "legend:2"]
     @test get(player, "chip", true) !== false

@@ -64,11 +64,11 @@ elseif isempty(picks)
     md"*No stations in the box.*"
 else
     rows = samples[picks]
-    lines = ["| Station | Region |", "|---|---|"]
+    md_rows = ["| Station | Region |", "|---|---|"]
     for r in rows
-        push!(lines, "| $(r.name) | $(r.region) |")
+        push!(md_rows, "| $(r.name) | $(r.region) |")
     end
-    Markdown.parse("**$(length(rows)) stations**\n\n" * join(lines, "\n"))
+    Markdown.parse("**$(length(rows)) stations**\n\n" * join(md_rows, "\n"))
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
