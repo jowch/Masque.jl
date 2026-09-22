@@ -1373,6 +1373,9 @@ try {
         throw new Error(`${key}-click: expected Julia index ${juliaIdx()}: ${after.slice(0, 220)}`);
       }
     }
+    if (spec.layerId === "legend" && !/LegendEvent\(/.test(after)) {
+      throw new Error(`${key}-click: expected LegendEvent: ${after.slice(0, 220)}`);
+    }
     if (!skipChangeWait) passed.push(`${key}/click-bind`);
 
     // Click-echo (#103/#107): the overlay pins the picked hit(s) in g.sel itself, with no bond

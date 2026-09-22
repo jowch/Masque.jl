@@ -10,6 +10,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test ev.index == 1
         xs = [10, 20, 30]
         @test xs[ev] == 10
+        picks = [ev, ElementEvent(:cities, 3, (; city = "Shanghai", pop = 27))]
+        @test xs[picks] == [10, 30]
         row = ElementEvent(:cities, 2, Dict(:city => "Delhi", "pop" => 32))
         @test row.city == "Delhi" && row.pop == 32
         @test_throws ArgumentError row.missing
@@ -57,9 +59,92 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
     @testset "show skips a payload field named index" begin
         ev = ElementEvent(:scatter, 2, (; index = 9, city = "Osaka"))
+        @test ev.index == 2
+        @test ev.payload.index == 9
+        @test propertynames(ev) == (:layer, :index, :city, :payload)
         @test sprint(show, ev) == "ElementEvent(:scatter, 2, city = \"Osaka\")"
         ax = AxisEvent(:axis, 1.0, 2.0)
         @test occursin("x = 1.0", sprint(show, ax))
         @test !occursin("-1", sprint(show, ax))
+    end
+
+    @testset "legend click is a LegendEvent" begin
+        fig = Figure(); ax = Axis(fig[1, 1])
+        lines!(ax, 1:3; label = "trend")
+        axislegend(ax)
+        w = masque(fig)
+        tv = Masque.APD.Bonds.transform_value
+        ev = tv(w, Dict("layer" => "legend", "index" => 0))
+        @test ev isa LegendEvent
+        @test ev.layer === :legend && ev.index == 1 && ev.label == "trend"
+        @test_throws ArgumentError Base.to_index(ev)
+        bare = Masque.MasqueWidget("", w.manifest, 100)
+        stamped = tv(bare, Dict("layer" => "legend", "index" => 0))
+        @test stamped isa LegendEvent && stamped.index == 1 && stamped.label == "trend"
+    end
+
+    @testset "FunctionInteractable follows the layer kind" begin
+        fig = Figure(); ax = Axis(fig[1, 1])
+        scatter!(ax, [1.0], [1.0])
+        axis = ctx -> first(keys(ctx.transforms))
+        tv = Masque.APD.Bonds.transform_value
+        el = masque(
+            fig, FunctionInteractable(
+                ctx -> [
+                    HitLayer(:el, :circles, Float32[1, 1, 4], Any[(; v = "a")], axis(ctx), (:click,)),
+                ]
+            )
+        )
+        got = tv(el, Dict("layer" => "el", "index" => 0))
+        @test got isa ElementEvent && got.index == 1 && got.v == "a"
+        grid = masque(
+            fig, FunctionInteractable(
+                ctx -> [
+                    HitLayer(:g, :grid, Dict{String, Any}(), Any[], axis(ctx), (:click,)),
+                ]
+            )
+        )
+        cell = tv(grid, Dict("layer" => "g", "index" => -1, "payload" => Dict("i" => 1, "j" => 0, "value" => 12)))
+        @test cell isa GridCellEvent && cell.i == 2 && cell.j == 1 && cell.value == 12
+        axisw = masque(
+            fig, FunctionInteractable(
+                ctx -> [
+                    HitLayer(:ax, :axis, Any[], Any[], axis(ctx), (:click,)),
+                ]
+            )
+        )
+        aev = tv(axisw, Dict("layer" => "ax", "index" => -1, "payload" => Dict("x" => 1.5, "y" => 2.5)))
+        @test aev isa AxisEvent && aev.x == 1.5 && aev.y == 2.5
+        thr = masque(
+            fig, FunctionInteractable(
+                ctx -> [
+                    HitLayer(:thr, :threshold, Any[], Any[], axis(ctx), (:drag,)),
+                ]
+            )
+        )
+        tev = tv(thr, Dict("layer" => "thr", "index" => 0, "payload" => 3.25))
+        @test tev isa ThresholdEvent && tev.value == 3.25
+        roi = masque(
+            fig, FunctionInteractable(
+                ctx -> [
+                    HitLayer(:box, :roi, Any[], Any[], axis(ctx), (:drag,)),
+                ]
+            )
+        )
+        bev = tv(
+            roi, Dict(
+                "layer" => "box", "index" => 0,
+                "payload" => Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 2.0, "ymax" => 3.0),
+            )
+        )
+        @test bev isa BoundsEvent && (bev.xmin, bev.xmax, bev.ymin, bev.ymax) == (0.0, 1.0, 2.0, 3.0)
+        view = masque(
+            fig, FunctionInteractable(
+                ctx -> [
+                    HitLayer(:view, :view, Any[], Any[], axis(ctx), (:drag,)),
+                ]
+            )
+        )
+        @test_throws ArgumentError tv(view, Dict("layer" => "view", "index" => -1, "payload" => nothing))
     end
 end

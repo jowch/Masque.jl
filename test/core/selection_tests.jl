@@ -205,7 +205,15 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test mmulti["layers"][1]["selected"] == [0]
         @test mmulti["layers"][2]["selected"] == [1]
         @test IP.APD.Bonds.initial_value(MasqueWidget("", mmulti, 100)) === nothing
-        @test_throws ArgumentError build_manifest([pts_i, segs_i], hctx; selected = 1)
+        err_bare = try
+            build_manifest([pts_i, segs_i], hctx; selected = 1)
+            nothing
+        catch e
+            e
+        end
+        @test err_bare isa ArgumentError
+        bare_msg = sprint(showerror, err_bare)
+        @test occursin("scatter", bare_msg) && occursin("segs", bare_msg)
 
         # no explicit payloads= (the common case): PointInteractable auto-fills one
         # `(; index, x, y)` NamedTuple per point. `selected = 2` is the second point.
@@ -214,6 +222,27 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test iv_auto isa ElementEvent
         @test iv_auto.layer === :scatter && iv_auto.index == 2
         @test iv_auto.payload == (; index = 2, x = pts[2][1], y = pts[2][2])
+    end
+
+    @testset "selects ROI hydrates a Vector{ElementEvent} through initial_value" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        pts = [(Float64(k), 1.0) for k in 1:8]
+        scatter!(ax, first.(pts), last.(pts))
+        payloads = ["p$k" for k in 1:8]
+        pi = PointInteractable(ax, pts; id = :pts, payloads)
+        roi = ROIInteractable(ax; bounds = (1.0, 3.0, 0.0, 2.0), selects = :pts, id = :box)
+        iv(sel) = IP.APD.Bonds.initial_value(masque(fig, [pi, roi]; selected = sel))
+        one = iv(1)
+        @test one isa Vector{ElementEvent} && length(one) == 1
+        @test one[1].layer === :pts && one[1].index == 1 && one[1].payload == "p1"
+        @test iv([1]) == one
+        two = iv([1, 8])
+        @test two isa Vector{ElementEvent}
+        @test [e.index for e in two] == [1, 8]
+        @test [e.payload for e in two] == ["p1", "p8"]
+        empty = iv(Int[])
+        @test empty isa Vector{ElementEvent} && isempty(empty)
+        @test masque(fig, [pi, roi]; selected = Int[]).manifest["hydrate"] == "items"
     end
 
     @testset "transform_value reconstructs the payload from the manifest, not the wire" begin

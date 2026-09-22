@@ -222,13 +222,17 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
             @test occursin(r"selected"i, sprint(showerror, err_grid))
             @test occursin("grid", sprint(showerror, err_grid))
 
-            # 3 pts → valid indices 1:3; index 0, 5, and -1 must fail
-            @test_throws ArgumentError build_manifest(
-                [PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [0])
-            )
-            @test_throws ArgumentError build_manifest(
-                [PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [5])
-            )
+            # 3 pts → valid indices 1:3; index 0, 5, and -1 must fail, naming that range
+            err_zero = try
+                build_manifest(
+                    [PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [0])
+                )
+                nothing
+            catch e
+                e
+            end
+            @test err_zero isa ArgumentError
+            @test occursin("1:3", sprint(showerror, err_zero))
             @test_throws ArgumentError build_manifest(
                 [PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [-1])
             )
@@ -240,8 +244,7 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
                 e
             end
             @test err_oob isa ArgumentError
-            @test occursin(r"selected"i, sprint(showerror, err_oob))
-            @test occursin(r"5|out of range|elements"i, sprint(showerror, err_oob))
+            @test occursin("1:3", sprint(showerror, err_oob))
 
             # supported kinds still accept in-range indices (rects list + polygons + polyline)
             rects = RectInteractable(bax; rects = [(1.0, 1.0, 0.5, 0.5), (2.0, 2.0, 0.5, 0.5)], id = :boxes)

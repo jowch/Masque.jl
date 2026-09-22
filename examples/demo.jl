@@ -234,9 +234,9 @@ end
 md"""
 ## Selection round-trip — click → re-highlight (M1.2)
 
-Click points in the **left** plot. Each click's index accumulates and is fed back as
-`selected` to the **right** plot, which pre-highlights them on mount — surviving
-re-renders flicker-free. This is the bond-value → `Dict(layer => indices)` → manifest loop.
+Click points in the **left** plot. Each click's index accumulates into a 1-based
+`Vector{Int}` and is fed back as `selected` to the **right** plot, which pre-highlights
+those marks on mount.
 """
 
 # ╔═╡ 40000000-0000-0000-0000-000000000071
@@ -274,7 +274,7 @@ begin
 end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000077
-@bind _rt_ignore masque(rt_fig_r, rt_int_r; selected = Dict(:scatter => picked))
+@bind _rt_ignore masque(rt_fig_r, rt_int_r; selected = picked)
 
 # ╔═╡ 40000000-0000-0000-0000-000000000090
 md"""

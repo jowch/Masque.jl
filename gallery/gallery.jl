@@ -75,14 +75,13 @@ let
     if picks === nothing || isempty(picks)
         md"_Adjust the box to select points._"
     else
-        (; xs, ys, grp) = scatter_data
-        idx = [e.index for e in picks]
-        n = length(idx)
-        ga = count(i -> grp[i] == "A", idx)
+        (; xs, ys) = scatter_data
+        n = length(picks)
+        ga = count(e -> e.group == "A", picks)
         md"""
         **$(n) points selected** — group A: $(ga), group B: $(n - ga)
 
-        mean x = $(round(sum(xs[idx]) / n; digits = 2)), mean y = $(round(sum(ys[idx]) / n; digits = 2))
+        mean x = $(round(sum(xs[picks]) / n; digits = 2)), mean y = $(round(sum(ys[picks]) / n; digits = 2))
         """
     end
 end
