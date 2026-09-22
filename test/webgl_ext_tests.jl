@@ -65,17 +65,12 @@ end
     @test w.scene isa Dict{String, Any}
     @test (w.width, w.height) == (400, 300)
 
-    # #102's gesture channel is :cairo only (docs/dev/architecture/12-gesture-channel.md
-    # §12.10) — `make_widget`'s shared signature hands WebGLBackend the same fig/interactables/
-    # ppu a ViewInteractable-carrying widget would need, and WebGLWidget has no field for it at
-    # all, so a ViewInteractable must still build without error and just carry no live-preview
-    # mechanism.
     fig_v = Figure(; size = (400, 300))
     ax_v = Axis(fig_v[1, 1])
     scatter!(ax_v, 1:5, rand(5))
     wv = masque(fig_v, [ViewInteractable(ax_v)]; backend = _WGLExt.WebGLBackend())
     @test wv isa _WGLExt.WebGLWidget
-    @test !hasfield(_WGLExt.WebGLWidget, :render_frame)
+    @test wv.render_frame isa Function
 
     # scene must be JSON3-safe (Makie can emit NaN in transformed-position buffers; _plain scrubs them)
     @test JSON3.write(w.scene) isa String
@@ -96,6 +91,7 @@ end
     @test occursin("createObjectURL", html)      # blob delivery (no server / no file://)
     @test occursin("window.__MasqueWGL", html)     # M2: bundle/shim blob URLs cached once per notebook
     @test occursin("window.Masque.mount", html)    # Masque's overlay reused verbatim
+    @test occursin("requestFrame", html)
 end
 
 @testset "PolarAxis scene is JSON3-safe (pagepolar e2e)" begin
@@ -190,6 +186,9 @@ end
     bundle = read(_WGLExt._wgl_bundle_path(), String)
     @test occursin("setup_scene_init", bundle)
     @test occursin("find_plots", bundle)
+    @test occursin("deserialize_scene", bundle)
+    @test occursin("start_renderloop", bundle)
+    @test occursin("delete_scene", bundle)
 end
 
 @testset "shim-completeness canary (Bonito/Connection symbols the bundle references)" begin
@@ -365,4 +364,90 @@ end
 
     wgl = masque(fig; backend = _WGLExt.WebGLBackend())
     @test wgl isa _WGLExt.WebGLWidget
+end
+
+@testset "gesture channel (#133): webgl frame is a scene plus a manifest" begin
+    function json_ok(x)
+        if x isa AbstractDict
+            return all(json_ok, values(x))
+        elseif x isa Base.Array
+            return all(json_ok, x)
+        else
+            return x isa Union{Real, AbstractString, Bool, Nothing}
+        end
+    end
+
+    fig = Figure(; size = (400, 300))
+    ax = Axis(fig[1, 1]; limits = (0.0, 10.0, 0.0, 5.0))
+    pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]
+    scatter!(ax, first.(pts), last.(pts))
+    w = masque(fig, [ViewInteractable(ax), PointInteractable(ax, pts)]; backend = _WGLExt.WebGLBackend())
+    @test w.render_frame isa Function
+
+    resp = w.render_frame(
+        Dict(
+            "id" => "view", "xmin" => 1.0, "xmax" => 9.0, "ymin" => 0.5, "ymax" => 4.5, "settle" => false,
+        ),
+    )
+    @test resp["pxPerUnit"] == 1.0
+    @test resp["width"] == 400 && resp["height"] == 300
+    @test resp["scene"] isa Dict{String, Any}
+    @test json_ok(resp["scene"])
+    @test !haskey(resp, "png")
+    m2 = resp["manifest"]
+    t2 = only(t for t in values(m2["transforms"]) if t["is3d"] == false)
+    @test t2["xlims"][1] ≈ 1.0 atol = 1.0e-6
+    @test t2["xlims"][2] ≈ 9.0 atol = 1.0e-6
+    @test t2["ylims"][1] ≈ 0.5 atol = 1.0e-6
+    @test t2["ylims"][2] ≈ 4.5 atol = 1.0e-6
+    @test m2["width"] == w.manifest["width"] && m2["height"] == w.manifest["height"]
+    @test m2["scaling"] == w.manifest["scaling"]
+
+    settled = w.render_frame(
+        Dict(
+            "id" => "view", "xmin" => 1.0, "xmax" => 9.0, "ymin" => 0.5, "ymax" => 4.5, "settle" => true,
+        ),
+    )
+    @test settled["pxPerUnit"] == w.px_per_unit
+    @test ax.limits[][1] ≈ 1.0 atol = 1.0e-6
+
+    @test_throws ArgumentError w.render_frame(
+        Dict("id" => "nope", "xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0),
+    )
+
+    fig3 = Figure(; size = (300, 300))
+    ax3 = Axis3(fig3[1, 1])
+    scatter!(ax3, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
+    w3 = masque(fig3, [ViewInteractable(ax3)]; backend = _WGLExt.WebGLBackend())
+    orb = w3.render_frame(Dict("id" => "view", "azimuth" => 0.7, "elevation" => 0.2, "settle" => false))
+    @test ax3.azimuth[] ≈ 0.7 atol = 1.0e-9
+    @test ax3.elevation[] ≈ 0.2 atol = 1.0e-9
+    view_layer = only(l for l in orb["manifest"]["layers"] if l["kind"] == "view")
+    @test view_layer["geometry"]["azimuth"] ≈ 0.7 atol = 1.0e-9
+    @test haskey(orb, "scene") && !haskey(orb, "png")
+
+    fig0 = Figure(; size = (200, 150))
+    ax0 = Axis(fig0[1, 1])
+    scatter!(ax0, 1:3, 1:3)
+    w0 = masque(
+        fig0, [PointInteractable(ax0, [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)])];
+        backend = _WGLExt.WebGLBackend(),
+    )
+    @test w0.render_frame === nothing
+
+    import HypertextLiteral: JavaScript
+    import JSON3
+    html = sprint(
+        show, MIME"text/html"(),
+        _WGLExt._widget_html(
+            w;
+            scene_expr = JavaScript(JSON3.write(w.scene)),
+            manifest_expr = JavaScript(JSON3.write(w.manifest)),
+            bundle_js = JavaScript(JSON3.write("/*bundle*/")),
+            shim_js = JavaScript(JSON3.write("/*shim*/")),
+            request_frame_expr = Masque._request_frame_js(IOBuffer(), w.render_frame),
+        ),
+    )
+    @test occursin("const requestFrame = null", html)
+    @test occursin("window.Masque.mount", html)
 end

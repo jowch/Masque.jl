@@ -40,11 +40,10 @@ rebuild — `masque` re-projects the overlay so hit regions never drift.
 
 **`ViewInteractable`** (drag-to-pan / drag-to-orbit) is different: it **commits nothing** — a
 camera is operational state, not an analysis value a notebook reads
-(docs/dev/architecture/12-gesture-channel.md §12.3). On `:cairo`, drag frames stream over a
-`with_js_link` gesture channel instead of a bond: the base image and hit manifest repaint live,
-in place, with no cell re-execution and no remount. `:webgl` has no live-preview mechanism yet
-(§12.10) — dragging there shows only a numeric readout and repaints nothing.
-The same notebook runs on `:webgl` (`examples/view_manip_webgl.jl`).
+(docs/dev/architecture/12-gesture-channel.md §12.3). Drag frames stream over a `with_js_link`
+gesture channel instead of a bond: the picture and hit manifest repaint live, in place, with no
+cell re-execution and no remount. On this notebook that picture is a PNG. The same notebook on
+`:webgl` (`examples/view_manip_webgl.jl`) swaps a serialized scene onto the canvas instead.
 """
 
 # ╔═╡ 50000000-0000-0000-0000-000000000010
@@ -159,7 +158,7 @@ md"""
 ## Drag-to-pan (2D) — commits nothing
 
 `ViewInteractable` no longer emits anything on mouse-up (§12.3) — drag the plot below and
-watch it repaint live on `:cairo` (the gesture channel, not a bond). `pan_ev` still reports the
+watch it repaint live (the gesture channel, not a bond). `pan_ev` still reports the
 **selection** (clicking a point), which this widget never updates via drag; `pan_committed`
 below is therefore always `pan_seed` and the second figure is a static duplicate, kept only to
 show that a `ViewInteractable`'s bond genuinely carries no view payload to drive it from.
@@ -210,7 +209,7 @@ md"""
 
 Same shape as the pan demo above: `ViewInteractable` commits nothing (§12.3), so `orbit_committed`
 below is always `orb_seed` and the bottom figure is a static duplicate — drag the top plot to see
-the live gesture-channel preview on `:cairo` instead.
+the live gesture-channel preview instead.
 """
 
 # ╔═╡ 50000000-0000-0000-0000-000000000051

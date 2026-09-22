@@ -31,10 +31,10 @@ md"""
 # ViewManip WebGL — drag-to-pan / drag-to-rotate live-verify
 
 `ViewInteractable` commits nothing (docs/dev/architecture/12-gesture-channel.md §12.3), on
-either backend. `:webgl` additionally has no live-preview mechanism yet (§12.10), so dragging
-here shows only the Tier-0 numeric readout and repaints nothing — `pan_committed`/
-`orbit_committed` below always equal their seed, and the second figure in each pair is a
-static duplicate kept to make that explicit.
+either backend. Dragging here repaints the canvas live: each frame is a freshly serialized
+scene plus a hit manifest, swapped onto the canvas this cell already holds (#133). Nothing is
+written to the bond, so `pan_committed`/`orbit_committed` below always equal their seed, and
+the second figure in each pair stays a static duplicate of that seed.
 """
 
 # ╔═╡ 60000000-0000-0000-0000-000000000011

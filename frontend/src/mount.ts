@@ -208,11 +208,7 @@ interface Mounted {
  * @param scriptEl  the cell's <script> (its parent is the light-DOM host containing the <img>/<canvas> base)
  * @param manifest  hit-region manifest (from published_to_js or inlined JSON)
  * @param invalidation  Pluto's cleanup promise (resolves on cell re-render)
- * @param requestFrame  the gesture channel's per-frame callback (#102), or `null`/absent when
- *   this widget has no live-preview mechanism (`:webgl`, or no `ViewInteractable` at all) —
- *   `render.jl`'s `Base.show` interpolates `null` in exactly that case, so a WGLWidget's own
- *   `mount()` call (which never passes this argument) and a Cairo widget with no view drag look
- *   identical to `createGestureChannel` below.
+ * @param requestFrame  per-frame callback, or null when this widget has none
  */
 export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: Promise<unknown>, requestFrame?: RenderFrame | null): Mounted {
     const host = scriptEl.parentElement as HTMLElement | null
@@ -342,8 +338,6 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
 
-    // #102's gesture channel: a no-op when `requestFrame` is absent (`:webgl`, or no
-    // ViewInteractable), so bond.ts never has to branch on whether a live preview exists.
     // `applyFrame` is a hoisted function declaration (below) referencing `ctx`/`state` by
     // closure — it's never CALLED until a real round trip resolves, well after both are
     // initialized, so the forward reference here is safe despite the textual order.
@@ -361,12 +355,23 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const state = createOverlayState()
     state.selHits_ = selHits
 
-    // Applies one {png, manifest?} response (§12.4/§12.5): swap the frame, and — whenever the
-    // camera moved (always, for a view gesture) — the hit manifest along with it, atomically.
-    // Both writes below happen synchronously in this one call, so a frame and the manifest
-    // describing it are never observably out of sync (#102 tripwire #1).
+    type GestureCanvas = HTMLCanvasElement & {
+        masqueReplaceScene?: (scene: unknown, pxPerUnit?: number, width?: number, height?: number) => void
+        masqueFlushPending?: () => void
+        masquePendingFrame?: { input: Record<string, unknown>; r: FrameResponse } | null
+    }
+    if (base instanceof HTMLCanvasElement) {
+        const canvas = base as GestureCanvas
+        canvas.masqueFlushPending = () => {
+            const pending = canvas.masquePendingFrame
+            if (!pending) return
+            canvas.masquePendingFrame = null
+            applyFrame(pending.input, pending.r)
+        }
+    }
+
     function applyFrame(input: Record<string, unknown>, r: FrameResponse): void {
-        if (base instanceof HTMLImageElement) {
+        if (base instanceof HTMLImageElement && r.png) {
             // `r.png` decodes off `with_js_link` as a plain (never Shared) ArrayBuffer-backed
             // Uint8Array, but its TS type is the generic `Uint8Array<ArrayBufferLike>` — narrower
             // than `BlobPart` wants; the cast reflects that decoded reality, not a bypass of it.
@@ -375,6 +380,18 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             lastFrameUrl = url
             base.src = url
             if (prev) URL.revokeObjectURL(prev) // revoke the PREVIOUS url, not this one, mid-gesture
+        } else if (base instanceof HTMLCanvasElement && r.scene != null) {
+            const canvas = base as GestureCanvas
+            if (typeof canvas.masqueReplaceScene !== "function") {
+                canvas.masquePendingFrame = { input, r }
+                return
+            }
+            try {
+                canvas.masqueReplaceScene(r.scene, r.pxPerUnit, r.width, r.height)
+            } catch (e) {
+                console.error("[masque] webgl gesture frame failed", e)
+                return
+            }
         }
         const newManifest = r.manifest as Manifest | undefined
         if (!newManifest) return

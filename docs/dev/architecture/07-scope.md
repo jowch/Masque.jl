@@ -17,7 +17,7 @@ profile shows JS hit-test *specifically* is the bottleneck.
 (draggable + resizable box, Tier 0 bounds + M4 box-select); `AbstractSelector` /
 `selects`-ROI — `Vector{InteractionEvent}` bond, Design-D contract ([§5](05-bond-value.md)); `ViewInteractable`
 (drag-to-pan / drag-to-orbit — commits nothing as of #102/§12.3; a live gesture-channel preview
-ships on `:cairo`); gallery recipes
+ships on `:cairo` and `:webgl`); gallery recipes
 (box-select scatter, image ROI per-channel stats).
 
 **Phase 2a (shipped):** Hist, Waterfall, CrossBar, HSpan, VSpan — all extracted as `:rects`; shared bar payload schema (semantic, no `index`); span viewport-clamp; uniform `_check_payloads` validation on Segment/Rect/Polygon interactables.

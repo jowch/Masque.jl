@@ -272,10 +272,6 @@ struct MasqueWidget
     b64::String
     manifest::Dict{String, Any}
     display_css::Int
-    # Gesture-channel (#102) per-frame callback, `:cairo` only — `nothing` when the widget has
-    # no `ViewInteractable` to drive, or on `:webgl` (no settled live-preview mechanism yet;
-    # docs/dev/architecture/12-gesture-channel.md §12.10). Defaulted below so every existing
-    # 3-arg and 4-arg call site keeps working.
     render_frame::Union{Nothing, Function}
     # Layer id → owner. Not published. Empty for hand-built test widgets; built-in bonds then
     # use the layer's `"bond"` stamp.
@@ -395,12 +391,6 @@ function masque(fig; kwargs...)
     return masque(fig, ints; kwargs...)
 end
 
-# Builds the gesture channel's per-frame callback for a `ViewInteractable`-carrying widget
-# (`:cairo` only, #102): mutate the dragged axis's camera, rebuild the manifest, re-render, and
-# hand back `{png, manifest}` — frame always, manifest whenever the camera moved (always, for a
-# view gesture specifically; §12.4/§12.5). `nothing` when `interactables` has no
-# `ViewInteractable`, so no in-drag frame can ever be requested and building the closure (and
-# paying `with_js_link`'s per-cell bookkeeping) would be pure cost.
 function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu)
     view_axes = Dict{Symbol, Any}(i.id => i.ax for i in interactables if i isa ViewInteractable)
     isempty(view_axes) && return nothing
@@ -435,27 +425,33 @@ function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu)
             ctx = context(backend, fig, ppu)
             manifest = build_manifest(interactables, ctx)
             result = render(backend, fig, render_ppu)
-            return Dict{String, Any}("png" => result.payload, "manifest" => manifest)
+            frame = _gesture_frame(result)
+            frame["manifest"] = manifest
+            return frame
         finally
             fig.scene.backgroundcolor[] = bg0
         end
     end
 end
 
+# Render-time capability question ONLY (§12.9) — NOT how a static export is detected.
+# Exporting doesn't re-render (`generate_html` serializes existing notebook state), so this
+# decision gets baked into the exported HTML from a session where a kernel was live and
+# would read back as stale `true` to a kernel-less reader. The frontend's own
+# `window.pluto_disable_ui` gate + try/catch backstop (gesture.ts) is what actually degrades
+# a dead channel at use time; this only decides whether to interpolate a `with_js_link` call
+# into the page at all. `null` when there is no callback, or this display can't host one.
+function _request_frame_js(io, render_frame)
+    link = render_frame === nothing ? nothing :
+        (APD.is_supported_by_display(io, APD.Display.with_js_link) ? APD.Display.with_js_link(render_frame) : nothing)
+    return link === nothing ? HypertextLiteral.JavaScript("null") : link
+end
+
 function Base.show(io::IO, m::MIME"text/html", w::MasqueWidget)
     # Inject unconditionally: wrapping the esbuild IIFE in `if (!window.Masque) {…}` makes it
     # install `{}` instead of `{mount}` (a JS block-scope/strict-mode quirk).
     boot = HypertextLiteral.JavaScript(_OVERLAY_JS[])
-    # Render-time capability question ONLY (§12.9) — NOT how a static export is detected.
-    # Exporting doesn't re-render (`generate_html` serializes existing notebook state), so this
-    # decision gets baked into the exported HTML from a session where a kernel was live and
-    # would read back as stale `true` to a kernel-less reader. The frontend's own
-    # `window.pluto_disable_ui` gate + try/catch backstop (gesture.ts) is what actually degrades
-    # a dead channel at use time; this only decides whether to interpolate a `with_js_link` call
-    # into the page at all.
-    link = w.render_frame === nothing ? nothing :
-        (APD.is_supported_by_display(io, APD.Display.with_js_link) ? APD.Display.with_js_link(w.render_frame) : nothing)
-    request_frame_js = link === nothing ? HypertextLiteral.JavaScript("null") : link
+    request_frame_js = _request_frame_js(io, w.render_frame)
     html = @htl(
         """
         <div class="ip-host" style="position:relative; display:inline-block; width:100%; max-width:$(w.display_css)px;">

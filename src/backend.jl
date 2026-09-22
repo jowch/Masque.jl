@@ -11,6 +11,8 @@ struct RenderResult
     scaling::Float64
 end
 
+_gesture_frame(result::RenderResult) = Dict{String, Any}("png" => result.payload)
+
 """
     AxisTransform
 
@@ -85,10 +87,7 @@ end
 function render end
 function context end
 function _ppu end         # (backend, fig) -> px_per_unit / device scale
-# (backend, <backend's RenderResult-like>, manifest, display_css, fig, interactables, ppu) ->
-# the @bind widget. The last three are for the gesture channel (#102, `:cairo`-only today):
-# `CairoBackend`'s method builds a per-frame `with_js_link` callback from them
-# (`Masque._view_render_frame`); `WebGLBackend`'s accepts and ignores them.
+# (backend, result, manifest, display_css, fig, interactables, ppu) -> the @bind widget
 function make_widget end
 
 # `Makie.project` expects post-transform_func coordinates; transform in Float64 first —

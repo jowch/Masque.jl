@@ -39,10 +39,10 @@ everything else: change `limits` (2D) or `azimuth`/`elevation` (`Axis3`) and reb
 — `masque` re-projects the overlay, so hit regions stay correct.
 
 **Dragging with [`ViewInteractable`](@ref) is different: it commits nothing.** A camera is
-operational state, not an analysis value the notebook reads. On the `:cairo` backend, in-drag
-frames stream over a `with_js_link` gesture channel instead of a bond — the image and hit
-regions repaint live, with no cell re-execution. `:webgl` has no live-preview mechanism yet: a
-drag there shows a numeric readout but repaints nothing. Shift+drag wins over a
+operational state, not an analysis value the notebook reads. On both backends, in-drag frames
+stream over a `with_js_link` gesture channel instead of a bond — the picture and hit regions
+repaint live, with no cell re-execution. `:cairo` ships a PNG; `:webgl` ships a freshly
+serialized scene onto the canvas already on the page. Shift+drag wins over a
 `ROIInteractable`/`ThresholdInteractable` on the same axis on both backends.
 [`examples/view_manip.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip.jl)
 demonstrates both.
@@ -80,7 +80,7 @@ takes neither an `Axis` nor `id` as constructor arguments at all — see
 | `LegendInteractable(leg; targets = nothing, id = :legend)` | takes a `Makie.Legend` block, not an `Axis`; one hit region per entry, bounded to that entry's row | `targets` — a `Dict{label => id(s)}` or one entry per legend entry; default auto-resolves from the plots each entry's elements were built from | [`LegendEvent`](@ref) (`label`, `group`, `targets`) — see [Legend](@ref) |
 | `ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold)` | a draggable line (`:horizontal` = constant-y, dragged vertically; `:vertical` = constant-x); live readout while dragging, commit on mouse-up | `orientation`, `value` (initial position; a number or a [`ThresholdEvent`](@ref)) | [`ThresholdEvent`](@ref) (`value`), on release |
 | `ROIInteractable(ax; bounds = (xmin, xmax, ymin, ymax), selects = nothing, id = :roi)` | a draggable + resizable box; move (interior) / resize (a corner resizes two edges, an edge midpoint resizes just that one); commit on mouse-up | `selects` — another layer's `id`; if set, the box reports that layer's selection instead of its own bounds (`circles`/`grid` layers only — see [Multi-element selectors](@ref)). `bounds=` accepts a 4-tuple or a [`BoundsEvent`](@ref) | [`BoundsEvent`](@ref) on release; with `selects`, a `Vector{ElementEvent}` (points) or one [`GridWindowEvent`](@ref) (grid) |
-| `ViewInteractable(ax; id = :view)` | drag-to-pan (2D) or drag-to-orbit (Axis3); commits nothing; Shift+drag forces view over ROI/threshold | — | none — a camera isn't an analysis value (§12.3); `:cairo` streams a live gesture-channel preview instead |
+| `ViewInteractable(ax; id = :view)` | drag-to-pan (2D) or drag-to-orbit (Axis3); commits nothing; Shift+drag forces view over ROI/threshold | — | none — a camera isn't an analysis value (§12.3); both backends stream a live gesture-channel preview instead |
 
 ## From a plot object
 

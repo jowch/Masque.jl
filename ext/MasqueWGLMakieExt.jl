@@ -189,6 +189,15 @@ function Masque.render(b::WebGLBackend, fig, ppu)
     return WebGLResult(scene_payload(fig), w, h, Float64(ppu))
 end
 
+function Masque._gesture_frame(result::WebGLResult)
+    return Dict{String, Any}(
+        "scene" => result.scene,
+        "width" => result.width,
+        "height" => result.height,
+        "pxPerUnit" => result.px_per_unit,
+    )
+end
+
 # Uses the same shared projection closure as CairoBackend, landing within 1-2px of where
 # WGLMakie draws the data.
 function Masque.context(b::WebGLBackend, fig, ppu)
@@ -243,29 +252,30 @@ struct WebGLWidget
     width::Int
     height::Int
     px_per_unit::Float64
+    render_frame::Union{Nothing, Function}
     owners::Dict{String, Masque.LayerOwner}
 end
-function WebGLWidget(scene, manifest, display_css, width, height, px_per_unit)
+function WebGLWidget(scene, manifest, display_css, width, height, px_per_unit, render_frame = nothing)
     return WebGLWidget(
-        scene, manifest, display_css, width, height, px_per_unit,
+        scene, manifest, display_css, width, height, px_per_unit, render_frame,
         Dict{String, Masque.LayerOwner}(),
     )
 end
 function Masque.with_owners(w::WebGLWidget, owners::Dict{String, Masque.LayerOwner})
-    return WebGLWidget(w.scene, w.manifest, w.display_css, w.width, w.height, w.px_per_unit, owners)
+    return WebGLWidget(
+        w.scene, w.manifest, w.display_css, w.width, w.height, w.px_per_unit, w.render_frame, owners,
+    )
 end
 
-# `fig`/`interactables`/`ppu` are accepted, not used: the gesture channel (#102) is `:cairo`
-# only — `:webgl` has no settled live-preview mechanism yet
-# (docs/dev/architecture/12-gesture-channel.md §12.10). `make_widget`'s signature is shared
-# across backends (src/backend.jl), so both extensions take the same arguments even though
-# only one acts on the last three.
 Masque.make_widget(b::WebGLBackend, result::WebGLResult, manifest, display_css, fig, interactables, ppu) =
-    WebGLWidget(result.scene, manifest, display_css, result.width, result.height, result.px_per_unit)
+    WebGLWidget(
+    result.scene, manifest, display_css, result.width, result.height, result.px_per_unit,
+    Masque._view_render_frame(b, fig, interactables, ppu),
+)
 
 # `*_expr`/`*_js` are JS expressions yielding the data/text: published_to_js for Pluto, or
 # inlined JSON for self-contained/testing.
-function _widget_html(w::WebGLWidget; scene_expr, manifest_expr, bundle_js, shim_js)
+function _widget_html(w::WebGLWidget; scene_expr, manifest_expr, bundle_js, shim_js, request_frame_expr = JavaScript("null"))
     overlay = JavaScript(Masque._OVERLAY_JS[])
     # Masque's overlay is base-agnostic (`querySelector("img, canvas")`; image-px scale from
     # `manifest.width`, not the element's intrinsic size), so it binds directly to our
@@ -300,7 +310,8 @@ function _widget_html(w::WebGLWidget; scene_expr, manifest_expr, bundle_js, shim
             $(overlay)
             const _o = document.currentScript;
             const manifest = $(manifest_expr);
-            window.Masque.mount(_o, manifest, typeof invalidation === "undefined" ? new Promise(() => {}) : invalidation);
+            const requestFrame = $(request_frame_expr);
+            window.Masque.mount(_o, manifest, typeof invalidation === "undefined" ? new Promise(() => {}) : invalidation, requestFrame);
           </script>
         </div>
         """
@@ -321,6 +332,7 @@ function Base.show(io::IO, m::MIME"text/html", w::WebGLWidget)
         w;
         scene_expr = pub(w.scene), manifest_expr = pub(w.manifest),
         bundle_js = pub(_bundle_text()), shim_js = pub(_shim_text()),
+        request_frame_expr = Masque._request_frame_js(io, w.render_frame),
     )
     return show(io, m, html)
 end
