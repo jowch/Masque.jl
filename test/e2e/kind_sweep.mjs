@@ -348,7 +348,7 @@ try {
   // layer dict every other kind gets by from `layersOf`.
   const transformsOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#axes_${k}`).textContent), key);
 
-  const dispatchAt = async (key, x, y, type) => page.evaluate(([k, ix, iy, typ]) => {
+  const dispatchAt = async (key, x, y, type) => page.evaluate(async ([k, ix, iy, typ]) => {
     const span = document.querySelector(`#coords_${k}`);
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -365,6 +365,13 @@ try {
       surface.dispatchEvent(new PointerEvent("pointerup", o));
       surface.dispatchEvent(new MouseEvent("click", o));
     }
+    // hover.ts coalesces pointermove onto one animation frame: a move that arrives while a
+    // frame is already pending is stored and not applied until that frame. A legend card used
+    // to reject that stale frame, because the tip still named the previous entry. With the
+    // card suppressed, the stale frame also has a hidden tip, so the sweep would read the
+    // previous entry's highlight (webgl kind sweep: series_legend/links[1] saw series 1's path).
+    // Flush one frame so the DOM matches this event before we read it.
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     const tip = sr.querySelector(".masque-tip");
     // Bare shape in g.hi — svg.masque-fill (fill half) + svg.masque-edge (edge half) for the
     // default split-blend recipe, svg.masque-plain for an explicit `hoverstyle` (no wrapper
