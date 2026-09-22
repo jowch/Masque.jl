@@ -15,9 +15,12 @@ for s in hover click brush legend; do
   node "$E2E/home_feature_gifs.mjs" "$BASE" "$s" "$frames"
   "$ROOT/docs/dev/readme-demo/assemble.sh" "$frames" "$OUT/$s.gif"
 done
-# Orbit is CairoMakie camera frames, not a harvested overlay player.
+# Orbit is a live Pluto drag (ViewInteractable streams cairo frames).
+# Requires a Pluto server: MASQUE_DEV_ENV=... julia test/e2e/serve.jl 1240
+PLUTO="${MASQUE_ORBIT_PLUTO:-http://localhost:1240}"
 frames="/tmp/home-gifs/orbit"
 rm -rf "$frames"
-julia --project="$ROOT/docs" "$ROOT/docs/dev/home-gifs/record-orbit.jl" "$frames"
+node "$E2E/home_orbit_gif.mjs" "$PLUTO" \
+  "$ROOT/docs/dev/home-gifs/orbit_notebook.jl" "$frames"
 "$ROOT/docs/dev/readme-demo/assemble.sh" "$frames" "$OUT/orbit.gif"
 ls -la "$OUT"

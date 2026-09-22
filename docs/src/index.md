@@ -18,7 +18,7 @@ When you click a mark to select it, `@bind` captures that selection, the same wa
 
 ## Interactive view controls
 
-![Orbiting a trefoil knot on Axis3](assets/home/orbit.gif)
+![Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera](assets/home/orbit.gif)
 
 Drag a 2D axis to pan, or an `Axis3` to orbit. The camera stays on the figure; it is not a selection. For more information, see [Pan and orbit](@ref).
 
