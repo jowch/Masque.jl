@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { layerNElements, selectionFor } from "../src/selection"
+import { layerNElements, selectionFor, linkedHits } from "../src/selection"
 import type { Hit, HitLayer, Manifest } from "../src/types"
 
 // layerNElements' other kind branches (circles/rects/polygons/segments/polyline) are exercised
@@ -58,5 +58,47 @@ describe("selectionFor", () => {
 
     it("a layer with an empty links array (links: []) pins itself — SELECTED_KINDS with nothing wired as a legend", () => {
         expect(selectionFor(hit({ ...circles, links: [] }), manifest)).toEqual([hit({ ...circles, links: [] })])
+    })
+})
+
+describe("linkedHits", () => {
+    const traces: HitLayer = {
+        id: "series", kind: "lines", axis: "ax1", events: ["hover"],
+        geometry: [[0, 0, 10, 10], [0, 5, 10, 15], [0, 10, 10, 20]],
+        payloads: [{}, {}, {}],
+    }
+    const legend: HitLayer = {
+        id: "legend", kind: "rects", axis: "ax1", events: ["hover"],
+        geometry: [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+        payloads: [{}, {}, {}],
+        links: [["series:1"], ["series:2"], ["series"]],
+    }
+    const namedPin: HitLayer = {
+        id: "series:2", kind: "circles", axis: "ax1", events: ["hover"],
+        geometry: [1, 1, 5], payloads: [{}],
+    }
+    const manifest: Manifest = {
+        width: 100, height: 100, scaling: 1, layers: [traces, legend], transforms: {},
+    }
+
+    it("id:k pins one element (Julia 1-based → JS 0-based), not every path of the layer", () => {
+        const hits = linkedHits(manifest, legend, 1)
+        expect(hits).toHaveLength(1)
+        expect(hits[0].layer).toBe(traces)
+        expect(hits[0].index).toBe(1)
+    })
+
+    it("a bare layer id still fans out to every element", () => {
+        const hits = linkedHits(manifest, legend, 2)
+        expect(hits.map((h) => h.index)).toEqual([0, 1, 2])
+    })
+
+    it("an exact layer id containing a colon is not parsed as an element pin", () => {
+        const pinLegend: HitLayer = { ...legend, links: [["series:2"]] }
+        const m: Manifest = { width: 100, height: 100, scaling: 1, layers: [namedPin, pinLegend], transforms: {} }
+        const hits = linkedHits(m, pinLegend, 0)
+        expect(hits).toHaveLength(1)
+        expect(hits[0].layer).toBe(namedPin)
+        expect(hits[0].index).toBe(0)
     })
 })

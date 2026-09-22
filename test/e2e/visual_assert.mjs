@@ -138,17 +138,19 @@ export function assertWash(wash, where, wantDark) {
 // Selected-open-geometry ring: unblended, lives only in `svg.masque-plain`, unchanged by the
 // fill/edge split.
 export function assertRing(ring, where) {
-  if (!ring || ring.lines.length !== 2) throw new Error(`${where}: ring ${JSON.stringify(ring)}`);
-  if (!ring.lines.every((l) => hasClass(l.className, "masque-hi"))) {
+  // A per-segment ring is two <line>s; a whole-line ring is two <path>s. Same 2px/4px recipe.
+  const strokes = ring?.paths?.length ? ring.paths : ring?.lines;
+  if (!ring || !strokes || strokes.length !== 2) throw new Error(`${where}: ring ${JSON.stringify(ring)}`);
+  if (!strokes.every((l) => hasClass(l.className, "masque-hi"))) {
     throw new Error(`${where}: ring line missing masque-hi class ${JSON.stringify(ring)}`);
   }
-  const widths = ring.lines.map((l) => l.width).sort().join(",");
+  const widths = strokes.map((l) => l.width).sort().join(",");
   if (widths !== "2,4") throw new Error(`${where}: ring recipe ${JSON.stringify(ring)}`);
-  const strokes = ring.lines.map((l) => l.stroke);
-  if (strokes[0] !== strokes[1] || !realColor(strokes[0])) {
+  const colors = strokes.map((l) => l.stroke);
+  if (colors[0] !== colors[1] || !realColor(colors[0])) {
     throw new Error(`${where}: ring stroke ${JSON.stringify(ring)}`);
   }
-  const outer = ring.lines.find((l) => l.width === "4");
+  const outer = strokes.find((l) => l.width === "4");
   if (!outer || String(outer.opacity) !== "0.25") {
     throw new Error(`${where}: ring outer opacity ${outer?.opacity} (want 0.25)`);
   }
@@ -233,7 +235,7 @@ export function assertHoverRecipe(hi, where, closed, wantDark) {
 // carry the opaque selected wash — see the module comment). The tooltip and `@bind` still fire;
 // only this is skipped.
 export function assertNoHighlight(hi, where) {
-  if (hi?.fill || hi?.edge) {
+  if (hi?.fill || hi?.edge || hi?.plain) {
     throw new Error(`${where}: highlight drawn on an already-selected mark ${JSON.stringify(hi)}`);
   }
 }

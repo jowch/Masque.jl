@@ -501,6 +501,27 @@ describe("keyboard navigation", () => {
         expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "l", index: 3 })
     })
 
+    it(":lines is one focus stop for the whole path, NaN gap included", () => {
+        const manifest: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{
+                id: "curves", kind: "lines",
+                geometry: [[0, 0, 50, 0, NaN, NaN, 80, 40], [0, 100, 40, 100]],
+                payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"],
+            }],
+        }
+        const { surface, shadow, host } = setup(manifest)
+        surface.focus()
+        down(surface, "ArrowRight")
+        const path = shadow.querySelector(".hi path") as SVGPathElement
+        expect(path.getAttribute("d")).toBe("M0 0L50 0M80 40")
+        down(surface, "Enter")
+        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "curves", index: 0 })
+        down(surface, "ArrowRight")
+        down(surface, "Enter")
+        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "curves", index: 1 })
+    })
+
     it("announces position/count over non-gap segments only, for a gapped :polyline", async () => {
         vi.useFakeTimers()
         try {

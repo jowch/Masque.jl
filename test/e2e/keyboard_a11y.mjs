@@ -22,7 +22,7 @@ const ALLOWED = [/Bonito\.decode_binary is not a function/, /Bonito\.fetch_binar
 
 const browser = await chromium.launch({
   headless: true,
-  // See kind_sweep.mjs's identical comment: this notebook mounts 18 WGL canvases (one per
+  // See kind_sweep.mjs's identical comment: this notebook mounts 20 WGL canvases (one per
   // widget) and Chromium's default active-context cap is 16 — past it, the OLDEST context is
   // silently evicted, regardless of which widgets this driver itself inspects.
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--max-active-webgl-contexts=64"],
@@ -257,10 +257,11 @@ try {
       if (l.kind === "rects") return g.length / 4;
       if (l.kind === "segments") return g.length / 4;
       if (l.kind === "polyline") return Math.max(0, g.length / 2 - 1);
+      if (l.kind === "lines") return g.length;
       if (l.kind === "polygons") return g.length;
       return 0; // :grid/:threshold/:roi/:view aren't in FOCUSABLE_KINDS
     };
-    const FOCUSABLE = new Set(["circles", "rects", "polygons", "segments", "polyline"]);
+    const FOCUSABLE = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines"]);
     let before = 0;
     for (let i = 0; i < legendIdx; i++) if (FOCUSABLE.has(layers[i].kind)) before += countOf(layers[i]);
     // "pts" is legend row index 2 (kind_sweep_figures.jl's links.cases) -> flat focus index

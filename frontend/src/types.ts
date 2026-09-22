@@ -2,6 +2,7 @@
 export type Kind =
     | "circles"   // geometry: [cx,cy,r, …]
     | "polyline"  // geometry: [x,y, …]  (NaN = gap); segment i = (v[i], v[i+1])
+    | "lines"     // geometry: number[][]  one [x,y,…] polyline per element (NaN = gap inside that line)
     | "segments"  // geometry: [x0,y0,x1,y1, …]  disjoint pairs
     | "rects"     // geometry: [cx,cy,w,h, …]
     | "grid"      // geometry: GridGeometry  (compact; edges not N rects)
@@ -73,16 +74,18 @@ export interface HitLayer {
     axis: string
     events: string[] // "click" | "hover" | "drag"
     style?: LayerStyle
-    tol?: number // :segments/:polyline hit-test slack, image px; absent → geometry.ts's SEG_TOL fallback
+    tol?: number // :segments/:polyline/:lines hit-test slack, image px; absent → geometry.ts's SEG_TOL fallback
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
     selected?: number[] // 0-based element indices seeding the highlight at mount
     // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | none
     bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "none"
     selects?: string   // id of the target layer this ROI selects; absent → bounds-ROI (no multi-select)
-    // Per-element linked highlight (e.g. a Legend entry): ids of OTHER layers this element
+    // Per-element linked highlight (e.g. a Legend entry): other layers this element
     // highlights with the selected recipe on hover/focus; [] or absent-per-element = no link.
-    // Julia guarantees every referenced id exists and has a kind in SELECTED_KINDS.
+    // Each id is a layer id (every element) or `id:k` pinning element k (Julia 1-based).
+    // Julia guarantees every referenced layer exists and has a kind in SELECTED_KINDS, and
+    // that a `:k` pin is in range.
     links?: string[][]
     label?: string     // screen-reader announcement prefix, e.g. "Scatter, element 3 of 10: …"; absent → no prefix
     // Per-element tooltip accent colour: one CSS colour string (uniform across the layer), or a
@@ -125,7 +128,7 @@ export interface Hit {
 }
 
 // One entry in keyboard.ts's flat, manifest-order nav list — element-indexed kinds only
-// (circles/rects/polygons/segments/polyline; grid/axis/threshold/roi/view excluded, see
+// (circles/rects/polygons/segments/polyline/lines; grid/axis/threshold/roi/view excluded, see
 // keyboard.ts's FOCUSABLE_KINDS for why). A polyline's NaN-gap "segments" (Julia's gap
 // sentinel — see geometry.ts's hitLayer, which the mouse path already skips) never get a
 // FocusRef at all. `index_` is the raw hitLayerByIndex/geometry index (used to resolve the

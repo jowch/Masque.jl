@@ -1098,6 +1098,25 @@ describe("tooltips (mount/showTip)", () => {
         expect(node.querySelectorAll("line").length).toBe(2)
     })
 
+    it("selected= on lines draws one ring for the whole path, NaN gap included", () => {
+        const { host, script } = setup()
+        const lines: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{
+                id: "curves", kind: "lines",
+                geometry: [[0, 0, 100, 0, NaN, NaN, 100, 80], [0, 200, 50, 200]],
+                payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"],
+                selected: [0],
+            }],
+        }
+        mount(script, lines)
+        const node = plainSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        const paths = [...node.querySelectorAll("path")]
+        expect(paths.length).toBe(2)
+        expect(paths[0].getAttribute("d")).toBe("M0 0L100 0M100 80")
+        expect(node.querySelector("line")).toBeNull()
+    })
+
     it("selected= on grid fails loud at mount", () => {
         const { script } = setup()
         const bad: Manifest = {

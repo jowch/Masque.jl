@@ -21,6 +21,66 @@ export function distToSegment(px: number, py: number, x0: number, y0: number, x1
     return Math.hypot(px - p.x, py - p.y)
 }
 
+function finitePair(x: number, y: number): boolean {
+    return Number.isFinite(x) && Number.isFinite(y)
+}
+
+// Nearest point on a polyline (flat [x,y,…], NaN/Inf = gap). null when the path has no finite edge.
+export function closestPointOnPath(px: number, py: number, verts: number[]): { x: number; y: number; dist: number } | null {
+    let best: { x: number; y: number; dist: number } | null = null
+    for (let i = 0; i < verts.length / 2 - 1; i++) {
+        const x0 = verts[2 * i], y0 = verts[2 * i + 1], x1 = verts[2 * i + 2], y1 = verts[2 * i + 3]
+        if (!finitePair(x0, y0) || !finitePair(x1, y1)) continue
+        const p = closestPointOnSegment(px, py, x0, y0, x1, y1)
+        const dist = Math.hypot(px - p.x, py - p.y)
+        if (!best || dist < best.dist) best = { x: p.x, y: p.y, dist }
+    }
+    return best
+}
+
+// Keyboard focus has no cursor: sit at the arc-length midpoint, the same idea as a segment's midpoint.
+export function pointHalfwayAlong(verts: number[]): { x: number; y: number } {
+    const segs: { x0: number; y0: number; x1: number; y1: number; len: number }[] = []
+    let total = 0
+    for (let i = 0; i < verts.length / 2 - 1; i++) {
+        const x0 = verts[2 * i], y0 = verts[2 * i + 1], x1 = verts[2 * i + 2], y1 = verts[2 * i + 3]
+        if (!finitePair(x0, y0) || !finitePair(x1, y1)) continue
+        const len = Math.hypot(x1 - x0, y1 - y0)
+        segs.push({ x0, y0, x1, y1, len })
+        total += len
+    }
+    if (!segs.length) {
+        for (let i = 0; i < verts.length; i += 2) {
+            if (finitePair(verts[i], verts[i + 1])) return { x: verts[i], y: verts[i + 1] }
+        }
+        return { x: 0, y: 0 }
+    }
+    let remain = total / 2
+    for (let s = 0; s < segs.length; s++) {
+        const seg = segs[s]
+        if (remain <= seg.len || s === segs.length - 1) {
+            const t = seg.len ? Math.max(0, Math.min(1, remain / seg.len)) : 0
+            return { x: seg.x0 + t * (seg.x1 - seg.x0), y: seg.y0 + t * (seg.y1 - seg.y0) }
+        }
+        remain -= seg.len
+    }
+    const last = segs[segs.length - 1]
+    return { x: last.x1, y: last.y1 }
+}
+
+// SVG path data for an open polyline. A non-finite vertex starts a new subpath (NaN gap).
+export function pathData(verts: number[]): string {
+    let d = ""
+    let pen = false
+    for (let i = 0; i < verts.length; i += 2) {
+        const x = verts[i], y = verts[i + 1]
+        if (!finitePair(x, y)) { pen = false; continue }
+        d += `${pen ? "L" : "M"}${x} ${y}`
+        pen = true
+    }
+    return d
+}
+
 // even-odd point-in-polygon; ring is a flat [x,y,…]
 export function pointInPolygon(px: number, py: number, ring: number[]): boolean {
     let inside = false
@@ -124,6 +184,20 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
                 if (d < bd) { bd = d; best = k }
             }
             if (bd <= tol) return { index: best, geom_: ["seg", a[2 * best], a[2 * best + 1], a[2 * best + 2], a[2 * best + 3]] }
+            return null
+        }
+        case "lines": {
+            // Each entry is one plotted line. Walk its edges only to decide whether the pointer
+            // is on that path; the hit's identity is the line, and its highlight is the full
+            // vertex list (NaN gaps stay gaps inside it).
+            const paths = g as number[][]
+            const tol = layer.tol ?? SEG_TOL
+            let best = -1, bd = Infinity
+            for (let k = 0; k < paths.length; k++) {
+                const hit = closestPointOnPath(px, py, paths[k])
+                if (hit && hit.dist < bd) { bd = hit.dist; best = k }
+            }
+            if (bd <= tol && best >= 0) return { index: best, geom_: ["path", paths[best]] }
             return null
         }
         case "segments": {
@@ -304,6 +378,12 @@ export function anchorFor(hit: Hit, cursor: { x: number; y: number } | null): An
     if (g[0] === "seg") {
         const x0 = g[1] as number, y0 = g[2] as number, x1 = g[3] as number, y1 = g[4] as number
         const p = cursor ? closestPointOnSegment(cursor.x, cursor.y, x0, y0, x1, y1) : { x: (x0 + x1) / 2, y: (y0 + y1) / 2 }
+        return { x: p.x, y: p.y, top: p.y }
+    }
+    if (g[0] === "path") {
+        const verts = g[1] as number[]
+        const on = cursor ? closestPointOnPath(cursor.x, cursor.y, verts) : null
+        const p = on ?? pointHalfwayAlong(verts)
         return { x: p.x, y: p.y, top: p.y }
     }
     if (g[0] === "poly") {

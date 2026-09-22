@@ -204,3 +204,37 @@ describe("legend links: fan-out across kinds", () => {
         expect(tags.filter((t) => t === "g").length).toBe(2)
     })
 })
+
+describe("legend links: id:k pins one element of a multi-path :lines layer", () => {
+    // legend rect at image [80,120]x[90,110] -> client center (50,50); links to series element 2
+    // (Julia 1-based) of a 3-path :lines layer — must draw one ring, not three.
+    const manifest: Manifest = {
+        width: 1200, height: 800, scaling: 2, transforms: {},
+        layers: [
+            {
+                id: "legend", kind: "rects", axis: "ax1", events: ["hover"],
+                geometry: [100, 100, 40, 20],
+                payloads: [{}],
+                links: [["series:2"]],
+            },
+            {
+                id: "series", kind: "lines", axis: "ax1", events: ["hover"],
+                geometry: [[0, 0, 50, 50], [10, 10, 60, 60], [20, 20, 70, 70]],
+                payloads: [{}, {}, {}],
+            },
+        ],
+    }
+
+    it("draws one selected ring for the pinned path, not every series", () => {
+        const { surface, shadow } = setup(manifest)
+        move(surface, 50, 50)
+        // open :lines selected recipe is an unblended ring in svg.masque-plain (a <g> wrapping
+        // two <path>s) — one top-level g.link child.
+        expect(linkGroupSize(shadow)).toBe(1)
+        const ring = shadow.querySelector("svg.masque-plain g.link > g")
+        expect(ring).not.toBeNull()
+        const ds = [...ring!.querySelectorAll("path")].map((p) => p.getAttribute("d") || "")
+        expect(ds.some((d) => d.includes("M10 10") && d.includes("L60 60"))).toBe(true)
+        expect(ds.every((d) => !d.includes("M0 0") && !d.includes("M20 20"))).toBe(true)
+    })
+})

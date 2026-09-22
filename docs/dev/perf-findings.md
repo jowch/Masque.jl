@@ -21,7 +21,11 @@
 > one MsgPack int header+value (1–3 B), added once per `:segments`/`:polyline` layer, not per
 > element/vertex — e.g. the parity corpus's `logscale`/`axis3`/`polaraxis`/`colorbar` line
 > layers each gained exactly one `"tol": 12` entry (`test/fixtures/parity/*.{cairo,webgl}.json`
-> diffs). Doesn't scale with plot size — negligible at any N;
+> diffs). Doesn't scale with plot size — negligible at any N.
+> Whole-line `:lines` (#89) is the same shape of change: geometry is one flat vertex list
+> per path, and each such layer ships that same per-layer `"tol"` int. The envelope benches
+> still construct `PointInteractable` and heatmap fixtures only, so they contain no `:lines`
+> layer and the published sizes are unchanged by construction;
 > and re-run for the keyboard-navigation `label` field (this PR, 2026-09-15):
 > manifest-shape change — a new optional per-layer `"label"` string field (screen-reader
 > announcement prefix), present only when the `label` keyword is set on
@@ -118,7 +122,7 @@
 > (−15 B), and two per-transform fields that are always present regardless of value —
 > `valueaxis` (+11 B; `null` on a non-colorbar axis like this one) and `is3d` (+6 B; `false`
 > here). `tol`/`label`/`links` do **not** apply here — `tol` is code-gated to
-> `:segments`/`:polyline` layers only (`src/render.jl`), and neither `label` nor `links` is
+> `:segments`/`:polyline`/`:lines` layers only (`src/render.jl`), and neither `label` nor `links` is
 > set on this bench's heatmap fixture, so none of the three appear in its manifest; checked
 > directly against the layer's keys), heatmap-1000² still 6 KB, and STRESS D still 10.24 MB —
 > matching the value already verified by direct inspection in the `#110`/`#109` entry above. This is the

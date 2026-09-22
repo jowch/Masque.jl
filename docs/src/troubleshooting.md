@@ -26,8 +26,14 @@ this as "got N payloads for M elements"; `PointInteractable` has its own check a
 
 **Cause:** `SegmentInteractable(...; mode = ...)` got something other than the two valid
 symbols.
-**Fix:** use `:polyline` (connected path, nearest-segment hit) or `:pairs` (disjoint segment
-pairs).
+**Fix:** use `:polyline` (connected path) or `:pairs` (disjoint segment pairs).
+
+### "unit=:line applies only to mode=:polyline"
+
+**Cause:** `SegmentInteractable(...; unit = :line)` was combined with `mode = :pairs` (or
+any mode other than `:polyline`).
+**Fix:** drop `unit` (the default `:segment` is one element per edge or pair) or keep
+`mode = :polyline`. `lines!` / `stairs!` / `series!` already pass `unit = :line`.
 
 ### "orientation must be :horizontal or :vertical"
 
