@@ -15,4 +15,9 @@ for s in hover click brush legend; do
   node "$E2E/home_feature_gifs.mjs" "$BASE" "$s" "$frames"
   "$ROOT/docs/dev/readme-demo/assemble.sh" "$frames" "$OUT/$s.gif"
 done
+# Orbit is CairoMakie camera frames, not a harvested overlay player.
+frames="/tmp/home-gifs/orbit"
+rm -rf "$frames"
+julia --project="$ROOT/docs" "$ROOT/docs/dev/home-gifs/record-orbit.jl" "$frames"
+"$ROOT/docs/dev/readme-demo/assemble.sh" "$frames" "$OUT/orbit.gif"
 ls -la "$OUT"

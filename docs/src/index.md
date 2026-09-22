@@ -14,25 +14,19 @@ Hold your pointer over a point, bar, heatmap cell, polygon, or legend entry and 
 
 ![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.gif)
 
-When you click a mark to select it,`@bind` captures that selection, the same way a PlutoUI slider does. Downstream cells re-run with the selected row, bar, or cell. For more information, see [Click marks](@ref) and
-[Selection](@ref).
+When you click a mark to select it, `@bind` captures that selection, the same way a PlutoUI slider does. Downstream cells re-run with the selected row, bar, or cell. For more information, see [Click marks](@ref) and [Selection](@ref).
 
 ## Interactive view controls
 
-![Dragging a region box onto Cascadia weather stations updates the bound table](assets/home/brush.gif)
+![Orbiting a trefoil knot on Axis3](assets/home/orbit.gif)
 
-[NOTE: Replace with an orbit gif]
-
-Drag a box over points to select a region. Drag a cutoff on a colorbar. Pan a 2D axis, or orbit `Axis3` on the WebGL backend. See
-[Brush a region](@ref), [Read coordinates](@ref), and
-[Pan and orbit](@ref).
+Drag a 2D axis to pan, or an `Axis3` to orbit. The camera stays on the figure; it is not a selection. For more information, see [Pan and orbit](@ref).
 
 ## Highlight from the legend
 
 ![Clicking a species in the legend keeps that class and fades the others](assets/home/legend.gif)
 
-Click a `Makie.Legend` entry. The overlay washes the traces it labels;
-a cell that reads the pick can fade the rest. See [Legend](@ref).
+Click a legend entry to highlight the traces it labels, and a cell that reads that pick can fade the rest. See [Legend](@ref).
 
 ## Inspect a static export
 
@@ -69,18 +63,15 @@ you can orbit. See [Backends](@ref).
 </script>
 ```
 
-
-
 ## Where to go next
 
-- [Getting started](@ref) — a walkthrough: explicit vs. zero-config,
-choosing a backend, what a bond value looks like
+- [Getting started](@ref) — install, overlay a figure, and read a click
 - [Constructors](@ref) — every built-in kind, its constructor, and its
-default payload
+  default payload
 - [Selection](@ref) — reacting to clicks, linking plots, persisting a
-highlight
+  highlight
 - [Legend](@ref) — hover/click a `Makie.Legend` entry to highlight the
-trace(s) it labels
+  trace(s) it labels
 - [Tooltips](@ref) — `masque"..."` templates and styling
 - [Custom hits](@ref) — `RegionInteractable` / `FunctionInteractable`
 - [Backends](@ref) — `:cairo` vs `:webgl`, and when to reach for which
