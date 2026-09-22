@@ -88,11 +88,12 @@ end
 
 ```julia
 pick === nothing ? "click a bar" :
-    "value $(pick.payload.value) (low $(pick.payload.low), high $(pick.payload.high))"
+    "value $(pick.value) (low $(pick.low), high $(pick.high))"
 ```
 
-`pick.payload.index` raises an error on this zero-config bar plot. There
-is no `index` field. Pass the plot object when you want an explicit
+`pick.payload.index` raises an error on this zero-config bar plot: the
+row is `(; low, high, value)`. `pick.index` is the 1-based bar. Pass the
+plot object when you want an explicit
 interactable: `p = barplot!(ax, 1:4, ys); RectInteractable(ax, p)`. That
 method is `RectInteractable(ax, p::BarPlot; id = :bars)`. `direction`
 (`:y` by default) chooses which axis is `low` / `high`.
@@ -273,7 +274,7 @@ end
 
 ```julia
 pick === nothing ? "click a point" :
-    "index $(pick.index) (θ $(pick.payload.x), r $(pick.payload.y))"
+    "index $(pick.index) (θ $(pick.x), r $(pick.y))"
 ```
 
 Auto on `PolarAxis` allowlists Scatter, Lines, LineSegments, and

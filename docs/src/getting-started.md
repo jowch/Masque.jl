@@ -166,18 +166,17 @@ mark does not change `pick`.
 **3.** Read the pick:
 
 ```julia
-pick === nothing ? "click a city" : "$(pick.payload.city) selected"
+pick === nothing ? "click a city" : "$(pick.city) selected"
 ```
 
 Click a city. The readout becomes `"Tokyo selected"` (or whichever city
 you clicked). Before a click, `pick` is `nothing`. After a click, `pick`
-is an [`InteractionEvent`](@ref): `layer` is `:cities`, `index` is
-0-based, and `payload` is the Julia object from `payloads[index + 1]`
-(`===`, not a JSON copy). Index it as `pick.payload.city`, not
-`pick.payload.label`. The selection stays on the last mark clicked. A
-click in empty space does not write the bond.
+is an [`ElementEvent`](@ref): `layer` is `:cities`, `index` is 1-based,
+and `pick.city` is that row's field. `cities_data[pick]` is the same row.
+The selection stays on the last mark clicked. A click in empty space
+does not write the bond.
 
-`InteractionEvent` is exported by Masque. Do not redefine it in the
+`ElementEvent` is exported by Masque. Do not redefine it in the
 notebook.
 
 ## You are done
@@ -201,8 +200,8 @@ uses the plot-object constructor, so the highlight already hugs the
 marker.
 
 Replace **both** the bind cell and the readout cell. The leftover
-`pick.payload.city` cell raises an error: the default payload has no
-field `city`.
+`pick.city` cell raises an error: the default payload has no field
+`city`.
 
 ```julia
 @bind pick masque(fig)
@@ -210,11 +209,11 @@ field `city`.
 
 ```julia
 pick === nothing ? "click a point" :
-    "index $(pick.payload.index) / x $(pick.payload.x) / y $(pick.payload.y)"
+    "index $(pick.index) / x $(pick.x) / y $(pick.y)"
 ```
 
-The default payload is `(; index, x, y)`, not `(; city, pop)`. The layer
-id is `:scatter`, not `:cities`. For `auto_interactables` and huge-data
-payloads, see [Constructors](@ref).
+The default payload is `(; index, x, y)` with 1-based `index`, not
+`(; city, pop)`. The layer id is `:scatter`, not `:cities`. For
+`auto_interactables` and huge-data payloads, see [Constructors](@ref).
 
 The default path is CairoMakie. For WebGL, see [Backends](@ref).

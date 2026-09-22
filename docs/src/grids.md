@@ -110,12 +110,12 @@ when a cell is smaller than about one screen pixel (Masque then drops
 table used on scatter and bars. For more information, see
 [Tooltips](@ref).
 
-Click the cell. In live Pluto, `pick` is an [`InteractionEvent`](@ref):
-`layer` is `:cells`, `index` is the linear 0-based cell, and `payload`
-is `(; i, j, value)` (or `(; i, j)` when values were dropped from the
-manifest; the click still carries the cell). `i` and `j` are 0-based
-(column, then row). The cell is a highlight in the overlay. A click in
-empty space does not write the bond.
+Click the cell. In live Pluto, `pick` is a [`GridCellEvent`](@ref):
+`layer` is `:cells`, `pick.i` and `pick.j` are 1-based (column, then
+row), and `A[pick]` is `A[pick.i, pick.j]`. `pick.value` is the cell
+value when it was shipped, or `nothing` when values were dropped from the
+manifest (the click still carries the cell). The cell is a highlight in
+the overlay. A click in empty space does not write the bond.
 
 Tab and arrow keys skip `:grid`. Keyboard focus walks bars and scatter
 marks, not heatmap cells. For more information, see
@@ -127,11 +127,10 @@ For `selected=` on `:grid`, see
 ## Brush cells with an ROI
 
 Pair [`ROIInteractable`](@ref) with `selects = :cells`. On release, the
-bond is one range event
-`(; i0, i1, j0, j1, xmin, xmax, ymin, ymax)`, not one event per enclosed
-cell. The overlay fills the enclosed block and leaves the ROI box as the
-outline. An empty box is `Vector()`, never
-`nothing`.
+bond is one [`GridWindowEvent`](@ref): `A[win]` is
+`A[win.i1:win.i2, win.j1:win.j2]`. A brush that misses the grid has
+empty ranges, not `[]`. The overlay fills the enclosed block and leaves
+the ROI box as the outline.
 
 `selects` accepts `:circles` or `:grid`. Pointing it at a `:rects` bar
 layer raises `ArgumentError`.

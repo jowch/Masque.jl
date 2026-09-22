@@ -96,7 +96,7 @@ end
 @bind pick masque(fig, cells)
 ```
 
-Do not pass `selected = Dict(:cells => [0])`. Use `:cells_c`, `:cells_r`,
+Do not pass `selected = Dict(:cells => [1])`. Use `:cells_c`, `:cells_r`,
 or `:cells_p` for the kind you hydrated.
 
 ## FunctionInteractable

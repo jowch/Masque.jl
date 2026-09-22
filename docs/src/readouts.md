@@ -1,7 +1,8 @@
 # Read coordinates
 
 Click anywhere in a 2D axis to read data `(x, y)`. Click a colorbar to
-read `value`. Drag a threshold line; on release, Julia gets a scalar.
+read `value`. Drag a threshold line; on release, Julia gets a
+[`ThresholdEvent`](@ref).
 
 **On this site:** overlay-only. For overlay versus `@bind` versus the
 docs player, see [Overlay, Julia, and the host](@ref). There is no
@@ -65,9 +66,8 @@ end
 @bind pick masque(fig, axint)
 ```
 
-After a click, `pick` is an [`InteractionEvent`](@ref): `layer` is
-`:axis`, `index` is `-1`, and `payload` is `(; x, y)`. Read
-`pick.payload.x` and `pick.payload.y`.
+After a click, `pick` is an [`AxisEvent`](@ref): `layer` is
+`:axis`. Read `pick.x` and `pick.y`.
 
 The tooltip follows the pointer, not a mark. A click writes the bond.
 There is no highlight in the overlay at that location.
@@ -87,7 +87,7 @@ Replace the previous `fig` and `@bind pick` cells.
 
 [`ColorbarInteractable`](@ref) is one hit region on the bar's pixel box.
 The layer kind is `:axis` with a bbox. Default `id` is `:colorbar`.
-Payload is `(; value)`. `index` is `-1`.
+`pick` is a [`ColorbarEvent`](@ref). `pick.value` is the data value.
 
 `masque(fig)` **does** install a `Colorbar` block. You can also pass the
 colorbar yourself so the heatmap cells are not in the same widget:
@@ -112,7 +112,7 @@ end
 @bind pick masque(fig, cbint)
 ```
 
-Click the bar. `pick.payload.value` is the data value under the pointer.
+Click the bar. `pick.value` is the data value under the pointer.
 The tooltip follows the pointer (`value=…`). Same invertible scales as
 the axis (`identity`, `log10`, `log`).
 
@@ -147,10 +147,9 @@ end
 ```
 
 While you drag, the overlay moves the line. After you release the
-pointer, `pick` is an `InteractionEvent`: `layer` is `:threshold`,
-`index` is `0`, and `payload` is a **scalar** (the data coordinate).
-There is no field name. `pick.payload.y` raises an error; use
-`pick.payload`.
+pointer, `pick` is a [`ThresholdEvent`](@ref): `layer` is `:threshold`,
+and `pick.value` is the data coordinate. `pick.y` raises an error; use
+`pick.value`.
 
 This is not a slider of the continuum. Release writes one scalar. The
 pointer can stop anywhere on the dragged axis.

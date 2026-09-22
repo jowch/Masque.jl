@@ -133,7 +133,7 @@ overlays the same kinds. Continuous θ/r readout is not shipped.
 [`gallery/gallery.jl`](https://github.com/jowch/Masque.jl/blob/main/gallery/gallery.jl)
 is closer to an application than a feature tour: a scatter with
 [`ROIInteractable`](@ref) `selects` (the bond is a
-`Vector{InteractionEvent}`, one per enclosed point) and an image ROI
+`Vector{ElementEvent}`, one per enclosed point) and an image ROI
 with per-channel stats.
 
 [Open the static export](notebooks/gallery.html)

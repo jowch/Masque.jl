@@ -68,12 +68,13 @@ end
 **3.** Read the pick:
 
 ```julia
-pick === nothing ? "click a legend entry" : "$(pick.payload.label) → $(pick.payload.targets)"
+pick === nothing ? "click a legend entry" : "$(pick.label) → $(pick.targets)"
 ```
 
-Before a click, `pick` is `nothing`. After a click, `pick` is an
-[`InteractionEvent`](@ref): `layer === :legend`, `index` is 0-based in
-the legend, and `payload` is `(; label, group, targets)`. `targets` are
+Before a click, `pick` is `nothing`. After a click, `pick` is a
+[`LegendEvent`](@ref): `layer === :legend`, `index` is 1-based in the
+legend, and `pick.label`, `pick.group`, and `pick.targets` are the
+entry. `targets` are
 `String` values (`"lines"`, `"lines_2"`), not `Symbol`s. `group` is the
 entry's group title, or `nothing` on an ungrouped legend.
 
@@ -83,7 +84,7 @@ series points is looking at the wrong object.
 
 ## Persist a series wash
 
-`selected = Dict(:legend => [0])` paints the **swatch** — the legend
+`selected = Dict(:legend => [1])` paints the **swatch** — the legend
 layer is `:rects`. To keep a series washed across a remount, hydrate the
 **target** layer ids instead. For more information, see
 [Selection](@ref).

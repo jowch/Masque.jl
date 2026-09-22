@@ -79,7 +79,7 @@ and `ymin < ymax`.
 
 **Cause:** `RegionInteractable`'s `regions` and `payloads` do not line
 up 1:1, or a region tuple's first element is not `:circle`, `:rect`, or
-`:polygon`. `selected = Dict(:cells => [0])` when `id = :cells` also
+`:polygon`. `selected = Dict(:cells => [1])` when `id = :cells` also
 fails: Region layers are `:cells_c` / `:cells_r` / `:cells_p`.
 
 **Fix:** check the region tuple shapes against [Custom hits](@ref). Key
@@ -186,7 +186,7 @@ can), or an index is out of range. Region keys are the suffixed ids,
 not the base `id`.
 
 **Fix:** check the layer's kind against [Selection](@ref). Indices are
-0-based and must be less than the element count.
+1-based and must be in `1:n`.
 
 ### An error mentioning "Makie internals changed?"
 

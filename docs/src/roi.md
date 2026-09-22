@@ -125,7 +125,7 @@ if picks === nothing
 elseif isempty(picks)
     md"*No stations in the box.*"
 else
-    rows = [samples[e.index + 1] for e in picks]
+    rows = samples[picks]
     lines = ["| Station | x | y | Group |", "|---|---:|---:|---|"]
     for r in rows
         push!(lines, "| $(r.name) | $(r.x) | $(r.y) | $(r.group) |")
@@ -135,9 +135,9 @@ end
 ```
 
 Before the first release, `picks` is `nothing`. After you release, `picks` is
-a `Vector` of [`InteractionEvent`](@ref) values. An empty box commits `[]`,
-never `nothing`. Index `e.index` is 0-based; `samples[e.index + 1]` is the
-enclosed station. Each event's `layer` is `:pts`. Enclosed points highlight
+a `Vector` of [`ElementEvent`](@ref) values. An empty box commits `[]`,
+never `nothing`. `e.index` is 1-based; `samples[e]` is the enclosed
+station. Each event's `layer` is `:pts`. Enclosed points highlight
 in the overlay; the PNG does not change.
 
 On this docs site, the player lists a handful of
@@ -146,22 +146,21 @@ the same way the overlay commits. Exact pixel bounds are not in that
 table. Unlisted box geometry still moves in the overlay; the table stays
 on the last listed set.
 
-## If your rows are NamedTuples
+## If your rows are a table
 
-If the points come from a table, pull columns for `scatter!` and build
-`payloads` as a vector of NamedTuples, one per mark, in the same order.
-Do not pass `eachrow(df)` as `payloads`. Do not pass the `DataFrame`
-itself.
+If the points come from a table, pull columns for `scatter!` and pass
+`payloads` as a `DataFrame` with one row per mark, in the same order, or
+as a vector of NamedTuples. Do not pass `eachrow(df)` as `payloads`.
 
 ```julia
 xs = Float64[r.x for r in table]
 ys = Float64[r.y for r in table]
-payloads = [(; name = r.name, group = r.group, x = r.x, y = r.y) for r in table]
+pts = PointInteractable(ax, collect(zip(xs, ys)); id = :pts, payloads = table)
 ```
 
-Filter with payload identity, not `samples[e.index + 1]`. After a
-`selects` release, each event's `payload` is the NamedTuple you passed
-(`===`). An empty box is still `[]`:
+Filter with `table[picks, :]` when `payloads` is that DataFrame, or with
+`e.name` on each event. After a `selects` release, `picks` is a
+`Vector{ElementEvent}`. An empty box is still `[]`:
 
 ```julia
 if picks === nothing
@@ -169,18 +168,18 @@ if picks === nothing
 elseif isempty(picks)
     md"*No stations in the box.*"
 else
-    rows = [e.payload for e in picks]
+    rows = table[picks, :]
     lines = ["| Station | x | y | Group |", "|---|---:|---:|---|"]
-    for r in rows
+    for r in eachrow(rows)
         push!(lines, "| $(r.name) | $(r.x) | $(r.y) | $(r.group) |")
     end
-    Markdown.parse("**$(length(rows)) stations**\n\n" * join(lines, "\n"))
+    Markdown.parse("**$(nrow(rows)) stations**\n\n" * join(lines, "\n"))
 end
 ```
 
-`index` stays 0-based. Slicing the original table with `e.index + 1`
-works only while row order matches the interactable. Payload identity
-survives a reorder. For more information, see [Constructors](@ref).
+`index` is 1-based. Slicing the original table with `e.index` works only
+while row order matches the interactable. `e.name` and `table[picks, :]`
+read the row you passed. For more information, see [Constructors](@ref).
 
 ## Drag and resize
 
@@ -197,23 +196,24 @@ For more information, see [Keyboard and screen readers](@ref).
 ## Commit bounds or enclosed items
 
 Omit `selects` when you want the rectangle itself. On release the bond is a
-scalar `InteractionEvent` with `index = 0` and payload
-`(; xmin, xmax, ymin, ymax)`:
+[`BoundsEvent`](@ref) (`box.xmin` .. `box.ymax`):
 
 ```julia
 ROIInteractable(ax; bounds = (1.0, 4.0, 2.0, 5.0))
 ```
 
-With `selects`, the bond is a `Vector{InteractionEvent}` instead of that
-bounds event:
+With `selects`, the bond is a `Vector{ElementEvent}` over points, or one
+[`GridWindowEvent`](@ref) over a grid:
 
-- Circles (`PointInteractable`, kind `:circles`): one item per enclosed
-  point, matching the payload that mark's click reports.
+- Circles (`PointInteractable`, kind `:circles`): one [`ElementEvent`](@ref)
+  per enclosed point. `e.name` is that row.
 - Grid ([`RectInteractable`](@ref) heatmap or image, kind `:grid`): **one**
-  range item `(; i0, i1, j0, j1, xmin, xmax, ymin, ymax)`, not one event per
+  [`GridWindowEvent`](@ref) with 1-based inclusive `i1:i2` / `j1:j2`
+  (`A[win]` is `A[win.i1:win.i2, win.j1:win.j2]`), not one event per
   cell. The enclosed cell-block is fill-only in the overlay; the ROI box
   is the outline.
-- Empty: `[]`, never `nothing`.
+- Empty points box: `[]`, never `nothing`. A grid brush that misses the
+  grid is one `GridWindowEvent` whose ranges are empty, not `[]`.
 
 `selects` names a layer id whose kind is `:circles` or `:grid`. The target
 must be in the same `masque` call. `selects = :bars` fails
@@ -227,6 +227,7 @@ must be in the same `masque` call. `selects = :bars` fails
 
 A larger live-Pluto scatter brush is the "Box-select scatter" recipe in
 [`gallery/gallery.jl`](https://github.com/jowch/Masque.jl/blob/main/gallery/gallery.jl).
-The image ROI in that notebook is the `:grid` cousin: one range item on
-release, not a listed cell-by-cell player. For more information, see
+The image ROI in that notebook is the `:grid` cousin: one
+[`GridWindowEvent`](@ref) on release, not a listed cell-by-cell player. For
+more information, see
 [Examples](@ref).

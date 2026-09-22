@@ -69,7 +69,7 @@ if picks === nothing
 elseif isempty(picks)
     md"*No stations in the box.*"
 else
-    rows = [samples[e.index + 1] for e in picks]
+    rows = samples[picks]
     lines = ["| Station | x | y | Group |", "|---|---:|---:|---|"]
     for r in rows
         push!(lines, "| $(r.name) | $(r.x) | $(r.y) | $(r.group) |")

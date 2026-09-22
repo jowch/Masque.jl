@@ -34,7 +34,7 @@ end
 @bind pick masque(fig)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-pick === nothing ? md"*Hold the pointer over a legend entry, then click one.*" : md"**$(pick.payload.label)** — targets $(pick.payload.targets)"
+pick === nothing ? md"*Hold the pointer over a legend entry, then click one.*" : md"**$(pick.label)** — targets $(pick.targets)"
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

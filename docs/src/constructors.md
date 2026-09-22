@@ -6,9 +6,10 @@ constructors: the signature that matters, the default payload, the
 payloads come from `src/interactables.jl` and `src/introspect.jl`. This
 page has no player.
 
-Element constructors also take `id`, `payloads` (except heatmap/image),
-and `tooltip` (`nothing` / `masque"..."` / `false`) unless the plot-object
-method omits them. `LegendInteractable` takes `tooltip` and a fixed
+Element constructors also take `id`, `payloads` (a vector or a
+`DataFrame`, except heatmap/image), and `tooltip` (`nothing` /
+`masque"..."` / `false`) unless the plot-object method omits them.
+`LegendInteractable` takes `tooltip` and a fixed
 payload; it does not take `payloads=`. Whole-axis and drag constructors
 take `id` plus their own keywords; `payloads=` / `tooltip=` is a
 `MethodError`. `FunctionInteractable` takes neither an axis nor `id`.
@@ -77,7 +78,7 @@ empty links, stays hittable, and does not resolve plots on its own.
 | [`PointInteractable`](@ref) | `(ax, p::MeshScatter; id=:meshscatter)` | `(; index, x, y, z)` | `:circles` | [Backends](@ref) |
 | [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, tol=6, id=:segments)` | `(; segment_index)` | `:polyline` or `:segments` | [Click marks](@ref) |
 | [`RectInteractable`](@ref) | `(ax; rects, id=:rects)` or `(ax, p::BarPlot; id=:bars)` | `(; index)` explicit; BarPlot `(; low, high, value)` | `:rects` | [Click marks](@ref) |
-| [`RectInteractable`](@ref) | `(ax; grid, id=:rects)` or `(ax, p::Union{Heatmap,Image}; id=:cells)` | `(; i, j, value)` client-side | `:grid` | [Inspect a grid](@ref) |
+| [`RectInteractable`](@ref) | `(ax; grid, id=:rects)` or `(ax, p::Union{Heatmap,Image}; id=:cells)` | [`GridCellEvent`](@ref): 1-based `i`, `j`; `value` when shipped | `:grid` | [Inspect a grid](@ref) |
 | [`PolygonInteractable`](@ref) | `(ax, rings; id=:polygons)` or `(ax, p::Poly; id=:poly)` | `(; index)` | `:polygons` | [Click marks](@ref) |
 | [`TextInteractable`](@ref) | `(ax, p::Makie.Text; id=:text)` only | `(; text, index, x, y)` | `:rects` | [Click marks](@ref) |
 
@@ -107,7 +108,7 @@ Each row is `*(ax, p)` unless noted. `id` is the auto layer id.
 | `CrossBar` | `RectInteractable` | `(; midpoint, low, high)` | `:rects` |
 | `HSpan` / `VSpan` | `RectInteractable` | `(; low, high)` | `:rects` |
 | `Spy` | `RectInteractable` | `(; index)` | `:rects` |
-| `Heatmap` / `Image` | `RectInteractable` | `(; i, j, value)` | `:grid` |
+| `Heatmap` / `Image` | `RectInteractable` | [`GridCellEvent`](@ref): 1-based `i`, `j` | `:grid` |
 | `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | `(; index)` | `:polygons` |
 | `Contourf` | `PolygonInteractable` | `(; low, high)` | `:polygons` |
 | `Violin` | `PolygonInteractable` | `(; x)` | `:polygons` |
@@ -121,11 +122,11 @@ Each row is `*(ax, p)` unless noted. `id` is the auto layer id.
 
 | Constructor | Signature | Default payload | Kind | Guide |
 |---|---|---|---|---|
-| [`AxisInteractable`](@ref) | `(ax; id=:axis)` | `(; x, y)` client-side; `index = -1` | `:axis` | [Read coordinates](@ref) |
-| [`ColorbarInteractable`](@ref) | `(cb; id=:colorbar)` | `(; value)` client-side | `:axis` (bbox) | [Read coordinates](@ref) |
-| [`LegendInteractable`](@ref) | `(leg; targets=nothing, id=:legend)` | `(; label, group, targets)` | `:rects` | [Legend](@ref) |
-| [`ThresholdInteractable`](@ref) | `(ax; orientation=:horizontal, value, id=:threshold)` | scalar on release | `:threshold` | [Read coordinates](@ref) |
-| [`ROIInteractable`](@ref) | `(ax; bounds, selects=nothing, id=:roi)` | `(; xmin, xmax, ymin, ymax)` or `Vector` with `selects` | `:roi` | [Brush a region](@ref) |
+| [`AxisInteractable`](@ref) | `(ax; id=:axis)` | [`AxisEvent`](@ref): `x`, `y` | `:axis` | [Read coordinates](@ref) |
+| [`ColorbarInteractable`](@ref) | `(cb; id=:colorbar)` | [`ColorbarEvent`](@ref): `value` | `:axis` (bbox) | [Read coordinates](@ref) |
+| [`LegendInteractable`](@ref) | `(leg; targets=nothing, id=:legend)` | [`LegendEvent`](@ref): `label`, `group`, `targets` | `:rects` | [Legend](@ref) |
+| [`ThresholdInteractable`](@ref) | `(ax; orientation=:horizontal, value, id=:threshold)` | [`ThresholdEvent`](@ref): `value` | `:threshold` | [Read coordinates](@ref) |
+| [`ROIInteractable`](@ref) | `(ax; bounds, selects=nothing, id=:roi)` | [`BoundsEvent`](@ref), or `Vector{ElementEvent}` / [`GridWindowEvent`](@ref) with `selects` | `:roi` | [Brush a region](@ref) |
 | [`ViewInteractable`](@ref) | `(ax; id=:view)` | none — commits nothing | `:view` | [Pan and orbit](@ref) |
 
 `AxisInteractable`, `ThresholdInteractable`, and `ROIInteractable` raise

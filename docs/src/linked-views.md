@@ -103,8 +103,8 @@ end
 @bind pick masque(fig)
 ```
 
-A click writes one [`InteractionEvent`](@ref): `layer` is `:scatter` or
-`:scatter_2`, and `index` is 0-based in that layer. Same row order in
+A click writes one [`ElementEvent`](@ref): `layer` is `:scatter` or
+`:scatter_2`, and `index` is 1-based in that layer. Same row order in
 both scatters is an authoring coincidence. Masque does not treat those
 indexes as one observation.
 
@@ -194,7 +194,7 @@ Naming other layers still washes every element of those layers.
 ## Filter a table from a region
 
 Drag the box; the overlay moves it. On release the bond is a
-`Vector{InteractionEvent}` (empty `[]`, never `nothing`). A downstream
+`Vector{ElementEvent}` (empty `[]`, never `nothing`). A downstream
 cell slices the table. Before the first release the bond is `nothing`
 unless you pass `selected=`.
 
@@ -209,13 +209,13 @@ fall in this box (viewports do not overlap).
 
 ## Drive a second plot from a click
 
-`layer`, `index`, and `payload` are plain data. One click can drive any
+`layer` and `index` are plain data. One click can drive any
 number of downstream cells: filter a table, remount a second figure, or
 recompute a fit. Give the `payloads` on two interactables the same shape
 and key on it, with no extra Masque API:
 
 ```julia
-rows = pick === nothing ? data : filter(r -> r.id == pick.payload.id, data)
+rows = pick === nothing ? data : filter(r -> r.id == pick.id, data)
 ```
 
 To wash the same index list on remount, pass `selected=` on both layer
@@ -228,7 +228,7 @@ masque(
 )
 ```
 
-Last pick wins. A later click is a scalar [`InteractionEvent`](@ref) and
+Last pick wins. A later click is an [`ElementEvent`](@ref) and
 replaces a hydrated vector wholesale. To accumulate across clicks, keep
 indexes in a `Ref` in a cell that does not read this widget's bond, then
 feed the set into `selected=`. Two `masque` widgets do not share overlay

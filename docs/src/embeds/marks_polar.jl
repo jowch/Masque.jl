@@ -33,7 +33,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
 pick === nothing ? md"*Hold the pointer over a point, then click one.*" :
-    md"**index $(pick.index)** — θ $(pick.payload.x), r $(pick.payload.y)"
+    md"**index $(pick.index)** — θ $(pick.x), r $(pick.y)"
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

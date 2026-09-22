@@ -95,7 +95,7 @@ source.
 |---|---|---|---|---|
 | Hover tooltip / highlight | Yes | No | No | No |
 | Click-echo wash | Yes | No | No | No |
-| Click / Enter commit | Echo yes | Scalar `InteractionEvent` | No | Re-runs if it reads the bond |
+| Click / Enter commit | Echo yes | Scalar `ElementEvent` | No | Re-runs if it reads the bond |
 | ROI / threshold **in-drag** | Box / line moves | No | No | No |
 | ROI / threshold **release** | Echo if `selects` | Bounds, scalar, or `Vector` | No | Re-runs |
 | View pan / orbit **in-drag** | Readout; cairo also new frames | No | `:cairo` yes; `:webgl` numeric only | No |

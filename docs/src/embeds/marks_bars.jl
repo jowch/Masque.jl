@@ -37,7 +37,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
 pick === nothing ? md"*Hold the pointer over a bar, then click one.*" :
-    md"**value $(pick.payload.value)** — low $(pick.payload.low), high $(pick.payload.high)"
+    md"**value $(pick.value)** — low $(pick.low), high $(pick.high)"
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

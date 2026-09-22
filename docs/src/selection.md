@@ -2,9 +2,10 @@
 
 There is exactly one selection. Before a click, the `@bind` bond is
 `nothing` unless you pass `selected=`. After a click, the bond is one
-[`InteractionEvent`](@ref): `layer` (the interactable `id`), a 0-based
-`index`, and `payload`. Click a mark to replace the selection with that
-mark. A cell that reads the bond re-runs.
+[`ElementEvent`](@ref): `layer` (the interactable `id`), a 1-based
+`index`, and the row's fields on the event (`pick.city`). Click a mark
+to replace the selection with that mark. A cell that reads the bond
+re-runs.
 
 The highlight in the overlay is not a copy of the bond.
 
@@ -29,7 +30,7 @@ versus the docs player, see [Overlay, Julia, and the host](@ref).
 **2.** Read the pick:
 
 ```julia
-pick === nothing ? "click a city" : "$(pick.payload.city) selected"
+pick === nothing ? "click a city" : "$(pick.city) selected"
 ```
 
 A click in empty space leaves the current selection in place. The bond
@@ -42,21 +43,27 @@ For the cities figure, `payloads`, and `radius=`, see
 
 ## Start with marks already selected
 
-`selected=` is the selection's initial value. Pass a map of
-`layer_id => 0-based indices`. The widget mounts with those marks
-highlighted in the overlay, and the bond already holds them:
+`selected=` is the selection's initial value. Indices are 1-based. With
+one seedable layer, a bare `Int` or vector of `Int`s is enough. The
+widget mounts with those marks highlighted in the overlay:
 
 ```julia
-@bind pick masque(fig, cities; selected = Dict(:cities => [0, 7]))
+@bind pick masque(fig, cities; selected = 1)
 ```
 
-At mount, `pick` is a `Vector{InteractionEvent}` for Tokyo (index 0) and
-Beijing (index 7). The hydrated bond is always a `Vector`, even for one
-index. Do not check `pick === nothing` after hydration, and do not read
-`pick.index` as if the value were a scalar.
+`selected = 1` and `selected = [1]` both mount as one
+[`ElementEvent`](@ref) for Tokyo. `selected = [1, 8]` highlights Tokyo
+and Beijing and leaves the bond `nothing`: this interaction returns one
+city, so a set is not a value it can hold. The next click replaces the
+highlight with that city.
 
-A later click is a scalar `InteractionEvent` and replaces that vector
-wholesale. `selected=` does not accumulate with clicks. Last pick wins.
+A `selects` ROI is the interaction that returns a vector. There,
+`selected = 1` and `selected = [1]` both mount as a one-element
+`Vector{ElementEvent}`, and `selected = [1, 8]` mounts as those two.
+
+Two seedable layers need a name: `selected = (; scatter = 1)` or
+`selected = Dict(:scatter => [1, 8])`. A bare `1` across two layers
+raises `ArgumentError`. `0` is out of range.
 
 Valid kinds are `:circles`, `:rects`, `:polygons`, `:segments`, and
 `:polyline`. Any other kind, or an out-of-range index, raises
@@ -89,7 +96,7 @@ indices with `selected=` from a cell that does **not** read this
 
 ```julia
 # Does not read `pick`.
-held = Dict(:cities => [0, 7])
+held = [1, 8]
 ```
 
 **2.** Pass them back in as `selected=`:
@@ -99,8 +106,9 @@ held = Dict(:cities => [0, 7])
 ```
 
 If a slider rebuilds `fig`, pass the indices you still consider valid.
-Masque does not match a stored `InteractionEvent` by payload identity
-across a reorder.
+Masque does not match a stored [`ElementEvent`](@ref) by payload identity
+across a reorder. You can pass the event itself back into a different
+cell's `selected=`.
 
 Do not feed this widget's own bond into the same call. Pluto reports
 **Cyclic references** and does not run the cell:
@@ -118,7 +126,7 @@ cell that does not read this `@bind`, then pass the growing set as
 copy the whole demo notebook.
 
 To brush a box with `selects` and report several marks, see
-[Brush a region](@ref). To drive another cell or plot from a click's
-payload, see [Linked views](@ref).
+[Brush a region](@ref). To drive another cell or plot from a click, see
+[Linked views](@ref).
 
 [demo-round-trip]: https://github.com/jowch/Masque.jl/blob/main/examples/demo.jl
