@@ -113,8 +113,9 @@ All notable changes to this project are documented here. The format is based on
   `svg.masque-edge` stays so the stroke paints above the fill, and it draws one chrome grey
   (`#7a7a7a` light, `#c8c8c8` dark) at 1.5px on hover and 2px when selected. The ROI
   outline, the threshold line, and the selected-open ring use that same grey instead of
-  tooltip-text ink. An ROI keeps eight handles. Each is a 7 CSS px white square with a 1px
-  chrome stroke. The hit target is still the manifest `handle`. An explicit `hoverstyle`
+  tooltip-text ink. An ROI draws four corner handles, each a 7 CSS px white square with a
+  1px chrome stroke. The sides have no grip; grabbing the middle of a side still resizes
+  that edge. The hit target is still the manifest `handle`. An explicit `hoverstyle`
   stroke is still verbatim and unblended. A browser without `mix-blend-mode` draws the fill
   as that chrome grey at 0.18 opacity; the edge stroke stays the flat grey.
 - **`lines!`, `stairs!`, and a `scatterlines!` line are one element: the whole path.**

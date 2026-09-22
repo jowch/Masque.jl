@@ -178,23 +178,22 @@ describe("mount", () => {
         expect(afterClick.layer).toBe("thr")
     })
 
-    it("draws an ROI box + 8 handles (4 corners + 4 edge midpoints) and commits inverted bounds after a move", () => {
+    it("draws an ROI box + 4 corner handles and commits inverted bounds after a move", () => {
         const { host, script } = setup()
         mount(script, roiManifest())
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
         const rects = shadow.querySelectorAll("rect")
-        expect(rects.length).toBe(9)                 // 1 box + 4 corner handles + 4 edge handles
+        expect(rects.length).toBe(5)                 // 1 box + 4 corner handles; sides have no grip
         // setup img is 600 css px wide against manifest width 1200 → drawn half-side is 7 image px
-        // (7 css px grip). Hit half-size stays the manifest handle (16). Edge midpoints: n(400,200)
-        // s(400,600) w(200,400) e(600,400).
+        // (7 css px grip). Hit half-size stays the manifest handle (16). Corners: TL(200,200)
+        // TR(600,200) BR(600,600) BL(200,600).
         const drawHalf = handleDrawHalf(1200, 600, 2)
         expect(drawHalf).toBe(7)
-        const edgeHandles = [...rects].slice(5)
-        const edgeCenters = edgeHandles.map((r) => ({
+        const cornerCenters = [...rects].slice(1).map((r) => ({
             x: Number(r.getAttribute("x")) + drawHalf, y: Number(r.getAttribute("y")) + drawHalf,
         }))
-        expect(edgeCenters).toEqual([{ x: 400, y: 200 }, { x: 400, y: 600 }, { x: 200, y: 400 }, { x: 600, y: 400 }])
+        expect(cornerCenters).toEqual([{ x: 200, y: 200 }, { x: 600, y: 200 }, { x: 600, y: 600 }, { x: 200, y: 600 }])
         for (const h of [...rects].slice(1)) {
             expect(h.classList.contains("masque-handle")).toBe(true)
             expect(h.getAttribute("width")).toBe(String(2 * drawHalf))
@@ -272,7 +271,7 @@ describe("mount", () => {
         expect(committed!.payload.ymax).toBeCloseTo(75)   // image y 200 → data 100*(1-200/800)=75
     })
 
-    it("resizes an ROI box from an edge handle, moving only that one edge", () => {
+    it("resizes an ROI box from a side midpoint, with no grip drawn there", () => {
         const { host, script } = setup()
         mount(script, roiManifest())
         const shadow = shadowOf(host)
@@ -353,7 +352,7 @@ describe("mount", () => {
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 50, clientY: 200, bubbles: true }))
     })
 
-    it("hovering an ROI edge/corner handle shows the matching directional resize cursor", async () => {
+    it("hovering an ROI corner or side shows the matching directional resize cursor", async () => {
         const { host, script } = setup()
         mount(script, roiManifest())
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement

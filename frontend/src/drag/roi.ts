@@ -27,8 +27,9 @@ export function syncHandleDraw(
 }
 
 // --- draggable + resizable ROI boxes (Tier 0) ---
-// handles_[0..3] are the corners (unchanged indices/order); handles_[4..7] are the edge
-// midpoints in n,s,w,e order, matching hitLayer's roi case in geometry.ts.
+// handles_[0..3] are the corners, in the same order geometry.ts checks. The four sides have
+// no drawn grip: geometry.ts still hit-tests a square on each edge midpoint, so grabbing the
+// middle of a side resizes that one edge.
 export function setROI(box: ROIBox): void {
     const { x, y, w, h } = box.g_
     const d = box.draw_
@@ -40,15 +41,6 @@ export function setROI(box: ROIBox): void {
         box.handles_[k].setAttribute("y", String(corners[k][1] - d))
         box.handles_[k].setAttribute("width", String(2 * d))
         box.handles_[k].setAttribute("height", String(2 * d))
-    }
-    const midX = x + w / 2, midY = y + h / 2
-    const edges = [[midX, y], [midX, y + h], [x, midY], [x + w, midY]] // n, s, w, e
-    for (let k = 0; k < 4; k++) {
-        const hdl = box.handles_[4 + k]
-        hdl.setAttribute("x", String(edges[k][0] - d))
-        hdl.setAttribute("y", String(edges[k][1] - d))
-        hdl.setAttribute("width", String(2 * d))
-        hdl.setAttribute("height", String(2 * d))
     }
 }
 
@@ -74,7 +66,7 @@ export function buildROIBoxes(manifest: Manifest, svg: SVGSVGElement, base: HTML
         if (st.stroke) rect.style.setProperty("--masque-hi-stroke", st.stroke)
         svg.appendChild(rect)
         const handles: SVGRectElement[] = []
-        for (let k = 0; k < 8; k++) {
+        for (let k = 0; k < 4; k++) {
             const hdl = document.createElementNS(SVG_NS, "rect")
             hdl.classList.add("masque-handle")
             hdl.setAttribute("stroke-width", "1")
