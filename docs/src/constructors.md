@@ -79,11 +79,10 @@ warns "overlaying nothing". Layer ids are the plot kind (`:scatter`,
 and image share `:cells`. BarPlot is `:bars`, not `:barplot`. LineSegments
 is `:segments`. `pick.layer` is that id.
 
-On `Axis3`, auto allowlists Scatter, Lines, LineSegments, MeshScatter,
-Wireframe, and Arrows3D. On `PolarAxis`, auto allowlists Scatter, Lines,
-LineSegments, and ScatterLines. Other kinds on those axes are skipped
-with `@warn`. Explicit AABB kinds can still construct and misalign; auto
-is the safe path.
+On `Axis3` and `PolarAxis`, auto skips kinds that would misalign. The
+allowlist is [Recipes masque(fig) extracts](@ref). Explicit AABB
+constructors can still build on those axes and sit in the wrong place;
+auto is the safe path.
 
 Stem and ScatterLines become two layers from `_construct` only (suffixes
 `:stem_stems` and `:scatterlines_line`). There is no public plot-object
@@ -138,6 +137,73 @@ LineSegments (`:segments`). `masque(fig)` uses those same ids.
 no `payloads` keyword: cells resolve `{i, j, value}` client-side, same
 as `grid = (...)`. That layer is `:grid`, so `selected=` cannot hydrate
 it.
+
+## Recipes masque(fig) extracts
+
+Sourced from `_plotbase` / `_construct` and the `Axis3` / `PolarAxis`
+gates in [`auto_interactables`](@ref). Unknown top-level plots are
+skipped with `@warn`, not an error. Nested children of an unknown parent
+are not walked. Constructor signatures and default fields stay in
+[Element constructors](@ref) and [Plot-object defaults](@ref).
+
+`Axis` is a 2D `Makie.Axis`. `Colorbar` and `Legend` are figure-content
+blocks, not scene plots.
+
+| Recipe | Layer `id` | Kind | Axis | Axis3 | PolarAxis |
+|---|---|---|---|---|---|
+| `scatter!` | `:scatter` | `:circles` | yes | yes | yes |
+| `meshscatter!` | `:meshscatter` | `:circles` | yes | yes | — |
+| `lines!` | `:lines` | `:polyline` | yes | yes | yes |
+| `linesegments!` | `:segments` | `:segments` | yes | yes | yes |
+| `wireframe!` | `:wireframe` | `:segments` | yes | yes | — |
+| `arrows3d!` (`Arrows3D`) | `:arrows3d` | `:segments` | yes | yes | — |
+| `heatmap!` / `image!` | `:cells` | `:grid` | yes | — | — |
+| `barplot!` | `:bars` | `:rects` | yes | — | — |
+| `poly!` | `:poly` | `:polygons` | yes | — | — |
+| `stairs!` | `:stairs` | `:polyline` | yes | — | — |
+| `errorbars!` | `:errorbars` | `:segments` | yes | — | — |
+| `rangebars!` | `:rangebars` | `:segments` | yes | — | — |
+| `hlines!` / `vlines!` | `:hlines` / `:vlines` | `:segments` | yes | — | — |
+| `spy!` | `:spy` | `:rects` | yes | — | — |
+| `hist!` | `:hist` | `:rects` | yes | — | — |
+| `waterfall!` | `:waterfall` | `:rects` | yes | — | — |
+| `crossbar!` | `:crossbar` | `:rects` | yes | — | — |
+| `hspan!` / `vspan!` | `:hspan` / `:vspan` | `:rects` | yes | — | — |
+| `band!` | `:band` | `:polygons` | yes | — | — |
+| `density!` | `:density` | `:polygons` | yes | — | — |
+| `contourf!` | `:contourf` | `:polygons` | yes | — | — |
+| `violin!` | `:violin` | `:polygons` | yes | — | — |
+| `voronoiplot!` | `:voronoiplot` | `:polygons` | yes | — | — |
+| `stem!` | `:stem` + `:stem_stems` | `:circles` + `:segments` | yes | — | — |
+| `scatterlines!` | `:scatterlines` + `:scatterlines_line` | `:circles` + `:polyline` | yes | — | yes |
+| `boxplot!` | `:boxplot` | `:rects` or `:polygons` (body only) | yes | — | — |
+| `text!` | `:text` | `:rects` | yes | — | — |
+| `annotation!` | `:annotation` | `:rects` | yes | — | — |
+| `Colorbar` (block) | `:colorbar` | `:axis` | figure content | | |
+| `Legend` (block) | `:legend` | `:rects` | figure content | | |
+
+`stem!` and `scatterlines!` become two layers. `boxplot!` hits the box
+body; whiskers and outliers are not hit-tested. `annotation!` is the
+inner `Text`. `text!` whose `space` is not `:data` is skipped with a
+specific warning. `lines!` is nearest-segment on a polyline.
+
+### Not auto-extracted
+
+These are skip-plus-warn today, or they never reach `_plotbase` because
+the walk is top-level plots only:
+
+- Parent recipes: `series!`, `hexbin!`, `textrepel!`, `rainclouds!`.
+  Nested `Lines` / `Scatter` / `Text` / `Violin` children are not walked.
+- Not in `_plotbase`: `contour!` (lines, not `contourf!`),
+  `tricontourf!`, `surface!`, `ablines!`, `arc!`, 2D `arrows!`, `pie!`,
+  `streamplot!`, `mesh!` (the plot, not `meshscatter!`), `volume!`.
+- Block: `TextLabel`. `Colorbar` and `Legend` are extracted.
+- Axis: `LScene` — no overlay. CairoMakie refuses the figure; see
+  [Troubleshooting](@ref).
+
+Many of those parents stringify as `Plot` in the warning
+(`typeof(p).name.name`). For a type that is not in the table, see
+[Custom hits](@ref).
 
 ## Element constructors
 
@@ -194,8 +260,9 @@ Each row is `*(ax, p)` unless noted. `id` is the auto layer id. Bond is
 | `Annotation` | auto only (inner `Text`) | text fields | `:rects` |
 
 `annotation!` labels are reachable only through that inner `Text` or
-`masque(fig)`, never a hand-written `TextInteractable`. Any plot type
-not listed here needs a custom interaction; see [Custom hits](@ref).
+`masque(fig)`, never a hand-written `TextInteractable`. For Axis3 /
+PolarAxis yes-or-no, and for types that are skipped, see
+[Recipes masque(fig) extracts](@ref).
 
 ## Axis, legend, and drag
 
@@ -246,7 +313,8 @@ Lines carry `index`, `x`, `y`, `z`. MeshScatter gets depth-correct
 per-marker hit radii from its data-space `markersize` (`radius3d`).
 Wireframe edges and Arrows3D shafts hit as segments. Geometry is
 projected once, in Julia, at build time, so it is the same on `:cairo`
-and `:webgl`. See [Backends](@ref).
+and `:webgl`. Auto-extract allowlists are
+[Recipes masque(fig) extracts](@ref). See [Backends](@ref).
 
 `PolarAxis` gets the same discrete point and segment overlays on both
 backends. Continuous θ/r readout is not shipped.

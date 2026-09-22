@@ -63,4 +63,6 @@ is Julia state when a cell reads it.
 - [Getting started](@ref) — overlay, hover, click, and a readout.
 - [Hover, click, and bind](@ref) — overlay versus `@bind` versus the
   docs player.
+- [Constructors](@ref) — which recipes `masque(fig)` extracts, and
+  constructor signatures.
 - [Examples](@ref) — kitchen-sink notebooks and static exports.
