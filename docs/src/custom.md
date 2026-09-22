@@ -173,10 +173,11 @@ that event writes `hitlayers` and inherits the rest. Implement
 `bondtype` and [`transform_bond`](@ref) when the commit is another type.
 
 This example hits a scatter of cities and commits a `CityPick`. `index`
-arriving at `transform_bond` is already 1-based for `:circles`.
-`js_payload` is unused: the event is built from the struct. Names on
-that struct are how you read the pick. Field forwarding applies only to
-[`ElementEvent`](@ref) and [`LegendEvent`](@ref).
+arriving at `transform_bond` is already 1-based for `:circles`. `layer`
+is a [`HitLayer`](@ref); annotate it so this method is not ambiguous
+with the default. `js_payload` is unused: the event is built from the
+struct. Names on that struct are how you read the pick. Field forwarding
+applies only to [`ElementEvent`](@ref) and [`LegendEvent`](@ref).
 
 Define the types in their own cell so a figure rebuild does not
 redefine them.
@@ -218,7 +219,7 @@ begin
         ]
     end
 
-    function Masque.transform_bond(i::Cities, layer, index, js_payload)
+    function Masque.transform_bond(i::Cities, layer::HitLayer, index, js_payload)
         row = i.rows[index]
         CityPick(i.id, index, row.city, row.pop)
     end
