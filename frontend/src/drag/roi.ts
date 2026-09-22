@@ -9,10 +9,19 @@ import type { HitLayer, Manifest, ROIGeometry } from "../types"
 // constant is only the painted square, so a wide figure doesn't grow the handles.
 export const HANDLE_CSS = 7
 
+// Corner radius of that square, CSS px. Visibly rounded, still a grip, not a pill.
+export const HANDLE_RADIUS_CSS = 1.5
+
 // Half-side in image px. cssWidth 0 (not laid out yet) falls back to manifest.scaling.
 export function handleDrawHalf(imageWidth: number, cssWidth: number, scaling = 2): number {
     const pxPerCss = cssWidth > 0 ? imageWidth / cssWidth : scaling
     return (HANDLE_CSS / 2) * pxPerCss
+}
+
+// Corner radius in image px, so the on-screen radius stays HANDLE_RADIUS_CSS when the figure
+// is scaled. `drawHalf` already carries the image-px-per-CSS-px ratio.
+export function handleCornerRadius(drawHalf: number): number {
+    return HANDLE_RADIUS_CSS * ((2 * drawHalf) / HANDLE_CSS)
 }
 
 export function syncHandleDraw(
@@ -33,6 +42,7 @@ export function syncHandleDraw(
 export function setROI(box: ROIBox): void {
     const { x, y, w, h } = box.g_
     const d = box.draw_
+    const r = handleCornerRadius(d)
     box.rect_.setAttribute("x", String(x)); box.rect_.setAttribute("y", String(y))
     box.rect_.setAttribute("width", String(w)); box.rect_.setAttribute("height", String(h))
     const corners = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]
@@ -41,6 +51,8 @@ export function setROI(box: ROIBox): void {
         box.handles_[k].setAttribute("y", String(corners[k][1] - d))
         box.handles_[k].setAttribute("width", String(2 * d))
         box.handles_[k].setAttribute("height", String(2 * d))
+        box.handles_[k].setAttribute("rx", String(r))
+        box.handles_[k].setAttribute("ry", String(r))
     }
 }
 

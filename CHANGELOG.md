@@ -114,10 +114,11 @@ All notable changes to this project are documented here. The format is based on
   (`#7a7a7a` light, `#c8c8c8` dark) at 1.5px on hover and 2px when selected. The ROI
   outline, the threshold line, and the selected-open ring use that same grey instead of
   tooltip-text ink. An ROI draws four corner handles, each a 7 CSS px white square with a
-  1px chrome stroke. The sides have no grip; grabbing the middle of a side still resizes
-  that edge. The hit target is still the manifest `handle`. An explicit `hoverstyle`
-  stroke is still verbatim and unblended. A browser without `mix-blend-mode` draws the fill
-  as that chrome grey at 0.18 opacity; the edge stroke stays the flat grey.
+  ~1.5 CSS px corner radius and a 1px chrome stroke. The sides have no grip; grabbing the
+  middle of a side still resizes that edge. The hit target is still the manifest `handle`.
+  An explicit `hoverstyle` stroke is still verbatim and unblended. A browser without
+  `mix-blend-mode` draws the fill as that chrome grey at 0.18 opacity; the edge stroke stays
+  the flat grey.
 - **`lines!`, `stairs!`, and a `scatterlines!` line are one element: the whole path.**
   A click anywhere along the line (within `tol` of an edge) binds that one line. The
   JavaScript wire index stays 0-based (`0` for a single line); the Julia

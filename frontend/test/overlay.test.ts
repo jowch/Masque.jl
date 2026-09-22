@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
-import { handleDrawHalf } from "../src/drag/roi"
+import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
 import type { HitLayer, Manifest } from "../src/types"
 
 // build a light-DOM host (img + script) like the Julia widget emits, with layout mocked
@@ -190,15 +190,22 @@ describe("mount", () => {
         // TR(600,200) BR(600,600) BL(200,600).
         const drawHalf = handleDrawHalf(1200, 600, 2)
         expect(drawHalf).toBe(7)
+        // 1.5 CSS px × (1200/600) image-px per CSS-px = 3 image px
+        const radius = handleCornerRadius(drawHalf)
+        expect(radius).toBe(3)
+        const handles = shadow.querySelectorAll("rect.masque-handle")
+        expect(handles).toHaveLength(4)
         const cornerCenters = [...rects].slice(1).map((r) => ({
             x: Number(r.getAttribute("x")) + drawHalf, y: Number(r.getAttribute("y")) + drawHalf,
         }))
         expect(cornerCenters).toEqual([{ x: 200, y: 200 }, { x: 600, y: 200 }, { x: 600, y: 600 }, { x: 200, y: 600 }])
-        for (const h of [...rects].slice(1)) {
-            expect(h.classList.contains("masque-handle")).toBe(true)
+        for (const h of handles) {
             expect(h.getAttribute("width")).toBe(String(2 * drawHalf))
             expect(h.getAttribute("stroke-width")).toBe("1")
+            expect(h.getAttribute("rx")).toBe(String(radius))
+            expect(h.getAttribute("ry")).toBe(String(radius))
         }
+        expect(rects[0].getAttribute("rx")).toBeNull()
         const box = rects[0] as SVGRectElement
         expect(box.getAttribute("stroke-width")).toBe("1")
         expect(box.getAttribute("x")).toBe("200")
@@ -224,11 +231,14 @@ describe("mount", () => {
         const shadow = shadowOf(host)
         const grip = shadow.querySelectorAll("rect")[1]
         expect(grip.getAttribute("width")).toBe("14")
+        expect(grip.getAttribute("rx")).toBe("3")
         img.getBoundingClientRect = () =>
             ({ left: 0, top: 0, width: 300, height: 200, right: 300, bottom: 200, x: 0, y: 0, toJSON() {} }) as DOMRect
         window.dispatchEvent(new Event("resize"))
-        // 1200/300 = 4 image-px per css-px → half-side 14, drawn side 28
+        // 1200/300 = 4 image-px per css-px → half-side 14, drawn side 28, radius 1.5×4 = 6
         expect(grip.getAttribute("width")).toBe("28")
+        expect(grip.getAttribute("rx")).toBe("6")
+        expect(grip.getAttribute("ry")).toBe("6")
     })
 
     it("an explicit ROI hoverstyle stroke keeps its colour and width on the outline", () => {

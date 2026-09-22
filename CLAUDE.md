@@ -106,9 +106,10 @@ text and the bond payload → it gets a live check on every backend × the kinds
   top-clip, shifts + moves the caret (`--masque-caret-x`) on a side-clip; a resolvable
   per-element `colors` (currently: `scatter!`'s `color=`) adds a 3px tooltip accent border in
   that colour (`--masque-mark-border`), text stays neutral; ROI draws 4 corner handles (7 CSS px,
-  white fill, 1px chrome stroke; a corner resizes two axes). The four sides have no grip: a
-  square on each edge midpoint, the manifest `handle` (8 logical px × scaling, and at least 6
-  image px), still resizes that one edge, with the matching resize cursor. The ROI outline is
+  white fill, 1px chrome stroke, ~1.5 CSS px corner radius; a corner resizes two axes). The four
+  sides have no grip: a square on each edge midpoint, the manifest `handle` (8 logical px ×
+  scaling, and at least 6 image px), still resizes that one edge, with the matching resize
+  cursor. The ROI outline is
   1px chrome unless an explicit `hoverstyle` stroke sets its own width and colour;
   a `selects`-ROI's grid cell-block union rect is fill-only (no stroke, `"rectfill"` geom tag)
   — the ROI box itself is the outline, so the rect doesn't double it into two parallel edges
