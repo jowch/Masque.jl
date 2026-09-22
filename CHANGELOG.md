@@ -101,6 +101,23 @@ All notable changes to this project are documented here. The format is based on
   MeshScatter children live in float32convert space (premise from #36).
 
 ### Changed
+- **`lines!`, `stairs!`, and a `scatterlines!` line are one element: the whole path.**
+  A click anywhere along the line (within `tol` of an edge) binds that one line. The
+  JavaScript wire index stays 0-based (`0` for a single line); the Julia
+  `ElementEvent.index` is 1-based (`1`), the same as every other element kind. Hover
+  and the selected ring trace the whole polyline. A `NaN` gap stays a gap inside that
+  one line and does not split the plot into several interactables. `series!` is one
+  `:lines` layer with one element per series: a click on the second series is wire
+  index `1` and Julia index `2`, and the default payload is `(; index, label)` when
+  Makie labeled that series (the default labels are `"series 1"`, `"series 2"`, …).
+  `selected=` follows the same meaning — `Dict(:lines => [1])` selects the whole line,
+  not its first edge. This breaks anyone who read a `lines!` `@bind` index or a
+  `selected=` index as "which edge". The raw
+  `SegmentInteractable(ax, vertices; mode = :polyline)` constructor stays per-segment
+  (`segment_index`); pass `unit = :line` for the whole path. `unit = :line` with any
+  other `mode` throws `ArgumentError`. `mode = :pairs` is unchanged, so
+  `LineSegments`, Errorbars, Rangebars, HLines, VLines, Wireframe, and Arrows3D stay
+  one element per piece.
 - **There is one way to read a `@bind` payload now: `ev.payload.field`, for every
   interactable kind.** An element hit's payload is the exact Julia object you passed, looked
   back up in Julia rather than decoded from the browser — `payloads = [(a = 1,)]` yields

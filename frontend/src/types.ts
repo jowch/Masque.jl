@@ -2,6 +2,7 @@
 export type Kind =
     | "circles"   // geometry: [cx,cy,r, …]
     | "polyline"  // geometry: [x,y, …]  (NaN = gap); segment i = (v[i], v[i+1])
+    | "lines"     // geometry: number[][]  one [x,y,…] polyline per element (NaN = gap inside that line)
     | "segments"  // geometry: [x0,y0,x1,y1, …]  disjoint pairs
     | "rects"     // geometry: [cx,cy,w,h, …]
     | "grid"      // geometry: GridGeometry  (compact; edges not N rects)
@@ -73,7 +74,7 @@ export interface HitLayer {
     axis: string
     events: string[] // "click" | "hover" | "drag"
     style?: LayerStyle
-    tol?: number // :segments/:polyline hit-test slack, image px; absent → geometry.ts's SEG_TOL fallback
+    tol?: number // :segments/:polyline/:lines hit-test slack, image px; absent → geometry.ts's SEG_TOL fallback
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
     selected?: number[] // 0-based element indices seeding the highlight at mount
@@ -125,7 +126,7 @@ export interface Hit {
 }
 
 // One entry in keyboard.ts's flat, manifest-order nav list — element-indexed kinds only
-// (circles/rects/polygons/segments/polyline; grid/axis/threshold/roi/view excluded, see
+// (circles/rects/polygons/segments/polyline/lines; grid/axis/threshold/roi/view excluded, see
 // keyboard.ts's FOCUSABLE_KINDS for why). A polyline's NaN-gap "segments" (Julia's gap
 // sentinel — see geometry.ts's hitLayer, which the mouse path already skips) never get a
 // FocusRef at all. `index_` is the raw hitLayerByIndex/geometry index (used to resolve the

@@ -164,7 +164,7 @@ function PointInteractable(ax, p::Makie.MeshScatter; id = :meshscatter, payloads
 end
 
 SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = 6) =
-    SegmentInteractable(ax, _conv(p)[1]; mode = :polyline, id, payloads, tol)
+    SegmentInteractable(ax, _conv(p)[1]; mode = :polyline, unit = :line, id, payloads, tol)
 SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothing, tol = 6) =
     SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol)
 
@@ -388,7 +388,32 @@ end
 # The parent `converted` is the raw input points; the rendered staircase (the actual click
 # target) lives in the child Lines as the pre-expanded step polyline.
 SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothing, tol = 6) =
-    SegmentInteractable(ax, _converted(_childof(p, Makie.Lines))[1]; mode = :polyline, id, payloads, tol)
+    SegmentInteractable(ax, _converted(_childof(p, Makie.Lines))[1]; mode = :polyline, unit = :line, id, payloads, tol)
+
+# Each child line (or a ScatterLines child's line, when markers are on) is one element.
+# BezierPath curves aren't sampled here — a child that isn't Lines/ScatterLines fails loud.
+function _series_line(child)
+    child isa Makie.Lines && return child
+    child isa Makie.ScatterLines && return _childof(child, Makie.Lines)
+    return error(
+        "Series introspection: expected a Lines or ScatterLines child, got $(typeof(child).name.name)",
+    )
+end
+function _series_payloads(children)
+    return Any[
+        let lab = children[k].label[]
+            lab isa AbstractString && !isempty(lab) ? (; index = k, label = String(lab)) : (; index = k)
+        end
+            for k in eachindex(children)
+    ]
+end
+function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothing, tol = 6)
+    children = _child_plots(p)
+    isempty(children) && error("Series introspection: no child lines (Makie internals changed?)")
+    paths = [_conv(_series_line(c))[1] for c in children]
+    pl = payloads === nothing ? _series_payloads(children) : payloads
+    return _whole_lines(ax, paths, id, pl, tol, nothing)
+end
 
 # Errorbars `converted` is Vec4 (x, y, low, high) with low/high RELATIVE offsets; Rangebars is
 # Vec3 (val, low, high) ABSOLUTE.
@@ -587,6 +612,7 @@ function _plotbase(p)
     p isa Makie.Voronoiplot && return :voronoiplot
     p isa Makie.Stem && return :stem
     p isa Makie.ScatterLines && return :scatterlines
+    p isa Makie.Series && return :series
     p isa Makie.BoxPlot && return :boxplot
     p isa Makie.Text && return :text
     p isa Makie.Annotation && return :annotation
@@ -615,6 +641,7 @@ function _construct(ax, p, id)
     p isa Makie.Voronoiplot && return [PolygonInteractable(ax, p; id)]
     p isa Makie.Stem && return _stem_parts(ax, p, id)
     p isa Makie.ScatterLines && return _scatterlines_parts(ax, p, id)
+    p isa Makie.Series && return [SegmentInteractable(ax, p; id)]
     p isa Makie.BoxPlot && return [_boxplot_interactable(ax, p; id)]
     p isa Makie.Text && return _text_interactables(ax, p, id)
     p isa Makie.Annotation && return _text_interactables(ax, _descendant(p, Makie.Text), id)

@@ -210,6 +210,20 @@ describe("hitLayer + hitTest", () => {
         // beyond SEG_TOL (8px) from the nearest real segment
         expect(hitLayer(pl, 5, 20)).toBeNull()
     })
+    it("lines: any edge of a path is the same element, and a second path is the next index", () => {
+        const lines: HitLayer = {
+            id: "curves", kind: "lines", axis: "ax1", events: ["hover"], payloads: [{}, {}],
+            geometry: [[0, 0, 10, 0, NaN, NaN, 20, 0, 30, 0], [0, 40, 30, 40]],
+        }
+        const a = hitLayer(lines, 5, 1)
+        const b = hitLayer(lines, 25, 1)
+        expect(a).toMatchObject({ index: 0 })
+        expect(b).toMatchObject({ index: 0 })
+        expect(a?.geom_).toEqual(["path", [0, 0, 10, 0, NaN, NaN, 20, 0, 30, 0]])
+        expect(b?.geom_).toEqual(a?.geom_)
+        expect(hitLayer(lines, 15, 40)).toMatchObject({ index: 1, geom_: ["path", [0, 40, 30, 40]] })
+        expect(hitLayer(lines, 5, 20)).toBeNull()
+    })
     it("segments: nearest of several disjoint segments wins; non-finite endpoints just don't match", () => {
         const segs: HitLayer = {
             id: "segs", kind: "segments", axis: "ax1", events: ["hover"], payloads: [],
@@ -459,6 +473,12 @@ describe("anchorFor: mark-anchored tooltip placement", () => {
     it("segment with no cursor (keyboard focus): falls back to the midpoint", () => {
         const hit: Hit = { layer: layer("polyline"), index: 0, geom_: ["seg", 0, 0, 100, 100] }
         expect(anchorFor(hit, null)).toEqual({ x: 50, y: 50, top: 50 })
+    })
+    it("path: tooltip slides along the nearest point, and keyboard focus uses the arc-length midpoint", () => {
+        const verts = [0, 0, 100, 0, 100, 100]
+        const hit: Hit = { layer: layer("lines"), index: 0, geom_: ["path", verts] }
+        expect(anchorFor(hit, { x: 40, y: 8 })).toEqual({ x: 40, y: 0, top: 0 })
+        expect(anchorFor(hit, null)).toEqual({ x: 100, y: 0, top: 0 }) // 200px of path, halfway is the corner
     })
     it("polygon: centroid when it lies inside the polygon", () => {
         const hit: Hit = { layer: layer("polygons"), index: 0, geom_: ["poly", [0, 0, 10, 0, 10, 10, 0, 10]] }

@@ -7,12 +7,15 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 
 # Fields
 - `id::Symbol` — the layer id; becomes `InteractionEvent.layer` on a hit.
-- `kind::Symbol` — one of `:circles`, `:polyline`, `:segments`, `:rects`, `:grid`, `:polygons`,
-  `:axis`, `:threshold`, `:roi`, `:view`. `geometry`'s layout depends on it:
+- `kind::Symbol` — one of `:circles`, `:polyline`, `:lines`, `:segments`, `:rects`, `:grid`,
+  `:polygons`, `:axis`, `:threshold`, `:roi`, `:view`. `geometry`'s layout depends on it:
   - `:circles` — flat `Real[]`, `(cx, cy, r)` per element (image px)
   - `:rects` — flat `Real[]`, `(cx, cy, w, h)` per element (image px)
-  - `:polyline` / `:segments` — flat `Real[]`, `(x, y)` per vertex — one connected path /
-    disjoint pairs, respectively (image px)
+  - `:polyline` / `:segments` — flat `Real[]`, `(x, y)` per vertex — one connected path hit
+    per segment, or disjoint pairs, respectively (image px)
+  - `:lines` — `Vector{Real}[]`, one flat `(x, y)`-per-vertex polyline per element (image px;
+    `NaN` is a gap inside that line, not another element). A `lines!` / `stairs!` /
+    `scatterlines!` line is one entry; a `series!` is one entry per series
   - `:polygons` — `Vector{Real}[]`, one flat `(x, y)`-per-vertex ring per element (image px)
   - `:grid` — a `Dict` with `"xedges"`, `"yedges"`, `"ncols"`, `"nrows"`, optional `"values"`
   - `:axis` — `nothing` (whole-axis readout, `AxisInteractable`) or flat `Real[x, y, w, h]`
@@ -45,7 +48,7 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 """
 struct HitLayer
     id::Symbol
-    kind::Symbol          # :circles|:polyline|:segments|:rects|:grid|:polygons|:axis|:threshold|:roi|:view
+    kind::Symbol          # :circles|:polyline|:lines|:segments|:rects|:grid|:polygons|:axis|:threshold|:roi|:view
     geometry::Any
     payloads::Vector{Any}
     axis::Symbol
@@ -97,7 +100,7 @@ Optional (default shown; all non-exported — extend as `Masque.<name>`):
   (see [`HitLayer`](@ref)) no longer affects the hover/selection outline at all — it only drives
   the tooltip's accent border.
 - `Masque.hit_tol(i) -> Union{Nothing,Real}` — logical-px hit-test slack for `:segments`/
-  `:polyline` layers, shipped in the manifest as image px (`round(Int, hit_tol(i) *
+  `:polyline`/`:lines` layers, shipped in the manifest as image px (`round(Int, hit_tol(i) *
   ctx.scaling)`). `nothing` (default) omits the field; the overlay then falls back to its
   own fixed slack. Only [`SegmentInteractable`](@ref) sets this.
 
@@ -125,7 +128,7 @@ tooltip_spec(::AbstractInteractable) = nothing
 # longer feeds this, only the tooltip accent; a CSS colour string here overrides it verbatim
 # (no blend, single unblended element).
 hoverstyle(::AbstractInteractable) = (; stroke = nothing, width = 2)
-# Logical-px hit-test slack for :segments/:polyline layers; nothing omits the manifest field.
+# Logical-px hit-test slack for :segments/:polyline/:lines layers; nothing omits the manifest field.
 hit_tol(::AbstractInteractable) = nothing
 
 """
@@ -331,21 +334,27 @@ end
 
 # ============================ SegmentInteractable ==========================
 """
-    SegmentInteractable(ax, vertices; mode=:polyline, id=:segments, payloads=nothing, tol=6, tooltip=nothing)
+    SegmentInteractable(ax, vertices; mode=:polyline, unit=:segment, id=:segments, payloads=nothing, tol=6, tooltip=nothing)
     SegmentInteractable(ax, p; id=<kind-specific>, payloads=nothing, tol=6)   # from a plot object
 
-Lines / polylines (nearest-segment hit) or disjoint segment pairs. Produces one `:polyline` or
-`:segments` [`HitLayer`](@ref) (per `mode`).
+Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`, or `:segments`
+[`HitLayer`](@ref).
 
 # Arguments
 - `vertices` — data-space points, each a 2- or 3-element point/tuple.
-- `mode` — `:polyline` (default): `vertices` is one connected path, `length(vertices) - 1`
-  segments, hit-tested against the nearest segment. `:pairs`: `vertices` is disjoint pairs
-  `(v1,v2), (v3,v4), …`, `length(vertices) ÷ 2` segments. Any other value raises
+- `mode` — `:polyline` (default): `vertices` is one connected path. `:pairs`: `vertices` is
+  disjoint pairs `(v1,v2), (v3,v4), …`, `length(vertices) ÷ 2` segments. Any other value raises
   `ArgumentError`.
+- `unit` — what one element is. `:segment` (default): a `:polyline` path is hit per edge
+  (`length(vertices) - 1` elements) and `:pairs` is hit per pair. `:line`: the whole path is
+  one element (kind `:lines`) — the pointer still has to land within `tol` of some edge, and a
+  `NaN` gap stays a gap in that one line. `:line` requires `mode = :polyline` (`ArgumentError`
+  otherwise). This is how `lines!` / `stairs!` / a `scatterlines!` line are built; the raw
+  vertex constructor stays per-segment unless you pass `unit = :line`.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit.
-- `payloads` — one entry per segment (count per `mode` above); `ArgumentError` if the length
-  doesn't match. Default: `(; segment_index)`, 1-based.
+- `payloads` — one entry per element (per segment when `unit = :segment`, one entry when
+  `unit = :line`); `ArgumentError` if the length doesn't match. Default: `(; segment_index)`
+  (1-based) for `:segment`, `(; index)` (1-based) for `:line`.
 - `tol` — hit-test slack around a segment, in logical px (scaled to the rendered image's DPI
   like [`PointInteractable`](@ref)'s `radius`). Must be finite and positive (`ArgumentError`
   otherwise). Shipped in the manifest as a per-layer `"tol"` field; the overlay's client-side
@@ -357,27 +366,32 @@ Lines / polylines (nearest-segment hit) or disjoint segment pairs. Produces one 
   [`PointInteractable`](@ref)). Default `nothing`.
 
 # From a plot object
-`SegmentInteractable(ax, p)` reads vertices from `p` (no `mode`/`tooltip` keyword — `mode` and
-the source geometry are fixed by the plot type):
+`SegmentInteractable(ax, p)` reads vertices from `p` (no `mode`/`unit`/`tooltip` keyword — those
+are fixed by the plot type):
 
-| `p` | default `id` | `mode` | vertices from |
+| `p` | default `id` | hit | vertices from |
 |---|---|---|---|
-| `Makie.Lines` | `:lines` | `:polyline` | converted data |
-| `Makie.LineSegments` | `:segments` | `:pairs` | converted data |
-| `Makie.Wireframe` | `:wireframe` | `:pairs` | the child `LineSegments`' edges (incl. mesh-triangulation diagonals) |
-| `Makie.Arrows3D` | `:arrows3d` | `:pairs` | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, z, u, v, w)` from `points`/`directions` |
-| `Makie.Stairs` | `:stairs` | `:polyline` | the child `Lines`' pre-expanded step polyline |
-| `Makie.Errorbars` | `:errorbars` | `:pairs` | each bar's low→high endpoints |
-| `Makie.Rangebars` | `:rangebars` | `:pairs` | each bar's low→high endpoints |
-| `Makie.HLines` | `:hlines` | `:pairs` | each line spanning the axis's current data range (re-resolved on limit changes) |
-| `Makie.VLines` | `:vlines` | `:pairs` | each line spanning the axis's current data range (re-resolved on limit changes) |
+| `Makie.Lines` | `:lines` | one `:lines` element, the whole path | converted data |
+| `Makie.Stairs` | `:stairs` | one `:lines` element, the whole staircase | the child `Lines`' pre-expanded step polyline |
+| `Makie.Series` | `:series` | one `:lines` layer, one element per series | each child line (or a `ScatterLines` child's line) |
+| `Makie.LineSegments` | `:segments` | `:pairs`, per segment | converted data |
+| `Makie.Wireframe` | `:wireframe` | `:pairs`, per edge | the child `LineSegments`' edges (incl. mesh-triangulation diagonals) |
+| `Makie.Arrows3D` | `:arrows3d` | `:pairs`, per shaft | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, z, u, v, w)` from `points`/`directions` |
+| `Makie.Errorbars` | `:errorbars` | `:pairs`, per bar | each bar's low→high endpoints |
+| `Makie.Rangebars` | `:rangebars` | `:pairs`, per bar | each bar's low→high endpoints |
+| `Makie.HLines` | `:hlines` | `:pairs`, per line | each line spanning the axis's current data range (re-resolved on limit changes) |
+| `Makie.VLines` | `:vlines` | `:pairs`, per line | each line spanning the axis's current data range (re-resolved on limit changes) |
+
+A `series!` element's default payload is `(; index, label)` when the child plot's label is a
+non-empty string (Makie's own default is `"series k"`), otherwise `(; index)`.
 
 # Examples
 ```julia
 p = lines!(ax, xs, ys)
-SegmentInteractable(ax, p)                       # :polyline, nearest-segment hit
+SegmentInteractable(ax, p)                       # one element: the whole line
 
-SegmentInteractable(ax, [(0,0), (1,1), (2,0)]; mode = :polyline)
+SegmentInteractable(ax, [(0,0), (1,1), (2,0)]; mode = :polyline)          # per segment
+SegmentInteractable(ax, [(0,0), (1,1), (2,0)]; mode = :polyline, unit = :line)  # one element
 ```
 """
 struct SegmentInteractable <: AbstractInteractable
@@ -386,38 +400,84 @@ struct SegmentInteractable <: AbstractInteractable
     # (e.g. HLines/VLines spanning `ax.finallimits[]`) only correct after construction.
     resolve::Union{Nothing, Function}
     label::Union{Nothing, String}
+    # :segment = one element per edge (:polyline) or pair (:pairs). :line = the whole path is
+    # one element (kind :lines). `paths` is set for a multi-line :line layer (series!); nothing
+    # means `vertices` is the single path.
+    unit::Symbol
+    paths::Union{Nothing, Vector{Vector{Point3f}}}
 end
 function SegmentInteractable(
-        ax, vertices; mode = :polyline, id = :segments,
+        ax, vertices; mode = :polyline, unit = :segment, id = :segments,
         payloads = nothing, tol = 6, tooltip = nothing, label = nothing
     )
     _check_tooltip(tooltip)
     mode in (:polyline, :pairs) ||
         throw(ArgumentError("SegmentInteractable: mode must be :polyline or :pairs, got :$mode"))
+    unit in (:segment, :line) ||
+        throw(ArgumentError("SegmentInteractable: unit must be :segment or :line, got :$unit"))
+    unit === :line && mode !== :polyline &&
+        throw(ArgumentError("SegmentInteractable: unit=:line applies only to mode=:polyline, got mode=:$mode"))
     _check_tol(tol)
     vs = [_pt3(v) for v in vertices]
-    nseg = mode === :polyline ? max(0, length(vs) - 1) : length(vs) ÷ 2
-    pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
-    return SegmentInteractable(ax, vs, mode, id, pl, Float64(tol), tooltip, nothing, label === nothing ? nothing : String(label))
+    pl = if unit === :line
+        payloads === nothing ? Any[(; index = 1)] : _check_payloads(payloads, 1, "SegmentInteractable")
+    else
+        nseg = mode === :polyline ? max(0, length(vs) - 1) : length(vs) ÷ 2
+        payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
+    end
+    return SegmentInteractable(
+        ax, vs, mode, id, pl, Float64(tol), tooltip, nothing,
+        label === nothing ? nothing : String(label), unit, nothing,
+    )
 end
 # Internal-only: construct with a lazy `resolve(ax) -> vertices`. Called directly by the
 # HLines/VLines plot-object constructors (src/introspect.jl), bypassing the keyword
 # constructor above — validate `tol` here too, or a user-supplied bad `tol` on those two
-# recipes skips the check entirely.
+# recipes skips the check entirely. Those recipes are per-segment pairs, so `unit` stays
+# `:segment`.
 function _segment_with_resolve(ax, vertices, mode, id, payloads, tol, resolve)
     _check_tol(tol)
-    return SegmentInteractable(ax, [_pt3(v) for v in vertices], mode, id, payloads, Float64(tol), nothing, resolve, nothing)
+    return SegmentInteractable(
+        ax, [_pt3(v) for v in vertices], mode, id, payloads, Float64(tol), nothing, resolve, nothing, :segment, nothing,
+    )
+end
+# One `:lines` layer whose elements are whole polylines (a `series!`, or any caller that
+# already has N paths). `paths` entries are data-space vertex lists; NaN gaps stay inside
+# the path they belong to.
+function _whole_lines(ax, paths, id, payloads, tol, label)
+    _check_tol(tol)
+    ps = [[_pt3(v) for v in path] for path in paths]
+    n = length(ps)
+    pl = payloads === nothing ? Any[(; index = k) for k in 1:n] : _check_payloads(payloads, n, "SegmentInteractable")
+    vs = n == 0 ? Point3f[] : ps[1]
+    return SegmentInteractable(
+        ax, vs, :polyline, id, pl, Float64(tol), nothing, nothing,
+        label === nothing ? nothing : String(label), :line, ps,
+    )
 end
 tooltip_spec(i::SegmentInteractable) = i.tooltip
 hit_tol(i::SegmentInteractable) = i.tol
-function hitlayers(i::SegmentInteractable, ctx)
-    vs = i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]
+function _flat_px(ctx, ax, vs)
     g = Real[]
     for v in vs
-        q = _proj(ctx, i.ax, v); append!(g, (_q(q[1]), _q(q[2])))
+        q = _proj(ctx, ax, v); append!(g, (_q(q[1]), _q(q[2])))
     end
+    return g
+end
+function hitlayers(i::SegmentInteractable, ctx)
+    if i.unit === :line
+        raw = if i.paths !== nothing
+            i.paths
+        else
+            vs = i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]
+            [vs]
+        end
+        geom = [_flat_px(ctx, i.ax, path) for path in raw]
+        return [HitLayer(i.id, :lines, geom, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
+    end
+    vs = i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]
     kind = i.mode === :polyline ? :polyline : :segments
-    return [HitLayer(i.id, kind, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
+    return [HitLayer(i.id, kind, _flat_px(ctx, i.ax, vs), i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
 end
 
 # ============================ RectInteractable =============================

@@ -92,7 +92,7 @@ function bond_stamp(i::AbstractInteractable, L::HitLayer)
 end
 
 # Wire index → Julia index (1-based) for an element kind; nothing for continuous / drag kinds.
-const _ELEMENT_KINDS = (:circles, :rects, :polygons, :segments, :polyline)
+const _ELEMENT_KINDS = (:circles, :rects, :polygons, :segments, :polyline, :lines)
 
 function julia_index(kind::Symbol, wire::Integer)
     kind in _ELEMENT_KINDS && return Int(wire) + 1
@@ -269,9 +269,9 @@ function explicit_empty_seed(selected)::Bool
     return false
 end
 
-# Closed kinds get the selected wash; open kinds (:segments/:polyline) get the ring. `selected=`
-# on any other kind fails loud.
-const _SELECTED_KINDS = (:circles, :rects, :polygons, :segments, :polyline)
+# Closed kinds get the selected wash; open kinds (:segments/:polyline/:lines) get the ring.
+# `selected=` on any other kind fails loud.
+const _SELECTED_KINDS = (:circles, :rects, :polygons, :segments, :polyline, :lines)
 
 # Element count for a HitLayer geometry, matching the JS layout in types.ts / hitLayerByIndex.
 function _layer_n_elements(kind::Symbol, geometry)
@@ -285,6 +285,8 @@ function _layer_n_elements(kind::Symbol, geometry)
         length(geometry) ÷ 4
     elseif kind === :polyline
         max(0, length(geometry) ÷ 2 - 1)
+    elseif kind === :lines
+        length(geometry)
     elseif kind === :grid
         Int(geometry["ncols"]) * Int(geometry["nrows"])
     else

@@ -68,7 +68,7 @@ export function computeSelection(
 
 // Kinds that can be drawn as a persistent pre-highlight (mirrors Julia `_SELECTED_KINDS`).
 // Open kinds (segments / polyline) use the selected-ring recipe; closed kinds use the wash.
-export const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline"])
+export const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines"])
 
 // Order matters: a legend entry is `rects` kind AND carries `links`, so the links branch is
 // tested first, gated at LAYER level — an entry whose own links[index] is empty still must not
@@ -90,6 +90,7 @@ export function layerNElements(layer: HitLayer): number {
     if (layer.kind === "polygons" && Array.isArray(g)) return (g as number[][]).length
     if (layer.kind === "segments" && Array.isArray(g)) return Math.floor((g as number[]).length / 4)
     if (layer.kind === "polyline" && Array.isArray(g)) return Math.max(0, Math.floor((g as number[]).length / 2) - 1)
+    if (layer.kind === "lines" && Array.isArray(g)) return (g as number[][]).length
     if (layer.kind === "grid" && g && typeof g === "object" && "ncols" in (g as object)) {
         const gg = g as GridGeometry
         return gg.ncols * gg.nrows
@@ -129,6 +130,9 @@ export function hitLayerByIndex(layer: HitLayer, index: number): Omit<Hit, "laye
     if (layer.kind === "polyline" && Array.isArray(g)) {
         const a = g as number[]
         return { index, geom_: ["seg", a[2 * index], a[2 * index + 1], a[2 * index + 2], a[2 * index + 3]] }
+    }
+    if (layer.kind === "lines" && Array.isArray(g)) {
+        return { index, geom_: ["path", (g as number[][])[index]] }
     }
     // polygons (only remaining closed SELECTED_KINDS entry)
     return { index, geom_: ["poly", (g as number[][])[index]] }

@@ -257,10 +257,11 @@ try {
       if (l.kind === "rects") return g.length / 4;
       if (l.kind === "segments") return g.length / 4;
       if (l.kind === "polyline") return Math.max(0, g.length / 2 - 1);
+      if (l.kind === "lines") return g.length;
       if (l.kind === "polygons") return g.length;
       return 0; // :grid/:threshold/:roi/:view aren't in FOCUSABLE_KINDS
     };
-    const FOCUSABLE = new Set(["circles", "rects", "polygons", "segments", "polyline"]);
+    const FOCUSABLE = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines"]);
     let before = 0;
     for (let i = 0; i < legendIdx; i++) if (FOCUSABLE.has(layers[i].kind)) before += countOf(layers[i]);
     // "pts" is legend row index 2 (kind_sweep_figures.jl's links.cases) -> flat focus index

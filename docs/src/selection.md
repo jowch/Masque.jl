@@ -50,7 +50,8 @@ Indices are 1-based. `0` is out of range. With one seedable layer a bare `Int` o
 `AbstractVector{<:Integer}` is enough. Two seedable layers need a name:
 `selected = Dict(:scatter => [1, 3])` or `selected = (; scatter = 1)`. A bare `1` across two
 layers throws, naming the layers. Unknown keys throw. Supported kinds: `circles` / `rects` /
-`polygons` (selected wash) and `segments` / `polyline` (selected ring). Unsupported kinds
+`polygons` (selected wash) and `segments` / `polyline` / `lines` (selected ring; a `lines`
+element is the whole path). Unsupported kinds
 (`grid`, `axis`, …) or out-of-range indices throw `ArgumentError` at build time — fail loud,
 like a wrong-length `payloads=`. Keys are layer ids: for the single-layer kinds that's the
 interactable's `id`, but [`RegionInteractable`](@ref) splits into suffixed layers (`:id_c`

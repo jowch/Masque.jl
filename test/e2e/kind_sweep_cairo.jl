@@ -68,6 +68,15 @@ HTML(
         "<span id=\"coords_lines\" style=\"display:none\">$(JSON3.write(sweep.lines.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000045
+@bind ev_series sweep.series
+
+# ╔═╡ c1000000-0000-0000-0000-000000000046
+HTML(
+    "<span id=\"out_series\">SERIES=$(repr(ev_series))</span>" *
+        "<span id=\"coords_series\" style=\"display:none\">$(JSON3.write(sweep.series.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000014
 @bind ev_segments sweep.segments
 
@@ -220,6 +229,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000011
 # ╠═c1000000-0000-0000-0000-000000000012
 # ╠═c1000000-0000-0000-0000-000000000013
+# ╠═c1000000-0000-0000-0000-000000000045
+# ╠═c1000000-0000-0000-0000-000000000046
 # ╠═c1000000-0000-0000-0000-000000000014
 # ╠═c1000000-0000-0000-0000-000000000015
 # ╠═c1000000-0000-0000-0000-000000000016

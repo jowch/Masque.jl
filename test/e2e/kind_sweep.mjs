@@ -23,7 +23,7 @@ const TINT_CHECK_KEYS = new Set(["scatter", "scatter_dark", "barplot", "heatmap"
 
 // Mirrors selection.ts's selectionFor: these kinds (plus :grid) pin the clicked hit itself; a
 // legend layer (has `links`) pins its linked target(s) instead.
-const SELF_PIN_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "grid"]);
+const SELF_PIN_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines", "grid"]);
 
 const [base, notebook, backend, artifactDirArg] = process.argv.slice(2);
 if (!base || !notebook || !backend) {
@@ -46,9 +46,25 @@ function layerElementCount(l) {
   if (l.kind === "rects") return g.length / 4;
   if (l.kind === "segments") return g.length / 4;
   if (l.kind === "polyline") return Math.max(0, g.length / 2 - 1);
+  if (l.kind === "lines") return g.length;
   if (l.kind === "polygons") return g.length;
   if (l.kind === "grid") return g.ncols * g.nrows;
   throw new Error(`layerElementCount: unhandled kind ${l.kind}`);
+}
+
+// A whole-line highlight is one SVG path through every finite vertex, not one chord.
+function assertPathCovers(d, verts, where) {
+  if (!d) throw new Error(`${where}: whole-line highlight has no path`);
+  let finite = 0;
+  for (let i = 0; i < verts.length; i += 2) {
+    const x = verts[i], y = verts[i + 1];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    finite++;
+    if (!d.includes(`${x} ${y}`)) {
+      throw new Error(`${where}: path missing vertex ${x},${y} in ${d}`);
+    }
+  }
+  if (finite < 2) throw new Error(`${where}: path has fewer than 2 finite vertices`);
 }
 
 function hitPoint(layer, index) {
@@ -72,6 +88,15 @@ function hitPoint(layer, index) {
       y: (g[2 * index + 1] + g[2 * index + 3]) / 2,
       x1: g[2 * index], y1: g[2 * index + 1], x2: g[2 * index + 2], y2: g[2 * index + 3],
     };
+  }
+  if (k === "lines") {
+    const a = g[index];
+    for (let i = 0; i < a.length / 2 - 1; i++) {
+      const x0 = a[2 * i], y0 = a[2 * i + 1], x1 = a[2 * i + 2], y1 = a[2 * i + 3];
+      if (![x0, y0, x1, y1].every(Number.isFinite)) continue;
+      return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, x1: x0, y1: y0, x2: x1, y2: y1 };
+    }
+    throw new Error(`lines path ${index} has no finite segment`);
   }
   if (k === "polygons") {
     const ring = g[index];
@@ -256,6 +281,14 @@ try {
               x2: ln.getAttribute("x2"), y2: ln.getAttribute("y2"),
             };
           }),
+          paths: [...el.querySelectorAll("path")].map((p) => {
+            const cs = getComputedStyle(p);
+            return {
+              className: p.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
+              width: p.getAttribute("stroke-width"), opacity: p.getAttribute("stroke-opacity"),
+              d: p.getAttribute("d"),
+            };
+          }),
         };
       }
       const cs = getComputedStyle(el);
@@ -333,6 +366,7 @@ try {
         blend: layerName === "plain" ? null : getComputedStyle(svg).mixBlendMode,
         r: el.getAttribute("r"), cx: el.getAttribute("cx"), cy: el.getAttribute("cy"),
         x1: el.getAttribute("x1"), y1: el.getAttribute("y1"), x2: el.getAttribute("x2"), y2: el.getAttribute("y2"),
+        d: el.getAttribute("d"),
       };
     };
     return {
@@ -934,10 +968,14 @@ try {
     } else if (spec.selected === "ring") {
       const ring = m.kids.find((k) => k.kind === "ring");
       assertRing(ring, key);
-      const hp = hitPoint(layer, spec.selectedIndex);
-      const ln = ring.lines[0];
-      if (hp.x1 != null && (Math.abs(Number(ln.x1) - hp.x1) > 1.2 || Math.abs(Number(ln.y1) - hp.y1) > 1.2)) {
-        throw new Error(`${key}: ring not on segment ${JSON.stringify(ln)} vs ${JSON.stringify(hp)}`);
+      if (layer.kind === "lines") {
+        assertPathCovers(ring.paths[0].d, layer.geometry[spec.selectedIndex], `${key}/selected-ring`);
+      } else {
+        const hp = hitPoint(layer, spec.selectedIndex);
+        const ln = ring.lines[0];
+        if (hp.x1 != null && (Math.abs(Number(ln.x1) - hp.x1) > 1.2 || Math.abs(Number(ln.y1) - hp.y1) > 1.2)) {
+          throw new Error(`${key}: ring not on segment ${JSON.stringify(ln)} vs ${JSON.stringify(hp)}`);
+        }
       }
       passed.push(`${key}/selected-ring`);
     } else if (m.sel !== 0) {
@@ -1007,10 +1045,26 @@ try {
       await new Promise((r) => setTimeout(r, 200));
     }
     if (!tipHit(tip)) throw new Error(`${key}: tooltip ${JSON.stringify(tip)}`);
-    // Open (edge-only, no fill shape) kinds are line-geometry layers (polyline/segments); every
-    // other element-kind layer (circles/rects/polygons/grid) is closed (fill + edge).
-    const closedHover = layer.kind !== "polyline" && layer.kind !== "segments";
+    // Open (edge-only, no fill shape) kinds are line-geometry layers (polyline/segments/lines);
+    // every other element-kind layer (circles/rects/polygons/grid) is closed (fill + edge).
+    // A one-element line with a baked selection has nowhere else to hover: that hover is the
+    // already-selected mark, which draws no highlight. The series row (several whole lines)
+    // is what exercises the hover stroke.
+    const closedHover = layer.kind !== "polyline" && layer.kind !== "segments" && layer.kind !== "lines";
+    const hoverIsSelected = !!(spec.selected && hoverIndex === spec.selectedIndex);
+    if (hoverIsSelected) {
+      assertNoHighlight(tip.hi, `${key}/hover-on-selected`);
+      if (tip.sel < 1) throw new Error(`${key}: g.sel gone while hovering the selected mark`);
+      passed.push(`${key}/tooltip`);
+      passed.push(`${key}/hover-on-selected-noop`);
+    } else {
     assertHoverRecipe(tip.hi, key, closedHover, wantDark);
+    if (layer.kind === "lines") {
+      if (tip.hi.edge?.tag !== "path") {
+        throw new Error(`${key}: whole-line hover is not a path ${JSON.stringify(tip.hi.edge)}`);
+      }
+      assertPathCovers(tip.hi.edge.d, layer.geometry[hoverIndex], `${key}/hover-path`);
+    }
     assertNoAlertRed(m.kids, `${key}/sel`);
     assertNoTeal(m.kids, `${key}/sel`);
 
@@ -1071,6 +1125,7 @@ try {
     ));
     assertLeaveFade(fadeEntries, key);
     passed.push(`${key}/remount-fade`);
+    }
     let afterLeave = await inspect(key);
     for (let a = 0; a < 8 && afterLeave.hi !== 0; a++) {
       await new Promise((r) => setTimeout(r, 25));
@@ -1110,6 +1165,14 @@ try {
                   width: ln.getAttribute("stroke-width"), opacity: ln.getAttribute("stroke-opacity"),
                   x1: ln.getAttribute("x1"), y1: ln.getAttribute("y1"),
                   x2: ln.getAttribute("x2"), y2: ln.getAttribute("y2"),
+                };
+              }),
+              paths: [...el.querySelectorAll("path")].map((p) => {
+                const cs = getComputedStyle(p);
+                return {
+                  className: p.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
+                  width: p.getAttribute("stroke-width"), opacity: p.getAttribute("stroke-opacity"),
+                  d: p.getAttribute("d"),
                 };
               }),
             };
@@ -1245,6 +1308,11 @@ try {
           if (Math.abs(Number(ln.x1) - hp0.x1) > 1.2 || Math.abs(Number(ln.y1) - hp0.y1) > 1.2) {
             throw new Error(`${key}/links[${c.index}]: link ring off-mark ${JSON.stringify(ln)} vs ${JSON.stringify(hp0)}`);
           }
+        } else if (tl0.kind === "lines") {
+          const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
+          if (!ringKid) throw new Error(`${key}/links[${c.index}]: no ring in g.link`);
+          assertRing(ringKid, `${key}/links[${c.index}]/ring`);
+          assertPathCovers(ringKid.paths[0].d, tl0.geometry[0], `${key}/links[${c.index}]/ring`);
         }
         passed.push(`${key}/links[${c.index}]`);
       }

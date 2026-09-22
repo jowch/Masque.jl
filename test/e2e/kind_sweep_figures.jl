@@ -1,6 +1,6 @@
 # Shared figures for the agent kind-sweep notebooks (Cairo / WGL).
 # Each widget is one interactable kind (interaction + visual). `selected=` is baked only
-# on supported kinds (`circles`, `rects`, `polygons`, `segments`, `polyline`). `circle` marks a
+# on supported kinds (`circles`, `rects`, `polygons`, `segments`, `polyline`, `lines`). `circle` marks a
 # kind whose highlight is a circle, so the driver checks r == geometry r (no halo offset).
 # Grid / threshold / roi / view are hover-click or drag only. `scatter_dark` is a dark
 # Makie figure so the split-blend recipe (dodge fill both figures, multiply/screen edge stroke
@@ -12,8 +12,11 @@
 # for the persisted-wash / selected-survives-unhover checks. `hoverIndex`/`hoverTip` are a
 # DIFFERENT element for the standard hover-recipe check: hovering an already-selected mark draws
 # no highlight (see CLAUDE.md), so a kind with a baked selection needs its own, distinct hover
-# target to exercise the normal recipe at all. Where nothing is baked, `hoverIndex`/`hoverTip`
-# just repeat `selectedIndex`/`tip`. `tintIndex` (only set where it must differ) is the element
+# target to exercise the normal recipe at all. The one-element `lines` row is the exception:
+# hover and the baked selection are the same mark, so that hover draws no highlight; the
+# `series` row (three whole lines, hover a different one) is what exercises the `:lines`
+# hover stroke. Where nothing is baked, `hoverIndex`/`hoverTip` just repeat
+# `selectedIndex`/`tip`. `tintIndex` (only set where it must differ) is the element
 # the screenshot-based tint-applied check hovers — for `heatmap` this steers off `selectedIndex`'s
 # cell (viridis' darkest, where a dodge brightening is hardest to measure) onto a brighter one.
 #
@@ -42,9 +45,14 @@ kind_sweep_meta() = [
         "tip" => "beta", "hoverIndex" => 0, "hoverTip" => "alpha", "mode" => "element",
     ),
     Dict(
-        "key" => "lines", "layerId" => "lines", "layerKind" => "polyline",
-        "selected" => "ring", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
-        "tip" => "seg-b", "hoverIndex" => 0, "hoverTip" => "seg-a", "mode" => "element",
+        "key" => "lines", "layerId" => "lines", "layerKind" => "lines",
+        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "curve", "hoverIndex" => 0, "hoverTip" => "curve", "mode" => "element",
+    ),
+    Dict(
+        "key" => "series", "layerId" => "series", "layerKind" => "lines",
+        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "series 1", "hoverIndex" => 1, "hoverTip" => "series 2", "mode" => "element",
     ),
     Dict(
         "key" => "segments", "layerId" => "segments", "layerKind" => "segments",
@@ -187,15 +195,21 @@ function build_kind_sweep()
         verts = [(0.0, 0.0), (1.0, 1.5), (2.0, 0.4), (3.0, 1.8)]
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "lines")
-        lines!(ax, first.(verts), last.(verts); color = :gray, linewidth = 4)
+        p = lines!(ax, first.(verts), last.(verts); color = :gray, linewidth = 4)
         masque(
             fig,
-            SegmentInteractable(
-                ax, verts; id = :lines, mode = :polyline,
-                payloads = [(; label = "seg-a"), (; label = "seg-b"), (; label = "seg-c")],
-            );
-            selected = Dict(:lines => [2]),
+            SegmentInteractable(ax, p; id = :lines, payloads = [(; label = "curve")]);
+            selected = Dict(:lines => [1]),
         )
+    end
+
+    series = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "series")
+        # Three rows, four samples each: one element per series, not per chord.
+        ys = [1.0 1.6 2.1 1.4; 2.8 2.2 1.5 0.9; 0.5 1.2 1.9 2.6]
+        series!(ax, ys; linewidth = 4)
+        masque(fig; selected = Dict(:series => [1]))
     end
 
     segments = let
@@ -400,7 +414,7 @@ function build_kind_sweep()
     end
 
     return (;
-        scatter, lines, segments, heatmap, image, barplot, poly,
+        scatter, lines, series, segments, heatmap, image, barplot, poly,
         polar, scatter_dark, arrows3d, hlines, threshold, roi, view, legend, legend_overlap,
         axis,
     )

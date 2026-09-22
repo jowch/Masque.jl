@@ -42,7 +42,7 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
-    if L.kind === :segments || L.kind === :polyline
+    if L.kind === :segments || L.kind === :polyline || L.kind === :lines
         t = hit_tol(i)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))
     end
@@ -322,7 +322,7 @@ element commit a `Vector{ElementEvent}` (a click is a one-element vector; an emp
   and `[1]` mount as a one-element vector, and `[]` mounts as `ElementEvent[]`. Also accepts the
   event itself, or a `NamedTuple` / `Dict` keyed by layer id when the figure has more than one
   seedable layer. A bare index is an `ArgumentError` in that case. Works on
-  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`; any other kind, or an out-of-range
+  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines`; any other kind, or an out-of-range
   index (`0` included), raises `ArgumentError` naming `1:n`. Clicking replaces the selection, so
   this is only needed to carry one through a rebuild — and it must come from a cell that doesn't
   read this widget's own bond, which Pluto rejects as a cyclic reference.
