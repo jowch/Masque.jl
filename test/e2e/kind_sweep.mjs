@@ -54,8 +54,9 @@ function layerElementCount(l) {
 
 // A whole-line highlight is one SVG path through every finite vertex, not one chord.
 // Tokenize numeric literals so `"10 20"` is not a substring of `"110 20"`.
-function assertPathCovers(d, verts, where) {
-  if (!d) throw new Error(`${where}: whole-line highlight has no path`);
+// null when `d` covers every finite vertex; otherwise a reason string.
+function pathCoverError(d, verts) {
+  if (!d || !verts) return "whole-line highlight has no path";
   const nums = (d.match(/-?(?:NaN|Infinity|\d+(?:\.\d+)?(?:e[+-]?\d+)?)/gi) || []).map(Number);
   let finite = 0;
   for (let i = 0; i < verts.length; i += 2) {
@@ -66,9 +67,15 @@ function assertPathCovers(d, verts, where) {
     for (let j = 0; j + 1 < nums.length; j++) {
       if (nums[j] === x && nums[j + 1] === y) { found = true; break; }
     }
-    if (!found) throw new Error(`${where}: path missing vertex ${x},${y} in ${d}`);
+    if (!found) return `path missing vertex ${x},${y} in ${d}`;
   }
-  if (finite < 2) throw new Error(`${where}: path has fewer than 2 finite vertices`);
+  if (finite < 2) return "path has fewer than 2 finite vertices";
+  return null;
+}
+
+function assertPathCovers(d, verts, where) {
+  const err = pathCoverError(d, verts);
+  if (err) throw new Error(`${where}: ${err}`);
 }
 
 // Legend `links` specs: exact layer id (every element) or `id:k` (Julia 1-based element pin).
@@ -388,6 +395,8 @@ try {
         width: el.getAttribute("stroke-width"), opacity: el.getAttribute("stroke-opacity"),
         blend: layerName === "plain" ? null : getComputedStyle(svg).mixBlendMode,
         r: el.getAttribute("r"), cx: el.getAttribute("cx"), cy: el.getAttribute("cy"),
+        x: el.getAttribute("x"), y: el.getAttribute("y"),
+        w: el.getAttribute("width"), h: el.getAttribute("height"),
         x1: el.getAttribute("x1"), y1: el.getAttribute("y1"), x2: el.getAttribute("x2"), y2: el.getAttribute("y2"),
         d: el.getAttribute("d"),
       };
@@ -1008,10 +1017,25 @@ try {
     const hoverIndex = spec.hoverIndex;
     const hoverTip = spec.hoverTip;
     // A legend's default (and `tooltip = false`) ships `tooltip: false`: the card must stay
-    // hidden. Every other element kind still requires a visible card, matched to hoverTip.
+    // hidden. A hidden card is not which entry was hit — every suppressed hover has one —
+    // so the row highlight has to sit on hoverPt. Every other element kind still requires
+    // a visible card, matched to hoverTip.
     const tipSuppressed = layer.tooltip === false;
+    const hiOnPoint = (t, pt) => {
+      const el = t?.hi?.fill || t?.hi?.edge || t?.hi?.plain;
+      if (!el || !pt) return false;
+      if (el.cx != null && el.cy != null) {
+        return Math.abs(Number(el.cx) - pt.x) <= 1.2 && Math.abs(Number(el.cy) - pt.y) <= 1.2;
+      }
+      if (el.x != null && el.y != null && el.w != null && el.h != null) {
+        const cx = Number(el.x) + Number(el.w) / 2;
+        const cy = Number(el.y) + Number(el.h) / 2;
+        return Math.abs(cx - pt.x) <= 1.2 && Math.abs(cy - pt.y) <= 1.2;
+      }
+      return false;
+    };
     const tipHit = (t) => {
-      if (tipSuppressed) return !!(t && !t.show);
+      if (tipSuppressed) return !!(t && !t.show && hiOnPoint(t, hoverPt));
       if (!hoverTip) return !!(t && t.show);
       const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
       return !!(t && t.show && norm(t.text).includes(norm(hoverTip)));
@@ -1289,14 +1313,45 @@ try {
 
         const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
         const wantCard = layer.tooltip !== false;
+        // A hidden card is every legend hover once the default tip is off, so it cannot
+        // tell this entry from the previous one. pointermove is also coalesced onto one
+        // frame (hover.ts). Leave first so the previous g.link is not this case's answer,
+        // then wait until the linked geometry is the pin for this entry.
+        const linkLanded = (li) => {
+          if (tl0.kind === "lines") {
+            const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
+            return pathCoverError(ringKid?.paths?.[0]?.d, tl0.geometry[idx0]) === null;
+          }
+          if (tl0.kind === "polyline" || tl0.kind === "segments") {
+            const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
+            const ln = ringKid?.lines?.[0];
+            return !!ln && Math.abs(Number(ln.x1) - hp0.x1) <= 1.2 && Math.abs(Number(ln.y1) - hp0.y1) <= 1.2;
+          }
+          if (tl0.kind === "circles") {
+            const circleKid = li.kids.find((kk) => kk.kind === "closed" && (kk.layer === "fill" || kk.layer === "edge"));
+            return !!circleKid && Math.abs(Number(circleKid.cx) - hp0.x) <= 0.6 && Math.abs(Number(circleKid.cy) - hp0.y) <= 0.6;
+          }
+          return false;
+        };
+        await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+        }, key);
         let t = null;
+        let landed = false;
         for (let a = 0; a < 8; a++) {
           t = await dispatchAt(key, hp.x, hp.y, "pointermove");
           const cardOk = wantCard
             ? !!(t?.show && norm(t.text).includes(norm(c.label)))
             : !!(t && !t.show);
-          if (cardOk) break;
+          if (cardOk && linkLanded(await linkInspect(key))) { landed = true; break; }
           await new Promise((r) => setTimeout(r, 200));
+        }
+        if (!landed) {
+          throw new Error(`${key}/links[${c.index}]: linked highlight did not match the pinned geometry (tooltip ${JSON.stringify(t)})`);
         }
         if (wantCard) {
           if (!t?.show || !norm(t.text).includes(norm(c.label))) {

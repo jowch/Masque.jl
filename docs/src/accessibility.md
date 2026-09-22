@@ -29,7 +29,8 @@ trace it labels, exactly as hovering it does, and the announcement names that en
 even though a legend shows no tooltip unless you pass one — see [Legend](@ref).
 
 Moving focus draws the same highlight ring a mouse hover would (there is never a separate
-"focus" look) and shows the same tooltip, positioned on the focused element.
+"focus" look). A layer that has a tooltip shows that same card on the focused element. A
+legend entry does not, unless you passed a template.
 
 ## What gets announced
 
