@@ -100,6 +100,44 @@ notebook package management off. Do not copy a
 want Pluto's package management off. For more information, see
 [Examples](@ref).
 
+## Quick start
+
+The following embed is a three-point scatter: your figure, `masque`, and
+a readout. Hover a point; click one. The **Simulating `@bind`** chip
+marks listed clicks as snapshots, not a live Julia process.
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-gs-quickstart" title="Three-point scatter with listed @bind snapshots"
+        style="width:100%;height:480px;border:0;background:transparent;overflow:hidden;"
+        scrolling="no" loading="lazy"></iframe>
+</div>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-gs-quickstart");
+  if (!el) return;
+  function isDocDark() {
+    var c = document.documentElement.className || "";
+    if (!c) return false;
+    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+    return /(^|\s)theme--/.test(c);
+  }
+  function pushTheme() {
+    var doc = el.contentDocument;
+    if (!doc) return;
+    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
+  }
+  el.addEventListener("load", pushTheme);
+  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  el.src = (pretty ? "../embeds/" : "embeds/") + "home_quickstart.html";
+})();
+</script>
+```
+
+`sel` is `nothing` until a click, then `sel.payload` is
+`(; index, x, y)`.
+
 ## Overlay the cities scatter
 
 The entry function is lowercase `masque`. A function named `Masque`

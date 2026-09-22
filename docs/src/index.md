@@ -6,51 +6,37 @@ your figures.
 
 ![A CairoMakie scatter in Pluto: holding the pointer over a point shows a tooltip, clicking it selects the point and updates the bound value in the following cell](assets/demo.gif)
 
-## Quick start
+## Hover a mark
 
-In a Pluto notebook:
+Hold the pointer over a point, bar, heatmap cell, polygon, or legend
+entry. A tooltip appears on the figure you already drew. For templates
+and styling, see [Tooltips](@ref).
 
-```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-home-quickstart" title="Three-point scatter with listed @bind snapshots"
-        style="width:100%;height:480px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
-</div>
-<script>
-(function () {
-  var el = document.getElementById("masque-home-quickstart");
-  if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = "embeds/home_quickstart.html";
-})();
-</script>
-```
+## Click, then use the pick in Julia
 
-Hovering shows a tooltip; clicking sets `sel` and re-runs downstream
-cells. On this docs site, listed clicks are precomputed snapshots — the
-**Simulating `@bind`** chip marks that this is not a live Julia process.
+Click a mark. `@bind` writes that pick into the next cell, the same way
+a PlutoUI slider does. Downstream cells re-run with the selected row,
+bar, or cell. For more information, see [Click marks](@ref) and
+[Selection](@ref).
 
-Pluto runs exactly one top-level expression per cell, so any snippet on
-this site with more than one statement is wrapped in `begin ... end`
-(which counts as one expression) or split across cells the way this
-notebook is.
+## Brush, threshold, and pan
 
-Under the hood, `masque(...)` sends the browser a manifest: the rendered
-image plus hit regions grouped into layers, one per interactable, keyed
-by its `id`. The value a `@bind`-ed variable holds — `sel` in that
-notebook — is called the bond value.
+Drag a box over points to select a region. Drag a cutoff on a colorbar.
+Pan a 2D axis, or orbit `Axis3` on the WebGL backend. See
+[Brush a region](@ref), [Read coordinates](@ref), and
+[Pan and orbit](@ref).
+
+## Highlight from the legend
+
+Hover or click a `Makie.Legend` entry to wash the traces it labels. See
+[Legend](@ref).
+
+## Inspect a static export
+
+Hover and click still work in a Pluto HTML export of the notebook.
+Re-running Julia cells needs a live session. CairoMakie is the default;
+WGLMakie is the live canvas when you want animation, large data, or 3D
+you can orbit. See [Backends](@ref).
 
 ## Where to go next
 
