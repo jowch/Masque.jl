@@ -1,121 +1,6 @@
-# Bond types and the wire → Julia transform. See docs/dev/architecture/05-bond-value.md
-# and the design note for the contract. Indices on the wire stay 0-based; every Julia-facing
+# Bond routing: which event a layer commits, the wire envelope, and `selected=` normalization.
+# Concrete event types live in events.jl. Indices on the wire stay 0-based; every Julia-facing
 # number is 1-based. Subtract 1 only when writing the manifest; add 1 when reading the wire.
-
-"""
-    InteractionEvent
-
-Abstract type of every `masque` `@bind` value that is not `nothing`. Concrete subtypes carry
-the fields of that commit: an element pick, a legend entry, a grid cell or window, an axis or
-colorbar click, a threshold, or ROI bounds. A `selects` ROI over points yields a
-`Vector{ElementEvent}` instead of one event. Field names on the struct win over a payload key
-of the same name; on an [`ElementEvent`](@ref) or [`LegendEvent`](@ref), other names forward
-to the payload. See [`bondtype`](@ref) and [`transform_bond`](@ref).
-"""
-abstract type InteractionEvent end
-
-"""
-    ElementEvent(layer, index, payload)
-
-One element of a point, bar, polygon, segment, polyline, or list-of-rects layer. `index` is
-1-based. Other fields (e.g. `city`) are read from `payload`. Use as a row index:
-`df[pick, :]`, `xs[pick]`.
-"""
-struct ElementEvent <: InteractionEvent
-    layer::Symbol
-    index::Int
-    payload::Any
-end
-
-"""
-    LegendEvent(layer, index, payload)
-
-One legend entry. `index` is which entry (1-based), not a row of the author's table.
-`entry.label` and `entry.targets` come from the payload. `df[entry, :]` does not treat the
-entry number as a row.
-"""
-struct LegendEvent <: InteractionEvent
-    layer::Symbol
-    index::Int
-    payload::Any
-end
-
-"""
-    GridCellEvent(layer, i, j, value)
-
-One heatmap or image cell. `i` and `j` are 1-based column and row of the author's
-`(ncols, nrows)` matrix. `A[cell]` is `A[cell.i, cell.j]`. `value` is the shipped cell value,
-or `nothing` when values were not sent.
-"""
-struct GridCellEvent <: InteractionEvent
-    layer::Symbol
-    i::Int
-    j::Int
-    value::Any
-end
-
-"""
-    GridWindowEvent(layer, i1, i2, j1, j2, xmin, xmax, ymin, ymax)
-
-A brushed window on a grid. Ranges are 1-based inclusive: `A[win]` is
-`A[win.i1:win.i2, win.j1:win.j2]`. A miss has an empty `i1:i2` (and `j1:j2`).
-"""
-struct GridWindowEvent <: InteractionEvent
-    layer::Symbol
-    i1::Int
-    i2::Int
-    j1::Int
-    j2::Int
-    xmin::Float64
-    xmax::Float64
-    ymin::Float64
-    ymax::Float64
-end
-
-"""
-    AxisEvent(layer, x, y)
-
-An axis click at data coordinates `(x, y)`. Not an array index.
-"""
-struct AxisEvent <: InteractionEvent
-    layer::Symbol
-    x::Float64
-    y::Float64
-end
-
-"""
-    ThresholdEvent(layer, value)
-
-A threshold drag release at data coordinate `value`. Pass back as `value=` to restore the line.
-"""
-struct ThresholdEvent <: InteractionEvent
-    layer::Symbol
-    value::Float64
-end
-
-"""
-    ColorbarEvent(layer, value)
-
-A colorbar click at data coordinate `value`.
-"""
-struct ColorbarEvent <: InteractionEvent
-    layer::Symbol
-    value::Float64
-end
-
-"""
-    BoundsEvent(layer, xmin, xmax, ymin, ymax)
-
-A bounds-only ROI release. Pass back as `bounds=` to restore the box. A `selects` ROI is not a
-`BoundsEvent`.
-"""
-struct BoundsEvent <: InteractionEvent
-    layer::Symbol
-    xmin::Float64
-    xmax::Float64
-    ymin::Float64
-    ymax::Float64
-end
 
 # One owner per layer id: the interactable that produced the layer, and the HitLayer it returned.
 # Attached to the widget (not the published manifest) so custom `transform_bond` can run at click.
@@ -125,106 +10,7 @@ struct LayerOwner
 end
 
 # ---------------------------------------------------------------------------
-# Field forwarding, propertynames, show
-# ---------------------------------------------------------------------------
-
-function Base.getproperty(ev::InteractionEvent, name::Symbol)
-    name === :layer && return getfield(ev, :layer)
-    hasfield(typeof(ev), name) && return getfield(ev, name)
-    ev isa Union{ElementEvent, LegendEvent} ||
-        throw(ArgumentError("$(typeof(ev)) has no field $name"))
-    pl = getfield(ev, :payload)
-    hasproperty(pl, name) && return getproperty(pl, name)
-    if pl isa AbstractDict
-        haskey(pl, name) && return pl[name]
-        ks = String(name)
-        haskey(pl, ks) && return pl[ks]
-    end
-    throw(ArgumentError("$(typeof(ev)) has no field $name"))
-end
-
-function _payload_names(pl::NamedTuple)
-    return collect(keys(pl))
-end
-function _payload_names(pl::AbstractDict)
-    out = Symbol[]
-    for k in keys(pl)
-        k isa Symbol && push!(out, k)
-        k isa AbstractString && push!(out, Symbol(k))
-    end
-    return out
-end
-function _payload_names(pl)
-    try
-        return collect(Symbol, propertynames(pl))
-    catch
-        return Symbol[]
-    end
-end
-
-function Base.propertynames(ev::InteractionEvent)
-    fs = fieldnames(typeof(ev))
-    ev isa Union{ElementEvent, LegendEvent} || return fs
-    pl = getfield(ev, :payload)
-    data = _payload_names(pl)
-    out = Symbol[]
-    for n in fs
-        n === :payload && continue
-        push!(out, n)
-    end
-    for n in data
-        n in out || push!(out, n)
-    end
-    push!(out, :payload)
-    return Tuple(out)
-end
-
-function Base.show(io::IO, ev::InteractionEvent)
-    print(io, nameof(typeof(ev)), '(')
-    show(io, getfield(ev, :layer))
-    if ev isa Union{ElementEvent, LegendEvent}
-        print(io, ", ")
-        show(io, getfield(ev, :index))
-        pl = getfield(ev, :payload)
-        if pl isa NamedTuple
-            for k in keys(pl)
-                k === :index && continue
-                print(io, ", ", k, " = ")
-                show(io, pl[k])
-            end
-        else
-            print(io, ", ")
-            show(io, pl)
-        end
-    else
-        for f in fieldnames(typeof(ev))
-            f === :layer && continue
-            print(io, ", ", f, " = ")
-            show(io, getfield(ev, f))
-        end
-    end
-    return print(io, ')')
-end
-
-# ---------------------------------------------------------------------------
-# Indexing
-# ---------------------------------------------------------------------------
-
-Base.to_index(ev::ElementEvent) = getfield(ev, :index)
-Base.to_index(evs::AbstractVector{ElementEvent}) = Int[getfield(ev, :index) for ev in evs]
-
-function Base.to_index(ev::InteractionEvent)
-    throw(ArgumentError("$(getfield(ev, :layer)) ($(typeof(ev))) is not an element index"))
-end
-
-Base.to_indices(A, inds, I::Tuple{GridCellEvent, Vararg{Any}}) =
-    to_indices(A, inds, (I[1].i, I[1].j, Base.tail(I)...))
-
-Base.to_indices(A, inds, I::Tuple{GridWindowEvent, Vararg{Any}}) =
-    to_indices(A, inds, (I[1].i1:I[1].i2, I[1].j1:I[1].j2, Base.tail(I)...))
-
-# ---------------------------------------------------------------------------
-# bondtype / transform_bond
+# bondtype / transform_bond — the methods that pick a type
 # ---------------------------------------------------------------------------
 
 """
@@ -235,11 +21,6 @@ also carries a `selects` ROI aimed at points returns a `Vector{ElementEvent}` fo
 element commit; that is a property of the call, not of the point layer's `bondtype`.
 """
 bondtype(::AbstractInteractable) = ElementEvent
-bondtype(::LegendInteractable) = LegendEvent
-bondtype(::AxisInteractable) = AxisEvent
-bondtype(::ColorbarInteractable) = ColorbarEvent
-bondtype(::ThresholdInteractable) = ThresholdEvent
-bondtype(::ROIInteractable) = BoundsEvent
 bondtype(::ViewInteractable) = Nothing
 function bondtype(i::RectInteractable)
     return i.layout === :grid ? GridCellEvent : ElementEvent
@@ -258,48 +39,10 @@ function transform_bond(i::AbstractInteractable, layer::HitLayer, index, js_payl
     return transform_bond(bondtype(i), i, layer, index, js_payload)
 end
 
-function transform_bond(::Type{ElementEvent}, i, layer::HitLayer, index, js_payload)
-    return _element_event(layer.id, index, layer.payloads)
-end
-function transform_bond(::Type{LegendEvent}, i, layer::HitLayer, index, js_payload)
-    return _legend_event(layer.id, index, layer.payloads)
-end
-function transform_bond(::Type{GridCellEvent}, i, layer::HitLayer, index, js_payload)
-    return _grid_cell_event(layer.id, js_payload)
-end
-function transform_bond(::Type{AxisEvent}, i, layer::HitLayer, index, js_payload)
-    return _axis_event(layer.id, js_payload)
-end
-function transform_bond(::Type{ColorbarEvent}, i, layer::HitLayer, index, js_payload)
-    return _colorbar_event(layer.id, js_payload)
-end
-function transform_bond(::Type{ThresholdEvent}, i, layer::HitLayer, index, js_payload)
-    return _threshold_event(layer.id, js_payload)
-end
-function transform_bond(::Type{BoundsEvent}, i, layer::HitLayer, index, js_payload)
-    return _bounds_event(layer.id, js_payload)
-end
 function transform_bond(::Type{Nothing}, i, layer::HitLayer, index, js_payload)
     throw(ArgumentError("bond: layer :$(layer.id) commits nothing"))
 end
 
-function transform_bond(i::AxisInteractable, layer::HitLayer, index, js_payload)
-    return _axis_event(i.id, js_payload)
-end
-function transform_bond(i::ColorbarInteractable, layer::HitLayer, index, js_payload)
-    return _colorbar_event(i.id, js_payload)
-end
-function transform_bond(i::ThresholdInteractable, layer::HitLayer, index, js_payload)
-    return _threshold_event(i.id, js_payload)
-end
-function transform_bond(i::ROIInteractable, layer::HitLayer, index, js_payload)
-    i.selects === nothing || throw(
-        ArgumentError(
-            "bond: ROI :$(i.id) selects :$(i.selects); the bond is the selection, not bounds",
-        ),
-    )
-    return _bounds_event(i.id, js_payload)
-end
 function transform_bond(i::RectInteractable, layer::HitLayer, index, js_payload)
     i.layout === :list && return _element_event(i.id, index, layer.payloads)
     return _grid_cell_event(i.id, js_payload)
@@ -315,91 +58,6 @@ function transform_bond(i::FunctionInteractable, layer::HitLayer, index, js_payl
     k === :roi && return _bounds_event(layer.id, js_payload)
     k === :view && throw(ArgumentError("bond: layer :$(layer.id) commits nothing"))
     return _element_event(layer.id, index, layer.payloads)
-end
-
-# ---------------------------------------------------------------------------
-# Event constructors shared by the owner path and the stamp path
-# ---------------------------------------------------------------------------
-
-function _element_event(id::Symbol, index, payloads)
-    index isa Integer || throw(ArgumentError("bond: layer :$id element hit has no index"))
-    n = length(payloads)
-    idx = Int(index)
-    (1 <= idx <= n) || throw(
-        ArgumentError(
-            "bond: layer :$id index $idx out of range for $n elements" *
-                (n > 0 ? " (valid: 1:$n)" : ""),
-        ),
-    )
-    return ElementEvent(id, idx, payloads[idx])
-end
-
-function _legend_event(id::Symbol, index, payloads)
-    index isa Integer || throw(ArgumentError("bond: layer :$id legend hit has no index"))
-    n = length(payloads)
-    idx = Int(index)
-    (1 <= idx <= n) || throw(
-        ArgumentError(
-            "bond: layer :$id index $idx out of range for $n entries" *
-                (n > 0 ? " (valid: 1:$n)" : ""),
-        ),
-    )
-    return LegendEvent(id, idx, payloads[idx])
-end
-
-function _js_req(js, key::String, id::Symbol)
-    js isa AbstractDict && haskey(js, key) && return js[key]
-    throw(ArgumentError("bond: layer :$id payload is missing `$key`"))
-end
-
-function _grid_cell_event(id::Symbol, js_payload)
-    js_payload isa AbstractDict || throw(
-        ArgumentError("bond: layer :$id grid cell payload must be a dict, got $(typeof(js_payload))"),
-    )
-    i = Int(_js_req(js_payload, "i", id)) + 1
-    j = Int(_js_req(js_payload, "j", id)) + 1
-    value = haskey(js_payload, "value") ? js_payload["value"] : nothing
-    return GridCellEvent(id, i, j, value)
-end
-
-function _axis_event(id::Symbol, js_payload)
-    return AxisEvent(id, Float64(_js_req(js_payload, "x", id)), Float64(_js_req(js_payload, "y", id)))
-end
-
-function _colorbar_event(id::Symbol, js_payload)
-    return ColorbarEvent(id, Float64(_js_req(js_payload, "value", id)))
-end
-
-function _threshold_event(id::Symbol, js_payload)
-    js_payload isa Real || throw(
-        ArgumentError("bond: layer :$id threshold payload must be a number, got $(typeof(js_payload))"),
-    )
-    return ThresholdEvent(id, Float64(js_payload))
-end
-
-function _bounds_event(id::Symbol, js_payload)
-    return BoundsEvent(
-        id,
-        Float64(_js_req(js_payload, "xmin", id)),
-        Float64(_js_req(js_payload, "xmax", id)),
-        Float64(_js_req(js_payload, "ymin", id)),
-        Float64(_js_req(js_payload, "ymax", id)),
-    )
-end
-
-function _grid_window_event(id::Symbol, js_payload)
-    js_payload === nothing && return GridWindowEvent(id, 1, 0, 1, 0, 0.0, 0.0, 0.0, 0.0)
-    return GridWindowEvent(
-        id,
-        Int(_js_req(js_payload, "i0", id)) + 1,
-        Int(_js_req(js_payload, "i1", id)) + 1,
-        Int(_js_req(js_payload, "j0", id)) + 1,
-        Int(_js_req(js_payload, "j1", id)) + 1,
-        Float64(_js_req(js_payload, "xmin", id)),
-        Float64(_js_req(js_payload, "xmax", id)),
-        Float64(_js_req(js_payload, "ymin", id)),
-        Float64(_js_req(js_payload, "ymax", id)),
-    )
 end
 
 # ---------------------------------------------------------------------------
@@ -611,21 +269,51 @@ function explicit_empty_seed(selected)::Bool
     return false
 end
 
-# ---------------------------------------------------------------------------
-# value= / bounds= coercion (constructors call these at runtime)
-# ---------------------------------------------------------------------------
+# Closed kinds get the selected wash; open kinds (:segments/:polyline) get the ring. `selected=`
+# on any other kind fails loud.
+const _SELECTED_KINDS = (:circles, :rects, :polygons, :segments, :polyline)
 
-_threshold_value(x::Real) = Float64(x)
-_threshold_value(x::ThresholdEvent) = getfield(x, :value)
-function _threshold_value(x)
-    throw(ArgumentError("ThresholdInteractable: value must be a number or a ThresholdEvent, got $(typeof(x))"))
+# Element count for a HitLayer geometry, matching the JS layout in types.ts / hitLayerByIndex.
+function _layer_n_elements(kind::Symbol, geometry)
+    return if kind === :circles
+        length(geometry) ÷ 3
+    elseif kind === :rects
+        length(geometry) ÷ 4
+    elseif kind === :polygons
+        length(geometry)
+    elseif kind === :segments
+        length(geometry) ÷ 4
+    elseif kind === :polyline
+        max(0, length(geometry) ÷ 2 - 1)
+    elseif kind === :grid
+        Int(geometry["ncols"]) * Int(geometry["nrows"])
+    else
+        0   # :axis / :threshold / :roi / :view — not element-indexed for selected=
+    end
 end
 
-_roi_bounds(b::BoundsEvent) = (b.xmin, b.xmax, b.ymin, b.ymax)
-function _roi_bounds(bounds)
-    length(bounds) == 4 || throw(ArgumentError("ROIInteractable: bounds must be (xmin, xmax, ymin, ymax)"))
-    xmin, xmax, ymin, ymax = Float64.(Tuple(bounds))
-    return (xmin, xmax, ymin, ymax)
+# Validate `selected=` indices for one layer: supported kind + in-range (1-based). Stores 0-based.
+function _check_selected(L::HitLayer, sel)
+    kind = L.kind
+    if !(kind in _SELECTED_KINDS)
+        throw(
+            ArgumentError(
+                "selected: layer :$(L.id) has kind :$kind, which does not support pre-highlight " *
+                    "(supported: $(join(_SELECTED_KINDS, ", ")))",
+            ),
+        )
+    end
+    n = _layer_n_elements(kind, L.geometry)
+    idxs = collect(Int, sel)
+    for idx in idxs
+        (1 <= idx <= n) || throw(
+            ArgumentError(
+                "selected: layer :$(L.id) index $idx out of range for $n elements" *
+                    (n > 0 ? " (valid: 1:$n)" : ""),
+            ),
+        )
+    end
+    return idxs .- 1
 end
 
 # ---------------------------------------------------------------------------

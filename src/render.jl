@@ -65,53 +65,6 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     return d
 end
 
-# Closed kinds get the selected wash; open kinds (:segments/:polyline) get the ring. `selected=`
-# on any other kind fails loud.
-const _SELECTED_KINDS = (:circles, :rects, :polygons, :segments, :polyline)
-
-# Element count for a HitLayer geometry, matching the JS layout in types.ts / hitLayerByIndex.
-function _layer_n_elements(kind::Symbol, geometry)
-    return if kind === :circles
-        length(geometry) ÷ 3
-    elseif kind === :rects
-        length(geometry) ÷ 4
-    elseif kind === :polygons
-        length(geometry)
-    elseif kind === :segments
-        length(geometry) ÷ 4
-    elseif kind === :polyline
-        max(0, length(geometry) ÷ 2 - 1)
-    elseif kind === :grid
-        Int(geometry["ncols"]) * Int(geometry["nrows"])
-    else
-        0   # :axis / :threshold / :roi / :view — not element-indexed for selected=
-    end
-end
-
-# Validate `selected=` indices for one layer: supported kind + in-range (1-based). Stores 0-based.
-function _check_selected(L::HitLayer, sel)
-    kind = L.kind
-    if !(kind in _SELECTED_KINDS)
-        throw(
-            ArgumentError(
-                "selected: layer :$(L.id) has kind :$kind, which does not support pre-highlight " *
-                    "(supported: $(join(_SELECTED_KINDS, ", ")))",
-            ),
-        )
-    end
-    n = _layer_n_elements(kind, L.geometry)
-    idxs = collect(Int, sel)
-    for idx in idxs
-        (1 <= idx <= n) || throw(
-            ArgumentError(
-                "selected: layer :$(L.id) index $idx out of range for $n elements" *
-                    (n > 0 ? " (valid: 1:$n)" : ""),
-            ),
-        )
-    end
-    return idxs .- 1
-end
-
 # One `selects` target for the widget. Several selectors must name that same layer.
 function _selection_spec(interactables, layers)
     targets = Symbol[]

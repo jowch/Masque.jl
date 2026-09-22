@@ -52,6 +52,7 @@ include("backend.jl")
 include("markup.jl")
 include("interactables.jl")
 include("introspect.jl")
+include("events.jl")
 include("bond.jl")
 include("render.jl")
 
