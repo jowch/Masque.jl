@@ -155,8 +155,104 @@ end
 ```
 
 `f` can emit one `HitLayer` per axis because `ctx` covers the whole
-figure. Each layer uses the `bondtype` of its kind; the default is
-[`ElementEvent`](@ref). Implement `bondtype` and `transform_bond` when
-the commit is another type. Prefer [`RegionInteractable`](@ref) when the
+figure. Each layer uses the bond type of its kind; the default is
+[`ElementEvent`](@ref). Prefer [`RegionInteractable`](@ref) when the
 shape is a circle, rect, or polygon. For the `HitLayer` field list, see
 [API](@ref).
+
+## A custom interactable
+
+Subtype [`AbstractInteractable`](@ref) to own the hits and the bond type.
+[`FunctionInteractable`](@ref) maps each layer's kind onto a built-in
+event. A commit that is not one of those types is a struct of your own,
+subtyping [`InteractionEvent`](@ref).
+
+Every subtype implements [`hitlayers`](@ref). The default
+[`bondtype`](@ref) is [`ElementEvent`](@ref); a type that only wants
+that event writes `hitlayers` and inherits the rest. Implement
+`bondtype` and [`transform_bond`](@ref) when the commit is another type.
+
+This example hits a scatter of cities and commits a `CityPick`. `index`
+arriving at `transform_bond` is already 1-based for `:circles`.
+`js_payload` is unused: the event is built from the struct. Names on
+that struct are how you read the pick. Field forwarding applies only to
+[`ElementEvent`](@ref) and [`LegendEvent`](@ref).
+
+Define the types in their own cell so a figure rebuild does not
+redefine them.
+
+```julia
+begin
+    struct CityPick <: InteractionEvent
+        layer::Symbol
+        index::Int
+        city::String
+        pop::Int
+    end
+
+    struct Cities <: AbstractInteractable
+        ax
+        pts
+        rows
+        id::Symbol
+    end
+
+    Masque.bondtype(::Cities) = CityPick
+
+    function Masque.hitlayers(i::Cities, ctx)
+        geom = Float64[]
+        for p in i.pts
+            q = data_to_image_px(ctx, i.ax, p)
+            r = 8 * ctx.scaling
+            push!(geom, q[1], q[2], r)
+        end
+        [
+            HitLayer(
+                i.id,
+                :circles,
+                geom,
+                Vector{Any}(i.rows),
+                Masque.axis_id(ctx, i.ax),
+                (:click, :hover),
+            ),
+        ]
+    end
+
+    function Masque.transform_bond(i::Cities, layer, index, js_payload)
+        row = i.rows[index]
+        CityPick(i.id, index, row.city, row.pop)
+    end
+end
+```
+
+Replace the previous `fig` and `@bind pick` cells.
+
+```julia
+begin
+    fig = Figure()
+    ax = Axis(fig[1, 1]; xlabel = "lon", ylabel = "lat")
+    rows = [
+        (; city = "Tokyo", pop = 37),
+        (; city = "Delhi", pop = 32),
+        (; city = "Shanghai", pop = 27),
+    ]
+    pts = [(139.7, 35.7), (77.2, 28.6), (121.5, 31.2)]
+    scatter!(ax, first.(pts), last.(pts); markersize = 16)
+    cities = Cities(ax, pts, rows, :cities)
+end
+```
+
+```julia
+@bind pick masque(fig, cities)
+```
+
+```julia
+pick === nothing ? "click a city" : "$(pick.city), $(pick.pop) million"
+```
+
+Circle `r` is logical pixels times the figure scale (`8 * ctx.scaling`),
+the same formula as [`PointInteractable`](@ref)'s `radius`. Project
+data-space points with [`data_to_image_px`](@ref). Look up an axis
+transform with `Masque.axis_id(ctx, ax)` (not exported — qualify it).
+Extend the methods as `Masque.hitlayers`, `Masque.bondtype`, and
+`Masque.transform_bond`.

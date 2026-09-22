@@ -233,7 +233,11 @@ numeric readout and does not repaint. See [Pan and orbit](@ref) and
 | Constructor | Signature | Bond | Kind | Guide |
 |---|---|---|---|---|
 | [`RegionInteractable`](@ref) | `(ax; regions, payloads, id=:region)` | [`ElementEvent`](@ref) per split layer | `:circles` / `:rects` / `:polygons` as `:id_c` / `:id_r` / `:id_p` | [Custom hits](@ref) |
-| [`FunctionInteractable`](@ref) | `(f; events=(:click, :hover))` | default [`ElementEvent`](@ref); implement `bondtype` / `transform_bond` for another type | whatever `f` emits | [Custom hits](@ref) |
+| [`FunctionInteractable`](@ref) | `(f; events=(:click, :hover))` | the bond type of each layer's kind; default [`ElementEvent`](@ref) | whatever `f` emits | [Custom hits](@ref) |
+
+A type of your own implements [`hitlayers`](@ref), plus [`bondtype`](@ref)
+and [`transform_bond`](@ref) when the commit is not [`ElementEvent`](@ref).
+See [A custom interactable](@ref).
 
 ## 3D axes and `PolarAxis`
 
