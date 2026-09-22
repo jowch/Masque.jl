@@ -40,7 +40,7 @@ self-contained pattern: an interactive plot whose `@bind` value drives a downstr
 ## 1. Box-select scatter
 
 Drag or resize the **ROI box** to select the points it encloses. The bond is a
-`Vector{InteractionEvent}` — one per selected point — which a second cell consumes.
+`Vector{ElementEvent}` — one per selected point — which a second cell consumes.
 """
 
 # ╔═╡ 24735e6d-3732-4b1f-ae9f-1077918b3d30
@@ -58,7 +58,7 @@ scatter_widget = let
     sf = Figure(size = (560, 380)); sax = Axis(sf[1, 1], title = "Drag the box to select points")
     scatter!(sax, xs, ys; color = map(g -> g == "A" ? :steelblue : :darkorange, grp), markersize = 9)
     pts = Point2f.(xs, ys)
-    payloads = [(; idx = i - 1, x = xs[i], y = ys[i], group = grp[i]) for i in eachindex(xs)]
+    payloads = [(; x = xs[i], y = ys[i], group = grp[i]) for i in eachindex(xs)]
     masque(
         sf, [
             PointInteractable(sax, pts; id = :pts, payloads),
@@ -76,7 +76,7 @@ let
         md"_Adjust the box to select points._"
     else
         (; xs, ys, grp) = scatter_data
-        idx = [e.index + 1 for e in picks]          # InteractionEvent.index is 0-based
+        idx = [e.index for e in picks]
         n = length(idx)
         ga = count(i -> grp[i] == "A", idx)
         md"""
@@ -95,10 +95,10 @@ A colored image (think fluorescence microscopy or a spectroscopic frame). Drag t
 region; a second cell slices the **full-resolution array** server-side and reports per-channel
 **min / p1 / p50 / p99 / max** with a Lightroom-style per-channel histogram.
 
-The box returns a *region descriptor* (cell-index bounds + data bounds), not the pixels — so the
-image never crosses the wire, and this scales to large frames. The histogram recomputes **once per
-box adjustment** (each is a reactive round-trip — per-frame at 60 fps is out of scope for a
-static-base overlay).
+The box returns one `GridWindowEvent` (1-based inclusive cell bounds plus data bounds), not the
+pixels — so the image never crosses the wire, and this scales to large frames. `R[region]` is
+`R[region.i1:region.i2, region.j1:region.j2]`. The histogram recomputes **once per box adjustment**
+(each is a reactive round-trip — per-frame at 60 fps is out of scope for a static-base overlay).
 """
 
 # ╔═╡ 3035d60d-a0ac-46f1-a7a7-462618bd6576
@@ -133,14 +133,13 @@ end
 
 # ╔═╡ 540533c2-83f6-41c7-819f-c23cd76ed92c
 let
-    if region === nothing || isempty(region)
+    if region === nothing || isempty(region.i1:region.i2)
         md"_Adjust the box to select an image region._"
     else
         (; R, G, B) = img_data
-        r = only(region).payload
-        i0, i1 = Int(r.i0) + 1, Int(r.i1) + 1      # 0-based cell indices → 1-based array
-        j0, j1 = Int(r.j0) + 1, Int(r.j1) + 1
-        Rs, Gs, Bs = vec(R[i0:i1, j0:j1]), vec(G[i0:i1, j0:j1]), vec(B[i0:i1, j0:j1])
+        Rs = vec(R[region.i1:region.i2, region.j1:region.j2])
+        Gs = vec(G[region.i1:region.i2, region.j1:region.j2])
+        Bs = vec(B[region.i1:region.i2, region.j1:region.j2])
         stat(v) = (min = minimum(v), p1 = quantile(v, 0.01), p50 = quantile(v, 0.5), p99 = quantile(v, 0.99), max = maximum(v))
         sr, sg, sb = stat(Rs), stat(Gs), stat(Bs)
         f = Figure(size = (560, 280)); ax = Axis(f[1, 1], title = "channel histograms (n=$(length(Rs)) px)", xlabel = "intensity")

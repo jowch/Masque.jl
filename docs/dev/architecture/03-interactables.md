@@ -131,7 +131,7 @@ happens during any of these drags — as opposed to on release — is [§12](12-
 *directly* to image px (the same ×scaling + y-flip as `project`, but no `project` call: the boxes
 are already pixel-space, not data-space, so there is nothing to project). A rotated label still
 yields exactly one `:rects` box, expanded to stay axis-aligned (a looser hit target, not a new
-geometry kind). The payload's `text`/`index` are the string and its 0-based per-label index;
+geometry kind). The payload's `text`/`index` are the string and its 1-based per-label index;
 `x`/`y` are the DATA-space anchor (`positions`), not the pixel box — consistent with `PointInteractable`'s
 `(; index, x, y)` shape. `masque(fig)` auto-detects `text!` directly and `annotation!` by reaching
 through to its child `Makie.Text` plot (`_descendant`); only **data-space** text is auto-detected

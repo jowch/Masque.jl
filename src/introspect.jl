@@ -193,7 +193,7 @@ function SegmentInteractable(ax, p::Makie.Arrows3D; id = :arrows3d, payloads = n
         )
         payloads = [
             (;
-                index = k - 1,
+                index = k,
                 x = Float64(pts[k][1]), y = Float64(pts[k][2]), z = Float64(pts[k][3]),
                 u = Float64(dirs[k][1]), v = Float64(dirs[k][2]), w = Float64(dirs[k][3]),
             )
@@ -432,13 +432,13 @@ end
 function SegmentInteractable(ax, p::Makie.HLines; id = :hlines, payloads = nothing, tol = 6)
     vs = _span_pairs(ax, p, true)
     nseg = length(vs) ÷ 2
-    pl = payloads === nothing ? Any[(; segment_index = k - 1) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
+    pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
     return _segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, true))
 end
 function SegmentInteractable(ax, p::Makie.VLines; id = :vlines, payloads = nothing, tol = 6)
     vs = _span_pairs(ax, p, false)
     nseg = length(vs) ÷ 2
-    pl = payloads === nothing ? Any[(; segment_index = k - 1) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
+    pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
     return _segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, false))
 end
 

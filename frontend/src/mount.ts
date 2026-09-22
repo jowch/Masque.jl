@@ -222,18 +222,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const noop: Mounted = { cleanup: () => {} }
     if (!host || !base) return noop
 
-    // The @bind target is the host element. Seed it with the hydrated selection rather than
-    // null: Pluto reads this at mount, so a null here would overwrite Julia's `initial_value`
-    // and settle the bond on `nothing` while the marks sit highlighted. The `items` shape is
-    // what `transform_value` already maps to a Vector{InteractionEvent}. Built in the same loop
-    // as `selHits` (state.selHits_'s hydration, below) so both read `hitLayerByIndex` — which
-    // throws on an unsupported kind or an out-of-range index — before either is assigned;
-    // splitting them let an invalid manifest set host.value first and throw only later.
+    // The @bind target is the host element. Seed the same envelope Julia's `mount_envelope`
+    // builds, or Pluto's mount-time read overwrites `initial_value`. A selects-elements widget
+    // seeds `{items}` (including an explicit empty brush). One hydrated index on a scalar layer
+    // seeds `{layer, index}`. Several indices on a scalar layer are a highlight only (`null`):
+    // that interaction holds one event, so a set is not a value it can carry.
     //
     // No `payload` key: `selected=` only ever hydrates a SELECTED_KINDS layer (hitLayerByIndex
-    // throws otherwise), and Julia already reconstructs an element hit's payload from its own
-    // manifest (`_bond_payload`) rather than trusting the upload — sending one here would just
-    // be dead weight Julia discards, and would diverge from the click path's shape (#109).
+    // throws otherwise), and Julia reconstructs an element hit from its own manifest rather than
+    // trusting an upload. Built in the same loop as `selHits` so both read `hitLayerByIndex` —
+    // which throws on an unsupported kind or an out-of-range index — before either is assigned.
     const hydrated: { layer: string; index: number }[] = []
     const selHits: Hit[] = []
     for (const layer of manifest.layers) {
@@ -242,7 +240,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             hydrated.push({ layer: layer.id, index: idx })
         }
     }
-    ;(host as unknown as { value: unknown }).value = hydrated.length ? { items: hydrated } : null
+    const selection = manifest.selection
+    const seedItems = selection === "elements" && (hydrated.length > 0 || manifest.hydrate === "items")
+    const hostValue = seedItems ? { items: hydrated } : hydrated.length === 1 ? hydrated[0] : null
+    ;(host as unknown as { value: unknown }).value = hostValue
 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })

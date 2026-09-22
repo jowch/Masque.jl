@@ -55,8 +55,8 @@ end
 ```
 
 ```julia
-# react to clicks — `sel` is `nothing` until a click, then an InteractionEvent
-sel === nothing ? "click a point" : "you picked $(sel.payload)"
+# react to clicks — `sel` is `nothing` until a click, then an ElementEvent
+sel === nothing ? "click a point" : "you picked $(sel.index)"
 ```
 
 Hovering shows a tooltip (purely client-side, no Julia round-trip); clicking sets `sel` and

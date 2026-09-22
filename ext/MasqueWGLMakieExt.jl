@@ -243,6 +243,16 @@ struct WebGLWidget
     width::Int
     height::Int
     px_per_unit::Float64
+    owners::Dict{String, Masque.LayerOwner}
+end
+function WebGLWidget(scene, manifest, display_css, width, height, px_per_unit)
+    return WebGLWidget(
+        scene, manifest, display_css, width, height, px_per_unit,
+        Dict{String, Masque.LayerOwner}(),
+    )
+end
+function Masque.with_owners(w::WebGLWidget, owners::Dict{String, Masque.LayerOwner})
+    return WebGLWidget(w.scene, w.manifest, w.display_css, w.width, w.height, w.px_per_unit, owners)
 end
 
 # `fig`/`interactables`/`ppu` are accepted, not used: the gesture channel (#102) is `:cairo`
@@ -316,22 +326,7 @@ function Base.show(io::IO, m::MIME"text/html", w::WebGLWidget)
 end
 
 # ---- bond plumbing: identical contract to MasqueWidget (same overlay, same events) ----
-APD.Bonds.initial_value(w::WebGLWidget) = Masque._hydrated_selection(w.manifest)
-function APD.Bonds.transform_value(w::WebGLWidget, js)
-    js === nothing && return nothing
-    if haskey(js, "items")
-        return InteractionEvent[
-            InteractionEvent(
-                Symbol(it["layer"]), Int(it["index"]),
-                Masque._bond_payload(w.manifest, it["layer"], Int(it["index"]), get(it, "payload", nothing)),
-            )
-                for it in js["items"]
-        ]
-    end
-    return InteractionEvent(
-        Symbol(js["layer"]), Int(js["index"]),
-        Masque._bond_payload(w.manifest, js["layer"], Int(js["index"]), get(js, "payload", nothing)),
-    )
-end
+APD.Bonds.initial_value(w::WebGLWidget) = Masque.initial_bond(w)
+APD.Bonds.transform_value(w::WebGLWidget, js) = Masque.bond_from_js(w, js)
 
 end # module MasqueWGLMakieExt

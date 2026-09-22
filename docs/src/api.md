@@ -10,6 +10,16 @@ Masque
 masque
 auto_interactables
 InteractionEvent
+ElementEvent
+LegendEvent
+GridCellEvent
+GridWindowEvent
+AxisEvent
+ThresholdEvent
+ColorbarEvent
+BoundsEvent
+bondtype
+transform_bond
 ```
 
 ## Interactable constructors

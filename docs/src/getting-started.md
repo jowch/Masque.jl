@@ -34,7 +34,7 @@ using Masque
 ```
 
 This is the fastest way to get *something* clickable. `ev` is the bond value: `nothing`
-until you click a marker, then an [`InteractionEvent`](@ref). Unsupported plot types are
+until you click a marker, then an [`ElementEvent`](@ref). Unsupported plot types are
 skipped with a `@warn`, not an error.
 
 ## 3. Explicit interactables — when you want control
@@ -62,7 +62,7 @@ vector `masque(fig)` builds internally), tweak it, and pass it back — see
 `@bind` re-runs every cell that reads `ev` whenever the bond value changes:
 
 ```julia
-ev === nothing ? "click a point" : "you picked $(ev.payload)"
+ev === nothing ? "click a point" : "you picked $(labels[ev])"
 ```
 
 The embed below is the same plot as the README demo GIF (`docs/dev/readme-demo/notebook.jl`):
@@ -101,23 +101,14 @@ view) stay overlay-only — that freeze is not for cities omitted from this plot
 ```
 
 Before the first click, `ev` is `nothing`. After a click, `ev` is an
-[`InteractionEvent`](@ref):
+[`ElementEvent`](@ref). `ev.index` is 1-based, and `labels[ev]` is that row. A named payload
+forwards its fields, so `(; city = "Tokyo")` is read as `ev.city`. `ev.layer` is the
+interactable's `id`.
 
-```julia
-struct InteractionEvent
-    layer::Symbol   # the interactable's `id`
-    index::Int      # 0-based element index within the layer
-    payload::Any    # the data you attached
-end
-```
-
-**The payload comes back exactly as you gave it.** A payload you built as `(; label = "a")`
-arrives as that same `NamedTuple` — index it as `ev.payload.label`. This holds for element
-kinds (points/rects/polygons/segments/polyline), which Masque looks back up in Julia rather
-than decoding from the browser. Kinds with no Julia-side original still report a
-browser-computed value — `AxisInteractable` yields `(; x, y)` — but it's converted to a flat
-`NamedTuple` too, so `ev.payload.x` reads the same way regardless of kind. The one exception
-is `ThresholdInteractable`, whose payload is a bare scalar — there's no field to name.
+Other commits are their own types, with the fields on the event: an axis click is an
+[`AxisEvent`](@ref) (`ev.x`, `ev.y`), a heatmap cell is a [`GridCellEvent`](@ref)
+(`A[ev]`), a threshold is a [`ThresholdEvent`](@ref) (`ev.value`). A `selects` ROI over
+points yields a `Vector{ElementEvent}`. See [Selection](@ref).
 
 ## 5. Choosing the backend
 

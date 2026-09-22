@@ -54,7 +54,7 @@ begin
     scatter!(pt_ax, first.(pt_data), last.(pt_data); color = :dodgerblue, markersize = 20)
     pt_int = PointInteractable(
         pt_ax, pt_data; id = :scatter,
-        payloads = [(; index = k - 1, label = pt_labels[k]) for k in eachindex(pt_labels)],
+        payloads = [(; index = k, label = pt_labels[k]) for k in eachindex(pt_labels)],
     )
 end
 
@@ -63,7 +63,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000013
 pt_sel === nothing ? "point: click a marker" :
-    "point: index=$(pt_sel.index) label=$(pt_sel.payload.label)"
+    "point: index=$(pt_sel.index) label=$(pt_sel.label)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000020
 md"## Segment — `SegmentInteractable` (polyline)"
@@ -82,7 +82,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000023
 sg_sel === nothing ? "segment: click a line segment" :
-    "segment: segment_index=$(sg_sel.payload.segment_index)"
+    "segment: segment_index=$(sg_sel.segment_index)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000030
 md"## Rect (grid) — `RectInteractable(; grid)` (heatmap cells)"
@@ -101,7 +101,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000033
 hm_sel === nothing ? "grid: click a cell" :
-    "grid: cell index=$(hm_sel.index) payload=$(hm_sel.payload)"
+    "grid: i=$(hm_sel.i) j=$(hm_sel.j) value=$(hm_sel.value)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000040
 md"## Rect (list) — `RectInteractable(; rects)` (explicit boxes)"
@@ -117,7 +117,7 @@ begin
     end
     rl_int = RectInteractable(
         rl_ax; id = :boxes, rects = rl_rects,
-        payloads = [(; index = k - 1, name = "box$k") for k in eachindex(rl_rects)],
+        payloads = [(; index = k, name = "box$k") for k in eachindex(rl_rects)],
     )
 end
 
@@ -126,7 +126,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000043
 rl_sel === nothing ? "list: click a box" :
-    "list: index=$(rl_sel.index) name=$(rl_sel.payload.name)"
+    "list: index=$(rl_sel.index) name=$(rl_sel.name)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000050
 md"## Polygon — `PolygonInteractable` (filled regions)"
@@ -144,7 +144,7 @@ begin
     end
     pg_int = PolygonInteractable(
         pg_ax, pg_rings; id = :regions,
-        payloads = [(; index = k - 1, shape = "ring$k") for k in eachindex(pg_rings)],
+        payloads = [(; index = k, shape = "ring$k") for k in eachindex(pg_rings)],
     )
 end
 
@@ -153,7 +153,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000053
 pg_sel === nothing ? "polygon: click a filled region" :
-    "polygon: index=$(pg_sel.index) shape=$(pg_sel.payload.shape)"
+    "polygon: index=$(pg_sel.index) shape=$(pg_sel.shape)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000060
 md"## Axis readout — `AxisInteractable` (data coordinate under the cursor)"
@@ -171,7 +171,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000063
 ar_sel === nothing ? "axis: click in the plot area" :
-    "axis: x=$(round(ar_sel.payload.x; digits = 3)) y=$(round(ar_sel.payload.y; digits = 3))"
+    "axis: x=$(round(ar_sel.x; digits = 3)) y=$(round(ar_sel.y; digits = 3))"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000080
 md"""
@@ -203,8 +203,8 @@ end
 @bind tt_sel masque(tt_fig, tt_int)
 
 # ╔═╡ 40000000-0000-0000-0000-000000000083
-tt_sel === nothing ? "tooltip: hover a marker; click to read the payload" :
-    "clicked: $(tt_sel.payload.city) (pop $(tt_sel.payload.pop))"
+tt_sel === nothing ? "tooltip: hover a marker; click to read the city" :
+    "clicked: $(tt_sel.city) (pop $(tt_sel.pop))"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000084
 md"""
@@ -223,7 +223,7 @@ begin
     scatter!(at_ax, first.(at_xy), last.(at_xy); color = :slateblue, markersize = 20)
     at_int = PointInteractable(
         at_ax, at_xy; id = :auto,
-        payloads = [(; index = k - 1, x = at_xy[k][1], y = at_xy[k][2]) for k in eachindex(at_xy)],
+        payloads = [(; index = k, x = at_xy[k][1], y = at_xy[k][2]) for k in eachindex(at_xy)],
     )
 end
 
@@ -352,7 +352,7 @@ md"""
 comes straight from Makie's own `Makie.string_boundingboxes` (no font-metric math needed), so
 each label rides the same `:rects` primitive as a bar or a heatmap cell. A **rotated** label
 still yields one box (a looser, axis-aligned one). **Click a label** to pick it — the bond
-reports `(; text, index, x, y)`.
+is an `ElementEvent` with `text`, `index`, `x`, and `y`.
 """
 
 # ╔═╡ 40000000-0000-0000-0000-0000000000c1
@@ -370,14 +370,14 @@ end
 @bind tx_sel masque(tx_fig)
 
 # ╔═╡ 40000000-0000-0000-0000-0000000000c3
-# masque(fig) also auto-detects the scatter!, so a marker click reports a (; index, x, y)
-# payload with no `text` field — guard the readout rather than assume every click hit a label.
+# masque(fig) also auto-detects the scatter!, so a marker click is an ElementEvent with
+# no `text` field — guard the readout rather than assume every click hit a label.
 if tx_sel === nothing
     "text: click a label (try the tilted one, or the annotation)"
-elseif haskey(tx_sel.payload, :text)
-    "text: picked \"$(tx_sel.payload.text)\" index=$(tx_sel.payload.index) at ($(tx_sel.payload.x), $(tx_sel.payload.y))"
+elseif hasproperty(tx_sel, :text)
+    "text: picked \"$(tx_sel.text)\" index=$(tx_sel.index) at ($(tx_sel.x), $(tx_sel.y))"
 else
-    "point: index=$(tx_sel.payload.index) (that was a marker — click a label instead)"
+    "point: index=$(tx_sel.index) (that was a marker — click a label instead)"
 end
 
 # ╔═╡ Cell order:

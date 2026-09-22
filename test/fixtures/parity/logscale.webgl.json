@@ -36,6 +36,7 @@
                 "hover"
             ],
             "kind": "circles",
+            "bond": "element",
             "axis": "ax1",
             "geometry": [
                 152,
@@ -55,17 +56,17 @@
             "colors": "rgb(0,114,178)",
             "payloads": [
                 {
-                    "index": 0,
+                    "index": 1,
                     "x": 1,
                     "y": 0.1
                 },
                 {
-                    "index": 1,
+                    "index": 2,
                     "x": 2,
                     "y": 10
                 },
                 {
-                    "index": 2,
+                    "index": 3,
                     "x": 3,
                     "y": 1000
                 }
@@ -78,6 +79,7 @@
             ],
             "kind": "polyline",
             "tol": 12,
+            "bond": "element",
             "axis": "ax1",
             "geometry": [
                 152,
@@ -93,10 +95,10 @@
             },
             "payloads": [
                 {
-                    "segment_index": 0
+                    "segment_index": 1
                 },
                 {
-                    "segment_index": 1
+                    "segment_index": 2
                 }
             ]
         }

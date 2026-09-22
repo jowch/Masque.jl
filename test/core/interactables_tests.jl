@@ -91,7 +91,7 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
         @test L.kind === :polygons && L.id === :poly
         @test length(L.geometry) == 2                       # two rings
         @test all(r -> length(r) == 6, L.geometry)          # 3 pts × (x,y) each
-        @test [p.index for p in L.payloads] == [0, 1]       # default per-ring payloads
+        @test [p.index for p in L.payloads] == [1, 2]       # default per-ring payloads, 1-based
     end
 
     @testset "TextInteractable" begin
@@ -99,9 +99,9 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
         t = text!(ax, [1.5, 2.5], [2.0, 1.0]; text = ["Hello", "Wörld"], fontsize = 20)
         bk, ppu, ctx = ctx_for(f)          # finalizes (update_state_before_display!) + builds ctx
         ti = TextInteractable(ax, t)
-        # payload: (; text, index, x, y) — 0-based index, DATA anchors
-        @test ti.payloads[1] == (; text = "Hello", index = 0, x = 1.5, y = 2.0)
-        @test ti.payloads[2] == (; text = "Wörld", index = 1, x = 2.5, y = 1.0)
+        # payload: (; text, index, x, y) — 1-based index, DATA anchors
+        @test ti.payloads[1] == (; text = "Hello", index = 1, x = 1.5, y = 2.0)
+        @test ti.payloads[2] == (; text = "Wörld", index = 2, x = 2.5, y = 1.0)
         # hitlayer: one :rects layer, 2 boxes × (cx,cy,w,h) = 8 coords
         L = only(hitlayers(ti, ctx))
         @test L.kind === :rects && length(L.geometry) == 8
@@ -124,7 +124,7 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
         t = text!(ax, 1.0, 1.0; text = "single")   # Makie normalizes: p.text[] == ["single"]
         _, _, ctx = ctx_for(f)
         ti = TextInteractable(ax, t)
-        @test ti.payloads == [(; text = "single", index = 0, x = 1.0, y = 1.0)]
+        @test ti.payloads == [(; text = "single", index = 1, x = 1.0, y = 1.0)]
         L = only(hitlayers(ti, ctx))
         @test L.kind === :rects && length(L.geometry) == 4   # one box × (cx,cy,w,h)
     end
@@ -189,24 +189,25 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
         @test mc["layers"][1]["style"]["stroke"] == "#123456"
         @test mc["layers"][1]["style"]["width"] == 3
 
-        # selection round-trip: pre-highlight indices ride the manifest keyed by layer id
+        # selection round-trip: author indices are 1-based; the manifest stores 0-based
         @test !haskey(m["layers"][1], "selected")                       # absent when unselected
-        ms = build_manifest([PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [0, 2]))
+        ms = build_manifest([PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [1, 3]))
         @test ms["layers"][1]["selected"] == [0, 2]
+        @test ms["layers"][1]["bond"] == "element"
         @test !haskey(
             build_manifest(
                 [PointInteractable(bax, pts; id = :scatter)], bctx;
                 selected = Dict(:scatter => Int[])
             )["layers"][1], "selected"
         )   # empty omitted
-        @test masque(bfig, PointInteractable(bax, pts; id = :scatter); selected = Dict(:scatter => [1])).manifest["layers"][1]["selected"] == [1]
+        @test masque(bfig, PointInteractable(bax, pts; id = :scatter); selected = Dict(:scatter => [2])).manifest["layers"][1]["selected"] == [1]
 
         # selected= fail-loud (issue #39): still-unsupported kinds (grid/axis/…) and OOB
         # indices throw at build_manifest. Open kinds (segments/polyline) now accept
         # selected= so the overlay can draw the selected-ring recipe.
         @testset "selected= fails loud on unsupported kinds and OOB indices" begin
             segs = SegmentInteractable(bax, [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0)]; mode = :pairs, id = :segs)
-            ms_seg = build_manifest([segs], bctx; selected = Dict(:segs => [0]))
+            ms_seg = build_manifest([segs], bctx; selected = Dict(:segs => [1]))
             @test ms_seg["layers"][1]["selected"] == [0]
             @test ms_seg["layers"][1]["kind"] == "segments"
 
@@ -221,7 +222,10 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
             @test occursin(r"selected"i, sprint(showerror, err_grid))
             @test occursin("grid", sprint(showerror, err_grid))
 
-            # 3 pts → valid indices 0:2; index 5 and -1 must fail
+            # 3 pts → valid indices 1:3; index 0, 5, and -1 must fail
+            @test_throws ArgumentError build_manifest(
+                [PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [0])
+            )
             @test_throws ArgumentError build_manifest(
                 [PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [5])
             )
@@ -241,13 +245,13 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
 
             # supported kinds still accept in-range indices (rects list + polygons + polyline)
             rects = RectInteractable(bax; rects = [(1.0, 1.0, 0.5, 0.5), (2.0, 2.0, 0.5, 0.5)], id = :boxes)
-            mr = build_manifest([rects], bctx; selected = Dict(:boxes => [1]))
+            mr = build_manifest([rects], bctx; selected = Dict(:boxes => [2]))
             @test mr["layers"][1]["selected"] == [1]
             polys = PolygonInteractable(bax, [[(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]]; id = :poly)
-            mp = build_manifest([polys], bctx; selected = Dict(:poly => [0]))
+            mp = build_manifest([polys], bctx; selected = Dict(:poly => [1]))
             @test mp["layers"][1]["selected"] == [0]
             poly = SegmentInteractable(bax, [(1.0, 1.0), (2.0, 2.0), (3.0, 1.5)]; mode = :polyline, id = :line)
-            ml = build_manifest([poly], bctx; selected = Dict(:line => [1]))
+            ml = build_manifest([poly], bctx; selected = Dict(:line => [2]))
             @test ml["layers"][1]["selected"] == [1]
             @test ml["layers"][1]["kind"] == "polyline"
         end
@@ -261,7 +265,7 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
         @test IP.APD.Bonds.initial_value(w) === nothing
         @test IP.APD.Bonds.transform_value(w, nothing) === nothing
         ev = IP.APD.Bonds.transform_value(w, Dict("layer" => "scatter", "index" => 2, "payload" => Dict("i" => 2)))
-        @test ev isa InteractionEvent && ev.layer === :scatter && ev.index == 2
+        @test ev isa ElementEvent && ev.layer === :scatter && ev.index == 3
     end
 
     @testset "axis_id fails loud on unregistered blocks" begin
@@ -284,14 +288,22 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
     end
 
     @testset "transform_value multi-select envelope" begin
-        using Masque: InteractionEvent
         tv = Masque.APD.Bonds.transform_value
-        w = Masque.MasqueWidget("", Dict{String, Any}(), 100)   # transform_value ignores the widget fields
+        manifest = Dict{String, Any}(
+            "selection" => "elements", "selectionTarget" => "pts",
+            "layers" => [
+                Dict{String, Any}(
+                    "id" => "pts", "kind" => "circles", "bond" => "element",
+                    "payloads" => Any["a", "b", "c", "d", "e"],
+                ),
+            ],
+        )
+        w = Masque.MasqueWidget("", manifest, 100)
         @test tv(w, nothing) === nothing
-        # single (click / bounds) — unchanged
+        # wire index 3 is the fourth element (Julia index 4)
         single = tv(w, Dict("layer" => "pts", "index" => 3, "payload" => Dict("city" => "NYC")))
-        @test single isa InteractionEvent && single.layer === :pts && single.index == 3
-        # multi (box-select over points)
+        @test single isa Vector{ElementEvent} && only(single).layer === :pts && only(single).index == 4
+        @test only(single).payload == "d"
         multi = tv(
             w, Dict(
                 "items" => [
@@ -300,11 +312,12 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
                 ]
             )
         )
-        @test multi isa Vector{InteractionEvent} && length(multi) == 2
-        @test multi[1].index == 1 && multi[2].index == 4
-        # empty box — empty vector, never nothing
+        @test multi isa Vector{ElementEvent} && length(multi) == 2
+        @test multi[1].index == 2 && multi[1].payload == "b"
+        @test multi[2].index == 5 && multi[2].payload == "e"
         empty = tv(w, Dict("items" => []))
-        @test empty isa Vector{InteractionEvent} && isempty(empty)
+        @test empty isa Vector{ElementEvent} && isempty(empty)
+        @test_throws ArgumentError tv(Masque.MasqueWidget("", Dict{String, Any}(), 100), Dict("items" => []))
     end
 
     @testset "payload-length validation (Segment/Rect/Polygon)" begin

@@ -271,19 +271,16 @@ end
     ev = APD.Bonds.transform_value(w, js)
     @test ev isa IE
     @test ev.layer === :scatter
-    @test ev.index == k
+    @test ev.index == k + 1
     @test ev.payload === layer["payloads"][k + 1]   # reconstructed, not `wrong`
 
     @test APD.Bonds.initial_value(w) === nothing
     @test APD.Bonds.transform_value(w, nothing) === nothing
 
     # second item has no "payload" key at all — reconstruction doesn't need one
+    # a plain scatter has no selects-ROI, so an items envelope is not a vector bond
     multi = Dict{String, Any}("items" => [js, Dict{String, Any}("layer" => "scatter", "index" => 0)])
-    evs = APD.Bonds.transform_value(w, multi)
-    @test evs isa Vector{IE}
-    @test length(evs) == 2 && evs[1].index == k && evs[2].index == 0
-    @test evs[1].payload === layer["payloads"][k + 1]
-    @test evs[2].payload === layer["payloads"][1]
+    @test_throws ArgumentError APD.Bonds.transform_value(w, multi)
 end
 
 @testset "@bind payload reconstruction matches Masque._bond_payload (WGL/Cairo must not drift)" begin
@@ -298,10 +295,10 @@ end
     w = masque(fig, pt; backend = _WGLExt.WebGLBackend())
 
     ev = APD.Bonds.transform_value(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "wrong"))
+    @test ev isa Masque.ElementEvent && ev.index == 2
     @test ev.payload === payloads[2]
-    # same object `MasqueWGLMakieExt.transform_value` delegates to — the shared helper, not a
-    # re-implementation, is what keeps the two backends from drifting.
-    @test ev.payload === Masque._bond_payload(w.manifest, "scatter", 1, "ignored")
+    # both backends call Masque.bond_from_js — not a second copy of the transform
+    @test ev == Masque.bond_from_js(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "ignored"))
 
     # out-of-range index: same fail-loud contract as the Cairo widget
     @test_throws ArgumentError APD.Bonds.transform_value(
@@ -318,16 +315,20 @@ end
 
     fig = Figure(; size = (400, 300)); ax = Axis(fig[1, 1])
     scatter!(ax, 1:5, (1:5) .^ 2)
-    w = masque(fig; backend = _WGLExt.WebGLBackend(), selected = Dict(:scatter => [1, 3]))
+    w = masque(fig; backend = _WGLExt.WebGLBackend(), selected = 2)
     layer = only(w.manifest["layers"])
     @test layer["id"] == "scatter"
+    @test layer["selected"] == [1]
 
     hydrated = APD.Bonds.initial_value(w)
-    @test hydrated isa Vector{IE}
-    @test [ev.layer for ev in hydrated] == [:scatter, :scatter]
-    @test [ev.index for ev in hydrated] == [1, 3]   # 0-based, matches `selected=`
-    @test hydrated[1].payload == layer["payloads"][2]   # payloads are 1-based Julia arrays
-    @test hydrated[2].payload == layer["payloads"][4]
+    @test hydrated isa Masque.ElementEvent
+    @test hydrated.layer === :scatter && hydrated.index == 2
+    @test hydrated.payload == layer["payloads"][2]
+
+    # several indices highlight and leave the bond nothing
+    wmany = masque(fig; backend = _WGLExt.WebGLBackend(), selected = [2, 4])
+    @test only(wmany.manifest["layers"])["selected"] == [1, 3]
+    @test APD.Bonds.initial_value(wmany) === nothing
 end
 
 # MUST run last in this file: this loads CairoMakie on top of the already-loaded WGLMakie.

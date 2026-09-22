@@ -274,9 +274,10 @@ try {
   // has actually happened — on the plain happy path (no retry, clickedIndex still 0) a landed
   // index of 1 can only mean a hit-test/scale regression mapped marker 0's click onto marker 1's
   // payload, which must still fail loud, not pass silently.
-  const landedMatch = /InteractionEvent\(:scatter, (\d+)/.exec(result.after);
+  const landedMatch = /ElementEvent\(:scatter, (\d+)/.exec(result.after);
   const landedIndex = landedMatch ? Number(landedMatch[1]) : null;
-  const validIndices = clickedIndex === 1 ? [0, 1] : [0];
+  // Wire marker 0 is Julia index 1. A late retry may still show marker 0's event.
+  const validIndices = clickedIndex === 1 ? [1, 2] : [1];
   if (!validIndices.includes(landedIndex)) {
     throw new Error(`unexpected readout after click on marker ${clickedIndex}: "${result.after}"`);
   }

@@ -54,13 +54,13 @@ kind_sweep_meta() = [
     Dict(
         "key" => "heatmap", "layerId" => "cells", "layerKind" => "grid",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
-        "tip" => "0,0", "hoverIndex" => 0, "hoverTip" => "0,0", "tintIndex" => 11,
+        "tip" => "1,1", "hoverIndex" => 0, "hoverTip" => "1,1", "tintIndex" => 11,
         "tintColor" => "rgb(253,231,37)", "mode" => "element",
     ),
     Dict(
         "key" => "image", "layerId" => "cells", "layerKind" => "grid",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
-        "tip" => "0,0", "hoverIndex" => 0, "hoverTip" => "0,0", "mode" => "element",
+        "tip" => "1,1", "hoverIndex" => 0, "hoverTip" => "1,1", "mode" => "element",
     ),
     Dict(
         "key" => "barplot", "layerId" => "bars", "layerKind" => "rects",
@@ -179,7 +179,7 @@ function build_kind_sweep()
                 ax, sc; id = :scatter,
                 payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")],
             );
-            selected = Dict(:scatter => [1]),
+            selected = Dict(:scatter => [2]),
         )
     end
 
@@ -194,7 +194,7 @@ function build_kind_sweep()
                 ax, verts; id = :lines, mode = :polyline,
                 payloads = [(; label = "seg-a"), (; label = "seg-b"), (; label = "seg-c")],
             );
-            selected = Dict(:lines => [1]),
+            selected = Dict(:lines => [2]),
         )
     end
 
@@ -209,7 +209,7 @@ function build_kind_sweep()
                 id = :segments, mode = :pairs,
                 payloads = [(; label = "pair-a"), (; label = "pair-b")],
             );
-            selected = Dict(:segments => [0]),
+            selected = Dict(:segments => [1]),
         )
     end
 
@@ -233,7 +233,7 @@ function build_kind_sweep()
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "barplot")
         barplot!(ax, 1:3, [2.0, 3.5, 1.5]; color = :gray)
-        masque(fig; selected = Dict(:bars => [1]))
+        masque(fig; selected = Dict(:bars => [2]))
     end
 
     poly = let
@@ -251,7 +251,7 @@ function build_kind_sweep()
                 ax, rings; id = :poly,
                 payloads = [(; shape = "ring1"), (; shape = "ring2")],
             );
-            selected = Dict(:poly => [0]),
+            selected = Dict(:poly => [1]),
         )
     end
 
@@ -266,7 +266,7 @@ function build_kind_sweep()
                 ax, pts; id = :polar,
                 payloads = [(; label = "east"), (; label = "north"), (; label = "west"), (; label = "south")],
             );
-            selected = Dict(:polar => [1]),
+            selected = Dict(:polar => [2]),
         )
     end
 
@@ -288,7 +288,7 @@ function build_kind_sweep()
                 ax, sc; id = :scatter_dark,
                 payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")],
             );
-            selected = Dict(:scatter_dark => [1]),
+            selected = Dict(:scatter_dark => [2]),
         )
     end
 
@@ -298,7 +298,7 @@ function build_kind_sweep()
         apts = Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3)]
         adirs = Makie.Vec3f[(1, 0, 0), (0, 1, 0.5), (-0.5, 0, 1)]
         arrows3d!(ax, apts, adirs; color = :gray)
-        masque(fig; selected = Dict(:arrows3d => [0]))
+        masque(fig; selected = Dict(:arrows3d => [1]))
     end
 
     hlines = let
@@ -307,7 +307,7 @@ function build_kind_sweep()
         scatter!(ax, [1.0, 4.0], [1.0, 4.0]; markersize = 8, color = :gray)
         hlines!(ax, [1.5, 3.5]; color = :gray, linewidth = 3)
         vlines!(ax, [2.5]; color = :gray, linewidth = 3)
-        masque(fig; selected = Dict(:hlines => [0]))
+        masque(fig; selected = Dict(:hlines => [1]))
     end
 
     threshold = let
@@ -395,7 +395,7 @@ function build_kind_sweep()
                 # (the layer-ordering hazard #113 calls out).
                 AxisInteractable(ax; id = :axis),
             ];
-            selected = Dict(:pts => [1]),
+            selected = Dict(:pts => [2]),
         )
     end
 

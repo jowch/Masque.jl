@@ -143,7 +143,7 @@ try {
     const t = await retryHover(2, cx, cy, (tt) => /point alpha/.test(tt.text), "template-tooltip");
     passed.push("template-tooltip");
     console.error("OK  template-tooltip —", JSON.stringify(t.text));
-    await clickAssert(2, cx, cy, "#out_tip", /InteractionEvent\(:tpts, 0.*alpha/, "template-click");
+    await clickAssert(2, cx, cy, "#out_tip", /ElementEvent\(:tpts, 1.*alpha/, "template-click");
   }
 
   // ---------- grid: (i,j)=value readout + colorbar value readout (widget 3) ----------
@@ -153,10 +153,10 @@ try {
     const cb = Ls.find((l) => l.kind === "axis" && l.id.startsWith("colorbar"));
     const gx = (grid.geometry.xedges[0] + grid.geometry.xedges[1]) / 2;
     const gy = (grid.geometry.yedges[0] + grid.geometry.yedges[1]) / 2;
-    const t = await retryHover(3, gx, gy, (tt) => /\(0,\s*0\)\s*=\s*4/.test(tt.text), "grid-readout");
+    const t = await retryHover(3, gx, gy, (tt) => /\(1,\s*1\)\s*=\s*4/.test(tt.text), "grid-readout");
     passed.push("grid-readout");
     console.error("OK  grid-readout —", JSON.stringify(t.text));
-    await clickAssert(3, gx, gy, "#out_grid", /"i"\s*=>\s*0|i.*0/, "grid-click");
+    await clickAssert(3, gx, gy, "#out_grid", /i\s*=\s*1/, "grid-click");
     const [bx, by, bw, bh] = cb.geometry;
     // 1-D value readout: the tip shows the bare number; mid-bar over limits [4,19] ≈ 11.5
     const ct = await retryHover(3, bx + bw / 2, by + bh / 2, (tt) => {
@@ -174,7 +174,7 @@ try {
     const ring = tri.geometry[0];
     let mx = 0, my = 0, n = ring.length / 2;
     for (let k = 0; k < ring.length; k += 2) { mx += ring[k]; my += ring[k + 1]; }
-    await clickAssert(4, mx / n, my / n, "#out_poly", /InteractionEvent\(:tri, 0/, "polygon-click");
+    await clickAssert(4, mx / n, my / n, "#out_poly", /ElementEvent\(:tri, 1/, "polygon-click");
     const regC = Ls.find((l) => l.id === "reg_c");
     await clickAssert(4, regC.geometry[0], regC.geometry[1], "#out_poly", /:reg_c, 0.*circ/, "region-click");
     const lbl = Ls.find((l) => l.id === "lbl");
@@ -214,7 +214,7 @@ try {
     // drag the ROI interior by half its width — commit selects points inside the NEW bounds
     await drag(6, g.x + g.w / 2, g.y + g.h / 2, g.x + g.w, g.y + g.h / 2);
     const after = await waitChange("#out_sel", before, "box-select-drag");
-    if (!/InteractionEvent\[/.test(after)) throw new Error(`box-select-drag: expected a Vector bond, got ${JSON.stringify(after)}`);
+    if (!/ElementEvent\[/.test(after)) throw new Error(`box-select-drag: expected a Vector bond, got ${JSON.stringify(after)}`);
     passed.push("box-select-drag");
     console.error("OK  box-select-drag —", after.slice(0, 130));
   }

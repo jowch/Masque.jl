@@ -52,6 +52,7 @@ include("backend.jl")
 include("markup.jl")
 include("interactables.jl")
 include("introspect.jl")
+include("bond.jl")
 include("render.jl")
 
 export AbstractBackend
@@ -59,7 +60,9 @@ export AbstractInteractable, AbstractSelector, HitLayer, InteractionContext, Axi
 export PointInteractable, SegmentInteractable, RectInteractable, PolygonInteractable,
     AxisInteractable, ColorbarInteractable, LegendInteractable, RegionInteractable, FunctionInteractable,
     ThresholdInteractable, ROIInteractable, TextInteractable, ViewInteractable
-export masque, auto_interactables, InteractionEvent, data_to_image_px, hitlayers
+export masque, auto_interactables, data_to_image_px, hitlayers, bondtype, transform_bond
+export InteractionEvent, ElementEvent, LegendEvent, GridCellEvent, GridWindowEvent,
+    AxisEvent, ThresholdEvent, ColorbarEvent, BoundsEvent
 export Markup, @masque_str
 
 end # module Masque

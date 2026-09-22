@@ -36,6 +36,7 @@
                 "hover"
             ],
             "kind": "circles",
+            "bond": "element",
             "axis": "ax1",
             "geometry": [
                 329,
@@ -56,6 +57,7 @@
                 "hover"
             ],
             "kind": "rects",
+            "bond": "element",
             "axis": "ax1",
             "geometry": [
                 625,
@@ -77,6 +79,7 @@
                 "hover"
             ],
             "kind": "polygons",
+            "bond": "element",
             "axis": "ax1",
             "geometry": [
                 [

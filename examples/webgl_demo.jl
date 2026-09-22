@@ -113,7 +113,7 @@ begin
             f, [
                 PointInteractable(
                     ax, pts; id = :tpts,
-                    payloads = [(; index = k - 1, label = ("alpha", "beta", "gamma")[k]) for k in 1:3],
+                    payloads = [(; index = k, label = ("alpha", "beta", "gamma")[k]) for k in 1:3],
                     tooltip = masque"point $(label)",
                 ),
             ]
@@ -233,7 +233,7 @@ begin
                 PointInteractable(ax, pts; id = :pts),
                 ROIInteractable(ax; bounds = (2.0, 6.0, 2.0, 6.0), selects = :pts, id = :roi),
             ];
-            selected = Dict(:pts => [0]),
+            selected = Dict(:pts => [1]),
         )
     end
     nothing

@@ -161,12 +161,14 @@ _pt3(p) = Point3f(p[1], p[2], length(p) >= 3 ? p[3] : 0)
 _q(x) = isfinite(x) ? round(Int, x) : Float32(x)
 
 # A payloads-length mismatch would otherwise surface as an `undefined` tooltip at hover time.
-# Positional: payloads[k] binds element k; a wrong order is undetectable here.
-function _check_payloads(payloads, n, what)
-    length(payloads) == n ||
-        throw(ArgumentError("$(what): got $(length(payloads)) payloads for $(n) elements"))
+# Positional: payloads[k] binds element k; a wrong order is undetectable here. A DataFrame is
+# accepted once the DataFrames extension is loaded (`MasqueDataFramesExt`).
+function expand_payloads(payloads, n, who)
+    npl = length(payloads)
+    npl == n || throw(ArgumentError("$who: payloads has $npl entries, expected $n"))
     return collect(Any, payloads)
 end
+_check_payloads(payloads, n, what) = expand_payloads(payloads, n, what)
 
 # Checked at construction (not manifest build time) so the error points at the caller's own call.
 _check_tooltip(tooltip) =
@@ -224,9 +226,9 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
 # Arguments
 - `points` — data-space points, each a 2- or 3-element point/tuple (`Axis3` scatters use 3).
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit.
-- `payloads` — one entry per point (`ArgumentError` if the length doesn't match `points`).
-  Default: `(; index, x, y)`, or `(; index, x, y, z)` for 3-coordinate points — `index` is
-  0-based.
+- `payloads` — one entry per point (`ArgumentError` if the length doesn't match `points`), or a
+  `DataFrame` with one row per point once DataFrames is loaded. Default: `(; index, x, y)`, or
+  `(; index, x, y, z)` for 3-coordinate points — `index` is 1-based.
 - `radius` — click-target radius in px (scaled to the rendered image's DPI), the same for
   every point. Default `9`.
 - `radius3d` — per-point data-space half-extents (`Vector{Makie.Vec3f}`), for markers whose
@@ -288,20 +290,20 @@ function PointInteractable(
         ax, points; id = :points,
         payloads = [
             length(p) >= 3 ?
-                (; index = k - 1, x = Float64(p[1]), y = Float64(p[2]), z = Float64(p[3])) :
-                (; index = k - 1, x = Float64(p[1]), y = Float64(p[2]))
+                (; index = k, x = Float64(p[1]), y = Float64(p[2]), z = Float64(p[3])) :
+                (; index = k, x = Float64(p[1]), y = Float64(p[2]))
                 for (k, p) in enumerate(points)
         ],
         radius = 9, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing
     )
     _check_tooltip(tooltip)
     pts = [_pt3(p) for p in points]
-    length(payloads) == length(pts) || throw(ArgumentError("payloads must match points"))
+    pl = expand_payloads(payloads, length(pts), "PointInteractable")
     r3 = radius3d === nothing ? nothing : Vector{Makie.Vec3f}(radius3d)
     r3 === nothing || length(r3) == length(pts) ||
         throw(ArgumentError("radius3d must have one entry per point (got $(length(r3)) for $(length(pts)))"))
     colors = _check_colors(colors, length(pts))
-    return PointInteractable(ax, pts, id, collect(Any, payloads), Float64(radius), r3, tooltip, label === nothing ? nothing : String(label), colors)
+    return PointInteractable(ax, pts, id, pl, Float64(radius), r3, tooltip, label === nothing ? nothing : String(label), colors)
 end
 tooltip_spec(i::PointInteractable) = i.tooltip
 # Max projected displacement over the ±axis half-extents; non-finite offsets are skipped.
@@ -343,7 +345,7 @@ Lines / polylines (nearest-segment hit) or disjoint segment pairs. Produces one 
   `ArgumentError`.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit.
 - `payloads` — one entry per segment (count per `mode` above); `ArgumentError` if the length
-  doesn't match. Default: `(; segment_index)`, 0-based.
+  doesn't match. Default: `(; segment_index)`, 1-based.
 - `tol` — hit-test slack around a segment, in logical px (scaled to the rendered image's DPI
   like [`PointInteractable`](@ref)'s `radius`). Must be finite and positive (`ArgumentError`
   otherwise). Shipped in the manifest as a per-layer `"tol"` field; the overlay's client-side
@@ -395,7 +397,7 @@ function SegmentInteractable(
     _check_tol(tol)
     vs = [_pt3(v) for v in vertices]
     nseg = mode === :polyline ? max(0, length(vs) - 1) : length(vs) ÷ 2
-    pl = payloads === nothing ? Any[(; segment_index = k - 1) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
+    pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
     return SegmentInteractable(ax, vs, mode, id, pl, Float64(tol), tooltip, nothing, label === nothing ? nothing : String(label))
 end
 # Internal-only: construct with a lazy `resolve(ax) -> vertices`. Called directly by the
@@ -432,7 +434,7 @@ construction. Produces one `:rects` or `:grid` [`HitLayer`](@ref).
 - `rects` — data-space boxes `[(xc, yc, w, h), …]` (center + width/height).
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:rects`.
 - `payloads` — one entry per rect; `ArgumentError` if the length doesn't match. Default:
-  `(; index)`, 0-based.
+  `(; index)`, 1-based.
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
 - `clamp_to_viewport` — clamp each rect's pixel bounds to the axis viewport (inward rounding,
@@ -514,7 +516,7 @@ function RectInteractable(
         RectInteractable(ax, :grid, (xe, ye, vals), id, Any[], tooltip, false, nothing, lbl)
     else
         rs = [(Float64(r[1]), Float64(r[2]), Float64(r[3]), Float64(r[4])) for r in rects]
-        pl = payloads === nothing ? Any[(; index = k - 1) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "RectInteractable")
+        pl = payloads === nothing ? Any[(; index = k) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "RectInteractable")
         RectInteractable(ax, :list, rs, id, pl, tooltip, clamp_to_viewport, nothing, lbl)
     end
 end
@@ -596,7 +598,7 @@ one. Produces one `:rects` [`HitLayer`](@ref), one box per string.
   [`auto_interactables`](@ref)).
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:text`.
 - `payloads` — one entry per string; `ArgumentError` if the length doesn't match. Default:
-  `(; text, index, x, y)` — `text` is the string, `index` 0-based, `(x, y)` its data-space
+  `(; text, index, x, y)` — `text` is the string, `index` 1-based, `(x, y)` its data-space
   anchor.
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
@@ -623,7 +625,7 @@ function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, too
         error("TextInteractable: $(length(anchors)) positions for $(length(strs)) strings (Makie internals changed?)")
     pl = if payloads === nothing
         Any[
-            (; text = string(strs[k]), index = k - 1, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
+            (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
                 for k in eachindex(strs)
         ]
     else
@@ -664,7 +666,7 @@ Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLa
   closes it implicitly).
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:polygons`.
 - `payloads` — one entry per ring; `ArgumentError` if the length doesn't match. Default:
-  `(; index)`, 0-based.
+  `(; index)`, 1-based.
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
 - `label` — an optional screen-reader announcement prefix for this layer (see
@@ -697,7 +699,7 @@ end
 function PolygonInteractable(ax, rings; id = :polygons, payloads = nothing, tooltip = nothing, label = nothing)
     _check_tooltip(tooltip)
     rs = [[_pt3(p) for p in ring] for ring in rings]
-    pl = payloads === nothing ? Any[(; index = k - 1) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "PolygonInteractable")
+    pl = payloads === nothing ? Any[(; index = k) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "PolygonInteractable")
     return PolygonInteractable(ax, rs, id, pl, tooltip, label === nothing ? nothing : String(label))
 end
 tooltip_spec(i::PolygonInteractable) = i.tooltip
@@ -904,7 +906,7 @@ function _resolve_legend_targets(entries, targets, plotmap)
             ),
         )
         result = [
-            _coerce_legend_target_ids(t, "entry $(k - 1) (\"$(entries[k].label)\")")
+            _coerce_legend_target_ids(t, "entry $k (\"$(entries[k].label)\")")
                 for (k, t) in enumerate(targets)
         ]
         return result, false
@@ -1131,7 +1133,7 @@ end
 function ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold)
     orientation in (:horizontal, :vertical) ||
         throw(ArgumentError("ThresholdInteractable: orientation must be :horizontal or :vertical, got $(orientation)"))
-    return ThresholdInteractable(ax, orientation, Float64(value), id)
+    return ThresholdInteractable(ax, orientation, _threshold_value(value), id)
 end
 events(::ThresholdInteractable) = (:drag,)
 function validate(i::ThresholdInteractable, ctx::InteractionContext)
@@ -1179,11 +1181,10 @@ compatible layer, reporting the contained elements. Produces one `:roi` [`HitLay
   geometry falls inside the ROI are reported. `masque` raises `ArgumentError` at build time if
   `selects` names a layer absent from the same call, or one of an unsupported kind.
 
-Payload on commit (client-side, no `selects`): `(; xmin, xmax, ymin, ymax)`. With `selects`
-set, the bond value instead becomes a `Vector{InteractionEvent}` — one per contained element
-for a `:circles` target (each an element payload, reconstructed like any other), or one entry
-covering the whole cell range for a `:grid` target (`(; i0, i1, j0, j1, xmin, xmax, ymin,
-ymax)`, since a `:grid` layer has no element to index) — see [`InteractionEvent`](@ref).
+Payload on commit (no `selects`): a [`BoundsEvent`](@ref). With `selects` set, the bond is a
+`Vector{ElementEvent}` for a `:circles` target (one per contained element), or one
+[`GridWindowEvent`](@ref) for a `:grid` target — see [`InteractionEvent`](@ref). `bounds=`
+accepts a `BoundsEvent` or a `(xmin, xmax, ymin, ymax)` tuple.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data point), a `PolarAxis` (continuous inversion isn't shipped), a categorical axis (bounds
@@ -1202,8 +1203,7 @@ struct ROIInteractable <: AbstractSelector
     ax; bounds::NTuple{4, Float64}; id::Symbol; selects::Union{Nothing, Symbol}   # (xmin,xmax,ymin,ymax) data space
 end
 function ROIInteractable(ax; bounds, id = :roi, selects = nothing)
-    length(bounds) == 4 || throw(ArgumentError("ROIInteractable: bounds must be (xmin, xmax, ymin, ymax)"))
-    xmin, xmax, ymin, ymax = Float64.(Tuple(bounds))
+    xmin, xmax, ymin, ymax = _roi_bounds(bounds)
     (xmin < xmax && ymin < ymax) ||
         throw(ArgumentError("ROIInteractable: need xmin < xmax and ymin < ymax, got $(bounds)"))
     return ROIInteractable(ax, (xmin, xmax, ymin, ymax), id, selects)
@@ -1279,8 +1279,8 @@ function RegionInteractable(
         tooltip = nothing, events = (:click, :hover)
     )
     _check_tooltip(tooltip)
-    length(regions) == length(payloads) || throw(ArgumentError("regions/payloads length mismatch"))
-    return RegionInteractable(ax, collect(regions), collect(Any, payloads), id, tooltip, events)
+    pl = expand_payloads(payloads, length(regions), "RegionInteractable")
+    return RegionInteractable(ax, collect(regions), pl, id, tooltip, events)
 end
 events(i::RegionInteractable) = i.evs
 tooltip_spec(i::RegionInteractable) = i.tooltip
