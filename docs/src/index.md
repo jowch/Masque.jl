@@ -4,15 +4,17 @@ Masque adds an interactive layer over Makie figures inside a Pluto
 notebook. Add rich tooltips, hover interactions, selections, and more to
 your figures.
 
-![A CairoMakie scatter in Pluto: holding the pointer over a point shows a tooltip, clicking it selects the point and updates the bound value in the following cell](assets/demo.gif)
-
 ## Hover a mark
+
+![Holding the pointer over a scatter point shows a tooltip with the city name and population](assets/home/hover.gif)
 
 Hold the pointer over a point, bar, heatmap cell, polygon, or legend
 entry. A tooltip appears on the figure you already drew. For templates
 and styling, see [Tooltips](@ref).
 
 ## Click, then use the pick in Julia
+
+![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.gif)
 
 Click a mark. `@bind` writes that pick into the next cell, the same way
 a PlutoUI slider does. Downstream cells re-run with the selected row,
@@ -21,6 +23,8 @@ bar, or cell. For more information, see [Click marks](@ref) and
 
 ## Brush, threshold, and pan
 
+![Dragging a region box onto the North stations updates the bound table](assets/home/brush.gif)
+
 Drag a box over points to select a region. Drag a cutoff on a colorbar.
 Pan a 2D axis, or orbit `Axis3` on the WebGL backend. See
 [Brush a region](@ref), [Read coordinates](@ref), and
@@ -28,10 +32,14 @@ Pan a 2D axis, or orbit `Axis3` on the WebGL backend. See
 
 ## Highlight from the legend
 
+![Hovering and clicking a legend entry washes that series and updates the bound pick](assets/home/legend.gif)
+
 Hover or click a `Makie.Legend` entry to wash the traces it labels. See
 [Legend](@ref).
 
 ## Inspect a static export
+
+![Holding the pointer over heatmap cells shows each cell's value on a static overlay](assets/home/export.gif)
 
 Hover and click still work in a Pluto HTML export of the notebook.
 Re-running Julia cells needs a live session. CairoMakie is the default;
