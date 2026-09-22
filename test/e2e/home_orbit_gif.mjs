@@ -157,8 +157,10 @@ try {
     return host?.dataset.masqueGestureFrame ?? null;
   });
 
-  let cur = { x: clip.x + 24, y: clip.y + 24 };
-  await page.mouse.move(cur.x, cur.y);
+  // Park on the knot before recording so the GIF is the drag, not the approach.
+  await page.mouse.move(start.x, start.y);
+  await sleep(200);
+  let cur = { ...start };
 
   const moveTo = async (target, durationMs, steps = 20) => {
     const from = { ...cur };
@@ -193,8 +195,6 @@ try {
   };
 
   const timeline = async () => {
-    await sleep(400);
-    await moveTo(start, 500, 18);
     await sleep(250);
     const stamp0 = await gestureStamp();
     await page.mouse.down();
