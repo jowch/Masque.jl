@@ -47,7 +47,7 @@ you can orbit. See [Backends](@ref).
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-home-export" title="New York City boroughs with overlay-only hover"
-        style="width:100%;height:480px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:520px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>

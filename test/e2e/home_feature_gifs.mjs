@@ -280,7 +280,8 @@ try {
       if (!/gentoo/i.test(after)) throw new Error(`legend: readout did not update — ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
       if (afterPng === beforePng) throw new Error("legend: PNG did not remount (fade missing)");
       console.error(`OK  legend: ${after}`);
-      await sleep(1100);
+      await moveTo({ x: clip.x + 24, y: clip.y + 24 }, 400);
+      await sleep(900);
     }
     done = true;
   };
