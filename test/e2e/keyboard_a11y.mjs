@@ -182,9 +182,10 @@ try {
     passed.push(`${key}/live-region`);
 
     const before = await textOf(`#out_${key}`);
+    // The bond prints a 1-based Julia index. Arrow steps and `target` stay 0-based wire indices.
     const beforeIdxMatch = new RegExp(`:${layer.id},\\s*(\\d+)\\b`).exec(before);
-    const beforeIdx = beforeIdxMatch ? Number(beforeIdxMatch[1]) : -1;
-    const target = (beforeIdx + 1) % n; // guaranteed != beforeIdx as long as n > 1
+    const beforeWire = beforeIdxMatch ? Number(beforeIdxMatch[1]) - 1 : -1;
+    const target = (beforeWire + 1) % n; // guaranteed != beforeWire as long as n > 1
     // We're at `landed` — walk to `target`. ArrowRight/ArrowLeft clamp at the ends, they don't
     // wrap, so step in whichever direction `target` actually is from here.
     const delta = target - landed;
@@ -193,11 +194,11 @@ try {
     await page.keyboard.press("Enter");
     let after = before;
     for (let i = 0; i < 40 && after === before; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
-    if (after === before) throw new Error(`${key}: Enter never updated #out_${key} (target index ${target}, was ${beforeIdx})`);
+    if (after === before) throw new Error(`${key}: Enter never updated #out_${key} (wire index ${target}, was ${beforeWire})`);
     const idRe = new RegExp(`:${layer.id}|${layer.id}`, "i");
     if (!idRe.test(after)) throw new Error(`${key}: Enter bond value missing layer id: ${after.slice(0, 200)}`);
-    if (!new RegExp(`:${layer.id},\\s*${target}\\b`).test(after)) {
-      throw new Error(`${key}: Enter bond value expected index ${target}: ${after.slice(0, 200)}`);
+    if (!new RegExp(`:${layer.id},\\s*${target + 1}\\b`).test(after)) {
+      throw new Error(`${key}: Enter bond value expected Julia index ${target + 1}: ${after.slice(0, 200)}`);
     }
     passed.push(`${key}/enter-bind`);
 

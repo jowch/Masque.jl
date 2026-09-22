@@ -151,7 +151,8 @@ try {
       host.dispatchEvent(new Event("input"));
     }, i);
     const text = await outText(frame);
-    const want = `${CITIES[i]} selected — index ${i}`;
+    // host.value stays the 0-based wire envelope. The readout prints the Julia index.
+    const want = `${CITIES[i]} selected — index ${i + 1}`;
     if (!text.includes(want)) {
       throw new Error(`host.value {layer:"cities",index:${i}} did not key a snapshot; #masque-out=${JSON.stringify(text)}`);
     }
@@ -165,7 +166,7 @@ try {
       throw new Error(`city ${i} (${CITIES[i]}) click emitted ${JSON.stringify(got)}`);
     }
     const text = await outText(frame);
-    const want = `${CITIES[got.index]} selected — index ${got.index}`;
+    const want = `${CITIES[got.index]} selected — index ${got.index + 1}`;
     if (!text.includes(want)) {
       throw new Error(`listed click (aimed ${i}, hit ${got.index}) did not swap #masque-out; got ${JSON.stringify(text)}`);
     }
