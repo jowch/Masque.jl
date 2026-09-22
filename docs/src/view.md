@@ -1,13 +1,10 @@
 # Pan and orbit
 
-Drag a 2D axis to pan, or an `Axis3` to orbit. The camera is operational
-state, not analysis data. [`ViewInteractable`](@ref) **commits
-nothing**. The bond never carries a `:view` event.
+Drag a 2D axis to pan, or an `Axis3` to orbit. Pass
+[`ViewInteractable`](@ref) on the axis you want to move. The camera is
+not a selection: pan and orbit do not write `@bind`.
 
-**On this site:** GIF/MP4 plus overlay-only. For overlay versus `@bind`
-versus the docs player, see [Overlay, Julia, and the host](@ref). The
-following clip is cairo in-drag frames: the axis limits move; `@bind`
-does not.
+The clip shows a pan: the axis limits move.
 
 ```@raw html
 <video id="masque-view-clip" title="CairoMakie in-drag pan frames on a 2D scatter"

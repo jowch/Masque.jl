@@ -2,11 +2,7 @@
 
 Click anywhere in a 2D axis to read data `(x, y)`. Click a colorbar to
 read `value`. Drag a threshold line; on release, Julia gets a
-[`ThresholdEvent`](@ref).
-
-**On this site:** overlay-only. For overlay versus `@bind` versus the
-docs player, see [Overlay, Julia, and the host](@ref). There is no
-highlight in the overlay at the click.
+[`ThresholdEvent`](@ref). There is no highlight at the click.
 
 ```@raw html
 <div class="masque-embed-wrap">

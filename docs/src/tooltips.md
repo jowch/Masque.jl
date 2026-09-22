@@ -1,12 +1,9 @@
 # Tooltips
 
-Hold the pointer over a mark to see a tooltip in the overlay. That path
-never writes `@bind` and never re-runs a Julia cell. A click can still
-write the bond; this page teaches the tooltip. The eight-city scatter on
-[Getting started](@ref) already templates on pointer hold.
-
-**On this site:** overlay-only. For overlay versus `@bind` versus the
-docs player, see [Overlay, Julia, and the host](@ref).
+Hold your pointer over a mark and a customizable tooltip appears on the
+figure. Hover stays on the figure; it does not re-run Julia. A click can
+still write `@bind`; this page teaches the tooltip. The eight-city
+scatter on [Getting started](@ref) already templates on pointer hold.
 
 ```@raw html
 <div class="masque-embed-wrap">

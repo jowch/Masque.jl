@@ -26,7 +26,6 @@ makedocs(;
         "Home" => "index.md",
         "Getting started" => "getting-started.md",
         "Guides" => [
-            "Hover, click, and bind" => "gestures.md",
             "Click marks" => "marks.md",
             "Tooltips" => "tooltips.md",
             "Inspect a grid" => "grids.md",
@@ -46,6 +45,9 @@ makedocs(;
             "Keyboard and screen readers" => "accessibility.md",
             "Troubleshooting" => "troubleshooting.md",
             "Contributing" => "contributing.md",
+        ],
+        "Advanced" => [
+            "Overlay, bind, and the host" => "gestures.md",
         ],
     ],
     doctest = false,

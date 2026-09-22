@@ -1,14 +1,12 @@
 # Getting started
 
-This page overlays one Makie figure: an eight-city scatter. Hold the
-pointer over a city to read its population. Click a city to write that
-pick into Julia.
+Masque overlays a Makie figure in Pluto. Hold your pointer over a city
+to read its population. Click a city to select it; `@bind` captures that
+pick, and a cell that reads it re-runs.
 
-The following embed is that scatter on this docs site. The
-**Simulating `@bind`** chip marks that listed city clicks are
-precomputed snapshots, not a live Julia process. For which gestures
-write `@bind` and which stay in the overlay, see
-[Hover, click, and bind](@ref).
+The embed on this page is that scatter. On this site the **Simulating
+`@bind`** chip is a listed snapshot; in your notebook, the next cell
+re-runs.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -39,7 +37,7 @@ write `@bind` and which stay in the overlay, see
 </script>
 ```
 
-In the iframe, hold the pointer over Tokyo to read the population, then
+In the iframe, hold your pointer over Tokyo to read the population, then
 click a city and watch the **Simulating `@bind`** chip.
 
 ## Install
@@ -89,9 +87,8 @@ already ran it. Pluto reports multiple definitions if you paste
 
 `using Masque` with no Makie backend raises `ArgumentError` the first
 time `masque` runs. Loading both CairoMakie and WGLMakie is fine; then
-`masque` defaults to CairoMakie. The `backend=` keyword takes an
-extension instance, not a `:cairo` or `:webgl` symbol. `masque` does not
-mutate the `Figure`.
+`masque` defaults to CairoMakie. For `backend=` and when to reach for
+WGLMakie, see [Backends](@ref).
 
 The example notebooks in this repository each `Pkg.develop` the checkout
 themselves. They use a temporary environment, which turns Pluto's
@@ -103,8 +100,8 @@ want Pluto's package management off. For more information, see
 ## Quick start
 
 The following embed is a three-point scatter: your figure, `masque`, and
-a readout. Hover a point; click one. The **Simulating `@bind`** chip
-marks listed clicks as snapshots, not a live Julia process.
+a readout. Hover a point, then click one. On this site the **Simulating
+`@bind`** chip is a listed snapshot.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -197,9 +194,9 @@ end
 Pluto rejects two cells that both `@bind` the same name. Replace the
 bind cell; do not add a second.
 
-Hold the pointer over a city. The tooltip shows the name and population.
-Downstream cells re-run when `pick` changes. Holding the pointer over a
-mark does not change `pick`.
+Hold your pointer over a city. The tooltip shows the name and
+population. A click selects that city; a cell that reads `pick` re-runs.
+Hover does not change `pick`.
 
 **3.** Read the pick:
 
@@ -212,27 +209,21 @@ you clicked). Before a click, `pick` is `nothing`. After a click, `pick`
 is an [`ElementEvent`](@ref): `layer` is `:cities`, `index` is 1-based,
 and `pick.city` is that row's field. `cities_data[pick]` is the same row.
 The selection stays on the last mark clicked. A click in empty space
-does not write the bond.
+does not change `pick`.
 
 `ElementEvent` is exported by Masque. Do not redefine it in the
 notebook.
 
-Other commits are their own types. An axis click is an
-[`AxisEvent`](@ref) (`pick.x`, `pick.y`). A heatmap cell is a
-[`GridCellEvent`](@ref) (`A[pick]`). A threshold is a
-[`ThresholdEvent`](@ref) (`pick.value`). A `selects` ROI over points
-yields a `Vector{ElementEvent}`. For the catalog, see
-[Constructors](@ref).
+For other event types, see [Constructors](@ref).
 
 ## You are done
 
-You have an overlay, a hover tooltip, and a click that writes `@bind`.
+You have an overlay, a hover tooltip, and a click that `@bind` captures.
 The readout cell is the sentence that uses the pick. The sections that
 follow are optional.
 
-The cities cell passes `radius = 0.3525 * markersize` so the highlight
-sits on the default `:circle` disc. For hug paths, `tooltip=` on a plot
-object, and `auto_interactables`, see [Constructors](@ref).
+For hug paths, `tooltip=` on a plot object, and `auto_interactables`,
+see [Constructors](@ref).
 
 A second axis on the same `Figure` is still one `masque` call. For more
 information, see [Linked views](@ref).

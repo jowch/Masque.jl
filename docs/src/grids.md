@@ -1,8 +1,7 @@
 # Inspect a grid
 
-Hold the pointer over a heatmap or image cell to read `(i, j)` and its
-value. Click the cell to write that pick into Julia. The cell is a
-highlight in the overlay; the PNG does not change.
+Hold your pointer over a heatmap or image cell to read its indices and
+value. Click the cell to select it; `@bind` captures that pick.
 
 The following clip shows the pointer over cells, then a click. The
 tooltip is `(i,j) = value`.
@@ -20,9 +19,6 @@ tooltip is `(i,j) = value`.
 })();
 </script>
 ```
-
-**On this site:** GIF/MP4 plus overlay-only. For overlay versus `@bind`
-versus the docs player, see [Overlay, Julia, and the host](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">

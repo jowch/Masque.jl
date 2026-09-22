@@ -1,23 +1,18 @@
 # Selection
 
-There is exactly one selection. Before a click, the `@bind` bond is
-`nothing` unless you pass `selected=`. After a click, the bond is one
-[`ElementEvent`](@ref): `layer` (the interactable `id`), a 1-based
-`index`, and the row's fields on the event (`pick.city`). Click a mark
-to replace the selection with that mark. A cell that reads the bond
-re-runs.
-
-The highlight in the overlay is not a copy of the bond.
+Click a mark to select it. `@bind` captures that pick; a cell that reads
+it re-runs. Before a click, the pick is `nothing` unless you pass
+`selected=`. After a click, the pick is one [`ElementEvent`](@ref):
+`layer` (the interactable `id`), a 1-based `index`, and the row's fields
+on the event (`pick.city`). Click another mark to replace the
+selection.
 
 This page continues the cities scatter from [Getting started](@ref) in
 the same notebook. Skip the load cell; `fig`, `cities`, and `pick`
-already exist. There is no Selection player on this page.
+already exist.
 
 Paste each snippet into its own Pluto cell. Replace the previous bind
 cell instead of adding a second `@bind pick`.
-
-**On this site:** this page has no player. For overlay versus `@bind`
-versus the docs player, see [Overlay, Julia, and the host](@ref).
 
 ## Click a mark
 

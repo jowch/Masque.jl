@@ -1,10 +1,9 @@
 # Linked views
 
-One `masque` call covers every axis in the figure. You get one overlay and
-one manifest. Layers from every `Axis`, `Axis3`, and `PolarAxis` share the
-hit list. Hold the pointer over a mark, or click it, and the overlay
-responds on the axis you hit. Adding a second axis is a larger notebook,
-not a second architecture. For the first overlay, see
+Put two axes in one figure. One `masque` call covers both: you get one
+overlay, and layers from every `Axis`, `Axis3`, and `PolarAxis` share
+the hit list. Hold your pointer over a mark, or click it, and the
+overlay responds on the axis you hit. For the first overlay, see
 [Getting started](@ref).
 
 ```@raw html
@@ -80,9 +79,6 @@ Do not use `Axis3` for this job. Two 2D axes are the 2D-of-3D shape.
 </script>
 ```
 
-**On this site:** overlay-only. For overlay versus `@bind` versus the
-docs player, see [Overlay, Julia, and the host](@ref).
-
 Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
 notebook.
 
@@ -155,7 +151,7 @@ here.
 </script>
 ```
 
-Hover needs no snapshots. **On this site:** overlay-only. Replace the
+Hover needs no snapshots. Replace the
 previous `fig` and `@bind pick` cells.
 
 ```julia
@@ -249,5 +245,5 @@ rebuild Julia. For `selected=` kinds and persist, see [Selection](@ref).
 - No lasso.
 - No SPLOM or crossfilter of several brushes (one ROI, one target).
 
-For overlay versus `@bind` timing, see [Hover, click, and bind](@ref).
+For overlay versus `@bind` timing, see [Overlay, bind, and the host](@ref).
 For kitchen-sink notebooks, see [Examples](@ref).

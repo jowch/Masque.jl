@@ -1,13 +1,9 @@
 # Legend
 
-Hold the pointer over a legend entry to wash that series in the overlay.
-Click the entry to write that pick into Julia.
-
-The overlay cannot hide Makie traces. Use the wash plus `@bind` so a Julia
-cell can filter the series.
-
-**On this site:** listed snapshots. For overlay versus `@bind` versus the
-docs player, see [Overlay, Julia, and the host](@ref).
+Hold your pointer over a legend entry to highlight the traces it labels.
+Click the entry to select that series; `@bind` captures the pick. The
+overlay cannot hide Makie traces — use the wash plus `@bind` so a Julia
+cell can fade the rest.
 
 ```@raw html
 <div class="masque-embed-wrap">

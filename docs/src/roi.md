@@ -3,12 +3,9 @@
 Drag a rectangle on a 2D scatter. When you release, Julia sees either the box
 bounds or the points the box enclosed.
 
-The following embed is that brush on this docs site.
-
-**On this site:** listed snapshots. For overlay versus `@bind` versus the
-docs player, see [Overlay, Julia, and the host](@ref). Dragging the box
-to a listed set swaps the table. Dragging to any other geometry still
-moves the box in the overlay; the table stays on the last listed set.
+The following embed is that brush on this docs site. Dragging the box to a
+listed set swaps the table. Any other geometry still moves the box; the
+table stays on the last listed set.
 
 ```@raw html
 <div class="masque-embed-wrap">

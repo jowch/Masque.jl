@@ -1,4 +1,9 @@
-# Hover, click, and bind
+# Overlay, bind, and the host
+
+[Getting started](@ref) and the Guides teach how to overlay a figure and
+use the pick. This page is the overlay, `@bind`, and the docs-site
+player — for when a hover does not re-run Julia, or a docs embed is not
+a live notebook.
 
 Masque splits pointer work across four channels: overlay chrome, the `@bind`
 bond, the gesture channel, and a downstream Julia cell. Holding the pointer

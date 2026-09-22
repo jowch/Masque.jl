@@ -1,11 +1,8 @@
 # Custom hits
 
 Declare hit regions Makie did not plot as marks: a circle, a rect, and a
-polygon over an image. Hold the pointer over a region to read its name.
-
-**On this site:** overlay-only. For overlay versus `@bind` versus the
-docs player, see [Overlay, Julia, and the host](@ref). For constructor
-signatures, see [Constructors](@ref).
+polygon over an image. Hold your pointer over a region to read its name.
+For constructor signatures, see [Constructors](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">

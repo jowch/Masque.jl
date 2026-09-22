@@ -226,7 +226,7 @@ in [Selection](@ref).
 browser. They do not assign `@bind`.
 
 **Fix:** read `pick` after a click (or Enter on a focused mark). For
-channel timing, see [Hover, click, and bind](@ref).
+channel timing, see [Overlay, bind, and the host](@ref).
 
 ### Tried a click and nothing happened
 

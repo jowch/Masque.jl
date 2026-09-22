@@ -1,8 +1,8 @@
 # Click marks
 
-This page is four bars, three polygons, and four polar points. Hold the
-pointer over a mark to inspect it. Click a mark to write that pick into
-Julia through `@bind`.
+Click a bar, a polygon, or a polar point to select it. `@bind` captures
+that pick the same way a slider does. Each geometry has its own default
+payload.
 
 This page is a new notebook. It does not reuse `fig` or `pick` from the
 cities scatter. Prerequisites: [Install](@ref) and
@@ -19,9 +19,6 @@ end
 
 Paste each snippet into its own Pluto cell. If a later demo on this page
 also binds `pick`, replace the previous bind cell.
-
-**On this site:** listed snapshots. For overlay versus `@bind` versus the
-docs player, see [Overlay, Julia, and the host](@ref).
 
 For the eight-city scatter, see [Getting started](@ref). For constructor
 signatures and default payloads, see [Constructors](@ref).
