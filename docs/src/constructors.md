@@ -187,22 +187,9 @@ body; whiskers and outliers are not hit-tested. `annotation!` is the
 inner `Text`. `text!` whose `space` is not `:data` is skipped with a
 specific warning. `lines!` is nearest-segment on a polyline.
 
-### Not auto-extracted
-
-These are skip-plus-warn today, or they never reach `_plotbase` because
-the walk is top-level plots only:
-
-- Parent recipes: `series!`, `hexbin!`, `textrepel!`, `rainclouds!`.
-  Nested `Lines` / `Scatter` / `Text` / `Violin` children are not walked.
-- Not in `_plotbase`: `contour!` (lines, not `contourf!`),
-  `tricontourf!`, `surface!`, `ablines!`, `arc!`, 2D `arrows!`, `pie!`,
-  `streamplot!`, `mesh!` (the plot, not `meshscatter!`), `volume!`.
-- Block: `TextLabel`. `Colorbar` and `Legend` are extracted.
-- Axis: `LScene` — no overlay. CairoMakie refuses the figure; see
-  [Troubleshooting](@ref).
-
-Many of those parents stringify as `Plot` in the warning
-(`typeof(p).name.name`). For a type that is not in the table, see
+A recipe that is not in the table is skipped with `@warn`. Nested
+children of an unknown parent are not walked. `LScene` has no overlay;
+see [Troubleshooting](@ref). For a type you implement yourself, see
 [Custom hits](@ref).
 
 ## Element constructors
