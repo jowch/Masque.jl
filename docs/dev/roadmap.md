@@ -36,11 +36,10 @@ v0.1.0 is unreleased and open: the pre-registration revisions can carry new work
 everything below is a candidate for it. `CHANGELOG.md` `[Unreleased]` is the running record.
 
 Shipped: `masque(fig)` auto-extraction over Scatter, Lines/LineSegments/ScatterLines, Stairs,
-Series (`lines!` / `stairs!` / `series!` and a `scatterlines!` line are one `:lines` element
-per path, #89),
-Stem, Errorbars/Rangebars, HLines/VLines, HSpan/VSpan, Heatmap, Image, Spy, BarPlot, Hist,
-Waterfall, CrossBar, BoxPlot (box body), Band, Density, Violin, Contourf, Voronoiplot, Poly,
-Text/Annotation, Colorbar, Legend, MeshScatter, Wireframe, Arrows3D (#91 tracks the full list);
+Series, Stem, Errorbars/Rangebars, HLines/VLines, HSpan/VSpan, Heatmap, Image, Spy, BarPlot,
+Hist, Waterfall, CrossBar, BoxPlot (box body), Band, Density, Violin, Contourf, Voronoiplot,
+Poly, Text/Annotation, Colorbar, Legend, MeshScatter, Wireframe, Arrows3D (#91 tracks the full
+list);
 explicit constructors for every primitive; `Axis`, `Axis3`, and `PolarAxis` (discrete hits) on both
 backends; tooltips (`masque"…"` templates, auto table, figure-aware theme, mark-anchored
 placement); client-side click-echo selection (#103: a click, an Enter/Space, or a `selects`-ROI
@@ -149,7 +148,7 @@ canvas-identity strategy keeps projection Julia-authored.
   sample attached 1-D series client-side, draw a hairline plus dots, show every series' value
   in the tooltip. Replaces the notebook workaround of baking hundreds of full-height segments.
   Hover-only by default; gated like the other continuous invert consumers (2D `Axis`, fail
-  loud on Axis3/Polar). A `lines!` is already one series to sample (#89).
+  loud on Axis3/Polar).
 - **#88 Right-click passthrough.** Ignore non-primary buttons in drag start, and let
   `contextmenu` land on the base `<img>` so the browser's Save image as… works on `:cairo`.
   No custom menu. `:webgl` gets no image menu without a canvas snapshot (out of scope).
@@ -272,7 +271,7 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
 - **`TextLabel`**: a `Block`, not a plot, so it needs the figure-block walk `Colorbar` and
   `Legend` use. Small.
 - **Legend follow-ups.** First, tick Legend in #91's table, which still lists it as not
-  auto-extracted even though #94 merged. Two further gaps, both already tracked elsewhere: an
+  auto-extracted even though #94 merged. A further gap, already tracked elsewhere: an
   entry cannot highlight a `:grid` target, which is one of the grid's special cases listed
   above. Separately,
   Makie's own `Legend(fig, polaraxis)` raises a `MethodError`, which is upstream rather than
@@ -518,7 +517,7 @@ shipped, which is a better filter than what other libraries happen to have.
 A proposed sequence, not a decided one. Only the dependency edges are real: #85 wants #84,
 #86 is not reconsidered until #84 and #85 exist, and registration wants
 the API to have stopped moving. (#83 closed not-planned — nothing left to build, so it is not
-a dependency of anything below. #89 shipped.)
+a dependency of anything below.)
 
 1. Resolve #49.
 2. Pre-registration revisions, including new work wanted in 0.1.0. Self-contained and cheap:
