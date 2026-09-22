@@ -4,29 +4,26 @@ Masque adds an interactive layer over Makie figures inside a Pluto
 notebook. Add rich tooltips, hover interactions, selections, and more to
 your figures.
 
-## Hover a mark
+## Rich tooltips
 
 ![Holding the pointer over a star shows its name, spectral type, and distance](assets/home/hover.gif)
 
-Hold the pointer over a point, bar, heatmap cell, polygon, or legend
-entry. A tooltip appears on the figure you already drew. For templates
-and styling, see [Tooltips](@ref).
+Hold your pointer over a point, bar, heatmap cell, polygon, or legend entry and a customizable tooltip appears on the figure. For templates and styling, see [Tooltips](@ref).
 
-## Click, then use the pick in Julia
+## Dynamic selections
 
 ![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.gif)
 
-Click a mark. `@bind` writes that pick into the next cell, the same way
-a PlutoUI slider does. Downstream cells re-run with the selected row,
-bar, or cell. For more information, see [Click marks](@ref) and
+When you click a mark to select it,`@bind` captures that selection, the same way a PlutoUI slider does. Downstream cells re-run with the selected row, bar, or cell. For more information, see [Click marks](@ref) and
 [Selection](@ref).
 
-## Brush, threshold, and pan
+## Interactive view controls
 
 ![Dragging a region box onto Cascadia weather stations updates the bound table](assets/home/brush.gif)
 
-Drag a box over points to select a region. Drag a cutoff on a colorbar.
-Pan a 2D axis, or orbit `Axis3` on the WebGL backend. See
+[NOTE: Replace with an orbit gif]
+
+Drag a box over points to select a region. Drag a cutoff on a colorbar. Pan a 2D axis, or orbit `Axis3` on the WebGL backend. See
 [Brush a region](@ref), [Read coordinates](@ref), and
 [Pan and orbit](@ref).
 
@@ -72,19 +69,22 @@ you can orbit. See [Backends](@ref).
 </script>
 ```
 
+
+
 ## Where to go next
 
 - [Getting started](@ref) — a walkthrough: explicit vs. zero-config,
-  choosing a backend, what a bond value looks like
+choosing a backend, what a bond value looks like
 - [Constructors](@ref) — every built-in kind, its constructor, and its
-  default payload
+default payload
 - [Selection](@ref) — reacting to clicks, linking plots, persisting a
-  highlight
+highlight
 - [Legend](@ref) — hover/click a `Makie.Legend` entry to highlight the
-  trace(s) it labels
+trace(s) it labels
 - [Tooltips](@ref) — `masque"..."` templates and styling
 - [Custom hits](@ref) — `RegionInteractable` / `FunctionInteractable`
 - [Backends](@ref) — `:cairo` vs `:webgl`, and when to reach for which
 - [Troubleshooting](@ref) — common errors and what causes them
 - [Examples](@ref) — every runnable notebook in the repo
 - [API](@ref) — full docstrings
+
