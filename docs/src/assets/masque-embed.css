@@ -48,3 +48,10 @@ html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latt
 html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-diagram .masque-diagram-dark {
   display: block;
 }
+
+/* Markdown `|---|` separators compile to inline `style="text-align: right"`
+   (and `:---:` to center). Left-align headers and cells on every docs page. */
+.content table th,
+.content table td {
+  text-align: left !important;
+}
