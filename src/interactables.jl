@@ -940,10 +940,11 @@ for: hover/click an entry to highlight the layer(s) named in `targets`. Produces
 - `leg` — a `Makie.Legend`.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:legend`.
 - `targets` — how each entry links to other layers, resolved once at construction:
-  - `nothing` (default) — auto-extracted `masque(fig)` legends resolve links from the plots
-    each entry's elements were built with (`Makie.get_plots`); anything else (a legend you
-    build by hand) gets no links (still hittable — a click still fires, and a `tooltip`
-    template still shows; it just highlights nothing).
+  - `nothing` (default) — `masque(fig)` links each entry to the layers of the plots its
+    elements were built with (`Makie.get_plots`). That lookup runs during auto extraction.
+    Calling `LegendInteractable` yourself, or a hand-built entry whose elements carry no
+    plots, leaves the link list empty. The entry stays a hit target: hover leaves the other
+    layers as they are, and a click reports a [`LegendEvent`](@ref).
   - a `Dict{<:AbstractString}` keyed by entry **label** — `Symbol` or `Vector{Symbol}` of layer
     ids for that entry. A key matching no entry label raises `ArgumentError`.
   - a `Vector` with one entry per legend entry (`nothing`/`Symbol`/`Vector{Symbol}`), in entry
@@ -970,7 +971,7 @@ nothing to auto-link — pass `plots=` on the element (Makie's own kwarg) or use
 l1 = lines!(ax, xs, ys1; label = "a")
 l2 = lines!(ax, xs, ys2; label = "b")
 leg = axislegend(ax)
-LegendInteractable(leg)   # entry "a" links to :lines, "b" links to :lines_2
+LegendInteractable(leg)   # hit targets only; `masque(fig)` is what fills in the links
 
 LegendInteractable(leg; targets = Dict("a" => :lines, "b" => [:lines_2, :scatter]))
 ```

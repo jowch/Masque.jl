@@ -66,8 +66,8 @@ target naming an unknown layer or an unselectable kind raises `ArgumentError` at
 unlike the auto path above, an explicit `targets=` is the caller's own claim, so a bad one
 fails loud rather than being dropped.
 
-A legend with no links at all is still fully usable — the entry is hittable and a click still
-fires; it just highlights nothing.
+A legend with an empty link list is still a set of hit targets. Hover leaves the other
+layers as they are, and a click reports a [`LegendEvent`](@ref).
 
 ## Tooltip
 
