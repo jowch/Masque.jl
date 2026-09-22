@@ -1,6 +1,15 @@
 using Test, Masque, CairoMakie, Makie, FileIO
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
+# `show` publishes the manifest through Pluto. A bare `IOBuffer` refuses that, so the ordering
+# test supplies the hook Pluto puts on the display IO. `with_js_link` stays unsupported here;
+# the mount `<img>` does not need it.
+function _pluto_display_io()
+    buf = IOBuffer()
+    io = IOContext(buf, :pluto_published_to_js => (io, x) -> print(io, "null"))
+    return io, buf
+end
+
 @testset "Gesture channel (#102)" begin
     @testset "no ViewInteractable -> no render_frame" begin
         (; fig, ax, pts) = default_fixture()
@@ -85,13 +94,29 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws ArgumentError w.render_frame(Dict("id" => "nope", "xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0))
     end
 
-    @testset "masque warms the gesture callback and restores the camera" begin
+    @testset "display writes the mount image before the view warmup" begin
         fig3 = Figure(size = (400, 400))
         ax3 = Axis3(fig3[1, 1])
         scatter!(ax3, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
         az0, el0 = ax3.azimuth[], ax3.elevation[]
         w3 = masque(fig3, [ViewInteractable(ax3)])
         @test w3.render_frame isa Function
+        @test !Masque._view_warmup_finished(w3.render_frame)
+        sender3 = @async begin
+            io, buf = _pluto_display_io()
+            show(io, MIME"text/html"(), w3)
+            html = String(take!(buf))
+            # This task is the stand-in for Pluto's cell task: `show` has the bytes, and the
+            # warmup waits for this task to finish before it touches the camera.
+            @test occursin("data:image/png;base64,", html)
+            @test !Masque._view_warmup_finished(w3.render_frame)
+            @test ax3.azimuth[] ≈ az0 atol = 1.0e-12
+            @test ax3.elevation[] ≈ el0 atol = 1.0e-12
+            return html
+        end
+        wait(sender3)
+        Masque._sync_view_warmup!(w3.render_frame)
+        @test Masque._view_warmup_finished(w3.render_frame)
         @test ax3.azimuth[] ≈ az0 atol = 1.0e-12
         @test ax3.elevation[] ≈ el0 atol = 1.0e-12
 
@@ -101,7 +126,18 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         scatter!(ax2, first.(pts), last.(pts))
         lim0 = ax2.limits[]
         w2 = masque(fig2, [ViewInteractable(ax2), PointInteractable(ax2, pts)])
-        @test w2.render_frame isa Function
+        sender2 = @async begin
+            io, buf = _pluto_display_io()
+            show(io, MIME"text/html"(), w2)
+            html = String(take!(buf))
+            @test occursin("data:image/png;base64,", html)
+            @test !Masque._view_warmup_finished(w2.render_frame)
+            @test ax2.limits[] == lim0
+            return html
+        end
+        wait(sender2)
+        Masque._sync_view_warmup!(w2.render_frame)
+        @test Masque._view_warmup_finished(w2.render_frame)
         @test ax2.limits[] == lim0
     end
 

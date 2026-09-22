@@ -415,13 +415,126 @@ function masque(fig; kwargs...)
     return masque(fig, ints; kwargs...)
 end
 
+# One gesture closure's compile-ahead call. `show` schedules it and returns; the closure waits
+# if a drag arrives while it is still running. Keyed by the closure so display and cancellation
+# can find it without a widget field.
+mutable struct _ViewWarmup
+    apply::Function
+    axes::Dict{Symbol, Any}
+    task::Union{Nothing, Task}
+    started::Bool
+    done::Bool
+    cancelled::Bool
+end
+
+const _VIEW_WARMUPS = IdDict{Function, _ViewWarmup}()
+const _VIEW_WARMUP_LOCK = ReentrantLock()
+
+function _view_warmup_state(render_frame)
+    return lock(_VIEW_WARMUP_LOCK) do
+        return get(_VIEW_WARMUPS, render_frame, nothing)
+    end
+end
+
+function _drop_view_warmup!(render_frame)
+    lock(_VIEW_WARMUP_LOCK) do
+        delete!(_VIEW_WARMUPS, render_frame)
+    end
+    return nothing
+end
+
+# `true` once the discarded calls have finished, or when this closure has nothing scheduled.
+_view_warmup_finished(render_frame)::Bool = (s = _view_warmup_state(render_frame); s === nothing || s.done)
+
+function _run_view_warmup!(state::_ViewWarmup, render_frame)
+    try
+        state.cancelled || _warm_view_render_frame!(state.apply, state.axes; stop = () -> state.cancelled)
+    catch err
+        @error "Masque view warmup failed" exception = (err, catch_backtrace())
+    finally
+        state.done = true
+        _drop_view_warmup!(render_frame)
+    end
+    return nothing
+end
+
+# Run the discarded calls after `caller` finishes. On Pluto's worker that task is the cell
+# evaluation, and it flushes the formatted output before it ends, so the browser can hydrate
+# while this runs. The root task (a test or the REPL) never ends; there the call just waits
+# for the next yield, which is after `show` has written the HTML.
+function _defer_view_warmup!(state::_ViewWarmup, render_frame)
+    caller = current_task()
+    return @async begin
+        if caller !== Base.roottask
+            try
+                wait(caller)
+            catch
+            end
+        end
+        _run_view_warmup!(state, render_frame)
+    end
+end
+
+function _kick_view_warmup!(render_frame)
+    state = _view_warmup_state(render_frame)
+    state === nothing && return nothing
+    lock(_VIEW_WARMUP_LOCK) do
+        state.started && return nothing
+        state.cancelled && return nothing
+        state.started = true
+        state.task = _defer_view_warmup!(state, render_frame)
+    end
+    return nothing
+end
+
+function _cancel_view_warmup!(render_frame)
+    state = _view_warmup_state(render_frame)
+    state === nothing && return nothing
+    state.cancelled = true
+    return nothing
+end
+
+# A drag that lands before the deferred call finishes waits for it. A drag that lands before
+# `show` (tests, a callback with no display) runs the calls on this task instead.
+function _join_view_warmup!(state::_ViewWarmup, render_frame)
+    run_here = lock(_VIEW_WARMUP_LOCK) do
+        state.done && return false
+        if !state.started
+            state.started = true
+            return true
+        end
+        return false
+    end
+    if run_here
+        _run_view_warmup!(state, render_frame)
+    else
+        t = state.task
+        t === nothing || t === current_task() || wait(t)
+    end
+    return nothing
+end
+
+function _sync_view_warmup!(render_frame)
+    state = _view_warmup_state(render_frame)
+    state === nothing && return nothing
+    _join_view_warmup!(state, render_frame)
+    return nothing
+end
+
 function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu)
     view_axes = Dict{Symbol, Any}(i.id => i.ax for i in interactables if i isa ViewInteractable)
     isempty(view_axes) && return nothing
+    state = _ViewWarmup(
+        input -> _apply_view_frame(input, view_axes, backend, fig, interactables, ppu),
+        view_axes, nothing, false, false, false,
+    )
     frame = function (input)
-        return _apply_view_frame(input, view_axes, backend, fig, interactables, ppu)
+        _join_view_warmup!(state, frame)
+        return state.apply(input)
     end
-    _warm_view_render_frame!(frame, view_axes)
+    lock(_VIEW_WARMUP_LOCK) do
+        _VIEW_WARMUPS[frame] = state
+    end
     return frame
 end
 
@@ -464,21 +577,28 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu)
     end
 end
 
-# The first real call compiles this path (JS payload, camera mutation, `ppu=1` re-render) —
-# ~1.5 s on an Axis3 surface, paid on the pointer while the overlay tooltip already moves.
-# Warm it here against this figure and restore the camera so the mount PNG and manifest still
-# match. The user waits on the cell, not the first drag. Tiny nudges plus one farther pose
-# cover the leftover compile a coalesced first drag otherwise pays.
-function _warm_view_render_frame!(frame, view_axes)
+# A real call is what compiles this path (camera write, `ppu=1` render, JS payload). The
+# frames are discarded. `show` schedules it after the mount HTML is written. Tiny nudges plus
+# one farther pose cover the compile a coalesced first drag otherwise still pays. `stop`
+# bails between frames when the cell is replaced; the camera is put back either way.
+function _warm_view_render_frame!(frame, view_axes; stop = () -> false)
     for (id, ax) in view_axes
+        stop() && break
         sid = String(id)
         if hasproperty(ax, :azimuth) && hasproperty(ax, :elevation)
             az0 = Float64(ax.azimuth[])
             el0 = Float64(ax.elevation[])
-            frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.05, "elevation" => el0, "settle" => false))
-            frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0 + 0.05, "settle" => false))
-            frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.8, "elevation" => el0 - 0.2, "settle" => false))
-            frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0, "settle" => true))
+            try
+                !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.05, "elevation" => el0, "settle" => false))
+                !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0 + 0.05, "settle" => false))
+                !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.8, "elevation" => el0 - 0.2, "settle" => false))
+                !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0, "settle" => true))
+            finally
+                if ax.azimuth[] != az0 || ax.elevation[] != el0
+                    ax.azimuth[] = az0
+                    ax.elevation[] = el0
+                end
+            end
         else
             lim0 = ax.limits[]
             fl = _finallimits(ax)
@@ -488,25 +608,28 @@ function _warm_view_render_frame!(frame, view_axes)
             ymax = ymin + Float64(fl.widths[2])
             dx = 0.01 * (xmax - xmin)
             dy = 0.01 * (ymax - ymin)
-            frame(
-                Dict{String, Any}(
-                    "id" => sid, "xmin" => xmin + dx, "xmax" => xmax + dx,
-                    "ymin" => ymin, "ymax" => ymax, "settle" => false,
-                ),
-            )
-            frame(
-                Dict{String, Any}(
-                    "id" => sid, "xmin" => xmin, "xmax" => xmax,
-                    "ymin" => ymin + dy, "ymax" => ymax + dy, "settle" => false,
-                ),
-            )
-            frame(
-                Dict{String, Any}(
-                    "id" => sid, "xmin" => xmin, "xmax" => xmax,
-                    "ymin" => ymin, "ymax" => ymax, "settle" => true,
-                ),
-            )
-            ax.limits[] = lim0
+            try
+                !stop() && frame(
+                    Dict{String, Any}(
+                        "id" => sid, "xmin" => xmin + dx, "xmax" => xmax + dx,
+                        "ymin" => ymin, "ymax" => ymax, "settle" => false,
+                    ),
+                )
+                !stop() && frame(
+                    Dict{String, Any}(
+                        "id" => sid, "xmin" => xmin, "xmax" => xmax,
+                        "ymin" => ymin + dy, "ymax" => ymax + dy, "settle" => false,
+                    ),
+                )
+                !stop() && frame(
+                    Dict{String, Any}(
+                        "id" => sid, "xmin" => xmin, "xmax" => xmax,
+                        "ymin" => ymin, "ymax" => ymax, "settle" => true,
+                    ),
+                )
+            finally
+                ax.limits[] == lim0 || (ax.limits[] = lim0)
+            end
         end
     end
     return nothing
@@ -521,7 +644,10 @@ end
 # into the page at all. `null` when there is no callback, or this display can't host one.
 function _request_frame_js(io, render_frame)
     link = render_frame === nothing ? nothing :
-        (APD.is_supported_by_display(io, APD.Display.with_js_link) ? APD.Display.with_js_link(render_frame) : nothing)
+        (
+            APD.is_supported_by_display(io, APD.Display.with_js_link) ?
+            APD.Display.with_js_link(render_frame, () -> _cancel_view_warmup!(render_frame)) : nothing
+        )
     return link === nothing ? HypertextLiteral.JavaScript("null") : link
 end
 
@@ -543,7 +669,11 @@ function Base.show(io::IO, m::MIME"text/html", w::MasqueWidget)
         </div>
         """
     )
-    return show(io, m, html)
+    show(io, m, html)
+    # HTML is in `io`. The discarded compile call runs after this returns; on Pluto's worker
+    # it waits until the cell result has been flushed, so the browser hydrates first.
+    _kick_view_warmup!(w.render_frame)
+    return nothing
 end
 
 # Hydration and click both go through `bond_from_js` (src/bond.jl). `mount.ts` seeds the same

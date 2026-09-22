@@ -334,7 +334,10 @@ function Base.show(io::IO, m::MIME"text/html", w::WebGLWidget)
         bundle_js = pub(_bundle_text()), shim_js = pub(_shim_text()),
         request_frame_expr = Masque._request_frame_js(io, w.render_frame),
     )
-    return show(io, m, html)
+    show(io, m, html)
+    # Same point as Cairo's `show`: the scene and manifest are in `io` before the warmup runs.
+    Masque._kick_view_warmup!(w.render_frame)
+    return nothing
 end
 
 # ---- bond plumbing: identical contract to MasqueWidget (same overlay, same events) ----
