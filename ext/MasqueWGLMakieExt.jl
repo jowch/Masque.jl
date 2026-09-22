@@ -189,10 +189,7 @@ function Masque.render(b::WebGLBackend, fig, ppu)
     return WebGLResult(scene_payload(fig), w, h, Float64(ppu))
 end
 
-# Gesture-channel frame body (#133). No PNG — the browser already has a canvas. `pxPerUnit`
-# is the render resolution for THIS frame (1 during the drag, the mount value on settle),
-# same lever `:cairo` spends by encoding a smaller PNG. `width`/`height` stay the figure's
-# own size; the manifest's coordinate space is the mount `px_per_unit`, applied separately.
+# Scene, not a PNG (#133). `pxPerUnit` is 1 in-drag and the mount value on settle.
 function Masque._gesture_frame(result::WebGLResult)
     return Dict{String, Any}(
         "scene" => result.scene,
@@ -256,9 +253,7 @@ struct WebGLWidget
     width::Int
     height::Int
     px_per_unit::Float64
-    # Same gesture-channel callback `MasqueWidget` carries (#102/#133). `nothing` when the
-    # widget has no `ViewInteractable`. Defaulted so the 6-arg constructor still builds a
-    # widget with no live preview.
+    # nothing: no ViewInteractable
     render_frame::Union{Nothing, Function}
     owners::Dict{String, Masque.LayerOwner}
 end
@@ -280,9 +275,9 @@ end
 # names, which is Pluto destroying the node on an `@bind` re-render.
 Masque.make_widget(b::WebGLBackend, result::WebGLResult, manifest, display_css, fig, interactables, ppu) =
     WebGLWidget(
-        result.scene, manifest, display_css, result.width, result.height, result.px_per_unit,
-        Masque._view_render_frame(b, fig, interactables, ppu),
-    )
+    result.scene, manifest, display_css, result.width, result.height, result.px_per_unit,
+    Masque._view_render_frame(b, fig, interactables, ppu),
+)
 
 # `*_expr`/`*_js` are JS expressions yielding the data/text: published_to_js for Pluto, or
 # inlined JSON for self-contained/testing.
