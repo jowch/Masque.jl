@@ -195,6 +195,15 @@ HTML(
         "<span id=\"coords_legend\" style=\"display:none\">$(JSON3.write(sweep.legend.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000047
+@bind ev_series_legend sweep.series_legend
+
+# ╔═╡ d1000000-0000-0000-0000-000000000048
+HTML(
+    "<span id=\"out_series_legend\">SERIES_LEGEND=$(repr(ev_series_legend))</span>" *
+        "<span id=\"coords_series_legend\" style=\"display:none\">$(JSON3.write(sweep.series_legend.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000041
 @bind ev_legend_overlap sweep.legend_overlap
 
@@ -258,6 +267,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000035
 # ╠═d1000000-0000-0000-0000-000000000038
 # ╠═d1000000-0000-0000-0000-000000000039
+# ╠═d1000000-0000-0000-0000-000000000047
+# ╠═d1000000-0000-0000-0000-000000000048
 # ╠═d1000000-0000-0000-0000-000000000041
 # ╠═d1000000-0000-0000-0000-000000000042
 # ╠═d1000000-0000-0000-0000-000000000043

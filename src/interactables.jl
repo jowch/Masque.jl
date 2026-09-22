@@ -38,13 +38,16 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
   `nothing` (default) omits it from the manifest — no accent border on the tooltip. Built by
   [`PointInteractable`](@ref)'s plot-object constructor when the source plot's colour is
   resolvable; not derived automatically for a bare-points/vertices interactable.
-- `links` — an optional `Vector{Vector{Symbol}}`, one entry per element: the ids of other
-  layers this element highlights on hover/click (e.g. a legend entry linking to the trace(s) it
-  labels). `nothing` (default) omits it from the manifest. Built by
+- `links` — an optional `Vector{Vector{Symbol}}`, one entry per element: other layers this
+  element highlights on hover/click (e.g. a legend entry linking to the trace(s) it labels).
+  Each id is a layer id (every element of that layer) or `id:k` pinning element `k` (1-based)
+  of that layer — auto-extracted `series!` legend entries use the pin so each swatch lights
+  one trace. `nothing` (default) omits it from the manifest. Built by
   [`LegendInteractable`](@ref); every id it names must belong to another layer in the same
   `masque()` call whose `kind` supports pre-highlight (`build_manifest` raises `ArgumentError`
   otherwise, for explicitly-given targets — the auto-extracted path drops an unsupported target
-  with a `@warn` instead of failing the whole build).
+  with a `@warn` instead of failing the whole build). An `id:k` pin whose `k` is out of range
+  is the same kind of error as an unknown layer.
 """
 struct HitLayer
     id::Symbol
@@ -1012,7 +1015,8 @@ for: hover/click an entry to highlight the layer(s) named in `targets`. Produces
     raises `ArgumentError`.
   Every id named here must belong to another layer in the same `masque()` call whose kind
   supports pre-highlight (`ArgumentError` from `build_manifest` otherwise — see
-  [`HitLayer`](@ref)'s `links` field).
+  [`HitLayer`](@ref)'s `links` field). A spec may be a layer id (every element of that layer)
+  or `id:k` pinning element `k` (1-based); auto-extracted `series!` entries use the pin.
 - `tooltip` — `nothing` (default) shows the entry's label; `masque"..."` for a custom template
   (payload fields: `label`, `group`, `targets`); `false` to suppress. `tooltip = true` is
   rejected (`ArgumentError`).

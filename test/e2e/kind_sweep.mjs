@@ -53,18 +53,34 @@ function layerElementCount(l) {
 }
 
 // A whole-line highlight is one SVG path through every finite vertex, not one chord.
+// Tokenize numeric literals so `"10 20"` is not a substring of `"110 20"`.
 function assertPathCovers(d, verts, where) {
   if (!d) throw new Error(`${where}: whole-line highlight has no path`);
+  const nums = (d.match(/-?(?:NaN|Infinity|\d+(?:\.\d+)?(?:e[+-]?\d+)?)/gi) || []).map(Number);
   let finite = 0;
   for (let i = 0; i < verts.length; i += 2) {
     const x = verts[i], y = verts[i + 1];
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
     finite++;
-    if (!d.includes(`${x} ${y}`)) {
-      throw new Error(`${where}: path missing vertex ${x},${y} in ${d}`);
+    let found = false;
+    for (let j = 0; j + 1 < nums.length; j++) {
+      if (nums[j] === x && nums[j + 1] === y) { found = true; break; }
     }
+    if (!found) throw new Error(`${where}: path missing vertex ${x},${y} in ${d}`);
   }
   if (finite < 2) throw new Error(`${where}: path has fewer than 2 finite vertices`);
+}
+
+// Legend `links` specs: exact layer id (every element) or `id:k` (Julia 1-based element pin).
+// An exact layer id wins, so a real layer named `foo:1` is not parsed as an element pin.
+function resolveLinkSpec(layers, spec) {
+  const exact = layers.find((l) => l.id === spec);
+  if (exact) return { layer: exact, index: null };
+  const m = /^(.*):(\d+)$/.exec(spec);
+  if (!m) return null;
+  const layer = layers.find((l) => l.id === m[1]);
+  if (!layer) return null;
+  return { layer, index: Number(m[2]) - 1 };
 }
 
 function hitPoint(layer, index) {
@@ -1204,11 +1220,16 @@ try {
       for (const c of spec.links.cases) {
         const targetIds = (layer.links && layer.links[c.index]) || [];
         if (!targetIds.length) throw new Error(`${key}/links[${c.index}]: legend entry "${c.label}" has no links`);
+        const resolved = targetIds.map((tid) => {
+          const r = resolveLinkSpec(layers, tid);
+          if (!r) throw new Error(`${key}/links[${c.index}]: target ${tid} missing from manifest`);
+          return r;
+        });
         const hp = hitPoint(layer, c.index);
         // Geometry: the first linked element must sit ON the plotted mark, not beside it.
-        const tl0 = layers.find((l) => l.id === targetIds[0]);
-        if (!tl0) throw new Error(`${key}/links[${c.index}]: target layer ${targetIds[0]} missing from manifest`);
-        const hp0 = hitPoint(tl0, 0);
+        const tl0 = resolved[0].layer;
+        const idx0 = resolved[0].index ?? 0;
+        const hp0 = hitPoint(tl0, idx0);
 
         // Visibility (screenshot-based, closed/circles targets only): DOM shape alone can't
         // catch a z-order or blend surprise that leaves the nodes present but invisible — same
@@ -1269,14 +1290,12 @@ try {
 
         const li = await linkInspect(key);
         let expected = 0;
-        for (const tid of targetIds) {
-          const tl = layers.find((l) => l.id === tid);
-          if (!tl) throw new Error(`${key}/links[${c.index}]: target layer ${tid} missing from manifest`);
+        for (const r of resolved) {
           // layerElementCount's :grid case (ncols*nrows) is untested here — no fixture links a
           // legend entry to a :grid target today, and the DOM-side count this feeds (`li.count`,
           // from linkInspect's fill/edge/ring fan-out) has no defined per-cell convention for a
           // grid hit. If a future fixture adds one, verify that convention before trusting this.
-          expected += layerElementCount(tl);
+          expected += r.index === null ? layerElementCount(r.layer) : 1;
         }
         if (li.count !== expected) {
           throw new Error(`${key}/links[${c.index}]: g.link has ${li.count} elements, want ${expected} (targets ${JSON.stringify(targetIds)})`);
@@ -1312,7 +1331,7 @@ try {
           const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
           if (!ringKid) throw new Error(`${key}/links[${c.index}]: no ring in g.link`);
           assertRing(ringKid, `${key}/links[${c.index}]/ring`);
-          assertPathCovers(ringKid.paths[0].d, tl0.geometry[0], `${key}/links[${c.index}]/ring`);
+          assertPathCovers(ringKid.paths[0].d, tl0.geometry[idx0], `${key}/links[${c.index}]/ring`);
         }
         passed.push(`${key}/links[${c.index}]`);
       }

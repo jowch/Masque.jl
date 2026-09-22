@@ -81,9 +81,11 @@ export interface HitLayer {
     // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | none
     bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "none"
     selects?: string   // id of the target layer this ROI selects; absent → bounds-ROI (no multi-select)
-    // Per-element linked highlight (e.g. a Legend entry): ids of OTHER layers this element
+    // Per-element linked highlight (e.g. a Legend entry): other layers this element
     // highlights with the selected recipe on hover/focus; [] or absent-per-element = no link.
-    // Julia guarantees every referenced id exists and has a kind in SELECTED_KINDS.
+    // Each id is a layer id (every element) or `id:k` pinning element k (Julia 1-based).
+    // Julia guarantees every referenced layer exists and has a kind in SELECTED_KINDS, and
+    // that a `:k` pin is in range.
     links?: string[][]
     label?: string     // screen-reader announcement prefix, e.g. "Scatter, element 3 of 10: …"; absent → no prefix
     // Per-element tooltip accent colour: one CSS colour string (uniform across the layer), or a

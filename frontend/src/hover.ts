@@ -213,11 +213,11 @@ export function showTipAt(ctx: OverlayCtx, state: OverlayState, hit: Hit, x: num
     return html
 }
 
-// A legend entry's linked highlight (HitLayer.links): draw the selected recipe for every
-// element of every layer the hit links to, or clear g.link when it links to nothing (absent,
-// or an empty links[index]). Shared by applyMove's hover-hit branch, restoreFocus (below), and
-// keyboard.ts's focusTo, so pointer and keyboard drive the same g.link lifecycle drawHi/clearHi
-// already give g.hi.
+// A legend entry's linked highlight (HitLayer.links): draw the selected recipe for each
+// linked spec (every element of a named layer, or the one element an `id:k` pin names),
+// or clear g.link when it links to nothing (absent, or an empty links[index]). Shared by
+// applyMove's hover-hit branch, restoreFocus (below), and keyboard.ts's focusTo, so pointer
+// and keyboard drive the same g.link lifecycle drawHi/clearHi already give g.hi.
 export function updateLinkForHit(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
     const hits = linkedHits(ctx.manifest_, hit.layer, hit.index)
     if (hits.length) drawLink(state, ctx.linkGroup_, hitKey(hit), hits)

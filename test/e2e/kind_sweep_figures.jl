@@ -141,6 +141,20 @@ kind_sweep_meta() = [
         ),
     ),
     Dict(
+        "key" => "series_legend", "layerId" => "legend", "layerKind" => "rects",
+        "selected" => nothing, "halo" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "series 1", "mode" => "element",
+        "hoverIndex" => 0, "hoverTip" => "series 1",
+        # Auto-extracted `series!` entries pin `series:k`, not the whole `:series` layer —
+        # hovering one swatch must light one path, not every trace.
+        "links" => Dict(
+            "cases" => [
+                Dict("index" => 0, "label" => "series 1"),
+                Dict("index" => 1, "label" => "series 2"),
+            ],
+        ),
+    ),
+    Dict(
         "key" => "legend_overlap", "layerId" => "legend", "layerKind" => "rects",
         "selected" => nothing, "halo" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "trend", "mode" => "element",
@@ -364,6 +378,15 @@ function build_kind_sweep()
         masque(fig)   # zero-config: legend auto-extracted, links auto-resolved from Makie.get_plots
     end
 
+    series_legend = let
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1]; title = "series_legend")
+        ys = [1.0 1.5 2.2 2.8; 3.0 2.4 1.2 1.5; 0.6 1.4 2.6 2.0]
+        series!(ax, ys; linewidth = 4)
+        axislegend(ax; position = :lt)
+        masque(fig)
+    end
+
     # A legend genuinely overlapping filled plot geometry: the heatmap fills the whole axis
     # (explicit `limits` matching its edges exactly, so there's no autolimit padding to dodge
     # into), and the `:lt` inset legend sits inside that axis viewport — so every legend-entry
@@ -415,7 +438,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, barplot, poly,
-        polar, scatter_dark, arrows3d, hlines, threshold, roi, view, legend, legend_overlap,
-        axis,
+        polar, scatter_dark, arrows3d, hlines, threshold, roi, view, legend, series_legend,
+        legend_overlap, axis,
     )
 end

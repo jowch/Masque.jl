@@ -117,7 +117,10 @@ All notable changes to this project are documented here. The format is based on
   (`segment_index`); pass `unit = :line` for the whole path. `unit = :line` with any
   other `mode` throws `ArgumentError`. `mode = :pairs` is unchanged, so
   `LineSegments`, Errorbars, Rangebars, HLines, VLines, Wireframe, and Arrows3D stay
-  one element per piece.
+  one element per piece. Auto-extracted `series!` legend entries pin `series:k` (element
+  `k` of the parent `:lines` layer) so a swatch hover lights that one series; a bare
+  `targets = :series` still highlights every series. `HitLayer.links` accepts that
+  `id:k` pin (1-based) as well as a layer id.
 - **There is one way to read a `@bind` payload now: `ev.payload.field`, for every
   interactable kind.** An element hit's payload is the exact Julia object you passed, looked
   back up in Julia rather than decoded from the browser — `payloads = [(a = 1,)]` yields

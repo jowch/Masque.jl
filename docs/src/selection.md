@@ -59,8 +59,8 @@ circles / `:id_r` rects / `:id_p` polygons) — key on those.
 
 That kind list constrains hydration, not the gesture: clicking a heatmap/image cell selects
 that cell even though `:grid` can't be hydrated via `selected=`, and clicking a legend entry
-selects every element of the series it links to, not the legend swatch itself (see
-[Legend](@ref)).
+selects the traces it links to — every element of a named layer, or the one element an
+`id:k` spec pins — not the legend swatch itself (see [Legend](@ref)).
 
 ## Persisting a selection across re-renders
 

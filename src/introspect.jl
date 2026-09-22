@@ -659,13 +659,25 @@ function _register_descendants!(plotmap, p, ids)
     return nothing
 end
 
+# A Series child's legend entry (`Makie.get_plots` returns the child Lines/ScatterLines, not
+# the Series) must pin that one element of the parent `:lines` layer, not every series. The
+# spec is `id:k` (1-based); the bare layer id still means the whole layer.
+function _register_series_elements!(plotmap, p, layer_id)
+    for (k, c) in enumerate(_child_plots(p))
+        ids = [Symbol(layer_id, :(:), k)]
+        haskey(plotmap, c) || (plotmap[c] = ids)
+        _register_descendants!(plotmap, c, ids)
+    end
+    return nothing
+end
+
 """
     auto_interactables(fig) -> Vector{AbstractInteractable}
 
 Introspect a Makie `Figure`: for every supported plot in every `Axis`, `Axis3`, or `PolarAxis`,
 build the interactable its explicit constructor would. On `Axis3`, only `Scatter`/`Lines`/
 `LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D` are supported; on `PolarAxis`, only
-`Scatter`/`Lines`/`LineSegments`/`ScatterLines`. Other kinds are skipped with a warning.
+`Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`. Other kinds are skipped with a warning.
 Layer ids are the plot kind (`:scatter`, `:lines`, …), suffixed `_2`, `_3`, … when a kind
 repeats. Returns the same concrete vector you could pass to [`masque`](@ref) yourself — edit or
 extend it freely.
@@ -705,9 +717,14 @@ function auto_interactables(fig)
             # Separable-edge / axis-aligned rect recipes assume Cartesian pixel geometry;
             # polar maps those into arcs and wedges, so an AABB/grid hit layer would be
             # silently wrong. Point/segment recipes project per-vertex and are fine.
-            if ax isa Makie.PolarAxis && !(p isa Union{Makie.Scatter, Makie.Lines, Makie.LineSegments, Makie.ScatterLines})
+            if ax isa Makie.PolarAxis && !(
+                    p isa Union{
+                        Makie.Scatter, Makie.Lines, Makie.LineSegments,
+                        Makie.ScatterLines, Makie.Series,
+                    }
+                )
                 @warn "masque: skipping $(typeof(p).name.name) on PolarAxis — only Scatter/Lines/" *
-                    "LineSegments/ScatterLines have polar-valid extraction today; continuous " *
+                    "LineSegments/ScatterLines/Series have polar-valid extraction today; continuous " *
                     "θ/r readout and grid/rect recipes are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
                 continue
             end
@@ -723,8 +740,14 @@ function auto_interactables(fig)
             # (`Makie.get_plots(element)` returns those children, not `p`) — so every descendant
             # of `p` needs the same ids in `plotmap` too, to auto-link. `haskey` keeps a plot's
             # own top-level entry (set by its own iteration of this loop) from being overwritten
-            # by an ancestor's.
-            _register_descendants!(plotmap, p, ids)
+            # by an ancestor's. Series is the exception: each child is one element of the
+            # parent `:lines` layer, so descendants register as `id:k` rather than the bare
+            # layer id (which would light every series from any one legend entry).
+            if p isa Makie.Series
+                _register_series_elements!(plotmap, p, id)
+            else
+                _register_descendants!(plotmap, p, ids)
+            end
         end
     end
     # Colorbar blocks live in fig.content, not in an Axis's scene.

@@ -77,6 +77,21 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test only(gints) isa PointInteractable
     end
 
+    @testset "PolarAxis Series auto-extracts (children are polar-valid Lines)" begin
+        f = Figure(; size = (600, 450))
+        ax = PolarAxis(f[1, 1])
+        θ = collect(range(0, 2π; length = 8))
+        ys = [ones(1, 8); fill(1.5, 1, 8)]
+        series!(ax, θ, ys)
+        Makie.update_state_before_display!(f)
+        ints = @test_logs auto_interactables(f)
+        @test length(ints) == 1
+        @test only(ints) isa SegmentInteractable
+        _, _, ctx = ctx_for(f)
+        L = only(hitlayers(only(ints), ctx))
+        @test L.kind === :lines && L.id === :series && length(L.geometry) == 2
+    end
+
     @testset "Axis3: context + projection + payloads + gates (WS-3D core)" begin
         f3 = Figure(; size = (600, 450))
         ax3 = Axis3(f3[1, 1]; azimuth = 0.4, elevation = 0.5)
