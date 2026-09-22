@@ -128,55 +128,62 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     end
 end
 
-@testset "_bond_payload converts computed payloads to NamedTuples (#110)" begin
-    bp = Masque._bond_payload
-    layer(kind) = Dict{String, Any}("layers" => [Dict{String, Any}("id" => "L", "kind" => kind, "payloads" => Any[])])
-    axism, gridm, roim, thrm, viewm = layer("axis"), layer("grid"), layer("roi"), layer("threshold"), layer("view")
+@testset "bond_from_js builds concrete events from the wire" begin
+    tv = Masque.APD.Bonds.transform_value
+    function wdg(kind, bond; extra = Dict{String, Any}())
+        layer = Dict{String, Any}("id" => "L", "kind" => kind, "bond" => bond, "payloads" => Any[])
+        manifest = Dict{String, Any}("layers" => [layer])
+        merge!(manifest, extra)
+        return Masque.MasqueWidget("", manifest, 100)
+    end
 
-    @test bp(axism, "L", -1, Dict("x" => 1.0, "y" => 2.0)) == (; x = 1.0, y = 2.0)
-    @test bp(axism, "L", -1, Dict("value" => 3.0)) == (; value = 3.0)   # colorbar / valueaxis readout
+    ev = tv(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => Dict("x" => 1.0, "y" => 2.0)))
+    @test ev isa AxisEvent && ev.x == 1.0 && ev.y == 2.0
+    ev = tv(wdg("axis", "colorbar"), Dict("layer" => "L", "index" => -1, "payload" => Dict("value" => 3.0)))
+    @test ev isa ColorbarEvent && ev.value == 3.0
 
-    @test bp(gridm, "L", 0, Dict("i" => 1, "j" => 2)) == (; i = 1, j = 2)
-    @test bp(gridm, "L", 0, Dict("i" => 1, "j" => 2, "value" => 9.5)) == (; i = 1, j = 2, value = 9.5)
-    # selects-ROI-over-grid cell range — a distinct key set arriving under the same "grid" kind
-    rng = bp(gridm, "L", 0, Dict("i0" => 0, "i1" => 1, "j0" => 0, "j1" => 1, "xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0))
-    @test rng == (; i0 = 0, i1 = 1, j0 = 0, j1 = 1, xmin = 0.0, xmax = 1.0, ymin = 0.0, ymax = 1.0)
+    ev = tv(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 5, "payload" => Dict("i" => 1, "j" => 2)))
+    @test ev isa GridCellEvent && ev.i == 2 && ev.j == 3 && ev.value === nothing
+    ev = tv(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 5, "payload" => Dict("i" => 1, "j" => 2, "value" => 9.5)))
+    @test ev.value == 9.5
 
-    @test bp(roim, "L", 0, Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0)) ==
-        (; xmin = 0.0, xmax = 1.0, ymin = 0.0, ymax = 1.0)
+    # wire i0/i1/j0/j1 are 0-based inclusive; Julia stores i1/i2/j1/j2 1-based inclusive
+    gridw = wdg("grid", "gridcell"; extra = Dict{String, Any}("selection" => "grid", "selectionTarget" => "L"))
+    win = tv(
+        gridw, Dict(
+            "items" => [
+                Dict(
+                    "layer" => "L", "index" => 0,
+                    "payload" => Dict("i0" => 0, "i1" => 1, "j0" => 0, "j1" => 1, "xmin" => 0.0, "xmax" => 1.0, "ymin" => 2.0, "ymax" => 3.0),
+                ),
+            ],
+        ),
+    )
+    @test win isa GridWindowEvent
+    @test (win.i1, win.i2, win.j1, win.j2) == (1, 2, 1, 2)
+    @test (win.xmin, win.xmax, win.ymin, win.ymax) == (0.0, 1.0, 2.0, 3.0)
+    miss = tv(gridw, Dict("items" => []))
+    @test miss isa GridWindowEvent && isempty(miss.i1:miss.i2) && isempty(miss.j1:miss.j2)
 
-    @test bp(thrm, "L", 0, 4.5) === 4.5   # bare scalar — nothing to convert, no fields to name
+    ev = tv(wdg("roi", "bounds"), Dict("layer" => "L", "index" => 0, "payload" => Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 2.0, "ymax" => 3.0)))
+    @test ev isa BoundsEvent && (ev.xmin, ev.xmax, ev.ymin, ev.ymax) == (0.0, 1.0, 2.0, 3.0)
+    ev = tv(wdg("threshold", "threshold"), Dict("layer" => "L", "index" => 0, "payload" => 4.5))
+    @test ev isa ThresholdEvent && ev.value === 4.5
 
-    # #102/§12.3: a view gesture commits nothing, so :view is no longer a recognized computed
-    # payload kind at all — retired alongside `_computed_payload`'s :view branch. `viewm` is
-    # kept as a fixture only to prove that explicitly, not because any real path reaches it.
-    @test_throws ArgumentError bp(viewm, "L", 0, Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0))
-    @test_throws ArgumentError bp(viewm, "L", 0, Dict("azimuth" => 0.1, "elevation" => 0.2))
-
-    # a payload shape none of the branches above recognize fails loud instead of silently
-    # passing a raw Dict through — the per-kind enumeration doing its job when a branch grows
-    # a field this hasn't been taught about yet.
-    @test_throws ArgumentError bp(axism, "L", -1, Dict("x" => 1.0))                          # missing y
-    @test_throws ArgumentError bp(gridm, "L", 0, Dict("i" => 1))                             # missing j
-    @test_throws ArgumentError bp(axism, "L", -1, Dict("x" => 1.0, "y" => 2.0, "z" => 3.0))  # unexpected extra key
-
-    # a non-dict computed payload (unreachable from the shipped client, but the per-kind
-    # enumeration should still fail loud and legibly rather than a raw MethodError off `keys(...)`)
-    @test_throws ArgumentError bp(axism, "L", -1, "not-a-dict")
-    # the error names the layer id, not just the kind, so it's actionable on a multi-layer widget
+    @test_throws ArgumentError tv(wdg("view", "none"), Dict("layer" => "L", "index" => 0, "payload" => Dict("azimuth" => 0.1)))
+    @test_throws ArgumentError tv(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => Dict("x" => 1.0)))
+    @test_throws ArgumentError tv(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1)))
+    @test_throws ArgumentError tv(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
     let err = try
-            bp(axism, "L", -1, "not-a-dict")
+            tv(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
             nothing
         catch e
             e
         end
-        @test err isa ArgumentError && occursin(":L", err.msg) && occursin(":axis", err.msg)
+        @test err isa ArgumentError && occursin(":L", err.msg)
     end
-
-    # pre-#110 fallback paths are unaffected: no "layers" key, an unknown layer id, or no payload
-    @test bp(Dict{String, Any}(), "L", -1, Dict("x" => 1.0)) == Dict("x" => 1.0)
-    @test bp(axism, "nope", -1, Dict("x" => 1.0)) == Dict("x" => 1.0)
-    @test bp(axism, "L", -1, nothing) === nothing
+    @test_throws ArgumentError tv(wdg("axis", "axis"), Dict("layer" => "missing", "index" => -1, "payload" => Dict("x" => 1.0, "y" => 2.0)))
+    @test_throws ArgumentError tv(Masque.MasqueWidget("", Dict{String, Any}(), 100), Dict("layer" => "L", "index" => 0))
 end
 
 @testset "SELECTED_KINDS parity: Julia _SELECTED_KINDS matches frontend selection.ts (#109)" begin

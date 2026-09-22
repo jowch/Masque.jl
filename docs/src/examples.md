@@ -59,7 +59,7 @@ Discrete point hits on a `PolarAxis`, on `:webgl` — hover for a tooltip, click
 
 Recipes closer to real applications than the feature tour, built from the same
 interactables as `demo.jl`: a box-select scatter plot (drag a [`ROIInteractable`](@ref) to
-select every enclosed point — its bond is a `Vector{InteractionEvent}`, one per selected
+select every enclosed point — its bond is a `Vector{ElementEvent}`, one per selected
 point) and an image ROI with per-channel stats.
 
 [Open the static export](notebooks/gallery.html)

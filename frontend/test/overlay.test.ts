@@ -2068,11 +2068,12 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         mount(script, m)
         const shadow = shadowOf(host)
         const tip = shadow.querySelector(".masque-tip") as HTMLElement
-        // scale = 1200/600 = 2 → client (7.5, 2.5) = image (15, 5), cell i=1,j=0 → values[0*2+1]=12
+        // scale = 1200/600 = 2 → client (7.5, 2.5) = image (15, 5), wire cell i=1,j=0 → values[0*2+1]=12
+        // The tooltip prints the Julia 1-based cell, (2, 1).
         ;(shadow.querySelector(".surface") as HTMLElement)
             .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 2.5, bubbles: true }))
         expect(tip.classList.contains("show")).toBe(true)
-        expect(tip.innerHTML).toBe("(1,0) = 12")
+        expect(tip.innerHTML).toBe("(2,1) = 12")
     })
 
     it("grid hover tooltip shows '(i,j)' with no value when values[] was dropped", () => {
@@ -2088,7 +2089,7 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         ;(shadow.querySelector(".surface") as HTMLElement)
             .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 2.5, bubbles: true }))
         expect(tip.classList.contains("show")).toBe(true)
-        expect(tip.innerHTML).toBe("(1,0)")
+        expect(tip.innerHTML).toBe("(2,1)")
     })
 
     it("hovering a drag-only target (no button pressed) shows a directional resize cursor and suppresses hover/tooltip", () => {
@@ -2384,7 +2385,7 @@ describe("click-echo (#103)", () => {
 // host.value is what Pluto reads at mount, before any click — mount() used to force it to null
 // unconditionally, overwriting Julia's initial_value and losing the selected= hydration.
 describe("host.value seeded at mount from selected= (bond hydration, not just g.sel)", () => {
-    it("a layer with selected= seeds host.value with one items[] entry per hydrated index", () => {
+    it("several indices on a scalar layer highlight only — host.value stays null", () => {
         const { host, script } = setup()
         const selManifest: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
@@ -2395,13 +2396,53 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
             }],
         }
         mount(script, selManifest)
-        // no `payload`: Julia reconstructs an element hit's payload from its own manifest (#109)
+        expect((host as unknown as { value: unknown }).value).toBeNull()
+        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
+    })
+
+    it("one hydrated index seeds {layer, index} and no payload", () => {
+        const { host, script } = setup()
+        const one: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{
+                id: "pts", kind: "circles", geometry: [300, 200, 20, 600, 400, 20],
+                payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"],
+                selected: [1],
+            }],
+        }
+        mount(script, one)
+        expect((host as unknown as { value: unknown }).value).toEqual({ layer: "pts", index: 1 })
+    })
+
+    it("selection: elements seeds {items}, including an explicit empty brush", () => {
+        const { host, script } = setup()
+        const brushed: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            selection: "elements", selectionTarget: "pts",
+            layers: [{
+                id: "pts", kind: "circles", geometry: [300, 200, 20, 600, 400, 20, 900, 600, 20],
+                payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["click", "hover"],
+                selected: [0, 2],
+            }],
+        }
+        mount(script, brushed)
         expect((host as unknown as { value: unknown }).value).toEqual({
             items: [
                 { layer: "pts", index: 0 },
                 { layer: "pts", index: 2 },
             ],
         })
+        const { host: host2, script: script2 } = setup()
+        const empty: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            selection: "elements", selectionTarget: "pts", hydrate: "items",
+            layers: [{
+                id: "pts", kind: "circles", geometry: [300, 200, 20],
+                payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"],
+            }],
+        }
+        mount(script2, empty)
+        expect((host2 as unknown as { value: unknown }).value).toEqual({ items: [] })
     })
 
     it("no layer bakes selected= -> host.value stays null (keeps Pluto's first-value dedup working)", () => {
@@ -2410,7 +2451,7 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
         expect((host as unknown as { value: unknown }).value).toBeNull()
     })
 
-    it("hydration across two layers flattens in manifest layer order", () => {
+    it("hydration across two scalar layers is highlight-only", () => {
         const { host, script } = setup()
         const twoLayer: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
@@ -2422,12 +2463,6 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
             ],
         }
         mount(script, twoLayer)
-        expect((host as unknown as { value: unknown }).value).toEqual({
-            items: [
-                { layer: "a", index: 1 },
-                { layer: "b", index: 0 },
-                { layer: "b", index: 1 },
-            ],
-        })
+        expect((host as unknown as { value: unknown }).value).toBeNull()
     })
 })

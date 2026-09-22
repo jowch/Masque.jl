@@ -76,7 +76,9 @@ export interface HitLayer {
     tol?: number // :segments/:polyline hit-test slack, image px; absent → geometry.ts's SEG_TOL fallback
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
-    selected?: number[] // element indices seeding the selection at mount (its initial value, not a separate pre-highlight)
+    selected?: number[] // 0-based element indices seeding the highlight at mount
+    // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | none
+    bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "none"
     selects?: string   // id of the target layer this ROI selects; absent → bounds-ROI (no multi-select)
     // Per-element linked highlight (e.g. a Legend entry): ids of OTHER layers this element
     // highlights with the selected recipe on hover/focus; [] or absent-per-element = no link.
@@ -99,6 +101,13 @@ export interface Manifest {
     transforms: Record<string, AxisTransform>
     tipStyle?: Record<string, string> // figure-level --masque-tip-* custom properties
     background?: string // the figure's background colour (CSS string) — drives the tooltip's light/dark theme
+    // Set when the widget contains a selects-ROI. "elements" hydrates and commits a vector of
+    // element hits; "grid" commits one window. selectionTarget is that layer's id.
+    selection?: "elements" | "grid"
+    selectionTarget?: string
+    // "items" forces an empty {items: []} seed (an explicit empty brush). Absent + no selected
+    // indices leaves host.value null.
+    hydrate?: "items"
 }
 
 // `layer`/`index` are excluded from the trailing-underscore mangle convention (see

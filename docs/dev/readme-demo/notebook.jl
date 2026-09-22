@@ -73,7 +73,7 @@ end
 @bind pick masque(fig, cities)
 
 # ╔═╡ d1000000-0000-0000-0000-000000000004
-pick === nothing ? md"*Hover a city, then click one.*" : md"**$(pick.payload.city)** selected — index $(pick.index)"
+pick === nothing ? md"*Hover a city, then click one.*" : md"**$(pick.city)** selected — index $(pick.index)"
 
 # ╔═╡ d1000000-0000-0000-0000-000000000005
 HTML("<span id=\"coords\" style=\"display:none\">$(JSON3.write(masque(fig, cities).manifest["layers"]))</span>")

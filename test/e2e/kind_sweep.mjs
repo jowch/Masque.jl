@@ -569,7 +569,7 @@ try {
       passed.push(`${key}/hydrated-bond`);
     } else if (/=\s*nothing$/.test(mountBond)) {
       passed.push(`${key}/hydrated-bond-control`);
-    } else if (/InteractionEvent/.test(mountBond) && layers.some((l) => mountBond.includes(`:${l.id},`))) {
+    } else if (/Event\(/.test(mountBond) && layers.some((l) => mountBond.includes(`:${l.id},`))) {
       // A prior kind_sweep.mjs run against this SAME warm Pluto session leaves the bond holding
       // its last value — Pluto's normal reconnect hydration (a bond keeps its value across a
       // page reload), not a regression of the mount.ts "force host.value = null" bug the check
@@ -577,8 +577,8 @@ try {
       // warm re-run (#114): accept any well-formed leftover naming one of THIS widget's own
       // layers — a `selects`-ROI's bond names its TARGET layer (e.g. `:pts`), never its own
       // `:roi` id, so this checks membership in `layers`, not `spec.layerId` specifically. The
-      // trailing comma anchors on the id boundary Julia's positional `repr` always emits right
-      // after it (`InteractionEvent(:id, index, …)`) — layer ids can nest (`lines`/`lines_2`,
+      // trailing comma anchors on the id boundary the event `show` always emits right
+      // after it (`ElementEvent(:id, index, …)`) — layer ids can nest (`lines`/`lines_2`,
       // `scatter`/`scatter_dark`), so an unanchored `includes` could false-match a leftover that
       // actually names neither this widget's layer nor any real one (e.g. `:linesX,`).
       passed.push(`${key}/hydrated-bond-control-warm`);
@@ -682,7 +682,7 @@ try {
         }
       }
       if (after === before) throw new Error(`${key}-drag: #out_${key} never changed from ${JSON.stringify(before)}`);
-      const re = spec.layerKind === "roi" ? /:roi|InteractionEvent\[/i : /:threshold|:thr/i;
+      const re = spec.layerKind === "roi" ? /:roi|ElementEvent\[|BoundsEvent/i : /:threshold|:thr|ThresholdEvent/i;
       if (!re.test(after)) throw new Error(`${key}-drag: readout mismatch ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/drag-bind`);
       console.error(`OK  ${key}/drag — ${after.slice(0, 100)}`);
@@ -861,15 +861,9 @@ try {
         throw new Error(`${what}: #out_${key} never matched (last seen: ${JSON.stringify(last)})`);
       };
 
-      // --- item 2: the payload is the browser-computed value, converted Julia-side into a flat
-      // NamedTuple — (; x, y) for AxisInteractable, index -1 ---
-      // `[^)]*?`, not `[\s\S]*?`, between `-1` and the field it's paired with: this bond text is
-      // a single flat span with no `$`-anchor to stop at, and a `:grid` payload's own `value =`
-      // field (`(i = …, j = …, value = …)`, `_computed_payload`) has the identical field name —
-      // stopping at the payload's own closing paren keeps this from ever crossing into a
-      // DIFFERENT tuple's fields, even though nothing in this fixture reaches that today.
+      // AxisEvent(:axis, x = …, y = …). The numbers are the click's data coordinates.
       const parseBondAxisXY = (t) => {
-        const m = new RegExp(`:${spec.layerId},\\s*-1\\b[^)]*?x\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)\\s*,\\s*y\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)`).exec(t);
+        const m = new RegExp(`:${spec.layerId},\\s*x\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)\\s*,\\s*y\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)`).exec(t);
         if (!m) return null;
         const x = Number(m[1]), y = Number(m[2]);
         return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
@@ -890,10 +884,9 @@ try {
       passed.push(`${key}/axis-click-preserves-selection`);
       console.error(`OK  ${key}/axis-click — ${axisAfter.slice(0, 110)}`);
 
-      // --- item 4: ColorbarInteractable's bounded bbox is a different hit-test branch from the
-      // axis catch-all, but the same conversion applies — (; value), index -1 ---
+      // ColorbarEvent(:colorbar, value = …). A different hit-test branch from the axis catch-all.
       const parseBondValue = (t) => {
-        const m = new RegExp(`:${spec.colorbarLayerId},\\s*-1\\b[^)]*?value\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)`).exec(t);
+        const m = new RegExp(`:${spec.colorbarLayerId},\\s*value\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)`).exec(t);
         if (!m) return null;
         const v = Number(m[1]);
         return Number.isFinite(v) ? v : null;
@@ -1292,7 +1285,9 @@ try {
 
     let clickIdx = spec.clickIndex;
     const before = await textOf(`#out_${key}`);
-    const already = new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`);
+    // The overlay's hit index stays 0-based. The bond prints the Julia 1-based index.
+    const juliaIdx = () => clickIdx + 1;
+    const already = new RegExp(`:${spec.layerId},\\s*${juliaIdx()}\\b`);
     // Collision-avoidance (#114): re-running this driver against a warm Pluto session (no
     // restart) can start a spec with its bond ALREADY holding the index we're about to click —
     // clicking the same index again produces byte-identical `repr(ev)` text, so `waitChange`
@@ -1374,9 +1369,12 @@ try {
     const idRe = new RegExp(`:${spec.layerId}|${spec.layerId}`, "i");
     if (!idRe.test(after)) throw new Error(`${key}-click: no layer in ${JSON.stringify(after).slice(0, 220)}`);
     if (spec.layerKind !== "grid") {
-      if (!new RegExp(`:${spec.layerId},\\s*${clickIdx}\\b`).test(after)) {
-        throw new Error(`${key}-click: expected index ${clickIdx}: ${after.slice(0, 220)}`);
+      if (!new RegExp(`:${spec.layerId},\\s*${juliaIdx()}\\b`).test(after)) {
+        throw new Error(`${key}-click: expected Julia index ${juliaIdx()}: ${after.slice(0, 220)}`);
       }
+    }
+    if (spec.layerId === "legend" && !/LegendEvent\(/.test(after)) {
+      throw new Error(`${key}-click: expected LegendEvent: ${after.slice(0, 220)}`);
     }
     if (!skipChangeWait) passed.push(`${key}/click-bind`);
 
@@ -1413,16 +1411,16 @@ try {
       throw new Error(`${key}/click-echo: unpinned ${layer.kind} click changed g.sel ${afterLeave.sel} -> ${echo.sel}`);
     }
 
-    // `InteractionEvent` has no custom `show`, so `repr(ev)` is Julia's default positional
-    // struct print: `InteractionEvent(:legend, 0, …)` — the ":<layerId>," prefix pins which
-    // layer actually won the hit-test. Belt-and-suspenders on top of the index regex above:
-    // this fails loud specifically on "resolved to the wrong layer", not just "wrong index".
+    // Every event prints `Type(:layerId, …)`. The ":<layerId>," prefix pins which layer won
+    // the hit-test (a grid cell continues `i = …`, a legend entry continues its 1-based index).
+    // Belt-and-suspenders on top of the index regex above: this fails loud specifically on
+    // "resolved to the wrong layer", not just "wrong index".
     // On `skipChangeWait`, `after` is stale (see above) so this re-check is vacuous for THIS
     // click — but the real regression test for `legend`-before-`:grid` layer precedence already
     // ran once per spec, unconditionally, before any click (`legend-precedence-order`/
     // `legend-precedence-pixel-contested`, pushed above using `spec.selectedIndex`), so the
     // structural property this guards is still covered even when this echo of it isn't.
-    if (spec.overlapsGrid && new RegExp(`:${spec.overlapsGrid},\\s*\\d+\\b`).test(after)) {
+    if (spec.overlapsGrid && new RegExp(`:${spec.overlapsGrid},`).test(after)) {
       throw new Error(`${key}-click: bond resolved to grid layer "${spec.overlapsGrid}", not legend: ${after.slice(0, 220)}`);
     }
     console.error(`OK  ${key} — ${after.slice(0, 110)}`);

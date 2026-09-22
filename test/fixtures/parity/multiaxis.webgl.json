@@ -61,6 +61,7 @@
                 "hover"
             ],
             "kind": "circles",
+            "bond": "element",
             "axis": "ax1",
             "geometry": [
                 110,
@@ -76,12 +77,12 @@
             },
             "payloads": [
                 {
-                    "index": 0,
+                    "index": 1,
                     "x": 1,
                     "y": 1
                 },
                 {
-                    "index": 1,
+                    "index": 2,
                     "x": 2,
                     "y": 2
                 }
@@ -93,6 +94,7 @@
                 "hover"
             ],
             "kind": "circles",
+            "bond": "element",
             "axis": "ax2",
             "geometry": [
                 696,
@@ -108,12 +110,12 @@
             },
             "payloads": [
                 {
-                    "index": 0,
+                    "index": 1,
                     "x": 1,
                     "y": 2
                 },
                 {
-                    "index": 1,
+                    "index": 2,
                     "x": 2,
                     "y": 1
                 }

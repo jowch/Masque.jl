@@ -86,7 +86,7 @@ than silently drop it).
 `roi`, `view` layers can't be pre-highlighted — only `circles`/`rects`/`polygons`/
 `segments`/`polyline` can) or an index is out of range for that layer.
 **Fix:** check the layer's kind against the supported list in [Selection](@ref); indices are
-0-based and must be `< ` the element count.
+1-based and must be in `1:n` for that layer.
 
 ### An error mentioning "Makie internals changed?"
 

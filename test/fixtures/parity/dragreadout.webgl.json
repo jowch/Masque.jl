@@ -35,6 +35,7 @@
                 "drag"
             ],
             "kind": "threshold",
+            "bond": "threshold",
             "axis": "ax1",
             "geometry": {
                 "span": [
@@ -56,6 +57,7 @@
                 "drag"
             ],
             "kind": "roi",
+            "bond": "bounds",
             "axis": "ax1",
             "geometry": {
                 "w": 490.90915,
@@ -77,6 +79,7 @@
                 "hover"
             ],
             "kind": "axis",
+            "bond": "axis",
             "axis": "ax1",
             "geometry": null,
             "id": "axis",

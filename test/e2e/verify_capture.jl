@@ -86,7 +86,7 @@ ev = APD.Bonds.transform_value(w, captured)   # the REAL browser emission -> Int
 
 ev isa Masque.InteractionEvent || error("transform_value did not return an InteractionEvent: $(typeof(ev))")
 ev.layer === :scatter || error("layer mismatch: $(ev.layer)")
-ev.index == 0 || error("index mismatch: $(ev.index)")
+ev.index == 1 || error("index mismatch: $(ev.index)")
 assert_payload_ignored(w, captured, :scatter, 0, "scatter")
 
 println("seam OK — browser host.value -> ", ev)
@@ -97,7 +97,7 @@ captured3 = JSON3.read(read(joinpath(dir, "captured3d.json"), String), Dict{Stri
 ev3 = APD.Bonds.transform_value(w3, captured3)
 ev3 isa Masque.InteractionEvent || error("transform_value (3D) did not return an InteractionEvent: $(typeof(ev3))")
 ev3.layer === :scatter || error("3D layer mismatch: $(ev3.layer)")
-ev3.index == 0 || error("3D index mismatch: $(ev3.index)")
+ev3.index == 1 || error("3D index mismatch: $(ev3.index)")
 assert_payload_ignored(w3, captured3, :scatter, 0, "Axis3")
 
 println("seam OK (Axis3) — browser host.value -> ", ev3)
@@ -107,7 +107,7 @@ capturedp = JSON3.read(read(joinpath(dir, "capturedpolar.json"), String), Dict{S
 evp = APD.Bonds.transform_value(wp, capturedp)
 evp isa Masque.InteractionEvent || error("transform_value (polar) did not return an InteractionEvent: $(typeof(evp))")
 evp.layer === :scatter || error("polar layer mismatch: $(evp.layer)")
-evp.index == 0 || error("polar index mismatch: $(evp.index)")
+evp.index == 1 || error("polar index mismatch: $(evp.index)")
 assert_payload_ignored(wp, capturedp, :scatter, 0, "PolarAxis")
 
 println("seam OK (PolarAxis) — browser host.value -> ", evp)

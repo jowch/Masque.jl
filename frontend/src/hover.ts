@@ -170,7 +170,9 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
     if (layer.template) {
         return renderTemplate(layer.template, resolvePayload(hit, ctx.manifest_, x, y))
     } else if (hit.grid_) {
-        return hit.grid_[2] === undefined ? `(${hit.grid_[0]},${hit.grid_[1]})` : `(${hit.grid_[0]},${hit.grid_[1]}) = ${esc(hit.grid_[2])}`
+        // Wire i/j are 0-based; the tooltip shows the Julia 1-based cell.
+        const i = hit.grid_[0] + 1, j = hit.grid_[1] + 1
+        return hit.grid_[2] === undefined ? `(${i},${j})` : `(${i},${j}) = ${esc(hit.grid_[2])}`
     } else if (hit.axis_) {
         const v = resolvePayload(hit, ctx.manifest_, x, y) as { x?: unknown; y?: unknown; value?: unknown }
         return "value" in v ? esc(fmt(v.value)) : `x=${esc(fmt(v.x))}, y=${esc(fmt(v.y))}`

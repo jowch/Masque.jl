@@ -1,41 +1,3 @@
-"""
-    InteractionEvent(layer, index, payload)
-
-The typed value a `masque` bond holds for one selected element: reported on a deliberate click,
-or, at mount, for each element `selected=` hydrated (`nothing` if there's neither).
-
-# Fields
-- `layer::Symbol` — the hit `HitLayer`'s (i.e. the interactable's) `id`.
-- `index::Int` — 0-based element index within that layer; for a `:grid` that is the linear
-  cell index. An `:axis` hit has no element to index and reports `-1`
-  (`AxisInteractable`, `ColorbarInteractable`); `:roi`/`:threshold` report `0`. A `:view` layer
-  ([`ViewInteractable`](@ref)) never appears here at all — it commits nothing
-  (docs/dev/architecture/12-gesture-channel.md §12.3).
-- `payload::Any` — for an element kind (points/rects/polygons/segments/polyline), the exact
-  object you passed in `payloads=`, looked back up in Julia rather than decoded from what the
-  browser sent: `ev.payload === payloads[i]`, not a JSON-reconstructed copy, so a `NamedTuple`
-  payload stays a `NamedTuple`. Kinds with no Julia-side original — an axis readout, a grid
-  cell, ROI bounds — still report a browser-computed value, but converted to a flat (never
-  nested) `NamedTuple` from the fixed field set that kind sends, so `ev.payload.x` works
-  everywhere, not just for element kinds: `(; x, y)` or `(; value)` for
-  [`AxisInteractable`](@ref)/[`ColorbarInteractable`](@ref); `(; i, j)` or `(; i, j, value)`
-  for a `:grid` cell hit, or `(; i0, i1, j0, j1, xmin, xmax, ymin, ymax)` for the cell-range a
-  `selects`-ROI reports over a `:grid` target; `(; xmin, xmax, ymin, ymax)` for `:roi`.
-  [`ThresholdInteractable`](@ref) is the one exception: its payload is a bare scalar (the data
-  coordinate), since there is no field to name.
-
-A `ROIInteractable` built with `selects` reports differently: the bond value is a
-`Vector{InteractionEvent}` (one entry per element the ROI contains on mouse-up), not a single
-`InteractionEvent`. `selected=` hydration is likewise always a `Vector{InteractionEvent}` (even
-for a single hydrated element), since `selected=` is a set-shaped API; only a click reports a
-scalar `InteractionEvent`.
-"""
-struct InteractionEvent
-    layer::Symbol
-    index::Int
-    payload::Any
-end
-
 # c can be a CSS string or any Makie-convertible color.
 function _css_color(c)
     c isa AbstractString && return c
@@ -103,51 +65,25 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     return d
 end
 
-# Closed kinds get the selected wash; open kinds (:segments/:polyline) get the ring. `selected=`
-# on any other kind fails loud.
-const _SELECTED_KINDS = (:circles, :rects, :polygons, :segments, :polyline)
-
-# Element count for a HitLayer geometry, matching the JS layout in types.ts / hitLayerByIndex.
-function _layer_n_elements(kind::Symbol, geometry)
-    return if kind === :circles
-        length(geometry) ÷ 3
-    elseif kind === :rects
-        length(geometry) ÷ 4
-    elseif kind === :polygons
-        length(geometry)
-    elseif kind === :segments
-        length(geometry) ÷ 4
-    elseif kind === :polyline
-        max(0, length(geometry) ÷ 2 - 1)
-    elseif kind === :grid
-        Int(geometry["ncols"]) * Int(geometry["nrows"])
-    else
-        0   # :axis / :threshold / :roi / :view — not element-indexed for selected=
+# One `selects` target for the widget. Several selectors must name that same layer.
+function _selection_spec(interactables, layers)
+    targets = Symbol[]
+    for i in interactables
+        s = selects(i)
+        s === nothing && continue
+        push!(targets, s)
     end
-end
-
-# Validate `selected=` indices for one layer: supported kind + in-range (0-based). Throws ArgumentError.
-function _check_selected(L::HitLayer, sel)
-    kind = L.kind
-    if !(kind in _SELECTED_KINDS)
-        throw(
-            ArgumentError(
-                "selected: layer :$(L.id) has kind :$kind, which does not support pre-highlight " *
-                    "(supported: $(join(_SELECTED_KINDS, ", ")))",
-            ),
-        )
-    end
-    n = _layer_n_elements(kind, L.geometry)
-    idxs = collect(Int, sel)
-    for idx in idxs
-        (0 <= idx < n) || throw(
-            ArgumentError(
-                "selected: layer :$(L.id) index $idx out of range for $n elements" *
-                    (n > 0 ? " (valid: 0:$(n - 1))" : ""),
-            ),
-        )
-    end
-    return idxs
+    isempty(targets) && return nothing
+    uniq = unique(targets)
+    length(uniq) == 1 || throw(
+        ArgumentError(
+            "masque: multiple selectors must share one target; got $(join(string.(uniq), ", "))",
+        ),
+    )
+    target = only(uniq)
+    kinds = Dict(Symbol(l["id"]) => Symbol(l["kind"]) for l in layers)
+    kind = kinds[target]
+    return (mode = kind === :grid ? "grid" : "elements", target = target)
 end
 
 # Fail loud when a selector's `selects` target is absent or has an incompatible kind.
@@ -203,19 +139,19 @@ function _validate_links(layer_owners, layers)
             for tid_str in ids
                 tid = Symbol(tid_str)
                 if !haskey(kinds, tid_str)
-                    throw(ArgumentError("links: layer :$(d["id"]) element $(k - 1) links to unknown layer :$(tid)"))
+                    throw(ArgumentError("links: layer :$(d["id"]) element $k links to unknown layer :$(tid)"))
                 end
                 tk = kinds[tid_str]
                 if tk in _SELECTED_KINDS
                     push!(kept, tid_str)
                 elseif lenient
-                    @warn "masque: legend entry $(k - 1) of layer :$(d["id"]) links to :$(tid) (kind :$(tk)), " *
+                    @warn "masque: legend entry $k of layer :$(d["id"]) links to :$(tid) (kind :$(tk)), " *
                         "which cannot be highlighted (supported: $(join(_SELECTED_KINDS, ", "))); dropping" maxlog = 16
                     dropped = true
                 else
                     throw(
                         ArgumentError(
-                            "links: layer :$(d["id"]) element $(k - 1) links to :$(tid) (kind :$(tk)), which cannot " *
+                            "links: layer :$(d["id"]) element $k links to :$(tid) (kind :$(tk)), which cannot " *
                                 "be highlighted (supported: $(join(_SELECTED_KINDS, ", ")))",
                         ),
                     )
@@ -252,28 +188,49 @@ _transform_dict(t::AxisTransform) = Dict{String, Any}(
 Validate every interactable (fail loud) and assemble the JS-facing manifest. Pure — the unit
 tests call this directly; the Pluto-only `published_to_js` step happens later in `show`.
 
-`selected` seeds the selection: a `layer_id => indices` map keyed by the same `Symbol` a click
-returns in `InteractionEvent.layer`. The overlay re-derives the selection from it on every
-mount, so a rebuilt figure comes back selecting what the caller asserts.
+`selected` seeds the selection, 1-based. Accepted forms: `nothing`; one event or a vector of
+them; an `Int` or a vector of `Int`s when exactly one layer can be seeded; a `NamedTuple` or
+`Dict` keyed by layer id. Indices are stored 0-based on each layer's `"selected"` array. Each
+layer carries a `"bond"` stamp. A `selects` ROI stamps `"selection"` and `"selectionTarget"`.
+
+`owners_out`, when a `Ref`, receives `layer id => LayerOwner` for the widget. It is not part of
+the published manifest.
 """
-function build_manifest(interactables, ctx::InteractionContext; selected = nothing, tip_style = nothing, background = nothing)
-    layers = Any[]
-    layer_owners = Any[]   # parallel to layers: the interactable that produced each layer dict
+function build_manifest(
+        interactables, ctx::InteractionContext;
+        selected = nothing, tip_style = nothing, background = nothing, owners_out = nothing,
+    )
+    built = Tuple{Any, HitLayer, Dict{String, Any}}[]
     for i in interactables
         msg = validate(i, ctx)
         msg === nothing || throw(ArgumentError(msg))
         for L in hitlayers(i, ctx)
-            d = _layer_dict(i, L, ctx)
-            sel = selected === nothing ? nothing : get(selected, L.id, nothing)
-            if sel !== nothing && !isempty(sel)
-                d["selected"] = _check_selected(L, sel)
-            end
-            push!(layers, d)
-            push!(layer_owners, i)
+            push!(built, (i, L, _layer_dict(i, L, ctx)))
         end
     end
+    layers = Any[d for (_, _, d) in built]
+    layer_owners = Any[i for (i, _, _) in built]
     _validate_selectors(interactables, layers)
     _validate_links(layer_owners, layers)
+    spec = _selection_spec(interactables, layers)
+    layer_ids = Symbol[L.id for (_, L, _) in built]
+    seedable = Symbol[L.id for (_, L, _) in built if L.kind in _SELECTED_KINDS]
+    norm = normalize_selected(layer_ids, seedable, selected)
+    for id in keys(norm)
+        id in layer_ids || throw(
+            ArgumentError(
+                "selected: :$id is not a layer in this masque() call " *
+                    "(available: $(join(sort(string.(layer_ids)), ", ")))",
+            ),
+        )
+    end
+    for (i, L, d) in built
+        idxs = get(norm, L.id, nothing)
+        if idxs !== nothing && !isempty(idxs)
+            d["selected"] = _check_selected(L, idxs)
+        end
+        d["bond"] = bond_stamp(i, L)
+    end
     # Precedence for the frontend's first-match-in-manifest-order `hitTest` (geometry.ts):
     # `LegendInteractable` layers sort FIRST (a legend drawn over plot geometry must win the
     # pixels under it, or it's unhoverable), `:view` layers sort LAST (catch-all viewport hits
@@ -292,8 +249,22 @@ function build_manifest(interactables, ctx::InteractionContext; selected = nothi
         "layers" => layers,
         "transforms" => Dict(string(id) => _transform_dict(t) for (id, t) in ctx.transforms),
     )
+    if spec !== nothing
+        m["selection"] = spec.mode
+        m["selectionTarget"] = string(spec.target)
+        if spec.mode == "elements" && explicit_empty_seed(selected)
+            m["hydrate"] = "items"
+        end
+    end
     (tip_style === nothing || isempty(tip_style)) || (m["tipStyle"] = tip_style)
     background === nothing || (m["background"] = _css_color(background))
+    if owners_out !== nothing
+        owners = Dict{String, LayerOwner}()
+        for (i, L, _) in built
+            owners[string(L.id)] = LayerOwner(i, L)
+        end
+        owners_out[] = owners
+    end
     return m
 end
 
@@ -304,10 +275,19 @@ struct MasqueWidget
     # Gesture-channel (#102) per-frame callback, `:cairo` only — `nothing` when the widget has
     # no `ViewInteractable` to drive, or on `:webgl` (no settled live-preview mechanism yet;
     # docs/dev/architecture/12-gesture-channel.md §12.10). Defaulted below so every existing
-    # 3-arg call site (tests, and any future one) keeps working.
+    # 3-arg and 4-arg call site keeps working.
     render_frame::Union{Nothing, Function}
+    # Layer id → owner. Not published. Empty for hand-built test widgets; built-in bonds then
+    # use the layer's `"bond"` stamp.
+    owners::Dict{String, LayerOwner}
 end
-MasqueWidget(b64, manifest, display_css) = MasqueWidget(b64, manifest, display_css, nothing)
+MasqueWidget(b64, manifest, display_css) = MasqueWidget(b64, manifest, display_css, nothing, Dict{String, LayerOwner}())
+function MasqueWidget(b64, manifest, display_css, render_frame)
+    return MasqueWidget(b64, manifest, display_css, render_frame, Dict{String, LayerOwner}())
+end
+function with_owners(w::MasqueWidget, owners::Dict{String, LayerOwner})
+    return MasqueWidget(w.b64, w.manifest, w.display_css, w.render_frame, owners)
+end
 
 # Backend choice follows which package extension is loaded, never sniffed from Makie's global
 # `current_backend()` state. `explicit` is the caller's `backend=` override.
@@ -334,17 +314,22 @@ end
 
 Overlay `fig` with JS hit-testing and return a Pluto `@bind` source. `fig` is not mutated.
 
-The bond reports the current selection: `nothing` when nothing is selected, an
-[`InteractionEvent`](@ref) after a click, or a `Vector{InteractionEvent}` for a `selects`
-[`ROIInteractable`](@ref) and for `selected=`.
+The bond is `nothing` until the first commit, unless `selected=` restored one. A click is one
+[`InteractionEvent`](@ref). A `selects` [`ROIInteractable`](@ref) aimed at points makes every
+element commit a `Vector{ElementEvent}` (a click is a one-element vector; an empty box is
+`ElementEvent[]`). Aimed at a grid, the brush is one [`GridWindowEvent`](@ref).
 
 # Keywords
-- `selected` — the selection's starting value: a `layer_id => indices` map, 0-based, matching
-  `InteractionEvent.index`. Those elements are highlighted and in the bond at mount. Works on
+- `selected` — the selection's starting value, 1-based. One index on a point layer mounts as
+  that [`ElementEvent`](@ref); `1` and `[1]` are the same. Several indices highlight those marks
+  and leave the bond `nothing` (a point layer holds one event). On a `selects` point brush, `1`
+  and `[1]` mount as a one-element vector, and `[]` mounts as `ElementEvent[]`. Also accepts the
+  event itself, or a `NamedTuple` / `Dict` keyed by layer id when the figure has more than one
+  seedable layer. A bare index is an `ArgumentError` in that case. Works on
   `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`; any other kind, or an out-of-range
-  index, raises `ArgumentError`. Clicking replaces the selection, so this is only needed to
-  carry one through a rebuild — and it must come from a cell that doesn't read this widget's
-  own bond, which Pluto rejects as a cyclic reference.
+  index (`0` included), raises `ArgumentError` naming `1:n`. Clicking replaces the selection, so
+  this is only needed to carry one through a rebuild — and it must come from a cell that doesn't
+  read this widget's own bond, which Pluto rejects as a cyclic reference.
 - `backend` — `CairoBackend()` (static image) or `WebGLBackend()` (live canvas), each with its
   own keywords. Defaults to whichever of `CairoMakie` / `WGLMakie` is loaded, Cairo if both,
   `ArgumentError` if neither.
@@ -379,10 +364,15 @@ function masque(
         tip_style = tip_style_dict(;
             tooltip_bg, tooltip_color, tooltip_accent, tooltip_font, tooltip_font_size, tooltip_radius, tooltip_caret,
         )
-        manifest = build_manifest(interactables, ctx; selected, tip_style, background = fig.scene.backgroundcolor[])
+        owners_out = Ref(Dict{String, LayerOwner}())
+        manifest = build_manifest(
+            interactables, ctx; selected, tip_style,
+            background = fig.scene.backgroundcolor[], owners_out,
+        )
         result = render(backend, fig, ppu)
         display_css = round(Int, min(size(fig.scene)[1], backend.max_width))
-        return make_widget(backend, result, manifest, display_css, fig, interactables, ppu)
+        w = make_widget(backend, result, manifest, display_css, fig, interactables, ppu)
+        return with_owners(w, owners_out[])
     finally
         fig.scene.backgroundcolor[] = bg0
     end
@@ -482,121 +472,8 @@ function Base.show(io::IO, m::MIME"text/html", w::MasqueWidget)
     return show(io, m, html)
 end
 
-# Hydration: at mount, `selected=` elements ARE the selection, so the bond must already
-# report them rather than `nothing` (manifest indices are 0-based; `payloads` is 1-based).
-# Shared by both widgets' `initial_value` so the backends can't drift on the bond contract;
-# `mount.ts` seeds the same set into `host.value`, or the browser's mount-time report would
-# overwrite this with `nothing`.
-function _hydrated_selection(manifest::Dict{String, Any})
-    events = InteractionEvent[]
-    for d in manifest["layers"]
-        idxs = get(d, "selected", nothing)
-        idxs === nothing && continue
-        payloads = d["payloads"]
-        for idx in idxs
-            push!(events, InteractionEvent(Symbol(d["id"]), idx, payloads[idx + 1]))
-        end
-    end
-    return isempty(events) ? nothing : events
-end
-
-# A computed kind (axis/grid/roi; :threshold is a bare scalar, see below) has no Julia-side
-# original, so there's nothing to reconstruct — but the browser's Dict-shaped value is converted
-# to a NamedTuple here so `ev.payload.x` reads the same way an element payload does. Per-kind
-# enumeration, not a generic `Dict{String,Any}` -> NamedTuple conversion: the generic route would
-# happily build a NamedTuple from keys that aren't identifiers, where this one fails loud (an
-# `ArgumentError` naming the unrecognized keys) the moment a JS-side branch grows a field this
-# hasn't been taught. Every shape here is flat (never nested) because every one of these payloads
-# is flat today — resolvePayload/roiBounds/threshold.ts in geometry.ts and drag/*.ts build them
-# and never nest.
-#
-# :view is deliberately absent: a view gesture commits nothing (§12.3), so no `js_payload` ever
-# arrives with kind :view — the branch that used to convert one retired with #102. A caller that
-# somehow reaches this with kind :view (there is no such path in the shipped frontend) falls
-# through to the unrecognized-shape throw below, same as any other kind this function hasn't
-# been taught.
-#
-# :grid carries two disjoint shapes under the one kind: `(i, j)`/`(i, j, value)` from a direct
-# cell hit (`resolvePayload`'s `hit.grid_` branch), and `(i0, i1, j0, j1, xmin, xmax, ymin,
-# ymax)` — the clamped cell-index range plus the unclamped drawn-box bounds — from a
-# `selects`-ROI brushing a `:grid` target (`selection.ts`'s `computeSelection`). Both arrive
-# tagged with the same `"grid"` kind, so the dispatch below is on the key set, not just the kind.
-function _computed_payload(layer_id::AbstractString, kind::Symbol, js_payload)
-    js_payload === nothing && return nothing
-    kind === :threshold && return js_payload   # scalar data coordinate — no fields to name
-    js_payload isa AbstractDict || throw(
-        ArgumentError(
-            "bond payload: layer :$(layer_id) (kind :$(kind)) sent a $(typeof(js_payload)) " *
-                "computed payload, expected a dict-like object with the fields that kind sends",
-        ),
-    )
-    ks = Set(String.(keys(js_payload)))
-    nt(syms...) = NamedTuple{syms}(Tuple(js_payload[String(s)] for s in syms))
-    if kind === :axis
-        ks == Set(("x", "y")) && return nt(:x, :y)
-        ks == Set(("value",)) && return nt(:value)
-    elseif kind === :grid
-        ks == Set(("i", "j")) && return nt(:i, :j)
-        ks == Set(("i", "j", "value")) && return nt(:i, :j, :value)
-        ks == Set(("i0", "i1", "j0", "j1", "xmin", "xmax", "ymin", "ymax")) &&
-            return nt(:i0, :i1, :j0, :j1, :xmin, :xmax, :ymin, :ymax)
-    elseif kind === :roi
-        ks == Set(("xmin", "xmax", "ymin", "ymax")) && return nt(:xmin, :xmax, :ymin, :ymax)
-    end
-    throw(
-        ArgumentError(
-            "bond payload: layer :$(layer_id) (kind :$(kind)) sent an unrecognized computed " *
-                "payload shape (keys: $(sort(collect(ks))))",
-        ),
-    )
-end
-
-# An element kind (`_SELECTED_KINDS`) already has its payload sitting in the manifest Julia
-# built; look it up there instead of trusting whatever the browser echoed back, so a click and
-# `initial_value` hand back the identical object. Other kinds (axis/grid/roi/threshold/view)
-# have no Julia-side original — `resolvePayload` in geometry.ts makes the same split — so
-# `js_payload` (the browser-computed value) is converted by `_computed_payload` instead.
-# `manifest` lacking a `"layers"` key at all (a bare test double, never a real widget) falls
-# through unchanged, as does an unknown `layer_id`.
-#
-# The unknown-`layer_id` and out-of-range-`index` cases below are deliberately asymmetric: an
-# unknown layer id means this manifest doesn't describe the hit at all, so falling back to the
-# browser's own value is the safe pre-reconstruction behaviour (and the placeholder manifests in
-# the test suite rely on exactly this fallback); a known layer with an out-of-range index means
-# the manifest DOES describe the layer, so the index is definitely wrong, and that fails loud.
-function _bond_payload(manifest, layer_id::AbstractString, index::Integer, js_payload)
-    layers = get(manifest, "layers", nothing)
-    layers === nothing && return js_payload
-    i = findfirst(d -> d["id"] == layer_id, layers)
-    i === nothing && return js_payload
-    d = layers[i]
-    kind = Symbol(d["kind"])
-    kind in _SELECTED_KINDS || return _computed_payload(layer_id, kind, js_payload)
-    payloads = d["payloads"]
-    n = length(payloads)
-    (0 <= index < n) || throw(
-        ArgumentError(
-            "bond payload: layer :$(layer_id) index $index out of range for $n elements" *
-                (n > 0 ? " (valid: 0:$(n - 1))" : ""),
-        ),
-    )
-    return payloads[index + 1]
-end
-
-APD.Bonds.initial_value(w::MasqueWidget) = _hydrated_selection(w.manifest)
-function APD.Bonds.transform_value(w::MasqueWidget, js)
-    js === nothing && return nothing
-    if haskey(js, "items")   # a selector's declared multi output — always a vector
-        return InteractionEvent[
-            InteractionEvent(
-                Symbol(it["layer"]), Int(it["index"]),
-                _bond_payload(w.manifest, it["layer"], Int(it["index"]), get(it, "payload", nothing)),
-            )
-                for it in js["items"]
-        ]
-    end
-    return InteractionEvent(
-        Symbol(js["layer"]), Int(js["index"]),
-        _bond_payload(w.manifest, js["layer"], Int(js["index"]), get(js, "payload", nothing)),
-    )
-end
+# Hydration and click both go through `bond_from_js` (src/bond.jl). `mount.ts` seeds the same
+# envelope `mount_envelope` builds, or the browser's mount-time report would overwrite
+# `initial_value`.
+APD.Bonds.initial_value(w::MasqueWidget) = initial_bond(w)
+APD.Bonds.transform_value(w::MasqueWidget, js) = bond_from_js(w, js)

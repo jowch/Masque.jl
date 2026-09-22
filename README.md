@@ -60,8 +60,8 @@ end
 ```
 
 ```julia
-# react to clicks — `sel` is `nothing` until a click, then an InteractionEvent
-sel === nothing ? "click a point" : "you picked $(sel.payload)"
+# react to clicks — `sel` is `nothing` until a click, then an ElementEvent
+sel === nothing ? "click a point" : "you picked $(sel.index)"
 ```
 
 For more information, see [Masque documentation](https://jowch.github.io/Masque.jl). See [`examples/`](examples/) for several runnable Pluto notebooks.

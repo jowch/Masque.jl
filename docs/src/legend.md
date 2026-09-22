@@ -34,12 +34,13 @@ is dropped from the auto path with a warning, rather than failing the whole buil
 
 Hovering a legend entry highlights every element of the layer(s) it links to, using the same
 wash/ring recipe as `selected=` (see [Selection](@ref)). Clicking reports the usual
-[`InteractionEvent`](@ref), `layer = :legend` (or `:legend_2`, … for a second legend),
-`payload = (; label, group, targets)` — `targets` is the list of layer ids (as strings) the
-entry links to, `group` is the entry's group title (`nothing` for an ungrouped legend).
+[`LegendEvent`](@ref), `layer = :legend` (or `:legend_2`, … for a second legend).
+`entry.label`, `entry.group`, and `entry.targets` are the entry's fields — `targets` is the
+list of layer ids (as strings) the entry links to, `group` is the entry's group title
+(`nothing` for an ungrouped legend). `entry.index` is which entry, not a row of a table.
 
 ```julia
-ev === nothing ? "hover/click a legend entry" : "linked layers: $(ev.payload.targets)"
+ev === nothing ? "hover/click a legend entry" : "linked layers: $(ev.targets)"
 ```
 
 ## Custom legends

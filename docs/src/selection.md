@@ -3,10 +3,11 @@
 ## Reacting to a click
 
 There is exactly one selection. A `masque(...)` bond reports it directly: `nothing` when
-nothing is selected, otherwise an [`InteractionEvent`](@ref) with `layer` (the selected
-interactable's `id`), `index` (0-based, within that layer), and `payload`. Clicking an element
-replaces the selection with that element, and a cell that reads the bond re-runs on every
-click:
+nothing is selected, otherwise one event whose type matches the interactable. A point,
+bar, polygon, or segment click is an [`ElementEvent`](@ref): `layer` is the interactable's
+`id`, `index` is 1-based, and the row's fields are read on the event (`ev.city`). Clicking
+an element replaces the selection with that element, and a cell that reads the bond re-runs
+on every click:
 
 ```julia
 @bind ev masque(fig, PointInteractable(ax, pts; id = :scatter))
@@ -18,13 +19,12 @@ ev === nothing ? "nothing selected" : "clicked #$(ev.index) in :$(ev.layer)"
 
 ## Linked selection across plots
 
-Because `layer`/`index`/`payload` are plain data, one click can drive any number of
-downstream cells — filter a table, highlight a second plot, recompute a fit. Give the
-`payloads` on two interactables the same shape and key on it to link them without any Masque
-API:
+`layer` and `index` are plain data, and an [`ElementEvent`](@ref) is a row index, so one
+click can drive any number of downstream cells — filter a table, highlight a second plot,
+recompute a fit:
 
 ```julia
-rows = ev === nothing ? data : filter(r -> r.id == ev.payload.id, data)
+row = ev === nothing ? nothing : data[ev, :]
 ```
 
 ## `selected=` — the selection's starting value
@@ -33,23 +33,28 @@ rows = ev === nothing ? data : filter(r -> r.id == ev.payload.id, data)
 call to say what's selected the moment the widget mounts, before any click:
 
 ```julia
-masque(fig, PointInteractable(ax, pts; id = :scatter); selected = Dict(:scatter => [0, 2]))
+masque(fig, PointInteractable(ax, pts; id = :scatter); selected = 2)
 ```
 
-The widget mounts already highlighting those elements, and the bond already holds them — not
-`nothing` — as a `Vector{InteractionEvent}`, one entry per hydrated element, each carrying
-that element's own `payload` exactly as a click on it would. A cell reading the bond sees the
-hydrated selection immediately, with no click required. From there it's an ordinary
-selection: the next click, or a `selects`-[`ROIInteractable`](@ref) release, replaces it
-wholesale, hydration included.
+On a point layer, `selected = 2` and `selected = [2]` mount as the same one
+[`ElementEvent`](@ref) a click on that point would produce. `selected = [1, 3]` highlights
+both marks and leaves the bond `nothing`: this interaction returns one element, so a set is
+not a value it can hold. The next click replaces the highlight with that one element.
 
-`selected` is a `layer_id => indices` map. Indices are 0-based and match
-`InteractionEvent.index`. Supported kinds: `circles` / `rects` / `polygons` (selected wash)
-and `segments` / `polyline` (selected ring). Unsupported kinds (`grid`, `axis`, …) or
-out-of-range indices throw `ArgumentError` at build time — fail loud, like a wrong-length
-`payloads=`. Keys are layer ids: for the single-layer kinds that's the interactable's `id`,
-but [`RegionInteractable`](@ref) splits into suffixed layers (`:id_c` circles / `:id_r` rects
-/ `:id_p` polygons) — key on those.
+A `selects` ROI is the interaction that returns a vector. There, `selected = 1` and
+`selected = [1]` both mount as a one-element `Vector{ElementEvent}`, and `selected = [1, 3]`
+mounts as those two. An explicit empty vector (`selected = Int[]`) mounts as `ElementEvent[]`.
+Omitting `selected=` leaves the bond `nothing`.
+
+Indices are 1-based. `0` is out of range. With one seedable layer a bare `Int` or
+`AbstractVector{<:Integer}` is enough. Two seedable layers need a name:
+`selected = Dict(:scatter => [1, 3])` or `selected = (; scatter = 1)`. A bare `1` across two
+layers throws, naming the layers. Unknown keys throw. Supported kinds: `circles` / `rects` /
+`polygons` (selected wash) and `segments` / `polyline` (selected ring). Unsupported kinds
+(`grid`, `axis`, …) or out-of-range indices throw `ArgumentError` at build time — fail loud,
+like a wrong-length `payloads=`. Keys are layer ids: for the single-layer kinds that's the
+interactable's `id`, but [`RegionInteractable`](@ref) splits into suffixed layers (`:id_c`
+circles / `:id_r` rects / `:id_p` polygons) — key on those.
 
 That kind list constrains hydration, not the gesture: clicking a heatmap/image cell selects
 that cell even though `:grid` can't be hydrated via `selected=`, and clicking a legend entry
@@ -61,7 +66,7 @@ selects every element of the series it links to, not the legend swatch itself (s
 Clicking an element replaces the selection immediately, in the browser — no round trip
 through Julia, no bond to feed back into anything. Clicking a different element moves it; the
 selection doesn't accumulate, since the echo mirrors the bond value and a click's bond value
-is a single [`InteractionEvent`](@ref). Enter/Space on a keyboard-focused element commits
+is a single [`ElementEvent`](@ref). Enter/Space on a keyboard-focused element commits
 through the same path as a mouse click. A `selects`-[`ROIInteractable`](@ref)'s release
 replaces the selection with everything its box enclosed, the same way — see
 [Multi-element selectors](@ref) below.
@@ -103,9 +108,10 @@ it.
 element of `:scatter` it currently encloses, rather than the single `{layer, index}` an
 ordinary click reports. `selects` only works when the target layer is a `circles` or `grid`
 kind — i.e. built from [`PointInteractable`](@ref) or the grid form of
-[`RectInteractable`](@ref) — pointing it at any other kind fails loud. The bond value becomes
-a `Vector{InteractionEvent}` — one entry per enclosed point — instead of a single
-`InteractionEvent`:
+[`RectInteractable`](@ref) — pointing it at any other kind fails loud. Over points the bond
+is a `Vector{ElementEvent}` — one entry per enclosed point, including a click on one of
+those points. Over a grid the bond is one [`GridWindowEvent`](@ref), and `A[win]` is
+`A[win.i1:win.i2, win.j1:win.j2]`. A box that misses the grid has an empty `i1:i2`.
 
 ```julia
 begin
@@ -116,7 +122,7 @@ end
 
 ```julia
 @bind picked masque(fig, [PointInteractable(ax, pts; id = :scatter), roi])
-# picked isa Vector{InteractionEvent} once you release a drag over some points
+# picked isa Vector{ElementEvent} once you release a drag, or click one point
 ```
 
 Releasing the drag replaces the selection with every enclosed element, the same click-echo as

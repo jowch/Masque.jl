@@ -121,8 +121,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         end
 
         # 3-coord default payloads carry z; 2-coord payloads keep the exact 2D shape
-        @test PointInteractable(ax3, pts3).payloads[1] == (; index = 0, x = 1.0, y = 2.0, z = 3.0)
-        @test PointInteractable(ax3, [(1.0, 2.0)]).payloads[1] == (; index = 0, x = 1.0, y = 2.0)
+        @test PointInteractable(ax3, pts3).payloads[1] == (; index = 1, x = 1.0, y = 2.0, z = 3.0)
+        @test PointInteractable(ax3, [(1.0, 2.0)]).payloads[1] == (; index = 1, x = 1.0, y = 2.0)
 
         # continuous pixel→data consumers fail loud on is3d (a screen pixel is a ray)
         for bad in (
@@ -149,7 +149,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test m3["transforms"]["ax1"]["is3d"] === true
         @test length(m3["layers"]) == 2
         pl3 = only(filter(l -> l["kind"] == "circles", m3["layers"]))["payloads"][1]
-        @test pl3 == (; index = 0, x = 1.0, y = 2.0, z = 3.0)   # introspected scatter payload carries z
+        @test pl3 == (; index = 1, x = 1.0, y = 2.0, z = 3.0)   # introspected scatter payload carries z
 
         # Axis3 introspection gate: a recipe whose extraction is only 2D-valid (heatmap's grid
         # edges are projected per-axis — separably, which a 3D camera breaks) must warn-and-skip,
@@ -188,7 +188,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         mi = only(mints)
         @test mi isa PointInteractable
         @test mi.radius3d !== nothing && length(mi.radius3d) == 3
-        @test mi.payloads[1] == (; index = 0, x = 1.0, y = 2.0, z = 3.0)
+        @test mi.payloads[1] == (; index = 1, x = 1.0, y = 2.0, z = 3.0)
         _, ppum, ctxm = ctx_for(fm)
         imgm = Makie.colorbuffer(fm; px_per_unit = ppum)
         Lm = only(hitlayers(mi, ctxm))
@@ -277,7 +277,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         ai = only(aints)
         @test ai isa SegmentInteractable && ai.mode === :pairs
         @test length(ai.vertices) == 6                  # 3 arrows × (start, end)
-        @test ai.payloads[1] == (; index = 0, x = 1.0, y = 1.0, z = 1.0, u = 1.0, v = 0.0, w = 0.0)
+        @test ai.payloads[1] == (; index = 1, x = 1.0, y = 1.0, z = 1.0, u = 1.0, v = 0.0, w = 0.0)
         _, ppua, ctxa = ctx_for(fa)
         imga = Makie.colorbuffer(fa; px_per_unit = ppua)
         La = only(hitlayers(ai, ctxa))

@@ -468,7 +468,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         pi = PolygonInteractable(ax, p; id = :band)
         @test length(pi.rings) == 1                       # one filled region → one ring
         @test length(pi.rings[1]) == 10                   # 5 lower + 5 upper, stitched
-        @test pi.payloads[1] == (; index = 0)             # default; no semantic per-element value
+        @test pi.payloads[1] == (; index = 1)             # default; no semantic per-element value
         # auto path picks it up as :band, exactly one layer (no stray :poly from the child)
         ints = auto_interactables(fig)
         @test length(ints) == 1
@@ -486,7 +486,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         pi = PolygonInteractable(ax, p; id = :density)
         @test length(pi.rings) == 1                       # the KDE fill is one region
         @test length(pi.rings[1]) > 50                    # dense outline (Makie's KDE band)
-        @test pi.payloads[1] == (; index = 0)
+        @test pi.payloads[1] == (; index = 1)
         ints = auto_interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
     end
@@ -515,7 +515,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         p = ax.scene.plots[1]
         pi = PolygonInteractable(ax, p; id = :voronoiplot)
         @test length(pi.rings) == 8                        # one cell per generator site
-        @test pi.payloads == Any[(; index = k - 1) for k in 1:8]   # cell order ≠ site order → index only
+        @test pi.payloads == Any[(; index = k) for k in 1:8]   # cell order ≠ site order → index only
         ints = auto_interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
     end

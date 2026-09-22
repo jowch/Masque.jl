@@ -37,13 +37,13 @@ the plot-scene walk) remains deferred.
 **Click-echo selection (shipped, #103):** selection moved fully client-side ([§5](05-bond-value.md)) — a click sets
 `OverlayState.selHits_` and draws the highlight in the browser, with no bond feedback onto the
 manifest. `selected=` now supplies only the selection's *starting* value: it seeds both the
-highlight and `host.value` at mount (via `initial_value`/`_hydrated_selection`) and plays no
+highlight and `host.value` at mount (via `initial_value`/`initial_bond`) and plays no
 further role afterward, so a rebuild — the overlay being wiped every re-render — restarts from
-whatever `selected=` says this time. The other half of #103: an element hit's `payload` is now
-reconstructed from the widget's own manifest for every element kind, not only `selected=`
-widgets (`_bond_payload`, [§5](05-bond-value.md)) — `ev.payload === payloads[i]`. As of #109 there is no browser
-copy left to discard: the upload for these kinds carries only `{layer, index}` in the first
-place.
+whatever `selected=` says this time. The other half of #103: an element hit is reconstructed
+from the widget's own manifest for every element kind, not only `selected=` widgets
+(`bond_from_js`, [§5](05-bond-value.md)) — `ev.payload === payloads[i]` with `i` 1-based. As of
+#109 there is no browser copy left to discard: the upload for these kinds carries only
+`{layer, index}` in the first place.
 
 **v2:** plot-object introspection constructors; ABLines/Arc,
 `TextLabel` (Block) support, animation frames, SVG-overlay annotations, spatial hit-test acceleration.
