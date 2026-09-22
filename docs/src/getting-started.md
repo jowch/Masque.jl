@@ -221,6 +221,9 @@ pick === nothing ? "click a point" :
 
 The default payload is `(; index, x, y)` with 1-based `index`, not
 `(; city, pop)`. The layer id is `:scatter`, not `:cities`. For
-`auto_interactables` and huge-data payloads, see [Constructors](@ref).
+`auto_interactables`, huge-data payloads, and which recipes
+`masque(fig)` extracts, see [Constructors](@ref).
 
-The default path is CairoMakie. For WebGL, see [Backends](@ref).
+The default path is CairoMakie. On WGLMakie, return `masque(f)` from the
+figure cell; a trailing `;` is only for `@bind`. See
+[The widget is the figure](@ref).

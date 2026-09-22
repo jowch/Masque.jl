@@ -148,7 +148,8 @@ ScatterLines) for discrete hits. Polar is not WebGL-only.
 (an axis-aligned hit layer would misalign). Explicit AABB constructors
 can still build and sit in the wrong place.
 
-**Fix:** stick to the polar allowlist, or use a Cartesian `Axis`.
+**Fix:** stick to the polar rows of
+[Recipes masque(fig) extracts](@ref), or use a Cartesian `Axis`.
 
 ### Tried ROI or View pan on a categorical 2D axis
 
@@ -238,7 +239,8 @@ Check, in order:
 3. Is the element you clicked actually interactive? An unsupported plot
    type in `masque(fig)` is skipped with a `@warn` in the notebook log,
    not an error, so it silently is not clickable. Polar heatmap /
-   barplot is this skip.
+   barplot is this skip. The allowlist is
+   [Recipes masque(fig) extracts](@ref).
 
 ### Tried a tooltip and saw `[object Object]`
 
@@ -276,6 +278,17 @@ on `:webgl` usually means the installed `WGLMakie` version is outside
 Masque's pinned compat range — see [Backends](@ref). Any other console
 error alongside a widget that otherwise renders is worth reporting as a
 bug rather than assuming it is expected.
+
+### Tried WGLMakie and the spinner never stops
+
+**Cause:** the cell displayed a WGLMakie `Figure`. Its MIME show waits
+for a Bonito session Pluto never starts, so the cell hangs on
+`.wglmakie-spinner`.
+
+**Fix:** return `masque(f)` from the construction cell. That cell is
+already the overlay. `@bind` is optional. A trailing `;` is only so
+Pluto does not show the widget twice. For the cell layout, see
+[The widget is the figure](@ref).
 
 ### Tried WGLMakie and the canvas is blank
 

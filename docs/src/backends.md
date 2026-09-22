@@ -52,9 +52,10 @@ A static `Axis3` figure on CairoMakie is a valid 3D plot. 3D does not
 require WGLMakie. Scatter and Lines on `Axis3` commit an
 [`ElementEvent`](@ref) with `x`, `y`, `z`. MeshScatter derives
 `radius3d` from data-space `markersize`. Orbit is
-[`ViewInteractable`](@ref) on that axis. For constructor allowlists, see
-[Constructors](@ref). For the cairo-frames versus webgl-numeric split,
-see [Pan and orbit preview](@ref).
+[`ViewInteractable`](@ref) on that axis. For which recipes
+`masque(fig)` extracts, see [Recipes masque(fig) extracts](@ref). For
+the cairo-frames versus webgl-numeric split, see
+[Pan and orbit preview](@ref).
 
 ## WGLMakie
 
@@ -63,21 +64,41 @@ see [Pan and orbit preview](@ref).
 
 `using WGLMakie` (with CairoMakie **not** loaded) switches `masque` to a
 browser-GPU canvas. The overlay sits on top. The `masque` / `@bind` API
-does not change:
+does not change.
+
+### The widget is the figure
+
+Return `masque(f)` from the construction cell. That cell is already a
+masqued figure. `@bind` is optional. Displaying a WGLMakie `Figure`
+hangs on `.wglmakie-spinner`: its MIME show waits for a Bonito session
+Pluto never starts.
 
 ```julia
-begin
-    using Masque, WGLMakie
-    x, y, z = randn(200), randn(200), randn(200)
-    fig = Figure()
-    ax = Axis3(fig[1, 1])
-    scatter!(ax, x, y, z)
+fig = let
+    f = Figure()
+    ax = Axis3(f[1, 1])
+    scatter!(ax, randn(200), randn(200), randn(200))
+    masque(f)
 end
 ```
 
+A trailing `;` is only for `@bind`, so Pluto does not show the widget
+twice:
+
 ```julia
-@bind pick masque(fig)
+fig = let
+    f = Figure()
+    ax = Axis3(f[1, 1])
+    scatter!(ax, randn(200), randn(200), randn(200))
+    masque(f)
+end;
+
+@bind pick fig
 ```
+
+CairoMakie can still `@bind pick masque(fig)` after displaying a
+`Figure`: a PNG show is fine. This layout is the WGLMakie
+recommendation, and a reasonable Pluto habit on either backend.
 
 Load WGLMakie for a live GPU canvas: animation, frequent re-renders, or
 large updating data, where per-frame PNG cost dominates.
