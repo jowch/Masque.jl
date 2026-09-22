@@ -316,10 +316,6 @@ function _check_selected(L::HitLayer, sel)
     return idxs .- 1
 end
 
-# ---------------------------------------------------------------------------
-# Envelope → Julia value (both backends)
-# ---------------------------------------------------------------------------
-
 function _manifest_layer(manifest::AbstractDict, id::AbstractString)
     layers = get(manifest, "layers", nothing)
     layers === nothing && throw(ArgumentError("bond: this manifest has no layers"))
