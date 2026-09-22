@@ -595,12 +595,11 @@ try {
       // commits) for the WRONG reason (the test still expects a commit). Asserting "the bond
       // stayed put" alone would pass just as well if the drag did nothing at all — the #99
       // failure shape (a green assertion unable to fail for the right reason) — so this checks
-      // three things: the bond truly didn't move, AND (on `:cairo`, where the gesture channel is
-      // implemented) mount.ts's `host.dataset.masqueGestureFrame` stamp — written atomically in
-      // the same block that swaps the frame + manifest — advanced with a well-formed new camera,
-      // proving a REAL frame landed from the CURRENT drag rather than sampling stale state. On
-      // `:webgl` (no live-preview mechanism yet, architecture §12.10) the stamp must never
-      // appear at all — the readout still works, but nothing repaints.
+      // three things: the bond truly didn't move, AND mount.ts's `host.dataset.masqueGestureFrame`
+      // stamp — written atomically in the same block that swaps the frame + manifest — advanced
+      // with a well-formed new camera, proving a REAL frame landed from the CURRENT drag rather
+      // than sampling stale state. Both backends (#102 on `:cairo`, #133 on `:webgl`). `:webgl`
+      // waits longer: the first frame pays scene serialization plus a GPU scene swap.
       const p = hitPoint(layer, 0);
       const before = await textOf(`#out_${key}`);
       const readStamp = () => page.evaluate((k) => {
@@ -623,32 +622,25 @@ try {
         throw new Error(`${key}-drag: a view gesture must not commit a bond value, but #out_${key} changed ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
       }
 
-      if (backend === "cairo") {
-        let stampAfter = stampBefore;
-        for (let i = 0; i < 25 && stampAfter === stampBefore; i++) {
-          await new Promise((r) => setTimeout(r, 200));
-          stampAfter = await readStamp();
-        }
-        if (!stampAfter || stampAfter === stampBefore) {
-          throw new Error(`${key}-drag: gesture-channel frame never landed (stamp stayed ${JSON.stringify(stampBefore)})`);
-        }
-        const cam = JSON.parse(stampAfter);
-        const nBefore = stampBefore ? JSON.parse(stampBefore).n : 0;
-        if (!(cam.n > nBefore)) throw new Error(`${key}-drag: gesture frame counter did not advance (${nBefore} -> ${cam.n})`);
-        const camKeys = "azimuth" in cam ? ["azimuth", "elevation"] : ["xmin", "xmax", "ymin", "ymax"];
-        if (!camKeys.every((k2) => typeof cam[k2] === "number" && Number.isFinite(cam[k2]))) {
-          throw new Error(`${key}-drag: gesture frame stamp missing camera fields: ${stampAfter}`);
-        }
-        passed.push(`${key}/view-gesture-frame`);
-        console.error(`OK  ${key}/drag — no commit (§12.3), gesture frame ${stampAfter}`);
-      } else {
-        const stampAfter = await readStamp();
-        if (stampAfter !== stampBefore) {
-          throw new Error(`${key}-drag: :webgl produced a gesture-channel frame, but no mechanism is implemented for it (architecture §12.10)`);
-        }
-        passed.push(`${key}/view-no-commit-no-webgl-frame`);
-        console.error(`OK  ${key}/drag — no commit, no frame (webgl has no live-preview mechanism yet)`);
+      const tries = backend === "webgl" ? 50 : 25;
+      const delayMs = backend === "webgl" ? 300 : 200;
+      let stampAfter = stampBefore;
+      for (let i = 0; i < tries && stampAfter === stampBefore; i++) {
+        await new Promise((r) => setTimeout(r, delayMs));
+        stampAfter = await readStamp();
       }
+      if (!stampAfter || stampAfter === stampBefore) {
+        throw new Error(`${key}-drag: gesture-channel frame never landed (stamp stayed ${JSON.stringify(stampBefore)})`);
+      }
+      const cam = JSON.parse(stampAfter);
+      const nBefore = stampBefore ? JSON.parse(stampBefore).n : 0;
+      if (!(cam.n > nBefore)) throw new Error(`${key}-drag: gesture frame counter did not advance (${nBefore} -> ${cam.n})`);
+      const camKeys = "azimuth" in cam ? ["azimuth", "elevation"] : ["xmin", "xmax", "ymin", "ymax"];
+      if (!camKeys.every((k2) => typeof cam[k2] === "number" && Number.isFinite(cam[k2]))) {
+        throw new Error(`${key}-drag: gesture frame stamp missing camera fields: ${stampAfter}`);
+      }
+      passed.push(`${key}/view-gesture-frame`);
+      console.error(`OK  ${key}/drag — no commit (§12.3), gesture frame ${stampAfter}`);
       continue;
     }
 

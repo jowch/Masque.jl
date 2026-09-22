@@ -74,12 +74,13 @@ Runic, and an advisory live kind sweep.
 ### View manipulation and the remount (#82, tracking)
 
 `ViewInteractable` used to be commit-on-release: nothing moved during the drag, and the commit
-replaced the cell output, which on `:webgl` was a blank canvas plus a scene re-init. #102 (landed,
-`:cairo` only) replaced that: the gesture commits nothing at all
+replaced the cell output, which on `:webgl` was a blank canvas plus a scene re-init. #102/#133
+replaced that: the gesture commits nothing at all
 ([§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)), and in-drag frames stream
-over the gesture channel instead — no cell re-execution, no remount, for the backend that has a
-mechanism. `:webgl` takes the same no-commit contract but has no live-preview mechanism yet, so a
-view drag there shows only the Tier-0 readout and repaints nothing (§12.10). What remains open:
+over the gesture channel instead — no cell re-execution, no remount, on both backends. `:cairo`
+ships a PNG per frame; `:webgl` ships a freshly serialized scene onto the canvas the cell already
+holds ([§12.5](architecture/12-gesture-channel.md#125-backend-obligations-mechanism-independent)).
+What remains open:
 
 1. **#84 Last-frame hold.** Park the last painted frame (Cairo PNG `src`, or a bitmap from the
    WGL canvas) and show it until the new base is ready. #102 already does this for `:cairo` (the
@@ -102,7 +103,9 @@ view drag there shows only the Tier-0 readout and repaints nothing (§12.10). Wh
    (flat regardless of scene weight) is what makes a fresh manifest per frame affordable. Nothing
    commits at the end: an orbit settles a camera, and a camera never enters notebook state (#122,
    [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)). `:webgl` orbit preview
-   remains open — same #86 mechanism gap as pan.
+   is the same scene-swap as pan (#133): a fresh serialization plus a fresh manifest, on the
+   canvas the cell already holds. #86 (surviving a cell replacement) is a different problem and
+   stays open.
 
 **#83: the double remount is a consequence of an unsupported self-referencing `@bind` shape.**
 The view-manipulation widget cell both defines the `@bind` and reads its own previous bond value

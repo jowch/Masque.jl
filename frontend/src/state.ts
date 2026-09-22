@@ -105,7 +105,7 @@ export interface OverlayCtx {
     focusable_: FocusRef[] // flat, manifest-order list of element-indexed hits — keyboard.ts's nav domain
     layerStarts_: number[] // computeLayerStarts(focusable), cached once — PageUp/PageDown's layer-jump index
     liveRegion_: HTMLElement // visually-hidden aria-live="polite" announcer (NOT the tooltip)
-    // #102's gesture channel — a no-op channel when the widget has no live-preview mechanism
+    // #102/#133's gesture channel — a no-op channel when the widget has no ViewInteractable
     // (mount.ts's createGestureChannel(null, …)), so bond.ts never needs to branch on whether
     // one is actually wired. `manifest_`/`thresholdLines_`/`roiBoxes_`/`focusable_`/
     // `layerStarts_` above are reassigned in place when a frame swaps in a new manifest (see

@@ -1,10 +1,15 @@
-// The gesture channel (#102, docs/dev/architecture/12-gesture-channel.md): request discipline
-// (§12.6) for a `with_js_link` round trip that streams frames during a view drag. `:cairo`
-// only — `render` is `null` whenever the widget has no live-preview mechanism (`:webgl`, or a
-// widget with no `ViewInteractable`), and every method below degrades to a no-op in that case.
+// The gesture channel (#102/#133, docs/dev/architecture/12-gesture-channel.md): request
+// discipline (§12.6) for a `with_js_link` round trip that streams frames during a view drag.
+// `render` is `null` when the widget has no `ViewInteractable` (or the channel has degraded),
+// and every method below degrades to a no-op in that case. Both backends use this; the frame
+// body differs — `{png}` on `:cairo`, `{scene, width, height, pxPerUnit}` on `:webgl`.
 
 export interface FrameResponse {
-    png: Uint8Array
+    png?: Uint8Array
+    scene?: unknown
+    width?: number
+    height?: number
+    pxPerUnit?: number
     manifest?: unknown // Manifest, kept loose here to avoid a cycle with mount.ts's own import of this file
 }
 

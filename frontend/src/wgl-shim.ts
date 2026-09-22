@@ -80,6 +80,120 @@ export interface MountArgs {
     pxPerUnit?: number
 }
 
+// A three.js scene node the gesture channel disposes. Loose on purpose: the shape is
+// WGLMakie's, and the only fields this file touches are the ones named here.
+interface WglScene {
+    scene_uuid?: unknown
+    scene_children?: WglScene[]
+    orbitcontrols?: { dispose?: () => void }
+    screen?: unknown
+}
+
+interface WglScreen {
+    renderer: {
+        _width: number
+        _height: number
+        setViewport?: (x: number, y: number, w: number, h: number) => void
+    }
+    px_per_unit: number
+    root_scene: WglScene | null
+}
+
+interface WglBundle {
+    deserialize_scene: (data: unknown, screen: WglScreen) => WglScene
+    start_renderloop: (scene: WglScene) => void
+    delete_scene?: (id: unknown) => void
+}
+
+export interface PendingScene {
+    scene: unknown
+    pxPerUnit?: number
+    width?: number
+    height?: number
+}
+
+interface WglCanvas extends HTMLCanvasElement {
+    wglmakie_screen?: WglScreen
+    masqueReplaceScene?: (scene: unknown, pxPerUnit?: number, width?: number, height?: number) => void
+    masquePendingScene?: PendingScene | null
+}
+
+// Stop the render loop that closed over `scene` without disposing the real WebGL renderer.
+// WGLMakie's check_screen treats a screen with no renderer as already gone (dispose_screen
+// returns immediately on an empty object), so the loop exits and the context on
+// canvas.wglmakie_screen stays. #86 is a different problem: Pluto replacing cell output
+// destroys the canvas. A view gesture does not replace the cell, so this canvas is stable
+// for the whole drag.
+function stopRenderLoop(scene: WglScene | null): void {
+    if (scene) scene.screen = {}
+}
+
+function disposeOrbit(scene: WglScene | null): void {
+    if (!scene) return
+    scene.orbitcontrols?.dispose?.()
+    scene.orbitcontrols = undefined
+    for (const child of scene.scene_children ?? []) disposeOrbit(child)
+}
+
+// Swap a Julia-serialized scene onto the canvas's existing renderer (#133, §12.5).
+// Projection stays Julia's: `scene` is a fresh serialize_scene for the camera Julia just
+// set, and the overlay swaps the matching manifest in the same turn (mount.ts). This does
+// not compute a camera in JS, and it does not call setup_scene_init again — a second
+// threejs renderer on this canvas would be a second WebGL context.
+function replaceScene(canvas: WglCanvas, WGL: WglBundle, scene: unknown, pxPerUnit?: number, width?: number, height?: number): void {
+    const screen = canvas.wglmakie_screen
+    if (!screen) throw new Error("Masque: canvas has no WGLMakie screen to update")
+    if (typeof WGL.deserialize_scene !== "function" || typeof WGL.start_renderloop !== "function") {
+        throw new Error("Masque: WGLMakie bundle is missing deserialize_scene/start_renderloop")
+    }
+    const old = screen.root_scene
+    if (old) {
+        stopRenderLoop(old)
+        disposeOrbit(old)
+        if (old.scene_uuid != null && typeof WGL.delete_scene === "function") {
+            try {
+                WGL.delete_scene(old.scene_uuid)
+            } catch (e) {
+                console.error("[masque-wgl] delete_scene failed", e)
+            }
+        }
+    }
+    if (typeof pxPerUnit === "number" && typeof width === "number" && typeof height === "number") {
+        screen.px_per_unit = pxPerUnit
+        screen.renderer._width = width
+        screen.renderer._height = height
+        const rw = Math.ceil(width * pxPerUnit)
+        const rh = Math.ceil(height * pxPerUnit)
+        // Assigning canvas.width clears the drawing buffer. Skip it when the framebuffer
+        // is already the right size so an in-drag frame at a steady ppu doesn't flash.
+        if (canvas.width !== rw || canvas.height !== rh) {
+            canvas.width = rw
+            canvas.height = rh
+            screen.renderer.setViewport?.(0, 0, rw, rh)
+        }
+    }
+    const next = WGL.deserialize_scene(rewrap(scene), screen)
+    next.screen = screen
+    screen.root_scene = next
+    WGL.start_renderloop(next)
+    // setup_scene_init / set_render_size write canvas CSS to the framebuffer size.
+    // The overlay pins to the element's border box, which has to stay the display size.
+    canvas.style.width = "100%"
+    canvas.style.height = "auto"
+}
+
+function installSceneReplacer(canvas: WglCanvas, WGL: WglBundle): void {
+    if (!canvas.wglmakie_screen) return
+    canvas.masqueReplaceScene = (scene, pxPerUnit, width, height) => {
+        replaceScene(canvas, WGL, scene, pxPerUnit, width, height)
+    }
+    const pending = canvas.masquePendingScene
+    if (pending) {
+        canvas.masquePendingScene = null
+        canvas.masqueReplaceScene(pending.scene, pending.pxPerUnit, pending.width, pending.height)
+    }
+}
+
 export async function mountWebGL({ canvas, wglBundleUrl, scene, width, height, pxPerUnit = 2 }: MountArgs) {
     const WGL = await import(/* @vite-ignore */ wglBundleUrl)
     ;(window as any).Bonito = makeBonitoShim()    // WGLMakie reads window.Bonito globals
@@ -101,9 +215,12 @@ export async function mountWebGL({ canvas, wglBundleUrl, scene, width, height, p
     // `.ip-host`). Keep the element display-sized so the overlay can pin to it.
     canvas.style.width = "100%"
     canvas.style.height = "auto"
+    installSceneReplacer(canvas as WglCanvas, WGL as WglBundle)
     // Return WGL so an animation driver can do BOTH tiers without re-importing:
     //  - uniforms/camera: find the live observable in `scene` and .notify(v)
     //  - data (positions): WGL.find_plots([uuid])[0].geometry.attributes.wgl_positions
     //      .array.set(frame); attr.needsUpdate = true;   (smooth, no Julia round-trip)
+    // A gesture frame replaces `scene` (the mount-time object). Drivers that held this
+    // return value are looking at the pre-gesture scene after the first view drag.
     return { scene: sceneObj, WGL }
 }

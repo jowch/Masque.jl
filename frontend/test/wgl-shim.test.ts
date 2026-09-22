@@ -179,4 +179,54 @@ describe("mountWebGL", () => {
         expect(canvas.style.width).toBe("100%")
         expect(canvas.style.height).toBe("auto")
     })
+
+    it("installs a scene replacer that swaps onto the existing screen and stops the old loop", async () => {
+        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+            wglmakie_screen?: { root_scene: { screen?: unknown; orbitcontrols?: { disposed: boolean } } }
+            masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
+        }
+        document.createElement("div").appendChild(canvas)
+        const mod = await import(/* @vite-ignore */ bundleUrl) as { sceneCalls: { deleted: number; loops: number; lastDeleted?: string } }
+        mod.sceneCalls.deleted = 0
+        mod.sceneCalls.loops = 0
+        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 640, height: 480, pxPerUnit: 2 })
+        const first = canvas.wglmakie_screen!.root_scene
+        const controls = first.orbitcontrols!
+        expect(typeof canvas.masqueReplaceScene).toBe("function")
+        canvas.masqueReplaceScene!({ tag: "next" }, 1, 100, 50)
+        expect(first.screen).toEqual({})
+        expect(controls.disposed).toBe(true)
+        expect(first.orbitcontrols).toBeUndefined()
+        expect(mod.sceneCalls.deleted).toBe(1)
+        expect(mod.sceneCalls.lastDeleted).toBe("mount")
+        expect(mod.sceneCalls.loops).toBe(1)
+        expect(canvas.wglmakie_screen!.root_scene).not.toBe(first)
+        expect((canvas.wglmakie_screen!.root_scene as { data?: unknown }).data).toEqual({ tag: "next" })
+        expect(canvas.width).toBe(100)
+        expect(canvas.height).toBe(50)
+        expect(canvas.style.width).toBe("100%")
+        expect(canvas.style.height).toBe("auto")
+        // A second frame at the same framebuffer size does not need another context.
+        canvas.masqueReplaceScene!({ tag: "settle" }, 2, 100, 50)
+        expect(mod.sceneCalls.deleted).toBe(2)
+        expect(mod.sceneCalls.loops).toBe(2)
+        expect(canvas.width).toBe(200) // 100 * ppu 2
+    })
+
+    it("applies a scene that arrived before the replacer was installed", async () => {
+        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+            wglmakie_screen?: { root_scene: { data?: unknown } }
+            masquePendingScene?: { scene: unknown; pxPerUnit?: number; width?: number; height?: number } | null
+        }
+        document.createElement("div").appendChild(canvas)
+        canvas.masquePendingScene = { scene: { tag: "early" }, pxPerUnit: 2, width: 80, height: 40 }
+        const mod = await import(/* @vite-ignore */ bundleUrl) as { sceneCalls: { deleted: number; loops: number } }
+        mod.sceneCalls.deleted = 0
+        mod.sceneCalls.loops = 0
+        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 80, height: 40, pxPerUnit: 2 })
+        expect(canvas.masquePendingScene).toBeNull()
+        expect(mod.sceneCalls.loops).toBe(1)
+        expect(canvas.wglmakie_screen!.root_scene.data).toEqual({ tag: "early" })
+        expect(canvas.width).toBe(160)
+    })
 })

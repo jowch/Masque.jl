@@ -22,8 +22,9 @@ export function tip(d: Extract<Drag, { kind: "view" }>, p: { x: number; y: numbe
 // reads for its readout, tagged with this drag's layer id (so Julia knows which
 // ViewInteractable to drive) and whether this is the terminal ("settle") request — the flag
 // that decides `px_per_unit` on the Julia side (dropped to 1 mid-gesture, restored on settle).
-// `haskey(input, "azimuth")` is how `Masque._view_render_frame` tells pan from orbit; the two
-// payload shapes are mutually exclusive by construction, same as `end`'s old commit payload was.
+// `haskey(input, "azimuth")` is how `Masque._view_render_frame` tells pan from orbit, on either
+// backend; the two payload shapes are mutually exclusive by construction, same as `end`'s old
+// commit payload was.
 export function requestInput(d: Extract<Drag, { kind: "view" }>, p: { x: number; y: number }, settle: boolean): Record<string, unknown> {
     const payload = d.g_.mode === "orbit" ? orbitAngles(d.g_, d.x0_, d.y0_, p.x, p.y) : panLimits(d.t_, d.x0_, d.y0_, p.x, p.y)
     return { id: d.id_, ...payload, settle }

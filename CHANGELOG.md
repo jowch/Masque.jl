@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `:webgl` view gestures stream live frames on the same `with_js_link` channel as `:cairo`.
+  Each frame is a freshly serialized scene plus a hit manifest Julia computed for that camera,
+  swapped onto the canvas the cell already holds — no new WebGL context, no cell re-run.
+  `ViewInteractable` still commits nothing. In-drag frames render at `px_per_unit = 1` and the
+  release frame restores the widget's own resolution, same as `:cairo`.
 - Selection is client-side, and `selected=` is its starting value. Clicking a mark selects it
   in the browser immediately — no bond fed back into the widget, and it works in a static
   export, where no kernel exists to fire one. `selected=` seeds the selection rather than

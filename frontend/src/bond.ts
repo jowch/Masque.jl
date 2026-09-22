@@ -37,7 +37,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
         // guard `end`'s old commit check used to apply, now protecting the gesture channel
         // instead of a bond write, so an ordinary click with a pixel of jitter doesn't spend a
         // round trip on a frame nobody will see move. ctx.gesture_ is a no-op channel when
-        // there's no mechanism for this widget (:webgl, no ViewInteractable, export, or a
+        // there's no callback for this widget (no ViewInteractable, a static export, or a
         // channel that already degraded).
         if (Math.hypot(p.x - d.x0_, p.y - d.y0_) >= viewDrag.VIEW_MIN_PX) {
             const input = viewDrag.requestInput(d, p, false)

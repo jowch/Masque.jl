@@ -156,6 +156,11 @@
 > ("Gesture channel (#102): the shipped `with_js_link` round trip"), measured directly against
 > `Masque._view_render_frame` (the shipped closure, not the pre-implementation spike issue #102
 > cites) via the new committed `bench/gesture_channel.jl`.
+> #133 (2026-09-22) adds the `:webgl` per-frame response (`{scene, width, height, pxPerUnit,
+> manifest}`, no PNG) on that same channel. The static mount payload is unchanged —
+> `scene_payload` / `build_manifest` at `show` time are the same functions — so the envelope
+> tables above were not re-run for it. The new frame's own cost is in
+> "Gesture channel (#133): `:webgl` scene frames" below, measured by `bench/gesture_channel_webgl.jl`.
 > baseline established after int-pixel geometry quantization, CairoMakie 0.15, Julia 1.12):
 > - **base64-PNG / manifest / render numbers** — `julia --project=. bench/payload_envelope.jl`
 >   (normal envelope) and `julia --project=. bench/stress.jl` (the 10× extremes). Both `seed!(0)`,
@@ -340,7 +345,8 @@ release — the unsupported-shape double remount described in issue #83, reprodu
 Pluto version rather than only inferred from its description.
 
 This section is the `@bind`-commit baseline #102 replaced for view manipulation. The
-`with_js_link` gesture channel now ships (`:cairo` only) — its own numbers are below.
+`with_js_link` gesture channel ships on both backends. `:cairo` numbers are in the next
+section; `:webgl` numbers are in "Gesture channel (#133): `:webgl` scene frames".
 
 ### Gesture channel (#102): the shipped `with_js_link` round trip
 
@@ -386,6 +392,34 @@ implementation should change that floor, since the wire shape (`{png, manifest}`
 bytes not base64) matches what the spike round-tripped. `test/e2e/kind_sweep.mjs`'s
 `view/view-gesture-frame` check confirms a real frame lands end-to-end through an actual Pluto
 kernel + headless Chromium, but does not time it.
+
+### Gesture channel (#133): `:webgl` scene frames
+
+Measured **2026-09-22**, Julia 1.10.12, WGLMakie 0.13.15, against the same
+`Masque._view_render_frame` closure as the `:cairo` section, on `:webgl`
+(`bench/gesture_channel_webgl.jl`). Same three scenes, same best-of-20-after-warmup method, two
+independent runs. No browser and no Pluto kernel — Julia-side only.
+
+`:webgl` does not rasterize a PNG. `render` serializes the figure once per frame and records
+`pxPerUnit` for the browser framebuffer (1 during the drag, the mount value on settle).
+`scene_payload` does not resample, so the serialized scene is the same number of bytes at both
+resolutions. Wire bytes are the binary length of every concrete numeric array in the value
+(the dominant MsgPack term; same definition as `bench/webgl_payload_size.jl`). The JSON column
+is `JSON3.write` of the scene alone, an upper bound, not the wire.
+
+| scene | in-drag (`ppu=1`) p50 | settle (mount `ppu`) p50 | scene wire (both phases) | scene JSON |
+|---|---:|---:|---:|---:|
+| light (helix + 12 markers), orbit | 3.4–3.5 ms | 4.4–4.5 ms | 132.3 KB | 545.9 KB |
+| heavy (+80×80 `surface!`), orbit | 3.4–3.5 ms | 4.5–4.6 ms | 522.2 KB | 1392.0 KB |
+| light (scatter-6), 2D pan | 1.1–1.2 ms | 1.1–1.2 ms | 136.8 KB | 521.3 KB |
+
+Frame wire (scene + manifest) is 0.1 KB above the scene on the two orbit rows and equal to it
+on the pan row. The heavy scene is not render-bound on this path: it costs the same few
+milliseconds as the light helix, and it pays in payload (522.2 KB wire, 1392.0 KB JSON) instead of
+in a raster. Dropping `pxPerUnit` to 1 does not shrink that payload. It only tells the browser
+to draw into a smaller framebuffer. Transfer and three.js deserialize/paint are not in this
+table. `test/e2e/kind_sweep.mjs`'s `view/view-gesture-frame` check is what confirms a frame
+lands on the live canvas.
 
 ## Stress test — the extremes (where it stops being render-bound)
 

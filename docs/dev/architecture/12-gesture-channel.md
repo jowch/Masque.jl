@@ -100,11 +100,11 @@ matches every other non-bond display state in Pluto, and [§5](05-bond-value.md)
 every re-render. To persist a view, an author writes the `Ref` + `@bind` pattern explicitly and
 accepts its tradeoffs (§12.8).
 
-*Status:* implemented on `:cairo` (#102). `ViewInteractable` commits nothing;
+*Status:* implemented on `:cairo` (#102) and `:webgl` (#133). `ViewInteractable` commits nothing;
 `_computed_payload`'s `:view` branch (`src/render.jl`) has retired — a `:view` computed payload
 now fails loud (unrecognized shape) rather than converting, since no path ever sends one.
-`:webgl` has no live-preview mechanism (§12.10 remains open for it), but it takes the same
-no-commit contract: a view drag there shows the Tier-0 readout and repaints nothing.
+Both backends stream in-drag frames over this channel. What they ship differs (§12.5); the
+no-commit contract does not.
 
 ## 12.4 Projection stays Julia-authored on every frame
 
@@ -145,11 +145,19 @@ unconditionally it charges the cheap case a manifest rebuild it does not need an
 hit-testing that could stay live.
 
 Mechanisms differ by backend and need not converge. `:cairo` re-renders and ships a fresh PNG
-plus, when owed, a fresh manifest. `:webgl` has no settled mechanism: #86 gates in-place buffer
-patching on canvas identity (a WebGL context is tied to one `<canvas>`, which Pluto's cell-output
-replacement destroys). #85 proposes a 2D last-frame preview — CSS-transforming frame and overlay
-together while a Julia frame is in flight — for both backends, not as a `:webgl`-specific answer
-to #86. **Backends differ in cost, never in the interaction contract:** conformance is judged
+plus, when owed, a fresh manifest. `:webgl` has no PNG to ship: each frame is a fresh
+`serialize_scene` of the same figure, deserialized onto the WebGL renderer the widget's
+`<canvas>` already owns (`deserialize_scene` + `start_renderloop` on that screen; the previous
+three.js scene is deleted first). The canvas is not recreated and `setup_scene_init` is not
+called again, so the gesture does not open a second WebGL context. Hit geometry is the manifest
+Julia built for that same camera, swapped in the same turn as the scene. A client-side camera
+would be cheaper and would not be this mechanism (§12.4).
+
+This is not #86. #86 is about a scene surviving Pluto *replacing* the cell output, which destroys
+the `<canvas>`. A view gesture does not replace the cell (§12.3), so the canvas this frame paints
+on is the one the current output already holds. #85's CSS-transform preview remains an
+alternative for hiding latency on both backends, not a substitute for the frame itself.
+**Backends differ in cost, never in the interaction contract:** conformance is judged
 against the obligations above, never against a particular backend's mechanism.
 
 ## 12.6 Request discipline
@@ -229,17 +237,15 @@ specified.
 
 ## 12.10 Open questions
 
-Constraints a conforming implementation must satisfy. Each is unresolved and left to whoever
-picks up #102.
+Constraints a conforming implementation must satisfy. Each is unresolved. The channel itself
+ships on both backends; these two are what it does not yet decide.
 
-- **Heavy-scene mitigation beyond `px_per_unit = 1`.** A render-bound heavy scene needs further
-  mitigation to hit a live-preview budget — a further downscale, a render-quality knob during the
-  drag, or an accepted lower frame rate. Which one, and at what threshold, is unresolved. Issue
-  #102 carries the measurements establishing that the heavy scene is render-bound.
-- **`:webgl` parity.** `:webgl` has no settled mechanism for §12.5's obligations, and the gap is
-  in the mechanism, not the measurement: #86 blocks in-place buffer patching on canvas identity,
-  and #85's 2D last-frame preview is an alternative for both backends rather than an answer to
-  #86. Whichever mechanism `:webgl` takes, what the backends share is this section's contract.
+- **Heavy-scene mitigation beyond `px_per_unit = 1`.** On `:cairo` the heavy scene is render-bound
+  (the PNG), so a further downscale, a render-quality knob during the drag, or an accepted lower
+  frame rate is still unresolved — which one, and at what threshold. On `:webgl` that lever does
+  not shrink the frame: `scene_payload` does not resample, so in-drag and settle ship the same
+  serialized scene and the cost is that payload, not a raster. Measurements for both are in
+  `perf-findings.md`.
 - **What ends a gesture with no release.** Committing is not the question — view manipulation
   commits nothing — but a wheel zoom still has no terminal event, so the channel needs a
   rule for when to stop requesting frames and settle on the last one: an idle debounce, an

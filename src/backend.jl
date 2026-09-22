@@ -11,6 +11,12 @@ struct RenderResult
     scaling::Float64
 end
 
+# The per-frame wire body for one backend's `render` result, before `_view_render_frame`
+# attaches the manifest. `:cairo`'s `RenderResult` ships PNG bytes. `:webgl`'s result type
+# (in the WGL extension) adds its own method: a fresh `serialize_scene`, not a PNG — the
+# figure is a live canvas. Both still travel with a manifest whenever the camera moved.
+_gesture_frame(result::RenderResult) = Dict{String, Any}("png" => result.payload)
+
 """
     AxisTransform
 
@@ -86,9 +92,9 @@ function render end
 function context end
 function _ppu end         # (backend, fig) -> px_per_unit / device scale
 # (backend, <backend's RenderResult-like>, manifest, display_css, fig, interactables, ppu) ->
-# the @bind widget. The last three are for the gesture channel (#102, `:cairo`-only today):
-# `CairoBackend`'s method builds a per-frame `with_js_link` callback from them
-# (`Masque._view_render_frame`); `WebGLBackend`'s accepts and ignores them.
+# the @bind widget. The last three build the gesture channel's per-frame callback
+# (`Masque._view_render_frame`, #102/#133): both backends call it. `:cairo` returns
+# `{png, manifest}`; `:webgl` returns `{scene, width, height, pxPerUnit, manifest}`.
 function make_widget end
 
 # `Makie.project` expects post-transform_func coordinates; transform in Float64 first —

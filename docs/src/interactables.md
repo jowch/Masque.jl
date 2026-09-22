@@ -39,10 +39,10 @@ everything else: change `limits` (2D) or `azimuth`/`elevation` (`Axis3`) and reb
 — `masque` re-projects the overlay, so hit regions stay correct.
 
 **Dragging with [`ViewInteractable`](@ref) is different: it commits nothing.** A camera is
-operational state, not an analysis value the notebook reads. On the `:cairo` backend, in-drag
-frames stream over a `with_js_link` gesture channel instead of a bond — the image and hit
-regions repaint live, with no cell re-execution. `:webgl` has no live-preview mechanism yet: a
-drag there shows a numeric readout but repaints nothing. Shift+drag wins over a
+operational state, not an analysis value the notebook reads. On both backends, in-drag frames
+stream over a `with_js_link` gesture channel instead of a bond — the picture and hit regions
+repaint live, with no cell re-execution. `:cairo` ships a PNG; `:webgl` ships a freshly
+serialized scene onto the canvas already on the page. Shift+drag wins over a
 `ROIInteractable`/`ThresholdInteractable` on the same axis on both backends.
 [`examples/view_manip.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip.jl)
 demonstrates both.

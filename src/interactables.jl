@@ -1035,15 +1035,14 @@ drag on those wins without a modifier — **Shift+drag** forces the view gesture
 
 **Commits nothing.** A camera is operational state, not an analysis value a notebook reads
 (docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a
-`:view` [`InteractionEvent`](@ref). On the `:cairo` backend, drag frames stream over a
-`with_js_link` gesture channel instead: Julia mutates `ax.limits[]` (pan) or
-`ax.azimuth[]`/`ax.elevation[]` (orbit), re-renders at `px_per_unit = 1`, and ships a fresh PNG
-plus hit manifest for every frame the camera moves; the release frame renders at the widget's
-own resolution. `:webgl` has no live-preview mechanism yet (§12.10) — the drag still shows a
-numeric readout, but nothing repaints until a future backend catches up. Because nothing
-commits, `ax`'s camera stays wherever the gesture left it until the cell re-runs (a fresh
-`Figure`/`Axis` resets it); to persist a view across re-renders, bind it explicitly with the
-`Ref` + `@bind` pattern (§12.8).
+`:view` [`InteractionEvent`](@ref). Drag frames stream over a `with_js_link` gesture channel
+instead, on both backends: Julia mutates `ax.limits[]` (pan) or `ax.azimuth[]`/`ax.elevation[]`
+(orbit) and ships a hit manifest for every frame the camera moves. `:cairo` ships that frame as
+a PNG; `:webgl` ships a freshly serialized scene applied to the canvas already on the page.
+In-drag frames render at `px_per_unit = 1`; the release frame renders at the widget's own
+resolution. Because nothing commits, `ax`'s camera stays wherever the gesture left it until the
+cell re-runs (a fresh `Figure`/`Axis` resets it); to persist a view across re-renders, bind it
+explicitly with the `Ref` + `@bind` pattern (§12.8).
 
 `masque` raises `ArgumentError` at build time if `ax` is a `PolarAxis` (continuous θ/r view
 gestures aren't shipped), a `Colorbar`'s value axis (no pan/orbit view applies), a categorical
@@ -1090,7 +1089,7 @@ function hitlayers(i::ViewInteractable, ctx)
     )
     if t.is3d
         # Current camera — JS computes the drag's (azimuth, elevation) from the pixel delta, for
-        # the Tier-0 readout and (on :cairo) the gesture-channel request payload. Never committed
+        # the Tier-0 readout and the gesture-channel request payload. Never committed
         # (§12.3): a view gesture reports no InteractionEvent at all.
         geom["azimuth"] = Float64(i.ax.azimuth[])
         geom["elevation"] = Float64(i.ax.elevation[])
