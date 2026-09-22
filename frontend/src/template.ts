@@ -71,7 +71,19 @@ export function stripToPlain(html: string): string {
 // unlike hover.ts's tipHtmlForHit this needs no manifest/px/py for continuous-axis inversion.
 export function plainTextForHit(hit: Hit): string {
     const layer = hit.layer
-    if (layer.tooltip === false) return ""
+    if (layer.tooltip === false) {
+        // A legend entry has no visual card by default — the label is already in the row —
+        // but the live region still names the entry. Without this, focus announces only
+        // "Legend, element k of n".
+        if (layer.bond === "legend") {
+            const payload = layer.payloads[hit.index]
+            if (payload && typeof payload === "object" && "label" in payload) {
+                const label = (payload as { label?: unknown }).label
+                if (label !== undefined && label !== null) return String(label)
+            }
+        }
+        return ""
+    }
     const payload = layer.payloads[hit.index]
     if (layer.template) return stripToPlain(renderTemplate(layer.template, payload))
     return renderAutoTablePlain(payload)

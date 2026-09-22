@@ -869,7 +869,6 @@ function hitlayers(i::ColorbarInteractable, ctx)
 end
 
 # ============================ LegendInteractable ============================
-const _LEGEND_DEFAULT_TOOLTIP = masque"$(label)"
 
 # Best-effort per-entry accent colour: the entry's first LegendElement's own colour attribute
 # (LineElement -> linecolor, MarkerElement -> markercolor, PolyElement -> polycolor). `nothing`
@@ -1004,10 +1003,11 @@ for: hover/click an entry to highlight the layer(s) named in `targets`. Produces
 - `leg` — a `Makie.Legend`.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:legend`.
 - `targets` — how each entry links to other layers, resolved once at construction:
-  - `nothing` (default) — auto-extracted `masque(fig)` legends resolve links from the plots
-    each entry's elements were built with (`Makie.get_plots`); anything else (a legend you
-    build by hand) gets no links (still hittable — `tooltip`/click still work, just no
-    highlight).
+  - `nothing` (default) — `masque(fig)` links each entry to the layers of the plots its
+    elements were built with (`Makie.get_plots`). That lookup runs during auto extraction.
+    Calling `LegendInteractable` yourself, or a hand-built entry whose elements carry no
+    plots, leaves the link list empty. The entry stays a hit target: hover leaves the other
+    layers as they are, and a click reports a [`LegendEvent`](@ref).
   - a `Dict{<:AbstractString}` keyed by entry **label** — `Symbol` or `Vector{Symbol}` of layer
     ids for that entry. A key matching no entry label raises `ArgumentError`.
   - a `Vector` with one entry per legend entry (`nothing`/`Symbol`/`Vector{Symbol}`), in entry
@@ -1017,9 +1017,10 @@ for: hover/click an entry to highlight the layer(s) named in `targets`. Produces
   supports pre-highlight (`ArgumentError` from `build_manifest` otherwise — see
   [`HitLayer`](@ref)'s `links` field). A spec may be a layer id (every element of that layer)
   or `id:k` pinning element `k` (1-based); auto-extracted `series!` entries use the pin.
-- `tooltip` — `nothing` (default) shows the entry's label; `masque"..."` for a custom template
-  (payload fields: `label`, `group`, `targets`); `false` to suppress. `tooltip = true` is
-  rejected (`ArgumentError`).
+- `tooltip` — `nothing` (default) and `false` show no card. The entry's label is already
+  drawn in the row, and a card there covers the entries around it. `masque"..."` shows that
+  template (payload fields: `label`, `group`, `targets`). `tooltip = true` is rejected
+  (`ArgumentError`). Focusing an entry still announces its label when no template is set.
 - `events` — the pointer events this layer responds to. Default `(:click, :hover)`.
 
 A custom legend built from `LineElement`/`MarkerElement`/`PolyElement` without `plots=` has
@@ -1034,7 +1035,7 @@ nothing to auto-link — pass `plots=` on the element (Makie's own kwarg) or use
 l1 = lines!(ax, xs, ys1; label = "a")
 l2 = lines!(ax, xs, ys2; label = "b")
 leg = axislegend(ax)
-LegendInteractable(leg)   # entry "a" links to :lines, "b" links to :lines_2
+LegendInteractable(leg)   # hit targets only; `masque(fig)` is what fills in the links
 
 LegendInteractable(leg; targets = Dict("a" => :lines, "b" => [:lines_2, :scatter]))
 ```
@@ -1059,7 +1060,10 @@ function LegendInteractable(
     return LegendInteractable(leg, id, resolved, events, tooltip, lenient)
 end
 events(i::LegendInteractable) = i.evs
-tooltip_spec(i::LegendInteractable) = i.tooltip === nothing ? _LEGEND_DEFAULT_TOOLTIP : i.tooltip
+# `nothing` suppresses the card, same as `false`. A `masque"..."` template still shows.
+# The entry label stays in the screen-reader announcement via the payload (`frontend`'s
+# `plainTextForHit` reads `bond == "legend"`), not via a default template.
+tooltip_spec(i::LegendInteractable) = i.tooltip === nothing ? false : i.tooltip
 function hitlayers(i::LegendInteractable, ctx)
     entries = _legend_entries(i.leg)
     aid = axis_id(ctx, i.leg)

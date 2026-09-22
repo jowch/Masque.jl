@@ -22,7 +22,7 @@ const ALLOWED = [/Bonito\.decode_binary is not a function/, /Bonito\.fetch_binar
 
 const browser = await chromium.launch({
   headless: true,
-  // See kind_sweep.mjs's identical comment: this notebook mounts 17 WGL canvases (one per
+  // See kind_sweep.mjs's identical comment: this notebook mounts 20 WGL canvases (one per
   // widget) and Chromium's default active-context cap is 16 — past it, the OLDEST context is
   // silently evicted, regardless of which widgets this driver itself inspects.
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--max-active-webgl-contexts=64"],
@@ -273,6 +273,16 @@ try {
     const li = await linkGCount(key);
     if (li.count === 0) throw new Error(`${key}: keyboard focus on a legend row drew no g.link content`);
     passed.push("legend/keyboard-focus-draws-link");
+
+    // Default legend has no visual card. The live region still names the entry ("pts" is row
+    // index 2, the one this block focuses).
+    let focused = await state(key);
+    if (focused.tipShown) throw new Error(`${key}: default legend focus showed a tooltip`);
+    focused = await waitForLiveRegion(key, /pts/);
+    if (!/pts/.test(focused.liveText)) {
+      throw new Error(`${key}: live region missing entry label: ${JSON.stringify(focused.liveText)}`);
+    }
+    passed.push("legend/no-default-tip+announces-label");
 
     await page.keyboard.press("Escape");
     const afterEsc = await linkGCount(key);
