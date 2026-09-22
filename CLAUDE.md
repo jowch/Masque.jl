@@ -62,17 +62,18 @@ text and the bond payload → it gets a live check on every backend × the kinds
   heatmap/image, barplot, poly, polar, dark-figure scatter, arrows3d, hlines/vlines,
   threshold, ROI, view-pan, and axis/colorbar. Interaction without visual is unfinished; visual
   chrome without the kind sweep is unfinished. Overlay recipes (locked — cite, do not reopen):
-  highlight is a split blend — a brightening fill plus a darkening stroke, not a mark-derived
+  highlight is a split — a brightening color-dodge fill plus a flat chrome stroke, not a mark-derived
   colour — `colors` (today `scatter!`'s `color=`) no longer touches the highlight at all, only
   the tooltip accent (below). The shadow root holds THREE sibling top-level svgs, identical
   box/viewBox, each with its own `g.hi`/`g.sel`: `svg.masque-fill` (`mix-blend-mode:
   color-dodge`, both light and dark figures) draws the fill half of a closed mark's
   hover/selected highlight (`masque-hi masque-fillshape`, computed fill `rgb(20, 20, 20)` /
-  `#141414`, fill-opacity 1, no stroke); `svg.masque-edge` (`multiply` on light figures, `screen`
-  on dark) draws the stroke half (`masque-hi masque-hover` at 1.5px hover, `masque-hi
-  masque-wash` at 2px selected, no fill) — Firefox only honours `mix-blend-mode` on a top-level
-  svg, not nested SVG content, which is why each blend mode gets its own sibling svg instead of
-  a per-element wrapper. Dodge against the near-black `#141414` source was, across a measured
+  `#141414`, fill-opacity 1, no stroke); `svg.masque-edge` (no blend) draws the stroke half
+  (`masque-hi masque-hover` at 1.5px hover, `masque-hi masque-wash` at 2px selected, no fill) in
+  one flat chrome grey — `#7a7a7a` on a light figure, `#c8c8c8` on a dark one, the same colour
+  for hover and selected — Firefox only honours `mix-blend-mode` on a top-level svg, not nested
+  SVG content, which is why the dodge fill is its own sibling svg; the edge svg stays a sibling
+  so the stroke paints above that fill and below the plain chrome. Dodge against the near-black `#141414` source was, across a measured
   10-colour palette, the only fill candidate that never rotated hue more than 8° and never
   dimmed a mark (`bar_blue` is the limiting case for hue rotation, so the source stays
   deliberately conservative); a single darkening layer alone made a highlighted mark read muddy
@@ -87,11 +88,11 @@ text and the bond payload → it gets a live check on every backend × the kinds
   `selects`-ROI's grid cell-block union rect (`"rectfill"` geom tag) draws the fill shape only,
   since the ROI box itself is already the rect's outline. The third svg, `svg.masque-plain` (no
   blend), holds ROI box/handles, the threshold line, the selected-open-geometry ring (2px + 4px @
-  0.25, unchanged ink), and hover/selected highlights for a layer with an explicit `hoverstyle`
+  0.25, chrome grey), and hover/selected highlights for a layer with an explicit `hoverstyle`
   stroke — single element, stroke verbatim + 18%/35% tint in that colour (the pre-split recipe,
   unchanged), open shapes staying stroke-only there (no `masque-hover`, `fill: none`); browsers
-  without `mix-blend-mode` fall back to the plain neutral ink instead — the fill layer to 0.18
-  opacity, the edge layer to the plain ink stroke. A scatter circle's highlight `r` is the
+  without `mix-blend-mode` draw the fill as chrome grey at 0.18 opacity, and the edge stroke
+  stays the flat chrome grey. A scatter circle's highlight `r` is the
   marker's DRAWN radius, not `markersize / 2` — flush against the visible disc (default `:circle`
   marker ≈0.3525×`markersize`; a `Circle`/`Rect` geometry marker draws at `markersize`; anything
   else falls back to `markersize / 2`); the overlay's own 4px hit slack keeps clicking as
@@ -105,7 +106,10 @@ text and the bond payload → it gets a live check on every backend × the kinds
   top-clip, shifts + moves the caret (`--masque-caret-x`) on a side-clip; a resolvable
   per-element `colors` (currently: `scatter!`'s `color=`) adds a 3px tooltip accent border in
   that colour (`--masque-mark-border`), text stays neutral; ROI has 8 square handles (4 corners +
-  4 edge midpoints, corners resize two axes, edges resize one) with directional resize cursors;
+  4 edge midpoints, corners resize two axes, edges resize one) drawn at 7 CSS px with a white
+  fill and a 1px chrome stroke — the hit target stays the manifest `handle` (8 logical px ×
+  scaling, and at least 6 image px) — with directional resize cursors, and the ROI outline is
+  1px chrome unless an explicit `hoverstyle` stroke sets its own width and colour;
   a `selects`-ROI's grid cell-block union rect is fill-only (no stroke, `"rectfill"` geom tag)
   — the ROI box itself is the outline, so the rect doesn't double it into two parallel edges
   (a `selected=` pre-highlight or a `selects`-ROI over `circles` keeps its stroke).

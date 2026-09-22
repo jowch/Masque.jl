@@ -18,17 +18,16 @@ const HOVER_FILL_OPACITY = 0.18
 const SELECTED_FILL_OPACITY = 0.35
 
 // Fill/edge split highlight (highlight.ts's makeHiElement, the default for every layer without
-// an explicit hoverstyle stroke): darkening the fill AND the stroke together (the old single
-// mix-blend-mode tint) went muddy on a light figure. Measured across a 10-colour palette,
-// color-dodge with source #141414 was the only fill candidate that never rotated hue >8° and
-// never dimmed any mark, so the fill BRIGHTENS (color-dodge) while the stroke keeps DARKENING
-// (multiply/screen, same as before) to carry contrast against the page. Fill source is the same
-// for hover and selected — only the stroke (width + colour) tells the two states apart. One
-// source here; mount() below picks light vs dark from the figure's own background and writes it
-// onto the shadow host.
+// an explicit hoverstyle stroke). The fill BRIGHTENS (color-dodge, source #141414 — measured
+// across a 10-colour palette as the only candidate that never rotated hue >8° and never dimmed
+// a mark). The edge stroke is its own flat colour, not blended into the mark: the same chrome
+// grey for hover and selected, so only the width (1.5 vs 2) separates the two states. Control
+// chrome (ROI outline, threshold, selected-open ring) uses that same grey; ROI grips are a
+// white square with a 1px chrome stroke (.masque-handle). One source here; mount() below picks
+// light vs dark from the figure's own background and writes it onto the shadow host.
 const HI_STYLE = {
-    light: { edgeBlend: "multiply", fillSrc: "#141414", edgeHover: "#555555", edgeSel: "#333333" },
-    dark: { edgeBlend: "screen", fillSrc: "#141414", edgeHover: "#aaaaaa", edgeSel: "#cccccc" },
+    light: { chrome: "#7a7a7a", fillSrc: "#141414" },
+    dark: { chrome: "#c8c8c8", fillSrc: "#141414" },
 }
 
 // Parses the handful of CSS colour syntaxes build_manifest's `background` kwarg actually emits
@@ -46,12 +45,11 @@ function parseRGB(css: string): [number, number, number] | null {
 
 // Same light/dark pivot as --masque-ink below: 49.44 is the lch lightness of middle grey
 // (#808080), the exact threshold the CSS lch(from --masque-fig-bg …) clamp already pivots on for
-// the tooltip theme. --masque-hi-blend has to be a static value written once at mount (it can't
-// be a live lch(from …) derivation like the tooltip vars — mix-blend-mode takes a keyword, not a
-// colour), so this mirrors that CSS math in JS: sRGB → relative luminance → CIE L*. A plain WCAG
-// relative-luminance cutoff (Y > 0.5) pivots at a different point than lch lightness and would
-// disagree with the tooltip theme on some backgrounds (light tooltip next to a "multiply" tint,
-// or vice versa) — matching the constant keeps the two derivations in lockstep.
+// the tooltip theme. --masque-chrome is one of two fixed greys written once at mount (it isn't a
+// live lch(from …) derivation like the tooltip vars), so this mirrors that CSS math in JS:
+// sRGB → relative luminance → CIE L*. A plain WCAG relative-luminance cutoff (Y > 0.5) pivots
+// at a different point than lch lightness and would disagree with the tooltip theme on some
+// backgrounds — matching the constant keeps the two derivations in lockstep.
 function isLightBackground(css: string | undefined): boolean {
     const rgb = css ? parseRGB(css) : null
     if (!rgb) return true // unparseable/absent → light, matching --masque-fig-bg's own #ffffff default
@@ -125,39 +123,32 @@ svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: n
     }
   }
 }
-/* Highlight ink. --masque-ink is the neutral default: near-black on light figures, near-white
-   on dark ones (it reuses the tooltip text colour, which already carries that lightness clamp
-   off --masque-fig-bg). An explicit per-layer hoverstyle stroke from Julia arrives inline as
-   --masque-hi-stroke and is used verbatim (highlight.ts's unblended path, drawn into
-   svg.masque-plain below) — ROI rect/handles, the threshold line, and the selected-open-geometry
-   ring always take this plain-ink route too, since they always live in svg.masque-plain.
-   Every other highlight (the default) is TWO bare shapes of identical geometry instead of one:
-   a fill-only shape in svg.masque-fill's g.hi/g.sel and a stroke-only shape in svg.masque-edge's
-   (highlight.ts's makeHiElement/drawHi/drawSelection route each half there, no per-element
-   wrapper) — mix-blend-mode has to live on each svg element ITSELF, one mode per element, so a
-   shape that brightens (fill, color-dodge) and one that darkens (stroke, multiply/screen) can't
-   share an svg. Firefox also doesn't reliably blend an element nested a second level inside
-   another, unblended <svg> (verified live), which is the other reason blending is the outermost
-   svg's own property, not a wrapper around each highlight. Browsers without mix-blend-mode fall
-   back to a plain ink wash/stroke for both layers. */
+/* Highlight ink. --masque-ink is tooltip text: near-black on light figures, near-white on dark
+   ones (the tooltip colour, which already carries that lightness clamp off --masque-fig-bg).
+   --masque-chrome is the control/highlight stroke (set at mount: #7a7a7a light, #c8c8c8 dark).
+   An explicit per-layer hoverstyle stroke from Julia arrives inline as --masque-hi-stroke and
+   is used verbatim (highlight.ts's unblended path, drawn into svg.masque-plain).
+   Every other highlight (the default) is TWO bare shapes of identical geometry: a fill-only
+   shape in svg.masque-fill and a stroke-only shape in svg.masque-edge. The fill svg carries
+   color-dodge — Firefox only honours mix-blend-mode on a top-level svg, not nested SVG content,
+   so the blend lives on that svg, not a per-shape wrapper. The edge svg does not blend: the
+   stroke is its own colour, painted above the dodge fill. Browsers without mix-blend-mode draw
+   the fill as chrome at 0.18 opacity; the edge stroke stays the flat chrome grey. */
 :host { --masque-ink: var(--masque-tip-color-resolved); }
-.masque-hi { --masque-hi-c: var(--masque-hi-stroke, var(--masque-ink)); stroke: var(--masque-hi-c); fill: none; }
+.masque-hi { --masque-hi-c: var(--masque-hi-stroke, var(--masque-chrome)); stroke: var(--masque-hi-c); fill: none; }
 .masque-hi.masque-hover { fill: var(--masque-hi-c); fill-opacity: ${HOVER_FILL_OPACITY}; }
 .masque-hi.masque-wash { fill: var(--masque-hi-c); fill-opacity: ${SELECTED_FILL_OPACITY}; }
 .masque-hi.masque-fill { fill: var(--masque-hi-c); }
 .masque-hi.masque-nostroke { stroke: none; }
-/* Element-prefixed (svg.masque-fill/svg.masque-edge), not bare .masque-fill: drag/roi.ts's ROI
-   handles already carry a class literally named "masque-fill" (the fill-a-solid-square rule
-   above) — a bare .masque-fill selector here would additionally put every ROI handle, which
-   lives in the unblended svg.masque-plain, under color-dodge. */
+/* Element-prefixed, not bare .masque-fillshape: the dodge fill must not leak onto plain-svg
+   chrome. ROI grips are .masque-handle (white fill, chrome stroke), not .masque-hi. */
 svg.masque-fill { mix-blend-mode: color-dodge; }
-svg.masque-edge { mix-blend-mode: var(--masque-hi-blend, multiply); }
 svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-hi-fill); fill-opacity: 1; stroke: none; }
-svg.masque-edge .masque-hi.masque-hover { stroke: var(--masque-hi-line-hover); fill: none; }
-svg.masque-edge .masque-hi.masque-wash  { stroke: var(--masque-hi-line-sel);   fill: none; }
+svg.masque-edge .masque-hi.masque-hover,
+svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: none; }
+.masque-handle { fill: #ffffff; stroke: var(--masque-hi-stroke, var(--masque-chrome)); stroke-width: 1; vector-effect: non-scaling-stroke; }
 @supports not (mix-blend-mode: color-dodge) {
-  svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-ink); fill-opacity: 0.18; }
-  svg.masque-edge .masque-hi.masque-hover, svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-ink); }
+  svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-chrome); fill-opacity: 0.18; }
 }
 .masque-tip { position: absolute; opacity: 0; pointer-events: none; z-index: 10;
        padding: var(--masque-tip-padding, 8px 12px); border-radius: var(--masque-tip-radius, 4px);
@@ -246,13 +237,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const style = document.createElement("style")
     style.textContent = STYLE
 
-    // Three coordinate-identical top-level <svg>s, not one: mix-blend-mode has to live on the
-    // svg element ITSELF, one mode per element (state.ts's HiGroups doc comment explains why —
-    // also Firefox won't blend an element nested inside a second, unblended <svg>), and a closed
-    // highlight needs a brightening fill and a darkening stroke at once, so those can't share an
-    // svg either. DOM order (fill, edge, plain) means each layer paints over the last: the
-    // stroke sits on top of the fill, and anything that must never blend (ROI, threshold,
-    // explicit-stroke highlights, the selected-open ring) — svg.masque-plain — paints over both.
+    // Three coordinate-identical top-level <svg>s. The fill svg carries color-dodge (Firefox
+    // only honours mix-blend-mode on a top-level svg). The edge svg paints the flat chrome
+    // stroke above that fill and does not blend. svg.masque-plain (ROI, threshold,
+    // explicit-stroke highlights, the selected-open ring) paints over both.
     const makeOverlaySvg = (cls: string): SVGSVGElement => {
         const s = document.createElementNS(SVG_NS, "svg")
         s.setAttribute("viewBox", `0 0 ${manifest.width} ${manifest.height}`)
@@ -323,18 +311,15 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // together via nested var() fallbacks, not a write-order race.
     if (manifest.background) shadowHost.style.setProperty("--masque-fig-bg", manifest.background)
     if (manifest.tipStyle) for (const [k, v] of Object.entries(manifest.tipStyle)) shadowHost.style.setProperty(k, v)
-    // Fill/edge split highlight: pick multiply (light figure) vs screen (dark figure) for the
-    // edge once at mount, from the same manifest.background the tooltip theme reads — see
-    // isLightBackground above. The fill source is the same on both rows (HI_STYLE above).
+    // Chrome grey + dodge-fill source, from the same manifest.background the tooltip theme
+    // reads — see isLightBackground above. The fill source is the same on both rows.
     const hiStyle = isLightBackground(manifest.background) ? HI_STYLE.light : HI_STYLE.dark
-    shadowHost.style.setProperty("--masque-hi-blend", hiStyle.edgeBlend)
+    shadowHost.style.setProperty("--masque-chrome", hiStyle.chrome)
     shadowHost.style.setProperty("--masque-hi-fill", hiStyle.fillSrc)
-    shadowHost.style.setProperty("--masque-hi-line-hover", hiStyle.edgeHover)
-    shadowHost.style.setProperty("--masque-hi-line-sel", hiStyle.edgeSel)
 
     // ROI rect/handles and threshold lines never blend — always svg.masque-plain.
     const thresholdLines = thresholdDrag.buildThresholdLines(manifest, plainSvg)
-    const roiBoxes = roiDrag.buildROIBoxes(manifest, plainSvg)
+    const roiBoxes = roiDrag.buildROIBoxes(manifest, plainSvg, base)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
 
@@ -407,7 +392,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         ctx.manifest_ = newManifest
         ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(newManifest, plainSvg)
-        ctx.roiBoxes_ = roiDrag.buildROIBoxes(newManifest, plainSvg)
+        ctx.roiBoxes_ = roiDrag.buildROIBoxes(newManifest, plainSvg, ctx.base_)
         ctx.focusable_ = buildFocusable(newManifest)
         ctx.layerStarts_ = computeLayerStarts(ctx.focusable_)
 
@@ -475,6 +460,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         shadowHost.style.top = `${br.top - hr.top}px`
         shadowHost.style.width = `${br.width}px`
         shadowHost.style.height = `${br.height}px`
+        roiDrag.syncHandleDraw(ctx.roiBoxes_, ctx.manifest_.width, br.width, ctx.manifest_.scaling)
         state.surfaceSized_ = false
     }
     syncOverlayToBase()

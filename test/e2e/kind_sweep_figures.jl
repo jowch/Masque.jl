@@ -3,8 +3,8 @@
 # on supported kinds (`circles`, `rects`, `polygons`, `segments`, `polyline`, `lines`). `circle` marks a
 # kind whose highlight is a circle, so the driver checks r == geometry r (no halo offset).
 # Grid / threshold / roi / view are hover-click or drag only. `scatter_dark` is a dark
-# Makie figure so the split-blend recipe (dodge fill both figures, multiply/screen edge stroke
-# on light/dark) is live-checked on dark axes too; `scatter` and `scatter_dark` are built from
+# Makie figure so the split recipe (dodge fill both figures, flat chrome edge stroke on
+# light/dark) is live-checked on dark axes too; `scatter` and `scatter_dark` are built from
 # the scatter plot object (not raw points) so `colors` resolves and the tooltip-accent check has
 # something to derive from.
 #

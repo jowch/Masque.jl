@@ -9,17 +9,18 @@ This playbook is **interaction and visual**. Both halves are required. Do not tr
 
 ## Visual language (settled)
 
-Recipes: highlight is a split blend — a brightening fill plus a darkening stroke, not a
+Recipes: highlight is a split — a brightening color-dodge fill plus a flat chrome stroke, not a
 mark-derived colour — `colors` (today `scatter!`'s `color=`) no longer touches the highlight at
 all, only the tooltip accent (below). The shadow root holds THREE sibling top-level overlay
 svgs with identical box/viewBox, each with its own `g.hi`/`g.sel`: `svg.masque-fill`
 (`mix-blend-mode: color-dodge`, both light and dark figures) draws the fill half of a closed
 mark's hover/selected highlight (`masque-hi masque-fillshape`, computed fill `rgb(20, 20, 20)`
-/ `#141414`, fill-opacity 1, no stroke); `svg.masque-edge` (`multiply` on light figures,
-`screen` on dark) draws the stroke half (`masque-hi masque-hover` at 1.5px hover, `masque-hi
-masque-wash` at 2px selected, no fill) — Firefox only honours `mix-blend-mode` on a top-level
-svg, not nested SVG content, which is why each blend mode gets its own sibling svg instead of a
-per-element wrapper. Dodge against the near-black `#141414` source was, across a measured
+/ `#141414`, fill-opacity 1, no stroke); `svg.masque-edge` (no blend) draws the stroke half
+(`masque-hi masque-hover` at 1.5px hover, `masque-hi masque-wash` at 2px selected, no fill) in
+one flat chrome grey — `#7a7a7a` on a light figure, `#c8c8c8` on a dark one, the same colour
+for hover and selected — Firefox only honours `mix-blend-mode` on a top-level svg, not nested
+SVG content, which is why the dodge fill is its own sibling svg; the edge svg stays a sibling
+so the stroke paints above that fill and below the plain chrome. Dodge against the near-black `#141414` source was, across a measured
 10-colour palette, the only fill candidate that never rotated hue more than 8° and never dimmed
 a mark; a single darkening layer alone made a highlighted mark read muddy on a light figure,
 which is why the highlight split into two layers. Because the fill is identical between hover
@@ -32,11 +33,11 @@ still fire for that hit, only the highlight is skipped. Per geometry: a closed m
 interior) draws the edge shape only, no fill shape; a `selects`-ROI's grid cell-block union rect
 (`"rectfill"` geom tag) draws the fill shape only, since the ROI box itself is already the
 rect's outline. The third svg, `svg.masque-plain` (unblended), holds ROI/threshold, the
-selected-seg ring (inner 2px + outer 4px @ 0.25, unchanged ink), and hover/selected highlights
+selected-seg ring (inner 2px + outer 4px @ 0.25, chrome grey), and hover/selected highlights
 for a layer with an explicit `hoverstyle` stroke — single element, stroke verbatim + 18%/35%
 tint in that colour (the pre-split recipe, unchanged), open shapes staying stroke-only there (no
-`masque-hover`, `fill: none`); browsers without `mix-blend-mode` fall back to the plain neutral
-ink instead — the fill layer to 0.18 opacity, the edge layer to the plain ink stroke. A scatter
+`masque-hover`, `fill: none`); browsers without `mix-blend-mode` draw the fill as chrome grey
+at 0.18 opacity, and the edge stroke stays the flat chrome grey. A scatter
 circle's highlight `r` is the marker's DRAWN radius, not `markersize / 2` — flush against the
 visible disc (default `:circle` marker ≈0.3525×`markersize`; a `Circle`/`Rect` geometry marker
 draws at `markersize`; anything else falls back to `markersize / 2`; the fill and edge shapes
@@ -112,7 +113,7 @@ bake it; hover/click or drag only.
 | BarPlot | `:rects` | wash | tip, click `@bind`, persist, dodge fill brightens the bar's interior (screenshot) |
 | Poly | `:polygons` | wash | tip, click `@bind`, persist, dodge fill brightens the polygon's interior (screenshot) |
 | Polar (`PolarAxis` scatter) | `:circles` | wash, flush drawn `r` | tip, click `@bind`, persist |
-| Scatter (dark figure) | `:circles` | wash, flush drawn `r` on dark axes | tip, click `@bind`, persist, `screen`-blend edge stroke + dodge fill brightens the marker's interior (screenshot) on the dark figure too, still readable |
+| Scatter (dark figure) | `:circles` | wash, flush drawn `r` on dark axes | tip, click `@bind`, persist, flat `#c8c8c8` edge stroke + dodge fill brightens the marker's interior (screenshot) on the dark figure too, still readable |
 | Arrows3D | `:segments` | ring | tip, click `@bind`, persist |
 | HLines / VLines | `:segments` | ring | tip, click `@bind`, persist |
 | Threshold | `:threshold` | none | drag commit → `@bind` |
@@ -175,11 +176,11 @@ These are required visual-fidelity checks, not optional nice-to-haves. Drivers m
 | Item | What “pass” looks like | Driver |
 | --- | --- | --- |
 | Wash / ring / hover fill+edge (flush on the mark's drawn `r`) / overlay-pin | Dodge-fill recipe on the bare shape in `svg.masque-fill`'s `g.hi`/`g.sel`, fixed-grey edge-stroke recipe in `svg.masque-edge`'s (never the fixed teal); ALL THREE of `svg.masque-fill`, `svg.masque-edge`, `svg.masque-plain` boxes match `<img>` / `<canvas>` at DPR 2 | `kind_sweep.mjs` per kind + `polish_verify.mjs` |
-| Tint-applied (screenshot) | Mean luminance of a small (≤8 css-px, sampled well inside the mark's drawn edge — not across the darkening rim) `page.screenshot()` clip centred on the mark's interior RISES ≥4 (0–255) after hover, on both a light and a dark figure — the dodge fill can only brighten, so this is the same-direction check on every figure, replacing the old darkens-on-light/lightens-on-dark check | `kind_sweep.mjs` (scatter, scatter_dark, barplot, heatmap, poly) |
+| Tint-applied (screenshot) | Mean luminance of a small (≤8 css-px, sampled well inside the mark's drawn edge — not across the chrome rim) `page.screenshot()` clip centred on the mark's interior RISES ≥4 (0–255) after hover, on both a light and a dark figure — the dodge fill can only brighten, so this is the same-direction check on every figure | `kind_sweep.mjs` (scatter, scatter_dark, barplot, heatmap, poly) |
 | Flush-radius pixel check (Cairo only) | A pixel just outside the highlight `r` reads as the figure background; a pixel just inside reads as the marker's own colour — proves the outline sits on the drawn edge, not offset | `polish_verify.mjs` (scatter, `:cairo` — skipped on `:webgl`, canvas readback isn't reliable) |
 | Hover-on-selected no-op | Hovering the baked-`selected` element draws NO highlight — `svg.masque-fill > g.hi` and `svg.masque-edge > g.hi` both empty — while `g.sel` still holds the wash and the tooltip still shows | `kind_sweep.mjs` (scatter) |
 | Remount fade / no pulse | `.masque-enter` on first insert (on each highlight shape itself — no wrapper); same hover node on mousemove; `.masque-leave` on clear | both |
-| Pluto dark / `prefers-color-scheme` | Tooltip light `#ffffff`/`#1a1a1a` and dark `#1e1e1e`/`#e8e8e8` via `emulateMedia`. Official Pluto has no notebook toggle — both follow the OS media query. Dark **Makie** figure (`scatter_dark`) uses the `screen`-blend edge stroke, not OS colour-scheme (highlights do not follow OS). | `polish_verify.mjs` + `kind_sweep.mjs` (`prefers-color-scheme` + `scatter_dark`) |
+| Pluto dark / `prefers-color-scheme` | Tooltip light `#ffffff`/`#1a1a1a` and dark `#1e1e1e`/`#e8e8e8` via `emulateMedia`. Official Pluto has no notebook toggle — both follow the OS media query. Dark **Makie** figure (`scatter_dark`) uses the flat `#c8c8c8` edge stroke, not OS colour-scheme (highlights do not follow OS). | `polish_verify.mjs` + `kind_sweep.mjs` (`prefers-color-scheme` + `scatter_dark`) |
 | No fixed steel-teal `#3A6F7C`, no alert red `#ff3b30` | Highlight colour is the dodge fill / fixed-grey edge stroke, or (for an explicit `hoverstyle`) the verbatim stroke, never a fixed literal like the old teal, in overlay CSS, hover stroke, wash, or ring | both |
 
 `prefers-reduced-motion: reduce` stays instant (unit-tested). Live drivers use default

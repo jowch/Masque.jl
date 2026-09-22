@@ -101,7 +101,7 @@ try {
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
     let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
     // Keyboard focus draws the same bare-shape highlight a hover would: svg.masque-fill's g.hi
-    // (dodge fill half) and svg.masque-edge's g.hi (darkening edge half) for the default
+    // (dodge fill half) and svg.masque-edge's g.hi (flat chrome stroke) for the default
     // split-blend recipe on a closed mark, svg.masque-plain's g.hi for an explicit `hoverstyle`
     // or an open seg (edge-only) — no wrapper either way, so masque-leave lives on the node
     // itself. Any populated layer is enough to prove a ring was drawn; grab whichever is first.

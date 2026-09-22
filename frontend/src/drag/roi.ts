@@ -5,28 +5,50 @@ import { clampX, clampY, fmt } from "../state"
 import type { Drag, OverlayCtx, OverlayState, ROIBox } from "../state"
 import type { HitLayer, Manifest, ROIGeometry } from "../types"
 
+// Drawn grip side, CSS px. The hit target stays the manifest `handle` (geometry.ts); this
+// constant is only the painted square, so a wide figure doesn't grow the handles.
+export const HANDLE_CSS = 7
+
+// Half-side in image px. cssWidth 0 (not laid out yet) falls back to manifest.scaling.
+export function handleDrawHalf(imageWidth: number, cssWidth: number, scaling = 2): number {
+    const pxPerCss = cssWidth > 0 ? imageWidth / cssWidth : scaling
+    return (HANDLE_CSS / 2) * pxPerCss
+}
+
+export function syncHandleDraw(
+    boxes: Map<string, ROIBox>, imageWidth: number, cssWidth: number, scaling = 2,
+): void {
+    const draw = handleDrawHalf(imageWidth, cssWidth, scaling)
+    for (const box of boxes.values()) {
+        if (box.draw_ === draw) continue
+        box.draw_ = draw
+        setROI(box)
+    }
+}
+
 // --- draggable + resizable ROI boxes (Tier 0) ---
 // handles_[0..3] are the corners (unchanged indices/order); handles_[4..7] are the edge
 // midpoints in n,s,w,e order, matching hitLayer's roi case in geometry.ts.
 export function setROI(box: ROIBox): void {
     const { x, y, w, h } = box.g_
+    const d = box.draw_
     box.rect_.setAttribute("x", String(x)); box.rect_.setAttribute("y", String(y))
     box.rect_.setAttribute("width", String(w)); box.rect_.setAttribute("height", String(h))
     const corners = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]
     for (let k = 0; k < 4; k++) {
-        box.handles_[k].setAttribute("x", String(corners[k][0] - box.handle_))
-        box.handles_[k].setAttribute("y", String(corners[k][1] - box.handle_))
-        box.handles_[k].setAttribute("width", String(2 * box.handle_))
-        box.handles_[k].setAttribute("height", String(2 * box.handle_))
+        box.handles_[k].setAttribute("x", String(corners[k][0] - d))
+        box.handles_[k].setAttribute("y", String(corners[k][1] - d))
+        box.handles_[k].setAttribute("width", String(2 * d))
+        box.handles_[k].setAttribute("height", String(2 * d))
     }
     const midX = x + w / 2, midY = y + h / 2
     const edges = [[midX, y], [midX, y + h], [x, midY], [x + w, midY]] // n, s, w, e
     for (let k = 0; k < 4; k++) {
         const hdl = box.handles_[4 + k]
-        hdl.setAttribute("x", String(edges[k][0] - box.handle_))
-        hdl.setAttribute("y", String(edges[k][1] - box.handle_))
-        hdl.setAttribute("width", String(2 * box.handle_))
-        hdl.setAttribute("height", String(2 * box.handle_))
+        hdl.setAttribute("x", String(edges[k][0] - d))
+        hdl.setAttribute("y", String(edges[k][1] - d))
+        hdl.setAttribute("width", String(2 * d))
+        hdl.setAttribute("height", String(2 * d))
     }
 }
 
@@ -36,29 +58,39 @@ export function roiBounds(box: ROIBox): { xmin: number; xmax: number; ymin: numb
     return { xmin: Math.min(ax, bx), xmax: Math.max(ax, bx), ymin: Math.min(ay, by), ymax: Math.max(ay, by) }
 }
 
-export function buildROIBoxes(manifest: Manifest, svg: SVGSVGElement): Map<string, ROIBox> {
+export function buildROIBoxes(manifest: Manifest, svg: SVGSVGElement, base: HTMLElement): Map<string, ROIBox> {
     const roiBoxes = new Map<string, ROIBox>()
+    const rect0 = base.getBoundingClientRect()
+    const draw = handleDrawHalf(manifest.width, rect0.width, manifest.scaling)
     for (const layer of manifest.layers) {
         if (layer.kind !== "roi") continue
         const rg = layer.geometry as ROIGeometry
         const st = layer.style ?? DEFAULT_STYLE
         const rect = document.createElementNS(SVG_NS, "rect")
         rect.classList.add("masque-hi")
-        rect.setAttribute("stroke-width", String(st.width)); rect.setAttribute("vector-effect", "non-scaling-stroke")
+        // 1px outline unless an explicit hoverstyle stroke names its own width.
+        rect.setAttribute("stroke-width", st.stroke ? String(st.width) : "1")
+        rect.setAttribute("vector-effect", "non-scaling-stroke")
         if (st.stroke) rect.style.setProperty("--masque-hi-stroke", st.stroke)
         svg.appendChild(rect)
         const handles: SVGRectElement[] = []
         for (let k = 0; k < 8; k++) {
             const hdl = document.createElementNS(SVG_NS, "rect")
-            hdl.classList.add("masque-hi", "masque-fill")
+            hdl.classList.add("masque-handle")
+            hdl.setAttribute("stroke-width", "1")
+            hdl.setAttribute("vector-effect", "non-scaling-stroke")
             if (st.stroke) hdl.style.setProperty("--masque-hi-stroke", st.stroke)
             svg.appendChild(hdl); handles.push(hdl)
         }
         // box.g_ aliases the manifest ROIGeometry so drag mutations stay visible to hitLayer,
         // which reads layer.geometry directly. `target_` is resolved once here, not per mousedown;
-        // undefined when this ROI has no `selects` (bounds-only).
+        // undefined when this ROI has no `selects` (bounds-only). draw_ is the painted square;
+        // the hit half-size stays on the geometry (`handle`), which geometry.ts reads directly.
         const target = layer.selects ? (manifest.layers.find((l) => l.id === layer.selects) as HitLayer | undefined) : undefined
-        const box: ROIBox = { rect_: rect, handles_: handles, g_: rg, handle_: rg.handle, t_: manifest.transforms[layer.axis], target_: target }
+        const box: ROIBox = {
+            rect_: rect, handles_: handles, g_: rg, draw_: draw,
+            t_: manifest.transforms[layer.axis], target_: target,
+        }
         setROI(box)
         roiBoxes.set(layer.id, box)
     }

@@ -107,6 +107,16 @@ All notable changes to this project are documented here. The format is based on
   MeshScatter children live in float32convert space (premise from #36).
 
 ### Changed
+- Highlight edges and control chrome are a flat grey, and ROI grips are small transform
+  handles. The color-dodge fill (`#141414` on `svg.masque-fill`) is unchanged. The edge
+  stroke no longer uses `multiply` on a light figure or `screen` on a dark one:
+  `svg.masque-edge` stays so the stroke paints above the fill, and it draws one chrome grey
+  (`#7a7a7a` light, `#c8c8c8` dark) at 1.5px on hover and 2px when selected. The ROI
+  outline, the threshold line, and the selected-open ring use that same grey instead of
+  tooltip-text ink. An ROI keeps eight handles. Each is a 7 CSS px white square with a 1px
+  chrome stroke. The hit target is still the manifest `handle`. An explicit `hoverstyle`
+  stroke is still verbatim and unblended. A browser without `mix-blend-mode` draws the fill
+  as that chrome grey at 0.18 opacity; the edge stroke stays the flat grey.
 - **`lines!`, `stairs!`, and a `scatterlines!` line are one element: the whole path.**
   A click anywhere along the line (within `tol` of an edge) binds that one line. The
   JavaScript wire index stays 0-based (`0` for a single line); the Julia

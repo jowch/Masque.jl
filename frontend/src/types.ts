@@ -31,7 +31,7 @@ export interface ROIGeometry {
     y: number
     w: number
     h: number
-    handle: number // corner-handle half-size, image px
+    handle: number // hit half-size, image px; the painted grip is HANDLE_CSS in drag/roi.ts
 }
 
 export interface ViewGeometry {

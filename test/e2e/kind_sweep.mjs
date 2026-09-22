@@ -279,8 +279,8 @@ try {
     let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
     const baseEl = host.querySelector("img, canvas");
     // THREE sibling overlay svgs, same box/viewBox: svg.masque-fill (mix-blend-mode:
-    // color-dodge — the brightening half) and svg.masque-edge (multiply/screen — the darkening
-    // half) together draw a closed mark's hover/selected highlight as two identical-geometry
+    // color-dodge — the brightening half) and svg.masque-edge (no blend — the flat chrome
+    // stroke) together draw a closed mark's hover/selected highlight as two identical-geometry
     // shapes, one per svg; svg.masque-plain (no blend) holds ROI/threshold, the selected-open
     // ring, and any explicit-`hoverstyle` highlight. Firefox only honours `mix-blend-mode` on a
     // top-level svg, not nested SVG content, which is why each is its own sibling svg rather
@@ -416,7 +416,7 @@ try {
   // A small css-px page.screenshot() clip centred on an image-space point — used by the
   // tint-applied check to sample real pixels before/after the hover blend applies (a page
   // screenshot, not a canvas readback, so it works on both Cairo <img> and WGL <canvas>).
-  // Default size is small (8) so the box stays inside the mark's interior, off the darkening
+  // Default size is small (8) so the box stays inside the mark's interior, off the chrome
   // edge stroke — scatter's drawn r is ≈15.5 image px ≈7.75 css px at the usual px_per_unit 2.
   const clipShot = async (key, ix, iy, size = 8) => {
     const pt = await page.evaluate(([k, x, y]) => {
