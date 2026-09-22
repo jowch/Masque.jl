@@ -253,7 +253,7 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   `(; q1, median, q3)`, `barplot!`/`hist!`/`waterfall!` `(; low, high, value)`, and `crossbar!`
   `(; midpoint, low, high)`. Others fall through to the
   primitive's generic `(; index)` and so tell the user nothing they can't see: `density!` and
-  `band!` are each a single polygon whose entire payload is `index = 0`, and `voronoiplot!`
+  `band!` are each a single polygon whose entire payload is `index = 1`, and `voronoiplot!`
   ships a cell index where the generating point would be more useful. Give these the
   statistics Makie already computed, so the default hover is worth reading before anyone
   writes a `masque"…"` template. Distinct from #92: the probe answers "what is the height

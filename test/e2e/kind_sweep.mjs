@@ -577,8 +577,8 @@ try {
       // warm re-run (#114): accept any well-formed leftover naming one of THIS widget's own
       // layers — a `selects`-ROI's bond names its TARGET layer (e.g. `:pts`), never its own
       // `:roi` id, so this checks membership in `layers`, not `spec.layerId` specifically. The
-      // trailing comma anchors on the id boundary Julia's positional `repr` always emits right
-      // after it (`InteractionEvent(:id, index, …)`) — layer ids can nest (`lines`/`lines_2`,
+      // trailing comma anchors on the id boundary the event `show` always emits right
+      // after it (`ElementEvent(:id, index, …)`) — layer ids can nest (`lines`/`lines_2`,
       // `scatter`/`scatter_dark`), so an unanchored `includes` could false-match a leftover that
       // actually names neither this widget's layer nor any real one (e.g. `:linesX,`).
       passed.push(`${key}/hydrated-bond-control-warm`);
@@ -861,13 +861,7 @@ try {
         throw new Error(`${what}: #out_${key} never matched (last seen: ${JSON.stringify(last)})`);
       };
 
-      // --- item 2: the payload is the browser-computed value, converted Julia-side into a flat
-      // NamedTuple — (; x, y) for AxisInteractable, index -1 ---
-      // `[^)]*?`, not `[\s\S]*?`, between `-1` and the field it's paired with: this bond text is
-      // a single flat span with no `$`-anchor to stop at, and a `:grid` payload's own `value =`
-      // field (`(i = …, j = …, value = …)`, `_computed_payload`) has the identical field name —
-      // stopping at the payload's own closing paren keeps this from ever crossing into a
-      // DIFFERENT tuple's fields, even though nothing in this fixture reaches that today.
+      // AxisEvent(:axis, x = …, y = …). The numbers are the click's data coordinates.
       const parseBondAxisXY = (t) => {
         const m = new RegExp(`:${spec.layerId},\\s*x\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)\\s*,\\s*y\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)`).exec(t);
         if (!m) return null;
@@ -890,8 +884,7 @@ try {
       passed.push(`${key}/axis-click-preserves-selection`);
       console.error(`OK  ${key}/axis-click — ${axisAfter.slice(0, 110)}`);
 
-      // --- item 4: ColorbarInteractable's bounded bbox is a different hit-test branch from the
-      // axis catch-all, but the same conversion applies — (; value), index -1 ---
+      // ColorbarEvent(:colorbar, value = …). A different hit-test branch from the axis catch-all.
       const parseBondValue = (t) => {
         const m = new RegExp(`:${spec.colorbarLayerId},\\s*value\\s*=\\s*(-?[\\d.]+(?:e-?\\d+)?)`).exec(t);
         if (!m) return null;

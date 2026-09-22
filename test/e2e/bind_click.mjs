@@ -3,7 +3,7 @@
 // THROUGH Pluto — the kernel re-runs the readout cell so #bondout flips from "BOND=nothing" to
 // the InteractionEvent. This is the mile the static E2E (click.mjs) skips: Pluto/APD bond
 // transport + reactive re-render, not just the overlay's emit. Verified locally against a real
-// kernel (06-30): click -> BOND=Masque.InteractionEvent(:scatter, 0, …).
+// kernel: click -> BOND=ElementEvent(:scatter, 1, …) for wire marker 0.
 //
 // Readiness is split on purpose (de-flake):
 //   1. layout — host/base have non-zero width (MARKER0 scale isn't 0)
@@ -266,14 +266,11 @@ try {
     if (artifactDir) await captureFailure("attempt2-no-pluto");
     throw new Error(`overlay emitted ${JSON.stringify(result.emitted)} but Pluto never re-ran readout on EITHER attempt (marker 0, then marker 1): #bondout stayed "${result.before}" — ${describeResult(result)}`);
   }
-  // Read the index straight out of the readout rather than asserting `clickedIndex` outright:
+  // Read the printed Julia index rather than asserting `clickedIndex` outright:
   // after a retry, attempt 1's own (merely late) round-trip can land during attempt 2's wait
-  // window — #bondout then flips to marker 0's value even though marker 1 was clicked last.
-  // That's still a genuine, successful `@bind` round-trip (the exact "kernel is slow, not stuck"
-  // case this PR exists to tolerate). But this widened acceptance only makes sense once a retry
-  // has actually happened — on the plain happy path (no retry, clickedIndex still 0) a landed
-  // index of 1 can only mean a hit-test/scale regression mapped marker 0's click onto marker 1's
-  // payload, which must still fail loud, not pass silently.
+  // window — #bondout then flips to marker 0's event (Julia index 1) even though marker 1 was
+  // clicked last. That's still a genuine `@bind` round-trip. On the happy path (clickedIndex
+  // still 0) only Julia index 1 is valid; Julia index 2 would mean the click hit marker 1.
   const landedMatch = /ElementEvent\(:scatter, (\d+)/.exec(result.after);
   const landedIndex = landedMatch ? Number(landedMatch[1]) : null;
   // Wire marker 0 is Julia index 1. A late retry may still show marker 0's event.
@@ -284,8 +281,9 @@ try {
   if (result.emitAttempt > 0) {
     console.error(`WARNING: overlay emitted only on click attempt ${result.emitAttempt} (0-based) — first click(s) missed or host not yet hittable. If this warns every run, investigate MARKER positions / layout.`);
   }
-  if (landedIndex !== clickedIndex) {
-    console.error(`NOTE: clicked marker ${clickedIndex} but the readout shows marker ${landedIndex} — attempt 1's round-trip was merely late and landed during the retry's wait window. Treating as a genuine pass, not a failure.`);
+  const juliaIndex = clickedIndex + 1;
+  if (landedIndex !== juliaIndex) {
+    console.error(`NOTE: clicked marker ${clickedIndex} (Julia index ${juliaIndex}) but the readout shows ${landedIndex} — attempt 1's round-trip was merely late and landed during the retry's wait window. Treating as a genuine pass, not a failure.`);
   } else if (clickedIndex !== 0) {
     console.error(`NOTE: bond only round-tripped after the retry (marker ${clickedIndex}) — mile 3 is flaky under load even though this run ultimately passed. Investigate if this becomes frequent.`);
   }

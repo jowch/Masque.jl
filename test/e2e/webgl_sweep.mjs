@@ -176,9 +176,9 @@ try {
     for (let k = 0; k < ring.length; k += 2) { mx += ring[k]; my += ring[k + 1]; }
     await clickAssert(4, mx / n, my / n, "#out_poly", /ElementEvent\(:tri, 1/, "polygon-click");
     const regC = Ls.find((l) => l.id === "reg_c");
-    await clickAssert(4, regC.geometry[0], regC.geometry[1], "#out_poly", /:reg_c, 0.*circ/, "region-click");
+    await clickAssert(4, regC.geometry[0], regC.geometry[1], "#out_poly", /:reg_c, 1.*circ/, "region-click");
     const lbl = Ls.find((l) => l.id === "lbl");
-    await clickAssert(4, lbl.geometry[0], lbl.geometry[1], "#out_poly", /:lbl, 0.*labelled/, "text-click");
+    await clickAssert(4, lbl.geometry[0], lbl.geometry[1], "#out_poly", /:lbl, 1.*labelled/, "text-click");
   }
 
   // ---------- thr: threshold drag commit + axis readout click (widget 5) ----------
@@ -194,7 +194,7 @@ try {
     passed.push("threshold-drag");
     console.error("OK  threshold-drag —", after.slice(0, 110));
     // axis readout: click empty space inside the viewport (top-left quadrant, away from markers/line)
-    await clickAssert(5, s0 + (s1 - s0) * 0.15, pos - 80, "#out_thr", /:axis, -1.*"x"\s*=>|:axis, -1/, "axis-readout-click");
+    await clickAssert(5, s0 + (s1 - s0) * 0.15, pos - 80, "#out_thr", /AxisEvent\(:axis,\s*x\s*=/, "axis-readout-click");
   }
 
   // ---------- sel: selected= pre-highlight + box-select drag (widget 6) ----------

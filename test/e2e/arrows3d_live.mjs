@@ -155,7 +155,8 @@ try {
     // prior session for the same notebook path — before===after would false-fail).
     let idx = 0;
     for (let i = 0; i < mids.length; i++) {
-      if (!new RegExp(`index\\s*[=:]?\\s*${i}|:arrows3d,\\s*${i}`).test(before0)) {
+      // Printed index is 1-based. `i` stays the 0-based geometry slot.
+      if (!new RegExp(`:arrows3d,\\s*${i + 1}\\b`).test(before0)) {
         idx = i;
         break;
       }
@@ -182,7 +183,7 @@ try {
       for (let i = 0; i < 50; i++) {
         await new Promise((r) => setTimeout(r, 200));
         after = document.querySelector("#bondout")?.textContent ?? before;
-        if (after !== before && new RegExp(`:arrows3d,\\s*${idx}`).test(after)) {
+        if (after !== before && new RegExp(`:arrows3d,\\s*${idx + 1}\\b`).test(after)) {
           won = attempt;
           break retry;
         }
@@ -195,7 +196,7 @@ try {
   const bondOk =
     click.after !== click.before &&
     /arrows3d/i.test(click.after) &&
-    new RegExp(`:arrows3d,\\s*${click.idx}`).test(click.after);
+    new RegExp(`:arrows3d,\\s*${click.idx + 1}\\b`).test(click.after);
   record("click-bind", bondOk, click);
 
   const interesting = pageErrors.filter(
