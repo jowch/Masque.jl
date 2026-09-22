@@ -80,17 +80,19 @@
                 "click",
                 "hover"
             ],
-            "kind": "polyline",
+            "kind": "lines",
             "tol": 12,
             "bond": "element",
             "axis": "ax1",
             "geometry": [
-                458,
-                438,
-                553,
-                421,
-                279,
-                537
+                [
+                    458,
+                    438,
+                    553,
+                    421,
+                    279,
+                    537
+                ]
             ],
             "id": "lines",
             "style": {
@@ -98,10 +100,7 @@
             },
             "payloads": [
                 {
-                    "segment_index": 1
-                },
-                {
-                    "segment_index": 2
+                    "index": 1
                 }
             ]
         }

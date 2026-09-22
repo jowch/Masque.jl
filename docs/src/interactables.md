@@ -3,7 +3,8 @@
 Declare interactables explicitly (geometry in data space):
 
 - [`PointInteractable`](@ref) — scatter-style points
-- [`SegmentInteractable`](@ref) — lines / polylines (nearest-segment) and segment pairs
+- [`SegmentInteractable`](@ref) — a whole line (`lines!` / `stairs!` / `series!`), a
+  per-segment polyline, or disjoint segment pairs
 - [`RectInteractable`](@ref) — bars (list) and heatmap cells (compact grid)
 - [`PolygonInteractable`](@ref) — arbitrary polygons
 - [`AxisInteractable`](@ref) — the whole axis: click anywhere → data `(x, y)` (linear + log)
@@ -71,7 +72,7 @@ takes neither an `Axis` nor `id` as constructor arguments at all — see
 | Constructor | Geometry | Extra keywords | Bond |
 |---|---|---|---|
 | `PointInteractable(ax, points; radius = 9, radius3d = nothing, id = :points)` | `points :: Vector{(x, y)}` (or `(x,y,z)` for a 3D axis) | `radius` — px click target; `radius3d` — per-point data-space half-extents on a 3D axis (overrides `radius`) | [`ElementEvent`](@ref); default fields `index` (1-based), `x`, `y`[, `z`] |
-| `SegmentInteractable(ax, vertices; mode = :polyline, tol = 6, id = :segments)` | connected/disjoint vertices | `mode` — `:polyline` (connected path, nearest-segment hit) or `:pairs` (disjoint pairs); `tol` — hit-test slack around a segment, in logical px, scaled to DPI like `radius` (default 6) | [`ElementEvent`](@ref); default field `segment_index` (1-based) |
+| `SegmentInteractable(ax, vertices; mode = :polyline, unit = :segment, tol = 6, id = :segments)` | connected/disjoint vertices | `mode` — `:polyline` (connected path) or `:pairs` (disjoint pairs); `unit` — `:segment` (one element per edge; the default) or `:line` (the whole path is one element; requires `mode = :polyline`); `tol` — hit-test slack around an edge, in logical px, scaled to DPI like `radius` (default 6) | [`ElementEvent`](@ref); default field `segment_index` (1-based) for `:segment`, `index` (1-based) for `:line` |
 | `RectInteractable(ax; rects, clamp_to_viewport = false, id = :rects)` | `rects = [(xc, yc, w, h), …]` — explicit boxes (e.g. bars) | `clamp_to_viewport` — clamp a rect that spans past the axis edge instead of letting it overflow | [`ElementEvent`](@ref); default field `index` (1-based) |
 | `RectInteractable(ax; grid, id = :rects)` | `grid = (xedges, yedges, values)` — a heatmap shipped as edges, not N rects | — | [`GridCellEvent`](@ref) (`i`, `j` 1-based; `A[cell]`) |
 | `PolygonInteractable(ax, rings; id = :polygons)` | `rings :: Vector{Vector{(x, y)}}` — one or more filled rings | — | [`ElementEvent`](@ref); default field `index` (1-based) |
@@ -107,7 +108,7 @@ tooltip contract, plot-specific default payload and `id`:
 | Produces | From these plots |
 |---|---|
 | [`PointInteractable`](@ref) | `Scatter` (`radius` from the marker's drawn extent — ≈0.35×`markersize` for the default `:circle`, `markersize` for a `Circle`/`Rect` geometry marker, `markersize/2` fallback otherwise); `MeshScatter` (data-space `radius3d` on a 3D axis) |
-| [`SegmentInteractable`](@ref) | `Lines`, `Stairs` (`:polyline`); `LineSegments`, `Errorbars`, `Rangebars` (`:pairs`); `Wireframe` (rendered edges); `Arrows3D` (shaft start→end); `HLines`/`VLines` (the rendered span) |
+| [`SegmentInteractable`](@ref) | `Lines`, `Stairs` (one `:lines` element, the whole path); `Series` (one `:lines` layer, one element per series); `LineSegments`, `Errorbars`, `Rangebars` (`:pairs`); `Wireframe` (rendered edges); `Arrows3D` (shaft start→end); `HLines`/`VLines` (the rendered span) |
 | [`RectInteractable`](@ref) | `Heatmap`/`Image` (compact grid); `BarPlot` (dodge/stack/auto-width honored); `Hist`, `Waterfall`, `CrossBar`, `Spy`, `HSpan`, `VSpan` |
 | [`PolygonInteractable`](@ref) | `Poly` (one ring or many); `Band`, `Density` (filled curve); `Contourf` (filled levels); `Violin`; `Voronoiplot` (cell polygons) |
 | [`TextInteractable`](@ref) | `Text` directly; `Annotation` via its inner `Text` (its only constructor takes a `Makie.Text`, so `annotation!` labels are only reachable through this path or `masque(fig)`, never a hand-written `TextInteractable`) |
@@ -168,8 +169,9 @@ end
 
 ## 3D axes and `PolarAxis`
 
-`Axis3` gets the point/segment kinds above with 3D-valid payloads: `Scatter`/`Lines` carry
-`{index, x, y, z}`, `MeshScatter` gets depth-correct per-marker hit radii from its data-space
+`Axis3` gets the point/segment kinds above with 3D-valid payloads: `Scatter` carries
+`{index, x, y, z}`, a `Lines` is one whole-line element whose default payload is `{index}`
+(the path is still projected from the 3D vertices), `MeshScatter` gets depth-correct per-marker hit radii from its data-space
 `markersize`, `Wireframe`'s rendered edges are hoverable, and `Arrows3D` shafts hit as
 start→end segments — all projected once, in Julia, at build time, so it works the same way
 static on `:cairo` and live on `:webgl` (see [Backends](@ref)). `PolarAxis` gets the same

@@ -36,9 +36,10 @@ v0.1.0 is unreleased and open: the pre-registration revisions can carry new work
 everything below is a candidate for it. `CHANGELOG.md` `[Unreleased]` is the running record.
 
 Shipped: `masque(fig)` auto-extraction over Scatter, Lines/LineSegments/ScatterLines, Stairs,
-Stem, Errorbars/Rangebars, HLines/VLines, HSpan/VSpan, Heatmap, Image, Spy, BarPlot, Hist,
-Waterfall, CrossBar, BoxPlot (box body), Band, Density, Violin, Contourf, Voronoiplot, Poly,
-Text/Annotation, Colorbar, Legend, MeshScatter, Wireframe, Arrows3D (#91 tracks the full list);
+Series, Stem, Errorbars/Rangebars, HLines/VLines, HSpan/VSpan, Heatmap, Image, Spy, BarPlot,
+Hist, Waterfall, CrossBar, BoxPlot (box body), Band, Density, Violin, Contourf, Voronoiplot,
+Poly, Text/Annotation, Colorbar, Legend, MeshScatter, Wireframe, Arrows3D (#91 tracks the full
+list);
 explicit constructors for every primitive; `Axis`, `Axis3`, and `PolarAxis` (discrete hits) on both
 backends; tooltips (`masque"…"` templates, auto table, figure-aware theme, mark-anchored
 placement); client-side click-echo selection (#103: a click, an Enter/Space, or a `selects`-ROI
@@ -147,7 +148,7 @@ canvas-identity strategy keeps projection Julia-authored.
   sample attached 1-D series client-side, draw a hairline plus dots, show every series' value
   in the tooltip. Replaces the notebook workaround of baking hundreds of full-height segments.
   Hover-only by default; gated like the other continuous invert consumers (2D `Axis`, fail
-  loud on Axis3/Polar). Wants #89 so a `lines!` is one series to sample.
+  loud on Axis3/Polar).
 - **#88 Right-click passthrough.** Ignore non-primary buttons in drag start, and let
   `contextmenu` land on the base `<img>` so the browser's Save image as… works on `:cairo`.
   No custom menu. `:webgl` gets no image menu without a canvas snapshot (out of scope).
@@ -246,10 +247,6 @@ canvas-identity strategy keeps projection Julia-authored.
 All Julia-side extractors over existing primitives. The live extracted/skipped table is #91;
 tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
 
-- **#89 `lines!` and `series!` as whole lines.** A `lines!` hit is one element with one
-  payload, and the highlight traces the whole polyline, instead of one interactable per edge.
-  `series!` becomes one layer with N polylines. `LineSegments`, Errorbars, HLines, Wireframe,
-  and Arrows3D stay per-piece.
 - **Informative default payloads for statistical recipes.** `architecture.md`'s rule is hit
   geometry from the rendered shape, payload values from Makie's computed values. Some
   extractors follow it — `violin!` ships `(; x)`, `contourf!` `(; low, high)`, `boxplot!`
@@ -274,9 +271,9 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
 - **`TextLabel`**: a `Block`, not a plot, so it needs the figure-block walk `Colorbar` and
   `Legend` use. Small.
 - **Legend follow-ups.** First, tick Legend in #91's table, which still lists it as not
-  auto-extracted even though #94 merged. Two further gaps, both already tracked elsewhere: an
+  auto-extracted even though #94 merged. A further gap, already tracked elsewhere: an
   entry cannot highlight a `:grid` target, which is one of the grid's special cases listed
-  above, and `series!` entries resolve to no layer until #89 extracts series. Separately,
+  above. Separately,
   Makie's own `Legend(fig, polaraxis)` raises a `MethodError`, which is upstream rather than
   ours but worth confirming before promising polar legends.
 - **Contour family**: compound polygons (ring groups) so Contourf levels with holes hit-test
@@ -287,7 +284,7 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   The shipped `:grid` works but is the awkward corner of the contract, and designing `surface!`
   on its own would build a second corner with the same shape.
 
-  What is awkward today. `:grid` is the only one of the six geometry kinds that is not a list
+  What is awkward today. `:grid` is the only one of the seven data geometry kinds that is not a list
   of elements, so it needs its own hit-test branch, its own selection result, its own tooltip
   behaviour with no per-element payload, no keyboard focus, and it cannot be a highlight target
   for a legend. Its `values[]` matrix is the only term in the manifest bounded by source
@@ -517,16 +514,16 @@ shipped, which is a better filter than what other libraries happen to have.
 
 ## Order
 
-A proposed sequence, not a decided one. Only the dependency edges are real: #92 wants #89,
-#85 wants #84, #86 is not reconsidered until #84 and #85 exist, and registration wants
+A proposed sequence, not a decided one. Only the dependency edges are real: #85 wants #84,
+#86 is not reconsidered until #84 and #85 exist, and registration wants
 the API to have stopped moving. (#83 closed not-planned — nothing left to build, so it is not
 a dependency of anything below.)
 
 1. Resolve #49.
 2. Pre-registration revisions, including new work wanted in 0.1.0. Self-contained and cheap:
-   #88, #89, #81, #90, keyboard drag nudging, and the composite-recipe child walk.
+   #88, #81, #90, keyboard drag nudging, and the composite-recipe child walk.
 3. The remount path (#84 hold, then #85 preview). Both backends, live-verified on view-pan.
-4. #92 cursor slice, after #89.
+4. #92 cursor slice.
 5. Register v0.1.0, then the notebook cleanup (drop `Pkg.develop`, re-enable Binder).
 6. Remaining coverage items as demand arrives (#91 list).
 7. Payload-gated items (animation, LOD layers) wait on a measured per-frame or per-element

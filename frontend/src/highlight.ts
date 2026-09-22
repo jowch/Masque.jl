@@ -1,3 +1,4 @@
+import { pathData } from "./geometry"
 import { hitKey, prefersReducedMotion, MOTION_MS } from "./state"
 import type { HiGroups, OverlayCtx, OverlayState } from "./state"
 import type { Hit, LayerStyle } from "./types"
@@ -74,6 +75,12 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
         el = document.createElementNS(SVG_NS, "line")
         el.setAttribute("x1", String(g[1])); el.setAttribute("y1", String(g[2]))
         el.setAttribute("x2", String(g[3])); el.setAttribute("y2", String(g[4]))
+    } else if (g[0] === "path") {
+        // Whole plotted line. fill none so the open stroke doesn't paint an interior; a NaN
+        // gap is a new subpath, not a second element.
+        el = document.createElementNS(SVG_NS, "path")
+        el.setAttribute("d", pathData(g[1] as number[]))
+        el.setAttribute("fill", "none")
     } else if (g[0] === "poly") {
         el = document.createElementNS(SVG_NS, "polygon")
         const ring = g[1] as number[]
@@ -82,7 +89,7 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
         el.setAttribute("points", pts.trim())
     }
     if (!el) return null
-    const open = g[0] === "seg"
+    const open = g[0] === "seg" || g[0] === "path"
     const rectfill = g[0] === "rectfill"
 
     // Explicit hoverstyle stroke: today's single unblended element in svg.masque-plain, unchanged.

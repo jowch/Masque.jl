@@ -68,7 +68,7 @@ export function computeSelection(
 
 // Kinds that can be drawn as a persistent pre-highlight (mirrors Julia `_SELECTED_KINDS`).
 // Open kinds (segments / polyline) use the selected-ring recipe; closed kinds use the wash.
-export const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline"])
+export const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines"])
 
 // Order matters: a legend entry is `rects` kind AND carries `links`, so the links branch is
 // tested first, gated at LAYER level — an entry whose own links[index] is empty still must not
@@ -90,6 +90,7 @@ export function layerNElements(layer: HitLayer): number {
     if (layer.kind === "polygons" && Array.isArray(g)) return (g as number[][]).length
     if (layer.kind === "segments" && Array.isArray(g)) return Math.floor((g as number[]).length / 4)
     if (layer.kind === "polyline" && Array.isArray(g)) return Math.max(0, Math.floor((g as number[]).length / 2) - 1)
+    if (layer.kind === "lines" && Array.isArray(g)) return (g as number[][]).length
     if (layer.kind === "grid" && g && typeof g === "object" && "ncols" in (g as object)) {
         const gg = g as GridGeometry
         return gg.ncols * gg.nrows
@@ -130,6 +131,9 @@ export function hitLayerByIndex(layer: HitLayer, index: number): Omit<Hit, "laye
         const a = g as number[]
         return { index, geom_: ["seg", a[2 * index], a[2 * index + 1], a[2 * index + 2], a[2 * index + 3]] }
     }
+    if (layer.kind === "lines" && Array.isArray(g)) {
+        return { index, geom_: ["path", (g as number[][])[index]] }
+    }
     // polygons (only remaining closed SELECTED_KINDS entry)
     return { index, geom_: ["poly", (g as number[][])[index]] }
 }
@@ -158,17 +162,30 @@ export function hitsForLayer(layer: HitLayer): Hit[] {
     return hits
 }
 
-// The linked-highlight fan-out for one legend element: every element of every layer named in
-// `layer.links[index]`, flattened into one Hit[] for drawLink. Julia guarantees each id exists
-// and names a SELECTED_KINDS layer, so hitsForLayer never throws here; a missing id (a stale
-// manifest) degrades to skipping that target rather than throwing.
+// The linked-highlight fan-out for one legend element: every spec in `layer.links[index]`,
+// flattened into one Hit[] for drawLink. A spec is a layer id (every element of that layer)
+// or `id:k` pinning element k (Julia 1-based → JS 0-based). An exact layer id wins, so a
+// real layer named `foo:1` is not parsed as an element pin. Julia guarantees each layer
+// exists, is SELECTED_KINDS, and that a `:k` pin is in range; a stale manifest degrades to
+// skipping that target rather than throwing.
+function resolveLinkedTarget(manifest: Manifest, spec: string): Hit[] {
+    const exact = manifest.layers.find((l) => l.id === spec)
+    if (exact) return hitsForLayer(exact)
+    const m = /^(.*):(\d+)$/.exec(spec)
+    if (!m) return []
+    const target = manifest.layers.find((l) => l.id === m[1])
+    if (!target) return []
+    const i = Number(m[2]) - 1
+    const n = layerNElements(target)
+    if (i < 0 || i >= n) return []
+    if (target.kind === "polyline" && isGapSegment(target, i)) return []
+    return [{ layer: target, ...hitLayerByIndex(target, i) }]
+}
+
 export function linkedHits(manifest: Manifest, layer: HitLayer, index: number): Hit[] {
     const ids = layer.links?.[index]
     if (!ids || !ids.length) return []
     const hits: Hit[] = []
-    for (const id of ids) {
-        const target = manifest.layers.find((l) => l.id === id)
-        if (target) hits.push(...hitsForLayer(target))
-    }
+    for (const id of ids) hits.push(...resolveLinkedTarget(manifest, id))
     return hits
 }

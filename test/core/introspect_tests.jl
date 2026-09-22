@@ -50,14 +50,31 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test PointInteractable(a, p; radius = 8) isa PointInteractable  # explicit radius is fine
         end
 
-        @testset "lines -> Segment(:polyline), linesegments -> (:pairs)" begin
+        @testset "lines -> one whole line, linesegments -> (:pairs)" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             pl = lines!(a, [0.0, 1.0, 2.0, 3.0], [0.0, 2.0, 1.0, 3.0])
             ps = linesegments!(a, [Point2f(0, 0), Point2f(1, 1), Point2f(2, 0), Point2f(3, 1)])
             _, _, c = ctx_for(f)
-            @test geom(SegmentInteractable(a, pl), c) == geom(SegmentInteractable(a, pl.converted[][1]; mode = :polyline), c)
-            @test only(hitlayers(SegmentInteractable(a, pl), c)).kind === :polyline
+            # The plot object is one element. The raw vertex constructor stays per-segment.
+            L = only(hitlayers(SegmentInteractable(a, pl), c))
+            raw = only(hitlayers(SegmentInteractable(a, pl.converted[][1]; mode = :polyline), c))
+            whole = only(hitlayers(SegmentInteractable(a, pl.converted[][1]; mode = :polyline, unit = :line), c))
+            @test L.kind === :lines && length(L.payloads) == 1 && L.payloads[1] == (; index = 1)
+            @test L.geometry == whole.geometry && length(L.geometry) == 1
+            @test raw.kind === :polyline && length(raw.payloads) == 3
+            @test raw.payloads[1] == (; segment_index = 1)
             @test only(hitlayers(SegmentInteractable(a, ps), c)).kind === :segments
+            # A NaN gap stays inside the one line; it does not become a second element.
+            pg = lines!(a, [0.0, NaN, 2.0], [0.0, NaN, 1.0])
+            Lg = only(hitlayers(SegmentInteractable(a, pg), c))
+            @test Lg.kind === :lines && length(Lg.payloads) == 1 && length(Lg.geometry) == 1
+            @test any(isnan, Lg.geometry[1])
+            w = masque(f; selected = Dict(:lines => [1]))
+            line = only(filter(d -> d["id"] == "lines", w.manifest["layers"]))
+            @test line["selected"] == [0] && length(line["payloads"]) == 1
+            @test_throws ArgumentError masque(f; selected = Dict(:lines => [2]))
+            ev = Masque.APD.Bonds.transform_value(w, Dict("layer" => "lines", "index" => 0))
+            @test ev isa ElementEvent && ev.index == 1 && ev.payload == (; index = 1)
         end
 
         @testset "heatmap/image -> Rect(:grid), incl. EndPoints expansion" begin
@@ -218,18 +235,20 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     @testset "M3 cheap-wins introspection" begin
         geom(int, c) = (L = only(hitlayers(int, c)); (L.kind, L.geometry, length(L.payloads)))
 
-        @testset "stairs -> Segment(:polyline) from the expanded staircase" begin
+        @testset "stairs -> one whole line from the expanded staircase" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             p = stairs!(a, [0.0, 1.0, 2.0, 3.0], [0.0, 2.0, 1.0, 3.0])
             _, _, c = ctx_for(f)
-            # uses the child Lines' 7-point staircase, NOT the 4 input points
+            # uses the child Lines' 7-point staircase, NOT the 4 input points, as one element
             steps = [(0.0, 0.0), (0.0, 2.0), (1.0, 2.0), (1.0, 1.0), (2.0, 1.0), (2.0, 3.0), (3.0, 3.0)]
             @test geom(SegmentInteractable(a, p), c) ==
-                geom(SegmentInteractable(a, steps; mode = :polyline), c)
+                geom(SegmentInteractable(a, steps; mode = :polyline, unit = :line), c)
             L = only(hitlayers(SegmentInteractable(a, p), c))
-            @test L.kind === :polyline && L.id === :stairs && length(L.payloads) == 6
+            @test L.kind === :lines && L.id === :stairs && length(L.payloads) == 1
+            @test L.payloads[1] == (; index = 1) && length(only(L.geometry)) == 14
             img = Makie.colorbuffer(f; px_per_unit = 2.0)
-            @test drawn_near(img, L.geometry[3], L.geometry[4])   # a corner of the staircase
+            g = only(L.geometry)
+            @test drawn_near(img, g[3], g[4])   # a corner of the staircase
         end
 
         @testset "errorbars/rangebars -> Segment(:pairs)" begin
@@ -390,13 +409,34 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test ids == [:stem, :stem_stems]
         end
 
-        @testset "scatterlines -> Point + Segment(:polyline) (composite)" begin
+        @testset "scatterlines -> Point + one whole line (composite)" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             scatterlines!(a, [1.0, 2.0, 3.0], [1.0, 4.0, 9.0]; markersize = 16); _, _, c = ctx_for(f)
             ints = auto_interactables(f)
             @test length(ints) == 2
-            @test [only(hitlayers(i, c)).kind for i in ints] == [:circles, :polyline]
+            @test [only(hitlayers(i, c)).kind for i in ints] == [:circles, :lines]
             @test [only(hitlayers(i, c)).id for i in ints] == [:scatterlines, :scatterlines_line]
+            @test length(only(hitlayers(ints[2], c)).payloads) == 1
+        end
+
+        @testset "series -> one :lines layer, one element per series" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1])
+            # 3 rows × 4 columns: each row is one series (Makie's matrix convention).
+            ys = [1.0 1.5 2.2 2.8; 3.0 2.4 1.2 1.5; 0.6 1.4 2.6 2.0]
+            series!(a, ys)
+            _, _, c = ctx_for(f)
+            ints = auto_interactables(f)
+            @test length(ints) == 1
+            L = only(hitlayers(only(ints), c))
+            @test L.kind === :lines && L.id === :series && length(L.payloads) == 3
+            @test length(L.geometry) == 3
+            @test all(g -> length(g) == 8, L.geometry)   # 4 vertices × (x, y), not 3 segments each
+            @test L.payloads[2].index == 2
+            @test L.payloads[2].label == "series 2"
+            w = masque(f)
+            ev = Masque.APD.Bonds.transform_value(w, Dict("layer" => "series", "index" => 1))
+            @test ev isa ElementEvent && ev.index == 2 && ev.layer === :series
+            @test ev.payload.index == 2
         end
 
         @testset "masque(fig) auto-extracts the cheap-win surfaces" begin
@@ -405,7 +445,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             hlines!(a, [2.0])
             w = masque(f)
             @test [L["id"] for L in w.manifest["layers"]] == ["stairs", "hlines"]
-            @test [L["kind"] for L in w.manifest["layers"]] == ["polyline", "segments"]
+            @test [L["kind"] for L in w.manifest["layers"]] == ["lines", "segments"]
         end
     end
 

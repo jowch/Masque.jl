@@ -3,7 +3,7 @@
 The overlay `surface` is a `tabindex="0"` focus stop (`role="application"` — NVDA/JAWS's default
 browse mode otherwise intercepts arrow keys before a `role="group"` element sees them). Focus
 moves over a flat, manifest-order list (`frontend/src/keyboard.ts`'s `buildFocusable`) restricted
-to the element-indexed kinds `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`, in the same
+to the element-indexed kinds `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines`, in the same
 layer-then-element order `hitTest` resolves ties in. `:grid` is excluded even though it's
 element-indexed — `hitLayerByIndex` has no pre-highlight geometry for it, its `payloads[]` is
 empty by design (values are resolved client-side from `(i,j)`, not positionally), and

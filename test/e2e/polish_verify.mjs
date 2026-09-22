@@ -129,6 +129,14 @@ try {
               width: ln.getAttribute("stroke-width"), opacity: ln.getAttribute("stroke-opacity"),
             };
           }),
+          paths: [...el.querySelectorAll("path")].map((p) => {
+            const cs = getComputedStyle(p);
+            return {
+              className: p.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
+              width: p.getAttribute("stroke-width"), opacity: p.getAttribute("stroke-opacity"),
+              d: p.getAttribute("d"),
+            };
+          }),
         };
       }
       const cs = getComputedStyle(el);

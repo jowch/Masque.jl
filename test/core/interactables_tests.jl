@@ -349,6 +349,13 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
         @test_throws ArgumentError SegmentInteractable(ax, pts; mode = :segments)
         @test SegmentInteractable(ax, pts; mode = :pairs) isa SegmentInteractable
         @test SegmentInteractable(ax, pts; mode = :polyline) isa SegmentInteractable
+        # unit=:line is the whole path (one payload). It does not apply to :pairs.
+        whole = SegmentInteractable(ax, [Point2f(0, 0), Point2f(1, 1), Point2f(2, 0)]; unit = :line)
+        @test whole.unit === :line && length(whole.payloads) == 1 && whole.payloads[1] == (; index = 1)
+        @test_throws ArgumentError SegmentInteractable(ax, pts; mode = :pairs, unit = :line)
+        @test_throws ArgumentError SegmentInteractable(ax, pts; unit = :edge)
+        per_seg = SegmentInteractable(ax, [Point2f(0, 0), Point2f(1, 1), Point2f(2, 0)])
+        @test per_seg.unit === :segment && length(per_seg.payloads) == 2
 
         # grid `values` must be (length(xedges)-1, length(yedges)-1)
         xe = 0.0:1.0:3.0; ye = 0.0:1.0:2.0   # 3x2 cells expected

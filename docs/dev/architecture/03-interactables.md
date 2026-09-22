@@ -50,7 +50,7 @@ data to resolve a hit to an element index and its payload.
 ```julia
 struct HitLayer
     id       :: Symbol            # stable key for this layer (links to events/style)
-    kind     :: Symbol            # :circles | :polyline | :segments | :rects | :grid | :polygons | :axis
+    kind     :: Symbol            # :circles | :polyline | :lines | :segments | :rects | :grid | :polygons | :axis
     geometry :: Any               # compact, image-px; layout keyed by `kind` (see below)
     payloads :: Vector{Any}       # element index -> JSON-serializable payload (the linkage key)
     axis     :: Symbol            # which AxisTransform applies (for data-coord tooltips / inversion)
@@ -67,13 +67,14 @@ Geometry layout by `kind` (all coords image-px, top-left origin):
 |---|---|---|---|
 | `:circles` | `Float32[cx,cy,r, …]` | distance ≤ r | triple index |
 | `:polyline` | `Float32[x,y, …]` (NaN = gap) | nearest segment, dist ≤ tol | segment i = (v[i],v[i+1]) |
+| `:lines` | `Vector{Real}[]` paths, one flat `[x,y,…]` per element (NaN = a gap inside that path) | nearest edge of any path, dist ≤ tol | path index — one element per plotted line |
 | `:segments` | `Float32[x0,y0,x1,y1, …]` | nearest of disjoint pairs | pair index |
 | `:rects` | `Float32[cx,cy,w,h, …]` | point-in-rect | quad index |
 | `:grid` | `(xedges, yedges, ncols, nrows, values[])` image-px | binary-search bin → (i,j) | `j*ncols+i` (O(1) hit-test; manifest **O(source-cells)** via `values[]`, see [§8](08-scaling.md)) |
 | `:polygons` | `Vector{Vector{Float32}}` rings | even-odd point-in-polygon | ring index |
 | `:axis` | `nothing` (unbounded, `AxisInteractable`) or `Real[x,y,w,h]` bbox (bounded, `ColorbarInteractable`) | absent geometry = always-hit; bbox present = point-in-bbox; invert pixel via `AxisTransform` | `-1` (continuous); `valueaxis ≠ nothing` → 1-D `(; value)` |
 
-`:polyline`/`:segments`' `tol` (the hit-test slack above) is an optional per-layer manifest
+`:polyline`/`:lines`/`:segments`' `tol` (the hit-test slack above) is an optional per-layer manifest
 field, `"tol"` (image px) — present only when `hit_tol(i) !== nothing` (`SegmentInteractable`
 sets it from its `tol` keyword, scaled like `radius`); absent, the overlay falls back to its
 own fixed `SEG_TOL`. Every other kind's manifest is untouched by this field.
@@ -85,9 +86,12 @@ the `label` keyword on `PointInteractable`/`SegmentInteractable`/`RectInteractab
 omitted from the manifest entirely when unset (same idiom as `selects`/`tol` above) — see
 `perf-findings.md` for the measured per-layer wire cost.
 
-This is a **closed set of six geometry kinds** (`:circles/:polyline/:segments/:rects/:grid/:polygons`)
-plus the `:axis` continuous channel. Every retained Makie surface projects to one of them; v1+v2
-needs no seventh — text labels (`TextInteractable`) ride plain `:rects`.
+This is a **closed set of seven data geometry kinds**
+(`:circles/:polyline/:lines/:segments/:rects/:grid/:polygons`)
+plus the `:axis` continuous channel. `:lines` is the whole-path form of a polyline: the pointer
+still has to land within `tol` of an edge, but the element is the path, and a `NaN` gap stays
+inside that path. Every retained Makie surface projects to one of them; text labels
+(`TextInteractable`) ride plain `:rects`.
 
 The three M4 drag kinds — `:view`, `:threshold`, `:roi` — sit outside this set. They are
 *control* geometry: one draggable region apiece, no elements, an empty `payloads`. The closed-set
@@ -103,7 +107,7 @@ primitive, with the exceptions noted inline: `:axis` is shared by two, `LegendIn
 | Type | kind(s) | Makie surfaces | payload |
 |---|---|---|---|
 | `PointInteractable` | `:circles` | Scatter, Stem, Spy, ScatterLines·pts | `(; index, x, y)` |
-| `SegmentInteractable` | `:polyline` \| `:segments` | Lines, Stairs, ScatterLines·lines (polyline); LineSegments, Errorbars, Rangebars, HLines, VLines (pairs) | `(; segment_index, p0, p1)` |
+| `SegmentInteractable` | `:polyline` \| `:lines` \| `:segments` | Lines, Stairs, Series, ScatterLines·lines (`:lines`, one element per path); an explicit `mode=:polyline` vertex list stays `:polyline` (per edge); LineSegments, Errorbars, Rangebars, HLines, VLines (`:pairs`) | `:lines` `(; index)` (a series adds `label` when Makie set one); `:polyline` / `:segments` `(; segment_index)` |
 | `RectInteractable` | `:rects` \| `:grid` | BarPlot, Hist, Waterfall, CrossBar, HSpan, VSpan (list); Heatmap, Image (grid) | grid `(; i, j, value)`; BarPlot/Waterfall `(; low, high, value)`; Hist `(; value, low, high)`; CrossBar `(; midpoint, low, high)`; HSpan/VSpan `(; low, high)` |
 | `PolygonInteractable` | `:polygons` | Poly, Band, Pie, Density, Contourf, Violin, Voronoiplot | Band/Density/Voronoiplot `(; index)`; Contourf `(; low, high)`; Violin `(; x)` |
 | `AxisInteractable` | `:axis` (unbounded) | the Axis area itself (linear + log) | `(; x, y)` inverted client-side |
@@ -166,6 +170,6 @@ type (`PointInteractable(ax, p::Makie.Scatter)`, `RectInteractable(ax, p::Makie.
 geometry and payload from the live plot object and delegating to the same explicit constructor — the
 same struct, not a different code path.
 
-**Composites emit multiple layers.** `ScatterLines` → one `:circles` layer + one `:polyline` layer,
-hit-tested points-first (within marker radius) then segment. This is the model for any composite recipe.
+**Composites emit multiple layers.** `ScatterLines` → one `:circles` layer + one `:lines` layer,
+hit-tested points-first (within marker radius) then the whole line. This is the model for any composite recipe.
 

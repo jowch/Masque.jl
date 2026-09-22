@@ -42,7 +42,7 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
-    if L.kind === :segments || L.kind === :polyline
+    if L.kind === :segments || L.kind === :polyline || L.kind === :lines
         t = hit_tol(i)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))
     end
@@ -127,8 +127,19 @@ _links_lenient(i::LegendInteractable) = i.lenient
 # An unknown `links` id (absent from the manifest entirely) always fails loud, in both modes —
 # it's not a "can't highlight this" shape, it's a typo/dangling reference. Only an id that
 # resolves to a layer whose KIND can't be pre-highlighted is lenient-mode-dependent: fail loud
-# by default, or (for a lenient/auto-resolved layer) warn and drop.
+# by default, or (for a lenient/auto-resolved layer) warn and drop. Specs are either a layer id
+# (every element of that layer) or `id:k` pinning element `k` (1-based); an exact layer id
+# wins, so a real layer named `foo:1` is not parsed as an element pin.
+function _parse_link_spec(tid_str, by_id)
+    haskey(by_id, tid_str) && return (tid_str, nothing)
+    m = match(r"^(.*):(\d+)$", tid_str)
+    m === nothing && return nothing
+    base = m.captures[1]
+    haskey(by_id, base) || return nothing
+    return (base, parse(Int, m.captures[2]))
+end
 function _validate_links(layer_owners, layers)
+    by_id = Dict(l["id"] => l for l in layers)
     kinds = Dict(l["id"] => Symbol(l["kind"]) for l in layers)
     for (owner, d) in zip(layer_owners, layers)
         haskey(d, "links") || continue
@@ -138,11 +149,24 @@ function _validate_links(layer_owners, layers)
             dropped = false
             for tid_str in ids
                 tid = Symbol(tid_str)
-                if !haskey(kinds, tid_str)
+                parsed = _parse_link_spec(tid_str, by_id)
+                if parsed === nothing
                     throw(ArgumentError("links: layer :$(d["id"]) element $k links to unknown layer :$(tid)"))
                 end
-                tk = kinds[tid_str]
+                base_id, elem = parsed
+                tk = kinds[base_id]
                 if tk in _SELECTED_KINDS
+                    if elem !== nothing
+                        n = _layer_n_elements(tk, by_id[base_id]["geometry"])
+                        if !(1 <= elem <= n)
+                            throw(
+                                ArgumentError(
+                                    "links: layer :$(d["id"]) element $k links to :$(tid), but layer :$(base_id) " *
+                                        "has $n elements (valid: 1:$n)",
+                                ),
+                            )
+                        end
+                    end
                     push!(kept, tid_str)
                 elseif lenient
                     @warn "masque: legend entry $k of layer :$(d["id"]) links to :$(tid) (kind :$(tk)), " *
@@ -322,7 +346,7 @@ element commit a `Vector{ElementEvent}` (a click is a one-element vector; an emp
   and `[1]` mount as a one-element vector, and `[]` mounts as `ElementEvent[]`. Also accepts the
   event itself, or a `NamedTuple` / `Dict` keyed by layer id when the figure has more than one
   seedable layer. A bare index is an `ArgumentError` in that case. Works on
-  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`; any other kind, or an out-of-range
+  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines`; any other kind, or an out-of-range
   index (`0` included), raises `ArgumentError` naming `1:n`. Clicking replaces the selection, so
   this is only needed to carry one through a rebuild — and it must come from a cell that doesn't
   read this widget's own bond, which Pluto rejects as a cyclic reference.

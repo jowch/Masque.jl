@@ -22,7 +22,7 @@ const ANNOUNCE_DEBOUNCE_MS = 150
 // (values are resolved client-side from a (i,j) lookup, not positional), and ncols*nrows is
 // unbounded (a 1000x1000 heatmap is not something you arrow through one cell at a time).
 // :axis/:threshold/:roi/:view are continuous or drag-only, not element-indexed at all.
-const FOCUSABLE_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline"])
+const FOCUSABLE_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines"])
 
 export function buildFocusable(manifest: Manifest): FocusRef[] {
     const out: FocusRef[] = []

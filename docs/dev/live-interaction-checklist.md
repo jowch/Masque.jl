@@ -95,8 +95,9 @@ CSS live in `frontend/test/overlay.test.ts`. Units are necessary, not live-verif
 For every **element** kind: hover tooltip, click → `@bind` (index moves), geometry sits
 **on the mark** (not beside it), no unexpected console, **and** the visual recipe for that
 kind. Where `selected=` is supported (`circles`, `rects`, `polygons`, `segments`,
-`polyline` only): selected persists after unhover; wash ≠ hover; open geometry uses the
-ring.
+`polyline`, `lines`): selected persists after unhover; wash ≠ hover; open geometry uses the
+ring. A one-element `lines!` with a baked selection has no other mark to hover, so that
+hover is the already-selected path (no highlight). The series row hovers a different line.
 
 `selected=` on `:grid` / `:axis` / `:threshold` / `:roi` / `:view` is fail-loud — do not
 bake it; hover/click or drag only.
@@ -104,7 +105,8 @@ bake it; hover/click or drag only.
 | Kind | Layer | Selected | Must assert |
 | --- | --- | --- | --- |
 | Scatter | `:circles` | wash, flush drawn `r`, centered | tip, click `@bind`, persist, overlay-on-base, fade, no `#ff3b30`, dodge fill brightens the marker's interior (screenshot, hovered on a NON-selected element), hover-on-the-selected-element is a no-op (no highlight, tooltip still shows) |
-| Lines | `:polyline` | ring | tip, click `@bind`, persist, ring recipe, hover edge-only (no fill shape) |
+| Lines | `:lines` | ring (one `<path>` through the whole polyline) | tip, click `@bind` (one element; Julia index `1`), persist, ring recipe, hover on that same selected path draws no highlight |
+| Series | `:lines` | ring on series 1 | tip per series, click the second series (`@bind` Julia index `2`), hover stroke traces that whole path (edge-only, no fill shape) |
 | LineSegments | `:segments` | ring | tip, click `@bind`, persist, hover edge-only (no fill shape) |
 | Heatmap / Image | `:grid` | **unsupported** | cell tip `(i,j)=value`, click `@bind`, dodge fill brightens the cell's interior (screenshot, on a bright-enough cell; grid hover is a closed "rect" geom_) |
 | BarPlot | `:rects` | wash | tip, click `@bind`, persist, dodge fill brightens the bar's interior (screenshot) |
@@ -116,7 +118,7 @@ bake it; hover/click or drag only.
 | Threshold | `:threshold` | none | drag commit → `@bind` |
 | ROI / box-select | `:roi` | none | drag commit → `@bind` (vector if `selects=`; a `selects`-ROI's grid cell-block union rect is fill-layer-only, `"rectfill"`) |
 | View (2D pan / 3D orbit) | `:view` | none | **commits nothing** (§12.3) — drag readout only, no `@bind` write. On both backends, in-drag frames stream over the gesture channel (`with_js_link`, #102/#133) — the picture and hit manifest swap together on every camera move, `px_per_unit` drops to 1 mid-gesture and restores on release, a pre-existing selection on another layer survives the swap. `:cairo`'s picture is a PNG; `:webgl`'s is a serialized scene applied to the existing canvas |
-| Legend | `:rects` | wash (entry row) | tip = entry label, hover fans out linked layers into `g.link` (wash/ring on the marks, on-mark geometry, fade on leave, `g.sel` untouched), click `@bind` payload carries `targets` |
+| Legend | `:rects` | wash (entry row) | tip = entry label, hover fans out linked layers into `g.link` (wash/ring on the marks, on-mark geometry, fade on leave, `g.sel` untouched), click `@bind` payload carries `targets`. A `series!` legend entry pins one path (`series:k`), not every series |
 | Axis / Colorbar readout | `:axis` | none — a click is NOT a selection gesture; must leave a pre-existing selection on ANOTHER layer of the same widget untouched | hover coordinate readout inverted from the `AxisTransform` (`x=…, y=…`; a `Colorbar`'s tooltip is a bare number, no `x=`/`y=` prefix), click → `@bind` `(index=-1, payload=(;x,y)` or `(;value))`, an axis click and a colorbar click both leave a pre-existing `:pts` selection alone (#107 regression), colorbar's bounded bbox is a different hit-test branch from the axis catch-all (a pixel just outside the bbox reads as the axis catch-all, not the colorbar) |
 
 ### Hover (element kinds)

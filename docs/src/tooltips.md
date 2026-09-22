@@ -156,8 +156,9 @@ neighboring marks. The anchor point depends on the kind:
 
 - circles: the marker's centre; the box sits above its top edge.
 - rects (bars): the bar's top-centre.
-- segments and polylines: the point on the segment nearest the cursor — the tooltip slides
-  along the line as the pointer moves. Keyboard focus (no cursor) uses the segment's midpoint.
+- segments, per-segment polylines, and whole lines (`lines!` / `series!`): the point on the
+  path nearest the cursor — the tooltip slides along the line as the pointer moves. Keyboard
+  focus (no cursor) uses the segment's midpoint, or the point halfway along a whole line.
 - polygons: the centroid, if it lies inside the polygon shape; otherwise the cursor point.
 - grid cells (heatmaps): the cell's centre; the box sits above the cell's top edge.
 - axis, threshold, ROI, and view (continuous/drag interactions with no discrete mark): the

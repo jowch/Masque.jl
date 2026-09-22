@@ -32,11 +32,14 @@ is dropped from the auto path with a warning, rather than failing the whole buil
 
 ## Hovering and clicking
 
-Hovering a legend entry highlights every element of the layer(s) it links to, using the same
-wash/ring recipe as `selected=` (see [Selection](@ref)). Clicking reports the usual
+Hovering a legend entry highlights the traces it links to, using the same wash/ring recipe as
+`selected=` (see [Selection](@ref)). A spec is a layer id — every element of that layer — or
+`id:k` pinning element `k` (1-based). Auto-extracted `series!` entries use the pin, so each
+swatch lights one series rather than every trace packed into the parent `:lines` layer. A
+bare `targets = :series` still highlights the whole layer. Clicking reports the usual
 [`LegendEvent`](@ref), `layer = :legend` (or `:legend_2`, … for a second legend).
 `entry.label`, `entry.group`, and `entry.targets` are the entry's fields — `targets` is the
-list of layer ids (as strings) the entry links to, `group` is the entry's group title
+list of those specs (as strings) the entry links to, `group` is the entry's group title
 (`nothing` for an ungrouped legend). `entry.index` is which entry, not a row of a table.
 
 ```julia

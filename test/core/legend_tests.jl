@@ -190,7 +190,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         leg = axislegend(ax)
         Makie.update_state_before_display!(fig)
         _, _, ctx = ctx_for(fig)
-        line_int = Masque.SegmentInteractable(ax, l1)   # :polyline, id :lines
+        line_int = Masque.SegmentInteractable(ax, l1)   # :lines, id :lines
         rect_int = Masque.RectInteractable(ax, hm)      # :grid, id :cells
 
         # explicit target naming the :grid layer -> ArgumentError from build_manifest
@@ -253,6 +253,51 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         L = only(hitlayers(li, ctx))
         @test length(L.geometry) ÷ 4 == 3
         @test [p.label for p in L.payloads] == ["H1", "H2", "H3"]
+    end
+
+    @testset "series! legend pins one element per entry, not the whole layer" begin
+        fig = Figure(); ax = Axis(fig[1, 1])
+        # 3 rows × 4 columns: each row is one series (Makie's matrix convention).
+        ys = [1.0 1.5 2.2 2.8; 3.0 2.4 1.2 1.5; 0.6 1.4 2.6 2.0]
+        series!(ax, ys)
+        axislegend(ax)
+        Makie.update_state_before_display!(fig)
+
+        ints = auto_interactables(fig)
+        li = only(filter(i -> i isa LegendInteractable, ints))
+        @test li.targets == [[Symbol("series:1")], [Symbol("series:2")], [Symbol("series:3")]]
+
+        _, _, ctx = ctx_for(fig)
+        m = @test_logs build_manifest(ints, ctx)
+        legd = only(filter(d -> d["id"] == "legend", m["layers"]))
+        @test legd["links"] == [["series:1"], ["series:2"], ["series:3"]]
+        ser = only(filter(d -> d["id"] == "series", m["layers"]))
+        @test ser["kind"] == "lines" && length(ser["geometry"]) == 3
+
+        # a bare layer id still means every element of that layer
+        leg = only(filter(c -> c isa Makie.Legend, fig.content))
+        series_int = only(filter(i -> !(i isa LegendInteractable), ints))
+        li_all = LegendInteractable(
+            leg;
+            targets = Dict("series 1" => :series, "series 2" => :series, "series 3" => :series),
+        )
+        m_all = build_manifest([series_int, li_all], ctx)
+        @test only(filter(d -> d["id"] == "legend", m_all["layers"]))["links"] ==
+            [["series"], ["series"], ["series"]]
+
+        # explicit `id:k` pin, and an out-of-range pin fails loud
+        li_pin = LegendInteractable(
+            leg;
+            targets = Dict("series 1" => Symbol("series:2"), "series 2" => nothing, "series 3" => nothing),
+        )
+        m_pin = build_manifest([series_int, li_pin], ctx)
+        @test only(filter(d -> d["id"] == "legend", m_pin["layers"]))["links"] == [["series:2"], [], []]
+
+        li_oob = LegendInteractable(
+            leg;
+            targets = Dict("series 1" => Symbol("series:9"), "series 2" => nothing, "series 3" => nothing),
+        )
+        @test_throws ArgumentError build_manifest([series_int, li_oob], ctx)
     end
 
     @testset "tooltip: default label template, false suppresses" begin
