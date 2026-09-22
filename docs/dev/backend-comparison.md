@@ -144,10 +144,11 @@ Two terms move independently under stress, and both are UX terms:
 cell pays a **one-time** tax — download the 1.09 MB bundle, compile it, initialize three.js, upload to
 the GPU, first draw — before anything shows. Today that tax buys **cheap re-renders** (flat ~30 ms
 server serialize + client redraw; §2) and live 3D *rendering*, and it amortizes across the notebook
-(every later `:webgl` cell reuses the cached bundle — M2). It does **not** yet buy live view
-manipulation — unbuilt on both; when it lands, `:webgl`'s cheap re-renders are exactly what a
-view-manip step costs (§1†). So the honest framing: `:cairo` wins the first 100 ms; `:webgl` wins
-repeated/animated re-renders and (today) 3D display after it.
+(every later `:webgl` cell reuses the cached bundle — M2). It also buys live view
+manipulation on the same canvas: a drag re-serializes the scene and rebuilds the three.js
+graph on the renderer the cell already holds, without a new WebGL context. So the honest
+framing: `:cairo` wins the first 100 ms; `:webgl` wins repeated/animated re-renders, 3D
+display after the tax, and in-drag view frames that do not rasterize.
 
 ## 5. Anti-finding — dense rasters are Cairo's home turf
 
@@ -162,14 +163,16 @@ which is exactly what makes them **co-equal**, not light-vs-heavy.
 (a headless browser runs software GL, so a canvas paint / frame-time there would be pessimistic and not
 the user's GPU anyway). Three facts, GL-independent:
 
-- **Camera interaction is gated off today — verified.** The shim hardcodes `can_send_to_julia:()=>true`
+- **Native WGLMakie OrbitControls stay gated — verified.** The shim hardcodes `can_send_to_julia:()=>true`
   (`frontend/src/wgl-shim.ts`); WGLMakie's
   `use_orbit_cam = ()=>!(Bonito.can_send_to_julia && Bonito.can_send_to_julia())` (pinned bundle)
   therefore **disables 3D OrbitControls**, and 2D `Axis` zoom/pan is Julia-side and dead under the
-  server-free (`NoConnection`) model. So a `:webgl` plot renders live but **does not pan, zoom, or
-  rotate** as shipped. (The flag is true *on purpose* — it's what lets the client-side camera/uniform
-  *observable* animation path fire; `update_cam` early-returns when it's false. Note this is **not**
-  roadmap tier-2 animation, which patches GL buffers via `find_plots` with no observable.)
+  server-free (`NoConnection`) model. A `:webgl` plot still does not pan, zoom, or rotate through
+  WGLMakie's own controls. View gestures go through Masque's overlay and the `with_js_link`
+  channel instead (`ViewInteractable`, #102/#133). (The flag is true *on purpose* — it's what lets
+  the client-side camera/uniform *observable* animation path fire; `update_cam` early-returns
+  when it's false. Note this is **not** roadmap tier-2 animation, which patches GL buffers via
+  `find_plots` with no observable.)
 - **If enabled, the wire/latency would be free but the overlay would drift.** Because the scene ships
   through `Bonito.Session(Bonito.NoConnection())` (`src/MasqueWGL.jl:84`) with no transport back to the
   kernel, a client-side camera move would cost **zero round-trip by construction**. But the overlay's
@@ -195,9 +198,9 @@ identity across Pluto's cell replacement, #86). Both tracked in `roadmap.md` (Ax
 view manipulation via Julia re-render); the client-side GPU camera remains a Masque-wide non-goal
 (alongside GPU-pick occlusion).
 
-**Amended (#122, implemented #102/#133):** the transport above is superseded — view parameters belong
-on the `with_js_link` gesture channel, not `@bind`, because a camera is operational state rather
-than an analysis value ([§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)).
-`ViewInteractable` commits nothing on either backend. In-drag frames stream over `with_js_link`
-instead of a bond: a PNG on `:cairo`, a serialized scene on the existing canvas on `:webgl`.
-The client-side GPU camera staying out is unaffected by any of this.
+View parameters belong on the `with_js_link` gesture channel, not `@bind`, because a camera is
+operational state rather than an analysis value
+([§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)). `ViewInteractable`
+commits nothing on either backend. In-drag frames stream over `with_js_link` instead of a bond:
+a PNG on `:cairo`, a serialized scene on the existing canvas on `:webgl`. The client-side GPU
+camera staying out is unaffected by any of this.

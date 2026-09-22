@@ -212,18 +212,25 @@ describe("mountWebGL", () => {
         expect(canvas.width).toBe(200) // 100 * ppu 2
     })
 
-    it("applies a scene that arrived before the replacer was installed", async () => {
+    it("flushes a pending overlay frame onto the existing screen", async () => {
         const canvas = document.createElement("canvas") as HTMLCanvasElement & {
             wglmakie_screen?: { root_scene: { data?: unknown } }
-            masquePendingScene?: { scene: unknown; pxPerUnit?: number; width?: number; height?: number } | null
+            masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
+            masqueFlushPending?: () => void
+            masquePendingFrame?: { r: { scene: unknown; pxPerUnit?: number; width?: number; height?: number } } | null
         }
         document.createElement("div").appendChild(canvas)
-        canvas.masquePendingScene = { scene: { tag: "early" }, pxPerUnit: 2, width: 80, height: 40 }
+        canvas.masquePendingFrame = { r: { scene: { tag: "early" }, pxPerUnit: 2, width: 80, height: 40 } }
+        canvas.masqueFlushPending = () => {
+            const pending = canvas.masquePendingFrame
+            canvas.masquePendingFrame = null
+            canvas.masqueReplaceScene?.(pending!.r.scene, pending!.r.pxPerUnit, pending!.r.width, pending!.r.height)
+        }
         const mod = await import(/* @vite-ignore */ bundleUrl) as { sceneCalls: { deleted: number; loops: number } }
         mod.sceneCalls.deleted = 0
         mod.sceneCalls.loops = 0
         await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 80, height: 40, pxPerUnit: 2 })
-        expect(canvas.masquePendingScene).toBeNull()
+        expect(canvas.masquePendingFrame).toBeNull()
         expect(mod.sceneCalls.loops).toBe(1)
         expect(canvas.wglmakie_screen!.root_scene.data).toEqual({ tag: "early" })
         expect(canvas.width).toBe(160)

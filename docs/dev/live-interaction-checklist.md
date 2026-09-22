@@ -155,8 +155,10 @@ bake it; hover/click or drag only.
 
 ### Drag kinds
 
-- Threshold / ROI / view: gesture commits; readout changes; overlay stays pinned to the
+- Threshold / ROI: gesture commits; readout changes; overlay stays pinned to the
   base (`<img>` Cairo, `<canvas>` WGL)
+- View: gesture commits nothing; picture and hit manifest still swap on the same
+  overlay pin
 
 ### Console
 

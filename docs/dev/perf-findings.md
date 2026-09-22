@@ -206,10 +206,11 @@ never touch them. Both bundles remain byte-identical across repeated `npm run bu
 The gesture channel (#102, commit `a9855b4`) added a new module (`frontend/src/gesture.ts`,
 the request-discipline state machine) plus the frame-swap/manifest-rebuild path in `mount.ts` and
 the request/settle wiring in `bond.ts`/`drag/view.ts`: `assets/overlay.js` **47 702 → 49 088
-bytes** (+1 386 B, ~2.9%). `assets/masque-webgl.js` is unaffected (**1 179 bytes**, unchanged —
-this doc's own count above was stale by 6 B, unrelated to this PR) — the gesture channel is
-`:cairo`-only, and `WebGLWidget`'s `Base.show`/`mount()` call never passes a `requestFrame`, so
-none of the new frontend code paths are exercised for `:webgl`.
+bytes** (+1 386 B, ~2.9%). `assets/masque-webgl.js` was then **1 179 bytes**, unchanged by
+#102 — this doc's own count above was stale by 6 B, unrelated to that PR. #133 later added
+the in-place scene swap to `wgl-shim.ts`; the shim is no longer a static-size spectator of
+the gesture channel. Current numbers for the `:webgl` frame itself are in
+"Gesture channel (#133): `:webgl` scene frames" below.
 
 ## Measured envelope
 

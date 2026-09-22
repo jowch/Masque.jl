@@ -103,17 +103,10 @@ interface WglBundle {
     delete_scene?: (id: unknown) => void
 }
 
-export interface PendingScene {
-    scene: unknown
-    pxPerUnit?: number
-    width?: number
-    height?: number
-}
-
 interface WglCanvas extends HTMLCanvasElement {
     wglmakie_screen?: WglScreen
     masqueReplaceScene?: (scene: unknown, pxPerUnit?: number, width?: number, height?: number) => void
-    masquePendingScene?: PendingScene | null
+    masqueFlushPending?: () => void
 }
 
 // An empty screen makes WGLMakie's render loop exit. dispose_screen no-ops on {}, so the
@@ -177,11 +170,7 @@ function installSceneReplacer(canvas: WglCanvas, WGL: WglBundle): void {
     canvas.masqueReplaceScene = (scene, pxPerUnit, width, height) => {
         replaceScene(canvas, WGL, scene, pxPerUnit, width, height)
     }
-    const pending = canvas.masquePendingScene
-    if (pending) {
-        canvas.masquePendingScene = null
-        canvas.masqueReplaceScene(pending.scene, pending.pxPerUnit, pending.width, pending.height)
-    }
+    canvas.masqueFlushPending?.()
 }
 
 export async function mountWebGL({ canvas, wglBundleUrl, scene, width, height, pxPerUnit = 2 }: MountArgs) {

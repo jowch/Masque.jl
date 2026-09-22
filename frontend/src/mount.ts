@@ -355,6 +355,21 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const state = createOverlayState()
     state.selHits_ = selHits
 
+    type GestureCanvas = HTMLCanvasElement & {
+        masqueReplaceScene?: (scene: unknown, pxPerUnit?: number, width?: number, height?: number) => void
+        masqueFlushPending?: () => void
+        masquePendingFrame?: { input: Record<string, unknown>; r: FrameResponse } | null
+    }
+    if (base instanceof HTMLCanvasElement) {
+        const canvas = base as GestureCanvas
+        canvas.masqueFlushPending = () => {
+            const pending = canvas.masquePendingFrame
+            if (!pending) return
+            canvas.masquePendingFrame = null
+            applyFrame(pending.input, pending.r)
+        }
+    }
+
     function applyFrame(input: Record<string, unknown>, r: FrameResponse): void {
         if (base instanceof HTMLImageElement && r.png) {
             // `r.png` decodes off `with_js_link` as a plain (never Shared) ArrayBuffer-backed
@@ -366,16 +381,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             base.src = url
             if (prev) URL.revokeObjectURL(prev) // revoke the PREVIOUS url, not this one, mid-gesture
         } else if (base instanceof HTMLCanvasElement && r.scene != null) {
-            const c = base as HTMLCanvasElement & {
-                masqueReplaceScene?: (scene: unknown, pxPerUnit?: number, width?: number, height?: number) => void
-                masquePendingScene?: { scene: unknown; pxPerUnit?: number; width?: number; height?: number } | null
-            }
-            if (typeof c.masqueReplaceScene !== "function") {
-                c.masquePendingScene = { scene: r.scene, pxPerUnit: r.pxPerUnit, width: r.width, height: r.height }
+            const canvas = base as GestureCanvas
+            if (typeof canvas.masqueReplaceScene !== "function") {
+                canvas.masquePendingFrame = { input, r }
                 return
             }
             try {
-                c.masqueReplaceScene(r.scene, r.pxPerUnit, r.width, r.height)
+                canvas.masqueReplaceScene(r.scene, r.pxPerUnit, r.width, r.height)
             } catch (e) {
                 console.error("[masque] webgl gesture frame failed", e)
                 return

@@ -1252,7 +1252,7 @@ describe("tooltips (mount/showTip)", () => {
         expect(stamp.xmax).toBe(9)
     })
 
-    it("gesture channel: a canvas with no replacer yet does not stamp a manifest ahead of the scene", async () => {
+    it("gesture channel: a canvas frame that lands before the replacer still swaps the manifest", async () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,
             transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
@@ -1262,22 +1262,37 @@ describe("tooltips (mount/showTip)", () => {
         }
         const host = document.createElement("div")
         const canvas = document.createElement("canvas") as HTMLCanvasElement & {
-            masquePendingScene?: { scene: unknown } | null
+            masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
+            masqueFlushPending?: () => void
+            masquePendingFrame?: { input: Record<string, unknown>; r: { scene?: unknown } } | null
         }
         canvas.getBoundingClientRect = () =>
             ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
         const script = document.createElement("script")
         host.append(canvas, script)
         document.body.append(host)
-        const requestFrame = vi.fn(async () => ({ scene: { tag: "early" }, manifest: m }))
+        const moved: Manifest = {
+            ...m,
+            transforms: { ax1: { ...m.transforms.ax1, xlims: [1, 9], ylims: [2, 80] } },
+        }
+        const requestFrame = vi.fn(async () => ({ scene: { tag: "early" }, pxPerUnit: 1, width: 400, height: 300, manifest: moved }))
         mount(script, m, undefined, requestFrame)
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
         await Promise.resolve()
         await Promise.resolve()
-        expect(canvas.masquePendingScene?.scene).toEqual({ tag: "early" })
+        expect(canvas.masquePendingFrame?.r.scene).toEqual({ tag: "early" })
         expect(host.dataset.masqueGestureFrame).toBeUndefined()
+        const replace = vi.fn()
+        canvas.masqueReplaceScene = replace
+        canvas.masqueFlushPending?.()
+        expect(canvas.masquePendingFrame).toBeNull()
+        expect(replace).toHaveBeenCalledWith({ tag: "early" }, 1, 400, 300)
+        const stamp = JSON.parse((host as HTMLElement & { dataset: DOMStringMap }).dataset.masqueGestureFrame!)
+        expect(stamp.n).toBe(1)
+        expect(stamp.xmin).toBe(1)
+        expect(stamp.xmax).toBe(9)
     })
 
     // Round-1 review, finding #2: settle used to be gated on the RELEASE point's own distance
