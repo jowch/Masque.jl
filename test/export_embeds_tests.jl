@@ -37,6 +37,15 @@ end
     @test get(player, "chip", true) !== false
 end
 
+@testset "home quickstart TOML lists idle + three scatter points" begin
+    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_quickstart.jl")
+    player = parse_player_toml(path)
+    @test player["bond"] == "sel"
+    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
+    @test keys == ["null", "scatter:0", "scatter:1", "scatter:2"]
+    @test get(player, "chip", true) !== false
+end
+
 @testset "overlay-only player TOML sets chip = false" begin
     path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "view_pan.jl")
     player = parse_player_toml(path)

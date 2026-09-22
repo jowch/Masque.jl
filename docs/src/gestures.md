@@ -29,8 +29,7 @@ does. For clone, `Pkg.develop`, and `Pkg.add(url=…)` cells, see
 At `masque()` time, one Makie `Figure` plus its interactables produces a
 backend image (PNG or GPU canvas) and hit geometry for every axis, then one
 manifest, then HTML: one image and one overlay. Several axes still share that
-overlay. They are not several `masque` calls. For the information-flow
-diagram, see [Masque.jl](@ref).
+overlay. They are not several `masque` calls.
 
 The overlay is a stateless view: tooltips, highlight in the overlay, and
 drag chrome. Authoritative analysis state lives in Julia as the `@bind`
