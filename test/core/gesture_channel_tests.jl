@@ -85,6 +85,26 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws ArgumentError w.render_frame(Dict("id" => "nope", "xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0))
     end
 
+    @testset "masque warms the gesture callback and restores the camera" begin
+        fig3 = Figure(size = (400, 400))
+        ax3 = Axis3(fig3[1, 1])
+        scatter!(ax3, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
+        az0, el0 = ax3.azimuth[], ax3.elevation[]
+        w3 = masque(fig3, [ViewInteractable(ax3)])
+        @test w3.render_frame isa Function
+        @test ax3.azimuth[] ≈ az0 atol = 1.0e-12
+        @test ax3.elevation[] ≈ el0 atol = 1.0e-12
+
+        fig2 = Figure(size = (600, 400))
+        ax2 = Axis(fig2[1, 1])
+        pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
+        scatter!(ax2, first.(pts), last.(pts))
+        lim0 = ax2.limits[]
+        w2 = masque(fig2, [ViewInteractable(ax2), PointInteractable(ax2, pts)])
+        @test w2.render_frame isa Function
+        @test ax2.limits[] == lim0
+    end
+
     @testset "MasqueWidget 3-arg constructor still works (render_frame defaults to nothing)" begin
         w = Masque.MasqueWidget("", Dict{String, Any}(), 100)
         @test w.render_frame === nothing

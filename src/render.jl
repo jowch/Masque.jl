@@ -418,44 +418,98 @@ end
 function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu)
     view_axes = Dict{Symbol, Any}(i.id => i.ax for i in interactables if i isa ViewInteractable)
     isempty(view_axes) && return nothing
-    return function (input)
-        id = Symbol(input["id"])
-        ax = get(view_axes, id, nothing)
-        ax === nothing && throw(
-            ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
+    frame = function (input)
+        return _apply_view_frame(input, view_axes, backend, fig, interactables, ppu)
+    end
+    _warm_view_render_frame!(frame, view_axes)
+    return frame
+end
+
+function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu)
+    id = Symbol(input["id"])
+    ax = get(view_axes, id, nothing)
+    ax === nothing && throw(
+        ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
+    )
+    if haskey(input, "azimuth")
+        ax.azimuth[] = Float64(input["azimuth"])
+        ax.elevation[] = Float64(input["elevation"])
+    else
+        ax.limits[] = (
+            Float64(input["xmin"]), Float64(input["xmax"]),
+            Float64(input["ymin"]), Float64(input["ymax"]),
         )
-        if haskey(input, "azimuth")
-            ax.azimuth[] = Float64(input["azimuth"])
-            ax.elevation[] = Float64(input["elevation"])
+    end
+    # Frame resolution drops to 1x for every in-drag frame and restores to the mount ppu on
+    # release ("settle", the frontend's terminal request) — the MANIFEST always stays in the
+    # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
+    # moves out from under the overlay; only the PNG's own pixel density changes (the <img>
+    # is width:100% CSS-scaled — see frontend-delivery.md — so that's decoupled from its
+    # intrinsic size).
+    render_ppu = get(input, "settle", false) === true ? ppu : 1.0
+    bg0 = fig.scene.backgroundcolor[]
+    try
+        # Same forcing masque() does around its own render — that guard is restored in ITS
+        # `finally` before this closure ever runs, so each frame has to redo it.
+        fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
+        _finalize!(fig)
+        ctx = context(backend, fig, ppu)
+        manifest = build_manifest(interactables, ctx)
+        result = render(backend, fig, render_ppu)
+        frame = _gesture_frame(result)
+        frame["manifest"] = manifest
+        return frame
+    finally
+        fig.scene.backgroundcolor[] = bg0
+    end
+end
+
+# The first real call compiles this path (JS payload, camera mutation, `ppu=1` re-render) —
+# ~1.5 s on an Axis3 surface, paid on the pointer while the overlay tooltip already moves.
+# Warm it here against this figure and restore the camera so the mount PNG and manifest still
+# match. The user waits on the cell, not the first drag. Tiny nudges plus one farther pose
+# cover the leftover compile a coalesced first drag otherwise pays.
+function _warm_view_render_frame!(frame, view_axes)
+    for (id, ax) in view_axes
+        sid = String(id)
+        if hasproperty(ax, :azimuth) && hasproperty(ax, :elevation)
+            az0 = Float64(ax.azimuth[])
+            el0 = Float64(ax.elevation[])
+            frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.05, "elevation" => el0, "settle" => false))
+            frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0 + 0.05, "settle" => false))
+            frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.8, "elevation" => el0 - 0.2, "settle" => false))
+            frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0, "settle" => true))
         else
-            ax.limits[] = (
-                Float64(input["xmin"]), Float64(input["xmax"]),
-                Float64(input["ymin"]), Float64(input["ymax"]),
+            lim0 = ax.limits[]
+            fl = _finallimits(ax)
+            xmin = Float64(fl.origin[1])
+            ymin = Float64(fl.origin[2])
+            xmax = xmin + Float64(fl.widths[1])
+            ymax = ymin + Float64(fl.widths[2])
+            dx = 0.01 * (xmax - xmin)
+            dy = 0.01 * (ymax - ymin)
+            frame(
+                Dict{String, Any}(
+                    "id" => sid, "xmin" => xmin + dx, "xmax" => xmax + dx,
+                    "ymin" => ymin, "ymax" => ymax, "settle" => false,
+                ),
             )
-        end
-        # Frame resolution drops to 1x for every in-drag frame and restores to the mount ppu on
-        # release ("settle", the frontend's terminal request) — the MANIFEST always stays in the
-        # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
-        # moves out from under the overlay; only the PNG's own pixel density changes (the <img>
-        # is width:100% CSS-scaled — see frontend-delivery.md — so that's decoupled from its
-        # intrinsic size).
-        render_ppu = get(input, "settle", false) === true ? ppu : 1.0
-        bg0 = fig.scene.backgroundcolor[]
-        try
-            # Same forcing masque() does around its own render — that guard is restored in ITS
-            # `finally` before this closure ever runs, so each frame has to redo it.
-            fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
-            _finalize!(fig)
-            ctx = context(backend, fig, ppu)
-            manifest = build_manifest(interactables, ctx)
-            result = render(backend, fig, render_ppu)
-            frame = _gesture_frame(result)
-            frame["manifest"] = manifest
-            return frame
-        finally
-            fig.scene.backgroundcolor[] = bg0
+            frame(
+                Dict{String, Any}(
+                    "id" => sid, "xmin" => xmin, "xmax" => xmax,
+                    "ymin" => ymin + dy, "ymax" => ymax + dy, "settle" => false,
+                ),
+            )
+            frame(
+                Dict{String, Any}(
+                    "id" => sid, "xmin" => xmin, "xmax" => xmax,
+                    "ymin" => ymin, "ymax" => ymax, "settle" => true,
+                ),
+            )
+            ax.limits[] = lim0
         end
     end
+    return nothing
 end
 
 # Render-time capability question ONLY (§12.9) — NOT how a static export is detected.
