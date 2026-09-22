@@ -410,24 +410,29 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     n_inlined_total = 0
     png_b = 0
     man_b = 0
-    idle_html = nothing
+    widget_id = string(widget.cell_id)
+    idle_state = findfirst(st -> st.key == "null", states)
+    src_for_idle = idle_state === nothing ? first(states) : states[idle_state]
+    idle_html = src_for_idle.record.htmls[widget_id]
+    idle_png = png_data_url(idle_html)
     for st in states
         key = st.key
         rec = st.record
-        snapshots[key] = Dict(
+        snap = Dict{String, Any}(
             "id" => st.id,
             "cells" => [rec.htmls[string(c.cell_id)] for c in downstream],
         )
+        png = png_data_url(get(rec.htmls, widget_id, ""))
+        if png !== nothing && png != idle_png
+            snap["png"] = png
+        end
+        snapshots[key] = snap
         n_inlined_total += rec.n_inlined
         png_b = max(png_b, rec.png_b)
         man_b = max(man_b, rec.man_b)
-        if idle_html === nothing || key == "null"
-            idle_html = rec.htmls[string(widget.cell_id)]
-        end
     end
     idle_down = String[]
-    idle_state = findfirst(st -> st.key == "null", states)
-    src_state = idle_state === nothing ? first(states) : states[idle_state]
+    src_state = src_for_idle
     src_state.record.n_inlined >= 1 || error(
         "idle masque cell in $(basename(path)) inlined $(src_state.record.n_inlined) published objects; rewrite_published_to_js missed getPublishedObject"
     )
@@ -514,17 +519,6 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         }
         return null;
       }
-      function applyFromHost(host) {
-        const man = host && host.masqueManifest;
-        const snaps = man && man.snapshots;
-        if (!snaps) return false;
-        const snap = snapFor(snaps, host.value);
-        if (!snap) return false;
-        const out = document.getElementById("masque-out");
-        if (!out) return false;
-        out.innerHTML = snap.cells.join("\\n");
-        return true;
-      }
       function sizeFrame() {
         if (!window.frameElement) return;
         window.frameElement.style.overflow = "hidden";
@@ -535,6 +529,22 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         window.frameElement.style.height = Math.max(1, Math.ceil(bottom)) + "px";
       }
       const host = document.querySelector(".ip-host");
+      const idlePng = (host && host.querySelector("img") && host.querySelector("img").src) || "";
+      function applyFromHost(host) {
+        const man = host && host.masqueManifest;
+        const snaps = man && man.snapshots;
+        if (!snaps) return false;
+        const snap = snapFor(snaps, host.value);
+        if (!snap) return false;
+        const img = host.querySelector("img");
+        if (img) {
+          const next = snap.png || idlePng;
+          if (next && img.src !== next) img.src = next;
+        }
+        const out = document.getElementById("masque-out");
+        if (out && Array.isArray(snap.cells)) out.innerHTML = snap.cells.join("\\n");
+        return true;
+      }
       if (host) {
         let cur = host.value;
         Object.defineProperty(host, "value", {

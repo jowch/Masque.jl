@@ -70,6 +70,14 @@ function html_escape(s::AbstractString)
     return s
 end
 
+# Cairo widget HTML inlines one `data:image/png;base64,…` on `<img>`. Listed states
+# that remount the figure (e.g. a `@bind` cell that changes `alpha`) carry a
+# different URL; the player swaps `img.src` so the PNG matches the snapshot.
+function png_data_url(html::AbstractString)
+    m = match(r"data:image/png;base64,[A-Za-z0-9+/=]+", html)
+    return m === nothing ? nothing : m.match
+end
+
 function rewrite_published_to_js(html::AbstractString, published::AbstractDict)
     n = Ref(0)
     rewritten = replace(

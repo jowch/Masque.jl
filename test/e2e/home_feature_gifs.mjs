@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 const [base, scenario, framesDir] = process.argv.slice(2);
 if (!base || !scenario || !framesDir) {
-  console.error("usage: node record.mjs <base-url> <hover|click|brush|legend|export> <frames-dir>");
+  console.error("usage: node record.mjs <base-url> <hover|click|brush|legend> <frames-dir>");
   process.exit(2);
 }
 mkdirSync(framesDir, { recursive: true });
@@ -18,11 +18,10 @@ mkdirSync(framesDir, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const SPECS = {
-  hover: { path: "/embeds/tooltips_template.html", showOut: false },
+  hover: { path: "/embeds/home_hover_stars.html", showOut: false },
   click: { path: "/embeds/getting_started.html", showOut: true },
-  brush: { path: "/embeds/roi_table.html", showOut: true },
-  legend: { path: "/embeds/legend_lines.html", showOut: true },
-  export: { path: "/embeds/grids_heatmap.html", showOut: false },
+  brush: { path: "/embeds/home_brush_stations.html", showOut: true },
+  legend: { path: "/embeds/home_legend_classes.html", showOut: true },
 };
 
 const spec = SPECS[scenario];
@@ -183,8 +182,8 @@ try {
 
   const timeline = async () => {
     if (scenario === "hover") {
-      const layer = layers.find((l) => l.kind === "circles");
-      const pts = [0, 2, 3].map((i) => hitPoint(layer, i));
+      const layer = layers.find((l) => l.id === "stars");
+      const pts = [0, 5, 7].map((i) => hitPoint(layer, i));
       const css = await Promise.all(pts.map((p) => toCss(p.x, p.y)));
       await sleep(350);
       for (const p of css) {
@@ -245,7 +244,7 @@ try {
       let after = before;
       for (let i = 0; i < 40; i++) {
         after = await outText();
-        if (after !== before && /North/i.test(after)) break;
+        if (after !== before && /Seattle|Cascadia/i.test(after)) break;
         await sleep(80);
       }
       if (after === before) {
@@ -257,41 +256,31 @@ try {
     } else if (scenario === "legend") {
       const legend = layers.find((l) => l.id === "legend");
       const a = hitPoint(legend, 0);
-      const b = hitPoint(legend, 1);
+      const b = hitPoint(legend, 2);
       const [ptA, ptB] = await Promise.all([toCss(a.x, a.y), toCss(b.x, b.y)]);
+      const imgTail = () => page.evaluate(() => (document.querySelector(".ip-host img")?.src || "").slice(-32));
       await sleep(350);
       await moveTo(ptA, 450);
       await sleep(800);
       await moveTo(ptB, 400);
       await sleep(200);
       const before = await outText();
+      const beforePng = await imgTail();
       await page.mouse.down();
       await sleep(40);
       await page.mouse.up();
       let after = before;
+      let afterPng = beforePng;
       for (let i = 0; i < 40; i++) {
         after = await outText();
-        if (after !== before && /\bb\b/i.test(after)) break;
+        afterPng = await imgTail();
+        if (after !== before && /gentoo/i.test(after) && afterPng !== beforePng) break;
         await sleep(80);
       }
-      if (after === before) throw new Error(`legend: readout did not update — ${JSON.stringify(before)}`);
+      if (!/gentoo/i.test(after)) throw new Error(`legend: readout did not update — ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+      if (afterPng === beforePng) throw new Error("legend: PNG did not remount (fade missing)");
       console.error(`OK  legend: ${after}`);
       await sleep(1100);
-    } else if (scenario === "export") {
-      const layer = layers.find((l) => l.kind === "grid");
-      const cells = [0, 5, 11].map((i) => hitPoint(layer, i));
-      const css = await Promise.all(cells.map((p) => toCss(p.x, p.y)));
-      await sleep(350);
-      for (const p of css) {
-        await moveTo(p, 400);
-        await sleep(150);
-        const t = await tip();
-        if (!t.show) throw new Error(`export hover: tooltip missing ${JSON.stringify(t)}`);
-        console.error(`OK  cell tooltip: ${t.text}`);
-        await sleep(650);
-      }
-      await moveTo({ x: clip.x + 24, y: clip.y + 24 }, 400);
-      await sleep(600);
     }
     done = true;
   };

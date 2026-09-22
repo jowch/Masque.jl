@@ -9,7 +9,7 @@ E2E="$ROOT/test/e2e"
 OUT="$ROOT/docs/src/assets/home"
 mkdir -p "$OUT"
 cd "$E2E"
-for s in hover click brush legend export; do
+for s in hover click brush legend; do
   frames="/tmp/home-gifs/$s"
   rm -rf "$frames"
   node "$E2E/home_feature_gifs.mjs" "$BASE" "$s" "$frames"

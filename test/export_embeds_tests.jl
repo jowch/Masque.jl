@@ -123,3 +123,66 @@ end
     @test obj["snapshots"]["null"]["cells"] == ["<p>idle</p>"]
     @test occursin("window.Masque.mount", out)
 end
+
+@testset "png_data_url reads the inlined Cairo PNG" begin
+    html = """<img src="data:image/png;base64,QUJDRA==" alt="fig">"""
+    @test png_data_url(html) == "data:image/png;base64,QUJDRA=="
+    @test png_data_url("<p>no image</p>") === nothing
+end
+
+@testset "inject_manifest_snapshots keeps a remounted png on the snapshot" begin
+    html = """<script>
+        const manifest = {"layers":[],"width":2};
+        window.Masque.mount(currentScript, manifest, invalidation);
+    </script>"""
+    snaps = Dict(
+        "null" => Dict("id" => "idle", "cells" => ["<p>idle</p>"]),
+        "legend:2" => Dict(
+            "id" => "gentoo",
+            "cells" => ["<p>Gentoo</p>"],
+            "png" => "data:image/png;base64,QUJD",
+        ),
+    )
+    out = inject_manifest_snapshots(html, snaps)
+    start = last(findfirst("const manifest = ", out))
+    json, _, _ = extract_json_object(out, start)
+    obj = json_read(String(json))
+    @test obj["snapshots"]["legend:2"]["png"] == "data:image/png;base64,QUJD"
+end
+
+@testset "home hover stars TOML is overlay-only" begin
+    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_hover_stars.jl")
+    player = parse_player_toml(path)
+    @test player["chip"] == false
+    @test player["bond"] == "pick"
+    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
+    @test keys == ["null"]
+end
+
+@testset "home legend classes TOML lists idle plus three species" begin
+    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_legend_classes.jl")
+    player = parse_player_toml(path)
+    @test player["bond"] == "pick"
+    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
+    @test keys == ["null", "legend:0", "legend:1", "legend:2"]
+    @test get(player, "chip", true) !== false
+end
+
+@testset "home export TOML is overlay-only" begin
+    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_export.jl")
+    player = parse_player_toml(path)
+    @test player["chip"] == false
+    @test player["bond"] == "pick"
+    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
+    @test keys == ["null"]
+end
+
+@testset "home brush stations TOML lists region item sets" begin
+    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_brush_stations.jl")
+    player = parse_player_toml(path)
+    @test player["bond"] == "picks"
+    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
+    @test keys[1] == "null"
+    @test "items:" in keys
+    @test any(startswith(k, "items:pts:0") for k in keys)
+end
