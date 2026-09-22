@@ -91,7 +91,8 @@ pick === nothing ? "click a bar" :
     "value $(pick.value) (low $(pick.low), high $(pick.high))"
 ```
 
-`pick.payload.index` raises an error on this zero-config bar plot: the
+After a click, `pick` is an [`ElementEvent`](@ref). `pick.payload.index`
+raises an error on this zero-config bar plot: the
 row is `(; low, high, value)`. `pick.index` is the 1-based bar. Pass the
 plot object when you want an explicit
 interactable: `p = barplot!(ax, 1:4, ys); RectInteractable(ax, p)`. That
@@ -174,12 +175,16 @@ end
 pick === nothing ? "click a polygon" : "index $(pick.index)"
 ```
 
+After a click, `pick` is an [`ElementEvent`](@ref). `pick.index` is
+1-based.
+
 `poly!` on a `PolarAxis` is skipped by auto with `@warn`. Band, density,
 contourf, violin, and voronoiplot are also `:polygons`; contourf defaults
 to `(; low, high)` and violin to `(; x)`.
 
 `text!` labels are bounding-box hits: `TextInteractable(ax, p::Makie.Text)`
-only, kind `:rects`, default payload `(; text, index, x, y)`.
+only, kind `:rects`. After a click, `pick` is an [`ElementEvent`](@ref)
+with `text`, 1-based `index`, `x`, `y`.
 `annotation!` is auto-only through its inner `Text`.
 
 ## Other geometries
@@ -190,8 +195,9 @@ This demo is another figure. Replace the previous `fig` cell and the
 `@bind pick` cell.
 
 A short polyline is the same click job with a different kind. Four
-vertices give three segments, layer `:lines`, kind `:polyline`, default
-payload `(; segment_index)`.
+vertices give three segments, layer `:lines`, kind `:polyline`. After a
+click, `pick` is an [`ElementEvent`](@ref) with 1-based
+`segment_index`.
 
 **1.** Draw a four-vertex polyline:
 
@@ -220,9 +226,10 @@ This demo is another figure. Replace the previous `fig` cell and the
 
 Scatter four `Point2f` values on a `PolarAxis`. `@bind pick masque(fig)`
 walks the scatter the same way as on a Cartesian axis. CairoMakie and
-WGLMakie both work; polar is not WebGL-only. The default payload is
-`(; index, x, y)` with `x` = θ and `y` = r. The highlight in the overlay
-hugs the marker because zero-config uses the Scatter constructor.
+WGLMakie both work; polar is not WebGL-only. After a click, `pick` is
+an [`ElementEvent`](@ref): 1-based `index`, `x` = θ, `y` = r. The
+highlight in the overlay hugs the marker because zero-config uses the
+Scatter constructor.
 
 ```@raw html
 <div class="masque-embed-wrap">

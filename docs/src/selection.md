@@ -60,6 +60,9 @@ highlight with that city.
 A `selects` ROI is the interaction that returns a vector. There,
 `selected = 1` and `selected = [1]` both mount as a one-element
 `Vector{ElementEvent}`, and `selected = [1, 8]` mounts as those two.
+Axis, colorbar, threshold, and bounds-only ROI commits stay their own
+types even inside a widget whose selection type is
+`Vector{ElementEvent}`. For the catalog, see [Constructors](@ref).
 
 Two seedable layers need a name: `selected = (; scatter = 1)` or
 `selected = Dict(:scatter => [1, 8])`. A bare `1` across two layers

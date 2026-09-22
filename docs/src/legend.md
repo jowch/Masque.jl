@@ -79,8 +79,10 @@ entry. `targets` are
 entry's group title, or `nothing` on an ungrouped legend.
 
 The click bond is that legend event. The highlight in the overlay is the
-linked traces, not the swatch. A cell that reads `pick` as a `Vector` of
-series points is looking at the wrong object.
+linked traces, not the swatch. `pick.index` is which entry.
+`df[pick, :]` does not treat the entry number as a row.
+A cell that reads `pick` as a `Vector` of series points is looking at
+the wrong object.
 
 ## Persist a series wash
 

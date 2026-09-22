@@ -67,7 +67,7 @@ end
 ```
 
 After a click, `pick` is an [`AxisEvent`](@ref): `layer` is
-`:axis`. Read `pick.x` and `pick.y`.
+`:axis`. Read `pick.x` and `pick.y`. There is no `index`.
 
 The tooltip follows the pointer, not a mark. A click writes the bond.
 There is no highlight in the overlay at that location.
@@ -88,6 +88,7 @@ Replace the previous `fig` and `@bind pick` cells.
 [`ColorbarInteractable`](@ref) is one hit region on the bar's pixel box.
 The layer kind is `:axis` with a bbox. Default `id` is `:colorbar`.
 `pick` is a [`ColorbarEvent`](@ref). `pick.value` is the data value.
+Pass `pick` back as `value=` when a remount should open on that value.
 
 `masque(fig)` **does** install a `Colorbar` block. You can also pass the
 colorbar yourself so the heatmap cells are not in the same widget:
@@ -121,8 +122,9 @@ the axis (`identity`, `log10`, `log`).
 Replace the previous `fig` and `@bind pick` cells.
 
 [`ThresholdInteractable`](@ref) is a draggable line. `value` is
-required. `:horizontal` is a constant-y line you drag vertically.
-`:vertical` is a constant-x line you drag horizontally.
+required (a number or a [`ThresholdEvent`](@ref)). `:horizontal` is a
+constant-y line you drag vertically. `:vertical` is a constant-x line
+you drag horizontally.
 
 **1.** Draw a scatter and a horizontal threshold:
 
@@ -149,7 +151,8 @@ end
 While you drag, the overlay moves the line. After you release the
 pointer, `pick` is a [`ThresholdEvent`](@ref): `layer` is `:threshold`,
 and `pick.value` is the data coordinate. `pick.y` raises an error; use
-`pick.value`.
+`pick.value`. Pass `pick` back as `value=` when some other input
+rebuilds the figure.
 
 This is not a slider of the continuum. Release writes one scalar. The
 pointer can stop anywhere on the dragged axis.

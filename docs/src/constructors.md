@@ -1,19 +1,46 @@
 # Constructors
 
 Read [Getting started](@ref) before this page. Lookup for built-in
-constructors: the signature that matters, the default payload, the
-`HitLayer` kind, and the Guide that teaches the job. Signatures and
-payloads come from `src/interactables.jl` and `src/introspect.jl`. This
-page has no player.
+constructors: the signature, the `@bind` type, the `HitLayer` kind, and
+the Guide that teaches the job. Signatures come from
+`src/interactables.jl` and `src/introspect.jl`. This page has no player.
 
-Element constructors also take `id`, `payloads` (a vector or a
-`DataFrame`, except heatmap/image), and `tooltip` (`nothing` /
-`masque"..."` / `false`) unless the plot-object method omits them.
-`LegendInteractable` takes `tooltip` and a fixed
-payload; it does not take `payloads=`. Whole-axis and drag constructors
-take `id` plus their own keywords; `payloads=` / `tooltip=` is a
-`MethodError`. `FunctionInteractable` takes neither an axis nor `id`.
-`RegionInteractable` requires `payloads`.
+Every constructor takes an `Axis` (or a `Makie.Colorbar` /
+`Makie.Legend`) and geometry in data space, plus `id` — the `Symbol`
+the event reports as `layer`. Element constructors also take `payloads`
+(a vector or a `DataFrame`, except heatmap/image) and `tooltip`
+(`nothing` / `masque"..."` / `false`) unless the plot-object method
+omits them. Omit `payloads` and the default is a 1-based `index` plus
+the coordinates that constructor ships. `LegendInteractable` takes
+`tooltip` and a fixed payload; it does not take `payloads=`. Whole-axis
+and drag constructors take `id` plus their own keywords; `payloads=` /
+`tooltip=` is a `MethodError`. `FunctionInteractable` takes neither an
+axis nor `id`. `RegionInteractable` requires `payloads`.
+
+## Bond
+
+The `@bind` value is `nothing` until the first commit of that
+interaction, unless `selected=` restored one. `bondtype` is a property
+of the interactable (and of `selects` on an ROI). Indices are 1-based.
+Named fields on the event are how you read the pick. The wire stays
+0-based.
+
+| Interaction | Value | Reads as | Guide |
+|---|---|---|---|
+| Click a point, bar, polygon, segment, or text | [`ElementEvent`](@ref) | `pick.city`, `pick.index`; `xs[pick]`, `df[pick, :]` | [Getting started](@ref), [Click marks](@ref) |
+| Legend entry | [`LegendEvent`](@ref) | `entry.label`; not a table row | [Legend](@ref) |
+| `selects` over points | `Vector{ElementEvent}` | `e.city`; empty box `[]` | [Brush a region](@ref) |
+| Heatmap / image cell | [`GridCellEvent`](@ref) | `pick.i`, `pick.j`; `A[pick]` | [Inspect a grid](@ref) |
+| Heatmap / image brush | [`GridWindowEvent`](@ref) | `i1:i2`, `j1:j2`; `A[win]` | [Inspect a grid](@ref) |
+| Axis click | [`AxisEvent`](@ref) | `pick.x`, `pick.y` | [Read coordinates](@ref) |
+| Colorbar click | [`ColorbarEvent`](@ref) | `pick.value` | [Read coordinates](@ref) |
+| Threshold release | [`ThresholdEvent`](@ref) | `pick.value` | [Read coordinates](@ref) |
+| Bounds-only ROI | [`BoundsEvent`](@ref) | `pick.xmin` … `pick.ymax` | [Brush a region](@ref) |
+| View pan / orbit | none | the bond does not change | [Pan and orbit](@ref) |
+
+A widget that mixes two of these has a bond whose type is the last
+commit. [`ViewInteractable`](@ref) is not in that list: a camera is
+operational state. For `selected=`, see [Selection](@ref).
 
 ## Zero-config: `masque(fig)`
 
@@ -31,11 +58,26 @@ does not install `AxisInteractable`, `ThresholdInteractable`,
 ints = auto_interactables(fig)
 ```
 
+Grab that vector, tweak ids or `payloads`, append a custom interactable,
+and pass it back:
+
+```julia
+ints = let
+    ints = auto_interactables(fig)
+    push!(ints, RegionInteractable(ax; regions = ..., payloads = ...))
+    ints
+end
+```
+
+```julia
+@bind pick masque(fig, ints)
+```
+
 Unsupported plots are skipped with `@warn`, not an error. An empty figure
 warns "overlaying nothing". Layer ids are the plot kind (`:scatter`,
 `:bars`, `:cells`, …), suffixed `_2`, `_3` when a kind repeats. Heatmap
 and image share `:cells`. BarPlot is `:bars`, not `:barplot`. LineSegments
-is `:segments`.
+is `:segments`. `pick.layer` is that id.
 
 On `Axis3`, auto allowlists Scatter, Lines, LineSegments, MeshScatter,
 Wireframe, and Arrows3D. On `PolarAxis`, auto allowlists Scatter, Lines,
@@ -70,22 +112,54 @@ not take `tooltip=` except `TextInteractable`. `tooltip = true` raises
 traces. `LegendInteractable(leg)` with no `plotmap` / `targets=` has
 empty links, stays hittable, and does not resolve plots on its own.
 
+## From a plot object
+
+Pass the plot object a `plot!` call returns. The geometry is pulled from
+it. The result is the same interactable the explicit constructor would
+build, so `payloads`, `selected=`, and tooltips still apply. `ax` is
+required: a plot has no back-reference to its axis.
+
+```julia
+begin
+    p = scatter!(ax, xs, ys; markersize = 14)
+    pt = PointInteractable(ax, p)   # radius from the marker's drawn extent
+end
+```
+
+```julia
+@bind pick masque(fig, pt)
+```
+
+`id` and `payloads` take the same keywords as the explicit constructors.
+Defaults are the plot's name in lowercase (`:scatter`, `:lines`,
+`:hist`, …), except Heatmap/Image (`:cells`), BarPlot (`:bars`), and
+LineSegments (`:segments`). `masque(fig)` uses those same ids.
+`pick.layer === :heatmap` never matches. The Heatmap/Image method takes
+no `payloads` keyword: cells resolve `{i, j, value}` client-side, same
+as `grid = (...)`. That layer is `:grid`, so `selected=` cannot hydrate
+it.
+
 ## Element constructors
 
-| Constructor | Signature | Default payload | Kind | Guide |
+| Constructor | Signature | Bond | Kind | Guide |
 |---|---|---|---|---|
-| [`PointInteractable`](@ref) | `(ax, points; radius=9, id=:points)` or `(ax, p::Scatter; id=:scatter)` | `(; index, x, y)` or `(; index, x, y, z)` | `:circles` | [Getting started](@ref), [Click marks](@ref) |
-| [`PointInteractable`](@ref) | `(ax, p::MeshScatter; id=:meshscatter)` | `(; index, x, y, z)` | `:circles` | [Backends](@ref) |
-| [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, tol=6, id=:segments)` | `(; segment_index)` | `:polyline` or `:segments` | [Click marks](@ref) |
-| [`RectInteractable`](@ref) | `(ax; rects, id=:rects)` or `(ax, p::BarPlot; id=:bars)` | `(; index)` explicit; BarPlot `(; low, high, value)` | `:rects` | [Click marks](@ref) |
-| [`RectInteractable`](@ref) | `(ax; grid, id=:rects)` or `(ax, p::Union{Heatmap,Image}; id=:cells)` | [`GridCellEvent`](@ref): 1-based `i`, `j`; `value` when shipped | `:grid` | [Inspect a grid](@ref) |
-| [`PolygonInteractable`](@ref) | `(ax, rings; id=:polygons)` or `(ax, p::Poly; id=:poly)` | `(; index)` | `:polygons` | [Click marks](@ref) |
-| [`TextInteractable`](@ref) | `(ax, p::Makie.Text; id=:text)` only | `(; text, index, x, y)` | `:rects` | [Click marks](@ref) |
+| [`PointInteractable`](@ref) | `(ax, points; radius=9, radius3d=nothing, id=:points)` or `(ax, p::Scatter; id=:scatter)` | [`ElementEvent`](@ref): 1-based `index`, `x`, `y`[, `z`] | `:circles` | [Getting started](@ref), [Click marks](@ref) |
+| [`PointInteractable`](@ref) | `(ax, p::MeshScatter; id=:meshscatter)` | [`ElementEvent`](@ref): 1-based `index`, `x`, `y`, `z` | `:circles` | [Backends](@ref) |
+| [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, tol=6, id=:segments)` | [`ElementEvent`](@ref): 1-based `segment_index` | `:polyline` or `:segments` | [Click marks](@ref) |
+| [`RectInteractable`](@ref) | `(ax; rects, clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot; id=:bars)` | [`ElementEvent`](@ref): explicit `index`; BarPlot `low`, `high`, `value` | `:rects` | [Click marks](@ref) |
+| [`RectInteractable`](@ref) | `(ax; grid, id=:rects)` or `(ax, p::Union{Heatmap,Image}; id=:cells)` | [`GridCellEvent`](@ref): 1-based `i`, `j`; `A[cell]`; `value` when shipped | `:grid` | [Inspect a grid](@ref) |
+| [`PolygonInteractable`](@ref) | `(ax, rings; id=:polygons)` or `(ax, p::Poly; id=:poly)` | [`ElementEvent`](@ref): 1-based `index` | `:polygons` | [Click marks](@ref) |
+| [`TextInteractable`](@ref) | `(ax, p::Makie.Text; id=:text)` only | [`ElementEvent`](@ref): `text`, 1-based `index`, `x`, `y` | `:rects` | [Click marks](@ref) |
 
 `mode` is `:polyline` (connected path, nearest-segment hit) or `:pairs`
-(disjoint pairs). Plot-object `SegmentInteractable` does not take `mode`
-or `tooltip`; the plot type fixes both. `PointInteractable(ax, p::Scatter)`
-does not take `tooltip=` (`MethodError`). Heatmap/image take `id` only.
+(disjoint pairs). `tol` is hit-test slack in logical px, scaled to DPI
+like `radius` (default 6). `radius3d` is per-point data-space
+half-extents on a 3D axis and overrides `radius`. `clamp_to_viewport`
+clamps a list rect that spans past the axis edge.
+
+Plot-object `SegmentInteractable` does not take `mode` or `tooltip`; the
+plot type fixes both. `PointInteractable(ax, p::Scatter)` does not take
+`tooltip=` (`MethodError`). Heatmap/image take `id` only.
 
 `selected=` hydrates `:circles`, `:rects`, `:polygons`, `:segments`, and
 `:polyline`. It cannot hydrate `:grid`. For more information, see
@@ -93,53 +167,89 @@ does not take `tooltip=` (`MethodError`). Heatmap/image take `id` only.
 
 ## Plot-object defaults
 
-Each row is `*(ax, p)` unless noted. `id` is the auto layer id.
+Each row is `*(ax, p)` unless noted. `id` is the auto layer id. Bond is
+[`ElementEvent`](@ref) except Heatmap/Image ([`GridCellEvent`](@ref)).
 
-| Plot | Constructor | Default payload | Kind |
+| Plot | Constructor | Default fields | Kind |
 |---|---|---|---|
-| `Scatter` | `PointInteractable` | `(; index, x, y[, z])` | `:circles` |
-| `MeshScatter` | `PointInteractable` | `(; index, x, y, z)` | `:circles` |
-| `Lines` / `Stairs` | `SegmentInteractable` | `(; segment_index)` | `:polyline` |
-| `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | `(; segment_index)` | `:segments` |
-| `Arrows3D` | `SegmentInteractable` | `(; index, x, y, z, u, v, w)` | `:segments` |
-| `BarPlot` | `RectInteractable` | `(; low, high, value)` | `:rects` |
-| `Hist` | `RectInteractable` | `(; value, low, high)` | `:rects` |
-| `Waterfall` | `RectInteractable` | `(; low, high, value)` | `:rects` |
-| `CrossBar` | `RectInteractable` | `(; midpoint, low, high)` | `:rects` |
-| `HSpan` / `VSpan` | `RectInteractable` | `(; low, high)` | `:rects` |
-| `Spy` | `RectInteractable` | `(; index)` | `:rects` |
+| `Scatter` | `PointInteractable` | 1-based `index`, `x`, `y`[, `z`] | `:circles` |
+| `MeshScatter` | `PointInteractable` | 1-based `index`, `x`, `y`, `z`; `radius3d` from data-space `markersize` | `:circles` |
+| `Lines` / `Stairs` | `SegmentInteractable` | 1-based `segment_index` | `:polyline` |
+| `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | 1-based `segment_index` | `:segments` |
+| `Arrows3D` | `SegmentInteractable` | 1-based `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:segments` |
+| `BarPlot` | `RectInteractable` | `low`, `high`, `value` (dodge/stack/auto-width honored) | `:rects` |
+| `Hist` | `RectInteractable` | `value`, `low`, `high` | `:rects` |
+| `Waterfall` | `RectInteractable` | `low`, `high`, `value` | `:rects` |
+| `CrossBar` | `RectInteractable` | `midpoint`, `low`, `high` | `:rects` |
+| `HSpan` / `VSpan` | `RectInteractable` | `low`, `high`; `clamp_to_viewport = true` | `:rects` |
+| `Spy` | `RectInteractable` | 1-based `index` | `:rects` |
 | `Heatmap` / `Image` | `RectInteractable` | [`GridCellEvent`](@ref): 1-based `i`, `j` | `:grid` |
-| `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | `(; index)` | `:polygons` |
-| `Contourf` | `PolygonInteractable` | `(; low, high)` | `:polygons` |
-| `Violin` | `PolygonInteractable` | `(; x)` | `:polygons` |
-| `Text` | `TextInteractable` | `(; text, index, x, y)` | `:rects` |
+| `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | 1-based `index` | `:polygons` |
+| `Contourf` | `PolygonInteractable` | `low`, `high` | `:polygons` |
+| `Violin` | `PolygonInteractable` | `x` | `:polygons` |
+| `Text` | `TextInteractable` | `text`, 1-based `index`, `x`, `y` | `:rects` |
 | `Stem` | auto only | points + stems | `:circles` + `:segments` |
 | `ScatterLines` | auto only | points + line | `:circles` + `:polyline` |
-| `BoxPlot` | auto only | `(; q1, median, q3)` | `:rects` or `:polygons` |
-| `Annotation` | auto only (inner `Text`) | text payload | `:rects` |
+| `BoxPlot` | auto only | `q1`, `median`, `q3`; whiskers and outliers are not hit-tested | `:rects` or `:polygons` |
+| `Annotation` | auto only (inner `Text`) | text fields | `:rects` |
+
+`annotation!` labels are reachable only through that inner `Text` or
+`masque(fig)`, never a hand-written `TextInteractable`. Any plot type
+not listed here needs a custom interaction; see [Custom hits](@ref).
 
 ## Axis, legend, and drag
 
-| Constructor | Signature | Default payload | Kind | Guide |
+| Constructor | Signature | Bond | Kind | Guide |
 |---|---|---|---|---|
 | [`AxisInteractable`](@ref) | `(ax; id=:axis)` | [`AxisEvent`](@ref): `x`, `y` | `:axis` | [Read coordinates](@ref) |
 | [`ColorbarInteractable`](@ref) | `(cb; id=:colorbar)` | [`ColorbarEvent`](@ref): `value` | `:axis` (bbox) | [Read coordinates](@ref) |
 | [`LegendInteractable`](@ref) | `(leg; targets=nothing, id=:legend)` | [`LegendEvent`](@ref): `label`, `group`, `targets` | `:rects` | [Legend](@ref) |
-| [`ThresholdInteractable`](@ref) | `(ax; orientation=:horizontal, value, id=:threshold)` | [`ThresholdEvent`](@ref): `value` | `:threshold` | [Read coordinates](@ref) |
-| [`ROIInteractable`](@ref) | `(ax; bounds, selects=nothing, id=:roi)` | [`BoundsEvent`](@ref), or `Vector{ElementEvent}` / [`GridWindowEvent`](@ref) with `selects` | `:roi` | [Brush a region](@ref) |
+| [`ThresholdInteractable`](@ref) | `(ax; orientation=:horizontal, value, id=:threshold)` | [`ThresholdEvent`](@ref): `value` on release | `:threshold` | [Read coordinates](@ref) |
+| [`ROIInteractable`](@ref) | `(ax; bounds, selects=nothing, id=:roi)` | [`BoundsEvent`](@ref); with `selects`, `Vector{ElementEvent}` or [`GridWindowEvent`](@ref) | `:roi` | [Brush a region](@ref) |
 | [`ViewInteractable`](@ref) | `(ax; id=:view)` | none — commits nothing | `:view` | [Pan and orbit](@ref) |
 
-`AxisInteractable`, `ThresholdInteractable`, and `ROIInteractable` raise
-`ArgumentError` on `Axis3` or `PolarAxis`. `ViewInteractable` raises
+`value=` on a threshold accepts a number or a [`ThresholdEvent`](@ref).
+`value=` on a colorbar accepts a number or a [`ColorbarEvent`](@ref).
+`bounds=` accepts a 4-tuple or a [`BoundsEvent`](@ref).
+
+[`AxisInteractable`](@ref), [`ThresholdInteractable`](@ref), and
+[`ROIInteractable`](@ref) are 2D-only: they raise `ArgumentError` on
+`Axis3` or `PolarAxis`. They need a linear or log scale. Categorical is
+fine for axis and threshold, not for ROI. `ViewInteractable` raises
 `ArgumentError` on polar, a Colorbar, or a categorical 2D axis; Axis3
-orbit is allowed. `selects` accepts a `:circles` or `:grid` layer id
-only. Colorbar kind is `:axis`, not `:colorbar`. Legend kind is `:rects`.
+orbit is allowed. Shift+drag wins over ROI or threshold on the same
+axis. `selects` accepts a `:circles` or `:grid` layer id only. Colorbar
+kind is `:axis`, not `:colorbar`. Legend kind is `:rects`.
+
+Changing `limits` (2D) or `azimuth`/`elevation` (`Axis3`) and rebuilding
+the widget re-projects the overlay. Dragging with
+[`ViewInteractable`](@ref) is different: it commits nothing. On
+`:cairo`, in-drag frames stream over `with_js_link`. `:webgl` shows a
+numeric readout and does not repaint. See [Pan and orbit](@ref) and
+[`examples/view_manip.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip.jl).
 
 ## Custom
 
-| Constructor | Signature | Default payload | Kind | Guide |
+| Constructor | Signature | Bond | Kind | Guide |
 |---|---|---|---|---|
-| [`RegionInteractable`](@ref) | `(ax; regions, payloads, id=:region)` | required `payloads` 1:1 | `:circles` / `:rects` / `:polygons` as `:id_c` / `:id_r` / `:id_p` | [Custom hits](@ref) |
-| [`FunctionInteractable`](@ref) | `(f; events=(:click, :hover))` | whatever `f` puts on each `HitLayer` | whatever `f` emits | [Custom hits](@ref) |
+| [`RegionInteractable`](@ref) | `(ax; regions, payloads, id=:region)` | [`ElementEvent`](@ref) per split layer | `:circles` / `:rects` / `:polygons` as `:id_c` / `:id_r` / `:id_p` | [Custom hits](@ref) |
+| [`FunctionInteractable`](@ref) | `(f; events=(:click, :hover))` | default [`ElementEvent`](@ref); implement `bondtype` / `transform_bond` for another type | whatever `f` emits | [Custom hits](@ref) |
+
+## 3D axes and `PolarAxis`
+
+`Axis3` gets the point and segment kinds with 3D fields: Scatter and
+Lines carry `index`, `x`, `y`, `z`. MeshScatter gets depth-correct
+per-marker hit radii from its data-space `markersize` (`radius3d`).
+Wireframe edges and Arrows3D shafts hit as segments. Geometry is
+projected once, in Julia, at build time, so it is the same on `:cairo`
+and `:webgl`. See [Backends](@ref).
+
+`PolarAxis` gets the same discrete point and segment overlays on both
+backends. Continuous θ/r readout is not shipped.
+`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, and
+orbit-mode `ViewInteractable` do not work on polar. On `Axis3`, those
+2D-only constructors raise `ArgumentError`; orbit-mode
+`ViewInteractable` is allowed. `LScene` is not supported on either
+backend. See [Troubleshooting](@ref).
 
 For the exported API dump, see [API](@ref).

@@ -97,7 +97,8 @@ end
 ```
 
 Do not pass `selected = Dict(:cells => [1])`. Use `:cells_c`, `:cells_r`,
-or `:cells_p` for the kind you hydrated.
+or `:cells_p` for the kind you hydrated. Each split layer commits an
+[`ElementEvent`](@ref).
 
 ## FunctionInteractable
 
@@ -140,7 +141,7 @@ begin
                 :track,
                 :segments,
                 geom,
-                [(; i = k - 1) for k in 1:nseg],
+                [(; i = k) for k in 1:nseg],
                 Masque.axis_id(ctx, ax),
                 (:click, :hover),
             ),
@@ -154,6 +155,8 @@ end
 ```
 
 `f` can emit one `HitLayer` per axis because `ctx` covers the whole
-figure. Prefer [`RegionInteractable`](@ref) when the shape is a circle,
-rect, or polygon. For the `HitLayer` field list, see
+figure. Each layer uses the `bondtype` of its kind; the default is
+[`ElementEvent`](@ref). Implement `bondtype` and `transform_bond` when
+the commit is another type. Prefer [`RegionInteractable`](@ref) when the
+shape is a circle, rect, or polygon. For the `HitLayer` field list, see
 [API](@ref).

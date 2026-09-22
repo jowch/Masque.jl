@@ -196,7 +196,8 @@ For more information, see [Keyboard and screen readers](@ref).
 ## Commit bounds or enclosed items
 
 Omit `selects` when you want the rectangle itself. On release the bond is a
-[`BoundsEvent`](@ref) (`box.xmin` .. `box.ymax`):
+[`BoundsEvent`](@ref) (`box.xmin` .. `box.ymax`). `bounds=` accepts that
+4-tuple or a `BoundsEvent`:
 
 ```julia
 ROIInteractable(ax; bounds = (1.0, 4.0, 2.0, 5.0))

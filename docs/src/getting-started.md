@@ -179,6 +179,13 @@ does not write the bond.
 `ElementEvent` is exported by Masque. Do not redefine it in the
 notebook.
 
+Other commits are their own types. An axis click is an
+[`AxisEvent`](@ref) (`pick.x`, `pick.y`). A heatmap cell is a
+[`GridCellEvent`](@ref) (`A[pick]`). A threshold is a
+[`ThresholdEvent`](@ref) (`pick.value`). A `selects` ROI over points
+yields a `Vector{ElementEvent}`. For the catalog, see
+[Constructors](@ref).
+
 ## You are done
 
 You have an overlay, a hover tooltip, and a click that writes `@bind`.

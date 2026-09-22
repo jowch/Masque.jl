@@ -49,9 +49,12 @@ you re-render every animation frame (each frame re-rasterizes the whole
 scene).
 
 A static `Axis3` figure on CairoMakie is a valid 3D plot. 3D does not
-require WGLMakie. Orbit is [`ViewInteractable`](@ref) on that axis. For
-the cairo-frames versus webgl-numeric split, see
-[Pan and orbit preview](@ref).
+require WGLMakie. Scatter and Lines on `Axis3` commit an
+[`ElementEvent`](@ref) with `x`, `y`, `z`. MeshScatter derives
+`radius3d` from data-space `markersize`. Orbit is
+[`ViewInteractable`](@ref) on that axis. For constructor allowlists, see
+[Constructors](@ref). For the cairo-frames versus webgl-numeric split,
+see [Pan and orbit preview](@ref).
 
 ## WGLMakie
 

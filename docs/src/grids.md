@@ -114,8 +114,11 @@ Click the cell. In live Pluto, `pick` is a [`GridCellEvent`](@ref):
 `layer` is `:cells`, `pick.i` and `pick.j` are 1-based (column, then
 row), and `A[pick]` is `A[pick.i, pick.j]`. `pick.value` is the cell
 value when it was shipped, or `nothing` when values were dropped from the
-manifest (the click still carries the cell). The cell is a highlight in
-the overlay. A click in empty space does not write the bond.
+manifest (the click still carries the cell). The same
+[`RectInteractable`](@ref) used as a bar list (`layout === :list`) is an
+[`ElementEvent`](@ref); `layout === :grid` is `GridCellEvent`. The cell
+is a highlight in the overlay. A click in empty space does not write
+the bond.
 
 Tab and arrow keys skip `:grid`. Keyboard focus walks bars and scatter
 marks, not heatmap cells. For more information, see
