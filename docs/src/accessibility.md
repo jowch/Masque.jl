@@ -25,7 +25,8 @@ draggable threshold/ROI/view-pan interactables are mouse/touch-only in this rele
 When the figure has a legend, its entries come first: Tab and Home land on the first legend
 entry, and Page Down steps from the legend into the plot layers. This matches the pointer, where
 a legend drawn on top of a plot takes the clicks under it. Focusing an entry highlights the
-trace it labels, exactly as hovering it does — see [Legend](@ref).
+trace it labels, exactly as hovering it does, and the announcement names that entry's label
+even though a legend shows no tooltip unless you pass one — see [Legend](@ref).
 
 Moving focus draws the same highlight ring a mouse hover would (there is never a separate
 "focus" look) and shows the same tooltip, positioned on the focused element.

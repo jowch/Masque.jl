@@ -121,7 +121,9 @@ kind_sweep_meta() = [
         # drives the GENERIC hover-recipe check on the legend row itself (default hoverstyle,
         # no explicit stroke override on `LegendInteractable` -> the normal split dodge-fill/
         # grey-edge recipe applies, same as any other `rects` layer).
-        "hoverIndex" => 2, "hoverTip" => "pts",
+        # No default card (`tooltip: false` on the layer). `tip` is still the click payload's
+        # label. The generic hover check asserts the card stays hidden.
+        "hoverIndex" => 2, "hoverTip" => "",
         # A legend entry's linked highlight isn't wash/ring on the legend layer itself (that
         # meta stays `selected = nothing`, like heatmap/grid) — it's g.link on OTHER layers.
         # "cases" checks two fan-out kinds: a polyline entry (ring) and a circles entry (wash).
@@ -136,7 +138,7 @@ kind_sweep_meta() = [
         "key" => "legend_overlap", "layerId" => "legend", "layerKind" => "rects",
         "selected" => nothing, "halo" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "trend", "mode" => "element",
-        "hoverIndex" => 0, "hoverTip" => "trend",
+        "hoverIndex" => 0, "hoverTip" => "",
         "links" => Dict(
             "cases" => [
                 Dict("index" => 0, "label" => "trend"),
@@ -148,6 +150,20 @@ kind_sweep_meta() = [
         # must ALSO fall inside, so kind_sweep.mjs can assert both (a) manifest order puts
         # `legend` before this grid layer and (b) the hit-test pixel is genuinely contested.
         "overlapsGrid" => "cells",
+    ),
+    Dict(
+        "key" => "legend_template", "layerId" => "legend", "layerKind" => "rects",
+        "selected" => nothing, "halo" => false, "selectedIndex" => 2, "clickIndex" => 2,
+        "tip" => "pts", "mode" => "element",
+        # Caller-supplied template. The card must show "series <label>", which also contains
+        # the bare label the links-loop checks for.
+        "hoverIndex" => 2, "hoverTip" => "series pts",
+        "links" => Dict(
+            "cases" => [
+                Dict("index" => 0, "label" => "quad"),
+                Dict("index" => 2, "label" => "pts"),
+            ],
+        ),
     ),
     Dict(
         "key" => "axis", "layerId" => "axis", "layerKind" => "axis",
@@ -367,6 +383,31 @@ function build_kind_sweep()
         masque(fig)   # zero-config: exercises the real auto-extraction + precedence path
     end
 
+    # Same geometry as `legend`, but the caller passed a template. The card must show that
+    # text (not stay hidden, and not fall back to a bare label).
+    legend_template = let
+        xs = collect(0.0:0.5:3.0)
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1]; title = "legend-template")
+        l1 = lines!(ax, xs, xs .^ 2; label = "quad", color = :steelblue, linewidth = 3)
+        l2 = lines!(ax, xs, 2 .* xs; label = "lin", color = :seagreen, linewidth = 3)
+        sc = scatter!(ax, [0.5, 1.5, 2.5], [1.0, 3.0, 5.0]; label = "pts", markersize = 18, color = :orange)
+        leg = axislegend(ax; position = :lt)
+        masque(
+            fig,
+            [
+                SegmentInteractable(ax, l1; id = :lines),
+                SegmentInteractable(ax, l2; id = :lines_2),
+                PointInteractable(ax, sc; id = :scatter),
+                LegendInteractable(
+                    leg;
+                    tooltip = masque"series $(label)",
+                    targets = Dict("quad" => :lines, "lin" => :lines_2, "pts" => :scatter),
+                ),
+            ],
+        )
+    end
+
     # AxisInteractable (whole-axis catch-all readout) + ColorbarInteractable (bounded-bbox
     # readout) sharing one widget/bond with a real, pre-existing selection (`:pts`) alongside
     # them — the fixture #113 asks for: an axis or colorbar click must leave that selection
@@ -402,6 +443,6 @@ function build_kind_sweep()
     return (;
         scatter, lines, segments, heatmap, image, barplot, poly,
         polar, scatter_dark, arrows3d, hlines, threshold, roi, view, legend, legend_overlap,
-        axis,
+        legend_template, axis,
     )
 end

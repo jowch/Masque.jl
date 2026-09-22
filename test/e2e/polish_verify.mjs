@@ -29,7 +29,7 @@ const ALLOWED = [/Bonito\.decode_binary is not a function/, /Bonito\.fetch_binar
 
 const browser = await chromium.launch({
   headless: true,
-  // See kind_sweep.mjs's identical comment: this notebook mounts 17 WGL canvases (one per
+  // See kind_sweep.mjs's identical comment: this notebook mounts 18 WGL canvases (one per
   // widget) and Chromium's default active-context cap is 16 — past it, the OLDEST context is
   // silently evicted, regardless of which widgets this driver itself inspects.
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--max-active-webgl-contexts=64"],

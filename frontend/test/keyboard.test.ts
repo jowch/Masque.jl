@@ -272,6 +272,29 @@ describe("keyboard navigation", () => {
         expect(fired).toBe(false)
     })
 
+    it("focusing a legend entry with no card announces the entry label", async () => {
+        vi.useFakeTimers()
+        try {
+            const legend: Manifest = {
+                width: 1200, height: 800, scaling: 2, transforms: {},
+                layers: [{
+                    id: "legend", kind: "rects", axis: "legend", events: ["click", "hover"],
+                    geometry: [100, 80, 40, 20], label: "Legend", bond: "legend", tooltip: false,
+                    payloads: [{ label: "quad", group: null, targets: ["lines"] }],
+                }],
+            }
+            const { surface, shadow } = setup(legend)
+            surface.focus()
+            down(surface, "ArrowRight")
+            expect(shadow.querySelector(".masque-tip")?.classList.contains("show")).toBe(false)
+            vi.advanceTimersByTime(200)
+            const live = shadow.querySelector('[aria-live="polite"]') as HTMLElement
+            expect(live.textContent).toBe("Legend, element 1 of 1: quad")
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it("focusing an element with tooltip=false shows no tooltip but still announces position", async () => {
         vi.useFakeTimers()
         try {

@@ -14,6 +14,9 @@ breakdown. Its type governs what the browser renders:
 | `masque"..."` | `Markup` | Template interpolated against the hovered element's payload |
 | `false` | `Bool` | Tooltip suppressed entirely — the hover highlight still applies |
 
+A legend is the exception to the omitted-`tooltip` row: hovering an entry shows no card unless
+you pass `masque"..."`. See [Legend](@ref).
+
 ## The default: an auto-table
 
 When `tooltip` isn't set, the browser renders a name/value table straight from the element's

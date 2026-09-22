@@ -52,7 +52,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test legd["kind"] == "rects"
         @test legd["links"] == [["lines"], ["lines_2"], ["scatter"]]
         @test legd["label"] == "Legend"
-        @test haskey(legd, "template")   # default tooltip = masque"$(label)"
+        @test legd["tooltip"] == false   # no default card; the label stays in the payload
+        @test !haskey(legd, "template")
 
     end
 
@@ -255,7 +256,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test [p.label for p in L.payloads] == ["H1", "H2", "H3"]
     end
 
-    @testset "tooltip: default label template, false suppresses" begin
+    @testset "tooltip: default and false suppress the card; a template shows" begin
         fig = Figure(); ax = Axis(fig[1, 1])
         l1 = lines!(ax, 1:3; label = "a")
         leg = axislegend(ax)
@@ -265,12 +266,20 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
         m = build_manifest([line_int, LegendInteractable(leg)], ctx)
         legd = only(filter(d -> d["id"] == "legend", m["layers"]))
-        @test haskey(legd, "template")
+        @test legd["tooltip"] == false
+        @test !haskey(legd, "template")
+        @test legd["payloads"][1].label == "a"
+        @test Masque.tooltip_spec(LegendInteractable(leg)) === false
 
         m2 = build_manifest([line_int, LegendInteractable(leg; tooltip = false)], ctx)
         legd2 = only(filter(d -> d["id"] == "legend", m2["layers"]))
         @test legd2["tooltip"] == false
         @test_throws ArgumentError LegendInteractable(leg; tooltip = true)
+
+        m3 = build_manifest([line_int, LegendInteractable(leg; tooltip = masque"series $(label)")], ctx)
+        legd3 = only(filter(d -> d["id"] == "legend", m3["layers"]))
+        @test !haskey(legd3, "tooltip")
+        @test legd3["template"] == ["series ", Dict("f" => "label")]
     end
 
     @testset "misuse: a Legend handed to axis-shaped interactables fails loud" begin

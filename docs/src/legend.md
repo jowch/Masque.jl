@@ -66,11 +66,17 @@ target naming an unknown layer or an unselectable kind raises `ArgumentError` at
 unlike the auto path above, an explicit `targets=` is the caller's own claim, so a bad one
 fails loud rather than being dropped.
 
-A legend with no links at all is still fully usable — the entry is hittable, its tooltip
-shows the label, and a click still fires; it just highlights nothing.
+A legend with no links at all is still fully usable — the entry is hittable and a click still
+fires; it just highlights nothing.
 
 ## Tooltip
 
-The default tooltip is just the entry's label (`masque"$(label)"`); pass your own
-`masque"..."` template (fields: `label`, `group`, `targets`) or `tooltip = false` to suppress
-it, same as any other interactable — see [Tooltips](@ref).
+Hovering a legend entry does not show a tooltip. The label is already drawn in the row, and a
+card there covers the entries around it. Pass a `masque"..."` template when you want a card
+(fields: `label`, `group`, `targets`). Omitting `tooltip` and `tooltip = false` both leave the
+card off. Moving keyboard focus to an entry still announces that entry's label — see
+[Keyboard and screen readers](@ref).
+
+```julia
+LegendInteractable(leg; tooltip = masque"$(label) — $(group)")
+```

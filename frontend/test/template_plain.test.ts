@@ -50,6 +50,17 @@ describe("plainTextForHit", () => {
         expect(plainTextForHit(hit)).toBe("")
     })
 
+    it("names a legend entry when the visual card is suppressed", () => {
+        const hit: Hit = {
+            layer: layer({
+                tooltip: false, bond: "legend", kind: "rects", label: "Legend",
+                payloads: [{ label: "quad", group: null, targets: ["lines"] }],
+            }),
+            index: 0,
+        }
+        expect(plainTextForHit(hit)).toBe("quad")
+    })
+
     it("renders the auto-table for a plain (non-template) layer", () => {
         const hit: Hit = { layer: layer(), index: 0 }
         expect(plainTextForHit(hit)).toBe("name A & B")

@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- Hovering or focusing a legend entry no longer shows a tooltip. The label is already drawn
+  in the row, and the card covered the entries around it. Pass `tooltip = masque"..."` to show
+  one (fields: `label`, `group`, `targets`). Omitting `tooltip` and `tooltip = false` both
+  leave the card off. A screen reader still announces the entry's label.
+
 ### Added
 - `:webgl` view gestures stream live frames on the same `with_js_link` channel as `:cairo`.
   Each frame is a freshly serialized scene plus a hit manifest Julia computed for that camera,

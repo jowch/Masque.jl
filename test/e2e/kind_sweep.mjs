@@ -121,7 +121,7 @@ function invertAxisJs(t, px, py) {
 const browser = await chromium.launch({
   headless: true,
   // kind_sweep_webgl.jl mounts one live canvas (= one WebGL context) per widget — Chromium's
-  // default active-context cap is 16, and this notebook is at 17 as of #113's `axis` widget.
+  // default active-context cap is 16, and this notebook is at 18 as of the legend-template widget.
   // Past the cap, Chromium silently evicts the OLDEST context ("Too many active WebGL
   // contexts. Oldest context will be lost."), which reads here as a null host/canvas on
   // whichever widget got evicted — nondeterministic, and not a Masque bug. Raised well above
@@ -946,7 +946,11 @@ try {
 
     const hoverIndex = spec.hoverIndex;
     const hoverTip = spec.hoverTip;
+    // A legend's default (and `tooltip = false`) ships `tooltip: false`: the card must stay
+    // hidden. Every other element kind still requires a visible card, matched to hoverTip.
+    const tipSuppressed = layer.tooltip === false;
     const tipHit = (t) => {
+      if (tipSuppressed) return !!(t && !t.show);
       if (!hoverTip) return !!(t && t.show);
       const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
       return !!(t && t.show && norm(t.text).includes(norm(hoverTip)));
@@ -1193,14 +1197,22 @@ try {
         }
 
         const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
+        const wantCard = layer.tooltip !== false;
         let t = null;
         for (let a = 0; a < 8; a++) {
           t = await dispatchAt(key, hp.x, hp.y, "pointermove");
-          if (t?.show && norm(t.text).includes(norm(c.label))) break;
+          const cardOk = wantCard
+            ? !!(t?.show && norm(t.text).includes(norm(c.label)))
+            : !!(t && !t.show);
+          if (cardOk) break;
           await new Promise((r) => setTimeout(r, 200));
         }
-        if (!t?.show || !norm(t.text).includes(norm(c.label))) {
-          throw new Error(`${key}/links[${c.index}]: tooltip ${JSON.stringify(t)} (want "${c.label}")`);
+        if (wantCard) {
+          if (!t?.show || !norm(t.text).includes(norm(c.label))) {
+            throw new Error(`${key}/links[${c.index}]: tooltip ${JSON.stringify(t)} (want "${c.label}")`);
+          }
+        } else if (t?.show) {
+          throw new Error(`${key}/links[${c.index}]: default legend tooltip should stay hidden ${JSON.stringify(t)}`);
         }
         assertHoverRecipe(t.hi, `${key}/links[${c.index}]/legend-row-hover`);
 
