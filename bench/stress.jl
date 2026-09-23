@@ -50,7 +50,7 @@ for n in (50_000, 100_000, 200_000)
     stress("scatter $n", () -> (f = Figure(size = (600, 400)); a = Axis(f[1, 1]); scatter!(a, rand(n), rand(n); markersize = 4); f))
 end
 
-println("\n=== STRESS B. heatmap cells — manifest carries the full value matrix ===")
+println("\n=== STRESS B. heatmap cells — source matrix, or one value per screen pixel when sub-pixel ===")
 for d in (300, 500, 1000)
     stress("heatmap $(d)×$(d) ($(d * d) cells)", () -> (f = Figure(size = (600, 400)); a = Axis(f[1, 1]); heatmap!(a, 1:d, 1:d, rand(d, d)); f))
 end

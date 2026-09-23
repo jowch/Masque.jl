@@ -46,8 +46,9 @@ export. Nothing else restricts which interaction, or whose code, uses the channe
 
 **Exhaust question 0 first.** It costs no round trip, no latency budget and no backpressure, and
 it survives static export. The manifest already carries `AxisTransform` (so any coordinate
-readout or inversion is local), per-element `payloads`, and — for a grid whose cells are at least
-one screen pixel — the cell `values[]` (`GRID_VALUES_MIN_SCREEN_PX`, `src/interactables.jl`).
+readout or inversion is local), per-element `payloads`, and a grid's values: the source matrix
+when a cell is at least one screen pixel, and one source value per screen pixel otherwise
+(`GRID_VALUES_MIN_SCREEN_PX`, `src/interactables.jl`).
 What blocks a question-0 answer is more often output surface than data: the overlay is three
 sibling SVGs with no raster layer (`frontend/src/mount.ts`), so an effect needing per-pixel output
 has nowhere to draw.
@@ -66,11 +67,10 @@ carries the transform and, at display resolution, the cell values. Committed thr
 kernel to recompute it, and the browser cannot produce it once the mask is not locally
 computable.
 
-Two conditions take the mask out of question 0: cells going sub-pixel, so Julia drops `values[]`
-from the manifest (the full-resolution case), and the mask ceasing to be pointwise, since
-morphology and connected components are neighbourhood-dependent. **Thresholding is question 0;
-segmentation is question 3.** #105's display-derived subsampling would restore values at display
-resolution and return the thresholding case to question 0.
+A pointwise mask stays question 0 on a sub-pixel grid: the manifest carries the source value
+under each screen pixel, so the readout is local. The mask leaves question 0 when it stops being
+pointwise, since morphology and connected components are neighbourhood-dependent. **Thresholding
+is question 0; segmentation is question 3.**
 
 The camera does not move in this case, so the projection and every hit region stay valid for the
 whole drag: a new frame is owed, a new manifest is not, and hit-testing stays live — a hover

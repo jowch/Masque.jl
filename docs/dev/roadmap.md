@@ -273,40 +273,26 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   What is awkward today. `:grid` is the only one of the seven data geometry kinds that is not a list
   of elements, so it needs its own hit-test branch, its own selection result, its own tooltip
   behaviour with no per-element payload, no keyboard focus, and it cannot be a highlight target
-  for a legend. Its `values[]` matrix is the only term in the manifest bounded by source
-  resolution rather than by display size, which is why it needs the on-screen-size cap at all.
-  That cap makes the user-visible contract depend on a rendering detail. It is one
-  all-or-nothing decision per grid, taken from the average cell size, so the same heatmap hovers
-  values at one display width and only `(i, j)` at a narrower one.
+  for a legend.
 
-  What `surface!` adds. The same dense cell field and the same unbounded per-cell payload, plus
-  self-occlusion and a hit-test that is no longer a 2-D bin search. Its occlusion policy is
-  already settled in `architecture.md`: document-and-accept on both backends, with a build-time
-  CPU cull in Julia as the upgrade path, since GPU picking is a Masque-wide non-goal.
+  `heatmap!` and `image!` subsample ([#105](https://github.com/jowch/Masque.jl/issues/105)).
+  Hover stays a push, so a static export still shows the value. A cell of at least one screen
+  pixel ships the source matrix. A smaller cell ships the source value under each screen pixel
+  of the axis viewport, the cell at that pixel's center, not an aggregate. The payload follows
+  the viewport, not the source resolution. Pulling the value per hover was the rejected
+  alternative: inspection has to survive a static export.
 
-  The question to answer once, for both, is now three-way rather than binary:
+  What `surface!` still adds. The same dense cell field, so the same sample once it can be
+  hovered, plus self-occlusion and a hit-test that is no longer a 2-D bin search. A screen pixel
+  on an Axis3 is a ray, and a folded surface can put several cells on that ray. The cell to
+  report is the front one. That hit-test is not built. Its occlusion policy is already settled
+  in `architecture.md`: document-and-accept on both backends, with a build-time CPU cull in
+  Julia as the upgrade path, since GPU picking is a Masque-wide non-goal. `mesh!` is not this
+  payload: an arbitrary triangle set has no `values[]` matrix.
 
-  - **Push** per-cell values into the manifest at build time, as today plus a cap — export-safe,
-    but the user-visible contract depends on a rendering detail, described above.
-  - **Pull** per hit from the kernel that clicks already require ([#102](https://github.com/jowch/Masque.jl/issues/102)
-    makes this concrete: `with_js_link` is exactly a mechanism for "pulled per hit from the
-    kernel," previously unmechanized here) — removes the cap and the resolution-dependent
-    contract, but hover stops working in a static export, which the principles say inspection
-    should survive.
-  - **Subsample to display resolution**
-    ([#105](https://github.com/jowch/Masque.jl/issues/105)) — keep the push model, so nothing
-    changes about when a kernel is needed, but bound the shipped payload by *display size* rather
-    than *source resolution*: report the one cell (or the aggregate of the cells) under each
-    screen pixel, not the whole matrix. This retires the `values[]` cap outright, the same way
-    pull would, without giving up static-export safety. The argument isn't just convenience: a
-    cap is an arbitrary size threshold, but a subpixel cell can't be hovered individually — its
-    value was never something a display-resolution report needed to include.
-
-  Subsampling and the gesture channel compound if both ship: with #102 making zoom cheap,
-  fidelity under subsampling becomes **navigable rather than fixed** — a user who wants the exact
-  value at a cell zooms in, fewer source cells land under each screen pixel as they do, and the
-  subsample resolves progressively finer. That turns a fixed contract compromise (pick a
-  resolution once, live with it at every zoom level) into an interaction.
+  A later zoom that writes `ax.limits[]` and rebuilds the manifest refines the sample on its
+  own: fewer source cells fall under each screen pixel. Wheel zoom is still #85. This does not
+  add it.
 
   Keep this distinct from the heavy-scene render latency in #102 (an 80×80 `surface!` case) —
   that cost is dominated by Makie's own draw time, not by payload or hit-test, so subsampling
@@ -314,8 +300,6 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   a gesture — a coarser frame mid-drag, full fidelity once it settles, in the spirit of #85's
   already-accepted "ticks and decorations move with the photograph until a real frame replaces
   it" — is the separate companion idea for that cost; named here, not designed.
-
-  Answer the push/pull/subsample question before any of the three is built on further.
 
 - **PolarAxis continuous θ/r readout**: ship `Makie.Polar` (and the letterboxed scene limits)
   to the JS `invertAxis` so `AxisInteractable`, thresholds, ROIs, and the #92 probe work on

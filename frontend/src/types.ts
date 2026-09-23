@@ -17,7 +17,15 @@ export interface GridGeometry {
     yedges: number[]
     ncols: number
     nrows: number
-    values?: number[] // row-major: values[j*ncols + i]; absent when dropped for sub-pixel cells (Julia GRID_VALUES_MIN_SCREEN_PX)
+    values?: number[] // row-major: values[j*ncols + i]; the source matrix, when a cell is at least one screen pixel
+    // One source value per screen pixel of the axis viewport, when cells are smaller.
+    // Row-major over (sncols, snrows). NaN is a viewport pixel whose center misses the grid (not a hit).
+    sample?: number[]
+    sncols?: number
+    snrows?: number
+    sample_origin?: [number, number] // image px, top-left of sample (0, 0)
+    sample_span?: [number, number]   // image px width, height of the sampled viewport
+    sample_px?: number                // image px per sample; the last bin may be shorter
 }
 
 export interface ThresholdGeometry {

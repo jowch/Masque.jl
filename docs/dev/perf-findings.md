@@ -127,7 +127,7 @@
 > here). `tol`/`label`/`links` do **not** apply here — `tol` is code-gated to
 > `:segments`/`:polyline`/`:lines` layers only (`src/render.jl`), and neither `label` nor `links` is
 > set on this bench's heatmap fixture, so none of the three appear in its manifest; checked
-> directly against the layer's keys), heatmap-1000² still 6 KB, and STRESS D still 10.24 MB —
+> directly against the layer's keys), heatmap-1000² was 6 KB on that run (edges only, before the screen-pixel sample; the current size is the STRESS table), and STRESS D still 10.24 MB —
 > matching the value already verified by direct inspection in the `#110`/`#109` entry above. This is the
 > **first run of `bench/stress.jl` to complete all five sections**; the corrected STRESS table
 > is below, reported as a range across repeated runs rather than a single sample — this machine
@@ -501,12 +501,10 @@ Pushing past the normal envelope (live round-trips + a pure-Julia sweep to 10× 
 | heatmap 1000×1000 | 2.13 MB | **4.78 MB** | **553 ms** | ~260 ms | **~290 ms** |
 
 > These two rows are **pre-change live snapshots** (dated, not regenerated). The wire format has since
-> shrunk both manifests: scatter-10000 is now ~379 KB (int-pixel geometry, this PR), and the 1000²
-> heatmap ships ~6 KB (its sub-pixel `values[]` is dropped by the PR #8 cap), so that exact heatmap is
-> now **render-bound** (a few hundred ms at most — not resolved to a single number at this sample
-> size; see the STRESS table below and its note), not the 553 ms payload-bound case shown, since
-> even the widest observed sample for this row is still well under it. The 553 ms remains a
-> valid datapoint for *what a 4.78 MB manifest costs* — it just no longer occurs by default.
+> shrunk both manifests: scatter-10000 is now ~379 KB (int-pixel geometry), and the 1000² heatmap
+> ships a 896 KB screen-pixel sample instead of the 4.78 MB source matrix (STRESS table below).
+> That heatmap is no longer the 553 ms payload-bound case. The 553 ms remains a valid datapoint for
+> *what a 4.78 MB manifest costs* — it just no longer occurs by default.
 
 (PNG sizes here are the live browser-measured transferred bytes; manifest sizes are from the bench.
 The render floor is bench `masque(fig)` — it excludes the `published_to_js` msgpack serialization
@@ -516,9 +514,10 @@ Below ~1 MB total, the round-trip is **render-bound** and browser/transfer overh
 ~15–55 ms. Above a few MB it flips to **payload-bound**: the 553 ms above is mostly *not* render — it's
 `published_to_js` msgpack-serializing a 4.78 MB manifest + shipping ~7 MB over the wire + paint. Nothing
 crashed; it degrades gracefully into the half-second range. The crossover sits around **~1–10 MB total**.
-Post-wire-shrink (int-pixel geometry + the `values[]` cap), the case that *reaches* that regime by
-default is **high-N scatter** (200 000 pts → 7.72 MB manifest), not heatmaps — the cap keeps even a 1 M-cell
-heatmap render-bound.
+Post-wire-shrink (int-pixel geometry + the screen-pixel grid sample), the case that *reaches* that
+regime by default is **high-N scatter** (200 000 pts → 7.72 MB manifest), not heatmaps. A sub-pixel
+heatmap on the default column ships about 900 KB of values (the sizer; see the STRESS table), under
+the ~1 MB line.
 
 **The manifest is the high-N wall, not the PNG** (pure-Julia sweep, `bench/stress.jl` at commit
 `226d9f2` — the first run of this script to complete all five STRESS sections; see the
@@ -535,8 +534,8 @@ during round-1 review (see below the table):
 | scatter 100 000 | 303 KB | 3.83 MB | 1 499–1 552 ms (3 runs) |
 | scatter 200 000 | 71 KB | **7.72 MB** | 3 117–3 369 ms (3 runs) |
 | heatmap 300×300 (cells visible) | 388 KB | 442 KB | 33–84 ms (7 runs) |
-| heatmap 500×500 (cells sub-pixel) | 1 009 KB | 3 KB | 57–206 ms (7 runs; see note) |
-| heatmap 1000×1000 (cells sub-pixel) | 2.26 MB | **6 KB** | 97–142 ms (7 runs; see note) |
+| heatmap 500×500 (cells sub-pixel) | 1 009 KB | 906 KB | 57–206 ms (7 runs; see note) |
+| heatmap 1000×1000 (cells sub-pixel) | 2.26 MB | **896 KB** | 97–142 ms (7 runs; see note) |
 | scatter 50 000 + 200 B payload/elem | 47 KB | **10.24 MB** | 1 248–1 340 ms (3 runs) |
 
 One case is a resolved improvement, in the direction the fix predicts, because the drop is much
@@ -572,13 +571,14 @@ bars.
 STRESS D (scatter 50 000 + 200 B payload/elem) and the new heatmap 500×500 row have no valid
 prior number to compare against — D never completed before this fix, and 500×500 was never in
 this table: `stress()`'s loop always sampled `d ∈ (300, 500, 1000)`, but the original table only
-carried the two endpoints. Heatmap 500×500 is **sub-pixel, not visible** — like 1000×1000, it
-drops the `values[]` payload (confirmed directly: `masque()` emits `Masque: heatmap/image grid
-cells are ~0.69 px on screen (sub-pixel); dropping the values[] payload…` for this case, and its
-manifest has no `values` key). The 300²/500² boundary, not 300²/1000², is where cells stop being
-individually targetable at this figure's default column width. Heatmap-500×500's manifest (3 KB)
-is smaller than the 1000×1000 row's (6 KB) because the sub-pixel cap ships grid *edges*
-(`nrows+1`/`ncols+1` entries), not per-cell values, so it scales with √cells, not cells.
+carried the two endpoints. Heatmap 500×500 is **sub-pixel** — like 1000×1000, it does not ship
+`values`. It ships `sample`, one source value per screen pixel of the axis viewport (500² is
+536×345 samples, 1000² is 528×345). The 300²/500² boundary, not 300²/1000², is where cells stop
+being individually targetable at this figure's default column width: 300² still has `values` and
+a 442 KB manifest. The two sub-pixel manifests are almost the same size because the sample follows
+the viewport, not the source. The manifest column for those two rows was remeasured with the sizer
+in `bench/stress.jl` (Float32 counted at 5 bytes) after the sample landed. The render ranges were
+not re-run; they remain the earlier seven-run ranges, and they are still not resolved.
 
 - **PNG is non-monotonic in N** — past saturation, dense random scatter compresses to a near-solid mass
   (200 000 pts → only 71 KB), while the **manifest grows strictly O(N) to 7.7 MB** (int-pixel geometry,
@@ -586,16 +586,18 @@ is smaller than the 1000×1000 row's (6 KB) because the sub-pixel cap ships grid
 - **Heatmap render is much cheaper than the multi-second high-N scatter case, though the exact
   figure is not resolved at this sample size** (33–227 ms across all rows and all runs recorded
   in the STRESS table above and its note — see there rather than a single bound here) — Cairo
-  blits the raster. The manifest carries the value matrix (O(cells)) **only while cells are
-  targetable**: at 300² (visible) it's 442 KB, but from 500² up the cells go sub-pixel and the
-  values cap (PR #8) drops the matrix (500² → 3 KB, 1000² → 6 KB). So a giant heatmap is no
-  longer the payload wall it was; high-N *scatter* is.
+  blits the raster. The manifest carries the source matrix **only while cells are at least one
+  screen pixel**: at 300² that is 442 KB. From 500² up the cells are sub-pixel and the manifest
+  carries one value per screen pixel (500² → 906 KB, 1000² → 896 KB). A larger source does not
+  grow that sample. High-N *scatter* is still the payload wall.
 - **Raw canvas pixels are *not* a payload driver for sparse content**: a 3200×2000 figure with 2 000
   points produced a *smaller* PNG (132 KB) than a 600×400 one — density drives PNG size, not resolution.
 - **What actually shrinks the multi-MB manifest** (de-speculated by `bench/encoding_experiment.jl`, real
   MsgPack bytes — see the encoding experiment below): **int-pixel geometry** (−58% on the geometry term,
-  no structural change) and **capping heatmap `values[]`** (−499×). **Both now shipped** — the values cap
-  in PR #8, int-pixel quantization here. The TypedArray binary fast-path, which I first guessed was the
+  no structural change) and **not shipping the source matrix for a sub-pixel heatmap**. The cap that
+  dropped the matrix (PR #8, 4.78 MB → 9.8 KB at 1000²) is what the screen-pixel sample replaced;
+  the current size is the STRESS row above, 896 KB. Int-pixel quantization shipped in PR #9. The
+  TypedArray binary fast-path, which I first guessed was the
   lever, buys only ~5% over int-quantization and is *not* worth the manifest-shape change.
 
 ### Encoding experiment (de-speculation)
@@ -613,16 +615,18 @@ under each scheme — replacing theoretical byte math with measured wire bytes:
 | with `values[]` (uncapped) | 4.78 MB |
 | capped → `{i,j}` only | 9.8 KB (**499× smaller**) |
 
-Both wins **shipped**: the `values[]` cap in `52f174c` (PR #8), and **int-pixel geometry quantization
-in PR #9** (element geometry vectors are `Int`,
-[§9](architecture/09-wire-encoding.md)). The
+The geometry win **shipped** in PR #9 (element geometry vectors are `Int`,
+[§9](architecture/09-wire-encoding.md)). The heatmap rows are the earlier cap experiment: dropping
+the matrix measured 4.78 MB → 9.8 KB. What ships now is the screen-pixel sample, 896 KB at 1000²
+in the STRESS table, not the 9.8 KB row. The
 experiment's −58%/2.10-B-per-coord is the *geometry-term* saving; on a whole realistic manifest (where
 the payload's Float64 `x`/`y` dilute it) it lands ~17 % — see the envelope table. AxisTransform stays
-Float64. The measured experiment numbers above are unchanged — they just describe what now ships.
+Float64.
 
-**Conclusion:** the cheap, non-structural wins (int-pixel coords + `values[]` cap) capture essentially all
-of it; the structural typed-array fast-path does not earn its cost. `Float16` is a non-starter (no MsgPack
-float16; lossy >2048px). Keep `AxisTransform` lims `Float64` (drag inversion) — quantize geometry only.
+**Conclusion:** int-pixel coords capture the geometry-term saving; the structural typed-array
+fast-path does not earn its cost. `Float16` is a non-starter (no MsgPack float16; lossy >2048px).
+Keep `AxisTransform` lims `Float64` (drag inversion) — quantize geometry only. A sub-pixel heatmap
+is bounded by the viewport sample, not by dropping the values.
 
 ## Scope bounds for downstream phases
 

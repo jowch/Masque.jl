@@ -277,6 +277,40 @@ describe("hitLayer + hitTest", () => {
         const h = hitLayer(grid, 15, 5)
         expect(h?.grid_).toEqual([1, 0, undefined]) // index found; value absent, no crash
     })
+    it("grid sample reports the pixel-center cell and highlights that screen pixel", () => {
+        const grid: HitLayer = { id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: {
+                xedges: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20], yedges: [0, 10],
+                ncols: 10, nrows: 1,
+                sample: [3.5, NaN], sncols: 2, snrows: 1,
+                sample_origin: [0, 0], sample_span: [20, 10], sample_px: 10,
+            } }
+        // (5, 5) is sample (0, 0). Its center is (5, 5), source bin i=2 (between 4 and 6).
+        const h = hitLayer(grid, 5, 5)
+        expect(h?.grid_).toEqual([2, 0, 3.5])
+        expect(h?.geom_).toEqual(["rect", 5, 5, 10, 10])
+        expect(hitLayer(grid, 15, 5)).toBeNull() // NaN sample: margin, not a hit
+        expect(hitLayer(grid, 25, 5)).toBeNull() // outside the sampled viewport
+    })
+    it("grid sample's last bin is the remainder, and the far edge still hits", () => {
+        const grid: HitLayer = { id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: {
+                xedges: [0, 15], yedges: [0, 10], ncols: 1, nrows: 1,
+                sample: [1, 2], sncols: 2, snrows: 1,
+                sample_origin: [0, 0], sample_span: [15, 10], sample_px: 10,
+            } }
+        const h = hitLayer(grid, 12, 5)
+        expect(h?.grid_).toEqual([0, 0, 2])
+        expect(h?.geom_).toEqual(["rect", 12.5, 5, 5, 10])
+        const edge: HitLayer = { id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: {
+                xedges: [0, 20], yedges: [0, 10], ncols: 1, nrows: 1,
+                sample: [1, 2], sncols: 2, snrows: 1,
+                sample_origin: [0, 0], sample_span: [20, 10], sample_px: 10,
+            } }
+        expect(hitLayer(edge, 20, 5)?.grid_).toEqual([0, 0, 2])
+        expect(hitLayer(edge, 20.001, 5)).toBeNull()
+    })
     it("hitTest respects the event filter and manifest order", () => {
         const m: Manifest = { width: 400, height: 400, scaling: 2, transforms: {},
             layers: [{ ...circles, events: ["hover"] }] }

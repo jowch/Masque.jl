@@ -105,7 +105,7 @@ are wall-clock and approximate** (`~`). Units: **KB = bytes/1024, MB = bytes/1 0
 | scatter, 10 000 | 1 103 KB (724+379) | ~300 | 158 KB | ~26 | **1.1** |
 | scatter, 100 000 | 3 973 KB (53+**3 920**) | **~2 280** | 861 KB | ~32 | **0.3** |
 | heatmap, 200² | 386 KB (190+197) | ~49 | 1 956 KB | ~30 | never |
-| heatmap, 500² | 1 012 KB (1 009+3) | ~71 | 11 843 KB | ~45 | never |
+| heatmap, 500² | 1 915 KB (1 009+906) | ~71 | 11 843 KB | ~45 | never |
 | 3D helix, 300 | **unsupported** | — | 141 KB | ~30 | WebGL-only |
 
 *Renders after which cumulative `:webgl` (bundle + N·scene) < cumulative `:cairo` (N·(PNG+manifest)).
