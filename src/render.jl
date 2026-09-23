@@ -417,11 +417,14 @@ end
 
 # One gesture closure's compile-ahead call. `show` schedules it and returns; the closure waits
 # if a drag arrives while it is still running. Keyed by the closure so display and cancellation
-# can find it without a widget field.
+# can find it without a widget field. The closure is immutable, so it cannot be a weak key;
+# the entry is removed when the discarded calls finish or a drag runs them.
 mutable struct _ViewWarmup
     apply::Function
     axes::Dict{Symbol, Any}
     task::Union{Nothing, Task}
+    # The deferred task `wait`s this one before drawing. Joining from it would deadlock.
+    blocked_on::Union{Nothing, Task}
     started::Bool
     done::Bool
     cancelled::Bool
@@ -444,15 +447,31 @@ function _drop_view_warmup!(render_frame)
 end
 
 # `true` once the discarded calls have finished, or when this closure has nothing scheduled.
-_view_warmup_finished(render_frame)::Bool = (s = _view_warmup_state(render_frame); s === nothing || s.done)
+function _view_warmup_finished(render_frame)::Bool
+    state = _view_warmup_state(render_frame)
+    state === nothing && return true
+    return lock(_VIEW_WARMUP_LOCK) do
+        return state.done
+    end
+end
+
+_warmup_cancelled(state::_ViewWarmup) = lock(_VIEW_WARMUP_LOCK) do
+    return state.cancelled
+end
 
 function _run_view_warmup!(state::_ViewWarmup, render_frame)
     try
-        state.cancelled || _warm_view_render_frame!(state.apply, state.axes; stop = () -> state.cancelled)
+        go = lock(_VIEW_WARMUP_LOCK) do
+            return !state.cancelled
+        end
+        go && _warm_view_render_frame!(state.apply, state.axes; stop = () -> _warmup_cancelled(state))
     catch err
         @error "Masque view warmup failed" exception = (err, catch_backtrace())
     finally
-        state.done = true
+        lock(_VIEW_WARMUP_LOCK) do
+            state.done = true
+            state.blocked_on = nothing
+        end
         _drop_view_warmup!(render_frame)
     end
     return nothing
@@ -461,7 +480,8 @@ end
 # Run the discarded calls after `caller` finishes. On Pluto's worker that task is the cell
 # evaluation, and it flushes the formatted output before it ends, so the browser can hydrate
 # while this runs. The root task (a test or the REPL) never ends; there the call just waits
-# for the next yield, which is after `show` has written the HTML.
+# for the next yield, which is after `show` has written the HTML. If `caller` joins first,
+# this task sees `done` and does not draw a second time.
 function _defer_view_warmup!(state::_ViewWarmup, render_frame)
     caller = current_task()
     return @async begin
@@ -471,7 +491,10 @@ function _defer_view_warmup!(state::_ViewWarmup, render_frame)
             catch
             end
         end
-        _run_view_warmup!(state, render_frame)
+        run = lock(_VIEW_WARMUP_LOCK) do
+            return !state.done
+        end
+        run && _run_view_warmup!(state, render_frame)
     end
 end
 
@@ -482,25 +505,51 @@ function _kick_view_warmup!(render_frame)
         state.started && return nothing
         state.cancelled && return nothing
         state.started = true
+        state.blocked_on = current_task() === Base.roottask ? nothing : current_task()
         state.task = _defer_view_warmup!(state, render_frame)
     end
     return nothing
 end
 
+# `on_cancellation` runs just before the cell re-evaluates. A discarded frame may already
+# have moved the camera. Wait until that frame's `finally` puts it back, so the next
+# `masque` on this figure snapshots the mount camera. Running the wait on the task the
+# deferred warmup is blocked on would deadlock; that task runs the restore itself.
 function _cancel_view_warmup!(render_frame)
     state = _view_warmup_state(render_frame)
     state === nothing && return nothing
-    state.cancelled = true
+    run_here = false
+    task = nothing
+    lock(_VIEW_WARMUP_LOCK) do
+        state.cancelled = true
+        if !state.done && state.blocked_on === current_task()
+            state.blocked_on = nothing
+            state.started = true
+            state.task = current_task()
+            run_here = true
+        else
+            task = state.task
+        end
+    end
+    if run_here
+        _run_view_warmup!(state, render_frame)
+    elseif task isa Task && task !== current_task()
+        wait(task)
+    end
     return nothing
 end
 
 # A drag that lands before the deferred call finishes waits for it. A drag that lands before
-# `show` (tests, a callback with no display) runs the calls on this task instead.
+# `show` (tests, a callback with no display) runs the calls on this task instead. A drag on
+# the task the deferred call is blocked on runs the calls here too: waiting would deadlock,
+# and the deferred task then sees `done` and does not draw again.
 function _join_view_warmup!(state::_ViewWarmup, render_frame)
     run_here = lock(_VIEW_WARMUP_LOCK) do
         state.done && return false
-        if !state.started
+        if state.blocked_on === current_task() || !state.started
+            state.blocked_on = nothing
             state.started = true
+            state.task = current_task()
             return true
         end
         return false
@@ -508,7 +557,9 @@ function _join_view_warmup!(state::_ViewWarmup, render_frame)
     if run_here
         _run_view_warmup!(state, render_frame)
     else
-        t = state.task
+        t = lock(_VIEW_WARMUP_LOCK) do
+            return state.task
+        end
         t === nothing || t === current_task() || wait(t)
     end
     return nothing
@@ -526,7 +577,7 @@ function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu)
     isempty(view_axes) && return nothing
     state = _ViewWarmup(
         input -> _apply_view_frame(input, view_axes, backend, fig, interactables, ppu),
-        view_axes, nothing, false, false, false,
+        view_axes, nothing, nothing, false, false, false,
     )
     frame = function (input)
         _join_view_warmup!(state, frame)
