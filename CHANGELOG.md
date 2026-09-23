@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- Suspending a `:webgl` plot calls `forceContextLoss` before the next plot takes a
+  context, so the browser cap is not crossed while the detached canvas is still live.
+  A right-click that passes through to the WebGL canvas no longer has its browser menu
+  cancelled by WGLMakie's `contextmenu` listener.
 - `:webgl` keeps at most 8 live WebGL contexts. A plot outside the viewport is drawn when
   it scrolls into view. Past 8 on screen at once, the extras show a note instead of the
   browser blanking an arbitrary canvas. `:cairo` is unchanged.
