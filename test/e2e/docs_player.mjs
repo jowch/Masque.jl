@@ -61,20 +61,58 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function waitMounted(frame, timeoutMs = 20000) {
+function mountSnapshot() {
+  const host = document.querySelector(".ip-host");
+  let shadowRoots = 0;
+  let surface = false;
+  if (host) {
+    host.querySelectorAll("*").forEach((el) => {
+      if (!el.shadowRoot) return;
+      shadowRoots++;
+      if (el.shadowRoot.querySelector(".surface")) surface = true;
+    });
+  }
+  return {
+    href: location.href,
+    ready: document.readyState,
+    host: !!host,
+    editor: typeof window.editor_state_set,
+    mount: window.Masque ? typeof window.Masque.mount : "undefined",
+    shadowRoots,
+    surface,
+  };
+}
+
+// about:blank's readyState is already "complete", so the first contentFrame
+// is not evidence that the embed loaded. Re-resolve the element each poll so
+// a replaced node is not a detached frame, and ignore about:blank until the
+// embed document is actually there.
+async function waitMounted(iframe, timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs;
+  let last = "iframe has no document";
   while (Date.now() < deadline) {
-    const ok = await frame.evaluate(() => {
-      const host = document.querySelector(".ip-host");
-      if (!host || typeof window.editor_state_set !== "function") return false;
-      let sr = null;
-      host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      return !!(sr && sr.querySelector(".surface") && typeof window.Masque?.mount === "function");
-    }).catch(() => false);
-    if (ok) return;
+    const handle = await iframe.elementHandle();
+    const frame = handle && await handle.contentFrame();
+    if (!frame) {
+      last = "iframe has no contentFrame";
+      await sleep(250);
+      continue;
+    }
+    const url = frame.url();
+    if (!url || url === "about:blank") {
+      last = `iframe url ${url || "empty"}`;
+      await sleep(250);
+      continue;
+    }
+    const snap = await frame.evaluate(mountSnapshot).catch((e) => ({
+      href: url,
+      error: String(e).split("\n")[0],
+    }));
+    if (snap.host && snap.editor === "function" && snap.mount === "function" && snap.surface) return frame;
+    last = JSON.stringify(snap);
     await sleep(250);
   }
-  throw new Error("quick start overlay never mounted (host/.surface/window.Masque.mount within 20s)");
+  throw new Error(`quick start overlay never mounted within 20s: ${last}`);
 }
 
 async function readout(frame) {
@@ -160,24 +198,17 @@ try {
 
   const iframe = page.locator("#masque-gs-quickstart");
   await iframe.waitFor({ state: "attached", timeout: 20000 });
-  // The quick start iframe is taller than the viewport, and Documenter
-  // keeps shifting layout while fonts and the theme settle. Playwright's
-  // actionability check then never calls the iframe stable.
-  await iframe.evaluate((el) => el.scrollIntoView({ block: "center", inline: "nearest" }));
-  const handle = await iframe.elementHandle();
-  let frame = null;
-  const frameDeadline = Date.now() + 20000;
-  while (Date.now() < frameDeadline) {
-    frame = await handle.contentFrame();
-    if (frame) {
-      const hasDoc = await frame.evaluate(() => document.readyState).catch(() => null);
-      if (hasDoc) break;
-    }
-    await sleep(250);
-  }
-  if (!frame) throw new Error("getting-started iframe has no contentDocument");
-
-  await waitMounted(frame);
+  // The iframe is taller than the viewport, and Documenter keeps shifting
+  // layout while fonts settle, so scroll via the element instead of waiting
+  // for Playwright to call it stable. Force the embed fetch in case the
+  // iframe is still sitting on about:blank.
+  await iframe.evaluate((el) => {
+    el.loading = "eager";
+    el.scrollIntoView({ block: "center", inline: "nearest" });
+    const src = el.getAttribute("src");
+    if (src) el.src = src;
+  });
+  const frame = await waitMounted(iframe);
 
   const mountType = await frame.evaluate(() => typeof window.Masque.mount);
   if (mountType !== "function") {

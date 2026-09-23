@@ -52,7 +52,7 @@ listed snapshot. In Pluto, the readout cell re-runs.
 <div class="masque-embed-wrap">
 <iframe id="masque-gs-quickstart" title="Three-point scatter with a tooltip, @bind, and a readout"
         style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
+        scrolling="no"></iframe>
 </div>
 <script>
 (function () {
