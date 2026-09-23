@@ -71,7 +71,7 @@ takes neither an `Axis` nor `id` as constructor arguments at all — see
 
 | Constructor | Geometry | Extra keywords | Bond |
 |---|---|---|---|
-| `PointInteractable(ax, points; radius = 9, radius3d = nothing, id = :points)` | `points :: Vector{(x, y)}` (or `(x,y,z)` for a 3D axis) | `radius` — px click target; `radius3d` — per-point data-space half-extents on a 3D axis (overrides `radius`) | [`ElementEvent`](@ref); default fields `index` (1-based), `x`, `y`[, `z`] |
+| `PointInteractable(ax, points; radius = nothing, radius3d = nothing, id = :points)` | `points :: Vector{(x, y)}` (or `(x,y,z)` for a 3D axis) | `radius` — px highlight radius. Omitted: the drawn radius of the one `Scatter` on `ax` with these positions, otherwise Makie's default `:circle` at the theme `markersize` (≈0.35×`markersize`). `radius3d` — per-point data-space half-extents on a 3D axis (overrides `radius`) | [`ElementEvent`](@ref); default fields `index` (1-based), `x`, `y`[, `z`] |
 | `SegmentInteractable(ax, vertices; mode = :polyline, unit = :segment, tol = 6, id = :segments)` | connected/disjoint vertices | `mode` — `:polyline` (connected path) or `:pairs` (disjoint pairs); `unit` — `:segment` (one element per edge; the default) or `:line` (the whole path is one element; requires `mode = :polyline`); `tol` — hit-test slack around an edge, in logical px, scaled to DPI like `radius` (default 6) | [`ElementEvent`](@ref); default field `segment_index` (1-based) for `:segment`, `index` (1-based) for `:line` |
 | `RectInteractable(ax; rects, clamp_to_viewport = false, id = :rects)` | `rects = [(xc, yc, w, h), …]` — explicit boxes (e.g. bars) | `clamp_to_viewport` — clamp a rect that spans past the axis edge instead of letting it overflow | [`ElementEvent`](@ref); default field `index` (1-based) |
 | `RectInteractable(ax; grid, id = :rects)` | `grid = (xedges, yedges, values)` — a heatmap shipped as edges, not N rects | — | [`GridCellEvent`](@ref) (`i`, `j` 1-based; `A[cell]`) |
@@ -93,9 +93,14 @@ applies. The `ax` argument is passed because a plot has no back-reference to its
 ```julia
 begin
     p = scatter!(ax, xs, ys; markersize = 14)
-    pt = PointInteractable(ax, p)   # radius derived from the marker's drawn extent
+    pt = PointInteractable(ax, p)   # the usual call: radius from the marker's drawn extent
 end
 ```
+
+`PointInteractable(ax, points)` (no plot object) uses that same radius when exactly one
+`Scatter` on `ax` has those positions. Pass `radius=` when the lookup would be ambiguous, or
+when there is no scatter to hug. A marker with no readable bbox (a character, an image) keeps
+`markersize / 2`.
 
 ```julia
 @bind sel masque(fig, pt)

@@ -52,6 +52,11 @@ labels = ["a", "b", "c"]
 @bind ev masque(fig, [PointInteractable(ax, pts; id = :points, payloads = labels)])
 ```
 
+That points constructor takes the highlight radius from the scatter already on `ax` (the
+drawn marker, not a fixed radius of 9). When you still have the plot object,
+`PointInteractable(ax, scatter)` is the usual call: same radius, and it also reads `color=`
+for the tooltip accent.
+
 Every built-in kind, its constructor, and its default payload are on the
 [Interactables](@ref) page. You can also start from `auto_interactables(fig)` (the same
 vector `masque(fig)` builds internally), tweak it, and pass it back — see

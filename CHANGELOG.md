@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- `PointInteractable(ax, points)` takes its highlight radius from the one `Scatter` on that
+  axis with the same positions — the marker's drawn extent, same as
+  `PointInteractable(ax, scatter)` — instead of a fixed `radius` of 9 that haloed the
+  marker. No matching scatter, or more than one, uses Makie's default `:circle` at the
+  theme `markersize` (≈0.35×`markersize`). Pass `radius=` to override. A marker with no
+  readable bbox still uses `markersize / 2`. `PointInteractable(ax, scatter)` is the usual
+  call; it also resolves the tooltip accent from `color=`.
 - Hovering or focusing a legend entry no longer shows a tooltip. The label is already drawn
   in the row, and the card covered the entries around it. Pass `tooltip = masque"..."` to show
   one (fields: `label`, `group`, `targets`). Omitting `tooltip` and `tooltip = false` both

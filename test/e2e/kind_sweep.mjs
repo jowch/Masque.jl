@@ -986,6 +986,16 @@ try {
           }
         }
         passed.push(`${key}/circle-r`);
+        // polar is PointInteractable(ax, pts) beside scatter!(markersize=22), figure width
+        // 480 so px_per_unit is 2. The drawn :circle is ≈0.3525·22·2 image px. The old
+        // points-constructor default (radius 9) quantizes to 18 and halos the marker.
+        if (key === "polar") {
+          const drawn = Math.round(0.3525 * 22 * 2);
+          if (Math.abs(Number(hp.r) - drawn) > 1) {
+            throw new Error(`${key}: points-constructor r=${hp.r} is not the drawn marker (~${drawn}); radius 9 logical px would be 18`);
+          }
+          passed.push(`${key}/drawn-r`);
+        }
       }
       if (layer.kind === "rects") {
         const hp = hitPoint(layer, spec.selectedIndex);
