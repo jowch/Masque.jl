@@ -12,7 +12,7 @@ export function setLine(line: SVGLineElement, tg: ThresholdGeometry, pos: number
     line.setAttribute("x2", String(x2)); line.setAttribute("y2", String(y2))
 }
 
-export function buildThresholdLines(manifest: Manifest, svg: SVGSVGElement): Map<string, SVGLineElement> {
+export function buildThresholdLines(manifest: Manifest, svg: SVGElement): Map<string, SVGLineElement> {
     const thresholdLines = new Map<string, SVGLineElement>()
     for (const layer of manifest.layers) {
         if (layer.kind !== "threshold") continue
