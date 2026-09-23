@@ -10,9 +10,9 @@
 //     this repo) whose target resolves into docs/dev/. Links to anything else in those files are
 //     out of scope for this checker.
 //
-// docs/src/notebooks/ is skipped entirely: it's gitignored and generated at build time by
-// docs/export_notebooks.jl, so a locally-built copy's links are only meaningful post-build, not
-// against the source tree this script walks. Documenter `[Label](@ref)` cross-references are
+// docs/src/notebooks/ is skipped if a stale checkout still has it: the whole-notebook
+// HTML export is gone, so those links are not part of the source tree this script walks.
+// Documenter `[Label](@ref)` cross-references are
 // left alone too -- Documenter resolves those itself during the site build, not this script.
 //
 // It fails loud on any in-scope link whose target file or heading anchor does not actually exist.
@@ -34,8 +34,8 @@ const REPO_ROOT = resolve(__dirname, "..", "..");
 const DOCS_ROOT = join(REPO_ROOT, "docs");
 const DOCS_DEV_DIR = join(REPO_ROOT, "docs", "dev");
 
-// Directories walkMarkdownFiles never descends into: docs/src/notebooks is gitignored and
-// generated post-build (see header); node_modules is excluded defensively wherever it turns up
+// Directories walkMarkdownFiles never descends into: a stale docs/src/notebooks
+// directory (see header); node_modules is excluded defensively wherever it turns up
 // (there is none under docs/ today, but a link checker should not choke on one appearing).
 const EXCLUDED_DIRS = new Set([join(REPO_ROOT, "docs", "src", "notebooks")]);
 

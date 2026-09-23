@@ -19,7 +19,7 @@ end
 begin
     import Pkg
     Pkg.activate(; temp = true)
-    Pkg.develop(path = joinpath(@__DIR__, ".."))
+    Pkg.develop(path = joinpath(@__DIR__, "..", ".."))
     Pkg.add(["WGLMakie", "JSON3"])
     Pkg.instantiate()
     using Masque

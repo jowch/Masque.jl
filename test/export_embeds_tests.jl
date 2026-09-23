@@ -188,3 +188,66 @@ end
     @test "items:" in keys
     @test any(startswith(k, "items:pts:0") for k in keys)
 end
+
+@testset "gallery players cover the demo sections" begin
+    root = joinpath(@__DIR__, "..")
+    @test !isdir(joinpath(root, "examples"))
+    @test !isdir(joinpath(root, "gallery"))
+    @test !isfile(joinpath(root, "docs", "export_notebooks.jl"))
+    @test !isfile(joinpath(root, "docs", "src", "examples.md"))
+    @test isfile(joinpath(root, "docs", "src", "embeds", "getting_started.jl"))
+
+    names = [
+        "gallery_tooltips",
+        "gallery_selection",
+        "gallery_bars",
+        "gallery_polygons",
+        "gallery_colorbar",
+        "gallery_text",
+        "gallery_boxselect",
+        "gallery_image",
+        "gallery_limits",
+        "gallery_pan",
+        "gallery_orbit",
+        "gallery_polar",
+    ]
+    for name in names
+        path = joinpath(root, "docs", "src", "embeds", name * ".jl")
+        @test isfile(path)
+        player = parse_player_toml(path)
+        @test player["bond"] isa AbstractString
+        @test !isempty(player["states"])
+        src = read(path, String)
+        @test occursin("path = \"../../..\"", src)
+    end
+
+    tips = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_tooltips.jl"))
+    tip_keys = [snapshot_key(js_shape_from_toml(row)) for row in tips["states"]]
+    @test tip_keys == ["null", "cities:0", "cities:1", "cities:2", "cities:3"]
+    @test get(tips, "chip", true) !== false
+
+    sel = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_selection.jl"))
+    sel_keys = [snapshot_key(js_shape_from_toml(row)) for row in sel["states"]]
+    @test sel_keys == ["null", "scatter:0", "scatter:2"]
+
+    box = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_boxselect.jl"))
+    box_keys = [snapshot_key(js_shape_from_toml(row)) for row in box["states"]]
+    @test box_keys[1] == "null"
+    @test "items:" in box_keys
+    @test any(startswith(k, "items:pts:") for k in box_keys)
+
+    polar = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_polar.jl"))
+    polar_keys = [snapshot_key(js_shape_from_toml(row)) for row in polar["states"]]
+    @test polar_keys == ["null", "scatter:0", "scatter:1", "scatter:2", "scatter:3"]
+
+    for name in ("gallery_bars", "gallery_pan", "gallery_orbit", "gallery_image", "gallery_limits")
+        player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))
+        @test player["chip"] == false
+        keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
+        @test keys == ["null"]
+    end
+
+    gs = read(joinpath(root, "docs", "src", "embeds", "getting_started.jl"), String)
+    @test occursin("bond = \"pick\"", gs)
+    @test occursin("id = \"tokyo\"", gs)
+end

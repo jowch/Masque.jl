@@ -1,14 +1,11 @@
 # Headlessly run every Pluto notebook in this directory and fail if any cell errors.
-# This is the CI gate that keeps the examples in lockstep with the package API: an
-# example that breaks against the current code fails the build instead of rotting
-# silently. No display needed — most notebooks render through CairoMakie (headless);
-# examples/webgl_demo.jl renders through WGLMakie instead.
+# Gallery demos are docs embed notebooks, harvested by docs/export_embeds.jl.
+# This gate keeps the API fixtures honest (point/segment/rect/polygon/axis, the
+# WebGL kitchen sink, view sliders and drag, polar points on WGLMakie).
 #
-# Run locally:  julia examples/ci_run.jl
+# Run locally:  julia test/notebooks/ci_run.jl
 # Each notebook manages its own env (Pkg.develop the package + add whichever Makie
 # backend it needs), so this runner only needs Pluto itself.
-# docs/export_notebooks.jl runs the same notebooks to produce the docs site's static exports;
-# keep the discovery and error handling in step.
 
 import Pkg
 Pkg.activate(; temp = true)
@@ -18,7 +15,7 @@ using Pluto
 const HEADER = "### A Pluto.jl notebook ###"
 is_notebook(p) = isfile(p) && endswith(p, ".jl") && startswith(readline(p), HEADER)
 
-dirs = [@__DIR__, normpath(joinpath(@__DIR__, "..", "gallery"))]
+dirs = [@__DIR__]
 notebooks = String[]
 for d in dirs
     isdir(d) || continue
@@ -45,5 +42,5 @@ for path in notebooks
 end
 
 isempty(failed) ||
-    error("example notebook(s) with errored cells: $(join(failed, ", "))")
-@info "All example notebooks ran clean ✓"
+    error("fixture notebook(s) with errored cells: $(join(failed, ", "))")
+@info "All fixture notebooks ran clean ✓"

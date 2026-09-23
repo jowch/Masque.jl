@@ -22,7 +22,7 @@ end
 begin
     import Pkg
     Pkg.activate(; temp = true)
-    Pkg.develop(path = joinpath(@__DIR__, ".."))   # examples/ -> package root (portable)
+    Pkg.develop(path = joinpath(@__DIR__, "..", ".."))   # test/notebooks/ -> package root
     Pkg.add(["CairoMakie", "PlutoUI"])
     Pkg.instantiate()
     using Masque
@@ -43,7 +43,7 @@ camera is operational state, not an analysis value a notebook reads
 (docs/dev/architecture/12-gesture-channel.md §12.3). Drag frames stream over a `with_js_link`
 gesture channel instead of a bond: the picture and hit manifest repaint live, in place, with no
 cell re-execution and no remount. On this notebook that picture is a PNG. The same notebook on
-`:webgl` (`examples/view_manip_webgl.jl`) swaps a serialized scene onto the canvas instead.
+`:webgl` (`test/notebooks/view_manip_webgl.jl`) swaps a serialized scene onto the canvas instead.
 """
 
 # ╔═╡ 50000000-0000-0000-0000-000000000010

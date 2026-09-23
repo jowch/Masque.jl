@@ -8,7 +8,7 @@
 # "@bind round-trip contract") asserts transform_value rebuilds the InteractionEvent.
 #
 # WGLMakie is a weak dep of Masque (the extension only loads when WGLMakie is `using`'d), so a
-# bare `--project=.` can't `using WGLMakie` directly — same temp-env dance as examples/webgl_demo.jl.
+# bare `--project=.` can't `using WGLMakie` directly — same temp-env dance as test/notebooks/webgl_demo.jl.
 import Pkg
 Pkg.activate(; temp = true)
 Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "..")))   # test/e2e -> package root

@@ -223,9 +223,7 @@ must be in the same `masque` call. `selects = :bars` fails
 (`identity`, `log10`, `log`). It raises `ArgumentError` on `Axis3`,
 `PolarAxis`, or a categorical axis.
 
-A larger live-Pluto scatter brush is the "Box-select scatter" recipe in
-[`gallery/gallery.jl`](https://github.com/jowch/Masque.jl/blob/main/gallery/gallery.jl).
-The image ROI in that notebook is the `:grid` cousin: one
-[`GridWindowEvent`](@ref) on release, not a listed cell-by-cell player. For
-more information, see
-[Examples](@ref).
+A larger scatter brush is [Box-select scatter](@ref). The
+image cousin is [Image ROI](@ref): one [`GridWindowEvent`](@ref) on
+release, not a listed cell-by-cell player. For more information, see
+[Gallery](@ref).

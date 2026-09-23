@@ -7,7 +7,7 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
 ## Commands
 - Julia tests: `julia --project=. test/runtests.jl`
 - Frontend gate: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` (build → `../assets/overlay.js` IIFE + `../assets/masque-webgl.js` ESM)
-- Format (Runic, CI-enforced): `julia -e 'using Runic; exit(Runic.main(["--inplace","src","test","bench","gallery","examples","docs"]))'` — pass every dir with `.jl`, since CI formats the whole repo (PR #11 slipped because `gallery/` was omitted here). **CI's `runic-action` has no `paths:` filter → it checks the WHOLE repo** (incl. `bench/`, `gallery/`, `examples/`, `docs/make.jl`), and tracks the latest Runic (1.7+); a locally-old Runic can pass a file CI rejects. Format every `.jl` you add, with current Runic.
+- Format (Runic, CI-enforced): `julia -e 'using Runic; exit(Runic.main(["--inplace","src","test","bench","docs"]))'` — pass every dir with `.jl`, since CI's `runic-action` has no `paths:` filter and checks the whole repo (including `bench/` and `docs/make.jl`), and tracks the latest Runic (1.7+). Format every `.jl` you add, with current Runic.
 - Registry name-clash check (manual, not `Pkg.test`): packed General (typical
   depot / CI) is a 129-byte `~/.julia/registries/General.toml` pointer +
   `General.tar.gz`. Package rows are inline tables (`uuid = { name = "Masque",
@@ -118,7 +118,7 @@ text and the bond payload → it gets a live check on every backend × the kinds
   it's user-facing — verify all backends × the kinds the change can touch, interaction
   **and** visual.
 - Mechanics below. Kind-sweep notebooks: `test/e2e/kind_sweep_cairo.jl` / `kind_sweep_webgl.jl`
-  (both drivers). Demo envs (`examples/demo.jl`, `examples/webgl_demo.jl`) and
+  (both drivers). Demo envs (`test/notebooks/api_tour.jl`, `test/notebooks/webgl_demo.jl`) and
   `test/e2e/webgl_sweep.mjs` remain useful extras, not a substitute.
 - CI's `kind-sweep` job runs both drivers on both backends advisorily
   (`continue-on-error: true`) — agents still run the sweep locally before calling a

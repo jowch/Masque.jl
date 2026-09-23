@@ -291,8 +291,8 @@ the widget re-projects the overlay. Dragging with
 [`ViewInteractable`](@ref) is different: it commits nothing. On both
 backends, in-drag frames stream over `with_js_link`. `:cairo` ships a
 PNG; `:webgl` ships a serialized scene onto the canvas already on the
-page. See [Pan and orbit](@ref) and
-[`examples/view_manip.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip.jl).
+page. See [Pan and orbit](@ref), [Limits slider](@ref), and
+[Drag to pan](@ref).
 
 ## Custom
 
