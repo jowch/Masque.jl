@@ -300,6 +300,9 @@ All notable changes to this project are documented here. The format is based on
   of the axis (default 0 and 1, the full limits), broadcast with the positions the way Makie
   draws the line. A log-scale fraction is taken on the transformed limits and inverse-transformed
   back to data space. A limit change re-resolves the same fractions.
+- `masque(fig)` names a skipped recipe in the `@warn` (`contour`, `heatmap`) instead of
+  `Plot` for every Makie recipe. The Axis3 and PolarAxis skips use the same name. Unknown
+  recipes still skip.
 - Right-click and Mac ctrl-click reach the Cairo base image, so the browser's own image menu
   appears. A Mac ctrl-click leaves `@bind` unchanged.
 - A `selects`-ROI over a `:grid` target (e.g. the gallery `image_widget` recipe:

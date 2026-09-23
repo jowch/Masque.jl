@@ -73,7 +73,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         heatmap!(axpg, 0:0.5:π, 1:3, rand(7, 3))
         scatter!(axpg, [0.0], [1.0]; markersize = 10)
         Makie.update_state_before_display!(fpg)
-        gints = @test_logs (:warn, r"on PolarAxis"i) auto_interactables(fpg)
+        gints = @test_logs (:warn, r"heatmap on PolarAxis") auto_interactables(fpg)
         @test length(gints) == 1
         @test only(gints) isa PointInteractable
     end
@@ -176,7 +176,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         heatmap!(ax3g, 1:3, 1:3, [Float64(i + j) for i in 1:3, j in 1:3])
         scatter!(ax3g, Makie.Point3f[(1, 2, 3)]; markersize = 10)
         Makie.update_state_before_display!(f3g)
-        gints = @test_logs (:warn, r"on Axis3"i) auto_interactables(f3g)
+        gints = @test_logs (:warn, r"heatmap on Axis3") auto_interactables(f3g)
         @test length(gints) == 1
         @test only(gints) isa PointInteractable
     end

@@ -791,7 +791,7 @@ function auto_interactables(fig)
         for p in _child_plots(ax.scene)
             base = _plotbase(p)
             if base === nothing
-                @warn "masque: skipping unsupported plot type $(typeof(p).name.name) (no introspection recipe)" maxlog = 16
+                @warn "masque: skipping unsupported plot type $(Makie.plotkey(p)) (no introspection recipe)" maxlog = 16
                 continue
             end
             # Other 2D recipes extract pixel-separable geometry that a 3D perspective
@@ -802,7 +802,7 @@ function auto_interactables(fig)
                         Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D,
                     }
                 )
-                @warn "masque: skipping $(typeof(p).name.name) on Axis3 — only Scatter/Lines/" *
+                @warn "masque: skipping $(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/" *
                     "LineSegments/MeshScatter/Wireframe/Arrows3D have 3D-valid extraction today; " *
                     "other kinds are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
                 continue
@@ -816,7 +816,7 @@ function auto_interactables(fig)
                         Makie.ScatterLines, Makie.Series,
                     }
                 )
-                @warn "masque: skipping $(typeof(p).name.name) on PolarAxis — only Scatter/Lines/" *
+                @warn "masque: skipping $(Makie.plotkey(p)) on PolarAxis — only Scatter/Lines/" *
                     "LineSegments/ScatterLines/Series have polar-valid extraction today; continuous " *
                     "θ/r readout and grid/rect recipes are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
                 continue
