@@ -107,6 +107,7 @@ interface WglScreen {
         _width: number
         _height: number
         setViewport?: (x: number, y: number, w: number, h: number) => void
+        forceContextLoss?: () => void
     }
     px_per_unit: number
     root_scene: WglScene | null
@@ -240,6 +241,7 @@ interface Pool {
 }
 
 const lossListening = new WeakSet<HTMLCanvasElement>()
+const menuGuards = new WeakSet<HTMLCanvasElement>()
 let lossToken = 0
 
 function pool(): Pool {
@@ -373,7 +375,19 @@ function suspend(plot: Plot): void {
         const url = canvas.toDataURL("image/png")
         if (url) img.src = url
     } catch { /* a sized <img> still holds the box */ }
-    canvas.replaceWith(img)
+    // The still has to be in the host before the context dies: WGLMakie's lost
+    // handler removes the canvas, and a removed canvas with no sibling collapses the cell.
+    canvas.insertAdjacentElement("beforebegin", img)
+    plot.host.masqueRetargetBase?.(img)
+    // Removing the canvas does not drop its WebGL context. WGLMakie only calls
+    // forceContextLoss from check_screen, on a later frame. The next plot's
+    // setup_scene_init would then be the one past the browser cap.
+    try {
+        ;(canvas as WglCanvas).wglmakie_screen?.renderer.forceContextLoss?.()
+    } catch (e) {
+        console.error("[masque-wgl] forceContextLoss failed", e)
+    }
+    if (canvas.isConnected) canvas.remove()
     plot.canvas = null
     plot.placeholder = null
     plot.needsNewCanvas = true
@@ -410,6 +424,18 @@ function unexpectedLoss(plot: Plot, canvas: HTMLCanvasElement): void {
     armTimer(p)
 }
 
+// WGLMakie (`add_canvas_events`) and OrbitControls both preventDefault on contextmenu.
+// The overlay only lets that event reach the canvas while a right-click is passing
+// through, and the browser menu is the point of that pass-through. A capture listener
+// runs before those bubble listeners and drops their preventDefault; the event still bubbles.
+function keepContextMenu(canvas: HTMLCanvasElement): void {
+    if (menuGuards.has(canvas)) return
+    menuGuards.add(canvas)
+    canvas.addEventListener("contextmenu", (event) => {
+        event.preventDefault = () => {}
+    }, true)
+}
+
 function watchLoss(plot: Plot, canvas: HTMLCanvasElement, token: number): void {
     if (lossListening.has(canvas)) return
     lossListening.add(canvas)
@@ -426,6 +452,7 @@ function initPlot(p: Pool, plot: Plot): void {
     let lost = false
     try {
         const canvas = takeCanvas(plot)
+        keepContextMenu(canvas)
         watchLoss(plot, canvas, token)
         const wrapped = rewrap(plot.scene)
         plot.WGL.setup_scene_init(
@@ -506,9 +533,10 @@ function pump(): void {
 function observe(plot: Plot): void {
     const p = pool()
     if (typeof IntersectionObserver !== "function") {
-        // No viewport signal. Grant in registration order up to the budget; do not open
-        // a context per plot.
-        plot.visible = livePlots(p).length < p.budget
+        // No viewport signal. Treat every plot as wanted: the pump still grants only
+        // `budget` contexts, and the rest get the released-context note instead of an
+        // empty canvas that can never be granted later.
+        plot.visible = true
         return
     }
     if (!p.io) p.io = new IntersectionObserver((records) => {

@@ -301,7 +301,7 @@ describe("WebGL context pool", () => {
     }
 
     async function mod() {
-        return import(/* @vite-ignore */ bundleUrl) as Promise<{ inits: unknown[][] }>
+        return import(/* @vite-ignore */ bundleUrl) as Promise<{ inits: unknown[][]; trace: string[] }>
     }
 
     async function settle() {
@@ -384,6 +384,9 @@ describe("WebGL context pool", () => {
         expect(gone.host.querySelector("img.masque-webgl-base")).toBeTruthy()
         expect(gone.canvas.isConnected).toBe(false)
         expect(m.inits).toHaveLength(DEFAULT_CONTEXT_BUDGET + 1)
+        const lossAt = m.trace.indexOf("loss")
+        expect(lossAt).toBeGreaterThan(0)
+        expect(m.trace[lossAt + 1]).toBe("init")
         gone.host.getBoundingClientRect = () => ({
             left: 0, top: 0, width: 400, height: 100, right: 400, bottom: 100, x: 0, y: 0, toJSON() {},
         }) as DOMRect
@@ -434,6 +437,36 @@ describe("WebGL context pool", () => {
         await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: { tag: "mount" }, width: 80, height: 40 })
         await settle()
         expect(m.inits).toHaveLength(1)
+    })
+
+    it("lets a right-click reach the browser menu on a live canvas", async () => {
+        const { canvas } = at(0)
+        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 80, height: 40, visible: true })
+        canvas.addEventListener("contextmenu", (event) => { event.preventDefault() })
+        const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true })
+        canvas.dispatchEvent(event)
+        expect(event.defaultPrevented).toBe(false)
+    })
+
+    it("notes plots past the budget when there is no viewport observer", async () => {
+        const previous = globalThis.IntersectionObserver
+        globalThis.IntersectionObserver = undefined as unknown as typeof IntersectionObserver
+        try {
+            const m = await mod()
+            m.inits.length = 0
+            const widgets = []
+            for (let i = 0; i < DEFAULT_CONTEXT_BUDGET + 1; i++) widgets.push(at(0))
+            for (const w of widgets) {
+                await mountWebGL({ canvas: w.canvas, wglBundleUrl: bundleUrl, scene: { tag: "n" }, width: 40, height: 20 })
+            }
+            await settle()
+            expect(m.inits).toHaveLength(DEFAULT_CONTEXT_BUDGET)
+            const notes = document.querySelectorAll(".masque-webgl-placeholder")
+            expect(notes).toHaveLength(1)
+            expect(widgets[DEFAULT_CONTEXT_BUDGET].host.contains(notes[0])).toBe(true)
+        } finally {
+            globalThis.IntersectionObserver = previous
+        }
     })
 
     it("does not draw after the overlay has detached", async () => {

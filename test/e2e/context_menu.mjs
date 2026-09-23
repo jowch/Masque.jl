@@ -83,6 +83,9 @@ try {
 
   await page.evaluate(() => {
     window.__masqueMenu = [];
+    // Bubble, not capture. The canvas listeners that call preventDefault run at the
+    // target, after every capture listener, so a capture-phase read of defaultPrevented
+    // is still false and cannot see them.
     document.addEventListener("contextmenu", (e) => {
       const t = e.target;
       window.__masqueMenu.push({
@@ -90,7 +93,7 @@ try {
         prevented: e.defaultPrevented,
         src: t instanceof HTMLImageElement ? (t.currentSrc || t.src) : "",
       });
-    }, true);
+    });
   });
 
   const hostBox = async (key) => {
