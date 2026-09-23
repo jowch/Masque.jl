@@ -664,6 +664,20 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       }
       const host = document.querySelector(".ip-host");
       const idlePng = (host && host.querySelector("img") && host.querySelector("img").src) || "";
+      // innerHTML does not run scripts. A swapped cell can be another widget, so
+      // rebuild each inline script or the selected highlight never mounts.
+      function setCellHtml(el, html) {
+        el.innerHTML = html;
+        el.querySelectorAll("script").forEach(function (old) {
+          if (old.src) return;
+          const s = document.createElement("script");
+          for (let i = 0; i < old.attributes.length; i++) {
+            s.setAttribute(old.attributes[i].name, old.attributes[i].value);
+          }
+          s.text = old.textContent;
+          old.replaceWith(s);
+        });
+      }
       function applyFromHost(host) {
         const man = host && host.masqueManifest;
         const snaps = man && man.snapshots;
@@ -676,11 +690,11 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
           if (next && img.src !== next) img.src = next;
         }
         const out = document.getElementById("masque-out");
-        if (out && Array.isArray(snap.cells)) out.innerHTML = snap.cells.join("\\n");
+        if (out && Array.isArray(snap.cells)) setCellHtml(out, snap.cells.join("\\n"));
         if (snap.cells && !Array.isArray(snap.cells)) {
           Object.keys(snap.cells).forEach(function (id) {
             const el = document.querySelector('[data-masque-cell="' + id + '"]');
-            if (el) el.innerHTML = snap.cells[id];
+            if (el) setCellHtml(el, snap.cells[id]);
           });
         }
         return true;
