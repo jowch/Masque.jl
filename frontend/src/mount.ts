@@ -194,6 +194,18 @@ interface Mounted {
     cleanup: () => void
 }
 
+// Names shared with the WebGL shim (a separate bundle). No trailing underscore: esbuild
+// mangles those, and the two bundles are built apart.
+interface WebGLHost extends HTMLElement {
+    masqueRetargetBase?: (next: HTMLElement) => void
+    masqueFlushPending?: () => void
+    masquePendingFrame?: { input: Record<string, unknown>; r: FrameResponse } | null
+    masqueRequestLive?: () => void
+    masqueDetach?: () => void
+    masqueDead?: boolean
+    masqueWantsLive?: boolean
+}
+
 /**
  * Mount the interaction overlay.
  * @param scriptEl  the cell's <script> (its parent is the light-DOM host containing the <img>/<canvas> base)
@@ -202,12 +214,16 @@ interface Mounted {
  * @param requestFrame  per-frame callback, or null when this widget has none
  */
 export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: Promise<unknown>, requestFrame?: RenderFrame | null): Mounted {
-    const host = scriptEl.parentElement as HTMLElement | null
+    const hostEl = scriptEl.parentElement as WebGLHost | null
     // Image-px scale comes from manifest.width, not the element's intrinsic size, so a
     // <canvas> needs no sizer shim. The host is assumed to hold exactly one base element.
-    const base = host?.querySelector("img, canvas") as HTMLElement | null
+    // `let`: the WebGL scheduler swaps the canvas for a snapshot <img> (and back) and
+    // retargets this binding. Hover math reads `ctx.base_`, which tracks it.
+    const found = hostEl?.querySelector("img, canvas") as HTMLElement | null
     const noop: Mounted = { cleanup: () => {} }
-    if (!host || !base) return noop
+    if (!hostEl || !found) return noop
+    const host: WebGLHost = hostEl
+    let base: HTMLElement = found
 
     // The @bind target is the host element. Seed the same envelope Julia's `mount_envelope`
     // builds, or Pluto's mount-time read overwrites `initial_value`. A selects-elements widget
@@ -345,17 +361,40 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         masqueFlushPending?: () => void
         masquePendingFrame?: { input: Record<string, unknown>; r: FrameResponse } | null
     }
+    type PendingFrame = { input: Record<string, unknown>; r: FrameResponse }
+    // The pending frame lives on the host. The canvas element is replaced on suspend/resume,
+    // so a stash on the canvas would be thrown away with it. The canvas mirror exists so a
+    // replacer installed on the current canvas can still see the same object.
+    const mirrorPending = (pending: PendingFrame | null) => {
+        if (base instanceof HTMLCanvasElement) (base as GestureCanvas).masquePendingFrame = pending
+    }
+    const takePending = (): PendingFrame | null => {
+        const pending = host.masquePendingFrame ?? null
+        host.masquePendingFrame = null
+        mirrorPending(null)
+        return pending
+    }
+    host.masqueFlushPending = () => {
+        const pending = takePending()
+        if (!pending) return
+        applyFrame(pending.input, pending.r)
+    }
+    if (!host.masqueRequestLive) host.masqueRequestLive = () => { host.masqueWantsLive = true }
     if (base instanceof HTMLCanvasElement) {
         const canvas = base as GestureCanvas
-        canvas.masqueFlushPending = () => {
-            const pending = canvas.masquePendingFrame
-            if (!pending) return
-            canvas.masquePendingFrame = null
-            applyFrame(pending.input, pending.r)
-        }
+        canvas.masqueFlushPending = () => { host.masqueFlushPending?.() }
     }
 
     function applyFrame(input: Record<string, unknown>, r: FrameResponse): void {
+        const canvas = base instanceof HTMLCanvasElement ? base as GestureCanvas : null
+        const live = canvas != null && typeof canvas.masqueReplaceScene === "function"
+        if (r.scene != null && !live) {
+            const pending = { input, r }
+            host.masquePendingFrame = pending
+            mirrorPending(pending)
+            host.masqueRequestLive?.()
+            return
+        }
         if (base instanceof HTMLImageElement && r.png) {
             // `r.png` decodes off `with_js_link` as a plain (never Shared) ArrayBuffer-backed
             // Uint8Array, but its TS type is the generic `Uint8Array<ArrayBufferLike>` — narrower
@@ -365,14 +404,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             lastFrameUrl = url
             base.src = url
             if (prev) URL.revokeObjectURL(prev) // revoke the PREVIOUS url, not this one, mid-gesture
-        } else if (base instanceof HTMLCanvasElement && r.scene != null) {
-            const canvas = base as GestureCanvas
-            if (typeof canvas.masqueReplaceScene !== "function") {
-                canvas.masquePendingFrame = { input, r }
-                return
-            }
+        } else if (live && canvas && r.scene != null) {
             try {
-                canvas.masqueReplaceScene(r.scene, r.pxPerUnit, r.width, r.height)
+                canvas.masqueReplaceScene?.(r.scene, r.pxPerUnit, r.width, r.height)
             } catch (e) {
                 console.error("[masque] webgl gesture frame failed", e)
                 return
@@ -467,6 +501,23 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const overlayRO = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncOverlayToBase) : null
     overlayRO?.observe(host)
     overlayRO?.observe(base)
+    host.masqueRetargetBase = (next: HTMLElement) => {
+        if (next === base) {
+            syncOverlayToBase()
+            return
+        }
+        mirrorPending(null)
+        overlayRO?.unobserve(base)
+        base = next
+        ctx.base_ = next
+        if (base instanceof HTMLCanvasElement) {
+            const canvas = base as GestureCanvas
+            canvas.masqueFlushPending = () => { host.masqueFlushPending?.() }
+            canvas.masquePendingFrame = host.masquePendingFrame ?? null
+        }
+        overlayRO?.observe(base)
+        syncOverlayToBase()
+    }
     window.addEventListener("resize", syncOverlayToBase)
     let overlayFrames = 0
     const overlayTick = () => {
@@ -526,6 +577,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         channel.dispose() // abandon anything in flight — a late response must not touch a dead DOM
         if (lastFrameUrl) URL.revokeObjectURL(lastFrameUrl)
         shadowHost.remove()
+        host.masqueDead = true
+        host.masqueDetach?.()
     }
     invalidation?.then(cleanup)
     return { cleanup }

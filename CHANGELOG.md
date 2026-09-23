@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- `:webgl` keeps at most 8 live WebGL contexts. A plot outside the viewport is drawn when
+  it scrolls into view. Past 8 on screen at once, the extras show a note instead of the
+  browser blanking an arbitrary canvas. `:cairo` is unchanged.
 - Hovering or focusing a legend entry no longer shows a tooltip. The label is already drawn
   in the row, and the card covered the entries around it. Pass `tooltip = masque"..."` to show
   one (fields: `label`, `group`, `targets`). Omitting `tooltip` and `tooltip = false` both
