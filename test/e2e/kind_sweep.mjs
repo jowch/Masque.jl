@@ -385,8 +385,15 @@ try {
     // either way). At most one of {fill|edge} vs. plain is populated for a given hit; an open
     // seg or an already-selected mark can leave fill/edge both empty.
     const svgFill = sr.querySelector("svg.masque-fill"), svgEdge = sr.querySelector("svg.masque-edge"), svgPlain = sr.querySelector("svg.masque-plain");
+    // Legend, colorbar, and axis rings live in g.masque-fixed, a sibling of the photograph
+    // clip. The data g.hi is created first and is empty for those hits.
+    const groupWithChild = (svg, sel) => {
+      const groups = [...(svg?.querySelectorAll(sel) ?? [])];
+      return groups.find((g) => g.firstElementChild) ?? groups[0] ?? null;
+    };
+    const childCount = (svg, sel) => [...(svg?.querySelectorAll(sel) ?? [])].reduce((n, g) => n + g.children.length, 0);
     const capture = (svg, layerName) => {
-      const el = svg?.querySelector("g.hi")?.firstElementChild;
+      const el = groupWithChild(svg, "g.hi")?.firstElementChild;
       if (!el) return null;
       const cs = getComputedStyle(el);
       return {
@@ -405,9 +412,7 @@ try {
       show: tip?.classList.contains("show"),
       text: (tip?.innerText || "").replace(/\s+/g, " ").trim(),
       hi: { fill: capture(svgFill, "fill"), edge: capture(svgEdge, "edge"), plain: capture(svgPlain, "plain") },
-      sel: (svgFill?.querySelector("g.sel")?.children.length ?? 0)
-        + (svgEdge?.querySelector("g.sel")?.children.length ?? 0)
-        + (svgPlain?.querySelector("g.sel")?.children.length ?? 0),
+      sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel"),
     };
   }, [key, x, y, type]);
 
