@@ -690,6 +690,41 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test L2.payloads[1].low < 0.5
     end
 
+    # A holed element is a flat list of rings, so `length` is the ring count. Several holes in one
+    # band, and an island that is its own solid element. Pointer checks, including a dented ring,
+    # live in test/e2e/contourf_complex.mjs.
+    _ringcount(elem) = first(elem) isa Real ? 1 : length(elem)
+    @testset "Contourf holes on busier fields" begin
+        using Masque: PolygonInteractable
+        # Three narrow peaks on a shared pedestal: one band carries several holes.
+        fig = Figure(); ax = Axis(fig[1, 1])
+        xs = range(-3, 3, length = 80)
+        ys = range(-3, 3, length = 80)
+        centers = [(0.85, 0.0), (-0.42, 0.73), (-0.42, -0.73)]
+        z = [
+            0.22 * exp(-(x^2 + y^2) / 6) +
+                sum(exp(-((x - cx)^2 + (y - cy)^2) / 0.18) for (cx, cy) in centers)
+                for x in xs, y in ys
+        ]
+        contourf!(ax, xs, ys, z; levels = [0.12, 0.28, 0.65])
+        _, _, ctx = ctx_for(fig)
+        ped = only(hitlayers(PolygonInteractable(ax, ax.scene.plots[1]), ctx))
+        @test length(ped.geometry) == length(ped.payloads)
+        @test maximum(_ringcount, ped.geometry) >= 4          # exterior + at least 3 holes
+
+        # A ring with a central bump of the same band: the bump is its own solid element.
+        figb = Figure(); axb = Axis(figb[1, 1])
+        xb = range(-3, 3, length = 70)
+        yb = range(-3, 3, length = 70)
+        zb = [exp(-((hypot(x, y) - 1.6)^2) / 0.1) + 0.35 * exp(-(x^2 + y^2) / 0.15) for x in xb, y in yb]
+        contourf!(axb, xb, yb, zb; levels = [0.15, 0.4, 0.8])
+        _, _, cb = ctx_for(figb)
+        bump = only(hitlayers(PolygonInteractable(axb, axb.scene.plots[1]), cb))
+        @test any(e -> _ringcount(e) == 1, bump.geometry)
+        @test any(e -> _ringcount(e) > 1, bump.geometry)
+        @test length(bump.geometry) == length(bump.payloads)
+    end
+
     @testset "BoxPlot extraction" begin
         using Masque: RectInteractable, PolygonInteractable, auto_interactables
         import Statistics
