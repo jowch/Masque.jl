@@ -954,6 +954,35 @@ describe("right-click passes through to the base image", () => {
         expect(surface.classList.contains("passthrough")).toBe(false)
     })
 
+    it("restores hit-testing on pointercancel", () => {
+        const spec = dragManifests()[0]
+        const { script } = setup()
+        mount(script, spec.manifest)
+        const surface = shadowOf(script.parentElement as HTMLElement).querySelector(".surface") as HTMLElement
+        rightDown(surface, spec.x, spec.y)
+        expect(surface.classList.contains("passthrough")).toBe(true)
+        window.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 4, bubbles: true }))
+        expect(surface.classList.contains("passthrough")).toBe(false)
+    })
+
+    it("restores hit-testing when neither menu nor pointerup arrives", () => {
+        const spec = dragManifests()[0]
+        const { script } = setup()
+        mount(script, spec.manifest)
+        const surface = shadowOf(script.parentElement as HTMLElement).querySelector(".surface") as HTMLElement
+        vi.useFakeTimers()
+        try {
+            rightDown(surface, spec.x, spec.y)
+            expect(surface.classList.contains("passthrough")).toBe(true)
+            vi.advanceTimersByTime(999)
+            expect(surface.classList.contains("passthrough")).toBe(true)
+            vi.advanceTimersByTime(1)
+            expect(surface.classList.contains("passthrough")).toBe(false)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it("a left click still round-trips after the menu gesture", async () => {
         const { host, script } = setup()
         mount(script, manifest)
@@ -987,9 +1016,19 @@ describe("right-click passes through to the base image", () => {
         Object.defineProperty(navigator, "userAgentData", { configurable: true, value: { platform: "macOS" } })
         try {
             const spec = dragManifests()[0]
-            const { script } = setup()
-            mount(script, spec.manifest)
-            const surface = shadowOf(script.parentElement as HTMLElement).querySelector(".surface") as HTMLElement
+            const { host, script } = setup()
+            const scaling = spec.manifest.scaling
+            mount(script, {
+                ...spec.manifest,
+                layers: [
+                    ...spec.manifest.layers,
+                    { id: "pts", kind: "circles", axis: "ax1", events: ["click"], payloads: [{ i: 0 }],
+                        geometry: [spec.x * scaling, spec.y * scaling, 20] },
+                ],
+            })
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            let fired = false
+            host.addEventListener("input", () => { fired = true })
             const down = new PointerEvent("pointerdown", {
                 button: 0, buttons: 1, ctrlKey: true, pointerId: 4,
                 clientX: spec.x, clientY: spec.y, bubbles: true, cancelable: true,
@@ -1001,6 +1040,14 @@ describe("right-click passes through to the base image", () => {
             expect(surface.hasPointerCapture(4)).toBe(false)
             await flushMenu()
             expect(surface.classList.contains("passthrough")).toBe(false)
+            surface.dispatchEvent(new MouseEvent("click", {
+                button: 0, ctrlKey: true, clientX: spec.x, clientY: spec.y, bubbles: true,
+            }))
+            expect(fired).toBe(false)
+            surface.dispatchEvent(new MouseEvent("click", {
+                button: 0, clientX: spec.x, clientY: spec.y, bubbles: true,
+            }))
+            expect(fired).toBe(true)
         } finally {
             if (prev === undefined) delete nav.userAgentData
             else Object.defineProperty(navigator, "userAgentData", { configurable: true, value: prev })

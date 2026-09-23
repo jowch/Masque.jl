@@ -77,7 +77,7 @@ function isApplePlatform(): boolean {
     return /Mac|iPhone|iPad|iPod/.test(navigator.platform)
 }
 
-function isMacContextClick(e: PointerEvent): boolean {
+function isMacContextClick(e: { button: number; ctrlKey: boolean }): boolean {
     return e.button === 0 && e.ctrlKey && isApplePlatform()
 }
 
@@ -303,6 +303,8 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
 
 export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
     if (state.justDragged_) { state.justDragged_ = false; return }
+    // Chromium still dispatches click after a Mac ctrl-click.
+    if (isMacContextClick(e)) return
     const p = imgPx(ctx.base_, ctx.manifest_, e)
     const hit = hitTest(ctx.manifest_, p.x, p.y, "click")
     if (!hit) return // miss = no-op, no round-trip
