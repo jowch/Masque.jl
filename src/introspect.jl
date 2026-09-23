@@ -885,13 +885,11 @@ end
 function _slice_parts(p)
     if p isa Makie.Lines
         xs, ys = _slice_xy(_conv(p)[1])
-        _flip_if_decreasing!(xs, ys, :vertical)
         lab = _slice_label(p)
         return :vertical, [(; id = _slice_ident_id(lab), label = lab, color = _slice_color(p), x = xs, y = ys)], :lines
     elseif p isa Makie.Stairs
         line = _childof(p, Makie.Lines)
         xs, ys = _slice_xy(_conv(line)[1])
-        _flip_if_decreasing!(xs, ys, :vertical)
         lab = _slice_label(p)
         col = _slice_color(p)
         col === nothing && (col = _slice_color(line))
@@ -903,7 +901,6 @@ function _slice_parts(p)
         for c in children
             line = _series_line(c)
             xs, ys = _slice_xy(_conv(line)[1])
-            _flip_if_decreasing!(xs, ys, :vertical)
             lab = _slice_label(c)
             push!(series, (; id = _slice_ident_id(lab), label = lab, color = _slice_color(line), x = xs, y = ys))
         end
@@ -913,7 +910,6 @@ function _slice_parts(p)
         orient = band.direction[] === :y ? :horizontal : :vertical
         _lower, upper = _conv(band)
         xs, ys = _slice_xy(upper)
-        _flip_if_decreasing!(xs, ys, orient)
         lab = _slice_label(p)
         col = _slice_color(p)
         col === nothing && (col = _slice_color(band))
@@ -984,6 +980,9 @@ function SliceInteractable(
         orientation
     end
     cover_ids = covers === nothing ? _slice_cover_ids(stems) : covers
+    for s in series
+        _flip_if_decreasing!(s.x, s.y, orient)
+    end
     return SliceInteractable(ax; series, orientation = orient, crosshair, id, covers = cover_ids, tooltip)
 end
 

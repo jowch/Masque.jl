@@ -187,6 +187,16 @@ end
         @test dens.series[1].id === :kde
         @test length(dens.series[1].x) >= 2
         @test issorted(dens.series[1].x, lt = <)
+        left = lines!(axp, [2.0, 1.0, 0.0], [0.0, 1.0, 0.0])
+        flipped = SliceInteractable(axp, left; covers = ())
+        @test flipped.series[1].x == [0.0, 1.0, 2.0]
+        @test flipped.series[1].y == [0.0, 1.0, 0.0]
+        hy = [0.0, 1.0, 2.0, 3.0, 4.0]
+        horiz = lines!(axp, 4 .- hy, hy)
+        hs = SliceInteractable(axp, horiz; orientation = :horizontal, covers = ())
+        @test hs.orientation === :horizontal
+        @test hs.series[1].y == hy
+        @test hs.series[1].x == 4 .- hy
         back = lines!(axp, [0.0, 1.0, 0.5], [0.0, 1.0, 0.5])
         @test_throws ArgumentError SliceInteractable(axp, back)
         sc = scatter!(axp, [1.0], [1.0])
