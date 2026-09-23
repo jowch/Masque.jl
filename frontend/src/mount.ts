@@ -460,6 +460,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
 
     function applyFrame(input: Record<string, unknown>, r: FrameResponse): void {
+        // A wheel-settle timer can resolve after happy-dom tears the test environment down.
+        // `instanceof HTMLCanvasElement` throws ReferenceError once that constructor is gone,
+        // so a frame for a dead widget is dropped instead of applied.
+        if (host.masqueDead || typeof HTMLCanvasElement !== "function") {
+            channel.dispose()
+            return
+        }
         const canvas = base instanceof HTMLCanvasElement ? base as GestureCanvas : null
         const live = canvas != null && typeof canvas.masqueReplaceScene === "function"
         if (r.scene != null && !live) {
@@ -857,7 +864,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // and support multiple selected indices (drawHi keeps only the last).
     if (state.selHits_.length) renderSelection(ctx, state)
 
+    let cleaned = false
     const cleanup = () => {
+        // Pluto invalidation and a test teardown can both call this. The second call must
+        // not revoke the blob URL again or deliver a frame the first call already dropped.
+        if (cleaned) return
+        cleaned = true
         loadToken += 1
         surface.removeEventListener("pointerdown", down)
         surface.removeEventListener("wheel", onWheel)

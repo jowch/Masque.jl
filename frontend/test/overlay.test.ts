@@ -1,6 +1,18 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from "vitest"
-import { mount } from "../src/overlay"
+import { afterEach, describe, it, expect, vi } from "vitest"
+import { mount as mountOverlay } from "../src/overlay"
+
+// Each mount's wheel-settle timer and in-flight frame outlive the test. happy-dom then
+// deletes HTMLCanvasElement, and the late frame throws. Cleanup runs before that teardown.
+const mountedCleanups: Array<() => void> = []
+afterEach(() => {
+    while (mountedCleanups.length) mountedCleanups.pop()!()
+})
+function mount(...args: Parameters<typeof mountOverlay>): ReturnType<typeof mountOverlay> {
+    const mounted = mountOverlay(...args)
+    mountedCleanups.push(mounted.cleanup)
+    return mounted
+}
 import { mapPoint, unmapPoint } from "../src/photo"
 import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
@@ -3473,6 +3485,26 @@ describe("photographic pan / wheel zoom", () => {
         expect((host as HTMLElement & { masqueDead?: boolean }).masqueDead).toBe(true)
         expect(host.dataset.masqueGestureFrame).toBeUndefined()
         expect(host.dataset.masquePhoto ?? "").toBe("")
+    })
+
+    it("a frame that lands after the canvas constructor is gone is not applied", async () => {
+        const { host, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, viewManifest("pan"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        const saved = globalThis.HTMLCanvasElement
+        Object.defineProperty(globalThis, "HTMLCanvasElement", { value: undefined, configurable: true })
+        try {
+            release({ png: new Uint8Array([1]), manifest: viewManifest("pan") })
+            await Promise.resolve()
+            await Promise.resolve()
+            expect(host.dataset.masqueGestureFrame).toBeUndefined()
+        } finally {
+            Object.defineProperty(globalThis, "HTMLCanvasElement", { value: saved, configurable: true })
+        }
     })
 
     it("an image error clears the photographic matrix", async () => {
