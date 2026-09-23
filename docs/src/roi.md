@@ -123,11 +123,11 @@ elseif isempty(picks)
     md"*No stations in the box.*"
 else
     rows = samples[picks]
-    lines = ["| Station | x | y | Group |", "|---|---:|---:|---|"]
+    md_rows = ["| Station | x | y | Group |", "|---|---:|---:|---|"]
     for r in rows
-        push!(lines, "| $(r.name) | $(r.x) | $(r.y) | $(r.group) |")
+        push!(md_rows, "| $(r.name) | $(r.x) | $(r.y) | $(r.group) |")
     end
-    Markdown.parse("**$(length(rows)) stations**\n\n" * join(lines, "\n"))
+    Markdown.parse("**$(length(rows)) stations**\n\n" * join(md_rows, "\n"))
 end
 ```
 
@@ -166,11 +166,11 @@ elseif isempty(picks)
     md"*No stations in the box.*"
 else
     rows = table[picks, :]
-    lines = ["| Station | x | y | Group |", "|---|---:|---:|---|"]
+    md_rows = ["| Station | x | y | Group |", "|---|---:|---:|---|"]
     for r in eachrow(rows)
-        push!(lines, "| $(r.name) | $(r.x) | $(r.y) | $(r.group) |")
+        push!(md_rows, "| $(r.name) | $(r.x) | $(r.y) | $(r.group) |")
     end
-    Markdown.parse("**$(nrow(rows)) stations**\n\n" * join(lines, "\n"))
+    Markdown.parse("**$(nrow(rows)) stations**\n\n" * join(md_rows, "\n"))
 end
 ```
 
