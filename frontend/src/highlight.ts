@@ -171,7 +171,9 @@ export function clearHi(state: OverlayState, hiGroups: HiGroups, fade = false): 
         clearHiImmediate(state, hiGroups)
         return
     }
-    state.hiKey_ = null
+    // Keep hiKey_ until the nodes are gone. drawSelection reconciles from it, and nulling
+    // it here left a mid-leave ring sitting on the new selected chrome for MOTION_MS (#97).
+    const fadingKey = state.hiKey_
     for (const hiGroup of [hiGroups.fill_, hiGroups.edge_, hiGroups.plain_]) {
         for (const el of [...hiGroup.children]) {
             el.classList.remove("masque-enter")
@@ -184,6 +186,7 @@ export function clearHi(state: OverlayState, hiGroups: HiGroups, fade = false): 
         for (const hiGroup of [hiGroups.fill_, hiGroups.edge_, hiGroups.plain_]) {
             while (hiGroup.firstChild) hiGroup.removeChild(hiGroup.firstChild)
         }
+        if (state.hiKey_ === fadingKey) state.hiKey_ = null
     }, MOTION_MS)
 }
 
@@ -198,8 +201,9 @@ export function clearSel(selGroups: HiGroups): void {
 // added emphasis — the selected wash/ring already shows this element. The tooltip is unaffected;
 // callers (hover.ts, keyboard.ts) show it via a separate call. This is the draw-time half of the
 // guard; the other direction — a hover/focus ring already on-screen when its key ENTERS the
-// selection (e.g. a selects-ROI sweeping over a keyboard-focused mark) — is reconciled by
-// drawSelection below, which clears the stale hiGroups the moment the key becomes selected.
+// selection, including one mid-leave (clearHi keeps hiKey_ until those nodes are gone) — is
+// reconciled by drawSelection below, which clears the stale hiGroups the moment the key
+// becomes selected.
 export function drawHi(state: OverlayState, hiGroups: HiGroups, hit: Hit): void {
     const key = hitKey(hit)
     if (state.selKeys_.has(key)) { clearHiImmediate(state, hiGroups); return }
@@ -284,9 +288,9 @@ export function drawSelection(state: OverlayState, selGroups: HiGroups, hits: Hi
         if (made.plain) { if (enter) made.plain.classList.add("masque-enter"); selGroups.plain_.appendChild(made.plain) }
     }
     state.selKeys_ = next
-    // A hover/focus ring already on-screen when its key enters selection (e.g. a selects-ROI
-    // sweeping over a keyboard-focused mark) would otherwise sit on top of the wash just drawn
-    // above until the next pointermove self-heals it via drawHi's own guard — clear it now so the
+    // A hover/focus ring already on-screen when its key enters selection — live, or mid-leave,
+    // since hiKey_ still names those nodes — would otherwise sit on top of the wash just drawn
+    // above until the next pointermove self-heals it via drawHi's own guard. Clear it now so the
     // stale chrome never paints, mid-sweep included.
     if (state.hiKey_ !== null && next.has(state.hiKey_)) clearHiImmediate(state, hiGroups)
 }
