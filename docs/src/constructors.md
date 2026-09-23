@@ -276,7 +276,8 @@ PolarAxis yes-or-no, and for types that are skipped, see
 | [`SliceInteractable`](@ref) | `(ax, plot)` or `(ax; series, orientation=:vertical, crosshair=true, id=:slice, covers=(), tooltip=nothing)` | none — hover only | `:slice` | [Sample a series](@ref) |
 
 `value=` on a threshold accepts a number or a [`ThresholdEvent`](@ref).
-`value=` on a colorbar accepts a number or a [`ColorbarEvent`](@ref).
+A colorbar click is a [`ColorbarEvent`](@ref) with `pick.value`.
+`ColorbarInteractable` takes the colorbar and `id` only.
 `bounds=` accepts a 4-tuple or a [`BoundsEvent`](@ref).
 
 [`AxisInteractable`](@ref), [`ThresholdInteractable`](@ref),

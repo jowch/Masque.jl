@@ -19,13 +19,15 @@ Arrow keys and Home / End stop at the first and last element. They do
 not wrap.
 
 **Tab** focuses the surface. It does not land on an element. **Home**
-and the **first arrow** (either direction) land on index 0. If a legend
-exists, its entries are first in the manifest, so index 0 is the first
-legend entry. Page Down then steps from the legend into the plot
-layers. That order matches the pointer: a legend drawn on top of a plot
-takes the clicks under it. Focusing an entry draws highlight in the
-overlay on the trace it labels, the same as holding the pointer over
-it. For more information, see [Legend](@ref).
+and the **first arrow** (either direction) land on the first focusable
+element. If a legend exists, its entries come first, so that element is
+the first legend entry. The announcement numbers it "element 1" of its
+layer, the same 1-based index `selected=` uses. `selected = 0` is out
+of range. Page Down then steps from the legend into the plot layers.
+That order matches the pointer: a legend drawn on top of a plot takes
+the clicks under it. Focusing an entry draws highlight in the overlay
+on the trace it labels, the same as holding the pointer over it. For
+more information, see [Legend](@ref).
 
 Moving focus draws the same highlight in the overlay as holding the
 pointer over the mark (there is never a separate focus look). A layer

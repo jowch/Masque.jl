@@ -40,9 +40,10 @@ one yourself when you are not using `masque(fig)`. See
 
 ## Variations
 
-Pass `value=` to put the readout back at a number, or pass a
-`ColorbarEvent`. The heatmap cells are a separate layer. Hovering a
-cell is the grid readout, not the bar.
+A click is a [`ColorbarEvent`](@ref). `pick.value` is the data value
+under the pointer. `ColorbarInteractable` takes the bar and `id` only,
+so there is no `value=` to reopen a position. The heatmap cells are a
+separate layer. Hovering a cell is the grid readout, not the bar.
 
 !!! note
 

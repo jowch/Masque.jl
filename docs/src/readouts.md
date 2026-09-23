@@ -63,8 +63,9 @@ Replace the previous `fig` and `@bind pick` cells.
 
 [`ColorbarInteractable`](@ref) is one hit region on the bar's pixel box.
 The layer kind is `:axis` with a bbox. Default `id` is `:colorbar`.
-`pick` is a [`ColorbarEvent`](@ref). `pick.value` is the data value.
-Pass `pick` back as `value=` when a remount should open on that value.
+`pick` is a [`ColorbarEvent`](@ref). `pick.value` is the data value
+under the pointer. A remount does not reopen a previous readout:
+`ColorbarInteractable` stores no position.
 
 `masque(fig)` **does** install a `Colorbar` block. You can also pass the
 colorbar yourself so the heatmap cells are not in the same widget:
@@ -90,8 +91,8 @@ end
 ```
 
 Click the bar. `pick.value` is the data value under the pointer.
-The tooltip follows the pointer (`value=…`). Same invertible scales as
-the axis (`identity`, `log10`, `log`).
+The tooltip follows the pointer. Same invertible scales as the axis
+(`identity`, `log10`, `log`).
 
 ## Drag a threshold
 

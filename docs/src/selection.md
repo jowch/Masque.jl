@@ -48,10 +48,10 @@ widget mounts with those marks highlighted in the overlay:
 ```
 
 `selected = 1` and `selected = [1]` both mount as one
-[`ElementEvent`](@ref) for Tokyo. `selected = [1, 8]` highlights Tokyo
-and Beijing and leaves the bond `nothing`: this interaction returns one
-city, so a set is not a value it can hold. The next click replaces the
-highlight with that city.
+[`ElementEvent`](@ref) for the first mark. `selected = [1, 8]`
+highlights the first and eighth marks and leaves the bond `nothing`:
+this interaction returns one mark, so a set is not a value it can hold.
+The next click replaces the highlight with that mark.
 
 A `selects` ROI is the interaction that returns a vector. There,
 `selected = 1` and `selected = [1]` both mount as a one-element

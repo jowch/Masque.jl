@@ -160,7 +160,10 @@ try {
 
   const iframe = page.locator("#masque-gs-quickstart");
   await iframe.waitFor({ state: "attached", timeout: 20000 });
-  await iframe.scrollIntoViewIfNeeded();
+  // The quick start iframe is taller than the viewport, and Documenter
+  // keeps shifting layout while fonts and the theme settle. Playwright's
+  // actionability check then never calls the iframe stable.
+  await iframe.evaluate((el) => el.scrollIntoView({ block: "center", inline: "nearest" }));
   const handle = await iframe.elementHandle();
   let frame = null;
   const frameDeadline = Date.now() + 20000;
