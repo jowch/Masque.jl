@@ -43,7 +43,8 @@ export interface SliceSeries {
 }
 
 export interface SliceGeometry {
-    orientation: "v" | "h" // which data coordinate is the probe (both cross arms still draw)
+    orientation: "v" | "h" // which data coordinate is the probe, and which single hair is drawn
+    crosshair?: boolean    // true draws that one hair; false or absent draws none
     covers: string[]       // layer ids whose hover this slice replaces
     series: SliceSeries[]
 }

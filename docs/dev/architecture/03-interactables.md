@@ -97,8 +97,8 @@ The three M4 drag kinds — `:view`, `:threshold`, `:roi` — sit outside this s
 *control* geometry: one draggable region apiece, no elements, an empty `payloads`. The closed-set
 claim covers data geometry projected from a Makie surface. `:slice` sits outside hit testing
 too: `hitLayer` returns null. The layer carries data-space series for the client to sample,
-not a region. The crosshair arms are overlay chrome driven by the cursor, not geometry on
-this layer.
+not a region. Its `crosshair` and `orientation` fields tell the overlay whether to draw
+one hair, and which arm. A plot with no slice draws none.
 
 ## Built-in interactables (v1 + M3 + M4 drags + Phase 2 text labels)
 

@@ -48,8 +48,8 @@ purely declarative); selection round-trip and re-highlight; box-select via a `se
 and ROI drags; drag-to-pan/rotate and slider-driven view changes through `@bind` re-render;
 keyboard navigation and screen-reader announcements; the highlight (a brightening color-dodge
 fill plus a flat chrome edge stroke, not a mark-derived colour, with `scatter!`'s drawn
-radius replacing `markersize/2`); the overlay crosshair (both arms whenever the cursor is
-`crosshair`; discrete marks and the legend stay `pointer`) and `SliceInteractable` (hover-only
+radius replacing `markersize/2`); the overlay hairline (one arm, and only for a
+`SliceInteractable` with `crosshair=true`) and `SliceInteractable` (hover-only
 1-D sample, not auto-extracted, not a hit target); the `:cairo` (PNG) and `:webgl` (live canvas) backends behind
 one contract; a Documenter site with static notebook exports; and eight CI jobs covering Julia
 on two versions, the no-backend error path, the WGLMakie extension with its own real-browser

@@ -1,7 +1,7 @@
-// The overlay cross: both arms across the axis viewport (or colorbar bbox) under the pointer,
-// plus a filled dot where a SliceInteractable samples a series. Drawn on svg.masque-plain.
-// Each arm is a figure-background halo under a quieter hairline. Opacity fades only when the
-// cross turns on or off, not on each move.
+// The overlay guide for a SliceInteractable: one hairline (vertical or horizontal) across the
+// axis viewport under the pointer, plus a filled dot per sampled series. Drawn on
+// svg.masque-plain. The hair is a figure-background halo under a quieter stroke. Opacity fades
+// only when the guide turns on or off, not on each move. Plots without a slice draw nothing.
 import { SVG_NS } from "./highlight"
 import type { OverlayCtx, OverlayState } from "./state"
 
@@ -56,11 +56,23 @@ function place(line: SVGLineElement, x1: number, y1: number, x2: number, y2: num
     line.setAttribute("y2", String(y2))
 }
 
+function arm(lines: SVGLineElement[], on: boolean, x1: number, y1: number, x2: number, y2: number): void {
+    for (const line of lines) {
+        if (!on) {
+            line.style.display = "none"
+            continue
+        }
+        line.style.removeProperty("display")
+        place(line, x1, y1, x2, y2)
+    }
+}
+
 export function syncCross(
     ctx: OverlayCtx, state: OverlayState, show: boolean,
     vx0: number, vy0: number, vx1: number, vy1: number,
     hx0: number, hy0: number, hx1: number, hy1: number,
     dots: CrossDot[],
+    arms: { v: boolean; h: boolean },
 ): void {
     const g = ctx.cross_.g_
     if (show !== state.crossOn_) {
@@ -69,10 +81,8 @@ export function syncCross(
     }
     if (!show) return
     const c = ctx.cross_
-    place(c.vHalo_, vx0, vy0, vx1, vy1)
-    place(c.vHair_, vx0, vy0, vx1, vy1)
-    place(c.hHalo_, hx0, hy0, hx1, hy1)
-    place(c.hHair_, hx0, hy0, hx1, hy1)
+    arm([c.vHalo_, c.vHair_], arms.v, vx0, vy0, vx1, vy1)
+    arm([c.hHalo_, c.hHair_], arms.h, hx0, hy0, hx1, hy1)
     const dotsG = c.dots_
     while (dotsG.children.length > dots.length) dotsG.removeChild(dotsG.lastElementChild!)
     for (let i = 0; i < dots.length; i++) {

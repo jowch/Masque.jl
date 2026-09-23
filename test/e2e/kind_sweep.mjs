@@ -881,8 +881,8 @@ try {
       if (axisTip.hi.fill || axisTip.hi.edge || axisTip.hi.plain) {
         throw new Error(`${key}/axis-hover: unexpected highlight ${JSON.stringify(axisTip.hi)}`);
       }
-      if (!axisTip.cross) throw new Error(`${key}/axis-hover: cross should be on for an axis readout`);
-      passed.push(`${key}/cross-on`);
+      if (axisTip.cross) throw new Error(`${key}/axis-hover: a readout draws no hairline`);
+      passed.push(`${key}/cross-off`);
       passed.push(`${key}/axis-hover-coords`);
       await leave();
 
@@ -908,8 +908,8 @@ try {
       if (gotCb === null || Math.abs(gotCb - expCbVal) > tolCb) {
         throw new Error(`${key}/colorbar-hover: tooltip ${JSON.stringify(cbTip)} parsed=${gotCb}, want ≈${expCbVal} (±${tolCb.toFixed(4)})`);
       }
-      if (!cbTip.cross) throw new Error(`${key}/colorbar-hover: cross should be on for a colorbar readout`);
-      passed.push(`${key}/colorbar-cross-on`);
+      if (cbTip.cross) throw new Error(`${key}/colorbar-hover: a readout draws no hairline`);
+      passed.push(`${key}/colorbar-cross-off`);
       passed.push(`${key}/colorbar-hover-coords`);
 
       // The gap pixel must read as the axis catch-all's 2-D "x=…, y=…" text, not the colorbar's
@@ -1129,11 +1129,7 @@ try {
       assertRawColorMatch(lumBefore, expectColor, `${key}/tint-applied`);
       await dispatchAt(key, tintPt.x, tintPt.y, "pointermove");
       await new Promise((r) => setTimeout(r, 200)); // let the 80-120ms enter fade settle
-      // A grid hover draws both hairlines through the pointer. The 8px clip centred on
-      // that point includes the chrome stroke, which darkens a bright cell and hides the
-      // dodge brightening. Shift one quadrant into the cell; the hairlines stay at the pointer.
-      const clipPt = layer.kind === "grid" ? { x: tintPt.x + 16, y: tintPt.y + 16 } : tintPt;
-      const lumAfter = meanLuminance(PNG.sync.read(await stableClipShot(key, clipPt.x, clipPt.y)));
+      const lumAfter = meanLuminance(PNG.sync.read(await stableClipShot(key, tintPt.x, tintPt.y)));
       assertTintApplied(lumBefore, lumAfter, `${key}/tint-applied`);
       passed.push(`${key}/tint-applied`);
       await page.evaluate((k) => {
@@ -1159,9 +1155,8 @@ try {
       await new Promise((r) => setTimeout(r, 200));
     }
     if (!tipHit(tip)) throw new Error(`${key}: tooltip ${JSON.stringify(tip)}`);
-    const crossExpected = layer.kind === "grid";
-    if (!!tip.cross !== crossExpected) {
-      throw new Error(`${key}: cross ${tip.cross}, expected ${crossExpected} for kind ${layer.kind}`);
+    if (tip.cross) {
+      throw new Error(`${key}: a hairline drew without a slice (kind ${layer.kind})`);
     }
     passed.push(`${key}/cross`);
     // Open (edge-only, no fill shape) kinds are line-geometry layers (polyline/segments/lines);

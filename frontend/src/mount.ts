@@ -83,8 +83,9 @@ const STYLE = `
 .masque-cross { opacity: 0; transition: opacity ${MOTION_MS}ms ease-out; }
 .masque-cross.is-on { opacity: 1; }
 /* Halo first (figure background, wider), hairline on top at 80%. The fringe only shows where
-   the line crosses a mark; on the empty axis it matches the background. */
-.masque-cross-halo { stroke: var(--masque-fig-bg, #ffffff); stroke-width: 3; }
+   the line crosses a mark; on the empty axis it matches the background. The halo is 1.5px,
+   half the earlier 3px, so the guide stays a hairline. */
+.masque-cross-halo { stroke: var(--masque-fig-bg, #ffffff); stroke-width: 1.5; }
 .masque-cross-hair { stroke: var(--masque-cross, #b0b0b0); stroke-width: 1; stroke-opacity: 0.8; }
 .masque-cross circle { fill: var(--masque-cross, #b0b0b0); stroke: var(--masque-fig-bg, #ffffff); stroke-width: 1; }
 /* Default :focus-visible outline stays until a focus ring is actually drawn (kbd-ring, set by

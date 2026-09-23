@@ -24,8 +24,8 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
     hit half-size `handle` — the overlay paints the grip at a fixed 7 CSS px — or viewport +
     camera, respectively); not element-indexed
   - `:slice` — a `Dict` of data-space series to sample at the cursor (`SliceInteractable`);
-    not a hit target. The overlay cross is drawn whenever the cursor is `crosshair`, with or
-    without a slice
+    not a hit target. The overlay hair is drawn only when this layer's `crosshair` is true,
+    and only the arm named by `orientation`
 - `payloads::Vector{Any}` — one JSON-serializable entry per element, positional (`payloads[k]`
   binds element `k`); empty for the element-count-free kinds above.
 - `axis::Symbol` — the id of this layer's [`AxisTransform`](@ref) in
@@ -1396,13 +1396,14 @@ end
 
 # ============================ SliceInteractable ============================
 """
-    SliceInteractable(ax; series, orientation=:vertical, id=:slice, covers=(), tooltip=nothing)
-    SliceInteractable(ax, plot; orientation=nothing, id=:slice, covers=nothing, tooltip=nothing)
-    SliceInteractable(ax, plots; orientation=nothing, id=:slice, covers=nothing, tooltip=nothing)
+    SliceInteractable(ax; series, orientation=:vertical, crosshair=true, id=:slice, covers=(), tooltip=nothing)
+    SliceInteractable(ax, plot; orientation=nothing, crosshair=true, id=:slice, covers=nothing, tooltip=nothing)
+    SliceInteractable(ax, plots; orientation=nothing, crosshair=true, id=:slice, covers=nothing, tooltip=nothing)
 
-Sample one or more 1-D series at the cursor. The overlay already draws both crosshair arms
-whenever the cursor is `crosshair`; this interactable chooses which arm is the sample
-coordinate and adds a filled dot plus a live tooltip for each series. Hover only — nothing is
+Sample one or more 1-D series at the cursor and show that sample in the tooltip. `masque(fig)`
+does not add a slice, and a plot without one draws no hairline. This interactable draws one
+hair — vertical or horizontal, matching `orientation` — and a filled dot per series in support.
+`crosshair=false` keeps the dots and the tooltip and draws no hair. Hover only — nothing is
 committed. Produces one `:slice` [`HitLayer`](@ref), which is not a hit target.
 
 # Arguments
@@ -1412,10 +1413,12 @@ committed. Produces one `:slice` [`HitLayer`](@ref), which is not a hit target.
   increasing; for `:horizontal`, `y` is. A non-finite probe coordinate starts a new run, and
   a run of one point cannot be interpolated. A decreasing or repeated probe coordinate raises
   `ArgumentError`.
-- `orientation` — `:vertical` (sample `y` at the cursor's data `x`; the default) or
-  `:horizontal` (sample `x` at the cursor's data `y`). On the plot constructor, `nothing`
-  (the default) follows the plot: a `Density` or `Band` with `direction == :y` is
-  `:horizontal`, and everything else is `:vertical`.
+- `orientation` — `:vertical` (sample `y` at the cursor's data `x`, and draw the vertical hair;
+  the default) or `:horizontal` (sample `x` at the cursor's data `y`, and draw the horizontal
+  hair). On the plot constructor, `nothing` (the default) follows the plot: a `Density` or
+  `Band` with `direction == :y` is `:horizontal`, and everything else is `:vertical`.
+- `crosshair` — draw that one hair. `false` leaves the sample tooltip and the dots, with no
+  hair. Default `true`. A figure with no slice draws no hair either way.
 - `id` — the layer id. Default `:slice`.
 - `covers` — layer ids in the same `masque` call whose hover this slice replaces. Each must be
   a `:polygons` or `:lines` layer (`ArgumentError` otherwise). While the pointer is over one
@@ -1423,9 +1426,11 @@ committed. Produces one `:slice` [`HitLayer`](@ref), which is not a hit target.
   tooltip is the sample. Default `()` on the series constructor. On the plot constructor,
   `nothing` (the default) names that plot's auto-extract layer id (`:density`, `:lines`,
   `:series`, `:stairs`, `:band`, with `_2`, `_3`, … when a vector repeats a kind).
-- `tooltip` — `nothing` for the auto table of the live sample (the probe coordinate plus one
-  field per series id), `masque"…"` for a template over those same fields, or `false` to
-  suppress. `tooltip = true` is rejected (`ArgumentError`).
+- `tooltip` — what the card says while this slice is the thing under the pointer (a covered
+  layer, or empty axis interior inside at least one series). `nothing` is the auto table of the
+  live sample (the probe coordinate plus one field per series id), `masque"…"` is a template
+  over those same fields, and `false` suppresses the card. A marker that is not covered, and a
+  colorbar, keep their own tooltip. `tooltip = true` is rejected (`ArgumentError`).
 - `plot` / `plots` — a `Lines`, `Stairs`, `Series`, `Band`, or `Density`, or a vector of
   those. Vertices are the converted points those plots already draw. `Density` and `Band`
   contribute the band's upper curve. A vector becomes one slice; mixed orientations raise
@@ -1451,6 +1456,7 @@ struct SliceInteractable <: AbstractInteractable
     id::Symbol
     covers::Vector{Symbol}
     tooltip::Union{Nothing, Markup, Bool}
+    crosshair::Bool
 end
 
 function _slice_covers(covers)
@@ -1516,10 +1522,12 @@ function _slice_unique_ids(series)
 end
 
 function SliceInteractable(
-        ax; series, orientation = :vertical, id = :slice, covers = (), tooltip = nothing,
+        ax; series, orientation = :vertical, crosshair = true, id = :slice, covers = (), tooltip = nothing,
     )
     orientation in (:vertical, :horizontal) ||
         throw(ArgumentError("SliceInteractable: orientation must be :vertical or :horizontal, got $(orientation)"))
+    crosshair isa Bool ||
+        throw(ArgumentError("SliceInteractable: crosshair must be true or false, got $(crosshair)"))
     tooltip === true &&
         throw(ArgumentError("tooltip = true is not meaningful — omit `tooltip` for the auto table, pass masque\"…\" for a template, or `false` to suppress."))
     series isa AbstractVector || throw(ArgumentError("SliceInteractable: series must be a vector, got $(typeof(series))"))
@@ -1534,7 +1542,7 @@ function SliceInteractable(
             )
         )
     end
-    return SliceInteractable(ax, orientation, unique_series, Symbol(id), _slice_covers(covers), tooltip)
+    return SliceInteractable(ax, orientation, unique_series, Symbol(id), _slice_covers(covers), tooltip, crosshair)
 end
 
 events(::SliceInteractable) = (:hover,)
@@ -1579,6 +1587,7 @@ function hitlayers(i::SliceInteractable, ctx)
     end
     geom = Dict{String, Any}(
         "orientation" => orient,
+        "crosshair" => i.crosshair,
         "covers" => [string(c) for c in i.covers],
         "series" => series,
     )

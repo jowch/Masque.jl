@@ -47,6 +47,7 @@ end
         @test L.events == (:hover,)
         g = L.geometry
         @test g["orientation"] == "v"
+        @test g["crosshair"] == true
         @test g["covers"] == String[]
         @test length(g["series"]) == 2
         a = g["series"][1]
@@ -78,6 +79,15 @@ end
         @test _lerp_probe(xy, 0.5) ≈ 0.5
         @test _lerp_probe(xy, 2.0) === nothing
         @test _lerp_probe(xy, 3.5) ≈ 3.5
+        off = SliceInteractable(
+            ax; crosshair = false,
+            series = [(; id = :a, x = [0.0, 1.0], y = [0.0, 1.0])],
+        )
+        @test off.crosshair == false
+        @test only(hitlayers(off, ctx)).geometry["crosshair"] == false
+        @test_throws ArgumentError SliceInteractable(
+            ax; crosshair = :no, series = [(; id = :a, x = [0.0, 1.0], y = [0.0, 1.0])],
+        )
     end
 
     @testset "construction fails loud" begin

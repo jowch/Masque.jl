@@ -940,7 +940,7 @@ function _slice_cover_ids(stems)
 end
 
 """
-    SliceInteractable(ax, plot; orientation=nothing, id=:slice, covers=nothing, tooltip=nothing)
+    SliceInteractable(ax, plot; orientation=nothing, crosshair=true, id=:slice, covers=nothing, tooltip=nothing)
     SliceInteractable(ax, plots; ...)
 
 One slice from a `Lines`, `Stairs`, `Series`, `Band`, or `Density`, or from a vector of those.
@@ -952,7 +952,7 @@ A vector that mixes those raises `ArgumentError` unless `orientation` is passed.
 """
 function SliceInteractable(
         ax, plots::AbstractVector;
-        orientation = nothing, id = :slice, covers = nothing, tooltip = nothing,
+        orientation = nothing, crosshair = true, id = :slice, covers = nothing, tooltip = nothing,
     )
     isempty(plots) && throw(ArgumentError("SliceInteractable: plots is empty"))
     series = NamedTuple[]
@@ -984,9 +984,9 @@ function SliceInteractable(
         orientation
     end
     cover_ids = covers === nothing ? _slice_cover_ids(stems) : covers
-    return SliceInteractable(ax; series, orientation = orient, id, covers = cover_ids, tooltip)
+    return SliceInteractable(ax; series, orientation = orient, crosshair, id, covers = cover_ids, tooltip)
 end
 
-function SliceInteractable(ax, p; orientation = nothing, id = :slice, covers = nothing, tooltip = nothing)
-    return SliceInteractable(ax, [p]; orientation, id, covers, tooltip)
+function SliceInteractable(ax, p; orientation = nothing, crosshair = true, id = :slice, covers = nothing, tooltip = nothing)
+    return SliceInteractable(ax, [p]; orientation, crosshair, id, covers, tooltip)
 end
