@@ -999,7 +999,7 @@ try {
       passed.push(`${key}/selected-wash`);
     } else if (spec.selected === "ring") {
       const ring = m.kids.find((k) => k.kind === "ring");
-      assertRing(ring, key);
+      assertRing(ring, key, wantDark);
       if (layer.kind === "lines") {
         assertPathCovers(ring.paths[0].d, layer.geometry[spec.selectedIndex], `${key}/selected-ring`);
       } else {
@@ -1396,7 +1396,7 @@ try {
         } else if (tl0.kind === "polyline" || tl0.kind === "segments") {
           const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
           if (!ringKid) throw new Error(`${key}/links[${c.index}]: no ring in g.link`);
-          assertRing(ringKid, `${key}/links[${c.index}]/ring`);
+          assertRing(ringKid, `${key}/links[${c.index}]/ring`, wantDark);
           const ln = ringKid.lines[0];
           if (Math.abs(Number(ln.x1) - hp0.x1) > 1.2 || Math.abs(Number(ln.y1) - hp0.y1) > 1.2) {
             throw new Error(`${key}/links[${c.index}]: link ring off-mark ${JSON.stringify(ln)} vs ${JSON.stringify(hp0)}`);
@@ -1404,7 +1404,7 @@ try {
         } else if (tl0.kind === "lines") {
           const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
           if (!ringKid) throw new Error(`${key}/links[${c.index}]: no ring in g.link`);
-          assertRing(ringKid, `${key}/links[${c.index}]/ring`);
+          assertRing(ringKid, `${key}/links[${c.index}]/ring`, wantDark);
           assertPathCovers(ringKid.paths[0].d, tl0.geometry[idx0], `${key}/links[${c.index}]/ring`);
         }
         passed.push(`${key}/links[${c.index}]`);

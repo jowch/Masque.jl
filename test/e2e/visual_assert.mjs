@@ -135,9 +135,9 @@ export function assertWash(wash, where, wantDark) {
   assertNoTeal(wash, where);
 }
 
-// Selected-open-geometry ring: unblended, lives only in `svg.masque-plain`, unchanged by the
-// fill/edge split.
-export function assertRing(ring, where) {
+// Selected-open-geometry ring: unblended, lives only in `svg.masque-plain`. Stroke is the
+// flat chrome grey (GREY.dark when wantDark). Same 2px/4px recipe as before the fill/edge split.
+export function assertRing(ring, where, wantDark = false) {
   // A per-segment ring is two <line>s; a whole-line ring is two <path>s. Same 2px/4px recipe.
   const strokes = ring?.paths?.length ? ring.paths : ring?.lines;
   if (!ring || !strokes || strokes.length !== 2) throw new Error(`${where}: ring ${JSON.stringify(ring)}`);
@@ -146,9 +146,10 @@ export function assertRing(ring, where) {
   }
   const widths = strokes.map((l) => l.width).sort().join(",");
   if (widths !== "2,4") throw new Error(`${where}: ring recipe ${JSON.stringify(ring)}`);
+  const g = wantDark ? GREY.dark : GREY.light;
   const colors = strokes.map((l) => l.stroke);
-  if (colors[0] !== colors[1] || !realColor(colors[0])) {
-    throw new Error(`${where}: ring stroke ${JSON.stringify(ring)}`);
+  if (colors[0] !== colors[1] || colors[0] !== g.stroke) {
+    throw new Error(`${where}: ring stroke ${JSON.stringify(ring)} (want ${g.stroke})`);
   }
   const outer = strokes.find((l) => l.width === "4");
   if (!outer || String(outer.opacity) !== "0.25") {

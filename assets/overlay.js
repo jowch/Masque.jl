@@ -75,7 +75,6 @@ svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: n
 .masque-hi { --masque-hi-c: var(--masque-hi-stroke, var(--masque-chrome)); stroke: var(--masque-hi-c); fill: none; }
 .masque-hi.masque-hover { fill: var(--masque-hi-c); fill-opacity: ${sr}; }
 .masque-hi.masque-wash { fill: var(--masque-hi-c); fill-opacity: ${ar}; }
-.masque-hi.masque-fill { fill: var(--masque-hi-c); }
 .masque-hi.masque-nostroke { stroke: none; }
 /* Element-prefixed, not bare .masque-fillshape: the dodge fill must not leak onto plain-svg
    chrome. ROI grips are .masque-handle (white fill, chrome stroke), not .masque-hi. */

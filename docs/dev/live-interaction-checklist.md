@@ -43,7 +43,7 @@ visible disc (default `:circle` marker ≈0.3525×`markersize`; a `Circle`/`Rect
 draws at `markersize`; anything else falls back to `markersize / 2`; the fill and edge shapes
 share identical geometry, so `r` is checked on both). Hover is not selected. Motion is an
 80–120 ms opacity fade on tip / highlight — a plain opacity fade on each shape itself (the blend
-lives on each svg root, so a fading child doesn't isolate it); no pulse on a same-hit remount.
+lives on `svg.masque-fill`, so a fading child doesn't isolate it); no pulse on a same-hit remount.
 Tooltip dark follows OS `prefers-color-scheme` — official Pluto has **no notebook light/dark
 toggle** (Settings → Dark mode is help text; Pluto itself uses the same media query).
 

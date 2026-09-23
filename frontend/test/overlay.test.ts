@@ -1684,9 +1684,8 @@ describe("tooltips (mount/showTip)", () => {
     })
 })
 
-// Overlay visual recipes (locked — the recipe is: an outline on the mark's own edge, coloured
-// as a mark-derived shade (color-mix toward --masque-ink) with a figure-aware neutral ink
-// default; see CLAUDE.md's overlay-chrome-redesign entry — do not reopen).
+// Overlay visual recipes (locked — a color-dodge fill of #141414 plus a flat chrome edge,
+// #7a7a7a on a light figure and #c8c8c8 on a dark one; see CLAUDE.md — do not reopen).
 // Units are necessary, not live-verify: agents still run
 // docs/dev/live-interaction-checklist.md (kind_sweep.mjs + polish_verify.mjs)
 // on Cairo and WGL for interaction AND visual.
@@ -2030,7 +2029,8 @@ describe("overlay visual polish", () => {
         expect(css).toMatch(/\.masque-handle/)
         expect(css).toMatch(/svg\.masque-fill \{ mix-blend-mode: color-dodge/)
         expect(css).not.toMatch(/svg\.masque-edge \{ mix-blend-mode:/)
-        expect(css).toMatch(/@supports not \(mix-blend-mode: color-dodge\)/)
+        expect(css).toMatch(/--masque-hi-c: var\(--masque-hi-stroke, var\(--masque-chrome\)\)/)
+        expect(css).toMatch(/@supports not \(mix-blend-mode: color-dodge\) \{\s*svg\.masque-fill \.masque-hi\.masque-fillshape \{ fill: var\(--masque-chrome\); fill-opacity: 0\.18; \}/)
     })
 
     it("does not rewrite tooltip HTML on same-hit mousemove", async () => {

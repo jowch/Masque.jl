@@ -97,7 +97,7 @@ text and the bond payload → it gets a live check on every backend × the kinds
   marker ≈0.3525×`markersize`; a `Circle`/`Rect` geometry marker draws at `markersize`; anything
   else falls back to `markersize / 2`); the overlay's own 4px hit slack keeps clicking as
   forgiving as before. 80–120 ms fade — a plain opacity fade on each shape itself
-  (`masque-enter`/`masque-leave`; the blend lives on each svg root, so a fading child doesn't
+  (`masque-enter`/`masque-leave`; the blend lives on `svg.masque-fill`, so a fading child doesn't
   isolate it); tooltip theme derived from the FIGURE's own background (CSS relative-colour
   syntax, `--masque-fig-bg`) — not just OS
   `prefers-color-scheme` (official Pluto has no notebook toggle), which is now only the
