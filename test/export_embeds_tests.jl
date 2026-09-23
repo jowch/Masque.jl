@@ -66,6 +66,7 @@ end
     @test occursin("`sel.index` is 1-based", src)
     @test occursin("name = \"one\"", src)
     @test occursin("if sel === nothing", src)
+    @test occursin("PointInteractable(ax, s; payloads = points)", src)
 end
 
 @testset "overlay-only player TOML sets chip = false" begin

@@ -97,8 +97,9 @@ default `:circle` at the theme `markersize`. Pass `radius=` when that
 lookup would be ambiguous, or when there is no scatter to hug. A marker
 with no readable bbox (a character, an image) keeps `markersize / 2`.
 Default `:circle` → `r ≈ 0.3525 × markersize`. A `Circle` or `Rect`
-sprite → `r = markersize / 2`. The quickstart overlay on
-[Getting started](@ref) passes `radius=`.
+sprite → `r = markersize / 2`. The quick start on
+[Getting started](@ref) passes the scatter, so the radius comes from
+the marker.
 
 On huge data, auto allocates one default payload per element. Pass a lean
 `payloads=` (or skip the layer) yourself. Auto-extracted layers do not

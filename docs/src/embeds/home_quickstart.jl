@@ -26,30 +26,20 @@ Hover a point to read its name, then click it. The last cell names the point.
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000010
 md"""
-Draw the scatter the way you already draw a Makie figure, and end the cell with `nothing` so this cell does not print the figure. The tooltip reads `name` and `y` off each point.
+Draw the scatter the way you already draw a Makie figure, and end the cell with `nothing` so this cell does not print the figure. `PointInteractable` takes that scatter, so the highlight sits on the marker. The tooltip reads `name` and `y` off each point.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000002
 begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-
     points = [
         (name = "one", x = 1.0, y = 1.0),
         (name = "two", x = 2.0, y = 4.0),
         (name = "three", x = 3.0, y = 9.0),
     ]
-    markersize = 18
-    scatter!(ax, [p.x for p in points], [p.y for p in points]; markersize)
-
-    # A default :circle marker is drawn at 0.3525 × markersize, not markersize / 2.
-    pts = PointInteractable(
-        ax, [(p.x, p.y) for p in points];
-        id = :scatter,
-        radius = 0.3525 * markersize,
-        payloads = points,
-        tooltip = masque"<b>$(name)</b><br>y = $(y)",
-    )
+    s = scatter!(ax, [p.x for p in points], [p.y for p in points]; markersize = 18)
+    pts = PointInteractable(ax, s; payloads = points)
     nothing
 end
 
