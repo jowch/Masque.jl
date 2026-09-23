@@ -3,7 +3,7 @@
 # stops keying a snapshot, rewrite misses getPublishedObject, wrap drops mount,
 # or inject_manifest_snapshots never attaches the table. Playwright against
 # docs/build/ (test/e2e/docs_player.mjs, Documentation.yml) covers the live
-# overlay click → #masque-out swap.
+# quick start: overlay click swaps the Pluto export's readout cell.
 
 using Test
 
