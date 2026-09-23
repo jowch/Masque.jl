@@ -595,7 +595,9 @@ describe("mount", () => {
         expect(hiChildren(shadow).length).toBe(0)
         expect(selChildren(shadow).length).toBe(2) // pts[2] × (fill + edge)
         await new Promise((r) => setTimeout(r, MOTION_MS + 40))
-        // The leave timer was cancelled, so it does not run later and wipe g.sel.
+        // After the fade window, g.hi is still empty and the selected pair is still drawn.
+        // The leave callback only removes g.hi children, so this wait does not show that the
+        // timer was cancelled. The re-hover test below is the one that keeps a replacement ring.
         expect(hiChildren(shadow).length).toBe(0)
         expect(selChildren(shadow).length).toBe(2)
     })
