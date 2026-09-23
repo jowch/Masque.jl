@@ -366,6 +366,59 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test drawn_near(img, (g[1] + g[3]) / 2, (g[2] + g[4]) / 2)
         end
 
+        @testset "hlines/vlines fractional span attributes" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 10, 0, 10))
+            ph = hlines!(a, [4.0]; xmin = 0.25, xmax = 0.75, linewidth = 6)
+            pv = vlines!(a, [4.0]; ymin = 0.2, ymax = 0.6, linewidth = 6)
+            _, _, c = ctx_for(f)
+            @test geom(SegmentInteractable(a, ph), c) ==
+                geom(SegmentInteractable(a, [(2.5, 4.0), (7.5, 4.0)]; mode = :pairs), c)
+            @test geom(SegmentInteractable(a, pv), c) ==
+                geom(SegmentInteractable(a, [(4.0, 2.0), (4.0, 6.0)]; mode = :pairs), c)
+            g = only(hitlayers(SegmentInteractable(a, ph), c)).geometry
+            img = Makie.colorbuffer(f; px_per_unit = 2.0)
+            @test drawn_near(img, (g[1] + g[3]) / 2, (g[2] + g[4]) / 2)
+
+            # per-line fractions, and a scalar position broadcast across a vector of fractions
+            pb = hlines!(a, [2.0, 8.0]; xmin = [0.1, 0.5], xmax = [0.4, 0.9])
+            @test geom(SegmentInteractable(a, pb), c) ==
+                geom(SegmentInteractable(a, [(1.0, 2.0), (4.0, 2.0), (5.0, 8.0), (9.0, 8.0)]; mode = :pairs), c)
+            ps = hlines!(a, 4.0; xmin = [0.1, 0.6], xmax = [0.3, 0.9])
+            Ls = only(hitlayers(SegmentInteractable(a, ps), c))
+            @test Ls.payloads == Any[(; segment_index = 1), (; segment_index = 2)]
+            @test geom(SegmentInteractable(a, ps), c) ==
+                geom(SegmentInteractable(a, [(1.0, 4.0), (3.0, 4.0), (6.0, 4.0), (9.0, 4.0)]; mode = :pairs), c)
+
+            # fraction of the transformed limits, inverse-transformed back to data space
+            flog = Figure(size = (500, 350))
+            al = Axis(flog[1, 1]; xscale = log10, limits = ((1, 1000), (0, 10)))
+            plog = hlines!(al, [5.0]; xmin = 0.5, xmax = 1)
+            pdef = hlines!(al, [5.0])
+            _, _, cl = ctx_for(flog)
+            @test geom(SegmentInteractable(al, plog), cl) ==
+                geom(SegmentInteractable(al, [(exp10(1.5), 5.0), (1000.0, 5.0)]; mode = :pairs), cl)
+            flim = al.finallimits[]
+            @test geom(SegmentInteractable(al, pdef), cl) ==
+                geom(SegmentInteractable(al, [(flim.origin[1], 5.0), (flim.origin[1] + flim.widths[1], 5.0)]; mode = :pairs), cl)
+
+            fv = Figure(size = (500, 350))
+            av = Axis(fv[1, 1]; yscale = log10, limits = ((0, 10), (1, 1000)))
+            pvlog = vlines!(av, [5.0]; ymin = 0.5, ymax = 1)
+            _, _, cv = ctx_for(fv)
+            @test geom(SegmentInteractable(av, pvlog), cv) ==
+                geom(SegmentInteractable(av, [(5.0, exp10(1.5)), (5.0, 1000.0)]; mode = :pairs), cv)
+
+            # built before finalize: a later limit change re-resolves the same fractions
+            fr = Figure(size = (500, 350)); ar = Axis(fr[1, 1]; limits = (0, 10, 0, 10))
+            pr = hlines!(ar, [4.0]; xmin = 0.25, xmax = 0.75)
+            seg = SegmentInteractable(ar, pr)
+            xlims!(ar, -20, 20)
+            masque(fr, [seg])
+            _, _, cr = ctx_for(fr)
+            @test geom(seg, cr) ==
+                geom(SegmentInteractable(ar, [(-10.0, 4.0), (10.0, 4.0)]; mode = :pairs), cr)
+        end
+
         @testset "hlines/vlines: interactable built before finalize resolves against finalized limits" begin
             # Regression: masque(fig, interactables) only finalizes AFTER the caller already built
             # `interactables` (unlike masque(fig), which finalizes first). A SegmentInteractable built
