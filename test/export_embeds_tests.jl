@@ -139,6 +139,21 @@ end
     @test occursin("window.Masque.mount", out)
 end
 
+@testset "inject_manifest_snapshots escapes a nested script tag" begin
+    html = """<script>
+        const manifest = {"layers":[]};
+        window.Masque.mount(currentScript, manifest, invalidation);
+    </script>"""
+    snaps = Dict("null" => Dict("id" => "idle", "cells" => Dict("c" => "<script>bad()</script>")))
+    out = inject_manifest_snapshots(html, snaps)
+    @test count("</script>", out) == 1
+    @test occursin("\\u003cscript>", out)
+    start = last(findfirst("const manifest = ", out))
+    json, _, _ = extract_json_object(out, start)
+    obj = json_read(String(json))
+    @test obj["snapshots"]["null"]["cells"]["c"] == "<script>bad()</script>"
+end
+
 @testset "png_data_url reads the inlined Cairo PNG" begin
     html = """<img src="data:image/png;base64,QUJDRA==" alt="fig">"""
     @test png_data_url(html) == "data:image/png;base64,QUJDRA=="

@@ -292,5 +292,8 @@ function inject_manifest_snapshots(html::AbstractString, snapshots)
     json, j0, j1 = extract_json_object(html, last(start))
     obj = json_read(String(json))
     obj["snapshots"] = jsonable(snapshots)
-    return html[1:(j0 - 1)] * json_write(obj) * html[(j1 + 1):end]
+    # A snapshot can be another widget, whose HTML contains `</script>`. Inside this
+    # script element that sequence ends the tag, so escape every `<`.
+    payload = replace(json_write(obj), "<" => "\\u003c")
+    return html[1:(j0 - 1)] * payload * html[(j1 + 1):end]
 end
