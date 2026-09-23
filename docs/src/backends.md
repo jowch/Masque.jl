@@ -102,3 +102,9 @@ Because they're unexported extension types, `CairoBackend`/`WebGLBackend` aren't
   a re-verification, not an automatic upgrade.
 - The WGLMakie JS bundle ships **once per notebook**, so each additional `masque(fig)` cell's
   own cost is just its own scene, not another copy of the bundle.
+- At most 8 `:webgl` plots hold a live WebGL context. Desktop Chrome and Safari allow
+  16, Android Chrome allows 8, and Firefox allows several hundred; 8 fits all of them
+  and leaves room for another tab. A plot outside the viewport is not given a context
+  until it scrolls into view. If more than 8 are on screen together, the extras show a
+  note instead of the browser blanking an arbitrary canvas. `:cairo` does not use a
+  WebGL context.
