@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
+import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
 import type { HitLayer, Manifest } from "../src/types"
 
 // build a light-DOM host (img + script) like the Julia widget emits, with layout mocked
@@ -177,20 +178,36 @@ describe("mount", () => {
         expect(afterClick.layer).toBe("thr")
     })
 
-    it("draws an ROI box + 8 handles (4 corners + 4 edge midpoints) and commits inverted bounds after a move", () => {
+    it("draws an ROI box + 4 corner handles and commits inverted bounds after a move", () => {
         const { host, script } = setup()
         mount(script, roiManifest())
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
         const rects = shadow.querySelectorAll("rect")
-        expect(rects.length).toBe(9)                 // 1 box + 4 corner handles + 4 edge handles
-        // geometry x:200,y:200,w:400,h:400,handle:16 → edge midpoints at n(400,200) s(400,600) w(200,400) e(600,400)
-        const edgeHandles = [...rects].slice(5)
-        const edgeCenters = edgeHandles.map((r) => ({
-            x: Number(r.getAttribute("x")) + 16, y: Number(r.getAttribute("y")) + 16,
+        expect(rects.length).toBe(5)                 // 1 box + 4 corner handles; sides have no grip
+        // setup img is 600 css px wide against manifest width 1200 → drawn half-side is 7 image px
+        // (7 css px grip). Hit half-size stays the manifest handle (16). Corners: TL(200,200)
+        // TR(600,200) BR(600,600) BL(200,600).
+        const drawHalf = handleDrawHalf(1200, 600, 2)
+        expect(drawHalf).toBe(7)
+        // 1.5 CSS px × (1200/600) image-px per CSS-px = 3 image px
+        const radius = handleCornerRadius(drawHalf)
+        expect(radius).toBe(3)
+        const handles = shadow.querySelectorAll("rect.masque-handle")
+        expect(handles).toHaveLength(4)
+        const cornerCenters = [...rects].slice(1).map((r) => ({
+            x: Number(r.getAttribute("x")) + drawHalf, y: Number(r.getAttribute("y")) + drawHalf,
         }))
-        expect(edgeCenters).toEqual([{ x: 400, y: 200 }, { x: 400, y: 600 }, { x: 200, y: 400 }, { x: 600, y: 400 }])
+        expect(cornerCenters).toEqual([{ x: 200, y: 200 }, { x: 600, y: 200 }, { x: 600, y: 600 }, { x: 200, y: 600 }])
+        for (const h of handles) {
+            expect(h.getAttribute("width")).toBe(String(2 * drawHalf))
+            expect(h.getAttribute("stroke-width")).toBe("1")
+            expect(h.getAttribute("rx")).toBe(String(radius))
+            expect(h.getAttribute("ry")).toBe(String(radius))
+        }
+        expect(rects[0].getAttribute("rx")).toBeNull()
         const box = rects[0] as SVGRectElement
+        expect(box.getAttribute("stroke-width")).toBe("1")
         expect(box.getAttribute("x")).toBe("200")
         let committed: { layer: string; index: number; payload: { xmin: number; xmax: number; ymin: number; ymax: number } } | null = null
         host.addEventListener("input", () => {
@@ -205,6 +222,38 @@ describe("mount", () => {
         // box x now [400,800] image → data [400/1200*10, 800/1200*10]
         expect(committed!.payload.xmin).toBeCloseTo(10 * 400 / 1200)
         expect(committed!.payload.xmax).toBeCloseTo(10 * 800 / 1200)
+    })
+
+    it("redraws ROI grips when the base CSS width changes, and falls back when it is zero", () => {
+        expect(handleDrawHalf(1200, 0, 2)).toBe(7)
+        const { host, img, script } = setup()
+        mount(script, roiManifest())
+        const shadow = shadowOf(host)
+        const grip = shadow.querySelectorAll("rect")[1]
+        expect(grip.getAttribute("width")).toBe("14")
+        expect(grip.getAttribute("rx")).toBe("3")
+        img.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 300, height: 200, right: 300, bottom: 200, x: 0, y: 0, toJSON() {} }) as DOMRect
+        window.dispatchEvent(new Event("resize"))
+        // 1200/300 = 4 image-px per css-px → half-side 14, drawn side 28, radius 1.5×4 = 6
+        expect(grip.getAttribute("width")).toBe("28")
+        expect(grip.getAttribute("rx")).toBe("6")
+        expect(grip.getAttribute("ry")).toBe("6")
+    })
+
+    it("an explicit ROI hoverstyle stroke keeps its colour and width on the outline", () => {
+        const m = roiManifest()
+        m.layers[0].style = { stroke: "#123456", width: 3 }
+        const { host, script } = setup()
+        mount(script, m)
+        const rects = shadowOf(host).querySelectorAll("rect")
+        const box = rects[0] as SVGRectElement
+        expect(box.getAttribute("stroke-width")).toBe("3")
+        expect(box.style.getPropertyValue("--masque-hi-stroke")).toBe("#123456")
+        const grip = rects[1] as SVGRectElement
+        expect(grip.classList.contains("masque-handle")).toBe(true)
+        expect(grip.getAttribute("stroke-width")).toBe("1")
+        expect(grip.style.getPropertyValue("--masque-hi-stroke")).toBe("#123456")
     })
 
     it("resizes an ROI box from a corner with the opposite corner fixed", () => {
@@ -232,7 +281,7 @@ describe("mount", () => {
         expect(committed!.payload.ymax).toBeCloseTo(75)   // image y 200 → data 100*(1-200/800)=75
     })
 
-    it("resizes an ROI box from an edge handle, moving only that one edge", () => {
+    it("resizes an ROI box from a side midpoint, with no grip drawn there", () => {
         const { host, script } = setup()
         mount(script, roiManifest())
         const shadow = shadowOf(host)
@@ -313,7 +362,7 @@ describe("mount", () => {
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 50, clientY: 200, bubbles: true }))
     })
 
-    it("hovering an ROI edge/corner handle shows the matching directional resize cursor", async () => {
+    it("hovering an ROI corner or side shows the matching directional resize cursor", async () => {
         const { host, script } = setup()
         mount(script, roiManifest())
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
@@ -851,22 +900,25 @@ describe("tooltips (mount/showTip)", () => {
         expect((host.lastElementChild as HTMLElement).style.getPropertyValue("--masque-fig-bg")).toBe("rgb(30,30,30)")
     })
 
-    it("picks the edge blend mode + line greys from the figure's own background; fill source is theme-independent", () => {
+    it("picks chrome grey from the figure's own background; fill source is theme-independent", () => {
         const { host: lightHost, script: lightScript } = setup()
         mount(lightScript, { ...tipManifest({}), background: "rgb(255,255,255)" })
         const lightStyle = (lightHost.lastElementChild as HTMLElement).style
-        expect(lightStyle.getPropertyValue("--masque-hi-blend")).toBe("multiply")
+        expect(lightStyle.getPropertyValue("--masque-chrome")).toBe("#7a7a7a")
         expect(lightStyle.getPropertyValue("--masque-hi-fill")).toBe("#141414")
-        expect(lightStyle.getPropertyValue("--masque-hi-line-hover")).toBe("#555555")
-        expect(lightStyle.getPropertyValue("--masque-hi-line-sel")).toBe("#333333")
+        expect(lightStyle.getPropertyValue("--masque-hi-blend")).toBe("")
+        expect(lightStyle.getPropertyValue("--masque-hi-line-hover")).toBe("")
+        expect(lightStyle.getPropertyValue("--masque-hi-line-sel")).toBe("")
 
         const { host: darkHost, script: darkScript } = setup()
         mount(darkScript, { ...tipManifest({}), background: "rgb(38,38,38)" })
         const darkStyle = (darkHost.lastElementChild as HTMLElement).style
-        expect(darkStyle.getPropertyValue("--masque-hi-blend")).toBe("screen")
+        expect(darkStyle.getPropertyValue("--masque-chrome")).toBe("#c8c8c8")
         expect(darkStyle.getPropertyValue("--masque-hi-fill")).toBe("#141414")
-        expect(darkStyle.getPropertyValue("--masque-hi-line-hover")).toBe("#aaaaaa")
-        expect(darkStyle.getPropertyValue("--masque-hi-line-sel")).toBe("#cccccc")
+
+        const { host: bareHost, script: bareScript } = setup()
+        mount(bareScript, { ...tipManifest({}) })
+        expect((bareHost.lastElementChild as HTMLElement).style.getPropertyValue("--masque-chrome")).toBe("#7a7a7a")
     })
 
     it("mounts three coordinate-identical top-level svgs, fill/edge/plain in paint order", () => {
@@ -1632,9 +1684,8 @@ describe("tooltips (mount/showTip)", () => {
     })
 })
 
-// Overlay visual recipes (locked — the recipe is: an outline on the mark's own edge, coloured
-// as a mark-derived shade (color-mix toward --masque-ink) with a figure-aware neutral ink
-// default; see CLAUDE.md's overlay-chrome-redesign entry — do not reopen).
+// Overlay visual recipes (locked — a color-dodge fill of #141414 plus a flat chrome edge,
+// #7a7a7a on a light figure and #c8c8c8 on a dark one; see CLAUDE.md — do not reopen).
 // Units are necessary, not live-verify: agents still run
 // docs/dev/live-interaction-checklist.md (kind_sweep.mjs + polish_verify.mjs)
 // on Cairo and WGL for interaction AND visual.
@@ -1753,7 +1804,7 @@ describe("overlay visual polish", () => {
         expect(edgeEl.getAttribute("stroke")).toBeNull() // colour comes from the stylesheet, not a presentation attribute
         expect(edgeEl.getAttribute("stroke-width")).toBe("1.5")
         expect(edgeEl.getAttribute("stroke-opacity")).toBeNull() // fully opaque
-        // svg.masque-edge itself carries the mix-blend-mode, not this shape or a wrapper.
+        // The stroke lives in svg.masque-edge; that svg does not blend.
         expect(edgeEl.closest("svg")!.classList.contains("masque-edge")).toBe(true)
     })
 
@@ -1968,15 +2019,18 @@ describe("overlay visual polish", () => {
         expect(css).not.toMatch(/#ff3b30/)
     })
 
-    it("overlay CSS defines the figure-aware highlight ink and the fill/edge split's blend rules + fallback", () => {
+    it("overlay CSS defines chrome ink, an unblended edge stroke, and the dodge-fill fallback", () => {
         const { host, script } = setup()
         mount(script, manifest)
         const css = shadowOf(host).querySelector("style")!.textContent!
         expect(css).toMatch(/--masque-ink/)
+        expect(css).toMatch(/--masque-chrome/)
         expect(css).toMatch(/--masque-hi-stroke/)
+        expect(css).toMatch(/\.masque-handle/)
         expect(css).toMatch(/svg\.masque-fill \{ mix-blend-mode: color-dodge/)
-        expect(css).toMatch(/svg\.masque-edge \{ mix-blend-mode:/)
-        expect(css).toMatch(/@supports not \(mix-blend-mode: color-dodge\)/)
+        expect(css).not.toMatch(/svg\.masque-edge \{ mix-blend-mode:/)
+        expect(css).toMatch(/--masque-hi-c: var\(--masque-hi-stroke, var\(--masque-chrome\)\)/)
+        expect(css).toMatch(/@supports not \(mix-blend-mode: color-dodge\) \{\s*svg\.masque-fill \.masque-hi\.masque-fillshape \{ fill: var\(--masque-chrome\); fill-opacity: 0\.18; \}/)
     })
 
     it("does not rewrite tooltip HTML on same-hit mousemove", async () => {

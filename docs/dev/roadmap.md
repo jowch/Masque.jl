@@ -46,8 +46,8 @@ placement); client-side click-echo selection (#103: a click, an Enter/Space, or 
 release pins its own highlight in the browser, resetting on remount, with `selected=` left
 purely declarative); selection round-trip and re-highlight; box-select via a `selects`-ROI; threshold
 and ROI drags; drag-to-pan/rotate and slider-driven view changes through `@bind` re-render;
-keyboard navigation and screen-reader announcements; the split-blend highlight (#93: a
-brightening fill plus a darkening stroke, not a mark-derived colour, with `scatter!`'s drawn
+keyboard navigation and screen-reader announcements; the highlight (a brightening color-dodge
+fill plus a flat chrome edge stroke, not a mark-derived colour, with `scatter!`'s drawn
 radius replacing `markersize/2`); the `:cairo` (PNG) and `:webgl` (live canvas) backends behind
 one contract; a Documenter site with static notebook exports; and eight CI jobs covering Julia
 on two versions, the no-backend error path, the WGLMakie extension with its own real-browser
@@ -161,20 +161,6 @@ canvas-identity strategy keeps projection Julia-authored.
   a legend entry and arguably for a discrete mark that emits a bond, while a grid wants
   `crosshair` or the CSS `cell` cursor, which exists for exactly this. Decide the map once
   rather than special-casing heatmap.
-- **Smaller, corners-only ROI handles.** Decided: drop the four edge-midpoint handles, shrink
-  the corner squares, and fill them for contrast against the figure rather than in a fixed
-  colour, light on a dark figure and dark grey on a light one. Edges stay resizable, losing
-  only their drawn handle: hovering one still shows the vertical or horizontal resize cursor,
-  which becomes the whole affordance. The theme half needs no new machinery, since tooltips
-  already derive from the figure background through `--masque-fig-bg`. Take the handle size out
-  of the manifest while here. Julia ships `handle` as 8 logical px times the DPI scale, in
-  image pixels, only so it lands in the same coordinate space as the ROI rect. It is pure
-  chrome that no Julia value depends on, and shipping it that way is actively worse: the
-  overlay is displayed at `width:100%`, so an image-pixel handle grows and shrinks with the
-  figure instead of staying a constant size on screen. A client-side constant in CSS pixels is
-  both simpler and more correct. The eight-handle recipe is written into `CLAUDE.md` and the
-  live checklist as locked, so both change with it, the same way #93 moved the highlight
-  recipe.
 - **The browser's focus outline boxes the whole figure on a heatmap.** The overlay surface is
   a focus stop, and the default `:focus-visible` outline is suppressed only once Masque draws
   its own keyboard focus ring, through the `kbd-ring` class. Grid layers are deliberately not

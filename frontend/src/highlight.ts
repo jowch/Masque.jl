@@ -23,7 +23,8 @@ export function markColorFor(hit: Hit): string | null {
 
 // An explicit per-layer hoverstyle stroke from Julia (wins outright, used verbatim). Shared by
 // every unblended (mount.ts's svg.masque-plain) highlight element — the explicit-stroke path
-// below, rings, the ROI rect/handles, the threshold line. A resolved mark colour no longer feeds
+// below, rings, the ROI outline, the threshold line. ROI grips set the same property themselves.
+// A resolved mark colour no longer feeds
 // a highlight's own colour (mount.ts's blend-tint path replaces that); markColorFor is still
 // exported for hover.ts's tooltip accent border.
 function setHiStroke(el: SVGElement | SVGGElement, stroke: string | undefined): void {
@@ -49,7 +50,7 @@ export function makeRing(shape: SVGElement, stroke: string | undefined): SVGGEle
 
 // Which svg(s) a highlight lands in. An explicit hoverstyle stroke, or the selected-open ring,
 // is unblended → plain only. Otherwise a closed shape splits into a brightening fill shape
-// (fill svg) and a darkening stroke shape (edge svg) of identical geometry; an open (seg) shape
+// (fill svg) and a flat chrome stroke (edge svg) of identical geometry; an open (seg) shape
 // has no interior, so hover on it is edge-only; a rectfill (grid cell-block union rect) is
 // fill-only, since the ROI box itself already draws that outline.
 export interface HiResult {
@@ -131,8 +132,8 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
     }
 
     // Closed geometry: two shapes of identical geometry, cloned before either is modified — a
-    // brightening fill (no stroke) and a darkening stroke (no fill), same source colour for
-    // hover and selected, distinguished only by the edge shape's width/darkness.
+    // brightening fill (no stroke) and a flat chrome stroke (no fill). Hover and selected share
+    // that stroke colour; the edge width (1.5 vs 2) is what separates them.
     const fillEl = el
     const edgeEl = el.cloneNode(true) as SVGElement
     fillEl.classList.add("masque-hi", "masque-fillshape")

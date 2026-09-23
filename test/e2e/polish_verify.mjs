@@ -1,6 +1,6 @@
 // Overlay visual-fidelity driver (LOCAL — not CI). Required by
 // docs/dev/live-interaction-checklist.md together with kind_sweep.mjs.
-// Runs on the kind-sweep notebooks. Asserts wash/ring/hover (dodge fill + darkening edge
+// Runs on the kind-sweep notebooks. Asserts wash/ring/hover (dodge fill + flat chrome edge
 // stroke)/overlay-pin, remount fade / no pulse, the split recipe on a dark figure too (not fixed
 // steel-teal, not #ff3b30), a Cairo-only flush-radius pixel check, and Pluto/OS
 // prefers-color-scheme (official Pluto has no notebook toggle).
@@ -106,8 +106,8 @@ try {
     let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
     const baseEl = host.querySelector("img, canvas");
     // THREE sibling overlay svgs, same box/viewBox: svg.masque-fill (mix-blend-mode:
-    // color-dodge — the brightening half) and svg.masque-edge (multiply/screen — the darkening
-    // half) together draw a closed mark's hover/selected highlight as two identical-geometry
+    // color-dodge — the brightening half) and svg.masque-edge (no blend — the flat chrome
+    // stroke) together draw a closed mark's hover/selected highlight as two identical-geometry
     // shapes, one per svg; svg.masque-plain (no blend) holds ROI/threshold, the selected-open
     // ring, and any explicit-`hoverstyle` highlight. Firefox only honours `mix-blend-mode` on a
     // top-level svg, not nested SVG content, which is why each is its own sibling svg rather
@@ -413,7 +413,7 @@ try {
 
   // Split recipe on the dark figure: what's left to check on scatter_dark's hover is that the
   // fill layer still dodges (colour-independent of figure background) and the edge layer picks
-  // the dark-figure grey stroke and `screen` blend, same as its wash did above.
+  // the dark-figure chrome stroke, unblended, same as its wash did above.
   const darkTip = await hoverAt("scatter_dark", dhx, dhy);
   assertHoverRecipe(darkTip.hi, "scatter_dark", true, true);
   passed.push("dark-figure-hover");
