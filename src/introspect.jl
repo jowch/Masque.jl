@@ -773,25 +773,50 @@ function _walk_refuses(p)
     return sp isa Symbol && sp !== :data
 end
 
+# Vertices the interactable would hit. A grid is not a vertex list; treat it as present.
+# A zero count is an empty construct: `qqplot!` with `qqline = :none` still builds a
+# `LineSegments` whose converted points are `Point2f[]`.
+_nverts(i::PointInteractable) = length(i.points)
+_nverts(i::SegmentInteractable) = i.paths === nothing ? length(i.vertices) : sum(length, i.paths; init = 0)
+_nverts(i::PolygonInteractable) = sum(length, i.rings; init = 0)
+_nverts(i::RectInteractable) = i.layout === :list ? length(i.data) : 1
+_nverts(i::TextInteractable) = length(i.payloads)
+_nverts(::AbstractInteractable) = 1
+
+# `_text_interactables` already warned. The parent walk must not add the generic
+# "unsupported plot type" warning on top of that (`bracket!`).
+function _warned_empty(p)
+    t = if p isa Makie.Text
+        p
+    elseif p isa Makie.Annotation
+        _descendant_or_nothing(p, Makie.Text)
+    else
+        nothing
+    end
+    return t !== nothing && hasproperty(t, :space) && t.space[] !== :data
+end
+
 # Construct `p` (`_plotbase` already accepted it) and register every descendant under the new
 # layer ids. `haskey` in `_register_descendants!` keeps a plot's own entry. A later parent
 # constructor, or a second visit, must not `_construct` those descendants again — that is the
 # double layer (`:violin` plus the violin's `:poly`). Series children register as `id:k`.
-# An empty construct (non-data text) does not consume a layer id.
+# An empty construct — non-data text, or a construct with no vertices — does not consume a
+# layer id. Returns `(built, warned)`: `warned` is the axis-skip warning or the non-data
+# text warning, so the caller can suppress a second, generic one.
 function _install_known!(ints, seen, plotmap, ax, p)
-    _skip_for_axis(ax, p) && return false
+    _skip_for_axis(ax, p) && return (built = false, warned = true)
     base = _plotbase(p)
     n = get(seen, base, 0) + 1
     seen[base] = n
     id = n == 1 ? base : Symbol(base, :_, n)
     built = _construct(ax, p, id)
-    if isempty(built)
+    if isempty(built) || all(i -> _nverts(i) == 0, built)
         if n == 1
             delete!(seen, base)
         else
             seen[base] = n - 1
         end
-        return false
+        return (built = false, warned = isempty(built) && _warned_empty(p))
     end
     append!(ints, built)
     ids = [ii.id for ii in built]
@@ -801,29 +826,41 @@ function _install_known!(ints, seen, plotmap, ax, p)
     else
         _register_descendants!(plotmap, p, ids)
     end
-    return true
+    return (built = true, warned = false)
 end
 
 # Children of a recipe `_plotbase` does not know. Stop at the first known plot: constructing
 # a `Violin` and also its `Poly` would be two layers for one mark. A zero-string `Text`
 # (`contour!` with labels off) is not a layer; keep walking so the sibling `Lines` is still
-# found. Descendants of a plot just installed are already in `plotmap` and are skipped.
+# found. A child with `visible[] == false` is not drawn (`triplot!` ghost edges, convex hull,
+# constrained edges, point scatter) and is not a layer; do not walk into it. Descendants of
+# a plot just installed are already in `plotmap` and are skipped. Returns `(built, warned)`.
 function _walk_unknown!(ints, seen, plotmap, ax, parent)
     built_any = false
+    warned_any = false
     for c in _child_plots(parent)
         haskey(plotmap, c) && continue
+        if hasproperty(c, :visible) && c.visible[] == false
+            continue
+        end
         if _plotbase(c) === nothing
-            _walk_unknown!(ints, seen, plotmap, ax, c) && (built_any = true)
+            r = _walk_unknown!(ints, seen, plotmap, ax, c)
+            built_any |= r.built
+            warned_any |= r.warned
             continue
         end
         if c isa Makie.Text && c.text[] isa AbstractVector && isempty(c.text[])
-            _walk_unknown!(ints, seen, plotmap, ax, c) && (built_any = true)
+            r = _walk_unknown!(ints, seen, plotmap, ax, c)
+            built_any |= r.built
+            warned_any |= r.warned
             continue
         end
         _walk_refuses(c) && continue
-        _install_known!(ints, seen, plotmap, ax, c) && (built_any = true)
+        r = _install_known!(ints, seen, plotmap, ax, c)
+        built_any |= r.built
+        warned_any |= r.warned
     end
-    return built_any
+    return (built = built_any, warned = warned_any)
 end
 
 """
@@ -834,8 +871,10 @@ build the interactable its explicit constructor would. On `Axis3`, only `Scatter
 `LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D` are supported; on `PolarAxis`, only
 `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`. Other kinds are skipped with a warning.
 A recipe with no branch of its own still contributes each child that has one (`arc!` is the
-`lines!` it draws), under that child's layer id. A data-space `Scatter` child is left alone
-(`hexbin!`), and so is a child whose `space` is not `:data` (`bracket!`).
+`lines!` it draws), under that child's layer id. A child with `visible[] == false` is not a
+layer (`triplot!`'s ghost edges). A construct with no vertices does not take a layer id
+(`qqplot!` with `qqline = :none`). A data-space `Scatter` child is left alone (`hexbin!`),
+and so is a child whose `space` is not `:data` (`bracket!`).
 Layer ids are the plot kind (`:scatter`, `:lines`, …), suffixed `_2`, `_3`, … when a kind
 repeats. Returns the same concrete vector you could pass to [`masque`](@ref) yourself — edit or
 extend it freely.
@@ -855,7 +894,10 @@ function auto_interactables(fig)
         ax isa Union{Makie.Axis, Makie.Axis3, Makie.PolarAxis} || continue
         for p in _child_plots(ax.scene)
             if _plotbase(p) === nothing
-                if !_walk_unknown!(ints, seen, plotmap, ax, p)
+                r = _walk_unknown!(ints, seen, plotmap, ax, p)
+                # A child already warned (non-data text, or an axis skip). A second warning
+                # that names the parent `Plot` only repeats that, which `bracket!` used to do.
+                if !r.built && !r.warned
                     @warn "masque: skipping unsupported plot type $(typeof(p).name.name) (no introspection recipe)" maxlog = 16
                 end
                 continue

@@ -232,19 +232,25 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   writes a `masque"…"` template. Distinct from `SliceInteractable`: the slice answers "what is the height
   at this x", this answers "what is this shape". The field list per recipe is the issue's
   job, not the roadmap's.
-- **Composite recipes.** An unknown parent contributes each child `_plotbase` already
-  knows (`arc!` is `:lines`; `rainclouds!` is the violin, the raindrop scatter, and the
-  box), and the walk stops at that child so a later parent constructor does not also
-  build those layers. `hexbin!`'s data-space `Scatter` stays unconstructed (hex polygons
-  and count payloads remain a #91 tick). A `:rainclouds` or `:textrepel` id is still a
-  tick. Naming the skipped recipe in the warning is #157.
+- **Composite recipes.** An unknown parent contributes each visible child `_plotbase`
+  already knows (`arc!` is `:lines`; `rainclouds!` is the violin, the raindrop scatter,
+  and the box), and the walk stops at that child so a later parent constructor does not
+  also build those layers. A child with `visible[] == false` is not a layer, and a
+  construct with no vertices does not take an id. `hexbin!`'s data-space `Scatter` stays
+  unconstructed (hex polygons and count payloads remain a #91 tick). A `:rainclouds` or
+  `:textrepel` id is still a tick. Naming the skipped recipe in the warning is #157.
 - **Named gaps from #91**, cheapest first: `ablines!`, `arc!`, `stephist!`, `ecdfplot!`,
   `qqplot!`, `bracket!`, `timeseries!`, 2D `arrows!`, `pie!`, `contour!` lines,
   `tricontourf!`/`triplot!`, `dendrogram!`, `streamplot!`, `hexbin!` (needs hex polygons and
   count payloads), `datashader!`, `mesh!`, `volume!`/`voxels!`. Not a commitment to all of
   them; each waits for a real use. The child walk already hits `ablines!`, `arc!`, `pie!`,
-  and `contour!` lines under the child's layer id. A parent id, and contour level
-  payloads, stay ticks.
+  and `contour!` lines under the child's layer id, `stephist!` and `ecdfplot!` as
+  `:stairs`, and `streamplot!` as the streamline `:lines` plus a data-position arrow-head
+  `:scatter`. `qqplot!` contributes its scatter; the unused fit line (`qqline = :none`)
+  is an empty `LineSegments` and does not take `:segments`. `triplot!` contributes the
+  visible triangle `Poly`; the ghost edges, convex hull, constrained edges, and point
+  scatter stay hidden. `arrows2d!` stays unconstructed: its `Poly` is pixel space. A
+  parent id, and contour level payloads, stay ticks.
 - **`TextLabel`**: a `Block`, not a plot, so it needs the figure-block walk `Colorbar` and
   `Legend` use. Small.
 - **Legend follow-ups.** First, tick Legend in #91's table, which still lists it as not

@@ -238,7 +238,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             scatter!(a, [1.0], [1.0])
             # hexbin's only child is a data-space hex Scatter. The walk must not construct it.
             hexbin!(a, rand(40), rand(40))
-            ints = @test_logs (:warn,) match_mode = :any auto_interactables(f)
+            ints = @test_logs (:warn, r"unsupported plot type") auto_interactables(f)
             @test length(ints) == 1
             @test only(ints) isa PointInteractable
         end
@@ -295,7 +295,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             fb = Figure(size = (400, 300)); ab = Axis(fb[1, 1])
             bracket!(ab, 0.0, 0.0, 1.0, 1.0)
             Makie.update_state_before_display!(fb)
-            bints = @test_logs (:warn,) match_mode = :any auto_interactables(fb)
+            # The pixel-space label warns once. The parent has nothing else to install,
+            # and must not add a second "unsupported plot type" warning.
+            bints = @test_logs (:warn, r"non-data-space text") auto_interactables(fb)
             @test isempty(bints)
 
             # A top-level data-space scatter still fails in PointInteractable. The refusal
@@ -303,6 +305,28 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             fd = Figure(size = (400, 300)); ad = Axis(fd[1, 1])
             scatter!(ad, [1.0, 2.0], [1.0, 2.0]; markersize = 0.3, markerspace = :data)
             @test_throws ErrorException auto_interactables(fd)
+
+            # Default `triplot!` draws the triangles and also ghost edges, the convex hull,
+            # constrained edges, and a point scatter, all with `visible[] == false`. Those
+            # must not be layers, and must not take `:scatter` away from a later scatter.
+            ft = Figure(size = (640, 360)); at = Axis(ft[1, 1])
+            triplot!(at, [0.0, 1.0, 0.2, 0.8], [0.0, 0.0, 1.0, 0.6])
+            scatter!(at, [0.4], [0.3]; markersize = 12)
+            Makie.update_state_before_display!(ft)
+            tints = @test_logs auto_interactables(ft)
+            _, _, ct = ctx_for(ft)
+            @test [only(hitlayers(i, ct)).id for i in tints] == [:poly, :scatter]
+
+            # `qqline = :none` leaves a visible `LineSegments` with no vertices. That must
+            # not publish `:segments`, so a real segment layer still gets the first id.
+            fq = Figure(size = (640, 360)); aq = Axis(fq[1, 1])
+            qqplot!(aq, [1.0, 2.0, 3.0, 4.0], [1.1, 1.9, 3.2, 3.8]; qqline = :none)
+            linesegments!(aq, [0.0, 1.0], [0.0, 1.0])
+            Makie.update_state_before_display!(fq)
+            qints = @test_logs auto_interactables(fq)
+            _, _, cq = ctx_for(fq)
+            @test [only(hitlayers(i, cq)).id for i in qints] == [:scatter, :segments]
+            @test !isempty(only(i for i in qints if i.id === :segments).vertices)
         end
 
         @testset "masque auto-detects text!" begin
