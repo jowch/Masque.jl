@@ -257,6 +257,8 @@ All notable changes to this project are documented here. The format is based on
   (`docs/dev/roadmap.md`), not groundwork already in place.
 
 ### Fixed
+- Right-click and Mac ctrl-click reach the Cairo base image, so the browser's own image menu
+  appears. A Mac ctrl-click leaves `@bind` unchanged.
 - A `selects`-ROI over a `:grid` target (e.g. the gallery `image_widget` recipe:
   `RectInteractable(; grid=...)` + `ROIInteractable(; selects=...)`) no longer draws its own
   stroke on the enclosed cell-block rect: that rect sat beside the ROI's own outline and read

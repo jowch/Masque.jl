@@ -69,12 +69,60 @@ function queueDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
     })
 }
 
+// ctrl-click is a context menu on Apple platforms only.
+function isApplePlatform(): boolean {
+    const nav = navigator as Navigator & { userAgentData?: { platform?: string } }
+    const platform = nav.userAgentData?.platform
+    if (platform) return platform === "macOS" || platform === "iOS"
+    return /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+}
+
+function isMacContextClick(e: { button: number; ctrlKey: boolean }): boolean {
+    return e.button === 0 && e.ctrlKey && isApplePlatform()
+}
+
+// The menu is hit-tested after pointerdown returns, or after pointerup on Windows.
+// Restoring any sooner targets this surface again. The timer covers a press that never
+// produces either event.
+function passContextToBase(surface: HTMLElement, pointerId: number): void {
+    surface.classList.add("passthrough")
+    let restored = false
+    let timer = 0
+    const restore = () => {
+        if (restored) return
+        restored = true
+        surface.classList.remove("passthrough")
+        window.removeEventListener("contextmenu", onMenu, true)
+        window.removeEventListener("pointerup", onPointerUp, true)
+        window.removeEventListener("pointercancel", onPointerCancel, true)
+        window.clearTimeout(timer)
+    }
+    const onMenu = () => { queueMicrotask(restore) }
+    const onPointerUp = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return
+        window.setTimeout(restore, 0)
+    }
+    const onPointerCancel = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return
+        restore()
+    }
+    window.addEventListener("contextmenu", onMenu, true)
+    window.addEventListener("pointerup", onPointerUp, true)
+    window.addEventListener("pointercancel", onPointerCancel, true)
+    timer = window.setTimeout(restore, 1000)
+}
+
 export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void {
     // A drag is already in progress (e.g. a second concurrent touch) — refuse to let a new
     // pointer overwrite the first one's `drag` and pointer capture mid-gesture.
     if (state.drag_) return
     cancelPendingMove(state)
     state.justDragged_ = false
+    // preventDefault here suppresses the native menu.
+    if (e.button !== 0 || isMacContextClick(e)) {
+        if (e.button === 2 || isMacContextClick(e)) passContextToBase(ctx.surface_, e.pointerId)
+        return
+    }
     const p = imgPx(ctx.base_, ctx.manifest_, e)
     // Shift+drag forces view (arbitration vs box-select / ROI / threshold).
     if (e.shiftKey) {
@@ -255,6 +303,8 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
 
 export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
     if (state.justDragged_) { state.justDragged_ = false; return }
+    // Chromium still dispatches click after a Mac ctrl-click.
+    if (isMacContextClick(e)) return
     const p = imgPx(ctx.base_, ctx.manifest_, e)
     const hit = hitTest(ctx.manifest_, p.x, p.y, "click")
     if (!hit) return // miss = no-op, no round-trip
