@@ -2890,6 +2890,8 @@ describe("crosshair", () => {
         move(surface, 200, 100) // image (400, 200): grid cell (1, 1)
         expect(crossOn(shadow)).toBe(true)
         expect(surface.classList.contains("hot")).toBe(false)
+        const hairline = shadow.querySelector(".masque-cross line") as SVGLineElement
+        expect(Number(getComputedStyle(hairline).strokeOpacity)).toBeCloseTo(0.8)
         expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("(1,1) = 1")
     })
 

@@ -80,7 +80,8 @@ const STYLE = `
 .masque-cross { opacity: 0; transition: opacity ${MOTION_MS}ms ease-out; }
 .masque-cross.is-on { opacity: 1; }
 .masque-cross line, .masque-cross circle { stroke: var(--masque-chrome, #7a7a7a); fill: none; }
-.masque-cross line { stroke-width: 1; }
+/* Hairlines sit a little under opaque so they read as a guide. Sample dots stay solid. */
+.masque-cross line { stroke-width: 1; stroke-opacity: 0.8; }
 .masque-cross circle { stroke-width: 1.5; }
 /* Default :focus-visible outline stays until a focus ring is actually drawn (kbd-ring, set by
    keyboard.ts's focusTo) — so tabbing in still shows *something* before the first arrow press,

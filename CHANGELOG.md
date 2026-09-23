@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 - The cursor follows what the pointer is over. An axis or colorbar readout, a grid cell, and
-  empty axis interior stay `crosshair` and draw both hairlines across that viewport. A discrete
+  empty axis interior stay `crosshair` and draw both hairlines, at 80% opacity, across that viewport. A discrete
   mark (points, bars, polygons, segments, lines) and a legend entry stay `pointer`. Threshold,
   ROI, and view keep their drag cursors, and the cross stays off for those. A layer named in a
   `SliceInteractable`'s `covers` stays `crosshair` and skips that layer's highlight.
