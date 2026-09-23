@@ -21,6 +21,8 @@ const OVERLAY_JS = joinpath(@__DIR__, "..", "assets", "overlay.js")
     @test occursin("<span class=\"hljs-number\">20</span>", html)
     @test occursin("<span class=\"hljs-keyword\">using</span>", highlight_julia_html("using Masque"))
     @test !occursin("hljs-symbol", highlight_julia_html("x::Int"))
+    @test !occursin("hljs-symbol", highlight_julia_html("for i in 1:nx"))
+    @test occursin("<span class=\"hljs-symbol\">:crimson</span>", highlight_julia_html("color = :crimson"))
 end
 
 @testset "snapshot_key matches overlay host.value" begin

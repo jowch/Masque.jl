@@ -118,6 +118,17 @@ function _scan_word(code, i, n)
     return j
 end
 
+# `:name` is a symbol. `1:n` and `a:b` are ranges, and `::T` is a type assert.
+function _colon_is_symbol(code, i, n)
+    i < n || return false
+    nxt = code[nextind(code, i)]
+    (isletter(nxt) || nxt == '_') || return false
+    i == 1 && return true
+    prev = code[prevind(code, i)]
+    prev == ':' && return false
+    return !(isletter(prev) || isdigit(prev) || prev in ('_', '!', ')', ']', '}'))
+end
+
 function _scan_number(code, i, n)
     j = i
     if code[j] == '.'
@@ -170,8 +181,7 @@ function highlight_julia_html(code::AbstractString)
             j = _scan_word(code, nextind(code, i), n)
             write(io, _hljs("meta", code[i:prevind(code, j)]))
             i = j
-        elseif c == ':' && i < n && (isletter(code[nextind(code, i)]) || code[nextind(code, i)] == '_') &&
-                (i == 1 || code[prevind(code, i)] != ':')
+        elseif c == ':' && _colon_is_symbol(code, i, n)
             j = _scan_word(code, nextind(code, i), n)
             write(io, _hljs("symbol", code[i:prevind(code, j)]))
             i = j
