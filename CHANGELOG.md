@@ -14,6 +14,13 @@ All notable changes to this project are documented here. The format is based on
   theme `markersize` (≈0.3525×`markersize`). Pass `radius=` to override. A marker with no
   readable bbox still uses `markersize / 2`. `PointInteractable(ax, scatter)` is the usual
   call; it also resolves the tooltip accent from `color=`.
+- Suspending a `:webgl` plot calls `forceContextLoss` before the next plot takes a
+  context, so the browser cap is not crossed while the detached canvas is still live.
+  A right-click that passes through to the WebGL canvas no longer has its browser menu
+  cancelled by WGLMakie's `contextmenu` listener.
+- `:webgl` keeps at most 8 live WebGL contexts. A plot outside the viewport is drawn when
+  it scrolls into view. Past 8 on screen at once, the extras show a note instead of the
+  browser blanking an arbitrary canvas. `:cairo` is unchanged.
 - Hovering or focusing a legend entry no longer shows a tooltip. The label is already drawn
   in the row, and the card covered the entries around it. Pass `tooltip = masque"..."` to show
   one (fields: `label`, `group`, `targets`). Omitting `tooltip` and `tooltip = false` both
@@ -264,6 +271,8 @@ All notable changes to this project are documented here. The format is based on
   (`docs/dev/roadmap.md`), not groundwork already in place.
 
 ### Fixed
+- Right-click and Mac ctrl-click reach the Cairo base image, so the browser's own image menu
+  appears. A Mac ctrl-click leaves `@bind` unchanged.
 - A `selects`-ROI over a `:grid` target (e.g. the gallery `image_widget` recipe:
   `RectInteractable(; grid=...)` + `ROIInteractable(; selects=...)`) no longer draws its own
   stroke on the enclosed cell-block rect: that rect sat beside the ROI's own outline and read

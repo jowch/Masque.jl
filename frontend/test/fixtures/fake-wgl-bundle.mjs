@@ -2,15 +2,22 @@
 // assert on setup_scene_init's arguments without needing three.js or a real WebGL context.
 export let lastCall = null
 export const sceneCalls = { deleted: 0, loops: 0 }
+export const inits = []
+export const trace = []
 
 export function setup_scene_init(...args) {
     lastCall = args
+    inits.push(args)
+    trace.push("init")
     const canvas = args[1]
     const width = args[2]
     const height = args[3]
     const ppu = args[5]
     const screen = {
-        renderer: { _width: width, _height: height, setViewport() {} },
+        renderer: {
+            _width: width, _height: height, setViewport() {},
+            forceContextLoss() { trace.push("loss") },
+        },
         px_per_unit: ppu,
         root_scene: null,
     }
