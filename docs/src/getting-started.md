@@ -89,6 +89,6 @@ the pointer over a point to read its name, then click one.
   selected
 - [Brush a region](@ref) — drag a box over points
 - [Pan and orbit](@ref) — move a 2D axis, or orbit an `Axis3`
-- [Examples](@ref) — the runnable notebooks in this repository
+- [Gallery](@ref) — a screenshot and a player for each demo
 - [Constructors](@ref) — every built-in kind and its default payload
 - [Backends](@ref) — CairoMakie and WGLMakie

@@ -121,10 +121,10 @@ A click already updates the highlight in the overlay and the bond.
 
 Last pick wins. To accumulate indices across clicks, keep a `Ref` in a
 cell that does not read this `@bind`, then pass the growing set as
-`selected=` to a second `masque` widget. For more information, see the
-[Selection round-trip](@ref). The player shows one click.
-The page describes the `Ref` that accumulates indices. Do not feed a
-widget's own bond into the same `masque` call.
+`selected=` to a second `masque` widget. For more information, see
+[Selection round-trip](@ref). That player shows one click, and the page
+describes the `Ref` that accumulates indices. Do not feed a widget's
+own bond into the same `masque` call.
 
 To brush a box with `selects` and report several marks, see
 [Brush a region](@ref). To drive another cell or plot from a click, see
