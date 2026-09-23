@@ -7,9 +7,10 @@ it re-runs. Before a click, the pick is `nothing` unless you pass
 on the event (`pick.city`). Click another mark to replace the
 selection.
 
-This page continues the cities scatter from [Getting started](@ref) in
-the same notebook. Skip the load cell; `fig`, `cities`, and `pick`
-already exist.
+This page is a cities scatter: `fig`, an interactable named `cities`, and
+`@bind pick`. [Getting started](@ref) uses the same click shape on a
+three-point scatter (`sel.name`). Define `fig` and `cities` in this
+notebook before these cells.
 
 Paste each snippet into its own Pluto cell. Replace the previous bind
 cell instead of adding a second `@bind pick`.
@@ -33,7 +34,7 @@ does not change. The highlight in the overlay stays as it is.
 
 Enter or Space on a focused mark commits the same way as a click.
 
-For the cities figure, `payloads`, and `radius=`, see
+For a scatter tooltip, `@bind`, and a readout, see
 [Getting started](@ref).
 
 ## Start with marks already selected

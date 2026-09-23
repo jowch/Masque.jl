@@ -4,8 +4,8 @@ Click a bar, a polygon, or a polar point to select it. `@bind` captures
 that pick the same way a slider does. Each geometry has its own default
 payload.
 
-This page is a new notebook. It does not reuse `fig` or `pick` from the
-cities scatter. Prerequisites: [Install](@ref) and
+This page is a new notebook. It does not reuse `fig` or `sel` from
+[Getting started](@ref). Prerequisites: [Install](@ref) and
 [Getting started](@ref) cells in your notebook.
 
 ```julia
@@ -20,8 +20,9 @@ end
 Paste each snippet into its own Pluto cell. If a later demo on this page
 also binds `pick`, replace the previous bind cell.
 
-For the eight-city scatter, see [Getting started](@ref). For constructor
-signatures and default payloads, see [Constructors](@ref).
+For a scatter with a tooltip and a click readout, see
+[Getting started](@ref). For constructor signatures and default payloads,
+see [Constructors](@ref).
 
 ## Click a bar
 

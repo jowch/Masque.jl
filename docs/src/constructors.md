@@ -93,7 +93,7 @@ Zero-config uses the Scatter plot-object constructor, so the highlight
 in the overlay hugs the drawn marker. `PointInteractable(ax, points)`
 defaults `radius=9` and never reads a marker. Pass the `Scatter`, or
 pass `radius=`. Default `:circle` → `r ≈ 0.3525 × markersize`. A
-`Circle` or `Rect` sprite → `r = markersize / 2`. The cities overlay
+`Circle` or `Rect` sprite → `r = markersize / 2`. The quickstart overlay
 on [Getting started](@ref) passes `radius=`.
 
 On huge data, auto allocates one default payload per element. Pass a lean

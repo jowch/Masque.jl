@@ -24,7 +24,7 @@ julia -e 'using Pluto; Pluto.run()'
 **3.** On Pluto's landing page, open the notebook path you want, for
    example `examples/demo.jl`.
 
-These notebooks are larger than the cities scatter on
+These notebooks are larger than the three-point scatter on
 [Getting started](@ref). A second axis still uses one `masque` call.
 For more information, see [Linked views](@ref).
 

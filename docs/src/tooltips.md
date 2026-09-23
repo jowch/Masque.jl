@@ -2,7 +2,7 @@
 
 Hold your pointer over a mark and a customizable tooltip appears on the
 figure. Hover stays on the figure; it does not re-run Julia. A click can
-still write `@bind`; this page teaches the tooltip. The eight-city
+still write `@bind`; this page teaches the tooltip. The three-point
 scatter on [Getting started](@ref) already templates on pointer hold.
 
 ```@raw html

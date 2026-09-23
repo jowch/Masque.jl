@@ -44,6 +44,8 @@ end
     keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
     @test keys == ["null", "scatter:0", "scatter:1", "scatter:2"]
     @test get(player, "chip", true) !== false
+    @test player["show_code"] == true
+    @test length(player["cells"]) == 6
 end
 
 @testset "overlay-only player TOML sets chip = false" begin

@@ -16,17 +16,17 @@ over a mark is not a click. A click is not a pan.
     listed snapshots; it does not run a Julia kernel. A static
     `generate_html` export keeps overlay inspection only.
 
-The eight-city scatter on [Getting started](@ref) already shows two of those
-channels on one plot. Holding the pointer over a city reads population in the
-overlay. A click writes `pick`. This page names every channel so a docs-site
-embed or a static export is not a Masque bug.
+The three-point scatter on [Getting started](@ref) already shows two of
+those channels on one plot. Holding the pointer over a point reads its
+name in the overlay. A click writes `sel`. This page names every channel
+so a docs-site embed or a static export is not a Masque bug.
 
 ## Pluto cells in these docs
 
 Paste each snippet into its own Pluto cell. Pluto runs one top-level
 expression per cell. Wrap multiple statements in `begin ... end`. Showing
 `fig` alone does not mount the overlay; `masque` returns the HTML that
-does. For clone, `Pkg.develop`, and `Pkg.add(url=…)` cells, see
+does. For `Pkg.add(url=…)` and `Pluto.activate_notebook_environment`, see
 [Install](@ref).
 
 ## One figure, one overlay
@@ -120,11 +120,11 @@ does.
 ## Overlay, Julia, and the host
 
 Live Pluto runs every `@bind` row except view. This docs site does not run
-those rows live. The cities player on [Getting started](@ref) lists idle plus
-every city click and swaps every cell in that embed, including extra table
-cells when a notebook has them. An overlay-only player keeps tooltip and
-highlight chrome. Julia stays at the default bond. Static `generate_html`
-keeps overlay chrome and drops `@bind` and `with_js_link`.
+those rows live. The quickstart player on [Getting started](@ref) lists
+idle plus each of the three points and swaps the readout cell. An
+overlay-only player keeps tooltip and highlight chrome. Julia stays at
+the default bond. Static `generate_html` keeps overlay chrome and drops
+`@bind` and `with_js_link`.
 
 ```@raw html
 <div class="masque-diagram">

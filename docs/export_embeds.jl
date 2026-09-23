@@ -341,6 +341,29 @@ pluto-trafficlight {
   visibility: visible;
   transform: none;
 }
+pre.masque-src {
+  display: block;
+  margin: 0 0 6px 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 4;
+  font-family: var(--julia-mono-font-stack);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  font-variant-ligatures: none;
+  background: transparent;
+  color: var(--pluto-output-color);
+}
+pluto-cell.masque-note pluto-output {
+  font-family: var(--lato-ui-font-stack);
+  font-size: 15px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+pluto-cell.masque-note pluto-output p {
+  margin: 0.4em 0;
+}
 """
 
 function pluto_player_css()
@@ -403,9 +426,71 @@ function extra_snapshot_bytes(states, cells)
     return extra
 end
 
+function is_markdown_annotation(code::AbstractString)
+    s = lstrip(code)
+    return startswith(s, "md\"") || startswith(s, "md\"\"\"")
+end
+
+function masque_widget_cell(cells)
+    hits = [c for c in cells if occursin("@bind", c.code) && occursin("masque(", c.code)]
+    length(hits) == 1 || error("show_code player needs one @bind masque(...) cell")
+    return only(hits)
+end
+
+function source_pre_html(code::AbstractString)
+    return "<pre class=\"masque-src\">$(html_escape(chomp(code)))</pre>"
+end
+
+# `show_code` players list every teaching cell. Markdown cells stay folded
+# (rendered notes). Code cells stay unfolded (source above the output).
+function show_code_cells_html(cells, widget, htmls, widget_html::AbstractString)
+    parts = String[]
+    for c in cells
+        cid = string(c.cell_id)
+        body = get(htmls, cid, "")
+        if is_markdown_annotation(c.code)
+            push!(
+                parts, """
+                <pluto-cell class="masque-note">
+                  <pluto-output class="rich_output">$body</pluto-output>
+                </pluto-cell>
+                """
+            )
+        elseif c.cell_id == widget.cell_id
+            push!(
+                parts, """
+                <pluto-cell>
+                  <pluto-trafficlight></pluto-trafficlight>
+                  $(source_pre_html(c.code))
+                  <pluto-output class="rich_output">
+                    <div id="masque-widget">
+                      $widget_html
+                    </div>
+                  </pluto-output>
+                </pluto-cell>
+                """
+            )
+        else
+            push!(
+                parts, """
+                <pluto-cell>
+                  <pluto-trafficlight></pluto-trafficlight>
+                  $(source_pre_html(c.code))
+                  <pluto-output>
+                    <div data-masque-cell="$cid">$body</div>
+                  </pluto-output>
+                </pluto-cell>
+                """
+            )
+        end
+    end
+    return join(parts, "\n")
+end
+
 function emit_player(path, outpath, player, cells, states, bond::Symbol)
-    widget = first(cells)
-    downstream = cells[2:end]
+    show_code = get(player, "show_code", false) === true
+    widget = show_code ? masque_widget_cell(cells) : first(cells)
+    downstream = show_code ? [c for c in cells if c.cell_id != widget.cell_id] : cells[2:end]
     snapshots = Dict{String, Any}()
     n_inlined_total = 0
     png_b = 0
@@ -418,9 +503,14 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     for st in states
         key = st.key
         rec = st.record
+        cell_snaps = if show_code
+            Dict(string(c.cell_id) => rec.htmls[string(c.cell_id)] for c in downstream)
+        else
+            [rec.htmls[string(c.cell_id)] for c in downstream]
+        end
         snap = Dict{String, Any}(
             "id" => st.id,
-            "cells" => [rec.htmls[string(c.cell_id)] for c in downstream],
+            "cells" => cell_snaps,
         )
         png = png_data_url(get(rec.htmls, widget_id, ""))
         if png !== nothing && png != idle_png
@@ -441,7 +531,8 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     end
 
     n_states = length(states)
-    extra = extra_snapshot_bytes(states, cells)
+    budget_cells = show_code ? [widget; downstream] : cells
+    extra = extra_snapshot_bytes(states, budget_cells)
 
     widget_html = inject_manifest_snapshots(something(idle_html), snapshots)
     down_html = join(idle_down, "\n")
@@ -450,7 +541,9 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     player_css = pluto_player_css()
     show_chip = get(player, "chip", true) !== false
     chip_html = show_chip ? SIM_CHIP_HTML : ""
-    downstream_cell = if isempty(downstream)
+    downstream_cell = if show_code
+        ""
+    elseif isempty(downstream)
         ""
     else
         """
@@ -463,6 +556,21 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
             </div>
           </pluto-output>
         </pluto-cell>
+        """
+    end
+    notebook_inner = if show_code
+        show_code_cells_html(cells, widget, src_state.record.htmls, widget_html)
+    else
+        """
+        <pluto-cell>
+          <pluto-trafficlight></pluto-trafficlight>
+          <pluto-output class="rich_output">
+            <div id="masque-widget">
+              $widget_html
+            </div>
+          </pluto-output>
+        </pluto-cell>
+        $downstream_cell
         """
     end
 
@@ -481,15 +589,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     <body>
       $chip_html
       <pluto-notebook class="masque-player">
-        <pluto-cell>
-          <pluto-trafficlight></pluto-trafficlight>
-          <pluto-output class="rich_output">
-            <div id="masque-widget">
-              $widget_html
-            </div>
-          </pluto-output>
-        </pluto-cell>
-        $downstream_cell
+        $notebook_inner
       </pluto-notebook>
       <script>
     {
@@ -543,6 +643,12 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         }
         const out = document.getElementById("masque-out");
         if (out && Array.isArray(snap.cells)) out.innerHTML = snap.cells.join("\\n");
+        if (snap.cells && !Array.isArray(snap.cells)) {
+          Object.keys(snap.cells).forEach(function (id) {
+            const el = document.querySelector('[data-masque-cell="' + id + '"]');
+            if (el) el.innerHTML = snap.cells[id];
+          });
+        }
         return true;
       }
       if (host) {

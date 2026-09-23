@@ -20,33 +20,58 @@ end
 using CairoMakie, Masque
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000010
-md"create your figure, as usual"
+md"""
+Draw the scatter the way you already draw a Makie figure. The tooltip template reads fields from that point's payload. `radius` is the drawn marker, so the highlight sits on the disc.
+"""
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000002
 begin
-    fig = Figure()
-    ax = Axis(fig[1, 1])
-    xs = [1, 2, 3]
-    ys = [1, 4, 9]
-    s = scatter!(ax, xs, ys)
+    fig = Figure(size = (560, 360))
+    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
+    xs = [1.0, 2.0, 3.0]
+    ys = [1.0, 4.0, 9.0]
+    names = ["one", "two", "three"]
+    markersize = 18
+    scatter!(ax, xs, ys; markersize)
+    pts = PointInteractable(
+        ax, collect(zip(xs, ys));
+        id = :scatter,
+        radius = 0.3525 * markersize,
+        payloads = [(; name, x, y) for (name, x, y) in zip(names, xs, ys)],
+        tooltip = masque"<b>$(name)</b><br>y = $(y)",
+    )
+    nothing
 end
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000011
-md"declare what's interactable, bind the result"
+md"""
+`masque` returns the HTML that mounts the overlay. `@bind` stores a click in `sel`. Hover updates the tooltip and does not change `sel`.
+"""
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000003
-@bind sel masque(fig, [PointInteractable(ax, s)])
+@bind sel masque(fig, pts)
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000012
-md"react to clicks"
+md"""
+Before a click, `sel` is `nothing`. After a click, `sel` is an `ElementEvent`: `sel.name` is that point's payload, and `sel.index` is 1-based. A cell that reads `sel` re-runs.
+"""
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000004
-sel === nothing ? "click a point" : "you picked $(sel.payload)"
+sel === nothing ? "click a point" : "$(sel.name) selected — y = $(sel.y)"
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "sel"
+show_code = true
+cells = [
+  "b0e1e001-0001-4000-8000-000000000010",
+  "b0e1e001-0001-4000-8000-000000000002",
+  "b0e1e001-0001-4000-8000-000000000011",
+  "b0e1e001-0001-4000-8000-000000000003",
+  "b0e1e001-0001-4000-8000-000000000012",
+  "b0e1e001-0001-4000-8000-000000000004",
+]
 
 [[player.states]]
 id = "idle"
