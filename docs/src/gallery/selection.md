@@ -1,9 +1,9 @@
 # Selection round-trip
 
-Click a point on the left. That index is passed back as `selected=` on
-a second `masque` call, which pre-highlights the same mark. The two
-widgets do not share an overlay. The highlight on the right is in the
-manifest for that figure.
+Click a point on the left. That index is passed as `selected=` on a
+second `masque` call, which highlights the same mark. The two widgets
+do not share an overlay. The highlight on the right is in the manifest
+for that figure.
 
 `selected=` takes 1-based indices. The player lists the click as a
 0-based `{layer, index}`, which is the shape the overlay posts. Julia
@@ -52,7 +52,7 @@ See [Limits slider](@ref).
 
 !!! note
 
-    Pre-highlight from `selected=` is the same on `:cairo` and `:webgl`.
+    `selected=` highlights the same way on `:cairo` and `:webgl`.
     This player is the Cairo figure. A live notebook re-runs the second
     widget when the bond changes; the snapshots here are those re-runs,
     baked in. There is no same-index link between two scatters beyond the

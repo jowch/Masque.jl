@@ -142,9 +142,8 @@ categorical 2D, and non-invertible 2D scales raise `ArgumentError`.
 overlay.
 
 Persist a camera across remount with an explicit `Ref` plus rebuild, not
-with `selected=`. The [Limits slider](@ref) shows that
-pattern. For the overlay-only embed and the cairo in-drag clip, see
-[Pan and orbit](@ref).
+with `selected=`. The [Limits slider](@ref) shows that pattern. For the
+overlay-only embed and the cairo in-drag clip, see [Pan and orbit](@ref).
 
 ## Export static HTML
 

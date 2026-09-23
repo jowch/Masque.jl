@@ -39,7 +39,7 @@ pick === nothing ? "click a point" : "selected index $(pick.index)"
 # ╔═╡ a1410002-0001-4000-8000-000000000005
 begin
     fig_r = Figure(size = (420, 300))
-    ax_r = Axis(fig_r[1, 1]; title = "pre-highlighted from the click")
+    ax_r = Axis(fig_r[1, 1]; title = "selected from the click")
     scatter!(ax_r, first.(data), last.(data); color = :teal, markersize = 20)
     right = PointInteractable(ax_r, data; id = :scatter)
     held = pick === nothing ? Int[] : Int[pick.index]

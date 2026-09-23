@@ -1,6 +1,6 @@
 # Box-select scatter
 
-Drag the box, or one of its handles, and release. The bond is a
+Drag the box, or a corner grip, and release. The bond is a
 `Vector{ElementEvent}`, one event per enclosed point, with that point's
 payload (`group`, `x`, `y`). An empty box is `[]`, not `nothing`.
 
@@ -40,9 +40,10 @@ coordinates. `xs[picks]` uses the events as indices. See
 ## Variations
 
 `selects` names a `:circles` or `:grid` layer in the same `masque`
-call. `selects = :bars` raises `ArgumentError`. Corners resize both
-axes; edge handles resize one. Shift+drag pans instead, when a
-`ViewInteractable` is on the same axis.
+call. `selects = :bars` raises `ArgumentError`. A corner grip resizes
+both axes. The middle of a side resizes that one axis, with no grip
+drawn there. Shift+drag pans instead, when a `ViewInteractable` is on
+the same axis.
 
 !!! note
 

@@ -5,8 +5,9 @@ readout. Hover the bar for the data value under the pointer. A click in
 a live notebook round-trips a `ColorbarEvent` with `value`. The layer
 kind is `:axis`.
 
-You do not construct a `ColorbarInteractable` for a colorbar Makie
-already drew. See [Read coordinates](@ref).
+`masque(fig)` builds that [`ColorbarInteractable`](@ref) for you. Write
+one yourself when you are not using `masque(fig)`. See
+[Read coordinates](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">

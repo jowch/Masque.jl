@@ -14,7 +14,7 @@ two still differ.
   <span>Tooltip templates</span>
 </a>
 <a class="masque-gallery-card" data-page="selection">
-  <img alt="Two scatters; a click on the left pre-highlights the right" src="assets/gallery/selection.png">
+  <img alt="Two scatters; the right figure highlights the mark clicked on the left" src="assets/gallery/selection.png">
   <span>Selection round-trip</span>
 </a>
 <a class="masque-gallery-card" data-page="bars">

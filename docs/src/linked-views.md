@@ -226,13 +226,11 @@ masque(
 ```
 
 Last pick wins. A later click is an [`ElementEvent`](@ref) and
-replaces a hydrated vector wholesale. To accumulate across clicks, keep
-indexes in a `Ref` in a cell that does not read this widget's bond, then
-feed the set into `selected=`. Two `masque` widgets do not share overlay
-state: each has its own overlay. [Selection round-trip](@ref) is that pattern: one widget's
-`@bind` and `selected=` on a second widget. To accumulate across clicks,
-keep a `Ref` in a cell that does not read the bond, as that page
-describes.
+replaces a hydrated vector wholesale. Two `masque` widgets do not share
+overlay state: each has its own overlay. [Selection round-trip](@ref)
+passes one widget's `@bind` into `selected=` on a second widget. To
+accumulate across clicks, keep a `Ref` in a cell that does not read the
+bond, as that page describes.
 
 A second plot that filters on a pick is a **click**, not a pointer hold.
 Holding the pointer over a mark does not write `@bind` and does not
