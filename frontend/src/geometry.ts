@@ -1,5 +1,5 @@
 // All coordinates here are image pixels.
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, ThresholdGeometry, ROIGeometry, ViewGeometry } from "./types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
 const SEG_TOL = 8 // px slack for segments/polylines
@@ -272,7 +272,101 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
             if (px < vg.x || px > vg.x + vg.w || py < vg.y || py > vg.y + vg.h) return null
             return { index: 0 }
         }
+        case "slice":
+            return null // data for the probe, not a hit target — hitTest stays first-match
     }
+}
+
+// data → image px. Inverse of invertAxis on the same AxisTransform (no categoricals: a slice
+// rejects those at build time). Identity and log10/log round-trip; a log axis's straight
+// screen segment is not this curve, so a sampled dot can leave the stroke.
+export function projectAxis(t: AxisTransform, x: number, y: number): { x: number; y: number } {
+    const [vx, vy, vw, vh] = t.viewport
+    let fx = unmapAxis(t.xlims, t.xscale, x)
+    let fy = unmapAxis(t.ylims, t.yscale, y)
+    if (t.xreversed) fx = 1 - fx
+    if (t.yreversed) fy = 1 - fy
+    return { x: vx + fx * vw, y: vy + (1 - fy) * vh }
+}
+
+function unmapAxis(lims: [number, number], scale: string, v: number): number {
+    if (scale === "log10" || scale === "log") {
+        const a = Math.log10(lims[0]), b = Math.log10(lims[1])
+        return (Math.log10(v) - a) / (b - a)
+    }
+    return (v - lims[0]) / (lims[1] - lims[0])
+}
+
+export interface SliceSample {
+    id: string
+    label?: string
+    color?: string
+    value: number
+    px: number
+    py: number
+}
+
+// Piecewise linear in data space, per NaN-separated run of `xy` (probe, value, …).
+// Outside every run's support the series is omitted (undefined), not a fake 0.
+function lerpProbe(xy: number[], probe: number): number | undefined {
+    const n = xy.length
+    let i = 0
+    while (i + 1 < n) {
+        if (!Number.isFinite(xy[i]) || !Number.isFinite(xy[i + 1])) { i += 2; continue }
+        let end = i
+        while (end + 1 < n && Number.isFinite(xy[end]) && Number.isFinite(xy[end + 1])) end += 2
+        const last = end - 2
+        if (last >= i + 2 && probe >= xy[i] && probe <= xy[last]) {
+            const npair = (last - i) / 2
+            let a = 0, b = npair
+            while (a < b) {
+                const mid = (a + b) >> 1
+                if (xy[i + 2 * mid] < probe) a = mid + 1
+                else b = mid
+            }
+            if (a === 0) return xy[i + 1]
+            const k = i + 2 * (a - 1)
+            const p0 = xy[k], p1 = xy[k + 2]
+            if (p1 === p0) return xy[k + 1]
+            const t = (probe - p0) / (p1 - p0)
+            return xy[k + 1] + t * (xy[k + 3] - xy[k + 1])
+        }
+        i = end
+    }
+    return undefined
+}
+
+// Sample every series at the probe coordinate (vertical: data x; horizontal: data y).
+// Returns the probe and the in-support samples; a series outside its run is absent.
+export function sampleSlice(
+    geom: SliceGeometry, t: AxisTransform, dataX: number, dataY: number,
+): { probe: number; samples: SliceSample[] } | null {
+    if (!Number.isFinite(dataX) || !Number.isFinite(dataY)) return null
+    const vertical = geom.orientation === "v"
+    const probe = vertical ? dataX : dataY
+    const samples: SliceSample[] = []
+    for (const s of geom.series) {
+        const value = lerpProbe(s.xy, probe)
+        if (value === undefined) continue
+        const dot = projectAxis(t, vertical ? probe : value, vertical ? value : probe)
+        samples.push({ id: s.id, label: s.label, color: s.color, value, px: dot.x, py: dot.y })
+    }
+    return { probe, samples }
+}
+
+// Smallest non-3D, non-polar viewport containing the point. A colorbar bbox beats the plot
+// axis when the pointer is on the bar; an inset axis beats the outer one. Null in the margin.
+export function viewportUnder(manifest: Manifest, px: number, py: number): { id: string; t: AxisTransform } | null {
+    let best: { id: string; t: AxisTransform; area: number } | null = null
+    for (const [id, t] of Object.entries(manifest.transforms)) {
+        if (t.is3d || t.ispolar) continue
+        const [x, y, w, h] = t.viewport
+        if (!(w > 0) || !(h > 0)) continue
+        if (px < x || px > x + w || py < y || py > y + h) continue
+        const area = w * h
+        if (!best || area < best.area) best = { id, t, area }
+    }
+    return best ? { id: best.id, t: best.t } : null
 }
 
 // Shift axis limits by a fractional viewport delta (grab pan). Works for identity + log scales.

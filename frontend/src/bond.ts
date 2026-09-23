@@ -1,6 +1,7 @@
 import { hitTest, resolvePayload } from "./geometry"
 import { drawHi, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
+import { hideCross } from "./cross"
 import { selectionFor, SELECTED_KINDS } from "./selection"
 import { imgPx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
@@ -132,6 +133,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         })
         if (viewLayer) {
             state.drag_ = viewDrag.begin(viewLayer.id, viewLayer.geometry as ViewGeometry, ctx.manifest_.transforms[viewLayer.axis], p.x, p.y, e.pointerId)
+            hideCross(ctx, state)
             ctx.surface_.classList.add("grabbing")
             tryCapture(ctx.surface_, e.pointerId)
             e.preventDefault()
@@ -166,6 +168,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     } else if (hit.layer.kind === "view") {
         state.drag_ = viewDrag.begin(hit.layer.id, hit.layer.geometry as ViewGeometry, ctx.manifest_.transforms[hit.layer.axis], p.x, p.y, e.pointerId)
     } else return
+    hideCross(ctx, state)
     ctx.surface_.classList.add("grabbing")
     tryCapture(ctx.surface_, e.pointerId)
     e.preventDefault()

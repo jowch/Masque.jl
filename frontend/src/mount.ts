@@ -1,6 +1,7 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex } from "./selection"
 import { onLeave, hideTip } from "./hover"
+import { buildCross, hideCross } from "./cross"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import * as thresholdDrag from "./drag/threshold"
@@ -76,6 +77,11 @@ const STYLE = `
 .surface.cur-move { cursor: move; }
 .masque-threshold-line { stroke-width: var(--masque-line-w, 2); }
 .masque-threshold-line.hovered { stroke-width: calc(var(--masque-line-w, 2) * 1.75); }
+.masque-cross { opacity: 0; transition: opacity ${MOTION_MS}ms ease-out; }
+.masque-cross.is-on { opacity: 1; }
+.masque-cross line, .masque-cross circle { stroke: var(--masque-chrome, #7a7a7a); fill: none; }
+.masque-cross line { stroke-width: 1; }
+.masque-cross circle { stroke-width: 1.5; }
 /* Default :focus-visible outline stays until a focus ring is actually drawn (kbd-ring, set by
    keyboard.ts's focusTo) — so tabbing in still shows *something* before the first arrow press,
    but the browser outline doesn't double up with our own ring once one exists. */
@@ -186,7 +192,7 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: non
 }
 @media (prefers-reduced-motion: reduce) {
   .masque-enter, .masque-leave { animation: none; }
-  .masque-tip { transition: none; }
+  .masque-tip, .masque-cross { transition: none; }
 }
 `
 
@@ -336,6 +342,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // ROI rect/handles and threshold lines never blend — always svg.masque-plain.
     const thresholdLines = thresholdDrag.buildThresholdLines(manifest, plainSvg)
     const roiBoxes = roiDrag.buildROIBoxes(manifest, plainSvg, base)
+    // After threshold lines so shadow.querySelector("line") still finds the threshold line first.
+    const cross = buildCross(plainSvg)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
 
@@ -351,6 +359,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         linkGroup_: linkGroup,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
+        cross_: cross,
         gesture_: channel,
     }
     const state = createOverlayState()
@@ -427,6 +436,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.manifest_ = newManifest
         ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(newManifest, plainSvg)
         ctx.roiBoxes_ = roiDrag.buildROIBoxes(newManifest, plainSvg, ctx.base_)
+        // New threshold lines append after the cross group; move it back to the end so the
+        // first <line> in the shadow stays the threshold line, and drop a cross that described
+        // the previous frame.
+        hideCross(ctx, state)
+        plainSvg.appendChild(ctx.cross_.g_)
         ctx.focusable_ = buildFocusable(newManifest)
         ctx.layerStarts_ = computeLayerStarts(ctx.focusable_)
 

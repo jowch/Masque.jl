@@ -36,6 +36,7 @@ TextInteractable
 ThresholdInteractable
 ROIInteractable
 ViewInteractable
+SliceInteractable
 RegionInteractable
 FunctionInteractable
 ```

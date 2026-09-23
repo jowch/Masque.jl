@@ -46,6 +46,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
                 AxisInteractable(axp),
                 ThresholdInteractable(axp; orientation = :horizontal, value = 1.0),
                 ROIInteractable(axp; bounds = (0.0, 1.0, 0.5, 1.5)),
+                SliceInteractable(axp; series = [(; x = [0.0, 1.0], y = [0.0, 1.0])]),
             )
             msg = validate(bad, ctxp)
             @test msg !== nothing && occursin("PolarAxis", msg)
@@ -144,6 +145,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
                 AxisInteractable(ax3),
                 ThresholdInteractable(ax3; orientation = :horizontal, value = 1.0),
                 ROIInteractable(ax3; bounds = (1.0, 2.0, 1.0, 2.0)),
+                SliceInteractable(ax3; series = [(; x = [0.0, 1.0], y = [0.0, 1.0])]),
             )
             msg = validate(bad, ctx3)
             @test msg !== nothing && occursin("Axis3", msg)

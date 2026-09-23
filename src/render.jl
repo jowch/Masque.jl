@@ -23,6 +23,17 @@ function tip_style_dict(;
     return d
 end
 
+# A `:slice` template interpolates the live sample, not `payloads` (always empty).
+function _slice_template_keys(L::HitLayer)
+    geom = L.geometry
+    ks = Set{Symbol}()
+    push!(ks, geom["orientation"] == "v" ? :x : :y)
+    for s in geom["series"]
+        push!(ks, Symbol(s["id"]))
+    end
+    return ks
+end
+
 # union of NamedTuple field names across a payload vector (empty if none are NamedTuples)
 function _payload_keys(payloads)
     ks = Set{Symbol}()
@@ -56,7 +67,8 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     spec = tooltip_spec(i)
     spec === true && throw(ArgumentError("tooltip = true is not meaningful — omit `tooltip` for the auto name/value table (the default), pass masque\"…\" for a template, or `false` to suppress."))
     if spec isa Markup
-        ks = _payload_keys(L.payloads)
+        # A slice has no payloads: the live sample's fields are the probe coordinate plus each series id.
+        ks = L.kind === :slice ? _slice_template_keys(L) : _payload_keys(L.payloads)
         isempty(ks) || check_fields(spec, ks)      # build-time field check (skip if no NamedTuple payloads)
         d["template"] = markup_segments(spec)
     elseif spec === false
@@ -84,6 +96,44 @@ function _selection_spec(interactables, layers)
     kinds = Dict(Symbol(l["id"]) => Symbol(l["kind"]) for l in layers)
     kind = kinds[target]
     return (mode = kind === :grid ? "grid" : "elements", target = target)
+end
+
+# One slice per axis. Each `covers` id must be a `:polygons` or `:lines` layer in this call.
+function _validate_slices(layers)
+    by_id = Dict(l["id"] => l for l in layers)
+    layer_ids = Set(Symbol(l["id"]) for l in layers)
+    seen = Dict{String, String}()
+    for l in layers
+        l["kind"] == "slice" || continue
+        ax = l["axis"]
+        if haskey(seen, ax)
+            throw(
+                ArgumentError(
+                    "SliceInteractable: this axis already has slice :$(seen[ax]); :$(l["id"]) is a second slice",
+                )
+            )
+        end
+        seen[ax] = l["id"]
+        for cid in l["geometry"]["covers"]
+            if !haskey(by_id, cid)
+                sug = _suggest(Symbol(cid), layer_ids)
+                hint = sug === nothing ? "" : " Did you mean `:$sug`?"
+                throw(
+                    ArgumentError(
+                        "SliceInteractable: `covers` names :$(cid), which is not a layer in this masque() call.$hint" *
+                            " (available: $(join(sort(string.(collect(layer_ids))), ", ")))",
+                    )
+                )
+            end
+            kind = by_id[cid]["kind"]
+            kind in ("polygons", "lines") || throw(
+                ArgumentError(
+                    "SliceInteractable: `covers = :$(cid)` targets a `:$(kind)` layer; only :polygons and :lines can be covered",
+                )
+            )
+        end
+    end
+    return nothing
 end
 
 # Fail loud when a selector's `selects` target is absent or has an incompatible kind.
@@ -235,6 +285,7 @@ function build_manifest(
     layers = Any[d for (_, _, d) in built]
     layer_owners = Any[i for (i, _, _) in built]
     _validate_selectors(interactables, layers)
+    _validate_slices(layers)
     _validate_links(layer_owners, layers)
     spec = _selection_spec(interactables, layers)
     layer_ids = Symbol[L.id for (_, L, _) in built]

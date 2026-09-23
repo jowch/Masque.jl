@@ -164,8 +164,8 @@ neighboring marks. The anchor point depends on the kind:
   focus (no cursor) uses the segment's midpoint, or the point halfway along a whole line.
 - polygons: the centroid, if it lies inside the polygon shape; otherwise the cursor point.
 - grid cells (heatmaps): the cell's centre; the box sits above the cell's top edge.
-- axis, threshold, ROI, and view (continuous/drag interactions with no discrete mark): the
-  cursor position, as before.
+- axis, threshold, ROI, view, and a slice sample (continuous/drag interactions, or a live
+  sample with no discrete mark): the cursor position, as before.
 
 If the box would clip the surface's top edge, it flips to sit below the mark instead. If it
 would clip a side, it shifts to stay inside the surface and the caret moves with it, so the
@@ -176,7 +176,7 @@ caret always points at the anchor even when the box itself isn't centred on it.
 When `tooltip_caret = true` (the default), a small triangle points from the tooltip toward
 the anchor described above. For the mark-anchored kinds the caret sits at the box's bottom
 centre (or top centre, when flipped below); for the cursor-following kinds (axis/threshold/
-ROI/view) it keeps the previous cursor-relative offset and edge-clamping behavior.
+ROI/view/slice) it keeps the previous cursor-relative offset and edge-clamping behavior.
 
 See [§10](https://github.com/jowch/Masque.jl/blob/main/docs/dev/architecture/10-tooltips.md#10-tooltips)
 for the wire format behind all of this.

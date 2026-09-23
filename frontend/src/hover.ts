@@ -1,11 +1,12 @@
-import { anchorFor, computeAnchoredPlacement, hitTest, resolvePayload, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP } from "./geometry"
-import type { Anchor } from "./geometry"
+import { anchorFor, computeAnchoredPlacement, hitTest, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP } from "./geometry"
+import type { Anchor, SliceSample } from "./geometry"
 import { renderTemplate, renderAutoTable, esc } from "./template"
 import { drawHi, clearHi, drawLink, clearLink, markColorFor } from "./highlight"
+import { hideCross, syncCross } from "./cross"
 import { linkedHits } from "./selection"
 import { fmt, imgPx, cssAnchor, hitKey, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { OverlayCtx, OverlayState } from "./state"
-import type { Hit, ThresholdGeometry } from "./types"
+import type { Hit, HitLayer, Manifest, SliceGeometry, ThresholdGeometry } from "./types"
 
 const TIP_GAP = 8
 const TIP_OFFSET = 10
@@ -248,27 +249,122 @@ export function setTipText(ctx: OverlayCtx, state: OverlayState, s: string): voi
     state.tipSized_ = false
 }
 
+// Discrete marks and the legend (a :rects layer) take `pointer` via .hot. Readouts — axis,
+// colorbar, grid, and empty axis interior — stay on the surface's default `crosshair`, and the
+// overlay cross follows that cursor. A layer named in a slice's `covers` stays on crosshair too.
+const PRESS_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines"])
+
+function sliceOnAxis(manifest: Manifest, axisId: string): HitLayer | null {
+    for (const layer of manifest.layers) {
+        if (layer.kind === "slice" && layer.axis === axisId) return layer
+    }
+    return null
+}
+
+function hitIsCovered(slice: HitLayer | null, hit: Hit | null): boolean {
+    if (!slice || !hit) return false
+    return (slice.geometry as SliceGeometry).covers.includes(hit.layer.id)
+}
+
+function hitIsColorbar(hit: Hit): boolean {
+    const g = hit.layer.geometry
+    return hit.layer.kind === "axis" && Array.isArray(g) && g.length === 4
+}
+
+function sliceTipHtml(layer: HitLayer, payload: Record<string, number>): string | null {
+    if (layer.tooltip === false) return null
+    if (layer.template) return renderTemplate(layer.template, payload)
+    const shown: Record<string, string> = {}
+    for (const [k, v] of Object.entries(payload)) shown[k] = fmt(v)
+    return renderAutoTable(shown)
+}
+
 export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
     // onPointerMove routes drag-active moves to queueDrag instead — this is only ever
     // reached with drag === null, but keep the guard as defense-in-depth.
     if (state.drag_) return
     const p = imgPx(ctx.base_, ctx.manifest_, e)
     const dragHit = hitTest(ctx.manifest_, p.x, p.y, "drag")
-    // A full-viewport :view hit must not suppress element hover.
+    // A full-viewport :view hit must not suppress element hover. A threshold/ROI drag-hover
+    // still does, and it takes the resize cursor — the cross stays off.
     if (dragHit && dragHit.layer.kind !== "view") {
         if (!restoreFocus(ctx, state)) { clearHi(state, ctx.hiGroup_, true); clearLink(state, ctx.linkGroup_, true); hideTip(ctx, state) }
         setDragHoverChrome(ctx, state, dragHit); ctx.surface_.classList.remove("hot")
+        hideCross(ctx, state)
         return
     }
     setDragHoverChrome(ctx, state, null)
     const hit = hitTest(ctx.manifest_, p.x, p.y, "hover")
-    if (hit) {
-        drawHi(state, ctx.hiGroup_, hit); showTip(ctx, state, hit, p.x, p.y, e); ctx.surface_.classList.add("hot")
-        updateLinkForHit(ctx, state, hit)
+    const vp = viewportUnder(ctx.manifest_, p.x, p.y)
+    const sliceLayer = vp ? sliceOnAxis(ctx.manifest_, vp.id) : null
+    let sampled: { probe: number; samples: SliceSample[] } | null = null
+    if (sliceLayer && vp) {
+        const inv = invertAxis(vp.t, p.x, p.y)
+        if (typeof inv.x === "number" && typeof inv.y === "number") {
+            sampled = sampleSlice(sliceLayer.geometry as SliceGeometry, vp.t, inv.x, inv.y)
+        }
+    }
+    const covered = hitIsCovered(sliceLayer, hit)
+    const press = !!hit && PRESS_KINDS.has(hit.layer.kind) && !covered
+    const viewGrab = !hit && dragHit?.layer.kind === "view"
+    const showCross = !!vp && !viewGrab && !press
+    const inSupport = !!sampled && sampled.samples.length > 0
+    const colorbar = !!hit && hitIsColorbar(hit)
+    const grid = hit?.layer.kind === "grid"
+    const axisSame = !!hit && hit.layer.kind === "axis" && !colorbar && hit.axis_ === vp?.id
+    // Slice tooltip: a covered layer, or empty space / the unbounded axis readout on this
+    // transform, and only while at least one series contains the probe. A grid cell and a
+    // colorbar keep their own tooltip. Outside every series' support the cross still draws
+    // and the winning hit's tooltip stays.
+    const sliceTip = inSupport && !!sliceLayer && !viewGrab && !grid && !colorbar && (covered || !hit || axisSame)
+
+    if (showCross && vp) {
+        const [vx, vy, vw, vh] = vp.t.viewport
+        const dots = sliceTip && sampled
+            ? sampled.samples.map((s) => ({ px: s.px, py: s.py, color: s.color }))
+            : []
+        syncCross(ctx, state, true, p.x, vy, p.x, vy + vh, vx, p.y, vx + vw, p.y, dots)
     } else {
-        if (!restoreFocus(ctx, state)) { clearHi(state, ctx.hiGroup_, true); clearLink(state, ctx.linkGroup_, true); hideTip(ctx, state) }
-        ctx.surface_.classList.remove("hot")
-        if (dragHit?.layer.kind === "view") setCursorClass(ctx.surface_, "grab")
+        hideCross(ctx, state)
+    }
+
+    if (press) ctx.surface_.classList.add("hot")
+    else ctx.surface_.classList.remove("hot")
+    if (viewGrab) setCursorClass(ctx.surface_, "grab")
+
+    if (sliceTip && sliceLayer && sampled) {
+        // A covered polygon's wash would sit under the cross; the sample tooltip replaces it.
+        clearHi(state, ctx.hiGroup_, true)
+        clearLink(state, ctx.linkGroup_, true)
+        const geom = sliceLayer.geometry as SliceGeometry
+        const payload: Record<string, number> = {}
+        payload[geom.orientation === "v" ? "x" : "y"] = sampled.probe
+        for (const s of sampled.samples) payload[s.id] = s.value
+        const html = sliceTipHtml(sliceLayer, payload)
+        if (html === null) hideTip(ctx, state)
+        else {
+            applyTipHtml(ctx, state, html, null)
+            const off = tipOffset(ctx, e)
+            placeTip(ctx, state, off.x, off.y)
+        }
+        return
+    }
+
+    if (covered && hit) {
+        clearHi(state, ctx.hiGroup_, true)
+        clearLink(state, ctx.linkGroup_, true)
+        showTip(ctx, state, hit, p.x, p.y, e)
+        return
+    }
+
+    if (hit) {
+        drawHi(state, ctx.hiGroup_, hit)
+        showTip(ctx, state, hit, p.x, p.y, e)
+        updateLinkForHit(ctx, state, hit)
+    } else if (!restoreFocus(ctx, state)) {
+        clearHi(state, ctx.hiGroup_, true)
+        clearLink(state, ctx.linkGroup_, true)
+        hideTip(ctx, state)
     }
 }
 
@@ -289,6 +385,7 @@ export function onLeave(ctx: OverlayCtx, state: OverlayState): void {
     cancelPendingMove(state)
     if (!restoreFocus(ctx, state)) { clearHi(state, ctx.hiGroup_, true); clearLink(state, ctx.linkGroup_, true); hideTip(ctx, state) }
     ctx.surface_.classList.remove("hot")
+    hideCross(ctx, state)
     setDragHoverChrome(ctx, state, null)
     // Fallback for tryCapture's uncaptured path: without real capture, leaving the surface
     // fires pointerleave (capture would otherwise suppress it until release), and the

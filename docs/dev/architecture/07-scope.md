@@ -34,6 +34,8 @@ from `Makie.string_boundingboxes` (no font-metric measurement needed — the ori
 `bbox` primitive was never built). `TextLabel` (a `Block`, needs the figure-block walk rather than
 the plot-scene walk) remains deferred.
 
+**Cursor crosshair and slice (shipped, #92):** whenever the resolved cursor is `crosshair` — an axis or colorbar readout, a grid cell, empty axis interior, or a layer named in a slice's `covers` — the overlay draws both hairlines across that viewport on `svg.masque-plain`. Discrete marks and the legend stay `pointer` and the cross stays off; threshold, ROI, and view keep their drag cursors. `SliceInteractable` is not a hit target and is not grown by `masque(fig)`. It samples attached 1-D series in data space (piecewise linear, then `projectAxis`) and adds stroke-only dots plus a hover tooltip. Series vertices ship as Float64, not integer pixels. Continuous invert still fails loud on `Axis3` and `PolarAxis`.
+
 **Click-echo selection (shipped, #103):** selection moved fully client-side ([§5](05-bond-value.md)) — a click sets
 `OverlayState.selHits_` and draws the highlight in the browser, with no bond feedback onto the
 manifest. `selected=` now supplies only the selection's *starting* value: it seeds both the

@@ -1,4 +1,5 @@
 import type { Anchor } from "./geometry"
+import type { CrossEls } from "./cross"
 import type { GestureChannel } from "./gesture"
 import type { AxisTransform, FocusRef, Hit, HitLayer, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
@@ -104,6 +105,7 @@ export interface OverlayCtx {
     focusable_: FocusRef[] // flat, manifest-order list of element-indexed hits — keyboard.ts's nav domain
     layerStarts_: number[] // computeLayerStarts(focusable), cached once — PageUp/PageDown's layer-jump index
     liveRegion_: HTMLElement // visually-hidden aria-live="polite" announcer (NOT the tooltip)
+    cross_: CrossEls // both arms + sample dots on svg.masque-plain; opacity tracks crossOn_
     // `manifest_`/`thresholdLines_`/`roiBoxes_`/`focusable_`/`layerStarts_` above are
     // reassigned in place when a frame swaps in a new manifest (mount.ts's applyFrame) —
     // the one exception to "construction-time, read-mostly".
@@ -153,6 +155,9 @@ export interface OverlayState {
     // :threshold layer id currently drawn thicker for drag-hover feedback; cleared on any miss
     // (hover.ts's setDragHoverChrome) so it can never point at a line no longer under the cursor.
     hoveredThresholdId_: string | null
+    // True while g.masque-cross has .is-on. Toggled only when the cross appears or disappears,
+    // so a move inside the viewport does not restart the opacity fade.
+    crossOn_: boolean
 }
 
 export function createOverlayState(): OverlayState {
@@ -183,6 +188,7 @@ export function createOverlayState(): OverlayState {
         focusTipCss_: null,
         announceTimer_: null,
         hoveredThresholdId_: null,
+        crossOn_: false,
     }
 }
 

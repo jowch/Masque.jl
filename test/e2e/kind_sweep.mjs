@@ -166,10 +166,26 @@ function invertAxisJs(t, px, py) {
   return { x: mapAxis(t.xlims, t.xscale, fx), y: mapAxis(t.ylims, t.yscale, fy) };
 }
 
+function projectAxisJs(t, x, y) {
+  const [vx, vy, vw, vh] = t.viewport;
+  const unmap = (lims, scale, v) => {
+    if (scale === "log10" || scale === "log") {
+      const a = Math.log10(lims[0]), b = Math.log10(lims[1]);
+      return (Math.log10(v) - a) / (b - a);
+    }
+    return (v - lims[0]) / (lims[1] - lims[0]);
+  };
+  let fx = unmap(t.xlims, t.xscale, x);
+  let fy = unmap(t.ylims, t.yscale, y);
+  if (t.xreversed) fx = 1 - fx;
+  if (t.yreversed) fy = 1 - fy;
+  return { x: vx + fx * vw, y: vy + (1 - fy) * vh };
+}
+
 const browser = await chromium.launch({
   headless: true,
   // kind_sweep_webgl.jl mounts one live canvas (= one WebGL context) per widget — Chromium's
-  // default active-context cap is 16, and this notebook is at 20 (series, series-legend, legend-template).
+  // default active-context cap is 16, and this notebook is at 22 (series, series-legend, legend-template, slice lines, slice density).
   // Past the cap, Chromium silently evicts the OLDEST context ("Too many active WebGL
   // contexts. Oldest context will be lost."), which reads here as a null host/canvas on
   // whichever widget got evicted — nondeterministic, and not a Masque bug. Raised well above
@@ -408,6 +424,7 @@ try {
       sel: (svgFill?.querySelector("g.sel")?.children.length ?? 0)
         + (svgEdge?.querySelector("g.sel")?.children.length ?? 0)
         + (svgPlain?.querySelector("g.sel")?.children.length ?? 0),
+      cross: sr.querySelector(".masque-cross")?.classList.contains("is-on") ?? false,
     };
   }, [key, x, y, type]);
 
@@ -711,6 +728,11 @@ try {
 
     if (spec.mode === "drag") {
       const p = hitPoint(layer, 0);
+      if (spec.layerKind === "threshold") {
+        const hover = await dispatchAt(key, p.x, p.y, "pointermove");
+        if (hover.cross) throw new Error(`${key}: cross should be off while hovering the threshold line`);
+        passed.push(`${key}/cross-off`);
+      }
       const before = await textOf(`#out_${key}`);
       const ends = spec.layerKind === "threshold"
         ? [[p.x, p.y - 50], [p.x, p.y + 50]]
@@ -743,6 +765,29 @@ try {
       if (!re.test(after)) throw new Error(`${key}-drag: readout mismatch ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/drag-bind`);
       console.error(`OK  ${key}/drag — ${after.slice(0, 100)}`);
+      continue;
+    }
+
+    if (spec.mode === "slice") {
+      const axes = await transformsOf(key);
+      const t = Object.values(axes).find((tr) => !tr.is3d && !tr.ispolar);
+      if (!t) throw new Error(`${key}: no 2D transform`);
+      for (const probe of spec.probes) {
+        const y = probe.y ?? (t.ylims[0] + t.ylims[1]) / 2;
+        const pt = projectAxisJs(t, probe.x, y);
+        let tip = null;
+        for (let a = 0; a < 8; a++) {
+          tip = await dispatchAt(key, pt.x, pt.y, "pointermove");
+          if (tip?.show && tip.cross && probe.contains.every((s) => tip.text.includes(s))) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        if (!tip?.cross) throw new Error(`${key}: cross off at data (${probe.x}, ${y}) tip=${JSON.stringify(tip)}`);
+        for (const s of probe.contains) {
+          if (!tip.text.includes(s)) throw new Error(`${key}: tooltip ${JSON.stringify(tip?.text)} missing ${JSON.stringify(s)}`);
+        }
+      }
+      passed.push(`${key}/slice`);
+      console.error(`OK  ${key}/slice`);
       continue;
     }
 
@@ -836,6 +881,8 @@ try {
       if (axisTip.hi.fill || axisTip.hi.edge || axisTip.hi.plain) {
         throw new Error(`${key}/axis-hover: unexpected highlight ${JSON.stringify(axisTip.hi)}`);
       }
+      if (!axisTip.cross) throw new Error(`${key}/axis-hover: cross should be on for an axis readout`);
+      passed.push(`${key}/cross-on`);
       passed.push(`${key}/axis-hover-coords`);
       await leave();
 
@@ -861,6 +908,8 @@ try {
       if (gotCb === null || Math.abs(gotCb - expCbVal) > tolCb) {
         throw new Error(`${key}/colorbar-hover: tooltip ${JSON.stringify(cbTip)} parsed=${gotCb}, want ≈${expCbVal} (±${tolCb.toFixed(4)})`);
       }
+      if (!cbTip.cross) throw new Error(`${key}/colorbar-hover: cross should be on for a colorbar readout`);
+      passed.push(`${key}/colorbar-cross-on`);
       passed.push(`${key}/colorbar-hover-coords`);
 
       // The gap pixel must read as the axis catch-all's 2-D "x=…, y=…" text, not the colorbar's
@@ -1106,6 +1155,11 @@ try {
       await new Promise((r) => setTimeout(r, 200));
     }
     if (!tipHit(tip)) throw new Error(`${key}: tooltip ${JSON.stringify(tip)}`);
+    const crossExpected = layer.kind === "grid";
+    if (!!tip.cross !== crossExpected) {
+      throw new Error(`${key}: cross ${tip.cross}, expected ${crossExpected} for kind ${layer.kind}`);
+    }
+    passed.push(`${key}/cross`);
     // Open (edge-only, no fill shape) kinds are line-geometry layers (polyline/segments/lines);
     // every other element-kind layer (circles/rects/polygons/grid) is closed (fill + edge).
     // A one-element line with a baked selection has nowhere else to hover: that hover is the

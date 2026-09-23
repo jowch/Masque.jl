@@ -829,3 +829,164 @@ function auto_interactables(fig)
     end
     return ints
 end
+
+# --- SliceInteractable from a plot -----------------------------------------------------------
+# Vertices are the converted points the plot already draws. Density/Band contribute the band's
+# upper curve (the same `_conv` PolygonInteractable reads — not a recomputed KDE). A strictly
+# decreasing probe is stored left-to-right; a non-monotonic one fails in the constructor.
+
+function _slice_xy(pts)
+    xs = Float64[]
+    ys = Float64[]
+    for p in pts
+        push!(xs, Float64(p[1]))
+        push!(ys, Float64(p[2]))
+    end
+    return xs, ys
+end
+
+function _slice_color(p)
+    hasproperty(p, :color) || return nothing
+    c = p.color[]
+    (c isa AbstractVector || c isa Real || c isa Makie.Automatic) && return nothing
+    try
+        _css_color(c)
+    catch
+        return nothing
+    end
+    return c
+end
+
+function _slice_label(p)
+    hasproperty(p, :label) || return nothing
+    lab = p.label[]
+    return lab isa AbstractString && !isempty(lab) ? String(lab) : nothing
+end
+
+_slice_ident_id(lab) = lab isa AbstractString && occursin(r"^[A-Za-z][A-Za-z0-9_]*$", lab) ? Symbol(lab) : nothing
+
+# Reverse only a strictly decreasing finite probe, so a right-to-left upper curve still samples.
+function _flip_if_decreasing!(xs, ys, orientation)
+    probe = orientation === :vertical ? xs : ys
+    prev = nothing
+    decreasing = false
+    for v in probe
+        isfinite(v) || continue
+        if prev !== nothing
+            v < prev && (decreasing = true)
+            v > prev && return nothing
+        end
+        prev = v
+    end
+    decreasing && (reverse!(xs); reverse!(ys))
+    return nothing
+end
+
+function _slice_parts(p)
+    if p isa Makie.Lines
+        xs, ys = _slice_xy(_conv(p)[1])
+        _flip_if_decreasing!(xs, ys, :vertical)
+        lab = _slice_label(p)
+        return :vertical, [(; id = _slice_ident_id(lab), label = lab, color = _slice_color(p), x = xs, y = ys)], :lines
+    elseif p isa Makie.Stairs
+        line = _childof(p, Makie.Lines)
+        xs, ys = _slice_xy(_conv(line)[1])
+        _flip_if_decreasing!(xs, ys, :vertical)
+        lab = _slice_label(p)
+        col = _slice_color(p)
+        col === nothing && (col = _slice_color(line))
+        return :vertical, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys)], :stairs
+    elseif p isa Makie.Series
+        children = _child_plots(p)
+        isempty(children) && error("SliceInteractable: Series has no child lines")
+        series = NamedTuple[]
+        for c in children
+            line = _series_line(c)
+            xs, ys = _slice_xy(_conv(line)[1])
+            _flip_if_decreasing!(xs, ys, :vertical)
+            lab = _slice_label(c)
+            push!(series, (; id = _slice_ident_id(lab), label = lab, color = _slice_color(line), x = xs, y = ys))
+        end
+        return :vertical, series, :series
+    elseif p isa Union{Makie.Band, Makie.Density}
+        band = p isa Makie.Density ? _descendant(p, Makie.Band) : p
+        orient = band.direction[] === :y ? :horizontal : :vertical
+        _lower, upper = _conv(band)
+        xs, ys = _slice_xy(upper)
+        _flip_if_decreasing!(xs, ys, orient)
+        lab = _slice_label(p)
+        col = _slice_color(p)
+        col === nothing && (col = _slice_color(band))
+        stem = p isa Makie.Density ? :density : :band
+        return orient, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys)], stem
+    else
+        throw(
+            ArgumentError(
+                "SliceInteractable: $(typeof(p).name.name) is not a Lines, Stairs, Series, Band, or Density",
+            )
+        )
+    end
+end
+
+function _slice_cover_ids(stems)
+    seen = Dict{Symbol, Int}()
+    ids = Symbol[]
+    for stem in stems
+        n = get(seen, stem, 0) + 1
+        seen[stem] = n
+        push!(ids, n == 1 ? stem : Symbol(stem, :_, n))
+    end
+    return ids
+end
+
+"""
+    SliceInteractable(ax, plot; orientation=nothing, id=:slice, covers=nothing, tooltip=nothing)
+    SliceInteractable(ax, plots; ...)
+
+One slice from a `Lines`, `Stairs`, `Series`, `Band`, or `Density`, or from a vector of those.
+See [`SliceInteractable`](@ref) for the series constructor. `covers=nothing` (the default) names
+each plot's auto-extract layer id (`:lines`, `:stairs`, `:series`, `:band`, `:density`, with
+`_2`, `_3`, … when the vector repeats a kind). `orientation=nothing` follows the plot:
+`Density`/`Band` with `direction == :y` are `:horizontal`, everything else is `:vertical`.
+A vector that mixes those raises `ArgumentError` unless `orientation` is passed.
+"""
+function SliceInteractable(
+        ax, plots::AbstractVector;
+        orientation = nothing, id = :slice, covers = nothing, tooltip = nothing,
+    )
+    isempty(plots) && throw(ArgumentError("SliceInteractable: plots is empty"))
+    series = NamedTuple[]
+    stems = Symbol[]
+    orients = Symbol[]
+    auto_n = 0
+    for p in plots
+        orient, parts, stem = _slice_parts(p)
+        push!(orients, orient)
+        push!(stems, stem)
+        for part in parts
+            sid = part.id
+            if sid === nothing
+                auto_n += 1
+                sid = Symbol("s", auto_n)
+            end
+            push!(series, (; id = sid, label = part.label, color = part.color, x = part.x, y = part.y))
+        end
+    end
+    uniq = unique(orients)
+    orient = if orientation === nothing
+        length(uniq) == 1 || throw(
+            ArgumentError(
+                "SliceInteractable: plots mix $(join(string.(uniq), " and ")) orientations; pass orientation=",
+            )
+        )
+        only(uniq)
+    else
+        orientation
+    end
+    cover_ids = covers === nothing ? _slice_cover_ids(stems) : covers
+    return SliceInteractable(ax; series, orientation = orient, id, covers = cover_ids, tooltip)
+end
+
+function SliceInteractable(ax, p; orientation = nothing, id = :slice, covers = nothing, tooltip = nothing)
+    return SliceInteractable(ax, [p]; orientation, id, covers, tooltip)
+end

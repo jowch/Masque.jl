@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- The cursor follows what the pointer is over. An axis or colorbar readout, a grid cell, and
+  empty axis interior stay `crosshair` and draw both hairlines across that viewport. A discrete
+  mark (points, bars, polygons, segments, lines) and a legend entry stay `pointer`. Threshold,
+  ROI, and view keep their drag cursors, and the cross stays off for those. A layer named in a
+  `SliceInteractable`'s `covers` stays `crosshair` and skips that layer's highlight.
 - `PointInteractable(ax, points)` takes its highlight radius from the one `Scatter` on that
   axis with the same positions — the marker's drawn extent, same as
   `PointInteractable(ax, scatter)` — instead of a fixed `radius` of 9 that haloed the
@@ -27,6 +32,14 @@ All notable changes to this project are documented here. The format is based on
   leave the card off. A screen reader still announces the entry's label.
 
 ### Added
+- `SliceInteractable`: hover samples one or more 1-D series at the cursor (piecewise linear in
+  data space) and shows the values in the tooltip. Both crosshair arms are drawn by the overlay
+  whenever the cursor is `crosshair`; the slice adds the dots and chooses which coordinate is
+  the sample. It does not enter hit testing, does not write `@bind`, and is not grown by
+  `masque(fig)`. `Lines`, `Stairs`, `Series`, `Band`, and `Density` have a plot constructor.
+  A second slice on the same axis, a non-monotonic probe, `Axis3`, `PolarAxis`, a
+  non-invertible scale, or a `covers` id that is not `:polygons` or `:lines` fails at
+  `masque()` time.
 - `:webgl` view gestures stream live frames on the same `with_js_link` channel as `:cairo`.
   Each frame is a freshly serialized scene plus a hit manifest Julia computed for that camera,
   swapped onto the canvas the cell already holds — no new WebGL context, no cell re-run.

@@ -2862,3 +2862,158 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
         expect((host as unknown as { value: unknown }).value).toBeNull()
     })
 })
+
+describe("crosshair", () => {
+    const ax: Manifest["transforms"] = {
+        ax1: {
+            xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false,
+        },
+    }
+    const move = (surface: HTMLElement, clientX: number, clientY: number) => {
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX, clientY, bubbles: true }))
+    }
+    const crossOn = (shadow: ShadowRoot) =>
+        shadow.querySelector(".masque-cross")!.classList.contains("is-on")
+
+    it("draws the cross on a grid cell without the pointer cursor", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: { xedges: [200, 600, 1000], yedges: [100, 400, 700], ncols: 2, nrows: 2, values: [1, 2, 3, 4] },
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 200, 100) // image (400, 200): grid cell (1, 1)
+        expect(crossOn(shadow)).toBe(true)
+        expect(surface.classList.contains("hot")).toBe(false)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("(1,1) = 1")
+    })
+
+    it("draws the cross on empty space inside the viewport", () => {
+        const { host, script } = setup()
+        mount(script, { width: 1200, height: 800, scaling: 2, transforms: ax, layers: [] })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 10, 10)
+        expect(crossOn(shadow)).toBe(true)
+        expect(surface.classList.contains("hot")).toBe(false)
+    })
+
+    it("draws the cross on an axis readout inside the viewport", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{ id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["hover"] }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 10, 10) // image (20, 20)
+        expect(crossOn(shadow)).toBe(true)
+        expect(surface.classList.contains("hot")).toBe(false)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toContain("x=")
+    })
+
+    it("hides the cross on a circle", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "pts", kind: "circles", geometry: [600, 200, 20], payloads: [{ i: 7 }],
+                axis: "ax1", events: ["click", "hover"],
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 300, 100) // image (600, 200)
+        expect(surface.classList.contains("hot")).toBe(true)
+        expect(crossOn(shadow)).toBe(false)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toContain("7")
+    })
+
+    it("hides the cross on a threshold drag-hover and keeps that line first", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { orientation: "h", pos: 400, span: [0, 1200] },
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 100, 200) // image (200, 400) sits on the horizontal threshold
+        expect(crossOn(shadow)).toBe(false)
+        expect(surface.classList.contains("cur-ns")).toBe(true)
+        const line = shadow.querySelector("line") as SVGLineElement
+        expect(line.getAttribute("y1")).toBe("400")
+        expect(line.classList.contains("masque-threshold-line")).toBe(true)
+    })
+
+    it("a covered polygon keeps crosshair and the slice tooltip; a circle keeps its own", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [
+                {
+                    id: "pts", kind: "circles", geometry: [100, 100, 15], payloads: [{ i: 3 }],
+                    axis: "ax1", events: ["hover"],
+                },
+                {
+                    id: "fill", kind: "polygons", axis: "ax1", events: ["hover"],
+                    geometry: [[200, 200, 1000, 200, 1000, 600, 200, 600]],
+                    payloads: [{ name: "the-fill" }],
+                },
+                {
+                    id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: {
+                        orientation: "v", covers: ["fill"],
+                        series: [{ id: "wide", xy: [0, 0, 10, 10] }, { id: "narrow", xy: [0, 10, 10, 0] }],
+                    },
+                },
+            ],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        move(surface, 300, 200) // image (600, 400) → data (5, 5); inside the polygon, on both series
+        expect(crossOn(shadow)).toBe(true)
+        expect(surface.classList.contains("hot")).toBe(false)
+        expect(tip.innerHTML).toContain("wide")
+        expect(tip.innerHTML).toContain("narrow")
+        expect(tip.innerHTML).not.toContain("the-fill")
+        expect(hiChildren(shadow).length).toBe(0)
+        expect(shadow.querySelectorAll(".masque-cross circle").length).toBe(2)
+    })
+
+    it("a circle beside a slice keeps pointer and its own tooltip", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [
+                {
+                    id: "pts", kind: "circles", geometry: [100, 100, 15], payloads: [{ i: 3 }],
+                    axis: "ax1", events: ["hover"],
+                },
+                {
+                    id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: {
+                        orientation: "v", covers: ["fill"],
+                        series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                    },
+                },
+            ],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 50, 50) // image (100, 100)
+        expect(surface.classList.contains("hot")).toBe(true)
+        expect(crossOn(shadow)).toBe(false)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        expect(tip.innerHTML).toContain("3")
+        expect(tip.innerHTML).not.toContain("wide")
+    })
+})
