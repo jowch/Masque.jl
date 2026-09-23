@@ -51,7 +51,7 @@ any mode other than `:polyline`).
 tuple's first element isn't `:circle`, `:rect`, or `:polygon`.
 **Fix:** check the region tuple shapes against [Custom interactions](@ref).
 
-### A scale-related `ArgumentError` from `AxisInteractable`/`ColorbarInteractable`/`ThresholdInteractable`/`ROIInteractable`/`ViewInteractable`
+### A scale-related `ArgumentError` from `AxisInteractable`/`ColorbarInteractable`/`ThresholdInteractable`/`ROIInteractable`/`ViewInteractable`/`SliceInteractable`
 
 **Cause:** these interactables invert a pixel back to a data value *in the browser*, which
 only works for `identity`, `log10`, or `log` axis scales. Any other Makie scale
@@ -59,13 +59,13 @@ only works for `identity`, `log10`, or `log` axis scales. Any other Makie scale
 `masque()` time instead of silently reporting the wrong coordinate. The exact wording differs
 per kind — `AxisInteractable`/`ColorbarInteractable` say "... is not invertible client-side";
 `ThresholdInteractable`/`ROIInteractable`/`ViewInteractable` say "needs (a) client-side
-invertible ... scale(s)".
+invertible ... scale(s)"; `SliceInteractable` says "needs client-side invertible x and y scales".
 **Fix:** switch the axis to one of the supported scales, or use an element interactable
 (`PointInteractable`, `SegmentInteractable`, …) instead of a continuous-readout one.
 
 ### "continuous pixel→data readout is undefined on an Axis3" / "on PolarAxis"
 
-**Cause:** `AxisInteractable`/`ThresholdInteractable`/`ROIInteractable`/orbit
+**Cause:** `AxisInteractable`/`ThresholdInteractable`/`ROIInteractable`/`SliceInteractable`/orbit
 `ViewInteractable` need a 2D pixel→data inverse; a 3D axis has none (a screen pixel is a ray)
 and `PolarAxis` continuous θ/r inversion isn't shipped yet.
 **Fix:** use element interactables (points/segments/polygons) on 3D or polar axes instead.
@@ -73,8 +73,9 @@ and `PolarAxis` continuous θ/r inversion isn't shipped yet.
 ### "bounds need continuous axes" / "pan needs continuous numeric axes"
 
 **Cause:** `ROIInteractable`/`ViewInteractable` pan needs numeric axis limits; a categorical
-axis has none.
-**Fix:** use `AxisInteractable` (reads the category) instead.
+axis has none. `SliceInteractable` also rejects a categorical axis: interpolation needs a
+numeric coordinate, unlike `AxisInteractable`, which reads the category.
+**Fix:** use `AxisInteractable` (reads the category) instead. A slice needs a continuous axis.
 
 ### "Masque's CairoMakie backend supports Makie.Axis, Makie.Axis3, and Makie.PolarAxis" (`LScene`)
 

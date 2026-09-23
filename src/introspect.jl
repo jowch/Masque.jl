@@ -829,3 +829,182 @@ function auto_interactables(fig)
     end
     return ints
 end
+
+# --- SliceInteractable from a plot -----------------------------------------------------------
+# Vertices are the points the plot already draws. Stairs keeps the child line's steppoints,
+# repeated probe and all, so a tread samples as a constant. Density/Band contribute the band's
+# upper curve as drawn (not a recomputed KDE): a Band with direction=:y is stored unflipped
+# and swapped here; a Density with direction=:y is already Point2(value, position) and is not
+# swapped again. A strictly decreasing probe is stored left-to-right; a non-monotonic one fails
+# in the constructor.
+
+function _slice_xy(pts)
+    xs = Float64[]
+    ys = Float64[]
+    for p in pts
+        push!(xs, Float64(p[1]))
+        push!(ys, Float64(p[2]))
+    end
+    return xs, ys
+end
+
+function _slice_color(p)
+    hasproperty(p, :color) || return nothing
+    c = p.color[]
+    (c isa AbstractVector || c isa Real || c isa Makie.Automatic) && return nothing
+    try
+        _css_color(c)
+    catch
+        return nothing
+    end
+    return c
+end
+
+function _slice_label(p)
+    hasproperty(p, :label) || return nothing
+    lab = p.label[]
+    return lab isa AbstractString && !isempty(lab) ? String(lab) : nothing
+end
+
+_slice_ident_id(lab) = lab isa AbstractString && occursin(r"^[A-Za-z][A-Za-z0-9_]*$", lab) ? Symbol(lab) : nothing
+
+# Reverse only a strictly decreasing finite probe, so a right-to-left upper curve still samples.
+function _flip_if_decreasing!(xs, ys, orientation)
+    probe = orientation === :vertical ? xs : ys
+    prev = nothing
+    decreasing = false
+    for v in probe
+        isfinite(v) || continue
+        if prev !== nothing
+            v < prev && (decreasing = true)
+            v > prev && return nothing
+        end
+        prev = v
+    end
+    decreasing && (reverse!(xs); reverse!(ys))
+    return nothing
+end
+
+function _slice_parts(p)
+    if p isa Makie.Lines
+        xs, ys = _slice_xy(_conv(p)[1])
+        lab = _slice_label(p)
+        return :vertical, [(; id = _slice_ident_id(lab), label = lab, color = _slice_color(p), x = xs, y = ys)], :lines
+    elseif p isa Makie.Stairs
+        line = _childof(p, Makie.Lines)
+        xs, ys = _slice_xy(_conv(line)[1])
+        lab = _slice_label(p)
+        col = _slice_color(p)
+        col === nothing && (col = _slice_color(line))
+        # plateau: :pre, :post, and :center each repeat x on the riser. Kept, so the linear
+        # sampler holds the tread instead of interpolating across the step.
+        return :vertical, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys, plateau = true)], :stairs
+    elseif p isa Makie.Series
+        children = _child_plots(p)
+        isempty(children) && error("SliceInteractable: Series has no child lines")
+        series = NamedTuple[]
+        for c in children
+            line = _series_line(c)
+            xs, ys = _slice_xy(_conv(line)[1])
+            lab = _slice_label(c)
+            push!(series, (; id = _slice_ident_id(lab), label = lab, color = _slice_color(line), x = xs, y = ys))
+        end
+        return :vertical, series, :series
+    elseif p isa Makie.Density
+        # The child band is called with no direction, so it stays :x. direction=:y already
+        # stored Point2(offset + density, k.x); swapping that again would undo the curve.
+        band = _descendant(p, Makie.Band)
+        orient = p.direction[] === :y ? :horizontal : :vertical
+        _lower, upper = _conv(band)
+        xs, ys = _slice_xy(upper)
+        lab = _slice_label(p)
+        col = _slice_color(p)
+        col === nothing && (col = _slice_color(band))
+        return orient, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys)], :density
+    elseif p isa Makie.Band
+        # converted[] stays Point2(x, yupper). direction=:y flips only the mesh, so the
+        # drawn upper edge is reverse.(point).
+        swap = p.direction[] === :y
+        orient = swap ? :horizontal : :vertical
+        _lower, upper = _conv(p)
+        xs, ys = _slice_xy(upper)
+        swap && ((xs, ys) = (ys, xs))
+        lab = _slice_label(p)
+        col = _slice_color(p)
+        return orient, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys)], :band
+    else
+        throw(
+            ArgumentError(
+                "SliceInteractable: $(typeof(p).name.name) is not a Lines, Stairs, Series, Band, or Density",
+            )
+        )
+    end
+end
+
+function _slice_cover_ids(stems)
+    seen = Dict{Symbol, Int}()
+    ids = Symbol[]
+    for stem in stems
+        n = get(seen, stem, 0) + 1
+        seen[stem] = n
+        push!(ids, n == 1 ? stem : Symbol(stem, :_, n))
+    end
+    return ids
+end
+
+"""
+    SliceInteractable(ax, plot; orientation=nothing, crosshair=true, id=:slice, covers=nothing, tooltip=nothing)
+    SliceInteractable(ax, plots; ...)
+
+One slice from a `Lines`, `Stairs`, `Series`, `Band`, or `Density`, or from a vector of those.
+See [`SliceInteractable`](@ref) for the series constructor. `covers=nothing` (the default) names
+each plot's auto-extract layer id (`:lines`, `:stairs`, `:series`, `:band`, `:density`, with
+`_2`, `_3`, … when the vector repeats a kind). That count is inside this vector, not across
+the figure. `orientation=nothing` follows the plot: a `Density` uses its own `direction`, and
+a `Band` uses its `direction`; `:y` is `:horizontal` and everything else is `:vertical`.
+A vector that mixes those raises `ArgumentError` unless `orientation` is passed.
+"""
+function SliceInteractable(
+        ax, plots::AbstractVector;
+        orientation = nothing, crosshair = true, id = :slice, covers = nothing, tooltip = nothing,
+    )
+    isempty(plots) && throw(ArgumentError("SliceInteractable: plots is empty"))
+    series = NamedTuple[]
+    stems = Symbol[]
+    orients = Symbol[]
+    auto_n = 0
+    for p in plots
+        orient, parts, stem = _slice_parts(p)
+        push!(orients, orient)
+        push!(stems, stem)
+        for part in parts
+            sid = part.id
+            if sid === nothing
+                auto_n += 1
+                sid = Symbol("s", auto_n)
+            end
+            plateau = hasproperty(part, :plateau) && part.plateau === true
+            push!(series, (; id = sid, label = part.label, color = part.color, x = part.x, y = part.y, plateau))
+        end
+    end
+    uniq = unique(orients)
+    orient = if orientation === nothing
+        length(uniq) == 1 || throw(
+            ArgumentError(
+                "SliceInteractable: plots mix $(join(string.(uniq), " and ")) orientations; pass orientation=",
+            )
+        )
+        only(uniq)
+    else
+        orientation
+    end
+    cover_ids = covers === nothing ? _slice_cover_ids(stems) : covers
+    for s in series
+        _flip_if_decreasing!(s.x, s.y, orient)
+    end
+    return SliceInteractable(ax; series, orientation = orient, crosshair, id, covers = cover_ids, tooltip)
+end
+
+function SliceInteractable(ax, p; orientation = nothing, crosshair = true, id = :slice, covers = nothing, tooltip = nothing)
+    return SliceInteractable(ax, [p]; orientation, crosshair, id, covers, tooltip)
+end

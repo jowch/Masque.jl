@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
-    distToSegment, pointInPolygon, findBin, invertAxis, hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles,
+    distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
+    hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles,
     anchorFor, computeAnchoredPlacement,
 } from "../src/geometry"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest } from "../src/types"
@@ -674,5 +675,76 @@ describe("computeAnchoredPlacement", () => {
         const bar = computeAnchoredPlacement({ x: 50, y: 10, top: 10 }, 60, 20, 400, 300)
         expect(bar.below).toBe(true)
         expect(bar.top).toBe(20) // bottom === top(10) + gap(10) — starts right at the anchor
+    })
+})
+
+describe("projectAxis / sampleSlice", () => {
+    const identity: AxisTransform = {
+        xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+        viewport: [0, 0, 100, 50], xreversed: false, yreversed: false,
+    }
+    const logY: AxisTransform = {
+        xlims: [0, 10], ylims: [1, 100], xscale: "identity", yscale: "log10",
+        viewport: [10, 20, 200, 100], xreversed: false, yreversed: false,
+    }
+    it("projectAxis round-trips invertAxis on identity and log", () => {
+        for (const t of [identity, logY]) {
+            const data = t === identity ? { x: 4, y: 2.5 } : { x: 4, y: 10 }
+            const px = projectAxis(t, data.x, data.y)
+            const back = invertAxis(t, px.x, px.y)
+            expect(back.x).toBeCloseTo(data.x)
+            expect(back.y).toBeCloseTo(data.y)
+        }
+    })
+    it("sampleSlice lerps in data space, omits outside support and a NaN gap", () => {
+        const geom = {
+            orientation: "v" as const, covers: [],
+            series: [
+                { id: "a", xy: [0, 0, 1, 10] },
+                { id: "b", xy: [2, 0, 3, 10] },
+                { id: "c", xy: [0, 0, 1, 1, NaN, NaN, 3, 0, 4, 2] },
+            ],
+        }
+        const at = (x: number) => sampleSlice(geom, identity, x, 0)!
+        expect(at(0.5).samples.map((s) => s.id)).toEqual(["a", "c"])
+        expect(at(0.5).samples[0].value).toBeCloseTo(5)
+        expect(at(0.5).probe).toBeCloseTo(0.5)
+        expect(at(2.5).samples.find((s) => s.id === "b")!.value).toBeCloseTo(5)
+        expect(at(2).samples.find((s) => s.id === "c")).toBeUndefined()
+        expect(at(3.5).samples.find((s) => s.id === "c")!.value).toBeCloseTo(1)
+        expect(at(-1).samples).toEqual([])
+    })
+    it("sampleSlice holds a stair tread when the riser repeats the probe", () => {
+        // :pre steppoints of (0,0), (1,2), (2,1), (3,3)
+        const geom = {
+            orientation: "v" as const, covers: [],
+            series: [{ id: "s", xy: [0, 0, 0, 2, 1, 2, 1, 1, 2, 1, 2, 3, 3, 3] }],
+        }
+        const at = (x: number) => sampleSlice(geom, identity, x, 0)!.samples[0].value
+        expect(at(0.5)).toBeCloseTo(2)
+        expect(at(1.5)).toBeCloseTo(1)
+        expect(at(2.5)).toBeCloseTo(3)
+        expect(at(1)).toBeCloseTo(2)
+    })
+    it("a slice layer is not a hit target", () => {
+        const layer: HitLayer = {
+            id: "s", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: { orientation: "v", covers: ["density"], series: [{ id: "a", xy: [0, 0, 1, 1] }] },
+        }
+        expect(hitLayer(layer, 0, 0)).toBeNull()
+    })
+    it("viewportUnder picks the smallest non-3d viewport that contains the point", () => {
+        const m: Manifest = {
+            width: 100, height: 100, scaling: 1,
+            transforms: {
+                plot: { ...identity, viewport: [0, 0, 100, 100] },
+                bar: { ...identity, viewport: [40, 40, 10, 10] },
+                ax3: { ...identity, viewport: [0, 0, 20, 20], is3d: true },
+            },
+            layers: [],
+        }
+        expect(viewportUnder(m, 45, 45)!.id).toBe("bar")
+        expect(viewportUnder(m, 10, 10)!.id).toBe("plot")
+        expect(viewportUnder(m, 200, 200)).toBeNull()
     })
 })

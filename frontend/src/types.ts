@@ -11,6 +11,7 @@ export type Kind =
     | "threshold" // geometry: ThresholdGeometry — a draggable h/v line; value computed via AxisTransform on drag
     | "roi"       // geometry: ROIGeometry — a draggable+resizable rect; bounds computed via AxisTransform
     | "view"      // geometry: ViewGeometry — drag-to-pan (2D) / drag-to-orbit (Axis3); commit on mouse-up
+    | "slice"     // geometry: SliceGeometry — data-space series sampled at the cursor; not a hit target
 
 export interface GridGeometry {
     xedges: number[]
@@ -42,6 +43,20 @@ export interface ROIGeometry {
     w: number
     h: number
     handle: number // hit half-size, image px; the painted grip is HANDLE_CSS in drag/roi.ts
+}
+
+export interface SliceSeries {
+    id: string
+    label?: string
+    color?: string
+    xy: number[] // data space, interleaved (probe, value); NaN starts a new run
+}
+
+export interface SliceGeometry {
+    orientation: "v" | "h" // which data coordinate is the probe, and which single hair is drawn
+    crosshair?: boolean    // true draws that one hair; false or absent draws none
+    covers: string[]       // layer ids whose hover this slice replaces
+    series: SliceSeries[]
 }
 
 export interface ViewGeometry {
@@ -79,7 +94,7 @@ export type TemplateSegment = string | { f: string; spec?: string }
 export interface HitLayer {
     id: string
     kind: Kind
-    geometry: number[] | number[][] | GridGeometry | ThresholdGeometry | ROIGeometry | ViewGeometry | null
+    geometry: number[] | number[][] | GridGeometry | ThresholdGeometry | ROIGeometry | ViewGeometry | SliceGeometry | null
     payloads: unknown[]
     axis: string
     events: string[] // "click" | "hover" | "drag"

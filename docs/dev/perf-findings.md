@@ -249,6 +249,12 @@ here. It becomes a real risk only at the extremes below.
 - **Heatmaps carry the full value matrix** (`:grid` geometry's `values[]`, O(cells)): 200×200 ≈
   198 KB. By design — that value already feeds the `{i,j,value}` hover readout; M2.3 confirmed
   no extra cost for heatmaps (template + tipStyle are O(1) per layer, not per-cell).
+- **Slice series are Float64, not integer pixels.** `bench/payload_envelope.jl` section H,
+  one series and no other layers: 100 vertices is 1.8 KB of `xy` inside a 2.2 KB manifest;
+  1 000 vertices is 17.6 KB of `xy` inside an 18.0 KB manifest (about 18 B/vertex, two
+  Float64s). The raster stays the empty-axis floor (9.8 KB) because the slice draws nothing
+  into the figure. A view gesture rebuilds the manifest each frame, so a slice on a panned
+  axis pays this term again per camera move.
 - **px_per_unit (display width)** scales the PNG ~quadratically with width but **does not** touch
   the manifest (geometry is pixel coords; the count is unchanged): scatter-1000 PNG 90 KB @300px
   → 187 KB @700px, manifest ~38 KB both.

@@ -71,6 +71,7 @@ function kind_bond_stamp(kind::Symbol)
     kind === :threshold && return "threshold"
     kind === :roi && return "bounds"
     kind === :view && return "none"
+    kind === :slice && return "none"
     return "element"
 end
 
@@ -86,8 +87,10 @@ function bond_stamp(i::AbstractInteractable, L::HitLayer)
     if i isa RectInteractable
         return i.layout === :grid ? "gridcell" : "element"
     end
+    i isa SliceInteractable && return "none"
     i isa FunctionInteractable && return kind_bond_stamp(L.kind)
     L.kind === :view && return "none"
+    L.kind === :slice && return "none"
     return "element"
 end
 

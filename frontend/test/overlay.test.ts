@@ -1,6 +1,18 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from "vitest"
-import { mount } from "../src/overlay"
+import { afterEach, describe, it, expect, vi } from "vitest"
+import { mount as mountOverlay } from "../src/overlay"
+
+// Each mount's wheel-settle timer and in-flight frame outlive the test. happy-dom then
+// deletes HTMLCanvasElement, and the late frame throws. Cleanup runs before that teardown.
+const mountedCleanups: Array<() => void> = []
+afterEach(() => {
+    while (mountedCleanups.length) mountedCleanups.pop()!()
+})
+function mount(...args: Parameters<typeof mountOverlay>): ReturnType<typeof mountOverlay> {
+    const mounted = mountOverlay(...args)
+    mountedCleanups.push(mounted.cleanup)
+    return mounted
+}
 import { mapPoint, unmapPoint } from "../src/photo"
 import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
@@ -3015,6 +3027,217 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
     })
 })
 
+describe("crosshair", () => {
+    const ax: Manifest["transforms"] = {
+        ax1: {
+            xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false,
+        },
+    }
+    const move = (surface: HTMLElement, clientX: number, clientY: number) => {
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX, clientY, bubbles: true }))
+    }
+    const crossOn = (shadow: ShadowRoot) =>
+        shadow.querySelector(".masque-cross")!.classList.contains("is-on")
+
+    it("leaves a grid cell on its own tooltip, with no hair", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: { xedges: [200, 600, 1000], yedges: [100, 400, 700], ncols: 2, nrows: 2, values: [1, 2, 3, 4] },
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 200, 100) // image (400, 200): grid cell (1, 1)
+        expect(crossOn(shadow)).toBe(false)
+        expect(surface.classList.contains("hot")).toBe(false)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("(1,1) = 1")
+    })
+
+    it("draws no hair on empty space inside the viewport", () => {
+        const { host, script } = setup()
+        mount(script, { width: 1200, height: 800, scaling: 2, transforms: ax, layers: [] })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 10, 10)
+        expect(crossOn(shadow)).toBe(false)
+        expect(surface.classList.contains("hot")).toBe(false)
+    })
+
+    it("draws no hair on an axis readout inside the viewport", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{ id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["hover"] }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 10, 10) // image (20, 20)
+        expect(crossOn(shadow)).toBe(false)
+        expect(surface.classList.contains("hot")).toBe(false)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toContain("x=")
+    })
+
+    it("hides the cross on a circle", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "pts", kind: "circles", geometry: [600, 200, 20], payloads: [{ i: 7 }],
+                axis: "ax1", events: ["click", "hover"],
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 300, 100) // image (600, 200)
+        expect(surface.classList.contains("hot")).toBe(true)
+        expect(crossOn(shadow)).toBe(false)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toContain("7")
+    })
+
+    it("hides the cross on a threshold drag-hover and keeps that line first", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { orientation: "h", pos: 400, span: [0, 1200] },
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 100, 200) // image (200, 400) sits on the horizontal threshold
+        expect(crossOn(shadow)).toBe(false)
+        expect(surface.classList.contains("cur-ns")).toBe(true)
+        const line = shadow.querySelector("line") as SVGLineElement
+        expect(line.getAttribute("y1")).toBe("400")
+        expect(line.classList.contains("masque-threshold-line")).toBe(true)
+    })
+
+    it("a covered polygon keeps crosshair and the slice tooltip; a circle keeps its own", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [
+                {
+                    id: "pts", kind: "circles", geometry: [100, 100, 15], payloads: [{ i: 3 }],
+                    axis: "ax1", events: ["hover"],
+                },
+                {
+                    id: "fill", kind: "polygons", axis: "ax1", events: ["hover"],
+                    geometry: [[200, 200, 1000, 200, 1000, 600, 200, 600]],
+                    payloads: [{ name: "the-fill" }],
+                },
+                {
+                    id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: {
+                        orientation: "v", crosshair: true, covers: ["fill"],
+                        series: [
+                            { id: "wide", color: "rgb(20, 80, 160)", xy: [0, 0, 10, 10] },
+                            { id: "narrow", xy: [0, 10, 10, 0] },
+                        ],
+                    },
+                },
+            ],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        move(surface, 300, 200) // image (600, 400) → data (5, 5); inside the polygon, on both series
+        expect(crossOn(shadow)).toBe(true)
+        expect(surface.classList.contains("hot")).toBe(false)
+        expect(tip.innerHTML).toContain("wide")
+        expect(tip.innerHTML).toContain("narrow")
+        expect(tip.innerHTML).not.toContain("the-fill")
+        expect(hiChildren(shadow).length).toBe(0)
+        const dots = [...shadow.querySelectorAll(".masque-cross circle")] as SVGCircleElement[]
+        expect(dots.length).toBe(2)
+        expect(dots[0].style.fill).toBe("rgb(20, 80, 160)")
+        expect(dots[0].getAttribute("r")).toBe("4")
+        expect(getComputedStyle(dots[1]).fill).toBe("#b0b0b0")
+        const hairs = [...shadow.querySelectorAll(".masque-cross-hair")] as SVGLineElement[]
+        expect(hairs.map((el) => el.style.display)).toEqual(["", "none"])
+        const halo = shadow.querySelector(".masque-cross-halo") as SVGLineElement
+        expect(getComputedStyle(halo).strokeWidth).toBe("1.5")
+        const hair = hairs[0]
+        expect(Number(getComputedStyle(hair).strokeOpacity)).toBeCloseTo(0.8)
+        expect(getComputedStyle(hair).stroke).toBe("#b0b0b0")
+    })
+
+    it("a circle beside a slice keeps pointer and its own tooltip", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [
+                {
+                    id: "pts", kind: "circles", geometry: [100, 100, 15], payloads: [{ i: 3 }],
+                    axis: "ax1", events: ["hover"],
+                },
+                {
+                    id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: {
+                        orientation: "v", crosshair: true, covers: ["fill"],
+                        series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                    },
+                },
+            ],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 50, 50) // image (100, 100)
+        expect(surface.classList.contains("hot")).toBe(true)
+        expect(crossOn(shadow)).toBe(false)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        expect(tip.innerHTML).toContain("3")
+        expect(tip.innerHTML).not.toContain("wide")
+    })
+
+    it("a horizontal slice draws only the horizontal hair", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: {
+                    orientation: "h", crosshair: true, covers: [],
+                    series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                },
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 10, 10)
+        expect(crossOn(shadow)).toBe(true)
+        const hairs = [...shadow.querySelectorAll(".masque-cross-hair")] as SVGLineElement[]
+        expect(hairs.map((el) => el.style.display)).toEqual(["none", ""])
+    })
+
+    it("crosshair false keeps the sample tooltip and dots and draws no hair", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: {
+                    orientation: "v", crosshair: false, covers: [],
+                    series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                },
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 10, 10) // image (20, 20) → data x = 20/1200*10
+        expect(crossOn(shadow)).toBe(true)
+        const hairs = [...shadow.querySelectorAll(".masque-cross-hair")] as SVGLineElement[]
+        expect(hairs.every((el) => el.style.display === "none")).toBe(true)
+        expect(shadow.querySelectorAll(".masque-cross circle").length).toBe(1)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toContain("wide")
+    })
+})
+
 describe("photographic pan / wheel zoom", () => {
     const viewManifest = (mode: "pan" | "orbit"): Manifest => ({
         width: 1200, height: 800, scaling: 2,
@@ -3322,6 +3545,26 @@ describe("photographic pan / wheel zoom", () => {
         expect(host.dataset.masquePhoto ?? "").toBe("")
     })
 
+    it("a frame that lands after the canvas constructor is gone is not applied", async () => {
+        const { host, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, viewManifest("pan"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        const saved = globalThis.HTMLCanvasElement
+        Object.defineProperty(globalThis, "HTMLCanvasElement", { value: undefined, configurable: true })
+        try {
+            release({ png: new Uint8Array([1]), manifest: viewManifest("pan") })
+            await Promise.resolve()
+            await Promise.resolve()
+            expect(host.dataset.masqueGestureFrame).toBeUndefined()
+        } finally {
+            Object.defineProperty(globalThis, "HTMLCanvasElement", { value: saved, configurable: true })
+        }
+    })
+
     it("an image error clears the photographic matrix", async () => {
         const { host, img, script } = setup()
         const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]), manifest: viewManifest("pan") }))
@@ -3612,5 +3855,50 @@ describe("photographic pan / wheel zoom", () => {
         surface.dispatchEvent(zoom)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 470, clientY: 100, bubbles: true }))
         expect((host as unknown as { value: { layer: string } }).value.layer).toBe("cb")
+    })
+
+    it("a pan samples the slid series in content pixels and leaves the hair on the axis frame", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { orientation: "h", pos: 100, span: [0, 1200] } },
+                { id: "fill", kind: "polygons", axis: "ax1", events: ["hover"],
+                    geometry: [[0, 0, 1200, 0, 1200, 800, 0, 800]], payloads: [{ name: "the-fill" }] },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+                { id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: {
+                        orientation: "v", crosshair: true, covers: ["fill"],
+                        series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                    } },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(async () => ({})))
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const at = (clientX: number, clientY: number, type: string) =>
+            surface.dispatchEvent(new PointerEvent(type, { clientX, clientY, bubbles: true, pointerId: 1 }))
+        at(100, 100, "pointerdown")
+        at(300, 200, "pointermove")
+        at(300, 200, "pointerup")
+        at(300, 200, "pointermove")
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        expect(tip.innerHTML).toContain("1.667")
+        expect(tip.innerHTML).not.toContain("5.000")
+        expect(tip.innerHTML).not.toContain("the-fill")
+        const hair = shadow.querySelector(".masque-cross-hair") as SVGLineElement
+        expect(hair.getAttribute("x1")).toBe("600")
+        expect(hair.closest("g.masque-photo")).toBeNull()
+        const dot = shadow.querySelector(".masque-cross circle") as SVGCircleElement
+        expect(dot.closest("g.masque-photo")).toBeTruthy()
+        expect(Number(dot.getAttribute("cx"))).toBeCloseTo(200)
+        expect(Number(dot.getAttribute("cy"))).toBeCloseTo(800 * 5 / 6)
+        const line = shadow.querySelector("line") as SVGLineElement
+        expect(line.classList.contains("masque-threshold-line")).toBe(true)
+        expect(line.closest("g.masque-photo")).toBeTruthy()
     })
 })

@@ -1,6 +1,7 @@
 import { hitTestAt, layoutSpaceLayer, matrixLimits, photoClip, resolvePayload } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
+import { hideCross } from "./cross"
 import { selectionFor, SELECTED_KINDS } from "./selection"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
@@ -184,6 +185,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             const g = viewLayer.geometry as ViewGeometry
             state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], layout.x, layout.y, e.pointerId)
             if (g.mode === "pan") armPan(ctx, state, e, viewLayer.id)
+            hideCross(ctx, state)
             ctx.surface_.classList.add("grabbing")
             tryCapture(ctx.surface_, e.pointerId)
             e.preventDefault()
@@ -220,6 +222,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], layout.x, layout.y, e.pointerId)
         if (g.mode === "pan") armPan(ctx, state, e, hit.layer.id)
     } else return
+    hideCross(ctx, state)
     ctx.surface_.classList.add("grabbing")
     tryCapture(ctx.surface_, e.pointerId)
     e.preventDefault()

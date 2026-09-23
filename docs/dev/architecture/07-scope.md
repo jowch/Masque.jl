@@ -34,6 +34,8 @@ from `Makie.string_boundingboxes` (no font-metric measurement needed — the ori
 `bbox` primitive was never built). `TextLabel` (a `Block`, needs the figure-block walk rather than
 the plot-scene walk) remains deferred.
 
+**Cursor crosshair and slice (shipped, #92):** a hairline is opt-in. `masque(fig)` does not draw one, and neither does an axis readout, a grid cell, or empty axis interior. `SliceInteractable` is not a hit target. It samples attached 1-D series in data space (piecewise linear, then `projectAxis`) and, when `crosshair=true` (the default), draws the one arm named by `orientation` on `svg.masque-plain`. `crosshair=false` keeps the filled dots and the sample tooltip and draws no hair. The tooltip is the tracked series while the pointer is over a covered layer or empty axis interior inside the support; a marker that is not covered keeps its own. Series vertices ship as Float64, not integer pixels. Continuous invert still fails loud on `Axis3` and `PolarAxis`.
+
 **Click-echo selection (shipped, #103):** selection moved fully client-side ([§5](05-bond-value.md)) — a click sets
 `OverlayState.selHits_` and draws the highlight in the browser, with no bond feedback onto the
 manifest. `selected=` now supplies only the selection's *starting* value: it seeds both the

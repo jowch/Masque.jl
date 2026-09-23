@@ -22,13 +22,15 @@ Declare interactables explicitly (geometry in data space):
 - [`ViewInteractable`](@ref) — drag-to-pan (2D `Axis`) / drag-to-orbit (`Axis3`); the wheel
   zooms a 2D view about the cursor; commits nothing (a camera isn't an analysis value);
   Shift+drag wins over ROI/threshold
+- [`SliceInteractable`](@ref) — sample 1-D series at the cursor; hover only, nothing committed
 - [`RegionInteractable`](@ref) / [`FunctionInteractable`](@ref) — custom interactions, no
   JavaScript required; see [Custom interactions](@ref)
 
-[`AxisInteractable`](@ref), [`ThresholdInteractable`](@ref), and [`ROIInteractable`](@ref)
-are 2D-only: they raise an `ArgumentError` on `Axis3` or `PolarAxis`, and need a `linear` or
-`log` axis scale (categorical is fine for `AxisInteractable`/`ThresholdInteractable`, not for
-`ROIInteractable`). See [Troubleshooting](@ref) for the exact error text. Every other kind
+[`AxisInteractable`](@ref), [`ThresholdInteractable`](@ref), [`ROIInteractable`](@ref), and
+[`SliceInteractable`](@ref) are 2D-only: they raise an `ArgumentError` on `Axis3` or
+`PolarAxis`, and need a `linear` or `log` axis scale (categorical is fine for
+`AxisInteractable`/`ThresholdInteractable`, not for `ROIInteractable` or
+`SliceInteractable`). See [Troubleshooting](@ref) for the exact error text. Every other kind
 works on `Axis3` and `PolarAxis` too — see [3D axes and `PolarAxis`](@ref) at the end of this
 page.
 
@@ -83,6 +85,12 @@ takes neither an `Axis` nor `id` as constructor arguments at all — see
 | `ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold)` | a draggable line (`:horizontal` = constant-y, dragged vertically; `:vertical` = constant-x); live readout while dragging, commit on mouse-up | `orientation`, `value` (initial position; a number or a [`ThresholdEvent`](@ref)) | [`ThresholdEvent`](@ref) (`value`), on release |
 | `ROIInteractable(ax; bounds = (xmin, xmax, ymin, ymax), selects = nothing, id = :roi)` | a draggable + resizable box; move (interior) / resize (a corner resizes two edges, the middle of a side resizes just that one); commit on mouse-up | `selects` — another layer's `id`; if set, the box reports that layer's selection instead of its own bounds (`circles`/`grid` layers only — see [Multi-element selectors](@ref)). `bounds=` accepts a 4-tuple or a [`BoundsEvent`](@ref) | [`BoundsEvent`](@ref) on release; with `selects`, a `Vector{ElementEvent}` (points) or one [`GridWindowEvent`](@ref) (grid) |
 | `ViewInteractable(ax; id = :view)` | drag-to-pan (2D) or drag-to-orbit (Axis3); the wheel zooms a 2D view about the cursor; the axis frame stays put while the data inside it slides; commits nothing; Shift+drag forces view over ROI/threshold | — | none — a camera isn't an analysis value (§12.3); both backends stream a live gesture-channel preview instead |
+| `SliceInteractable(ax; series, orientation = :vertical, crosshair = true, id = :slice, covers = (), tooltip = nothing)` | samples 1-D series at the cursor. Draws one hair, the arm named by `orientation`, plus a filled dot per series in the series colour, ringed in the figure background | `orientation` — `:vertical` samples `y` at data `x` and draws the vertical hair (the default), `:horizontal` samples `x` at data `y` and draws the horizontal hair. `crosshair = false` keeps the dots and the tooltip and draws no hair. `covers` — `:polygons` or `:lines` layer ids in the same `masque` call whose highlight this slice replaces. `series` — `(; x, y)` plus optional `id`, `label`, `color`. `tooltip` — `nothing` (auto table of the tracked series), `masque"…"`, or `false` | none — hover only |
+
+A hairline is drawn only by a `SliceInteractable` with `crosshair = true`, and only the one arm its `orientation` names. `masque(fig)` does not add a slice, so a heatmap, a scatter, an axis readout, and empty space draw no hair. The hair is a quieter grey than the selection edge (`#b0b0b0` on a light figure, `#929292` on a dark one), at 80% opacity, with a 1.5px fringe in the figure's own background. While the pointer is over a covered layer, or over empty axis interior inside at least one series, the tooltip is that slice's sample. A marker that is not covered, and a colorbar, keep their own tooltip, and a marker turns the hair off. One slice per axis.
+
+`SliceInteractable(ax, plot)` and `SliceInteractable(ax, plots)` accept `Lines`, `Stairs`, `Series`, `Band`, and `Density`. Vertices are the points those plots already draw. `Stairs` keeps the expanded steppoints, so the sample is constant between risers and, on the riser itself, the y where that riser starts. `Density` and `Band` contribute the band's upper curve as drawn: a `Band` with `direction = :y` flips the converted edge, and a `Density` with `direction = :y` is already stored in drawn coordinates and is sampled horizontally. `covers = nothing` (the plot-constructor default) names each plot's auto-extract layer id, numbered inside that call's vector (`:lines`, then `:lines_2` when the vector repeats a kind). It does not count other plots already on the axis, so slicing only the second `lines!` covers `:lines`.
+
 
 ## From a plot object
 
@@ -183,6 +191,7 @@ start→end segments — all projected once, in Julia, at build time, so it work
 static on `:cairo` and live on `:webgl` (see [Backends](@ref)). `PolarAxis` gets the same
 discrete point/segment overlays on both backends; continuous θ/r readout is not shipped yet.
 
-`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, and orbit-mode
-`ViewInteractable` don't work on either — see [Troubleshooting](@ref) for why and what to use
-instead. `LScene` isn't supported on either backend at all; see [Troubleshooting](@ref).
+`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, `SliceInteractable`, and
+orbit-mode `ViewInteractable` don't work on either — see [Troubleshooting](@ref) for why and
+what to use instead. `LScene` isn't supported on either backend at all; see
+[Troubleshooting](@ref).

@@ -48,7 +48,7 @@ data to resolve a hit to an element index and its payload.
 ```julia
 struct HitLayer
     id       :: Symbol            # stable key for this layer (links to events/style)
-    kind     :: Symbol            # :circles | :polyline | :lines | :segments | :rects | :grid | :polygons | :axis
+    kind     :: Symbol            # :circles | :polyline | :lines | :segments | :rects | :grid | :polygons | :axis | :slice
     geometry :: Any               # compact, image-px; layout keyed by `kind` (see below)
     payloads :: Vector{Any}       # element index -> JSON-serializable payload (the linkage key)
     axis     :: Symbol            # which AxisTransform applies (for data-coord tooltips / inversion)
@@ -93,7 +93,10 @@ inside that path. Every retained Makie surface projects to one of them; text lab
 
 The three M4 drag kinds — `:view`, `:threshold`, `:roi` — sit outside this set. They are
 *control* geometry: one draggable region apiece, no elements, an empty `payloads`. The closed-set
-claim covers data geometry projected from a Makie surface.
+claim covers data geometry projected from a Makie surface. `:slice` sits outside hit testing
+too: `hitLayer` returns null. The layer carries data-space series for the client to sample,
+not a region. Its `crosshair` and `orientation` fields tell the overlay whether to draw
+one hair, and which arm. A plot with no slice draws none.
 
 ## Built-in interactables (v1 + M3 + M4 drags + Phase 2 text labels)
 
@@ -115,6 +118,7 @@ primitive, with the exceptions noted inline: `:axis` is shared by two, `LegendIn
 | `ViewInteractable` *(M4)* | `:view` | the Axis/Axis3 view itself — declared, never auto-extracted | none — commits nothing ([§12](12-gesture-channel.md) §12.3); in-drag frames stream over the gesture channel instead (`:cairo` PNG, `:webgl` serialized scene; #102/#133) |
 | `ThresholdInteractable` *(M4)* | `:threshold` | a draggable horizontal/vertical line on an Axis — declared | a bare data scalar, not a `NamedTuple` (nothing to name) |
 | `ROIInteractable` *(M4)* | `:roi` | a draggable box on an Axis — declared; an `AbstractSelector` | `(; xmin, xmax, ymin, ymax)`, or a `Vector{InteractionEvent}` of enclosed elements when `selects=` is set ([§5](05-bond-value.md)) |
+| `SliceInteractable` | `:slice` (not a hit target) | declared 1-D series on an Axis, or Lines, Stairs, Series, Band, Density | none — hover samples client-side; the live tooltip is the probe coordinate plus one field per series id. Bond stamp `"none"` |
 
 `SegmentInteractable` carries `mode ∈ {:polyline,:pairs}`; `RectInteractable` carries
 `layout ∈ {:grid,:list}`. Same JS test, different Julia extractor. The three M4 drags are

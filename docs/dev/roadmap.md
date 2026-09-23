@@ -48,7 +48,9 @@ purely declarative); selection round-trip and re-highlight; box-select via a `se
 and ROI drags; drag-to-pan/rotate and slider-driven view changes through `@bind` re-render;
 keyboard navigation and screen-reader announcements; the highlight (a brightening color-dodge
 fill plus a flat chrome edge stroke, not a mark-derived colour, with `scatter!`'s drawn
-radius replacing `markersize/2`); the `:cairo` (PNG) and `:webgl` (live canvas) backends behind
+radius replacing `markersize/2`); the overlay hairline (one arm, and only for a
+`SliceInteractable` with `crosshair=true`) and `SliceInteractable` (hover-only
+1-D sample, not auto-extracted, not a hit target); the `:cairo` (PNG) and `:webgl` (live canvas) backends behind
 one contract; a Documenter site with static notebook exports; and eight CI jobs covering Julia
 on two versions, the no-backend error path, the WGLMakie extension with its own real-browser
 end-to-end check, a second through-Pluto bind end-to-end, every example notebook, the frontend,
@@ -142,23 +144,9 @@ canvas-identity strategy keeps projection Julia-authored.
 
 ### Overlay interactions
 
-- **#92 Cursor slice / crosshair.** A first-class probe: invert the pointer to data x (or y),
-  sample attached 1-D series client-side, draw a hairline plus dots, show every series' value
-  in the tooltip. Replaces the notebook workaround of baking hundreds of full-height segments.
-  Hover-only by default; gated like the other continuous invert consumers (2D `Axis`, fail
-  loud on Axis3/Polar).
 - **#88 Right-click passthrough.** Ignore non-primary buttons in drag start, and let
   `contextmenu` land on the base `<img>` so the browser's Save image as… works on `:cairo`.
   No custom menu. `:webgl` gets no image menu without a canvas snapshot (out of scope).
-- **Cursor should say what pressing will do.** The surface already defaults to `crosshair`,
-  which is right, and the drag kinds already pick a cursor per part through
-  `cursorForDragHit`. The gap is everything else: hovering any hittable element sets one
-  binary `hot` class, so every non-drag kind becomes the finger `pointer`. A heatmap therefore
-  reads as a button across its whole area when the user is reading a value, not pressing
-  anything. Replace the binary class with a per-kind mapping. `pointer` is genuinely right for
-  a legend entry and arguably for a discrete mark that emits a bond, while a grid wants
-  `crosshair` or the CSS `cell` cursor, which exists for exactly this. Decide the map once
-  rather than special-casing heatmap.
 - **The browser's focus outline boxes the whole figure on a heatmap.** The overlay surface is
   a focus stop, and the default `:focus-visible` outline is suppressed only once Masque draws
   its own keyboard focus ring, through the `kbd-ring` class. Grid layers are deliberately not
@@ -174,8 +162,9 @@ canvas-identity strategy keeps projection Julia-authored.
   outer `contourf!` level or a boundary Voronoi cell can cover most of the plot, and lines from
   `hlines!` span the limits. Feedback that repaints the entire plot area is a flash, not a
   signal. Decide what the recipe becomes at that scale, perhaps outline only, or an indicator
-  at the cursor rather than over the element. Related to the probe in #92, which is the other
-  half of making a large filled region readable.
+  at the cursor rather than over the element. A covering `SliceInteractable` is the other
+  half for a polygon or a whole line: it skips that layer's highlight and reports the sample
+  at the cursor. The wash for a large element that is not covered is still open.
 - **Keyboard equivalents for drags**: arrow-key nudging for threshold, ROI, and view
   interactables. Promised as "on the roadmap" in the site's accessibility page.
 - **Animation / scrubbing**: precomputed frames in one manifest plus a JS scrubber; bond value
@@ -240,7 +229,7 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   `band!` are each a single polygon whose entire payload is `index = 1`, and `voronoiplot!`
   ships a cell index where the generating point would be more useful. Give these the
   statistics Makie already computed, so the default hover is worth reading before anyone
-  writes a `masque"…"` template. Distinct from #92: the probe answers "what is the height
+  writes a `masque"…"` template. Distinct from `SliceInteractable`: the slice answers "what is the height
   at this x", this answers "what is this shape". The field list per recipe is the issue's
   job, not the roadmap's.
 - **Composite recipes.** `rainclouds!`, `hexbin!`, `textrepel!` and any recipe whose parent
@@ -300,7 +289,7 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   it" — is the separate companion idea for that cost; named here, not designed.
 
 - **PolarAxis continuous θ/r readout**: ship `Makie.Polar` (and the letterboxed scene limits)
-  to the JS `invertAxis` so `AxisInteractable`, thresholds, ROIs, and the #92 probe work on
+  to the JS `invertAxis` so `AxisInteractable`, thresholds, ROIs, and `SliceInteractable` work on
   polar axes.
 - **`LScene` disposition**: decide whether it is a parity item or a Masque-wide non-goal. Until
   then `:cairo` rejects it and `:webgl` renders it with no overlay.
@@ -430,7 +419,7 @@ shipped, which is a better filter than what other libraries happen to have.
   instead of requiring the pointer inside it; sparse scatter and thin lines benefit.
 
 **Probing and readout**
-- **2D profile probe.** #92 in two dimensions: hovering a heatmap cell shows the row and column
+- **2D profile probe.** The slice in two dimensions: hovering a heatmap cell shows the row and column
   profiles as sparklines in the tooltip or as overlay traces along the axes.
 - **Delta readout.** Two parked probe lines (or a two-click gesture) report the difference
   in x and each series' y between them.
@@ -491,10 +480,9 @@ nothing left to build, so it is not a dependency of anything below.)
 2. Pre-registration revisions, including new work wanted in 0.1.0. Self-contained and cheap:
    #88, #81, #90, keyboard drag nudging, and the composite-recipe child walk.
 3. The remount path (#84 hold). Both backends, live-verified on view-pan.
-4. #92 cursor slice.
-5. Register v0.1.0, then the notebook cleanup (drop `Pkg.develop`, re-enable Binder).
-6. Remaining coverage items as demand arrives (#91 list).
-7. Payload-gated items (animation, LOD layers) wait on a measured per-frame or per-element
+4. Register v0.1.0, then the notebook cleanup (drop `Pkg.develop`, re-enable Binder).
+5. Remaining coverage items as demand arrives (#91 list).
+6. Payload-gated items (animation, LOD layers) wait on a measured per-frame or per-element
    cost reduction.
-8. Spike-gated items wait for a real use or for the spike that sizes them: the Julia-declared
+7. Spike-gated items wait for a real use or for the spike that sizes them: the Julia-declared
    theme, SVG output, spatial acceleration, GLMakie-static.

@@ -1,6 +1,7 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex } from "./selection"
 import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
+import { buildCross, hideCross } from "./cross"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import * as thresholdDrag from "./drag/threshold"
@@ -30,8 +31,11 @@ const SELECTED_FILL_OPACITY = 0.35
 // white square with a 1px chrome stroke (.masque-handle). One source here; mount() below picks
 // light vs dark from the figure's own background and writes it onto the shadow host.
 const HI_STYLE = {
-    light: { chrome: "#7a7a7a", fillSrc: "#141414" },
-    dark: { chrome: "#c8c8c8", fillSrc: "#141414" },
+    // `cross` is a step quieter than `chrome` (the selection edge). Light moves toward white,
+    // dark moves toward black by the same amount, so the hairline is not the same ink as a
+    // selected mark.
+    light: { chrome: "#7a7a7a", fillSrc: "#141414", cross: "#b0b0b0" },
+    dark: { chrome: "#c8c8c8", fillSrc: "#141414", cross: "#929292" },
 }
 
 // Parses the handful of CSS colour syntaxes build_manifest's `background` kwarg actually emits
@@ -80,6 +84,14 @@ const STYLE = `
 .surface.cur-move { cursor: move; }
 .masque-threshold-line { stroke-width: var(--masque-line-w, 2); }
 .masque-threshold-line.hovered { stroke-width: calc(var(--masque-line-w, 2) * 1.75); }
+.masque-cross { opacity: 0; transition: opacity ${MOTION_MS}ms ease-out; }
+.masque-cross.is-on { opacity: 1; }
+/* Halo first (figure background, wider), hairline on top at 80%. The fringe only shows where
+   the line crosses a mark; on the empty axis it matches the background. The halo is 1.5px,
+   half the earlier 3px, so the guide stays a hairline. */
+.masque-cross-halo { stroke: var(--masque-fig-bg, #ffffff); stroke-width: 1.5; }
+.masque-cross-hair { stroke: var(--masque-cross, #b0b0b0); stroke-width: 1; stroke-opacity: 0.8; }
+.masque-cross circle { fill: var(--masque-cross, #b0b0b0); stroke: var(--masque-fig-bg, #ffffff); stroke-width: 1; }
 /* Default :focus-visible outline stays until a focus ring is actually drawn (kbd-ring, set by
    keyboard.ts's focusTo) — so tabbing in still shows *something* before the first arrow press,
    but the browser outline doesn't double up with our own ring once one exists. */
@@ -190,7 +202,7 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: non
 }
 @media (prefers-reduced-motion: reduce) {
   .masque-enter, .masque-leave { animation: none; }
-  .masque-tip { transition: none; }
+  .masque-tip, .masque-cross { transition: none; }
 }
 `
 
@@ -354,10 +366,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const hiStyle = isLightBackground(manifest.background) ? HI_STYLE.light : HI_STYLE.dark
     shadowHost.style.setProperty("--masque-chrome", hiStyle.chrome)
     shadowHost.style.setProperty("--masque-hi-fill", hiStyle.fillSrc)
+    shadowHost.style.setProperty("--masque-cross", hiStyle.cross)
 
-    // ROI rect/handles and threshold lines never blend — always svg.masque-plain.
+    // Threshold lines and ROI boxes slide with the photograph. The hair stays on the plain svg,
+    // after the clip, so the first <line> in the shadow is still a threshold line.
     const thresholdLines = thresholdDrag.buildThresholdLines(manifest, plainPhoto)
     const roiBoxes = roiDrag.buildROIBoxes(manifest, plainPhoto, base)
+    const cross = buildCross(plainSvg, plainPhoto)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
 
@@ -379,6 +394,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
+        cross_: cross,
         gesture_: channel,
         photoPaint_: (m) => paintPhoto(m),
     }
@@ -433,6 +449,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(man, plainPhoto)
         ctx.roiBoxes_ = roiDrag.buildROIBoxes(man, plainPhoto, ctx.base_)
+        plainPhoto.appendChild(ctx.cross_.dots_)
     }
 
     function flushPendingChrome(): void {
@@ -443,6 +460,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
 
     function applyFrame(input: Record<string, unknown>, r: FrameResponse): void {
+        // A wheel-settle timer can resolve after happy-dom tears the test environment down.
+        // `instanceof HTMLCanvasElement` throws ReferenceError once that constructor is gone,
+        // so a frame for a dead widget is dropped instead of applied.
+        if (host.masqueDead || typeof HTMLCanvasElement !== "function") {
+            channel.dispose()
+            return
+        }
         const canvas = base instanceof HTMLCanvasElement ? base as GestureCanvas : null
         const live = canvas != null && typeof canvas.masqueReplaceScene === "function"
         if (r.scene != null && !live) {
@@ -508,6 +532,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             replaceDraggedChrome(newManifest)
         }
         ctx.manifest_ = newManifest
+        // Drop a cross that described the previous frame. The hair stays on the plain svg;
+        // the dots stay in the photo group, above the chrome just rebuilt there.
+        hideCross(ctx, state)
+        plainSvg.appendChild(ctx.cross_.g_)
+        plainPhoto.appendChild(ctx.cross_.dots_)
         ctx.focusable_ = buildFocusable(newManifest)
         ctx.layerStarts_ = computeLayerStarts(ctx.focusable_)
 
@@ -835,7 +864,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // and support multiple selected indices (drawHi keeps only the last).
     if (state.selHits_.length) renderSelection(ctx, state)
 
+    let cleaned = false
     const cleanup = () => {
+        // Pluto invalidation and a test teardown can both call this. The second call must
+        // not revoke the blob URL again or deliver a frame the first call already dropped.
+        if (cleaned) return
+        cleaned = true
         loadToken += 1
         surface.removeEventListener("pointerdown", down)
         surface.removeEventListener("wheel", onWheel)
