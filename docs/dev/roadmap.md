@@ -238,7 +238,7 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   also build those layers. A child with `visible[] == false` is not a layer, and a
   construct with no vertices does not take an id. `hexbin!`'s data-space `Scatter` stays
   unconstructed (hex polygons and count payloads remain a #91 tick). A `:rainclouds` or
-  `:textrepel` id is still a tick. Naming the skipped recipe in the warning is #157.
+  `:textrepel` id is still a tick. The skip warning names the recipe (`Makie.plotkey`).
 - **Named gaps from #91**, cheapest first: `ablines!`, `arc!`, `stephist!`, `ecdfplot!`,
   `qqplot!`, `bracket!`, `timeseries!`, 2D `arrows!`, `pie!`, `contour!` lines,
   `tricontourf!`/`triplot!`, `dendrogram!`, `streamplot!`, `hexbin!` (needs hex polygons and
@@ -259,10 +259,6 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   above. Separately,
   Makie's own `Legend(fig, polaraxis)` raises a `MethodError`, which is upstream rather than
   ours but worth confirming before promising polar legends.
-- **Contour family**: compound polygons (ring groups) so Contourf levels with holes hit-test
-  correctly.
-- **HLines/VLines fractional span attributes** (`xmin`/`xmax`, `ymin`/`ymax`): ignored today,
-  lines always span `finallimits`.
 - **Dense cell fields: revisit `heatmap!`/`image!` and `surface!` together.** Not two items.
   The shipped `:grid` works but is the awkward corner of the contract, and designing `surface!`
   on its own would build a second corner with the same shape.

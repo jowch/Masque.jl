@@ -114,14 +114,18 @@ let
 end
 
 println("\n=== F. polygon surfaces — :polygons vertex-dense envelope ===")
-# Polygon ring geometry: Vector{Vector{Real}}, one subvector per ring/element, flat [x0,y0,x1,y1,…].
-# Vertices are projected to integer px (1–3 B/coord). The key new term vs scatter: per-element cost
+# Polygon ring geometry: one subvector per element. A solid element is a flat [x0,y0,…] ring.
+# An element with holes is a list of those rings (exterior, then each hole). Vertices are
+# projected to integer px (1–3 B/coord). The key new term vs scatter: per-element cost
 # scales with ring vertex count, not just a fixed few coords — a violin KDE ring is ~400 pts,
-# a contourf ring may be tens of pts × many rings per level.
+# a contourf level may be an exterior plus its holes.
+function _ringverts(ring)
+    return (ring isa AbstractVector && !isempty(ring) && first(ring) isa AbstractVector) ?
+        sum(length(r) ÷ 2 for r in ring; init = 0) : length(ring) ÷ 2
+end
 function npolyverts(L)
     g = L["geometry"]
-    return (g isa AbstractVector && !isempty(g) && first(g) isa AbstractVector) ?
-        sum(length(ring) ÷ 2 for ring in g; init = 0) : 0
+    return (g isa AbstractVector) ? sum(_ringverts, g; init = 0) : 0
 end
 function poly_row(label, w)
     polylayers = filter(l -> l["kind"] == "polygons", w.manifest["layers"])
@@ -155,13 +159,23 @@ let
     poly_row("violin, 3 groups (~400 verts/ring)", masque(f))
 end
 let
-    # Contourf: many exterior rings (one per filled polygon piece), O(levels × ring-length).
+    # Contourf: one element per filled polygon. A level with a hole ships the exterior and
+    # each hole, so the vertex count includes both.
     # Default levels ≈ 8; each level may produce several ring pieces over the grid.
     xs = LinRange(-2, 2, 50)
     ys = LinRange(-2, 2, 50)
     f = Figure(size = (600, 400)); ax = Axis(f[1, 1])
     contourf!(ax, xs, ys, [sin(x) * cos(y) for x in xs, y in ys])
     poly_row("contourf, 50×50, default levels", masque(f))
+end
+let
+    # Same recipe with holes: a radial Gaussian. Four of the five polygons are an exterior
+    # plus one hole, so the vertex count includes both rings of each element.
+    xg = LinRange(-2, 2, 40)
+    yg = LinRange(-2, 2, 40)
+    f = Figure(size = (600, 400)); ax = Axis(f[1, 1])
+    contourf!(ax, xg, yg, [exp(-(x^2 + y^2)) for x in xg, y in yg]; levels = 5)
+    poly_row("contourf, 40×40 Gaussian, levels=5", masque(f))
 end
 
 println("\n=== G. text labels — :rects box (4 ints) + (; text, index, x, y) payload ===")

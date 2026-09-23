@@ -69,7 +69,7 @@ Geometry layout by `kind` (all coords image-px, top-left origin):
 | `:segments` | `Float32[x0,y0,x1,y1, …]` | nearest of disjoint pairs | pair index |
 | `:rects` | `Float32[cx,cy,w,h, …]` | point-in-rect | quad index |
 | `:grid` | `(xedges, yedges, ncols, nrows)` plus `values[]` **or** `sample` (screen pixels; [§8](08-scaling.md)) | source bin, or the screen pixel then the cell at its center | `j*ncols+i` |
-| `:polygons` | `Vector{Vector{Float32}}` rings | even-odd point-in-polygon | ring index |
+| `:polygons` | one flat ring per element, or a list of rings when that element has holes (exterior, then each hole) | even-odd across that element's rings | element index |
 | `:axis` | `nothing` (unbounded, `AxisInteractable`) or `Real[x,y,w,h]` bbox (bounded, `ColorbarInteractable`) | absent geometry = always-hit; bbox present = point-in-bbox; invert pixel via `AxisTransform` | `-1` (continuous); `valueaxis ≠ nothing` → 1-D `(; value)` |
 
 `:polyline`/`:lines`/`:segments`' `tol` (the hit-test slack above) is an optional per-layer manifest

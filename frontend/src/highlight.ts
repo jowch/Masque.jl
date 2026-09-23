@@ -1,4 +1,4 @@
-import { pathData, screenFixedLayer } from "./geometry"
+import { pathData, polygonRings, ringsPathData, screenFixedLayer } from "./geometry"
 import { hitKey, prefersReducedMotion, MOTION_MS } from "./state"
 import type { HiGroups, OverlayCtx, OverlayState } from "./state"
 import type { Hit, LayerStyle } from "./types"
@@ -83,11 +83,19 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
         el.setAttribute("d", pathData(g[1] as number[]))
         el.setAttribute("fill", "none")
     } else if (g[0] === "poly") {
-        el = document.createElementNS(SVG_NS, "polygon")
-        const ring = g[1] as number[]
-        let pts = ""
-        for (let k = 0; k < ring.length; k += 2) pts += `${ring[k]},${ring[k + 1]} `
-        el.setAttribute("points", pts.trim())
+        const rings = polygonRings(g[1] as number[] | number[][])
+        if (rings.length < 2) {
+            el = document.createElementNS(SVG_NS, "polygon")
+            const ring = rings[0] ?? []
+            let pts = ""
+            for (let k = 0; k < ring.length; k += 2) pts += `${ring[k]},${ring[k + 1]} `
+            el.setAttribute("points", pts.trim())
+        } else {
+            // One subpath per ring. evenodd leaves each hole unfilled and strokes its outline.
+            el = document.createElementNS(SVG_NS, "path")
+            el.setAttribute("fill-rule", "evenodd")
+            el.setAttribute("d", ringsPathData(rings))
+        }
     }
     if (!el) return null
     const open = g[0] === "seg" || g[0] === "path"
