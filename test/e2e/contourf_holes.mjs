@@ -149,10 +149,11 @@ try {
       surface.dispatchEvent(new MouseEvent("click", o));
     }
     await new Promise((resolve) => requestAnimationFrame(resolve));
+    // A miss fades the previous highlight for ~100ms and drops the tooltip's `show` class
+    // without clearing its text or setting display:none. A fading node is not a hit.
     const hi = (svgName) => {
-      const svg = sr.querySelector(svgName);
-      const el = svg?.querySelector("g.hi")?.firstElementChild;
-      if (!el) return null;
+      const el = sr.querySelector(svgName)?.querySelector("g.hi")?.firstElementChild;
+      if (!el || el.classList.contains("masque-leave")) return null;
       return {
         tag: el.tagName.toLowerCase(),
         fillRule: el.getAttribute("fill-rule"),
@@ -161,7 +162,7 @@ try {
       };
     };
     const tip = sr.querySelector(".masque-tip");
-    const shown = tip && getComputedStyle(tip).display !== "none" && tip.textContent.trim().length > 0;
+    const shown = tip && tip.classList.contains("show") && tip.textContent.trim().length > 0;
     return { tip: shown ? tip.textContent.trim() : "", fill: hi("svg.masque-fill"), edge: hi("svg.masque-edge") };
   }, [key, x, y, type]);
 

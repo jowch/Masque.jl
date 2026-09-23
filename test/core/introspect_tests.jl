@@ -691,9 +691,35 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     end
 
     # A holed element is a flat list of rings, so `length` is the ring count. Several holes in one
-    # band, and an island that is its own solid element. Pointer checks, including a dented ring,
-    # live in test/e2e/contourf_complex.mjs.
+    # band, and an island that is its own solid element of the same band. Pointer checks,
+    # including a dented ring, live in test/e2e/contourf_complex.mjs.
     _ringcount(elem) = first(elem) isa Real ? 1 : length(elem)
+    _rings(elem) = first(elem) isa Real ? [elem] : elem
+    function _inring(px, py, ring)
+        inside = false
+        n = length(ring) ÷ 2
+        j = n
+        for i in 1:n
+            xi, yi = ring[2i - 1], ring[2i]
+            xj, yj = ring[2j - 1], ring[2j]
+            if (yi > py) != (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi
+                inside = !inside
+            end
+            j = i
+        end
+        return inside
+    end
+    function _inrings(px, py, rings)
+        inside = false
+        for ring in rings
+            _inring(px, py, ring) && (inside = !inside)
+        end
+        return inside
+    end
+    function _centroid(ring)
+        n = length(ring) ÷ 2
+        return (sum(ring[2i - 1] for i in 1:n) / n, sum(ring[2i] for i in 1:n) / n)
+    end
     @testset "Contourf holes on busier fields" begin
         using Masque: PolygonInteractable
         # Three narrow peaks on a shared pedestal: one band carries several holes.
@@ -720,9 +746,24 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         contourf!(axb, xb, yb, zb; levels = [0.15, 0.4, 0.8])
         _, _, cb = ctx_for(figb)
         bump = only(hitlayers(PolygonInteractable(axb, axb.scene.plots[1]), cb))
-        @test any(e -> _ringcount(e) == 1, bump.geometry)
-        @test any(e -> _ringcount(e) > 1, bump.geometry)
         @test length(bump.geometry) == length(bump.payloads)
+        # The central bump is a solid element of the same band, sitting in a hole of that band.
+        island = false
+        for (s, solid) in enumerate(bump.geometry)
+            _ringcount(solid) == 1 || continue
+            cx, cy = _centroid(solid)
+            for (h, holed) in enumerate(bump.geometry)
+                _ringcount(holed) > 1 || continue
+                rings = _rings(holed)
+                in_hole = any(ring -> _inring(cx, cy, ring), rings[2:end])
+                same_band = bump.payloads[s].low == bump.payloads[h].low &&
+                    bump.payloads[s].high == bump.payloads[h].high
+                if in_hole && !_inrings(cx, cy, rings) && same_band
+                    island = true
+                end
+            end
+        end
+        @test island
     end
 
     @testset "BoxPlot extraction" begin
