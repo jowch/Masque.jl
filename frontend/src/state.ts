@@ -129,6 +129,8 @@ export interface OverlayCtx {
 export interface OverlayState {
     drag_: Drag | null
     justDragged_: boolean
+    // Hover chrome still in g.hi, live or mid-leave. Null once those nodes are gone.
+    // drawSelection reads it to drop a ring whose key just entered the selection (#97).
     hiKey_: string | null
     selKeys_: Set<string>
     // THE selection. Seeded at mount from the manifest's `selected=` hits (hydration only, an
