@@ -502,18 +502,51 @@ SegmentInteractable(ax, p::Makie.Errorbars; id = :errorbars, payloads = nothing,
 SegmentInteractable(ax, p::Makie.Rangebars; id = :rangebars, payloads = nothing, tol = 6) =
     SegmentInteractable(ax, _rangebar_pairs(p); mode = :pairs, id, payloads, tol)
 
-# Each line spans the full data range from `finallimits`; fractional xmin/xmax (HLines) /
-# ymin/ymax (VLines) span attrs are ignored.
+# `xmin`/`xmax` (HLines) and `ymin`/`ymax` (VLines) are fractions of the axis in relative
+# units. Default 0 and 1 is the full limits. Makie applies the fraction on the transformed
+# limits (`axis_limits_transformed`); the hit segment stores the inverse-transformed
+# data-space endpoints, and the position stays in data space, so projection matches the
+# drawn line. `broadcast_foreach` is Makie's scalar-or-vector rule: a scalar position with
+# a vector of fractions is one segment per fraction.
 function _span_pairs(ax, p, ishoriz)
-    fl = _finallimits(ax)
-    lo = fl.origin[ishoriz ? 1 : 2]; hi = lo + fl.widths[ishoriz ? 1 : 2]
+    dim = ishoriz ? 1 : 2
+    tlo, thi = _span_transformed_interval(ax, dim)
+    finv = _span_inverse(ax, dim)
+    vals = _converted(p)[1]
+    fr0, fr1 = ishoriz ? (p.xmin[], p.xmax[]) : (p.ymin[], p.ymax[])
     vs = Point2f[]
-    for c in _converted(p)[1]
-        ishoriz ? (push!(vs, Point2f(lo, c)); push!(vs, Point2f(hi, c))) :
-            (push!(vs, Point2f(c, lo)); push!(vs, Point2f(c, hi)))
+    Makie.broadcast_foreach(vals, fr0, fr1) do val, a, b
+        s0 = _frac_to_data(finv, tlo, thi, a)
+        s1 = _frac_to_data(finv, tlo, thi, b)
+        ishoriz ? (push!(vs, Point2f(s0, val)); push!(vs, Point2f(s1, val))) :
+            (push!(vs, Point2f(val, s0)); push!(vs, Point2f(val, s1)))
     end
     return vs
 end
+
+# Transformed min/max of one axis dimension, from `finallimits` through the scene scale.
+function _span_transformed_interval(ax, dim)
+    fl = _finallimits(ax)
+    tf = _transform_func(ax.scene)
+    o = fl.origin
+    hi = o .+ fl.widths
+    a = _apply_transform(tf, Makie.Point2d(Float64(o[1]), Float64(o[2])))
+    b = _apply_transform(tf, Makie.Point2d(Float64(hi[1]), Float64(hi[2])))
+    return min(Float64(a[dim]), Float64(b[dim])), max(Float64(a[dim]), Float64(b[dim]))
+end
+
+function _span_inverse(ax, dim)
+    inv = Makie.inverse_transform(_transform_func(ax.scene))
+    f = inv isa Tuple ? inv[dim] : inv
+    f === nothing && error(
+        "Masque: this axis scale has no inverse_transform, so an hlines/vlines span fraction " *
+            "cannot be placed in data space"
+    )
+    return f
+end
+
+_frac_to_data(finv, tlo, thi, frac) = Float64(_apply_transform(finv, tlo + (thi - tlo) * Float64(frac)))
+
 function SegmentInteractable(ax, p::Makie.HLines; id = :hlines, payloads = nothing, tol = 6)
     vs = _span_pairs(ax, p, true)
     nseg = length(vs) ÷ 2

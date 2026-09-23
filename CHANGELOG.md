@@ -296,6 +296,10 @@ All notable changes to this project are documented here. The format is based on
   (`docs/dev/roadmap.md`), not groundwork already in place.
 
 ### Fixed
+- `hlines!` `xmin`/`xmax` and `vlines!` `ymin`/`ymax` set the hit segment. They are fractions
+  of the axis (default 0 and 1, the full limits), broadcast with the positions the way Makie
+  draws the line. A log-scale fraction is taken on the transformed limits and inverse-transformed
+  back to data space. A limit change re-resolves the same fractions.
 - `masque(fig)` names a skipped recipe in the `@warn` (`contour`, `heatmap`) instead of
   `Plot` for every Makie recipe. The Axis3 and PolarAxis skips use the same name. Unknown
   recipes still skip.

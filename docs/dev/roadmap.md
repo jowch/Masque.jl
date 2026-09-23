@@ -251,8 +251,6 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   ours but worth confirming before promising polar legends.
 - **Contour family**: compound polygons (ring groups) so Contourf levels with holes hit-test
   correctly.
-- **HLines/VLines fractional span attributes** (`xmin`/`xmax`, `ymin`/`ymax`): ignored today,
-  lines always span `finallimits`.
 - **Dense cell fields: revisit `heatmap!`/`image!` and `surface!` together.** Not two items.
   The shipped `:grid` works but is the awkward corner of the contract, and designing `surface!`
   on its own would build a second corner with the same shape.
