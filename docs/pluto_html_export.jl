@@ -1,6 +1,6 @@
 # Quick-start tutorials ship as a real Pluto static export, cropped to the
 # teaching cells, with listed `@bind` snapshots applied through the editor.
-# Gallery players stay on `emit_player` until they are rewritten for this.
+# Home GIF notebooks stay on `emit_player`. Guide and gallery tutorials use this path.
 
 # Downstream cell body as Pluto should render it. HTML inlines
 # `getPublishedObject` so a swapped cell does not depend on the idle

@@ -7,7 +7,7 @@ For constructor signatures, see [Constructors](@ref).
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-custom-regions" title="Three RegionInteractable hits over an image, overlay-only"
-        style="width:100%;height:480px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
@@ -62,36 +62,8 @@ Masque groups regions by kind. Base `id = :cells` becomes `:cells_c`
 (circles), `:cells_r` (rects), and `:cells_p` (polygons). Key
 `selected=` on those suffixed ids, not on `:cells`.
 
-Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
-notebook.
-
-```julia
-begin
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    img = [Float32(sin(i / 12) * cos(j / 10)) for i in 1:100, j in 1:100]
-    image!(ax, img)
-
-    regions = [
-        (:circle, (20.0, 20.0), 14.0),
-        (:rect, (60.0, 60.0), 20.0, 14.0),
-        (:polygon, [(30.0, 70.0), (50.0, 90.0), (20.0, 90.0)]),
-    ]
-    payloads = [
-        (; name = "cell A"),
-        (; name = "cell B"),
-        (; name = "cell C"),
-    ]
-    cells = RegionInteractable(
-        ax; regions, payloads, id = :cells,
-        tooltip = masque"<b>$(name)</b>",
-    )
-end
-```
-
-```julia
-@bind pick masque(fig, cells)
-```
+The notebook draws the image and the three regions, and the last cell
+names the one you click.
 
 Do not pass `selected = Dict(:cells => [1])`. Use `:cells_c`, `:cells_r`,
 or `:cells_p` for the kind you hydrated. Each split layer commits an

@@ -20,16 +20,31 @@ end
 # ╔═╡ a141000a-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a141000a-0001-4000-8000-000000000009
+md"""
+Drag to pan. Click a point to highlight it. The window moves; the points stay in data space.
+"""
+
+# ╔═╡ a141000a-0001-4000-8000-000000000010
+md"""
+Scatter the points and add `ViewInteractable` beside them.
+"""
+
 # ╔═╡ a141000a-0001-4000-8000-000000000002
 begin
     data = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0), (4.0, 16.0), (5.0, 25.0), (6.0, 36.0)]
     fig = Figure(size = (500, 320))
     ax = Axis(fig[1, 1]; limits = (0, 8, 0, 40), title = "drag to pan")
-    scatter!(ax, first.(data), last.(data); color = :dodgerblue, markersize = 18)
-    pts = PointInteractable(ax, data; id = :scatter)
+    s = scatter!(ax, first.(data), last.(data); color = :dodgerblue, markersize = 18)
+    pts = PointInteractable(ax, s)
     view = ViewInteractable(ax)
     nothing
 end
+
+# ╔═╡ a141000a-0001-4000-8000-000000000011
+md"""
+Pan does not write a new `@bind` value. A click on a point still can, in your own notebook.
+"""
 
 # ╔═╡ a141000a-0001-4000-8000-000000000003
 @bind pick masque(fig, [pts, view])
@@ -38,16 +53,20 @@ end
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
-chip = false
 show_code = true
+pluto_html = true
+chip = false
+
 cells = [
+  "a141000a-0001-4000-8000-000000000009",
+  "a141000a-0001-4000-8000-000000000010",
   "a141000a-0001-4000-8000-000000000002",
+  "a141000a-0001-4000-8000-000000000011",
   "a141000a-0001-4000-8000-000000000003",
 ]
 
 [[player.states]]
 id = "idle"
-
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1695,7 +1714,10 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a141000a-0001-4000-8000-000000000001
+# ╟─a141000a-0001-4000-8000-000000000009
+# ╟─a141000a-0001-4000-8000-000000000010
 # ╠═a141000a-0001-4000-8000-000000000002
+# ╟─a141000a-0001-4000-8000-000000000011
 # ╠═a141000a-0001-4000-8000-000000000003
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

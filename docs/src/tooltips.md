@@ -1,14 +1,13 @@
 # Tooltips
 
-Hold your pointer over a mark and a customizable tooltip appears on the
-figure. Hover stays on the figure; it does not re-run Julia. A click can
-still write `@bind`; this page teaches the tooltip. The three-point
-scatter on [Getting started](@ref) already templates on pointer hold.
+Hold your pointer over a mark and a tooltip appears on the figure. The
+notebook is the tutorial. Hover updates the card and does not re-run
+Julia. A click still writes `@bind`, and the last cell names the city.
 
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-tt-template" title="Four-city scatter with templated tooltips"
-        style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
@@ -34,47 +33,10 @@ scatter on [Getting started](@ref) already templates on pointer hold.
 </script>
 ```
 
-Hold the pointer over a city. The card shows **Tokyo** and a formatted
-population, not a name/value table. The 3px border is that mark's
-accent.
-
 ## Write a template
 
-Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
-notebook. Pass `tooltip = masque"..."` on the points constructor.
-Placeholders read fields from that mark's payload at pointer-hold time.
-They do not read Julia locals. Use the points constructor when you need
-a template. The Scatter plot-object constructor does not take
-`tooltip=` (`MethodError`). Omit `radius=` to hug the one matching
-scatter on that axis. The snippet below passes `radius=` so the disc
-matches `markersize`.
-
-**1.** Plot four cities and a templated [`PointInteractable`](@ref):
-
-```julia
-begin
-    xy = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0), (4.0, 16.0)]
-    cities = ["Tokyo", "Delhi", "Shanghai", "São Paulo"]
-    pops = [37_400_000, 32_900_000, 28_500_000, 22_400_000]
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    markersize = 20
-    scatter!(ax, first.(xy), last.(xy); markersize)
-    tips = PointInteractable(
-        ax, xy;
-        radius = 0.3525 * markersize,
-        payloads = [(; city = cities[k], pop = pops[k]) for k in eachindex(cities)],
-        tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
-    )
-    nothing
-end
-```
-
-**2.** Mount the overlay:
-
-```julia
-@bind pick masque(fig, tips)
-```
+`$(field)` reads that field from the point under the pointer. It does
+not read a Julia local. `$(pop:,)` formats the number before escaping.
 
 | Value | Type | Browser behavior |
 |---|---|---|
@@ -129,7 +91,7 @@ tooltip accent. The following embed is that dark-figure scatter.
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-tt-dark" title="Dark-figure scatter with figure-derived tooltip theme"
-        style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>

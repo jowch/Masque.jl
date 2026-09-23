@@ -8,7 +8,7 @@ cell can fade the rest.
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-legend-lines" title="two-line axislegend with listed @bind snapshots"
-        style="width:100%;height:480px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
@@ -34,51 +34,11 @@ cell can fade the rest.
 </script>
 ```
 
-## Overlay two series
-
-Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
-notebook.
-
-**1.** Draw two lines, label them, and add `axislegend`:
-
-```julia
-begin
-    xs = range(0, 2π; length = 80)
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    lines!(ax, xs, sin.(xs); label = "a")
-    lines!(ax, xs, cos.(xs); label = "b")
-    axislegend(ax)
-    nothing
-end
-```
-
-**2.** Bind a click. `masque(fig)` walks the figure and installs a
-   [`LegendInteractable`](@ref) from `auto_interactables` with
-   `plotmap`, which links each entry to its traces:
-
-```julia
-@bind pick masque(fig)
-```
-
-**3.** Read the pick:
-
-```julia
-pick === nothing ? "click a legend entry" : "$(pick.label) → $(pick.targets)"
-```
-
-Before a click, `pick` is `nothing`. After a click, `pick` is a
-[`LegendEvent`](@ref): `layer === :legend`, `index` is 1-based in the
-legend, and `pick.label`, `pick.group`, and `pick.targets` are the
-entry. `targets` are `String` values (`"lines"`, `"lines_2"`, or `"series:2"`
-to pin one element), not `Symbol`s. `group` is the entry's group title,
-or `nothing` on an ungrouped legend.
-
-The click bond is that legend event. The highlight in the overlay is the
-linked traces, not the swatch. `pick.index` is which entry.
-`df[pick, :]` does not treat the entry number as a row.
-A cell that reads `pick` as a `Vector` of series points is looking at
-the wrong object.
+The notebook draws two labeled lines and an `axislegend`. A click names
+the series. `pick.label` is that name. `pick.targets` names the lines
+the entry highlights (`"lines"`, `"lines_2"`, or `"series:2"` to pin one
+element). `pick.group` is the group title, or `nothing` when the legend
+is not grouped.
 
 ## Persist a series wash
 

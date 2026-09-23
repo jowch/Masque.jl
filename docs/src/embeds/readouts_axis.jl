@@ -19,6 +19,16 @@ end
 # ╔═╡ b18a0001-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ b18a0001-0001-4000-8000-000000000009
+md"""
+Move the pointer across the axis. The tooltip reads data `(x, y)` and follows the cursor.
+"""
+
+# ╔═╡ b18a0001-0001-4000-8000-000000000010
+md"""
+Draw the line the way you already draw it, and add `AxisInteractable` on that axis. `masque(fig)` does not add this on its own.
+"""
+
 # ╔═╡ b18a0001-0001-4000-8000-000000000002
 begin
     xs = range(0, 2π; length = 80)
@@ -29,6 +39,11 @@ begin
     nothing
 end
 
+# ╔═╡ b18a0001-0001-4000-8000-000000000011
+md"""
+`@bind pick` is there for a click in your own notebook. A click stores `pick.x` and `pick.y`. This page keeps the readout on the figure, so the cell below does not re-run.
+"""
+
 # ╔═╡ b18a0001-0001-4000-8000-000000000003
 @bind pick masque(fig, ints)
 
@@ -36,7 +51,18 @@ end
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
+show_code = true
+pluto_html = true
 chip = false
+
+cells = [
+  "b18a0001-0001-4000-8000-000000000009",
+  "b18a0001-0001-4000-8000-000000000010",
+  "b18a0001-0001-4000-8000-000000000002",
+  "b18a0001-0001-4000-8000-000000000011",
+  "b18a0001-0001-4000-8000-000000000003",
+]
+
 [[player.states]]
 id = "idle"
 """
@@ -1686,7 +1712,10 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═b18a0001-0001-4000-8000-000000000001
+# ╟─b18a0001-0001-4000-8000-000000000009
+# ╟─b18a0001-0001-4000-8000-000000000010
 # ╠═b18a0001-0001-4000-8000-000000000002
+# ╟─b18a0001-0001-4000-8000-000000000011
 # ╠═b18a0001-0001-4000-8000-000000000003
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

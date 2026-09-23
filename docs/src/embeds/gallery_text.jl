@@ -20,6 +20,16 @@ end
 # ╔═╡ a1410006-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1410006-0001-4000-8000-000000000009
+md"""
+Click a label, including the tilted one and the annotation. The last cell quotes it.
+"""
+
+# ╔═╡ a1410006-0001-4000-8000-000000000010
+md"""
+Add `text!` and `annotation!` on the scatter you already have. `masque` makes the labels clickable.
+"""
+
 # ╔═╡ a1410006-0001-4000-8000-000000000002
 begin
     fig = Figure(size = (500, 350))
@@ -35,14 +45,24 @@ begin
     nothing
 end
 
+# ╔═╡ a1410006-0001-4000-8000-000000000011
+md"""
+`@bind pick` stores the click. A marker click is a different value from a label click.
+"""
+
 # ╔═╡ a1410006-0001-4000-8000-000000000003
 @bind pick masque(fig)
 
+# ╔═╡ a1410006-0001-4000-8000-000000000012
+md"""
+This cell reads `pick`, so it re-runs on the click.
+"""
+
 # ╔═╡ a1410006-0001-4000-8000-000000000004
 if pick === nothing
-    "click a label (try the tilted one, or the annotation)"
+    "click a label"
 elseif hasproperty(pick, :text)
-    "text: picked \"$(pick.text)\" at ($(pick.x), $(pick.y))"
+    "\"$(pick.text)\""
 else
     "that was a marker — click a label"
 end
@@ -51,17 +71,45 @@ end
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
-chip = false
 show_code = true
+pluto_html = true
+
 cells = [
+  "a1410006-0001-4000-8000-000000000009",
+  "a1410006-0001-4000-8000-000000000010",
   "a1410006-0001-4000-8000-000000000002",
+  "a1410006-0001-4000-8000-000000000011",
   "a1410006-0001-4000-8000-000000000003",
+  "a1410006-0001-4000-8000-000000000012",
   "a1410006-0001-4000-8000-000000000004",
 ]
 
 [[player.states]]
 id = "idle"
 
+[[player.states]]
+id = "alpha"
+value = { layer = "text", index = 0 }
+
+[[player.states]]
+id = "beta"
+value = { layer = "text", index = 1 }
+
+[[player.states]]
+id = "gamma"
+value = { layer = "text", index = 2 }
+
+[[player.states]]
+id = "tilted"
+value = { layer = "text_2", index = 0 }
+
+[[player.states]]
+id = "annotated"
+value = { layer = "annotation", index = 0 }
+
+[[player.states]]
+id = "marker"
+value = { layer = "scatter", index = 0 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1709,8 +1757,12 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1410006-0001-4000-8000-000000000001
+# ╟─a1410006-0001-4000-8000-000000000009
+# ╟─a1410006-0001-4000-8000-000000000010
 # ╠═a1410006-0001-4000-8000-000000000002
+# ╟─a1410006-0001-4000-8000-000000000011
 # ╠═a1410006-0001-4000-8000-000000000003
+# ╟─a1410006-0001-4000-8000-000000000012
 # ╠═a1410006-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

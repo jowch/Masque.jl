@@ -20,6 +20,16 @@ end
 # ╔═╡ a1410009-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1410009-0001-4000-8000-000000000009
+md"""
+The rightmost point sits on the axis limit and stays clickable.
+"""
+
+# ╔═╡ a1410009-0001-4000-8000-000000000010
+md"""
+Set the axis limits, scatter the points, and pass that scatter to `PointInteractable`.
+"""
+
 # ╔═╡ a1410009-0001-4000-8000-000000000002
 begin
     data = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0), (4.0, 16.0), (5.0, 25.0), (6.0, 36.0)]
@@ -27,12 +37,17 @@ begin
     ax = Axis(
         fig[1, 1];
         limits = (0, 6, 0, 40),
-        title = "limits (0, 6) — markers stay clickable",
+        title = "the point at x = 6 stays clickable",
     )
-    scatter!(ax, first.(data), last.(data); color = :dodgerblue, markersize = 18)
-    pts = PointInteractable(ax, data; id = :scatter)
+    s = scatter!(ax, first.(data), last.(data); color = :dodgerblue, markersize = 18)
+    pts = PointInteractable(ax, s)
     nothing
 end
+
+# ╔═╡ a1410009-0001-4000-8000-000000000011
+md"""
+Hover and click stay on the figure. This page does not re-run a readout.
+"""
 
 # ╔═╡ a1410009-0001-4000-8000-000000000003
 @bind pick masque(fig, pts)
@@ -41,16 +56,20 @@ end
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
-chip = false
 show_code = true
+pluto_html = true
+chip = false
+
 cells = [
+  "a1410009-0001-4000-8000-000000000009",
+  "a1410009-0001-4000-8000-000000000010",
   "a1410009-0001-4000-8000-000000000002",
+  "a1410009-0001-4000-8000-000000000011",
   "a1410009-0001-4000-8000-000000000003",
 ]
 
 [[player.states]]
 id = "idle"
-
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1698,7 +1717,10 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1410009-0001-4000-8000-000000000001
+# ╟─a1410009-0001-4000-8000-000000000009
+# ╟─a1410009-0001-4000-8000-000000000010
 # ╠═a1410009-0001-4000-8000-000000000002
+# ╟─a1410009-0001-4000-8000-000000000011
 # ╠═a1410009-0001-4000-8000-000000000003
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

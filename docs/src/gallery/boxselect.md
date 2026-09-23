@@ -11,7 +11,7 @@ coordinates. `xs[picks]` uses the events as indices. See
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-gal-boxselect" title="Box-select scatter"
-        style="width:100%;height:680px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1400px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>

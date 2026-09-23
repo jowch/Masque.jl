@@ -9,7 +9,7 @@ Polar is not a WebGL-only feature. See [Click marks](@ref).
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-gal-polar" title="Polar points"
-        style="width:100%;height:640px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1320px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>

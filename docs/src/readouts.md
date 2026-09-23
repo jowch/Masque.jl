@@ -7,7 +7,7 @@ read `value`. Drag a threshold line; on release, Julia gets a
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-readouts-player" title="Sine plot with axis coordinate readout overlay"
-        style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
@@ -40,30 +40,10 @@ on this page also binds `pick`, replace the previous bind cell.
 
 ## Read `(x, y)` from the axis
 
-[`AxisInteractable`](@ref) is the whole axis as one hit region.
-`masque(fig)` does **not** install it. Pass it yourself:
-
-**1.** Draw a short sine and an `AxisInteractable`:
-
-```julia
-begin
-    xs = range(0, 2π; length = 80)
-    fig = Figure(size = (560, 320))
-    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "sin(x)")
-    lines!(ax, xs, sin.(xs); color = :steelblue)
-    axint = AxisInteractable(ax)
-    nothing
-end
-```
-
-**2.** Bind a click:
-
-```julia
-@bind pick masque(fig, axint)
-```
-
-After a click, `pick` is an [`AxisEvent`](@ref): `layer` is
-`:axis`. Read `pick.x` and `pick.y`. There is no `index`.
+The notebook draws a sine and adds [`AxisInteractable`](@ref) on that
+axis. `masque(fig)` does not add it. The tooltip follows the pointer.
+A click in your notebook stores `pick.x` and `pick.y`. There is no
+`index`.
 
 The tooltip follows the pointer, not a mark. A click writes the bond.
 There is no highlight in the overlay at that location.

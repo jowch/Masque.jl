@@ -10,7 +10,7 @@ table stays on the last listed set.
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-roi-table" title="Stations scatter with a region box and listed @bind table snapshots"
-        style="width:100%;height:480px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1400px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
@@ -42,106 +42,21 @@ Julia runs when you release, not while you drag.
 
 ## Overlay a scatter and a box
 
-`masque(fig)` does not install an [`ROIInteractable`](@ref). Pass the box in
-the same `masque` call as the layer it brushes.
+The notebook is the tutorial. It scatters the stations, passes that
+scatter to `PointInteractable` with the station rows as `payloads`, and
+brushes them with `ROIInteractable`. `masque(fig)` does not add the box.
+Pass it in the same call as the points.
 
-Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
-notebook, plus `Markdown` for the table cell.
+`bounds` is `(xmin, xmax, ymin, ymax)` in data space, with `xmin < xmax`
+and `ymin < ymax`.
 
-**1.** Plot ten stations, a [`PointInteractable`](@ref) with `id = :pts`, and an
-   `ROIInteractable` whose `selects` names that layer. `bounds` is required:
-   `(xmin, xmax, ymin, ymax)` in data space, with `xmin < xmax` and
-   `ymin < ymax` (`ArgumentError` otherwise):
+Before the first release, `picks` is `nothing`. After you release,
+`picks` is the stations inside the box. An empty box is an empty list.
+`samples[picks]` is those rows. Enclosed points highlight in the overlay.
 
-```julia
-begin
-    samples = [
-        (name = "North-1", x = 1.5, y = 8.0, group = "North"),
-        (name = "North-2", x = 2.5, y = 7.2, group = "North"),
-        (name = "North-3", x = 2.0, y = 9.0, group = "North"),
-        (name = "Mid-1", x = 5.0, y = 5.0, group = "Mid"),
-        (name = "Mid-2", x = 5.8, y = 4.2, group = "Mid"),
-        (name = "Mid-3", x = 4.5, y = 5.8, group = "Mid"),
-        (name = "South-1", x = 8.0, y = 1.5, group = "South"),
-        (name = "South-2", x = 8.8, y = 2.4, group = "South"),
-        (name = "South-3", x = 7.2, y = 2.0, group = "South"),
-        (name = "East", x = 9.0, y = 6.5, group = "East"),
-    ]
-    group_color = Dict(
-        "North" => "#4363d8",
-        "Mid" => "#f58231",
-        "South" => "#3cb44b",
-        "East" => "#911eb4",
-    )
-    palette = [group_color[s.group] for s in samples]
-    xs = Float64[s.x for s in samples]
-    ys = Float64[s.y for s in samples]
-
-    fig = Figure(size = (560, 360))
-    ax = Axis(
-        fig[1, 1];
-        xlabel = "x",
-        ylabel = "y",
-        limits = (0.5, 10.0, 0.5, 10.0),
-    )
-    markersize = 18
-    scatter!(ax, xs, ys; color = palette, markersize)
-    pts = PointInteractable(
-        ax, collect(zip(xs, ys));
-        id = :pts,
-        radius = 0.3525 * markersize,
-        payloads = [
-            (; name = s.name, group = s.group, x = s.x, y = s.y)
-            for s in samples
-        ],
-    )
-    roi = ROIInteractable(
-        ax;
-        bounds = (4.0, 6.5, 3.8, 6.5),
-        selects = :pts,
-    )
-    nothing
-end
-```
-
-**2.** Bind the widget. A vector of interactables is required here, because the
-   box is not part of `auto_interactables`:
-
-```julia
-@bind picks masque(fig, [pts, roi])
-```
-
-Pluto rejects two cells that both `@bind` the same name. Replace the bind
-cell; do not add a second. `masque` does not mutate `fig`.
-
-**3.** Filter a table from `picks`:
-
-```julia
-if picks === nothing
-    md"*Drag the box over some stations, then release.*"
-elseif isempty(picks)
-    md"*No stations in the box.*"
-else
-    rows = samples[picks]
-    md_rows = ["| Station | x | y | Group |", "|---|---:|---:|---|"]
-    for r in rows
-        push!(md_rows, "| $(r.name) | $(r.x) | $(r.y) | $(r.group) |")
-    end
-    Markdown.parse("**$(length(rows)) stations**\n\n" * join(md_rows, "\n"))
-end
-```
-
-Before the first release, `picks` is `nothing`. After you release, `picks` is
-a `Vector` of [`ElementEvent`](@ref) values. An empty box commits `[]`,
-never `nothing`. `e.index` is 1-based; `samples[e]` is the enclosed
-station. Each event's `layer` is `:pts`. Enclosed points highlight
-in the overlay; the PNG does not change.
-
-On this docs site, the player lists a handful of
-`{ items: [{ layer, index }, …] }` sets (including empty `items`), keyed
-the same way the overlay commits. Exact pixel bounds are not in that
-table. Unlisted box geometry still moves in the overlay; the table stays
-on the last listed set.
+On this site the chip lists a handful of boxes, including an empty one.
+A box that is not in that list still moves; the table stays on the last
+listed set.
 
 ## If your rows are a table
 
@@ -150,9 +65,7 @@ If the points come from a table, pull columns for `scatter!` and pass
 as a vector of NamedTuples. Do not pass `eachrow(df)` as `payloads`.
 
 ```julia
-xs = Float64[r.x for r in table]
-ys = Float64[r.y for r in table]
-pts = PointInteractable(ax, collect(zip(xs, ys)); id = :pts, payloads = table)
+pts = PointInteractable(ax, s; id = :pts, payloads = table)
 ```
 
 Filter with `table[picks, :]` when `payloads` is that DataFrame, or with

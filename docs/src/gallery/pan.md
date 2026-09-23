@@ -10,7 +10,7 @@ on `@bind`. See [Pan and orbit](@ref).
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-gal-pan" title="Drag to pan"
-        style="width:100%;height:520px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>

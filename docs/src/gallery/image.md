@@ -13,7 +13,7 @@ and [Brush a region](@ref).
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-gal-image" title="Image ROI"
-        style="width:100%;height:680px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1560px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>

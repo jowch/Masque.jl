@@ -19,6 +19,16 @@ end
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
+md"""
+Click a legend entry. The last cell names that series, and the line stays highlighted.
+"""
+
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
+md"""
+Draw two labeled lines and add `axislegend`, the way you already build a figure. `masque` links each entry to its line.
+"""
+
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
 begin
     xs = range(0, 2π; length = 80)
@@ -30,16 +40,42 @@ begin
     nothing
 end
 
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
+md"""
+`@bind pick` stores a click on a legend entry in `pick`. Hover highlights that line and does not change `pick`.
+"""
+
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
 @bind pick masque(fig)
 
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
+md"""
+Before a click, `pick` is `nothing`. `pick.label` is the entry you clicked. This cell reads `pick`, so it re-runs on the click.
+"""
+
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-pick === nothing ? md"*Hold the pointer over a legend entry, then click one.*" : md"**$(pick.label)** — targets $(pick.targets)"
+if pick === nothing
+    "click a legend entry"
+else
+    "$(pick.label) selected"
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
+show_code = true
+pluto_html = true
+
+cells = [
+  "a1b2c3d4-0001-4000-8000-000000000009",
+  "a1b2c3d4-0001-4000-8000-000000000010",
+  "a1b2c3d4-0001-4000-8000-000000000002",
+  "a1b2c3d4-0001-4000-8000-000000000011",
+  "a1b2c3d4-0001-4000-8000-000000000003",
+  "a1b2c3d4-0001-4000-8000-000000000012",
+  "a1b2c3d4-0001-4000-8000-000000000004",
+]
 
 [[player.states]]
 id = "idle"
@@ -1698,8 +1734,12 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
+# ╟─a1b2c3d4-0001-4000-8000-000000000009
+# ╟─a1b2c3d4-0001-4000-8000-000000000010
 # ╠═a1b2c3d4-0001-4000-8000-000000000002
+# ╟─a1b2c3d4-0001-4000-8000-000000000011
 # ╠═a1b2c3d4-0001-4000-8000-000000000003
+# ╟─a1b2c3d4-0001-4000-8000-000000000012
 # ╠═a1b2c3d4-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

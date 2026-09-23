@@ -9,7 +9,7 @@ For a `poly!` you authored as a ring, see [Click marks](@ref).
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-gal-polygons" title="Polygons"
-        style="width:100%;height:860px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1480px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>

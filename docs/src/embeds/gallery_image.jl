@@ -20,6 +20,16 @@ end
 # ╔═╡ a1410008-0001-4000-8000-000000000001
 using Masque, CairoMakie, Statistics
 
+# ╔═╡ a1410008-0001-4000-8000-000000000009
+md"""
+Drag the box over the image. In your notebook, the last cell slices the arrays inside the box when you release.
+"""
+
+# ╔═╡ a1410008-0001-4000-8000-000000000010
+md"""
+Draw the image, and brush it with a box that selects the pixel grid.
+"""
+
 # ╔═╡ a1410008-0001-4000-8000-000000000002
 begin
     nx, ny = 96, 64
@@ -41,8 +51,18 @@ begin
     nothing
 end
 
+# ╔═╡ a1410008-0001-4000-8000-000000000011
+md"""
+`@bind region` stores the window when you release. Dragging does not re-run the cell below until then.
+"""
+
 # ╔═╡ a1410008-0001-4000-8000-000000000003
 @bind region masque(fig, ints)
+
+# ╔═╡ a1410008-0001-4000-8000-000000000012
+md"""
+This cell reads `region`, so it re-runs when you release the box.
+"""
 
 # ╔═╡ a1410008-0001-4000-8000-000000000004
 if region === nothing || isempty(region.i1:region.i2)
@@ -59,17 +79,22 @@ end
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "region"
-chip = false
 show_code = true
+pluto_html = true
+chip = false
+
 cells = [
+  "a1410008-0001-4000-8000-000000000009",
+  "a1410008-0001-4000-8000-000000000010",
   "a1410008-0001-4000-8000-000000000002",
+  "a1410008-0001-4000-8000-000000000011",
   "a1410008-0001-4000-8000-000000000003",
+  "a1410008-0001-4000-8000-000000000012",
   "a1410008-0001-4000-8000-000000000004",
 ]
 
 [[player.states]]
 id = "idle"
-
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1717,8 +1742,12 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1410008-0001-4000-8000-000000000001
+# ╟─a1410008-0001-4000-8000-000000000009
+# ╟─a1410008-0001-4000-8000-000000000010
 # ╠═a1410008-0001-4000-8000-000000000002
+# ╟─a1410008-0001-4000-8000-000000000011
 # ╠═a1410008-0001-4000-8000-000000000003
+# ╟─a1410008-0001-4000-8000-000000000012
 # ╠═a1410008-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

@@ -19,6 +19,16 @@ end
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
 using Masque, CairoMakie, Markdown
 
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
+md"""
+Drag the box over some stations. The last cell lists the ones inside.
+"""
+
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
+md"""
+Draw the scatter the way you already draw it. Pass that scatter to `PointInteractable`, with the station rows as `payloads`, so a hover reads the name and the group. `ROIInteractable` brushes those points.
+"""
+
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
 begin
     samples = [
@@ -39,29 +49,30 @@ begin
         "South" => "#3cb44b",
         "East" => "#911eb4",
     )
-    palette = [group_color[s.group] for s in samples]
-    xs = Float64[s.x for s in samples]
-    ys = Float64[s.y for s in samples]
-
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y", limits = (0.5, 10.0, 0.5, 10.0))
-    markersize = 18
-    scatter!(ax, xs, ys; color = palette, markersize)
-    # Default `:circle` draws at ≈0.3525×markersize. `colors` is tooltip accent only.
-    pts = PointInteractable(
-        ax, collect(zip(xs, ys));
-        id = :pts,
-        radius = 0.3525 * markersize,
-        payloads = [(; name = s.name, group = s.group, x = s.x, y = s.y) for s in samples],
-        colors = (; palette, index = collect(0:(length(samples) - 1))),
-        tooltip = masque"<b>$(name)</b><br>$(group)",
+    s = scatter!(
+        ax, [p.x for p in samples], [p.y for p in samples];
+        color = [group_color[p.group] for p in samples],
+        markersize = 18,
     )
+    pts = PointInteractable(ax, s; id = :pts, payloads = samples)
     roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = :pts)
     nothing
 end
 
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
+md"""
+`@bind picks` stores the stations inside the box when you release. Dragging moves the box and does not change `picks`.
+"""
+
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
 @bind picks masque(fig, [pts, roi])
+
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
+md"""
+Before a drag, `picks` is `nothing`. An empty box is an empty list. Otherwise `picks` is the stations inside, and this cell builds the table.
+"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
 if picks === nothing
@@ -81,6 +92,18 @@ end
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "picks"
+show_code = true
+pluto_html = true
+
+cells = [
+  "a1b2c3d4-0001-4000-8000-000000000009",
+  "a1b2c3d4-0001-4000-8000-000000000010",
+  "a1b2c3d4-0001-4000-8000-000000000002",
+  "a1b2c3d4-0001-4000-8000-000000000011",
+  "a1b2c3d4-0001-4000-8000-000000000003",
+  "a1b2c3d4-0001-4000-8000-000000000012",
+  "a1b2c3d4-0001-4000-8000-000000000004",
+]
 
 [[player.states]]
 id = "idle"
@@ -1755,8 +1778,12 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
+# ╟─a1b2c3d4-0001-4000-8000-000000000009
+# ╟─a1b2c3d4-0001-4000-8000-000000000010
 # ╠═a1b2c3d4-0001-4000-8000-000000000002
+# ╟─a1b2c3d4-0001-4000-8000-000000000011
 # ╠═a1b2c3d4-0001-4000-8000-000000000003
+# ╟─a1b2c3d4-0001-4000-8000-000000000012
 # ╠═a1b2c3d4-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

@@ -12,7 +12,7 @@ one yourself when you are not using `masque(fig)`. See
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-gal-colorbar" title="Colorbar"
-        style="width:100%;height:560px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>

@@ -23,7 +23,7 @@ The clip shows a pan: the axis limits move.
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-view-player" title="2D scatter with overlay pan"
-        style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
@@ -55,29 +55,9 @@ yourself.
 
 ## Pan a 2D axis
 
-**1.** Draw a scatter and pass [`ViewInteractable`](@ref):
-
-```julia
-begin
-    xs = Float64[1, 2, 3, 4, 5, 6]
-    ys = Float64[1, 4, 9, 16, 25, 36]
-    fig = Figure(size = (560, 320))
-    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    scatter!(ax, xs, ys; color = :dodgerblue, markersize = 18)
-    v = ViewInteractable(ax)
-    nothing
-end
-```
-
-**2.** Mount the overlay. Do not `@bind` a camera pose:
-
-```julia
-masque(fig, v)
-```
-
-You can still `@bind pick masque(fig, v)`. After a pan, `pick` is
-unchanged (`nothing` unless some other layer committed). There is no
-camera NamedTuple on the bond.
+The notebook scatters the points and adds [`ViewInteractable`](@ref).
+`masque(fig)` does not add pan. After a pan, `pick` is unchanged.
+There is no camera value on the bond.
 
 If a threshold or ROI shares the axis, an ordinary drag moves that
 handle. **Shift**+drag pans.

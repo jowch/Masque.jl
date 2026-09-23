@@ -254,8 +254,9 @@ end
         @test player["bond"] isa AbstractString
         @test !isempty(player["states"])
         @test player["show_code"] == true
+        @test player["pluto_html"] == true
         @test length(player["cells"]) >= 2
-        @test endswith(player["cells"][1], "0002")
+        @test any(endswith(id, "0002") for id in player["cells"])
         src = read(path, String)
         @test occursin("path = \"../../..\"", src)
         for id in player["cells"]
@@ -271,7 +272,7 @@ end
     sel = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_selection.jl"))
     sel_keys = [snapshot_key(js_shape_from_toml(row)) for row in sel["states"]]
     @test sel_keys == ["null", "scatter:0", "scatter:2"]
-    @test length(sel["cells"]) == 5
+    @test length(sel["cells"]) >= 5
     @test any(endswith(id, "0005") for id in sel["cells"])
     @test any(endswith(id, "0006") for id in sel["cells"])
 
@@ -295,4 +296,16 @@ end
     gs = read(joinpath(root, "docs", "src", "embeds", "getting_started.jl"), String)
     @test occursin("bond = \"pick\"", gs)
     @test occursin("id = \"tokyo\"", gs)
+
+    guides = [
+        "marks_bars", "marks_poly", "marks_polar", "legend_lines", "roi_table",
+        "tooltips_template", "tooltips_dark", "grids_heatmap", "readouts_axis",
+        "view_pan", "custom_regions", "linked_two_axis", "linked_legend_wash",
+    ]
+    for name in guides
+        player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))
+        @test player["pluto_html"] == true
+        @test player["show_code"] == true
+        @test any(js_shape_from_toml(row) === nothing for row in player["states"])
+    end
 end

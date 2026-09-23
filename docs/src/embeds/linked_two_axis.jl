@@ -19,6 +19,16 @@ end
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000009
+md"""
+Hold the pointer over a point. The highlight stays on the panel you are on.
+"""
+
+# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000010
+md"""
+Draw both scatters in one figure, the way you already would. One `masque` call covers both axes.
+"""
+
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000002
 begin
     xs = [1.0, 2.0, 3.0, 4.0]
@@ -32,6 +42,11 @@ begin
     nothing
 end
 
+# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000011
+md"""
+Hover stays on the figure. A click can still land in `pick` in your own notebook; this page does not re-run a readout.
+"""
+
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000003
 @bind pick masque(fig)
 
@@ -39,8 +54,17 @@ end
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
+show_code = true
+pluto_html = true
 chip = false
-title = "Two Axis panels, overlay-only hover"
+
+cells = [
+  "a1b2c3d4-00a1-4000-8000-000000000009",
+  "a1b2c3d4-00a1-4000-8000-000000000010",
+  "a1b2c3d4-00a1-4000-8000-000000000002",
+  "a1b2c3d4-00a1-4000-8000-000000000011",
+  "a1b2c3d4-00a1-4000-8000-000000000003",
+]
 
 [[player.states]]
 id = "idle"
@@ -1691,7 +1715,10 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-00a1-4000-8000-000000000001
+# ╟─a1b2c3d4-00a1-4000-8000-000000000009
+# ╟─a1b2c3d4-00a1-4000-8000-000000000010
 # ╠═a1b2c3d4-00a1-4000-8000-000000000002
+# ╟─a1b2c3d4-00a1-4000-8000-000000000011
 # ╠═a1b2c3d4-00a1-4000-8000-000000000003
 # ╟═e1be0000-0000-4000-8000-000000000001
 # ╟═00000000-0000-0000-0000-000000000001

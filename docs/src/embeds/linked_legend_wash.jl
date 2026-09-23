@@ -19,6 +19,16 @@ end
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1b2c3d4-00b1-4000-8000-000000000009
+md"""
+Hold the pointer over a legend entry. Every point in that series highlights, on both axes.
+"""
+
+# ╔═╡ a1b2c3d4-00b1-4000-8000-000000000010
+md"""
+Label each scatter and put them in one `Legend`. `masque` links the entry to the series it names.
+"""
+
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000002
 begin
     xs = [1.0, 2.0, 3.0, 4.0]
@@ -33,6 +43,11 @@ begin
     nothing
 end
 
+# ╔═╡ a1b2c3d4-00b1-4000-8000-000000000011
+md"""
+Hover paints the series. This page does not re-run a readout.
+"""
+
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000003
 @bind pick masque(fig)
 
@@ -40,8 +55,17 @@ end
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
+show_code = true
+pluto_html = true
 chip = false
-title = "Legend whole-layer wash, overlay-only hover"
+
+cells = [
+  "a1b2c3d4-00b1-4000-8000-000000000009",
+  "a1b2c3d4-00b1-4000-8000-000000000010",
+  "a1b2c3d4-00b1-4000-8000-000000000002",
+  "a1b2c3d4-00b1-4000-8000-000000000011",
+  "a1b2c3d4-00b1-4000-8000-000000000003",
+]
 
 [[player.states]]
 id = "idle"
@@ -1692,7 +1716,10 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-00b1-4000-8000-000000000001
+# ╟─a1b2c3d4-00b1-4000-8000-000000000009
+# ╟─a1b2c3d4-00b1-4000-8000-000000000010
 # ╠═a1b2c3d4-00b1-4000-8000-000000000002
+# ╟─a1b2c3d4-00b1-4000-8000-000000000011
 # ╠═a1b2c3d4-00b1-4000-8000-000000000003
 # ╟═e1be0000-0000-4000-8000-000000000001
 # ╟═00000000-0000-0000-0000-000000000001

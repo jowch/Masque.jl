@@ -19,6 +19,16 @@ end
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
+md"""
+Click a bar. The last cell reads its value.
+"""
+
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
+md"""
+Draw the bar plot the way you already draw it, and end the cell with `nothing` so this cell does not print the figure. `masque` makes each bar clickable.
+"""
+
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
 begin
     fig = Figure(size = (560, 360))
@@ -32,17 +42,42 @@ begin
     nothing
 end
 
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
+md"""
+`masque` mounts the overlay on the figure. `@bind pick` stores a click in `pick`. Hover highlights the bar and does not change `pick`.
+"""
+
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
 @bind pick masque(fig)
 
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
+md"""
+Before a click, `pick` is `nothing`. A click reads the bar: `pick.value` is the height, and `pick.index` is 1-based. This cell reads `pick`, so it re-runs on the click.
+"""
+
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-pick === nothing ? md"*Hold the pointer over a bar, then click one.*" :
-    md"**value $(pick.value)** — low $(pick.low), high $(pick.high)"
+if pick === nothing
+    "click a bar"
+else
+    "Q$(pick.index) — value $(pick.value)"
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
+show_code = true
+pluto_html = true
+
+cells = [
+  "a1b2c3d4-0001-4000-8000-000000000009",
+  "a1b2c3d4-0001-4000-8000-000000000010",
+  "a1b2c3d4-0001-4000-8000-000000000002",
+  "a1b2c3d4-0001-4000-8000-000000000011",
+  "a1b2c3d4-0001-4000-8000-000000000003",
+  "a1b2c3d4-0001-4000-8000-000000000012",
+  "a1b2c3d4-0001-4000-8000-000000000004",
+]
 
 [[player.states]]
 id = "idle"
@@ -1709,8 +1744,12 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
+# ╟─a1b2c3d4-0001-4000-8000-000000000009
+# ╟─a1b2c3d4-0001-4000-8000-000000000010
 # ╠═a1b2c3d4-0001-4000-8000-000000000002
+# ╟─a1b2c3d4-0001-4000-8000-000000000011
 # ╠═a1b2c3d4-0001-4000-8000-000000000003
+# ╟─a1b2c3d4-0001-4000-8000-000000000012
 # ╠═a1b2c3d4-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

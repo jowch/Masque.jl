@@ -10,7 +10,7 @@ WGLMakie to draw the three markers. See [Pan and orbit](@ref).
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-gal-orbit" title="Drag to orbit"
-        style="width:100%;height:560px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>

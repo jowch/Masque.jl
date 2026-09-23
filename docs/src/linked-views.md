@@ -53,7 +53,7 @@ Do not use `Axis3` for this job. Two 2D axes are the 2D-of-3D shape.
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-lv-two-axis" title="Two Axis panels, four points, overlay-only hover"
-        style="width:100%;height:380px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
@@ -79,27 +79,7 @@ Do not use `Axis3` for this job. Two 2D axes are the 2D-of-3D shape.
 </script>
 ```
 
-Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
-notebook.
-
-```julia
-begin
-    xs = [1.0, 2.0, 3.0, 4.0]
-    ys = [2.0, 1.5, 3.0, 2.2]
-    zs = [0.8, 2.5, 1.2, 3.1]
-    fig = Figure(size = (640, 280))
-    ax_xy = Axis(fig[1, 1]; xlabel = "x", ylabel = "y", title = "xy")
-    ax_xz = Axis(fig[1, 2]; xlabel = "x", ylabel = "z", title = "xz")
-    scatter!(ax_xy, xs, ys; markersize = 18)
-    scatter!(ax_xz, xs, zs; markersize = 18)
-end
-```
-
-```julia
-@bind pick masque(fig)
-```
-
-A click writes one [`ElementEvent`](@ref): `layer` is `:scatter` or
+The notebook is that figure. A click writes one [`ElementEvent`](@ref): `layer` is `:scatter` or
 `:scatter_2`, and `index` is 1-based in that layer. Same row order in
 both scatters is an authoring coincidence. Masque does not treat those
 indexes as one observation.
@@ -126,7 +106,7 @@ here.
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-lv-legend-wash" title="Legend whole-layer wash across two Axis panels"
-        style="width:100%;height:400px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
@@ -152,28 +132,7 @@ here.
 </script>
 ```
 
-Hover needs no snapshots. Replace the
-previous `fig` and `@bind pick` cells.
-
-```julia
-begin
-    xs = [1.0, 2.0, 3.0, 4.0]
-    ys = [2.0, 1.5, 3.0, 2.2]
-    zs = [0.8, 2.5, 1.2, 3.1]
-    fig = Figure(size = (700, 280))
-    ax_xy = Axis(fig[1, 1]; xlabel = "x", ylabel = "y", title = "xy")
-    ax_xz = Axis(fig[1, 2]; xlabel = "x", ylabel = "z", title = "xz")
-    p_xy = scatter!(ax_xy, xs, ys; label = "xy", markersize = 18)
-    p_xz = scatter!(ax_xz, xs, zs; label = "xz", markersize = 18)
-    Legend(fig[1, 3], [p_xy, p_xz], ["xy", "xz"])
-end
-```
-
-```julia
-@bind pick masque(fig)
-```
-
-`masque(fig)` picks up the `Legend`. Click still reports the legend
+The notebook is that figure. `masque(fig)` picks up the `Legend`. Click still reports the legend
 entry (`layer === :legend`), not each washed mark. The overlay cannot
 hide Makie traces. Use the wash plus `@bind` so a Julia cell can
 filter the series. For `targets=` and a click readout, see

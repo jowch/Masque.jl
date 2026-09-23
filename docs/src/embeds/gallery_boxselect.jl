@@ -20,6 +20,16 @@ end
 # ╔═╡ a1410007-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1410007-0001-4000-8000-000000000009
+md"""
+Drag the box. The last cell counts the points inside, by group.
+"""
+
+# ╔═╡ a1410007-0001-4000-8000-000000000010
+md"""
+Scatter the points, keep each point's group on the payload, and brush them with a box.
+"""
+
 # ╔═╡ a1410007-0001-4000-8000-000000000002
 begin
     npts = 80
@@ -27,19 +37,29 @@ begin
     ys = [3 + 5 * cos(i / 7) + 0.5 * (i % 5) for i in 1:npts]
     grp = [iseven(i) ? "A" : "B" for i in 1:npts]
     fig = Figure(size = (560, 380))
-    ax = Axis(fig[1, 1]; title = "drag the box to select points")
-    scatter!(ax, xs, ys; color = map(g -> g == "A" ? :steelblue : :darkorange, grp), markersize = 9)
-    pts = Point2f.(xs, ys)
-    payloads = [(; x = xs[i], y = ys[i], group = grp[i]) for i in eachindex(xs)]
-    ints = [
-        PointInteractable(ax, pts; id = :pts, payloads),
-        ROIInteractable(ax; bounds = (3.0, 6.0, 2.0, 7.0), selects = :pts),
-    ]
+    ax = Axis(fig[1, 1]; title = "drag the box")
+    s = scatter!(ax, xs, ys; color = map(g -> g == "A" ? :steelblue : :darkorange, grp), markersize = 9)
+    pts = PointInteractable(
+        ax, s;
+        id = :pts,
+        payloads = [(; group = grp[i], x = xs[i], y = ys[i]) for i in eachindex(xs)],
+    )
+    roi = ROIInteractable(ax; bounds = (3.0, 6.0, 2.0, 7.0), selects = :pts)
     nothing
 end
 
+# ╔═╡ a1410007-0001-4000-8000-000000000011
+md"""
+`@bind picks` stores the points inside the box when you release.
+"""
+
 # ╔═╡ a1410007-0001-4000-8000-000000000003
-@bind picks masque(fig, ints)
+@bind picks masque(fig, [pts, roi])
+
+# ╔═╡ a1410007-0001-4000-8000-000000000012
+md"""
+This cell reads `picks`, so it re-runs when you release the box.
+"""
 
 # ╔═╡ a1410007-0001-4000-8000-000000000004
 if picks === nothing || isempty(picks)
@@ -57,9 +77,15 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "picks"
 show_code = true
+pluto_html = true
+
 cells = [
+  "a1410007-0001-4000-8000-000000000009",
+  "a1410007-0001-4000-8000-000000000010",
   "a1410007-0001-4000-8000-000000000002",
+  "a1410007-0001-4000-8000-000000000011",
   "a1410007-0001-4000-8000-000000000003",
+  "a1410007-0001-4000-8000-000000000012",
   "a1410007-0001-4000-8000-000000000004",
 ]
 
@@ -73,7 +99,6 @@ value = { items = [] }
 [[player.states]]
 id = "some"
 value = { items = [{ layer = "pts", index = 1 }, { layer = "pts", index = 2 }, { layer = "pts", index = 4 }] }
-
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1721,8 +1746,12 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1410007-0001-4000-8000-000000000001
+# ╟─a1410007-0001-4000-8000-000000000009
+# ╟─a1410007-0001-4000-8000-000000000010
 # ╠═a1410007-0001-4000-8000-000000000002
+# ╟─a1410007-0001-4000-8000-000000000011
 # ╠═a1410007-0001-4000-8000-000000000003
+# ╟─a1410007-0001-4000-8000-000000000012
 # ╠═a1410007-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

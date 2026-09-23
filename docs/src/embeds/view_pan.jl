@@ -19,6 +19,16 @@ end
 # ╔═╡ b20a0001-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ b20a0001-0001-4000-8000-000000000009
+md"""
+Drag the axis to pan. The points stay put in data space; the window moves.
+"""
+
+# ╔═╡ b20a0001-0001-4000-8000-000000000010
+md"""
+Draw the scatter the way you already draw it, and add `ViewInteractable` on that axis. `masque(fig)` does not add pan on its own.
+"""
+
 # ╔═╡ b20a0001-0001-4000-8000-000000000002
 begin
     xs = Float64[1, 2, 3, 4, 5, 6]
@@ -26,18 +36,34 @@ begin
     fig = Figure(size = (560, 320))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
     scatter!(ax, xs, ys; color = :dodgerblue, markersize = 18)
-    ints = ViewInteractable(ax)
+    view = ViewInteractable(ax)
     nothing
 end
 
+# ╔═╡ b20a0001-0001-4000-8000-000000000011
+md"""
+Mount the overlay with the view. Pan does not write a new `@bind` value, so there is no readout cell to re-run.
+"""
+
 # ╔═╡ b20a0001-0001-4000-8000-000000000003
-@bind pick masque(fig, ints)
+@bind pick masque(fig, view)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
+show_code = true
+pluto_html = true
 chip = false
+
+cells = [
+  "b20a0001-0001-4000-8000-000000000009",
+  "b20a0001-0001-4000-8000-000000000010",
+  "b20a0001-0001-4000-8000-000000000002",
+  "b20a0001-0001-4000-8000-000000000011",
+  "b20a0001-0001-4000-8000-000000000003",
+]
+
 [[player.states]]
 id = "idle"
 """
@@ -1687,7 +1713,10 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═b20a0001-0001-4000-8000-000000000001
+# ╟─b20a0001-0001-4000-8000-000000000009
+# ╟─b20a0001-0001-4000-8000-000000000010
 # ╠═b20a0001-0001-4000-8000-000000000002
+# ╟─b20a0001-0001-4000-8000-000000000011
 # ╠═b20a0001-0001-4000-8000-000000000003
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

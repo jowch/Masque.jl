@@ -19,38 +19,86 @@ end
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
+md"""
+Hold the pointer over a region to read its name, then click it. The last cell names the region.
+"""
+
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
+md"""
+The image is the figure. The circle, the rectangle, and the triangle are extra hit regions, with a name on each one.
+"""
+
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
 begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
     img = [Float32(sin(i / 12) * cos(j / 10)) for i in 1:100, j in 1:100]
     image!(ax, img)
-    # Circle `r` is logical px × DPI (`r * ctx.scaling`), same as PointInteractable.radius.
-    # Rect w,h and polygon rings are data space. Triangle is a Region `:polygon`.
     regions = [
         (:circle, (20.0, 20.0), 14.0),
         (:rect, (60.0, 60.0), 20.0, 14.0),
         (:polygon, [(30.0, 70.0), (50.0, 90.0), (20.0, 90.0)]),
     ]
-    payloads = [(; name = "cell A"), (; name = "cell B"), (; name = "cell C")]
-    cells = RegionInteractable(
-        ax; regions, payloads, id = :cells,
+    names = [(; name = "cell A"), (; name = "cell B"), (; name = "cell C")]
+    hits = RegionInteractable(
+        ax; regions, payloads = names, id = :cells,
         tooltip = masque"<b>$(name)</b>",
     )
     nothing
 end
 
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
+md"""
+`@bind ev` stores a click in `ev`. Hover updates the card and does not change `ev`.
+"""
+
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind ev masque(fig, cells)
+@bind ev masque(fig, hits)
+
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
+md"""
+Before a click, `ev` is `nothing`. `ev.name` is the region's name. This cell reads `ev`, so it re-runs on the click.
+"""
+
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
+if ev === nothing
+    "click a region"
+else
+    "$(ev.name) selected"
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "ev"
-chip = false
+show_code = true
+pluto_html = true
+
+cells = [
+  "a1b2c3d4-0001-4000-8000-000000000009",
+  "a1b2c3d4-0001-4000-8000-000000000010",
+  "a1b2c3d4-0001-4000-8000-000000000002",
+  "a1b2c3d4-0001-4000-8000-000000000011",
+  "a1b2c3d4-0001-4000-8000-000000000003",
+  "a1b2c3d4-0001-4000-8000-000000000012",
+  "a1b2c3d4-0001-4000-8000-000000000004",
+]
 
 [[player.states]]
 id = "idle"
+
+[[player.states]]
+id = "circle"
+value = { layer = "cells_c", index = 0 }
+
+[[player.states]]
+id = "rect"
+value = { layer = "cells_r", index = 0 }
+
+[[player.states]]
+id = "triangle"
+value = { layer = "cells_p", index = 0 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1698,8 +1746,13 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
+# ╟─a1b2c3d4-0001-4000-8000-000000000009
+# ╟─a1b2c3d4-0001-4000-8000-000000000010
 # ╠═a1b2c3d4-0001-4000-8000-000000000002
+# ╟─a1b2c3d4-0001-4000-8000-000000000011
 # ╠═a1b2c3d4-0001-4000-8000-000000000003
+# ╟─a1b2c3d4-0001-4000-8000-000000000012
+# ╠═a1b2c3d4-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

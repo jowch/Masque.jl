@@ -5,9 +5,7 @@ second `masque` call, which highlights the same mark. The two widgets
 do not share an overlay. The highlight on the right is in the manifest
 for that figure.
 
-`selected=` takes 1-based indices. The player lists the click as a
-0-based `{layer, index}`, which is the shape the overlay posts. Julia
-sees `pick.index` starting at 1.
+`selected=` takes 1-based indices. The readout prints `pick.index` that way.
 
 Do not pass this widget's own bond into the same `masque` call. Pluto
 reports a cycle and does not run the cell. For `selected=` on one

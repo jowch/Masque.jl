@@ -19,26 +19,113 @@ end
 # ╔═╡ b15a0001-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ b15a0001-0001-4000-8000-000000000009
+md"""
+Click a cell. The last cell reads its column, row, and value.
+"""
+
+# ╔═╡ b15a0001-0001-4000-8000-000000000010
+md"""
+Draw the heatmap the way you already draw it, and pass that plot to `RectInteractable` so each cell is a hit. Hover reads the cell; the click is what this notebook stores.
+"""
+
 # ╔═╡ b15a0001-0001-4000-8000-000000000002
 begin
     z = [Float64(i + 3j) for i in 1:4, j in 1:3]
     fig = Figure(size = (560, 320))
     ax = Axis(fig[1, 1]; xlabel = "column", ylabel = "row")
     p = heatmap!(ax, 1:4, 1:3, z)
-    ints = RectInteractable(ax, p; id = :cells)
+    cells = RectInteractable(ax, p)
     nothing
 end
 
+# ╔═╡ b15a0001-0001-4000-8000-000000000011
+md"""
+`@bind pick` stores a click in `pick`. Hover updates the tooltip and does not change `pick`.
+"""
+
 # ╔═╡ b15a0001-0001-4000-8000-000000000003
-@bind pick masque(fig, ints)
+@bind pick masque(fig, cells)
+
+# ╔═╡ b15a0001-0001-4000-8000-000000000012
+md"""
+Before a click, `pick` is `nothing`. `pick.i` is the column and `pick.j` is the row, both 1-based. `z[pick]` is the same cell. This cell reads `pick`, so it re-runs on the click.
+"""
+
+# ╔═╡ b15a0001-0001-4000-8000-000000000004
+if pick === nothing
+    "click a cell"
+else
+    "column $(pick.i), row $(pick.j) — value $(pick.value)"
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
-chip = false
+show_code = true
+pluto_html = true
+
+cells = [
+  "b15a0001-0001-4000-8000-000000000009",
+  "b15a0001-0001-4000-8000-000000000010",
+  "b15a0001-0001-4000-8000-000000000002",
+  "b15a0001-0001-4000-8000-000000000011",
+  "b15a0001-0001-4000-8000-000000000003",
+  "b15a0001-0001-4000-8000-000000000012",
+  "b15a0001-0001-4000-8000-000000000004",
+]
+
 [[player.states]]
 id = "idle"
+
+[[player.states]]
+id = "c11"
+value = { layer = "cells", index = 0, payload = { i = 0, j = 0, value = 4.0 } }
+
+[[player.states]]
+id = "c21"
+value = { layer = "cells", index = 1, payload = { i = 1, j = 0, value = 5.0 } }
+
+[[player.states]]
+id = "c31"
+value = { layer = "cells", index = 2, payload = { i = 2, j = 0, value = 6.0 } }
+
+[[player.states]]
+id = "c41"
+value = { layer = "cells", index = 3, payload = { i = 3, j = 0, value = 7.0 } }
+
+[[player.states]]
+id = "c12"
+value = { layer = "cells", index = 4, payload = { i = 0, j = 1, value = 7.0 } }
+
+[[player.states]]
+id = "c22"
+value = { layer = "cells", index = 5, payload = { i = 1, j = 1, value = 8.0 } }
+
+[[player.states]]
+id = "c32"
+value = { layer = "cells", index = 6, payload = { i = 2, j = 1, value = 9.0 } }
+
+[[player.states]]
+id = "c42"
+value = { layer = "cells", index = 7, payload = { i = 3, j = 1, value = 10.0 } }
+
+[[player.states]]
+id = "c13"
+value = { layer = "cells", index = 8, payload = { i = 0, j = 2, value = 10.0 } }
+
+[[player.states]]
+id = "c23"
+value = { layer = "cells", index = 9, payload = { i = 1, j = 2, value = 11.0 } }
+
+[[player.states]]
+id = "c33"
+value = { layer = "cells", index = 10, payload = { i = 2, j = 2, value = 12.0 } }
+
+[[player.states]]
+id = "c43"
+value = { layer = "cells", index = 11, payload = { i = 3, j = 2, value = 13.0 } }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1686,8 +1773,13 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═b15a0001-0001-4000-8000-000000000001
+# ╟─b15a0001-0001-4000-8000-000000000009
+# ╟─b15a0001-0001-4000-8000-000000000010
 # ╠═b15a0001-0001-4000-8000-000000000002
+# ╟─b15a0001-0001-4000-8000-000000000011
 # ╠═b15a0001-0001-4000-8000-000000000003
+# ╟─b15a0001-0001-4000-8000-000000000012
+# ╠═b15a0001-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

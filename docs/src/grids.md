@@ -23,7 +23,7 @@ tooltip is `(i,j) = value`.
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-grids-player" title="Tiny heatmap with overlay cell inspection"
-        style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
@@ -55,29 +55,11 @@ are `:rects` and are a different job.
 
 ## Overlay a heatmap
 
-**1.** Draw a small heatmap and pass the plot object to
-   [`RectInteractable`](@ref). The plot-object method takes `id` only
-   (default `:cells`):
-
-```julia
-begin
-    z = [Float64(i + 3j) for i in 1:4, j in 1:3]
-    fig = Figure(size = (560, 320))
-    ax = Axis(fig[1, 1]; xlabel = "column", ylabel = "row")
-    p = heatmap!(ax, 1:4, 1:3, z)
-    cells = RectInteractable(ax, p; id = :cells)
-    nothing
-end
-```
-
-`image!` uses the same method. `masque(fig)` walks a `Heatmap` or
-`Image` and installs this layer for you.
-
-**2.** Bind a click:
-
-```julia
-@bind pick masque(fig, cells)
-```
+The notebook draws a small heatmap and passes that plot to
+[`RectInteractable`](@ref). A click fills `pick`, and the last cell
+reads the column, the row, and the value. `image!` uses the same
+method. `masque(fig)` walks a `Heatmap` or `Image` and installs this
+layer for you.
 
 Or pass edges and values yourself. Edges must be monotonic. `values`
 must have shape `(length(xedges) - 1, length(yedges) - 1)`:

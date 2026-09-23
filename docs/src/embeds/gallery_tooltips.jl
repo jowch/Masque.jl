@@ -20,31 +20,54 @@ end
 # ╔═╡ a1410001-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1410001-0001-4000-8000-000000000009
+md"""
+Hold the pointer over a city, then click it. The last cell names the city.
+"""
+
+# ╔═╡ a1410001-0001-4000-8000-000000000010
+md"""
+Scatter the cities and give each point a tooltip that reads its name and population.
+"""
+
 # ╔═╡ a1410001-0001-4000-8000-000000000002
 begin
-    xy = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0), (4.0, 16.0)]
-    cities = ["Tokyo", "Delhi", "Shanghai", "São Paulo"]
-    pops = [37_000_000, 32_000_000, 29_000_000, 22_000_000]
+    cities = [
+        (city = "Tokyo", pop = 37_000_000, x = 1.0, y = 1.0),
+        (city = "Delhi", pop = 32_000_000, x = 2.0, y = 4.0),
+        (city = "Shanghai", pop = 29_000_000, x = 3.0, y = 9.0),
+        (city = "São Paulo", pop = 22_000_000, x = 4.0, y = 16.0),
+    ]
     fig = Figure(size = (500, 350))
-    ax = Axis(fig[1, 1]; title = "hover: template tooltip")
-    scatter!(ax, first.(xy), last.(xy); color = :crimson, markersize = 20)
+    ax = Axis(fig[1, 1]; title = "hover a city")
+    scatter!(ax, [c.x for c in cities], [c.y for c in cities]; color = :crimson, markersize = 20)
     tips = PointInteractable(
-        ax, xy;
+        ax, [(c.x, c.y) for c in cities];
         id = :cities,
-        payloads = [(; city = cities[k], pop = pops[k]) for k in eachindex(cities)],
+        payloads = cities,
         tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
     )
     nothing
 end
 
+# ╔═╡ a1410001-0001-4000-8000-000000000011
+md"""
+`@bind pick` stores the click. Hover updates the card and does not change `pick`.
+"""
+
 # ╔═╡ a1410001-0001-4000-8000-000000000003
 @bind pick masque(fig, tips)
 
+# ╔═╡ a1410001-0001-4000-8000-000000000012
+md"""
+This cell reads `pick`, so it re-runs on the click.
+"""
+
 # ╔═╡ a1410001-0001-4000-8000-000000000004
 if pick === nothing
-    "hover a marker; click to read the city"
+    "hover a city, or click one"
 else
-    "clicked: $(pick.city) (pop $(pick.pop))"
+    "$(pick.city) — pop $(pick.pop)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
@@ -52,9 +75,15 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
 show_code = true
+pluto_html = true
+
 cells = [
+  "a1410001-0001-4000-8000-000000000009",
+  "a1410001-0001-4000-8000-000000000010",
   "a1410001-0001-4000-8000-000000000002",
+  "a1410001-0001-4000-8000-000000000011",
   "a1410001-0001-4000-8000-000000000003",
+  "a1410001-0001-4000-8000-000000000012",
   "a1410001-0001-4000-8000-000000000004",
 ]
 
@@ -76,7 +105,6 @@ value = { layer = "cities", index = 2 }
 [[player.states]]
 id = "saopaulo"
 value = { layer = "cities", index = 3 }
-
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1724,8 +1752,12 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1410001-0001-4000-8000-000000000001
+# ╟─a1410001-0001-4000-8000-000000000009
+# ╟─a1410001-0001-4000-8000-000000000010
 # ╠═a1410001-0001-4000-8000-000000000002
+# ╟─a1410001-0001-4000-8000-000000000011
 # ╠═a1410001-0001-4000-8000-000000000003
+# ╟─a1410001-0001-4000-8000-000000000012
 # ╠═a1410001-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

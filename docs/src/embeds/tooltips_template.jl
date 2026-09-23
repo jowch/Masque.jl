@@ -19,39 +19,92 @@ end
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1b2c3d4-0011-4000-8000-000000000009
+md"""
+Hold the pointer over a city to read its name and population. Click one and the last cell names it.
+"""
+
+# ╔═╡ a1b2c3d4-0011-4000-8000-000000000010
+md"""
+Scatter the cities the way you already would. The tooltip template reads `city` and `pop` off each point, and the border uses the same palette as the markers.
+"""
+
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000002
 begin
-    xy = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0), (4.0, 16.0)]
-    cities = ["Tokyo", "Delhi", "Shanghai", "São Paulo"]
-    pops = [37_400_000, 32_900_000, 28_500_000, 22_400_000]
+    cities = [
+        (city = "Tokyo", pop = 37_400_000, x = 1.0, y = 1.0),
+        (city = "Delhi", pop = 32_900_000, x = 2.0, y = 4.0),
+        (city = "Shanghai", pop = 28_500_000, x = 3.0, y = 9.0),
+        (city = "São Paulo", pop = 22_400_000, x = 4.0, y = 16.0),
+    ]
     palette = ["#e6194b", "#3cb44b", "#4363d8", "#f58231"]
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    markersize = 20
-    scatter!(ax, first.(xy), last.(xy); color = palette, markersize)
-    # Points constructor: needs tooltip= / colors= / custom payloads. Default
-    # `:circle` draws at ≈0.3525×markersize. `colors` is tooltip accent only.
+    scatter!(ax, [c.x for c in cities], [c.y for c in cities]; color = palette, markersize = 20)
     tips = PointInteractable(
-        ax, xy;
-        id = :tips,
-        radius = 0.3525 * markersize,
-        payloads = [(; city = cities[k], pop = pops[k]) for k in eachindex(cities)],
+        ax, [(c.x, c.y) for c in cities];
+        payloads = cities,
         colors = (; palette, index = collect(0:(length(cities) - 1))),
         tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
     )
     nothing
 end
 
+# ╔═╡ a1b2c3d4-0011-4000-8000-000000000011
+md"""
+`@bind pick` stores a click in `pick`. Hover updates the card and does not change `pick`.
+"""
+
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000003
 @bind pick masque(fig, tips)
+
+# ╔═╡ a1b2c3d4-0011-4000-8000-000000000012
+md"""
+Before a click, `pick` is `nothing`. This cell reads `pick`, so it re-runs on the click.
+"""
+
+# ╔═╡ a1b2c3d4-0011-4000-8000-000000000004
+if pick === nothing
+    "hover a city, or click one"
+else
+    "$(pick.city) selected"
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
-chip = false
+show_code = true
+pluto_html = true
+
+cells = [
+  "a1b2c3d4-0011-4000-8000-000000000009",
+  "a1b2c3d4-0011-4000-8000-000000000010",
+  "a1b2c3d4-0011-4000-8000-000000000002",
+  "a1b2c3d4-0011-4000-8000-000000000011",
+  "a1b2c3d4-0011-4000-8000-000000000003",
+  "a1b2c3d4-0011-4000-8000-000000000012",
+  "a1b2c3d4-0011-4000-8000-000000000004",
+]
+
 [[player.states]]
 id = "idle"
+
+[[player.states]]
+id = "tokyo"
+value = { layer = "points", index = 0 }
+
+[[player.states]]
+id = "delhi"
+value = { layer = "points", index = 1 }
+
+[[player.states]]
+id = "shanghai"
+value = { layer = "points", index = 2 }
+
+[[player.states]]
+id = "saopaulo"
+value = { layer = "points", index = 3 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1699,8 +1752,13 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0011-4000-8000-000000000001
+# ╟─a1b2c3d4-0011-4000-8000-000000000009
+# ╟─a1b2c3d4-0011-4000-8000-000000000010
 # ╠═a1b2c3d4-0011-4000-8000-000000000002
+# ╟─a1b2c3d4-0011-4000-8000-000000000011
 # ╠═a1b2c3d4-0011-4000-8000-000000000003
+# ╟─a1b2c3d4-0011-4000-8000-000000000012
+# ╠═a1b2c3d4-0011-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

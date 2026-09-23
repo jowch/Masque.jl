@@ -19,9 +19,23 @@ end
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000001
 using Masque, CairoMakie
 
+# ╔═╡ a1b2c3d4-0012-4000-8000-000000000009
+md"""
+Hold the pointer over a point. The card is dark because the figure is dark. Click a point and the last cell names it.
+"""
+
+# ╔═╡ a1b2c3d4-0012-4000-8000-000000000010
+md"""
+Draw the scatter on a dark figure, and pass that scatter to `PointInteractable`. The tooltip picks up the figure background and the marker color.
+"""
+
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000002
 begin
-    pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 1.2)]
+    points = [
+        (label = "alpha", x = 1.0, y = 1.0),
+        (label = "beta", x = 2.0, y = 2.0),
+        (label = "gamma", x = 3.0, y = 1.2),
+    ]
     fig = Figure(size = (560, 360); backgroundcolor = :gray12)
     ax = Axis(
         fig[1, 1];
@@ -37,31 +51,66 @@ begin
         rightspinecolor = :gray70,
         topspinecolor = :gray70,
     )
-    sc = scatter!(
-        ax, first.(pts), last.(pts);
+    s = scatter!(
+        ax, [p.x for p in points], [p.y for p in points];
         color = ["#e6194b", "#3cb44b", "#4363d8"],
         markersize = 22,
     )
-    # Scatter constructor resolves `color=` into layer.colors (tooltip accent)
-    # and hugs the drawn marker. Omit tooltip= for the auto-table default.
-    dark = PointInteractable(
-        ax, sc;
-        id = :dark,
-        payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")],
-    )
+    pts = PointInteractable(ax, s; payloads = points)
     nothing
 end
 
+# ╔═╡ a1b2c3d4-0012-4000-8000-000000000011
+md"""
+`@bind pick` stores a click in `pick`. Hover updates the card and does not change `pick`.
+"""
+
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000003
-@bind pick masque(fig, dark)
+@bind pick masque(fig, pts)
+
+# ╔═╡ a1b2c3d4-0012-4000-8000-000000000012
+md"""
+Before a click, `pick` is `nothing`. `pick.label` is the point's name. This cell reads `pick`, so it re-runs on the click.
+"""
+
+# ╔═╡ a1b2c3d4-0012-4000-8000-000000000004
+if pick === nothing
+    "hover a point, or click one"
+else
+    "$(pick.label) selected"
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
-chip = false
+show_code = true
+pluto_html = true
+
+cells = [
+  "a1b2c3d4-0012-4000-8000-000000000009",
+  "a1b2c3d4-0012-4000-8000-000000000010",
+  "a1b2c3d4-0012-4000-8000-000000000002",
+  "a1b2c3d4-0012-4000-8000-000000000011",
+  "a1b2c3d4-0012-4000-8000-000000000003",
+  "a1b2c3d4-0012-4000-8000-000000000012",
+  "a1b2c3d4-0012-4000-8000-000000000004",
+]
+
 [[player.states]]
 id = "idle"
+
+[[player.states]]
+id = "alpha"
+value = { layer = "scatter", index = 0 }
+
+[[player.states]]
+id = "beta"
+value = { layer = "scatter", index = 1 }
+
+[[player.states]]
+id = "gamma"
+value = { layer = "scatter", index = 2 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1709,8 +1758,13 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0012-4000-8000-000000000001
+# ╟─a1b2c3d4-0012-4000-8000-000000000009
+# ╟─a1b2c3d4-0012-4000-8000-000000000010
 # ╠═a1b2c3d4-0012-4000-8000-000000000002
+# ╟─a1b2c3d4-0012-4000-8000-000000000011
 # ╠═a1b2c3d4-0012-4000-8000-000000000003
+# ╟─a1b2c3d4-0012-4000-8000-000000000012
+# ╠═a1b2c3d4-0012-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
