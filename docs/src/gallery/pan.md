@@ -1,8 +1,9 @@
 # Drag to pan
 
-`ViewInteractable` on a 2D axis pans while you drag. The bond does not
-update when the camera moves. A click on a marker still reports that
-point. The camera is not an analysis value.
+`ViewInteractable` on a 2D axis pans while you drag. The wheel zooms
+about the cursor. The axis frame stays put while the data inside it
+slides. The bond does not update when the camera moves. A click on a
+marker still reports that point. The camera is not an analysis value.
 
 In-drag frames need a live kernel. They travel on `with_js_link`, not
 on `@bind`. See [Pan and orbit](@ref).

@@ -59,6 +59,9 @@ The notebook scatters the points and adds [`ViewInteractable`](@ref).
 `masque(fig)` does not add pan. After a pan, `pick` is unchanged.
 There is no camera value on the bond.
 
+The wheel zooms that 2D view about the cursor. The axis frame stays
+put while the data inside it slides.
+
 If a threshold or ROI shares the axis, an ordinary drag moves that
 handle. **Shift**+drag pans.
 
@@ -66,7 +69,9 @@ handle. **Shift**+drag pans.
 
 Both backends stream frames over `with_js_link` (live kernel).
 CairoMakie ships a PNG. WGLMakie ships a serialized scene onto the
-canvas already on the page. For more information, see [Backends](@ref).
+canvas already on the page. During that pan, and during the wheel
+zoom, the axis frame stays put while the data inside it slides. For
+more information, see [Backends](@ref).
 
 ## Orbit an `Axis3`
 

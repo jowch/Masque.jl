@@ -48,7 +48,7 @@ operational state. For `selected=`, see [Selection](@ref).
 [`auto_interactables`](@ref) walks every `Axis`, `Axis3`,
 and `PolarAxis` plot it knows, plus every `Colorbar` and `Legend`. It
 does not install `AxisInteractable`, `ThresholdInteractable`,
-`ROIInteractable`, or `ViewInteractable`.
+`ROIInteractable`, `ViewInteractable`, or `SliceInteractable`.
 
 ```julia
 @bind pick masque(fig)
@@ -273,6 +273,7 @@ PolarAxis yes-or-no, and for types that are skipped, see
 | [`ThresholdInteractable`](@ref) | `(ax; orientation=:horizontal, value, id=:threshold)` | [`ThresholdEvent`](@ref): `value` on release | `:threshold` | [Read coordinates](@ref) |
 | [`ROIInteractable`](@ref) | `(ax; bounds, selects=nothing, id=:roi)` | [`BoundsEvent`](@ref); with `selects`, `Vector{ElementEvent}` or [`GridWindowEvent`](@ref) | `:roi` | [Brush a region](@ref) |
 | [`ViewInteractable`](@ref) | `(ax; id=:view)` | none — commits nothing | `:view` | [Pan and orbit](@ref) |
+| [`SliceInteractable`](@ref) | `(ax, plot)` or `(ax; series, orientation=:vertical, crosshair=true, id=:slice, covers=(), tooltip=nothing)` | none — hover only | `:slice` | [Sample a series](@ref) |
 
 `value=` on a threshold accepts a number or a [`ThresholdEvent`](@ref).
 `value=` on a colorbar accepts a number or a [`ColorbarEvent`](@ref).
@@ -283,17 +284,79 @@ PolarAxis yes-or-no, and for types that are skipped, see
 they raise `ArgumentError` on `Axis3` or `PolarAxis`. They need a linear
 or log scale. Categorical is fine for axis and threshold, not for ROI
 or a slice. `ViewInteractable` raises `ArgumentError` on polar, a
-Colorbar, or a categorical 2D axis; Axis3 orbit is allowed. Shift+drag wins over ROI or threshold on the same
-axis. `selects` accepts a `:circles` or `:grid` layer id only. Colorbar
-kind is `:axis`, not `:colorbar`. Legend kind is `:rects`.
+Colorbar, or a categorical 2D axis; Axis3 orbit is allowed. Shift+drag
+wins over ROI or threshold on the same axis. `selects` accepts a
+`:circles` or `:grid` layer id only. Colorbar kind is `:axis`, not
+`:colorbar`. Legend kind is `:rects`.
 
 Changing `limits` (2D) or `azimuth`/`elevation` (`Axis3`) and rebuilding
 the widget re-projects the overlay. Dragging with
-[`ViewInteractable`](@ref) is different: it commits nothing. On both
-backends, in-drag frames stream over `with_js_link`. `:cairo` ships a
-PNG; `:webgl` ships a serialized scene onto the canvas already on the
-page. See [Pan and orbit](@ref), [Limits slider](@ref), and
-[Drag to pan](@ref).
+[`ViewInteractable`](@ref) is different: it commits nothing. The wheel
+zooms a 2D view about the cursor. The axis frame stays put while the
+data inside it slides. On both backends, in-drag frames stream over
+`with_js_link`. `:cairo` ships a PNG; `:webgl` ships a serialized scene
+onto the canvas already on the page. See [Pan and orbit](@ref),
+[Limits slider](@ref), and [Drag to pan](@ref).
+
+## Sample a series
+
+You already drew the line. Pass that plot:
+
+```julia
+s = lines!(ax, xs, ys)
+probe = SliceInteractable(ax, s)
+```
+
+Hover reads the line at the cursor. `@bind` does not change: a slice
+commits nothing. `masque(fig)` does not add one, so a heatmap, a
+scatter, an axis readout, and empty space draw no hair.
+
+The default is one vertical hair, sampling `y` at the cursor's data
+`x`, plus a filled dot on each series in that series' colour. The hair
+is a quieter grey than the selection edge (`#b0b0b0` on a light figure,
+`#929292` on a dark one), at 80% opacity, with a 1.5px fringe in the
+figure's background. `orientation = :horizontal` samples `x` at data
+`y` and draws the horizontal hair. `crosshair = false` keeps the dots
+and the tooltip and draws no hair. One slice per axis.
+
+While the pointer is over a covered layer, or over empty axis interior
+inside at least one series, the tooltip is that sample. A marker that
+is not covered, and a colorbar, keep their own tooltip, and a marker
+turns the hair off.
+
+`SliceInteractable(ax, plot)` and `SliceInteractable(ax, plots)` accept
+`Lines`, `Stairs`, `Series`, `Band`, and `Density`. Vertices are the
+points those plots already draw. `Stairs` keeps the expanded
+steppoints, so the sample is constant between risers and, on the riser
+itself, the y where that riser starts. `Density` and `Band` contribute
+the band's upper curve as drawn: a `Band` with `direction = :y` flips
+the converted edge, and a `Density` with `direction = :y` is already
+stored in drawn coordinates and is sampled horizontally.
+`orientation = nothing` on the plot constructor follows that: `:y` is
+horizontal, and everything else is vertical.
+
+`covers = nothing` on the plot constructor names each plot's
+auto-extract layer id, numbered inside that call's vector (`:lines`,
+then `:lines_2` when the vector repeats a kind; also `:stairs`,
+`:series`, `:band`, `:density`). It does not count other plots already
+on the axis, so slicing only the second `lines!` covers `:lines`.
+Pass `covers` to name `:polygons` or `:lines` layers in the same
+`masque` call whose highlight this slice replaces.
+
+Without a plot object, pass the vertices. Each series is `(; x, y)`
+plus optional `id`, `label`, and `color`. For a vertical slice, `x` is
+strictly increasing; for a horizontal slice, `y` is.
+
+```julia
+probe = SliceInteractable(ax; series = [(; id = :wide, x = xs, y = ys)])
+```
+
+`tooltip = nothing` is the auto table of the live sample. `masque"…"`
+is a template over those fields. `false` suppresses the card.
+
+`Axis3`, `PolarAxis`, a categorical axis, and a scale other than
+`identity`, `log10`, or `log` raise `ArgumentError`. See
+[Troubleshooting](@ref).
 
 ## Custom
 

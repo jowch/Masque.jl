@@ -38,7 +38,8 @@ Same-index highlight between two scatters is not shipped.
 
 `auto_interactables` walks every axis it knows, plus every `Colorbar` and
 `Legend`. It does not install `AxisInteractable`, `ThresholdInteractable`,
-`ROIInteractable`, or `ViewInteractable`. Append those yourself. Layer ids
+`ROIInteractable`, `ViewInteractable`, or `SliceInteractable`. Append
+those yourself. Layer ids
 must not collide; a second scatter becomes `:scatter_2`.
 
 ## Inspect two views of the same points

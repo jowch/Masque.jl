@@ -131,10 +131,12 @@ For a runnable gallery, see [Gallery](@ref).
 `:view`. Drag is operational camera state, not analysis data.
 
 On both backends, in-drag frames stream over `with_js_link`. Julia
-mutates limits (2D pan) or `azimuth` / `elevation` (`Axis3` orbit),
-recomputes hit regions, and ships a fresh frame. `:cairo` ships a PNG.
-`:webgl` ships a serialized scene onto the canvas already on the page.
-That channel needs a live kernel. It is dead on static export.
+mutates limits (2D pan or wheel zoom) or `azimuth` / `elevation`
+(`Axis3` orbit), recomputes hit regions, and ships a fresh frame.
+The wheel zooms a 2D view about the cursor. The axis frame stays put
+while the data inside it slides. `:cairo` ships a PNG. `:webgl` ships
+a serialized scene onto the canvas already on the page. That channel
+needs a live kernel. It is dead on static export.
 
 `ViewInteractable` on `Axis3` is allowed: that is orbit. Polar, Colorbar,
 categorical 2D, and non-invertible 2D scales raise `ArgumentError`.

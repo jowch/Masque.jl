@@ -49,6 +49,10 @@ A legend is the exception to the omitted-`tooltip` row: holding the
 pointer over an entry shows no card unless you pass `masque"..."`. See
 [Legend](@ref).
 
+A [`SliceInteractable`](@ref) is a card for the sample at the cursor,
+not for a mark. Omit `tooltip` and the card is that sample. See
+[Sample a series](@ref).
+
 `$(field)` is a placeholder resolved in the browser from the payload of
 the mark under the pointer. Put derived text in the payload, not in the
 template. `masque"$(pop+1)"` is a `TemplateValidationError` at parse.
