@@ -42,35 +42,11 @@ click a city and watch the **Simulating `@bind`** chip.
 
 ## Install
 
-Masque is not in the General registry. `] add Masque` fails.
-
 In a Pluto notebook, paste each snippet from these docs into its own
 cell. Pluto runs one top-level expression per cell. Wrap multiple
-statements in `begin ... end`, which counts as one expression. Showing
-`fig` alone does not mount the overlay; `masque` returns the HTML that
-does. Later pages link here instead of repeating those rules; see
-[Pluto cells in these docs](@ref).
+statements in `begin ... end`, which counts as one expression.
 
-**1.** In a terminal, clone the repository:
-
-```bash
-git clone https://github.com/jowch/Masque.jl
-```
-
-**2.** In a Pluto cell, develop the checkout and load a backend. Replace
-   `path/to/Masque.jl` with your clone:
-
-```julia
-begin
-    using Pkg
-    Pkg.develop(path = "path/to/Masque.jl")
-    Pkg.add("CairoMakie")
-    using Masque, CairoMakie
-end
-```
-
-**3.** If you do not want a sibling clone, add the GitHub URL instead of
-   `Pkg.develop`:
+[Note: add the Pluto.activate_notebook_environment path to preserve nbpkg.]
 
 ```julia
 begin
@@ -81,23 +57,15 @@ begin
 end
 ```
 
-Paste **2.** or **3.**, not both. Skip the load cell if this notebook
-already ran it. Pluto reports multiple definitions if you paste
-`using` twice.
-
-`using Masque` with no Makie backend raises `ArgumentError` the first
-time `masque` runs. Loading both CairoMakie and WGLMakie is fine; then
-`masque` defaults to CairoMakie. For `backend=` and when to reach for
-WGLMakie, see [Backends](@ref).
-
-The example notebooks in this repository each `Pkg.develop` the checkout
-themselves. They use a temporary environment, which turns Pluto's
-notebook package management off. Do not copy a
-`Pkg.activate(; temp = true)` cell into your own notebook unless you
-want Pluto's package management off. For more information, see
-[Examples](@ref).
+[Note: wrap this in a documenter info callout]
+Masque currently supports two backends, CairoMakie and WGLMakie. `using Masque`
+with no Makie backend raises `ArgumentError` the first time `masque` runs. If
+both CairoMakie and WGLMakie are loaded at the same time, then `masque` defaults
+to CairoMakie. See [Backends](@ref) for more information.
 
 ## Quick start
+
+[Note: quickstart embed needs to show code unfolded. Use cells with md"" in them for annotation.]
 
 The following embed is a three-point scatter: your figure, `masque`, and
 a readout. Hover a point, then click one. On this site the **Simulating
@@ -135,7 +103,9 @@ a readout. Hover a point, then click one. On this site the **Simulating
 `sel` is `nothing` until a click, then `sel.payload` is
 `(; index, x, y)`.
 
-## Overlay the cities scatter
+[Note: remove cities example, expand simple example above to fold in custom tooltips, bind, reacting to bind values, etc. + descriptions]
+
+<!-- ## Overlay the cities scatter
 
 The entry function is lowercase `masque`. A function named `Masque`
 clashes with `module Masque`.
@@ -214,45 +184,6 @@ does not change `pick`.
 `ElementEvent` is exported by Masque. Do not redefine it in the
 notebook.
 
-For other event types, see [Constructors](@ref).
+For other event types, see [Constructors](@ref). -->
 
-## You are done
-
-You have an overlay, a hover tooltip, and a click that `@bind` captures.
-The readout cell is the sentence that uses the pick. The sections that
-follow are optional.
-
-For hug paths, `tooltip=` on a plot object, and `auto_interactables`,
-see [Constructors](@ref).
-
-A second axis on the same `Figure` is still one `masque` call. For more
-information, see [Linked views](@ref).
-
-## Skip the constructor
-
-When you do not need custom `payloads`, `tooltip=`, or `id`, skip
-`PointInteractable` and call `masque(fig)`. On this same scatter, that
-uses the plot-object constructor, so the highlight already hugs the
-marker.
-
-Replace **both** the bind cell and the readout cell. The leftover
-`pick.city` cell raises an error: the default payload has no field
-`city`.
-
-```julia
-@bind pick masque(fig)
-```
-
-```julia
-pick === nothing ? "click a point" :
-    "index $(pick.index) / x $(pick.x) / y $(pick.y)"
-```
-
-The default payload is `(; index, x, y)` with 1-based `index`, not
-`(; city, pop)`. The layer id is `:scatter`, not `:cities`. For
-`auto_interactables`, huge-data payloads, and which recipes
-`masque(fig)` extracts, see [Constructors](@ref).
-
-The default path is CairoMakie. On WGLMakie, return `masque(f)` from the
-figure cell; a trailing `;` is only for `@bind`. See
-[The widget is the figure](@ref).
+[Note: add pointers to examples and other next things to read]
