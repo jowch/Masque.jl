@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- The cursor follows what the pointer is over. An axis or colorbar readout, a grid cell, and
+  empty axis interior stay on the `crosshair` cursor and draw no hairline. A hairline is drawn
+  only by a `SliceInteractable` with `crosshair = true`, and only the one arm named by
+  `orientation` (`:vertical` or `:horizontal`). It is a quieter grey than the selection edge
+  (`#b0b0b0` on a light figure, `#929292` on a dark one), at 80% opacity, with a 1.5px fringe
+  in the figure's own background. A discrete mark (points, bars, polygons, segments, lines) and
+  a legend entry stay `pointer`, and the hair turns off over them. Threshold, ROI, and view
+  keep their drag cursors. A layer named in a slice's `covers` stays `crosshair` and skips
+  that layer's highlight; the tooltip is the slice's sample.
 - `PointInteractable(ax, points)` takes its highlight radius from the one `Scatter` on that
   axis with the same positions — the marker's drawn extent, same as
   `PointInteractable(ax, scatter)` — instead of a fixed `radius` of 9 that haloed the
@@ -27,6 +36,22 @@ All notable changes to this project are documented here. The format is based on
   leave the card off. A screen reader still announces the entry's label.
 
 ### Added
+- `SliceInteractable`: hover samples one or more 1-D series at the cursor (piecewise linear in
+  data space) and shows those values in the tooltip. `orientation` chooses the sample coordinate
+  and the one hair that is drawn. `crosshair = false` keeps the filled dots and the tooltip and
+  draws no hair. Dots are the series colour, ringed in the figure background. It does not enter
+  hit testing, does not write `@bind`, and is not grown by `masque(fig)`. `Lines`, `Stairs`,
+  `Series`, `Band`, and `Density` have a plot constructor.
+  A second slice on the same axis, a non-monotonic probe, `Axis3`, `PolarAxis`, a
+  non-invertible scale, or a `covers` id that is not `:polygons` or `:lines` fails at
+  `masque()` time.
+- The wheel zooms a 2D `ViewInteractable` about the cursor. Pan and that zoom slide the data
+  inside the axis viewport until the gesture-channel frame is visible. The axis frame stays
+  where it is. Hover, click, and an ROI or threshold drag follow that slid data; legend,
+  colorbar, and axis hits stay on the unmoved chrome. A click outside the axis viewport does
+  not select data the preview has clipped away. Orbit is unchanged. The wheel settles
+  one frame 150ms after the last notch.
+  Nothing is written to `@bind`.
 - `:webgl` view gestures stream live frames on the same `with_js_link` channel as `:cairo`.
   Each frame is a freshly serialized scene plus a hit manifest Julia computed for that camera,
   swapped onto the canvas the cell already holds — no new WebGL context, no cell re-run.

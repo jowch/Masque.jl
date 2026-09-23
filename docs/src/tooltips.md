@@ -142,9 +142,10 @@ is omitted when the color cannot be resolved.
 ## Placement
 
 The tooltip sits above the mark under the pointer, not on the cursor,
-except on axis, threshold, ROI, and view, where it follows the pointer.
-On a line it slides to the nearest point on the path (`lines!` /
-`series!` included). Keyboard focus uses the segment midpoint, or the
-point halfway along a whole line. It flips below if it would clip the
-top edge, and shifts if it would clip a side. For card chrome keywords
-and CSS custom properties, see [Tooltip chrome](@ref).
+except on axis, threshold, ROI, view, and a slice sample, where it
+follows the pointer. On a line it slides to the nearest point on the
+path (`lines!` / `series!` included). Keyboard focus uses the segment
+midpoint, or the point halfway along a whole line. It flips below if
+it would clip the top edge, and shifts if it would clip a side. For
+card chrome keywords and CSS custom properties, see
+[Tooltip chrome](@ref).

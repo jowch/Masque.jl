@@ -1,8 +1,23 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from "vitest"
-import { mount } from "../src/overlay"
+import { afterEach, describe, it, expect, vi } from "vitest"
+import { mount as mountOverlay } from "../src/overlay"
+
+// Each mount's wheel-settle timer and in-flight frame outlive the test. happy-dom then
+// deletes HTMLCanvasElement, and the late frame throws. Cleanup runs before that teardown.
+const mountedCleanups: Array<() => void> = []
+afterEach(() => {
+    while (mountedCleanups.length) mountedCleanups.pop()!()
+})
+function mount(...args: Parameters<typeof mountOverlay>): ReturnType<typeof mountOverlay> {
+    const mounted = mountOverlay(...args)
+    mountedCleanups.push(mounted.cleanup)
+    return mounted
+}
+import { mapPoint, unmapPoint } from "../src/photo"
+import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
-import type { HitLayer, Manifest } from "../src/types"
+import { createOverlayState, MOTION_MS, type HiGroups } from "../src/state"
+import type { GridGeometry, Hit, HitLayer, Manifest } from "../src/types"
 
 // build a light-DOM host (img + script) like the Julia widget emits, with layout mocked
 function setup() {
@@ -568,6 +583,38 @@ describe("mount", () => {
         expect(selChildren(shadow).length).toBe(4)
     })
 
+    it("a selects-ROI drag onto a mark mid-leave clears the fading hover ring", async () => {
+        // The test above keeps a keyboard-focus ring live, so hiKey_ is still set when the box
+        // arrives. #97 is the other window: the pointer has already left the mark, clearHi has
+        // started the fade, and the box then claims that mark before MOTION_MS.
+        const { host, script } = setup()
+        mount(script, boxSelectManifest())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const at = (x: number, y: number, type: string) =>
+            surface.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, pointerId: 1 }))
+        // pts[2] at image (900, 700) = client (450, 350), outside the initial box.
+        at(450, 350, "pointermove")
+        await flushFrame()
+        expect(hiChildren(shadow).length).toBe(2)
+        // Onto the ROI interior. The drag-hit branch starts the leave; the ring stays up.
+        at(200, 200, "pointermove")
+        const leaving = hiChildren(shadow)
+        expect(leaving.length).toBe(2)
+        expect(leaving.every((el) => el.classList.contains("masque-leave"))).toBe(true)
+        // Grab the box and move it over pts[2]. The first drag move applies synchronously.
+        at(200, 200, "pointerdown")
+        at(450, 300, "pointermove")
+        expect(hiChildren(shadow).length).toBe(0)
+        expect(selChildren(shadow).length).toBe(2) // pts[2] × (fill + edge)
+        await new Promise((r) => setTimeout(r, MOTION_MS + 40))
+        // After the fade window, g.hi is still empty and the selected pair is still drawn.
+        // The leave callback only removes g.hi children, so this wait does not show that the
+        // timer was cancelled. The re-hover test below is the one that keeps a replacement ring.
+        expect(hiChildren(shadow).length).toBe(0)
+        expect(selChildren(shadow).length).toBe(2)
+    })
+
     // Factory so each test gets a fresh geometry object — drag mutates geometry in-place.
     const gridSelectManifest = (): Manifest => ({
         width: 1200, height: 800, scaling: 2,
@@ -619,6 +666,55 @@ describe("mount", () => {
         expect(el.getAttribute("fill")).toBeNull()
         expect(el.getAttribute("stroke")).toBeNull()
         expect(edgeSelGroup(shadowOf(host)).children.length).toBe(0)
+    })
+})
+
+// #97's timer contract, under drawHi/clearHi/drawSelection directly. The mount test above is the
+// user path; these two lock the neighbours that path does not reach.
+describe("hover leave key while a selection is drawn", () => {
+    const layer: HitLayer = {
+        id: "pts", kind: "circles", geometry: [], payloads: [], axis: "ax1", events: ["hover", "click"],
+    }
+    const hit = (index: number): Hit => ({ layer, index, geom_: ["circle", 10 + index, 10, 5] })
+    const groups = (): HiGroups => {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+        const fill_ = document.createElementNS("http://www.w3.org/2000/svg", "g")
+        const edge_ = document.createElementNS("http://www.w3.org/2000/svg", "g")
+        const plain_ = document.createElementNS("http://www.w3.org/2000/svg", "g")
+        svg.append(fill_, edge_, plain_)
+        document.body.append(svg)
+        return { fill_, edge_, plain_ }
+    }
+    const count = (g: HiGroups) => g.fill_.children.length + g.edge_.children.length + g.plain_.children.length
+
+    it("a leave whose key is absent from the new selection still fades out on its own", async () => {
+        const state = createOverlayState()
+        const hi = groups()
+        const sel = groups()
+        drawHi(state, hi, hit(2))
+        clearHi(state, hi, true)
+        drawSelection(state, sel, [hit(0)], hi)
+        expect(hi.edge_.firstElementChild!.classList.contains("masque-leave")).toBe(true)
+        expect(count(sel)).toBeGreaterThan(0)
+        await new Promise((r) => setTimeout(r, MOTION_MS + 40))
+        expect(count(hi)).toBe(0)
+        expect(state.hiKey_).toBeNull()
+        expect(count(sel)).toBeGreaterThan(0)
+    })
+
+    it("re-hovering the same mark during the leave replaces the ring, and the old timer does not remove it", async () => {
+        const state = createOverlayState()
+        const hi = groups()
+        drawHi(state, hi, hit(2))
+        clearHi(state, hi, true)
+        drawHi(state, hi, hit(2))
+        const edge = hi.edge_.firstElementChild as SVGElement
+        expect(edge.classList.contains("masque-leave")).toBe(false)
+        expect(edge.classList.contains("masque-enter")).toBe(true)
+        expect(state.hiKey_).toBe("pts:2")
+        await new Promise((r) => setTimeout(r, MOTION_MS + 40))
+        expect(hi.edge_.firstElementChild).toBe(edge)
+        expect(state.hiKey_).toBe("pts:2")
     })
 })
 
@@ -1476,9 +1572,16 @@ describe("tooltips (mount/showTip)", () => {
 
         // A real drag: at least one in-drag request (settle: false), and a terminal one
         // (settle: true) on release, carrying the pan payload the old commit used to.
+        const img = host.querySelector("img") as HTMLImageElement
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        // The base stays untransformed, so its border box is the layout box. pointerup
+        // samples that same layout point and must not put the translation back to 0.
+        expect(img.style.transform).toBe("")
+        expect(host.dataset.masquePhoto).toBe("1,200,0")
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        expect(img.style.transform).toBe("")
+        expect(host.dataset.masquePhoto).toBe("1,200,0")
         await Promise.resolve()
         expect(requestFrame).toHaveBeenCalled()
         const calls = requestFrame.mock.calls; const last = calls[calls.length - 1][0]
@@ -1713,6 +1816,8 @@ describe("tooltips (mount/showTip)", () => {
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
         await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+        // Cairo keeps the previous pixels until load. The manifest swap waits with them.
+        host.querySelector("img")!.dispatchEvent(new Event("load"))
 
         expect(hiChildren(shadow).length).toBe(0) // not left describing the point's stale, pre-pan position
     })
@@ -1916,6 +2021,7 @@ describe("tooltips (mount/showTip)", () => {
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
         await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+        host.querySelector("img")!.dispatchEvent(new Event("load"))
 
         expect(selChildren(shadow).length).toBe(2) // selection survived the manifest swap (still fill+edge)
         // The ring is drawn at index 1's NEW position (cx=700) — not its stale pre-swap position
@@ -2472,6 +2578,64 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         expect(tip.innerHTML).toBe("(2,1) = 12")
     })
 
+    it("grid sample hover shows the pixel-center value, and a NaN sample shows nothing", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{ id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: {
+                    xedges: [0, 10, 20, 30], yedges: [0, 20], ncols: 3, nrows: 1,
+                    sample: [7, 8], sncols: 2, snrows: 1,
+                    sample_origin: [0, 0], sample_span: [30, 20], sample_px: 15,
+                } }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        // scale = 1200/600 = 2 → client (7.5, 5) = image (15, 10), the left edge of sample (1, 0).
+        // That sample spans image x [15, 30], so its center is 22.5, source bin i=2 (between 20 and 30).
+        // Tooltip is 1-based (3, 1) = the stored sample value 8.
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 5, bubbles: true }))
+        expect(tip.classList.contains("show")).toBe(true)
+        expect(tip.innerHTML).toBe("(3,1) = 8")
+        const hi = shadow.querySelector("svg.masque-edge .masque-hi") as SVGRectElement
+        expect(hi).not.toBeNull()
+        expect(hi.getAttribute("width")).toBe("15")
+        // An in-grid NaN is still that cell. A second move on the same mount is rAF-deferred,
+        // so this is a fresh widget. Image (15, 10) is sample 1, center 22.5, source bin i=2.
+        const nanM: Manifest = {
+            ...m,
+            layers: [{ ...m.layers[0], geometry: { ...(m.layers[0].geometry as GridGeometry), sample: [7, NaN] } }],
+        }
+        const host2 = setup()
+        mount(host2.script, nanM)
+        const shadow2 = shadowOf(host2.host)
+        const tip2 = shadow2.querySelector(".masque-tip") as HTMLElement
+        ;(shadow2.querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 5, bubbles: true }))
+        expect(tip2.classList.contains("show")).toBe(true)
+        expect(tip2.innerHTML).toBe("(3,1) = NaN")
+        expect(shadow2.querySelector("svg.masque-edge .masque-hi")).not.toBeNull()
+        // The same point is a miss when the source edges stop before the sample center.
+        const miss: Manifest = {
+            ...m,
+            layers: [{
+                ...m.layers[0],
+                geometry: {
+                    ...(m.layers[0].geometry as GridGeometry),
+                    xedges: [0, 10], ncols: 1, sample: [NaN, NaN],
+                },
+            }],
+        }
+        const host3 = setup()
+        mount(host3.script, miss)
+        const tip3 = shadowOf(host3.host).querySelector(".masque-tip") as HTMLElement
+        ;(shadowOf(host3.host).querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 5, bubbles: true }))
+        expect(tip3.classList.contains("show")).toBe(false)
+    })
+
     it("grid hover tooltip shows '(i,j)' with no value when values[] was dropped", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
@@ -2860,5 +3024,881 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
         }
         mount(script, twoLayer)
         expect((host as unknown as { value: unknown }).value).toBeNull()
+    })
+})
+
+describe("crosshair", () => {
+    const ax: Manifest["transforms"] = {
+        ax1: {
+            xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false,
+        },
+    }
+    const move = (surface: HTMLElement, clientX: number, clientY: number) => {
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX, clientY, bubbles: true }))
+    }
+    const crossOn = (shadow: ShadowRoot) =>
+        shadow.querySelector(".masque-cross")!.classList.contains("is-on")
+
+    it("leaves a grid cell on its own tooltip, with no hair", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: { xedges: [200, 600, 1000], yedges: [100, 400, 700], ncols: 2, nrows: 2, values: [1, 2, 3, 4] },
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 200, 100) // image (400, 200): grid cell (1, 1)
+        expect(crossOn(shadow)).toBe(false)
+        expect(surface.classList.contains("hot")).toBe(false)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("(1,1) = 1")
+    })
+
+    it("draws no hair on empty space inside the viewport", () => {
+        const { host, script } = setup()
+        mount(script, { width: 1200, height: 800, scaling: 2, transforms: ax, layers: [] })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 10, 10)
+        expect(crossOn(shadow)).toBe(false)
+        expect(surface.classList.contains("hot")).toBe(false)
+    })
+
+    it("draws no hair on an axis readout inside the viewport", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{ id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["hover"] }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 10, 10) // image (20, 20)
+        expect(crossOn(shadow)).toBe(false)
+        expect(surface.classList.contains("hot")).toBe(false)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toContain("x=")
+    })
+
+    it("hides the cross on a circle", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "pts", kind: "circles", geometry: [600, 200, 20], payloads: [{ i: 7 }],
+                axis: "ax1", events: ["click", "hover"],
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 300, 100) // image (600, 200)
+        expect(surface.classList.contains("hot")).toBe(true)
+        expect(crossOn(shadow)).toBe(false)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toContain("7")
+    })
+
+    it("hides the cross on a threshold drag-hover and keeps that line first", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { orientation: "h", pos: 400, span: [0, 1200] },
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 100, 200) // image (200, 400) sits on the horizontal threshold
+        expect(crossOn(shadow)).toBe(false)
+        expect(surface.classList.contains("cur-ns")).toBe(true)
+        const line = shadow.querySelector("line") as SVGLineElement
+        expect(line.getAttribute("y1")).toBe("400")
+        expect(line.classList.contains("masque-threshold-line")).toBe(true)
+    })
+
+    it("a covered polygon keeps crosshair and the slice tooltip; a circle keeps its own", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [
+                {
+                    id: "pts", kind: "circles", geometry: [100, 100, 15], payloads: [{ i: 3 }],
+                    axis: "ax1", events: ["hover"],
+                },
+                {
+                    id: "fill", kind: "polygons", axis: "ax1", events: ["hover"],
+                    geometry: [[200, 200, 1000, 200, 1000, 600, 200, 600]],
+                    payloads: [{ name: "the-fill" }],
+                },
+                {
+                    id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: {
+                        orientation: "v", crosshair: true, covers: ["fill"],
+                        series: [
+                            { id: "wide", color: "rgb(20, 80, 160)", xy: [0, 0, 10, 10] },
+                            { id: "narrow", xy: [0, 10, 10, 0] },
+                        ],
+                    },
+                },
+            ],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        move(surface, 300, 200) // image (600, 400) → data (5, 5); inside the polygon, on both series
+        expect(crossOn(shadow)).toBe(true)
+        expect(surface.classList.contains("hot")).toBe(false)
+        expect(tip.innerHTML).toContain("wide")
+        expect(tip.innerHTML).toContain("narrow")
+        expect(tip.innerHTML).not.toContain("the-fill")
+        expect(hiChildren(shadow).length).toBe(0)
+        const dots = [...shadow.querySelectorAll(".masque-cross circle")] as SVGCircleElement[]
+        expect(dots.length).toBe(2)
+        expect(dots[0].style.fill).toBe("rgb(20, 80, 160)")
+        expect(dots[0].getAttribute("r")).toBe("4")
+        expect(getComputedStyle(dots[1]).fill).toBe("#b0b0b0")
+        const hairs = [...shadow.querySelectorAll(".masque-cross-hair")] as SVGLineElement[]
+        expect(hairs.map((el) => el.style.display)).toEqual(["", "none"])
+        const halo = shadow.querySelector(".masque-cross-halo") as SVGLineElement
+        expect(getComputedStyle(halo).strokeWidth).toBe("1.5")
+        const hair = hairs[0]
+        expect(Number(getComputedStyle(hair).strokeOpacity)).toBeCloseTo(0.8)
+        expect(getComputedStyle(hair).stroke).toBe("#b0b0b0")
+    })
+
+    it("a circle beside a slice keeps pointer and its own tooltip", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [
+                {
+                    id: "pts", kind: "circles", geometry: [100, 100, 15], payloads: [{ i: 3 }],
+                    axis: "ax1", events: ["hover"],
+                },
+                {
+                    id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: {
+                        orientation: "v", crosshair: true, covers: ["fill"],
+                        series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                    },
+                },
+            ],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 50, 50) // image (100, 100)
+        expect(surface.classList.contains("hot")).toBe(true)
+        expect(crossOn(shadow)).toBe(false)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        expect(tip.innerHTML).toContain("3")
+        expect(tip.innerHTML).not.toContain("wide")
+    })
+
+    it("a horizontal slice draws only the horizontal hair", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: {
+                    orientation: "h", crosshair: true, covers: [],
+                    series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                },
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 10, 10)
+        expect(crossOn(shadow)).toBe(true)
+        const hairs = [...shadow.querySelectorAll(".masque-cross-hair")] as SVGLineElement[]
+        expect(hairs.map((el) => el.style.display)).toEqual(["none", ""])
+    })
+
+    it("crosshair false keeps the sample tooltip and dots and draws no hair", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [{
+                id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: {
+                    orientation: "v", crosshair: false, covers: [],
+                    series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                },
+            }],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 10, 10) // image (20, 20) → data x = 20/1200*10
+        expect(crossOn(shadow)).toBe(true)
+        const hairs = [...shadow.querySelectorAll(".masque-cross-hair")] as SVGLineElement[]
+        expect(hairs.every((el) => el.style.display === "none")).toBe(true)
+        expect(shadow.querySelectorAll(".masque-cross circle").length).toBe(1)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toContain("wide")
+    })
+})
+
+describe("photographic pan / wheel zoom", () => {
+    const viewManifest = (mode: "pan" | "orbit"): Manifest => ({
+        width: 1200, height: 800, scaling: 2,
+        transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+        layers: [{ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode } }],
+    })
+    const wheelAt = (surface: HTMLElement, deltaY: number) => {
+        // happy-dom's WheelEvent init ignores clientX/clientY. A real browser sets both.
+        const ev = new WheelEvent("wheel", {
+            bubbles: true, cancelable: true, deltaY, ctrlKey: true,
+        })
+        Object.defineProperty(ev, "clientX", { value: 300 })
+        Object.defineProperty(ev, "clientY", { value: 200 })
+        surface.dispatchEvent(ev)
+        return ev
+    }
+
+    it("a wheel zoom scales the photograph inside the host and keeps the tooltip outside it", async () => {
+        const { host, img, script } = setup()
+        let release: (r: { png: Uint8Array; manifest: Manifest }) => void = () => {}
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, viewManifest("pan"), undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const shadowHost = host.lastElementChild as HTMLElement
+        expect(shadowHost.style.width).toBe("600px")
+        img.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 700, height: 400, right: 700, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        const ev = wheelAt(surface, -120)
+        expect(ev.defaultPrevented).toBe(true)
+        expect(img.style.transform).toBe("")
+        expect(host.querySelector(".masque-data-clip")).toBeTruthy()
+        expect(host.dataset.masquePhoto).not.toBe("")
+        expect(shadowHost.style.width).toBe("600px")
+        const photo = shadow.querySelector("svg.masque-plain g.masque-photo") as SVGGElement
+        expect(photo.getAttribute("transform")).toContain("scale(")
+        expect(photo.querySelector("g.sel")).toBeTruthy()
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        expect(tip.closest("g.masque-photo")).toBeNull()
+        expect(tip.textContent).toContain("x:[")
+        await Promise.resolve()
+        release({ png: new Uint8Array([1, 2, 3]), manifest: viewManifest("pan") })
+        await Promise.resolve()
+        await Promise.resolve()
+        if (host.dataset.masquePhoto) img.dispatchEvent(new Event("load"))
+        expect(host.dataset.masquePhoto).toBe("")
+        expect(host.querySelector(".masque-data-clip")).toBeNull()
+        expect(img.style.transform).toBe("")
+        expect(photo.getAttribute("transform")).toBeNull()
+        expect(shadowHost.style.width).toBe("700px")
+    })
+
+    it("a wheel zoom leaves the axis frame unscaled and clips the data to the viewport", () => {
+        const { host, img, script } = setup()
+        const m = viewManifest("pan")
+        m.transforms.ax1.viewport = [100, 80, 1000, 640]
+        const g = m.layers[0].geometry as { x: number; y: number; w: number; h: number }
+        g.x = 100; g.y = 80; g.w = 1000; g.h = 640
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, m, undefined, requestFrame)
+        img.getBoundingClientRect = () =>
+            ({ left: 10, top: 20, width: 600, height: 400, right: 610, bottom: 420, x: 10, y: 20, toJSON() {} }) as DOMRect
+        host.getBoundingClientRect = () =>
+            ({ left: 10, top: 20, width: 600, height: 400, right: 610, bottom: 420, x: 10, y: 20, toJSON() {} }) as DOMRect
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        expect(img.style.transform).toBe("")
+        const clip = host.querySelector(".masque-data-clip") as HTMLElement
+        // viewport (100, 80, 1000, 640) on a 1200×800 image laid out at 600×400 → half scale
+        expect(clip.style.left).toBe("50px")
+        expect(clip.style.top).toBe("40px")
+        expect(clip.style.width).toBe("500px")
+        expect(clip.style.height).toBe("320px")
+        const copy = clip.firstElementChild as HTMLElement
+        expect(copy.style.transform).toContain("scale(")
+        const clipped = shadowOf(host).querySelector("svg.masque-plain g.masque-clip") as SVGGElement
+        expect(clipped.getAttribute("clip-path")).toBe("url(#masque-clip-plain)")
+        const rect = shadowOf(host).querySelector("#masque-clip-plain rect") as SVGRectElement
+        expect(rect.getAttribute("width")).toBe("1000")
+        expect(rect.getAttribute("height")).toBe("640")
+    })
+
+    it("an orbit ignores the wheel, and a wheel during a drag does nothing", async () => {
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, viewManifest("orbit"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        const ev = wheelAt(surface, -120)
+        expect(ev.defaultPrevented).toBe(false)
+        expect(host.dataset.masquePhoto ?? "").toBe("")
+        await Promise.resolve()
+        expect(requestFrame).not.toHaveBeenCalled()
+
+        const pan = setup()
+        const panFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(pan.script, viewManifest("pan"), undefined, panFrame)
+        const panSurface = shadowOf(pan.host).querySelector(".surface") as HTMLElement
+        panSurface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+        const during = wheelAt(panSurface, -120)
+        expect(during.defaultPrevented).toBe(false)
+        expect(panFrame).not.toHaveBeenCalled()
+    })
+
+    it("a second notch inside 150ms settles once", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+            mount(script, viewManifest("pan"), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            const settles = () => requestFrame.mock.calls.filter((c) => c[0].settle === true)
+            wheelAt(surface, -80)
+            await vi.advanceTimersByTimeAsync(100)
+            wheelAt(surface, -80)
+            await vi.advanceTimersByTimeAsync(149)
+            expect(settles()).toHaveLength(0)
+            expect(requestFrame.mock.calls.some((c) => c[0].settle === false)).toBe(true)
+            await vi.advanceTimersByTimeAsync(1)
+            expect(settles()).toHaveLength(1)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("a dead channel clears the matrix", async () => {
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async () => { throw new Error("no kernel") })
+        mount(script, viewManifest("pan"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        expect(host.dataset.masquePhoto).not.toBe("")
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(host.dataset.masquePhoto).toBe("")
+        expect(host.querySelector(".masque-data-clip")).toBeNull()
+        expect(host.querySelector("img")!.style.transform).toBe("")
+    })
+
+    it("a canvas frame drops the matrix in the same turn the scene swaps", async () => {
+        const m = viewManifest("pan")
+        const host = document.createElement("div")
+        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+            masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
+        }
+        canvas.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        canvas.masqueReplaceScene = vi.fn()
+        const script = document.createElement("script")
+        host.append(canvas, script)
+        document.body.append(host)
+        const requestFrame = vi.fn(async () => ({ scene: { tag: "z" }, pxPerUnit: 1, width: 400, height: 300, manifest: m }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        expect(host.dataset.masquePhoto).not.toBe("")
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(canvas.masqueReplaceScene).toHaveBeenCalled()
+        expect(host.dataset.masquePhoto).toBe("")
+        const stamp = JSON.parse(host.dataset.masqueGestureFrame!)
+        expect(stamp.settle).toBe(false)
+    })
+
+    it("a second wheel notch stays on the cursor", () => {
+        const { host, script } = setup()
+        mount(script, viewManifest("pan"), undefined, vi.fn(async () => ({})))
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        const mid = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        const layout = { x: 100 / 600 * 1200, y: 200 / 400 * 800 }
+        const content = unmapPoint({ s: mid[0], tx: mid[1], ty: mid[2] }, layout)
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -120 })
+        Object.defineProperty(ev, "clientX", { value: 100 })
+        Object.defineProperty(ev, "clientY", { value: 200 })
+        surface.dispatchEvent(ev)
+        const next = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        const screen = mapPoint({ s: next[0], tx: next[1], ty: next[2] }, content)
+        expect(screen.x).toBeCloseTo(layout.x)
+        expect(screen.y).toBeCloseTo(layout.y)
+    })
+
+    it("a pan during a live zoom keeps the grabbed content under the cursor", () => {
+        const { host, script } = setup()
+        mount(script, viewManifest("pan"), undefined, vi.fn(async () => ({})))
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        const mid = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        const down = { x: 100 / 600 * 1200, y: 200 / 400 * 800 }
+        const content = unmapPoint({ s: mid[0], tx: mid[1], ty: mid[2] }, down)
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        const next = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        const screen = mapPoint({ s: next[0], tx: next[1], ty: next[2] }, content)
+        expect(screen.x).toBeCloseTo(200 / 600 * 1200)
+        expect(screen.y).toBeCloseTo(down.y)
+        expect(host.querySelector("img")!.style.transform).toBe("")
+    })
+
+    it("clearing a live wheel timer still settles a pan that never passes VIEW_MIN_PX", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+            mount(script, viewManifest("pan"), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            const settles = () => requestFrame.mock.calls.filter((c) => c[0].settle === true)
+            const micro = (init: PointerEventInit) => {
+                surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true, ...init }))
+                surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 100, clientY: 100, bubbles: true, ...init }))
+            }
+
+            wheelAt(surface, -80)
+            micro({})
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(1)
+            await vi.advanceTimersByTimeAsync(200)
+            expect(settles()).toHaveLength(1)
+
+            wheelAt(surface, -80)
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointercancel", { clientX: 100, clientY: 100, bubbles: true }))
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(2)
+
+            wheelAt(surface, -80)
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("lostpointercapture", { bubbles: true }))
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(3)
+
+            wheelAt(surface, -80)
+            micro({ shiftKey: true })
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(4)
+            await vi.advanceTimersByTimeAsync(200)
+            expect(settles()).toHaveLength(4)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("a wheel that already settled does not settle again on a micro pan", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+            mount(script, viewManifest("pan"), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            const settles = () => requestFrame.mock.calls.filter((c) => c[0].settle === true)
+            wheelAt(surface, -80)
+            await vi.advanceTimersByTimeAsync(150)
+            expect(settles()).toHaveLength(1)
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 100, clientY: 100, bubbles: true }))
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(1)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("a real pan after a wheel settles once", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+            mount(script, viewManifest("pan"), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            const settles = () => requestFrame.mock.calls.filter((c) => c[0].settle === true)
+            wheelAt(surface, -80)
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(1)
+            await vi.advanceTimersByTimeAsync(200)
+            expect(settles()).toHaveLength(1)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("a load after cleanup does not reveal a dead widget", async () => {
+        const { host, img, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        let resolveInval!: () => void
+        const inval = new Promise<void>((r) => { resolveInval = r })
+        mount(script, viewManifest("pan"), inval, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        release({ png: new Uint8Array([1, 2, 3]), manifest: viewManifest("pan") })
+        await Promise.resolve()
+        await Promise.resolve()
+        resolveInval()
+        await inval
+        await Promise.resolve()
+        img.dispatchEvent(new Event("load"))
+        expect((host as HTMLElement & { masqueDead?: boolean }).masqueDead).toBe(true)
+        expect(host.dataset.masqueGestureFrame).toBeUndefined()
+        expect(host.dataset.masquePhoto ?? "").toBe("")
+    })
+
+    it("a frame that lands after the canvas constructor is gone is not applied", async () => {
+        const { host, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, viewManifest("pan"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        const saved = globalThis.HTMLCanvasElement
+        Object.defineProperty(globalThis, "HTMLCanvasElement", { value: undefined, configurable: true })
+        try {
+            release({ png: new Uint8Array([1]), manifest: viewManifest("pan") })
+            await Promise.resolve()
+            await Promise.resolve()
+            expect(host.dataset.masqueGestureFrame).toBeUndefined()
+        } finally {
+            Object.defineProperty(globalThis, "HTMLCanvasElement", { value: saved, configurable: true })
+        }
+    })
+
+    it("an image error clears the photographic matrix", async () => {
+        const { host, img, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]), manifest: viewManifest("pan") }))
+        mount(script, viewManifest("pan"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        expect(host.dataset.masquePhoto).not.toBe("")
+        await Promise.resolve()
+        await Promise.resolve()
+        img.dispatchEvent(new Event("error"))
+        expect(host.dataset.masquePhoto).toBe("")
+        expect(host.dataset.masqueGestureFrame).toBeUndefined()
+    })
+
+    it("a thrown scene swap clears the photographic matrix", async () => {
+        const m = viewManifest("pan")
+        const host = document.createElement("div")
+        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+            masqueReplaceScene?: () => void
+        }
+        canvas.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        canvas.masqueReplaceScene = () => { throw new Error("swap failed") }
+        const script = document.createElement("script")
+        host.append(canvas, script)
+        document.body.append(host)
+        const requestFrame = vi.fn(async () => ({ scene: { tag: "z" }, pxPerUnit: 1, width: 400, height: 300, manifest: m }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        const err = vi.spyOn(console, "error").mockImplementation(() => {})
+        try {
+            wheelAt(surface, -120)
+            expect(host.dataset.masquePhoto).not.toBe("")
+            await Promise.resolve()
+            await Promise.resolve()
+            expect(host.dataset.masquePhoto).toBe("")
+            expect(host.dataset.masqueGestureFrame).toBeUndefined()
+        } finally {
+            err.mockRestore()
+        }
+    })
+
+    it("a frame during an ROI drag does not replace the box until the drag ends", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const moved: Manifest = {
+            ...m,
+            layers: [
+                { ...m.layers[0], geometry: { x: 100, y: 100, w: 500, h: 500, handle: 16 } },
+                m.layers[1],
+            ],
+        }
+        const { host, img, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const rect = shadow.querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        expect(rect.getAttribute("x")).toBe("200")
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
+        release({ png: new Uint8Array([1, 2, 3]), manifest: moved })
+        await Promise.resolve()
+        await Promise.resolve()
+        img.dispatchEvent(new Event("load"))
+        expect(rect.isConnected).toBe(true)
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 260, clientY: 240, bubbles: true }))
+        expect(rect.isConnected).toBe(true)
+        expect(rect.getAttribute("x")).not.toBe("200")
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 260, clientY: 240, bubbles: true }))
+        expect(rect.isConnected).toBe(false)
+        const next = shadow.querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        expect(next.getAttribute("x")).toBe("100")
+    })
+
+    it("a frame during a threshold drag does not replace the line until the drag ends", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { orientation: "h", pos: 400, span: [0, 1200] } },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const moved: Manifest = {
+            ...m,
+            layers: [
+                { ...m.layers[0], geometry: { orientation: "h", pos: 120, span: [0, 1200] } },
+                m.layers[1],
+            ],
+        }
+        const { host, img, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const line = shadow.querySelector("line.masque-threshold-line") as SVGLineElement
+        expect(line.getAttribute("y1")).toBe("400")
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        release({ png: new Uint8Array([1, 2, 3]), manifest: moved })
+        await Promise.resolve()
+        await Promise.resolve()
+        img.dispatchEvent(new Event("load"))
+        expect(line.isConnected).toBe(true)
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 250, bubbles: true }))
+        expect(line.isConnected).toBe(true)
+        expect(line.getAttribute("y1")).not.toBe("400")
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 250, bubbles: true }))
+        expect(line.isConnected).toBe(false)
+        const next = shadow.querySelector("line.masque-threshold-line") as SVGLineElement
+        expect(next.getAttribute("y1")).toBe("120")
+    })
+
+    it("a live zoom hits the mark where it is drawn and keeps legend chrome outside the clip", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20], payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"] },
+                { id: "legend", kind: "rects", bond: "legend", axis: "ax1", events: ["hover"],
+                    geometry: [100, 100, 40, 20], payloads: [{ name: "a" }] },
+                { id: "cb", kind: "axis", bond: "colorbar", axis: "ax1", events: ["click"], payloads: [],
+                    geometry: [20, 600, 60, 80] },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(async () => ({})))
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const zoom = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -800 })
+        Object.defineProperty(zoom, "clientX", { value: 100 })
+        Object.defineProperty(zoom, "clientY", { value: 100 })
+        surface.dispatchEvent(zoom)
+        const parts = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        const photo = { s: parts[0], tx: parts[1], ty: parts[2] }
+        const screen = mapPoint(photo, { x: 600, y: 400 })
+        const clickAt = (x: number, y: number) => {
+            surface.dispatchEvent(new MouseEvent("click", {
+                clientX: x / 1200 * 600, clientY: y / 800 * 400, bubbles: true,
+            }))
+        }
+        clickAt(600, 400)
+        expect((host as unknown as { value: unknown }).value).toBeNull()
+        clickAt(screen.x, screen.y)
+        expect((host as unknown as { value: unknown }).value).toEqual({ layer: "pts", index: 0 })
+        const wash = shadow.querySelector("g.sel .masque-hi")
+        expect(wash?.closest("g.masque-photo")).toBeTruthy()
+        expect(wash?.closest("g.masque-fixed")).toBeNull()
+        clickAt(50, 640)
+        expect((host as unknown as { value: { layer: string } }).value.layer).toBe("cb")
+        surface.dispatchEvent(new PointerEvent("pointermove", {
+            clientX: 50, clientY: 50, bubbles: true,
+        }))
+        const ring = shadow.querySelector("g.masque-fixed .masque-hi")
+        expect(ring).toBeTruthy()
+        expect(ring!.closest("g.masque-clip")).toBeNull()
+        expect(ring!.closest("g.masque-photo")).toBeNull()
+    })
+
+    it("an ROI drag grabs the handle where it is drawn", () => {
+        // Fresh geometry each mount: the box aliases layer.geometry and a drag mutates it.
+        const make = (): Manifest => ({
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        })
+        const zoomed = () => {
+            const { host, script } = setup()
+            mount(script, make(), undefined, vi.fn(async () => ({})))
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            const zoom = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -405 })
+            Object.defineProperty(zoom, "clientX", { value: 250 })
+            Object.defineProperty(zoom, "clientY", { value: 250 })
+            surface.dispatchEvent(zoom)
+            const parts = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+            return { host, surface, photo: { s: parts[0], tx: parts[1], ty: parts[2] } }
+        }
+        const live = zoomed()
+        const corner = mapPoint(live.photo, { x: 200, y: 200 })
+        const down = { clientX: corner.x / 1200 * 600, clientY: corner.y / 800 * 400, bubbles: true }
+        live.surface.dispatchEvent(new PointerEvent("pointerdown", down))
+        live.surface.dispatchEvent(new PointerEvent("pointermove", {
+            clientX: down.clientX + 40, clientY: down.clientY + 10, bubbles: true,
+        }))
+        const moved = shadowOf(live.host).querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        expect(Number(moved.getAttribute("width"))).not.toBe(400)
+
+        const old = zoomed()
+        // Layout (200, 200) is where the corner was. The drawn handle has moved.
+        expect(Math.hypot(corner.x - 200, corner.y - 200)).toBeGreaterThan(32)
+        old.surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+        old.surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 140, clientY: 110, bubbles: true }))
+        const stayed = shadowOf(old.host).querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        expect(stayed.getAttribute("width")).toBe("400")
+    })
+
+    it("pointerleave flushes chrome deferred by an uncaptured ROI drag", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const moved: Manifest = {
+            ...m,
+            layers: [
+                { ...m.layers[0], geometry: { x: 100, y: 100, w: 500, h: 500, handle: 16 } },
+                m.layers[1],
+            ],
+        }
+        const { host, img, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        surface.setPointerCapture = () => {
+            throw new DOMException("No active pointer with the given id is found.", "InvalidPointerId")
+        }
+        const rect = shadow.querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
+        expect(surface.classList.contains("grabbing")).toBe(true)
+        release({ png: new Uint8Array([1, 2, 3]), manifest: moved })
+        await Promise.resolve()
+        await Promise.resolve()
+        img.dispatchEvent(new Event("load"))
+        expect(rect.isConnected).toBe(true)
+        expect(rect.getAttribute("x")).toBe("200")
+        surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
+        expect(rect.isConnected).toBe(false)
+        const next = shadow.querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        expect(next.getAttribute("x")).toBe("100")
+    })
+
+    it("a click outside the pan view does not commit a cell the clip has hidden", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 800, 600], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "cells", kind: "grid", axis: "ax1", events: ["click"], payloads: [],
+                    geometry: { xedges: [0, 800], yedges: [0, 600], ncols: 1, nrows: 1, values: [1] } },
+                { id: "cb", kind: "axis", bond: "colorbar", axis: "ax1", events: ["click"], payloads: [],
+                    geometry: [900, 100, 80, 200] },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 800, h: 600, mode: "pan" } },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(async () => ({})))
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        const zoom = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -693 })
+        Object.defineProperty(zoom, "clientX", { value: 200 })
+        Object.defineProperty(zoom, "clientY", { value: 100 })
+        surface.dispatchEvent(zoom)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 470, clientY: 100, bubbles: true }))
+        expect((host as unknown as { value: { layer: string } }).value.layer).toBe("cb")
+    })
+
+    it("a pan samples the slid series in content pixels and leaves the hair on the axis frame", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { orientation: "h", pos: 100, span: [0, 1200] } },
+                { id: "fill", kind: "polygons", axis: "ax1", events: ["hover"],
+                    geometry: [[0, 0, 1200, 0, 1200, 800, 0, 800]], payloads: [{ name: "the-fill" }] },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+                { id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: {
+                        orientation: "v", crosshair: true, covers: ["fill"],
+                        series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                    } },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(async () => ({})))
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const at = (clientX: number, clientY: number, type: string) =>
+            surface.dispatchEvent(new PointerEvent(type, { clientX, clientY, bubbles: true, pointerId: 1 }))
+        at(100, 100, "pointerdown")
+        at(300, 200, "pointermove")
+        at(300, 200, "pointerup")
+        at(300, 200, "pointermove")
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        expect(tip.innerHTML).toContain("1.667")
+        expect(tip.innerHTML).not.toContain("5.000")
+        expect(tip.innerHTML).not.toContain("the-fill")
+        const hair = shadow.querySelector(".masque-cross-hair") as SVGLineElement
+        expect(hair.getAttribute("x1")).toBe("600")
+        expect(hair.closest("g.masque-photo")).toBeNull()
+        const dot = shadow.querySelector(".masque-cross circle") as SVGCircleElement
+        expect(dot.closest("g.masque-photo")).toBeTruthy()
+        expect(Number(dot.getAttribute("cx"))).toBeCloseTo(200)
+        expect(Number(dot.getAttribute("cy"))).toBeCloseTo(800 * 5 / 6)
+        const line = shadow.querySelector("line") as SVGLineElement
+        expect(line.classList.contains("masque-threshold-line")).toBe(true)
+        expect(line.closest("g.masque-photo")).toBeTruthy()
     })
 })

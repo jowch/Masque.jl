@@ -1,5 +1,7 @@
 import type { Anchor } from "./geometry"
+import type { CrossEls } from "./cross"
 import type { GestureChannel } from "./gesture"
+import { IDENTITY, type PhotoMatrix } from "./photo"
 import type { AxisTransform, FocusRef, Hit, HitLayer, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 export const MOTION_MS = 100 // 80–120 ms window; prefers-reduced-motion disables below
@@ -21,6 +23,30 @@ export const imgPx = (base: HTMLElement, manifest: Manifest, e: MouseEvent): { x
     const r = base.getBoundingClientRect()
     const s = manifest.width / r.width // image-px per CSS-px (manifest renderWidth ÷ live rect; never the base's intrinsic size)
     return { x: (e.clientX - r.left) * s, y: (e.clientY - r.top) * s }
+}
+
+// Image pixel under the cursor in the base's border box. `offsetWidth` cancels, so a
+// photographic CSS transform on that element would make this the content pixel. The base
+// stays untransformed — the matrix is on the data copy — so this is the layout point a
+// pan wants as `cur`. Wheel zoom and the grabbed pan anchor want the content pixel,
+// `unmapPoint(photo, layoutImagePx(...))`. A zero `offsetWidth` (happy-dom, or not laid
+// out yet) falls back to the border box.
+export function layoutImagePx(base: HTMLElement, manifest: Manifest, clientX: number, clientY: number): { x: number; y: number } {
+    const r = base.getBoundingClientRect()
+    const boxW = base.offsetWidth > 0 ? base.offsetWidth : r.width
+    const boxH = base.offsetHeight > 0 ? base.offsetHeight : r.height
+    if (!(r.width > 0) || !(boxW > 0) || !(r.height > 0) || !(boxH > 0)) return { x: 0, y: 0 }
+    // Same product as imgPx when the border box is the layout box. Dividing by
+    // offsetWidth and multiplying back is a no-op that drifts a ulp.
+    if (boxW === r.width && boxH === r.height) {
+        return {
+            x: (clientX - r.left) * (manifest.width / r.width),
+            y: (clientY - r.top) * (manifest.height / r.height),
+        }
+    }
+    const lx = (clientX - r.left) / r.width * boxW
+    const ly = (clientY - r.top) / r.height * boxH
+    return { x: lx / boxW * manifest.width, y: ly / boxH * manifest.height }
 }
 
 // Anchor (image px, from geometry.ts's anchorFor) → css px, for the tooltip placement math —
@@ -78,13 +104,18 @@ export type Drag =
     }
     | {
         kind: "view"; id_: string; g_: ViewGeometry; t_: AxisTransform; x0_: number; y0_: number; pointerId_: number
-        // The last gesture-channel request payload actually sent for this drag (round-1 review,
-        // finding #2) — `undefined` until the first one past VIEW_MIN_PX. bond.ts's terminal
-        // handlers (onUp/onCancel/onLostCapture) gate `settle()` on this, not on the drag's
-        // final release distance: a drag that went out past VIEW_MIN_PX and back below it before
-        // release still owes a settle (ppu=1 was sent at least once and has to be restored), and
-        // onCancel/onLostCapture have no "was this ever a real drag" signal of their own at all.
+        // The last gesture-channel request payload actually sent for this drag — `undefined`
+        // until the first one past VIEW_MIN_PX. bond.ts's terminal handlers
+        // (onUp/onCancel/onLostCapture) settle when this is set, not from the release point's
+        // distance: a drag that went out past VIEW_MIN_PX and back below it before release
+        // still owes a settle (ppu=1 was sent at least once and has to be restored).
         lastInput_?: Record<string, unknown>
+        // A pan pointerdown cleared a live wheel-idle timer. That timer was the only
+        // settle:true for the notch. A press that never passes VIEW_MIN_PX leaves
+        // `lastInput_` unset, so the terminal handlers settle the current photo from this
+        // flag instead. A wheel whose timer already fired does not set it. A drag that
+        // also sets `lastInput_` settles once.
+        settleOwed_?: boolean
     }
 
 // Construction-time DOM/manifest refs, built once by mount.ts and threaded read-mostly through
@@ -97,6 +128,10 @@ export interface OverlayCtx {
     tip_: HTMLElement
     hiGroup_: HiGroups
     selGroup_: HiGroups
+    // Legend, colorbar, and axis rings. Siblings of the photograph clip, so a live matrix
+    // neither slides nor clips them. Linked data marks stay in linkGroup_.
+    hiFixed_: HiGroups
+    selFixed_: HiGroups
     linkGroup_: HiGroups // transient legend-linked highlights (g.link), z-ordered between sel and hi
     thresholdLines_: Map<string, SVGLineElement>
     roiBoxes_: Map<string, ROIBox>
@@ -104,15 +139,20 @@ export interface OverlayCtx {
     focusable_: FocusRef[] // flat, manifest-order list of element-indexed hits — keyboard.ts's nav domain
     layerStarts_: number[] // computeLayerStarts(focusable), cached once — PageUp/PageDown's layer-jump index
     liveRegion_: HTMLElement // visually-hidden aria-live="polite" announcer (NOT the tooltip)
+    cross_: CrossEls // slice hair on svg.masque-plain; sample dots in the photo group; opacity tracks crossOn_
     // `manifest_`/`thresholdLines_`/`roiBoxes_`/`focusable_`/`layerStarts_` above are
     // reassigned in place when a frame swaps in a new manifest (mount.ts's applyFrame) —
     // the one exception to "construction-time, read-mostly".
     gesture_: GestureChannel
+    // Paints the photographic matrix onto the base and the overlay groups. Mount owns the DOM.
+    photoPaint_: (m: PhotoMatrix) => void
 }
 
 export interface OverlayState {
     drag_: Drag | null
     justDragged_: boolean
+    // Hover chrome still in g.hi, live or mid-leave. Null once those nodes are gone.
+    // drawSelection reads it to drop a ring whose key just entered the selection (#97).
     hiKey_: string | null
     selKeys_: Set<string>
     // THE selection. Seeded at mount from the manifest's `selected=` hits (hydration only, an
@@ -153,6 +193,16 @@ export interface OverlayState {
     // :threshold layer id currently drawn thicker for drag-hover feedback; cleared on any miss
     // (hover.ts's setDragHoverChrome) so it can never point at a line no longer under the cursor.
     hoveredThresholdId_: string | null
+    // True while both masque-cross groups have .is-on. Toggled only when the cross appears or
+    // disappears, so a move inside the viewport does not restart the opacity fade.
+    crossOn_: boolean
+    // Photographic pan/zoom of the frame on screen (#85). Image pixels of that frame.
+    // `photoAnchor_` is the grabbed point during a 2D pan; null when the pointer is up.
+    // `photoViewId_` is the pan view whose viewport stays fixed while the data inside it slides.
+    photo_: PhotoMatrix
+    photoAnchor_: { x: number; y: number } | null
+    photoViewId_: string | null
+    wheelTimer_: ReturnType<typeof setTimeout> | null
 }
 
 export function createOverlayState(): OverlayState {
@@ -183,6 +233,11 @@ export function createOverlayState(): OverlayState {
         focusTipCss_: null,
         announceTimer_: null,
         hoveredThresholdId_: null,
+        crossOn_: false,
+        photo_: IDENTITY,
+        photoAnchor_: null,
+        photoViewId_: null,
+        wheelTimer_: null,
     }
 }
 

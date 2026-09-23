@@ -39,18 +39,16 @@ that a flat per-element list can't give: a 1000×1000 **heatmap grid** (ship edg
 a **polyline** (ship vertices once, hit-test segments in JS). A layer is one geometry *kind* plus the
 data to resolve a hit to an element index and its payload.
 
-> **The grid is compact in geometry, not in payload.** The grid *geometry* is O(edges), but to
-> power the client-side `(i,j)=value` readout the layer also ships the full **source-resolution**
-> `values[]` matrix — O(source-cells), the dominant grid term. A routine 2000²–4000² `heatmap!`/`image!`
-> already ships tens of MB of values on top of a display-bounded PNG (4.78 MB measured at 1000²) —
-> this is what [§8](08-scaling.md) calls "the manifest is the scaling wall", reachable on an
-> ordinary call, not only at extreme sizes. The committed fix ships `values[]` only when cells are
-> targetable (≥~1 px on the known display) — sub-pixel grids drop it ([§8](08-scaling.md)).
+> **The grid is compact in geometry.** The edges are O(source cells along one side). The values
+> follow the screen: the full source matrix when a cell is at least one screen pixel, and one
+> source value per screen pixel of the axis viewport when cells are smaller ([§8](08-scaling.md)).
+> On that sub-pixel branch a matrix that is not real-valued ships edges only. A 2000²–4000²
+> `heatmap!`/`image!` does not ship the source matrix.
 
 ```julia
 struct HitLayer
     id       :: Symbol            # stable key for this layer (links to events/style)
-    kind     :: Symbol            # :circles | :polyline | :lines | :segments | :rects | :grid | :polygons | :axis
+    kind     :: Symbol            # :circles | :polyline | :lines | :segments | :rects | :grid | :polygons | :axis | :slice
     geometry :: Any               # compact, image-px; layout keyed by `kind` (see below)
     payloads :: Vector{Any}       # element index -> JSON-serializable payload (the linkage key)
     axis     :: Symbol            # which AxisTransform applies (for data-coord tooltips / inversion)
@@ -70,7 +68,7 @@ Geometry layout by `kind` (all coords image-px, top-left origin):
 | `:lines` | `Vector{Real}[]` paths, one flat `[x,y,…]` per element (NaN = a gap inside that path) | nearest edge of any path, dist ≤ tol | path index — one element per plotted line |
 | `:segments` | `Float32[x0,y0,x1,y1, …]` | nearest of disjoint pairs | pair index |
 | `:rects` | `Float32[cx,cy,w,h, …]` | point-in-rect | quad index |
-| `:grid` | `(xedges, yedges, ncols, nrows, values[])` image-px | binary-search bin → (i,j) | `j*ncols+i` (O(1) hit-test; manifest **O(source-cells)** via `values[]`, see [§8](08-scaling.md)) |
+| `:grid` | `(xedges, yedges, ncols, nrows)` plus `values[]` **or** `sample` (screen pixels; [§8](08-scaling.md)) | source bin, or the screen pixel then the cell at its center | `j*ncols+i` |
 | `:polygons` | `Vector{Vector{Float32}}` rings | even-odd point-in-polygon | ring index |
 | `:axis` | `nothing` (unbounded, `AxisInteractable`) or `Real[x,y,w,h]` bbox (bounded, `ColorbarInteractable`) | absent geometry = always-hit; bbox present = point-in-bbox; invert pixel via `AxisTransform` | `-1` (continuous); `valueaxis ≠ nothing` → 1-D `(; value)` |
 
@@ -95,7 +93,10 @@ inside that path. Every retained Makie surface projects to one of them; text lab
 
 The three M4 drag kinds — `:view`, `:threshold`, `:roi` — sit outside this set. They are
 *control* geometry: one draggable region apiece, no elements, an empty `payloads`. The closed-set
-claim covers data geometry projected from a Makie surface.
+claim covers data geometry projected from a Makie surface. `:slice` sits outside hit testing
+too: `hitLayer` returns null. The layer carries data-space series for the client to sample,
+not a region. Its `crosshair` and `orientation` fields tell the overlay whether to draw
+one hair, and which arm. A plot with no slice draws none.
 
 ## Built-in interactables (v1 + M3 + M4 drags + Phase 2 text labels)
 
@@ -117,6 +118,7 @@ primitive, with the exceptions noted inline: `:axis` is shared by two, `LegendIn
 | `ViewInteractable` *(M4)* | `:view` | the Axis/Axis3 view itself — declared, never auto-extracted | none — commits nothing ([§12](12-gesture-channel.md) §12.3); in-drag frames stream over the gesture channel instead (`:cairo` PNG, `:webgl` serialized scene; #102/#133) |
 | `ThresholdInteractable` *(M4)* | `:threshold` | a draggable horizontal/vertical line on an Axis — declared | a bare data scalar, not a `NamedTuple` (nothing to name) |
 | `ROIInteractable` *(M4)* | `:roi` | a draggable box on an Axis — declared; an `AbstractSelector` | `(; xmin, xmax, ymin, ymax)`, or a `Vector{InteractionEvent}` of enclosed elements when `selects=` is set ([§5](05-bond-value.md)) |
+| `SliceInteractable` | `:slice` (not a hit target) | declared 1-D series on an Axis, or Lines, Stairs, Series, Band, Density | none — hover samples client-side; the live tooltip is the probe coordinate plus one field per series id. Bond stamp `"none"` |
 
 `SegmentInteractable` carries `mode ∈ {:polyline,:pairs}`; `RectInteractable` carries
 `layout ∈ {:grid,:list}`. Same JS test, different Julia extractor. The three M4 drags are

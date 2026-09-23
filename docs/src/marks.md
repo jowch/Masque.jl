@@ -131,6 +131,7 @@ vlines stay one element per piece.
 ```
 
 Scatter, lines, line segments, and `series!` work on a `PolarAxis`.
-`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, and
-`ViewInteractable` on polar raise `ArgumentError`. `heatmap!`,
-`barplot!`, and `poly!` on polar are skipped with `@warn`.
+`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`,
+`SliceInteractable`, and `ViewInteractable` on polar raise
+`ArgumentError`. `heatmap!`, `barplot!`, and `poly!` on polar are
+skipped with `@warn`.

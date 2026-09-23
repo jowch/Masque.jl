@@ -278,12 +278,12 @@ PolarAxis yes-or-no, and for types that are skipped, see
 `value=` on a colorbar accepts a number or a [`ColorbarEvent`](@ref).
 `bounds=` accepts a 4-tuple or a [`BoundsEvent`](@ref).
 
-[`AxisInteractable`](@ref), [`ThresholdInteractable`](@ref), and
-[`ROIInteractable`](@ref) are 2D-only: they raise `ArgumentError` on
-`Axis3` or `PolarAxis`. They need a linear or log scale. Categorical is
-fine for axis and threshold, not for ROI. `ViewInteractable` raises
-`ArgumentError` on polar, a Colorbar, or a categorical 2D axis; Axis3
-orbit is allowed. Shift+drag wins over ROI or threshold on the same
+[`AxisInteractable`](@ref), [`ThresholdInteractable`](@ref),
+[`ROIInteractable`](@ref), and [`SliceInteractable`](@ref) are 2D-only:
+they raise `ArgumentError` on `Axis3` or `PolarAxis`. They need a linear
+or log scale. Categorical is fine for axis and threshold, not for ROI
+or a slice. `ViewInteractable` raises `ArgumentError` on polar, a
+Colorbar, or a categorical 2D axis; Axis3 orbit is allowed. Shift+drag wins over ROI or threshold on the same
 axis. `selects` accepts a `:circles` or `:grid` layer id only. Colorbar
 kind is `:axis`, not `:colorbar`. Legend kind is `:rects`.
 
@@ -320,10 +320,10 @@ and `:webgl`. Auto-extract allowlists are
 
 `PolarAxis` gets the same discrete point and segment overlays on both
 backends. Continuous θ/r readout is not shipped.
-`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, and
-orbit-mode `ViewInteractable` do not work on polar. On `Axis3`, those
-2D-only constructors raise `ArgumentError`; orbit-mode
-`ViewInteractable` is allowed. `LScene` is not supported on either
+`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`,
+`SliceInteractable`, and orbit-mode `ViewInteractable` do not work on
+polar. On `Axis3`, those 2D-only constructors raise `ArgumentError`;
+orbit-mode `ViewInteractable` is allowed. `LScene` is not supported on either
 backend. See [Troubleshooting](@ref).
 
 For the exported API dump, see [API](@ref).

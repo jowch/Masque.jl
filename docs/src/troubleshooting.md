@@ -102,12 +102,13 @@ fails: Region layers are `:cells_c` / `:cells_r` / `:cells_p`.
 `needs client-side invertible`
 
 **Cause:** `AxisInteractable`, `ColorbarInteractable`,
-`ThresholdInteractable`, `ROIInteractable`, and **2D**
-`ViewInteractable` invert a pixel back to a data value in the browser.
-That works for `identity`, `log10`, or `log`. Any other Makie scale
-(`Makie.pseudolog10`, `Makie.Symlog10`, a custom `ReversibleScale`)
-fails loud at `masque()` time instead of reporting the wrong
-coordinate.
+`ThresholdInteractable`, `ROIInteractable`, `SliceInteractable`, and
+**2D** `ViewInteractable` invert a pixel back to a data value in the
+browser. That works for `identity`, `log10`, or `log`. Any other Makie
+scale (`Makie.pseudolog10`, `Makie.Symlog10`, a custom
+`ReversibleScale`) fails loud at `masque()` time instead of reporting
+the wrong coordinate. `SliceInteractable` says "needs client-side
+invertible x and y scales".
 
 **Fix:** switch the axis to a supported scale, or use an element
 interactable (`PointInteractable`, `SegmentInteractable`, …) instead of
@@ -115,25 +116,25 @@ a continuous-readout one.
 
 This is **not** the Axis3 orbit path. `ViewInteractable` on `Axis3`
 does not invert a pixel to data. Orbit is allowed; a pixel→data error
-comes from Axis, Threshold, or ROI, not from View.
+comes from Axis, Threshold, ROI, or Slice, not from View.
 
-### Tried `AxisInteractable`, `ThresholdInteractable`, or `ROIInteractable` on Axis3
+### Tried `AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, or `SliceInteractable` on Axis3
 
 **Error prefix:** `continuous pixel→data readout is undefined on an Axis3` /
 `undefined on an Axis3`
 
-**Cause:** those three kinds need a 2D pixel→data inverse. A screen
+**Cause:** those four kinds need a 2D pixel→data inverse. A screen
 pixel on `Axis3` is a ray, not a data point.
 
 **Fix:** pick marks with element interactables (points, segments,
-polygons) on 3D axes. Do not attach Axis / Threshold / ROI to
+polygons) on 3D axes. Do not attach Axis, Threshold, ROI, or Slice to
 `Axis3`.
 
 ### Tried `ViewInteractable` orbit on Axis3
 
 **Cause:** orbit **is allowed**. `ViewInteractable` on `Axis3` validates
 and sorts as a `:view` layer. If you saw a continuous pixel→data error,
-that error came from Axis, Threshold, or ROI, not from View.
+that error came from Axis, Threshold, ROI, or Slice, not from View.
 
 **Fix:** pass `ViewInteractable(ax)` for orbit. In-drag frames on both
 backends need a live kernel. The bond never carries `:view`. For more
@@ -146,8 +147,9 @@ information, see [Backends](@ref).
 `PolarAxis continuous θ/r inversion is not yet shipped`
 
 **Cause:** continuous polar inversion is not shipped.
-`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, and
-`ViewInteractable` on `PolarAxis` raise `ArgumentError`.
+`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`,
+`SliceInteractable`, and `ViewInteractable` on `PolarAxis` raise
+`ArgumentError`.
 
 **Fix:** use element interactables (Scatter, Lines, LineSegments,
 ScatterLines) for discrete hits. Polar is not WebGL-only.
@@ -167,11 +169,14 @@ can still build and sit in the wrong place.
 `pan needs continuous numeric axes`
 
 **Cause:** `ROIInteractable` and 2D `ViewInteractable` pan need numeric
-axis limits; a categorical axis has none. (`ViewInteractable` orbit on
-`Axis3` is a different gate — that path is allowed.)
+axis limits; a categorical axis has none. `SliceInteractable` also
+rejects a categorical axis: interpolation needs a numeric coordinate,
+unlike `AxisInteractable`, which reads the category.
+(`ViewInteractable` orbit on `Axis3` is a different gate — that path
+is allowed.)
 
 **Fix:** use `AxisInteractable` (reads the category) instead, or pass
-numeric limits.
+numeric limits. A slice needs a continuous axis.
 
 ### Tried an `LScene` figure on CairoMakie
 

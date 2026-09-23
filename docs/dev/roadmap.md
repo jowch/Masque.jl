@@ -48,7 +48,9 @@ purely declarative); selection round-trip and re-highlight; box-select via a `se
 and ROI drags; drag-to-pan/rotate and slider-driven view changes through `@bind` re-render;
 keyboard navigation and screen-reader announcements; the highlight (a brightening color-dodge
 fill plus a flat chrome edge stroke, not a mark-derived colour, with `scatter!`'s drawn
-radius replacing `markersize/2`); the `:cairo` (PNG) and `:webgl` (live canvas) backends behind
+radius replacing `markersize/2`); the overlay hairline (one arm, and only for a
+`SliceInteractable` with `crosshair=true`) and `SliceInteractable` (hover-only
+1-D sample, not auto-extracted, not a hit target); the `:cairo` (PNG) and `:webgl` (live canvas) backends behind
 one contract; a Documenter site with static notebook exports; and eight CI jobs covering Julia
 on two versions, the no-backend error path, the WGLMakie extension with its own real-browser
 end-to-end check, a second through-Pluto bind end-to-end, every example notebook, the frontend,
@@ -81,20 +83,18 @@ replaced that: the gesture commits nothing at all
 over the gesture channel instead — no cell re-execution, no remount, on both backends. `:cairo`
 ships a PNG per frame; `:webgl` ships a freshly serialized scene onto the canvas the cell already
 holds ([§12.5](architecture/12-gesture-channel.md#125-backend-obligations-mechanism-independent)).
+Wheel zoom on a 2D view, and the photographic slide of the last frame during that zoom and
+during pan, ship with #85. The matrix is an inner layer clipped by the host, not a transform of
+`.ip-host` itself, and it comes off when the channel frame is visible
+([§12.5](architecture/12-gesture-channel.md#125-backend-obligations-mechanism-independent)).
 What remains open:
 
 1. **#84 Last-frame hold.** Park the last painted frame (Cairo PNG `src`, or a bitmap from the
    WGL canvas) and show it until the new base is ready. #102 already does this for `:cairo` (the
    base image only swaps once the new frame has decoded); #84 is now specifically the `:webgl`
-   gap. Not a GL-context transfer: a context cannot move to a new canvas.
-2. **#85 2D photographic preview.** During pan and wheel zoom, CSS-transform the host so the
-   base and overlay slide together. Julia authored the frame being slid, so this is not a client
-   camera. Accepted artifacts: ticks and decorations move with the photograph until a real frame
-   replaces it. The gesture commits nothing (#122,
-   [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)), so the CSS transform is
-   latency-hiding for an in-flight frame on #102's channel rather than the interaction itself —
-   one mechanism instead of two that have to agree. Still open for both backends.
-3. **#87 3D orbit preview**: no longer parked — **#102 makes it buildable, and implements the
+   gap. Not a GL-context transfer: a context cannot move to a new canvas. #85 waits for that
+   Cairo `load` so a zoom does not snap the old photograph; it does not build the WebGL hold.
+2. **#87 3D orbit preview**: no longer parked — **#102 makes it buildable, and implements the
    `:cairo` half.** The blocker was that the overlay is a projection at the old
    `azimuth`/`elevation`, so a live orbit either freezes the overlay or needs 3D coordinates in
    JS, and neither respects the Julia-authored-projection principle this list is written to keep.
@@ -144,23 +144,9 @@ canvas-identity strategy keeps projection Julia-authored.
 
 ### Overlay interactions
 
-- **#92 Cursor slice / crosshair.** A first-class probe: invert the pointer to data x (or y),
-  sample attached 1-D series client-side, draw a hairline plus dots, show every series' value
-  in the tooltip. Replaces the notebook workaround of baking hundreds of full-height segments.
-  Hover-only by default; gated like the other continuous invert consumers (2D `Axis`, fail
-  loud on Axis3/Polar).
 - **#88 Right-click passthrough.** Ignore non-primary buttons in drag start, and let
   `contextmenu` land on the base `<img>` so the browser's Save image as… works on `:cairo`.
   No custom menu. `:webgl` gets no image menu without a canvas snapshot (out of scope).
-- **Cursor should say what pressing will do.** The surface already defaults to `crosshair`,
-  which is right, and the drag kinds already pick a cursor per part through
-  `cursorForDragHit`. The gap is everything else: hovering any hittable element sets one
-  binary `hot` class, so every non-drag kind becomes the finger `pointer`. A heatmap therefore
-  reads as a button across its whole area when the user is reading a value, not pressing
-  anything. Replace the binary class with a per-kind mapping. `pointer` is genuinely right for
-  a legend entry and arguably for a discrete mark that emits a bond, while a grid wants
-  `crosshair` or the CSS `cell` cursor, which exists for exactly this. Decide the map once
-  rather than special-casing heatmap.
 - **The browser's focus outline boxes the whole figure on a heatmap.** The overlay surface is
   a focus stop, and the default `:focus-visible` outline is suppressed only once Masque draws
   its own keyboard focus ring, through the `kbd-ring` class. Grid layers are deliberately not
@@ -176,8 +162,9 @@ canvas-identity strategy keeps projection Julia-authored.
   outer `contourf!` level or a boundary Voronoi cell can cover most of the plot, and lines from
   `hlines!` span the limits. Feedback that repaints the entire plot area is a flash, not a
   signal. Decide what the recipe becomes at that scale, perhaps outline only, or an indicator
-  at the cursor rather than over the element. Related to the probe in #92, which is the other
-  half of making a large filled region readable.
+  at the cursor rather than over the element. A covering `SliceInteractable` is the other
+  half for a polygon or a whole line: it skips that layer's highlight and reports the sample
+  at the cursor. The wash for a large element that is not covered is still open.
 - **Keyboard equivalents for drags**: arrow-key nudging for threshold, ROI, and view
   interactables. Promised as "on the roadmap" in the site's accessibility page.
 - **Animation / scrubbing**: precomputed frames in one manifest plus a JS scrubber; bond value
@@ -242,7 +229,7 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   `band!` are each a single polygon whose entire payload is `index = 1`, and `voronoiplot!`
   ships a cell index where the generating point would be more useful. Give these the
   statistics Makie already computed, so the default hover is worth reading before anyone
-  writes a `masque"…"` template. Distinct from #92: the probe answers "what is the height
+  writes a `masque"…"` template. Distinct from `SliceInteractable`: the slice answers "what is the height
   at this x", this answers "what is this shape". The field list per recipe is the issue's
   job, not the roadmap's.
 - **Composite recipes.** `rainclouds!`, `hexbin!`, `textrepel!` and any recipe whose parent
@@ -273,40 +260,26 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   What is awkward today. `:grid` is the only one of the seven data geometry kinds that is not a list
   of elements, so it needs its own hit-test branch, its own selection result, its own tooltip
   behaviour with no per-element payload, no keyboard focus, and it cannot be a highlight target
-  for a legend. Its `values[]` matrix is the only term in the manifest bounded by source
-  resolution rather than by display size, which is why it needs the on-screen-size cap at all.
-  That cap makes the user-visible contract depend on a rendering detail. It is one
-  all-or-nothing decision per grid, taken from the average cell size, so the same heatmap hovers
-  values at one display width and only `(i, j)` at a narrower one.
+  for a legend.
 
-  What `surface!` adds. The same dense cell field and the same unbounded per-cell payload, plus
-  self-occlusion and a hit-test that is no longer a 2-D bin search. Its occlusion policy is
-  already settled in `architecture.md`: document-and-accept on both backends, with a build-time
-  CPU cull in Julia as the upgrade path, since GPU picking is a Masque-wide non-goal.
+  `heatmap!` and `image!` subsample ([#105](https://github.com/jowch/Masque.jl/issues/105)).
+  Hover stays a push, so a static export still shows the value. A cell of at least one screen
+  pixel ships the source matrix. A smaller cell ships the source value under each screen pixel
+  of the axis viewport, the cell at that pixel's center, not an aggregate. The payload follows
+  the viewport, not the source resolution. Pulling the value per hover was the rejected
+  alternative: inspection has to survive a static export.
 
-  The question to answer once, for both, is now three-way rather than binary:
+  What `surface!` still adds. The same dense cell field, so the same sample once it can be
+  hovered, plus self-occlusion and a hit-test that is no longer a 2-D bin search. A screen pixel
+  on an Axis3 is a ray, and a folded surface can put several cells on that ray. The cell to
+  report is the front one. That hit-test is not built. Its occlusion policy is already settled
+  in `architecture.md`: document-and-accept on both backends, with a build-time CPU cull in
+  Julia as the upgrade path, since GPU picking is a Masque-wide non-goal. `mesh!` is not this
+  payload: an arbitrary triangle set has no `values[]` matrix.
 
-  - **Push** per-cell values into the manifest at build time, as today plus a cap — export-safe,
-    but the user-visible contract depends on a rendering detail, described above.
-  - **Pull** per hit from the kernel that clicks already require ([#102](https://github.com/jowch/Masque.jl/issues/102)
-    makes this concrete: `with_js_link` is exactly a mechanism for "pulled per hit from the
-    kernel," previously unmechanized here) — removes the cap and the resolution-dependent
-    contract, but hover stops working in a static export, which the principles say inspection
-    should survive.
-  - **Subsample to display resolution**
-    ([#105](https://github.com/jowch/Masque.jl/issues/105)) — keep the push model, so nothing
-    changes about when a kernel is needed, but bound the shipped payload by *display size* rather
-    than *source resolution*: report the one cell (or the aggregate of the cells) under each
-    screen pixel, not the whole matrix. This retires the `values[]` cap outright, the same way
-    pull would, without giving up static-export safety. The argument isn't just convenience: a
-    cap is an arbitrary size threshold, but a subpixel cell can't be hovered individually — its
-    value was never something a display-resolution report needed to include.
-
-  Subsampling and the gesture channel compound if both ship: with #102 making zoom cheap,
-  fidelity under subsampling becomes **navigable rather than fixed** — a user who wants the exact
-  value at a cell zooms in, fewer source cells land under each screen pixel as they do, and the
-  subsample resolves progressively finer. That turns a fixed contract compromise (pick a
-  resolution once, live with it at every zoom level) into an interaction.
+  A later zoom that writes `ax.limits[]` and rebuilds the manifest refines the sample on its
+  own: fewer source cells fall under each screen pixel. Wheel zoom does that rebuild through
+  the gesture channel (#85). This sample does not add a zoom of its own.
 
   Keep this distinct from the heavy-scene render latency in #102 (an 80×80 `surface!` case) —
   that cost is dominated by Makie's own draw time, not by payload or hit-test, so subsampling
@@ -315,10 +288,8 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   already-accepted "ticks and decorations move with the photograph until a real frame replaces
   it" — is the separate companion idea for that cost; named here, not designed.
 
-  Answer the push/pull/subsample question before any of the three is built on further.
-
 - **PolarAxis continuous θ/r readout**: ship `Makie.Polar` (and the letterboxed scene limits)
-  to the JS `invertAxis` so `AxisInteractable`, thresholds, ROIs, and the #92 probe work on
+  to the JS `invertAxis` so `AxisInteractable`, thresholds, ROIs, and `SliceInteractable` work on
   polar axes.
 - **`LScene` disposition**: decide whether it is a parity item or a Masque-wide non-goal. Until
   then `:cairo` rejects it and `:webgl` renders it with no overlay.
@@ -448,7 +419,7 @@ shipped, which is a better filter than what other libraries happen to have.
   instead of requiring the pointer inside it; sparse scatter and thin lines benefit.
 
 **Probing and readout**
-- **2D profile probe.** #92 in two dimensions: hovering a heatmap cell shows the row and column
+- **2D profile probe.** The slice in two dimensions: hovering a heatmap cell shows the row and column
   profiles as sparklines in the tooltip or as overlay traces along the axes.
 - **Delta readout.** Two parked probe lines (or a two-click gesture) report the difference
   in x and each series' y between them.
@@ -500,19 +471,18 @@ shipped, which is a better filter than what other libraries happen to have.
 
 ## Order
 
-A proposed sequence, not a decided one. Only the dependency edges are real: #85 wants #84,
-#86 is not reconsidered until #84 and #85 exist, and registration wants
-the API to have stopped moving. (#83 closed not-planned — nothing left to build, so it is not
-a dependency of anything below.)
+A proposed sequence, not a decided one. Only the dependency edges are real: #86 is not
+reconsidered until #84 exists (#85 has shipped — wheel zoom and the photographic slide of the
+last frame), and registration wants the API to have stopped moving. (#83 closed not-planned —
+nothing left to build, so it is not a dependency of anything below.)
 
 1. Resolve #49.
 2. Pre-registration revisions, including new work wanted in 0.1.0. Self-contained and cheap:
    #88, #81, #90, keyboard drag nudging, and the composite-recipe child walk.
-3. The remount path (#84 hold, then #85 preview). Both backends, live-verified on view-pan.
-4. #92 cursor slice.
-5. Register v0.1.0, then the notebook cleanup (drop `Pkg.develop`, re-enable Binder).
-6. Remaining coverage items as demand arrives (#91 list).
-7. Payload-gated items (animation, LOD layers) wait on a measured per-frame or per-element
+3. The remount path (#84 hold). Both backends, live-verified on view-pan.
+4. Register v0.1.0, then the notebook cleanup (drop `Pkg.develop`, re-enable Binder).
+5. Remaining coverage items as demand arrives (#91 list).
+6. Payload-gated items (animation, LOD layers) wait on a measured per-frame or per-element
    cost reduction.
-8. Spike-gated items wait for a real use or for the spike that sizes them: the Julia-declared
+7. Spike-gated items wait for a real use or for the spike that sizes them: the Julia-declared
    theme, SVG output, spatial acceleration, GLMakie-static.

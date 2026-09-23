@@ -186,8 +186,13 @@ try {
     // default split-blend recipe, svg.masque-plain for an explicit `hoverstyle` (no wrapper
     // either way).
     const svgFill = sr.querySelector("svg.masque-fill"), svgEdge = sr.querySelector("svg.masque-edge"), svgPlain = sr.querySelector("svg.masque-plain");
+    const groupWithChild = (svg, sel) => {
+      const groups = [...(svg?.querySelectorAll(sel) ?? [])];
+      return groups.find((g) => g.firstElementChild) ?? groups[0] ?? null;
+    };
+    const childCount = (svg, sel) => [...(svg?.querySelectorAll(sel) ?? [])].reduce((n, g) => n + g.children.length, 0);
     const capture = (svg, layerName) => {
-      const el = svg?.querySelector("g.hi")?.firstElementChild;
+      const el = groupWithChild(svg, "g.hi")?.firstElementChild;
       if (!el) return null;
       const cs = getComputedStyle(el);
       return {
@@ -203,9 +208,7 @@ try {
       show: t?.classList.contains("show"), text: t?.innerText ?? "",
       bg: cs?.backgroundColor, color: cs?.color,
       hi: { fill: capture(svgFill, "fill"), edge: capture(svgEdge, "edge"), plain: capture(svgPlain, "plain") },
-      sel: (svgFill?.querySelector("g.sel")?.children.length ?? 0)
-        + (svgEdge?.querySelector("g.sel")?.children.length ?? 0)
-        + (svgPlain?.querySelector("g.sel")?.children.length ?? 0),
+      sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel"),
     };
   }, [key, x, y]);
 

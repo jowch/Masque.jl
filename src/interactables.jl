@@ -8,7 +8,7 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 # Fields
 - `id::Symbol` — the layer id; becomes `InteractionEvent.layer` on a hit.
 - `kind::Symbol` — one of `:circles`, `:polyline`, `:lines`, `:segments`, `:rects`, `:grid`,
-  `:polygons`, `:axis`, `:threshold`, `:roi`, `:view`. `geometry`'s layout depends on it:
+  `:polygons`, `:axis`, `:threshold`, `:roi`, `:view`, `:slice`. `geometry`'s layout depends on it:
   - `:circles` — flat `Real[]`, `(cx, cy, r)` per element (image px)
   - `:rects` — flat `Real[]`, `(cx, cy, w, h)` per element (image px)
   - `:polyline` / `:segments` — flat `Real[]`, `(x, y)` per vertex — one connected path hit
@@ -17,12 +17,18 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
     `NaN` is a gap inside that line, not another element). A `lines!` / `stairs!` /
     `scatterlines!` line is one entry; a `series!` is one entry per series
   - `:polygons` — `Vector{Real}[]`, one flat `(x, y)`-per-vertex ring per element (image px)
-  - `:grid` — a `Dict` with `"xedges"`, `"yedges"`, `"ncols"`, `"nrows"`, optional `"values"`
+  - `:grid` — a `Dict` with `"xedges"`, `"yedges"`, `"ncols"`, `"nrows"`, and either
+    `"values"` (the source matrix, when a cell is at least one screen pixel) or `"sample"`
+    (one source value per screen pixel of the axis viewport, when cells are smaller). A
+    sub-pixel matrix that is not real-valued ships neither.
   - `:axis` — `nothing` (whole-axis readout, `AxisInteractable`) or flat `Real[x, y, w, h]`
     (the colorbar's pixel bbox, `ColorbarInteractable`); not element-indexed
   - `:threshold` / `:roi` / `:view` — a small `Dict` (orientation/position, drag bbox +
     hit half-size `handle` — the overlay paints the grip at a fixed 7 CSS px — or viewport +
     camera, respectively); not element-indexed
+  - `:slice` — a `Dict` of data-space series to sample at the cursor (`SliceInteractable`);
+    not a hit target. The overlay hair is drawn only when this layer's `crosshair` is true,
+    and only the arm named by `orientation`
 - `payloads::Vector{Any}` — one JSON-serializable entry per element, positional (`payloads[k]`
   binds element `k`); empty for the element-count-free kinds above.
 - `axis::Symbol` — the id of this layer's [`AxisTransform`](@ref) in
@@ -52,7 +58,7 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 """
 struct HitLayer
     id::Symbol
-    kind::Symbol          # :circles|:polyline|:lines|:segments|:rects|:grid|:polygons|:axis|:threshold|:roi|:view
+    kind::Symbol          # :circles|:polyline|:lines|:segments|:rects|:grid|:polygons|:axis|:threshold|:roi|:view|:slice
     geometry::Any
     payloads::Vector{Any}
     axis::Symbol
@@ -72,8 +78,9 @@ Supertype for everything [`masque`](@ref) can turn into hit-testable JS layers. 
 kinds ([`PointInteractable`](@ref), [`SegmentInteractable`](@ref), [`RectInteractable`](@ref),
 [`PolygonInteractable`](@ref), [`AxisInteractable`](@ref), [`ColorbarInteractable`](@ref),
 [`LegendInteractable`](@ref), [`ThresholdInteractable`](@ref), [`ROIInteractable`](@ref),
-[`TextInteractable`](@ref), [`ViewInteractable`](@ref), [`RegionInteractable`](@ref),
-[`FunctionInteractable`](@ref)) cover most needs; implement this interface for anything else.
+[`TextInteractable`](@ref), [`ViewInteractable`](@ref), [`SliceInteractable`](@ref),
+[`RegionInteractable`](@ref), [`FunctionInteractable`](@ref)) cover most needs; implement
+this interface for anything else.
 
 # Interface
 
@@ -154,7 +161,8 @@ compatible_kinds(::AbstractInteractable) = ()
 # Only AxisInteractable relies on client-side JS inversion and restricts scales.
 const _JS_INVERTIBLE = (:identity, :log10, :log)  # scales geometry.ts `invert` implements
 
-# A heatmap/image cell smaller than this (screen px) can't be cursor-targeted, so values[] is dropped.
+# Below this on-screen cell size a cursor can't land on one source cell, so the manifest
+# carries one source value per screen pixel of the axis viewport instead of the full matrix.
 const GRID_VALUES_MIN_SCREEN_PX = 1.0
 
 _proj(ctx, ax, p) = data_to_image_px(ctx, ax, p)
@@ -166,6 +174,69 @@ _pt3(p) = Point3f(p[1], p[2], length(p) >= 3 ? p[3] : 0)
 # throws, so non-finite values pass through as Float32 — NaN is the polyline gap sentinel
 # (geometry.ts). Geometry vectors use `Real[]`, not a concrete eltype, to allow this mix.
 _q(x) = isfinite(x) ? round(Int, x) : Float32(x)
+
+# 0-based bin, or -1 outside. Matches `findBin` in `frontend/src/geometry.ts`, including the
+# smaller-index bin on an interior edge. `edges` is 1-based; the returned index is not.
+function _find_bin(edges, v)
+    n = length(edges)
+    (n < 2 || !isfinite(v) || !isfinite(edges[1]) || !isfinite(edges[n])) && return -1
+    ascending = edges[n] > edges[1]
+    if ascending
+        (v < edges[1] || v > edges[n]) && return -1
+    else
+        (v > edges[1] || v < edges[n]) && return -1
+    end
+    lo = 0
+    hi = n - 2
+    while lo < hi
+        mid = (lo + hi) >>> 1
+        right = edges[mid + 2]
+        brackets = ascending ? v <= right : v >= right
+        lo, hi = brackets ? (lo, mid) : (mid + 1, hi)
+    end
+    return lo
+end
+
+# Image-px extent of sample index `i`. The last bin keeps the remainder, so it is shorter
+# than `step` when `span` is not a whole number of steps.
+function _sample_bin(origin, i, n, step, span)
+    start = origin + i * step
+    stop = i == n - 1 ? origin + span : start + step
+    return start, stop
+end
+
+# Real-valued cells can be sampled. `missing` is stored as `NaN32`. A color image, or any
+# other non-real eltype, cannot — `_grid_sample` returns `nothing` and the caller ships edges only.
+_sampleable(::Type{T}) where {T} = (R = nonmissingtype(T); R === Union{} || R <: Real)
+_sample_value(::Missing) = NaN32
+_sample_value(v::Real) = Float32(v)
+
+# One `Float32` per screen pixel of `vp` (`x, y, w, h` image px), or `nothing` when `vals`
+# is not real-valued. The value is the source cell under that pixel's center. `NaN32` is both
+# a center that misses the grid and a source cell that is `missing` / non-finite; the overlay
+# tells those apart by running `findBin` on the center.
+function _grid_sample(xedges, yedges, vals, vp, display_scale)
+    _sampleable(eltype(vals)) || return nothing
+    vx, vy, vw, vh = vp
+    sample_px = 1 / display_scale
+    sncols = ceil(Int, vw * display_scale)
+    snrows = ceil(Int, vh * display_scale)
+    (sncols < 1 || snrows < 1) && return nothing
+    sample = Vector{Float32}(undef, sncols * snrows)
+    for sy in 0:(snrows - 1)
+        y0, y1 = _sample_bin(vy, sy, snrows, sample_px, vh)
+        j = _find_bin(yedges, (y0 + y1) / 2)
+        for sx in 0:(sncols - 1)
+            x0, x1 = _sample_bin(vx, sx, sncols, sample_px, vw)
+            i = _find_bin(xedges, (x0 + x1) / 2)
+            sample[sy * sncols + sx + 1] = i < 0 || j < 0 ? NaN32 : _sample_value(vals[i + 1, j + 1])
+        end
+    end
+    return (;
+        sample, sncols, snrows, sample_px,
+        origin = Float64[vx, vy], span = Float64[vw, vh],
+    )
+end
 
 # A payloads-length mismatch would otherwise surface as an `undefined` tooltip at hover time.
 # Positional: payloads[k] binds element k; a wrong order is undetectable here. A DataFrame is
@@ -525,9 +596,13 @@ construction. Produces one `:rects` or `:grid` [`HitLayer`](@ref).
 - `grid` — `(xedges, yedges, values)`: `xedges`/`yedges` are cell-edge vectors (length
   `ncols+1`/`nrows+1`), `values` an `(ncols, nrows)` `Matrix` of per-cell values. Shape mismatch
   raises `ArgumentError`. `id`/`tooltip` as above; `payloads` is unused (cell `(i, j, value)`
-  is resolved client-side from `values`). If a cell renders under ~1 screen px, `values` is
-  dropped from the manifest to bound its size (hover then shows `(i, j)` only; a `@warn` notes
-  it) — clicks still carry the cell index.
+  is resolved client-side). When a cell is at least one screen pixel, the manifest carries
+  `values` (row-major). Below that it carries `sample`: one source value per screen pixel of
+  the axis viewport, the cell under that pixel's center. A pixel whose center misses the grid
+  is `NaN` and is not a hit. A source cell that is itself `NaN`, `Inf`, or `missing` is still
+  that cell (`missing` is stored as `NaN`). A matrix that is not real-valued (a color `image!`)
+  ships edges only on this branch: the cell index, no numeric value. Clicks still carry that
+  center cell, so `A[cell]` indexes it.
 
 # From a plot object
 `RectInteractable(ax, p)` builds `rects`/`grid` and default payloads from `p`:
@@ -652,9 +727,16 @@ function hitlayers(i::RectInteractable, ctx)
         if cell_px >= GRID_VALUES_MIN_SCREEN_PX
             geom["values"] = Float32[Float32(vals[c, r]) for r in 1:nrows for c in 1:ncols]  # row-major: r*ncols+c
         else
-            @warn "Masque: heatmap/image grid cells are ~$(round(cell_px; digits = 2)) px on screen " *
-                "(sub-pixel); dropping the values[] payload to bound manifest size. Hover shows (i,j) " *
-                "only; clicks still carry it (the kernel round-trip has your matrix)." maxlog = 1
+            vp = ctx.transforms[axis_id(ctx, i.ax)].viewport
+            sampled = _grid_sample(xedges, yedges, vals, vp, ctx.display_scale)
+            if sampled !== nothing
+                geom["sample"] = sampled.sample
+                geom["sncols"] = sampled.sncols
+                geom["snrows"] = sampled.snrows
+                geom["sample_origin"] = sampled.origin
+                geom["sample_span"] = sampled.span
+                geom["sample_px"] = sampled.sample_px
+            end
         end
         return [HitLayer(i.id, :grid, geom, Any[], axis_id(ctx, i.ax), events(i), i.label)]
     end
@@ -1388,6 +1470,215 @@ function hitlayers(i::RegionInteractable, ctx)
     isempty(rpl) || push!(ls, HitLayer(Symbol(i.id, :_r), :rects, rect, rpl, aid, i.evs))
     isempty(ppl) || push!(ls, HitLayer(Symbol(i.id, :_p), :polygons, polys, ppl, aid, i.evs))
     return ls
+end
+
+# ============================ SliceInteractable ============================
+"""
+    SliceInteractable(ax; series, orientation=:vertical, crosshair=true, id=:slice, covers=(), tooltip=nothing)
+    SliceInteractable(ax, plot; orientation=nothing, crosshair=true, id=:slice, covers=nothing, tooltip=nothing)
+    SliceInteractable(ax, plots; orientation=nothing, crosshair=true, id=:slice, covers=nothing, tooltip=nothing)
+
+Sample one or more 1-D series at the cursor and show that sample in the tooltip. `masque(fig)`
+does not add a slice, and a plot without one draws no hairline. This interactable draws one
+hair — vertical or horizontal, matching `orientation` — and a filled dot per series in support.
+`crosshair=false` keeps the dots and the tooltip and draws no hair. Hover only — nothing is
+committed. Produces one `:slice` [`HitLayer`](@ref), which is not a hit target.
+
+# Arguments
+- `ax` — a `Makie.Axis`.
+- `series` — a vector of `(; x, y)`, each `x` and `y` an equal-length vector of reals. Optional
+  `id` (default `:s1`, `:s2`, …), `label`, and `color`. For `:vertical`, `x` is strictly
+  increasing; for `:horizontal`, `y` is. A non-finite probe coordinate starts a new run, and
+  a run of one point cannot be interpolated. A decreasing or repeated probe coordinate raises
+  `ArgumentError`. A `Stairs` plot is the exception: its steppoints repeat the probe on each
+  riser, and that repeat is kept.
+- `orientation` — `:vertical` (sample `y` at the cursor's data `x`, and draw the vertical hair;
+  the default) or `:horizontal` (sample `x` at the cursor's data `y`, and draw the horizontal
+  hair). On the plot constructor, `nothing` (the default) follows the plot: a `Density` or
+  `Band` with `direction == :y` is `:horizontal`, and everything else is `:vertical`.
+- `crosshair` — draw that one hair. `false` leaves the sample tooltip and the dots, with no
+  hair. Default `true`. A figure with no slice draws no hair either way.
+- `id` — the layer id. Default `:slice`.
+- `covers` — layer ids in the same `masque` call whose hover this slice replaces. Each must be
+  a `:polygons` or `:lines` layer (`ArgumentError` otherwise). While the pointer is over one
+  of them the cursor stays `crosshair`, the polygon or line highlight is skipped, and the
+  tooltip is the sample. Default `()` on the series constructor. On the plot constructor,
+  `nothing` (the default) names that plot's auto-extract layer id (`:density`, `:lines`,
+  `:series`, `:stairs`, `:band`, with `_2`, `_3`, … when a vector repeats a kind).
+- `tooltip` — what the card says while this slice is the thing under the pointer (a covered
+  layer, or empty axis interior inside at least one series). `nothing` is the auto table of the
+  live sample (the probe coordinate plus one field per series id), `masque"…"` is a template
+  over those same fields, and `false` suppresses the card. A marker that is not covered, and a
+  colorbar, keep their own tooltip. `tooltip = true` is rejected (`ArgumentError`).
+- `plot` / `plots` — a `Lines`, `Stairs`, `Series`, `Band`, or `Density`, or a vector of
+  those. Vertices are the points those plots already draw. `Stairs` uses the child line's
+  steppoints, so between risers the sample is constant; at a riser the sample is the y where
+  that riser starts. `Density` and `Band` contribute the band's upper curve as drawn. A `Band`
+  with `direction = :y` flips its converted edge (Makie swaps only the mesh). A `Density` with
+  `direction = :y` already stores `Point2(offset + density, x)` and is `:horizontal`; it is not
+  flipped again. A vector becomes one slice; mixed orientations raise `ArgumentError` unless
+  `orientation` is passed.
+
+`masque` raises `ArgumentError` at build time if `ax` is an `Axis3` or a `PolarAxis`, if
+either scale is not client-invertible (`identity`, `log10`, `log`), if either axis is
+categorical, or if the figure already has a slice on this axis.
+
+# Examples
+```julia
+SliceInteractable(ax; series = [(; id = :wide, x = xs, y = ys), (; id = :narrow, x = xs, y = zs)])
+
+d1 = density!(ax, randn(200))
+d2 = density!(ax, randn(200) .+ 2)
+SliceInteractable(ax, [d1, d2])
+```
+"""
+struct SliceInteractable <: AbstractInteractable
+    ax
+    orientation::Symbol
+    series::Vector{NamedTuple}
+    id::Symbol
+    covers::Vector{Symbol}
+    tooltip::Union{Nothing, Markup, Bool}
+    crosshair::Bool
+end
+
+function _slice_covers(covers)
+    covers isa Symbol && return Symbol[covers]
+    return Symbol[Symbol(c) for c in covers]
+end
+
+function _slice_probe_ok(probe, id::Symbol; plateau::Bool = false)
+    prev = nothing
+    run = 0
+    long = false
+    for v in probe
+        if !isfinite(v)
+            prev = nothing
+            run = 0
+            continue
+        end
+        run += 1
+        run >= 2 && (long = true)
+        # A stair riser repeats the probe. The series constructor stays strict; only the
+        # Stairs plot path sets plateau, so a caller-supplied repeat still errors.
+        if prev !== nothing && (plateau ? v < prev : v <= prev)
+            how = plateau ? "increasing" : "strictly increasing"
+            throw(
+                ArgumentError(
+                    "SliceInteractable: series :$id probe coordinate must be $how, got $v after $prev",
+                )
+            )
+        end
+        prev = v
+    end
+    long || throw(ArgumentError("SliceInteractable: series :$id needs at least two finite points"))
+    return nothing
+end
+
+function _slice_one(s, i::Int, orientation::Symbol)
+    hasproperty(s, :x) && hasproperty(s, :y) ||
+        throw(ArgumentError("SliceInteractable: series $i needs `x` and `y`"))
+    x = Float64[Float64(v) for v in s.x]
+    y = Float64[Float64(v) for v in s.y]
+    length(x) == length(y) ||
+        throw(ArgumentError("SliceInteractable: series $i has $(length(x)) x values and $(length(y)) y values"))
+    for k in eachindex(x)
+        if isfinite(x[k]) != isfinite(y[k])
+            throw(ArgumentError("SliceInteractable: series $i has a non-finite coordinate at index $k"))
+        end
+    end
+    id = hasproperty(s, :id) && s.id !== nothing ? Symbol(s.id) : Symbol("s", i)
+    label = hasproperty(s, :label) && s.label !== nothing ? String(s.label) : nothing
+    color = hasproperty(s, :color) && s.color !== nothing ? s.color : nothing
+    plateau = hasproperty(s, :plateau) && s.plateau === true
+    probe = orientation === :vertical ? x : y
+    _slice_probe_ok(probe, id; plateau)
+    return (; id, label, color, x, y)
+end
+
+function _slice_unique_ids(series)
+    seen = Dict{Symbol, Int}()
+    out = NamedTuple[]
+    for s in series
+        n = get(seen, s.id, 0) + 1
+        seen[s.id] = n
+        id = n == 1 ? s.id : Symbol(s.id, :_, n)
+        push!(out, (; id, s.label, s.color, s.x, s.y))
+    end
+    return out
+end
+
+function SliceInteractable(
+        ax; series, orientation = :vertical, crosshair = true, id = :slice, covers = (), tooltip = nothing,
+    )
+    orientation in (:vertical, :horizontal) ||
+        throw(ArgumentError("SliceInteractable: orientation must be :vertical or :horizontal, got $(orientation)"))
+    crosshair isa Bool ||
+        throw(ArgumentError("SliceInteractable: crosshair must be true or false, got $(crosshair)"))
+    tooltip === true &&
+        throw(ArgumentError("tooltip = true is not meaningful — omit `tooltip` for the auto table, pass masque\"…\" for a template, or `false` to suppress."))
+    series isa AbstractVector || throw(ArgumentError("SliceInteractable: series must be a vector, got $(typeof(series))"))
+    isempty(series) && throw(ArgumentError("SliceInteractable: series is empty"))
+    built = NamedTuple[_slice_one(s, i, orientation) for (i, s) in enumerate(series)]
+    unique_series = _slice_unique_ids(built)
+    coord = orientation === :vertical ? :x : :y
+    for s in unique_series
+        s.id === coord && throw(
+            ArgumentError(
+                "SliceInteractable: series id :$(s.id) is the probe coordinate; rename it",
+            )
+        )
+    end
+    return SliceInteractable(ax, orientation, unique_series, Symbol(id), _slice_covers(covers), tooltip, crosshair)
+end
+
+events(::SliceInteractable) = (:hover,)
+tooltip_spec(i::SliceInteractable) = i.tooltip
+
+function validate(i::SliceInteractable, ctx::InteractionContext)
+    i.ax isa Makie.Legend && return "SliceInteractable: ax is a Legend, not an Axis — a legend has no data-space series to sample."
+    t = ctx.transforms[axis_id(ctx, i.ax)]
+    t.is3d && return "SliceInteractable: sampling inverts a pixel to a data coordinate via the axis " *
+        "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
+    t.ispolar && return "SliceInteractable: sampling inverts a pixel via Cartesian axis scales; " *
+        "PolarAxis continuous θ/r inversion is not yet shipped. Use element interactables for discrete hits."
+    (t.xscale in _JS_INVERTIBLE && t.yscale in _JS_INVERTIBLE) ||
+        return "SliceInteractable: sampling needs client-side invertible x and y scales " *
+        "(x=$(t.xscale), y=$(t.yscale); supported: identity/log10/log)."
+    (t.xcats === nothing && t.ycats === nothing) ||
+        return "SliceInteractable: sampling needs continuous axes; a categorical axis has no numeric coordinate to interpolate."
+    return nothing
+end
+
+function hitlayers(i::SliceInteractable, ctx)
+    t = ctx.transforms[axis_id(ctx, i.ax)]
+    orient = i.orientation === :vertical ? "v" : "h"
+    series = Dict{String, Any}[]
+    for s in i.series
+        xy = Float64[]
+        if i.orientation === :vertical
+            for k in eachindex(s.x)
+                push!(xy, s.x[k], s.y[k])
+            end
+        else
+            for k in eachindex(s.x)
+                push!(xy, s.y[k], s.x[k])
+            end
+        end
+        d = Dict{String, Any}("id" => string(s.id), "xy" => xy)
+        s.label === nothing || (d["label"] = s.label)
+        if s.color !== nothing
+            d["color"] = _css_color(s.color)
+        end
+        push!(series, d)
+    end
+    geom = Dict{String, Any}(
+        "orientation" => orient,
+        "crosshair" => i.crosshair,
+        "covers" => [string(c) for c in i.covers],
+        "series" => series,
+    )
+    return [HitLayer(i.id, :slice, geom, Any[], axis_id(ctx, i.ax), events(i))]
 end
 
 # ============================ custom: FunctionInteractable (Tier B) =======

@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest"
 import {
-    distToSegment, pointInPolygon, findBin, invertAxis, hitLayer, hitTest, resolvePayload, panLimits, orbitAngles,
+    distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
+    hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles,
     anchorFor, computeAnchoredPlacement,
 } from "../src/geometry"
-import type { AxisTransform, Hit, HitLayer, Manifest } from "../src/types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest } from "../src/types"
 
 describe("primitives", () => {
     it("distToSegment", () => {
@@ -277,11 +278,93 @@ describe("hitLayer + hitTest", () => {
         const h = hitLayer(grid, 15, 5)
         expect(h?.grid_).toEqual([1, 0, undefined]) // index found; value absent, no crash
     })
+    it("grid sample reports the pixel-center cell and highlights that screen pixel", () => {
+        const grid: HitLayer = { id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: {
+                xedges: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20], yedges: [0, 10],
+                ncols: 10, nrows: 1,
+                sample: [3.5, NaN], sncols: 2, snrows: 1,
+                sample_origin: [0, 0], sample_span: [20, 10], sample_px: 10,
+            } }
+        // (5, 5) is sample (0, 0). Its center is (5, 5), source bin i=2 (between 4 and 6).
+        const h = hitLayer(grid, 5, 5)
+        expect(h?.grid_).toEqual([2, 0, 3.5])
+        expect(h?.geom_).toEqual(["rect", 5, 5, 10, 10])
+        // Sample 1 is NaN, but its center (15, 5) sits in source bin i=7. That cell is still a hit.
+        const nanHit = hitLayer(grid, 15, 5)
+        expect(nanHit?.grid_).toEqual([7, 0, NaN])
+        expect(nanHit?.geom_).toEqual(["rect", 15, 5, 10, 10])
+        expect(hitLayer(grid, 25, 5)).toBeNull() // outside the sampled viewport
+        // Same NaN sample, but the source edges stop at 10, so center 15 misses. No hit.
+        const margin: HitLayer = { ...grid, geometry: { ...(grid.geometry as GridGeometry), xedges: [0, 10], ncols: 1 } }
+        expect(hitLayer(margin, 5, 5)?.grid_).toEqual([0, 0, 3.5])
+        expect(hitLayer(margin, 15, 5)).toBeNull()
+        const infGrid: HitLayer = { ...grid, geometry: { ...(grid.geometry as GridGeometry), sample: [Infinity, 1] } }
+        expect(hitLayer(infGrid, 5, 5)?.grid_).toEqual([2, 0, Infinity])
+    })
+    it("grid sample's last bin is the remainder, and the far edge still hits", () => {
+        const grid: HitLayer = { id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: {
+                xedges: [0, 15], yedges: [0, 10], ncols: 1, nrows: 1,
+                sample: [1, 2], sncols: 2, snrows: 1,
+                sample_origin: [0, 0], sample_span: [15, 10], sample_px: 10,
+            } }
+        const h = hitLayer(grid, 12, 5)
+        expect(h?.grid_).toEqual([0, 0, 2])
+        expect(h?.geom_).toEqual(["rect", 12.5, 5, 5, 10])
+        const edge: HitLayer = { id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: {
+                xedges: [0, 20], yedges: [0, 10], ncols: 1, nrows: 1,
+                sample: [1, 2], sncols: 2, snrows: 1,
+                sample_origin: [0, 0], sample_span: [20, 10], sample_px: 10,
+            } }
+        expect(hitLayer(edge, 20, 5)?.grid_).toEqual([0, 0, 2])
+        expect(hitLayer(edge, 20.001, 5)).toBeNull()
+    })
     it("hitTest respects the event filter and manifest order", () => {
         const m: Manifest = { width: 400, height: 400, scaling: 2, transforms: {},
             layers: [{ ...circles, events: ["hover"] }] }
         expect(hitTest(m, 100, 100, "hover")?.layer.id).toBe("pts")
         expect(hitTest(m, 100, 100, "click")).toBeNull() // not a click layer
+    })
+    it("hitTestAt unmaps data layers and keeps legend, colorbar, and view in layout pixels", () => {
+        const photo = { s: 2, tx: -100, ty: -50 }
+        const m: Manifest = {
+            width: 400, height: 400, scaling: 1, transforms: {},
+            layers: [
+                { id: "pts", kind: "circles", axis: "ax", events: ["hover"], payloads: [{}], geometry: [50, 40, 5] },
+                { id: "legend", kind: "rects", bond: "legend", axis: "ax", events: ["hover"], payloads: [{}], geometry: [10, 10, 8, 8] },
+                { id: "cb", kind: "axis", bond: "colorbar", axis: "ax", events: ["hover"], payloads: [], geometry: [300, 20, 40, 80] },
+                { id: "view", kind: "view", axis: "ax", events: ["drag"], payloads: [], geometry: { x: 0, y: 0, w: 400, h: 400, mode: "pan" } },
+            ],
+        }
+        // circle content (50, 40) is drawn at layout (0, 30). The pre-slide point is a miss.
+        expect(hitTestAt(m, 0, 30, photo, "hover")?.layer.id).toBe("pts")
+        expect(hitTestAt(m, 50, 40, photo, "hover")?.layer.id).not.toBe("pts")
+        // legend center (10, 10) did not move. Unmapping it would test content (55, 30) and miss.
+        expect(hitTestAt(m, 10, 10, photo, "hover")?.layer.id).toBe("legend")
+        expect(hitTestAt(m, 320, 60, photo, "hover")?.layer.id).toBe("cb")
+        expect(hitTestAt(m, 10, 10, photo, "drag")?.layer.id).toBe("view")
+    })
+    it("hitTestAt skips clipped data so a colorbar outside the pan view still wins", () => {
+        // Viewport ends at x = 800. Zoom s = 2 about x = 400 gives tx = -400.
+        // unmap(840) = 620, inside the grid, but that cell is drawn outside the clip.
+        const photo = { s: 2, tx: -400, ty: 0 }
+        const m: Manifest = {
+            width: 1200, height: 400, scaling: 1, transforms: {},
+            layers: [
+                { id: "cells", kind: "grid", axis: "ax", events: ["click", "hover"], payloads: [],
+                    geometry: { xedges: [0, 800], yedges: [0, 400], ncols: 1, nrows: 1 } },
+                { id: "cb", kind: "axis", bond: "colorbar", axis: "ax", events: ["click", "hover"], payloads: [],
+                    geometry: [820, 40, 80, 200] },
+                { id: "view", kind: "view", axis: "ax", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 800, h: 400, mode: "pan" } },
+            ],
+        }
+        const clip = { x: 0, y: 0, w: 800, h: 400 }
+        expect(hitTestAt(m, 840, 100, photo, "click", clip)?.layer.id).toBe("cb")
+        expect(hitTestAt(m, 400, 100, photo, "click", clip)?.layer.id).toBe("cells")
+        expect(hitTestAt(m, 840, 100, photo, "click")?.layer.id).toBe("cells")
     })
     it("resolvePayload returns the element payload", () => {
         const m: Manifest = { width: 400, height: 400, scaling: 2, transforms: {}, layers: [circles] }
@@ -399,6 +482,58 @@ describe("view pan / orbit math", () => {
         expect(rev.xmax).toBeCloseTo(11)
         expect(rev.ymin).toBeCloseTo(-40)
         expect(rev.ymax).toBeCloseTo(60)
+    })
+    it("matrixLimits matches panLimits for a pure translate", () => {
+        const cases: [AxisTransform, number, number, number, number][] = [
+            [t, 100, 250, 200, 250],
+            [{ ...t, xlims: [1, 100], xscale: "log10" }, 0, 250, 500, 250],
+            [{ ...t, xreversed: true, yreversed: true }, 100, 100, 200, 300],
+        ]
+        for (const [tr, x0, y0, x1, y1] of cases) {
+            const m = { s: 1, tx: x1 - x0, ty: y1 - y0 }
+            const lim = matrixLimits(tr, m)
+            const pan = panLimits(tr, x0, y0, x1, y1)
+            expect(lim).not.toBeNull()
+            expect(lim!.xmin).toBeCloseTo(pan.xmin)
+            expect(lim!.xmax).toBeCloseTo(pan.xmax)
+            expect(lim!.ymin).toBeCloseTo(pan.ymin)
+            expect(lim!.ymax).toBeCloseTo(pan.ymax)
+        }
+    })
+    it("matrixLimits is the visible pixel window of a zoom about the cursor", () => {
+        // Spike: 500×320 image, scale 2 about (200, 140), linear lims [0, 10] × [0, 8].
+        // Data window shrinks to x 2…7, y 2.25…6.25. Log [1, 1000]² shares the pixel window.
+        const zoom = { s: 2, tx: (1 - 2) * 200, ty: (1 - 2) * 140 }
+        const linear: AxisTransform = {
+            xlims: [0, 10], ylims: [0, 8], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 500, 320], xreversed: false, yreversed: false,
+        }
+        const lin = matrixLimits(linear, zoom)
+        expect(lin!.xmin).toBeCloseTo(2)
+        expect(lin!.xmax).toBeCloseTo(7)
+        expect(lin!.ymin).toBeCloseTo(2.25)
+        expect(lin!.ymax).toBeCloseTo(6.25)
+        const logT: AxisTransform = {
+            ...linear, xlims: [1, 1000], ylims: [1, 1000], xscale: "log10", yscale: "log10",
+        }
+        const log = matrixLimits(logT, zoom)
+        const fx = 200 / 500
+        const fy = 1 - 140 / 320
+        const edge = (a: number, b: number, f: number) => {
+            const la = Math.log10(a), lb = Math.log10(b), lc = la + f * (lb - la)
+            const factor = 0.5
+            return [10 ** (lc - (lc - la) * factor), 10 ** (lc + (lb - lc) * factor)]
+        }
+        const [xmin, xmax] = edge(1, 1000, fx)
+        const [ymin, ymax] = edge(1, 1000, fy)
+        expect(log!.xmin).toBeCloseTo(xmin)
+        expect(log!.xmax).toBeCloseTo(xmax)
+        expect(log!.ymin).toBeCloseTo(ymin)
+        expect(log!.ymax).toBeCloseTo(ymax)
+        expect(Math.abs(log!.xmax - xmax)).toBeLessThan(1e-9)
+    })
+    it("matrixLimits rejects a non-positive scale", () => {
+        expect(matrixLimits(t, { s: 0, tx: 0, ty: 0 })).toBeNull()
     })
     it("orbitAngles maps dx/dy to azimuth/elevation and clamps elevation", () => {
         const g = { x: 0, y: 0, w: 1000, h: 500, mode: "orbit" as const, azimuth: 1.0, elevation: 0.5 }
@@ -540,5 +675,76 @@ describe("computeAnchoredPlacement", () => {
         const bar = computeAnchoredPlacement({ x: 50, y: 10, top: 10 }, 60, 20, 400, 300)
         expect(bar.below).toBe(true)
         expect(bar.top).toBe(20) // bottom === top(10) + gap(10) — starts right at the anchor
+    })
+})
+
+describe("projectAxis / sampleSlice", () => {
+    const identity: AxisTransform = {
+        xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+        viewport: [0, 0, 100, 50], xreversed: false, yreversed: false,
+    }
+    const logY: AxisTransform = {
+        xlims: [0, 10], ylims: [1, 100], xscale: "identity", yscale: "log10",
+        viewport: [10, 20, 200, 100], xreversed: false, yreversed: false,
+    }
+    it("projectAxis round-trips invertAxis on identity and log", () => {
+        for (const t of [identity, logY]) {
+            const data = t === identity ? { x: 4, y: 2.5 } : { x: 4, y: 10 }
+            const px = projectAxis(t, data.x, data.y)
+            const back = invertAxis(t, px.x, px.y)
+            expect(back.x).toBeCloseTo(data.x)
+            expect(back.y).toBeCloseTo(data.y)
+        }
+    })
+    it("sampleSlice lerps in data space, omits outside support and a NaN gap", () => {
+        const geom = {
+            orientation: "v" as const, covers: [],
+            series: [
+                { id: "a", xy: [0, 0, 1, 10] },
+                { id: "b", xy: [2, 0, 3, 10] },
+                { id: "c", xy: [0, 0, 1, 1, NaN, NaN, 3, 0, 4, 2] },
+            ],
+        }
+        const at = (x: number) => sampleSlice(geom, identity, x, 0)!
+        expect(at(0.5).samples.map((s) => s.id)).toEqual(["a", "c"])
+        expect(at(0.5).samples[0].value).toBeCloseTo(5)
+        expect(at(0.5).probe).toBeCloseTo(0.5)
+        expect(at(2.5).samples.find((s) => s.id === "b")!.value).toBeCloseTo(5)
+        expect(at(2).samples.find((s) => s.id === "c")).toBeUndefined()
+        expect(at(3.5).samples.find((s) => s.id === "c")!.value).toBeCloseTo(1)
+        expect(at(-1).samples).toEqual([])
+    })
+    it("sampleSlice holds a stair tread when the riser repeats the probe", () => {
+        // :pre steppoints of (0,0), (1,2), (2,1), (3,3)
+        const geom = {
+            orientation: "v" as const, covers: [],
+            series: [{ id: "s", xy: [0, 0, 0, 2, 1, 2, 1, 1, 2, 1, 2, 3, 3, 3] }],
+        }
+        const at = (x: number) => sampleSlice(geom, identity, x, 0)!.samples[0].value
+        expect(at(0.5)).toBeCloseTo(2)
+        expect(at(1.5)).toBeCloseTo(1)
+        expect(at(2.5)).toBeCloseTo(3)
+        expect(at(1)).toBeCloseTo(2)
+    })
+    it("a slice layer is not a hit target", () => {
+        const layer: HitLayer = {
+            id: "s", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: { orientation: "v", covers: ["density"], series: [{ id: "a", xy: [0, 0, 1, 1] }] },
+        }
+        expect(hitLayer(layer, 0, 0)).toBeNull()
+    })
+    it("viewportUnder picks the smallest non-3d viewport that contains the point", () => {
+        const m: Manifest = {
+            width: 100, height: 100, scaling: 1,
+            transforms: {
+                plot: { ...identity, viewport: [0, 0, 100, 100] },
+                bar: { ...identity, viewport: [40, 40, 10, 10] },
+                ax3: { ...identity, viewport: [0, 0, 20, 20], is3d: true },
+            },
+            layers: [],
+        }
+        expect(viewportUnder(m, 45, 45)!.id).toBe("bar")
+        expect(viewportUnder(m, 10, 10)!.id).toBe("plot")
+        expect(viewportUnder(m, 200, 200)).toBeNull()
     })
 })

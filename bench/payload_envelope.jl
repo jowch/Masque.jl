@@ -198,4 +198,25 @@ let
     text!(ax, xs, ys; text = ["L$(k)" for k in 1:n], fontsize = 10)
     text_row("text-only, $n labels", masque(f))
 end
+
+println("\n=== H. slice series — data-space Float64 xy (not integer px) ===")
+# SliceInteractable ships the probe series as Float64, not the quantized Int geometry every
+# other kind uses. One series of N vertices is 2N float64s (9 B each on the wire) plus a
+# small dict. View gestures rebuild the whole manifest each frame, so this term is paid again
+# on every camera move when a slice is present.
+let
+    for n in (100, 1_000)
+        f = Figure(size = (600, 400)); ax = Axis(f[1, 1])
+        xs = collect(range(0, 1; length = n))
+        ys = sin.(xs)
+        s = SliceInteractable(ax; series = [(; id = :curve, x = xs, y = ys)])
+        w = masque(f, s)
+        layer = only(filter(l -> l["kind"] == "slice", w.manifest["layers"]))
+        xy_b = mp(layer["geometry"]["series"][1]["xy"])
+        @printf(
+            "  %-40s  png=%6s KB   manifest=%6s KB   xy=%6s KB  (%d pts)\n",
+            "slice, 1 series", kb(b64bytes(w)), kb(mp(w.manifest)), kb(xy_b), n,
+        )
+    end
+end
 println()

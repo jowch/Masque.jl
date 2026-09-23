@@ -62,7 +62,7 @@ export function roiBounds(box: ROIBox): { xmin: number; xmax: number; ymin: numb
     return { xmin: Math.min(ax, bx), xmax: Math.max(ax, bx), ymin: Math.min(ay, by), ymax: Math.max(ay, by) }
 }
 
-export function buildROIBoxes(manifest: Manifest, svg: SVGSVGElement, base: HTMLElement): Map<string, ROIBox> {
+export function buildROIBoxes(manifest: Manifest, svg: SVGElement, base: HTMLElement): Map<string, ROIBox> {
     const roiBoxes = new Map<string, ROIBox>()
     const rect0 = base.getBoundingClientRect()
     const draw = handleDrawHalf(manifest.width, rect0.width, manifest.scaling)

@@ -37,6 +37,11 @@
 # literals, derived once (barplot's flat grey, heatmap's brightest viridis cell, poly's alpha-blend
 # over the axis background all come out right without reimplementing colormap/alpha math here) —
 # regenerate them the same way if any of these three figures' construction changes.
+#
+# `slice_lines` and `slice_density` are hover samples, not hit targets. The driver projects a
+# data point through the axis transform and checks the slice tooltip plus the crosshair.
+
+using Random
 
 kind_sweep_meta() = [
     Dict(
@@ -201,6 +206,24 @@ kind_sweep_meta() = [
         # (geometry.ts's unbounded branch) — a different hit-test code path, exercised in the
         # same widget so one fixture covers both.
         "pinLayerId" => "pts", "colorbarLayerId" => "colorbar",
+    ),
+    Dict(
+        "key" => "slice_lines", "layerId" => "slice", "layerKind" => "slice",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "slice",
+        # y = 2 sits between the two lines. At x = 1 the narrow line is higher; at x = 3 the
+        # wide line is. Tooltip values are toPrecision(4).
+        "probes" => [
+            Dict("x" => 1.0, "y" => 2.0, "contains" => ["wide 1.000", "narrow 3.000"]),
+            Dict("x" => 3.0, "y" => 2.0, "contains" => ["wide 3.000", "narrow 1.000"]),
+        ],
+    ),
+    Dict(
+        "key" => "slice_density", "layerId" => "slice", "layerKind" => "slice",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "slice",
+        # Both KDEs have support at x = 1. Don't pin the KDE height — only that both labels show.
+        "probes" => [Dict("x" => 1.0, "contains" => ["wide", "narrow"])],
     ),
 ]
 
@@ -478,9 +501,39 @@ function build_kind_sweep()
         )
     end
 
+    slice_lines = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "slice lines", limits = (0, 4, 0, 4))
+        xs = [0.0, 1.0, 2.0, 3.0, 4.0]
+        wide = lines!(ax, xs, xs; label = "wide", color = :gray, linewidth = 3)
+        narrow = lines!(ax, xs, 4 .- xs; label = "narrow", color = :gray, linewidth = 3)
+        masque(
+            fig, [
+                SegmentInteractable(ax, wide; id = :wide, payloads = [(; label = "wide")]),
+                SegmentInteractable(ax, narrow; id = :narrow, payloads = [(; label = "narrow")]),
+                SliceInteractable(ax, [wide, narrow]; covers = (:wide, :narrow)),
+            ],
+        )
+    end
+
+    slice_density = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "slice density")
+        rng = MersenneTwister(1)
+        d1 = density!(ax, randn(rng, 200); label = "wide")
+        d2 = density!(ax, randn(rng, 200) .+ 2; label = "narrow")
+        masque(
+            fig, [
+                PolygonInteractable(ax, d1; id = :wide),
+                PolygonInteractable(ax, d2; id = :narrow),
+                SliceInteractable(ax, [d1, d2]; covers = (:wide, :narrow)),
+            ],
+        )
+    end
+
     return (;
         scatter, lines, series, segments, heatmap, image, barplot, poly,
         polar, scatter_dark, arrows3d, hlines, threshold, roi, view, legend, series_legend,
-        legend_overlap, legend_template, axis,
+        legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
 end

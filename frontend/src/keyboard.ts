@@ -4,8 +4,8 @@
 // one visual language for "this element is what you're on" whether you got there by mouse or
 // keyboard — see hover.ts's restoreFocus for how the two stay in sync on a pointer miss.
 import { hitLayerByIndex, isGapSegment, layerNElements } from "./selection"
-import { drawHi, clearHi, clearLink } from "./highlight"
-import { showTipAt, hideTip, updateLinkForHit } from "./hover"
+import { drawHover, clearHover, clearLink } from "./highlight"
+import { showTipAt, hideTip, updateLinkForHit, layoutAnchor } from "./hover"
 import { commitClick } from "./bond"
 import { plainTextForHit } from "./template"
 import { cssAnchor } from "./state"
@@ -76,7 +76,7 @@ export function focusTo(ctx: OverlayCtx, state: OverlayState, i: number | null):
         state.focusTipHtml_ = null
         state.focusTipCss_ = null
         ctx.surface_.classList.remove("kbd-ring")
-        clearHi(state, ctx.hiGroup_, true)
+        clearHover(ctx, state, true)
         clearLink(state, ctx.linkGroup_, true)
         hideTip(ctx, state)
         scheduleAnnounce(ctx, state, "")
@@ -88,12 +88,12 @@ export function focusTo(ctx: OverlayCtx, state: OverlayState, i: number | null):
     const hit = hitFor(ref)
     state.focusHit_ = hit
     ctx.surface_.classList.add("kbd-ring")
-    drawHi(state, ctx.hiGroup_, hit)
+    drawHover(ctx, state, hit)
     updateLinkForHit(ctx, state, hit)
     // anchorFor(hit, null): no pointer to derive a "closest point on segment"/"cursor inside
     // polygon" placement from, so this falls back to the midpoint/centroid rule (geometry.ts).
     const anchor = anchorFor(hit, null)
-    const css = cssAnchor(ctx.base_, ctx.manifest_, anchor)
+    const css = cssAnchor(ctx.base_, ctx.manifest_, layoutAnchor(state.photo_, hit, anchor))
     const html = showTipAt(ctx, state, hit, anchor.x, anchor.y, css)
     state.focusTipHtml_ = html
     state.focusTipCss_ = html === null ? null : css

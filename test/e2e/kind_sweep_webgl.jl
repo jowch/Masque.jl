@@ -232,6 +232,26 @@ HTML(
         "<span id=\"axes_axis\" style=\"display:none\">$(JSON3.write(sweep.axis.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000050
+@bind ev_slice_lines sweep.slice_lines
+
+# ╔═╡ d1000000-0000-0000-0000-000000000051
+HTML(
+    "<span id=\"out_slice_lines\">SLICE_LINES=$(repr(ev_slice_lines))</span>" *
+        "<span id=\"coords_slice_lines\" style=\"display:none\">$(JSON3.write(sweep.slice_lines.manifest["layers"]))</span>" *
+        "<span id=\"axes_slice_lines\" style=\"display:none\">$(JSON3.write(sweep.slice_lines.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000052
+@bind ev_slice_density sweep.slice_density
+
+# ╔═╡ d1000000-0000-0000-0000-000000000053
+HTML(
+    "<span id=\"out_slice_density\">SLICE_DENSITY=$(repr(ev_slice_density))</span>" *
+        "<span id=\"coords_slice_density\" style=\"display:none\">$(JSON3.write(sweep.slice_density.manifest["layers"]))</span>" *
+        "<span id=\"axes_slice_density\" style=\"display:none\">$(JSON3.write(sweep.slice_density.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000040
 HTML(
     "<span id=\"kind_meta\" style=\"display:none\">$(JSON3.write(kind_sweep_meta()))</span>" *
@@ -284,4 +304,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000004a
 # ╠═d1000000-0000-0000-0000-000000000043
 # ╠═d1000000-0000-0000-0000-000000000044
+# ╠═d1000000-0000-0000-0000-000000000050
+# ╠═d1000000-0000-0000-0000-000000000051
+# ╠═d1000000-0000-0000-0000-000000000052
+# ╠═d1000000-0000-0000-0000-000000000053
 # ╠═d1000000-0000-0000-0000-000000000040

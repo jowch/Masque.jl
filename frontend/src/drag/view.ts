@@ -18,6 +18,10 @@ export function tip(d: Extract<Drag, { kind: "view" }>, p: { x: number; y: numbe
     return `x:[${fmt(lim.xmin)}, ${fmt(lim.xmax)}] y:[${fmt(lim.ymin)}, ${fmt(lim.ymax)}]`
 }
 
+export function limitsTip(lim: { xmin: number; xmax: number; ymin: number; ymax: number }): string {
+    return `x:[${fmt(lim.xmin)}, ${fmt(lim.xmax)}] y:[${fmt(lim.ymin)}, ${fmt(lim.ymax)}]`
+}
+
 // The gesture-channel request body for one frame (§12.6/#102): the same camera value `tip`
 // reads for its readout, tagged with this drag's layer id (so Julia knows which
 // ViewInteractable to drive) and whether this is the terminal ("settle") request — the flag

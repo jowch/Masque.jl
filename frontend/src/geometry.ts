@@ -1,5 +1,6 @@
 // All coordinates here are image pixels.
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, ThresholdGeometry, ROIGeometry, ViewGeometry } from "./types"
+import { contentPoint, isIdentity, type PhotoMatrix } from "./photo"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
 const SEG_TOL = 8 // px slack for segments/polylines
@@ -153,6 +154,40 @@ function mapAxis(lims: [number, number], scale: string, f: number, cats?: string
     return v
 }
 
+// Image-px [start, stop] of sample index `i`. The last bin keeps the remainder of `span`.
+function sampleBin(origin: number, i: number, n: number, step: number, span: number): [number, number] {
+    const start = origin + i * step
+    const end = i === n - 1 ? origin + span : start + step
+    return [start, end]
+}
+
+// Sub-pixel grid: one stored value per screen pixel. The hit is that pixel, and (i, j) is
+// the source cell under the pixel's center. A center that misses the source edges is a miss.
+// A non-finite sample whose center lands in a cell is still that cell (tooltip shows the NaN
+// or Infinity), same as the full-matrix path.
+function hitGridSample(gg: GridGeometry, px: number, py: number): Omit<Hit, "layer"> | null {
+    const origin = gg.sample_origin, span = gg.sample_span, step = gg.sample_px
+    const sncols = gg.sncols, snrows = gg.snrows, sample = gg.sample
+    if (!origin || !span || step === undefined || step <= 0 || !sncols || !snrows || !sample) return null
+    const [ox, oy] = origin, [sw, sh] = span
+    if (px < ox || py < oy || px > ox + sw || py > oy + sh) return null
+    let sx = Math.floor((px - ox) / step), sy = Math.floor((py - oy) / step)
+    if (sx === sncols) sx = sncols - 1
+    if (sy === snrows) sy = snrows - 1
+    if (sx < 0 || sy < 0 || sx >= sncols || sy >= snrows) return null
+    const v = sample[sy * sncols + sx]
+    const [x0, x1] = sampleBin(ox, sx, sncols, step, sw)
+    const [y0, y1] = sampleBin(oy, sy, snrows, step, sh)
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+    const i = findBin(gg.xedges, cx), j = findBin(gg.yedges, cy)
+    if (i < 0 || j < 0) return null
+    return {
+        index: j * gg.ncols + i,
+        grid_: [i, j, v],
+        geom_: ["rect", cx, cy, Math.abs(x1 - x0), Math.abs(y1 - y0)],
+    }
+}
+
 // hit-test one layer at (px,py); null if no element under the point
 export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "layer"> | null {
     const g = layer.geometry
@@ -218,6 +253,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
         }
         case "grid": {
             const gg = g as GridGeometry
+            if (gg.sample) return hitGridSample(gg, px, py)
             const i = findBin(gg.xedges, px), j = findBin(gg.yedges, py)
             if (i < 0 || j < 0) return null
             const idx = j * gg.ncols + i
@@ -272,7 +308,101 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
             if (px < vg.x || px > vg.x + vg.w || py < vg.y || py > vg.y + vg.h) return null
             return { index: 0 }
         }
+        case "slice":
+            return null // data for the probe, not a hit target — hitTest stays first-match
     }
+}
+
+// data → image px. Inverse of invertAxis on the same AxisTransform (no categoricals: a slice
+// rejects those at build time). Identity and log10/log round-trip; a log axis's straight
+// screen segment is not this curve, so a sampled dot can leave the stroke.
+export function projectAxis(t: AxisTransform, x: number, y: number): { x: number; y: number } {
+    const [vx, vy, vw, vh] = t.viewport
+    let fx = unmapAxis(t.xlims, t.xscale, x)
+    let fy = unmapAxis(t.ylims, t.yscale, y)
+    if (t.xreversed) fx = 1 - fx
+    if (t.yreversed) fy = 1 - fy
+    return { x: vx + fx * vw, y: vy + (1 - fy) * vh }
+}
+
+function unmapAxis(lims: [number, number], scale: string, v: number): number {
+    if (scale === "log10" || scale === "log") {
+        const a = Math.log10(lims[0]), b = Math.log10(lims[1])
+        return (Math.log10(v) - a) / (b - a)
+    }
+    return (v - lims[0]) / (lims[1] - lims[0])
+}
+
+export interface SliceSample {
+    id: string
+    label?: string
+    color?: string
+    value: number
+    px: number
+    py: number
+}
+
+// Piecewise linear in data space, per NaN-separated run of `xy` (probe, value, …).
+// Outside every run's support the series is omitted (undefined), not a fake 0.
+function lerpProbe(xy: number[], probe: number): number | undefined {
+    const n = xy.length
+    let i = 0
+    while (i + 1 < n) {
+        if (!Number.isFinite(xy[i]) || !Number.isFinite(xy[i + 1])) { i += 2; continue }
+        let end = i
+        while (end + 1 < n && Number.isFinite(xy[end]) && Number.isFinite(xy[end + 1])) end += 2
+        const last = end - 2
+        if (last >= i + 2 && probe >= xy[i] && probe <= xy[last]) {
+            const npair = (last - i) / 2
+            let a = 0, b = npair
+            while (a < b) {
+                const mid = (a + b) >> 1
+                if (xy[i + 2 * mid] < probe) a = mid + 1
+                else b = mid
+            }
+            if (a === 0) return xy[i + 1]
+            const k = i + 2 * (a - 1)
+            const p0 = xy[k], p1 = xy[k + 2]
+            if (p1 === p0) return xy[k + 1]
+            const t = (probe - p0) / (p1 - p0)
+            return xy[k + 1] + t * (xy[k + 3] - xy[k + 1])
+        }
+        i = end
+    }
+    return undefined
+}
+
+// Sample every series at the probe coordinate (vertical: data x; horizontal: data y).
+// Returns the probe and the in-support samples; a series outside its run is absent.
+export function sampleSlice(
+    geom: SliceGeometry, t: AxisTransform, dataX: number, dataY: number,
+): { probe: number; samples: SliceSample[] } | null {
+    if (!Number.isFinite(dataX) || !Number.isFinite(dataY)) return null
+    const vertical = geom.orientation === "v"
+    const probe = vertical ? dataX : dataY
+    const samples: SliceSample[] = []
+    for (const s of geom.series) {
+        const value = lerpProbe(s.xy, probe)
+        if (value === undefined) continue
+        const dot = projectAxis(t, vertical ? probe : value, vertical ? value : probe)
+        samples.push({ id: s.id, label: s.label, color: s.color, value, px: dot.x, py: dot.y })
+    }
+    return { probe, samples }
+}
+
+// Smallest non-3D, non-polar viewport containing the point. A colorbar bbox beats the plot
+// axis when the pointer is on the bar; an inset axis beats the outer one. Null in the margin.
+export function viewportUnder(manifest: Manifest, px: number, py: number): { id: string; t: AxisTransform } | null {
+    let best: { id: string; t: AxisTransform; area: number } | null = null
+    for (const [id, t] of Object.entries(manifest.transforms)) {
+        if (t.is3d || t.ispolar) continue
+        const [x, y, w, h] = t.viewport
+        if (!(w > 0) || !(h > 0)) continue
+        if (px < x || px > x + w || py < y || py > y + h) continue
+        const area = w * h
+        if (!best || area < best.area) best = { id, t, area }
+    }
+    return best ? { id: best.id, t: best.t } : null
 }
 
 // Shift axis limits by a fractional viewport delta (grab pan). Works for identity + log scales.
@@ -299,6 +429,42 @@ export function panLimits(
     return { xmin, xmax, ymin, ymax }
 }
 
+function fracToData(lims: [number, number], scale: string, f: number): number {
+    if (scale === "log10" || scale === "log") {
+        const a = Math.log10(lims[0]), b = Math.log10(lims[1])
+        return 10 ** (a + f * (b - a))
+    }
+    return lims[0] + f * (lims[1] - lims[0])
+}
+
+// Data range of the shown frame's content currently sitting in the layout viewport.
+// The matrix is in that frame's image pixels (`photo.ts`). A pure translate matches
+// `panLimits`; a scale matches the visible pixel window, linear or log.
+export function matrixLimits(
+    t: AxisTransform, m: { s: number; tx: number; ty: number },
+): { xmin: number; xmax: number; ymin: number; ymax: number } | null {
+    const [vx, vy, vw, vh] = t.viewport
+    if (!(vw > 0) || !(vh > 0) || !(m.s > 0)) return null
+    const ix0 = (vx - m.tx) / m.s
+    const ix1 = (vx + vw - m.tx) / m.s
+    const iy0 = (vy - m.ty) / m.s
+    const iy1 = (vy + vh - m.ty) / m.s
+    let fx0 = (ix0 - vx) / vw
+    let fx1 = (ix1 - vx) / vw
+    let fyBottom = 1 - (iy1 - vy) / vh
+    let fyTop = 1 - (iy0 - vy) / vh
+    if (t.xreversed) { fx0 = 1 - fx0; fx1 = 1 - fx1 }
+    if (t.yreversed) { fyBottom = 1 - fyBottom; fyTop = 1 - fyTop }
+    let xmin = fracToData(t.xlims, t.xscale, fx0)
+    let xmax = fracToData(t.xlims, t.xscale, fx1)
+    let ymin = fracToData(t.ylims, t.yscale, fyBottom)
+    let ymax = fracToData(t.ylims, t.yscale, fyTop)
+    if (xmin > xmax) { const s = xmin; xmin = xmax; xmax = s }
+    if (ymin > ymax) { const s = ymin; ymin = ymax; ymax = s }
+    if (!(xmax > xmin) || !(ymax > ymin) || !Number.isFinite(xmin + xmax + ymin + ymax)) return null
+    return { xmin, xmax, ymin, ymax }
+}
+
 /** Axis3 orbit: pixel Δ → azimuth/elevation (radians). Elevation clamped away from ±π/2. */
 export function orbitAngles(
     g: ViewGeometry, x0: number, y0: number, x1: number, y1: number,
@@ -312,11 +478,61 @@ export function orbitAngles(
     return { azimuth: az, elevation: el }
 }
 
+// Legend entries, colorbars, and axis readouts stay on the unmoved figure. A legend entry is
+// `rects` with `bond: "legend"`; hand-built manifests sometimes omit the stamp and carry `links`.
+export function screenFixedLayer(layer: HitLayer): boolean {
+    if (layer.kind === "axis" || layer.bond === "legend") return true
+    return layer.links != null && layer.links.length > 0
+}
+
+// The view rectangle is the axis viewport in layout pixels. It is not drawn as sliding chrome.
+export function layoutSpaceLayer(layer: HitLayer): boolean {
+    return layer.kind === "view" || screenFixedLayer(layer)
+}
+
 // first layer (in manifest order) with a hit for the given event; null if none
 export function hitTest(manifest: Manifest, px: number, py: number, event: string): Hit | null {
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
         const h = hitLayer(layer, px, py)
+        if (h) return { layer, ...h }
+    }
+    return null
+}
+
+// The pan view `paintPhoto` clips to, or null when the photograph is identity. Data outside
+// that rectangle is not on screen. `viewId` is the pan view that owns the live matrix.
+export function photoClip(manifest: Manifest, photo: PhotoMatrix, viewId: string | null): { x: number; y: number; w: number; h: number } | null {
+    if (isIdentity(photo)) return null
+    const named = viewId ? manifest.layers.find((l) => l.id === viewId) : undefined
+    const layer = named && named.kind === "view" ? named
+        : manifest.layers.find((l) => l.kind === "view" && (l.geometry as ViewGeometry).mode === "pan")
+    if (!layer || layer.kind !== "view") return null
+    const g = layer.geometry as ViewGeometry
+    if (g.mode === "orbit" || !(g.w > 0) || !(g.h > 0)) return null
+    return { x: g.x, y: g.y, w: g.w, h: g.h }
+}
+
+function insideClip(clip: { x: number; y: number; w: number; h: number }, x: number, y: number): boolean {
+    return x >= clip.x && x <= clip.x + clip.w && y >= clip.y && y <= clip.y + clip.h
+}
+
+// `(x, y)` is a layout point on the untransformed base. Data-space layers are tested at the
+// content pixel under that point while a photograph is live. The view rectangle and
+// screen-fixed chrome stay in layout pixels. A layout point outside `clip` does not hit
+// data the photograph has clipped away.
+export function hitTestAt(
+    manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string,
+    clip: { x: number; y: number; w: number; h: number } | null = null,
+): Hit | null {
+    const content = contentPoint(photo, { x, y })
+    const outside = clip != null && !insideClip(clip, x, y)
+    for (const layer of manifest.layers) {
+        if (!layer.events.includes(event)) continue
+        const layoutSpace = layoutSpaceLayer(layer)
+        if (!layoutSpace && outside) continue
+        const p = layoutSpace ? { x, y } : content
+        const h = hitLayer(layer, p.x, p.y)
         if (h) return { layer, ...h }
     }
     return null

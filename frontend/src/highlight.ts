@@ -1,4 +1,4 @@
-import { pathData } from "./geometry"
+import { pathData, screenFixedLayer } from "./geometry"
 import { hitKey, prefersReducedMotion, MOTION_MS } from "./state"
 import type { HiGroups, OverlayCtx, OverlayState } from "./state"
 import type { Hit, LayerStyle } from "./types"
@@ -157,33 +157,53 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
 
 // Fade-out is hover-only (leave / miss). selects-ROI remounts g.sel every drag
 // frame — a leave class there would wash the box-select on every pointer tick.
-export function clearHiImmediate(state: OverlayState, hiGroups: HiGroups): void {
+function hiNodes(groups: HiGroups): SVGGElement[] {
+    return [groups.fill_, groups.edge_, groups.plain_]
+}
+
+function firstHiChild(groups: HiGroups): ChildNode | null {
+    return groups.fill_.firstChild ?? groups.edge_.firstChild ?? groups.plain_.firstChild
+}
+
+// `also` is the other hover home (data vs screen-fixed). A ring only lives in one of them,
+// and a clear has to drop both or the one you left keeps painting.
+export function clearHiImmediate(state: OverlayState, hiGroups: HiGroups, also?: HiGroups): void {
     if (state.hiLeaveTimer_ != null) { clearTimeout(state.hiLeaveTimer_); state.hiLeaveTimer_ = null }
     state.hiKey_ = null
-    for (const hiGroup of [hiGroups.fill_, hiGroups.edge_, hiGroups.plain_]) {
-        while (hiGroup.firstChild) hiGroup.removeChild(hiGroup.firstChild)
+    for (const groups of also ? [hiGroups, also] : [hiGroups]) {
+        for (const hiGroup of hiNodes(groups)) {
+            while (hiGroup.firstChild) hiGroup.removeChild(hiGroup.firstChild)
+        }
     }
 }
 
-export function clearHi(state: OverlayState, hiGroups: HiGroups, fade = false): void {
-    const cur = hiGroups.fill_.firstChild ?? hiGroups.edge_.firstChild ?? hiGroups.plain_.firstChild
+export function clearHi(state: OverlayState, hiGroups: HiGroups, fade = false, also?: HiGroups): void {
+    const sets = also ? [hiGroups, also] : [hiGroups]
+    const cur = firstHiChild(hiGroups) ?? (also ? firstHiChild(also) : null)
     if (!fade || !cur || prefersReducedMotion()) {
-        clearHiImmediate(state, hiGroups)
+        clearHiImmediate(state, hiGroups, also)
         return
     }
-    state.hiKey_ = null
-    for (const hiGroup of [hiGroups.fill_, hiGroups.edge_, hiGroups.plain_]) {
-        for (const el of [...hiGroup.children]) {
-            el.classList.remove("masque-enter")
-            el.classList.add("masque-leave")
+    // Keep hiKey_ until the nodes are gone. drawSelection reconciles from it, and nulling
+    // it here left a mid-leave ring sitting on the new selected chrome for MOTION_MS (#97).
+    const fadingKey = state.hiKey_
+    for (const groups of sets) {
+        for (const hiGroup of hiNodes(groups)) {
+            for (const el of [...hiGroup.children]) {
+                el.classList.remove("masque-enter")
+                el.classList.add("masque-leave")
+            }
         }
     }
     if (state.hiLeaveTimer_ != null) clearTimeout(state.hiLeaveTimer_)
     state.hiLeaveTimer_ = setTimeout(() => {
         state.hiLeaveTimer_ = null
-        for (const hiGroup of [hiGroups.fill_, hiGroups.edge_, hiGroups.plain_]) {
-            while (hiGroup.firstChild) hiGroup.removeChild(hiGroup.firstChild)
+        for (const groups of sets) {
+            for (const hiGroup of hiNodes(groups)) {
+                while (hiGroup.firstChild) hiGroup.removeChild(hiGroup.firstChild)
+            }
         }
+        if (state.hiKey_ === fadingKey) state.hiKey_ = null
     }, MOTION_MS)
 }
 
@@ -198,20 +218,32 @@ export function clearSel(selGroups: HiGroups): void {
 // added emphasis — the selected wash/ring already shows this element. The tooltip is unaffected;
 // callers (hover.ts, keyboard.ts) show it via a separate call. This is the draw-time half of the
 // guard; the other direction — a hover/focus ring already on-screen when its key ENTERS the
-// selection (e.g. a selects-ROI sweeping over a keyboard-focused mark) — is reconciled by
-// drawSelection below, which clears the stale hiGroups the moment the key becomes selected.
-export function drawHi(state: OverlayState, hiGroups: HiGroups, hit: Hit): void {
+// selection, including one mid-leave (clearHi keeps hiKey_ until those nodes are gone) — is
+// reconciled by drawSelection below, which clears the stale hiGroups the moment the key
+// becomes selected.
+export function drawHi(state: OverlayState, hiGroups: HiGroups, hit: Hit, also?: HiGroups): void {
     const key = hitKey(hit)
-    if (state.selKeys_.has(key)) { clearHiImmediate(state, hiGroups); return }
+    if (state.selKeys_.has(key)) { clearHiImmediate(state, hiGroups, also); return }
     const cur = hiGroups.fill_.firstElementChild ?? hiGroups.edge_.firstElementChild ?? hiGroups.plain_.firstElementChild
     if (key === state.hiKey_ && cur && !cur.classList.contains("masque-leave")) return
-    clearHiImmediate(state, hiGroups)
+    clearHiImmediate(state, hiGroups, also)
     const made = makeHiElement(hit, "hover")
     if (!made) return
     if (made.fill) { made.fill.classList.add("masque-enter"); hiGroups.fill_.appendChild(made.fill) }
     if (made.edge) { made.edge.classList.add("masque-enter"); hiGroups.edge_.appendChild(made.edge) }
     if (made.plain) { made.plain.classList.add("masque-enter"); hiGroups.plain_.appendChild(made.plain) }
     state.hiKey_ = key
+}
+
+// Screen-fixed chrome (legend, colorbar, axis) is drawn outside the photograph clip.
+// Data marks stay in the clipped, transformed groups so the ring slides with them.
+export function drawHover(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
+    const fixed = screenFixedLayer(hit.layer)
+    drawHi(state, fixed ? ctx.hiFixed_ : ctx.hiGroup_, hit, fixed ? ctx.hiGroup_ : ctx.hiFixed_)
+}
+
+export function clearHover(ctx: OverlayCtx, state: OverlayState, fade = false): void {
+    clearHi(state, ctx.hiGroup_, fade, ctx.hiFixed_)
 }
 
 // --- g.link lifecycle: a legend entry's linked highlight, keyed by the SOURCE hit (not the
@@ -270,10 +302,7 @@ export function drawLink(state: OverlayState, linkGroups: HiGroups, key: string,
     state.linkKey_ = key
 }
 
-export function drawSelection(state: OverlayState, selGroups: HiGroups, hits: Hit[], hiGroups: HiGroups): void {
-    const next = new Set(hits.map(hitKey))
-    const entering = new Set<string>()
-    for (const k of next) if (!state.selKeys_.has(k)) entering.add(k)
+function placeSel(selGroups: HiGroups, hits: Hit[], entering: Set<string>): void {
     clearSel(selGroups)
     for (const h of hits) {
         const made = makeHiElement(h, "selected")
@@ -283,15 +312,32 @@ export function drawSelection(state: OverlayState, selGroups: HiGroups, hits: Hi
         if (made.edge) { if (enter) made.edge.classList.add("masque-enter"); selGroups.edge_.appendChild(made.edge) }
         if (made.plain) { if (enter) made.plain.classList.add("masque-enter"); selGroups.plain_.appendChild(made.plain) }
     }
+}
+
+export function drawSelection(state: OverlayState, selGroups: HiGroups, hits: Hit[], hiGroups: HiGroups): void {
+    const next = new Set(hits.map(hitKey))
+    const entering = new Set<string>()
+    for (const k of next) if (!state.selKeys_.has(k)) entering.add(k)
+    placeSel(selGroups, hits, entering)
     state.selKeys_ = next
-    // A hover/focus ring already on-screen when its key enters selection (e.g. a selects-ROI
-    // sweeping over a keyboard-focused mark) would otherwise sit on top of the wash just drawn
-    // above until the next pointermove self-heals it via drawHi's own guard — clear it now so the
+    // A hover/focus ring already on-screen when its key enters selection — live, or mid-leave,
+    // since hiKey_ still names those nodes — would otherwise sit on top of the wash just drawn
+    // above until the next pointermove self-heals it via drawHi's own guard. Clear it now so the
     // stale chrome never paints, mid-sweep included.
     if (state.hiKey_ !== null && next.has(state.hiKey_)) clearHiImmediate(state, hiGroups)
 }
 
 // The single funnel to g.sel — every writer of state.selHits_ calls this after assigning it.
+// Screen-fixed hits (a legend entry) land outside the photograph clip. Linked data marks stay in.
 export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
-    drawSelection(state, ctx.selGroup_, state.selHits_, ctx.hiGroup_)
+    const data: Hit[] = []
+    const fixed: Hit[] = []
+    for (const h of state.selHits_) (screenFixedLayer(h.layer) ? fixed : data).push(h)
+    const next = new Set(state.selHits_.map(hitKey))
+    const entering = new Set<string>()
+    for (const k of next) if (!state.selKeys_.has(k)) entering.add(k)
+    placeSel(ctx.selGroup_, data, entering)
+    placeSel(ctx.selFixed_, fixed, entering)
+    state.selKeys_ = next
+    if (state.hiKey_ !== null && next.has(state.hiKey_)) clearHiImmediate(state, ctx.hiGroup_, ctx.hiFixed_)
 }

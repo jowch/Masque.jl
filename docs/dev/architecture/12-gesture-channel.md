@@ -46,8 +46,9 @@ export. Nothing else restricts which interaction, or whose code, uses the channe
 
 **Exhaust question 0 first.** It costs no round trip, no latency budget and no backpressure, and
 it survives static export. The manifest already carries `AxisTransform` (so any coordinate
-readout or inversion is local), per-element `payloads`, and — for a grid whose cells are at least
-one screen pixel — the cell `values[]` (`GRID_VALUES_MIN_SCREEN_PX`, `src/interactables.jl`).
+readout or inversion is local), per-element `payloads`, and a grid's values: the source matrix
+when a cell is at least one screen pixel, and one source value per screen pixel otherwise
+(`GRID_VALUES_MIN_SCREEN_PX`, `src/interactables.jl`).
 What blocks a question-0 answer is more often output surface than data: the overlay is three
 sibling SVGs with no raster layer (`frontend/src/mount.ts`), so an effect needing per-pixel output
 has nowhere to draw.
@@ -66,11 +67,10 @@ carries the transform and, at display resolution, the cell values. Committed thr
 kernel to recompute it, and the browser cannot produce it once the mask is not locally
 computable.
 
-Two conditions take the mask out of question 0: cells going sub-pixel, so Julia drops `values[]`
-from the manifest (the full-resolution case), and the mask ceasing to be pointwise, since
-morphology and connected components are neighbourhood-dependent. **Thresholding is question 0;
-segmentation is question 3.** #105's display-derived subsampling would restore values at display
-resolution and return the thresholding case to question 0.
+A pointwise mask stays question 0 on a sub-pixel grid: the manifest carries the source value
+under each screen pixel, so the readout is local. The mask leaves question 0 when it stops being
+pointwise, since morphology and connected components are neighbourhood-dependent. **Thresholding
+is question 0; segmentation is question 3.**
 
 The camera does not move in this case, so the projection and every hit region stay valid for the
 whole drag: a new frame is owed, a new manifest is not, and hit-testing stays live — a hover
@@ -155,8 +155,19 @@ would be cheaper and would not be this mechanism (§12.4).
 
 This is not #86. #86 is about a scene surviving Pluto *replacing* the cell output, which destroys
 the `<canvas>`. A view gesture does not replace the cell (§12.3), so the canvas this frame paints
-on is the one the current output already holds. #85's CSS-transform preview remains an
-alternative for hiding latency on both backends, not a substitute for the frame itself.
+on is the one the current output already holds. #85 hides the wait for that frame: while a 2D pan
+or wheel zoom is ahead of the channel, the data inside the axis viewport slides under the cursor
+on an inner matrix. The base image itself is not transformed, so the axis frame, tick labels, and
+the rest of the figure stay where they are; a copy of those pixels, clipped to the viewport,
+carries the matrix, and so does the data `g` inside each overlay svg. A data-space hit uses the
+content pixel under the cursor, and only when that cursor is inside the pan view. A layout point
+outside the clip does not hit data the preview has hidden. The view rectangle stays in layout pixels, and legend, colorbar,
+and axis chrome are siblings of that clip so a ring outside the viewport is not cut off. The
+matrix comes off in the turn
+the sent frame is actually visible — the image `load` on `:cairo`, the scene swap on `:webgl` —
+leaving only the residual if the pointer has moved on. It is not a client camera, and it is not a
+substitute for the frame itself. A wheel has no pointer release, so the terminal request is one
+settle 150ms after the last notch. A new notch resets that wait. Orbit ignores the wheel.
 **Backends differ in cost, never in the interaction contract:** conformance is judged
 against the obligations above, never against a particular backend's mechanism.
 
@@ -238,19 +249,12 @@ specified.
 ## 12.10 Open questions
 
 Constraints a conforming implementation must satisfy. Each is unresolved. The channel itself
-ships on both backends; these two are what it does not yet decide.
+ships on both backends; this is what it does not yet decide.
 
 - **Heavy-scene mitigation beyond `px_per_unit = 1`.** On `:cairo` the heavy scene is render-bound
   (the PNG), so a further downscale, a render-quality knob during the drag, or an accepted lower
   frame rate is still unresolved — which one, and at what threshold. On `:webgl` that lever does
   not shrink the frame: `scene_payload` does not resample, so in-drag and settle ship the same
   serialized scene and the cost is that payload, not a raster. Measurements for both are in
-  `perf-findings.md`.
-- **What ends a gesture with no release.** Committing is not the question — view manipulation
-  commits nothing — but a wheel zoom still has no terminal event, so the channel needs a
-  rule for when to stop requesting frames and settle on the last one: an idle debounce, an
-  explicit affordance, something else. `ViewInteractable` is drag-only today (`events` is
-  `(:drag,)`; `mode` is `"pan"` or `"orbit"`; `frontend/src/` has no wheel handler), so nothing is
-  blocked now. `roadmap.md` plans wheel zoom as part of #85, so the rule is needed before #85
-  lands. #105 does not wait on it: subsampling is worth doing whether or not this channel ships,
-  and the two only compound if both do.
+  `perf-findings.md`. A wheel zoom ends without a pointer release: one settle 150ms after the
+  last notch (§12.5). That rule is separate from how heavy a single frame is allowed to be.
