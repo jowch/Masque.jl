@@ -55,3 +55,45 @@ html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latt
 .content table td {
   text-align: left !important;
 }
+
+
+/* Gallery index: one card per demo. Screenshots are the figure only;
+   the player lives on the linked page. */
+.masque-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-block: 1em;
+}
+.masque-gallery-card {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, #fff 55%, #dbdbdb);
+  background: #fff;
+}
+.masque-gallery-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #fff;
+}
+.masque-gallery-card span {
+  padding: 10px 12px 12px;
+  font-weight: 600;
+}
+.masque-gallery-card:hover {
+  border-color: #4363d8;
+}
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-gallery-card {
+  border: 1px solid color-mix(in srgb, hsl(0deg 0% 12%) 55%, #5e6d6f);
+  background: hsl(0deg 0% 12%);
+}
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-gallery-card img {
+  background: hsl(0deg 0% 12%);
+}

@@ -229,10 +229,10 @@ Last pick wins. A later click is an [`ElementEvent`](@ref) and
 replaces a hydrated vector wholesale. To accumulate across clicks, keep
 indexes in a `Ref` in a cell that does not read this widget's bond, then
 feed the set into `selected=`. Two `masque` widgets do not share overlay
-state: each has its own overlay. The "Selection round-trip" cells in
-[`examples/demo.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/demo.jl)
-are that pattern: one widget's `@bind`, a `Ref` accumulator, and
-`selected=` on a second widget.
+state: each has its own overlay. [Selection round-trip](@ref) is that pattern: one widget's
+`@bind` and `selected=` on a second widget. To accumulate across clicks,
+keep a `Ref` in a cell that does not read the bond, as that page
+describes.
 
 A second plot that filters on a pick is a **click**, not a pointer hold.
 Holding the pointer over a mark does not write `@bind` and does not
@@ -247,4 +247,4 @@ rebuild Julia. For `selected=` kinds and persist, see [Selection](@ref).
 - No SPLOM or crossfilter of several brushes (one ROI, one target).
 
 For overlay versus `@bind` timing, see [Overlay, bind, and the host](@ref).
-For kitchen-sink notebooks, see [Examples](@ref).
+For the demos, see [Gallery](@ref).

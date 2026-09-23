@@ -265,7 +265,7 @@ jobs:
           retention-days: 14
 
   examples:
-    name: Example notebooks
+    name: Fixture notebooks
     runs-on: ubuntu-latest
     # Each notebook devs the package + adds CairoMakie into a temp env (full Makie
     # precompile on a cold cache); generous ceiling so a slow run fails loud, not hangs.
@@ -276,10 +276,10 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v2
-      # Runs every Pluto notebook in examples/ headlessly; fails if any cell errors,
-      # so an example can never silently drift out of sync with the package API.
-      - name: Run example notebooks headlessly
-        run: julia --color=yes examples/ci_run.jl
+      # Runs every Pluto notebook under test/notebooks headlessly; fails if any
+      # cell errors, so a fixture can never silently drift out of sync with the API.
+      - name: Run fixture notebooks headlessly
+        run: julia --color=yes test/notebooks/ci_run.jl
 
   frontend:
     name: Frontend (TS) + bundle

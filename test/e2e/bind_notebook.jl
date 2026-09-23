@@ -18,7 +18,7 @@ end
 
 # ╔═╡ c0000000-0000-0000-0000-000000000001
 # Self-contained env: dev the local package via a checkout-relative path, add WGLMakie — same
-# dance as examples/webgl_demo.jl. WGLMakie is a weak dep of Masque (the :webgl extension only
+# dance as test/notebooks/webgl_demo.jl. WGLMakie is a weak dep of Masque (the :webgl extension only
 # loads once WGLMakie is `using`'d), so a plain activate of the package root alone can't
 # `using WGLMakie`. Pkg.develop/activate disables Pluto's own pkg management.
 begin

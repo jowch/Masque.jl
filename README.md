@@ -64,7 +64,7 @@ end
 sel === nothing ? "click a point" : "you picked $(sel.index)"
 ```
 
-For more information, see [Masque documentation](https://jowch.github.io/Masque.jl). See [`examples/`](examples/) for several runnable Pluto notebooks.
+For more information, see [Masque documentation](https://jowch.github.io/Masque.jl). Demos are in the [gallery](https://jowch.github.io/Masque.jl/dev/gallery/).
 
 ## Backends
 

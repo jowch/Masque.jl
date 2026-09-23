@@ -27,7 +27,7 @@ Julia code is formatted with [Runic](https://github.com/fredrikekre/Runic.jl)
 (CI enforces it, and checks the whole repo, not only `src` / `test`):
 
 ```bash
-julia -e 'using Runic; exit(Runic.main(["--inplace", "src", "test", "bench", "gallery", "examples", "docs"]))'
+julia -e 'using Runic; exit(Runic.main(["--inplace", "src", "test", "bench", "docs"]))'
 ```
 
 This site is Documenter, built from `docs/src/`. Maintainer notes live

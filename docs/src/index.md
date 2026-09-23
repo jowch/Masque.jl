@@ -76,6 +76,6 @@ you can orbit. See [Backends](@ref).
 - [Custom hits](@ref) — `RegionInteractable` / `FunctionInteractable`
 - [Backends](@ref) — `:cairo` vs `:webgl`, and when to reach for which
 - [Troubleshooting](@ref) — common errors and what causes them
-- [Examples](@ref) — every runnable notebook in the repo
+- [Gallery](@ref) — a screenshot and a player for each demo
 - [API](@ref) — full docstrings
 

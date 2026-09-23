@@ -24,7 +24,7 @@ end
 begin
     import Pkg
     Pkg.activate(; temp = true)
-    Pkg.develop(path = joinpath(@__DIR__, ".."))   # examples/ -> package root (portable)
+    Pkg.develop(path = joinpath(@__DIR__, "..", ".."))   # test/notebooks/ -> package root
     Pkg.add(["WGLMakie", "JSON3"])
     Pkg.instantiate()
     using Masque

@@ -129,9 +129,7 @@ overlay. For more information, see [Troubleshooting](@ref).
 ## Persist a view across remount
 
 A fresh `Figure` resets the camera. Persist limits or
-azimuth/elevation in a `Ref` (or a slider) and rebuild, as in
-[`examples/view_manip.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip.jl)
-(slider remount versus drag). The WGLMakie cousin
-[`examples/view_manip_webgl.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip_webgl.jl)
-streams live scene frames the same way. Do not pass `selected=` for a
-camera pose.
+azimuth/elevation in a `Ref` (or a slider) and rebuild, as on
+[Limits slider](@ref). [Drag to pan](@ref) and [Drag to orbit](@ref) are
+the drag half: a PNG frame on `:cairo`, a scene frame on `:webgl`. Do
+not pass `selected=` for a camera pose.
