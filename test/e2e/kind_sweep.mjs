@@ -385,8 +385,15 @@ try {
     // either way). At most one of {fill|edge} vs. plain is populated for a given hit; an open
     // seg or an already-selected mark can leave fill/edge both empty.
     const svgFill = sr.querySelector("svg.masque-fill"), svgEdge = sr.querySelector("svg.masque-edge"), svgPlain = sr.querySelector("svg.masque-plain");
+    // Legend, colorbar, and axis rings live in g.masque-fixed, a sibling of the photograph
+    // clip. The data g.hi is created first and is empty for those hits.
+    const groupWithChild = (svg, sel) => {
+      const groups = [...(svg?.querySelectorAll(sel) ?? [])];
+      return groups.find((g) => g.firstElementChild) ?? groups[0] ?? null;
+    };
+    const childCount = (svg, sel) => [...(svg?.querySelectorAll(sel) ?? [])].reduce((n, g) => n + g.children.length, 0);
     const capture = (svg, layerName) => {
-      const el = svg?.querySelector("g.hi")?.firstElementChild;
+      const el = groupWithChild(svg, "g.hi")?.firstElementChild;
       if (!el) return null;
       const cs = getComputedStyle(el);
       return {
@@ -405,9 +412,7 @@ try {
       show: tip?.classList.contains("show"),
       text: (tip?.innerText || "").replace(/\s+/g, " ").trim(),
       hi: { fill: capture(svgFill, "fill"), edge: capture(svgEdge, "edge"), plain: capture(svgPlain, "plain") },
-      sel: (svgFill?.querySelector("g.sel")?.children.length ?? 0)
-        + (svgEdge?.querySelector("g.sel")?.children.length ?? 0)
-        + (svgPlain?.querySelector("g.sel")?.children.length ?? 0),
+      sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel"),
     };
   }, [key, x, y, type]);
 
@@ -706,6 +711,68 @@ try {
       }
       passed.push(`${key}/view-gesture-frame`);
       console.error(`OK  ${key}/drag — no commit (§12.3), gesture frame ${stampAfter}`);
+
+      if (layer.geometry && layer.geometry.mode === "pan") {
+        const zoom = await page.evaluate(([k, ix, iy]) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null;
+          host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const surface = sr.querySelector(".surface");
+          const b = host.querySelector("img, canvas").getBoundingClientRect();
+          const vb = sr.querySelector("svg.masque-plain").viewBox.baseVal;
+          const s = b.width / vb.width;
+          const ev = new WheelEvent("wheel", {
+            bubbles: true, cancelable: true,
+            clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -120,
+          });
+          surface.dispatchEvent(ev);
+          const base = host.querySelector("img, canvas");
+          return {
+            photo: host.dataset.masquePhoto || "",
+            clip: !!host.querySelector(".masque-data-clip"),
+            baseTransform: base?.style.transform || "",
+            prevented: ev.defaultPrevented,
+          };
+        }, [key, p.x, p.y]);
+        if (!zoom.prevented || !zoom.photo || !zoom.clip || zoom.baseTransform) {
+          throw new Error(`${key}-wheel: photographic zoom did not engage (${JSON.stringify(zoom)})`);
+        }
+        let photo = zoom.photo;
+        let zoomStamp = stampAfter;
+        // A settle:false frame can clear the matrix as soon as it matches. The sample is the
+        // terminal frame (stamp.settle), once that matrix is gone, and its camera must have zoomed.
+        for (let i = 0; i < tries; i++) {
+          await new Promise((r) => setTimeout(r, delayMs));
+          const snap = await page.evaluate((k) => {
+            const span = document.querySelector(`#coords_${k}`);
+            const hosts = [...document.querySelectorAll(".ip-host")];
+            const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+            return { photo: host?.dataset.masquePhoto || "", stamp: host?.dataset.masqueGestureFrame || "" };
+          }, key);
+          photo = snap.photo;
+          zoomStamp = snap.stamp || zoomStamp;
+          if (photo || !snap.stamp) continue;
+          let parsed = null;
+          try { parsed = JSON.parse(snap.stamp); } catch { parsed = null; }
+          if (parsed && parsed.settle === true && parsed.n > cam.n) break;
+        }
+        if (photo) throw new Error(`${key}-wheel: matrix still applied after the frame (${photo})`);
+        if (!zoomStamp || zoomStamp === stampAfter) {
+          throw new Error(`${key}-wheel: gesture-channel frame never landed (stamp stayed ${JSON.stringify(stampAfter)})`);
+        }
+        const zcam = JSON.parse(zoomStamp);
+        if (!(zcam.n > cam.n)) throw new Error(`${key}-wheel: gesture frame counter did not advance (${cam.n} -> ${zcam.n})`);
+        if (zcam.settle !== true) throw new Error(`${key}-wheel: sampled a settle:false frame (${zoomStamp})`);
+        const xSpan = (c) => c.xmax - c.xmin;
+        const ySpan = (c) => c.ymax - c.ymin;
+        if (!(xSpan(zcam) < xSpan(cam) && ySpan(zcam) < ySpan(cam))) {
+          throw new Error(`${key}-wheel: camera limits did not zoom (${stampAfter} -> ${zoomStamp})`);
+        }
+        passed.push(`${key}/wheel-zoom`);
+        console.error(`OK  ${key}/wheel — photo cleared, zoomed gesture frame ${zoomStamp}`);
+      }
       continue;
     }
 

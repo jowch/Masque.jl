@@ -8,7 +8,10 @@
 // reproductions purely by restructuring the evaluate around it, with no product code changed.
 // A MutationObserver installed BEFORE the interaction turns the transient into durable state:
 // childList (element add/remove) and class-attribute mutations on g.hi/g.sel/g.link, across all
-// three blend svgs, are appended to an array kept on the widget's own `.ip-host` element. Runner
+// three blend svgs, are appended to an array kept on the widget's own `.ip-host` element. Each
+// svg has two of those groups: the photograph one inside g.masque-photo, and the screen-fixed
+// one inside g.masque-fixed (legend, colorbar, axis). querySelector would bind the first and
+// miss a legend hover, which is why every match is observed. Runner
 // speed then changes WHEN entries land, not WHETHER they do — the array can be read any time
 // after the interaction, at whatever pace page.evaluate round trips actually take.
 //
@@ -53,33 +56,36 @@ export async function installRecorder(page, key) {
         const svg = sr.querySelector(svgSel);
         if (!svg) continue;
         for (const group of ["hi", "sel", "link"]) {
-          const g = svg.querySelector(`g.${group}`);
-          if (!g) continue;
-          const mo = new MutationObserver((muts) => {
-            for (const m of muts) {
-              if (m.type === "childList") {
-                // getAttribute, not .className -- on an SVG element .className is an
-                // SVGAnimatedString, not a string, and would log as "[object SVGAnimatedString]".
-                for (const n of m.addedNodes) {
-                  rec.entries.push({ t: performance.now(), type: "add", svg: svgName, group, id: idOf(n), classes: n.getAttribute ? n.getAttribute("class") : null });
+          // Both homes: g.masque-photo (data) and g.masque-fixed (legend, colorbar, axis).
+          // The photograph group is created first, so a single querySelector never sees a
+          // screen-fixed hover.
+          for (const g of svg.querySelectorAll(`g.${group}`)) {
+            const mo = new MutationObserver((muts) => {
+              for (const m of muts) {
+                if (m.type === "childList") {
+                  // getAttribute, not .className -- on an SVG element .className is an
+                  // SVGAnimatedString, not a string, and would log as "[object SVGAnimatedString]".
+                  for (const n of m.addedNodes) {
+                    rec.entries.push({ t: performance.now(), type: "add", svg: svgName, group, id: idOf(n), classes: n.getAttribute ? n.getAttribute("class") : null });
+                  }
+                  for (const n of m.removedNodes) {
+                    // A removed node's own attributes are untouched after removal, so this is the
+                    // class it carried AT THE MOMENT of removal, immune to MutationObserver's
+                    // microtask batching (which would otherwise coalesce a remove-class +
+                    // add-class pair on a node that's still IN the tree into a single record
+                    // showing only the final state) -- this is the one signal the pass/fail
+                    // assertions below actually depend on: removed carrying masque-leave (a real
+                    // fade completed) vs. removed without it (the genuine "cleared instantly" bug).
+                    rec.entries.push({ t: performance.now(), type: "remove", svg: svgName, group, id: idOf(n), classes: n.getAttribute ? n.getAttribute("class") : null });
+                  }
+                } else if (m.type === "attributes" && m.attributeName === "class") {
+                  rec.entries.push({ t: performance.now(), type: "attr", svg: svgName, group, id: idOf(m.target), classes: m.target.getAttribute("class") });
                 }
-                for (const n of m.removedNodes) {
-                  // A removed node's own attributes are untouched after removal, so this is the
-                  // class it carried AT THE MOMENT of removal, immune to MutationObserver's
-                  // microtask batching (which would otherwise coalesce a remove-class +
-                  // add-class pair on a node that's still IN the tree into a single record
-                  // showing only the final state) -- this is the one signal the pass/fail
-                  // assertions below actually depend on: removed carrying masque-leave (a real
-                  // fade completed) vs. removed without it (the genuine "cleared instantly" bug).
-                  rec.entries.push({ t: performance.now(), type: "remove", svg: svgName, group, id: idOf(n), classes: n.getAttribute ? n.getAttribute("class") : null });
-                }
-              } else if (m.type === "attributes" && m.attributeName === "class") {
-                rec.entries.push({ t: performance.now(), type: "attr", svg: svgName, group, id: idOf(m.target), classes: m.target.getAttribute("class") });
               }
-            }
-          });
-          mo.observe(g, { childList: true, attributes: true, attributeFilter: ["class"], subtree: true });
-          groupObservers.push(mo);
+            });
+            mo.observe(g, { childList: true, attributes: true, attributeFilter: ["class"], subtree: true });
+            groupObservers.push(mo);
+          }
         }
       }
     };
