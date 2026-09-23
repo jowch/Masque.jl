@@ -2730,6 +2730,26 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         expect(el.classList.contains("masque-wash")).toBe(true) // closed kind → wash, not a ring
     })
 
+    it("selected= on a polygon with a hole draws an even-odd path, not a filled polygon", () => {
+        const { host, script } = setup()
+        const outer = [0, 0, 40, 0, 40, 40, 0, 40]
+        const hole = [10, 10, 30, 10, 30, 30, 10, 30]
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{ id: "polys", kind: "polygons", geometry: [[outer, hole]],
+                payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"], selected: [0] }],
+        })
+        const edge = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        const fill = fillSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        for (const el of [edge, fill]) {
+            expect(el.tagName.toLowerCase()).toBe("path")
+            expect(el.getAttribute("fill-rule")).toBe("evenodd")
+            expect(el.getAttribute("d")).toBe("M0 0L40 0L40 40L0 40ZM10 10L30 10L30 30L10 30Z")
+        }
+        expect(edge.classList.contains("masque-wash")).toBe(true)
+        expect(fill.classList.contains("masque-fillshape")).toBe(true)
+    })
+
     it("plain axis hover on a categorical x-axis formats the label via String(), not toPrecision", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2,

@@ -668,6 +668,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         p = ax.scene.plots[1]
         pi = PolygonInteractable(ax, p; id = :voronoiplot)
         @test length(pi.rings) == 8                        # one cell per generator site
+        @test all(isempty, pi.holes)                       # cells have no interiors; the shared helper stays exterior-only
         @test pi.payloads == Any[(; index = k) for k in 1:8]   # cell order ≠ site order → index only
         ints = auto_interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
@@ -706,6 +707,116 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         pic = PolygonInteractable(axc, axc.scene.plots[1]; id = :contourf)
         @test !isempty(pic.payloads)
         @test all(pl.low <= pl.high for pl in pic.payloads)
+
+        # A nested peak: each annular band keeps its hole on the same element. The innermost disk stays one flat ring.
+        figh = Figure(); axh = Axis(figh[1, 1])
+        xs = range(-2, 2, length = 40)
+        ys = range(-2, 2, length = 40)
+        contourf!(axh, xs, ys, [exp(-(x^2 + y^2)) for x in xs, y in ys]; levels = 5)
+        _, _, ch = ctx_for(figh)
+        ph = PolygonInteractable(axh, axh.scene.plots[1]; id = :contourf)
+        Lh = only(hitlayers(ph, ch))
+        pieces = Masque._conv(Masque._childof(axh.scene.plots[1], Makie.Poly))[1]
+        @test length(Lh.geometry) == length(pieces) == length(Lh.payloads)
+        @test any(!isempty, (piece.interiors for piece in pieces))
+        for (piece, elem) in zip(pieces, Lh.geometry)
+            n = length(piece.interiors)
+            if n == 0
+                @test first(elem) isa Real
+            else
+                @test length(elem) == 1 + n
+                @test all(ring -> first(ring) isa Real, elem)
+            end
+        end
+
+        # Two peaks under an explicit top edge: one band has two holes, and the unfilled peak is a hole, not its own element.
+        fig2 = Figure(); ax2 = Axis(fig2[1, 1])
+        xs2 = range(-3, 3, length = 50)
+        ys2 = range(-2, 2, length = 40)
+        z2 = [exp(-((x - 1.2)^2 + y^2)) + exp(-((x + 1.2)^2 + y^2)) for x in xs2, y in ys2]
+        contourf!(ax2, xs2, ys2, z2; levels = [0.2, 0.5, 0.9])
+        _, _, c2 = ctx_for(fig2)
+        p2 = PolygonInteractable(ax2, ax2.scene.plots[1]; id = :contourf)
+        L2 = only(hitlayers(p2, c2))
+        @test length(L2.geometry) == length(p2.payloads) == 3
+        @test length(L2.geometry[1]) == 3                  # exterior + two holes
+        @test L2.payloads[1].low < 0.5
+    end
+
+    # A holed element is a flat list of rings, so `length` is the ring count. Several holes in one
+    # band, and an island that is its own solid element of the same band. Pointer checks,
+    # including a dented ring, live in test/e2e/contourf_complex.mjs.
+    _ringcount(elem) = first(elem) isa Real ? 1 : length(elem)
+    _rings(elem) = first(elem) isa Real ? [elem] : elem
+    function _inring(px, py, ring)
+        inside = false
+        n = length(ring) ÷ 2
+        j = n
+        for i in 1:n
+            xi, yi = ring[2i - 1], ring[2i]
+            xj, yj = ring[2j - 1], ring[2j]
+            if (yi > py) != (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi
+                inside = !inside
+            end
+            j = i
+        end
+        return inside
+    end
+    function _inrings(px, py, rings)
+        inside = false
+        for ring in rings
+            _inring(px, py, ring) && (inside = !inside)
+        end
+        return inside
+    end
+    function _centroid(ring)
+        n = length(ring) ÷ 2
+        return (sum(ring[2i - 1] for i in 1:n) / n, sum(ring[2i] for i in 1:n) / n)
+    end
+    @testset "Contourf holes on busier fields" begin
+        using Masque: PolygonInteractable
+        # Three narrow peaks on a shared pedestal: one band carries several holes.
+        fig = Figure(); ax = Axis(fig[1, 1])
+        xs = range(-3, 3, length = 80)
+        ys = range(-3, 3, length = 80)
+        centers = [(0.85, 0.0), (-0.42, 0.73), (-0.42, -0.73)]
+        z = [
+            0.22 * exp(-(x^2 + y^2) / 6) +
+                sum(exp(-((x - cx)^2 + (y - cy)^2) / 0.18) for (cx, cy) in centers)
+                for x in xs, y in ys
+        ]
+        contourf!(ax, xs, ys, z; levels = [0.12, 0.28, 0.65])
+        _, _, ctx = ctx_for(fig)
+        ped = only(hitlayers(PolygonInteractable(ax, ax.scene.plots[1]), ctx))
+        @test length(ped.geometry) == length(ped.payloads)
+        @test maximum(_ringcount, ped.geometry) >= 4          # exterior + at least 3 holes
+
+        # A ring with a central bump of the same band: the bump is its own solid element.
+        figb = Figure(); axb = Axis(figb[1, 1])
+        xb = range(-3, 3, length = 70)
+        yb = range(-3, 3, length = 70)
+        zb = [exp(-((hypot(x, y) - 1.6)^2) / 0.1) + 0.35 * exp(-(x^2 + y^2) / 0.15) for x in xb, y in yb]
+        contourf!(axb, xb, yb, zb; levels = [0.15, 0.4, 0.8])
+        _, _, cb = ctx_for(figb)
+        bump = only(hitlayers(PolygonInteractable(axb, axb.scene.plots[1]), cb))
+        @test length(bump.geometry) == length(bump.payloads)
+        # The central bump is a solid element of the same band, sitting in a hole of that band.
+        island = false
+        for (s, solid) in enumerate(bump.geometry)
+            _ringcount(solid) == 1 || continue
+            cx, cy = _centroid(solid)
+            for (h, holed) in enumerate(bump.geometry)
+                _ringcount(holed) > 1 || continue
+                rings = _rings(holed)
+                in_hole = any(ring -> _inring(cx, cy, ring), rings[2:end])
+                same_band = bump.payloads[s].low == bump.payloads[h].low &&
+                    bump.payloads[s].high == bump.payloads[h].high
+                if in_hole && !_inrings(cx, cy, rings) && same_band
+                    island = true
+                end
+            end
+        end
+        @test island
     end
 
     @testset "BoxPlot extraction" begin

@@ -326,8 +326,8 @@ function PolygonInteractable(ax, p::Makie.Density; id = :density, payloads = not
     return PolygonInteractable(ax, [_band_ring(lower, upper)]; id, payloads)
 end
 
-# Takes each filled polygon's EXTERIOR ring only; holes are excluded, so annular bands
-# over-cover their hole at the boundary (documented v1 limitation).
+# Voronoi cells are Polygons whose interior list is empty (Makie clips an exterior only).
+# Contourf polygons carry holes and do not use this.
 _poly_exterior_rings(polys) = [poly.exterior for poly in polys]
 
 # Makie's `computed_levels` are the true band edges, but the child Poly's per-polygon `color`
@@ -347,9 +347,11 @@ function _contourf_payloads(p, poly)
 end
 function PolygonInteractable(ax, p::Makie.Contourf; id = :contourf, payloads = nothing)
     poly = _childof(p, Makie.Poly)
-    rings = _poly_exterior_rings(_conv(poly)[1])
+    polys = _conv(poly)[1]
+    rings = [piece.exterior for piece in polys]
+    holes = [piece.interiors for piece in polys]
     pl = payloads === nothing ? _contourf_payloads(p, poly) : payloads
-    return PolygonInteractable(ax, rings; id, payloads = pl)
+    return PolygonInteractable(ax, rings; id, payloads = pl, holes)
 end
 
 # Payload x is read from Makie's converted category data (not ring geometry) to avoid Float32

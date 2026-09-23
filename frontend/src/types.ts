@@ -6,7 +6,7 @@ export type Kind =
     | "segments"  // geometry: [x0,y0,x1,y1, …]  disjoint pairs
     | "rects"     // geometry: [cx,cy,w,h, …]
     | "grid"      // geometry: GridGeometry  (compact; edges not N rects)
-    | "polygons"  // geometry: number[][]  rings, even-odd fill rule
+    | "polygons"  // geometry: (number[] | number[][])[]  one ring, or [exterior, ...holes]; even-odd per element
     | "axis"      // geometry: null  — continuous, rides the axis transform
     | "threshold" // geometry: ThresholdGeometry — a draggable h/v line; value computed via AxisTransform on drag
     | "roi"       // geometry: ROIGeometry — a draggable+resizable rect; bounds computed via AxisTransform
@@ -94,7 +94,8 @@ export type TemplateSegment = string | { f: string; spec?: string }
 export interface HitLayer {
     id: string
     kind: Kind
-    geometry: number[] | number[][] | GridGeometry | ThresholdGeometry | ROIGeometry | ViewGeometry | SliceGeometry | null
+    // A polygon element is a flat ring (number[]) or, when it has holes, a ring group (number[][]).
+    geometry: number[] | Array<number[] | number[][]> | GridGeometry | ThresholdGeometry | ROIGeometry | ViewGeometry | SliceGeometry | null
     payloads: unknown[]
     axis: string
     events: string[] // "click" | "hover" | "drag"
