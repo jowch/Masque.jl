@@ -1129,7 +1129,11 @@ try {
       assertRawColorMatch(lumBefore, expectColor, `${key}/tint-applied`);
       await dispatchAt(key, tintPt.x, tintPt.y, "pointermove");
       await new Promise((r) => setTimeout(r, 200)); // let the 80-120ms enter fade settle
-      const lumAfter = meanLuminance(PNG.sync.read(await stableClipShot(key, tintPt.x, tintPt.y)));
+      // A grid hover draws both hairlines through the pointer. The 8px clip centred on
+      // that point includes the chrome stroke, which darkens a bright cell and hides the
+      // dodge brightening. Shift one quadrant into the cell; the hairlines stay at the pointer.
+      const clipPt = layer.kind === "grid" ? { x: tintPt.x + 16, y: tintPt.y + 16 } : tintPt;
+      const lumAfter = meanLuminance(PNG.sync.read(await stableClipShot(key, clipPt.x, clipPt.y)));
       assertTintApplied(lumBefore, lumAfter, `${key}/tint-applied`);
       passed.push(`${key}/tint-applied`);
       await page.evaluate((k) => {
