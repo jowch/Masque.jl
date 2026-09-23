@@ -854,6 +854,162 @@ describe("pointer capture, cancel, and coalesced drag release", () => {
     })
 })
 
+// #88: the overlay surface must not eat the right button. The native image menu is a fresh
+// hit-test after pointerdown (not a synthetic contextmenu), so the surface drops out via
+// .passthrough; happy-dom does not retarget, and the live check covers that half.
+describe("right-click passes through to the base image", () => {
+    const dragManifests = (): { name: string; manifest: Manifest; x: number; y: number }[] => [
+        { name: "threshold", x: 300, y: 200, manifest: {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [{ id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { orientation: "h", pos: 400, span: [0, 1200] } }],
+        } },
+        { name: "roi", x: 200, y: 200, manifest: roiManifest() },
+        { name: "view", x: 100, y: 200, manifest: {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [{ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }],
+        } },
+    ]
+
+    const rightDown = (surface: HTMLElement, x: number, y: number, init: PointerEventInit = {}) => {
+        const down = new PointerEvent("pointerdown", {
+            button: 2, buttons: 2, pointerId: 4, clientX: x, clientY: y,
+            bubbles: true, cancelable: true, ...init,
+        })
+        surface.dispatchEvent(down)
+        return down
+    }
+
+    const flushMenu = async () => {
+        window.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }))
+        await Promise.resolve()
+    }
+
+    it("styles .passthrough as pointer-events none", () => {
+        const { host, script } = setup()
+        mount(script, manifest)
+        const css = shadowOf(host).querySelector("style")!.textContent!
+        expect(css).toContain(".surface.passthrough { pointer-events: none; }")
+    })
+
+    it.each(["threshold", "roi", "view"])("right-button pointerdown does not drag or capture on %s", async (name) => {
+        const spec = dragManifests().find((s) => s.name === name)!
+        const { host, script } = setup()
+        mount(script, spec.manifest)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        let fired = false
+        host.addEventListener("input", () => { fired = true })
+        const down = rightDown(surface, spec.x, spec.y)
+        expect(down.defaultPrevented).toBe(false)
+        expect(surface.classList.contains("passthrough")).toBe(true)
+        expect(surface.classList.contains("grabbing")).toBe(false)
+        expect(surface.hasPointerCapture(4)).toBe(false)
+        surface.dispatchEvent(new PointerEvent("pointermove", { pointerId: 4, button: 2, clientX: spec.x + 40, clientY: spec.y + 30, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { pointerId: 4, button: 2, clientX: spec.x + 40, clientY: spec.y + 30, bubbles: true }))
+        expect(fired).toBe(false)
+        expect(surface.classList.contains("grabbing")).toBe(false)
+        await flushMenu()
+        expect(surface.classList.contains("passthrough")).toBe(false)
+    })
+
+    it("shift+right-click does not start a view drag", async () => {
+        const spec = dragManifests().find((s) => s.name === "view")!
+        const { host, script } = setup()
+        mount(script, spec.manifest)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        const down = rightDown(surface, spec.x, spec.y, { shiftKey: true })
+        expect(down.defaultPrevented).toBe(false)
+        expect(surface.classList.contains("grabbing")).toBe(false)
+        expect(surface.classList.contains("passthrough")).toBe(true)
+        await flushMenu()
+    })
+
+    it("middle-button pointerdown does not drag and does not drop hit-testing", () => {
+        const spec = dragManifests()[0]
+        const { host, script } = setup()
+        mount(script, spec.manifest)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        const down = new PointerEvent("pointerdown", {
+            button: 1, buttons: 4, pointerId: 4, clientX: spec.x, clientY: spec.y, bubbles: true, cancelable: true,
+        })
+        surface.dispatchEvent(down)
+        expect(down.defaultPrevented).toBe(false)
+        expect(surface.classList.contains("passthrough")).toBe(false)
+        expect(surface.classList.contains("grabbing")).toBe(false)
+        expect(surface.hasPointerCapture(4)).toBe(false)
+    })
+
+    it("restores hit-testing on pointerup when no contextmenu follows", async () => {
+        const spec = dragManifests()[0]
+        const { script } = setup()
+        mount(script, spec.manifest)
+        const surface = shadowOf(script.parentElement as HTMLElement).querySelector(".surface") as HTMLElement
+        rightDown(surface, spec.x, spec.y)
+        expect(surface.classList.contains("passthrough")).toBe(true)
+        window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 4, button: 2, bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        expect(surface.classList.contains("passthrough")).toBe(false)
+    })
+
+    it("a left click still round-trips after the menu gesture", async () => {
+        const { host, script } = setup()
+        mount(script, manifest)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        rightDown(surface, 300, 200)
+        await flushMenu()
+        let fired = false
+        host.addEventListener("input", () => { fired = true })
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
+        expect(fired).toBe(true)
+        expect((host as unknown as { value: { layer: string; index: number } }).value).toEqual({ layer: "pts", index: 0 })
+    })
+
+    it("ctrl-click on a non-Apple platform still starts a drag", () => {
+        const spec = dragManifests()[0]
+        const { script } = setup()
+        mount(script, spec.manifest)
+        const surface = shadowOf(script.parentElement as HTMLElement).querySelector(".surface") as HTMLElement
+        const down = new PointerEvent("pointerdown", {
+            button: 0, buttons: 1, ctrlKey: true, clientX: spec.x, clientY: spec.y, bubbles: true, cancelable: true,
+        })
+        surface.dispatchEvent(down)
+        expect(down.defaultPrevented).toBe(true)
+        expect(surface.classList.contains("grabbing")).toBe(true)
+        expect(surface.classList.contains("passthrough")).toBe(false)
+    })
+
+    it("Mac ctrl-click passes through instead of dragging", async () => {
+        const nav = navigator as Navigator & { userAgentData?: { platform?: string } }
+        const prev = nav.userAgentData
+        Object.defineProperty(navigator, "userAgentData", { configurable: true, value: { platform: "macOS" } })
+        try {
+            const spec = dragManifests()[0]
+            const { script } = setup()
+            mount(script, spec.manifest)
+            const surface = shadowOf(script.parentElement as HTMLElement).querySelector(".surface") as HTMLElement
+            const down = new PointerEvent("pointerdown", {
+                button: 0, buttons: 1, ctrlKey: true, pointerId: 4,
+                clientX: spec.x, clientY: spec.y, bubbles: true, cancelable: true,
+            })
+            surface.dispatchEvent(down)
+            expect(down.defaultPrevented).toBe(false)
+            expect(surface.classList.contains("passthrough")).toBe(true)
+            expect(surface.classList.contains("grabbing")).toBe(false)
+            expect(surface.hasPointerCapture(4)).toBe(false)
+            await flushMenu()
+            expect(surface.classList.contains("passthrough")).toBe(false)
+        } finally {
+            if (prev === undefined) delete nav.userAgentData
+            else Object.defineProperty(navigator, "userAgentData", { configurable: true, value: prev })
+        }
+    })
+})
+
 // M2.3 tooltip glue in showTip: tipStyle application + the template / auto-table / suppress branches.
 // (template.test.ts covers the escape/format logic in isolation; this locks the mount-level wiring.)
 describe("tooltips (mount/showTip)", () => {
