@@ -249,8 +249,6 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   above. Separately,
   Makie's own `Legend(fig, polaraxis)` raises a `MethodError`, which is upstream rather than
   ours but worth confirming before promising polar legends.
-- **HLines/VLines fractional span attributes** (`xmin`/`xmax`, `ymin`/`ymax`): ignored today,
-  lines always span `finallimits`.
 - **Dense cell fields: revisit `heatmap!`/`image!` and `surface!` together.** Not two items.
   The shipped `:grid` works but is the awkward corner of the contract, and designing `surface!`
   on its own would build a second corner with the same shape.

@@ -468,8 +468,8 @@ are fixed by the plot type):
 | `Makie.Arrows3D` | `:arrows3d` | `:pairs`, per shaft | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, z, u, v, w)` from `points`/`directions` |
 | `Makie.Errorbars` | `:errorbars` | `:pairs`, per bar | each bar's low→high endpoints |
 | `Makie.Rangebars` | `:rangebars` | `:pairs`, per bar | each bar's low→high endpoints |
-| `Makie.HLines` | `:hlines` | `:pairs`, per line | each line spanning the axis's current data range (re-resolved on limit changes) |
-| `Makie.VLines` | `:vlines` | `:pairs`, per line | each line spanning the axis's current data range (re-resolved on limit changes) |
+| `Makie.HLines` | `:hlines` | `:pairs`, per line | each line's rendered span (`xmin`/`xmax` fractions of the axis; default 0–1 is the full limits; re-resolved on limit changes) |
+| `Makie.VLines` | `:vlines` | `:pairs`, per line | each line's rendered span (`ymin`/`ymax` fractions of the axis; default 0–1 is the full limits; re-resolved on limit changes) |
 
 A `series!` element's default payload is `(; index, label)` when the child plot's label is a
 non-empty string (Makie's own default is `"series k"`), otherwise `(; index)`.
@@ -486,7 +486,7 @@ SegmentInteractable(ax, [(0,0), (1,1), (2,0)]; mode = :polyline, unit = :line)  
 struct SegmentInteractable <: AbstractInteractable
     ax; vertices::Vector{Point3f}; mode::Symbol; id::Symbol; payloads::Vector{Any}; tol::Float64; tooltip::Union{Nothing, Markup, Bool}
     # When set, hitlayers calls resolve(ax) instead of using the stored vertices — for geometry
-    # (e.g. HLines/VLines spanning `ax.finallimits[]`) only correct after construction.
+    # (e.g. HLines/VLines fractions of the axis limits) only correct after construction.
     resolve::Union{Nothing, Function}
     label::Union{Nothing, String}
     # :segment = one element per edge (:polyline) or pair (:pairs). :line = the whole path is
