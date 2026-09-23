@@ -27,8 +27,11 @@ const SELECTED_FILL_OPACITY = 0.35
 // white square with a 1px chrome stroke (.masque-handle). One source here; mount() below picks
 // light vs dark from the figure's own background and writes it onto the shadow host.
 const HI_STYLE = {
-    light: { chrome: "#7a7a7a", fillSrc: "#141414" },
-    dark: { chrome: "#c8c8c8", fillSrc: "#141414" },
+    // `cross` is a step quieter than `chrome` (the selection edge). Light moves toward white,
+    // dark moves toward black by the same amount, so the hairline is not the same ink as a
+    // selected mark.
+    light: { chrome: "#7a7a7a", fillSrc: "#141414", cross: "#b0b0b0" },
+    dark: { chrome: "#c8c8c8", fillSrc: "#141414", cross: "#929292" },
 }
 
 // Parses the handful of CSS colour syntaxes build_manifest's `background` kwarg actually emits
@@ -79,10 +82,11 @@ const STYLE = `
 .masque-threshold-line.hovered { stroke-width: calc(var(--masque-line-w, 2) * 1.75); }
 .masque-cross { opacity: 0; transition: opacity ${MOTION_MS}ms ease-out; }
 .masque-cross.is-on { opacity: 1; }
-.masque-cross line, .masque-cross circle { stroke: var(--masque-chrome, #7a7a7a); fill: none; }
-/* Hairlines sit a little under opaque so they read as a guide. Sample dots stay solid. */
-.masque-cross line { stroke-width: 1; stroke-opacity: 0.8; }
-.masque-cross circle { stroke-width: 1.5; }
+/* Halo first (figure background, wider), hairline on top at 80%. The fringe only shows where
+   the line crosses a mark; on the empty axis it matches the background. */
+.masque-cross-halo { stroke: var(--masque-fig-bg, #ffffff); stroke-width: 3; }
+.masque-cross-hair { stroke: var(--masque-cross, #b0b0b0); stroke-width: 1; stroke-opacity: 0.8; }
+.masque-cross circle { fill: var(--masque-cross, #b0b0b0); stroke: var(--masque-fig-bg, #ffffff); stroke-width: 1; }
 /* Default :focus-visible outline stays until a focus ring is actually drawn (kbd-ring, set by
    keyboard.ts's focusTo) — so tabbing in still shows *something* before the first arrow press,
    but the browser outline doesn't double up with our own ring once one exists. */
@@ -339,6 +343,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const hiStyle = isLightBackground(manifest.background) ? HI_STYLE.light : HI_STYLE.dark
     shadowHost.style.setProperty("--masque-chrome", hiStyle.chrome)
     shadowHost.style.setProperty("--masque-hi-fill", hiStyle.fillSrc)
+    shadowHost.style.setProperty("--masque-cross", hiStyle.cross)
 
     // ROI rect/handles and threshold lines never blend — always svg.masque-plain.
     const thresholdLines = thresholdDrag.buildThresholdLines(manifest, plainSvg)

@@ -2890,8 +2890,12 @@ describe("crosshair", () => {
         move(surface, 200, 100) // image (400, 200): grid cell (1, 1)
         expect(crossOn(shadow)).toBe(true)
         expect(surface.classList.contains("hot")).toBe(false)
-        const hairline = shadow.querySelector(".masque-cross line") as SVGLineElement
+        const hairline = shadow.querySelector(".masque-cross-hair") as SVGLineElement
         expect(Number(getComputedStyle(hairline).strokeOpacity)).toBeCloseTo(0.8)
+        expect(getComputedStyle(hairline).stroke).toBe("#b0b0b0")
+        const halo = shadow.querySelector(".masque-cross-halo") as SVGLineElement
+        expect(halo.getAttribute("stroke-width")).toBeNull()
+        expect(getComputedStyle(halo).strokeWidth).toBe("3")
         expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("(1,1) = 1")
     })
 
@@ -2973,7 +2977,10 @@ describe("crosshair", () => {
                     id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
                     geometry: {
                         orientation: "v", covers: ["fill"],
-                        series: [{ id: "wide", xy: [0, 0, 10, 10] }, { id: "narrow", xy: [0, 10, 10, 0] }],
+                        series: [
+                            { id: "wide", color: "rgb(20, 80, 160)", xy: [0, 0, 10, 10] },
+                            { id: "narrow", xy: [0, 10, 10, 0] },
+                        ],
                     },
                 },
             ],
@@ -2988,7 +2995,11 @@ describe("crosshair", () => {
         expect(tip.innerHTML).toContain("narrow")
         expect(tip.innerHTML).not.toContain("the-fill")
         expect(hiChildren(shadow).length).toBe(0)
-        expect(shadow.querySelectorAll(".masque-cross circle").length).toBe(2)
+        const dots = [...shadow.querySelectorAll(".masque-cross circle")] as SVGCircleElement[]
+        expect(dots.length).toBe(2)
+        expect(dots[0].style.fill).toBe("rgb(20, 80, 160)")
+        expect(dots[0].getAttribute("r")).toBe("4")
+        expect(getComputedStyle(dots[1]).fill).toBe("#b0b0b0")
     })
 
     it("a circle beside a slice keeps pointer and its own tooltip", () => {

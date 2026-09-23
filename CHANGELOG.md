@@ -8,7 +8,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 - The cursor follows what the pointer is over. An axis or colorbar readout, a grid cell, and
-  empty axis interior stay `crosshair` and draw both hairlines, at 80% opacity, across that viewport. A discrete
+  empty axis interior stay `crosshair` and draw both hairlines across that viewport. The hairline
+  is a quieter grey than the selection edge (`#b0b0b0` on a light figure, `#929292` on a dark
+  one), at 80% opacity, with a fringe in the figure's own background so it stays visible across
+  a mark. A discrete
   mark (points, bars, polygons, segments, lines) and a legend entry stay `pointer`. Threshold,
   ROI, and view keep their drag cursors, and the cross stays off for those. A layer named in a
   `SliceInteractable`'s `covers` stays `crosshair` and skips that layer's highlight.
@@ -34,9 +37,10 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 - `SliceInteractable`: hover samples one or more 1-D series at the cursor (piecewise linear in
   data space) and shows the values in the tooltip. Both crosshair arms are drawn by the overlay
-  whenever the cursor is `crosshair`; the slice adds the dots and chooses which coordinate is
-  the sample. It does not enter hit testing, does not write `@bind`, and is not grown by
-  `masque(fig)`. `Lines`, `Stairs`, `Series`, `Band`, and `Density` have a plot constructor.
+  whenever the cursor is `crosshair`; the slice adds a filled dot in the series colour, ringed
+  in the figure background, and chooses which coordinate is the sample. It does not enter hit
+  testing, does not write `@bind`, and is not grown by `masque(fig)`. `Lines`, `Stairs`,
+  `Series`, `Band`, and `Density` have a plot constructor.
   A second slice on the same axis, a non-monotonic probe, `Axis3`, `PolarAxis`, a
   non-invertible scale, or a `covers` id that is not `:polygons` or `:lines` fails at
   `masque()` time.

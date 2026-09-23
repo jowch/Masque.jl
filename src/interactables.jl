@@ -1402,7 +1402,7 @@ end
 
 Sample one or more 1-D series at the cursor. The overlay already draws both crosshair arms
 whenever the cursor is `crosshair`; this interactable chooses which arm is the sample
-coordinate and adds a dot plus a live tooltip for each series. Hover only — nothing is
+coordinate and adds a filled dot plus a live tooltip for each series. Hover only — nothing is
 committed. Produces one `:slice` [`HitLayer`](@ref), which is not a hit target.
 
 # Arguments
