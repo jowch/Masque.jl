@@ -8,7 +8,8 @@
 
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { extname, join, normalize, sep } from "node:path";
 
 const rootArg = process.argv[2];
@@ -59,6 +60,43 @@ function serve(dir) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// Pluto's static export loads its editor from jsDelivr. On the docs CI runner
+// that document reaches readyState "complete" and still never creates
+// .ip-host. The same file boots when those scripts load. Serve the copy
+// already in the Julia depot (the harvest that wrote the HTML used it).
+function plutoFrontendDirs() {
+  const depots = (process.env.JULIA_DEPOT_PATH || join(homedir(), ".julia")).split(":");
+  const dirs = [];
+  for (const depot of depots) {
+    if (!depot) continue;
+    const root = join(depot, "packages", "Pluto");
+    if (!existsSync(root)) continue;
+    for (const slug of readdirSync(root)) {
+      const dist = join(root, slug, "frontend-dist");
+      if (existsSync(dist)) dirs.push(dist);
+    }
+  }
+  return dirs;
+}
+
+const plutoDists = plutoFrontendDirs();
+
+function localPlutoAsset(url) {
+  const marker = "/frontend-dist/";
+  const i = url.indexOf(marker);
+  if (i < 0) return null;
+  let name = url.slice(i + marker.length).split("?")[0].split("#")[0];
+  try { name = decodeURIComponent(name); } catch { return null; }
+  if (!name || name.split("/").includes("..")) return null;
+  for (const dir of plutoDists) {
+    const file = normalize(join(dir, name));
+    const prefix = dir.endsWith(sep) ? dir : dir + sep;
+    if (file !== dir && !file.startsWith(prefix)) continue;
+    if (existsSync(file) && statSync(file).isFile()) return file;
+  }
+  return null;
 }
 
 function mountSnapshot() {
@@ -112,7 +150,12 @@ async function waitMounted(iframe, timeoutMs = 20000) {
     last = JSON.stringify(snap);
     await sleep(250);
   }
-  throw new Error(`quick start overlay never mounted within 20s: ${last}`);
+  const tail = [...consoleLog, ...netLog]
+    .filter((l) => l.startsWith("error:") || l.startsWith("pageerror:") || l.startsWith("failed ") || l.startsWith("cdn "))
+    .slice(-8)
+    .map((l) => l.slice(0, 240));
+  const extra = tail.length ? ` | ${tail.join(" | ")}` : "";
+  throw new Error(`quick start overlay never mounted within 20s: ${last}${extra}`);
 }
 
 async function readout(frame) {
@@ -187,13 +230,28 @@ const server = serve(root);
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const url = `http://127.0.0.1:${server.address().port}${path}`;
 
+const consoleLog = [];
+const netLog = [];
 const browser = await chromium.launch({ headless: true });
 let failed = null;
 try {
   const page = await browser.newPage();
-  const consoleLog = [];
   page.on("console", (msg) => consoleLog.push(`${msg.type()}: ${msg.text()}`));
   page.on("pageerror", (err) => consoleLog.push(`pageerror: ${err.message}`));
+  page.on("requestfailed", (req) => {
+    const u = req.url();
+    if (!u.includes("jsdelivr") && !u.includes("frontend-dist")) return;
+    netLog.push(`failed ${u} ${req.failure()?.errorText || ""}`);
+  });
+  await page.route(/https:\/\/cdn\.jsdelivr\.net\/gh\/JuliaPluto\/Pluto\.jl@[^/]+\/frontend-dist\//, async (route) => {
+    const file = localPlutoAsset(route.request().url());
+    if (!file) {
+      netLog.push(`cdn miss ${route.request().url()}`);
+      await route.continue();
+      return;
+    }
+    await route.fulfill({ path: file });
+  });
   await page.goto(url, { waitUntil: "domcontentloaded" });
 
   const iframe = page.locator("#masque-gs-quickstart");
