@@ -1,10 +1,11 @@
-import { anchorFor, computeAnchoredPlacement, hitTest, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP } from "./geometry"
+import { anchorFor, computeAnchoredPlacement, hitTestAt, photoClip, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layoutSpaceLayer } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
 import { renderTemplate, renderAutoTable, esc } from "./template"
-import { drawHi, clearHi, drawLink, clearLink, markColorFor } from "./highlight"
+import { drawHover, clearHover, drawLink, clearLink, markColorFor } from "./highlight"
 import { hideCross, syncCross } from "./cross"
 import { linkedHits } from "./selection"
-import { fmt, imgPx, cssAnchor, hitKey, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
+import { fmt, cssAnchor, hitKey, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
+import { contentPoint, isIdentity, mapPoint, type PhotoMatrix } from "./photo"
 import type { OverlayCtx, OverlayState } from "./state"
 import type { Hit, HitLayer, Manifest, SliceGeometry, ThresholdGeometry } from "./types"
 
@@ -191,6 +192,16 @@ export function applyTipHtml(ctx: OverlayCtx, state: OverlayState, html: string,
     setTipVisible(ctx, true)
 }
 
+// `anchor` is in the hit's own space (content pixels for a data mark, layout pixels for
+// screen-fixed chrome). The tooltip is placed on the untransformed base, so a slid mark's
+// anchor is mapped back to the layout point where the mark is drawn.
+export function layoutAnchor(photo: PhotoMatrix, hit: Hit, anchor: Anchor): Anchor {
+    if (layoutSpaceLayer(hit.layer) || isIdentity(photo)) return anchor
+    const c = mapPoint(photo, { x: anchor.x, y: anchor.y })
+    const top = mapPoint(photo, { x: anchor.x, y: anchor.top })
+    return { x: c.x, y: c.y, top: top.y }
+}
+
 export function showTip(ctx: OverlayCtx, state: OverlayState, hit: Hit, x: number, y: number, e: MouseEvent): void {
     const html = tipHtmlForHit(ctx, hit, x, y)
     if (html === null) { hideTip(ctx, state); return }
@@ -200,7 +211,19 @@ export function showTip(ctx: OverlayCtx, state: OverlayState, hit: Hit, x: numbe
         placeTip(ctx, state, p.x, p.y)
         return
     }
-    placeAnchored(ctx, state, cssAnchor(ctx.base_, ctx.manifest_, anchorFor(hit, { x, y })))
+    const placed = layoutAnchor(state.photo_, hit, anchorFor(hit, { x, y }))
+    placeAnchored(ctx, state, cssAnchor(ctx.base_, ctx.manifest_, placed))
+}
+
+// Keyboard focus caches a css anchor. A later pan or wheel moves a data mark; the ring
+// slides with the photograph group, and this puts the tooltip back on that mark.
+export function syncFocusTip(ctx: OverlayCtx, state: OverlayState): void {
+    const hit = state.focusHit_
+    if (!hit || state.focusTipCss_ === null) return
+    const placed = layoutAnchor(state.photo_, hit, anchorFor(hit, null))
+    const css = cssAnchor(ctx.base_, ctx.manifest_, placed)
+    state.focusTipCss_ = css
+    placeAnchored(ctx, state, css)
 }
 
 // Same as showTip, but placed at an explicit css-px anchor rather than derived from a
@@ -231,7 +254,7 @@ export function updateLinkForHit(ctx: OverlayCtx, state: OverlayState, hit: Hit)
 // Returns false (nothing to restore) so the caller falls back to its usual clearHi/hideTip.
 export function restoreFocus(ctx: OverlayCtx, state: OverlayState): boolean {
     if (!state.focusHit_) return false
-    drawHi(state, ctx.hiGroup_, state.focusHit_)
+    drawHover(ctx, state, state.focusHit_)
     updateLinkForHit(ctx, state, state.focusHit_)
     if (state.focusTipHtml_ !== null && state.focusTipCss_) {
         applyTipHtml(ctx, state, state.focusTipHtml_, state.focusHit_)
@@ -284,23 +307,27 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     // onPointerMove routes drag-active moves to queueDrag instead — this is only ever
     // reached with drag === null, but keep the guard as defense-in-depth.
     if (state.drag_) return
-    const p = imgPx(ctx.base_, ctx.manifest_, e)
-    const dragHit = hitTest(ctx.manifest_, p.x, p.y, "drag")
+    const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+    const content = contentPoint(state.photo_, layout)
+    const clip = photoClip(ctx.manifest_, state.photo_, state.photoViewId_)
+    const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", clip)
     // A full-viewport :view hit must not suppress element hover. A threshold/ROI drag-hover
     // still does, and it takes the resize cursor — the cross stays off.
     if (dragHit && dragHit.layer.kind !== "view") {
-        if (!restoreFocus(ctx, state)) { clearHi(state, ctx.hiGroup_, true); clearLink(state, ctx.linkGroup_, true); hideTip(ctx, state) }
+        if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLink(state, ctx.linkGroup_, true); hideTip(ctx, state) }
         setDragHoverChrome(ctx, state, dragHit); ctx.surface_.classList.remove("hot")
         hideCross(ctx, state)
         return
     }
     setDragHoverChrome(ctx, state, null)
-    const hit = hitTest(ctx.manifest_, p.x, p.y, "hover")
-    const vp = viewportUnder(ctx.manifest_, p.x, p.y)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", clip)
+    // The axis frame does not slide, so the viewport and the hair are layout pixels.
+    // The sample is the content pixel under the cursor, so the value follows the slid series.
+    const vp = viewportUnder(ctx.manifest_, layout.x, layout.y)
     const sliceLayer = vp ? sliceOnAxis(ctx.manifest_, vp.id) : null
     let sampled: { probe: number; samples: SliceSample[] } | null = null
     if (sliceLayer && vp) {
-        const inv = invertAxis(vp.t, p.x, p.y)
+        const inv = invertAxis(vp.t, content.x, content.y)
         if (typeof inv.x === "number" && typeof inv.y === "number") {
             sampled = sampleSlice(sliceLayer.geometry as SliceGeometry, vp.t, inv.x, inv.y)
         }
@@ -327,7 +354,7 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
             : []
         const vertical = geom?.orientation !== "h"
         syncCross(
-            ctx, state, true, p.x, vy, p.x, vy + vh, vx, p.y, vx + vw, p.y, dots,
+            ctx, state, true, layout.x, vy, layout.x, vy + vh, vx, layout.y, vx + vw, layout.y, dots,
             { v: hairOn && vertical, h: hairOn && !vertical },
         )
     } else {
@@ -340,7 +367,7 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
 
     if (sliceTip && sliceLayer && sampled) {
         // A covered polygon's wash would sit under the cross; the sample tooltip replaces it.
-        clearHi(state, ctx.hiGroup_, true)
+        clearHover(ctx, state, true)
         clearLink(state, ctx.linkGroup_, true)
         const geom = sliceLayer.geometry as SliceGeometry
         const payload: Record<string, number> = {}
@@ -357,18 +384,20 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     }
 
     if (covered && hit) {
-        clearHi(state, ctx.hiGroup_, true)
+        clearHover(ctx, state, true)
         clearLink(state, ctx.linkGroup_, true)
-        showTip(ctx, state, hit, p.x, p.y, e)
+        const sample = layoutSpaceLayer(hit.layer) ? layout : content
+        showTip(ctx, state, hit, sample.x, sample.y, e)
         return
     }
 
     if (hit) {
-        drawHi(state, ctx.hiGroup_, hit)
-        showTip(ctx, state, hit, p.x, p.y, e)
+        drawHover(ctx, state, hit)
+        const sample = layoutSpaceLayer(hit.layer) ? layout : content
+        showTip(ctx, state, hit, sample.x, sample.y, e)
         updateLinkForHit(ctx, state, hit)
     } else if (!restoreFocus(ctx, state)) {
-        clearHi(state, ctx.hiGroup_, true)
+        clearHover(ctx, state, true)
         clearLink(state, ctx.linkGroup_, true)
         hideTip(ctx, state)
     }
@@ -389,7 +418,7 @@ export function onMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): voi
 
 export function onLeave(ctx: OverlayCtx, state: OverlayState): void {
     cancelPendingMove(state)
-    if (!restoreFocus(ctx, state)) { clearHi(state, ctx.hiGroup_, true); clearLink(state, ctx.linkGroup_, true); hideTip(ctx, state) }
+    if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLink(state, ctx.linkGroup_, true); hideTip(ctx, state) }
     ctx.surface_.classList.remove("hot")
     hideCross(ctx, state)
     setDragHoverChrome(ctx, state, null)

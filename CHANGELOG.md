@@ -45,6 +45,13 @@ All notable changes to this project are documented here. The format is based on
   A second slice on the same axis, a non-monotonic probe, `Axis3`, `PolarAxis`, a
   non-invertible scale, or a `covers` id that is not `:polygons` or `:lines` fails at
   `masque()` time.
+- The wheel zooms a 2D `ViewInteractable` about the cursor. Pan and that zoom slide the data
+  inside the axis viewport until the gesture-channel frame is visible. The axis frame stays
+  where it is. Hover, click, and an ROI or threshold drag follow that slid data; legend,
+  colorbar, and axis hits stay on the unmoved chrome. A click outside the axis viewport does
+  not select data the preview has clipped away. Orbit is unchanged. The wheel settles
+  one frame 150ms after the last notch.
+  Nothing is written to `@bind`.
 - `:webgl` view gestures stream live frames on the same `with_js_link` channel as `:cairo`.
   Each frame is a freshly serialized scene plus a hit manifest Julia computed for that camera,
   swapped onto the canvas the cell already holds — no new WebGL context, no cell re-run.

@@ -1,7 +1,9 @@
 // The overlay guide for a SliceInteractable: one hairline (vertical or horizontal) across the
-// axis viewport under the pointer, plus a filled dot per sampled series. Drawn on
-// svg.masque-plain. The hair is a figure-background halo under a quieter stroke. Opacity fades
-// only when the guide turns on or off, not on each move. Plots without a slice draw nothing.
+// axis viewport under the pointer, plus a filled dot per sampled series. The hair stays on
+// svg.masque-plain, in layout pixels, because the axis frame does not move. The dots are
+// parented in the photograph group so they ride the slid series. The hair is a
+// figure-background halo under a quieter stroke. Opacity fades only when the guide turns on
+// or off, not on each move. Plots without a slice draw nothing.
 import { SVG_NS } from "./highlight"
 import type { OverlayCtx, OverlayState } from "./state"
 
@@ -23,7 +25,7 @@ export interface CrossDot {
     color?: string
 }
 
-export function buildCross(svg: SVGSVGElement): CrossEls {
+export function buildCross(svg: SVGSVGElement, dotsParent: SVGElement): CrossEls {
     const g = document.createElementNS(SVG_NS, "g")
     g.setAttribute("class", "masque-cross")
     const line = (cls: string): SVGLineElement => {
@@ -37,16 +39,23 @@ export function buildCross(svg: SVGSVGElement): CrossEls {
     const hHalo = line("masque-cross-halo")
     const vHair = line("masque-cross-hair")
     const hHair = line("masque-cross-hair")
-    const dots = document.createElementNS(SVG_NS, "g")
-    g.append(vHalo, hHalo, vHair, hHair, dots)
+    g.append(vHalo, hHalo, vHair, hHair)
     svg.appendChild(g)
+    const dots = document.createElementNS(SVG_NS, "g")
+    dots.setAttribute("class", "masque-cross")
+    dotsParent.appendChild(dots)
     return { g_: g, vHalo_: vHalo, hHalo_: hHalo, vHair_: vHair, hHair_: hHair, dots_: dots }
+}
+
+function setCrossOn(ctx: OverlayCtx, on: boolean): void {
+    ctx.cross_.g_.classList.toggle("is-on", on)
+    ctx.cross_.dots_.classList.toggle("is-on", on)
 }
 
 export function hideCross(ctx: OverlayCtx, state: OverlayState): void {
     if (!state.crossOn_) return
     state.crossOn_ = false
-    ctx.cross_.g_.classList.remove("is-on")
+    setCrossOn(ctx, false)
 }
 
 function place(line: SVGLineElement, x1: number, y1: number, x2: number, y2: number): void {
@@ -74,10 +83,9 @@ export function syncCross(
     dots: CrossDot[],
     arms: { v: boolean; h: boolean },
 ): void {
-    const g = ctx.cross_.g_
     if (show !== state.crossOn_) {
         state.crossOn_ = show
-        g.classList.toggle("is-on", show)
+        setCrossOn(ctx, show)
     }
     if (!show) return
     const c = ctx.cross_
