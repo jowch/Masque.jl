@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
+import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
-import type { HitLayer, Manifest } from "../src/types"
+import { createOverlayState, MOTION_MS, type HiGroups } from "../src/state"
+import type { Hit, HitLayer, Manifest } from "../src/types"
 
 // build a light-DOM host (img + script) like the Julia widget emits, with layout mocked
 function setup() {
@@ -568,6 +570,36 @@ describe("mount", () => {
         expect(selChildren(shadow).length).toBe(4)
     })
 
+    it("a selects-ROI drag onto a mark mid-leave clears the fading hover ring", async () => {
+        // The test above keeps a keyboard-focus ring live, so hiKey_ is still set when the box
+        // arrives. #97 is the other window: the pointer has already left the mark, clearHi has
+        // started the fade, and the box then claims that mark before MOTION_MS.
+        const { host, script } = setup()
+        mount(script, boxSelectManifest())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const at = (x: number, y: number, type: string) =>
+            surface.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, pointerId: 1 }))
+        // pts[2] at image (900, 700) = client (450, 350), outside the initial box.
+        at(450, 350, "pointermove")
+        await flushFrame()
+        expect(hiChildren(shadow).length).toBe(2)
+        // Onto the ROI interior. The drag-hit branch starts the leave; the ring stays up.
+        at(200, 200, "pointermove")
+        const leaving = hiChildren(shadow)
+        expect(leaving.length).toBe(2)
+        expect(leaving.every((el) => el.classList.contains("masque-leave"))).toBe(true)
+        // Grab the box and move it over pts[2]. The first drag move applies synchronously.
+        at(200, 200, "pointerdown")
+        at(450, 300, "pointermove")
+        expect(hiChildren(shadow).length).toBe(0)
+        expect(selChildren(shadow).length).toBe(2) // pts[2] × (fill + edge)
+        await new Promise((r) => setTimeout(r, MOTION_MS + 40))
+        // The leave timer was cancelled, so it does not run later and wipe g.sel.
+        expect(hiChildren(shadow).length).toBe(0)
+        expect(selChildren(shadow).length).toBe(2)
+    })
+
     // Factory so each test gets a fresh geometry object — drag mutates geometry in-place.
     const gridSelectManifest = (): Manifest => ({
         width: 1200, height: 800, scaling: 2,
@@ -619,6 +651,55 @@ describe("mount", () => {
         expect(el.getAttribute("fill")).toBeNull()
         expect(el.getAttribute("stroke")).toBeNull()
         expect(edgeSelGroup(shadowOf(host)).children.length).toBe(0)
+    })
+})
+
+// #97's timer contract, under drawHi/clearHi/drawSelection directly. The mount test above is the
+// user path; these two lock the neighbours that path does not reach.
+describe("hover leave key while a selection is drawn", () => {
+    const layer: HitLayer = {
+        id: "pts", kind: "circles", geometry: [], payloads: [], axis: "ax1", events: ["hover", "click"],
+    }
+    const hit = (index: number): Hit => ({ layer, index, geom_: ["circle", 10 + index, 10, 5] })
+    const groups = (): HiGroups => {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+        const fill_ = document.createElementNS("http://www.w3.org/2000/svg", "g")
+        const edge_ = document.createElementNS("http://www.w3.org/2000/svg", "g")
+        const plain_ = document.createElementNS("http://www.w3.org/2000/svg", "g")
+        svg.append(fill_, edge_, plain_)
+        document.body.append(svg)
+        return { fill_, edge_, plain_ }
+    }
+    const count = (g: HiGroups) => g.fill_.children.length + g.edge_.children.length + g.plain_.children.length
+
+    it("a leave whose key is absent from the new selection still fades out on its own", async () => {
+        const state = createOverlayState()
+        const hi = groups()
+        const sel = groups()
+        drawHi(state, hi, hit(2))
+        clearHi(state, hi, true)
+        drawSelection(state, sel, [hit(0)], hi)
+        expect(hi.edge_.firstElementChild!.classList.contains("masque-leave")).toBe(true)
+        expect(count(sel)).toBeGreaterThan(0)
+        await new Promise((r) => setTimeout(r, MOTION_MS + 40))
+        expect(count(hi)).toBe(0)
+        expect(state.hiKey_).toBeNull()
+        expect(count(sel)).toBeGreaterThan(0)
+    })
+
+    it("re-hovering the same mark during the leave replaces the ring, and the old timer does not remove it", async () => {
+        const state = createOverlayState()
+        const hi = groups()
+        drawHi(state, hi, hit(2))
+        clearHi(state, hi, true)
+        drawHi(state, hi, hit(2))
+        const edge = hi.edge_.firstElementChild as SVGElement
+        expect(edge.classList.contains("masque-leave")).toBe(false)
+        expect(edge.classList.contains("masque-enter")).toBe(true)
+        expect(state.hiKey_).toBe("pts:2")
+        await new Promise((r) => setTimeout(r, MOTION_MS + 40))
+        expect(hi.edge_.firstElementChild).toBe(edge)
+        expect(state.hiKey_).toBe("pts:2")
     })
 })
 
