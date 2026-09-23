@@ -723,9 +723,15 @@ try {
             clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -120,
           });
           surface.dispatchEvent(ev);
-          return { photo: host.dataset.masquePhoto || "", overflow: host.style.overflow, prevented: ev.defaultPrevented };
+          const base = host.querySelector("img, canvas");
+          return {
+            photo: host.dataset.masquePhoto || "",
+            clip: !!host.querySelector(".masque-data-clip"),
+            baseTransform: base?.style.transform || "",
+            prevented: ev.defaultPrevented,
+          };
         }, [key, p.x, p.y]);
-        if (!zoom.prevented || !zoom.photo || zoom.overflow !== "hidden") {
+        if (!zoom.prevented || !zoom.photo || !zoom.clip || zoom.baseTransform) {
           throw new Error(`${key}-wheel: photographic zoom did not engage (${JSON.stringify(zoom)})`);
         }
         let photo = zoom.photo;

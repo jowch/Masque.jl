@@ -173,8 +173,10 @@ export interface OverlayState {
     hoveredThresholdId_: string | null
     // Photographic pan/zoom of the frame on screen (#85). Image pixels of that frame.
     // `photoAnchor_` is the grabbed point during a 2D pan; null when the pointer is up.
+    // `photoViewId_` is the pan view whose viewport stays fixed while the data inside it slides.
     photo_: PhotoMatrix
     photoAnchor_: { x: number; y: number } | null
+    photoViewId_: string | null
     wheelTimer_: ReturnType<typeof setTimeout> | null
 }
 
@@ -208,6 +210,7 @@ export function createOverlayState(): OverlayState {
         hoveredThresholdId_: null,
         photo_: IDENTITY,
         photoAnchor_: null,
+        photoViewId_: null,
         wheelTimer_: null,
     }
 }

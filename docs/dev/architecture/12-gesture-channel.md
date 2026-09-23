@@ -156,13 +156,14 @@ would be cheaper and would not be this mechanism (§12.4).
 This is not #86. #86 is about a scene surviving Pluto *replacing* the cell output, which destroys
 the `<canvas>`. A view gesture does not replace the cell (§12.3), so the canvas this frame paints
 on is the one the current output already holds. #85 hides the wait for that frame: while a 2D pan
-or wheel zoom is ahead of the channel, the last frame slides under the cursor on an inner matrix
-(the base element, and a `g` inside each overlay svg). `.ip-host` clips it with `overflow: hidden`
-for that gesture. The matrix comes off in the turn the sent frame is actually visible — the image
-`load` on `:cairo`, the scene swap on `:webgl` — leaving only the residual if the pointer has
-moved on. It is not a client camera, and it is not a substitute for the frame itself. A wheel has
-no pointer release, so the terminal request is one settle 150ms after the last notch. A new notch
-resets that wait. Orbit ignores the wheel.
+or wheel zoom is ahead of the channel, the data inside the axis viewport slides under the cursor
+on an inner matrix. The base image itself is not transformed, so the axis frame, tick labels, and
+the rest of the figure stay where they are; a copy of those pixels, clipped to the viewport,
+carries the matrix, and so does a `g` inside each overlay svg. The matrix comes off in the turn
+the sent frame is actually visible — the image `load` on `:cairo`, the scene swap on `:webgl` —
+leaving only the residual if the pointer has moved on. It is not a client camera, and it is not a
+substitute for the frame itself. A wheel has no pointer release, so the terminal request is one
+settle 150ms after the last notch. A new notch resets that wait. Orbit ignores the wheel.
 **Backends differ in cost, never in the interaction contract:** conformance is judged
 against the obligations above, never against a particular backend's mechanism.
 

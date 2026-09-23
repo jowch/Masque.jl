@@ -277,11 +277,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const fillSvg = makeOverlaySvg("masque-fill")
     const edgeSvg = makeOverlaySvg("masque-edge")
     const plainSvg = makeOverlaySvg("masque-plain")
-    // A photographic pan/zoom transforms this group, not the svg, so the svg's own overflow
-    // clips the scaled drawing to the plot. The tooltip is not inside it.
-    const fillPhoto = makeGroup(fillSvg, "masque-photo")
-    const edgePhoto = makeGroup(edgeSvg, "masque-photo")
-    const plainPhoto = makeGroup(plainSvg, "masque-photo")
+    // The photographic matrix is applied to the inner group. The outer group clips that
+    // drawing to the axis viewport, so tick labels and the axis frame stay put. The tooltip
+    // is not inside either group.
+    const fillClip = makeGroup(fillSvg, "masque-clip")
+    const edgeClip = makeGroup(edgeSvg, "masque-clip")
+    const plainClip = makeGroup(plainSvg, "masque-clip")
+    const fillPhoto = makeGroup(fillClip, "masque-photo")
+    const edgePhoto = makeGroup(edgeClip, "masque-photo")
+    const plainPhoto = makeGroup(plainClip, "masque-photo")
+    const clipGroups = [fillClip, edgeClip, plainClip]
     const photoGroups = [fillPhoto, edgePhoto, plainPhoto]
     // persistent box-selection highlights (g.sel, z-below link) then transient legend-linked
     // highlights (g.link, z-above sel) then transient hover highlights (g.hi, z-above sel/link) —
@@ -355,6 +360,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     let lastFrameUrl: string | null = null
     let gestureFrameCount = 0
     let loadToken = 0
+    // Bumps when the base pixels change, so the viewport copy is not redrawn on every pan sample.
+    let frameGen = 0
     let paintPhoto: (m: PhotoMatrix) => void = () => {}
     const channel = createGestureChannel(requestFrame ?? null, applyFrame, () => {
         state.photo_ = IDENTITY
@@ -438,6 +445,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 console.error("[masque] webgl gesture frame failed", e)
                 return
             }
+            frameGen += 1
         }
         revealFrame(input, r)
     }
@@ -548,22 +556,109 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         roiDrag.syncHandleDraw(ctx.roiBoxes_, ctx.manifest_.width, br.width, ctx.manifest_.scaling)
         state.surfaceSized_ = false
     }
+    // The axis frame (spines, ticks, labels) stays on the untransformed base. A copy of the
+    // same pixels, clipped to the pan view's viewport, carries the matrix, so only the data
+    // inside the axes slides.
+    let dataClip: HTMLDivElement | null = null
+    let dataCopy: HTMLImageElement | HTMLCanvasElement | null = null
+    let copyGen = -1
+    const clipIds = ["masque-clip-fill", "masque-clip-edge", "masque-clip-plain"]
+    const photoViewport = (): ViewGeometry | null => {
+        const id = state.photoViewId_
+        const layer = (id ? ctx.manifest_.layers.find((l) => l.id === id) : undefined)
+            ?? ctx.manifest_.layers.find((l) => l.kind === "view" && (l.geometry as ViewGeometry).mode === "pan")
+        if (!layer || layer.kind !== "view") return null
+        const g = layer.geometry as ViewGeometry
+        if (!(g.w > 0) || !(g.h > 0)) return null
+        return g
+    }
+    const clearDataClip = () => {
+        dataClip?.remove()
+        dataClip = null
+        dataCopy = null
+        copyGen = -1
+        for (const g of clipGroups) g.removeAttribute("clip-path")
+    }
     paintPhoto = (m) => {
         const id = isIdentity(m)
         const w = ctx.manifest_.width
         const h = ctx.manifest_.height
-        const ow = ctx.base_.offsetWidth
-        const oh = ctx.base_.offsetHeight
+        const br = ctx.base_.getBoundingClientRect()
+        const hr = host.getBoundingClientRect()
+        const ow = ctx.base_.offsetWidth > 0 ? ctx.base_.offsetWidth : br.width
+        const oh = ctx.base_.offsetHeight > 0 ? ctx.base_.offsetHeight : br.height
         const sx = ow > 0 && w > 0 ? ow / w : 1
         const sy = oh > 0 && h > 0 ? oh / h : 1
-        ctx.base_.style.transformOrigin = id ? "" : "0 0"
-        ctx.base_.style.transform = id ? "" : `translate(${m.tx * sx}px, ${m.ty * sy}px) scale(${m.s})`
+        // The base itself never scales. A transform here moves the axis frame, and the next
+        // frame draws that frame back where it was.
+        ctx.base_.style.transform = ""
+        ctx.base_.style.transformOrigin = ""
+        const view = id ? null : photoViewport()
         const svgT = `translate(${m.tx} ${m.ty}) scale(${m.s})`
         for (const g of photoGroups) {
-            if (id) g.removeAttribute("transform")
+            if (id || !view) g.removeAttribute("transform")
             else g.setAttribute("transform", svgT)
         }
-        host.style.overflow = id ? "" : "hidden"
+        if (!view) {
+            clearDataClip()
+        } else {
+            if (!dataClip || !dataCopy) {
+                dataClip = document.createElement("div")
+                dataClip.className = "masque-data-clip"
+                dataClip.style.position = "absolute"
+                dataClip.style.overflow = "hidden"
+                dataClip.style.pointerEvents = "none"
+                dataCopy = ctx.base_ instanceof HTMLCanvasElement
+                    ? document.createElement("canvas")
+                    : document.createElement("img")
+                if (dataCopy instanceof HTMLImageElement) dataCopy.alt = ""
+                dataCopy.style.position = "absolute"
+                dataCopy.style.transformOrigin = "0 0"
+                dataCopy.style.maxWidth = "none"
+                dataClip.appendChild(dataCopy)
+                host.insertBefore(dataClip, shadowHost)
+                copyGen = -1
+            }
+            dataClip.style.left = `${br.left - hr.left + view.x * sx}px`
+            dataClip.style.top = `${br.top - hr.top + view.y * sy}px`
+            dataClip.style.width = `${view.w * sx}px`
+            dataClip.style.height = `${view.h * sy}px`
+            dataCopy.style.left = `${-view.x * sx}px`
+            dataCopy.style.top = `${-view.y * sy}px`
+            dataCopy.style.width = `${ow}px`
+            dataCopy.style.height = `${oh}px`
+            dataCopy.style.transform = `translate(${m.tx * sx}px, ${m.ty * sy}px) scale(${m.s})`
+            if (dataCopy instanceof HTMLImageElement && ctx.base_ instanceof HTMLImageElement) {
+                if (dataCopy.src !== ctx.base_.src) dataCopy.src = ctx.base_.src
+            } else if (dataCopy instanceof HTMLCanvasElement && ctx.base_ instanceof HTMLCanvasElement && copyGen !== frameGen) {
+                const bw = ctx.base_.width
+                const bh = ctx.base_.height
+                if (bw > 0 && bh > 0) {
+                    dataCopy.width = bw
+                    dataCopy.height = bh
+                    dataCopy.getContext("2d")?.drawImage(ctx.base_, 0, 0)
+                    copyGen = frameGen
+                }
+            }
+            clipGroups.forEach((g, i) => {
+                const svg = g.ownerSVGElement
+                if (!svg) return
+                const cid = clipIds[i]
+                let cp = svg.querySelector(`#${cid}`) as SVGClipPathElement | null
+                if (!cp) {
+                    cp = document.createElementNS(SVG_NS, "clipPath")
+                    cp.id = cid
+                    cp.appendChild(document.createElementNS(SVG_NS, "rect"))
+                    svg.insertBefore(cp, svg.firstChild)
+                }
+                const rect = cp.firstElementChild as SVGRectElement
+                rect.setAttribute("x", String(view.x))
+                rect.setAttribute("y", String(view.y))
+                rect.setAttribute("width", String(view.w))
+                rect.setAttribute("height", String(view.h))
+                g.setAttribute("clip-path", `url(#${cid})`)
+            })
+        }
         host.dataset.masquePhoto = id ? "" : `${m.s},${m.tx},${m.ty}`
         if (id) syncOverlayToBase()
     }
@@ -630,6 +725,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         if (!id) return
         e.preventDefault()
+        state.photoViewId_ = id
         const next = zoomAt(state.photo_, local, wheelScale(e.deltaY, e.deltaMode))
         state.photo_ = next
         paintPhoto(next)

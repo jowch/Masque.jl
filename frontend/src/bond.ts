@@ -156,6 +156,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], p.x, p.y, e.pointerId)
             if (g.mode === "pan") {
                 clearWheelTimer(state)
+                state.photoViewId_ = viewLayer.id
                 state.photoAnchor_ = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
             }
             ctx.surface_.classList.add("grabbing")
@@ -194,6 +195,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], p.x, p.y, e.pointerId)
         if (g.mode === "pan") {
             clearWheelTimer(state)
+            state.photoViewId_ = hit.layer.id
             state.photoAnchor_ = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
         }
     } else return

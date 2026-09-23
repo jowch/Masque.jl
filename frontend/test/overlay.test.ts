@@ -2981,7 +2981,8 @@ describe("photographic pan / wheel zoom", () => {
             ({ left: 0, top: 0, width: 700, height: 400, right: 700, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
         const ev = wheelAt(surface, -120)
         expect(ev.defaultPrevented).toBe(true)
-        expect(host.style.overflow).toBe("hidden")
+        expect(img.style.transform).toBe("")
+        expect(host.querySelector(".masque-data-clip")).toBeTruthy()
         expect(host.dataset.masquePhoto).not.toBe("")
         expect(shadowHost.style.width).toBe("600px")
         const photo = shadow.querySelector("svg.masque-plain g.masque-photo") as SVGGElement
@@ -2996,9 +2997,40 @@ describe("photographic pan / wheel zoom", () => {
         await Promise.resolve()
         if (host.dataset.masquePhoto) img.dispatchEvent(new Event("load"))
         expect(host.dataset.masquePhoto).toBe("")
-        expect(host.style.overflow).toBe("")
+        expect(host.querySelector(".masque-data-clip")).toBeNull()
+        expect(img.style.transform).toBe("")
         expect(photo.getAttribute("transform")).toBeNull()
         expect(shadowHost.style.width).toBe("700px")
+    })
+
+    it("a wheel zoom leaves the axis frame unscaled and clips the data to the viewport", () => {
+        const { host, img, script } = setup()
+        const m = viewManifest("pan")
+        m.transforms.ax1.viewport = [100, 80, 1000, 640]
+        const g = m.layers[0].geometry as { x: number; y: number; w: number; h: number }
+        g.x = 100; g.y = 80; g.w = 1000; g.h = 640
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, m, undefined, requestFrame)
+        img.getBoundingClientRect = () =>
+            ({ left: 10, top: 20, width: 600, height: 400, right: 610, bottom: 420, x: 10, y: 20, toJSON() {} }) as DOMRect
+        host.getBoundingClientRect = () =>
+            ({ left: 10, top: 20, width: 600, height: 400, right: 610, bottom: 420, x: 10, y: 20, toJSON() {} }) as DOMRect
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        expect(img.style.transform).toBe("")
+        const clip = host.querySelector(".masque-data-clip") as HTMLElement
+        // viewport (100, 80, 1000, 640) on a 1200×800 image laid out at 600×400 → half scale
+        expect(clip.style.left).toBe("50px")
+        expect(clip.style.top).toBe("40px")
+        expect(clip.style.width).toBe("500px")
+        expect(clip.style.height).toBe("320px")
+        const copy = clip.firstElementChild as HTMLElement
+        expect(copy.style.transform).toContain("scale(")
+        const clipped = shadowOf(host).querySelector("svg.masque-plain g.masque-clip") as SVGGElement
+        expect(clipped.getAttribute("clip-path")).toBe("url(#masque-clip-plain)")
+        const rect = shadowOf(host).querySelector("#masque-clip-plain rect") as SVGRectElement
+        expect(rect.getAttribute("width")).toBe("1000")
+        expect(rect.getAttribute("height")).toBe("640")
     })
 
     it("an orbit ignores the wheel, and a wheel during a drag does nothing", async () => {
@@ -3053,7 +3085,8 @@ describe("photographic pan / wheel zoom", () => {
         await Promise.resolve()
         await Promise.resolve()
         expect(host.dataset.masquePhoto).toBe("")
-        expect(host.style.overflow).toBe("")
+        expect(host.querySelector(".masque-data-clip")).toBeNull()
+        expect(host.querySelector("img")!.style.transform).toBe("")
     })
 
     it("a canvas frame drops the matrix in the same turn the scene swaps", async () => {
