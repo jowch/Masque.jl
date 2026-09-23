@@ -64,6 +64,8 @@ end
     src = read(path, String)
     @test occursin("Hover a point to read its name", src)
     @test occursin("`sel.index` is 1-based", src)
+    @test occursin("name = \"one\"", src)
+    @test occursin("if sel === nothing", src)
 end
 
 @testset "overlay-only player TOML sets chip = false" begin

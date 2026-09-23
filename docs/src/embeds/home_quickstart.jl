@@ -26,23 +26,28 @@ Hover a point to read its name, then click it. The last cell names the point.
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000010
 md"""
-Draw the scatter the way you already draw a Makie figure, and end the cell with `nothing` so this cell does not print the figure. The tooltip reads `name` and `y` from that point's payload. `radius` is the drawn marker, so the highlight sits on the disc.
+Draw the scatter the way you already draw a Makie figure, and end the cell with `nothing` so this cell does not print the figure. The tooltip reads `name` and `y` off each point.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000002
 begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    xs = [1.0, 2.0, 3.0]
-    ys = [1.0, 4.0, 9.0]
-    names = ["one", "two", "three"]
+
+    points = [
+        (name = "one", x = 1.0, y = 1.0),
+        (name = "two", x = 2.0, y = 4.0),
+        (name = "three", x = 3.0, y = 9.0),
+    ]
     markersize = 18
-    scatter!(ax, xs, ys; markersize)
+    scatter!(ax, [p.x for p in points], [p.y for p in points]; markersize)
+
+    # A default :circle marker is drawn at 0.3525 × markersize, not markersize / 2.
     pts = PointInteractable(
-        ax, collect(zip(xs, ys));
+        ax, [(p.x, p.y) for p in points];
         id = :scatter,
         radius = 0.3525 * markersize,
-        payloads = [(; name, x, y) for (name, x, y) in zip(names, xs, ys)],
+        payloads = points,
         tooltip = masque"<b>$(name)</b><br>y = $(y)",
     )
     nothing
@@ -62,7 +67,11 @@ Before a click, `sel` is `nothing`. A click is an `ElementEvent`. `sel.name` is 
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000004
-sel === nothing ? "click a point" : "$(sel.name) selected — y = $(sel.y)"
+if sel === nothing
+    "click a point"
+else
+    "$(sel.name) selected — y = $(sel.y)"
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
