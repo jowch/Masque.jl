@@ -53,7 +53,7 @@ md"""
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000012
 md"""
-Before a click, `sel` is `nothing`. After a click, `sel` is an `ElementEvent`: `sel.name` is that point's payload, and `sel.index` is 1-based. A cell that reads `sel` re-runs.
+Before a click, `sel` is `nothing`. After a click, `sel` is an `ElementEvent`: `sel.name` is that point's name, and `sel.index` is 1-based. A cell that reads `sel` re-runs.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000004
