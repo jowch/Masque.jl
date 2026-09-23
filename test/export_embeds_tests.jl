@@ -58,7 +58,12 @@ end
     @test keys == ["null", "scatter:0", "scatter:1", "scatter:2"]
     @test get(player, "chip", true) !== false
     @test player["show_code"] == true
-    @test length(player["cells"]) == 6
+    @test player["pluto_html"] == true
+    @test length(player["cells"]) == 7
+    @test endswith(player["cells"][1], "0009")
+    src = read(path, String)
+    @test occursin("Hover a point to read its name", src)
+    @test occursin("`sel.index` is 1-based", src)
 end
 
 @testset "overlay-only player TOML sets chip = false" begin

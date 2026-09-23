@@ -746,6 +746,8 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     )
 end
 
+include("pluto_html_export.jl")
+
 function harvest_one(session, path::AbstractString, outdir::AbstractString; retarget_docs::Bool)
     path = abspath(path)
     outdir = abspath(outdir)
@@ -764,6 +766,14 @@ function harvest_one(session, path::AbstractString, outdir::AbstractString; reta
         assert_no_errors(nb, path)
         cells = snapshot_cells(nb, player, bond)
         isempty(cells) && error("no cells to snapshot in $path")
+
+        outpath = joinpath(outdir, splitext(basename(path))[1] * ".html")
+        if get(player, "pluto_html", false) === true
+            info = emit_pluto_notebook(session, nb, path, outpath, player, cells, bond)
+            file_hash_after = hash(read(path))
+            file_hash_before == file_hash_after || error("harvest rewrote $path — disable_writing_notebook_files failed")
+            return (; failed_pkg = false, nb, info, cells, states = nothing)
+        end
 
         states = NamedTuple[]
         default_rec = record_state(cells)

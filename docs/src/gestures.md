@@ -124,11 +124,10 @@ not start a drag, and the bond stays unchanged.
 ## Overlay, Julia, and the host
 
 Live Pluto runs every `@bind` row except view. This docs site does not run
-those rows live. The quickstart player on [Getting started](@ref) lists
-idle plus each of the three points and swaps the readout cell. An
-overlay-only player keeps tooltip and highlight chrome. Julia stays at
-the default bond. Static `generate_html` keeps overlay chrome and drops
-`@bind` and `with_js_link`.
+those rows live. The quick start on [Getting started](@ref) is a Pluto
+export of the tutorial notebook, and the listed clicks swap the readout.
+An overlay-only player keeps tooltip and highlight chrome. Julia stays at
+the default bond.
 
 ```@raw html
 <div class="masque-diagram">

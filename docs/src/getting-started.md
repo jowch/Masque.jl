@@ -44,15 +44,14 @@ end
 
 ## Quick start
 
-This notebook is a three-point scatter: a custom tooltip, `@bind`, and a
-cell that reads the click. Markdown cells are the notes. Code cells are
-unfolded. On this site the **Simulating `@bind`** chip is a listed
-snapshot. In your notebook, the readout cell re-runs.
+The notebook is the tutorial. Paste each cell into your own notebook,
+including the notes. On this site the **Simulating `@bind`** chip is a
+listed snapshot. In Pluto, the readout cell re-runs.
 
 ```@raw html
 <div class="masque-embed-wrap">
 <iframe id="masque-gs-quickstart" title="Three-point scatter with a tooltip, @bind, and a readout"
-        style="width:100%;height:960px;border:0;background:transparent;overflow:hidden;"
+        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
         scrolling="no" loading="lazy"></iframe>
 </div>
 <script>
@@ -77,9 +76,6 @@ snapshot. In your notebook, the readout cell re-runs.
 })();
 </script>
 ```
-
-Paste each cell into your notebook, including the markdown cells. Hold
-the pointer over a point to read its name, then click one.
 
 ## Where to go next
 

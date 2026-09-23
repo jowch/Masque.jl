@@ -19,9 +19,14 @@ end
 # ╔═╡ b0e1e001-0001-4000-8000-000000000001
 using CairoMakie, Masque
 
+# ╔═╡ b0e1e001-0001-4000-8000-000000000009
+md"""
+Hover a point to read its name, then click it. The last cell names the point.
+"""
+
 # ╔═╡ b0e1e001-0001-4000-8000-000000000010
 md"""
-Draw the scatter the way you already draw a Makie figure. The tooltip template reads fields from that point's payload. `radius` is the drawn marker, so the highlight sits on the disc.
+Draw the scatter the way you already draw a Makie figure, and end the cell with `nothing` so this cell does not print the figure. The tooltip reads `name` and `y` from that point's payload. `radius` is the drawn marker, so the highlight sits on the disc.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000002
@@ -45,7 +50,7 @@ end
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000011
 md"""
-`masque` returns the HTML that mounts the overlay. `@bind` stores a click in `sel`. Hover updates the tooltip and does not change `sel`.
+`masque` mounts the overlay on the figure. `@bind sel` stores a click in `sel`. Hover updates the tooltip and does not change `sel`.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000003
@@ -53,7 +58,7 @@ md"""
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000012
 md"""
-Before a click, `sel` is `nothing`. After a click, `sel` is an `ElementEvent`: `sel.name` is that point's name, and `sel.index` is 1-based. A cell that reads `sel` re-runs.
+Before a click, `sel` is `nothing`. A click is an `ElementEvent`. `sel.name` is the payload's name, and `sel.index` is 1-based. This cell reads `sel`, so it re-runs on the click.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000004
@@ -64,7 +69,9 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "sel"
 show_code = true
+pluto_html = true
 cells = [
+  "b0e1e001-0001-4000-8000-000000000009",
   "b0e1e001-0001-4000-8000-000000000010",
   "b0e1e001-0001-4000-8000-000000000002",
   "b0e1e001-0001-4000-8000-000000000011",
@@ -1735,6 +1742,7 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═b0e1e001-0001-4000-8000-000000000001
+# ╟─b0e1e001-0001-4000-8000-000000000009
 # ╟─b0e1e001-0001-4000-8000-000000000010
 # ╠═b0e1e001-0001-4000-8000-000000000002
 # ╟─b0e1e001-0001-4000-8000-000000000011
