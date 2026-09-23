@@ -302,6 +302,26 @@ describe("hitLayer + hitTest", () => {
         expect(hitTestAt(m, 320, 60, photo, "hover")?.layer.id).toBe("cb")
         expect(hitTestAt(m, 10, 10, photo, "drag")?.layer.id).toBe("view")
     })
+    it("hitTestAt skips clipped data so a colorbar outside the pan view still wins", () => {
+        // Viewport ends at x = 800. Zoom s = 2 about x = 400 gives tx = -400.
+        // unmap(840) = 620, inside the grid, but that cell is drawn outside the clip.
+        const photo = { s: 2, tx: -400, ty: 0 }
+        const m: Manifest = {
+            width: 1200, height: 400, scaling: 1, transforms: {},
+            layers: [
+                { id: "cells", kind: "grid", axis: "ax", events: ["click", "hover"], payloads: [],
+                    geometry: { xedges: [0, 800], yedges: [0, 400], ncols: 1, nrows: 1 } },
+                { id: "cb", kind: "axis", bond: "colorbar", axis: "ax", events: ["click", "hover"], payloads: [],
+                    geometry: [820, 40, 80, 200] },
+                { id: "view", kind: "view", axis: "ax", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 800, h: 400, mode: "pan" } },
+            ],
+        }
+        const clip = { x: 0, y: 0, w: 800, h: 400 }
+        expect(hitTestAt(m, 840, 100, photo, "click", clip)?.layer.id).toBe("cb")
+        expect(hitTestAt(m, 400, 100, photo, "click", clip)?.layer.id).toBe("cells")
+        expect(hitTestAt(m, 840, 100, photo, "click")?.layer.id).toBe("cells")
+    })
     it("resolvePayload returns the element payload", () => {
         const m: Manifest = { width: 400, height: 400, scaling: 2, transforms: {}, layers: [circles] }
         const hit = hitTest(m, 300, 300, "click")!

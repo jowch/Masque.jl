@@ -1,4 +1,4 @@
-import { anchorFor, computeAnchoredPlacement, hitTestAt, resolvePayload, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layoutSpaceLayer } from "./geometry"
+import { anchorFor, computeAnchoredPlacement, hitTestAt, photoClip, resolvePayload, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layoutSpaceLayer } from "./geometry"
 import type { Anchor } from "./geometry"
 import { renderTemplate, renderAutoTable, esc } from "./template"
 import { drawHover, clearHover, drawLink, clearLink, markColorFor } from "./highlight"
@@ -277,7 +277,8 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     if (state.drag_) return
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
     const content = contentPoint(state.photo_, layout)
-    const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag")
+    const clip = photoClip(ctx.manifest_, state.photo_, state.photoViewId_)
+    const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", clip)
     // A full-viewport :view hit must not suppress element hover.
     if (dragHit && dragHit.layer.kind !== "view") {
         if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLink(state, ctx.linkGroup_, true); hideTip(ctx, state) }
@@ -285,7 +286,7 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
         return
     }
     setDragHoverChrome(ctx, state, null)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover")
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", clip)
     if (hit) {
         const sample = layoutSpaceLayer(hit.layer) ? layout : content
         drawHover(ctx, state, hit); showTip(ctx, state, hit, sample.x, sample.y, e); ctx.surface_.classList.add("hot")

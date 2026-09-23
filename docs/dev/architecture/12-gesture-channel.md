@@ -160,7 +160,8 @@ or wheel zoom is ahead of the channel, the data inside the axis viewport slides 
 on an inner matrix. The base image itself is not transformed, so the axis frame, tick labels, and
 the rest of the figure stay where they are; a copy of those pixels, clipped to the viewport,
 carries the matrix, and so does the data `g` inside each overlay svg. A data-space hit uses the
-content pixel under the cursor. The view rectangle stays in layout pixels, and legend, colorbar,
+content pixel under the cursor, and only when that cursor is inside the pan view. A layout point
+outside the clip does not hit data the preview has hidden. The view rectangle stays in layout pixels, and legend, colorbar,
 and axis chrome are siblings of that clip so a ring outside the viewport is not cut off. The
 matrix comes off in the turn
 the sent frame is actually visible — the image `load` on `:cairo`, the scene swap on `:webgl` —

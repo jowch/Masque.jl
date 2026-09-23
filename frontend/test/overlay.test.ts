@@ -3530,4 +3530,29 @@ describe("photographic pan / wheel zoom", () => {
         const next = shadow.querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
         expect(next.getAttribute("x")).toBe("100")
     })
+
+    it("a click outside the pan view does not commit a cell the clip has hidden", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 800, 600], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "cells", kind: "grid", axis: "ax1", events: ["click"], payloads: [],
+                    geometry: { xedges: [0, 800], yedges: [0, 600], ncols: 1, nrows: 1, values: [1] } },
+                { id: "cb", kind: "axis", bond: "colorbar", axis: "ax1", events: ["click"], payloads: [],
+                    geometry: [900, 100, 80, 200] },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 800, h: 600, mode: "pan" } },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(async () => ({})))
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        const zoom = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -693 })
+        Object.defineProperty(zoom, "clientX", { value: 200 })
+        Object.defineProperty(zoom, "clientY", { value: 100 })
+        surface.dispatchEvent(zoom)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 470, clientY: 100, bubbles: true }))
+        expect((host as unknown as { value: { layer: string } }).value.layer).toBe("cb")
+    })
 })

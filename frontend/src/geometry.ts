@@ -1,5 +1,5 @@
 // All coordinates here are image pixels.
-import { contentPoint, type PhotoMatrix } from "./photo"
+import { contentPoint, isIdentity, type PhotoMatrix } from "./photo"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, ThresholdGeometry, ROIGeometry, ViewGeometry } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
@@ -371,14 +371,38 @@ export function hitTest(manifest: Manifest, px: number, py: number, event: strin
     return null
 }
 
+// The pan view `paintPhoto` clips to, or null when the photograph is identity. Data outside
+// that rectangle is not on screen. `viewId` is the pan view that owns the live matrix.
+export function photoClip(manifest: Manifest, photo: PhotoMatrix, viewId: string | null): { x: number; y: number; w: number; h: number } | null {
+    if (isIdentity(photo)) return null
+    const named = viewId ? manifest.layers.find((l) => l.id === viewId) : undefined
+    const layer = named && named.kind === "view" ? named
+        : manifest.layers.find((l) => l.kind === "view" && (l.geometry as ViewGeometry).mode === "pan")
+    if (!layer || layer.kind !== "view") return null
+    const g = layer.geometry as ViewGeometry
+    if (g.mode === "orbit" || !(g.w > 0) || !(g.h > 0)) return null
+    return { x: g.x, y: g.y, w: g.w, h: g.h }
+}
+
+function insideClip(clip: { x: number; y: number; w: number; h: number }, x: number, y: number): boolean {
+    return x >= clip.x && x <= clip.x + clip.w && y >= clip.y && y <= clip.y + clip.h
+}
+
 // `(x, y)` is a layout point on the untransformed base. Data-space layers are tested at the
 // content pixel under that point while a photograph is live. The view rectangle and
-// screen-fixed chrome stay in layout pixels.
-export function hitTestAt(manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string): Hit | null {
+// screen-fixed chrome stay in layout pixels. A layout point outside `clip` does not hit
+// data the photograph has clipped away.
+export function hitTestAt(
+    manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string,
+    clip: { x: number; y: number; w: number; h: number } | null = null,
+): Hit | null {
     const content = contentPoint(photo, { x, y })
+    const outside = clip != null && !insideClip(clip, x, y)
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
-        const p = layoutSpaceLayer(layer) ? { x, y } : content
+        const layoutSpace = layoutSpaceLayer(layer)
+        if (!layoutSpace && outside) continue
+        const p = layoutSpace ? { x, y } : content
         const h = hitLayer(layer, p.x, p.y)
         if (h) return { layer, ...h }
     }

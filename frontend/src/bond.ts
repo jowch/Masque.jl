@@ -1,4 +1,4 @@
-import { hitTestAt, layoutSpaceLayer, matrixLimits, resolvePayload } from "./geometry"
+import { hitTestAt, layoutSpaceLayer, matrixLimits, photoClip, resolvePayload } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { selectionFor, SELECTED_KINDS } from "./selection"
@@ -178,7 +178,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     if (e.shiftKey) {
         const viewLayer = ctx.manifest_.layers.find((l) => {
             if (l.kind !== "view" || !l.events.includes("drag")) return false
-            return hitTestAt({ ...ctx.manifest_, layers: [l] }, layout.x, layout.y, state.photo_, "drag") !== null
+            return hitTestAt({ ...ctx.manifest_, layers: [l] }, layout.x, layout.y, state.photo_, "drag", photoClip(ctx.manifest_, state.photo_, state.photoViewId_)) !== null
         })
         if (viewLayer) {
             const g = viewLayer.geometry as ViewGeometry
@@ -190,7 +190,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             return
         }
     }
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag")
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))
     if (!hit) return
     if (hit.layer.kind === "threshold") {
         const line = ctx.thresholdLines_.get(hit.layer.id)
@@ -383,7 +383,7 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     // Chromium still dispatches click after a Mac ctrl-click.
     if (isMacContextClick(e)) return
     const { layout, content } = pointerSpace(ctx, state, e)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click")
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))
     if (!hit) return // miss = no-op, no round-trip
     const sample = layoutSpaceLayer(hit.layer) ? layout : content
     commitClick(ctx, state, hit, sample.x, sample.y)
