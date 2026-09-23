@@ -48,7 +48,9 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "pick"
 chip = false
+show_code = true
 cells = [
+  "a1410003-0001-4000-8000-000000000002",
   "a1410003-0001-4000-8000-000000000003",
 ]
 

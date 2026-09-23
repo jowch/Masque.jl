@@ -341,20 +341,39 @@ pluto-trafficlight {
   visibility: visible;
   transform: none;
 }
+pluto-input {
+  display: block;
+  position: relative;
+}
+/* Unfolded source stands in for Pluto's CodeMirror box: same border, same token colors. */
 pre.masque-src {
   display: block;
-  margin: 0 0 6px 0;
-  padding: 8px 10px;
+  margin: 0;
+  padding: 2px 6px 2px 4px;
   overflow-x: auto;
   white-space: pre;
   tab-size: 4;
-  font-family: var(--julia-mono-font-stack);
-  font-size: 0.78rem;
+  font-family: var(--code-font-stack);
+  font-size: 15px;
   line-height: 1.45;
   font-variant-ligatures: none;
   background: transparent;
-  color: var(--pluto-output-color);
+  color: var(--cm-color-editor-text);
+  border: 1px solid var(--normal-cell-color);
+  border-left: none;
+  border-bottom-right-radius: 4px;
+  min-height: 25px;
 }
+/* Same mapping as Pluto frontend/highlightjs.css: token classes onto the editor palette. */
+pre.masque-src .hljs-keyword { color: var(--cm-color-keyword); }
+pre.masque-src .hljs-built_in,
+pre.masque-src .hljs-type { color: var(--cm-color-builtin); }
+pre.masque-src .hljs-literal,
+pre.masque-src .hljs-number { color: var(--cm-color-literal); }
+pre.masque-src .hljs-string { color: var(--cm-color-string); }
+pre.masque-src .hljs-symbol { color: var(--cm-color-symbol); }
+pre.masque-src .hljs-comment { color: var(--cm-color-comment); }
+pre.masque-src .hljs-meta { color: var(--cm-color-macro); font-weight: 700; }
 pluto-cell.masque-note pluto-output {
   font-family: var(--lato-ui-font-stack);
   font-size: 15px;
@@ -431,14 +450,22 @@ function is_markdown_annotation(code::AbstractString)
     return startswith(s, "md\"") || startswith(s, "md\"\"\"")
 end
 
-function masque_widget_cell(cells)
-    hits = [c for c in cells if occursin("@bind", c.code) && occursin("masque(", c.code)]
-    length(hits) == 1 || error("show_code player needs one @bind masque(...) cell")
+function masque_widget_cell(cells, bond)
+    needle = "@bind $bond"
+    hits = [c for c in cells if occursin(needle, c.code) && occursin("masque(", c.code)]
+    length(hits) == 1 || error("show_code player needs one `$needle masque(...)` cell")
     return only(hits)
 end
 
 function source_pre_html(code::AbstractString)
-    return "<pre class=\"masque-src\">$(html_escape(chomp(code)))</pre>"
+    body = highlight_julia_html(chomp(code))
+    return "<pluto-input><pre class=\"masque-src\"><code class=\"language-julia hljs\">$body</code></pre></pluto-input>"
+end
+
+# A `nothing` cell is source-only. Pluto prints that as an empty or literal output.
+function blank_cell_output(body::AbstractString)
+    text = strip(replace(body, r"<[^>]*>" => ""))
+    return isempty(text) || text == "nothing"
 end
 
 # `show_code` players list every teaching cell. Markdown cells stay folded
@@ -471,14 +498,21 @@ function show_code_cells_html(cells, widget, htmls, widget_html::AbstractString)
                 """
             )
         else
+            output = if blank_cell_output(body)
+                ""
+            else
+                """
+                  <pluto-output>
+                    <div data-masque-cell="$cid">$body</div>
+                  </pluto-output>
+                """
+            end
             push!(
                 parts, """
                 <pluto-cell>
                   <pluto-trafficlight></pluto-trafficlight>
                   $(source_pre_html(c.code))
-                  <pluto-output>
-                    <div data-masque-cell="$cid">$body</div>
-                  </pluto-output>
+                  $output
                 </pluto-cell>
                 """
             )
@@ -489,7 +523,7 @@ end
 
 function emit_player(path, outpath, player, cells, states, bond::Symbol)
     show_code = get(player, "show_code", false) === true
-    widget = show_code ? masque_widget_cell(cells) : first(cells)
+    widget = show_code ? masque_widget_cell(cells, bond) : first(cells)
     downstream = show_code ? [c for c in cells if c.cell_id != widget.cell_id] : cells[2:end]
     snapshots = Dict{String, Any}()
     n_inlined_total = 0

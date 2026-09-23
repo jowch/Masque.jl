@@ -12,6 +12,17 @@ include(joinpath(@__DIR__, "..", "docs", "player_pipeline.jl"))
 const GS_NB = joinpath(@__DIR__, "..", "docs", "src", "embeds", "getting_started.jl")
 const OVERLAY_JS = joinpath(@__DIR__, "..", "assets", "overlay.js")
 
+@testset "julia source highlight uses Pluto token classes" begin
+    html = highlight_julia_html("@bind pick masque(fig)\n# note\nx = \"a<b\"\n:city\n20")
+    @test occursin("<span class=\"hljs-meta\">@bind</span>", html)
+    @test occursin("<span class=\"hljs-comment\"># note</span>", html)
+    @test occursin("<span class=\"hljs-string\">&quot;a&lt;b&quot;</span>", html)
+    @test occursin("<span class=\"hljs-symbol\">:city</span>", html)
+    @test occursin("<span class=\"hljs-number\">20</span>", html)
+    @test occursin("<span class=\"hljs-keyword\">using</span>", highlight_julia_html("using Masque"))
+    @test !occursin("hljs-symbol", highlight_julia_html("x::Int"))
+end
+
 @testset "snapshot_key matches overlay host.value" begin
     # keyOf in emit_player: null → "null"; {layer, index} → "layer:index"; items → "items:…"
     @test snapshot_key(nothing) == "null"
@@ -217,8 +228,14 @@ end
         player = parse_player_toml(path)
         @test player["bond"] isa AbstractString
         @test !isempty(player["states"])
+        @test player["show_code"] == true
+        @test length(player["cells"]) >= 2
+        @test endswith(player["cells"][1], "0002")
         src = read(path, String)
         @test occursin("path = \"../../..\"", src)
+        for id in player["cells"]
+            @test occursin("# ╔═╡ $id", src)
+        end
     end
 
     tips = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_tooltips.jl"))
@@ -229,6 +246,9 @@ end
     sel = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_selection.jl"))
     sel_keys = [snapshot_key(js_shape_from_toml(row)) for row in sel["states"]]
     @test sel_keys == ["null", "scatter:0", "scatter:2"]
+    @test length(sel["cells"]) == 5
+    @test any(endswith(id, "0005") for id in sel["cells"])
+    @test any(endswith(id, "0006") for id in sel["cells"])
 
     box = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_boxselect.jl"))
     box_keys = [snapshot_key(js_shape_from_toml(row)) for row in box["states"]]

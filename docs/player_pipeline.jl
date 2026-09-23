@@ -70,6 +70,132 @@ function html_escape(s::AbstractString)
     return s
 end
 
+# Pluto's editor colors tokens with `--cm-color-*`. Static players have no CodeMirror,
+# so unfolded source is highlighted into the same classes `highlightjs.css` maps onto
+# those variables.
+const _JULIA_KEYWORDS = Set{String}(
+    [
+        "abstract", "baremodule", "begin", "break", "catch", "const", "continue", "do",
+        "else", "elseif", "end", "export", "false", "finally", "for", "function", "global",
+        "if", "import", "let", "local", "macro", "module", "mutable", "nothing", "primitive",
+        "quote", "return", "struct", "true", "try", "type", "using", "where", "while",
+    ]
+)
+
+function _hljs(class, text)
+    return "<span class=\"hljs-$class\">$(html_escape(text))</span>"
+end
+
+function _scan_string(code, i, n, q)
+    triple = i + 2 <= n && code[i:(i + 2)] == q^3
+    delim = triple ? q^3 : string(q)
+    j = i + ncodeunits(delim)
+    while j <= n
+        if code[j] == '\\'
+            j = nextind(code, j)
+            j <= n && (j = nextind(code, j))
+            continue
+        end
+        if !triple && code[j] == '\n'
+            break
+        end
+        if startswith(SubString(code, j), delim)
+            j += ncodeunits(delim)
+            break
+        end
+        j = nextind(code, j)
+    end
+    return j
+end
+
+function _scan_word(code, i, n)
+    j = i
+    while j <= n
+        c = code[j]
+        (isletter(c) || isdigit(c) || c == '_' || c == '!') || break
+        j = nextind(code, j)
+    end
+    return j
+end
+
+function _scan_number(code, i, n)
+    j = i
+    if code[j] == '.'
+        j = nextind(code, j)
+    end
+    while j <= n
+        c = code[j]
+        (isdigit(c) || c == '_') || break
+        j = nextind(code, j)
+    end
+    if j <= n && code[j] == '.' && (j == n || code[nextind(code, j)] != '.')
+        j = nextind(code, j)
+        while j <= n && (isdigit(code[j]) || code[j] == '_')
+            j = nextind(code, j)
+        end
+    end
+    if j <= n && (code[j] == 'e' || code[j] == 'E')
+        k = nextind(code, j)
+        if k <= n && (code[k] == '+' || code[k] == '-')
+            k = nextind(code, k)
+        end
+        if k <= n && isdigit(code[k])
+            j = k
+            while j <= n && (isdigit(code[j]) || code[j] == '_')
+                j = nextind(code, j)
+            end
+        end
+    end
+    return j
+end
+
+# Highlight a Julia cell the way Pluto's markdown code blocks do: keyword, string,
+# comment, number, macro, and symbol spans. Colors come from the Pluto theme.
+function highlight_julia_html(code::AbstractString)
+    io = IOBuffer()
+    i = 1
+    n = ncodeunits(code)
+    while i <= n
+        c = code[i]
+        if c == '#'
+            j = findnext('\n', code, i)
+            j = j === nothing ? n + 1 : j
+            write(io, _hljs("comment", code[i:prevind(code, j)]))
+            i = j
+        elseif c == '"' || c == '\''
+            j = _scan_string(code, i, n, c)
+            write(io, _hljs("string", code[i:prevind(code, j)]))
+            i = j
+        elseif c == '@'
+            j = _scan_word(code, nextind(code, i), n)
+            write(io, _hljs("meta", code[i:prevind(code, j)]))
+            i = j
+        elseif c == ':' && i < n && (isletter(code[nextind(code, i)]) || code[nextind(code, i)] == '_') &&
+                (i == 1 || code[prevind(code, i)] != ':')
+            j = _scan_word(code, nextind(code, i), n)
+            write(io, _hljs("symbol", code[i:prevind(code, j)]))
+            i = j
+        elseif isdigit(c) || (c == '.' && i < n && isdigit(code[nextind(code, i)]))
+            j = _scan_number(code, i, n)
+            write(io, _hljs("number", code[i:prevind(code, j)]))
+            i = j
+        elseif isletter(c) || c == '_'
+            j = _scan_word(code, i, n)
+            word = code[i:prevind(code, j)]
+            if word in _JULIA_KEYWORDS
+                write(io, _hljs("keyword", word))
+            else
+                write(io, html_escape(word))
+            end
+            i = j
+        else
+            write(io, html_escape(string(c)))
+            i = nextind(code, i)
+        end
+    end
+    return String(take!(io))
+end
+
 # Cairo widget HTML inlines one `data:image/png;base64,…` on `<img>`. Listed states
 # that remount the figure (e.g. a `@bind` cell that changes `alpha`) carry a
 # different URL; the player swaps `img.src` so the PNG matches the snapshot.
