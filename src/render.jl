@@ -415,47 +415,275 @@ function masque(fig; kwargs...)
     return masque(fig, ints; kwargs...)
 end
 
+# One gesture closure's compile-ahead call. `show` schedules it and returns; the closure waits
+# if a drag arrives while it is still running. Keyed by the closure so display and cancellation
+# can find it without a widget field. The closure is immutable, so it cannot be a weak key;
+# the entry is removed when the discarded calls finish or a drag runs them.
+mutable struct _ViewWarmup
+    apply::Function
+    axes::Dict{Symbol, Any}
+    task::Union{Nothing, Task}
+    # The deferred task `wait`s this one before drawing. Joining from it would deadlock.
+    blocked_on::Union{Nothing, Task}
+    started::Bool
+    done::Bool
+    cancelled::Bool
+end
+
+const _VIEW_WARMUPS = IdDict{Function, _ViewWarmup}()
+const _VIEW_WARMUP_LOCK = ReentrantLock()
+
+function _view_warmup_state(render_frame)
+    return lock(_VIEW_WARMUP_LOCK) do
+        return get(_VIEW_WARMUPS, render_frame, nothing)
+    end
+end
+
+function _drop_view_warmup!(render_frame)
+    lock(_VIEW_WARMUP_LOCK) do
+        delete!(_VIEW_WARMUPS, render_frame)
+    end
+    return nothing
+end
+
+# `true` once the discarded calls have finished, or when this closure has nothing scheduled.
+function _view_warmup_finished(render_frame)::Bool
+    state = _view_warmup_state(render_frame)
+    state === nothing && return true
+    return lock(_VIEW_WARMUP_LOCK) do
+        return state.done
+    end
+end
+
+_warmup_cancelled(state::_ViewWarmup) = lock(_VIEW_WARMUP_LOCK) do
+    return state.cancelled
+end
+
+function _run_view_warmup!(state::_ViewWarmup, render_frame)
+    try
+        go = lock(_VIEW_WARMUP_LOCK) do
+            return !state.cancelled
+        end
+        go && _warm_view_render_frame!(state.apply, state.axes; stop = () -> _warmup_cancelled(state))
+    catch err
+        @error "Masque view warmup failed" exception = (err, catch_backtrace())
+    finally
+        lock(_VIEW_WARMUP_LOCK) do
+            state.done = true
+            state.blocked_on = nothing
+        end
+        _drop_view_warmup!(render_frame)
+    end
+    return nothing
+end
+
+# Run the discarded calls after `caller` finishes. On Pluto's worker that task is the cell
+# evaluation, and it flushes the formatted output before it ends, so the browser can hydrate
+# while this runs. The root task (a test or the REPL) never ends; there the call just waits
+# for the next yield, which is after `show` has written the HTML. If `caller` joins first,
+# this task sees `done` and does not draw a second time.
+function _defer_view_warmup!(state::_ViewWarmup, render_frame)
+    caller = current_task()
+    return @async begin
+        if caller !== Base.roottask
+            try
+                wait(caller)
+            catch
+            end
+        end
+        run = lock(_VIEW_WARMUP_LOCK) do
+            return !state.done
+        end
+        run && _run_view_warmup!(state, render_frame)
+    end
+end
+
+function _kick_view_warmup!(render_frame)
+    state = _view_warmup_state(render_frame)
+    state === nothing && return nothing
+    lock(_VIEW_WARMUP_LOCK) do
+        state.started && return nothing
+        state.cancelled && return nothing
+        state.started = true
+        state.blocked_on = current_task() === Base.roottask ? nothing : current_task()
+        state.task = _defer_view_warmup!(state, render_frame)
+    end
+    return nothing
+end
+
+# `on_cancellation` runs just before the cell re-evaluates. A discarded frame may already
+# have moved the camera. Wait until that frame's `finally` puts it back, so the next
+# `masque` on this figure snapshots the mount camera. Running the wait on the task the
+# deferred warmup is blocked on would deadlock; that task runs the restore itself.
+function _cancel_view_warmup!(render_frame)
+    state = _view_warmup_state(render_frame)
+    state === nothing && return nothing
+    run_here = false
+    task = nothing
+    lock(_VIEW_WARMUP_LOCK) do
+        state.cancelled = true
+        if !state.done && state.blocked_on === current_task()
+            state.blocked_on = nothing
+            state.started = true
+            state.task = current_task()
+            run_here = true
+        else
+            task = state.task
+        end
+    end
+    if run_here
+        _run_view_warmup!(state, render_frame)
+    elseif task isa Task && task !== current_task()
+        wait(task)
+    end
+    return nothing
+end
+
+# A drag that lands before the deferred call finishes waits for it. A drag that lands before
+# `show` (tests, a callback with no display) runs the calls on this task instead. A drag on
+# the task the deferred call is blocked on runs the calls here too: waiting would deadlock,
+# and the deferred task then sees `done` and does not draw again.
+function _join_view_warmup!(state::_ViewWarmup, render_frame)
+    run_here = lock(_VIEW_WARMUP_LOCK) do
+        state.done && return false
+        if state.blocked_on === current_task() || !state.started
+            state.blocked_on = nothing
+            state.started = true
+            state.task = current_task()
+            return true
+        end
+        return false
+    end
+    if run_here
+        _run_view_warmup!(state, render_frame)
+    else
+        t = lock(_VIEW_WARMUP_LOCK) do
+            return state.task
+        end
+        t === nothing || t === current_task() || wait(t)
+    end
+    return nothing
+end
+
+function _sync_view_warmup!(render_frame)
+    state = _view_warmup_state(render_frame)
+    state === nothing && return nothing
+    _join_view_warmup!(state, render_frame)
+    return nothing
+end
+
 function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu)
     view_axes = Dict{Symbol, Any}(i.id => i.ax for i in interactables if i isa ViewInteractable)
     isempty(view_axes) && return nothing
-    return function (input)
-        id = Symbol(input["id"])
-        ax = get(view_axes, id, nothing)
-        ax === nothing && throw(
-            ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
+    state = _ViewWarmup(
+        input -> _apply_view_frame(input, view_axes, backend, fig, interactables, ppu),
+        view_axes, nothing, nothing, false, false, false,
+    )
+    frame = function (input)
+        _join_view_warmup!(state, frame)
+        return state.apply(input)
+    end
+    lock(_VIEW_WARMUP_LOCK) do
+        _VIEW_WARMUPS[frame] = state
+    end
+    return frame
+end
+
+function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu)
+    id = Symbol(input["id"])
+    ax = get(view_axes, id, nothing)
+    ax === nothing && throw(
+        ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
+    )
+    if haskey(input, "azimuth")
+        ax.azimuth[] = Float64(input["azimuth"])
+        ax.elevation[] = Float64(input["elevation"])
+    else
+        ax.limits[] = (
+            Float64(input["xmin"]), Float64(input["xmax"]),
+            Float64(input["ymin"]), Float64(input["ymax"]),
         )
-        if haskey(input, "azimuth")
-            ax.azimuth[] = Float64(input["azimuth"])
-            ax.elevation[] = Float64(input["elevation"])
+    end
+    # Frame resolution drops to 1x for every in-drag frame and restores to the mount ppu on
+    # release ("settle", the frontend's terminal request) — the MANIFEST always stays in the
+    # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
+    # moves out from under the overlay; only the PNG's own pixel density changes (the <img>
+    # is width:100% CSS-scaled — see frontend-delivery.md — so that's decoupled from its
+    # intrinsic size).
+    render_ppu = get(input, "settle", false) === true ? ppu : 1.0
+    bg0 = fig.scene.backgroundcolor[]
+    try
+        # Same forcing masque() does around its own render — that guard is restored in ITS
+        # `finally` before this closure ever runs, so each frame has to redo it.
+        fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
+        _finalize!(fig)
+        ctx = context(backend, fig, ppu)
+        manifest = build_manifest(interactables, ctx)
+        result = render(backend, fig, render_ppu)
+        frame = _gesture_frame(result)
+        frame["manifest"] = manifest
+        return frame
+    finally
+        fig.scene.backgroundcolor[] = bg0
+    end
+end
+
+# A real call is what compiles this path (camera write, `ppu=1` render, JS payload). The
+# frames are discarded. `show` schedules it after the mount HTML is written. Tiny nudges plus
+# one farther pose cover the compile a coalesced first drag otherwise still pays. `stop`
+# bails between frames when the cell is replaced; the camera is put back either way.
+function _warm_view_render_frame!(frame, view_axes; stop = () -> false)
+    for (id, ax) in view_axes
+        stop() && break
+        sid = String(id)
+        if hasproperty(ax, :azimuth) && hasproperty(ax, :elevation)
+            az0 = Float64(ax.azimuth[])
+            el0 = Float64(ax.elevation[])
+            try
+                !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.05, "elevation" => el0, "settle" => false))
+                !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0 + 0.05, "settle" => false))
+                !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.8, "elevation" => el0 - 0.2, "settle" => false))
+                !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0, "settle" => true))
+            finally
+                if ax.azimuth[] != az0 || ax.elevation[] != el0
+                    ax.azimuth[] = az0
+                    ax.elevation[] = el0
+                end
+            end
         else
-            ax.limits[] = (
-                Float64(input["xmin"]), Float64(input["xmax"]),
-                Float64(input["ymin"]), Float64(input["ymax"]),
-            )
-        end
-        # Frame resolution drops to 1x for every in-drag frame and restores to the mount ppu on
-        # release ("settle", the frontend's terminal request) — the MANIFEST always stays in the
-        # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
-        # moves out from under the overlay; only the PNG's own pixel density changes (the <img>
-        # is width:100% CSS-scaled — see frontend-delivery.md — so that's decoupled from its
-        # intrinsic size).
-        render_ppu = get(input, "settle", false) === true ? ppu : 1.0
-        bg0 = fig.scene.backgroundcolor[]
-        try
-            # Same forcing masque() does around its own render — that guard is restored in ITS
-            # `finally` before this closure ever runs, so each frame has to redo it.
-            fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
-            _finalize!(fig)
-            ctx = context(backend, fig, ppu)
-            manifest = build_manifest(interactables, ctx)
-            result = render(backend, fig, render_ppu)
-            frame = _gesture_frame(result)
-            frame["manifest"] = manifest
-            return frame
-        finally
-            fig.scene.backgroundcolor[] = bg0
+            lim0 = ax.limits[]
+            fl = _finallimits(ax)
+            xmin = Float64(fl.origin[1])
+            ymin = Float64(fl.origin[2])
+            xmax = xmin + Float64(fl.widths[1])
+            ymax = ymin + Float64(fl.widths[2])
+            dx = 0.01 * (xmax - xmin)
+            dy = 0.01 * (ymax - ymin)
+            try
+                !stop() && frame(
+                    Dict{String, Any}(
+                        "id" => sid, "xmin" => xmin + dx, "xmax" => xmax + dx,
+                        "ymin" => ymin, "ymax" => ymax, "settle" => false,
+                    ),
+                )
+                !stop() && frame(
+                    Dict{String, Any}(
+                        "id" => sid, "xmin" => xmin, "xmax" => xmax,
+                        "ymin" => ymin + dy, "ymax" => ymax + dy, "settle" => false,
+                    ),
+                )
+                !stop() && frame(
+                    Dict{String, Any}(
+                        "id" => sid, "xmin" => xmin, "xmax" => xmax,
+                        "ymin" => ymin, "ymax" => ymax, "settle" => true,
+                    ),
+                )
+            finally
+                ax.limits[] == lim0 || (ax.limits[] = lim0)
+            end
         end
     end
+    return nothing
 end
 
 # Render-time capability question ONLY (§12.9) — NOT how a static export is detected.
@@ -467,7 +695,10 @@ end
 # into the page at all. `null` when there is no callback, or this display can't host one.
 function _request_frame_js(io, render_frame)
     link = render_frame === nothing ? nothing :
-        (APD.is_supported_by_display(io, APD.Display.with_js_link) ? APD.Display.with_js_link(render_frame) : nothing)
+        (
+            APD.is_supported_by_display(io, APD.Display.with_js_link) ?
+            APD.Display.with_js_link(render_frame, () -> _cancel_view_warmup!(render_frame)) : nothing
+        )
     return link === nothing ? HypertextLiteral.JavaScript("null") : link
 end
 
@@ -489,7 +720,11 @@ function Base.show(io::IO, m::MIME"text/html", w::MasqueWidget)
         </div>
         """
     )
-    return show(io, m, html)
+    show(io, m, html)
+    # HTML is in `io`. The discarded compile call runs after this returns; on Pluto's worker
+    # it waits until the cell result has been flushed, so the browser hydrates first.
+    _kick_view_warmup!(w.render_frame)
+    return nothing
 end
 
 # Hydration and click both go through `bond_from_js` (src/bond.jl). `mount.ts` seeds the same

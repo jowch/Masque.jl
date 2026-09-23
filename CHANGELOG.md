@@ -119,6 +119,10 @@ All notable changes to this project are documented here. The format is based on
   An explicit `hoverstyle` stroke is still verbatim and unblended. A browser without
   `mix-blend-mode` draws the fill as that chrome grey at 0.18 opacity; the edge stroke stays
   the flat grey.
+- The first pan or orbit compiles after the plot is on the page. `show` writes the mount
+  image, then a few discarded frames warm the view callback, and the camera is put back.
+  A drag that arrives during that warmup waits for it. Re-running the cell waits until the
+  in-flight frame has restored the camera before the next `masque` on that figure.
 - **`lines!`, `stairs!`, and a `scatterlines!` line are one element: the whole path.**
   A click anywhere along the line (within `tol` of an edge) binds that one line. The
   JavaScript wire index stays 0-based (`0` for a single line); the Julia

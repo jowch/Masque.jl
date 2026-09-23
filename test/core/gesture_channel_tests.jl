@@ -1,6 +1,15 @@
 using Test, Masque, CairoMakie, Makie, FileIO
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
+# `show` publishes the manifest through Pluto. A bare `IOBuffer` refuses that, so the ordering
+# test supplies the hook Pluto puts on the display IO. `with_js_link` stays unsupported here;
+# the mount `<img>` does not need it.
+function _pluto_display_io()
+    buf = IOBuffer()
+    io = IOContext(buf, :pluto_published_to_js => (io, x) -> print(io, "null"))
+    return io, buf
+end
+
 @testset "Gesture channel (#102)" begin
     @testset "no ViewInteractable -> no render_frame" begin
         (; fig, ax, pts) = default_fixture()
@@ -83,6 +92,183 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         (; fig, ax, pts) = default_fixture()
         w = masque(fig, [ViewInteractable(ax; id = :view), PointInteractable(ax, pts)])
         @test_throws ArgumentError w.render_frame(Dict("id" => "nope", "xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0))
+    end
+
+    @testset "display writes the mount image before the view warmup" begin
+        fig3 = Figure(size = (400, 400))
+        ax3 = Axis3(fig3[1, 1])
+        scatter!(ax3, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
+        az0, el0 = ax3.azimuth[], ax3.elevation[]
+        w3 = masque(fig3, [ViewInteractable(ax3)])
+        @test w3.render_frame isa Function
+        @test !Masque._view_warmup_finished(w3.render_frame)
+        sender3 = @async begin
+            io, buf = _pluto_display_io()
+            show(io, MIME"text/html"(), w3)
+            html = String(take!(buf))
+            # This task is the stand-in for Pluto's cell task: `show` has the bytes, and the
+            # warmup waits for this task to finish before it touches the camera.
+            @test occursin("data:image/png;base64,", html)
+            @test !Masque._view_warmup_finished(w3.render_frame)
+            @test ax3.azimuth[] ≈ az0 atol = 1.0e-12
+            @test ax3.elevation[] ≈ el0 atol = 1.0e-12
+            return html
+        end
+        wait(sender3)
+        Masque._sync_view_warmup!(w3.render_frame)
+        @test Masque._view_warmup_finished(w3.render_frame)
+        @test ax3.azimuth[] ≈ az0 atol = 1.0e-12
+        @test ax3.elevation[] ≈ el0 atol = 1.0e-12
+
+        fig2 = Figure(size = (600, 400))
+        ax2 = Axis(fig2[1, 1])
+        pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
+        scatter!(ax2, first.(pts), last.(pts))
+        lim0 = ax2.limits[]
+        w2 = masque(fig2, [ViewInteractable(ax2), PointInteractable(ax2, pts)])
+        sender2 = @async begin
+            io, buf = _pluto_display_io()
+            show(io, MIME"text/html"(), w2)
+            html = String(take!(buf))
+            @test occursin("data:image/png;base64,", html)
+            @test !Masque._view_warmup_finished(w2.render_frame)
+            @test ax2.limits[] == lim0
+            return html
+        end
+        wait(sender2)
+        Masque._sync_view_warmup!(w2.render_frame)
+        @test Masque._view_warmup_finished(w2.render_frame)
+        @test ax2.limits[] == lim0
+    end
+
+    # Block after the first discarded frame, once the camera has moved and before `finally`
+    # puts it back. `release` is what lets that frame's caller continue.
+    function _pause_after_first_frame!(render_frame, nudged, release)
+        state = Masque._view_warmup_state(render_frame)
+        inner = state.apply
+        hits = Ref(0)
+        state.apply = function (input)
+            out = inner(input)
+            hits[] += 1
+            if hits[] == 1
+                put!(nudged, nothing)
+                take!(release)
+            end
+            return out
+        end
+        return state
+    end
+
+    @testset "cancel waits until the in-flight warmup restores the camera" begin
+        fig = Figure(size = (400, 400))
+        ax = Axis3(fig[1, 1])
+        scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
+        az0, el0 = ax.azimuth[], ax.elevation[]
+        w = masque(fig, [ViewInteractable(ax)])
+        nudged = Channel{Nothing}(1)
+        release = Channel{Nothing}(1)
+        _pause_after_first_frame!(w.render_frame, nudged, release)
+        sender = @async begin
+            io, _ = _pluto_display_io()
+            show(io, MIME"text/html"(), w)
+        end
+        wait(sender)
+        take!(nudged)
+        @test abs(ax.azimuth[] - az0) > 1.0e-8 || abs(ax.elevation[] - el0) > 1.0e-8
+        canceller = @async Masque._cancel_view_warmup!(w.render_frame)
+        seen = false
+        for _ in 1:100
+            yield()
+            state = Masque._view_warmup_state(w.render_frame)
+            state !== nothing && state.cancelled && (seen = true)
+            seen && !istaskdone(canceller) && break
+        end
+        @test seen && !istaskdone(canceller)
+        put!(release, nothing)
+        wait(canceller)
+        @test ax.azimuth[] ≈ az0 atol = 1.0e-12
+        @test ax.elevation[] ≈ el0 atol = 1.0e-12
+        # The next mount on this figure must sample the restored camera, not the nudge.
+        w2 = masque(fig, [ViewInteractable(ax)])
+        @test ax.azimuth[] ≈ az0 atol = 1.0e-12
+        @test ax.elevation[] ≈ el0 atol = 1.0e-12
+        Masque._sync_view_warmup!(w2.render_frame)
+    end
+
+    @testset "a drag during warmup waits and keeps the requested camera" begin
+        fig = Figure(size = (400, 400))
+        ax = Axis3(fig[1, 1])
+        scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
+        az0, el0 = ax.azimuth[], ax.elevation[]
+        requested_az, requested_el = az0 + 0.4, el0 - 0.15
+        w = masque(fig, [ViewInteractable(ax)])
+        go = Channel{Nothing}(1)
+        entered = Ref(false)
+        result = Ref{Any}(nothing)
+        drag = @async begin
+            take!(go)
+            entered[] = true
+            result[] = w.render_frame(
+                Dict("id" => "view", "azimuth" => requested_az, "elevation" => requested_el, "settle" => false),
+            )
+        end
+        sender = @async begin
+            io, buf = _pluto_display_io()
+            show(io, MIME"text/html"(), w)
+            @test occursin("data:image/png;base64,", String(take!(buf)))
+            @test !Masque._view_warmup_finished(w.render_frame)
+            @test ax.azimuth[] ≈ az0 atol = 1.0e-12
+            put!(go, nothing)
+            while !entered[]
+                yield()
+            end
+            # The drag is inside `render_frame` and this task has not ended, so the deferred
+            # warmup has not started. Returning is what lets it run; the drag waits for that.
+            @test !Masque._view_warmup_finished(w.render_frame)
+        end
+        wait(sender)
+        wait(drag)
+        @test Masque._view_warmup_finished(w.render_frame)
+        @test ax.azimuth[] ≈ requested_az atol = 1.0e-9
+        @test ax.elevation[] ≈ requested_el atol = 1.0e-9
+        view_layer = only(l for l in result[]["manifest"]["layers"] if l["kind"] == "view")
+        @test view_layer["geometry"]["azimuth"] ≈ requested_az atol = 1.0e-9
+        @test view_layer["geometry"]["elevation"] ≈ requested_el atol = 1.0e-9
+        yield()
+        @test ax.azimuth[] ≈ requested_az atol = 1.0e-9
+        @test ax.elevation[] ≈ requested_el atol = 1.0e-9
+    end
+
+    @testset "show then render_frame on the displaying task does not deadlock" begin
+        fig = Figure(size = (400, 400))
+        ax = Axis3(fig[1, 1])
+        scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
+        az0, el0 = ax.azimuth[], ax.elevation[]
+        requested_az, requested_el = az0 + 0.25, el0 + 0.1
+        w = masque(fig, [ViewInteractable(ax)])
+        worker = @async begin
+            io, _ = _pluto_display_io()
+            show(io, MIME"text/html"(), w)
+            @test !Masque._view_warmup_finished(w.render_frame)
+            return w.render_frame(
+                Dict("id" => "view", "azimuth" => requested_az, "elevation" => requested_el, "settle" => false),
+            )
+        end
+        watchdog = Timer(60)
+        @async begin
+            wait(watchdog)
+            istaskdone(worker) || Base.throwto(worker, ErrorException("warmup join deadlocked"))
+        end
+        resp = try
+            fetch(worker)
+        finally
+            close(watchdog)
+        end
+        @test Masque._view_warmup_finished(w.render_frame)
+        @test ax.azimuth[] ≈ requested_az atol = 1.0e-9
+        @test ax.elevation[] ≈ requested_el atol = 1.0e-9
+        view_layer = only(l for l in resp["manifest"]["layers"] if l["kind"] == "view")
+        @test view_layer["geometry"]["azimuth"] ≈ requested_az atol = 1.0e-9
     end
 
     @testset "MasqueWidget 3-arg constructor still works (render_frame defaults to nothing)" begin

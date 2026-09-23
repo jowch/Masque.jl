@@ -451,3 +451,31 @@ end
     @test occursin("const requestFrame = null", html)
     @test occursin("window.Masque.mount", html)
 end
+
+@testset "webgl show kicks the view warmup before it runs" begin
+    fig = Figure(; size = (300, 200))
+    ax = Axis3(fig[1, 1])
+    scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
+    az0, el0 = ax.azimuth[], ax.elevation[]
+    w = masque(fig, [ViewInteractable(ax)]; backend = _WGLExt.WebGLBackend())
+    sender = @async begin
+        buf = IOBuffer()
+        io = IOContext(buf, :pluto_published_to_js => (io, x) -> print(io, "null"))
+        show(io, MIME"text/html"(), w)
+        html = String(take!(buf))
+        state = Masque._view_warmup_state(w.render_frame)
+        return (;
+            html, kicked = state !== nothing && state.started && state.task isa Task && !state.done,
+            az = ax.azimuth[], el = ax.elevation[],
+        )
+    end
+    got = fetch(sender)
+    @test occursin("<canvas", got.html)
+    @test got.kicked
+    @test got.az ≈ az0 atol = 1.0e-12
+    @test got.el ≈ el0 atol = 1.0e-12
+    Masque._sync_view_warmup!(w.render_frame)
+    @test Masque._view_warmup_finished(w.render_frame)
+    @test ax.azimuth[] ≈ az0 atol = 1.0e-12
+    @test ax.elevation[] ≈ el0 atol = 1.0e-12
+end

@@ -399,7 +399,8 @@ own dispatch overhead + browser PNG decode+paint) — issue #102's spike measure
 implementation should change that floor, since the wire shape (`{png, manifest}`, PNG as raw
 bytes not base64) matches what the spike round-tripped. `test/e2e/kind_sweep.mjs`'s
 `view/view-gesture-frame` check confirms a real frame lands end-to-end through an actual Pluto
-kernel + headless Chromium, but does not time it.
+kernel + headless Chromium, but does not time it. The discarded warmup this bench leaves out of
+the timed trials is measured on its own in the view-warmup section below.
 
 ### Gesture channel (#133): `:webgl` scene frames
 
@@ -427,7 +428,65 @@ milliseconds as the light helix, and it pays in payload (522.2 KB wire, 1392.0 K
 in a raster. Dropping `pxPerUnit` to 1 does not shrink that payload. It only tells the browser
 to draw into a smaller framebuffer. Transfer and three.js deserialize/paint are not in this
 table. `test/e2e/kind_sweep.mjs`'s `view/view-gesture-frame` check is what confirms a frame
-lands on the live canvas.
+lands on the live canvas. The discarded warmup this bench leaves out of the timed trials is
+measured on its own in the next section.
+
+### View warmup runs after the mount HTML
+
+Measured **2026-09-22**, Julia 1.10.12, `OPENBLAS_NUM_THREADS=1`, two fresh processes per
+backend via `bench/view_warmup.jl`. Same three scenes
+as the gesture-channel benches. No browser and no Pluto kernel. `published_to_js` is stubbed to
+`null`; the Cairo PNG is already on the widget and is written into the `<img>`. On every row the
+mount HTML was written before the discarded frames started, and the camera matched the mount
+image again after they finished.
+
+`masque` is the mount render. `show` writes that HTML and returns. The discarded frames run
+after that. "cold" is the first widget of that scene in the process. "warm" is the next
+identical widget, after those methods exist. Scenes run light orbit, then heavy orbit, then 2D
+pan, so the heavy and pan rows do not repeat the light orbit's first-call compile. A drag that
+arrives while the discarded frames are still running waits for them and then renders.
+
+Orbit discards four frames: an azimuth nudge, an elevation nudge, a farther pose, then a settle
+at the original angles. Pan discards three: an x shift, a y shift, then a settle. Times below
+are those frames in that order, milliseconds, as a range across the two processes.
+
+| backend | scene | pass | `masque` | `show` | discarded frames | drag p50 | settle p50 |
+|---|---|---|---:|---:|---|---:|---:|
+| cairo | light orbit | cold | 1509–1564 | 86–87 | 1502–1546, 10, 194–196, 22–36 | 8.2–8.3 | 19.3–19.4 |
+| cairo | light orbit | warm | 21–22 | 0.5 | ~9, ~9, ~9, ~33 | 7.9 | 18.3–19.0 |
+| cairo | heavy orbit | cold | 193–209 | 0.6 | 219–247, 65–66, 77–79, 99–103 | 61–63 | 92 |
+| cairo | heavy orbit | warm | 105–129 | 0.6–0.7 | ~66, ~65, ~78, 100–161 | 62–63 | 92–93 |
+| cairo | 2D pan | cold | 116–117 | 0.1 | ~39, ~5, ~12 | 3.2 | 10.4–10.6 |
+| cairo | 2D pan | warm | 13 | 0.1 | ~4, ~4–5, ~11–12 | 3.1–3.3 | 10.5–10.9 |
+| webgl | light orbit | cold | 2152–2170 | 118–131 | 1310–1370, ~5, 324–333, ~5 | 3.2–3.3 | 3.5 |
+| webgl | light orbit | warm | 11–12 | 0.1 | ~4, ~4, ~5, ~5 | 3.3–3.6 | 3.5 |
+| webgl | heavy orbit | cold | 44–46 | 0.1 | 122–130, ~4–5, ~5, ~5 | 3.4 | 3.6–4.2 |
+| webgl | heavy orbit | warm | 12–13 | 0.1 | 4–21, ~4, ~5, ~5 | 3.2–3.3 | 3.4–3.7 |
+| webgl | 2D pan | cold | 101–103 | 0.1 | 509–527, 13–14, ~2–3 | 1.2 | 1.1–1.2 |
+| webgl | 2D pan | warm | 8 | 0.1 | ~2, ~3, ~2 | 1.2 | 1.2–1.4 |
+
+The first discarded orbit frame is the gesture-path compile, about 1.5 s on Cairo and 1.3–1.4 s
+on WebGL. It runs after `show` has written the HTML. The farther pose adds about 0.2 s on Cairo
+and about 0.3 s on WebGL, once, on that first orbit. The mount compile stays in `masque`: the
+first Axis3 in a process is 1.5–1.6 s on Cairo and 2.2 s on WebGL before the HTML exists. Later
+widgets pay the mount render only (Cairo light ~22 ms, Cairo heavy 105–129 ms, WebGL ~12 ms).
+
+Once those methods exist, the discarded frames are ordinary renders. Cairo heavy is the
+expensive steady case, a few hundred milliseconds of raster after the HTML is already written.
+Warm WebGL stays around 20 ms even with the 80×80 surface, and the drag p50 matches the
+`:webgl` table above. The first 2D pan still compiles its own limit updates: about 40 ms on
+Cairo, about 0.5 s on WebGL, in the first discarded frame, also after the HTML.
+
+A drag during a warm warmup waited about the sum of the discarded frames plus one in-drag
+frame. One sample each: Cairo light 59–72 ms, Cairo heavy 380 ms, WebGL light 25–39 ms, WebGL
+heavy 38 ms. Two further samples waited longer (Cairo light 273 ms, WebGL light 180 ms) while
+the frames themselves still added up to the short number, so that extra time was outside the
+renders. The first `show` in a process is 86–131 ms and later shows are under 1 ms; that cost
+is inside the HTML write.
+
+Drag and settle here are a p50 of 5 after the discarded frames, not the best-of-20 in the
+tables above, and the Cairo steady numbers there were taken on Julia 1.12.7. This section does
+not replace those tables.
 
 ## Stress test — the extremes (where it stops being render-bound)
 
