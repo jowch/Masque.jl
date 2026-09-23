@@ -69,8 +69,7 @@ function queueDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
     })
 }
 
-// ctrl-click opens the context menu on Apple platforms only. Elsewhere it is a modified
-// primary click and has to keep today's drag/click behaviour.
+// ctrl-click is a context menu on Apple platforms only.
 function isApplePlatform(): boolean {
     const nav = navigator as Navigator & { userAgentData?: { platform?: string } }
     const platform = nav.userAgentData?.platform
@@ -82,13 +81,9 @@ function isMacContextClick(e: PointerEvent): boolean {
     return e.button === 0 && e.ctrlKey && isApplePlatform()
 }
 
-// The native menu's target is a fresh hit-test, not the pointerdown target, and a synthetic
-// contextmenu does not open Save image as…. Drop the surface out of hit-testing until that
-// test runs. It runs after this pointerdown returns (Linux/Mac, on press) or synchronously
-// after pointerup returns, still inside that input task (Windows, on release) — so restoring
-// at the end of pointerdown is too early, and restoring inside the pointerup listener is too
-// early on Windows. A microtask after contextmenu, or a 0-timeout after pointerup, is the
-// first turn after the hit-test. The 1s timer covers a press that never produces either.
+// The menu is hit-tested after pointerdown returns, or after pointerup on Windows.
+// Restoring any sooner targets this surface again. The timer covers a press that never
+// produces either event.
 function passContextToBase(surface: HTMLElement, pointerId: number): void {
     surface.classList.add("passthrough")
     let restored = false
@@ -123,10 +118,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     if (state.drag_) return
     cancelPendingMove(state)
     state.justDragged_ = false
-    // Non-primary buttons never start a drag and never preventDefault — preventDefault on
-    // the right button suppresses the native menu. Button 2, and Mac ctrl-click (button 0),
-    // also have to hit the base <img>/<canvas>; see passContextToBase. Middle-click just
-    // returns: it must not drag, and it is not a context menu.
+    // preventDefault here suppresses the native menu.
     if (e.button !== 0 || isMacContextClick(e)) {
         if (e.button === 2 || isMacContextClick(e)) passContextToBase(ctx.surface_, e.pointerId)
         return

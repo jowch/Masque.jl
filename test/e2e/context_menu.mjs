@@ -1,11 +1,4 @@
-// #88: right-click must reach the base element. Not part of the standing
-// kind_sweep/polish_verify pair — those still have to pass — this checks the
-// claim they don't: the native menu targets the Cairo <img> (so Save image as…
-// is the browser's), a right-press does not start a threshold/ROI/view drag,
-// and hover/click still work after the menu closes. On :webgl the target is the
-// <canvas> and there is no Masque menu.
-//
-//   node context_menu.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
+// node context_menu.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -56,7 +49,6 @@ try {
   let tick = 0;
   while (Date.now() < deadline) {
     const st = await page.evaluate(() => {
-      // Once: a repeated click re-runs the notebook and tears the canvas down mid-check.
       const runBtn = [...document.querySelectorAll("button, a")].find((b) => /run notebook code/i.test(b.innerText || b.title || ""));
       if (runBtn && !window.__masqueClickedRun) { runBtn.click(); window.__masqueClickedRun = true; }
       const hosts = [...document.querySelectorAll(".ip-host")];
@@ -164,7 +156,6 @@ try {
     passed.push(`${key}/contextmenu-targets-${expectBase}`);
   }
 
-  // A right-press on a drag kind must not engage the gesture.
   for (const key of ["threshold", "view"]) {
     const before = await hostBox(key);
     await clearMenu();
@@ -219,7 +210,6 @@ try {
   if (custom.length) throw new Error(`custom context menu in the overlay: ${custom.join(", ")}`);
   passed.push("no-custom-menu");
 
-  // Overlay still hit-tests after the menu closes: a real left click on a scatter mark binds.
   {
     const layers = await page.evaluate(() => JSON.parse(document.querySelector("#coords_scatter").textContent));
     const pts = layers.find((l) => l.kind === "circles");

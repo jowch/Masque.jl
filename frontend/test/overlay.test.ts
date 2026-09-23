@@ -854,9 +854,7 @@ describe("pointer capture, cancel, and coalesced drag release", () => {
     })
 })
 
-// #88: the overlay surface must not eat the right button. The native image menu is a fresh
-// hit-test after pointerdown (not a synthetic contextmenu), so the surface drops out via
-// .passthrough; happy-dom does not retarget, and the live check covers that half.
+// happy-dom does not retarget hit-tests.
 describe("right-click passes through to the base image", () => {
     const dragManifests = (): { name: string; manifest: Manifest; x: number; y: number }[] => [
         { name: "threshold", x: 300, y: 200, manifest: {

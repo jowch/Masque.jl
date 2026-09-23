@@ -65,7 +65,6 @@ function isLightBackground(css: string | undefined): boolean {
 const STYLE = `
 :host { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
 .surface { position: absolute; inset: 0; cursor: crosshair; pointer-events: auto; }
-/* #88: on only for the contextmenu hit-test, so the native menu targets the base image. */
 .surface.passthrough { pointer-events: none; }
 .surface.hot { cursor: pointer; }
 .surface.grab { cursor: grab; }
