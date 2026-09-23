@@ -202,4 +202,80 @@ end
         sc = scatter!(axp, [1.0], [1.0])
         @test_throws ArgumentError SliceInteractable(axp, sc)
     end
+
+    # Packed the way hitlayers ships it: vertical is (x, y), horizontal is (y, x).
+    function _packed(s, orientation)
+        xy = Float64[]
+        if orientation === :vertical
+            for k in eachindex(s.x)
+                push!(xy, s.x[k], s.y[k])
+            end
+        else
+            for k in eachindex(s.x)
+                push!(xy, s.y[k], s.x[k])
+            end
+        end
+        return xy
+    end
+
+    @testset "plot constructor: stairs holds the tread" begin
+        f = Figure(); ax = Axis(f[1, 1])
+        xs = [0.0, 1.0, 2.0, 3.0]
+        ys = [0.0, 2.0, 1.0, 3.0]
+        # :pre repeats x on the riser. The series constructor still rejects that repeat.
+        @test_throws ArgumentError SliceInteractable(
+            ax; series = [(; x = [0.0, 0.0, 1.0], y = [0.0, 2.0, 2.0])],
+        )
+        for step in (:pre, :post, :center)
+            p = stairs!(ax, xs, ys; step)
+            Makie.update_state_before_display!(f)
+            s = SliceInteractable(ax, p)
+            @test s.orientation === :vertical
+            @test s.covers == [:stairs]
+            xy = _packed(only(s.series), :vertical)
+            if step === :pre
+                # (0,0),(0,2),(1,2),(1,1),(2,1),(2,3),(3,3) — constant between risers
+                @test _lerp_probe(xy, 0.5) == 2.0
+                @test _lerp_probe(xy, 1.5) == 1.0
+                @test _lerp_probe(xy, 2.5) == 3.0
+                @test _lerp_probe(xy, 1.0) == 2.0   # riser x: the y the riser starts at
+            elseif step === :post
+                @test _lerp_probe(xy, 0.5) == 0.0
+                @test _lerp_probe(xy, 1.5) == 2.0
+                @test _lerp_probe(xy, 2.5) == 1.0
+                @test _lerp_probe(xy, 1.0) == 0.0
+            else
+                @test _lerp_probe(xy, 0.25) == 0.0
+                @test _lerp_probe(xy, 1.0) == 2.0
+                @test _lerp_probe(xy, 2.0) == 1.0
+                @test _lerp_probe(xy, 2.75) == 3.0
+                @test _lerp_probe(xy, 0.5) == 0.0
+            end
+        end
+    end
+
+    @testset "plot constructor: direction=:y samples the drawn edge" begin
+        f = Figure(); ax = Axis(f[1, 1])
+        b = band!(ax, [0.0, 1.0, 2.0], zeros(3), [1.0, 2.0, 3.0]; direction = :y)
+        wig = band!(ax, [0.0, 1.0, 2.0], zeros(3), [1.0, 3.0, 2.0]; direction = :y)
+        rng = MersenneTwister(1)
+        d = density!(ax, randn(rng, 40); direction = :y, label = "kde")
+        Makie.update_state_before_display!(f)
+        sb = SliceInteractable(ax, b; covers = ())
+        @test sb.orientation === :horizontal
+        @test sb.series[1].x == [1.0, 2.0, 3.0]
+        @test sb.series[1].y == [0.0, 1.0, 2.0]
+        @test _lerp_probe(_packed(only(sb.series), :horizontal), 1.0) == 2.0
+        sw = SliceInteractable(ax, wig; covers = ())
+        @test sw.orientation === :horizontal
+        @test sw.series[1].y == [0.0, 1.0, 2.0]
+        @test sw.series[1].x == [1.0, 3.0, 2.0]
+        @test _lerp_probe(_packed(only(sw.series), :horizontal), 0.5) == 2.0
+        sd = SliceInteractable(ax, d; covers = ())
+        @test sd.orientation === :horizontal
+        @test sd.series[1].id === :kde
+        @test length(sd.series[1].y) >= 2
+        @test issorted(sd.series[1].y, lt = <)
+        @test _lerp_probe(_packed(only(sd.series), :horizontal), sd.series[1].y[2]) == sd.series[1].x[2]
+    end
 end

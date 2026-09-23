@@ -580,6 +580,18 @@ describe("projectAxis / sampleSlice", () => {
         expect(at(3.5).samples.find((s) => s.id === "c")!.value).toBeCloseTo(1)
         expect(at(-1).samples).toEqual([])
     })
+    it("sampleSlice holds a stair tread when the riser repeats the probe", () => {
+        // :pre steppoints of (0,0), (1,2), (2,1), (3,3)
+        const geom = {
+            orientation: "v" as const, covers: [],
+            series: [{ id: "s", xy: [0, 0, 0, 2, 1, 2, 1, 1, 2, 1, 2, 3, 3, 3] }],
+        }
+        const at = (x: number) => sampleSlice(geom, identity, x, 0)!.samples[0].value
+        expect(at(0.5)).toBeCloseTo(2)
+        expect(at(1.5)).toBeCloseTo(1)
+        expect(at(2.5)).toBeCloseTo(3)
+        expect(at(1)).toBeCloseTo(2)
+    })
     it("a slice layer is not a hit target", () => {
         const layer: HitLayer = {
             id: "s", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],

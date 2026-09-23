@@ -831,9 +831,12 @@ function auto_interactables(fig)
 end
 
 # --- SliceInteractable from a plot -----------------------------------------------------------
-# Vertices are the converted points the plot already draws. Density/Band contribute the band's
-# upper curve (the same `_conv` PolygonInteractable reads — not a recomputed KDE). A strictly
-# decreasing probe is stored left-to-right; a non-monotonic one fails in the constructor.
+# Vertices are the points the plot already draws. Stairs keeps the child line's steppoints,
+# repeated probe and all, so a tread samples as a constant. Density/Band contribute the band's
+# upper curve as drawn (not a recomputed KDE): a Band with direction=:y is stored unflipped
+# and swapped here; a Density with direction=:y is already Point2(value, position) and is not
+# swapped again. A strictly decreasing probe is stored left-to-right; a non-monotonic one fails
+# in the constructor.
 
 function _slice_xy(pts)
     xs = Float64[]
@@ -893,7 +896,9 @@ function _slice_parts(p)
         lab = _slice_label(p)
         col = _slice_color(p)
         col === nothing && (col = _slice_color(line))
-        return :vertical, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys)], :stairs
+        # plateau: :pre, :post, and :center each repeat x on the riser. Kept, so the linear
+        # sampler holds the tread instead of interpolating across the step.
+        return :vertical, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys, plateau = true)], :stairs
     elseif p isa Makie.Series
         children = _child_plots(p)
         isempty(children) && error("SliceInteractable: Series has no child lines")
@@ -905,16 +910,28 @@ function _slice_parts(p)
             push!(series, (; id = _slice_ident_id(lab), label = lab, color = _slice_color(line), x = xs, y = ys))
         end
         return :vertical, series, :series
-    elseif p isa Union{Makie.Band, Makie.Density}
-        band = p isa Makie.Density ? _descendant(p, Makie.Band) : p
-        orient = band.direction[] === :y ? :horizontal : :vertical
+    elseif p isa Makie.Density
+        # The child band is called with no direction, so it stays :x. direction=:y already
+        # stored Point2(offset + density, k.x); swapping that again would undo the curve.
+        band = _descendant(p, Makie.Band)
+        orient = p.direction[] === :y ? :horizontal : :vertical
         _lower, upper = _conv(band)
         xs, ys = _slice_xy(upper)
         lab = _slice_label(p)
         col = _slice_color(p)
         col === nothing && (col = _slice_color(band))
-        stem = p isa Makie.Density ? :density : :band
-        return orient, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys)], stem
+        return orient, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys)], :density
+    elseif p isa Makie.Band
+        # converted[] stays Point2(x, yupper). direction=:y flips only the mesh, so the
+        # drawn upper edge is reverse.(point).
+        swap = p.direction[] === :y
+        orient = swap ? :horizontal : :vertical
+        _lower, upper = _conv(p)
+        xs, ys = _slice_xy(upper)
+        swap && ((xs, ys) = (ys, xs))
+        lab = _slice_label(p)
+        col = _slice_color(p)
+        return orient, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys)], :band
     else
         throw(
             ArgumentError(
@@ -942,8 +959,9 @@ end
 One slice from a `Lines`, `Stairs`, `Series`, `Band`, or `Density`, or from a vector of those.
 See [`SliceInteractable`](@ref) for the series constructor. `covers=nothing` (the default) names
 each plot's auto-extract layer id (`:lines`, `:stairs`, `:series`, `:band`, `:density`, with
-`_2`, `_3`, … when the vector repeats a kind). `orientation=nothing` follows the plot:
-`Density`/`Band` with `direction == :y` are `:horizontal`, everything else is `:vertical`.
+`_2`, `_3`, … when the vector repeats a kind). That count is inside this vector, not across
+the figure. `orientation=nothing` follows the plot: a `Density` uses its own `direction`, and
+a `Band` uses its `direction`; `:y` is `:horizontal` and everything else is `:vertical`.
 A vector that mixes those raises `ArgumentError` unless `orientation` is passed.
 """
 function SliceInteractable(
@@ -965,7 +983,8 @@ function SliceInteractable(
                 auto_n += 1
                 sid = Symbol("s", auto_n)
             end
-            push!(series, (; id = sid, label = part.label, color = part.color, x = part.x, y = part.y))
+            plateau = hasproperty(part, :plateau) && part.plateau === true
+            push!(series, (; id = sid, label = part.label, color = part.color, x = part.x, y = part.y, plateau))
         end
     end
     uniq = unique(orients)

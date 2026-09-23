@@ -1412,7 +1412,8 @@ committed. Produces one `:slice` [`HitLayer`](@ref), which is not a hit target.
   `id` (default `:s1`, `:s2`, …), `label`, and `color`. For `:vertical`, `x` is strictly
   increasing; for `:horizontal`, `y` is. A non-finite probe coordinate starts a new run, and
   a run of one point cannot be interpolated. A decreasing or repeated probe coordinate raises
-  `ArgumentError`.
+  `ArgumentError`. A `Stairs` plot is the exception: its steppoints repeat the probe on each
+  riser, and that repeat is kept.
 - `orientation` — `:vertical` (sample `y` at the cursor's data `x`, and draw the vertical hair;
   the default) or `:horizontal` (sample `x` at the cursor's data `y`, and draw the horizontal
   hair). On the plot constructor, `nothing` (the default) follows the plot: a `Density` or
@@ -1432,9 +1433,13 @@ committed. Produces one `:slice` [`HitLayer`](@ref), which is not a hit target.
   over those same fields, and `false` suppresses the card. A marker that is not covered, and a
   colorbar, keep their own tooltip. `tooltip = true` is rejected (`ArgumentError`).
 - `plot` / `plots` — a `Lines`, `Stairs`, `Series`, `Band`, or `Density`, or a vector of
-  those. Vertices are the converted points those plots already draw. `Density` and `Band`
-  contribute the band's upper curve. A vector becomes one slice; mixed orientations raise
-  `ArgumentError` unless `orientation` is passed.
+  those. Vertices are the points those plots already draw. `Stairs` uses the child line's
+  steppoints, so between risers the sample is constant; at a riser the sample is the y where
+  that riser starts. `Density` and `Band` contribute the band's upper curve as drawn. A `Band`
+  with `direction = :y` flips its converted edge (Makie swaps only the mesh). A `Density` with
+  `direction = :y` already stores `Point2(offset + density, x)` and is `:horizontal`; it is not
+  flipped again. A vector becomes one slice; mixed orientations raise `ArgumentError` unless
+  `orientation` is passed.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` or a `PolarAxis`, if
 either scale is not client-invertible (`identity`, `log10`, `log`), if either axis is
@@ -1464,7 +1469,7 @@ function _slice_covers(covers)
     return Symbol[Symbol(c) for c in covers]
 end
 
-function _slice_probe_ok(probe, id::Symbol)
+function _slice_probe_ok(probe, id::Symbol; plateau::Bool = false)
     prev = nothing
     run = 0
     long = false
@@ -1476,10 +1481,13 @@ function _slice_probe_ok(probe, id::Symbol)
         end
         run += 1
         run >= 2 && (long = true)
-        if prev !== nothing && v <= prev
+        # A stair riser repeats the probe. The series constructor stays strict; only the
+        # Stairs plot path sets plateau, so a caller-supplied repeat still errors.
+        if prev !== nothing && (plateau ? v < prev : v <= prev)
+            how = plateau ? "increasing" : "strictly increasing"
             throw(
                 ArgumentError(
-                    "SliceInteractable: series :$id probe coordinate must be strictly increasing, got $v after $prev",
+                    "SliceInteractable: series :$id probe coordinate must be $how, got $v after $prev",
                 )
             )
         end
@@ -1504,8 +1512,9 @@ function _slice_one(s, i::Int, orientation::Symbol)
     id = hasproperty(s, :id) && s.id !== nothing ? Symbol(s.id) : Symbol("s", i)
     label = hasproperty(s, :label) && s.label !== nothing ? String(s.label) : nothing
     color = hasproperty(s, :color) && s.color !== nothing ? s.color : nothing
+    plateau = hasproperty(s, :plateau) && s.plateau === true
     probe = orientation === :vertical ? x : y
-    _slice_probe_ok(probe, id)
+    _slice_probe_ok(probe, id; plateau)
     return (; id, label, color, x, y)
 end
 
