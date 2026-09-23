@@ -44,6 +44,66 @@ function _marker_extent_factor(marker)
     shape !== nothing && return Float64(maximum(Makie.widths(Makie.bbox(shape))))
     return 1.0
 end
+
+# Theme `markersize` (a scalar, or Makie's per-point vector) as one diameter. The points
+# constructor's fallback when no single scatter matches — default `:circle`, not a fixed 9.
+function _theme_markersize()
+    ms = Makie.theme(:markersize)
+    v = ms isa Makie.Observable ? ms[] : ms
+    return v isa AbstractVector ? (isempty(v) ? 0.0 : Float64(maximum(v))) : Float64(v)
+end
+_default_circle_radius() = _theme_markersize() * _marker_extent_factor(:circle) / 2
+
+# Every Scatter under `ax`, including a recipe's child (scatterlines!/stem! keep the marker
+# on a child plot, not the recipe object `ax.scene.plots` lists).
+function _scatters_on(ax)
+    found = Makie.Scatter[]
+    seen = IdDict{Any, Nothing}()
+    function walk(p)
+        haskey(seen, p) && return nothing
+        seen[p] = nothing
+        p isa Makie.Scatter && push!(found, p)
+        for c in _child_plots(p)
+            walk(c)
+        end
+        return nothing
+    end
+    scene = ax isa Makie.Scene ? ax : ax.scene
+    for p in _child_plots(scene)
+        walk(p)
+    end
+    return found
+end
+
+# Same length and the same positions, in order. Compared as Point3f (z = 0 for 2D) so a
+# tuple, a Point2, and the scatter's converted vector agree after one conversion.
+function _scatter_matches(p::Makie.Scatter, pts::Vector{Point3f})
+    raw = _converted(p)
+    (raw isa Tuple && length(raw) >= 1) || return false
+    pos = raw[1]
+    (pos isa AbstractVector && length(pos) == length(pts)) || return false
+    for (a, b) in zip(pos, pts)
+        _pt3(a) == b || return false
+    end
+    return true
+end
+
+# Radius for `PointInteractable(ax, points)` when `radius` is omitted. One matching scatter
+# takes `_marker_radius` (drawn extent; unreadable markers stay `markersize / 2`; a non-:pixel
+# markerspace errors, same as passing that scatter). None, or more than one, assumes the
+# default `:circle` — guessing which of two scatters to hug would halo one of them.
+function _point_radius(ax, pts::Vector{Point3f})
+    matches = [p for p in _scatters_on(ax) if _scatter_matches(p, pts)]
+    if length(matches) == 1
+        return _marker_radius(only(matches))
+    end
+    if length(matches) > 1
+        @warn "PointInteractable: $(length(matches)) scatters on this axis share these " *
+            "positions, so the highlight radius is ambiguous; using the default :circle. " *
+            "Pass radius= or PointInteractable(ax, scatter)."
+    end
+    return _default_circle_radius()
+end
 # Tooltip accent colour for a Scatter's points (HitLayer's `colors` field): a shared palette of
 # CSS strings + one 0-based index per point, or a single CSS string when every point is the same
 # colour. `nothing` (no accent) for anything not shaped one of those two ways — not an error,

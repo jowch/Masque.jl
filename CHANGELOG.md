@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- `PointInteractable(ax, points)` takes its highlight radius from the one `Scatter` on that
+  axis with the same positions — the marker's drawn extent, same as
+  `PointInteractable(ax, scatter)` — instead of a fixed `radius` of 9 that haloed the
+  marker. No matching scatter, or more than one, uses Makie's default `:circle` at the
+  theme `markersize` (≈0.3525×`markersize`). Pass `radius=` to override. A marker with no
+  readable bbox still uses `markersize / 2`. `PointInteractable(ax, scatter)` is the usual
+  call; it also resolves the tooltip accent from `color=`.
 - Suspending a `:webgl` plot calls `forceContextLoss` before the next plot takes a
   context, so the browser cap is not crossed while the detached canvas is still live.
   A right-click that passes through to the WebGL canvas no longer has its browser menu

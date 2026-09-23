@@ -168,7 +168,11 @@ an explicit, data-space constructor (`PointInteractable(ax, points; payloads)`) 
 subtype implements. `src/introspect.jl` adds one introspection constructor per supported Makie plot
 type (`PointInteractable(ax, p::Makie.Scatter)`, `RectInteractable(ax, p::Makie.BarPlot)`), extracting
 geometry and payload from the live plot object and delegating to the same explicit constructor — the
-same struct, not a different code path.
+same struct, not a different code path. `PointInteractable(ax, p::Makie.Scatter)` is the usual
+call: it derives the circle radius from the marker's drawn extent. The points constructor does
+the same lookup when `radius` is omitted and exactly one `Scatter` on `ax` has those positions
+(a recipe child counts). No match, or more than one, assumes Makie's default `:circle` at the
+theme `markersize` instead of a fixed radius of 9.
 
 **Composites emit multiple layers.** `ScatterLines` → one `:circles` layer + one `:lines` layer,
 hit-tested points-first (within marker radius) then the whole line. This is the model for any composite recipe.

@@ -224,7 +224,7 @@ _check_tol(tol) =
 
 # ============================ PointInteractable ============================
 """
-    PointInteractable(ax, points; id=:points, payloads=<auto>, radius=9, radius3d=nothing, tooltip=nothing)
+    PointInteractable(ax, points; id=:points, payloads=<auto>, radius=nothing, radius3d=nothing, tooltip=nothing)
     PointInteractable(ax, p::Makie.Scatter; id=:scatter, payloads=nothing, radius=nothing)
     PointInteractable(ax, p::Makie.MeshScatter; id=:meshscatter, payloads=nothing, radius=nothing, radius3d=nothing)
 
@@ -236,8 +236,12 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
 - `payloads` — one entry per point (`ArgumentError` if the length doesn't match `points`), or a
   `DataFrame` with one row per point once DataFrames is loaded. Default: `(; index, x, y)`, or
   `(; index, x, y, z)` for 3-coordinate points — `index` is 1-based.
-- `radius` — click-target radius in px (scaled to the rendered image's DPI), the same for
-  every point. Default `9`.
+- `radius` — highlight and click-target radius in px (scaled to the rendered image's DPI),
+  the same for every point. Default `nothing`: use the drawn radius of the one `Scatter` on
+  `ax` with these positions (see below). If none matches, or more than one does, assume
+  Makie's default `:circle` at the theme `markersize` (radius ≈0.3525×`markersize`; the theme
+  default markersize is 9). Pass a number to override. A matched marker with no readable bbox
+  (a `Char`, an image, a per-element vector of markers) keeps the `markersize / 2` bound.
 - `radius3d` — per-point data-space half-extents (`Vector{Makie.Vec3f}`), for markers whose
   on-screen size is camera/depth-dependent (e.g. `meshscatter`). When set, overrides `radius`
   with an axis-aligned pixel-radius approximation projected per point — it can underestimate
@@ -254,17 +258,20 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
   p::Makie.Scatter)` resolves it, from `p`'s own colour.
 
 # From a plot object
-`PointInteractable(ax, p::Makie.Scatter)` reads points from `p`'s converted data and derives
-`radius` from the marker's drawn extent, not the full `markersize` square — Makie's default
-`:circle` marker draws a disc of diameter ≈0.705·`markersize` (radius ≈0.3525·`markersize`), so
-that's what ships; other `default_marker_map()` symbols/`BezierPath`s use their own bbox in the
-same way, a `GeometryBasics` `Circle`/`Rect` marker draws at the full `markersize` (radius =
-`markersize / 2`), and anything else (a `Char` glyph, an image, a per-element vector of markers)
-falls back to `markersize / 2` as a conservative bound. This requires `markerspace = :pixel` (the
-default); pass `radius=` explicitly for any other markerspace, or it errors. The overlay adds its
-own hit-test slack on top, so the smaller radius doesn't make small markers harder to click. It
-also resolves `colors` from
-`p.color[]`: a single colour (including a bare numeric value mapped through `colormap`) ships
+`PointInteractable(ax, p::Makie.Scatter)` is the usual call. It reads points from `p`'s
+converted data and derives `radius` from the marker's drawn extent, not the full `markersize`
+square — Makie's default `:circle` marker draws a disc of diameter ≈0.705·`markersize` (radius
+≈0.3525·`markersize`), so that's what ships; other `default_marker_map()` symbols/`BezierPath`s
+use their own bbox in the same way, a `GeometryBasics` `Circle`/`Rect` marker draws at the full
+`markersize` (radius = `markersize / 2`), and anything else (a `Char` glyph, an image, a
+per-element vector of markers) falls back to `markersize / 2` as a conservative bound. This
+requires `markerspace = :pixel` (the default); pass `radius=` explicitly for any other
+markerspace, or it errors. The points constructor above takes the same radius when exactly one
+`Scatter` on `ax` has the same positions (including a `scatterlines!`/`stem!` child scatter);
+it does not resolve `colors`. The overlay adds its own hit-test slack on top, so the smaller
+radius doesn't make small markers harder to click. The scatter constructor also resolves
+`colors` from `p.color[]`: a single colour (including a bare numeric value mapped through
+`colormap`) ships
 as one CSS string; a numeric (colormap-driven) or explicit per-point colour vector ships as a
 shared palette + one index per point; anything else (e.g. no colour, or unresolvable) omits
 `colors` — no accent, not an error. A value outside `colorrange` is clamped to the nearest
@@ -277,10 +284,11 @@ be derived.
 # Examples
 ```julia
 pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
-PointInteractable(ax, pts; payloads = ["a", "b", "c"])
+scatter!(ax, first.(pts), last.(pts); markersize = 14)
+PointInteractable(ax, pts)   # radius ≈ 0.3525 * 14, from that scatter
 
 p = scatter!(ax, xs, ys; markersize = 14)
-PointInteractable(ax, p)   # radius ≈ 0.3525 * 14, the drawn :circle disc's radius
+PointInteractable(ax, p)   # the usual call; same radius, and colors from p
 ```
 """
 struct PointInteractable <: AbstractInteractable
@@ -301,7 +309,7 @@ function PointInteractable(
                 (; index = k, x = Float64(p[1]), y = Float64(p[2]))
                 for (k, p) in enumerate(points)
         ],
-        radius = 9, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing
+        radius = nothing, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing
     )
     _check_tooltip(tooltip)
     pts = [_pt3(p) for p in points]
@@ -310,7 +318,10 @@ function PointInteractable(
     r3 === nothing || length(r3) == length(pts) ||
         throw(ArgumentError("radius3d must have one entry per point (got $(length(r3)) for $(length(pts)))"))
     colors = _check_colors(colors, length(pts))
-    return PointInteractable(ax, pts, id, pl, Float64(radius), r3, tooltip, label === nothing ? nothing : String(label), colors)
+    # `nothing` looks the radius up (`_point_radius`, introspect.jl). A passed number wins,
+    # including the `9` the MeshScatter constructor still forwards when it has no pixel radius.
+    r = radius === nothing ? _point_radius(ax, pts) : Float64(radius)
+    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors)
 end
 tooltip_spec(i::PointInteractable) = i.tooltip
 # Max projected displacement over the ±axis half-extents; non-finite offsets are skipped.

@@ -48,6 +48,66 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             p = scatter!(a, [1.0, 2.0], [1.0, 2.0]; markersize = 0.3, markerspace = :data)
             @test_throws ErrorException PointInteractable(a, p)        # can't derive radius
             @test PointInteractable(a, p; radius = 8) isa PointInteractable  # explicit radius is fine
+            # The points form finds that same scatter and fails the same way.
+            @test_throws ErrorException PointInteractable(a, [(1.0, 1.0), (2.0, 2.0)])
+            @test PointInteractable(a, [(1.0, 1.0), (2.0, 2.0)]; radius = 8).radius == 8
+        end
+
+        @testset "points constructor hugs a matching scatter" begin
+            # Getting-started shape: points next to scatter!(markersize = 18), not radius = 9.
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1])
+            pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
+            p = scatter!(a, first.(pts), last.(pts); markersize = 18)
+            pin = PointInteractable(a, pts)
+            @test pin.radius ≈ Masque._marker_radius(p)
+            @test pin.radius ≈ 0.3525 * 18
+            @test pin.radius < 9
+            xs = [10.0, 20.0]; ys = [1.0, 2.0]
+            scatter!(a, xs, ys; markersize = 18)
+            @test PointInteractable(a, collect(zip(xs, ys))).radius ≈ 0.3525 * 18
+            # An explicit radius wins over the lookup.
+            @test PointInteractable(a, pts; radius = 4).radius == 4.0
+            # A marker with no readable bbox keeps markersize/2 — the lookup does not invent a disc.
+            ac = Axis(f[1, 2])
+            scatter!(ac, [1.0], [1.0]; marker = '●', markersize = 22)
+            @test PointInteractable(ac, [(1.0, 1.0)]).radius == 11.0
+            # No scatter, or positions that are not that scatter's, assume default :circle.
+            an = Axis(f[2, 1])
+            @test PointInteractable(an, [(1.0, 2.0)]).radius ≈ Masque._default_circle_radius()
+            @test Masque._default_circle_radius() ≈ 0.3525 * Float64(Makie.theme(:markersize)[])
+            scatter!(an, [1.0], [1.0]; markersize = 40)
+            @test PointInteractable(an, [(9.0, 9.0)]).radius ≈ Masque._default_circle_radius()
+            # Reversed order is a different element mapping, so it does not match.
+            ar = Axis(f[2, 2])
+            scatter!(ar, [1.0, 2.0], [3.0, 4.0]; markersize = 40)
+            @test PointInteractable(ar, [(2.0, 4.0), (1.0, 3.0)]).radius ≈ Masque._default_circle_radius()
+            # Two scatters at the same positions: don't guess. Default :circle, and say so.
+            aa = Axis(f[3, 1])
+            both = [(1.0, 1.0), (2.0, 2.0)]
+            scatter!(aa, first.(both), last.(both); markersize = 20)
+            scatter!(aa, first.(both), last.(both); markersize = 30)
+            amb = nothing
+            @test_logs (:warn, r"highlight radius is ambiguous") amb = PointInteractable(aa, both)
+            @test amb.radius ≈ Masque._default_circle_radius()
+            # A scatterlines! child scatter is the drawn marker, not the recipe object.
+            al = Axis(f[3, 2])
+            sl = [(0.0, 1.0), (1.0, 2.0), (2.0, 0.5)]
+            scatterlines!(al, first.(sl), last.(sl); markersize = 16)
+            @test PointInteractable(al, sl).radius ≈ 0.3525 * 16
+            # A stem! child scatter is the drawn marker too, not the recipe object.
+            ast = Axis(f[4, 1])
+            st = [(1.0, 3.0), (2.0, 4.0)]
+            stem!(ast, first.(st), last.(st); markersize = 16)
+            @test PointInteractable(ast, st).radius ≈ 0.3525 * 16
+            # Axis3 and PolarAxis store the same positions the points constructor compares.
+            f3 = Figure(size = (400, 300)); ax3 = Axis3(f3[1, 1])
+            p3 = [(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)]
+            scatter!(ax3, p3; markersize = 12)
+            @test PointInteractable(ax3, p3).radius ≈ 0.3525 * 12
+            fp = Figure(size = (400, 300)); axp = PolarAxis(fp[1, 1])
+            pp = [(0.0, 1.0), (π / 2, 2.0)]
+            scatter!(axp, pp; markersize = 22)
+            @test PointInteractable(axp, pp).radius ≈ 0.3525 * 22
         end
 
         @testset "lines -> one whole line, linesegments -> (:pairs)" begin
