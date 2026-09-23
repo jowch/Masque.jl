@@ -311,3 +311,14 @@ nothing is interactive — that is expected).
 **Fix:** check the `WGLMakie` compat bound in `Project.toml`; confirm
 the figure actually has a plot call in it before `masque(fig)`.
 Drag-orbit on `:webgl` streams live scene frames; see [Backends](@ref).
+
+### A WebGL plot says its GPU context was released
+
+**Cause:** the browser caps how many WebGL contexts a page can keep
+(16 on desktop Chrome and Safari, 8 on Android Chrome). Masque stays at
+8 and releases an off-screen plot before the browser does. More than 8
+plots on screen at once cannot all be live; the extras show this note.
+Hover and `@bind` still work.
+
+**Fix:** scroll so fewer `:webgl` plots are on screen at once, or use
+`:cairo` for a plot that is a static picture.

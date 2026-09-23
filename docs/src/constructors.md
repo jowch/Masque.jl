@@ -91,10 +91,14 @@ constructor for Stem, ScatterLines, BoxPlot, or Annotation, and no
 
 Zero-config uses the Scatter plot-object constructor, so the highlight
 in the overlay hugs the drawn marker. `PointInteractable(ax, points)`
-defaults `radius=9` and never reads a marker. Pass the `Scatter`, or
-pass `radius=`. Default `:circle` → `r ≈ 0.3525 × markersize`. A
-`Circle` or `Rect` sprite → `r = markersize / 2`. The quickstart overlay
-on [Getting started](@ref) passes `radius=`.
+with `radius` omitted uses that same radius when exactly one `Scatter`
+on `ax` has those positions in the same order. Otherwise it uses Makie's
+default `:circle` at the theme `markersize`. Pass `radius=` when that
+lookup would be ambiguous, or when there is no scatter to hug. A marker
+with no readable bbox (a character, an image) keeps `markersize / 2`.
+Default `:circle` → `r ≈ 0.3525 × markersize`. A `Circle` or `Rect`
+sprite → `r = markersize / 2`. The quickstart overlay on
+[Getting started](@ref) passes `radius=`.
 
 On huge data, auto allocates one default payload per element. Pass a lean
 `payloads=` (or skip the layer) yourself. Auto-extracted layers do not
@@ -198,7 +202,7 @@ see [Troubleshooting](@ref). For a type you implement yourself, see
 
 | Constructor | Signature | Bond | Kind | Guide |
 |---|---|---|---|---|
-| [`PointInteractable`](@ref) | `(ax, points; radius=9, radius3d=nothing, id=:points)` or `(ax, p::Scatter; id=:scatter)` | [`ElementEvent`](@ref): 1-based `index`, `x`, `y`[, `z`] | `:circles` | [Getting started](@ref), [Click marks](@ref) |
+| [`PointInteractable`](@ref) | `(ax, points; radius=nothing, radius3d=nothing, id=:points)` or `(ax, p::Scatter; id=:scatter)` | [`ElementEvent`](@ref): 1-based `index`, `x`, `y`[, `z`] | `:circles` | [Getting started](@ref), [Click marks](@ref) |
 | [`PointInteractable`](@ref) | `(ax, p::MeshScatter; id=:meshscatter)` | [`ElementEvent`](@ref): 1-based `index`, `x`, `y`, `z` | `:circles` | [Backends](@ref) |
 | [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, unit=:segment, tol=6, id=:segments)` | [`ElementEvent`](@ref): 1-based `segment_index` (`:segment`) or `index` (`:line`) | `:polyline`, `:lines`, or `:segments` | [Click marks](@ref) |
 | [`RectInteractable`](@ref) | `(ax; rects, clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot; id=:bars)` | [`ElementEvent`](@ref): explicit `index`; BarPlot `low`, `high`, `value` | `:rects` | [Click marks](@ref) |
