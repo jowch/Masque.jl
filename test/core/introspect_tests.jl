@@ -236,8 +236,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @testset "skips unsupported plot types with a warning" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             scatter!(a, [1.0], [1.0])
-            contour!(a, 1:5, 1:5, rand(5, 5))     # unsupported -> skip + warn
-            ints = @test_logs (:warn,) match_mode = :any auto_interactables(f)
+            # hexbin's only child is a data-space hex Scatter. The walk must not construct it.
+            hexbin!(a, rand(40), rand(40))
+            ints = @test_logs (:warn, r"plot type hexbin") auto_interactables(f)
             @test length(ints) == 1
             @test only(ints) isa PointInteractable
         end
@@ -253,10 +254,79 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
         @testset "no introspectable plots -> warn, render image only" begin
             f = Figure(size = (400, 300)); a = Axis(f[1, 1])
-            contour!(a, 1:5, 1:5, rand(5, 5))
-            w = @test_logs (:warn,) match_mode = :any masque(f)
+            hexbin!(a, rand(40), rand(40))
+            w = @test_logs (:warn, r"plot type hexbin") match_mode = :any masque(f)
             @test isempty(w.manifest["layers"])
             @test !isempty(w.b64)                  # static image still produced
+        end
+
+        @testset "unknown parent contributes known children, and stops there" begin
+            using Masque: PolygonInteractable, SegmentInteractable
+            f = Figure(size = (640, 360))
+            a = Axis(f[1, 1])
+            arc!(a, Point2f(0), 1, 0.0, π)
+            ablines!(a, 0.0, 1.0)
+            pie!(a, [1.0, 2.0, 3.0])
+            contour!(a, 1:8, 1:8, [sin(i / 2) * cos(j / 2) for i in 1:8, j in 1:8])
+            Makie.update_state_before_display!(f)
+            ints = @test_logs auto_interactables(f)
+            _, _, c = ctx_for(f)
+            ids = [only(hitlayers(i, c)).id for i in ints]
+            @test ids == [:lines, :segments, :poly, :lines_2]
+            @test ints[1] isa SegmentInteractable && ints[4] isa SegmentInteractable
+            @test ints[3] isa PolygonInteractable
+            # The arc is one polyline. Its image-px vertices sit on the stroke Cairo drew.
+            g = only(hitlayers(ints[1], c)).geometry[1]
+            img = Makie.colorbuffer(f; px_per_unit = 2.0)
+            @test drawn_near(img, g[1], g[2])
+            mid = length(g) ÷ 2
+            mid = isodd(mid) ? mid : mid - 1
+            @test drawn_near(img, g[mid], g[mid + 1])
+
+            fr = Figure(size = (640, 360)); ar = Axis(fr[1, 1])
+            rainclouds!(ar, ["a", "a", "a", "b", "b", "b"], [1.0, 1.2, 0.8, 2.0, 2.3, 1.9])
+            Makie.update_state_before_display!(fr)
+            rints = @test_logs auto_interactables(fr)
+            _, _, cr = ctx_for(fr)
+            rids = [only(hitlayers(i, cr)).id for i in rints]
+            # violin, raindrop scatter, box — not the violin's poly or the box's crossbar
+            @test rids == [:violin, :scatter, :boxplot]
+
+            fb = Figure(size = (400, 300)); ab = Axis(fb[1, 1])
+            bracket!(ab, 0.0, 0.0, 1.0, 1.0)
+            Makie.update_state_before_display!(fb)
+            # The pixel-space label warns once. The parent has nothing else to install,
+            # and must not add a second "unsupported plot type" warning.
+            bints = @test_logs (:warn, r"non-data-space text") auto_interactables(fb)
+            @test isempty(bints)
+
+            # A top-level data-space scatter still fails in PointInteractable. The refusal
+            # applies to children discovered under an unknown parent, not to this plot.
+            fd = Figure(size = (400, 300)); ad = Axis(fd[1, 1])
+            scatter!(ad, [1.0, 2.0], [1.0, 2.0]; markersize = 0.3, markerspace = :data)
+            @test_throws ErrorException auto_interactables(fd)
+
+            # Default `triplot!` draws the triangles and also ghost edges, the convex hull,
+            # constrained edges, and a point scatter, all with `visible[] == false`. Those
+            # must not be layers, and must not take `:scatter` away from a later scatter.
+            ft = Figure(size = (640, 360)); at = Axis(ft[1, 1])
+            triplot!(at, [0.0, 1.0, 0.2, 0.8], [0.0, 0.0, 1.0, 0.6])
+            scatter!(at, [0.4], [0.3]; markersize = 12)
+            Makie.update_state_before_display!(ft)
+            tints = @test_logs auto_interactables(ft)
+            _, _, ct = ctx_for(ft)
+            @test [only(hitlayers(i, ct)).id for i in tints] == [:poly, :scatter]
+
+            # `qqline = :none` leaves a visible `LineSegments` with no vertices. That must
+            # not publish `:segments`, so a real segment layer still gets the first id.
+            fq = Figure(size = (640, 360)); aq = Axis(fq[1, 1])
+            qqplot!(aq, [1.0, 2.0, 3.0, 4.0], [1.1, 1.9, 3.2, 3.8]; qqline = :none)
+            linesegments!(aq, [0.0, 1.0], [0.0, 1.0])
+            Makie.update_state_before_display!(fq)
+            qints = @test_logs auto_interactables(fq)
+            _, _, cq = ctx_for(fq)
+            @test [only(hitlayers(i, cq)).id for i in qints] == [:scatter, :segments]
+            @test !isempty(only(i for i in qints if i.id === :segments).vertices)
         end
 
         @testset "masque auto-detects text!" begin
@@ -364,6 +434,59 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             g = only(hitlayers(SegmentInteractable(a, ph), c)).geometry
             img = Makie.colorbuffer(f; px_per_unit = 2.0)
             @test drawn_near(img, (g[1] + g[3]) / 2, (g[2] + g[4]) / 2)
+        end
+
+        @testset "hlines/vlines fractional span attributes" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 10, 0, 10))
+            ph = hlines!(a, [4.0]; xmin = 0.25, xmax = 0.75, linewidth = 6)
+            pv = vlines!(a, [4.0]; ymin = 0.2, ymax = 0.6, linewidth = 6)
+            _, _, c = ctx_for(f)
+            @test geom(SegmentInteractable(a, ph), c) ==
+                geom(SegmentInteractable(a, [(2.5, 4.0), (7.5, 4.0)]; mode = :pairs), c)
+            @test geom(SegmentInteractable(a, pv), c) ==
+                geom(SegmentInteractable(a, [(4.0, 2.0), (4.0, 6.0)]; mode = :pairs), c)
+            g = only(hitlayers(SegmentInteractable(a, ph), c)).geometry
+            img = Makie.colorbuffer(f; px_per_unit = 2.0)
+            @test drawn_near(img, (g[1] + g[3]) / 2, (g[2] + g[4]) / 2)
+
+            # per-line fractions, and a scalar position broadcast across a vector of fractions
+            pb = hlines!(a, [2.0, 8.0]; xmin = [0.1, 0.5], xmax = [0.4, 0.9])
+            @test geom(SegmentInteractable(a, pb), c) ==
+                geom(SegmentInteractable(a, [(1.0, 2.0), (4.0, 2.0), (5.0, 8.0), (9.0, 8.0)]; mode = :pairs), c)
+            ps = hlines!(a, 4.0; xmin = [0.1, 0.6], xmax = [0.3, 0.9])
+            Ls = only(hitlayers(SegmentInteractable(a, ps), c))
+            @test Ls.payloads == Any[(; segment_index = 1), (; segment_index = 2)]
+            @test geom(SegmentInteractable(a, ps), c) ==
+                geom(SegmentInteractable(a, [(1.0, 4.0), (3.0, 4.0), (6.0, 4.0), (9.0, 4.0)]; mode = :pairs), c)
+
+            # fraction of the transformed limits, inverse-transformed back to data space
+            flog = Figure(size = (500, 350))
+            al = Axis(flog[1, 1]; xscale = log10, limits = ((1, 1000), (0, 10)))
+            plog = hlines!(al, [5.0]; xmin = 0.5, xmax = 1)
+            pdef = hlines!(al, [5.0])
+            _, _, cl = ctx_for(flog)
+            @test geom(SegmentInteractable(al, plog), cl) ==
+                geom(SegmentInteractable(al, [(exp10(1.5), 5.0), (1000.0, 5.0)]; mode = :pairs), cl)
+            flim = al.finallimits[]
+            @test geom(SegmentInteractable(al, pdef), cl) ==
+                geom(SegmentInteractable(al, [(flim.origin[1], 5.0), (flim.origin[1] + flim.widths[1], 5.0)]; mode = :pairs), cl)
+
+            fv = Figure(size = (500, 350))
+            av = Axis(fv[1, 1]; yscale = log10, limits = ((0, 10), (1, 1000)))
+            pvlog = vlines!(av, [5.0]; ymin = 0.5, ymax = 1)
+            _, _, cv = ctx_for(fv)
+            @test geom(SegmentInteractable(av, pvlog), cv) ==
+                geom(SegmentInteractable(av, [(5.0, exp10(1.5)), (5.0, 1000.0)]; mode = :pairs), cv)
+
+            # built before finalize: a later limit change re-resolves the same fractions
+            fr = Figure(size = (500, 350)); ar = Axis(fr[1, 1]; limits = (0, 10, 0, 10))
+            pr = hlines!(ar, [4.0]; xmin = 0.25, xmax = 0.75)
+            seg = SegmentInteractable(ar, pr)
+            xlims!(ar, -20, 20)
+            masque(fr, [seg])
+            _, _, cr = ctx_for(fr)
+            @test geom(seg, cr) ==
+                geom(SegmentInteractable(ar, [(-10.0, 4.0), (10.0, 4.0)]; mode = :pairs), cr)
         end
 
         @testset "hlines/vlines: interactable built before finalize resolves against finalized limits" begin
@@ -615,6 +738,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         p = ax.scene.plots[1]
         pi = PolygonInteractable(ax, p; id = :voronoiplot)
         @test length(pi.rings) == 8                        # one cell per generator site
+        @test all(isempty, pi.holes)                       # cells have no interiors; the shared helper stays exterior-only
         @test pi.payloads == Any[(; index = k) for k in 1:8]   # cell order ≠ site order → index only
         ints = auto_interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
@@ -653,6 +777,116 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         pic = PolygonInteractable(axc, axc.scene.plots[1]; id = :contourf)
         @test !isempty(pic.payloads)
         @test all(pl.low <= pl.high for pl in pic.payloads)
+
+        # A nested peak: each annular band keeps its hole on the same element. The innermost disk stays one flat ring.
+        figh = Figure(); axh = Axis(figh[1, 1])
+        xs = range(-2, 2, length = 40)
+        ys = range(-2, 2, length = 40)
+        contourf!(axh, xs, ys, [exp(-(x^2 + y^2)) for x in xs, y in ys]; levels = 5)
+        _, _, ch = ctx_for(figh)
+        ph = PolygonInteractable(axh, axh.scene.plots[1]; id = :contourf)
+        Lh = only(hitlayers(ph, ch))
+        pieces = Masque._conv(Masque._childof(axh.scene.plots[1], Makie.Poly))[1]
+        @test length(Lh.geometry) == length(pieces) == length(Lh.payloads)
+        @test any(!isempty, (piece.interiors for piece in pieces))
+        for (piece, elem) in zip(pieces, Lh.geometry)
+            n = length(piece.interiors)
+            if n == 0
+                @test first(elem) isa Real
+            else
+                @test length(elem) == 1 + n
+                @test all(ring -> first(ring) isa Real, elem)
+            end
+        end
+
+        # Two peaks under an explicit top edge: one band has two holes, and the unfilled peak is a hole, not its own element.
+        fig2 = Figure(); ax2 = Axis(fig2[1, 1])
+        xs2 = range(-3, 3, length = 50)
+        ys2 = range(-2, 2, length = 40)
+        z2 = [exp(-((x - 1.2)^2 + y^2)) + exp(-((x + 1.2)^2 + y^2)) for x in xs2, y in ys2]
+        contourf!(ax2, xs2, ys2, z2; levels = [0.2, 0.5, 0.9])
+        _, _, c2 = ctx_for(fig2)
+        p2 = PolygonInteractable(ax2, ax2.scene.plots[1]; id = :contourf)
+        L2 = only(hitlayers(p2, c2))
+        @test length(L2.geometry) == length(p2.payloads) == 3
+        @test length(L2.geometry[1]) == 3                  # exterior + two holes
+        @test L2.payloads[1].low < 0.5
+    end
+
+    # A holed element is a flat list of rings, so `length` is the ring count. Several holes in one
+    # band, and an island that is its own solid element of the same band. Pointer checks,
+    # including a dented ring, live in test/e2e/contourf_complex.mjs.
+    _ringcount(elem) = first(elem) isa Real ? 1 : length(elem)
+    _rings(elem) = first(elem) isa Real ? [elem] : elem
+    function _inring(px, py, ring)
+        inside = false
+        n = length(ring) ÷ 2
+        j = n
+        for i in 1:n
+            xi, yi = ring[2i - 1], ring[2i]
+            xj, yj = ring[2j - 1], ring[2j]
+            if (yi > py) != (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi
+                inside = !inside
+            end
+            j = i
+        end
+        return inside
+    end
+    function _inrings(px, py, rings)
+        inside = false
+        for ring in rings
+            _inring(px, py, ring) && (inside = !inside)
+        end
+        return inside
+    end
+    function _centroid(ring)
+        n = length(ring) ÷ 2
+        return (sum(ring[2i - 1] for i in 1:n) / n, sum(ring[2i] for i in 1:n) / n)
+    end
+    @testset "Contourf holes on busier fields" begin
+        using Masque: PolygonInteractable
+        # Three narrow peaks on a shared pedestal: one band carries several holes.
+        fig = Figure(); ax = Axis(fig[1, 1])
+        xs = range(-3, 3, length = 80)
+        ys = range(-3, 3, length = 80)
+        centers = [(0.85, 0.0), (-0.42, 0.73), (-0.42, -0.73)]
+        z = [
+            0.22 * exp(-(x^2 + y^2) / 6) +
+                sum(exp(-((x - cx)^2 + (y - cy)^2) / 0.18) for (cx, cy) in centers)
+                for x in xs, y in ys
+        ]
+        contourf!(ax, xs, ys, z; levels = [0.12, 0.28, 0.65])
+        _, _, ctx = ctx_for(fig)
+        ped = only(hitlayers(PolygonInteractable(ax, ax.scene.plots[1]), ctx))
+        @test length(ped.geometry) == length(ped.payloads)
+        @test maximum(_ringcount, ped.geometry) >= 4          # exterior + at least 3 holes
+
+        # A ring with a central bump of the same band: the bump is its own solid element.
+        figb = Figure(); axb = Axis(figb[1, 1])
+        xb = range(-3, 3, length = 70)
+        yb = range(-3, 3, length = 70)
+        zb = [exp(-((hypot(x, y) - 1.6)^2) / 0.1) + 0.35 * exp(-(x^2 + y^2) / 0.15) for x in xb, y in yb]
+        contourf!(axb, xb, yb, zb; levels = [0.15, 0.4, 0.8])
+        _, _, cb = ctx_for(figb)
+        bump = only(hitlayers(PolygonInteractable(axb, axb.scene.plots[1]), cb))
+        @test length(bump.geometry) == length(bump.payloads)
+        # The central bump is a solid element of the same band, sitting in a hole of that band.
+        island = false
+        for (s, solid) in enumerate(bump.geometry)
+            _ringcount(solid) == 1 || continue
+            cx, cy = _centroid(solid)
+            for (h, holed) in enumerate(bump.geometry)
+                _ringcount(holed) > 1 || continue
+                rings = _rings(holed)
+                in_hole = any(ring -> _inring(cx, cy, ring), rings[2:end])
+                same_band = bump.payloads[s].low == bump.payloads[h].low &&
+                    bump.payloads[s].high == bump.payloads[h].high
+                if in_hole && !_inrings(cx, cy, rings) && same_band
+                    island = true
+                end
+            end
+        end
+        @test island
     end
 
     @testset "BoxPlot extraction" begin

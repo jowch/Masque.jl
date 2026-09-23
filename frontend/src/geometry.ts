@@ -82,6 +82,30 @@ export function pathData(verts: number[]): string {
     return d
 }
 
+// A polygon element is one flat ring, or a ring group (exterior first, then each hole).
+export function polygonRings(elem: number[] | number[][]): number[][] {
+    return typeof elem[0] === "number" ? [elem as number[]] : (elem as number[][])
+}
+
+// even-odd across every ring of one element. A hole ring flips the exterior back to outside.
+export function pointInRings(px: number, py: number, rings: number[][]): boolean {
+    let inside = false
+    for (const ring of rings) if (pointInPolygon(px, py, ring)) inside = !inside
+    return inside
+}
+
+// SVG path for a ring group. Each ring is its own closed subpath; fill-rule evenodd punches the holes.
+export function ringsPathData(rings: number[][]): string {
+    let d = ""
+    for (const ring of rings) {
+        if (ring.length < 4) continue
+        d += `M${ring[0]} ${ring[1]}`
+        for (let k = 2; k < ring.length; k += 2) d += `L${ring[k]} ${ring[k + 1]}`
+        d += "Z"
+    }
+    return d
+}
+
 // even-odd point-in-polygon; ring is a flat [x,y,…]
 export function pointInPolygon(px: number, py: number, ring: number[]): boolean {
     let inside = false
@@ -247,8 +271,11 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
             return null
         }
         case "polygons": {
-            const rings = g as number[][]
-            for (let k = 0; k < rings.length; k++) if (pointInPolygon(px, py, rings[k])) return { index: k, geom_: ["poly", rings[k]] }
+            const elems = g as (number[] | number[][])[]
+            for (let k = 0; k < elems.length; k++) {
+                const rings = polygonRings(elems[k])
+                if (pointInRings(px, py, rings)) return { index: k, geom_: ["poly", rings.length === 1 ? rings[0] : rings] }
+            }
             return null
         }
         case "grid": {
@@ -605,12 +632,15 @@ export function anchorFor(hit: Hit, cursor: { x: number; y: number } | null): An
         return { x: p.x, y: p.y, top: p.y }
     }
     if (g[0] === "poly") {
-        const ring = g[1] as number[]
+        // Centroid of the exterior. A ring group's centroid can sit in a hole; that is outside
+        // the filled shape, so the pointer path uses the cursor, same as a concave notch.
+        const rings = polygonRings(g[1] as number[] | number[][])
+        const ring = rings[0] ?? []
         const n = ring.length / 2
         let sx = 0, sy = 0
         for (let k = 0; k < ring.length; k += 2) { sx += ring[k]; sy += ring[k + 1] }
-        const cx = sx / n, cy = sy / n
-        if (pointInPolygon(cx, cy, ring)) return { x: cx, y: cy, top: cy }
+        const cx = n ? sx / n : 0, cy = n ? sy / n : 0
+        if (pointInRings(cx, cy, rings)) return { x: cx, y: cy, top: cy }
         if (cursor) return { x: cursor.x, y: cursor.y, top: cursor.y }
         return { x: cx, y: cy, top: cy } // keyboard focus with an off-centroid centroid: no cursor to fall back to
     }

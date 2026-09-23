@@ -648,24 +648,29 @@ is bounded by the viewport sample, not by dropping the values.
 
 - **Phase 2b polygon surfaces** *(delivered, commit `431bd99`, 2026-06-30)* — Band, Density,
   Contourf, Violin, Voronoiplot, BoxPlot now auto-extracted as `:polygons` (plus `:rects` for
-  un-notched BoxPlot bodies). Ring geometry ships as a `Vector{Vector{Real}}` — one subvector per
-  polygon element, flat `[x0,y0,x1,y1,…]` — with vertex coords quantized to integer pixels (the
-  same 1–3 B/coord path as scatter; see
-  [§9](architecture/09-wire-encoding.md)). Bench §F (2026-06-30,
-  `bench/payload_envelope.jl`):
+  un-notched BoxPlot bodies). A solid element is one flat `[x0,y0,x1,y1,…]` ring. A contourf
+  element with holes is a list of those rings instead (exterior, then each hole); vertex coords
+  stay quantized integer pixels (the same 1–3 B/coord path as scatter; see
+  [§9](architecture/09-wire-encoding.md)). Bench §F (`bench/payload_envelope.jl`; the first three
+  rows 2026-06-30, the holed contourf row 2026-09-23):
 
   | Surface | elements | total verts | manifest | ~B/elem | ~B/vert |
   |---------|--------:|------------:|--------:|--------:|--------:|
   | band, 100 x-pts (1 ring) | 1 | 200 | 1.5 KB | 1 494 | 6 |
   | violin, 3 groups (~400 verts/ring each) | 3 | 1 206 | 7.3 KB | 2 479 | 6 |
   | contourf, 50×50, default levels | 20 | 1 780 | 10.5 KB | 537 | 6 |
+  | contourf, 40×40 Gaussian, levels=5 | 5 | 693 | 4.4 KB | 905 | 6 |
 
   The fundamental rate is **~6 B/vertex** (2 coords × ~3 B each at typical 700-px plot widths),
-  consistent across all polygon kinds. Per-element cost is vertex-count-driven: a violin KDE ring
-  (~400 verts) is ~2.5 KB/element — far above scatter's per-element cost (§A) — because the ring
-  boundary is large. But realistic polygon charts have low element counts: a 3-violin plot is 7.3 KB
-  total; a 20-piece contourf is 10.5 KB total — both well under the render-bound / payload-bound
-  crossover (~1 MB). A high-cell voronoiplot (e.g. 1 000 cells, each a few vertices) could reach
+  consistent across all polygon kinds, including a holed contourf ring. Per-element cost is
+  vertex-count-driven: a violin KDE ring (~400 verts) is ~2.5 KB/element — far above scatter's
+  per-element cost (§A) — because the ring boundary is large. But realistic polygon charts have
+  low element counts: a 3-violin plot is 7.3 KB total; a 20-piece contourf with no holes is 10.5 KB
+  total; the 40×40 Gaussian (four of five polygons are an exterior plus one hole, 693 verts
+  counting both) is 4.4 KB — all well under the render-bound / payload-bound
+  crossover (~1 MB). A 2026-09-23 re-run of the no-hole 50×50 row is still 20 elements, 1 780
+  verts, 10.5 KB, ~6 B/vert (the ~B/elem print is 539; the June cell's 537 is that same 10.5 KB
+  row). A high-cell voronoiplot (e.g. 1 000 cells, each a few vertices) could reach
   scatter-scale manifest sizes (scatter per-element × 1 000 → a few hundred KB; cf. §A), but is still
   render-bound. The §A–E envelope is
   **unchanged** — bench re-run (2026-06-30) confirms all existing scatter/heatmap numbers are

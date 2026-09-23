@@ -204,6 +204,13 @@ struct _NotReal end
         @test length(L.geometry) == 2                       # two rings
         @test all(r -> length(r) == 6, L.geometry)          # 3 pts × (x,y) each
         @test [p.index for p in L.payloads] == [1, 2]       # default per-ring payloads, 1-based
+        # a hole is another ring of the same element, not another element
+        hole = [(1.2, 1.5), (1.8, 1.5), (1.5, 2.2)]
+        holed = only(hitlayers(PolygonInteractable(ax, [rings[1]]; holes = [[hole]]), ctx))
+        @test length(holed.geometry) == 1 && length(holed.payloads) == 1
+        @test length(holed.geometry[1]) == 2               # exterior, then the hole
+        @test length(holed.geometry[1][1]) == 6 && length(holed.geometry[1][2]) == 6
+        @test_throws ArgumentError PolygonInteractable(ax, rings; holes = [[hole]])  # 1 group, 2 rings
     end
 
     @testset "TextInteractable" begin

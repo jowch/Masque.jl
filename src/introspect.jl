@@ -326,8 +326,8 @@ function PolygonInteractable(ax, p::Makie.Density; id = :density, payloads = not
     return PolygonInteractable(ax, [_band_ring(lower, upper)]; id, payloads)
 end
 
-# Takes each filled polygon's EXTERIOR ring only; holes are excluded, so annular bands
-# over-cover their hole at the boundary (documented v1 limitation).
+# Voronoi cells are Polygons whose interior list is empty (Makie clips an exterior only).
+# Contourf polygons carry holes and do not use this.
 _poly_exterior_rings(polys) = [poly.exterior for poly in polys]
 
 # Makie's `computed_levels` are the true band edges, but the child Poly's per-polygon `color`
@@ -347,9 +347,11 @@ function _contourf_payloads(p, poly)
 end
 function PolygonInteractable(ax, p::Makie.Contourf; id = :contourf, payloads = nothing)
     poly = _childof(p, Makie.Poly)
-    rings = _poly_exterior_rings(_conv(poly)[1])
+    polys = _conv(poly)[1]
+    rings = [piece.exterior for piece in polys]
+    holes = [piece.interiors for piece in polys]
     pl = payloads === nothing ? _contourf_payloads(p, poly) : payloads
-    return PolygonInteractable(ax, rings; id, payloads = pl)
+    return PolygonInteractable(ax, rings; id, payloads = pl, holes)
 end
 
 # Payload x is read from Makie's converted category data (not ring geometry) to avoid Float32
@@ -502,18 +504,51 @@ SegmentInteractable(ax, p::Makie.Errorbars; id = :errorbars, payloads = nothing,
 SegmentInteractable(ax, p::Makie.Rangebars; id = :rangebars, payloads = nothing, tol = 6) =
     SegmentInteractable(ax, _rangebar_pairs(p); mode = :pairs, id, payloads, tol)
 
-# Each line spans the full data range from `finallimits`; fractional xmin/xmax (HLines) /
-# ymin/ymax (VLines) span attrs are ignored.
+# `xmin`/`xmax` (HLines) and `ymin`/`ymax` (VLines) are fractions of the axis in relative
+# units. Default 0 and 1 is the full limits. Makie applies the fraction on the transformed
+# limits (`axis_limits_transformed`); the hit segment stores the inverse-transformed
+# data-space endpoints, and the position stays in data space, so projection matches the
+# drawn line. `broadcast_foreach` is Makie's scalar-or-vector rule: a scalar position with
+# a vector of fractions is one segment per fraction.
 function _span_pairs(ax, p, ishoriz)
-    fl = _finallimits(ax)
-    lo = fl.origin[ishoriz ? 1 : 2]; hi = lo + fl.widths[ishoriz ? 1 : 2]
+    dim = ishoriz ? 1 : 2
+    tlo, thi = _span_transformed_interval(ax, dim)
+    finv = _span_inverse(ax, dim)
+    vals = _converted(p)[1]
+    fr0, fr1 = ishoriz ? (p.xmin[], p.xmax[]) : (p.ymin[], p.ymax[])
     vs = Point2f[]
-    for c in _converted(p)[1]
-        ishoriz ? (push!(vs, Point2f(lo, c)); push!(vs, Point2f(hi, c))) :
-            (push!(vs, Point2f(c, lo)); push!(vs, Point2f(c, hi)))
+    Makie.broadcast_foreach(vals, fr0, fr1) do val, a, b
+        s0 = _frac_to_data(finv, tlo, thi, a)
+        s1 = _frac_to_data(finv, tlo, thi, b)
+        ishoriz ? (push!(vs, Point2f(s0, val)); push!(vs, Point2f(s1, val))) :
+            (push!(vs, Point2f(val, s0)); push!(vs, Point2f(val, s1)))
     end
     return vs
 end
+
+# Transformed min/max of one axis dimension, from `finallimits` through the scene scale.
+function _span_transformed_interval(ax, dim)
+    fl = _finallimits(ax)
+    tf = _transform_func(ax.scene)
+    o = fl.origin
+    hi = o .+ fl.widths
+    a = _apply_transform(tf, Makie.Point2d(Float64(o[1]), Float64(o[2])))
+    b = _apply_transform(tf, Makie.Point2d(Float64(hi[1]), Float64(hi[2])))
+    return min(Float64(a[dim]), Float64(b[dim])), max(Float64(a[dim]), Float64(b[dim]))
+end
+
+function _span_inverse(ax, dim)
+    inv = Makie.inverse_transform(_transform_func(ax.scene))
+    f = inv isa Tuple ? inv[dim] : inv
+    f === nothing && error(
+        "Masque: this axis scale has no inverse_transform, so an hlines/vlines span fraction " *
+            "cannot be placed in data space"
+    )
+    return f
+end
+
+_frac_to_data(finv, tlo, thi, frac) = Float64(_apply_transform(finv, tlo + (thi - tlo) * Float64(frac)))
+
 function SegmentInteractable(ax, p::Makie.HLines; id = :hlines, payloads = nothing, tol = 6)
     vs = _span_pairs(ax, p, true)
     nseg = length(vs) ÷ 2
@@ -731,6 +766,138 @@ function _register_series_elements!(plotmap, p, layer_id)
     return nothing
 end
 
+# Other 2D recipes extract pixel-separable geometry that a 3D perspective projection
+# silently misaligns, and separable-edge / axis-aligned rect recipes assume Cartesian pixel
+# geometry (polar maps those into arcs and wedges). Skip loudly rather than construct.
+function _skip_for_axis(ax, p)
+    if ax isa Makie.Axis3 && !(
+            p isa Union{
+                Makie.Scatter, Makie.Lines, Makie.LineSegments,
+                Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D,
+            }
+        )
+        @warn "masque: skipping $(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/" *
+            "LineSegments/MeshScatter/Wireframe/Arrows3D have 3D-valid extraction today; " *
+            "other kinds are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
+        return true
+    end
+    if ax isa Makie.PolarAxis && !(
+            p isa Union{
+                Makie.Scatter, Makie.Lines, Makie.LineSegments,
+                Makie.ScatterLines, Makie.Series,
+            }
+        )
+        @warn "masque: skipping $(Makie.plotkey(p)) on PolarAxis — only Scatter/Lines/" *
+            "LineSegments/ScatterLines/Series have polar-valid extraction today; continuous " *
+            "θ/r readout and grid/rect recipes are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
+        return true
+    end
+    return false
+end
+
+# A known child of an unknown recipe that must not become its own layer. `hexbin!` draws one
+# data-space hexagon `Scatter` (`markerspace = :data`); `_marker_radius` throws unless
+# markerspace is `:pixel`, and a pixel radius would not be the hex. `bracket!` draws a
+# pixel-space `Series`; `SegmentInteractable` would project those points as data. Non-data
+# `Text` is not refused here — `_text_interactables` warns and returns an empty vector.
+function _walk_refuses(p)
+    p isa Makie.Scatter && p.markerspace[] !== :pixel && return true
+    p isa Makie.Text && return false
+    hasproperty(p, :space) || return false
+    sp = p.space[]
+    return sp isa Symbol && sp !== :data
+end
+
+# Vertices the interactable would hit. A grid is not a vertex list; treat it as present.
+# A zero count is an empty construct: `qqplot!` with `qqline = :none` still builds a
+# `LineSegments` whose converted points are `Point2f[]`.
+_nverts(i::PointInteractable) = length(i.points)
+_nverts(i::SegmentInteractable) = i.paths === nothing ? length(i.vertices) : sum(length, i.paths; init = 0)
+_nverts(i::PolygonInteractable) = sum(length, i.rings; init = 0)
+_nverts(i::RectInteractable) = i.layout === :list ? length(i.data) : 1
+_nverts(i::TextInteractable) = length(i.payloads)
+_nverts(::AbstractInteractable) = 1
+
+# `_text_interactables` already warned. The parent walk must not add the generic
+# "unsupported plot type" warning on top of that (`bracket!`).
+function _warned_empty(p)
+    t = if p isa Makie.Text
+        p
+    elseif p isa Makie.Annotation
+        _descendant_or_nothing(p, Makie.Text)
+    else
+        nothing
+    end
+    return t !== nothing && hasproperty(t, :space) && t.space[] !== :data
+end
+
+# Construct `p` (`_plotbase` already accepted it) and register every descendant under the new
+# layer ids. `haskey` in `_register_descendants!` keeps a plot's own entry. A later parent
+# constructor, or a second visit, must not `_construct` those descendants again — that is the
+# double layer (`:violin` plus the violin's `:poly`). Series children register as `id:k`.
+# An empty construct — non-data text, or a construct with no vertices — does not consume a
+# layer id. Returns `(built, warned)`: `warned` is the axis-skip warning or the non-data
+# text warning, so the caller can suppress a second, generic one.
+function _install_known!(ints, seen, plotmap, ax, p)
+    _skip_for_axis(ax, p) && return (built = false, warned = true)
+    base = _plotbase(p)
+    n = get(seen, base, 0) + 1
+    seen[base] = n
+    id = n == 1 ? base : Symbol(base, :_, n)
+    built = _construct(ax, p, id)
+    if isempty(built) || all(i -> _nverts(i) == 0, built)
+        if n == 1
+            delete!(seen, base)
+        else
+            seen[base] = n - 1
+        end
+        return (built = false, warned = isempty(built) && _warned_empty(p))
+    end
+    append!(ints, built)
+    ids = [ii.id for ii in built]
+    plotmap[p] = ids
+    if p isa Makie.Series
+        _register_series_elements!(plotmap, p, id)
+    else
+        _register_descendants!(plotmap, p, ids)
+    end
+    return (built = true, warned = false)
+end
+
+# Children of a recipe `_plotbase` does not know. Stop at the first known plot: constructing
+# a `Violin` and also its `Poly` would be two layers for one mark. A zero-string `Text`
+# (`contour!` with labels off) is not a layer; keep walking so the sibling `Lines` is still
+# found. A child with `visible[] == false` is not drawn (`triplot!` ghost edges, convex hull,
+# constrained edges, point scatter) and is not a layer; do not walk into it. Descendants of
+# a plot just installed are already in `plotmap` and are skipped. Returns `(built, warned)`.
+function _walk_unknown!(ints, seen, plotmap, ax, parent)
+    built_any = false
+    warned_any = false
+    for c in _child_plots(parent)
+        haskey(plotmap, c) && continue
+        if hasproperty(c, :visible) && c.visible[] == false
+            continue
+        end
+        if _plotbase(c) === nothing
+            r = _walk_unknown!(ints, seen, plotmap, ax, c)
+            built_any |= r.built
+            warned_any |= r.warned
+            continue
+        end
+        if c isa Makie.Text && c.text[] isa AbstractVector && isempty(c.text[])
+            r = _walk_unknown!(ints, seen, plotmap, ax, c)
+            built_any |= r.built
+            warned_any |= r.warned
+            continue
+        end
+        _walk_refuses(c) && continue
+        r = _install_known!(ints, seen, plotmap, ax, c)
+        built_any |= r.built
+        warned_any |= r.warned
+    end
+    return (built = built_any, warned = warned_any)
+end
+
 """
     auto_interactables(fig) -> Vector{AbstractInteractable}
 
@@ -738,6 +905,11 @@ Introspect a Makie `Figure`: for every supported plot in every `Axis`, `Axis3`, 
 build the interactable its explicit constructor would. On `Axis3`, only `Scatter`/`Lines`/
 `LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D` are supported; on `PolarAxis`, only
 `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`. Other kinds are skipped with a warning.
+A recipe with no branch of its own still contributes each child that has one (`arc!` is the
+`lines!` it draws), under that child's layer id. A child with `visible[] == false` is not a
+layer (`triplot!`'s ghost edges). A construct with no vertices does not take a layer id
+(`qqplot!` with `qqline = :none`). A data-space `Scatter` child is left alone (`hexbin!`),
+and so is a child whose `space` is not `:data` (`bracket!`).
 Layer ids are the plot kind (`:scatter`, `:lines`, …), suffixed `_2`, `_3`, … when a kind
 repeats. Returns the same concrete vector you could pass to [`masque`](@ref) yourself — edit or
 extend it freely.
@@ -756,58 +928,16 @@ function auto_interactables(fig)
     for ax in fig.content
         ax isa Union{Makie.Axis, Makie.Axis3, Makie.PolarAxis} || continue
         for p in _child_plots(ax.scene)
-            base = _plotbase(p)
-            if base === nothing
-                @warn "masque: skipping unsupported plot type $(typeof(p).name.name) (no introspection recipe)" maxlog = 16
+            if _plotbase(p) === nothing
+                r = _walk_unknown!(ints, seen, plotmap, ax, p)
+                # A child already warned (non-data text, or an axis skip). A second warning
+                # that names the parent only repeats that, which `bracket!` used to do.
+                if !r.built && !r.warned
+                    @warn "masque: skipping unsupported plot type $(Makie.plotkey(p)) (no introspection recipe)" maxlog = 16
+                end
                 continue
             end
-            # Other 2D recipes extract pixel-separable geometry that a 3D perspective
-            # projection silently misaligns; skip loudly rather than construct.
-            if ax isa Makie.Axis3 && !(
-                    p isa Union{
-                        Makie.Scatter, Makie.Lines, Makie.LineSegments,
-                        Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D,
-                    }
-                )
-                @warn "masque: skipping $(typeof(p).name.name) on Axis3 — only Scatter/Lines/" *
-                    "LineSegments/MeshScatter/Wireframe/Arrows3D have 3D-valid extraction today; " *
-                    "other kinds are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
-                continue
-            end
-            # Separable-edge / axis-aligned rect recipes assume Cartesian pixel geometry;
-            # polar maps those into arcs and wedges, so an AABB/grid hit layer would be
-            # silently wrong. Point/segment recipes project per-vertex and are fine.
-            if ax isa Makie.PolarAxis && !(
-                    p isa Union{
-                        Makie.Scatter, Makie.Lines, Makie.LineSegments,
-                        Makie.ScatterLines, Makie.Series,
-                    }
-                )
-                @warn "masque: skipping $(typeof(p).name.name) on PolarAxis — only Scatter/Lines/" *
-                    "LineSegments/ScatterLines/Series have polar-valid extraction today; continuous " *
-                    "θ/r readout and grid/rect recipes are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
-                continue
-            end
-            n = get(seen, base, 0) + 1
-            seen[base] = n
-            id = n == 1 ? base : Symbol(base, :_, n)
-            built = _construct(ax, p, id)
-            append!(ints, built)
-            ids = [ii.id for ii in built]
-            plotmap[p] = ids
-            # A compound recipe (ScatterLines/Stem/…) is what `_construct` ran on, but Makie's
-            # `legendelements` fallback puts the recipe's drawn CHILD plots on the legend entry
-            # (`Makie.get_plots(element)` returns those children, not `p`) — so every descendant
-            # of `p` needs the same ids in `plotmap` too, to auto-link. `haskey` keeps a plot's
-            # own top-level entry (set by its own iteration of this loop) from being overwritten
-            # by an ancestor's. Series is the exception: each child is one element of the
-            # parent `:lines` layer, so descendants register as `id:k` rather than the bare
-            # layer id (which would light every series from any one legend entry).
-            if p isa Makie.Series
-                _register_series_elements!(plotmap, p, id)
-            else
-                _register_descendants!(plotmap, p, ids)
-            end
+            _install_known!(ints, seen, plotmap, ax, p)
         end
     end
     # Colorbar blocks live in fig.content, not in an Axis's scene.

@@ -146,9 +146,12 @@ it.
 ## Recipes masque(fig) extracts
 
 Sourced from `_plotbase` / `_construct` and the `Axis3` / `PolarAxis`
-gates in [`auto_interactables`](@ref). Unknown top-level plots are
-skipped with `@warn`, not an error. Nested children of an unknown parent
-are not walked. Constructor signatures and default fields stay in
+gates in [`auto_interactables`](@ref). A recipe missing from the table
+still contributes each visible child the table already knows, under that
+child's layer id. The walk stops at the child, so a parent that later
+gets its own row is not registered twice. A recipe with nothing to
+contribute is skipped with `@warn`, and the warning names the recipe.
+Constructor signatures and default fields stay in
 [Element constructors](@ref) and [Plot-object defaults](@ref).
 
 `Axis` is a 2D `Makie.Axis`. `Colorbar` and `Legend` are figure-content
@@ -194,10 +197,12 @@ inner `Text`. `text!` whose `space` is not `:data` is skipped with a
 specific warning. `lines!` and `stairs!` are one whole-line element.
 `series!` is one `:lines` layer with one element per series.
 
-A recipe that is not in the table is skipped with `@warn`. Nested
-children of an unknown parent are not walked. `LScene` has no overlay;
-see [Troubleshooting](@ref). For a type you implement yourself, see
-[Custom hits](@ref).
+`contourf!` is filled levels. A pointer in a hole misses that polygon
+and hits the polygon drawn there. `hexbin!` stays unconstructed: its
+scatter is data-space. A child whose `space` is not `:data`, such as
+`bracket!`'s label, is skipped with its own warning. Hidden children
+are not layers. `LScene` has no overlay; see [Troubleshooting](@ref).
+For a type you implement yourself, see [Custom hits](@ref).
 
 ## Element constructors
 
@@ -208,7 +213,7 @@ see [Troubleshooting](@ref). For a type you implement yourself, see
 | [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, unit=:segment, tol=6, id=:segments)` | [`ElementEvent`](@ref): 1-based `segment_index` (`:segment`) or `index` (`:line`) | `:polyline`, `:lines`, or `:segments` | [Click marks](@ref) |
 | [`RectInteractable`](@ref) | `(ax; rects, clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot; id=:bars)` | [`ElementEvent`](@ref): explicit `index`; BarPlot `low`, `high`, `value` | `:rects` | [Click marks](@ref) |
 | [`RectInteractable`](@ref) | `(ax; grid, id=:rects)` or `(ax, p::Union{Heatmap,Image}; id=:cells)` | [`GridCellEvent`](@ref): 1-based `i`, `j`; `A[cell]`; `value` when shipped | `:grid` | [Inspect a grid](@ref) |
-| [`PolygonInteractable`](@ref) | `(ax, rings; id=:polygons)` or `(ax, p::Poly; id=:poly)` | [`ElementEvent`](@ref): 1-based `index` | `:polygons` | [Click marks](@ref) |
+| [`PolygonInteractable`](@ref) | `(ax, rings; holes=nothing, id=:polygons)` or `(ax, p::Poly; id=:poly)` | [`ElementEvent`](@ref): 1-based `index` | `:polygons` | [Click marks](@ref) |
 | [`TextInteractable`](@ref) | `(ax, p::Makie.Text; id=:text)` only | [`ElementEvent`](@ref): `text`, 1-based `index`, `x`, `y` | `:rects` | [Click marks](@ref) |
 
 `mode` is `:polyline` (connected path) or `:pairs` (disjoint pairs).
@@ -218,7 +223,9 @@ see [Troubleshooting](@ref). For a type you implement yourself, see
 `unit = :line`. `tol` is hit-test slack in logical px, scaled to DPI
 like `radius` (default 6). `radius3d` is per-point data-space
 half-extents on a 3D axis and overrides `radius`. `clamp_to_viewport`
-clamps a list rect that spans past the axis edge.
+clamps a list rect that spans past the axis edge. `holes` is one group
+of hole rings per element, the same point type as `rings`. Omit it and
+every element is solid. A point in a hole is not a hit of that element.
 
 Plot-object `SegmentInteractable` does not take `mode`, `unit`, or
 `tooltip`; the plot type fixes all three.
