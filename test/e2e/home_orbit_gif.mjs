@@ -156,10 +156,16 @@ try {
       pluto-shoulder, .add_cell_commands, .foldcode, .runcell, .cell_folder,
       .add_cell, .addcell, .runtime { display: none !important; }
       pluto-input-container > button { display: none !important; }
-      html, body, main, pluto-notebook, pluto-cell, pluto-output {
+      html, body {
         background: white !important;
         overflow: hidden !important;
       }
+      main, pluto-notebook, pluto-output, pluto-cell {
+        background: white !important;
+      }
+      /* Do not set overflow:hidden on the notebook or the cell. The traffic
+         light sits 4px left of the cell, and that clip was hiding Pluto's
+         working-state bar. */
       pluto-cell { margin: 0 !important; }
       ::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
     `,
@@ -173,15 +179,25 @@ try {
   const rect = await page.evaluate((id) => {
     const cell = document.getElementById(id);
     const host = document.querySelector(".ip-host");
+    const light = cell.querySelector("pluto-trafficlight");
     const r1 = cell.getBoundingClientRect();
     const r2 = host.getBoundingClientRect();
+    const r3 = light ? light.getBoundingClientRect() : r1;
     return {
-      left: Math.min(r1.left, r2.left),
-      top: Math.min(r1.top, r2.top),
-      right: Math.max(r1.right, r2.right),
-      bottom: Math.max(r1.bottom, r2.bottom),
+      left: Math.min(r1.left, r2.left, r3.left),
+      top: Math.min(r1.top, r2.top, r3.top),
+      right: Math.max(r1.right, r2.right, r3.right),
+      bottom: Math.max(r1.bottom, r2.bottom, r3.bottom),
+      light: light ? {
+        x: r3.x, y: r3.y, w: r3.width, h: r3.height,
+        cls: cell.className,
+        bg: getComputedStyle(light).backgroundColor,
+        cellOverflow: getComputedStyle(cell).overflow,
+        nbOverflow: getComputedStyle(cell.closest("pluto-notebook")).overflow,
+      } : null,
     };
   }, ID_MASQUE);
+  console.error(`traffic light: ${JSON.stringify(rect.light)}`);
   const margin = 12;
   const clip = {
     x: Math.max(0, Math.round(rect.left - margin)),
@@ -197,9 +213,10 @@ try {
     const b = media.getBoundingClientRect();
     return { x: b.x, y: b.y, w: b.width, h: b.height };
   });
-  const start = { x: plotBox.x + plotBox.w * 0.38, y: plotBox.y + plotBox.h * 0.52 };
-  const mid = { x: plotBox.x + plotBox.w * 0.72, y: plotBox.y + plotBox.h * 0.42 };
-  const end = { x: plotBox.x + plotBox.w * 0.55, y: plotBox.y + plotBox.h * 0.68 };
+  // One sweep across the figure. A there-and-back path plus long holds
+  // read as a cursor that never moves.
+  const start = { x: plotBox.x + plotBox.w * 0.18, y: plotBox.y + plotBox.h * 0.62 };
+  const end = { x: plotBox.x + plotBox.w * 0.82, y: plotBox.y + plotBox.h * 0.36 };
 
   const gestureStamp = () => page.evaluate(() => {
     const host = document.querySelector(".ip-host");
@@ -219,6 +236,10 @@ try {
       const y = from.y + (target.y - from.y) * t;
       await page.mouse.move(x, y);
       cur = { x, y };
+      if (i === 30) {
+        const cls = await page.evaluate((id) => document.getElementById(id)?.className ?? "", ID_MASQUE);
+        console.error(`cell class mid-drag: ${cls}`);
+      }
       await sleep(durationMs / steps);
     }
   };
@@ -248,13 +269,10 @@ try {
   };
 
   const timeline = async () => {
-    await sleep(250);
+    await sleep(80);
     const stamp0 = await gestureStamp();
     await page.mouse.down();
-    await sleep(40);
-    await moveTo(mid, 1800, 36);
-    await sleep(80);
-    await moveTo(end, 1200, 24);
+    await moveTo(end, 4600, 80);
     await page.mouse.up();
     let stamp1 = stamp0;
     for (let i = 0; i < 80; i++) {
@@ -266,7 +284,12 @@ try {
       throw new Error(`orbit drag produced no gesture frame (stamp stayed ${JSON.stringify(stamp0)})`);
     }
     console.error(`OK  orbit gesture-frame ${stamp0} → ${stamp1}`);
-    await sleep(900);
+    const light = await page.evaluate((id) => {
+      const cell = document.getElementById(id);
+      return cell ? cell.className : "";
+    }, ID_MASQUE);
+    console.error(`cell class after drag: ${light}`);
+    await sleep(350);
     done = true;
   };
 
