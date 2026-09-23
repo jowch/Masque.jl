@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest"
+import { describe, it, expect, vi, afterEach } from "vitest"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
-import { rewrap, obs, makeBonitoShim, mountWebGL, resetWebGLPool, contextBudget, DEFAULT_CONTEXT_BUDGET } from "../src/wgl-shim"
+import { rewrap, obs, makeBonitoShim, mountWebGL } from "../src/wgl-shim"
 
 // rewrap is the JS half of the 4-rule scene contract — it must decode exactly what `_plain`
 // in ext/MasqueWGLMakieExt.jl emits. These lock that cross-language contract (previously
@@ -134,22 +134,14 @@ describe("mountWebGL", () => {
 
     afterEach(() => {
         delete (window as unknown as { Bonito?: unknown }).Bonito
-        resetWebGLPool()
-        document.body.replaceChildren()
     })
 
-    function hostCanvas() {
-        const host = document.createElement("div")
-        const canvas = document.createElement("canvas")
-        host.appendChild(canvas)
-        document.body.appendChild(host)
-        return { host, canvas }
-    }
-
     it("imports the bundle, installs window.Bonito, and forwards args to setup_scene_init", async () => {
-        const { host: wrapper, canvas } = hostCanvas()
+        const canvas = document.createElement("canvas")
+        const wrapper = document.createElement("div")
+        wrapper.appendChild(canvas)
         const scene = { __obs__: { __t__: "f32", d: [1, 2] } }
-        const result = await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene, width: 640, height: 480, pxPerUnit: 3, visible: true })
+        const result = await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene, width: 640, height: 480, pxPerUnit: 3 })
 
         expect((window as unknown as { Bonito?: { can_send_to_julia?: () => boolean } }).Bonito).toBeTruthy()
         expect((window as unknown as { Bonito: { can_send_to_julia: () => boolean } }).Bonito.can_send_to_julia()).toBe(true)
@@ -174,14 +166,16 @@ describe("mountWebGL", () => {
     })
 
     it("defaults pxPerUnit to 2 when omitted", async () => {
-        const { canvas } = hostCanvas()
-        const result = await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 100, height: 50, visible: true })
+        const canvas = document.createElement("canvas")
+        document.createElement("div").appendChild(canvas)
+        const result = await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 100, height: 50 })
         expect(result.WGL.lastCall[5]).toBe(2)
     })
 
     it("sizes the canvas to fill its container via CSS after WGL's own sizing", async () => {
-        const { canvas } = hostCanvas()
-        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 100, height: 50, visible: true })
+        const canvas = document.createElement("canvas")
+        document.createElement("div").appendChild(canvas)
+        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 100, height: 50 })
         expect(canvas.style.width).toBe("100%")
         expect(canvas.style.height).toBe("auto")
     })
@@ -191,13 +185,11 @@ describe("mountWebGL", () => {
             wglmakie_screen?: { root_scene: { screen?: unknown; orbitcontrols?: { disposed: boolean } } }
             masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
         }
-        const host = document.createElement("div")
-        host.appendChild(canvas)
-        document.body.appendChild(host)
+        document.createElement("div").appendChild(canvas)
         const mod = await import(/* @vite-ignore */ bundleUrl) as { sceneCalls: { deleted: number; loops: number; lastDeleted?: string } }
         mod.sceneCalls.deleted = 0
         mod.sceneCalls.loops = 0
-        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 640, height: 480, pxPerUnit: 2, visible: true })
+        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 640, height: 480, pxPerUnit: 2 })
         const first = canvas.wglmakie_screen!.root_scene
         const controls = first.orbitcontrols!
         expect(typeof canvas.masqueReplaceScene).toBe("function")
@@ -227,9 +219,7 @@ describe("mountWebGL", () => {
             masqueFlushPending?: () => void
             masquePendingFrame?: { r: { scene: unknown; pxPerUnit?: number; width?: number; height?: number } } | null
         }
-        const host = document.createElement("div")
-        host.appendChild(canvas)
-        document.body.appendChild(host)
+        document.createElement("div").appendChild(canvas)
         canvas.masquePendingFrame = { r: { scene: { tag: "early" }, pxPerUnit: 2, width: 80, height: 40 } }
         canvas.masqueFlushPending = () => {
             const pending = canvas.masquePendingFrame
@@ -239,210 +229,10 @@ describe("mountWebGL", () => {
         const mod = await import(/* @vite-ignore */ bundleUrl) as { sceneCalls: { deleted: number; loops: number } }
         mod.sceneCalls.deleted = 0
         mod.sceneCalls.loops = 0
-        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 80, height: 40, pxPerUnit: 2, visible: true })
+        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 80, height: 40, pxPerUnit: 2 })
         expect(canvas.masquePendingFrame).toBeNull()
         expect(mod.sceneCalls.loops).toBe(1)
         expect(canvas.wglmakie_screen!.root_scene.data).toEqual({ tag: "early" })
         expect(canvas.width).toBe(160)
-    })
-})
-
-describe("WebGL context pool", () => {
-    const fixtureSrc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures/fake-wgl-bundle.mjs"), "utf8")
-    const bundleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(fixtureSrc)}`
-
-    class FakeIO {
-        cb: IntersectionObserverCallback
-        opts: IntersectionObserverInit
-        static last: FakeIO | null = null
-        constructor(cb: IntersectionObserverCallback, opts?: IntersectionObserverInit) {
-            this.cb = cb
-            this.opts = opts ?? {}
-            FakeIO.last = this
-        }
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-        takeRecords(): IntersectionObserverEntry[] { return [] }
-        fire(pairs: [Element, boolean][]) {
-            const records = pairs.map(([target, isIntersecting]) => ({
-                isIntersecting, target, intersectionRatio: isIntersecting ? 1 : 0,
-            })) as IntersectionObserverEntry[]
-            this.cb(records, this as unknown as IntersectionObserver)
-        }
-    }
-
-    const prevIO = globalThis.IntersectionObserver
-    beforeEach(() => {
-        globalThis.IntersectionObserver = FakeIO as unknown as typeof IntersectionObserver
-        Object.defineProperty(window, "innerWidth", { value: 800, configurable: true })
-        Object.defineProperty(window, "innerHeight", { value: 600, configurable: true })
-    })
-
-    afterEach(() => {
-        globalThis.IntersectionObserver = prevIO
-        FakeIO.last = null
-        delete (window as unknown as { Bonito?: unknown }).Bonito
-        resetWebGLPool()
-        document.body.replaceChildren()
-    })
-
-    function at(top: number) {
-        const host = document.createElement("div")
-        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
-            masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
-        }
-        host.appendChild(canvas)
-        host.getBoundingClientRect = () => ({
-            left: 0, top, width: 400, height: 100, right: 400, bottom: top + 100, x: 0, y: top, toJSON() {},
-        }) as DOMRect
-        document.body.appendChild(host)
-        return { host, canvas }
-    }
-
-    async function mod() {
-        return import(/* @vite-ignore */ bundleUrl) as Promise<{ inits: unknown[][] }>
-    }
-
-    async function settle() {
-        for (let i = 0; i < 40; i++) await new Promise((r) => setTimeout(r, 0))
-    }
-
-    it("leaves an off-screen plot asleep", async () => {
-        const { canvas } = at(4000)
-        const m = await mod()
-        m.inits.length = 0
-        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: { tag: "off" }, width: 80, height: 40 })
-        await settle()
-        expect(m.inits).toHaveLength(0)
-        expect(canvas.isConnected).toBe(true)
-        expect(FakeIO.last?.opts.rootMargin).toBe("200px")
-    })
-
-    it("draws a plot when the viewport observer reports it", async () => {
-        const { host, canvas } = at(0)
-        const m = await mod()
-        m.inits.length = 0
-        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: { tag: "on" }, width: 80, height: 40 })
-        expect(m.inits).toHaveLength(0)
-        FakeIO.last!.fire([[host, true]])
-        await settle()
-        expect(m.inits).toHaveLength(1)
-        expect((m.inits[0][9] as { value: unknown }).value).toEqual({ tag: "on" })
-    })
-
-    it("keeps eight live contexts and notes the plot that does not fit", async () => {
-        const m = await mod()
-        m.inits.length = 0
-        const widgets = []
-        for (let i = 0; i < DEFAULT_CONTEXT_BUDGET + 1; i++) widgets.push(at(0))
-        for (const w of widgets) {
-            await mountWebGL({ canvas: w.canvas, wglBundleUrl: bundleUrl, scene: { tag: "n" }, width: 40, height: 20 })
-        }
-        FakeIO.last!.fire(widgets.map((w) => [w.host, true]))
-        await settle()
-        expect(m.inits).toHaveLength(DEFAULT_CONTEXT_BUDGET)
-        const notes = document.querySelectorAll(".masque-webgl-placeholder")
-        expect(notes).toHaveLength(1)
-        expect(notes[0].textContent).toBe("This plot's GPU context was released.")
-        expect(widgets[DEFAULT_CONTEXT_BUDGET].host.contains(notes[0])).toBe(true)
-    })
-
-    it("snapshots a farther plot to free a slot, and resumes the latest scene", async () => {
-        const m = await mod()
-        m.inits.length = 0
-        const pinned = []
-        for (let i = 0; i < DEFAULT_CONTEXT_BUDGET - 1; i++) pinned.push(at(0))
-        const gone = at(0)
-        const coming = at(4000)
-        const all = [...pinned, gone, coming]
-        for (const w of all) {
-            await mountWebGL({ canvas: w.canvas, wglBundleUrl: bundleUrl, scene: { tag: "mount" }, width: 80, height: 40 })
-        }
-        FakeIO.last!.fire([
-            ...pinned.map((w) => [w.host, true] as [Element, boolean]),
-            [gone.host, true],
-            [coming.host, false],
-        ])
-        await settle()
-        expect(m.inits).toHaveLength(DEFAULT_CONTEXT_BUDGET)
-        gone.canvas.masqueReplaceScene!({ tag: "panned" }, 2, 90, 50)
-        // Scroll: `gone` leaves the viewport, `coming` enters. Distance comes from the rect,
-        // so the flag alone does not make a plot farther.
-        gone.host.getBoundingClientRect = () => ({
-            left: 0, top: 4000, width: 400, height: 100, right: 400, bottom: 4100, x: 0, y: 4000, toJSON() {},
-        }) as DOMRect
-        coming.host.getBoundingClientRect = () => ({
-            left: 0, top: 0, width: 400, height: 100, right: 400, bottom: 100, x: 0, y: 0, toJSON() {},
-        }) as DOMRect
-        FakeIO.last!.fire([
-            ...pinned.map((w) => [w.host, true] as [Element, boolean]),
-            [gone.host, false],
-            [coming.host, true],
-        ])
-        await settle()
-        expect(gone.host.querySelector("img.masque-webgl-base")).toBeTruthy()
-        expect(gone.canvas.isConnected).toBe(false)
-        expect(m.inits).toHaveLength(DEFAULT_CONTEXT_BUDGET + 1)
-        gone.host.getBoundingClientRect = () => ({
-            left: 0, top: 0, width: 400, height: 100, right: 400, bottom: 100, x: 0, y: 0, toJSON() {},
-        }) as DOMRect
-        coming.host.getBoundingClientRect = () => ({
-            left: 0, top: 4000, width: 400, height: 100, right: 400, bottom: 4100, x: 0, y: 4000, toJSON() {},
-        }) as DOMRect
-        FakeIO.last!.fire([
-            ...pinned.map((w) => [w.host, true] as [Element, boolean]),
-            [gone.host, true],
-            [coming.host, false],
-        ])
-        await settle()
-        const resumed = m.inits[m.inits.length - 1]
-        expect((resumed[9] as { value: unknown }).value).toEqual({ tag: "panned" })
-        expect(resumed[2]).toBe(90)
-        expect(resumed[3]).toBe(50)
-        expect(resumed[5]).toBe(2)
-    })
-
-    it("lowers the budget when a context is lost", async () => {
-        const m = await mod()
-        m.inits.length = 0
-        const widgets = []
-        for (let i = 0; i < DEFAULT_CONTEXT_BUDGET; i++) widgets.push(at(0))
-        for (const w of widgets) {
-            await mountWebGL({ canvas: w.canvas, wglBundleUrl: bundleUrl, scene: {}, width: 40, height: 20 })
-        }
-        FakeIO.last!.fire(widgets.map((w) => [w.host, true]))
-        await settle()
-        expect(contextBudget()).toBe(DEFAULT_CONTEXT_BUDGET)
-        widgets[0].canvas.dispatchEvent(new Event("webglcontextlost"))
-        expect(contextBudget()).toBe(DEFAULT_CONTEXT_BUDGET - 1)
-        expect(widgets[0].canvas.style.display).toBe("none")
-        expect(widgets[0].host.querySelector(".masque-webgl-placeholder")).toBeTruthy()
-        const extra = at(0)
-        await mountWebGL({ canvas: extra.canvas, wglBundleUrl: bundleUrl, scene: { tag: "extra" }, width: 40, height: 20 })
-        FakeIO.last!.fire([[extra.host, true], ...widgets.map((w) => [w.host, true] as [Element, boolean])])
-        await settle()
-        expect(m.inits).toHaveLength(DEFAULT_CONTEXT_BUDGET)
-        expect(extra.host.querySelector(".masque-webgl-placeholder")).toBeTruthy()
-    })
-
-    it("draws a plot that already holds a gesture frame, even before the observer fires", async () => {
-        const { host, canvas } = at(4000)
-        ;(host as HTMLElement & { masquePendingFrame?: unknown }).masquePendingFrame = { r: { scene: { tag: "early" } } }
-        const m = await mod()
-        m.inits.length = 0
-        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: { tag: "mount" }, width: 80, height: 40 })
-        await settle()
-        expect(m.inits).toHaveLength(1)
-    })
-
-    it("does not draw after the overlay has detached", async () => {
-        const { host, canvas } = at(0)
-        ;(host as HTMLElement & { masqueDead?: boolean }).masqueDead = true
-        const m = await mod()
-        m.inits.length = 0
-        await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 80, height: 40, visible: true })
-        await settle()
-        expect(m.inits).toHaveLength(0)
     })
 })

@@ -78,21 +78,6 @@ export interface MountArgs {
     width: number
     height: number
     pxPerUnit?: number
-    // Test hook. Omit it in the widget: the viewport observer decides. `true` grants a
-    // context immediately; `false` stays asleep until a gesture asks.
-    visible?: boolean
-}
-
-// Cross-bundle names (overlay.js ↔ this ESM). No trailing underscore: esbuild mangles those,
-// and the two bundles are built separately.
-interface WebGLHost extends HTMLElement {
-    masqueRetargetBase?: (next: HTMLElement) => void
-    masqueFlushPending?: () => void
-    masquePendingFrame?: unknown
-    masqueRequestLive?: () => void
-    masqueDetach?: () => void
-    masqueDead?: boolean
-    masqueWantsLive?: boolean
 }
 
 interface WglScene {
@@ -116,13 +101,6 @@ interface WglBundle {
     deserialize_scene: (data: unknown, screen: WglScreen) => WglScene
     start_renderloop: (scene: WglScene) => void
     delete_scene?: (id: unknown) => void
-    setup_scene_init: (
-        wrapper: HTMLElement, canvas: HTMLCanvasElement,
-        width: number, height: number, resizeTo: null,
-        pxPerUnit: number, devicePixelRatio: number,
-        realSize: Obs<number[]>, canvasWidth: Obs<number[]>, scene: Obs<unknown>,
-        conn: unknown, fps: number, done: Obs<boolean>,
-    ) => void
 }
 
 interface WglCanvas extends HTMLCanvasElement {
@@ -187,375 +165,40 @@ function replaceScene(canvas: WglCanvas, WGL: WglBundle, scene: unknown, pxPerUn
     canvas.style.height = "auto"
 }
 
-function installSceneReplacer(canvas: WglCanvas, WGL: WglBundle, plot: Plot): void {
+function installSceneReplacer(canvas: WglCanvas, WGL: WglBundle): void {
     if (!canvas.wglmakie_screen) return
     canvas.masqueReplaceScene = (scene, pxPerUnit, width, height) => {
         replaceScene(canvas, WGL, scene, pxPerUnit, width, height)
-        // The mount-time scene is stale once a gesture frame lands. Resume has to redraw
-        // this one, or the camera snaps back under an overlay that already panned.
-        plot.scene = scene
-        if (typeof pxPerUnit === "number" && typeof width === "number" && typeof height === "number") {
-            plot.pxPerUnit = pxPerUnit
-            plot.width = width
-            plot.height = height
-        }
     }
-    const flush = plot.host.masqueFlushPending ?? canvas.masqueFlushPending
-    flush?.()
+    canvas.masqueFlushPending?.()
 }
 
-// Desktop Chrome and Safari allow 16 live WebGL contexts, Android Chrome 8. Eight fits
-// all of them. The slots are not a thread pool and they are not spent on off-screen plots:
-// setup_scene_init blocks the main thread, and drawing a plot the user cannot see does not
-// make the next one cheaper.
-export const DEFAULT_CONTEXT_BUDGET = 8
-const VIEW_MARGIN = "200px"
-const RELEASED = "This plot's GPU context was released."
-
-type Phase = "blank" | "live" | "snapshot" | "placeholder"
-
-interface Plot {
-    host: WebGLHost
-    canvas: HTMLCanvasElement | null
-    placeholder: HTMLElement | null
-    scene: unknown
-    width: number
-    height: number
-    pxPerUnit: number
-    WGL: WglBundle
-    phase: Phase
-    visible: boolean
-    dead: boolean
-    needsNewCanvas: boolean
-    token: number
-}
-
-interface Pool {
-    plots: Set<Plot>
-    byHost: Map<HTMLElement, Plot>
-    budget: number
-    io: IntersectionObserver | null
-    busy: boolean
-    timer: number
-}
-
-const lossListening = new WeakSet<HTMLCanvasElement>()
-let lossToken = 0
-
-function pool(): Pool {
-    const H = ((window as any).__MasqueWGL ??= {})
-    if (!H.contextPool) {
-        H.contextPool = {
-            plots: new Set<Plot>(), byHost: new Map<HTMLElement, Plot>(),
-            budget: DEFAULT_CONTEXT_BUDGET, io: null, busy: false, timer: 0,
-        }
-    }
-    return H.contextPool as Pool
-}
-
-export function contextBudget(): number {
-    return pool().budget
-}
-
-export function resetWebGLPool(): void {
-    const H = (window as any).__MasqueWGL
-    const p = H?.contextPool as Pool | undefined
-    if (!p) return
-    if (p.timer) window.clearTimeout(p.timer)
-    p.io?.disconnect()
-    p.plots.clear()
-    p.byHost.clear()
-    p.budget = DEFAULT_CONTEXT_BUDGET
-    p.busy = false
-    p.timer = 0
-    p.io = null
-}
-
-function livePlots(p: Pool): Plot[] {
-    return [...p.plots].filter((plot) => plot.phase === "live")
-}
-
-function distanceToViewport(el: HTMLElement): number {
-    const r = el.getBoundingClientRect()
-    const vw = window.innerWidth || 0
-    const vh = window.innerHeight || 0
-    const dx = r.right < 0 ? -r.right : r.left > vw ? r.left - vw : 0
-    const dy = r.bottom < 0 ? -r.bottom : r.top > vh ? r.top - vh : 0
-    return Math.hypot(dx, dy)
-}
-
-// Strictly farther than `candidate`. A tie (every plot on screen) is not a victim:
-// an on-screen plot does not lose its context to another on-screen plot.
-function victimFor(p: Pool, candidate: Plot): Plot | null {
-    const floor = distanceToViewport(candidate.host)
-    let best: Plot | null = null
-    let bestD = floor
-    for (const plot of livePlots(p)) {
-        if (plot === candidate) continue
-        const d = distanceToViewport(plot.host)
-        if (d > bestD) { best = plot; bestD = d }
-    }
-    return best
-}
-
-function waitingPlots(p: Pool): Plot[] {
-    return [...p.plots]
-        .filter((plot) => plot.visible && plot.phase !== "live" && !plot.dead)
-        .sort((a, b) => distanceToViewport(a.host) - distanceToViewport(b.host))
-}
-
-function grantable(p: Pool): Plot | null {
-    for (const candidate of waitingPlots(p)) {
-        if (livePlots(p).length < p.budget || victimFor(p, candidate)) return candidate
-    }
-    return null
-}
-
-function visualOf(plot: Plot): HTMLElement | null {
-    if (plot.canvas?.isConnected) return plot.canvas
-    return plot.host.querySelector("img.masque-webgl-base, canvas.masque-webgl-base, .masque-webgl-placeholder")
-}
-
-function showPlaceholder(plot: Plot, lostCanvas?: HTMLCanvasElement): void {
-    if (plot.phase === "snapshot" && !lostCanvas) return
-    if (plot.placeholder?.isConnected && !lostCanvas) {
-        plot.phase = "placeholder"
-        plot.host.masqueRetargetBase?.(plot.placeholder)
-        return
-    }
-    const el = document.createElement("div")
-    el.className = "masque-webgl-base masque-webgl-placeholder"
-    el.textContent = RELEASED
-    el.style.display = "grid"
-    el.style.placeItems = "center"
-    el.style.width = "100%"
-    el.style.boxSizing = "border-box"
-    el.style.aspectRatio = `${plot.width} / ${plot.height}`
-    el.style.color = "CanvasText"
-    el.style.background = "Canvas"
-    el.style.border = "1px solid GrayText"
-    el.style.font = "13px/1.4 sans-serif"
-    el.style.textAlign = "center"
-    el.style.padding = "12px"
-    if (lostCanvas?.isConnected) {
-        // Leave the canvas in the document. WGLMakie's own lost handler removes it;
-        // pulling it out first makes that removeChild throw and skip forceContextLoss.
-        lostCanvas.insertAdjacentElement("beforebegin", el)
-        lostCanvas.style.display = "none"
-    } else {
-        const old = visualOf(plot)
-        if (old) old.replaceWith(el)
-        else plot.host.prepend(el)
-    }
-    plot.placeholder = el
-    plot.canvas = null
-    plot.needsNewCanvas = true
-    plot.phase = "placeholder"
-    plot.host.masqueRetargetBase?.(el)
-}
-
-function suspend(plot: Plot): void {
-    const canvas = plot.canvas
-    plot.token = 0
-    if (!canvas?.isConnected) {
-        plot.phase = "blank"
-        plot.canvas = null
-        plot.needsNewCanvas = true
-        return
-    }
-    const img = document.createElement("img")
-    img.className = "masque-webgl-base"
-    img.alt = ""
-    img.width = canvas.width || plot.width
-    img.height = canvas.height || plot.height
-    img.style.cssText = canvas.style.cssText || "display:block;width:100%;height:auto;"
-    try {
-        const url = canvas.toDataURL("image/png")
-        if (url) img.src = url
-    } catch { /* a sized <img> still holds the box */ }
-    canvas.replaceWith(img)
-    plot.canvas = null
-    plot.placeholder = null
-    plot.needsNewCanvas = true
-    plot.phase = "snapshot"
-    plot.host.masqueRetargetBase?.(img)
-}
-
-function takeCanvas(plot: Plot): HTMLCanvasElement {
-    if (!plot.needsNewCanvas && plot.canvas?.isConnected) return plot.canvas
-    const canvas = document.createElement("canvas")
-    canvas.className = "masque-webgl-base"
-    canvas.width = plot.width
-    canvas.height = plot.height
-    canvas.style.display = "block"
-    canvas.style.width = "100%"
-    canvas.style.height = "auto"
-    const old = plot.placeholder?.isConnected ? plot.placeholder : visualOf(plot)
-    if (old && old !== canvas) old.replaceWith(canvas)
-    else plot.host.prepend(canvas)
-    plot.canvas = canvas
-    plot.placeholder = null
-    plot.needsNewCanvas = false
-    return canvas
-}
-
-function unexpectedLoss(plot: Plot, canvas: HTMLCanvasElement): void {
-    if (plot.token === 0 || plot.dead) return
-    plot.token = 0
-    const p = pool()
-    const remaining = livePlots(p).filter((other) => other !== plot).length
-    p.budget = Math.max(1, remaining)
-    plot.needsNewCanvas = true
-    showPlaceholder(plot, canvas)
-    armTimer(p)
-}
-
-function watchLoss(plot: Plot, canvas: HTMLCanvasElement, token: number): void {
-    if (lossListening.has(canvas)) return
-    lossListening.add(canvas)
-    canvas.addEventListener("webglcontextlost", () => {
-        if (plot.token !== token) return
-        unexpectedLoss(plot, canvas)
-    }, true)
-}
-
-function initPlot(p: Pool, plot: Plot): void {
-    p.busy = true
-    const token = ++lossToken
-    plot.token = token
-    let lost = false
-    try {
-        const canvas = takeCanvas(plot)
-        watchLoss(plot, canvas, token)
-        const wrapped = rewrap(plot.scene)
-        plot.WGL.setup_scene_init(
-            plot.host, canvas,
-            plot.width, plot.height,
-            null,
-            plot.pxPerUnit, 1,
-            obs([plot.width, plot.height]),
-            obs([plot.width, plot.height]),
-            obs(wrapped),
-            new ((window as any).Bonito._ConnStub)(),
-            30,
-            obs(false),
-        )
-        lost = plot.token !== token || plot.phase === "placeholder"
-        if (lost) return
-        // setup_scene_init may write canvas CSS to the framebuffer size (wider than
-        // `.ip-host`). Keep the element display-sized so the overlay can pin to it.
-        canvas.style.width = "100%"
-        canvas.style.height = "auto"
-        plot.canvas = canvas
-        plot.phase = "live"
-        installSceneReplacer(canvas as WglCanvas, plot.WGL, plot)
-        plot.host.masqueRetargetBase?.(canvas)
-    } catch (e) {
-        console.error("[masque-wgl] setup_scene_init failed", e)
-        // Stay asleep until the viewport (or a gesture) asks again. Leaving `visible`
-        // set retries setup_scene_init on every timer tick.
-        plot.visible = false
-        if (plot.phase !== "placeholder") showPlaceholder(plot)
-    } finally {
-        p.busy = false
-        if (!lost) armTimer(p)
-    }
-}
-
-function armTimer(p: Pool): void {
-    if (p.busy || p.timer || waitingPlots(p).length === 0) return
-    p.timer = window.setTimeout(() => {
-        p.timer = 0
-        pump()
-    }, 0)
-}
-
-function drop(p: Pool, plot: Plot): void {
-    plot.dead = true
-    plot.token = 0
-    p.plots.delete(plot)
-    p.byHost.delete(plot.host)
-    p.io?.unobserve(plot.host)
-}
-
-function reap(p: Pool): void {
-    for (const plot of [...p.plots]) {
-        if (plot.dead || plot.host.masqueDead || !plot.host.isConnected) drop(p, plot)
-    }
-}
-
-function pump(): void {
-    const p = pool()
-    if (p.busy || p.timer) return
-    reap(p)
-    const next = grantable(p)
-    if (!next) {
-        for (const plot of waitingPlots(p)) {
-            if (plot.phase !== "snapshot") showPlaceholder(plot)
-        }
-        return
-    }
-    if (livePlots(p).length >= p.budget) {
-        const victim = victimFor(p, next)
-        if (!victim) return
-        suspend(victim)
-    }
-    initPlot(p, next)
-}
-
-function observe(plot: Plot): void {
-    const p = pool()
-    if (typeof IntersectionObserver !== "function") {
-        // No viewport signal. Grant in registration order up to the budget; do not open
-        // a context per plot.
-        plot.visible = livePlots(p).length < p.budget
-        return
-    }
-    if (!p.io) p.io = new IntersectionObserver((records) => {
-        for (const rec of records) {
-            const known = p.byHost.get(rec.target as HTMLElement)
-            if (!known || known.dead) continue
-            if (!known.host.isConnected || known.host.masqueDead) { drop(p, known); continue }
-            known.visible = rec.isIntersecting
-        }
-        pump()
-    }, { rootMargin: VIEW_MARGIN })
-    p.io.observe(plot.host)
-}
-
-function enroll(host: WebGLHost, canvas: HTMLCanvasElement, WGL: WglBundle, scene: unknown, width: number, height: number, pxPerUnit: number, visible: boolean | undefined): void {
-    const p = pool()
-    if (p.byHost.has(host)) return
-    const plot: Plot = {
-        host, canvas, placeholder: null, scene, width, height, pxPerUnit, WGL,
-        phase: "blank", visible: false, dead: false, needsNewCanvas: false, token: 0,
-    }
-    p.plots.add(plot)
-    p.byHost.set(host, plot)
-    host.masqueDetach = () => drop(p, plot)
-    host.masqueRequestLive = () => {
-        if (plot.dead) return
-        plot.visible = true
-        pump()
-    }
-    // Observe after the plot is registered. A browser can deliver the first intersection
-    // record from inside observe(), and the callback looks the plot up by host.
-    if (visible === true || host.masqueWantsLive || host.masquePendingFrame) plot.visible = true
-    else if (visible !== false) observe(plot)
-    pump()
-}
-
-export async function mountWebGL({ canvas, wglBundleUrl, scene, width, height, pxPerUnit = 2, visible }: MountArgs) {
+export async function mountWebGL({ canvas, wglBundleUrl, scene, width, height, pxPerUnit = 2 }: MountArgs) {
     const WGL = await import(/* @vite-ignore */ wglBundleUrl)
     ;(window as any).Bonito = makeBonitoShim()    // WGLMakie reads window.Bonito globals
+    const wrapper = canvas.parentElement
     const sceneObj = rewrap(scene)
-    const host = canvas.parentElement as WebGLHost | null
+    WGL.setup_scene_init(
+        wrapper, canvas,
+        width, height,
+        null,                  // resize_to (fixed size -> overlay alignment holds)
+        pxPerUnit, 1,
+        obs([width, height]),  // real_size
+        obs([width, height]),  // canvas_width
+        obs(sceneObj),         // scene_serialized (.value set -> immediate init)
+        new ((window as any).Bonito._ConnStub)(),
+        30,                    // framerate
+        obs(false),            // done_init
+    )
+    // setup_scene_init may write canvas CSS to the framebuffer size (wider than
+    // `.ip-host`). Keep the element display-sized so the overlay can pin to it.
+    canvas.style.width = "100%"
+    canvas.style.height = "auto"
+    installSceneReplacer(canvas as WglCanvas, WGL as WglBundle)
     // Return WGL so an animation driver can do BOTH tiers without re-importing:
     //  - uniforms/camera: find the live observable in `scene` and .notify(v)
     //  - data (positions): WGL.find_plots([uuid])[0].geometry.attributes.wgl_positions
     //      .array.set(frame); attr.needsUpdate = true;   (smooth, no Julia round-trip)
     // After the first gesture frame this `scene` is stale; the live one is on the canvas.
-    if (!host || host.masqueDead) return { scene: sceneObj, WGL }
-    enroll(host, canvas, WGL as WglBundle, scene, width, height, pxPerUnit, visible)
     return { scene: sceneObj, WGL }
 }

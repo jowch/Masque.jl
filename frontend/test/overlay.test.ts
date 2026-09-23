@@ -1567,48 +1567,6 @@ describe("tooltips (mount/showTip)", () => {
         expect(stamp.xmax).toBe(9)
     })
 
-    it("retargets the overlay when the WebGL base is swapped, and stashes a frame on the host", async () => {
-        const m: Manifest = {
-            width: 1200, height: 800, scaling: 2,
-            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
-                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
-            layers: [{ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
-                geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }],
-        }
-        const host = document.createElement("div") as HTMLElement & {
-            masqueRetargetBase?: (next: HTMLElement) => void
-            masquePendingFrame?: { r: { scene?: unknown } } | null
-            masqueRequestLive?: () => void
-        }
-        const canvas = document.createElement("canvas")
-        canvas.getBoundingClientRect = () =>
-            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
-        const script = document.createElement("script")
-        host.append(canvas, script)
-        document.body.append(host)
-        const requestLive = vi.fn()
-        host.masqueRequestLive = requestLive
-        const requestFrame = vi.fn(async () => ({ scene: { tag: "asleep" }, pxPerUnit: 1, width: 400, height: 300, manifest: m }))
-        mount(script, m, undefined, requestFrame)
-        const img = document.createElement("img")
-        img.getBoundingClientRect = () =>
-            ({ left: 12, top: 8, width: 500, height: 300, right: 512, bottom: 308, x: 12, y: 8, toJSON() {} }) as DOMRect
-        host.masqueRetargetBase!(img)
-        const shadowHost = host.lastElementChild as HTMLElement
-        expect(shadowHost.style.left).toBe("12px")
-        expect(shadowHost.style.top).toBe("8px")
-        expect(shadowHost.style.width).toBe("500px")
-        expect(shadowHost.style.height).toBe("300px")
-        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
-        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
-        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
-        await Promise.resolve()
-        await Promise.resolve()
-        expect(host.masquePendingFrame?.r.scene).toEqual({ tag: "asleep" })
-        expect(requestLive).toHaveBeenCalled()
-        expect(host.dataset.masqueGestureFrame).toBeUndefined()
-    })
-
     // Round-1 review, finding #2: settle used to be gated on the RELEASE point's own distance
     // from the drag's start, so a drag that went out past VIEW_MIN_PX (sending ppu=1 in-drag
     // requests) and drifted back near its start before release read as a micro-drag at release
