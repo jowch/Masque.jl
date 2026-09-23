@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- Hovering or focusing a legend entry no longer shows a tooltip. The label is already drawn
+  in the row, and the card covered the entries around it. Pass `tooltip = masque"..."` to show
+  one (fields: `label`, `group`, `targets`). Omitting `tooltip` and `tooltip = false` both
+  leave the card off. A screen reader still announces the entry's label.
+
 ### Added
 - `:webgl` view gestures stream live frames on the same `with_js_link` channel as `:cairo`.
   Each frame is a freshly serialized scene plus a hit manifest Julia computed for that camera,
@@ -39,10 +45,10 @@ All notable changes to this project are documented here. The format is based on
   cell centre for grid). It flips below the mark when it would clip the surface's top edge,
   and shifts inside the surface (moving the caret via `--masque-caret-x`) when it would clip a
   side. Keyboard focus uses the same placement. `axis`/`threshold`/`roi`/`view` (no discrete
-  mark) keep the previous cursor-relative placement. ROI boxes gained 4 edge-midpoint resize
-  handles alongside the existing 4 (square) corner handles — an edge handle resizes only that
-  one edge — with directional resize cursors (`nwse-resize`/`nesw-resize`/`ns-resize`/
-  `ew-resize`/`move`) on hover, and hovering a threshold line thickens its stroke.
+  mark) keep the previous cursor-relative placement. An ROI resizes from a corner grip or from
+  the middle of a side (no drawn side grip; that hit still resizes only that one edge), with
+  directional resize cursors (`nwse-resize`/`nesw-resize`/`ns-resize`/`ew-resize`/`move`) on
+  hover, and hovering a threshold line thickens its stroke.
 - The tooltip's light/dark theme now follows the figure's own background colour (CSS
   relative-colour syntax), not just the OS/browser `prefers-color-scheme` — a dark figure on
   a light Pluto page gets a dark tooltip, and vice versa. Browsers without relative-colour
@@ -101,6 +107,18 @@ All notable changes to this project are documented here. The format is based on
   MeshScatter children live in float32convert space (premise from #36).
 
 ### Changed
+- Highlight edges and control chrome are a flat grey, and ROI grips are small transform
+  handles. The color-dodge fill (`#141414` on `svg.masque-fill`) is unchanged. The edge
+  stroke no longer uses `multiply` on a light figure or `screen` on a dark one:
+  `svg.masque-edge` stays so the stroke paints above the fill, and it draws one chrome grey
+  (`#7a7a7a` light, `#c8c8c8` dark) at 1.5px on hover and 2px when selected. The ROI
+  outline, the threshold line, and the selected-open ring use that same grey instead of
+  tooltip-text ink. An ROI draws four corner handles, each a 7 CSS px white square with a
+  ~1.5 CSS px corner radius and a 1px chrome stroke. The sides have no grip; grabbing the
+  middle of a side still resizes that edge. The hit target is still the manifest `handle`.
+  An explicit `hoverstyle` stroke is still verbatim and unblended. A browser without
+  `mix-blend-mode` draws the fill as that chrome grey at 0.18 opacity; the edge stroke stays
+  the flat grey.
 - The first pan or orbit compiles after the plot is on the page. `show` writes the mount
   image, then a few discarded frames warm the view callback, and the camera is put back.
   A drag that arrives during that warmup waits for it. Re-running the cell waits until the

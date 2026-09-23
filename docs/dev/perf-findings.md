@@ -77,7 +77,10 @@
 > and re-run for the split blend highlight (this PR, 2026-09-18): manifest-shape change — the
 > mark-derived hover outline dropped the per-layer default `"style"."stroke"` key (`hoverstyle`'s
 > stroke is now `nothing`; the highlight split itself — three sibling top-level svgs, `mix-blend-
-> mode` color-dodge/multiply/screen — is CSS/JS-only and adds nothing to the manifest). Envelope
+> mode` color-dodge/multiply/screen — is CSS/JS-only and adds nothing to the manifest). A later
+> change drops `multiply`/`screen` on the edge (flat chrome grey, same three svgs). Still
+> CSS/JS-only: `handle` stays in the manifest as the hit half-size, so the envelope below was
+> not re-measured. Envelope
 > unchanged: neither bench fixture sets a custom `hoverstyle`, so re-running reproduces the
 > previous numbers byte-for-byte (scatter-1k manifest still 38.0 KB, heatmap-200² still
 > 196.8 KB). Measured the exact delta the same way as the `tol`/`label`/`links` re-runs above,

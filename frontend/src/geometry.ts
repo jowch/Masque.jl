@@ -240,9 +240,11 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
         }
         case "roi": {
             const rg = g as ROIGeometry
-            // Hit area is generous (>= 2x the drawn glyph, floor 6px) so a thin ROI is still
-            // grabbable; corners are checked before edges before the body so a small ROI's
-            // overlapping corner/edge hit boxes resolve to the (two-axis) corner, not an edge.
+            // `handle` is the manifest hit size, not the painted grip (HANDLE_CSS). The hit
+            // square's half-size is max(2 * handle, 6px). Corners are drawn; each side is
+            // only this midpoint square (no grip).
+            // Corners are checked before edges before the body so a small ROI's overlapping
+            // corner/edge hit boxes resolve to the (two-axis) corner, not an edge.
             const halfHit = Math.max(2 * rg.handle, 6)
             const corners: [number, number][] = [[rg.x, rg.y], [rg.x + rg.w, rg.y], [rg.x + rg.w, rg.y + rg.h], [rg.x, rg.y + rg.h]]
             for (let k = 0; k < 4; k++) {

@@ -356,9 +356,10 @@ describe("roi hit-test", () => {
         expect(hitLayer(roi, 200, 110)).toMatchObject({ roiPart_: { move: true } }) // interior
         expect(hitLayer(roi, 50, 50)).toBeNull()                                    // outside
     })
-    it("hit area is >= 2x the drawn handle half-size, floored at 6px, and never below the drawn glyph", () => {
+    it("hit half-size is max(2 * handle, 6px); handle is the hit size, not the drawn grip", () => {
         const tiny: HitLayer = { ...roi, geometry: { x: 100, y: 50, w: 200, h: 120, handle: 1 } }
-        // handle=1 → drawn half-size 1px, but the hit half-size floors at 6px
+        // handle=1 is the manifest hit size. The painted grip is HANDLE_CSS. The hit
+        // half-size floors at 6px.
         expect(hitLayer(tiny, 100, 56)).toMatchObject({ roiPart_: { corner: 0 } }) // 6px from the TL corner
         expect(hitLayer(tiny, 100, 40)).toBeNull() // 10px away (and outside the box entirely) → miss
     })

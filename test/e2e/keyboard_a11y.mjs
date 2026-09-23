@@ -22,7 +22,7 @@ const ALLOWED = [/Bonito\.decode_binary is not a function/, /Bonito\.fetch_binar
 
 const browser = await chromium.launch({
   headless: true,
-  // See kind_sweep.mjs's identical comment: this notebook mounts 17 WGL canvases (one per
+  // See kind_sweep.mjs's identical comment: this notebook mounts 20 WGL canvases (one per
   // widget) and Chromium's default active-context cap is 16 — past it, the OLDEST context is
   // silently evicted, regardless of which widgets this driver itself inspects.
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--max-active-webgl-contexts=64"],
@@ -101,7 +101,7 @@ try {
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
     let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
     // Keyboard focus draws the same bare-shape highlight a hover would: svg.masque-fill's g.hi
-    // (dodge fill half) and svg.masque-edge's g.hi (darkening edge half) for the default
+    // (dodge fill half) and svg.masque-edge's g.hi (flat chrome stroke) for the default
     // split-blend recipe on a closed mark, svg.masque-plain's g.hi for an explicit `hoverstyle`
     // or an open seg (edge-only) — no wrapper either way, so masque-leave lives on the node
     // itself. Any populated layer is enough to prove a ring was drawn; grab whichever is first.
@@ -273,6 +273,16 @@ try {
     const li = await linkGCount(key);
     if (li.count === 0) throw new Error(`${key}: keyboard focus on a legend row drew no g.link content`);
     passed.push("legend/keyboard-focus-draws-link");
+
+    // Default legend has no visual card. The live region still names the entry ("pts" is row
+    // index 2, the one this block focuses).
+    let focused = await state(key);
+    if (focused.tipShown) throw new Error(`${key}: default legend focus showed a tooltip`);
+    focused = await waitForLiveRegion(key, /pts/);
+    if (!/pts/.test(focused.liveText)) {
+      throw new Error(`${key}: live region missing entry label: ${JSON.stringify(focused.liveText)}`);
+    }
+    passed.push("legend/no-default-tip+announces-label");
 
     await page.keyboard.press("Escape");
     const afterEsc = await linkGCount(key);

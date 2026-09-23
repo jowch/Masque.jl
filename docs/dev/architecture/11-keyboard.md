@@ -26,11 +26,12 @@ two rings, or a "focused but no ring" gap when the mouse merely passes over empt
 **Announcements** go to a visually-hidden `aria-live="polite" aria-atomic="true"` `<div>` inside
 the shadow root — not the tooltip (`aria-hidden` toggling on the tooltip is a visibility signal,
 not an announcement path for assistive tech). Text is `<label prefix, if set>element <n> of
-<count in that layer>: <plain-text tooltip>`, debounced 150ms so a held arrow key announces only
+<count in that layer>: <body>`, debounced 150ms so a held arrow key announces only
 the element you land on. `template.ts`'s `plainTextForHit`/`stripToPlain`/`renderAutoTablePlain`
-produce the plain-text body (tag-stripped + entity-unescaped for the template path, a parallel
+produce that body (tag-stripped + entity-unescaped for the template path, a parallel
 non-HTML renderer for the auto-table path — a bare tag-strip over the auto-table's markup would
-announce `"amp;"` for an escaped `&`). `aria-describedby` on the surface points at a static,
+announce `"amp;"` for an escaped `&`). A legend with no card (`tooltip === false` and
+`bond == "legend"`) uses `payload.label` for the body, so the entry name is still announced. `aria-describedby` on the surface points at a static,
 non-live usage hint in the same shadow root (ARIA idrefs don't cross shadow boundaries).
 
 The per-layer `label` field ([§3](03-interactables.md), `HitLayer`) is the only manifest-shape change here — see

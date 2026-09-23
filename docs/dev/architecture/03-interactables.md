@@ -18,8 +18,8 @@ events(::AbstractInteractable)::Tuple = (:click, :hover)   # which events the ov
 # See §10 Tooltips.
 # hoverstyle is per-LAYER too — the manifest ships one `style` per layer, not per element.
 # stroke=nothing (default) omits "stroke" from the manifest; the overlay then draws its own
-# split highlight — a color-dodge fill (brightens) plus a multiply/screen edge stroke (darkens
-# on light/dark figures) — instead of a stroke colour. `colors` no longer feeds the highlight,
+# split highlight — a color-dodge fill (brightens) plus a flat chrome edge stroke
+# (#7a7a7a light figure, #c8c8c8 dark; not blended into the mark) — instead of a stroke colour. `colors` no longer feeds the highlight,
 # only the tooltip accent. An explicit stroke here is used verbatim (no blend, single element).
 hoverstyle(::AbstractInteractable)::NamedTuple = (; stroke=nothing, width=2)
 ```

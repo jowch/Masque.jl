@@ -3,15 +3,15 @@
 // root holds THREE sibling top-level svgs, identical box/viewBox, in DOM order `svg.masque-fill`
 // (`mix-blend-mode: color-dodge`, both light and dark figures — a fixed `#141414` source
 // brightens without rotating hue, measured across a 10-colour palette), `svg.masque-edge`
-// (`multiply` on light figures, `screen` on dark — this is the darkening half, so the state
-// distinction — hover 1.5px vs. selected 2px — lives here), `svg.masque-plain` (no blend).
+// (no blend — one flat chrome grey, so the state distinction — hover 1.5px vs. selected 2px —
+// is the stroke width), `svg.masque-plain` (no blend).
 // Firefox only honours `mix-blend-mode` on a top-level svg, not nested SVG content, which is why
 // there is no single wrapped svg with per-element blend classes. A closed mark (circle/rect/
 // polygon) hover or selected highlight is TWO shapes, identical geometry, one in each of
 // `masque-fill`/`masque-edge` (`masque-hi masque-fillshape` / `masque-hi masque-hover` or
 // `masque-wash`); an open seg (line has no interior) is edge-only; a `rectfill` (selects-ROI
 // grid cell-block union) is fill-only. `svg.masque-plain` holds ROI/threshold, the selected-open
-// ring (unchanged ink), and a layer with an explicit Julia `hoverstyle` stroke — single element,
+// ring (chrome grey), and a layer with an explicit Julia `hoverstyle` stroke — single element,
 // unblended, verbatim colour + 18%/35% tint (the pre-split recipe). Hovering a mark that is
 // already selected draws no highlight at all (both layers are already opaque from the wash; a
 // 1.5px hover stroke over a 2px selected stroke would read as weaker, not stronger) — the
@@ -22,12 +22,12 @@ export const ALERT_RED = "#ff3b30";
 export const TEAL = "#3A6F7C";
 
 // The fill layer's source colour (`color-dodge` against this near-black brightens without
-// rotating hue — see mount.ts). The edge layer keeps the old fixed-grey darkening stroke pair;
-// only the fill side is new (there is no more grey *fill*, dodge replaced it).
+// rotating hue — see mount.ts). The edge layer is one flat chrome grey per figure, the same
+// colour for hover and selected.
 export const DODGE_FILL = "rgb(20, 20, 20)";
 export const GREY = {
-  light: { hoverStroke: "rgb(85, 85, 85)", washStroke: "rgb(51, 51, 51)" },
-  dark: { hoverStroke: "rgb(170, 170, 170)", washStroke: "rgb(204, 204, 204)" },
+  light: { stroke: "rgb(122, 122, 122)" },
+  dark: { stroke: "rgb(200, 200, 200)" },
 };
 
 // getComputedStyle serializes a colour back out in whatever functional notation the browser
@@ -126,18 +126,18 @@ export function assertWash(wash, where, wantDark) {
   }
   if (edge.width !== "2") throw new Error(`${where}: wash edge width ${edge.width} (want 2)`);
   const g = wantDark ? GREY.dark : GREY.light;
-  if (edge.stroke !== g.washStroke) throw new Error(`${where}: wash edge stroke ${edge.stroke} (want ${g.washStroke})`);
+  if (edge.stroke !== g.stroke) throw new Error(`${where}: wash edge stroke ${edge.stroke} (want ${g.stroke})`);
   if (edge.fill !== "none") throw new Error(`${where}: wash edge fill ${edge.fill} (want none)`);
-  if (edge.blend !== (wantDark ? "screen" : "multiply")) {
-    throw new Error(`${where}: wash edge blend ${edge.blend} (want ${wantDark ? "screen" : "multiply"})`);
+  if (edge.blend !== "normal") {
+    throw new Error(`${where}: wash edge blend ${edge.blend} (want normal)`);
   }
   assertNoAlertRed(wash, where);
   assertNoTeal(wash, where);
 }
 
-// Selected-open-geometry ring: unblended, lives only in `svg.masque-plain`, unchanged by the
-// fill/edge split.
-export function assertRing(ring, where) {
+// Selected-open-geometry ring: unblended, lives only in `svg.masque-plain`. Stroke is the
+// flat chrome grey (GREY.dark when wantDark). Same 2px/4px recipe as before the fill/edge split.
+export function assertRing(ring, where, wantDark = false) {
   // A per-segment ring is two <line>s; a whole-line ring is two <path>s. Same 2px/4px recipe.
   const strokes = ring?.paths?.length ? ring.paths : ring?.lines;
   if (!ring || !strokes || strokes.length !== 2) throw new Error(`${where}: ring ${JSON.stringify(ring)}`);
@@ -146,9 +146,10 @@ export function assertRing(ring, where) {
   }
   const widths = strokes.map((l) => l.width).sort().join(",");
   if (widths !== "2,4") throw new Error(`${where}: ring recipe ${JSON.stringify(ring)}`);
+  const g = wantDark ? GREY.dark : GREY.light;
   const colors = strokes.map((l) => l.stroke);
-  if (colors[0] !== colors[1] || !realColor(colors[0])) {
-    throw new Error(`${where}: ring stroke ${JSON.stringify(ring)}`);
+  if (colors[0] !== colors[1] || colors[0] !== g.stroke) {
+    throw new Error(`${where}: ring stroke ${JSON.stringify(ring)} (want ${g.stroke})`);
   }
   const outer = strokes.find((l) => l.width === "4");
   if (!outer || String(outer.opacity) !== "0.25") {
@@ -213,10 +214,10 @@ export function assertHoverRecipe(hi, where, closed, wantDark) {
   }
   if (!realColor(edge.stroke)) throw new Error(`${where}: hover edge stroke not resolved ${JSON.stringify(edge)}`);
   const g = wantDark ? GREY.dark : GREY.light;
-  if (edge.stroke !== g.hoverStroke) throw new Error(`${where}: hover edge stroke ${edge.stroke} (want ${g.hoverStroke})`);
+  if (edge.stroke !== g.stroke) throw new Error(`${where}: hover edge stroke ${edge.stroke} (want ${g.stroke})`);
   if (edge.fill !== "none") throw new Error(`${where}: hover edge fill ${edge.fill} (want none)`);
-  if (edge.blend !== (wantDark ? "screen" : "multiply")) {
-    throw new Error(`${where}: hover edge blend ${edge.blend} (want ${wantDark ? "screen" : "multiply"})`);
+  if (edge.blend !== "normal") {
+    throw new Error(`${where}: hover edge blend ${edge.blend} (want normal)`);
   }
   if (closed) {
     if (!hasClass(fill.className, "masque-hi") || !hasClass(fill.className, "masque-fillshape")) {
@@ -417,12 +418,11 @@ export async function assertTooltipColorScheme(page, sample) {
 
 // Tint-applied (dodge fill brightens the mark itself, screenshot-verified): mean luminance
 // (0-255) of a small page.screenshot() clip centred INSIDE the mark (a small box well within the
-// drawn edge, not overlapping the rim — the rim is the darkening edge stroke, sampling across it
-// would cancel the fill-layer reading), taken before vs. after the hover highlight applies.
-// `color-dodge` against the near-black fill source can only raise luminance, so both a light and
-// a dark figure are expected to get BRIGHTER on hover — this is what replaced the old
-// darkens-on-light/lightens-on-dark check when the highlight split into a brightening fill and a
-// darkening stroke. See PNG.sync.read (pngjs, already a devDependency here) for the buffer -> RGBA
+// drawn edge, not overlapping the rim — the rim is the chrome edge stroke, sampling across it
+// would mix the stroke into the fill-layer reading), taken before vs. after the hover highlight
+// applies. `color-dodge` against the near-black fill source can only raise luminance, so both a
+// light and a dark figure are expected to get BRIGHTER on hover. See PNG.sync.read (pngjs,
+// already a devDependency here) for the buffer -> RGBA
 // decode.
 export function meanLuminance(png) {
   let sum = 0;
