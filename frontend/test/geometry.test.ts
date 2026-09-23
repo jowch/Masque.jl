@@ -245,6 +245,27 @@ describe("hitLayer + hitTest", () => {
         expect(hitLayer(polys, 25, 3)).toMatchObject({ index: 1 })
         expect(hitLayer(polys, 100, 100)).toBeNull()
     })
+    it("polygons: a ring group excludes each hole, and the element drawn there can still win", () => {
+        const outer = [0, 0, 100, 0, 100, 100, 0, 100]
+        const holeA = [10, 10, 30, 10, 30, 30, 10, 30]
+        const holeB = [60, 60, 80, 60, 80, 80, 60, 80]
+        const disk = [10, 10, 30, 10, 30, 30, 10, 30] // fills hole A; hole B stays empty
+        const polys: HitLayer = {
+            id: "polys", kind: "polygons", axis: "ax1", events: ["hover"],
+            payloads: [{ low: 0 }, { low: 1 }],
+            geometry: [[outer, holeA, holeB], disk],
+        }
+        expect(hitLayer(polys, 50, 50)).toMatchObject({ index: 0 })  // filled region between the holes
+        expect(hitLayer(polys, 20, 20)).toMatchObject({ index: 1 })  // hole A → the inner disk
+        expect(hitLayer(polys, 70, 70)).toBeNull()                   // hole B, nothing drawn there
+        expect(hitLayer(polys, 200, 200)).toBeNull()
+        // Centroid of this exterior sits in its hole, so the pointer path uses the cursor.
+        const annulus = [0, 0, 40, 0, 40, 40, 0, 40]
+        const mid = [10, 10, 30, 10, 30, 30, 10, 30]
+        const holed: Hit = { layer: polys, index: 0, geom_: ["poly", [annulus, mid]] }
+        expect(anchorFor(holed, { x: 5, y: 5 })).toEqual({ x: 5, y: 5, top: 5 })
+        expect(anchorFor(holed, null)).toEqual({ x: 20, y: 20, top: 20 })
+    })
     it("polygons: an even-odd ring with a bridged hole excludes the hole's interior", () => {
         // Outer 0..10 square, bridged out-and-back to an inner 3..7 hole: the bridge edge is
         // traversed twice (there and back), so its ray-crossings cancel and even-odd only "sees"

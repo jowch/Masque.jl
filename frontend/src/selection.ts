@@ -1,4 +1,4 @@
-import { findBin, invertAxis } from "./geometry"
+import { findBin, invertAxis, polygonRings } from "./geometry"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest } from "./types"
 
 // Bond item shape emitted per contained element in a selects-ROI { items: SelectionItem[] }.
@@ -134,8 +134,9 @@ export function hitLayerByIndex(layer: HitLayer, index: number): Omit<Hit, "laye
     if (layer.kind === "lines" && Array.isArray(g)) {
         return { index, geom_: ["path", (g as number[][])[index]] }
     }
-    // polygons (only remaining closed SELECTED_KINDS entry)
-    return { index, geom_: ["poly", (g as number[][])[index]] }
+    // polygons (only remaining closed SELECTED_KINDS entry). A ring group stays one element.
+    const rings = polygonRings((g as (number[] | number[][])[])[index])
+    return { index, geom_: ["poly", rings.length === 1 ? rings[0] : rings] }
 }
 
 // A :polyline's flat [x,y,…] vertex array uses NaN as Julia's gap sentinel (interactables.jl's

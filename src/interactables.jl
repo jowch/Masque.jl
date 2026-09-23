@@ -16,7 +16,10 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
   - `:lines` — `Vector{Real}[]`, one flat `(x, y)`-per-vertex polyline per element (image px;
     `NaN` is a gap inside that line, not another element). A `lines!` / `stairs!` /
     `scatterlines!` line is one entry; a `series!` is one entry per series
-  - `:polygons` — `Vector{Real}[]`, one flat `(x, y)`-per-vertex ring per element (image px)
+  - `:polygons` — one element per filled polygon. A solid element is a flat `(x, y)`-per-vertex
+    ring (`Vector{Real}`, image px). An element with holes is a vector of those rings instead:
+    the exterior first, then each hole. The overlay even-odd-tests the rings of one element
+    together, so a point in a hole is not a hit of that element.
   - `:grid` — a `Dict` with `"xedges"`, `"yedges"`, `"ncols"`, `"nrows"`, and either
     `"values"` (the source matrix, when a cell is at least one screen pixel) or `"sample"`
     (one source value per screen pixel of the axis viewport, when cells are smaller). A
@@ -812,7 +815,7 @@ end
 
 # ============================ PolygonInteractable ==========================
 """
-    PolygonInteractable(ax, rings; id=:polygons, payloads=nothing, tooltip=nothing)
+    PolygonInteractable(ax, rings; id=:polygons, payloads=nothing, tooltip=nothing, holes=nothing)
     PolygonInteractable(ax, p; id=<kind-specific>, payloads=nothing)   # from a plot object
 
 Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLayer`](@ref).
@@ -821,6 +824,9 @@ Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLa
 - `rings` — `Vector{Vector{point}}`, one or more rings, each a `Vector` of 2- or 3-element
   data-space points/tuples (one polygon per ring; a ring need not be closed — the hit-test
   closes it implicitly).
+- `holes` — one group of hole rings per element, same point type as `rings`. `nothing`
+  (default) means every element is solid. A point inside a hole is not a hit of that element,
+  and the highlight leaves the hole unfilled. The group count must match `rings`.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:polygons`.
 - `payloads` — one entry per ring; `ArgumentError` if the length doesn't match. Default:
   `(; index)`, 1-based.
@@ -837,7 +843,7 @@ Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLa
 | `Makie.Poly` | `:poly` | converted geometry | one ring, or many for a multi-ring `Poly` |
 | `Makie.Band` | `:band` | lower curve + reversed upper curve | always exactly one open ring |
 | `Makie.Density` | `:density` | its descendant `Band`'s KDE fill | same shape as `Band` |
-| `Makie.Contourf` | `:contourf` | each filled level's **exterior** ring only (holes excluded — a v1 limitation: an annular band over-covers its hole at the boundary) | payload `(; low, high)`, the band edges nearest each polygon's fill color |
+| `Makie.Contourf` | `:contourf` | each filled polygon's exterior, plus its holes as further rings of the same element | payload `(; low, high)`, the band edges nearest each polygon's fill color |
 | `Makie.Violin` | `:violin` | each violin's outline | payload `(; x)`, the nearest category to the ring's geometric center |
 | `Makie.Voronoiplot` | `:voronoiplot` | each cell's exterior ring | cells come back in tessellation order (no cheap cell→generator map), so default payload is `(; index)` only |
 
@@ -852,22 +858,50 @@ PolygonInteractable(ax, p)
 struct PolygonInteractable <: AbstractInteractable
     ax; rings::Vector; id::Symbol; payloads::Vector{Any}; tooltip::Union{Nothing, Markup, Bool}
     label::Union{Nothing, String}
+    holes::Vector # one vector of hole-rings per element; empty when that element is solid
 end
-function PolygonInteractable(ax, rings; id = :polygons, payloads = nothing, tooltip = nothing, label = nothing)
+# `nothing` → every element is solid. A group is the hole rings of one element.
+function _hole_groups(holes, n)
+    holes === nothing && return [Vector{Point3f}[] for _ in 1:n]
+    length(holes) == n || throw(ArgumentError("PolygonInteractable: $(length(holes)) hole groups for $n rings"))
+    return map(holes) do group
+        out = Vector{Point3f}[]
+        for hole in group
+            pts = [_pt3(p) for p in hole]
+            isempty(pts) || push!(out, pts)
+        end
+        out
+    end
+end
+function PolygonInteractable(ax, rings; id = :polygons, payloads = nothing, tooltip = nothing, label = nothing, holes = nothing)
     _check_tooltip(tooltip)
     rs = [[_pt3(p) for p in ring] for ring in rings]
     pl = payloads === nothing ? Any[(; index = k) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "PolygonInteractable")
-    return PolygonInteractable(ax, rs, id, pl, tooltip, label === nothing ? nothing : String(label))
+    return PolygonInteractable(ax, rs, id, pl, tooltip, label === nothing ? nothing : String(label), _hole_groups(holes, length(rs)))
 end
 tooltip_spec(i::PolygonInteractable) = i.tooltip
+function _project_ring(ctx, ax, ring)
+    flat = Real[]
+    for p in ring
+        q = _proj(ctx, ax, p)
+        append!(flat, (_q(q[1]), _q(q[2])))
+    end
+    return flat
+end
 function hitlayers(i::PolygonInteractable, ctx)
-    geom = Vector{Real}[]
-    for ring in i.rings
-        flat = Real[]
-        for p in ring
-            q = _proj(ctx, i.ax, p); append!(flat, (_q(q[1]), _q(q[2])))
+    geom = Any[]
+    for (k, ring) in enumerate(i.rings)
+        flat = _project_ring(ctx, i.ax, ring)
+        hs = i.holes[k]
+        if isempty(hs)
+            push!(geom, flat)
+        else
+            group = Any[flat]
+            for hole in hs
+                push!(group, _project_ring(ctx, i.ax, hole))
+            end
+            push!(geom, group)
         end
-        push!(geom, flat)
     end
     return [HitLayer(i.id, :polygons, geom, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
 end

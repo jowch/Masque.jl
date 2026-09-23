@@ -615,6 +615,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         p = ax.scene.plots[1]
         pi = PolygonInteractable(ax, p; id = :voronoiplot)
         @test length(pi.rings) == 8                        # one cell per generator site
+        @test all(isempty, pi.holes)                       # cells have no interiors; the shared helper stays exterior-only
         @test pi.payloads == Any[(; index = k) for k in 1:8]   # cell order ≠ site order → index only
         ints = auto_interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
@@ -653,6 +654,40 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         pic = PolygonInteractable(axc, axc.scene.plots[1]; id = :contourf)
         @test !isempty(pic.payloads)
         @test all(pl.low <= pl.high for pl in pic.payloads)
+
+        # A nested peak: each annular band keeps its hole on the same element. The innermost disk stays one flat ring.
+        figh = Figure(); axh = Axis(figh[1, 1])
+        xs = range(-2, 2, length = 40)
+        ys = range(-2, 2, length = 40)
+        contourf!(axh, xs, ys, [exp(-(x^2 + y^2)) for x in xs, y in ys]; levels = 5)
+        _, _, ch = ctx_for(figh)
+        ph = PolygonInteractable(axh, axh.scene.plots[1]; id = :contourf)
+        Lh = only(hitlayers(ph, ch))
+        pieces = Masque._conv(Masque._childof(axh.scene.plots[1], Makie.Poly))[1]
+        @test length(Lh.geometry) == length(pieces) == length(Lh.payloads)
+        @test any(!isempty, (piece.interiors for piece in pieces))
+        for (piece, elem) in zip(pieces, Lh.geometry)
+            n = length(piece.interiors)
+            if n == 0
+                @test first(elem) isa Real
+            else
+                @test length(elem) == 1 + n
+                @test all(ring -> first(ring) isa Real, elem)
+            end
+        end
+
+        # Two peaks under an explicit top edge: one band has two holes, and the unfilled peak is a hole, not its own element.
+        fig2 = Figure(); ax2 = Axis(fig2[1, 1])
+        xs2 = range(-3, 3, length = 50)
+        ys2 = range(-2, 2, length = 40)
+        z2 = [exp(-((x - 1.2)^2 + y^2)) + exp(-((x + 1.2)^2 + y^2)) for x in xs2, y in ys2]
+        contourf!(ax2, xs2, ys2, z2; levels = [0.2, 0.5, 0.9])
+        _, _, c2 = ctx_for(fig2)
+        p2 = PolygonInteractable(ax2, ax2.scene.plots[1]; id = :contourf)
+        L2 = only(hitlayers(p2, c2))
+        @test length(L2.geometry) == length(p2.payloads) == 3
+        @test length(L2.geometry[1]) == 3                  # exterior + two holes
+        @test L2.payloads[1].low < 0.5
     end
 
     @testset "BoxPlot extraction" begin

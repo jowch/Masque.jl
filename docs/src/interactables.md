@@ -124,7 +124,7 @@ tooltip contract, plot-specific default payload and `id`:
 | [`PointInteractable`](@ref) | `Scatter` (`radius` from the marker's drawn extent — ≈0.3525×`markersize` for the default `:circle`, `markersize` for a `Circle`/`Rect` geometry marker, `markersize/2` fallback otherwise); `MeshScatter` (data-space `radius3d` on a 3D axis) |
 | [`SegmentInteractable`](@ref) | `Lines`, `Stairs` (one `:lines` element, the whole path); `Series` (one `:lines` layer, one element per series); `LineSegments`, `Errorbars`, `Rangebars` (`:pairs`); `Wireframe` (rendered edges); `Arrows3D` (shaft start→end); `HLines`/`VLines` (the rendered span) |
 | [`RectInteractable`](@ref) | `Heatmap`/`Image` (compact grid); `BarPlot` (dodge/stack/auto-width honored); `Hist`, `Waterfall`, `CrossBar`, `Spy`, `HSpan`, `VSpan` |
-| [`PolygonInteractable`](@ref) | `Poly` (one ring or many); `Band`, `Density` (filled curve); `Contourf` (filled levels); `Violin`; `Voronoiplot` (cell polygons) |
+| [`PolygonInteractable`](@ref) | `Poly` (one ring or many); `Band`, `Density` (filled curve); `Contourf` (filled levels; a hole is not a hit); `Violin`; `Voronoiplot` (cell polygons) |
 | [`TextInteractable`](@ref) | `Text` directly; `Annotation` via its inner `Text` (its only constructor takes a `Makie.Text`, so `annotation!` labels are only reachable through this path or `masque(fig)`, never a hand-written `TextInteractable`) |
 | Point **+** Segment (two layers) | `Stem` (`id` = points, `id_stems` = the stems); `ScatterLines` (`id` = points, `id_line` = the line) |
 | Rect **or** Polygon (box body only) | `BoxPlot` — a rect unless the box is notched, then a polygon; whiskers/outliers are decorative, not hit-tested |
