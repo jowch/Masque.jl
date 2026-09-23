@@ -237,7 +237,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             scatter!(a, [1.0], [1.0])
             contour!(a, 1:5, 1:5, rand(5, 5))     # unsupported -> skip + warn
-            ints = @test_logs (:warn,) match_mode = :any auto_interactables(f)
+            ints = @test_logs (:warn, r"plot type contour") match_mode = :any auto_interactables(f)
             @test length(ints) == 1
             @test only(ints) isa PointInteractable
         end
@@ -254,7 +254,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @testset "no introspectable plots -> warn, render image only" begin
             f = Figure(size = (400, 300)); a = Axis(f[1, 1])
             contour!(a, 1:5, 1:5, rand(5, 5))
-            w = @test_logs (:warn,) match_mode = :any masque(f)
+            w = @test_logs (:warn, r"plot type contour") match_mode = :any masque(f)
             @test isempty(w.manifest["layers"])
             @test !isempty(w.b64)                  # static image still produced
         end
