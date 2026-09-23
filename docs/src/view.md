@@ -84,9 +84,9 @@ handle. **Shift**+drag pans.
 
 ## Preview while you drag
 
-CairoMakie streams PNG frames over `with_js_link` (live kernel).
-WGLMakie shows a numeric readout only. For more information, see
-[Backends](@ref).
+Both backends stream frames over `with_js_link` (live kernel).
+CairoMakie ships a PNG. WGLMakie ships a serialized scene onto the
+canvas already on the page. For more information, see [Backends](@ref).
 
 ## Orbit an `Axis3`
 
@@ -111,8 +111,8 @@ end
 ```
 
 A static `Axis3` on CairoMakie is a valid 3D plot. Orbit through Masque
-still commits nothing. For cairo frames versus a WGLMakie numeric
-readout, see [Backends](@ref).
+still commits nothing. For in-drag frames on either backend, see
+[Backends](@ref).
 
 ## What does not pan
 
@@ -133,5 +133,5 @@ azimuth/elevation in a `Ref` (or a slider) and rebuild, as in
 [`examples/view_manip.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip.jl)
 (slider remount versus drag). The WGLMakie cousin
 [`examples/view_manip_webgl.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip_webgl.jl)
-shows the numeric readout with no repaint. Do not pass `selected=` for
-a camera pose.
+streams live scene frames the same way. Do not pass `selected=` for a
+camera pose.

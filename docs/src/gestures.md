@@ -102,16 +102,16 @@ source.
 | Click / Enter commit | Echo yes | Scalar `ElementEvent` | No | Re-runs if it reads the bond |
 | ROI / threshold **in-drag** | Box / line moves | No | No | No |
 | ROI / threshold **release** | Echo if `selects` | Bounds, scalar, or `Vector` | No | Re-runs |
-| View pan / orbit **in-drag** | Readout; cairo also new frames | No | `:cairo` yes; `:webgl` numeric only | No |
+| View pan / orbit **in-drag** | Readout; new frames | No | Yes | No |
 | View **release** | — | **Nothing** | Stops | No |
 | Empty-space click | No | Unchanged | No | No |
 
 ROI and threshold in-drag stay in the overlay: it already has what it
 needs, so the drag never leaves the browser. In-drag view frames still
-leave the overlay: CairoMakie repaints the image over the gesture
-channel, and the WebGL backend updates a numeric readout only. Neither
-path writes `@bind`. On release the channel stops, and the bond still
-holds **nothing** from the pan.
+leave the overlay: both backends repaint over the gesture channel.
+CairoMakie ships a PNG; WGLMakie ships a serialized scene onto the
+canvas already on the page. Neither path writes `@bind`. On release the
+channel stops, and the bond still holds **nothing** from the pan.
 
 A click in empty space does not write the bond and does not clear a
 selection. Enter or Space on a focused mark commits the same way a click

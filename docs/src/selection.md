@@ -63,8 +63,9 @@ Two seedable layers need a name: `selected = (; scatter = 1)` or
 `selected = Dict(:scatter => [1, 8])`. A bare `1` across two layers
 raises `ArgumentError`. `0` is out of range.
 
-Valid kinds are `:circles`, `:rects`, `:polygons`, `:segments`, and
-`:polyline`. Any other kind, or an out-of-range index, raises
+Valid kinds are `:circles`, `:rects`, `:polygons`, `:segments`,
+`:polyline`, and `:lines` (a `lines` element is the whole path). Any
+other kind, or an out-of-range index, raises
 `ArgumentError` at `masque()` time. An empty index list for a layer is
 omitted from the manifest, so that layer starts with no highlight.
 

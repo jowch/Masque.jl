@@ -28,15 +28,16 @@ overlay on the trace it labels, the same as holding the pointer over
 it. For more information, see [Legend](@ref).
 
 Moving focus draws the same highlight in the overlay as holding the
-pointer over the mark (there is never a separate focus look) and shows
-the same tooltip, positioned on the focused element.
+pointer over the mark (there is never a separate focus look). A layer
+that has a tooltip shows that same card on the focused element. A
+legend entry does not, unless you passed a template.
 
-Reachable kinds: `:circles`, `:rects`, `:polygons`, `:segments`, and
-`:polyline`. That includes [`TextInteractable`](@ref) (kind `:rects`)
-and Region circle / rect / polygon layers. Not reachable: `:grid`
-(heatmap / image cells), threshold, ROI, and view. Hold the pointer or
-use a touch drag for those. Keyboard does not arrow through heatmap
-cells.
+Reachable kinds: `:circles`, `:rects`, `:polygons`, `:segments`,
+`:polyline`, and `:lines`. That includes [`TextInteractable`](@ref)
+(kind `:rects`) and Region circle / rect / polygon layers. Not
+reachable: `:grid` (heatmap / image cells), threshold, ROI, and view.
+Hold the pointer or use a touch drag for those. Keyboard does not
+arrow through heatmap cells.
 
 ## What gets announced
 

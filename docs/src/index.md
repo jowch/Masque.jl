@@ -8,7 +8,7 @@ your figures.
 
 ![Holding the pointer over a star shows its name, spectral type, and distance](assets/home/hover.gif)
 
-Hold your pointer over a point, bar, heatmap cell, polygon, or legend entry and a customizable tooltip appears on the figure. For templates and styling, see [Tooltips](@ref).
+Hold your pointer over a point, bar, heatmap cell, or polygon and a customizable tooltip appears on the figure. For templates and styling, see [Tooltips](@ref).
 
 ## Dynamic selections
 

@@ -70,9 +70,9 @@ pick === nothing ? "click a legend entry" : "$(pick.label) → $(pick.targets)"
 Before a click, `pick` is `nothing`. After a click, `pick` is a
 [`LegendEvent`](@ref): `layer === :legend`, `index` is 1-based in the
 legend, and `pick.label`, `pick.group`, and `pick.targets` are the
-entry. `targets` are
-`String` values (`"lines"`, `"lines_2"`), not `Symbol`s. `group` is the
-entry's group title, or `nothing` on an ungrouped legend.
+entry. `targets` are `String` values (`"lines"`, `"lines_2"`, or `"series:2"`
+to pin one element), not `Symbol`s. `group` is the entry's group title,
+or `nothing` on an ungrouped legend.
 
 The click bond is that legend event. The highlight in the overlay is the
 linked traces, not the swatch. `pick.index` is which entry.
@@ -105,8 +105,16 @@ build time.
 An explicit `targets=` is fail-loud. The auto path drops unhighlightable
 kinds (`:grid`) with `@warn` and keeps the rest.
 
-A legend with no links is still hittable. The tooltip still shows the
-label, and a click still fires. The visual echo **clears**.
+A spec is a layer id — every element of that layer — or `id:k` pinning
+element `k` (1-based). Auto-extracted `series!` entries use the pin, so
+each swatch lights one series rather than every trace packed into the
+parent `:lines` layer. A bare `targets = :series` still highlights the
+whole layer.
+
+A legend with no links is still hittable. A click still fires. The
+visual echo **clears**, and no tooltip card appears unless you pass a
+template.
+
 `LegendInteractable(leg)` on a custom `LineElement` legend with no
 `plots=` and no `targets=` has empty links. Pass `plots=` on the
 element (Makie's own keyword) or pass `targets=` on
@@ -119,10 +127,17 @@ they win pixels under them.
 
 ## Tooltip
 
-The default tooltip is the entry's label (`masque"$(label)"`). Pass your
-own `masque"..."` template (fields: `label`, `group`, `targets`) or
-`tooltip = false` to suppress it. For more information, see
-[Tooltips](@ref).
+Holding the pointer over a legend entry does not show a tooltip. The
+label is already drawn in the row, and a card there covers the entries
+around it. Pass a `masque"..."` template when you want a card (fields:
+`label`, `group`, `targets`). Omitting `tooltip` and `tooltip = false`
+both leave the card off. Moving keyboard focus to an entry still
+announces that entry's label. For more information, see
+[Keyboard and screen readers](@ref).
+
+```julia
+LegendInteractable(leg; tooltip = masque"$(label) — $(group)")
+```
 
 A whole-layer wash can span axes. That two-panel picture lives on
 [Linked views](@ref). This page is two `lines!` plus `axislegend` on one

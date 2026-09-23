@@ -49,13 +49,13 @@ you re-render every animation frame (each frame re-rasterizes the whole
 scene).
 
 A static `Axis3` figure on CairoMakie is a valid 3D plot. 3D does not
-require WGLMakie. Scatter and Lines on `Axis3` commit an
-[`ElementEvent`](@ref) with `x`, `y`, `z`. MeshScatter derives
+require WGLMakie. Scatter on `Axis3` commits an
+[`ElementEvent`](@ref) with `x`, `y`, `z`. A `lines!` is one whole-line
+element whose default payload is `{index}`. MeshScatter derives
 `radius3d` from data-space `markersize`. Orbit is
 [`ViewInteractable`](@ref) on that axis. For which recipes
 `masque(fig)` extracts, see [Recipes masque(fig) extracts](@ref). For
-the cairo-frames versus webgl-numeric split, see
-[Pan and orbit preview](@ref).
+in-drag preview, see [Pan and orbit preview](@ref).
 
 ## WGLMakie
 
@@ -121,14 +121,11 @@ For a runnable gallery, see [Examples](@ref).
 [`ViewInteractable`](@ref) commits nothing. The bond never carries
 `:view`. Drag is operational camera state, not analysis data.
 
-On `:cairo`, in-drag frames stream over `with_js_link`. Julia mutates
-limits (2D pan) or `azimuth` / `elevation` (`Axis3` orbit), re-renders,
-and ships a fresh PNG plus hit manifest. That channel needs a live
-kernel. It is dead on static export.
-
-On `:webgl`, drag shows a numeric readout only. The canvas does not
-repaint from Masque during the gesture. Loading WGLMakie so the PNG
-"updates" during pan does not produce live preview.
+On both backends, in-drag frames stream over `with_js_link`. Julia
+mutates limits (2D pan) or `azimuth` / `elevation` (`Axis3` orbit),
+recomputes hit regions, and ships a fresh frame. `:cairo` ships a PNG.
+`:webgl` ships a serialized scene onto the canvas already on the page.
+That channel needs a live kernel. It is dead on static export.
 
 `ViewInteractable` on `Axis3` is allowed: that is orbit. Polar, Colorbar,
 categorical 2D, and non-invertible 2D scales raise `ArgumentError`.

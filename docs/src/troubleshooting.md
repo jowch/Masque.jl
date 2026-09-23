@@ -62,6 +62,17 @@ have an auto default.
 segments); `:horizontal` (constant-y, dragged vertically) or
 `:vertical`.
 
+### Tried `unit = :line` with `mode = :pairs`
+
+**Error prefix:** `unit=:line applies only to mode=:polyline`
+
+**Cause:** `SegmentInteractable(...; unit = :line)` was combined with
+`mode = :pairs` (or any mode other than `:polyline`).
+
+**Fix:** drop `unit` (the default `:segment` is one element per edge or
+pair) or keep `mode = :polyline`. `lines!` / `stairs!` / `series!`
+already pass `unit = :line`.
+
 ### Tried ROI `bounds` that are not a 4-tuple in order
 
 **Error prefix:** `ROIInteractable: bounds must be (xmin, xmax, ymin, ymax)` /
@@ -124,10 +135,9 @@ polygons) on 3D axes. Do not attach Axis / Threshold / ROI to
 and sorts as a `:view` layer. If you saw a continuous pixel→data error,
 that error came from Axis, Threshold, or ROI, not from View.
 
-**Fix:** pass `ViewInteractable(ax)` for orbit. On `:cairo`, in-drag
-frames need a live kernel. On `:webgl`, drag shows a numeric readout
-only. The bond never carries `:view`. For more information, see
-[Backends](@ref).
+**Fix:** pass `ViewInteractable(ax)` for orbit. In-drag frames on both
+backends need a live kernel. The bond never carries `:view`. For more
+information, see [Backends](@ref).
 
 ### Tried continuous θ/r readout on PolarAxis
 
@@ -182,8 +192,8 @@ overlay. Masque builds no overlay for `LScene` on either backend.
 
 **Cause:** the layer id does not support highlight in the overlay from
 `selected=` (`:grid`, `:axis`, `:threshold`, `:roi`, `:view` cannot;
-only `:circles` / `:rects` / `:polygons` / `:segments` / `:polyline`
-can), or an index is out of range. Region keys are the suffixed ids,
+only `:circles` / `:rects` / `:polygons` / `:segments` / `:polyline` /
+`:lines` can), or an index is out of range. Region keys are the suffixed ids,
 not the base `id`.
 
 **Fix:** check the layer's kind against [Selection](@ref). Indices are
@@ -268,8 +278,8 @@ struct matches the column width you expect.
 **Cause:** `ViewInteractable` commits nothing. The bond does not change
 when you drag the view.
 
-**Fix:** do not read `@bind` for camera state. On `:cairo`, live frames
-use `with_js_link`. On `:webgl`, you get a numeric readout only.
+**Fix:** do not read `@bind` for camera state. Live frames on both
+backends use `with_js_link`.
 
 ### Browser console errors
 
@@ -300,5 +310,4 @@ nothing is interactive — that is expected).
 
 **Fix:** check the `WGLMakie` compat bound in `Project.toml`; confirm
 the figure actually has a plot call in it before `masque(fig)`.
-Expecting drag-orbit **preview** on `:webgl` is the numeric-readout
-path; see [Backends](@ref).
+Drag-orbit on `:webgl` streams live scene frames; see [Backends](@ref).

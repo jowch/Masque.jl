@@ -104,9 +104,9 @@ pans, zooms, and orbits by rebuilding the figure from `@bind` sliders
 that rebuild if you re-pass `selected=`.
 
 [`ViewInteractable`](@ref) **drag** is a different path: it commits
-nothing. On `:cairo`, in-drag frames stream over `with_js_link`. On
-`:webgl`, drag shows a numeric readout only. For more information, see
-[Backends](@ref).
+nothing. Both backends stream in-drag frames over `with_js_link`.
+`:cairo` ships a PNG; `:webgl` ships a serialized scene onto the canvas
+already on the page. For more information, see [Backends](@ref).
 
 [Open the static export](notebooks/view_manip.html)
 
@@ -114,7 +114,7 @@ nothing. On `:cairo`, in-drag frames stream over `with_js_link`. On
 
 [`examples/view_manip_webgl.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip_webgl.jl)
 is the drag-to-pan / drag-to-orbit half of `view_manip.jl`, live-checked
-on `:webgl` (numeric readout, no live PNG frames).
+on `:webgl` (serialized scene frames, not PNGs).
 
 [Open the static export](notebooks/view_manip_webgl.html)
 

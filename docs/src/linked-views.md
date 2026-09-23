@@ -112,8 +112,9 @@ Do not add a second `@bind pick` cell. Do not `deepcopy(fig)`.
 
 ## Highlight a series across axes
 
-A legend entry highlights every element of the layer or layers it names,
-including layers on other axes. That wash is client-side: it does not
+A legend entry highlights the traces it names, including layers on
+other axes. A spec is a layer id — every element of that layer — or
+`id:k` pinning element `k`. That wash is client-side: it does not
 write `@bind`. It is the only shipped cross-layer highlight. It is
 series-shaped, not observation `i`. Hold the pointer over **xy** and
 every mark of that series highlights in the overlay. Point 3 in both

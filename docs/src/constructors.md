@@ -153,14 +153,15 @@ blocks, not scene plots.
 |---|---|---|---|---|---|
 | `scatter!` | `:scatter` | `:circles` | yes | yes | yes |
 | `meshscatter!` | `:meshscatter` | `:circles` | yes | yes | — |
-| `lines!` | `:lines` | `:polyline` | yes | yes | yes |
+| `lines!` | `:lines` | `:lines` | yes | yes | yes |
 | `linesegments!` | `:segments` | `:segments` | yes | yes | yes |
 | `wireframe!` | `:wireframe` | `:segments` | yes | yes | — |
 | `arrows3d!` (`Arrows3D`) | `:arrows3d` | `:segments` | yes | yes | — |
 | `heatmap!` / `image!` | `:cells` | `:grid` | yes | — | — |
 | `barplot!` | `:bars` | `:rects` | yes | — | — |
 | `poly!` | `:poly` | `:polygons` | yes | — | — |
-| `stairs!` | `:stairs` | `:polyline` | yes | — | — |
+| `stairs!` | `:stairs` | `:lines` | yes | — | — |
+| `series!` | `:series` | `:lines` | yes | — | yes |
 | `errorbars!` | `:errorbars` | `:segments` | yes | — | — |
 | `rangebars!` | `:rangebars` | `:segments` | yes | — | — |
 | `hlines!` / `vlines!` | `:hlines` / `:vlines` | `:segments` | yes | — | — |
@@ -175,7 +176,7 @@ blocks, not scene plots.
 | `violin!` | `:violin` | `:polygons` | yes | — | — |
 | `voronoiplot!` | `:voronoiplot` | `:polygons` | yes | — | — |
 | `stem!` | `:stem` + `:stem_stems` | `:circles` + `:segments` | yes | — | — |
-| `scatterlines!` | `:scatterlines` + `:scatterlines_line` | `:circles` + `:polyline` | yes | — | yes |
+| `scatterlines!` | `:scatterlines` + `:scatterlines_line` | `:circles` + `:lines` | yes | — | yes |
 | `boxplot!` | `:boxplot` | `:rects` or `:polygons` (body only) | yes | — | — |
 | `text!` | `:text` | `:rects` | yes | — | — |
 | `annotation!` | `:annotation` | `:rects` | yes | — | — |
@@ -185,7 +186,8 @@ blocks, not scene plots.
 `stem!` and `scatterlines!` become two layers. `boxplot!` hits the box
 body; whiskers and outliers are not hit-tested. `annotation!` is the
 inner `Text`. `text!` whose `space` is not `:data` is skipped with a
-specific warning. `lines!` is nearest-segment on a polyline.
+specific warning. `lines!` and `stairs!` are one whole-line element.
+`series!` is one `:lines` layer with one element per series.
 
 A recipe that is not in the table is skipped with `@warn`. Nested
 children of an unknown parent are not walked. `LScene` has no overlay;
@@ -198,25 +200,29 @@ see [Troubleshooting](@ref). For a type you implement yourself, see
 |---|---|---|---|---|
 | [`PointInteractable`](@ref) | `(ax, points; radius=9, radius3d=nothing, id=:points)` or `(ax, p::Scatter; id=:scatter)` | [`ElementEvent`](@ref): 1-based `index`, `x`, `y`[, `z`] | `:circles` | [Getting started](@ref), [Click marks](@ref) |
 | [`PointInteractable`](@ref) | `(ax, p::MeshScatter; id=:meshscatter)` | [`ElementEvent`](@ref): 1-based `index`, `x`, `y`, `z` | `:circles` | [Backends](@ref) |
-| [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, tol=6, id=:segments)` | [`ElementEvent`](@ref): 1-based `segment_index` | `:polyline` or `:segments` | [Click marks](@ref) |
+| [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, unit=:segment, tol=6, id=:segments)` | [`ElementEvent`](@ref): 1-based `segment_index` (`:segment`) or `index` (`:line`) | `:polyline`, `:lines`, or `:segments` | [Click marks](@ref) |
 | [`RectInteractable`](@ref) | `(ax; rects, clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot; id=:bars)` | [`ElementEvent`](@ref): explicit `index`; BarPlot `low`, `high`, `value` | `:rects` | [Click marks](@ref) |
 | [`RectInteractable`](@ref) | `(ax; grid, id=:rects)` or `(ax, p::Union{Heatmap,Image}; id=:cells)` | [`GridCellEvent`](@ref): 1-based `i`, `j`; `A[cell]`; `value` when shipped | `:grid` | [Inspect a grid](@ref) |
 | [`PolygonInteractable`](@ref) | `(ax, rings; id=:polygons)` or `(ax, p::Poly; id=:poly)` | [`ElementEvent`](@ref): 1-based `index` | `:polygons` | [Click marks](@ref) |
 | [`TextInteractable`](@ref) | `(ax, p::Makie.Text; id=:text)` only | [`ElementEvent`](@ref): `text`, 1-based `index`, `x`, `y` | `:rects` | [Click marks](@ref) |
 
-`mode` is `:polyline` (connected path, nearest-segment hit) or `:pairs`
-(disjoint pairs). `tol` is hit-test slack in logical px, scaled to DPI
+`mode` is `:polyline` (connected path) or `:pairs` (disjoint pairs).
+`unit` is `:segment` (one element per edge or pair; the default) or
+`:line` (the whole path is one element; requires `mode = :polyline`).
+`lines!` / `stairs!` / a `scatterlines!` line already pass
+`unit = :line`. `tol` is hit-test slack in logical px, scaled to DPI
 like `radius` (default 6). `radius3d` is per-point data-space
 half-extents on a 3D axis and overrides `radius`. `clamp_to_viewport`
 clamps a list rect that spans past the axis edge.
 
-Plot-object `SegmentInteractable` does not take `mode` or `tooltip`; the
-plot type fixes both. `PointInteractable(ax, p::Scatter)` does not take
-`tooltip=` (`MethodError`). Heatmap/image take `id` only.
+Plot-object `SegmentInteractable` does not take `mode`, `unit`, or
+`tooltip`; the plot type fixes all three.
+`PointInteractable(ax, p::Scatter)` does not take `tooltip=`
+(`MethodError`). Heatmap/image take `id` only.
 
-`selected=` hydrates `:circles`, `:rects`, `:polygons`, `:segments`, and
-`:polyline`. It cannot hydrate `:grid`. For more information, see
-[Selection](@ref).
+`selected=` hydrates `:circles`, `:rects`, `:polygons`, `:segments`,
+`:polyline`, and `:lines`. It cannot hydrate `:grid`. For more
+information, see [Selection](@ref).
 
 ## Plot-object defaults
 
@@ -227,7 +233,8 @@ Each row is `*(ax, p)` unless noted. `id` is the auto layer id. Bond is
 |---|---|---|---|
 | `Scatter` | `PointInteractable` | 1-based `index`, `x`, `y`[, `z`] | `:circles` |
 | `MeshScatter` | `PointInteractable` | 1-based `index`, `x`, `y`, `z`; `radius3d` from data-space `markersize` | `:circles` |
-| `Lines` / `Stairs` | `SegmentInteractable` | 1-based `segment_index` | `:polyline` |
+| `Lines` / `Stairs` | `SegmentInteractable` | 1-based `index` | `:lines` |
+| `Series` | `SegmentInteractable` | 1-based `index`; `label` when Makie set one | `:lines` |
 | `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | 1-based `segment_index` | `:segments` |
 | `Arrows3D` | `SegmentInteractable` | 1-based `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:segments` |
 | `BarPlot` | `RectInteractable` | `low`, `high`, `value` (dodge/stack/auto-width honored) | `:rects` |
@@ -242,7 +249,7 @@ Each row is `*(ax, p)` unless noted. `id` is the auto layer id. Bond is
 | `Violin` | `PolygonInteractable` | `x` | `:polygons` |
 | `Text` | `TextInteractable` | `text`, 1-based `index`, `x`, `y` | `:rects` |
 | `Stem` | auto only | points + stems | `:circles` + `:segments` |
-| `ScatterLines` | auto only | points + line | `:circles` + `:polyline` |
+| `ScatterLines` | auto only | points + line | `:circles` + `:lines` |
 | `BoxPlot` | auto only | `q1`, `median`, `q3`; whiskers and outliers are not hit-tested | `:rects` or `:polygons` |
 | `Annotation` | auto only (inner `Text`) | text fields | `:rects` |
 
@@ -277,9 +284,10 @@ kind is `:axis`, not `:colorbar`. Legend kind is `:rects`.
 
 Changing `limits` (2D) or `azimuth`/`elevation` (`Axis3`) and rebuilding
 the widget re-projects the overlay. Dragging with
-[`ViewInteractable`](@ref) is different: it commits nothing. On
-`:cairo`, in-drag frames stream over `with_js_link`. `:webgl` shows a
-numeric readout and does not repaint. See [Pan and orbit](@ref) and
+[`ViewInteractable`](@ref) is different: it commits nothing. On both
+backends, in-drag frames stream over `with_js_link`. `:cairo` ships a
+PNG; `:webgl` ships a serialized scene onto the canvas already on the
+page. See [Pan and orbit](@ref) and
 [`examples/view_manip.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/view_manip.jl).
 
 ## Custom
@@ -295,8 +303,10 @@ See [A custom interactable](@ref).
 
 ## 3D axes and `PolarAxis`
 
-`Axis3` gets the point and segment kinds with 3D fields: Scatter and
-Lines carry `index`, `x`, `y`, `z`. MeshScatter gets depth-correct
+`Axis3` gets the point and segment kinds with 3D fields: Scatter
+carries `index`, `x`, `y`, `z`. A `lines!` is one whole-line element
+whose default payload is `{index}` (the path is still projected from
+the 3D vertices). MeshScatter gets depth-correct
 per-marker hit radii from its data-space `markersize` (`radius3d`).
 Wireframe edges and Arrows3D shafts hit as segments. Geometry is
 projected once, in Julia, at build time, so it is the same on `:cairo`

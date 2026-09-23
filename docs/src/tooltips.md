@@ -81,6 +81,10 @@ end
 | `false` | `Bool` | Tooltip suppressed; the highlight in the overlay still runs |
 | `true` | `Bool` | `ArgumentError` — not meaningful |
 
+A legend is the exception to the omitted-`tooltip` row: holding the
+pointer over an entry shows no card unless you pass `masque"..."`. See
+[Legend](@ref).
+
 `$(field)` is a placeholder resolved in the browser from the payload of
 the mark under the pointer. Put derived text in the payload, not in the
 template. `masque"$(pop+1)"` is a `TemplateValidationError` at parse.
@@ -175,6 +179,8 @@ is omitted when the color cannot be resolved.
 
 The tooltip sits above the mark under the pointer, not on the cursor,
 except on axis, threshold, ROI, and view, where it follows the pointer.
-It flips below if it would clip the top edge, and shifts if it would
-clip a side. For card chrome keywords and CSS custom properties, see
-[Tooltip chrome](@ref).
+On a line it slides to the nearest point on the path (`lines!` /
+`series!` included). Keyboard focus uses the segment midpoint, or the
+point halfway along a whole line. It flips below if it would clip the
+top edge, and shifts if it would clip a side. For card chrome keywords
+and CSS custom properties, see [Tooltip chrome](@ref).

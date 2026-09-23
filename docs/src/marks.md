@@ -186,17 +186,18 @@ with `text`, 1-based `index`, `x`, `y`.
 
 ## Other geometries
 
-### Click a polyline
+### Click a line
 
 This demo is another figure. Replace the previous `fig` cell and the
 `@bind pick` cell.
 
-A short polyline is the same click job with a different kind. Four
-vertices give three segments, layer `:lines`, kind `:polyline`. After a
-click, `pick` is an [`ElementEvent`](@ref) with 1-based
-`segment_index`.
+A `lines!` path is one element: the whole line. Four vertices still
+draw three edges, but a click anywhere along the path (within `tol`)
+binds that one line. Layer `:lines`, kind `:lines`. After a click,
+`pick` is an [`ElementEvent`](@ref) with 1-based `index` (always `1`
+for a single line).
 
-**1.** Draw a four-vertex polyline:
+**1.** Draw a four-vertex line:
 
 ```julia
 begin
@@ -212,9 +213,11 @@ end
 @bind pick masque(fig)
 ```
 
-Line segments, errorbars, rangebars, hlines, and vlines use kind
-`:segments` instead. Keep N small enough to list every segment. Do not
-bind-swap a dense `lines!` click by click.
+`stairs!` is the same whole-line kind. `series!` is one `:lines` layer
+with one element per series. Line segments, errorbars, rangebars,
+hlines, and vlines stay one element per piece (`:segments`). The raw
+`SegmentInteractable(ax, vertices; mode = :polyline)` constructor stays
+per-edge; pass `unit = :line` for the whole path.
 
 ### Click points on a polar axis
 
