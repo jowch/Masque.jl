@@ -232,15 +232,19 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   writes a `masque"…"` template. Distinct from `SliceInteractable`: the slice answers "what is the height
   at this x", this answers "what is this shape". The field list per recipe is the issue's
   job, not the roadmap's.
-- **Composite recipes.** `rainclouds!`, `hexbin!`, `textrepel!` and any recipe whose parent
-  is unknown are skipped without visiting known children. Add a generic child walk for
-  unknown parents (with a double-register guard for recipes that later get their own
-  constructor), and warn with the recipe name rather than `Plot` (#91 comments).
+- **Composite recipes.** An unknown parent contributes each child `_plotbase` already
+  knows (`arc!` is `:lines`; `rainclouds!` is the violin, the raindrop scatter, and the
+  box), and the walk stops at that child so a later parent constructor does not also
+  build those layers. `hexbin!`'s data-space `Scatter` stays unconstructed (hex polygons
+  and count payloads remain a #91 tick). A `:rainclouds` or `:textrepel` id is still a
+  tick. Naming the skipped recipe in the warning is #157.
 - **Named gaps from #91**, cheapest first: `ablines!`, `arc!`, `stephist!`, `ecdfplot!`,
   `qqplot!`, `bracket!`, `timeseries!`, 2D `arrows!`, `pie!`, `contour!` lines,
   `tricontourf!`/`triplot!`, `dendrogram!`, `streamplot!`, `hexbin!` (needs hex polygons and
   count payloads), `datashader!`, `mesh!`, `volume!`/`voxels!`. Not a commitment to all of
-  them; each waits for a real use.
+  them; each waits for a real use. The child walk already hits `ablines!`, `arc!`, `pie!`,
+  and `contour!` lines under the child's layer id. A parent id, and contour level
+  payloads, stay ticks.
 - **`TextLabel`**: a `Block`, not a plot, so it needs the figure-block walk `Colorbar` and
   `Legend` use. Small.
 - **Legend follow-ups.** First, tick Legend in #91's table, which still lists it as not
@@ -478,7 +482,7 @@ nothing left to build, so it is not a dependency of anything below.)
 
 1. Resolve #49.
 2. Pre-registration revisions, including new work wanted in 0.1.0. Self-contained and cheap:
-   #88, #81, #90, keyboard drag nudging, and the composite-recipe child walk.
+   #88, #81, #90, and keyboard drag nudging. Unknown parents already contribute known children (#158).
 3. The remount path (#84 hold). Both backends, live-verified on view-pan.
 4. Register v0.1.0, then the notebook cleanup (drop `Pkg.develop`, re-enable Binder).
 5. Remaining coverage items as demand arrives (#91 list).
