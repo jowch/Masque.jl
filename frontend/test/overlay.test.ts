@@ -17,7 +17,7 @@ import { mapPoint, unmapPoint } from "../src/photo"
 import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
 import { createOverlayState, MOTION_MS, type HiGroups } from "../src/state"
-import type { Hit, HitLayer, Manifest } from "../src/types"
+import type { GridGeometry, Hit, HitLayer, Manifest } from "../src/types"
 
 // build a light-DOM host (img + script) like the Julia widget emits, with layout mocked
 function setup() {
@@ -2576,6 +2576,64 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 2.5, bubbles: true }))
         expect(tip.classList.contains("show")).toBe(true)
         expect(tip.innerHTML).toBe("(2,1) = 12")
+    })
+
+    it("grid sample hover shows the pixel-center value, and a NaN sample shows nothing", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{ id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: {
+                    xedges: [0, 10, 20, 30], yedges: [0, 20], ncols: 3, nrows: 1,
+                    sample: [7, 8], sncols: 2, snrows: 1,
+                    sample_origin: [0, 0], sample_span: [30, 20], sample_px: 15,
+                } }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        // scale = 1200/600 = 2 → client (7.5, 5) = image (15, 10), the left edge of sample (1, 0).
+        // That sample spans image x [15, 30], so its center is 22.5, source bin i=2 (between 20 and 30).
+        // Tooltip is 1-based (3, 1) = the stored sample value 8.
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 5, bubbles: true }))
+        expect(tip.classList.contains("show")).toBe(true)
+        expect(tip.innerHTML).toBe("(3,1) = 8")
+        const hi = shadow.querySelector("svg.masque-edge .masque-hi") as SVGRectElement
+        expect(hi).not.toBeNull()
+        expect(hi.getAttribute("width")).toBe("15")
+        // An in-grid NaN is still that cell. A second move on the same mount is rAF-deferred,
+        // so this is a fresh widget. Image (15, 10) is sample 1, center 22.5, source bin i=2.
+        const nanM: Manifest = {
+            ...m,
+            layers: [{ ...m.layers[0], geometry: { ...(m.layers[0].geometry as GridGeometry), sample: [7, NaN] } }],
+        }
+        const host2 = setup()
+        mount(host2.script, nanM)
+        const shadow2 = shadowOf(host2.host)
+        const tip2 = shadow2.querySelector(".masque-tip") as HTMLElement
+        ;(shadow2.querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 5, bubbles: true }))
+        expect(tip2.classList.contains("show")).toBe(true)
+        expect(tip2.innerHTML).toBe("(3,1) = NaN")
+        expect(shadow2.querySelector("svg.masque-edge .masque-hi")).not.toBeNull()
+        // The same point is a miss when the source edges stop before the sample center.
+        const miss: Manifest = {
+            ...m,
+            layers: [{
+                ...m.layers[0],
+                geometry: {
+                    ...(m.layers[0].geometry as GridGeometry),
+                    xedges: [0, 10], ncols: 1, sample: [NaN, NaN],
+                },
+            }],
+        }
+        const host3 = setup()
+        mount(host3.script, miss)
+        const tip3 = shadowOf(host3.host).querySelector(".masque-tip") as HTMLElement
+        ;(shadowOf(host3.host).querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 5, bubbles: true }))
+        expect(tip3.classList.contains("show")).toBe(false)
     })
 
     it("grid hover tooltip shows '(i,j)' with no value when values[] was dropped", () => {

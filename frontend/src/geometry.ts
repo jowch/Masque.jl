@@ -154,6 +154,40 @@ function mapAxis(lims: [number, number], scale: string, f: number, cats?: string
     return v
 }
 
+// Image-px [start, stop] of sample index `i`. The last bin keeps the remainder of `span`.
+function sampleBin(origin: number, i: number, n: number, step: number, span: number): [number, number] {
+    const start = origin + i * step
+    const end = i === n - 1 ? origin + span : start + step
+    return [start, end]
+}
+
+// Sub-pixel grid: one stored value per screen pixel. The hit is that pixel, and (i, j) is
+// the source cell under the pixel's center. A center that misses the source edges is a miss.
+// A non-finite sample whose center lands in a cell is still that cell (tooltip shows the NaN
+// or Infinity), same as the full-matrix path.
+function hitGridSample(gg: GridGeometry, px: number, py: number): Omit<Hit, "layer"> | null {
+    const origin = gg.sample_origin, span = gg.sample_span, step = gg.sample_px
+    const sncols = gg.sncols, snrows = gg.snrows, sample = gg.sample
+    if (!origin || !span || step === undefined || step <= 0 || !sncols || !snrows || !sample) return null
+    const [ox, oy] = origin, [sw, sh] = span
+    if (px < ox || py < oy || px > ox + sw || py > oy + sh) return null
+    let sx = Math.floor((px - ox) / step), sy = Math.floor((py - oy) / step)
+    if (sx === sncols) sx = sncols - 1
+    if (sy === snrows) sy = snrows - 1
+    if (sx < 0 || sy < 0 || sx >= sncols || sy >= snrows) return null
+    const v = sample[sy * sncols + sx]
+    const [x0, x1] = sampleBin(ox, sx, sncols, step, sw)
+    const [y0, y1] = sampleBin(oy, sy, snrows, step, sh)
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+    const i = findBin(gg.xedges, cx), j = findBin(gg.yedges, cy)
+    if (i < 0 || j < 0) return null
+    return {
+        index: j * gg.ncols + i,
+        grid_: [i, j, v],
+        geom_: ["rect", cx, cy, Math.abs(x1 - x0), Math.abs(y1 - y0)],
+    }
+}
+
 // hit-test one layer at (px,py); null if no element under the point
 export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "layer"> | null {
     const g = layer.geometry
@@ -219,6 +253,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
         }
         case "grid": {
             const gg = g as GridGeometry
+            if (gg.sample) return hitGridSample(gg, px, py)
             const i = findBin(gg.xedges, px), j = findBin(gg.yedges, py)
             if (i < 0 || j < 0) return null
             const idx = j * gg.ncols + i

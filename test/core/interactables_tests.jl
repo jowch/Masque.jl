@@ -10,6 +10,9 @@ end
 Masque.hitlayers(i::_CustomHoverInteractable, ctx::Masque.InteractionContext) = hitlayers(i.inner, ctx)
 Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3)
 
+# Stand-in for a color image cell: not `Real`, so it must not be cast to Float32.
+struct _NotReal end
+
 @testset "Interactables" begin
     @testset "RectInteractable grid is compact" begin
         fh = Figure(); axh = Axis(fh[1, 1]); z = rand(20, 30); heatmap!(axh, 1:20, 1:30, z)
@@ -18,19 +21,128 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
         @test L.kind === :grid
         @test L.geometry["ncols"] == 20 && L.geometry["nrows"] == 30
         @test length(L.geometry["xedges"]) == 21 && length(L.geometry["values"]) == 600
+        @test !haskey(L.geometry, "sample")
     end
 
-    @testset "RectInteractable grid drops sub-pixel values[]" begin
-        # 1000² grid on a ~700px column → ~0.7 px/cell on screen, below the targetability floor:
-        # ship edges+dims (hit-testing needs only those), drop the source-resolution values[] matrix.
+    @testset "RectInteractable grid samples sub-pixel values to the screen" begin
+        # 1000² grid on a ~700px column → ~0.7 px/cell on screen. The manifest keeps the source
+        # edges and ships one source value per screen pixel, not the source matrix.
         fb = Figure(); axb = Axis(fb[1, 1]); zb = rand(Float32, 1000, 1000); heatmap!(axb, zb)
         _, _, ctxb = ctx_for(fb)
-        # This is the suite's only sub-pixel grid, so it's the sole trigger of the @warn (maxlog=1 is
-        # per-call-site per-process): keep it that way, or the warn is suppressed and this assert sees 0 logs.
-        L = (@test_logs (:warn, r"sub-pixel"i) only(hitlayers(RectInteractable(axb; grid = (0.5:1:1000.5, 0.5:1:1000.5, zb)), ctxb)))
+        L = only(hitlayers(RectInteractable(axb; grid = (0.5:1:1000.5, 0.5:1:1000.5, zb)), ctxb))
+        g = L.geometry
         @test L.kind === :grid
-        @test L.geometry["ncols"] == 1000 && length(L.geometry["xedges"]) == 1001  # hit-test still works
-        @test !haskey(L.geometry, "values")                                        # the unbounded term is gone
+        @test g["ncols"] == 1000 && length(g["xedges"]) == 1001
+        @test !haskey(g, "values")
+        sample = g["sample"]
+        sncols, snrows = g["sncols"], g["snrows"]
+        @test length(sample) == sncols * snrows
+        @test g["sample_px"] ≈ 1 / ctxb.display_scale
+        vp = ctxb.transforms[Masque.axis_id(ctxb, axb)].viewport
+        @test g["sample_origin"] == [vp[1], vp[2]]
+        @test g["sample_span"] == [vp[3], vp[4]]
+        # A heatmap whose limits are the cell edges fills the axis, so every sample center
+        # lands on a cell. The margin case is the test below.
+        ox, oy = g["sample_origin"]
+        step = g["sample_px"]
+        bad = 0
+        for sy in 0:(snrows - 1), sx in 0:(sncols - 1)
+            x0, x1 = Masque._sample_bin(ox, sx, sncols, step, vp[3])
+            y0, y1 = Masque._sample_bin(oy, sy, snrows, step, vp[4])
+            i = Masque._find_bin(g["xedges"], (x0 + x1) / 2)
+            j = Masque._find_bin(g["yedges"], (y0 + y1) / 2)
+            got = sample[sy * sncols + sx + 1]
+            match = i < 0 || j < 0 ? isnan(got) : got == Float32(zb[i + 1, j + 1])
+            bad += !match
+        end
+        @test bad == 0
+        @test all(isfinite, sample)
+    end
+
+    @testset "a viewport wider than the grid stores NaN outside the cells" begin
+        n = 800
+        fw = Figure(size = (600, 400))
+        axw = Axis(fw[1, 1]; limits = (-50, n + 50, -50, n + 50))
+        _, _, ctxw = ctx_for(fw)
+        zw = rand(Float32, n, n)
+        edges = range(0, n; length = n + 1)
+        L = only(hitlayers(RectInteractable(axw; grid = (edges, edges, zw)), ctxw))
+        g = L.geometry
+        @test !haskey(g, "values")
+        sample = g["sample"]
+        @test any(isnan, sample)
+        @test any(isfinite, sample)
+        ox, oy = g["sample_origin"]
+        step = g["sample_px"]
+        sncols, snrows = g["sncols"], g["snrows"]
+        span = g["sample_span"]
+        bad = 0
+        for sy in 0:(snrows - 1), sx in 0:(sncols - 1)
+            x0, x1 = Masque._sample_bin(ox, sx, sncols, step, span[1])
+            y0, y1 = Masque._sample_bin(oy, sy, snrows, step, span[2])
+            i = Masque._find_bin(g["xedges"], (x0 + x1) / 2)
+            j = Masque._find_bin(g["yedges"], (y0 + y1) / 2)
+            got = sample[sy * sncols + sx + 1]
+            match = i < 0 || j < 0 ? isnan(got) : got == Float32(zw[i + 1, j + 1])
+            bad += !match
+        end
+        @test bad == 0
+    end
+
+    @testset "grid sample bin search matches the overlay, including a miss and a short last bin" begin
+        @test Masque._find_bin([0.0, 10.0, 20.0, 30.0], 12.0) == 1
+        @test Masque._find_bin([30.0, 20.0, 10.0, 0.0], 12.0) == 1
+        @test Masque._find_bin([0.0, 10.0, 20.0, 30.0], 10.0) == 0
+        @test Masque._find_bin([0.0, 10.0, 20.0], 99.0) == -1
+        # Irregular edges, descending y. Viewport is wider than the data, so the margin is NaN.
+        xe = Float64[0, 1, 4, 10]
+        ye = Float64[10, 6, 0]
+        vals = Float32[1 4; 2 5; 3 6]
+        s = Masque._grid_sample(xe, ye, vals, (0.0, -2.0, 12.0, 14.0), 0.5)
+        @test s.sample_px == 2
+        @test s.sncols == 6 && s.snrows == 7
+        # Sample (0, 0): y bin [-2, 0], center -1, below the data. That slot is not a hit.
+        @test isnan(s.sample[1])
+        # A center inside both: x [4, 6] → 5 is in [4, 10] → i=2; y [6, 8] → 7 is in [6, 10] (desc) → j=0.
+        # vals[3, 1] == 3. Locate that sample by scanning centers rather than assuming the index.
+        found = false
+        for sy in 0:(s.snrows - 1), sx in 0:(s.sncols - 1)
+            x0, x1 = Masque._sample_bin(0.0, sx, s.sncols, s.sample_px, 12.0)
+            y0, y1 = Masque._sample_bin(-2.0, sy, s.snrows, s.sample_px, 14.0)
+            cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+            cx == 5 && cy == 7 || continue
+            found = true
+            @test s.sample[sy * s.sncols + sx + 1] == Float32(3)
+        end
+        @test found
+        # span 5, step 2 → last bin is the remainder [4, 5], shorter than one step.
+        x0, x1 = Masque._sample_bin(0.0, 2, 3, 2.0, 5.0)
+        @test (x0, x1) == (4.0, 5.0)
+    end
+
+    @testset "a non-real sub-pixel grid ships edges and no sample" begin
+        # Same 1000² layout as the float sample above. A color image (or any non-real matrix)
+        # used to throw inside Float32(cell) and the widget never mounted.
+        n = 1000
+        fb = Figure(); axb = Axis(fb[1, 1]); heatmap!(axb, rand(Float32, n, n))
+        _, _, ctxb = ctx_for(fb)
+        zb = fill(_NotReal(), n, n)
+        L = only(hitlayers(RectInteractable(axb; grid = (0.5:1:(n + 0.5), 0.5:1:(n + 0.5), zb)), ctxb))
+        g = L.geometry
+        @test g["ncols"] == n && length(g["xedges"]) == n + 1
+        @test !haskey(g, "values")
+        @test !haskey(g, "sample")
+        @test Masque._grid_sample(Float64[0, 1], Float64[0, 1], fill(_NotReal(), 1, 1), (0.0, 0.0, 4.0, 4.0), 0.5) === nothing
+    end
+
+    @testset "missing and non-finite source cells are stored as sample values" begin
+        missing_cell = reshape(Union{Missing, Float64}[missing], 1, 1)
+        sm = Masque._grid_sample(Float64[0, 10], Float64[0, 10], missing_cell, (0.0, 0.0, 4.0, 4.0), 0.5)
+        @test sm !== nothing && all(isnan, sm.sample)
+        sn = Masque._grid_sample(Float64[0, 10], Float64[0, 10], Float64[NaN;;], (0.0, 0.0, 4.0, 4.0), 0.5)
+        @test all(isnan, sn.sample)
+        si = Masque._grid_sample(Float64[0, 10], Float64[0, 10], Float64[Inf;;], (0.0, 0.0, 4.0, 4.0), 0.5)
+        @test all(isinf, si.sample)
     end
 
     @testset "RectInteractable grid rejects non-monotonic edges and non-finite projections" begin

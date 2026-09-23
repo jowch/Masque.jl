@@ -4,7 +4,7 @@ import {
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles,
     anchorFor, computeAnchoredPlacement,
 } from "../src/geometry"
-import type { AxisTransform, Hit, HitLayer, Manifest } from "../src/types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest } from "../src/types"
 
 describe("primitives", () => {
     it("distToSegment", () => {
@@ -277,6 +277,49 @@ describe("hitLayer + hitTest", () => {
             geometry: { xedges: [0, 10, 20], yedges: [0, 10, 20], ncols: 2, nrows: 2 } } // no values
         const h = hitLayer(grid, 15, 5)
         expect(h?.grid_).toEqual([1, 0, undefined]) // index found; value absent, no crash
+    })
+    it("grid sample reports the pixel-center cell and highlights that screen pixel", () => {
+        const grid: HitLayer = { id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: {
+                xedges: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20], yedges: [0, 10],
+                ncols: 10, nrows: 1,
+                sample: [3.5, NaN], sncols: 2, snrows: 1,
+                sample_origin: [0, 0], sample_span: [20, 10], sample_px: 10,
+            } }
+        // (5, 5) is sample (0, 0). Its center is (5, 5), source bin i=2 (between 4 and 6).
+        const h = hitLayer(grid, 5, 5)
+        expect(h?.grid_).toEqual([2, 0, 3.5])
+        expect(h?.geom_).toEqual(["rect", 5, 5, 10, 10])
+        // Sample 1 is NaN, but its center (15, 5) sits in source bin i=7. That cell is still a hit.
+        const nanHit = hitLayer(grid, 15, 5)
+        expect(nanHit?.grid_).toEqual([7, 0, NaN])
+        expect(nanHit?.geom_).toEqual(["rect", 15, 5, 10, 10])
+        expect(hitLayer(grid, 25, 5)).toBeNull() // outside the sampled viewport
+        // Same NaN sample, but the source edges stop at 10, so center 15 misses. No hit.
+        const margin: HitLayer = { ...grid, geometry: { ...(grid.geometry as GridGeometry), xedges: [0, 10], ncols: 1 } }
+        expect(hitLayer(margin, 5, 5)?.grid_).toEqual([0, 0, 3.5])
+        expect(hitLayer(margin, 15, 5)).toBeNull()
+        const infGrid: HitLayer = { ...grid, geometry: { ...(grid.geometry as GridGeometry), sample: [Infinity, 1] } }
+        expect(hitLayer(infGrid, 5, 5)?.grid_).toEqual([2, 0, Infinity])
+    })
+    it("grid sample's last bin is the remainder, and the far edge still hits", () => {
+        const grid: HitLayer = { id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: {
+                xedges: [0, 15], yedges: [0, 10], ncols: 1, nrows: 1,
+                sample: [1, 2], sncols: 2, snrows: 1,
+                sample_origin: [0, 0], sample_span: [15, 10], sample_px: 10,
+            } }
+        const h = hitLayer(grid, 12, 5)
+        expect(h?.grid_).toEqual([0, 0, 2])
+        expect(h?.geom_).toEqual(["rect", 12.5, 5, 5, 10])
+        const edge: HitLayer = { id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+            geometry: {
+                xedges: [0, 20], yedges: [0, 10], ncols: 1, nrows: 1,
+                sample: [1, 2], sncols: 2, snrows: 1,
+                sample_origin: [0, 0], sample_span: [20, 10], sample_px: 10,
+            } }
+        expect(hitLayer(edge, 20, 5)?.grid_).toEqual([0, 0, 2])
+        expect(hitLayer(edge, 20.001, 5)).toBeNull()
     })
     it("hitTest respects the event filter and manifest order", () => {
         const m: Manifest = { width: 400, height: 400, scaling: 2, transforms: {},
