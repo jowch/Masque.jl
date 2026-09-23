@@ -98,7 +98,9 @@ function _point_radius(ax, pts::Vector{Point3f})
         return _marker_radius(only(matches))
     end
     if length(matches) > 1
-        @warn "PointInteractable: $(length(matches)) scatters on this axis share these positions, so the highlight radius is ambiguous; using the default :circle. Pass radius= or PointInteractable(ax, scatter)."
+        @warn "PointInteractable: $(length(matches)) scatters on this axis share these " *
+            "positions, so the highlight radius is ambiguous; using the default :circle. " *
+            "Pass radius= or PointInteractable(ax, scatter)."
     end
     return _default_circle_radius()
 end

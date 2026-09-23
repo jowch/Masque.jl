@@ -94,6 +94,11 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             sl = [(0.0, 1.0), (1.0, 2.0), (2.0, 0.5)]
             scatterlines!(al, first.(sl), last.(sl); markersize = 16)
             @test PointInteractable(al, sl).radius ≈ 0.3525 * 16
+            # A stem! child scatter is the drawn marker too, not the recipe object.
+            ast = Axis(f[4, 1])
+            st = [(1.0, 3.0), (2.0, 4.0)]
+            stem!(ast, first.(st), last.(st); markersize = 16)
+            @test PointInteractable(ast, st).radius ≈ 0.3525 * 16
             # Axis3 and PolarAxis store the same positions the points constructor compares.
             f3 = Figure(size = (400, 300)); ax3 = Axis3(f3[1, 1])
             p3 = [(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)]
