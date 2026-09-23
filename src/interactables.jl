@@ -17,7 +17,10 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
     `NaN` is a gap inside that line, not another element). A `lines!` / `stairs!` /
     `scatterlines!` line is one entry; a `series!` is one entry per series
   - `:polygons` — `Vector{Real}[]`, one flat `(x, y)`-per-vertex ring per element (image px)
-  - `:grid` — a `Dict` with `"xedges"`, `"yedges"`, `"ncols"`, `"nrows"`, optional `"values"`
+  - `:grid` — a `Dict` with `"xedges"`, `"yedges"`, `"ncols"`, `"nrows"`, and either
+    `"values"` (the source matrix, when a cell is at least one screen pixel) or `"sample"`
+    (one source value per screen pixel of the axis viewport, when cells are smaller). A
+    sub-pixel matrix that is not real-valued ships neither.
   - `:axis` — `nothing` (whole-axis readout, `AxisInteractable`) or flat `Real[x, y, w, h]`
     (the colorbar's pixel bbox, `ColorbarInteractable`); not element-indexed
   - `:threshold` / `:roi` / `:view` — a small `Dict` (orientation/position, drag bbox +
@@ -154,7 +157,8 @@ compatible_kinds(::AbstractInteractable) = ()
 # Only AxisInteractable relies on client-side JS inversion and restricts scales.
 const _JS_INVERTIBLE = (:identity, :log10, :log)  # scales geometry.ts `invert` implements
 
-# A heatmap/image cell smaller than this (screen px) can't be cursor-targeted, so values[] is dropped.
+# Below this on-screen cell size a cursor can't land on one source cell, so the manifest
+# carries one source value per screen pixel of the axis viewport instead of the full matrix.
 const GRID_VALUES_MIN_SCREEN_PX = 1.0
 
 _proj(ctx, ax, p) = data_to_image_px(ctx, ax, p)
@@ -166,6 +170,69 @@ _pt3(p) = Point3f(p[1], p[2], length(p) >= 3 ? p[3] : 0)
 # throws, so non-finite values pass through as Float32 — NaN is the polyline gap sentinel
 # (geometry.ts). Geometry vectors use `Real[]`, not a concrete eltype, to allow this mix.
 _q(x) = isfinite(x) ? round(Int, x) : Float32(x)
+
+# 0-based bin, or -1 outside. Matches `findBin` in `frontend/src/geometry.ts`, including the
+# smaller-index bin on an interior edge. `edges` is 1-based; the returned index is not.
+function _find_bin(edges, v)
+    n = length(edges)
+    (n < 2 || !isfinite(v) || !isfinite(edges[1]) || !isfinite(edges[n])) && return -1
+    ascending = edges[n] > edges[1]
+    if ascending
+        (v < edges[1] || v > edges[n]) && return -1
+    else
+        (v > edges[1] || v < edges[n]) && return -1
+    end
+    lo = 0
+    hi = n - 2
+    while lo < hi
+        mid = (lo + hi) >>> 1
+        right = edges[mid + 2]
+        brackets = ascending ? v <= right : v >= right
+        lo, hi = brackets ? (lo, mid) : (mid + 1, hi)
+    end
+    return lo
+end
+
+# Image-px extent of sample index `i`. The last bin keeps the remainder, so it is shorter
+# than `step` when `span` is not a whole number of steps.
+function _sample_bin(origin, i, n, step, span)
+    start = origin + i * step
+    stop = i == n - 1 ? origin + span : start + step
+    return start, stop
+end
+
+# Real-valued cells can be sampled. `missing` is stored as `NaN32`. A color image, or any
+# other non-real eltype, cannot — `_grid_sample` returns `nothing` and the caller ships edges only.
+_sampleable(::Type{T}) where {T} = (R = nonmissingtype(T); R === Union{} || R <: Real)
+_sample_value(::Missing) = NaN32
+_sample_value(v::Real) = Float32(v)
+
+# One `Float32` per screen pixel of `vp` (`x, y, w, h` image px), or `nothing` when `vals`
+# is not real-valued. The value is the source cell under that pixel's center. `NaN32` is both
+# a center that misses the grid and a source cell that is `missing` / non-finite; the overlay
+# tells those apart by running `findBin` on the center.
+function _grid_sample(xedges, yedges, vals, vp, display_scale)
+    _sampleable(eltype(vals)) || return nothing
+    vx, vy, vw, vh = vp
+    sample_px = 1 / display_scale
+    sncols = ceil(Int, vw * display_scale)
+    snrows = ceil(Int, vh * display_scale)
+    (sncols < 1 || snrows < 1) && return nothing
+    sample = Vector{Float32}(undef, sncols * snrows)
+    for sy in 0:(snrows - 1)
+        y0, y1 = _sample_bin(vy, sy, snrows, sample_px, vh)
+        j = _find_bin(yedges, (y0 + y1) / 2)
+        for sx in 0:(sncols - 1)
+            x0, x1 = _sample_bin(vx, sx, sncols, sample_px, vw)
+            i = _find_bin(xedges, (x0 + x1) / 2)
+            sample[sy * sncols + sx + 1] = i < 0 || j < 0 ? NaN32 : _sample_value(vals[i + 1, j + 1])
+        end
+    end
+    return (;
+        sample, sncols, snrows, sample_px,
+        origin = Float64[vx, vy], span = Float64[vw, vh],
+    )
+end
 
 # A payloads-length mismatch would otherwise surface as an `undefined` tooltip at hover time.
 # Positional: payloads[k] binds element k; a wrong order is undetectable here. A DataFrame is
@@ -525,9 +592,13 @@ construction. Produces one `:rects` or `:grid` [`HitLayer`](@ref).
 - `grid` — `(xedges, yedges, values)`: `xedges`/`yedges` are cell-edge vectors (length
   `ncols+1`/`nrows+1`), `values` an `(ncols, nrows)` `Matrix` of per-cell values. Shape mismatch
   raises `ArgumentError`. `id`/`tooltip` as above; `payloads` is unused (cell `(i, j, value)`
-  is resolved client-side from `values`). If a cell renders under ~1 screen px, `values` is
-  dropped from the manifest to bound its size (hover then shows `(i, j)` only; a `@warn` notes
-  it) — clicks still carry the cell index.
+  is resolved client-side). When a cell is at least one screen pixel, the manifest carries
+  `values` (row-major). Below that it carries `sample`: one source value per screen pixel of
+  the axis viewport, the cell under that pixel's center. A pixel whose center misses the grid
+  is `NaN` and is not a hit. A source cell that is itself `NaN`, `Inf`, or `missing` is still
+  that cell (`missing` is stored as `NaN`). A matrix that is not real-valued (a color `image!`)
+  ships edges only on this branch: the cell index, no numeric value. Clicks still carry that
+  center cell, so `A[cell]` indexes it.
 
 # From a plot object
 `RectInteractable(ax, p)` builds `rects`/`grid` and default payloads from `p`:
@@ -652,9 +723,16 @@ function hitlayers(i::RectInteractable, ctx)
         if cell_px >= GRID_VALUES_MIN_SCREEN_PX
             geom["values"] = Float32[Float32(vals[c, r]) for r in 1:nrows for c in 1:ncols]  # row-major: r*ncols+c
         else
-            @warn "Masque: heatmap/image grid cells are ~$(round(cell_px; digits = 2)) px on screen " *
-                "(sub-pixel); dropping the values[] payload to bound manifest size. Hover shows (i,j) " *
-                "only; clicks still carry it (the kernel round-trip has your matrix)." maxlog = 1
+            vp = ctx.transforms[axis_id(ctx, i.ax)].viewport
+            sampled = _grid_sample(xedges, yedges, vals, vp, ctx.display_scale)
+            if sampled !== nothing
+                geom["sample"] = sampled.sample
+                geom["sncols"] = sampled.sncols
+                geom["snrows"] = sampled.snrows
+                geom["sample_origin"] = sampled.origin
+                geom["sample_span"] = sampled.span
+                geom["sample_px"] = sampled.sample_px
+            end
         end
         return [HitLayer(i.id, :grid, geom, Any[], axis_id(ctx, i.ax), events(i), i.label)]
     end

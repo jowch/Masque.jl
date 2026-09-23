@@ -17,7 +17,17 @@ export interface GridGeometry {
     yedges: number[]
     ncols: number
     nrows: number
-    values?: number[] // row-major: values[j*ncols + i]; absent when dropped for sub-pixel cells (Julia GRID_VALUES_MIN_SCREEN_PX)
+    values?: number[] // row-major: values[j*ncols + i]; the source matrix, when a cell is at least one screen pixel
+    // One source value per screen pixel of the axis viewport, when cells are smaller.
+    // Row-major over (sncols, snrows). NaN is a center that misses the grid (not a hit) or a
+    // non-finite source cell (still a hit; the cell comes from the edges). Absent, with
+    // `values` also absent, when the matrix is not real-valued.
+    sample?: number[]
+    sncols?: number
+    snrows?: number
+    sample_origin?: [number, number] // image px, top-left of sample (0, 0)
+    sample_span?: [number, number]   // image px width, height of the sampled viewport
+    sample_px?: number                // image px per sample; the last bin may be shorter
 }
 
 export interface ThresholdGeometry {
@@ -122,7 +132,7 @@ export interface Hit {
     layer: HitLayer
     index: number // -1 for axis (continuous)
     geom_?: unknown[] // shape descriptor for highlight drawing
-    grid_?: [number, number, number?] // [i, j, value]; value absent when values[] was dropped
+    grid_?: [number, number, number?] // [i, j, value]; value absent only when neither values nor sample was sent
     axis_?: string // transform id, for continuous inversion
     roiPart_?: { corner?: number; edge?: "n" | "s" | "w" | "e"; move?: boolean } // which sub-part of an :roi a drag grabbed
 }
