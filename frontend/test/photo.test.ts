@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { IDENTITY, mapPoint, residual, wheelScale, zoomAt } from "../src/photo"
+import { IDENTITY, mapPoint, residual, unmapPoint, wheelScale, zoomAt } from "../src/photo"
 
 describe("photographic matrix", () => {
     it("three composed notches stay on the cursor", () => {
@@ -39,6 +39,14 @@ describe("photographic matrix", () => {
             expect(screenRes.x).toBeCloseTo(screenNow.x)
             expect(screenRes.y).toBeCloseTo(screenNow.y)
         }
+    })
+
+    it("unmapPoint is the inverse of mapPoint", () => {
+        const m = zoomAt(zoomAt(IDENTITY, { x: 200, y: 140 }, 1.2), { x: 80, y: 40 }, 1.1)
+        const p = { x: 50, y: 70 }
+        const back = unmapPoint(m, mapPoint(m, p))
+        expect(back.x).toBeCloseTo(p.x)
+        expect(back.y).toBeCloseTo(p.y)
     })
 
     it("wheel-up zooms in, and line/page deltas convert before the exponent", () => {

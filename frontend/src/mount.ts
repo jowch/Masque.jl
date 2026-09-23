@@ -12,7 +12,7 @@ import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx
 import type { HiGroups, OverlayCtx } from "./state"
 import type { Hit, Manifest, ViewGeometry } from "./types"
 import { matrixLimits } from "./geometry"
-import { IDENTITY, isIdentity, mapPoint, residual, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
+import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
 // Single source for the two highlight tint strengths (mount.ts's STYLE reads both; the e2e
@@ -363,11 +363,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // Bumps when the base pixels change, so the viewport copy is not redrawn on every pan sample.
     let frameGen = 0
     let paintPhoto: (m: PhotoMatrix) => void = () => {}
-    const channel = createGestureChannel(requestFrame ?? null, applyFrame, () => {
-        state.photo_ = IDENTITY
-        state.photoAnchor_ = null
-        paintPhoto(IDENTITY)
-    })
+    // A frame that arrives while an ROI or threshold drag holds those nodes. Rebuilt when the drag ends.
+    let pendingChrome: Manifest | null = null
+    const channel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto() })
 
     const ctx: OverlayCtx = {
         manifest_: manifest, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
@@ -409,6 +407,34 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         canvas.masqueFlushPending = () => { host.masqueFlushPending?.() }
     }
 
+    function clearPhoto(): void {
+        state.photo_ = IDENTITY
+        state.photoAnchor_ = null
+        paintPhoto(IDENTITY)
+    }
+
+    function chromeHeld(): boolean {
+        const k = state.drag_?.kind
+        return k === "roi" || k === "threshold"
+    }
+
+    function replaceDraggedChrome(man: Manifest): void {
+        for (const line of ctx.thresholdLines_.values()) line.remove()
+        for (const box of ctx.roiBoxes_.values()) {
+            box.rect_.remove()
+            for (const hdl of box.handles_) hdl.remove()
+        }
+        ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(man, plainPhoto)
+        ctx.roiBoxes_ = roiDrag.buildROIBoxes(man, plainPhoto, ctx.base_)
+    }
+
+    function flushPendingChrome(): void {
+        if (!pendingChrome || chromeHeld()) return
+        const man = pendingChrome
+        pendingChrome = null
+        replaceDraggedChrome(man)
+    }
+
     function applyFrame(input: Record<string, unknown>, r: FrameResponse): void {
         const canvas = base instanceof HTMLCanvasElement ? base as GestureCanvas : null
         const live = canvas != null && typeof canvas.masqueReplaceScene === "function"
@@ -429,11 +455,19 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             const img = base
             const token = ++loadToken
             const onload = () => {
-                if (token !== loadToken) return
                 img.removeEventListener("load", onload)
+                img.removeEventListener("error", onerror)
+                if (token !== loadToken || host.masqueDead) return
                 revealFrame(input, r)
             }
+            const onerror = () => {
+                img.removeEventListener("load", onload)
+                img.removeEventListener("error", onerror)
+                if (token !== loadToken || host.masqueDead) return
+                clearPhoto()
+            }
             img.addEventListener("load", onload)
+            img.addEventListener("error", onerror)
             img.src = url
             if (prev) URL.revokeObjectURL(prev) // revoke the PREVIOUS url, not this one, mid-gesture
             // The previous pixels stay until load. Dropping the matrix here snaps them.
@@ -443,6 +477,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 canvas.masqueReplaceScene?.(r.scene, r.pxPerUnit, r.width, r.height)
             } catch (e) {
                 console.error("[masque] webgl gesture frame failed", e)
+                clearPhoto()
                 return
             }
             frameGen += 1
@@ -458,14 +493,14 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // patched in place elsewhere — a camera move invalidates every hit region on the same
         // axis (§12.4), so anything derived from the OLD manifest is torn down and rebuilt from
         // the new one rather than mutated.
-        for (const line of ctx.thresholdLines_.values()) line.remove()
-        for (const box of ctx.roiBoxes_.values()) {
-            box.rect_.remove()
-            for (const hdl of box.handles_) hdl.remove()
+        // An ROI or threshold drag still holds these nodes. Replacing them detaches the
+        // gesture. The photograph and the stamp still land; the chrome waits for pointerup.
+        if (chromeHeld()) pendingChrome = newManifest
+        else {
+            pendingChrome = null
+            replaceDraggedChrome(newManifest)
         }
         ctx.manifest_ = newManifest
-        ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(newManifest, plainPhoto)
-        ctx.roiBoxes_ = roiDrag.buildROIBoxes(newManifest, plainPhoto, ctx.base_)
         ctx.focusable_ = buildFocusable(newManifest)
         ctx.layerStarts_ = computeLayerStarts(ctx.focusable_)
 
@@ -523,7 +558,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 return { xmin: t?.xlims[0] ?? NaN, xmax: t?.xlims[1] ?? NaN, ymin: t?.ylims[0] ?? NaN, ymax: t?.ylims[1] ?? NaN }
             })()
         gestureFrameCount += 1
-        ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueGestureFrame = JSON.stringify({ n: gestureFrameCount, ...camera })
+        ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueGestureFrame = JSON.stringify({
+            n: gestureFrameCount, settle: input.settle === true, ...camera,
+        })
     }
 
     // The sent frame is the photograph now. Keep whatever the live matrix has moved since
@@ -695,10 +732,25 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     const down = (e: PointerEvent) => onDown(ctx, state, e)
     const move = (e: PointerEvent) => onPointerMove(ctx, state, e)
-    const up = (e: PointerEvent) => onUp(ctx, state, e)
-    const cancel = (e: PointerEvent) => onCancel(ctx, state, e)
+    const releaseChrome = (kind: string | undefined) => {
+        if ((kind === "roi" || kind === "threshold") && !state.drag_) flushPendingChrome()
+    }
+    const up = (e: PointerEvent) => {
+        const kind = state.drag_?.kind
+        onUp(ctx, state, e)
+        releaseChrome(kind)
+    }
+    const cancel = (e: PointerEvent) => {
+        const kind = state.drag_?.kind
+        onCancel(ctx, state, e)
+        releaseChrome(kind)
+    }
     const leave = () => onLeave(ctx, state)
-    const lostCapture = () => onLostCapture(ctx, state)
+    const lostCapture = () => {
+        const kind = state.drag_?.kind
+        onLostCapture(ctx, state)
+        releaseChrome(kind)
+    }
     const click = (e: MouseEvent) => onClick(ctx, state, e)
     const keydown = (e: KeyboardEvent) => handleKeydown(ctx, state, e)
     // DOM focus leaving the surface — Tab-away, a click landing elsewhere on the page, or the
@@ -710,14 +762,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     const onWheel = (e: WheelEvent) => {
         if (state.drag_) return
-        const local = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+        // The axis viewport is in layout pixels. The zoom anchor is the content pixel
+        // under the cursor, or a second notch walks off it.
+        const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
         let id = ""
         let axis = ""
         for (const layer of ctx.manifest_.layers) {
             if (layer.kind !== "view" || !layer.events.includes("drag")) continue
             const g = layer.geometry as ViewGeometry
             if (g.mode !== "pan") continue
-            if (local.x < g.x || local.x > g.x + g.w || local.y < g.y || local.y > g.y + g.h) continue
+            if (layout.x < g.x || layout.x > g.x + g.w || layout.y < g.y || layout.y > g.y + g.h) continue
             if (!ctx.manifest_.transforms[layer.axis]) continue
             id = layer.id
             axis = layer.axis
@@ -726,6 +780,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (!id) return
         e.preventDefault()
         state.photoViewId_ = id
+        const local = unmapPoint(state.photo_, layout)
         const next = zoomAt(state.photo_, local, wheelScale(e.deltaY, e.deltaMode))
         state.photo_ = next
         paintPhoto(next)
@@ -767,6 +822,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     if (state.selHits_.length) renderSelection(ctx, state)
 
     const cleanup = () => {
+        loadToken += 1
         surface.removeEventListener("pointerdown", down)
         surface.removeEventListener("wheel", onWheel)
         surface.removeEventListener("pointermove", move)

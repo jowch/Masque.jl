@@ -736,15 +736,22 @@ try {
         }
         let photo = zoom.photo;
         let zoomStamp = stampAfter;
-        for (let i = 0; i < tries && (photo || zoomStamp === stampAfter); i++) {
+        // A settle:false frame can clear the matrix as soon as it matches. The sample is the
+        // terminal frame (stamp.settle), once that matrix is gone, and its camera must have zoomed.
+        for (let i = 0; i < tries; i++) {
           await new Promise((r) => setTimeout(r, delayMs));
-          photo = await page.evaluate((k) => {
+          const snap = await page.evaluate((k) => {
             const span = document.querySelector(`#coords_${k}`);
             const hosts = [...document.querySelectorAll(".ip-host")];
             const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
-            return host?.dataset.masquePhoto || "";
+            return { photo: host?.dataset.masquePhoto || "", stamp: host?.dataset.masqueGestureFrame || "" };
           }, key);
-          zoomStamp = await readStamp();
+          photo = snap.photo;
+          zoomStamp = snap.stamp || zoomStamp;
+          if (photo || !snap.stamp) continue;
+          let parsed = null;
+          try { parsed = JSON.parse(snap.stamp); } catch { parsed = null; }
+          if (parsed && parsed.settle === true && parsed.n > cam.n) break;
         }
         if (photo) throw new Error(`${key}-wheel: matrix still applied after the frame (${photo})`);
         if (!zoomStamp || zoomStamp === stampAfter) {
@@ -752,8 +759,14 @@ try {
         }
         const zcam = JSON.parse(zoomStamp);
         if (!(zcam.n > cam.n)) throw new Error(`${key}-wheel: gesture frame counter did not advance (${cam.n} -> ${zcam.n})`);
+        if (zcam.settle !== true) throw new Error(`${key}-wheel: sampled a settle:false frame (${zoomStamp})`);
+        const xSpan = (c) => c.xmax - c.xmin;
+        const ySpan = (c) => c.ymax - c.ymin;
+        if (!(xSpan(zcam) < xSpan(cam) && ySpan(zcam) < ySpan(cam))) {
+          throw new Error(`${key}-wheel: camera limits did not zoom (${stampAfter} -> ${zoomStamp})`);
+        }
         passed.push(`${key}/wheel-zoom`);
-        console.error(`OK  ${key}/wheel — photo cleared, gesture frame ${zoomStamp}`);
+        console.error(`OK  ${key}/wheel — photo cleared, zoomed gesture frame ${zoomStamp}`);
       }
       continue;
     }

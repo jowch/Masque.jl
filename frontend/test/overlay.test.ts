@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
+import { mapPoint, unmapPoint } from "../src/photo"
 import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
 import { createOverlayState, MOTION_MS, type HiGroups } from "../src/state"
@@ -1559,9 +1560,16 @@ describe("tooltips (mount/showTip)", () => {
 
         // A real drag: at least one in-drag request (settle: false), and a terminal one
         // (settle: true) on release, carrying the pan payload the old commit used to.
+        const img = host.querySelector("img") as HTMLImageElement
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        // The base stays untransformed, so its border box is the layout box. pointerup
+        // samples that same layout point and must not put the translation back to 0.
+        expect(img.style.transform).toBe("")
+        expect(host.dataset.masquePhoto).toBe("1,200,0")
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        expect(img.style.transform).toBe("")
+        expect(host.dataset.masquePhoto).toBe("1,200,0")
         await Promise.resolve()
         expect(requestFrame).toHaveBeenCalled()
         const calls = requestFrame.mock.calls; const last = calls[calls.length - 1][0]
@@ -3110,5 +3118,279 @@ describe("photographic pan / wheel zoom", () => {
         await Promise.resolve()
         expect(canvas.masqueReplaceScene).toHaveBeenCalled()
         expect(host.dataset.masquePhoto).toBe("")
+        const stamp = JSON.parse(host.dataset.masqueGestureFrame!)
+        expect(stamp.settle).toBe(false)
+    })
+
+    it("a second wheel notch stays on the cursor", () => {
+        const { host, script } = setup()
+        mount(script, viewManifest("pan"), undefined, vi.fn(async () => ({})))
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        const mid = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        const layout = { x: 100 / 600 * 1200, y: 200 / 400 * 800 }
+        const content = unmapPoint({ s: mid[0], tx: mid[1], ty: mid[2] }, layout)
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -120 })
+        Object.defineProperty(ev, "clientX", { value: 100 })
+        Object.defineProperty(ev, "clientY", { value: 200 })
+        surface.dispatchEvent(ev)
+        const next = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        const screen = mapPoint({ s: next[0], tx: next[1], ty: next[2] }, content)
+        expect(screen.x).toBeCloseTo(layout.x)
+        expect(screen.y).toBeCloseTo(layout.y)
+    })
+
+    it("a pan during a live zoom keeps the grabbed content under the cursor", () => {
+        const { host, script } = setup()
+        mount(script, viewManifest("pan"), undefined, vi.fn(async () => ({})))
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        const mid = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        const down = { x: 100 / 600 * 1200, y: 200 / 400 * 800 }
+        const content = unmapPoint({ s: mid[0], tx: mid[1], ty: mid[2] }, down)
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        const next = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        const screen = mapPoint({ s: next[0], tx: next[1], ty: next[2] }, content)
+        expect(screen.x).toBeCloseTo(200 / 600 * 1200)
+        expect(screen.y).toBeCloseTo(down.y)
+        expect(host.querySelector("img")!.style.transform).toBe("")
+    })
+
+    it("clearing a live wheel timer still settles a pan that never passes VIEW_MIN_PX", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+            mount(script, viewManifest("pan"), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            const settles = () => requestFrame.mock.calls.filter((c) => c[0].settle === true)
+            const micro = (init: PointerEventInit) => {
+                surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true, ...init }))
+                surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 100, clientY: 100, bubbles: true, ...init }))
+            }
+
+            wheelAt(surface, -80)
+            micro({})
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(1)
+            await vi.advanceTimersByTimeAsync(200)
+            expect(settles()).toHaveLength(1)
+
+            wheelAt(surface, -80)
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointercancel", { clientX: 100, clientY: 100, bubbles: true }))
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(2)
+
+            wheelAt(surface, -80)
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("lostpointercapture", { bubbles: true }))
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(3)
+
+            wheelAt(surface, -80)
+            micro({ shiftKey: true })
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(4)
+            await vi.advanceTimersByTimeAsync(200)
+            expect(settles()).toHaveLength(4)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("a wheel that already settled does not settle again on a micro pan", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+            mount(script, viewManifest("pan"), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            const settles = () => requestFrame.mock.calls.filter((c) => c[0].settle === true)
+            wheelAt(surface, -80)
+            await vi.advanceTimersByTimeAsync(150)
+            expect(settles()).toHaveLength(1)
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 100, clientY: 100, bubbles: true }))
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(1)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("a real pan after a wheel settles once", async () => {
+        vi.useFakeTimers()
+        try {
+            const { host, script } = setup()
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+            mount(script, viewManifest("pan"), undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            const settles = () => requestFrame.mock.calls.filter((c) => c[0].settle === true)
+            wheelAt(surface, -80)
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+            await vi.advanceTimersByTimeAsync(0)
+            expect(settles()).toHaveLength(1)
+            await vi.advanceTimersByTimeAsync(200)
+            expect(settles()).toHaveLength(1)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("a load after cleanup does not reveal a dead widget", async () => {
+        const { host, img, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        let resolveInval!: () => void
+        const inval = new Promise<void>((r) => { resolveInval = r })
+        mount(script, viewManifest("pan"), inval, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        release({ png: new Uint8Array([1, 2, 3]), manifest: viewManifest("pan") })
+        await Promise.resolve()
+        await Promise.resolve()
+        resolveInval()
+        await inval
+        await Promise.resolve()
+        img.dispatchEvent(new Event("load"))
+        expect((host as HTMLElement & { masqueDead?: boolean }).masqueDead).toBe(true)
+        expect(host.dataset.masqueGestureFrame).toBeUndefined()
+        expect(host.dataset.masquePhoto ?? "").toBe("")
+    })
+
+    it("an image error clears the photographic matrix", async () => {
+        const { host, img, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]), manifest: viewManifest("pan") }))
+        mount(script, viewManifest("pan"), undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        expect(host.dataset.masquePhoto).not.toBe("")
+        await Promise.resolve()
+        await Promise.resolve()
+        img.dispatchEvent(new Event("error"))
+        expect(host.dataset.masquePhoto).toBe("")
+        expect(host.dataset.masqueGestureFrame).toBeUndefined()
+    })
+
+    it("a thrown scene swap clears the photographic matrix", async () => {
+        const m = viewManifest("pan")
+        const host = document.createElement("div")
+        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+            masqueReplaceScene?: () => void
+        }
+        canvas.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        canvas.masqueReplaceScene = () => { throw new Error("swap failed") }
+        const script = document.createElement("script")
+        host.append(canvas, script)
+        document.body.append(host)
+        const requestFrame = vi.fn(async () => ({ scene: { tag: "z" }, pxPerUnit: 1, width: 400, height: 300, manifest: m }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        const err = vi.spyOn(console, "error").mockImplementation(() => {})
+        try {
+            wheelAt(surface, -120)
+            expect(host.dataset.masquePhoto).not.toBe("")
+            await Promise.resolve()
+            await Promise.resolve()
+            expect(host.dataset.masquePhoto).toBe("")
+            expect(host.dataset.masqueGestureFrame).toBeUndefined()
+        } finally {
+            err.mockRestore()
+        }
+    })
+
+    it("a frame during an ROI drag does not replace the box until the drag ends", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const moved: Manifest = {
+            ...m,
+            layers: [
+                { ...m.layers[0], geometry: { x: 100, y: 100, w: 500, h: 500, handle: 16 } },
+                m.layers[1],
+            ],
+        }
+        const { host, img, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const rect = shadow.querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        expect(rect.getAttribute("x")).toBe("200")
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
+        release({ png: new Uint8Array([1, 2, 3]), manifest: moved })
+        await Promise.resolve()
+        await Promise.resolve()
+        img.dispatchEvent(new Event("load"))
+        expect(rect.isConnected).toBe(true)
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 260, clientY: 240, bubbles: true }))
+        expect(rect.isConnected).toBe(true)
+        expect(rect.getAttribute("x")).not.toBe("200")
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 260, clientY: 240, bubbles: true }))
+        expect(rect.isConnected).toBe(false)
+        const next = shadow.querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        expect(next.getAttribute("x")).toBe("100")
+    })
+
+    it("a frame during a threshold drag does not replace the line until the drag ends", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { orientation: "h", pos: 400, span: [0, 1200] } },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const moved: Manifest = {
+            ...m,
+            layers: [
+                { ...m.layers[0], geometry: { orientation: "h", pos: 120, span: [0, 1200] } },
+                m.layers[1],
+            ],
+        }
+        const { host, img, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const line = shadow.querySelector("line.masque-threshold-line") as SVGLineElement
+        expect(line.getAttribute("y1")).toBe("400")
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        release({ png: new Uint8Array([1, 2, 3]), manifest: moved })
+        await Promise.resolve()
+        await Promise.resolve()
+        img.dispatchEvent(new Event("load"))
+        expect(line.isConnected).toBe(true)
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 250, bubbles: true }))
+        expect(line.isConnected).toBe(true)
+        expect(line.getAttribute("y1")).not.toBe("400")
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 250, bubbles: true }))
+        expect(line.isConnected).toBe(false)
+        const next = shadow.querySelector("line.masque-threshold-line") as SVGLineElement
+        expect(next.getAttribute("y1")).toBe("120")
     })
 })

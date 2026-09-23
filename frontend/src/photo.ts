@@ -51,3 +51,10 @@ export function residual(sent: PhotoMatrix, now: PhotoMatrix): PhotoMatrix {
 export function mapPoint(m: PhotoMatrix, p: { x: number; y: number }): { x: number; y: number } {
     return { x: m.s * p.x + m.tx, y: m.s * p.y + m.ty }
 }
+
+// Inverse of `mapPoint`. A layout point on the untransformed base is the content pixel
+// under the cursor once a photographic matrix is live.
+export function unmapPoint(m: PhotoMatrix, p: { x: number; y: number }): { x: number; y: number } {
+    const s = m.s > 0 ? m.s : 1
+    return { x: (p.x - m.tx) / s, y: (p.y - m.ty) / s }
+}

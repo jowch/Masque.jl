@@ -498,15 +498,15 @@ shipped, which is a better filter than what other libraries happen to have.
 
 ## Order
 
-A proposed sequence, not a decided one. Only the dependency edges are real: #85 wants #84,
-#86 is not reconsidered until #84 and #85 exist, and registration wants
-the API to have stopped moving. (#83 closed not-planned — nothing left to build, so it is not
-a dependency of anything below.)
+A proposed sequence, not a decided one. Only the dependency edges are real: #86 is not
+reconsidered until #84 exists (#85 has shipped — wheel zoom and the photographic slide of the
+last frame), and registration wants the API to have stopped moving. (#83 closed not-planned —
+nothing left to build, so it is not a dependency of anything below.)
 
 1. Resolve #49.
 2. Pre-registration revisions, including new work wanted in 0.1.0. Self-contained and cheap:
    #88, #81, #90, keyboard drag nudging, and the composite-recipe child walk.
-3. The remount path (#84 hold, then #85 preview). Both backends, live-verified on view-pan.
+3. The remount path (#84 hold). Both backends, live-verified on view-pan.
 4. #92 cursor slice.
 5. Register v0.1.0, then the notebook cleanup (drop `Pkg.develop`, re-enable Binder).
 6. Remaining coverage items as demand arrives (#91 list).

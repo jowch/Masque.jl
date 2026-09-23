@@ -7,7 +7,7 @@ import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
-import { panTo } from "./photo"
+import { panTo, unmapPoint } from "./photo"
 import type { AxisTransform, Hit, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
@@ -28,11 +28,33 @@ function shownViewTransform(ctx: OverlayCtx, id: string, fallback: AxisTransform
     return layer ? ctx.manifest_.transforms[layer.axis] ?? fallback : fallback
 }
 
-function clearWheelTimer(state: OverlayState): void {
-    if (state.wheelTimer_ !== null) {
-        clearTimeout(state.wheelTimer_)
-        state.wheelTimer_ = null
-    }
+// Returns whether a live wheel-idle timer was cleared. That timer is the only
+// settle:true a notch has, so the caller owes a settle of the current photo.
+function clearWheelTimer(state: OverlayState): boolean {
+    if (state.wheelTimer_ === null) return false
+    clearTimeout(state.wheelTimer_)
+    state.wheelTimer_ = null
+    return true
+}
+
+function armPan(ctx: OverlayCtx, state: OverlayState, e: PointerEvent, viewId: string): void {
+    const drag = state.drag_
+    if (!drag || drag.kind !== "view" || drag.g_.mode !== "pan") return
+    if (clearWheelTimer(state)) drag.settleOwed_ = true
+    state.photoViewId_ = viewId
+    // The base is untransformed, so this sample is a layout point. The anchor panTo
+    // holds is the content pixel under that point.
+    const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+    state.photoAnchor_ = unmapPoint(state.photo_, layout)
+}
+
+function viewNeedsSettle(d: Extract<Drag, { kind: "view" }>): boolean {
+    return d.lastInput_ !== undefined || d.settleOwed_ === true
+}
+
+function settleCurrentPan(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { kind: "view" }>): void {
+    const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), state.photo_)
+    if (lim) ctx.gesture_.settle({ id: d.id_, ...lim, settle: true, s: state.photo_.s, tx: state.photo_.tx, ty: state.photo_.ty })
 }
 
 // Takes the drag explicitly rather than reading `state.drag_` — onUp/onCancel null that out
@@ -52,12 +74,14 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
                 d.lastInput_ = input
             }
         } else {
+            // Layout point. The base is not photographically transformed, so this is not
+            // the content pixel — that is `photoAnchor_`, captured at pointerdown.
             const cur = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
-            const anchor = state.photoAnchor_ ?? { x: d.x0_, y: d.y0_ }
+            const anchor = state.photoAnchor_ ?? unmapPoint(state.photo_, { x: d.x0_, y: d.y0_ })
             const next = panTo(anchor, cur, state.photo_.s)
             const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), next)
             text = lim ? viewDrag.limitsTip(lim) : viewDrag.tip(d, p)
-            if (Math.hypot(cur.x - anchor.x, cur.y - anchor.y) >= viewDrag.VIEW_MIN_PX && lim) {
+            if (Math.hypot(cur.x - d.x0_, cur.y - d.y0_) >= viewDrag.VIEW_MIN_PX && lim) {
                 state.photo_ = next
                 ctx.photoPaint_(next)
                 const input = { id: d.id_, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty }
@@ -154,11 +178,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         if (viewLayer) {
             const g = viewLayer.geometry as ViewGeometry
             state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], p.x, p.y, e.pointerId)
-            if (g.mode === "pan") {
-                clearWheelTimer(state)
-                state.photoViewId_ = viewLayer.id
-                state.photoAnchor_ = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
-            }
+            if (g.mode === "pan") armPan(ctx, state, e, viewLayer.id)
             ctx.surface_.classList.add("grabbing")
             tryCapture(ctx.surface_, e.pointerId)
             e.preventDefault()
@@ -193,11 +213,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     } else if (hit.layer.kind === "view") {
         const g = hit.layer.geometry as ViewGeometry
         state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], p.x, p.y, e.pointerId)
-        if (g.mode === "pan") {
-            clearWheelTimer(state)
-            state.photoViewId_ = hit.layer.id
-            state.photoAnchor_ = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
-        }
+        if (g.mode === "pan") armPan(ctx, state, e, hit.layer.id)
     } else return
     ctx.surface_.classList.add("grabbing")
     tryCapture(ctx.surface_, e.pointerId)
@@ -236,13 +252,10 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
         // before release still sent ppu=1 frames and owes the ppu restore, even though this
         // release point alone reads as a micro-drag. The payload itself still uses the fresh
         // release position, not the (possibly stale) last in-drag one.
-        if (d.lastInput_ !== undefined) {
-            if (d.g_.mode === "pan") {
-                const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), state.photo_)
-                if (lim) ctx.gesture_.settle({ id: d.id_, ...lim, settle: true, s: state.photo_.s, tx: state.photo_.tx, ty: state.photo_.ty })
-            } else {
-                ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
-            }
+        if (d.g_.mode === "pan") {
+            if (viewNeedsSettle(d)) settleCurrentPan(ctx, state, d)
+        } else if (d.lastInput_ !== undefined) {
+            ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
         }
         state.photoAnchor_ = null
     } else {
@@ -278,15 +291,18 @@ export function onCancel(ctx: OverlayCtx, state: OverlayState, e: PointerEvent):
     // re-renders this static widget, so skipping settle here strands it at low resolution
     // permanently. Unlike onUp this isn't a release in the commit sense, but the cancel event's
     // own position is the best available stand-in for "where the camera actually is now."
-    if (d.kind === "view" && d.lastInput_ !== undefined) {
+    if (d.kind === "view" && viewNeedsSettle(d)) {
         if (d.g_.mode === "pan") {
-            const cur = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
-            const anchor = state.photoAnchor_ ?? { x: d.x0_, y: d.y0_ }
-            state.photo_ = panTo(anchor, cur, state.photo_.s)
-            ctx.photoPaint_(state.photo_)
-            const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), state.photo_)
-            if (lim) ctx.gesture_.settle({ id: d.id_, ...lim, settle: true, s: state.photo_.s, tx: state.photo_.tx, ty: state.photo_.ty })
-        } else {
+            // A micro press never moved the photo. Only a drag that already sent a frame
+            // re-reads the pointer, and that read is the layout point.
+            if (d.lastInput_ !== undefined) {
+                const cur = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+                const anchor = state.photoAnchor_ ?? unmapPoint(state.photo_, { x: d.x0_, y: d.y0_ })
+                state.photo_ = panTo(anchor, cur, state.photo_.s)
+                ctx.photoPaint_(state.photo_)
+            }
+            settleCurrentPan(ctx, state, d)
+        } else if (d.lastInput_ !== undefined) {
             const p = imgPx(ctx.base_, ctx.manifest_, e)
             ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
         }
@@ -306,11 +322,10 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
     state.drag_ = null
     // Same §12.5 obligation as onCancel — but this handler gets no event/position at all, so the
     // last camera a request actually carried is the only thing available to resettle with.
-    if (d.kind === "view" && d.lastInput_ !== undefined) {
+    if (d.kind === "view" && viewNeedsSettle(d)) {
         if (d.g_.mode === "pan") {
-            const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), state.photo_)
-            if (lim) ctx.gesture_.settle({ id: d.id_, ...lim, settle: true, s: state.photo_.s, tx: state.photo_.tx, ty: state.photo_.ty })
-        } else {
+            settleCurrentPan(ctx, state, d)
+        } else if (d.lastInput_ !== undefined) {
             ctx.gesture_.settle({ ...d.lastInput_, settle: true })
         }
     }

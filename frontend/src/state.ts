@@ -24,9 +24,12 @@ export const imgPx = (base: HTMLElement, manifest: Manifest, e: MouseEvent): { x
     return { x: (e.clientX - r.left) * s, y: (e.clientY - r.top) * s }
 }
 
-// Image px in the element's layout box, ignoring a photographic CSS transform on the base.
-// `offsetWidth` is the pre-transform size; a zero (happy-dom, or not laid out yet) falls
-// back to the border box, which matches layout only while the transform is identity.
+// Image pixel under the cursor in the base's border box. `offsetWidth` cancels, so a
+// photographic CSS transform on that element would make this the content pixel. The base
+// stays untransformed — the matrix is on the data copy — so this is the layout point a
+// pan wants as `cur`. Wheel zoom and the grabbed pan anchor want the content pixel,
+// `unmapPoint(photo, layoutImagePx(...))`. A zero `offsetWidth` (happy-dom, or not laid
+// out yet) falls back to the border box.
 export function layoutImagePx(base: HTMLElement, manifest: Manifest, clientX: number, clientY: number): { x: number; y: number } {
     const r = base.getBoundingClientRect()
     const boxW = base.offsetWidth > 0 ? base.offsetWidth : r.width
@@ -92,13 +95,18 @@ export type Drag =
     }
     | {
         kind: "view"; id_: string; g_: ViewGeometry; t_: AxisTransform; x0_: number; y0_: number; pointerId_: number
-        // The last gesture-channel request payload actually sent for this drag (round-1 review,
-        // finding #2) — `undefined` until the first one past VIEW_MIN_PX. bond.ts's terminal
-        // handlers (onUp/onCancel/onLostCapture) gate `settle()` on this, not on the drag's
-        // final release distance: a drag that went out past VIEW_MIN_PX and back below it before
-        // release still owes a settle (ppu=1 was sent at least once and has to be restored), and
-        // onCancel/onLostCapture have no "was this ever a real drag" signal of their own at all.
+        // The last gesture-channel request payload actually sent for this drag — `undefined`
+        // until the first one past VIEW_MIN_PX. bond.ts's terminal handlers
+        // (onUp/onCancel/onLostCapture) settle when this is set, not from the release point's
+        // distance: a drag that went out past VIEW_MIN_PX and back below it before release
+        // still owes a settle (ppu=1 was sent at least once and has to be restored).
         lastInput_?: Record<string, unknown>
+        // A pan pointerdown cleared a live wheel-idle timer. That timer was the only
+        // settle:true for the notch. A press that never passes VIEW_MIN_PX leaves
+        // `lastInput_` unset, so the terminal handlers settle the current photo from this
+        // flag instead. A wheel whose timer already fired does not set it. A drag that
+        // also sets `lastInput_` settles once.
+        settleOwed_?: boolean
     }
 
 // Construction-time DOM/manifest refs, built once by mount.ts and threaded read-mostly through
