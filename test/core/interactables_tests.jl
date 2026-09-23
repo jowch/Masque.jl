@@ -10,6 +10,9 @@ end
 Masque.hitlayers(i::_CustomHoverInteractable, ctx::Masque.InteractionContext) = hitlayers(i.inner, ctx)
 Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3)
 
+# Stand-in for a color image cell: not `Real`, so it must not be cast to Float32.
+struct _NotReal end
+
 @testset "Interactables" begin
     @testset "RectInteractable grid is compact" begin
         fh = Figure(); axh = Axis(fh[1, 1]); z = rand(20, 30); heatmap!(axh, 1:20, 1:30, z)
@@ -115,6 +118,31 @@ Masque.hoverstyle(::_CustomHoverInteractable) = (; stroke = "#123456", width = 3
         # span 5, step 2 → last bin is the remainder [4, 5], shorter than one step.
         x0, x1 = Masque._sample_bin(0.0, 2, 3, 2.0, 5.0)
         @test (x0, x1) == (4.0, 5.0)
+    end
+
+    @testset "a non-real sub-pixel grid ships edges and no sample" begin
+        # Same 1000² layout as the float sample above. A color image (or any non-real matrix)
+        # used to throw inside Float32(cell) and the widget never mounted.
+        n = 1000
+        fb = Figure(); axb = Axis(fb[1, 1]); heatmap!(axb, rand(Float32, n, n))
+        _, _, ctxb = ctx_for(fb)
+        zb = fill(_NotReal(), n, n)
+        L = only(hitlayers(RectInteractable(axb; grid = (0.5:1:(n + 0.5), 0.5:1:(n + 0.5), zb)), ctxb))
+        g = L.geometry
+        @test g["ncols"] == n && length(g["xedges"]) == n + 1
+        @test !haskey(g, "values")
+        @test !haskey(g, "sample")
+        @test Masque._grid_sample(Float64[0, 1], Float64[0, 1], fill(_NotReal(), 1, 1), (0.0, 0.0, 4.0, 4.0), 0.5) === nothing
+    end
+
+    @testset "missing and non-finite source cells are stored as sample values" begin
+        missing_cell = reshape(Union{Missing, Float64}[missing], 1, 1)
+        sm = Masque._grid_sample(Float64[0, 10], Float64[0, 10], missing_cell, (0.0, 0.0, 4.0, 4.0), 0.5)
+        @test sm !== nothing && all(isnan, sm.sample)
+        sn = Masque._grid_sample(Float64[0, 10], Float64[0, 10], Float64[NaN;;], (0.0, 0.0, 4.0, 4.0), 0.5)
+        @test all(isnan, sn.sample)
+        si = Masque._grid_sample(Float64[0, 10], Float64[0, 10], Float64[Inf;;], (0.0, 0.0, 4.0, 4.0), 0.5)
+        @test all(isinf, si.sample)
     end
 
     @testset "RectInteractable grid rejects non-monotonic edges and non-finite projections" begin

@@ -39,7 +39,12 @@ uses, so irregular bins are exact and a fixed stride is not assumed. The array i
 highlight is that screen pixel. A plain heatmap's limits are the cell edges, so the cells fill the
 axis and every sample is a cell. A viewport pixel whose center misses the grid — a wider `limits`,
 another plot on the axis, or a pan past the data — is `NaN` and is not a hit: no tooltip, no
-highlight. Source `xedges` / `yedges` stay at source resolution on both branches.
+highlight. A source cell that is itself `NaN`, `Inf`, or `missing` is still that cell (`missing`
+is stored as `NaN`); hover shows `(i, j) = NaN` the same way the full matrix does. The overlay
+tells a miss from a non-finite cell by running the bin search on the pixel center. A matrix that
+is not real-valued, such as an `image!` of `RGB` / `RGBA`, ships neither `values` nor `sample` on
+this branch: hover is the cell index with no numeric value. Source `xedges` / `yedges` stay at
+source resolution on both branches.
 
 The on-screen size is known at manifest-build. `cell_screen_px` is the tighter of the two average cell
 sizes, in screen pixels: the projected edge span over the cell count, times `display_scale`

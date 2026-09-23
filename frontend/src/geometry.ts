@@ -161,8 +161,9 @@ function sampleBin(origin: number, i: number, n: number, step: number, span: num
 }
 
 // Sub-pixel grid: one stored value per screen pixel. The hit is that pixel, and (i, j) is
-// the source cell under the pixel's center. A NaN sample, or a point outside the sampled
-// viewport, is a miss — no tooltip, no highlight.
+// the source cell under the pixel's center. A center that misses the source edges is a miss.
+// A non-finite sample whose center lands in a cell is still that cell (tooltip shows the NaN
+// or Infinity), same as the full-matrix path.
 function hitGridSample(gg: GridGeometry, px: number, py: number): Omit<Hit, "layer"> | null {
     const origin = gg.sample_origin, span = gg.sample_span, step = gg.sample_px
     const sncols = gg.sncols, snrows = gg.snrows, sample = gg.sample
@@ -174,7 +175,6 @@ function hitGridSample(gg: GridGeometry, px: number, py: number): Omit<Hit, "lay
     if (sy === snrows) sy = snrows - 1
     if (sx < 0 || sy < 0 || sx >= sncols || sy >= snrows) return null
     const v = sample[sy * sncols + sx]
-    if (!Number.isFinite(v)) return null
     const [x0, x1] = sampleBin(ox, sx, sncols, step, sw)
     const [y0, y1] = sampleBin(oy, sy, snrows, step, sh)
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2

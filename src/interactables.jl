@@ -19,7 +19,8 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
   - `:polygons` — `Vector{Real}[]`, one flat `(x, y)`-per-vertex ring per element (image px)
   - `:grid` — a `Dict` with `"xedges"`, `"yedges"`, `"ncols"`, `"nrows"`, and either
     `"values"` (the source matrix, when a cell is at least one screen pixel) or `"sample"`
-    (one source value per screen pixel of the axis viewport, when cells are smaller)
+    (one source value per screen pixel of the axis viewport, when cells are smaller). A
+    sub-pixel matrix that is not real-valued ships neither.
   - `:axis` — `nothing` (whole-axis readout, `AxisInteractable`) or flat `Real[x, y, w, h]`
     (the colorbar's pixel bbox, `ColorbarInteractable`); not element-indexed
   - `:threshold` / `:roi` / `:view` — a small `Dict` (orientation/position, drag bbox +
@@ -200,9 +201,18 @@ function _sample_bin(origin, i, n, step, span)
     return start, stop
 end
 
-# One `Float32` per screen pixel of `vp` (`x, y, w, h` image px). The value is the source
-# cell under that pixel's center; `NaN32` when the center misses the grid.
+# Real-valued cells can be sampled. `missing` is stored as `NaN32`. A color image, or any
+# other non-real eltype, cannot — `_grid_sample` returns `nothing` and the caller ships edges only.
+_sampleable(::Type{T}) where {T} = (R = nonmissingtype(T); R === Union{} || R <: Real)
+_sample_value(::Missing) = NaN32
+_sample_value(v::Real) = Float32(v)
+
+# One `Float32` per screen pixel of `vp` (`x, y, w, h` image px), or `nothing` when `vals`
+# is not real-valued. The value is the source cell under that pixel's center. `NaN32` is both
+# a center that misses the grid and a source cell that is `missing` / non-finite; the overlay
+# tells those apart by running `findBin` on the center.
 function _grid_sample(xedges, yedges, vals, vp, display_scale)
+    _sampleable(eltype(vals)) || return nothing
     vx, vy, vw, vh = vp
     sample_px = 1 / display_scale
     sncols = ceil(Int, vw * display_scale)
@@ -215,7 +225,7 @@ function _grid_sample(xedges, yedges, vals, vp, display_scale)
         for sx in 0:(sncols - 1)
             x0, x1 = _sample_bin(vx, sx, sncols, sample_px, vw)
             i = _find_bin(xedges, (x0 + x1) / 2)
-            sample[sy * sncols + sx + 1] = i < 0 || j < 0 ? NaN32 : Float32(vals[i + 1, j + 1])
+            sample[sy * sncols + sx + 1] = i < 0 || j < 0 ? NaN32 : _sample_value(vals[i + 1, j + 1])
         end
     end
     return (;
@@ -585,7 +595,10 @@ construction. Produces one `:rects` or `:grid` [`HitLayer`](@ref).
   is resolved client-side). When a cell is at least one screen pixel, the manifest carries
   `values` (row-major). Below that it carries `sample`: one source value per screen pixel of
   the axis viewport, the cell under that pixel's center. A pixel whose center misses the grid
-  is `NaN` and is not a hit. Clicks still carry that center cell, so `A[cell]` indexes it.
+  is `NaN` and is not a hit. A source cell that is itself `NaN`, `Inf`, or `missing` is still
+  that cell (`missing` is stored as `NaN`). A matrix that is not real-valued (a color `image!`)
+  ships edges only on this branch: the cell index, no numeric value. Clicks still carry that
+  center cell, so `A[cell]` indexes it.
 
 # From a plot object
 `RectInteractable(ax, p)` builds `rects`/`grid` and default payloads from `p`:

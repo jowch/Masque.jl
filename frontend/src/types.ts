@@ -19,7 +19,9 @@ export interface GridGeometry {
     nrows: number
     values?: number[] // row-major: values[j*ncols + i]; the source matrix, when a cell is at least one screen pixel
     // One source value per screen pixel of the axis viewport, when cells are smaller.
-    // Row-major over (sncols, snrows). NaN is a viewport pixel whose center misses the grid (not a hit).
+    // Row-major over (sncols, snrows). NaN is a center that misses the grid (not a hit) or a
+    // non-finite source cell (still a hit; the cell comes from the edges). Absent, with
+    // `values` also absent, when the matrix is not real-valued.
     sample?: number[]
     sncols?: number
     snrows?: number
@@ -130,7 +132,7 @@ export interface Hit {
     layer: HitLayer
     index: number // -1 for axis (continuous)
     geom_?: unknown[] // shape descriptor for highlight drawing
-    grid_?: [number, number, number?] // [i, j, value]; value absent when values[] was dropped
+    grid_?: [number, number, number?] // [i, j, value]; value absent only when neither values nor sample was sent
     axis_?: string // transform id, for continuous inversion
     roiPart_?: { corner?: number; edge?: "n" | "s" | "w" | "e"; move?: boolean } // which sub-part of an :roi a drag grabbed
 }

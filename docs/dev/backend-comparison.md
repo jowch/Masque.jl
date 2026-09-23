@@ -105,12 +105,14 @@ are wall-clock and approximate** (`~`). Units: **KB = bytes/1024, MB = bytes/1 0
 | scatter, 10 000 | 1 103 KB (724+379) | ~300 | 158 KB | ~26 | **1.1** |
 | scatter, 100 000 | 3 973 KB (53+**3 920**) | **~2 280** | 861 KB | ~32 | **0.3** |
 | heatmap, 200² | 386 KB (190+197) | ~49 | 1 956 KB | ~30 | never |
-| heatmap, 500² | 1 915 KB (1 009+906) | ~71 | 11 843 KB | ~45 | never |
+| heatmap, 500² | STRESS table in `perf-findings.md` | STRESS table in `perf-findings.md` | 11 843 KB | ~45 | never |
 | 3D helix, 300 | **unsupported** | — | 141 KB | ~30 | WebGL-only |
 
 *Renders after which cumulative `:webgl` (bundle + N·scene) < cumulative `:cairo` (N·(PNG+manifest)).
 `:cairo` has no bundle but re-rasterizes and re-ships everything each render; `:webgl` ships the bundle
-once, then only its compact scene.
+once, then only its compact scene. The heatmap 500² Cairo columns are the STRESS table in
+`perf-findings.md`. That manifest is the screen-pixel sample, and the render range there was not
+re-timed after the sample landed, so this row does not copy either number.
 
 Two terms move independently under stress, and both are UX terms:
 

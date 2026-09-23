@@ -3,7 +3,7 @@ import {
     distToSegment, pointInPolygon, findBin, invertAxis, hitLayer, hitTest, resolvePayload, panLimits, orbitAngles,
     anchorFor, computeAnchoredPlacement,
 } from "../src/geometry"
-import type { AxisTransform, Hit, HitLayer, Manifest } from "../src/types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest } from "../src/types"
 
 describe("primitives", () => {
     it("distToSegment", () => {
@@ -289,8 +289,17 @@ describe("hitLayer + hitTest", () => {
         const h = hitLayer(grid, 5, 5)
         expect(h?.grid_).toEqual([2, 0, 3.5])
         expect(h?.geom_).toEqual(["rect", 5, 5, 10, 10])
-        expect(hitLayer(grid, 15, 5)).toBeNull() // NaN sample: margin, not a hit
+        // Sample 1 is NaN, but its center (15, 5) sits in source bin i=7. That cell is still a hit.
+        const nanHit = hitLayer(grid, 15, 5)
+        expect(nanHit?.grid_).toEqual([7, 0, NaN])
+        expect(nanHit?.geom_).toEqual(["rect", 15, 5, 10, 10])
         expect(hitLayer(grid, 25, 5)).toBeNull() // outside the sampled viewport
+        // Same NaN sample, but the source edges stop at 10, so center 15 misses. No hit.
+        const margin: HitLayer = { ...grid, geometry: { ...(grid.geometry as GridGeometry), xedges: [0, 10], ncols: 1 } }
+        expect(hitLayer(margin, 5, 5)?.grid_).toEqual([0, 0, 3.5])
+        expect(hitLayer(margin, 15, 5)).toBeNull()
+        const infGrid: HitLayer = { ...grid, geometry: { ...(grid.geometry as GridGeometry), sample: [Infinity, 1] } }
+        expect(hitLayer(infGrid, 5, 5)?.grid_).toEqual([2, 0, Infinity])
     })
     it("grid sample's last bin is the remainder, and the far edge still hits", () => {
         const grid: HitLayer = { id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],

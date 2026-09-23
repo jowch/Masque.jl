@@ -2579,19 +2579,38 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         const hi = shadow.querySelector("svg.masque-edge .masque-hi") as SVGRectElement
         expect(hi).not.toBeNull()
         expect(hi.getAttribute("width")).toBe("15")
-        // A NaN sample is not a hit. A second move on the same mount is rAF-deferred, so this
-        // is a fresh widget.
-        const miss: Manifest = {
+        // An in-grid NaN is still that cell. A second move on the same mount is rAF-deferred,
+        // so this is a fresh widget. Image (15, 10) is sample 1, center 22.5, source bin i=2.
+        const nanM: Manifest = {
             ...m,
-            layers: [{ ...m.layers[0], geometry: { ...(m.layers[0].geometry as GridGeometry), sample: [NaN, NaN] } }],
+            layers: [{ ...m.layers[0], geometry: { ...(m.layers[0].geometry as GridGeometry), sample: [7, NaN] } }],
         }
         const host2 = setup()
-        mount(host2.script, miss)
+        mount(host2.script, nanM)
         const shadow2 = shadowOf(host2.host)
         const tip2 = shadow2.querySelector(".masque-tip") as HTMLElement
         ;(shadow2.querySelector(".surface") as HTMLElement)
             .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 5, bubbles: true }))
-        expect(tip2.classList.contains("show")).toBe(false)
+        expect(tip2.classList.contains("show")).toBe(true)
+        expect(tip2.innerHTML).toBe("(3,1) = NaN")
+        expect(shadow2.querySelector("svg.masque-edge .masque-hi")).not.toBeNull()
+        // The same point is a miss when the source edges stop before the sample center.
+        const miss: Manifest = {
+            ...m,
+            layers: [{
+                ...m.layers[0],
+                geometry: {
+                    ...(m.layers[0].geometry as GridGeometry),
+                    xedges: [0, 10], ncols: 1, sample: [NaN, NaN],
+                },
+            }],
+        }
+        const host3 = setup()
+        mount(host3.script, miss)
+        const tip3 = shadowOf(host3.host).querySelector(".masque-tip") as HTMLElement
+        ;(shadowOf(host3.host).querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 5, bubbles: true }))
+        expect(tip3.classList.contains("show")).toBe(false)
     })
 
     it("grid hover tooltip shows '(i,j)' with no value when values[] was dropped", () => {
