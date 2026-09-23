@@ -235,7 +235,11 @@ const netLog = [];
 const browser = await chromium.launch({ headless: true });
 let failed = null;
 try {
-  const page = await browser.newPage();
+  // GitHub runners have a minimal locale. Pluto's frontend then throws
+  // "Incorrect locale information provided" from a V8 Intl call and never
+  // creates .ip-host. Same context the live Pluto click test uses.
+  const context = await browser.newContext({ locale: "en-US", timezoneId: "UTC" });
+  const page = await context.newPage();
   page.on("console", (msg) => consoleLog.push(`${msg.type()}: ${msg.text()}`));
   page.on("pageerror", (err) => consoleLog.push(`pageerror: ${err.message}`));
   page.on("requestfailed", (req) => {
