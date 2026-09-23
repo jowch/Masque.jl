@@ -24,7 +24,7 @@ const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 const browser = await chromium.launch({
   headless: false,
-  args: ["--no-sandbox", "--disable-dev-shm-usage", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+  args: ["--no-sandbox", "--disable-dev-shm-usage", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--max-active-webgl-contexts=64"],
 });
 const passed = [];
 const unexpected = [];
@@ -44,29 +44,47 @@ try {
     console.error(benign ? "PAGEERROR (known-benign):" : "PAGEERROR:", e.message);
   });
 
+  const WGL_CHURN_RE = /removing WGL context/;
+  let lastWglChurnAt = 0;
+  page.on("console", (m) => {
+    if (WGL_CHURN_RE.test(m.text())) lastWglChurnAt = Date.now();
+  });
+
   await page.goto(`${base}/open?path=${encodeURIComponent(notebook)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
-  const deadline = Date.now() + 180000;
+  const deadline = Date.now() + 900000;
   let ready = false;
+  let tick = 0;
   while (Date.now() < deadline) {
     const st = await page.evaluate(() => {
+      // Once: a repeated click re-runs the notebook and tears the canvas down mid-check.
       const runBtn = [...document.querySelectorAll("button, a")].find((b) => /run notebook code/i.test(b.innerText || b.title || ""));
-      if (runBtn) runBtn.click();
+      if (runBtn && !window.__masqueClickedRun) { runBtn.click(); window.__masqueClickedRun = true; }
       const hosts = [...document.querySelectorAll(".ip-host")];
       let surfaces = 0;
       for (const h of hosts) {
         let sr = null; h.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         if (sr && sr.querySelector(".surface")) surfaces++;
       }
+      let metaN = 0;
+      try { metaN = JSON.parse(document.querySelector("#kind_meta")?.textContent || "[]").length; } catch { metaN = 0; }
+      const scatter = document.querySelector("#coords_scatter");
+      const hostsBefore = scatter
+        ? [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(scatter) & Node.DOCUMENT_POSITION_FOLLOWING))
+        : [];
+      const plot = hostsBefore.at(-1);
       return {
         busy: document.querySelectorAll("pluto-cell.running, pluto-cell.queued").length,
-        surfaces,
-        scatter: !!document.querySelector("#coords_scatter"),
-        heatmap: !!document.querySelector("#coords_heatmap"),
-        view: !!document.querySelector("#coords_view"),
-        threshold: !!document.querySelector("#coords_threshold"),
+        errored: document.querySelectorAll("pluto-cell.errored").length,
+        surfaces, metaN,
+        base: !!(plot && plot.querySelector("img, canvas")),
+        errText: [...document.querySelectorAll("pluto-cell.errored")].map((c) => c.innerText).slice(0, 1).join("").slice(0, 300),
       };
     });
-    if (!st.busy && st.surfaces >= 4 && st.scatter && st.heatmap && st.view && st.threshold) { ready = true; break; }
+    if (st.errored) throw new Error(`${backend} notebook errored: ${st.errText}`);
+    const wglQuiet = backend !== "webgl" || !lastWglChurnAt || (Date.now() - lastWglChurnAt) > 3000;
+    if (!st.busy && st.metaN >= 14 && st.surfaces >= st.metaN && st.base && wglQuiet) { ready = true; break; }
+    if (tick % 15 === 0) console.error(`  …${backend} [${tick}s] busy=${st.busy} surfaces=${st.surfaces} meta=${st.metaN} base=${st.base}`);
+    tick++;
     await new Promise((r) => setTimeout(r, 1000));
   }
   if (!ready) throw new Error(`${backend}: timed out waiting for widgets`);
@@ -83,20 +101,29 @@ try {
     }, true);
   });
 
-  const hostBox = (key) => page.evaluate((k) => {
-    const span = document.querySelector(`#coords_${k}`);
-    const hosts = [...document.querySelectorAll(".ip-host")];
-    const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
-    host.scrollIntoView({ block: "center", inline: "nearest" });
-    let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-    const baseEl = host.querySelector("img, canvas");
-    const b = baseEl.getBoundingClientRect();
-    return {
-      left: b.left, top: b.top, width: b.width, height: b.height,
-      tag: baseEl.tagName,
-      frame: host.dataset.masqueGestureFrame || "",
-    };
-  }, key);
+  const hostBox = async (key) => {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const box = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        if (!host) return null;
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        const baseEl = host.querySelector("img, canvas");
+        if (!baseEl) return null;
+        const b = baseEl.getBoundingClientRect();
+        if (!(b.width > 0 && b.height > 0)) return null;
+        return {
+          left: b.left, top: b.top, width: b.width, height: b.height,
+          tag: baseEl.tagName,
+          frame: host.dataset.masqueGestureFrame || "",
+        };
+      }, key);
+      if (box) return box;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    throw new Error(`${key}: base element not in the DOM`);
+  };
 
   const menuEvents = () => page.evaluate(() => window.__masqueMenu);
   const clearMenu = () => page.evaluate(() => { window.__masqueMenu = []; });
