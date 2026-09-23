@@ -180,9 +180,10 @@ read the row you passed. For more information, see [Constructors](@ref).
 
 ## Drag and resize
 
-The box has eight square handles. Corner handles resize two axes. Edge
-midpoint handles resize one axis. The pointer shows a directional resize
-cursor on a handle and a move cursor in the interior.
+The box draws four corner grips. A corner resizes two axes. The middle
+of each side resizes that one axis, with no grip drawn there. The
+pointer shows a directional resize cursor on a corner or an edge
+midpoint, and a move cursor in the interior.
 
 If the same axis also has a [`ViewInteractable`](@ref), Shift+drag yields to
 the view: the plot pans (or orbits) instead of moving the box.

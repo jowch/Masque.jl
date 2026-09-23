@@ -43,9 +43,11 @@ accent.
 Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
 notebook. Pass `tooltip = masque"..."` on the points constructor.
 Placeholders read fields from that mark's payload at pointer-hold time.
-They do not read Julia locals. Use the points constructor plus `radius=`
-when you need a template. The Scatter plot-object constructor does not
-take `tooltip=` (`MethodError`).
+They do not read Julia locals. Use the points constructor when you need
+a template. The Scatter plot-object constructor does not take
+`tooltip=` (`MethodError`). Omit `radius=` to hug the one matching
+scatter on that axis. The snippet below passes `radius=` so the disc
+matches `markersize`.
 
 **1.** Plot four cities and a templated [`PointInteractable`](@ref):
 

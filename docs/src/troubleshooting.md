@@ -238,6 +238,13 @@ browser. They do not assign `@bind`.
 **Fix:** read `pick` after a click (or Enter on a focused mark). For
 channel timing, see [Overlay, bind, and the host](@ref).
 
+### Right-click opens the context menu
+
+Right-click the figure to open the context menu on the Cairo image or
+the WebGL canvas. Control-click does the same on macOS. That press does
+not start a drag, and `@bind` stays unchanged. For channel timing, see
+[Overlay, bind, and the host](@ref).
+
 ### Tried a click and nothing happened
 
 Check, in order:
@@ -315,10 +322,10 @@ Drag-orbit on `:webgl` streams live scene frames; see [Backends](@ref).
 ### A WebGL plot says its GPU context was released
 
 **Cause:** the browser caps how many WebGL contexts a page can keep
-(16 on desktop Chrome and Safari, 8 on Android Chrome). Masque stays at
-8 and releases an off-screen plot before the browser does. More than 8
-plots on screen at once cannot all be live; the extras show this note.
-Hover and `@bind` still work.
+(16 on desktop Chrome and Safari, 8 on Android Chrome). Masque keeps at
+most 8. A plot that scrolls out of view releases its context before the
+next plot takes one. More than 8 plots on screen at once cannot all be
+live; the extras show this note. Hover and `@bind` still work.
 
 **Fix:** scroll so fewer `:webgl` plots are on screen at once, or use
 `:cairo` for a plot that is a static picture.

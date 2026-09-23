@@ -113,10 +113,11 @@ Treat a WGLMakie version bump as a re-check, not an automatic upgrade.
 At most 8 `:webgl` plots hold a live WebGL context. Desktop Chrome and
 Safari allow 16, Android Chrome allows 8, and Firefox allows several
 hundred. 8 fits all of them and leaves room for another tab. A plot
-outside the viewport is not given a context until it scrolls into view.
-If more than 8 are on screen together, the extras show a note instead of
-the browser blanking an arbitrary canvas. `:cairo` does not use a WebGL
-context.
+outside the viewport is not given a context until it scrolls into view,
+and a plot that leaves the viewport releases its context before the next
+plot takes one. If more than 8 are on screen together, the extras show a
+note instead of the browser blanking an arbitrary canvas. `:cairo` does
+not use a WebGL context.
 
 `using WGLMakie` in a session that already loaded CairoMakie does not
 switch the PNG. Pick WebGL with `backend=` as shown earlier, or start a

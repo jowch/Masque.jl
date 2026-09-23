@@ -48,8 +48,8 @@ These four are separate channels, not speeds of one channel.
   threshold line, and a view readout. No Julia round trip.
 - **Bond (`@bind`).** The analysis value a cell reads: a click, an Enter
   commit, an ROI release, or a threshold release.
-- **Gesture channel (`with_js_link`).** CairoMakie frames while you pan or
-  orbit. Not a bond. Not a faster `@bind`.
+- **Gesture channel (`with_js_link`).** In-drag pan and orbit frames on
+  both backends. Not a bond. Not a faster `@bind`.
 - **Downstream Julia cell.** Re-runs only when it reads a bond that changed.
 
 A Dash hover callback is a **click** in Masque. Altair `.interactive()`
@@ -116,6 +116,10 @@ channel stops, and the bond still holds **nothing** from the pan.
 A click in empty space does not write the bond and does not clear a
 selection. Enter or Space on a focused mark commits the same way a click
 does.
+
+Right-click opens the context menu on the figure: the Cairo image, or
+the WebGL canvas. Control-click does the same on macOS. That press does
+not start a drag, and the bond stays unchanged.
 
 ## Overlay, Julia, and the host
 
