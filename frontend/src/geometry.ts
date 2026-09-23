@@ -299,6 +299,42 @@ export function panLimits(
     return { xmin, xmax, ymin, ymax }
 }
 
+function fracToData(lims: [number, number], scale: string, f: number): number {
+    if (scale === "log10" || scale === "log") {
+        const a = Math.log10(lims[0]), b = Math.log10(lims[1])
+        return 10 ** (a + f * (b - a))
+    }
+    return lims[0] + f * (lims[1] - lims[0])
+}
+
+// Data range of the shown frame's content currently sitting in the layout viewport.
+// The matrix is in that frame's image pixels (`photo.ts`). A pure translate matches
+// `panLimits`; a scale matches the visible pixel window, linear or log.
+export function matrixLimits(
+    t: AxisTransform, m: { s: number; tx: number; ty: number },
+): { xmin: number; xmax: number; ymin: number; ymax: number } | null {
+    const [vx, vy, vw, vh] = t.viewport
+    if (!(vw > 0) || !(vh > 0) || !(m.s > 0)) return null
+    const ix0 = (vx - m.tx) / m.s
+    const ix1 = (vx + vw - m.tx) / m.s
+    const iy0 = (vy - m.ty) / m.s
+    const iy1 = (vy + vh - m.ty) / m.s
+    let fx0 = (ix0 - vx) / vw
+    let fx1 = (ix1 - vx) / vw
+    let fyBottom = 1 - (iy1 - vy) / vh
+    let fyTop = 1 - (iy0 - vy) / vh
+    if (t.xreversed) { fx0 = 1 - fx0; fx1 = 1 - fx1 }
+    if (t.yreversed) { fyBottom = 1 - fyBottom; fyTop = 1 - fyTop }
+    let xmin = fracToData(t.xlims, t.xscale, fx0)
+    let xmax = fracToData(t.xlims, t.xscale, fx1)
+    let ymin = fracToData(t.ylims, t.yscale, fyBottom)
+    let ymax = fracToData(t.ylims, t.yscale, fyTop)
+    if (xmin > xmax) { const s = xmin; xmin = xmax; xmax = s }
+    if (ymin > ymax) { const s = ymin; ymin = ymax; ymax = s }
+    if (!(xmax > xmin) || !(ymax > ymin) || !Number.isFinite(xmin + xmax + ymin + ymax)) return null
+    return { xmin, xmax, ymin, ymax }
+}
+
 /** Axis3 orbit: pixel Δ → azimuth/elevation (radians). Elevation clamped away from ±π/2. */
 export function orbitAngles(
     g: ViewGeometry, x0: number, y0: number, x1: number, y1: number,

@@ -1,15 +1,19 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex } from "./selection"
-import { onLeave, hideTip } from "./hover"
+import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset } from "./hover"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
+import { limitsTip } from "./drag/view"
 import { createGestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
-import { createOverlayState, cancelPendingMove, cancelPendingDrag, MOTION_MS } from "./state"
+import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, MOTION_MS } from "./state"
 import type { HiGroups, OverlayCtx } from "./state"
-import type { Hit, Manifest } from "./types"
+import type { Hit, Manifest, ViewGeometry } from "./types"
+import { matrixLimits } from "./geometry"
+import { IDENTITY, isIdentity, mapPoint, residual, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
+import type { PhotoMatrix } from "./photo"
 
 // Single source for the two highlight tint strengths (mount.ts's STYLE reads both; the e2e
 // drivers assert these exact computed fillOpacity values) — hover tints lightly, selection more
@@ -264,22 +268,28 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         s.classList.add(cls)
         return s
     }
-    const makeGroup = (svgEl: SVGSVGElement, cls: string): SVGGElement => {
+    const makeGroup = (parent: SVGElement, cls: string): SVGGElement => {
         const g = document.createElementNS(SVG_NS, "g")
         g.setAttribute("class", cls)
-        svgEl.appendChild(g)
+        parent.appendChild(g)
         return g
     }
     const fillSvg = makeOverlaySvg("masque-fill")
     const edgeSvg = makeOverlaySvg("masque-edge")
     const plainSvg = makeOverlaySvg("masque-plain")
+    // A photographic pan/zoom transforms this group, not the svg, so the svg's own overflow
+    // clips the scaled drawing to the plot. The tooltip is not inside it.
+    const fillPhoto = makeGroup(fillSvg, "masque-photo")
+    const edgePhoto = makeGroup(edgeSvg, "masque-photo")
+    const plainPhoto = makeGroup(plainSvg, "masque-photo")
+    const photoGroups = [fillPhoto, edgePhoto, plainPhoto]
     // persistent box-selection highlights (g.sel, z-below link) then transient legend-linked
     // highlights (g.link, z-above sel) then transient hover highlights (g.hi, z-above sel/link) —
     // same append order in every svg, so g.hi always paints over g.link/g.sel whichever svg(s)
     // any of the three lands in.
-    const selGroup: HiGroups = { fill_: makeGroup(fillSvg, "sel"), edge_: makeGroup(edgeSvg, "sel"), plain_: makeGroup(plainSvg, "sel") }
-    const linkGroup: HiGroups = { fill_: makeGroup(fillSvg, "link"), edge_: makeGroup(edgeSvg, "link"), plain_: makeGroup(plainSvg, "link") }
-    const hiGroup: HiGroups = { fill_: makeGroup(fillSvg, "hi"), edge_: makeGroup(edgeSvg, "hi"), plain_: makeGroup(plainSvg, "hi") }
+    const selGroup: HiGroups = { fill_: makeGroup(fillPhoto, "sel"), edge_: makeGroup(edgePhoto, "sel"), plain_: makeGroup(plainPhoto, "sel") }
+    const linkGroup: HiGroups = { fill_: makeGroup(fillPhoto, "link"), edge_: makeGroup(edgePhoto, "link"), plain_: makeGroup(plainPhoto, "link") }
+    const hiGroup: HiGroups = { fill_: makeGroup(fillPhoto, "hi"), edge_: makeGroup(edgePhoto, "hi"), plain_: makeGroup(plainPhoto, "hi") }
     const surface = document.createElement("div")
     surface.className = "surface"
     // touch-action: block native scroll/pinch on the surface ONLY when this manifest has a drag
@@ -334,8 +344,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     shadowHost.style.setProperty("--masque-hi-fill", hiStyle.fillSrc)
 
     // ROI rect/handles and threshold lines never blend — always svg.masque-plain.
-    const thresholdLines = thresholdDrag.buildThresholdLines(manifest, plainSvg)
-    const roiBoxes = roiDrag.buildROIBoxes(manifest, plainSvg, base)
+    const thresholdLines = thresholdDrag.buildThresholdLines(manifest, plainPhoto)
+    const roiBoxes = roiDrag.buildROIBoxes(manifest, plainPhoto, base)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
 
@@ -344,7 +354,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // initialized, so the forward reference here is safe despite the textual order.
     let lastFrameUrl: string | null = null
     let gestureFrameCount = 0
-    const channel = createGestureChannel(requestFrame ?? null, applyFrame)
+    let loadToken = 0
+    let paintPhoto: (m: PhotoMatrix) => void = () => {}
+    const channel = createGestureChannel(requestFrame ?? null, applyFrame, () => {
+        state.photo_ = IDENTITY
+        state.photoAnchor_ = null
+        paintPhoto(IDENTITY)
+    })
 
     const ctx: OverlayCtx = {
         manifest_: manifest, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
@@ -352,6 +368,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
         gesture_: channel,
+        photoPaint_: (m) => paintPhoto(m),
     }
     const state = createOverlayState()
     state.selHits_ = selHits
@@ -402,8 +419,18 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             const url = URL.createObjectURL(new Blob([r.png as Uint8Array<ArrayBuffer>], { type: "image/png" }))
             const prev = lastFrameUrl
             lastFrameUrl = url
-            base.src = url
+            const img = base
+            const token = ++loadToken
+            const onload = () => {
+                if (token !== loadToken) return
+                img.removeEventListener("load", onload)
+                revealFrame(input, r)
+            }
+            img.addEventListener("load", onload)
+            img.src = url
             if (prev) URL.revokeObjectURL(prev) // revoke the PREVIOUS url, not this one, mid-gesture
+            // The previous pixels stay until load. Dropping the matrix here snaps them.
+            return
         } else if (live && canvas && r.scene != null) {
             try {
                 canvas.masqueReplaceScene?.(r.scene, r.pxPerUnit, r.width, r.height)
@@ -412,6 +439,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 return
             }
         }
+        revealFrame(input, r)
+    }
+
+    function revealFrame(input: Record<string, unknown>, r: FrameResponse): void {
         const newManifest = r.manifest as Manifest | undefined
         if (!newManifest) return
 
@@ -425,8 +456,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             for (const hdl of box.handles_) hdl.remove()
         }
         ctx.manifest_ = newManifest
-        ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(newManifest, plainSvg)
-        ctx.roiBoxes_ = roiDrag.buildROIBoxes(newManifest, plainSvg, ctx.base_)
+        ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(newManifest, plainPhoto)
+        ctx.roiBoxes_ = roiDrag.buildROIBoxes(newManifest, plainPhoto, ctx.base_)
         ctx.focusable_ = buildFocusable(newManifest)
         ctx.layerStarts_ = computeLayerStarts(ctx.focusable_)
 
@@ -448,7 +479,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.surface_.classList.remove("kbd-ring")
         clearHiImmediate(state, ctx.hiGroup_)
         clearLinkImmediate(state, ctx.linkGroup_)
-        hideTip(ctx, state)
+        // A frame that lands mid-pan or mid-wheel would wipe the readout the gesture is still
+        // showing. Pointer-up and the wheel idle timer hide it themselves once the gesture ends.
+        if (state.drag_?.kind !== "view" && state.wheelTimer_ === null) hideTip(ctx, state)
 
         // Re-key the LIVE selection against the new layer objects — do NOT re-derive it from
         // the new manifest's own `selected=` field, which is only the mount-time hydration seed;
@@ -467,6 +500,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         state.selHits_ = nextSel
         renderSelection(ctx, state)
+        adoptPhoto(input)
 
         // A paired, atomic stamp — written in the SAME synchronous block as the swap above, not
         // sampled separately — so an observer (e2e's kind_sweep.mjs) can tell "a frame actually
@@ -484,9 +518,26 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueGestureFrame = JSON.stringify({ n: gestureFrameCount, ...camera })
     }
 
+    // The sent frame is the photograph now. Keep whatever the live matrix has moved since
+    // that request, in the new frame's image pixels. Identity means the screen already
+    // matches the new pixels, so the transform comes off in this same turn.
+    function adoptPhoto(input: Record<string, unknown>): void {
+        const s = input.s, tx = input.tx, ty = input.ty
+        if (typeof s !== "number" || typeof tx !== "number" || typeof ty !== "number") return
+        if (!(s > 0) || !Number.isFinite(s + tx + ty)) return
+        const sent = { s, tx, ty }
+        if (state.photoAnchor_) state.photoAnchor_ = mapPoint(sent, state.photoAnchor_)
+        const next = residual(sent, state.photo_)
+        state.photo_ = isIdentity(next) || !Number.isFinite(next.s + next.tx + next.ty) ? IDENTITY : next
+        paintPhoto(state.photo_)
+    }
+
     // Pinned to the base (img/canvas), not the host: WGLMakie can size the <canvas>
     // differently from `.ip-host`, which left g.sel offset when the SVG was `inset:0` on the host.
     const syncOverlayToBase = () => {
+        // getBoundingClientRect follows a CSS transform. Rewriting the overlay from that
+        // rect while the photograph is scaled throws every non-anchor mark off the image.
+        if (!isIdentity(state.photo_)) return
         const hr = host.getBoundingClientRect()
         const br = base.getBoundingClientRect()
         if (!(br.width > 0 && br.height > 0)) return
@@ -496,6 +547,25 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         shadowHost.style.height = `${br.height}px`
         roiDrag.syncHandleDraw(ctx.roiBoxes_, ctx.manifest_.width, br.width, ctx.manifest_.scaling)
         state.surfaceSized_ = false
+    }
+    paintPhoto = (m) => {
+        const id = isIdentity(m)
+        const w = ctx.manifest_.width
+        const h = ctx.manifest_.height
+        const ow = ctx.base_.offsetWidth
+        const oh = ctx.base_.offsetHeight
+        const sx = ow > 0 && w > 0 ? ow / w : 1
+        const sy = oh > 0 && h > 0 ? oh / h : 1
+        ctx.base_.style.transformOrigin = id ? "" : "0 0"
+        ctx.base_.style.transform = id ? "" : `translate(${m.tx * sx}px, ${m.ty * sy}px) scale(${m.s})`
+        const svgT = `translate(${m.tx} ${m.ty}) scale(${m.s})`
+        for (const g of photoGroups) {
+            if (id) g.removeAttribute("transform")
+            else g.setAttribute("transform", svgT)
+        }
+        host.style.overflow = id ? "" : "hidden"
+        host.dataset.masquePhoto = id ? "" : `${m.s},${m.tx},${m.ty}`
+        if (id) syncOverlayToBase()
     }
     syncOverlayToBase()
     const overlayRO = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncOverlayToBase) : null
@@ -507,6 +577,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             return
         }
         mirrorPending(null)
+        base.style.transform = ""
+        base.style.transformOrigin = ""
         overlayRO?.unobserve(base)
         base = next
         ctx.base_ = next
@@ -516,7 +588,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             canvas.masquePendingFrame = host.masquePendingFrame ?? null
         }
         overlayRO?.observe(base)
-        syncOverlayToBase()
+        paintPhoto(state.photo_)
     }
     window.addEventListener("resize", syncOverlayToBase)
     let overlayFrames = 0
@@ -541,7 +613,50 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // on every later pointer miss even though nothing is keyboard-focused anymore.
     const focusout = () => focusTo(ctx, state, null)
 
+    const onWheel = (e: WheelEvent) => {
+        if (state.drag_) return
+        const local = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+        let id = ""
+        let axis = ""
+        for (const layer of ctx.manifest_.layers) {
+            if (layer.kind !== "view" || !layer.events.includes("drag")) continue
+            const g = layer.geometry as ViewGeometry
+            if (g.mode !== "pan") continue
+            if (local.x < g.x || local.x > g.x + g.w || local.y < g.y || local.y > g.y + g.h) continue
+            if (!ctx.manifest_.transforms[layer.axis]) continue
+            id = layer.id
+            axis = layer.axis
+            break
+        }
+        if (!id) return
+        e.preventDefault()
+        const next = zoomAt(state.photo_, local, wheelScale(e.deltaY, e.deltaMode))
+        state.photo_ = next
+        paintPhoto(next)
+        const lim = matrixLimits(ctx.manifest_.transforms[axis], next)
+        if (lim) {
+            ctx.gesture_.request({ id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
+            setTipText(ctx, state, limitsTip(lim))
+            setTipVisible(ctx, true)
+            const tp = tipOffset(ctx, e)
+            placeTip(ctx, state, tp.x, tp.y)
+        }
+        if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
+        const wheelId = id
+        const wheelAxis = axis
+        state.wheelTimer_ = setTimeout(() => {
+            state.wheelTimer_ = null
+            hideTip(ctx, state)
+            const layer = ctx.manifest_.layers.find((l) => l.id === wheelId)
+            const shown = layer ? ctx.manifest_.transforms[layer.axis] : ctx.manifest_.transforms[wheelAxis]
+            if (!shown) return
+            const settled = matrixLimits(shown, state.photo_)
+            if (settled) ctx.gesture_.settle({ id: wheelId, ...settled, settle: true, s: state.photo_.s, tx: state.photo_.tx, ty: state.photo_.ty })
+        }, WHEEL_IDLE_MS)
+    }
+
     surface.addEventListener("pointerdown", down)
+    surface.addEventListener("wheel", onWheel, { passive: false })
     surface.addEventListener("pointermove", move)
     surface.addEventListener("pointerup", up)
     surface.addEventListener("pointercancel", cancel)
@@ -557,6 +672,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     const cleanup = () => {
         surface.removeEventListener("pointerdown", down)
+        surface.removeEventListener("wheel", onWheel)
         surface.removeEventListener("pointermove", move)
         surface.removeEventListener("pointerup", up)
         surface.removeEventListener("pointercancel", cancel)
@@ -574,6 +690,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (state.linkLeaveTimer_ != null) clearTimeout(state.linkLeaveTimer_)
         if (state.tipFlipTimer_ != null) clearTimeout(state.tipFlipTimer_)
         if (state.announceTimer_ != null) clearTimeout(state.announceTimer_)
+        if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
+        state.wheelTimer_ = null
+        state.photo_ = IDENTITY
+        paintPhoto(IDENTITY)
         channel.dispose() // abandon anything in flight — a late response must not touch a dead DOM
         if (lastFrameUrl) URL.revokeObjectURL(lastFrameUrl)
         shadowHost.remove()

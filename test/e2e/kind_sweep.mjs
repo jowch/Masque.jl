@@ -706,6 +706,49 @@ try {
       }
       passed.push(`${key}/view-gesture-frame`);
       console.error(`OK  ${key}/drag — no commit (§12.3), gesture frame ${stampAfter}`);
+
+      if (layer.geometry && layer.geometry.mode === "pan") {
+        const zoom = await page.evaluate(([k, ix, iy]) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null;
+          host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const surface = sr.querySelector(".surface");
+          const b = host.querySelector("img, canvas").getBoundingClientRect();
+          const vb = sr.querySelector("svg.masque-plain").viewBox.baseVal;
+          const s = b.width / vb.width;
+          const ev = new WheelEvent("wheel", {
+            bubbles: true, cancelable: true,
+            clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -120,
+          });
+          surface.dispatchEvent(ev);
+          return { photo: host.dataset.masquePhoto || "", overflow: host.style.overflow, prevented: ev.defaultPrevented };
+        }, [key, p.x, p.y]);
+        if (!zoom.prevented || !zoom.photo || zoom.overflow !== "hidden") {
+          throw new Error(`${key}-wheel: photographic zoom did not engage (${JSON.stringify(zoom)})`);
+        }
+        let photo = zoom.photo;
+        let zoomStamp = stampAfter;
+        for (let i = 0; i < tries && (photo || zoomStamp === stampAfter); i++) {
+          await new Promise((r) => setTimeout(r, delayMs));
+          photo = await page.evaluate((k) => {
+            const span = document.querySelector(`#coords_${k}`);
+            const hosts = [...document.querySelectorAll(".ip-host")];
+            const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+            return host?.dataset.masquePhoto || "";
+          }, key);
+          zoomStamp = await readStamp();
+        }
+        if (photo) throw new Error(`${key}-wheel: matrix still applied after the frame (${photo})`);
+        if (!zoomStamp || zoomStamp === stampAfter) {
+          throw new Error(`${key}-wheel: gesture-channel frame never landed (stamp stayed ${JSON.stringify(stampAfter)})`);
+        }
+        const zcam = JSON.parse(zoomStamp);
+        if (!(zcam.n > cam.n)) throw new Error(`${key}-wheel: gesture frame counter did not advance (${cam.n} -> ${zcam.n})`);
+        passed.push(`${key}/wheel-zoom`);
+        console.error(`OK  ${key}/wheel — photo cleared, gesture frame ${zoomStamp}`);
+      }
       continue;
     }
 

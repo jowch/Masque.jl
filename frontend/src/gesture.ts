@@ -50,6 +50,7 @@ function uiDisabled(): boolean {
 export function createGestureChannel(
     render: RenderFrame | null,
     onFrame: (input: Record<string, unknown>, response: FrameResponse) => void,
+    onDead?: () => void,
 ): GestureChannel {
     if (!render || uiDisabled()) return noopChannel
     let lock: Promise<void> = Promise.resolve()
@@ -89,11 +90,12 @@ export function createGestureChannel(
             pending = render(input)
         } catch {
             disposed = true
+            onDead?.()
             return Promise.resolve()
         }
         return pending.then(
             (r) => { if (!disposed) onFrame(input as Record<string, unknown>, r) },
-            () => { disposed = true }, // a rejected round trip degrades the same way a thrown one does
+            () => { disposed = true; onDead?.() }, // a rejected round trip degrades the same way a thrown one does
         )
     }
 

@@ -1,13 +1,14 @@
-import { hitTest, resolvePayload } from "./geometry"
+import { hitTest, matrixLimits, resolvePayload } from "./geometry"
 import { drawHi, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { selectionFor, SELECTED_KINDS } from "./selection"
-import { imgPx, cancelPendingMove, cancelPendingDrag } from "./state"
+import { imgPx, layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
-import type { Hit, ThresholdGeometry, ViewGeometry } from "./types"
+import { panTo } from "./photo"
+import type { AxisTransform, Hit, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
 // (observed live in Chromium for a synthetic/non-primary pointerId — real touch/pen input can
@@ -22,6 +23,18 @@ function tryCapture(surface: HTMLElement, pointerId: number): void {
     }
 }
 
+function shownViewTransform(ctx: OverlayCtx, id: string, fallback: AxisTransform): AxisTransform {
+    const layer = ctx.manifest_.layers.find((l) => l.id === id)
+    return layer ? ctx.manifest_.transforms[layer.axis] ?? fallback : fallback
+}
+
+function clearWheelTimer(state: OverlayState): void {
+    if (state.wheelTimer_ !== null) {
+        clearTimeout(state.wheelTimer_)
+        state.wheelTimer_ = null
+    }
+}
+
 // Takes the drag explicitly rather than reading `state.drag_` — onUp/onCancel null that out
 // before this can run (see the reentrancy note there), so a stale read here would apply to a
 // gesture that's already been discarded.
@@ -31,18 +44,26 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
     if (d.kind === "threshold") {
         text = thresholdDrag.move(d, p)
     } else if (d.kind === "view") {
-        text = viewDrag.tip(d, p)
-        // Tier-0 readout above always works (browser-only) even for a sub-threshold move; the
-        // live preview only kicks in past VIEW_MIN_PX — same "ignore accidental micro-drags"
-        // guard `end`'s old commit check used to apply, now protecting the gesture channel
-        // instead of a bond write, so an ordinary click with a pixel of jitter doesn't spend a
-        // round trip on a frame nobody will see move. ctx.gesture_ is a no-op channel when
-        // there's no callback for this widget (no ViewInteractable, a static export, or a
-        // channel that already degraded).
-        if (Math.hypot(p.x - d.x0_, p.y - d.y0_) >= viewDrag.VIEW_MIN_PX) {
-            const input = viewDrag.requestInput(d, p, false)
-            ctx.gesture_.request(input)
-            d.lastInput_ = input // marks this drag as owing a settle — see state.ts's Drag doc
+        if (d.g_.mode === "orbit") {
+            text = viewDrag.tip(d, p)
+            if (Math.hypot(p.x - d.x0_, p.y - d.y0_) >= viewDrag.VIEW_MIN_PX) {
+                const input = viewDrag.requestInput(d, p, false)
+                ctx.gesture_.request(input)
+                d.lastInput_ = input
+            }
+        } else {
+            const cur = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+            const anchor = state.photoAnchor_ ?? { x: d.x0_, y: d.y0_ }
+            const next = panTo(anchor, cur, state.photo_.s)
+            const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), next)
+            text = lim ? viewDrag.limitsTip(lim) : viewDrag.tip(d, p)
+            if (Math.hypot(cur.x - anchor.x, cur.y - anchor.y) >= viewDrag.VIEW_MIN_PX && lim) {
+                state.photo_ = next
+                ctx.photoPaint_(next)
+                const input = { id: d.id_, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty }
+                ctx.gesture_.request(input)
+                d.lastInput_ = input
+            }
         }
     } else {
         text = roiDrag.move(ctx, state, d, p)
@@ -131,7 +152,12 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             return hitTest({ ...ctx.manifest_, layers: [l] }, p.x, p.y, "drag") !== null
         })
         if (viewLayer) {
-            state.drag_ = viewDrag.begin(viewLayer.id, viewLayer.geometry as ViewGeometry, ctx.manifest_.transforms[viewLayer.axis], p.x, p.y, e.pointerId)
+            const g = viewLayer.geometry as ViewGeometry
+            state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], p.x, p.y, e.pointerId)
+            if (g.mode === "pan") {
+                clearWheelTimer(state)
+                state.photoAnchor_ = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+            }
             ctx.surface_.classList.add("grabbing")
             tryCapture(ctx.surface_, e.pointerId)
             e.preventDefault()
@@ -164,7 +190,12 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             state.drag_ = roiDrag.begin(hit.layer.id, box, { corner: k }, opp[0], opp[1], e.pointerId)
         }
     } else if (hit.layer.kind === "view") {
-        state.drag_ = viewDrag.begin(hit.layer.id, hit.layer.geometry as ViewGeometry, ctx.manifest_.transforms[hit.layer.axis], p.x, p.y, e.pointerId)
+        const g = hit.layer.geometry as ViewGeometry
+        state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], p.x, p.y, e.pointerId)
+        if (g.mode === "pan") {
+            clearWheelTimer(state)
+            state.photoAnchor_ = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+        }
     } else return
     ctx.surface_.classList.add("grabbing")
     tryCapture(ctx.surface_, e.pointerId)
@@ -202,8 +233,16 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
         // finding #2): a drag that went out past VIEW_MIN_PX and drifted back near the start
         // before release still sent ppu=1 frames and owes the ppu restore, even though this
         // release point alone reads as a micro-drag. The payload itself still uses the fresh
-        // release position `p`, not the (possibly stale) last in-drag one.
-        if (d.lastInput_ !== undefined) ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
+        // release position, not the (possibly stale) last in-drag one.
+        if (d.lastInput_ !== undefined) {
+            if (d.g_.mode === "pan") {
+                const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), state.photo_)
+                if (lim) ctx.gesture_.settle({ id: d.id_, ...lim, settle: true, s: state.photo_.s, tx: state.photo_.tx, ty: state.photo_.ty })
+            } else {
+                ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
+            }
+        }
+        state.photoAnchor_ = null
     } else {
         (ctx.host_ as unknown as { value: unknown }).value = roiDrag.end(ctx, state, d)
         ctx.host_.dispatchEvent(new CustomEvent("input"))
@@ -238,9 +277,19 @@ export function onCancel(ctx: OverlayCtx, state: OverlayState, e: PointerEvent):
     // permanently. Unlike onUp this isn't a release in the commit sense, but the cancel event's
     // own position is the best available stand-in for "where the camera actually is now."
     if (d.kind === "view" && d.lastInput_ !== undefined) {
-        const p = imgPx(ctx.base_, ctx.manifest_, e)
-        ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
+        if (d.g_.mode === "pan") {
+            const cur = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+            const anchor = state.photoAnchor_ ?? { x: d.x0_, y: d.y0_ }
+            state.photo_ = panTo(anchor, cur, state.photo_.s)
+            ctx.photoPaint_(state.photo_)
+            const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), state.photo_)
+            if (lim) ctx.gesture_.settle({ id: d.id_, ...lim, settle: true, s: state.photo_.s, tx: state.photo_.tx, ty: state.photo_.ty })
+        } else {
+            const p = imgPx(ctx.base_, ctx.manifest_, e)
+            ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
+        }
     }
+    if (d.kind === "view") state.photoAnchor_ = null
 }
 
 // lostpointercapture fires after any capture release, including the explicit ones in onUp/
@@ -256,8 +305,14 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
     // Same §12.5 obligation as onCancel — but this handler gets no event/position at all, so the
     // last camera a request actually carried is the only thing available to resettle with.
     if (d.kind === "view" && d.lastInput_ !== undefined) {
-        ctx.gesture_.settle({ ...d.lastInput_, settle: true })
+        if (d.g_.mode === "pan") {
+            const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), state.photo_)
+            if (lim) ctx.gesture_.settle({ id: d.id_, ...lim, settle: true, s: state.photo_.s, tx: state.photo_.tx, ty: state.photo_.ty })
+        } else {
+            ctx.gesture_.settle({ ...d.lastInput_, settle: true })
+        }
     }
+    if (d.kind === "view") state.photoAnchor_ = null
 }
 
 // The click→bond commit, factored out of onClick so keyboard.ts's Enter/Space can dispatch the

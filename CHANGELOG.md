@@ -27,6 +27,11 @@ All notable changes to this project are documented here. The format is based on
   leave the card off. A screen reader still announces the entry's label.
 
 ### Added
+- The wheel zooms a 2D `ViewInteractable` about the cursor. Pan and that zoom slide the last
+  frame on an inner CSS/SVG matrix until the gesture-channel frame is visible, so the
+  photograph stays under the cursor during the round trip and the plot stays in its cell.
+  Orbit is unchanged. The wheel settles one frame 150ms after the last notch. Nothing is
+  written to `@bind`.
 - `:webgl` view gestures stream live frames on the same `with_js_link` channel as `:cairo`.
   Each frame is a freshly serialized scene plus a hit manifest Julia computed for that camera,
   swapped onto the canvas the cell already holds — no new WebGL context, no cell re-run.

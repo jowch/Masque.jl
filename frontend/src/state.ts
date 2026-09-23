@@ -1,5 +1,6 @@
 import type { Anchor } from "./geometry"
 import type { GestureChannel } from "./gesture"
+import { IDENTITY, type PhotoMatrix } from "./photo"
 import type { AxisTransform, FocusRef, Hit, HitLayer, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 export const MOTION_MS = 100 // 80–120 ms window; prefers-reduced-motion disables below
@@ -21,6 +22,19 @@ export const imgPx = (base: HTMLElement, manifest: Manifest, e: MouseEvent): { x
     const r = base.getBoundingClientRect()
     const s = manifest.width / r.width // image-px per CSS-px (manifest renderWidth ÷ live rect; never the base's intrinsic size)
     return { x: (e.clientX - r.left) * s, y: (e.clientY - r.top) * s }
+}
+
+// Image px in the element's layout box, ignoring a photographic CSS transform on the base.
+// `offsetWidth` is the pre-transform size; a zero (happy-dom, or not laid out yet) falls
+// back to the border box, which matches layout only while the transform is identity.
+export function layoutImagePx(base: HTMLElement, manifest: Manifest, clientX: number, clientY: number): { x: number; y: number } {
+    const r = base.getBoundingClientRect()
+    const boxW = base.offsetWidth > 0 ? base.offsetWidth : r.width
+    const boxH = base.offsetHeight > 0 ? base.offsetHeight : r.height
+    if (!(r.width > 0) || !(boxW > 0) || !(r.height > 0) || !(boxH > 0)) return { x: 0, y: 0 }
+    const lx = (clientX - r.left) / r.width * boxW
+    const ly = (clientY - r.top) / r.height * boxH
+    return { x: lx / boxW * manifest.width, y: ly / boxH * manifest.height }
 }
 
 // Anchor (image px, from geometry.ts's anchorFor) → css px, for the tooltip placement math —
@@ -108,6 +122,8 @@ export interface OverlayCtx {
     // reassigned in place when a frame swaps in a new manifest (mount.ts's applyFrame) —
     // the one exception to "construction-time, read-mostly".
     gesture_: GestureChannel
+    // Paints the photographic matrix onto the base and the overlay groups. Mount owns the DOM.
+    photoPaint_: (m: PhotoMatrix) => void
 }
 
 export interface OverlayState {
@@ -153,6 +169,11 @@ export interface OverlayState {
     // :threshold layer id currently drawn thicker for drag-hover feedback; cleared on any miss
     // (hover.ts's setDragHoverChrome) so it can never point at a line no longer under the cursor.
     hoveredThresholdId_: string | null
+    // Photographic pan/zoom of the frame on screen (#85). Image pixels of that frame.
+    // `photoAnchor_` is the grabbed point during a 2D pan; null when the pointer is up.
+    photo_: PhotoMatrix
+    photoAnchor_: { x: number; y: number } | null
+    wheelTimer_: ReturnType<typeof setTimeout> | null
 }
 
 export function createOverlayState(): OverlayState {
@@ -183,6 +204,9 @@ export function createOverlayState(): OverlayState {
         focusTipCss_: null,
         announceTimer_: null,
         hoveredThresholdId_: null,
+        photo_: IDENTITY,
+        photoAnchor_: null,
+        wheelTimer_: null,
     }
 }
 

@@ -81,20 +81,18 @@ replaced that: the gesture commits nothing at all
 over the gesture channel instead — no cell re-execution, no remount, on both backends. `:cairo`
 ships a PNG per frame; `:webgl` ships a freshly serialized scene onto the canvas the cell already
 holds ([§12.5](architecture/12-gesture-channel.md#125-backend-obligations-mechanism-independent)).
+Wheel zoom on a 2D view, and the photographic slide of the last frame during that zoom and
+during pan, ship with #85. The matrix is an inner layer clipped by the host, not a transform of
+`.ip-host` itself, and it comes off when the channel frame is visible
+([§12.5](architecture/12-gesture-channel.md#125-backend-obligations-mechanism-independent)).
 What remains open:
 
 1. **#84 Last-frame hold.** Park the last painted frame (Cairo PNG `src`, or a bitmap from the
    WGL canvas) and show it until the new base is ready. #102 already does this for `:cairo` (the
    base image only swaps once the new frame has decoded); #84 is now specifically the `:webgl`
-   gap. Not a GL-context transfer: a context cannot move to a new canvas.
-2. **#85 2D photographic preview.** During pan and wheel zoom, CSS-transform the host so the
-   base and overlay slide together. Julia authored the frame being slid, so this is not a client
-   camera. Accepted artifacts: ticks and decorations move with the photograph until a real frame
-   replaces it. The gesture commits nothing (#122,
-   [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)), so the CSS transform is
-   latency-hiding for an in-flight frame on #102's channel rather than the interaction itself —
-   one mechanism instead of two that have to agree. Still open for both backends.
-3. **#87 3D orbit preview**: no longer parked — **#102 makes it buildable, and implements the
+   gap. Not a GL-context transfer: a context cannot move to a new canvas. #85 waits for that
+   Cairo `load` so a zoom does not snap the old photograph; it does not build the WebGL hold.
+2. **#87 3D orbit preview**: no longer parked — **#102 makes it buildable, and implements the
    `:cairo` half.** The blocker was that the overlay is a projection at the old
    `azimuth`/`elevation`, so a live orbit either freezes the overlay or needs 3D coordinates in
    JS, and neither respects the Julia-authored-projection principle this list is written to keep.

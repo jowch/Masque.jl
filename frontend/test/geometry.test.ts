@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
-    distToSegment, pointInPolygon, findBin, invertAxis, hitLayer, hitTest, resolvePayload, panLimits, orbitAngles,
+    distToSegment, pointInPolygon, findBin, invertAxis, hitLayer, hitTest, resolvePayload, panLimits, matrixLimits, orbitAngles,
     anchorFor, computeAnchoredPlacement,
 } from "../src/geometry"
 import type { AxisTransform, Hit, HitLayer, Manifest } from "../src/types"
@@ -399,6 +399,58 @@ describe("view pan / orbit math", () => {
         expect(rev.xmax).toBeCloseTo(11)
         expect(rev.ymin).toBeCloseTo(-40)
         expect(rev.ymax).toBeCloseTo(60)
+    })
+    it("matrixLimits matches panLimits for a pure translate", () => {
+        const cases: [AxisTransform, number, number, number, number][] = [
+            [t, 100, 250, 200, 250],
+            [{ ...t, xlims: [1, 100], xscale: "log10" }, 0, 250, 500, 250],
+            [{ ...t, xreversed: true, yreversed: true }, 100, 100, 200, 300],
+        ]
+        for (const [tr, x0, y0, x1, y1] of cases) {
+            const m = { s: 1, tx: x1 - x0, ty: y1 - y0 }
+            const lim = matrixLimits(tr, m)
+            const pan = panLimits(tr, x0, y0, x1, y1)
+            expect(lim).not.toBeNull()
+            expect(lim!.xmin).toBeCloseTo(pan.xmin)
+            expect(lim!.xmax).toBeCloseTo(pan.xmax)
+            expect(lim!.ymin).toBeCloseTo(pan.ymin)
+            expect(lim!.ymax).toBeCloseTo(pan.ymax)
+        }
+    })
+    it("matrixLimits is the visible pixel window of a zoom about the cursor", () => {
+        // Spike: 500×320 image, scale 2 about (200, 140), linear lims [0, 10] × [0, 8].
+        // Data window shrinks to x 2…7, y 2.25…6.25. Log [1, 1000]² shares the pixel window.
+        const zoom = { s: 2, tx: (1 - 2) * 200, ty: (1 - 2) * 140 }
+        const linear: AxisTransform = {
+            xlims: [0, 10], ylims: [0, 8], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 500, 320], xreversed: false, yreversed: false,
+        }
+        const lin = matrixLimits(linear, zoom)
+        expect(lin!.xmin).toBeCloseTo(2)
+        expect(lin!.xmax).toBeCloseTo(7)
+        expect(lin!.ymin).toBeCloseTo(2.25)
+        expect(lin!.ymax).toBeCloseTo(6.25)
+        const logT: AxisTransform = {
+            ...linear, xlims: [1, 1000], ylims: [1, 1000], xscale: "log10", yscale: "log10",
+        }
+        const log = matrixLimits(logT, zoom)
+        const fx = 200 / 500
+        const fy = 1 - 140 / 320
+        const edge = (a: number, b: number, f: number) => {
+            const la = Math.log10(a), lb = Math.log10(b), lc = la + f * (lb - la)
+            const factor = 0.5
+            return [10 ** (lc - (lc - la) * factor), 10 ** (lc + (lb - lc) * factor)]
+        }
+        const [xmin, xmax] = edge(1, 1000, fx)
+        const [ymin, ymax] = edge(1, 1000, fy)
+        expect(log!.xmin).toBeCloseTo(xmin)
+        expect(log!.xmax).toBeCloseTo(xmax)
+        expect(log!.ymin).toBeCloseTo(ymin)
+        expect(log!.ymax).toBeCloseTo(ymax)
+        expect(Math.abs(log!.xmax - xmax)).toBeLessThan(1e-9)
+    })
+    it("matrixLimits rejects a non-positive scale", () => {
+        expect(matrixLimits(t, { s: 0, tx: 0, ty: 0 })).toBeNull()
     })
     it("orbitAngles maps dx/dy to azimuth/elevation and clamps elevation", () => {
         const g = { x: 0, y: 0, w: 1000, h: 500, mode: "orbit" as const, azimuth: 1.0, elevation: 0.5 }
