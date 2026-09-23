@@ -159,7 +159,10 @@ on is the one the current output already holds. #85 hides the wait for that fram
 or wheel zoom is ahead of the channel, the data inside the axis viewport slides under the cursor
 on an inner matrix. The base image itself is not transformed, so the axis frame, tick labels, and
 the rest of the figure stay where they are; a copy of those pixels, clipped to the viewport,
-carries the matrix, and so does a `g` inside each overlay svg. The matrix comes off in the turn
+carries the matrix, and so does the data `g` inside each overlay svg. A data-space hit uses the
+content pixel under the cursor. The view rectangle stays in layout pixels, and legend, colorbar,
+and axis chrome are siblings of that clip so a ring outside the viewport is not cut off. The
+matrix comes off in the turn
 the sent frame is actually visible — the image `load` on `:cairo`, the scene swap on `:webgl` —
 leaving only the residual if the pointer has moved on. It is not a client camera, and it is not a
 substitute for the frame itself. A wheel has no pointer release, so the terminal request is one

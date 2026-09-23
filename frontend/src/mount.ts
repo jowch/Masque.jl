@@ -1,6 +1,6 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex } from "./selection"
-import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset } from "./hover"
+import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import * as thresholdDrag from "./drag/threshold"
@@ -295,6 +295,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const selGroup: HiGroups = { fill_: makeGroup(fillPhoto, "sel"), edge_: makeGroup(edgePhoto, "sel"), plain_: makeGroup(plainPhoto, "sel") }
     const linkGroup: HiGroups = { fill_: makeGroup(fillPhoto, "link"), edge_: makeGroup(edgePhoto, "link"), plain_: makeGroup(plainPhoto, "link") }
     const hiGroup: HiGroups = { fill_: makeGroup(fillPhoto, "hi"), edge_: makeGroup(edgePhoto, "hi"), plain_: makeGroup(plainPhoto, "hi") }
+    // Screen-fixed chrome paints above the clip and is not transformed. A legend or colorbar
+    // ring outside the axis viewport would otherwise vanish for the whole preview.
+    const fillFixed = makeGroup(fillSvg, "masque-fixed")
+    const edgeFixed = makeGroup(edgeSvg, "masque-fixed")
+    const plainFixed = makeGroup(plainSvg, "masque-fixed")
+    const selFixed: HiGroups = { fill_: makeGroup(fillFixed, "sel"), edge_: makeGroup(edgeFixed, "sel"), plain_: makeGroup(plainFixed, "sel") }
+    const hiFixed: HiGroups = { fill_: makeGroup(fillFixed, "hi"), edge_: makeGroup(edgeFixed, "hi"), plain_: makeGroup(plainFixed, "hi") }
     const surface = document.createElement("div")
     surface.className = "surface"
     // touch-action: block native scroll/pinch on the surface ONLY when this manifest has a drag
@@ -369,7 +376,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     const ctx: OverlayCtx = {
         manifest_: manifest, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
-        linkGroup_: linkGroup,
+        hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
         gesture_: channel,
@@ -520,7 +527,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         state.focusTipHtml_ = null
         state.focusTipCss_ = null
         ctx.surface_.classList.remove("kbd-ring")
-        clearHiImmediate(state, ctx.hiGroup_)
+        clearHiImmediate(state, ctx.hiGroup_, ctx.hiFixed_)
         clearLinkImmediate(state, ctx.linkGroup_)
         // A frame that lands mid-pan or mid-wheel would wipe the readout the gesture is still
         // showing. Pointer-up and the wheel idle timer hide it themselves once the gesture ends.
@@ -698,6 +705,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         host.dataset.masquePhoto = id ? "" : `${m.s},${m.tx},${m.ty}`
         if (id) syncOverlayToBase()
+        syncFocusTip(ctx, state)
     }
     syncOverlayToBase()
     const overlayRO = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncOverlayToBase) : null
@@ -745,7 +753,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         onCancel(ctx, state, e)
         releaseChrome(kind)
     }
-    const leave = () => onLeave(ctx, state)
+    const leave = () => {
+        // onLeave nulls an uncaptured drag. Capture the kind first or the deferred
+        // ROI/threshold frame stays pending with the old nodes still on screen.
+        const kind = state.drag_?.kind
+        onLeave(ctx, state)
+        releaseChrome(kind)
+    }
     const lostCapture = () => {
         const kind = state.drag_?.kind
         onLostCapture(ctx, state)

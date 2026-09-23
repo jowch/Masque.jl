@@ -58,3 +58,9 @@ export function unmapPoint(m: PhotoMatrix, p: { x: number; y: number }): { x: nu
     const s = m.s > 0 ? m.s : 1
     return { x: (p.x - m.tx) / s, y: (p.y - m.ty) / s }
 }
+
+// Layout point → content pixel. Identity keeps the same point: the base is not transformed,
+// so layout and content coincide until a photograph is live.
+export function contentPoint(m: PhotoMatrix, layout: { x: number; y: number }): { x: number; y: number } {
+    return isIdentity(m) ? layout : unmapPoint(m, layout)
+}

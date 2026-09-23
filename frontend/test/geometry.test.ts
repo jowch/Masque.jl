@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
-    distToSegment, pointInPolygon, findBin, invertAxis, hitLayer, hitTest, resolvePayload, panLimits, matrixLimits, orbitAngles,
+    distToSegment, pointInPolygon, findBin, invertAxis, hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles,
     anchorFor, computeAnchoredPlacement,
 } from "../src/geometry"
 import type { AxisTransform, Hit, HitLayer, Manifest } from "../src/types"
@@ -282,6 +282,25 @@ describe("hitLayer + hitTest", () => {
             layers: [{ ...circles, events: ["hover"] }] }
         expect(hitTest(m, 100, 100, "hover")?.layer.id).toBe("pts")
         expect(hitTest(m, 100, 100, "click")).toBeNull() // not a click layer
+    })
+    it("hitTestAt unmaps data layers and keeps legend, colorbar, and view in layout pixels", () => {
+        const photo = { s: 2, tx: -100, ty: -50 }
+        const m: Manifest = {
+            width: 400, height: 400, scaling: 1, transforms: {},
+            layers: [
+                { id: "pts", kind: "circles", axis: "ax", events: ["hover"], payloads: [{}], geometry: [50, 40, 5] },
+                { id: "legend", kind: "rects", bond: "legend", axis: "ax", events: ["hover"], payloads: [{}], geometry: [10, 10, 8, 8] },
+                { id: "cb", kind: "axis", bond: "colorbar", axis: "ax", events: ["hover"], payloads: [], geometry: [300, 20, 40, 80] },
+                { id: "view", kind: "view", axis: "ax", events: ["drag"], payloads: [], geometry: { x: 0, y: 0, w: 400, h: 400, mode: "pan" } },
+            ],
+        }
+        // circle content (50, 40) is drawn at layout (0, 30). The pre-slide point is a miss.
+        expect(hitTestAt(m, 0, 30, photo, "hover")?.layer.id).toBe("pts")
+        expect(hitTestAt(m, 50, 40, photo, "hover")?.layer.id).not.toBe("pts")
+        // legend center (10, 10) did not move. Unmapping it would test content (55, 30) and miss.
+        expect(hitTestAt(m, 10, 10, photo, "hover")?.layer.id).toBe("legend")
+        expect(hitTestAt(m, 320, 60, photo, "hover")?.layer.id).toBe("cb")
+        expect(hitTestAt(m, 10, 10, photo, "drag")?.layer.id).toBe("view")
     })
     it("resolvePayload returns the element payload", () => {
         const m: Manifest = { width: 400, height: 400, scaling: 2, transforms: {}, layers: [circles] }

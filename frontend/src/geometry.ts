@@ -1,4 +1,5 @@
 // All coordinates here are image pixels.
+import { contentPoint, type PhotoMatrix } from "./photo"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, ThresholdGeometry, ROIGeometry, ViewGeometry } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
@@ -348,11 +349,37 @@ export function orbitAngles(
     return { azimuth: az, elevation: el }
 }
 
+// Legend entries, colorbars, and axis readouts stay on the unmoved figure. A legend entry is
+// `rects` with `bond: "legend"`; hand-built manifests sometimes omit the stamp and carry `links`.
+export function screenFixedLayer(layer: HitLayer): boolean {
+    if (layer.kind === "axis" || layer.bond === "legend") return true
+    return layer.links != null && layer.links.length > 0
+}
+
+// The view rectangle is the axis viewport in layout pixels. It is not drawn as sliding chrome.
+export function layoutSpaceLayer(layer: HitLayer): boolean {
+    return layer.kind === "view" || screenFixedLayer(layer)
+}
+
 // first layer (in manifest order) with a hit for the given event; null if none
 export function hitTest(manifest: Manifest, px: number, py: number, event: string): Hit | null {
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
         const h = hitLayer(layer, px, py)
+        if (h) return { layer, ...h }
+    }
+    return null
+}
+
+// `(x, y)` is a layout point on the untransformed base. Data-space layers are tested at the
+// content pixel under that point while a photograph is live. The view rectangle and
+// screen-fixed chrome stay in layout pixels.
+export function hitTestAt(manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string): Hit | null {
+    const content = contentPoint(photo, { x, y })
+    for (const layer of manifest.layers) {
+        if (!layer.events.includes(event)) continue
+        const p = layoutSpaceLayer(layer) ? { x, y } : content
+        const h = hitLayer(layer, p.x, p.y)
         if (h) return { layer, ...h }
     }
     return null

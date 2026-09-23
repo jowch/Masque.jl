@@ -1,13 +1,13 @@
-import { hitTest, matrixLimits, resolvePayload } from "./geometry"
-import { drawHi, renderSelection } from "./highlight"
+import { hitTestAt, layoutSpaceLayer, matrixLimits, resolvePayload } from "./geometry"
+import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { selectionFor, SELECTED_KINDS } from "./selection"
-import { imgPx, layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
+import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
-import { panTo, unmapPoint } from "./photo"
+import { contentPoint, panTo, unmapPoint } from "./photo"
 import type { AxisTransform, Hit, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
@@ -60,16 +60,21 @@ function settleCurrentPan(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag,
 // Takes the drag explicitly rather than reading `state.drag_` — onUp/onCancel null that out
 // before this can run (see the reentrancy note there), so a stale read here would apply to a
 // gesture that's already been discarded.
+function pointerSpace(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): { layout: { x: number; y: number }; content: { x: number; y: number } } {
+    const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+    return { layout, content: contentPoint(state.photo_, layout) }
+}
+
 function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEvent): void {
-    const p = imgPx(ctx.base_, ctx.manifest_, e)
+    const { layout, content } = pointerSpace(ctx, state, e)
     let text: string
     if (d.kind === "threshold") {
-        text = thresholdDrag.move(d, p)
+        text = thresholdDrag.move(d, content)
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {
-            text = viewDrag.tip(d, p)
-            if (Math.hypot(p.x - d.x0_, p.y - d.y0_) >= viewDrag.VIEW_MIN_PX) {
-                const input = viewDrag.requestInput(d, p, false)
+            text = viewDrag.tip(d, layout)
+            if (Math.hypot(layout.x - d.x0_, layout.y - d.y0_) >= viewDrag.VIEW_MIN_PX) {
+                const input = viewDrag.requestInput(d, layout, false)
                 ctx.gesture_.request(input)
                 d.lastInput_ = input
             }
@@ -80,7 +85,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
             const anchor = state.photoAnchor_ ?? unmapPoint(state.photo_, { x: d.x0_, y: d.y0_ })
             const next = panTo(anchor, cur, state.photo_.s)
             const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), next)
-            text = lim ? viewDrag.limitsTip(lim) : viewDrag.tip(d, p)
+            text = lim ? viewDrag.limitsTip(lim) : viewDrag.tip(d, layout)
             if (Math.hypot(cur.x - d.x0_, cur.y - d.y0_) >= viewDrag.VIEW_MIN_PX && lim) {
                 state.photo_ = next
                 ctx.photoPaint_(next)
@@ -90,7 +95,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
             }
         }
     } else {
-        text = roiDrag.move(ctx, state, d, p)
+        text = roiDrag.move(ctx, state, d, content)
     }
     setMarkAccent(ctx, null) // a drag readout is never a coloured element's tooltip
     setTipText(ctx, state, text)
@@ -168,16 +173,16 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         if (e.button === 2 || isMacContextClick(e)) passContextToBase(ctx.surface_, e.pointerId)
         return
     }
-    const p = imgPx(ctx.base_, ctx.manifest_, e)
+    const { layout, content } = pointerSpace(ctx, state, e)
     // Shift+drag forces view (arbitration vs box-select / ROI / threshold).
     if (e.shiftKey) {
         const viewLayer = ctx.manifest_.layers.find((l) => {
             if (l.kind !== "view" || !l.events.includes("drag")) return false
-            return hitTest({ ...ctx.manifest_, layers: [l] }, p.x, p.y, "drag") !== null
+            return hitTestAt({ ...ctx.manifest_, layers: [l] }, layout.x, layout.y, state.photo_, "drag") !== null
         })
         if (viewLayer) {
             const g = viewLayer.geometry as ViewGeometry
-            state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], p.x, p.y, e.pointerId)
+            state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], layout.x, layout.y, e.pointerId)
             if (g.mode === "pan") armPan(ctx, state, e, viewLayer.id)
             ctx.surface_.classList.add("grabbing")
             tryCapture(ctx.surface_, e.pointerId)
@@ -185,7 +190,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             return
         }
     }
-    const hit = hitTest(ctx.manifest_, p.x, p.y, "drag")
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag")
     if (!hit) return
     if (hit.layer.kind === "threshold") {
         const line = ctx.thresholdLines_.get(hit.layer.id)
@@ -195,14 +200,14 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         const box = ctx.roiBoxes_.get(hit.layer.id)
         if (!box) return
         if (hit.roiPart_.move) {
-            state.drag_ = roiDrag.begin(hit.layer.id, box, { move: true }, p.x - box.g_.x, p.y - box.g_.y, e.pointerId)
+            state.drag_ = roiDrag.begin(hit.layer.id, box, { move: true }, content.x - box.g_.x, content.y - box.g_.y, e.pointerId)
         } else if (hit.roiPart_.edge) {
             const edge = hit.roiPart_.edge
             // ax/ay carry the ONE fixed opposite edge for this drag (the other axis is untouched
             // by move()'s edge branch) — same "precompute the fixed reference point" convention
             // as the corner branch below, just one axis at a time.
-            const ax = edge === "w" ? box.g_.x + box.g_.w : edge === "e" ? box.g_.x : p.x
-            const ay = edge === "n" ? box.g_.y + box.g_.h : edge === "s" ? box.g_.y : p.y
+            const ax = edge === "w" ? box.g_.x + box.g_.w : edge === "e" ? box.g_.x : content.x
+            const ay = edge === "n" ? box.g_.y + box.g_.h : edge === "s" ? box.g_.y : content.y
             state.drag_ = roiDrag.begin(hit.layer.id, box, { edge }, ax, ay, e.pointerId)
         } else {
             const k = hit.roiPart_.corner as number
@@ -212,7 +217,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         }
     } else if (hit.layer.kind === "view") {
         const g = hit.layer.geometry as ViewGeometry
-        state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], p.x, p.y, e.pointerId)
+        state.drag_ = viewDrag.begin(hit.layer.id, g, ctx.manifest_.transforms[hit.layer.axis], layout.x, layout.y, e.pointerId)
         if (g.mode === "pan") armPan(ctx, state, e, hit.layer.id)
     } else return
     ctx.surface_.classList.add("grabbing")
@@ -240,9 +245,9 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     // been dropped, and the commit below reads mutated drag state, not e, so the final visual
     // (and the value it derives from) must come from this event.
     applyDrag(ctx, state, d, e)
-    const p = imgPx(ctx.base_, ctx.manifest_, e)
+    const { layout, content } = pointerSpace(ctx, state, e)
     if (d.kind === "threshold") {
-        (ctx.host_ as unknown as { value: unknown }).value = thresholdDrag.end(d, p)
+        (ctx.host_ as unknown as { value: unknown }).value = thresholdDrag.end(d, content)
         ctx.host_.dispatchEvent(new CustomEvent("input"))
     } else if (d.kind === "view") {
         // §12.3: a view gesture commits nothing — no bond write, no "input" event.
@@ -255,7 +260,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
         if (d.g_.mode === "pan") {
             if (viewNeedsSettle(d)) settleCurrentPan(ctx, state, d)
         } else if (d.lastInput_ !== undefined) {
-            ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
+            ctx.gesture_.settle(viewDrag.requestInput(d, layout, true))
         }
         state.photoAnchor_ = null
     } else {
@@ -264,7 +269,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     }
     hideTip(ctx, state); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     if (d.kind === "view") {
-        const dist = Math.hypot(p.x - d.x0_, p.y - d.y0_)
+        const dist = Math.hypot(layout.x - d.x0_, layout.y - d.y0_)
         state.justDragged_ = dist >= viewDrag.VIEW_MIN_PX
     } else {
         state.justDragged_ = true
@@ -303,7 +308,7 @@ export function onCancel(ctx: OverlayCtx, state: OverlayState, e: PointerEvent):
             }
             settleCurrentPan(ctx, state, d)
         } else if (d.lastInput_ !== undefined) {
-            const p = imgPx(ctx.base_, ctx.manifest_, e)
+            const p = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
             ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
         }
     }
@@ -341,7 +346,7 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     // selection untouched rather than clearing it.
     const next = selectionFor(hit, ctx.manifest_)
     if (next !== null) { state.selHits_ = next; renderSelection(ctx, state) }
-    drawHi(state, ctx.hiGroup_, hit)
+    drawHover(ctx, state, hit)
     // Keep keyboard focus in sync with the mouse, but ONLY once keyboard nav is already
     // engaged (state.focusIdx_ !== null) — gating on that, not just "click landed on a
     // focus-list element", matters for a PURE mouse user: setting state.focusHit_ unconditionally
@@ -377,10 +382,11 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     if (state.justDragged_) { state.justDragged_ = false; return }
     // Chromium still dispatches click after a Mac ctrl-click.
     if (isMacContextClick(e)) return
-    const p = imgPx(ctx.base_, ctx.manifest_, e)
-    const hit = hitTest(ctx.manifest_, p.x, p.y, "click")
+    const { layout, content } = pointerSpace(ctx, state, e)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click")
     if (!hit) return // miss = no-op, no round-trip
-    commitClick(ctx, state, hit, p.x, p.y)
+    const sample = layoutSpaceLayer(hit.layer) ? layout : content
+    commitClick(ctx, state, hit, sample.x, sample.y)
 }
 
 // Single entry point for pointermove: while a drag owns the pointer, route to the

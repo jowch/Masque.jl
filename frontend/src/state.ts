@@ -35,6 +35,14 @@ export function layoutImagePx(base: HTMLElement, manifest: Manifest, clientX: nu
     const boxW = base.offsetWidth > 0 ? base.offsetWidth : r.width
     const boxH = base.offsetHeight > 0 ? base.offsetHeight : r.height
     if (!(r.width > 0) || !(boxW > 0) || !(r.height > 0) || !(boxH > 0)) return { x: 0, y: 0 }
+    // Same product as imgPx when the border box is the layout box. Dividing by
+    // offsetWidth and multiplying back is a no-op that drifts a ulp.
+    if (boxW === r.width && boxH === r.height) {
+        return {
+            x: (clientX - r.left) * (manifest.width / r.width),
+            y: (clientY - r.top) * (manifest.height / r.height),
+        }
+    }
     const lx = (clientX - r.left) / r.width * boxW
     const ly = (clientY - r.top) / r.height * boxH
     return { x: lx / boxW * manifest.width, y: ly / boxH * manifest.height }
@@ -119,6 +127,10 @@ export interface OverlayCtx {
     tip_: HTMLElement
     hiGroup_: HiGroups
     selGroup_: HiGroups
+    // Legend, colorbar, and axis rings. Siblings of the photograph clip, so a live matrix
+    // neither slides nor clips them. Linked data marks stay in linkGroup_.
+    hiFixed_: HiGroups
+    selFixed_: HiGroups
     linkGroup_: HiGroups // transient legend-linked highlights (g.link), z-ordered between sel and hi
     thresholdLines_: Map<string, SVGLineElement>
     roiBoxes_: Map<string, ROIBox>

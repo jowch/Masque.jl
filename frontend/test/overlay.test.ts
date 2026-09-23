@@ -3393,4 +3393,141 @@ describe("photographic pan / wheel zoom", () => {
         const next = shadow.querySelector("line.masque-threshold-line") as SVGLineElement
         expect(next.getAttribute("y1")).toBe("120")
     })
+
+    it("a live zoom hits the mark where it is drawn and keeps legend chrome outside the clip", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20], payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"] },
+                { id: "legend", kind: "rects", bond: "legend", axis: "ax1", events: ["hover"],
+                    geometry: [100, 100, 40, 20], payloads: [{ name: "a" }] },
+                { id: "cb", kind: "axis", bond: "colorbar", axis: "ax1", events: ["click"], payloads: [],
+                    geometry: [20, 600, 60, 80] },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(async () => ({})))
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const zoom = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -800 })
+        Object.defineProperty(zoom, "clientX", { value: 100 })
+        Object.defineProperty(zoom, "clientY", { value: 100 })
+        surface.dispatchEvent(zoom)
+        const parts = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+        const photo = { s: parts[0], tx: parts[1], ty: parts[2] }
+        const screen = mapPoint(photo, { x: 600, y: 400 })
+        const clickAt = (x: number, y: number) => {
+            surface.dispatchEvent(new MouseEvent("click", {
+                clientX: x / 1200 * 600, clientY: y / 800 * 400, bubbles: true,
+            }))
+        }
+        clickAt(600, 400)
+        expect((host as unknown as { value: unknown }).value).toBeNull()
+        clickAt(screen.x, screen.y)
+        expect((host as unknown as { value: unknown }).value).toEqual({ layer: "pts", index: 0 })
+        const wash = shadow.querySelector("g.sel .masque-hi")
+        expect(wash?.closest("g.masque-photo")).toBeTruthy()
+        expect(wash?.closest("g.masque-fixed")).toBeNull()
+        clickAt(50, 640)
+        expect((host as unknown as { value: { layer: string } }).value.layer).toBe("cb")
+        surface.dispatchEvent(new PointerEvent("pointermove", {
+            clientX: 50, clientY: 50, bubbles: true,
+        }))
+        const ring = shadow.querySelector("g.masque-fixed .masque-hi")
+        expect(ring).toBeTruthy()
+        expect(ring!.closest("g.masque-clip")).toBeNull()
+        expect(ring!.closest("g.masque-photo")).toBeNull()
+    })
+
+    it("an ROI drag grabs the handle where it is drawn", () => {
+        // Fresh geometry each mount: the box aliases layer.geometry and a drag mutates it.
+        const make = (): Manifest => ({
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        })
+        const zoomed = () => {
+            const { host, script } = setup()
+            mount(script, make(), undefined, vi.fn(async () => ({})))
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            const zoom = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -405 })
+            Object.defineProperty(zoom, "clientX", { value: 250 })
+            Object.defineProperty(zoom, "clientY", { value: 250 })
+            surface.dispatchEvent(zoom)
+            const parts = (host.dataset.masquePhoto ?? "").split(",").map(Number)
+            return { host, surface, photo: { s: parts[0], tx: parts[1], ty: parts[2] } }
+        }
+        const live = zoomed()
+        const corner = mapPoint(live.photo, { x: 200, y: 200 })
+        const down = { clientX: corner.x / 1200 * 600, clientY: corner.y / 800 * 400, bubbles: true }
+        live.surface.dispatchEvent(new PointerEvent("pointerdown", down))
+        live.surface.dispatchEvent(new PointerEvent("pointermove", {
+            clientX: down.clientX + 40, clientY: down.clientY + 10, bubbles: true,
+        }))
+        const moved = shadowOf(live.host).querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        expect(Number(moved.getAttribute("width"))).not.toBe(400)
+
+        const old = zoomed()
+        // Layout (200, 200) is where the corner was. The drawn handle has moved.
+        expect(Math.hypot(corner.x - 200, corner.y - 200)).toBeGreaterThan(32)
+        old.surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true }))
+        old.surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 140, clientY: 110, bubbles: true }))
+        const stayed = shadowOf(old.host).querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        expect(stayed.getAttribute("width")).toBe("400")
+    })
+
+    it("pointerleave flushes chrome deferred by an uncaptured ROI drag", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } },
+                { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+                    geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } },
+            ],
+        }
+        const moved: Manifest = {
+            ...m,
+            layers: [
+                { ...m.layers[0], geometry: { x: 100, y: 100, w: 500, h: 500, handle: 16 } },
+                m.layers[1],
+            ],
+        }
+        const { host, img, script } = setup()
+        let release!: (r: { png: Uint8Array; manifest: Manifest }) => void
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        surface.setPointerCapture = () => {
+            throw new DOMException("No active pointer with the given id is found.", "InvalidPointerId")
+        }
+        const rect = shadow.querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        wheelAt(surface, -120)
+        await Promise.resolve()
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
+        expect(surface.classList.contains("grabbing")).toBe(true)
+        release({ png: new Uint8Array([1, 2, 3]), manifest: moved })
+        await Promise.resolve()
+        await Promise.resolve()
+        img.dispatchEvent(new Event("load"))
+        expect(rect.isConnected).toBe(true)
+        expect(rect.getAttribute("x")).toBe("200")
+        surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
+        expect(rect.isConnected).toBe(false)
+        const next = shadow.querySelector("svg.masque-plain rect.masque-hi") as SVGRectElement
+        expect(next.getAttribute("x")).toBe("100")
+    })
 })
