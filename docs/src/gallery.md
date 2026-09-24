@@ -1,9 +1,9 @@
 # Examples
 
-Each example is a small notebook you can copy. Hovering works on this
-page as it does in Pluto; clicks and brushes swap in results recorded
-for a few choices, and every page has the notebook as text below the
-player.
+Each example is a small notebook you can copy. On an example's page,
+hovering works as it does in Pluto, clicks and brushes swap in results
+recorded for a few choices, and the notebook follows the player as text.
+Pan and orbit are recorded clips instead.
 
 ## Analyses
 

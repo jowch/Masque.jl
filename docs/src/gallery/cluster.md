@@ -31,6 +31,9 @@ and the last cell draws an ordinary Makie figure from it.
 
 - Keep your samples in a `DataFrame` and pass it as `payloads`; then
   `df[picks, :]` is the rows inside the box, ready for any summary.
+  Guard it for the state before the first release, when `picks` is
+  `nothing`:
+  `picks === nothing || isempty(picks) ? df[1:0, :] : df[picks, :]`.
 - Replace the histogram with whatever the comparison needs: a table of
   means, a second scatter of two other columns, or a model fitted to the
   selected points only.
