@@ -85,12 +85,75 @@ include("ci_run.jl")
     )
     msg = notebook_status(session)
     @test occursin("process=starting", msg)
-    @test occursin("3 busy", msg)
+    @test occursin("2 running", msg)
     @test occursin("alpha", msg)
-    @test occursin("beta", msg)
-    @test occursin("(+1 more)", msg)
-    @test !occursin("gamma", msg)
+    @test occursin("gamma", msg)
+    @test !occursin("beta", msg)
     @test notebook_status((; notebooks = Dict{Int, Any}())) == "notebook not open yet"
+
+    tree = (;
+        name = :notebook,
+        started_at = 1.0,
+        finished_at = nothing,
+        subtasks = Dict(
+            :pkg => (;
+                name = :pkg,
+                started_at = 1.0,
+                finished_at = nothing,
+                subtasks = Dict(
+                    :precompile => (;
+                        name = :precompile,
+                        started_at = 1.0,
+                        finished_at = nothing,
+                        subtasks = Dict{Symbol, Any}(),
+                    ),
+                ),
+            ),
+            :run => (;
+                name = :run,
+                started_at = 1.0,
+                finished_at = 2.0,
+                subtasks = Dict{Symbol, Any}(),
+            ),
+        ),
+    )
+    @test open_business_names(tree) == ["pkg", "pkg/precompile"]
+    checked = notebook_status(
+        (;
+            notebooks = Dict(1 => (; cells = NamedTuple[], process_status = "ready", status_tree = tree)),
+        )
+    )
+    @test occursin("status: pkg, pkg/precompile", checked)
+    @test occursin("no cell running", checked)
+    idle = (;
+        name = :notebook,
+        started_at = 1.0,
+        finished_at = 2.0,
+        subtasks = Dict(
+            :run => (;
+                name = :run,
+                started_at = 1.0,
+                finished_at = 2.0,
+                subtasks = Dict{Symbol, Any}(),
+            ),
+        ),
+    )
+    @test occursin(
+        "status idle",
+        notebook_status(
+            (;
+                notebooks = Dict(1 => (; cells = NamedTuple[], process_status = "ready", status_tree = idle)),
+            )
+        ),
+    )
+    @test workflow_command(true, "All fixture notebooks ran clean") ==
+        "::notice title=Fixture notebooks::All fixture notebooks ran clean"
+    @test workflow_command(false, "a%b\nc") == "::error title=Fixture notebooks::a%25b%0Ac"
+    summary = tempname()
+    withenv("GITHUB_ACTIONS" => "true", "GITHUB_STEP_SUMMARY" => summary) do
+        report_check(true, "All fixture notebooks ran clean")
+    end
+    @test occursin("All fixture notebooks ran clean", read(summary, String))
 
     withenv("MASQUE_NOTEBOOK_TIMEOUT_S" => "90") do
         @test notebook_timeout_s() == 90.0

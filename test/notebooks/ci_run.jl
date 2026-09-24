@@ -62,16 +62,70 @@ function cell_hint(cell)
     return length(line) > 72 ? first(line, 72) * "…" : line
 end
 
+# Pluto's status tree is the editor's "what is happening" check (pkg, workspace,
+# run). `cell.queued` is set on every cell when a run is planned, so it is not
+# that check.
+function open_business_names(node)
+    names = String[]
+    for (key, child) in getproperty(node, :subtasks)
+        label = String(key)
+        started = getproperty(child, :started_at)
+        finished = getproperty(child, :finished_at)
+        if started !== nothing && finished === nothing
+            push!(names, label)
+        end
+        if finished === nothing
+            for nested in open_business_names(child)
+                push!(names, label * "/" * nested)
+            end
+        end
+    end
+    return sort!(names)
+end
+
 function notebook_status(session)
     nbs = collect(values(session.notebooks))
     isempty(nbs) && return "notebook not open yet"
     length(nbs) == 1 || return "$(length(nbs)) notebooks in the session"
     nb = only(nbs)
-    busy = filter(c -> c.running || c.queued, nb.cells)
-    isempty(busy) && return "process=$(nb.process_status), no cell running"
-    shown = join(cell_hint.(collect(Iterators.take(busy, 2))), " | ")
-    extra = length(busy) > 2 ? " (+$(length(busy) - 2) more)" : ""
-    return "process=$(nb.process_status), $(length(busy)) busy: $(shown)$(extra)"
+    bits = String["process=$(nb.process_status)"]
+    if hasproperty(nb, :status_tree)
+        openb = open_business_names(nb.status_tree)
+        push!(bits, isempty(openb) ? "status idle" : "status: $(join(openb, ", "))")
+    end
+    running = filter(c -> c.running, nb.cells)
+    if isempty(running)
+        push!(bits, "no cell running")
+    else
+        shown = join(cell_hint.(collect(Iterators.take(running, 2))), " | ")
+        extra = length(running) > 2 ? " (+$(length(running) - 2) more)" : ""
+        push!(bits, "$(length(running)) running: $(shown)$(extra)")
+    end
+    return join(bits, ", ")
+end
+
+# GitHub Actions turns `::notice::` / `::error::` into check annotations. A plain
+# `@info` at the end of the script does not.
+function workflow_escape(msg)
+    return replace(replace(replace(msg, "%" => "%25"), "\r" => "%0D"), "\n" => "%0A")
+end
+
+function workflow_command(ok::Bool, msg)
+    kind = ok ? "notice" : "error"
+    return "::$kind title=Fixture notebooks::$(workflow_escape(msg))"
+end
+
+function report_check(ok::Bool, msg)
+    if get(ENV, "GITHUB_ACTIONS", "") == "true"
+        println(stderr, workflow_command(ok, msg))
+        summary = get(ENV, "GITHUB_STEP_SUMMARY", "")
+        if !isempty(summary)
+            open(summary, "a") do io
+                println(io, ok ? "- $msg" : "- FAILED: $msg")
+            end
+        end
+    end
+    return say(ok ? msg : "ERROR: $msg")
 end
 
 # A status read must not take down the wait. The notebook dict is mutated by the
@@ -105,7 +159,7 @@ function open_and_wait(session, path; timeout_s::Real, heartbeat_s::Real = 15.0)
         ),
     )
     if outcome === :timeout
-        say("ERROR: $name exceeded $(round(Int, timeout_s))s — $(safe_status(session))")
+        report_check(false, "$name exceeded $(round(Int, timeout_s))s — $(safe_status(session))")
         # throwto fails if the task already finished between the deadline check and here.
         try
             Base.throwto(task, InterruptException())
@@ -181,7 +235,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         flush(stderr)
     end
 
-    isempty(failed) ||
-        error("fixture notebook(s) with errored cells: $(join(failed, ", "))")
-    @info "All fixture notebooks ran clean ✓"
+    if !isempty(failed)
+        report_check(false, "fixture notebook(s) with errored cells: $(join(failed, ", "))")
+        exit(1)
+    end
+    report_check(true, "All fixture notebooks ran clean")
+    exit(0)
 end
