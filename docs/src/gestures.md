@@ -102,7 +102,7 @@ source.
 | Click / Enter commit | Echo yes | One event (a one-element `Vector` on a `selects` target layer) | No | Re-runs if it reads the bond |
 | ROI / threshold **in-drag** | Box / line moves | No | No | No |
 | ROI / threshold **release** | Echo if `selects` | Bounds, scalar, or `Vector` | No | Re-runs |
-| View pan / orbit **in-drag** | Readout; new frames | No | Yes | No |
+| View pan / orbit **in-drag** | Readout | No | Yes: new frames | No |
 | View **release** | — | **Nothing** | Stops | No |
 | Empty-space click | No | Unchanged | No | No |
 
