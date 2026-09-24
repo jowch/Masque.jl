@@ -1,7 +1,8 @@
 # Gallery
 
-Each card is one demo. Open it for what the figure does, a player you
-can hover or click, and the variations on that pattern.
+Each card is one demo. Open it for what the figure does, and the
+variations on that pattern. Most cards are a player you can hover or
+click. Pan and orbit are clips: those frames need a live kernel.
 
 The player is a small notebook harvested with the docs. One page covers
 both backends. A note on the page says which one to load, and where the

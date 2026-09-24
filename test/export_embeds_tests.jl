@@ -73,7 +73,7 @@ end
 end
 
 @testset "overlay-only player TOML sets chip = false" begin
-    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "view_pan.jl")
+    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "gallery_limits.jl")
     player = parse_player_toml(path)
     @test player["chip"] == false
     @test player["bond"] == "pick"
@@ -246,8 +246,6 @@ end
         "gallery_boxselect",
         "gallery_image",
         "gallery_limits",
-        "gallery_pan",
-        "gallery_orbit",
         "gallery_polar",
     ]
     for name in names
@@ -289,7 +287,7 @@ end
     polar_keys = [snapshot_key(js_shape_from_toml(row)) for row in polar["states"]]
     @test polar_keys == ["null", "scatter:0", "scatter:1", "scatter:2", "scatter:3"]
 
-    for name in ("gallery_bars", "gallery_pan", "gallery_orbit", "gallery_image", "gallery_limits")
+    for name in ("gallery_bars", "gallery_image", "gallery_limits")
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))
         @test player["chip"] == false
         keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
@@ -303,7 +301,7 @@ end
     guides = [
         "marks_bars", "marks_poly", "marks_polar", "legend_lines", "roi_table",
         "tooltips_template", "tooltips_dark", "grids_heatmap", "readouts_axis",
-        "view_pan", "custom_regions", "linked_two_axis", "linked_legend_wash",
+        "custom_regions", "linked_two_axis", "linked_legend_wash",
     ]
     for name in guides
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))

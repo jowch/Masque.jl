@@ -5,35 +5,40 @@
 empty of any view payload, same as a 2D pan.
 
 A static `Axis3` is a valid figure on CairoMakie. You do not need
-WGLMakie to draw the three markers. See [Pan and orbit](@ref).
+WGLMakie to draw the three markers. See [Pan and orbit](@ref). The clip
+is that drag.
 
 ```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-gal-orbit" title="Drag to orbit"
-        style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
-</div>
+<video id="masque-gal-orbit" title="Drag to orbit three markers on an Axis3"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
 <script>
 (function () {
   var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
   var el = document.getElementById("masque-gal-orbit");
   if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = (pretty ? "../../embeds/" : "../embeds/") + "gallery_orbit.html";
+  el.src = (pretty ? "../../assets/" : "../assets/") + "gallery-orbit.mp4";
 })();
 </script>
+```
+
+```julia
+begin
+    fig = Figure(size = (500, 380))
+    ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "drag to orbit")
+    scatter!(
+        ax,
+        Makie.Point3f[(1, 2, 3), (4, 5, 6), (7, 8, 2)];
+        color = :crimson,
+        markersize = 16,
+    )
+    view = ViewInteractable(ax)
+    nothing
+end
+```
+
+```julia
+@bind pick masque(fig, view)
 ```
 
 ## Variations
@@ -46,8 +51,8 @@ yourself and rebuilding. `selected=` does not store a camera.
 !!! note
 
     Orbit commits nothing on both backends. In-drag frames need a live
-    kernel: a PNG from `:cairo`, a serialized scene from `:webgl`. This
-    player is the resting Cairo figure, so a drag here does not move the
-    markers. Reach for `:webgl` when you want the orbit on the GPU canvas.
-    `PolarAxis` and a `Colorbar` are not orbit targets.
+    kernel: a PNG from `:cairo`, a serialized scene from `:webgl`. The
+    clip above is that Cairo drag. Reach for `:webgl` when you want the
+    orbit on the GPU canvas. `PolarAxis` and a `Colorbar` are not orbit
+    targets.
 

@@ -6,35 +6,36 @@ slides. The bond does not update when the camera moves. A click on a
 marker still reports that point. The camera is not an analysis value.
 
 In-drag frames need a live kernel. They travel on `with_js_link`, not
-on `@bind`. See [Pan and orbit](@ref).
+on `@bind`. See [Pan and orbit](@ref). The clip is that drag.
 
 ```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-gal-pan" title="Drag to pan"
-        style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
-</div>
+<video id="masque-gal-pan" title="Drag to pan a 2D scatter"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
 <script>
 (function () {
   var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
   var el = document.getElementById("masque-gal-pan");
   if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = (pretty ? "../../embeds/" : "../embeds/") + "gallery_pan.html";
+  el.src = (pretty ? "../../assets/" : "../assets/") + "gallery-pan.mp4";
 })();
 </script>
+```
+
+```julia
+begin
+    data = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0), (4.0, 16.0), (5.0, 25.0), (6.0, 36.0)]
+    fig = Figure(size = (500, 320))
+    ax = Axis(fig[1, 1]; limits = (0, 8, 0, 40), title = "drag to pan")
+    s = scatter!(ax, first.(data), last.(data); color = :dodgerblue, markersize = 18)
+    pts = PointInteractable(ax, s)
+    view = ViewInteractable(ax)
+    nothing
+end
+```
+
+```julia
+@bind pick masque(fig, [pts, view])
 ```
 
 ## Variations
@@ -49,7 +50,6 @@ follow the drag: the bond never carries `:view`.
 
     The gesture commits nothing on both backends. On a live kernel,
     `:cairo` ships a PNG each frame and `:webgl` ships a serialized scene
-    onto the canvas already on the page. This player is the resting Cairo
-    figure. Drag on the static page does not stream frames. Reach for
-    `:webgl` when those frames have to stay on the GPU.
+    onto the canvas already on the page. The clip above is that Cairo
+    drag. Reach for `:webgl` when those frames have to stay on the GPU.
 

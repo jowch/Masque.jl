@@ -1,24 +1,8 @@
 # Inspect a grid
 
 Hold your pointer over a heatmap or image cell to read its indices and
-value. Click the cell to select it; `@bind` captures that pick.
-
-The following clip shows the pointer over cells, then a click. The
+value. Click the cell to select it; `@bind` captures that pick. The
 tooltip is `(i,j) = value`.
-
-```@raw html
-<video id="masque-grids-clip" title="Hold the pointer over heatmap cells, then click one"
-       controls muted loop playsinline autoplay
-       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-grids-clip");
-  if (!el) return;
-  el.src = (pretty ? "../assets/" : "assets/") + "grids-heatmap.mp4";
-})();
-</script>
-```
 
 ```@raw html
 <div class="masque-embed-wrap">
