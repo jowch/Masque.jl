@@ -46,7 +46,7 @@ The player keeps the last click. To accumulate indices across clicks,
 store them in a `Ref` in a cell that does not read this `@bind`, then
 pass the growing set as `selected=` on the second widget. A slider that
 rebuilds the figure drops the highlight unless you pass that set again.
-See [Limits slider](@ref).
+See [Limits](@ref).
 
 !!! note
 

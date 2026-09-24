@@ -307,7 +307,7 @@ zooms a 2D view about the cursor. The axis frame stays put while the
 data inside it slides. On both backends, in-drag frames stream over
 `with_js_link`. `:cairo` ships a PNG; `:webgl` ships a serialized scene
 onto the canvas already on the page. See [Pan and orbit](@ref),
-[Limits slider](@ref), and [Drag to pan](@ref).
+[Limits](@ref), and [Drag to pan](@ref).
 
 ## Sample a series
 

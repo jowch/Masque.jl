@@ -115,6 +115,6 @@ overlay. For more information, see [Troubleshooting](@ref).
 
 A fresh `Figure` resets the camera. Persist limits or
 azimuth/elevation in a `Ref` (or a slider) and rebuild, as on
-[Limits slider](@ref). [Drag to pan](@ref) and [Drag to orbit](@ref) are
+[Limits](@ref). [Drag to pan](@ref) and [Drag to orbit](@ref) are
 the drag half: a PNG frame on `:cairo`, a scene frame on `:webgl`. Do
 not pass `selected=` for a camera pose.
