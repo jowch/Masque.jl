@@ -145,7 +145,7 @@ overlay.
 
 Persist a camera across remount with an explicit `Ref` plus rebuild, not
 with `selected=`. The [Limits](@ref) shows that pattern. For the
-overlay-only embed and the cairo in-drag clip, see [Pan and orbit](@ref).
+cairo in-drag clip and the cells, see [Pan and orbit](@ref).
 
 ## Export static HTML
 

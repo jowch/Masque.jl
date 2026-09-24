@@ -132,9 +132,9 @@ the default bond.
 ```@raw html
 <div class="masque-diagram">
   <img class="masque-diagram-light" src="assets/diagrams/overlay-vs-host.svg"
-       alt="Four hosts compared: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect and cairo view frames use GIF or MP4 on this site, with no bind on view.">
+       alt="Four hosts compared: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect goes through the grids player. Cairo view frames use GIF or MP4 on this site, with no bind on view.">
   <img class="masque-diagram-dark" src="assets/diagrams/overlay-vs-host-dark.svg"
-       alt="Four hosts compared: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect and cairo view frames use GIF or MP4 on this site, with no bind on view.">
+       alt="Four hosts compared: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect goes through the grids player. Cairo view frames use GIF or MP4 on this site, with no bind on view.">
 </div>
 <script>
 (function () {
@@ -167,12 +167,13 @@ The following table is that split.
 | Listed element `@bind` (incl. extra table cells) | Bond writes; every cell that reads it re-runs | Snapshot swap for every cell in the embed | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
 | Listed ROI `items` / a few axis or threshold values | Bond writes on release | Snapshot swap for listed sets or values | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
 | Unlisted continuous drag | Overlay chrome during the drag; Julia on ROI or threshold release; view never writes `@bind` | Overlay chrome; Julia stays on the last listed set | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
-| Heatmap inspect (GIF/MP4) | Overlay tooltip; Julia on click | GIF/MP4 on this site; overlay-only tooltip chrome if that player is present | Overlay tooltip chrome if that player is present | Overlay tooltip; Julia click dead; site uses GIF/MP4 |
+| Heatmap inspect | Overlay tooltip; Julia on click | Overlay tooltip; listed click swaps the readout | Overlay tooltip chrome if that player is present | Overlay tooltip; Julia click dead |
 | Cairo view frames (GIF/MP4, no `@bind`) | Gesture channel frames; no `@bind` | GIF/MP4 on this site; no `@bind` | Overlay readout; no frames; no `@bind` | Gesture channel dead; site uses GIF/MP4 |
 
-Heatmaps are not listed cell by cell. View pan never appears as an
+The grids player lists every cell (`c11` through `c43`), so a click
+swaps the readout. View pan never appears as an
 `InteractionEvent`. For a box that filters a table, see
-[Brush a region](@ref). For a grid you inspect without enumerating cells, see
+[Brush a region](@ref). For that heatmap, see
 [Inspect a grid](@ref). For pan and orbit, see [Pan and orbit](@ref).
 
 ## Common mistakes
@@ -181,7 +182,8 @@ Heatmaps are not listed cell by cell. View pan never appears as an
   the pointer over a mark. That path is overlay-only.
 - Do not treat a docs player as live Pluto. Axis, ROI, and threshold commits
   write `@bind` in a notebook. On this site, a listed player snapshots those
-  commits, a heatmap uses GIF/MP4, and view has no `@bind`.
+  commits, heatmap hover and click go through the grids player, and view
+  has no `@bind`.
 - Do not design a click demo around a miss. List every mark.
 - Do not expect SliderServer or `Bonds.possible_values` to enumerate Masque
   bonds.
