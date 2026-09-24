@@ -144,7 +144,7 @@ not use a WebGL context.
 switch the PNG. Pick WebGL with `backend=` as shown earlier, or start a
 session that loads only WGLMakie.
 
-For a runnable gallery, see [Gallery](@ref).
+For runnable examples, see [Examples](@ref).
 
 ## Pan and orbit preview
 

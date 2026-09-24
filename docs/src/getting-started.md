@@ -111,5 +111,5 @@ copy.
 - [Brush a region](@ref) — drag a box and get the points inside it
 - [Selection](@ref) — start with a mark selected, or keep one across a rebuild
 - [Linked views](@ref) — drive another plot or a table from a click
-- [Gallery](@ref) — more examples to copy
+- [Examples](@ref) — worked examples to copy
 - [Backends](@ref) — CairoMakie or WGLMakie
