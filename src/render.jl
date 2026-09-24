@@ -288,6 +288,12 @@ function build_manifest(
     _validate_slices(layers)
     _validate_links(layer_owners, layers)
     spec = _selection_spec(interactables, layers)
+    # The box owns a brushed grid's bond: a cell click would replace its GridWindowEvent with a
+    # GridCellEvent. The grid keeps hover (tooltip); the overlay hit-tests clicks by `events`.
+    if spec !== nothing && spec.mode == "grid"
+        target = only(filter(l -> l["id"] == string(spec.target), layers))
+        filter!(!=("click"), target["events"])
+    end
     layer_ids = Symbol[L.id for (_, L, _) in built]
     seedable = Symbol[L.id for (_, L, _) in built if L.kind in _SELECTED_KINDS]
     norm = normalize_selected(layer_ids, seedable, selected)

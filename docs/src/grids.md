@@ -63,8 +63,10 @@ Add an [`ROIInteractable`](@ref) with `selects` naming the grid, and a
 drag returns one [`GridWindowEvent`](@ref) for the block of cells under
 the box: `A[win]` is that sub-matrix. A box that misses the grid still
 returns one `GridWindowEvent`, with empty ranges (`win.i1:win.i2` is
-`1:0`), so `A[win]` is an empty matrix rather than an error. See
-[Brush a region](@ref).
+`1:0`), so `A[win]` is an empty matrix rather than an error. Once a box
+brushes the grid, clicking a cell no longer commits a `GridCellEvent`:
+the cells still show their tooltip, and the value stays the box's
+window. See [Brush a region](@ref).
 
 ## What grids cannot do
 

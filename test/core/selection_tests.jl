@@ -301,4 +301,43 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test ev_same.payload === iv.payload
         @test ev_same == iv
     end
+
+    @testset "a selects box owns a brushed grid's bond; a cell click commits nothing" begin
+        gfig = Figure(size = (400, 300)); gax = Axis(gfig[1, 1])
+        vals = [Float64(i + 10j) for i in 1:4, j in 1:3]
+        heatmap!(gax, 0 .. 4.0, 0 .. 3.0, vals)
+        grid = RectInteractable(gax; grid = (collect(0.0:4.0), collect(0.0:3.0), vals), id = :img)
+        roi = ROIInteractable(gax; bounds = (1.0, 3.0, 1.0, 2.0), selects = :img, id = :roi)
+        tv = IP.APD.Bonds.transform_value
+
+        # Without a box the grid is clickable: a click is a GridCellEvent.
+        alone = masque(gfig, grid)
+        @test "click" in only(alone.manifest["layers"])["events"]
+        cell = tv(alone, Dict("layer" => "img", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
+        @test cell isa GridCellEvent && (cell.i, cell.j) == (1, 1)
+
+        # With the box, the grid layer is hover-only, so the overlay never posts a cell.
+        w = masque(gfig, [grid, roi])
+        @test w.manifest["selection"] == "grid" && w.manifest["selectionTarget"] == "img"
+        img = only(filter(l -> l["id"] == "img", w.manifest["layers"]))
+        @test img["events"] == ["hover"]
+        @test IP.APD.Bonds.initial_value(w) === nothing
+
+        # A cell envelope can still reach Julia from a stale bundle or a hand-set bond. It fails
+        # with a message that names the box, not `GridCellEvent has no field i1` downstream.
+        err = try
+            tv(w, Dict("layer" => "img", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("selects", err.msg) && occursin(":img", err.msg)
+
+        # The brush still commits a GridWindowEvent.
+        payload = Dict("i0" => 1, "i1" => 2, "j0" => 1, "j1" => 1, "xmin" => 1.0, "xmax" => 3.0, "ymin" => 1.0, "ymax" => 2.0)
+        win = tv(w, Dict("items" => [Dict("layer" => "img", "index" => 0, "payload" => payload)]))
+        @test win isa GridWindowEvent && (win.i1, win.i2, win.j1, win.j2) == (2, 3, 2, 2)
+        @test vals[win] == vals[2:3, 2:2]
+    end
 end

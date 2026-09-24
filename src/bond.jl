@@ -337,6 +337,15 @@ function _one_event(manifest, owners, js; wrap::Bool)
     wire = Int(js["index"])
     index = julia_index(kind, wire)
     js_payload = get(js, "payload", nothing)
+    if get(manifest, "selection", nothing) == "grid" &&
+            get(manifest, "selectionTarget", nothing) == layer_id
+        throw(
+            ArgumentError(
+                "bond: grid :$layer_id is brushed by a `selects` box, which owns the bond; " *
+                    "a click on one of its cells commits nothing (expected an {items} window)",
+            ),
+        )
+    end
     ev = if haskey(owners, layer_id)
         o = owners[layer_id]
         transform_bond(o.interactable, o.layer, index, js_payload)
