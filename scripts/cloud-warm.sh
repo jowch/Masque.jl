@@ -5,10 +5,12 @@
 #   scripts/cloud-warm.sh [julia] [frontend] [e2e]     (no args = julia)
 #
 #   julia     Shared dev env at $MASQUE_DEV_ENV: Masque (dev'd from this checkout)
-#             + every [deps]/[extras] package in Project.toml + Pluto, precompiled
+#             + every [deps]/[extras] package in Project.toml + Pluto 0.20, precompiled
 #             (~7 min cold). One env serves both the unit tests
-#             (`julia --project=$MASQUE_DEV_ENV test/runtests.jl`) and the kind-sweep
-#             notebooks, which read MASQUE_DEV_ENV. Mirrors CI's kind-sweep step.
+#             (`julia --project="$MASQUE_DEV_ENV" test/runtests.jl`) and the kind-sweep
+#             notebooks, which read MASQUE_DEV_ENV. Unlike CI's kind-sweep step (CairoMakie,
+#             WGLMakie, JSON3 only), every dep is a direct dep here, because the test files
+#             `using` [extras] and indirect deps (Makie, FileIO, …) that `using` can't see.
 #   frontend  `npm ci` in frontend/.
 #   e2e       `npm install` + the Chromium build matching test/e2e's pinned Playwright.
 #
@@ -25,23 +27,29 @@ for target in "$@"; do
     case "$target" in
         julia)
             mkdir -p "$DEV_ENV"
-            julia --project="$DEV_ENV" -e "
+            # JULIA_NOSYSIMAGE=1: a sysimage wrapper (e.g. the Cursor image) would preload
+            # CairoMakie + Masque; a no-op for stock julia. REPO goes in via ARGS, not
+            # string interpolation, so any checkout path is safe.
+            JULIA_NOSYSIMAGE=1 julia --project="$DEV_ENV" -e '
                 using Pkg, TOML
-                Pkg.develop(path = \"$REPO\")
+                repo = ARGS[1]
+                Pkg.develop(path = repo)
                 # Tests import deps directly, so the env needs what Pkg.test() would give:
-                # [deps] + [extras], read from Project.toml so it never drifts. Plus Pluto.
-                p = TOML.parsefile(\"$REPO/Project.toml\")
-                pkgs = union(keys(p[\"deps\"]), keys(get(p, \"extras\", Dict())), [\"Pluto\"])
-                Pkg.add(sort!(collect(pkgs)))
+                # [deps] + [extras], read from Project.toml so it never drifts.
+                p = TOML.parsefile(joinpath(repo, "Project.toml"))
+                Pkg.add(sort!(collect(union(keys(p["deps"]), keys(get(p, "extras", Dict()))))))
+                # Pluto pinned to the 0.20 series test/e2e/serve.jl installs, so that server
+                # reuses this precompile cache whenever it resolves the same versions.
+                Pkg.add(Pkg.PackageSpec(name = "Pluto", version = "0.20"))
                 Pkg.precompile()
-            "
-            echo "julia env ready: $DEV_ENV (export MASQUE_DEV_ENV=$DEV_ENV if unset)"
+            ' "$REPO"
+            echo "julia env ready: $DEV_ENV"
             ;;
         frontend)
             (cd "$REPO/frontend" && npm ci)
             ;;
         e2e)
-            (cd "$REPO/test/e2e" && npm install && npx playwright install chromium)
+            (cd "$REPO/test/e2e" && npm install && npx playwright install --with-deps chromium)
             ;;
         *)
             echo "unknown target: $target (expected julia, frontend, e2e)" >&2

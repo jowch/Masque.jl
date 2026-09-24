@@ -5,10 +5,11 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
 `assets/overlay.js`, read by Julia at `__init__`. Manifest shipped to JS via `published_to_js`.
 
 ## Commands
-- Julia tests: `GROUP=Core julia --project=$MASQUE_DEV_ENV test/runtests.jl` (groups: `Core`
+- Julia tests: `GROUP=Core julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" test/runtests.jl` (groups: `Core`
   default, `NoBackend`, `WebGL`; warm env: ~6 min / ~20 s / ~70 s, all test time). **Not** `--project=.`: the test deps (CairoMakie, WGLMakie,
   JSON3, …) are `[extras]`, invisible to the package env — it only "works" when your default
-  `@v1.x` env happens to stack them in. `scripts/cloud-warm.sh julia` builds `$MASQUE_DEV_ENV`.
+  `@v1.x` env happens to stack them in. Keep the `:-` default: an unset variable would make it
+  `--project=`, which silently means `@v1.x`. `scripts/cloud-warm.sh julia` builds that env.
   CI runs `Pkg.test()`, which builds its own fresh env (~6 min precompile cold, may resolve
   newer deps than `$MASQUE_DEV_ENV`) — use it to reproduce a CI-only failure, not day to day.
 - Frontend gate: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` (build → `../assets/overlay.js` IIFE + `../assets/masque-webgl.js` ESM)
@@ -138,8 +139,11 @@ text and the bond payload → it gets a live check on every backend × the kinds
   compiles (~7 min cold). Add `frontend` before the frontend gate and `e2e` before live
   verification (Chromium matching the pinned Playwright). Don't run Julia tests or Pluto until
   the warm-up log says `done` — competing for the 4 cores slows both.
-- `$MASQUE_DEV_ENV` (set in the environment) is that one warmed env; it serves the unit tests
-  and the kind-sweep notebooks alike.
+- That one warmed env lives at `$MASQUE_DEV_ENV`, defaulting to
+  `~/.julia/environments/masque-dev` when the variable is unset (the script and the test
+  command both fall back to it). It serves the unit tests and, when `MASQUE_DEV_ENV` is set in
+  the cloud environment's settings, the kind-sweep notebooks too (unset, each notebook builds
+  its own temp env — the ~6 min cold precompile).
 - Julia 1.10 (CI's floor) is not installed; 1.10-only breakage is caught by CI. Reproduce one
   with `juliaup add 1.10` and `julia +1.10 …` (cold env, so another full precompile).
 
