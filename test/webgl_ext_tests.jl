@@ -90,6 +90,7 @@ end
     @test occursin("mountWebGL", html)
     @test occursin("createObjectURL", html)      # blob delivery (no server / no file://)
     @test occursin("window.__MasqueWGL", html)     # M2: bundle/shim blob URLs cached once per notebook
+    @test occursin("const Bonito = globalThis.__MasqueWGL.bonito;", html)   # #175: shim scoped to our bundle copy
     @test occursin("window.Masque.mount", html)    # Masque's overlay reused verbatim
     @test occursin("requestFrame", html)
 end
@@ -192,7 +193,7 @@ end
 end
 
 @testset "shim-completeness canary (Bonito/Connection symbols the bundle references)" begin
-    # The bundle calls window.Bonito.<x> and window.Bonito.Connection.<x> globals with no
+    # The bundle calls Bonito.<x> and Bonito.Connection.<x> (resolved to the scoped shim) with no
     # compile-time check against our shim (frontend/src/wgl-shim.ts) — a WGLMakie bump that
     # references a new one silently produces a browser TypeError (this guarded against
     # `send_warning`, added after `on_shader_error` started calling it). This asserts the

@@ -299,7 +299,10 @@ function _widget_html(w::WebGLWidget; scene_expr, manifest_expr, bundle_js, shim
             // the bytes cross the wire only once — is documented at Base.show.)
             const _H = (window.__MasqueWGL ??= {});
             const _blob = (t) => URL.createObjectURL(new Blob([t], { type: "text/javascript" }));
-            const _bundleUrl = (_H.bundleUrl ??= _blob($(bundle_js)));
+            // Scope Masque's Bonito shim to its own copy of the bundle: the prelude shadows the
+            // bundle's bare `Bonito` identifier, so a raw WGLMakie figure on the page keeps the
+            // real window.Bonito (#175). mountWebGL creates _H.bonito before importing.
+            const _bundleUrl = (_H.bundleUrl ??= _blob("const Bonito = globalThis.__MasqueWGL.bonito;\n" + $(bundle_js)));
             const _shimUrl = (_H.shimUrl ??= _blob($(shim_js)));
             import(_shimUrl).then(({ mountWebGL }) =>
               mountWebGL({ canvas: _canvas, wglBundleUrl: _bundleUrl,

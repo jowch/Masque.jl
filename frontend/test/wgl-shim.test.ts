@@ -146,13 +146,17 @@ describe("mountWebGL", () => {
         return { host, canvas }
     }
 
-    it("imports the bundle, installs window.Bonito, and forwards args to setup_scene_init", async () => {
+    it("imports the bundle, scopes the Bonito shim, and forwards args to setup_scene_init", async () => {
         const { host: wrapper, canvas } = hostCanvas()
         const scene = { __obs__: { __t__: "f32", d: [1, 2] } }
+        const realBonito = { real: true }
+        ;(window as unknown as { Bonito?: unknown }).Bonito = realBonito
         const result = await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene, width: 640, height: 480, pxPerUnit: 3, visible: true })
 
-        expect((window as unknown as { Bonito?: { can_send_to_julia?: () => boolean } }).Bonito).toBeTruthy()
-        expect((window as unknown as { Bonito: { can_send_to_julia: () => boolean } }).Bonito.can_send_to_julia()).toBe(true)
+        // #175: a page's real Bonito client is left alone; the shim lives on __MasqueWGL.
+        expect((window as unknown as { Bonito?: unknown }).Bonito).toBe(realBonito)
+        const H = (window as unknown as { __MasqueWGL: { bonito: { can_send_to_julia: () => boolean } } }).__MasqueWGL
+        expect(H.bonito.can_send_to_julia()).toBe(true)
 
         const [passedWrapper, passedCanvas, w, h, resizeTo, ppu, one, realSize, canvasWidth, sceneObs] = result.WGL.lastCall
         expect(passedWrapper).toBe(wrapper)
