@@ -86,15 +86,18 @@ Hold the pointer over a cell. The tooltip is `(i,j) = value`. A real
 cell smaller than about one screen pixel still shows that form: Masque
 ships one sample per screen pixel instead of `values[]`, and does not
 warn. `(i,j)` with no value is the case where neither `values` nor
-`sample` was sent. A color image, or any other non-real matrix, takes
-that path. That is not the auto name/value table used on scatter and
-bars. For more information, see [Tooltips](@ref).
+`sample` was sent. For a color image, or any other non-real matrix,
+that is only the sub-pixel path: `_grid_sample` returns `nothing` and
+the manifest keeps the edges. A cell at least one screen pixel wide
+still builds `values` with `Float32`, and a non-real cell throws, so
+the widget does not mount. That is not the auto name/value table used
+on scatter and bars. For more information, see [Tooltips](@ref).
 
 Click the cell. In live Pluto, `pick` is a [`GridCellEvent`](@ref):
 `layer` is `:cells`, `pick.i` and `pick.j` are 1-based (column, then
 row), and `A[pick]` is `A[pick.i, pick.j]`. `pick.value` is the cell
-when `values[]` was shipped, the screen-pixel sample when the cell is
-smaller than one screen pixel, or `nothing` when neither was sent. The same
+when `values[]` was shipped, the screen-pixel sample when a real cell
+is smaller than one screen pixel, or `nothing` when neither was sent. The same
 [`RectInteractable`](@ref) used as a bar list (`layout === :list`) is an
 [`ElementEvent`](@ref); `layout === :grid` is `GridCellEvent`. The cell
 is a highlight in the overlay. A click in empty space does not write
