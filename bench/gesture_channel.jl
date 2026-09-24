@@ -3,7 +3,7 @@
 # actual production code path: mutate the axis camera, rebuild the manifest at the mount ppu,
 # re-render at ppu=1 (in-gesture) or the mount ppu (settle), and return {png, manifest}.
 #
-# Run: julia --project=. bench/gesture_channel.jl
+# Run: julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/gesture_channel.jl
 
 using Masque, CairoMakie, Printf, Random
 Random.seed!(0)

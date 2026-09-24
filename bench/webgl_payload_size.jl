@@ -5,7 +5,7 @@
 # docs/dev/perf-findings.md's "## :webgl backend (WGLMakie)" section — re-run this and update that
 # section when the wire format changes.
 #
-#   julia --project=. bench/webgl_payload_size.jl
+#   julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/webgl_payload_size.jl
 #
 # WIRE vs JSON proxy: Pluto's published_to_js does NOT ship the scene as JSON text. Its MsgPack
 # encodes every typed numeric Vector (Float32/Int32/UInt32/UInt8 — exactly what `_plain` emits) as

@@ -169,8 +169,8 @@ of them breaks an existing call.
 - **#169: arrow-key nudging for threshold, ROI, and view.** This is the WCAG 2.1.1 gap.
   Each drag layer gets one extra tab stop. The view nudge never writes `@bind`. It depends
   on #168 for the focus indicator. Its view nudge reuses the pan and settle path, so fix #165
-  and #171 first. `architecture/11-keyboard.md` scopes this out today, and it has to be
-  revised when #169 lands.
+  and #171 first. When #169 lands, `architecture/11-keyboard.md` changes from describing it
+  as a proposal to describing the shipped keys.
 - **#179: wide mode.** `max_width` already sets the render width, but Pluto's column shrinks
   the result. #179 widens the cell from inside the widget using `PlutoUI.WideCell`'s
   technique, without the PlutoUI dependency. `WideCell` itself no-ops under `@bind`. A

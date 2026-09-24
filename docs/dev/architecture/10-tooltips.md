@@ -88,11 +88,10 @@ Each entry in the manifest `layers` array carries at most one of these two optio
 The template is **pre-parsed in Julia** at build time and shipped as structured data; the
 browser never re-parses a template string.
 
-The per-element `tooltips[]` string array that pre-M2.3 versions emitted is retired. Tooltip
+The per-element `tooltips[]` string array that earlier versions emitted is retired. Tooltip
 content is entirely client-side, rendered on hover from the existing `payloads[i]` entry — this
 keeps the tooltip wire cost O(1) per layer regardless of element count; the per-element
-envelope is unchanged (see `perf-findings.md` §"Scope bounds for downstream phases" for the
-measured comparison).
+envelope is unchanged (`perf-findings.md` has the measured comparison).
 
 The top-level manifest field `tipStyle` (`Record<string,string>`, optional) is a CSS-var dict
 of set `tooltip_*` kwargs, applied once to the shadow host at mount.
@@ -107,7 +106,7 @@ per-layer `colors` field (optional; a single CSS string, or a shared palette + o
 element) drives a 3px accent border in the hovered element's own colour — resolved only for a
 `PointInteractable(ax, p::Makie.Scatter)`-derived layer whose colour is resolvable; omitted
 (no accent) otherwise. Both are O(1)-per-manifest/per-layer, same cost-model rationale as
-`tipStyle` above (see `perf-findings.md`'s figure-background/`colors` reconciliation entry).
+`tipStyle` above (measured in `perf-findings.md`).
 
 `HitLayer` carries `template?: TemplateSegment[]`, `tooltip?: false`, and `colors?: string |
 {palette, index}`; `Manifest` carries `tipStyle?: Record<string, string>` and `background?:

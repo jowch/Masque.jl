@@ -109,7 +109,8 @@ no-commit contract does not.
 ## 12.4 Projection stays Julia-authored on every frame
 
 No backend ships 3D or 2D coordinates to JS and reprojects them there. That holds everywhere
-([§2](02-backends.md)'s `InteractionContext`; the client-side-GPU-camera non-goal in [§7](07-scope.md)'s backend-scope note). On
+([§2](02-backends.md)'s `InteractionContext`; the client-side-GPU-camera non-goal in
+[§7](07-scope.md)). On
 this channel it holds **per frame**: a gesture that changes what Julia projected accompanies
 every frame with hit geometry Julia computed for that same state.
 
@@ -123,8 +124,9 @@ The trigger is a change to the projection, not a change to the picture:
 A gesture that moves the camera and ships a frame without a matching manifest, or that lets JS
 derive geometry from a JS-owned camera, does not conform, whatever its performance.
 
-#87 (3D orbit preview) rests on this clause: without per-frame re-projection an orbit leaves the
-overlay at a stale azimuth/elevation.
+The 3D orbit preview (#87) rests on this clause: without per-frame re-projection an orbit would
+leave the overlay at a stale azimuth/elevation. JS maps pointer delta to angles
+(`orbitAngles`, `frontend/src/geometry.ts`) and sends them; Julia owns the projection.
 
 ## 12.5 Backend obligations (mechanism-independent)
 
@@ -153,9 +155,11 @@ called again, so the gesture does not open a second WebGL context. Hit geometry 
 Julia built for that same camera, swapped in the same turn as the scene. A client-side camera
 would be cheaper and would not be this mechanism (§12.4).
 
-This is not #86. #86 is about a scene surviving Pluto *replacing* the cell output, which destroys
-the `<canvas>`. A view gesture does not replace the cell (§12.3), so the canvas this frame paints
-on is the one the current output already holds. #85 hides the wait for that frame: while a 2D pan
+This needs no resident scene. A scene surviving Pluto *replacing* the cell output, which destroys
+the `<canvas>`, was #86, closed as not planned: nothing on main patches a camera into a kept scene,
+and each frame is a full `serialize_scene` (§12.10). A view gesture does not replace the cell
+(§12.3), so the canvas this frame paints on is the one the current output already holds. The
+photographic slide (#85) hides the wait for that frame: while a 2D pan
 or wheel zoom is ahead of the channel, the data inside the axis viewport slides under the cursor
 on an inner matrix. The base image itself is not transformed, so the axis frame, tick labels, and
 the rest of the figure stay where they are; a copy of those pixels, clipped to the viewport,
@@ -167,7 +171,10 @@ matrix comes off in the turn
 the sent frame is actually visible — the image `load` on `:cairo`, the scene swap on `:webgl` —
 leaving only the residual if the pointer has moved on. It is not a client camera, and it is not a
 substitute for the frame itself. A wheel has no pointer release, so the terminal request is one
-settle 150ms after the last notch. A new notch resets that wait. Orbit ignores the wheel.
+settle 150ms (`WHEEL_IDLE_MS`, `frontend/src/photo.ts`) after the last notch. A new notch resets
+that wait. Orbit ignores the wheel. Two known preview bugs are open: the axis frame can move while a
+pan waits for its next frame (#171), and a wheel zoom can leave an inverse photograph when the
+settle frame follows a preview (#165).
 **Backends differ in cost, never in the interaction contract:** conformance is judged
 against the obligations above, never against a particular backend's mechanism.
 
