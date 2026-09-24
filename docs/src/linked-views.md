@@ -81,6 +81,9 @@ masque(fig; selected = Dict(:scatter => [i], :scatter_2 => [i]))
 ```
 
 where `i` comes from a cell that does not read this widget's own value.
+With one index on each of two layers the widget highlights both but
+starts with its value at `nothing`, so a cell reading this widget's
+`pick` goes back to its "nothing clicked" state after the rebuild.
 
 ## Highlight a series across panels
 
@@ -113,8 +116,8 @@ box on release, and a cell slices your table with it —
 - There is no shared data source between widgets. Two `masque` calls
   are two independent widgets, connected only through the Pluto cells
   you write.
-- Every box in one widget brushes the same layer, and boxes are
-  rectangles: there is no lasso and no cross-filtering between brushes
-  on different plots.
+- Every box with `selects` in one widget must name the same layer, and
+  boxes are rectangles: there is no lasso and no cross-filtering
+  between brushes on different plots.
 
 For how hover, clicks, and drags reach Julia, see [Concepts](@ref).

@@ -77,15 +77,18 @@ end
 
 ## When the figure is rebuilt
 
-The view you panned or turned to lives only in the widget. When a cell
-upstream re-runs and `masque` builds a new widget, the axis starts again
-from the limits (or azimuth and elevation) in your figure code. If a
-view needs to survive, set it in Julia — for example from a slider that
-controls the axis limits, as in the [Limits](@ref) example.
+A pan or orbit is written onto the axis itself: Julia updates the
+axis's limits (or its azimuth and elevation) as you drag. So calling
+`masque` again on the same figure mounts at the view you dragged to.
+When the cell that draws the figure re-runs, it creates a new `Axis`,
+which starts from whatever limits or angles your code gives it. To keep
+a view across such a rebuild, set those values in the figure code
+yourself, for example from a slider bound to the limits.
 
 ## Where it works
 
 Panning needs a 2D `Axis` with numeric limits on an `identity`, `log10`,
-or `log` scale; orbiting needs an `Axis3`. A `PolarAxis`, a categorical
-axis, or another scale raises an `ArgumentError` when `masque` runs, and
+or `log` scale; orbiting needs an `Axis3`. A `PolarAxis`, a
+`Colorbar`, a categorical axis, or another scale raises an
+`ArgumentError` when `masque` runs, and
 an `LScene` is not supported. See [Supported plots and axes](@ref).

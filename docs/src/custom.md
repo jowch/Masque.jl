@@ -7,7 +7,7 @@ than an [`ElementEvent`](@ref). Masque has three levels for this, each
 more work and more control than the last:
 
 1. [`RegionInteractable`](@ref) — list circles, rectangles, and polygons
-   in data coordinates. Enough for most cases.
+   placed in data coordinates. Enough for most cases.
 2. [`FunctionInteractable`](@ref) — compute hit geometry yourself from
    the figure's layout, for shapes the first level cannot express.
 3. A subtype of [`AbstractInteractable`](@ref) — also choose what a
@@ -21,7 +21,8 @@ be visible.
 ## Regions over a figure
 
 Pass a list of shapes and one payload per shape. Hovering a region shows
-its payload, and a click returns it:
+its payload, and a click returns an [`ElementEvent`](@ref) that carries
+the payload's fields (`pick.name`):
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -36,15 +37,16 @@ Main.masque_fallback("custom_regions")
 Each region is one of
 
 ```julia
-(:circle,  (cx, cy), r)            # r is logical px × DPI
+(:circle,  (cx, cy), r)            # r in logical pixels
 (:rect,    (cx, cy), w, h)         # w, h in data space
 (:polygon, [(x, y), ...])          # a ring in data space
 ```
 
 Rectangles and polygons are in data coordinates, so they stay on the
 features they outline. A circle's centre is in data coordinates too, but
-its radius is in screen pixels (like a scatter marker), so `r = 8` is a
-small target however wide the axis is. `payloads` is required — a region
+its radius is in logical pixels, like a scatter marker's size: `r = 8`
+is an eight-pixel target however wide the axis is. Pass the logical
+size; Masque scales it for the figure's resolution itself. `payloads` is required — a region
 has no data of its own — and `tooltip` works as elsewhere (see
 [Tooltips](@ref)).
 
@@ -98,8 +100,9 @@ end
 @bind pick masque(fig, track)
 ```
 
-Each layer's `geometry` is a flat vector of image pixels whose layout
-depends on its kind:
+Each layer's `geometry` is in image pixels, laid out according to its
+kind — a flat vector for most kinds, a vector of paths or rings for
+`:lines` and `:polygons`:
 
 | Kind | `geometry` | One element is |
 |---|---|---|
@@ -108,9 +111,11 @@ depends on its kind:
 | `:polyline` | `[x, y, x, y, …]` (`NaN` starts a gap) | one edge between consecutive points |
 | `:lines` | a vector of paths, each `[x, y, …]` | one whole path |
 | `:rects` | `[cx, cy, w, h, …]` | one rectangle |
-| `:polygons` | a vector of rings, each `[x, y, …]` | one polygon |
+| `:polygons` | one ring `[x, y, …]` per element, or `[exterior, hole, …]` for an element with holes | one polygon |
 
-`payloads` has one entry per element. A click on a layer returns an
+Heatmap-style `:grid` layers use a different, edge-based layout; build
+those with [`RectInteractable`](@ref)'s `grid=` keyword rather than by
+hand. `payloads` has one entry per element. A click on a layer returns an
 [`ElementEvent`](@ref), with the payload's fields on it. Because the
 function sees the whole figure, one `FunctionInteractable` can return
 layers on several axes.
