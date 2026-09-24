@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470"
      role="img">
   <title>Four channels against each gesture</title>
-  <desc>Swimlanes for overlay chrome, the bind bond, the gesture channel, and a downstream Julia cell. Hover tooltip and highlight, and click-echo wash, use the overlay only. Click or Enter commit echoes in the overlay, writes one InteractionEvent to the bond (a one-element vector on a selects target layer), and re-runs a cell that reads the bond. ROI or threshold in-drag moves the box or line in the overlay with no bond. ROI or threshold release echoes if selects is set, writes bounds, a scalar, or a Vector, and re-runs a reading cell. View pan or orbit in-drag shows a readout and repaints the view with frames streamed over the gesture channel on both backends (a PNG on cairo, a serialized scene on webgl), with no bond. View release writes nothing and the channel stops. Empty-space click leaves overlay and bond unchanged.</desc>
+  <desc>Swimlanes for overlay chrome, the bind bond, the gesture channel, and a downstream Julia cell. Hover tooltip and highlight, and click-echo wash, use the overlay only. Click or Enter commit echoes in the overlay, writes one InteractionEvent to the bond (a one-element vector on a selects target layer), and re-runs a cell that reads the bond. ROI or threshold in-drag moves the box or line in the overlay with no bond. ROI or threshold release echoes if selects is set, writes bounds, a scalar, or a Vector, and re-runs a reading cell. View pan or orbit in-drag shows a readout in the overlay while new frames of the view are streamed over the gesture channel on both backends (a PNG on cairo, a serialized scene on webgl), with no bond. View release writes nothing and the channel stops. Empty-space click leaves overlay and bond unchanged.</desc>
   <style>
     .ink { fill: #1b1f24; }
     .muted { fill: #5c6570; }
@@ -155,10 +155,8 @@
         font-family="ui-sans-serif, system-ui, sans-serif">View pan / orbit</text>
   <text class="ink" x="102" y="358" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">in-drag</text>
-  <text class="yes" x="257" y="344" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">Readout; the</text>
-  <text class="yes" x="257" y="358" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">view repaints</text>
+  <text class="yes" x="257" y="351" text-anchor="middle" font-size="12"
+        font-family="ui-sans-serif, system-ui, sans-serif">Readout</text>
   <text class="muted" x="395" y="351" text-anchor="middle" font-size="12"
         font-family="ui-sans-serif, system-ui, sans-serif">No</text>
   <text class="yes" x="533" y="344" text-anchor="middle" font-size="11"

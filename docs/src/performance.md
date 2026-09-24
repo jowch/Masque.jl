@@ -19,23 +19,28 @@ A Masque widget is two things:
   This grows with the number of interactive marks and with the size of
   each payload.
 
-For a typical plot — hundreds or a few thousand points — both are small
-and the notebook stays responsive. Around ten thousand interactive marks
-the hit data approaches the size of the picture, and in the hundreds of
-thousands it dominates and is what makes the notebook feel slow.
+For a typical interactive plot both are small and the notebook stays
+responsive. The picture stays roughly the same size however many marks
+there are, while the hit data keeps growing with them, so on a plot with
+very many interactive marks the hit data becomes the larger term and is
+what makes the notebook feel slow. The findings page has the measured
+crossover.
 
-Heatmaps are the exception to "grows with the data". When a grid has
-more cells than the screen has pixels, Masque sends one value per screen
-pixel instead of the whole matrix (see [Inspect a grid](@ref)), so a very
-large heatmap costs about the same as one that just fills the plot.
+Heatmaps are the exception to "grows with the data". When a grid's
+cells are smaller than one screen pixel on its axis, Masque sends one
+value per screen pixel instead of the whole matrix (see
+[Inspect a grid](@ref)), so a very large heatmap costs about the same as
+one that just fills the plot.
 
 ## What happens on each interaction
 
 - **Hover** is handled entirely in the browser: no Julia runs, whatever
   the size of the data.
-- **A click or a release** sets the `@bind` value, and Pluto re-runs
-  every cell that reads it. The time that takes is the time your cells
-  take — including drawing a new figure if one depends on the click.
+- **A click on a mark, or releasing a box or a threshold,** sets the
+  `@bind` value, and Pluto re-runs every cell that reads it. The time
+  that takes is the time your cells take — including drawing a new
+  figure if one depends on the click. A click on empty space, and the
+  end of a pan or orbit, set nothing and re-run nothing.
 - **Pan and orbit** re-render the figure in Julia for each frame while
   you drag, so they cost one render per frame.
 
@@ -55,5 +60,6 @@ large heatmap costs about the same as one that just fills the plot.
   animates, WGLMakie's live canvas is the better fit; see
   [Backends](@ref).
 - **Mind the figure's width.** A wider figure is a bigger picture, though
-  it does not change the hit data. `masque`'s `max_width` keyword sets
-  the display width it renders for.
+  it does not change the hit data. `masque`'s `max_width` keyword (700
+  pixels by default) caps the display width it renders for; a narrower
+  figure is rendered at its own width.

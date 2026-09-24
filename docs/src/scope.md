@@ -45,12 +45,24 @@ the pointer by the polygon drawn before it. Pass the interactables
 yourself, points first:
 
 ```julia
+begin
+    fig = Figure()
+    ax = Axis(fig[1, 1])
+    p = poly!(ax, Point2f[(0, 0), (3, 0), (3, 3), (0, 3)])
+    s = scatter!(ax, [1.0, 2.0], [1.0, 2.0]; markersize = 16)
+    nothing
+end
+```
+
+```julia
 @bind pick masque(fig, [PointInteractable(ax, s), PolygonInteractable(ax, p)])
 ```
 
-In 3D there is no depth test either: a point on the far side of an
-`Axis3` scene is hittable wherever it is projected, even if another
-object is drawn in front of it.
+In 3D there is no depth test either. Which mark the pointer hits
+depends on the same layer order, not on distance from the camera: a
+point on the far side of an `Axis3` scene can be hit through a nearer
+object in a later layer, and a nearer mark in a later layer can be
+hidden by a farther one in an earlier layer.
 
 ## Current rough edges
 
