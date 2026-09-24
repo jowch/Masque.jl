@@ -50,12 +50,10 @@ pixel instead: hovering shows the cell under the pointer and its value,
 and a click still reports the true `i` and `j`. A 4000 × 4000 heatmap
 works this way without any setting.
 
-Colour images have no single value per cell. A large colour image
-(cells smaller than a pixel) reports `i` and `j` with `value = nothing`.
-A small colour image, whose cells are one screen pixel or wider, currently
-fails with a `MethodError` when `masque` runs; show a small RGB image
-with its cells as a real-valued matrix, or pass a
-[`RectInteractable`](@ref) grid with the values you want to read.
+Colour images have no single value per cell, so hovering or clicking
+one reports `i` and `j` with `value = nothing`, whatever its size. To
+read a number, pass a [`RectInteractable`](@ref) grid with the values
+you want, such as each pixel's intensity.
 
 ## Brush a block of cells
 

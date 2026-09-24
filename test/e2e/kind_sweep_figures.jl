@@ -76,6 +76,13 @@ kind_sweep_meta() = [
         "tip" => "1,1", "hoverIndex" => 0, "hoverTip" => "1,1", "mode" => "element",
     ),
     Dict(
+        # A small colour image: cells are many screen pixels, so this is the `values` branch,
+        # which ships no values for a non-real matrix (#189). Hover and click report i/j only.
+        "key" => "image_rgb", "layerId" => "cells", "layerKind" => "grid",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "1,1", "hoverIndex" => 0, "hoverTip" => "1,1", "mode" => "element",
+    ),
+    Dict(
         "key" => "barplot", "layerId" => "bars", "layerKind" => "rects",
         "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
         "tip" => "value", "hoverIndex" => 0, "hoverTip" => "value",
@@ -293,6 +300,14 @@ function build_kind_sweep()
         z = [Float64(i + j) for i in 1:4, j in 1:3]
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "image")
+        image!(ax, (0.5, 4.5), (0.5, 3.5), z)
+        masque(fig)
+    end
+
+    image_rgb = let
+        z = [RGBf(i / 4, j / 3, 0.5) for i in 1:4, j in 1:3]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "image_rgb")
         image!(ax, (0.5, 4.5), (0.5, 3.5), z)
         masque(fig)
     end
@@ -532,7 +547,7 @@ function build_kind_sweep()
     end
 
     return (;
-        scatter, lines, series, segments, heatmap, image, barplot, poly,
+        scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly,
         polar, scatter_dark, arrows3d, hlines, threshold, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
