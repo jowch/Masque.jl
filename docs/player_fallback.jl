@@ -30,6 +30,9 @@ function notebook_cell_code(src::AbstractString)
     return cells
 end
 
+# Whether `code` is the cell that binds `bond`: `@bind pick` must not match `@bind picks`.
+is_bind_cell(code::AbstractString, bond) = occursin(Regex("@bind\\s+" * string(bond) * raw"(?![\w!])"), code)
+
 # The string inside a cell that is only `md"..."` / `md"""..."""`, else `nothing`.
 function markdown_cell_text(code::AbstractString)
     ex = try
@@ -65,7 +68,6 @@ function fallback_markdown(
     player = fallback_player(src)
     haskey(player, "cells") || error("player in $(basename(nbpath)) lists no cells")
     code = notebook_cell_code(src)
-    bind_needle = "@bind " * string(player["bond"])
     blocks = Any[]
     for id in player["cells"]
         haskey(code, id) || error("player cell $id is not in $(basename(nbpath))")
@@ -76,7 +78,7 @@ function fallback_markdown(
             continue
         end
         push!(blocks, Markdown.Code("julia", c))
-        if image !== nothing && occursin(bind_needle, c)
+        if image !== nothing && is_bind_cell(c, player["bond"])
             push!(blocks, Markdown.Paragraph(Any[Markdown.Image(image, "The figure before any interaction")]))
         end
         out = get(outputs, id, nothing)
