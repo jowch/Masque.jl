@@ -64,8 +64,17 @@ end
 
 # Pluto's status tree is the editor's "what is happening" check (pkg, workspace,
 # run). `cell.queued` is set on every cell when a run is planned, so it is not
-# that check.
+# that check. Child businesses share the root SpinLock, so lock once here and
+# walk unlocked; locking again on the way down deadlocks.
 function open_business_names(node)
+    lk = hasproperty(node, :lock) ? getproperty(node, :lock) : nothing
+    lk === nothing && return _open_business_names(node)
+    return lock(lk) do
+        _open_business_names(node)
+    end
+end
+
+function _open_business_names(node)
     names = String[]
     for (key, child) in getproperty(node, :subtasks)
         label = String(key)
@@ -75,7 +84,7 @@ function open_business_names(node)
             push!(names, label)
         end
         if finished === nothing
-            for nested in open_business_names(child)
+            for nested in _open_business_names(child)
                 push!(names, label * "/" * nested)
             end
         end
@@ -180,7 +189,12 @@ function open_and_wait(session, path; timeout_s::Real, heartbeat_s::Real = 15.0)
     result = fetch(task)
     if result isa Tuple && length(result) == 2 && result[1] isa Exception
         err, bt = result
-        throw(CapturedException(err, bt))
+        report_check(false, "$name: $(sprint(showerror, err))")
+        showerror(stderr, err, bt)
+        println(stderr)
+        flush(stdout)
+        flush(stderr)
+        return nothing
     end
     return result
 end

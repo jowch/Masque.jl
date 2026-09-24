@@ -118,6 +118,32 @@ include("ci_run.jl")
         ),
     )
     @test open_business_names(tree) == ["pkg", "pkg/precompile"]
+    # Children share the root lock. Locking on the way down would deadlock.
+    lk = Threads.SpinLock()
+    locked = (;
+        name = :notebook,
+        started_at = 1.0,
+        finished_at = nothing,
+        lock = lk,
+        subtasks = Dict(
+            :pkg => (;
+                name = :pkg,
+                started_at = 1.0,
+                finished_at = nothing,
+                lock = lk,
+                subtasks = Dict(
+                    :precompile => (;
+                        name = :precompile,
+                        started_at = 1.0,
+                        finished_at = nothing,
+                        lock = lk,
+                        subtasks = Dict{Symbol, Any}(),
+                    ),
+                ),
+            ),
+        ),
+    )
+    @test open_business_names(locked) == ["pkg", "pkg/precompile"]
     checked = notebook_status(
         (;
             notebooks = Dict(1 => (; cells = NamedTuple[], process_status = "ready", status_tree = tree)),
