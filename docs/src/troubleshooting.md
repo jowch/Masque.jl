@@ -219,6 +219,18 @@ Loading neither raises the `ArgumentError` earlier on this page.
 Loading both is fine; unqualified `masque` defaults to CairoMakie. For
 more information, see [Backends](@ref).
 
+### Tried `CairoMakie.activate!(type = "svg")` and the widget is a PNG
+
+**Cause:** `type = "svg"` chooses the MIME for a bare `Figure`.
+`masque` draws a PNG on CairoMakie, or a canvas on WGLMakie, and lays
+the overlay on that picture. `save("figure.svg", fig)` writes SVG from
+the file extension.
+
+**Fix:** leave the activation in place for cells that return a `Figure`,
+and for files you save. Return `masque(fig)` from the cell that should
+show the overlay. For more information, see
+[SVG display and files](@ref).
+
 ### Tried feeding this widget's bond into the same call's `selected=`
 
 **Pluto says:** cyclic references.
