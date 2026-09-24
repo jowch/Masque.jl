@@ -71,6 +71,7 @@ makedocs(;
             "Polar points" => "gallery/polar.md",
         ],
         "Reference" => [
+            "Supported plots and axes" => "support.md",
             "Constructors" => "constructors.md",
             "API" => "api.md",
             "Backends" => "backends.md",

@@ -1,9 +1,10 @@
 # Legend
 
-Hold your pointer over a legend entry to highlight the traces it labels.
-Click the entry to select that series; `@bind` captures the pick. The
-overlay cannot hide Makie traces — use the wash plus `@bind` so a Julia
-cell can fade the rest.
+A legend already names every series in a figure, so it is a natural
+place to choose one. With Masque, hovering a legend entry highlights the
+lines or points it labels, and clicking it hands that series to your
+notebook. `masque(fig)` makes every `Legend` and `axislegend` interactive
+and links each entry to the plots it describes.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -15,71 +16,81 @@ cell can fade the rest.
 Main.masque_fallback("legend_lines")
 ```
 
-The notebook draws two labeled lines and an `axislegend`. A click names
-the series. `pick.label` is that name. `pick.targets` names the lines
-the entry highlights (`"lines"`, `"lines_2"`, or `"series:2"` to pin one
-element). `pick.group` is the group title, or `nothing` when the legend
-is not grouped.
+## What a click returns
 
-## Persist a series wash
+A click on an entry makes `pick` a [`LegendEvent`](@ref). `pick.label`
+is the entry's text, `pick.group` is the group title in a grouped legend
+(`nothing` otherwise), and `pick.targets` lists the layers the entry
+highlights. Clicks on the plot itself still return the plot's own
+events, so a cell can check which kind it got:
 
-`selected = Dict(:legend => [1])` paints the **swatch** — the legend
-layer is `:rects`. To keep a series washed across a remount, hydrate the
-**target** layer ids instead. For more information, see
-[Selection](@ref).
+```julia
+pick isa LegendEvent ? "series $(pick.label)" : "click a legend entry"
+```
 
-## Targets and empty links
+## Fade the other series
 
-Pass `targets=` when auto-link is not enough:
+The highlight is drawn over the figure; it cannot hide or dim the lines
+Makie drew. To fade the unselected series, draw a second figure in a
+cell that reads `pick`:
+
+```julia
+begin
+    focus = pick isa LegendEvent ? pick.label : nothing
+    fig2 = Figure(size = (560, 360))
+    ax2 = Axis(fig2[1, 1])
+    for (label, f) in (("a", sin), ("b", cos))
+        faded = focus !== nothing && label != focus
+        lines!(ax2, xs, f.(xs); label, alpha = faded ? 0.2 : 1.0)
+    end
+    fig2
+end
+```
+
+The same `pick.label` can filter a table, choose which series to fit, or
+drive any other cell.
+
+## Which marks an entry highlights
+
+Each entry is linked automatically to the plots Makie drew it for: the
+line for a `lines!` entry, both the points and the line for
+`scatterlines!` and `stem!`, and one series of a `series!` plot. Pass
+`targets=` to [`LegendInteractable`](@ref) when you want something
+else — for example, to have an entry light up a scatter as well as its
+line:
 
 ```julia
 LegendInteractable(leg; targets = Dict("a" => :lines, "b" => [:lines_2, :scatter]))
 ```
 
-`targets` also accepts a `Vector` — one value per legend entry, in
-order (top to bottom, matching a grouped legend's flattened
-`entrygroups`) — `Symbol` / `Vector{Symbol}` / `nothing`. A `Dict` key
-that matches no label, a wrong-length `Vector`, or a target that names
-an unknown layer or an unhighlightable kind raises `ArgumentError` at
-build time.
+A target is a layer id, which highlights every mark in that layer, or
+`id:k`, which highlights only element `k` of it. `targets` can also be a
+vector with one entry per legend row, top to bottom. A label or layer
+that does not exist raises an `ArgumentError`, so a typo shows up
+immediately.
 
-An explicit `targets=` is fail-loud. The auto path drops unhighlightable
-kinds (`:grid`) with `@warn` and keeps the rest.
+A legend built by hand from `LineElement`s has nothing to link to unless
+you say so. Give the elements Makie's own `plots=` keyword, or pass
+`targets=`. An entry with no targets is still clickable; it just
+highlights nothing.
 
-A spec is a layer id — every element of that layer — or `id:k` pinning
-element `k` (1-based). Auto-extracted `series!` entries use the pin, so
-each swatch lights one series rather than every trace packed into the
-parent `:lines` layer. A bare `targets = :series` still highlights the
-whole layer.
+## A tooltip for each entry
 
-A legend with no links is still hittable. A click still fires. The
-visual echo **clears**, and no tooltip card appears unless you pass a
-template.
-
-`LegendInteractable(leg)` on a custom `LineElement` legend with no
-`plots=` and no `targets=` has empty links. Pass `plots=` on the
-element (Makie's own keyword) or pass `targets=` on
-[`LegendInteractable`](@ref).
-
-`scatterlines!` and `stem!` auto-link both of their layers. With
-`merge = true`, one legend entry names several ids. A second legend in
-the figure is `:legend_2`. The manifest sorts legend layers first so
-they win pixels under them.
-
-## Tooltip
-
-Holding the pointer over a legend entry does not show a tooltip. The
-label is already drawn in the row, and a card there covers the entries
-around it. Pass a `masque"..."` template when you want a card (fields:
-`label`, `group`, `targets`). Omitting `tooltip` and `tooltip = false`
-both leave the card off. Moving keyboard focus to an entry still
-announces that entry's label. For more information, see
-[Keyboard and screen readers](@ref).
+Legend entries show no tooltip by default, since the label is already
+on screen and a card would cover the neighbouring entries. Pass a
+template to add one; its fields are `label`, `group`, and `targets`:
 
 ```julia
 LegendInteractable(leg; tooltip = masque"$(label) — $(group)")
 ```
 
-A whole-layer wash can span axes. That two-panel picture lives on
-[Linked views](@ref). This page is two `lines!` plus `axislegend` on one
-axis.
+## Keep a series highlighted after a rebuild
+
+`selected=` on the legend layer highlights the entry's swatch. To keep
+the series itself highlighted when the figure is rebuilt, select the
+series' own layer instead — for example `selected = Dict(:lines => [1])`.
+See [Selection](@ref).
+
+A legend can also highlight series on other axes of the same figure;
+[Linked views](@ref) shows that across two panels. Keyboard focus visits
+the legend entries first, and highlights the series as hover does.

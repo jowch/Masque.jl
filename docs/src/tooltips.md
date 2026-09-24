@@ -1,8 +1,14 @@
 # Tooltips
 
-Hold your pointer over a mark and a tooltip appears on the figure. The
-notebook is the tutorial. Hover updates the card and does not re-run
-Julia. A click still writes `@bind`, and the last cell names the city.
+Hold the pointer over a mark and a card appears above it with that
+mark's data. The card is built in the browser from the mark's payload,
+so it appears instantly and never re-runs Julia. You choose one of three
+things for each interactable: the default table, a template of your own,
+or no card at all.
+
+In this notebook each city's card is a template that prints the name in
+bold and the population with thousands separators, and the card's border
+takes the marker's colour:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -14,64 +20,87 @@ Julia. A click still writes `@bind`, and the last cell names the city.
 Main.masque_fallback("tooltips_template")
 ```
 
+## The default card
+
+Leave `tooltip` out and the card is a small table of the payload's
+fields. For a scatter whose payloads you did not set, that is the point's
+`index`, `x`, and `y`; with your own payloads, it is your fields. The
+table is a good first draft and often all you need.
+
+Two interactables are exceptions. A legend entry shows no card by
+default, because its label is already drawn next to the swatch; pass a
+template if you want one (see [Legend](@ref)). A
+[`SliceInteractable`](@ref) shows the series values at the cursor rather
+than a mark's payload.
+
 ## Write a template
 
-`$(field)` reads that field from the point under the pointer. It does
-not read a Julia local. `$(pop:,)` formats the number before escaping.
+A template is a `masque"..."` string. Each `$(field)` is replaced by that
+field of the payload under the pointer:
 
-| Value | Type | Browser behavior |
-|---|---|---|
-| *(omitted / `nothing`)* | `Nothing` | Auto name/value table from the payload |
-| `masque"..."` | `Markup` | Template interpolated against that mark's payload |
-| `false` | `Bool` | Tooltip suppressed; the highlight in the overlay still runs |
-| `true` | `Bool` | `ArgumentError` — not meaningful |
+```julia
+PointInteractable(ax, s;
+    payloads = cities,
+    tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
+)
+```
 
-A legend is the exception to the omitted-`tooltip` row: holding the
-pointer over an entry shows no card unless you pass `masque"..."`. See
-[Legend](@ref).
-
-A [`SliceInteractable`](@ref) is a card for the sample at the cursor,
-not for a mark. Omit `tooltip` and the card is that sample. See
-[Sample a series](@ref).
-
-`$(field)` is a placeholder resolved in the browser from the payload of
-the mark under the pointer. Put derived text in the payload, not in the
-template. `masque"$(pop+1)"` is a `TemplateValidationError` at parse.
-
-| Syntax | Meaning |
+| In the template | Becomes |
 |---|---|
-| `$(field)` | Value of payload field `field`; HTML-escaped |
-| `$(field:spec)` | Same, formatted by a [d3-format](https://d3js.org/d3-format) `spec` before escaping |
-| `` \$ `` | Literal dollar sign |
+| `$(field)` | the payload's `field`, HTML-escaped |
+| `$(field:spec)` | the same, formatted with a [d3-format](https://d3js.org/d3-format) `spec` first — `:,` adds thousands separators, `:.2f` two decimals, `:.1%` a percentage |
+| `\$` | a literal dollar sign |
+| anything else | copied into the card as HTML, so `<b>` and `<br>` work |
 
-For constructors that take `tooltip=`, see [Constructors](@ref). For
-card chrome keywords and CSS custom properties, see [Tooltip chrome](@ref).
+`$(field)` names a payload field, not a Julia variable, and it cannot be
+an expression. The template has to work in the browser without Julia —
+in a static export, for instance — so anything you want to compute goes
+into the payload first:
 
-## Check payload fields
+```julia
+rows = [(; city = c.city, density = round(c.pop / c.area; digits = 1)) for c in raw]
+```
 
-A malformed template (`$(pop+1)`, an unclosed `$(`, an unknown
-d3-format type character) is a `TemplateValidationError` the instant
-the cell containing `masque"..."` parses.
+Because the template's own text is inserted as HTML, keep it to markup
+you wrote. Payload values are always escaped, so data cannot inject
+markup, but a template like `<a href="$(url)">` still trusts whatever URL
+the data holds.
 
-A syntactically valid field that is not a key in the payload is caught
-later, when `masque()` builds the manifest: an `ArgumentError` with a
-"did you mean?" suggestion for a close misspelling. This check runs
-when any payload in the layer is a `NamedTuple` — against the union of
-those field names — and is skipped only when none are (for example
-every payload is a `Dict`). Then a missing `$(field)` renders empty at
-pointer-hold instead of erroring.
+`tooltip = false` turns the card off while keeping the hover highlight
+and the click.
+
+## Mistakes Masque catches
+
+A template that cannot be parsed — an expression such as `$(pop + 1)`,
+an unclosed `$(`, or a format spec d3 does not understand — is a
+`TemplateValidationError` as soon as the cell containing `masque"..."`
+runs.
+
+A field the payload does not have is caught when `masque` builds the
+widget, with a "did you mean" suggestion for a close misspelling. That
+check reads the field names of named-tuple payloads. With a `DataFrame`
+or `Dict` payloads it is skipped, and a misspelled field simply leaves a
+blank in the card — worth a quick hover after you write the template.
+
+## Where the card appears
+
+The card sits above the mark under the pointer, with a small caret
+pointing at it, and flips below the mark if it would run off the top of
+the figure or shifts sideways at the edges. On a line it follows the
+nearest point of the line. Axis readouts, thresholds, boxes, the view,
+and a slice have no single mark, so their card follows the pointer
+instead. When a mark has keyboard focus, the card anchors to it the same
+way.
 
 ## Match a dark figure
 
-A `Figure(; backgroundcolor = :gray12)` gets a dark tooltip card, from
-the figure's background, not from OS `prefers-color-scheme`.
+The card's light or dark theme comes from the figure's own background,
+not from the browser or operating-system setting, so a dark figure gets
+a dark card even on a light page:
 
 ```julia
 fig = Figure(size = (560, 360); backgroundcolor = :gray12)
 ```
-
-Pass the `Scatter` to `PointInteractable` so `color=` becomes the
-tooltip accent. The following embed is that dark-figure scatter.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -83,35 +112,18 @@ tooltip accent. The following embed is that dark-figure scatter.
 Main.masque_fallback("tooltips_dark")
 ```
 
-Hold the pointer over a mark. The card is dark because the figure is
-`gray12`, even when this docs page is light. Setting Pluto or the OS
-to dark does not darken a white figure's tooltip.
-
-The tooltip's light/dark theme comes from the **figure's** background
-(`manifest.background` → `--masque-fig-bg`, CSS relative-color
-syntax). OS `prefers-color-scheme` is the fallback for browsers without
-`lch(from …)`. `masque` writes an opaque figure background while it
-builds the overlay, then restores `fig.scene.backgroundcolor[]`.
+Browsers too old for CSS relative colours fall back to the system
+light/dark setting.
 
 ## Accent color
 
-When Masque can resolve the color of the mark under the pointer into
-`layer.colors`, the tooltip gets a 3px accent border in that color.
-Tooltip **text stays neutral**. Accent is the border, not the overlay
-highlight.
+When Masque knows the colour of the mark under the pointer, the card gets
+a 3px border in that colour; the text stays neutral. The colour comes
+from `scatter!`'s `color=` when you pass the `Scatter` itself to
+[`PointInteractable`](@ref) (as the dark example does), from the
+`colors=` keyword (as the city example does), or from a legend entry's
+swatch. Without a known colour the border is a plain hairline.
 
-`layer.colors` is filled from `scatter!`'s `color=` when you pass the
-`Scatter` to `PointInteractable`, from the points constructor's
-`colors=` keyword, or from a legend entry's element color. The accent
-is omitted when the color cannot be resolved.
-
-## Placement
-
-The tooltip sits above the mark under the pointer, not on the cursor,
-except on axis, threshold, ROI, view, and a slice sample, where it
-follows the pointer. On a line it slides to the nearest point on the
-path (`lines!` / `series!` included). Keyboard focus uses the segment
-midpoint, or the point halfway along a whole line. It flips below if
-it would clip the top edge, and shifts if it would clip a side. For
-card chrome keywords and CSS custom properties, see
-[Tooltip chrome](@ref).
+To change the card's background, text colour, font, or corner radius for
+a whole widget, pass the `tooltip_*` keywords to `masque`, or set the
+`--masque-tip-*` CSS properties on the page; see [Tooltip chrome](@ref).

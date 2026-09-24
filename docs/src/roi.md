@@ -1,11 +1,11 @@
 # Brush a region
 
-Drag a rectangle on a 2D scatter. When you release, Julia sees either the box
-bounds or the points the box enclosed.
+Drag a box across a plot and release it; the notebook gets what the box
+covers. That can be the points inside it, a block of heatmap cells, or
+just the box's coordinates. While you drag, only the box moves — Julia
+runs once, when you let go.
 
-The following embed is that brush on this docs site. Dragging the box to a
-listed set swaps the table. Any other geometry still moves the box; the
-table stays on the last listed set.
+Drag the box over the stations below. The table lists the ones inside:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -17,109 +17,75 @@ table stays on the last listed set.
 Main.masque_fallback("roi_table")
 ```
 
-Hold the pointer over a station to read its name. Drag the box interior to
-move it, or a handle to resize. Enclosed stations highlight in the overlay.
-Julia runs when you release, not while you drag.
+## Pick the points inside a box
 
-## Overlay a scatter and a box
-
-The notebook is the tutorial. It scatters the stations, passes that
-scatter to `PointInteractable` with the station rows as `payloads`, and
-brushes them with `ROIInteractable`. `masque(fig)` does not add the box.
-Pass it in the same call as the points.
-
-`bounds` is `(xmin, xmax, ymin, ymax)` in data space, with `xmin < xmax`
-and `ymin < ymax`.
-
-Before the first release, `picks` is `nothing`. After you release,
-`picks` is the stations inside the box. An empty box is an empty list.
-`samples[picks]` is those rows. Enclosed points highlight in the overlay.
-
-On this site the chip lists a handful of boxes, including an empty one.
-A box that is not in that list still moves; the table stays on the last
-listed set.
-
-## If your rows are a table
-
-If the points come from a table, pull columns for `scatter!` and pass
-`payloads` as a `DataFrame` with one row per mark, in the same order, or
-as a vector of NamedTuples. Do not pass `eachrow(df)` as `payloads`.
+An [`ROIInteractable`](@ref) draws the box; `selects` names the layer
+whose marks it collects. Give the points an `id` so the box can refer to
+them, and pass both to the same `masque` call:
 
 ```julia
-pts = PointInteractable(ax, s; id = :pts, payloads = table)
+pts = PointInteractable(ax, s; id = :pts, payloads = samples)
+roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = :pts)
 ```
-
-Filter with `table[picks, :]` when `payloads` is that DataFrame, or with
-`e.name` on each event. After a `selects` release, `picks` is a
-`Vector{ElementEvent}`. An empty box is still `[]`:
 
 ```julia
-if picks === nothing
-    md"*Drag the box, then release.*"
-elseif isempty(picks)
-    md"*No stations in the box.*"
-else
-    rows = table[picks, :]
-    md_rows = ["| Station | x | y | Group |", "|---|---:|---:|---|"]
-    for r in eachrow(rows)
-        push!(md_rows, "| $(r.name) | $(r.x) | $(r.y) | $(r.group) |")
-    end
-    Markdown.parse("**$(nrow(rows)) stations**\n\n" * join(md_rows, "\n"))
-end
+@bind picks masque(fig, [pts, roi])
 ```
 
-`index` is 1-based. Slicing the original table with `e.index` works only
-while row order matches the interactable. `e.name` and `table[picks, :]`
-read the row you passed. For more information, see [Constructors](@ref).
+`bounds` is where the box starts, as `(xmin, xmax, ymin, ymax)` in data
+coordinates. After a release, `picks` is a `Vector{ElementEvent}` with
+one event per enclosed point, and the points inside stay highlighted. An
+empty box gives an empty vector, not `nothing`, so one `isempty` check
+covers it. Each event carries its point's payload (`e.name`,
+`e.group`), and the vector indexes your data directly: `samples[picks]`
+is the rows inside the box.
 
-## Drag and resize
-
-The box draws four corner grips. A corner resizes two axes. The middle
-of each side resizes that one axis, with no grip drawn there. The
-pointer shows a directional resize cursor on a corner or an edge
-midpoint, and a move cursor in the interior.
-
-If the same axis also has a [`ViewInteractable`](@ref), Shift+drag pans
-instead of moving the box. Orbit is the `Axis3` camera, and
-[`ROIInteractable`](@ref) raises `ArgumentError` on an `Axis3`.
-
-The keyboard cannot drag the box. Tab reaches scatter points, not the ROI.
-For more information, see [Keyboard and screen readers](@ref).
-
-## Commit bounds or enclosed items
-
-Omit `selects` when you want the rectangle itself. On release the bond is a
-[`BoundsEvent`](@ref) (`box.xmin` .. `box.ymax`). `bounds=` accepts that
-4-tuple or a `BoundsEvent`:
+If your rows are a `DataFrame`, pass it as `payloads` — one row per
+point, in the order you plotted them — and slice it with the events:
 
 ```julia
-ROIInteractable(ax; bounds = (1.0, 4.0, 2.0, 5.0))
+pts = PointInteractable(ax, s; id = :pts, payloads = df)
 ```
 
-With `selects`, the bond is a `Vector{ElementEvent}` over points, or one
-[`GridWindowEvent`](@ref) over a grid:
+```julia
+picks === nothing || isempty(picks) ? df[1:0, :] : df[picks, :]
+```
 
-- Circles (`PointInteractable`, kind `:circles`): one [`ElementEvent`](@ref)
-  per enclosed point. `e.name` is that row.
-- Grid ([`RectInteractable`](@ref) heatmap or image, kind `:grid`): **one**
-  [`GridWindowEvent`](@ref) with 1-based inclusive `i1:i2` / `j1:j2`
-  (`A[win]` is `A[win.i1:win.i2, win.j1:win.j2]`), not one event per
-  cell. The enclosed cell-block is fill-only in the overlay; the ROI box
-  is the outline.
-- Empty points box: `[]`, never `nothing`. A grid brush that misses the
-  grid is one `GridWindowEvent` whose ranges are empty, not `[]`.
+Clicking one of those points in the same widget also returns a vector
+(with one event), so the downstream cell treats a click and a brush the
+same way.
 
-`selects` names a layer id whose kind is `:circles` or `:grid`. The target
-must be in the same `masque` call. `selects = :bars` fails
-(`ArgumentError`): bars are `:rects`. A polyline layer fails the same way.
+## Brush heatmap cells
 
-## Axes that work
+Point `selects` at a heatmap or image layer instead, and the box returns
+one [`GridWindowEvent`](@ref) describing the block of cells it covers:
+`win.i1:win.i2` columns and `win.j1:win.j2` rows, so `A[win]` is that
+sub-matrix. See [Inspect a grid](@ref).
 
-`ROIInteractable` works on a 2D `Axis` with linear or log numeric scales
-(`identity`, `log10`, `log`). It raises `ArgumentError` on `Axis3`,
-`PolarAxis`, or a categorical axis.
+## Read the box itself
 
-A larger scatter brush is [Box-select scatter](@ref). The
-image cousin is [Image ROI](@ref): one [`GridWindowEvent`](@ref) on
-release, not a listed cell-by-cell player. For more information, see
-[Gallery](@ref).
+Leave out `selects` and the value is the box: a [`BoundsEvent`](@ref)
+with `xmin`, `xmax`, `ymin`, and `ymax`. Use this when the region is the
+result — a time window, a crop, a range to fit over. `bounds` accepts a
+`BoundsEvent` too, so one widget's box can seed another's; passing a
+widget its own box back would be a cyclic reference in Pluto.
+
+## Moving and resizing
+
+Drag inside the box to move it, a corner to resize it in both
+directions, or the middle of an edge to move just that edge; the pointer
+changes to show which. If the axis also has a
+[`ViewInteractable`](@ref), a plain drag moves the box and Shift+drag pans
+the plot. The box cannot be moved with the keyboard.
+
+## Where it works
+
+The box needs a 2D `Axis` with numeric limits and a scale the browser can
+invert (`identity`, `log10`, or `log`); on an `Axis3`, a `PolarAxis`, or
+a categorical axis it raises an `ArgumentError` when `masque` runs.
+`selects` can name a layer of points or a heatmap/image, and that layer
+must be in the same `masque` call; bars and lines cannot be brushed. See
+[Supported plots and axes](@ref).
+
+For a larger example, [Box-select scatter](@ref) summarizes two groups of
+points inside the box, and [Image ROI](@ref) brushes an image.

@@ -1,8 +1,18 @@
 # Read coordinates
 
-Click anywhere in a 2D axis to read data `(x, y)`. Click a colorbar to
-read `value`. Drag a threshold line; on release, Julia gets a
-[`ThresholdEvent`](@ref). There is no highlight at the click.
+Not every question is about a mark. Sometimes you want a value off the
+plot itself: the data coordinates under the pointer, the value a colour
+stands for, or a cutoff you set by dragging a line. This page covers the
+three interactables that turn a pointer position into a number. None of
+them is added by `masque(fig)` on its own except the colorbar, so pass
+them yourself.
+
+## Read `(x, y)` from the axis
+
+[`AxisInteractable`](@ref) turns the whole plot area into a readout.
+Moving the pointer shows the data coordinates in a card that follows the
+cursor; clicking makes `pick` an [`AxisEvent`](@ref) with `pick.x` and
+`pick.y`:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -14,44 +24,17 @@ read `value`. Drag a threshold line; on release, Julia gets a
 Main.masque_fallback("readouts_axis")
 ```
 
-Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
-notebook. Heatmap *cells* stay on [Inspect a grid](@ref). This page is
-the continuous readout: axis, colorbar, and threshold. If a later demo
-on this page also binds `pick`, replace the previous bind cell.
-
-## Read `(x, y)` from the axis
-
-The notebook draws a sine and adds [`AxisInteractable`](@ref) on that
-axis. `masque(fig)` does not add it. The tooltip follows the pointer.
-A click in your notebook stores `pick.x` and `pick.y`. There is no
-`index`.
-
-The tooltip follows the pointer, not a mark. A click writes the bond.
-There is no highlight in the overlay at that location.
-
-Supported scales: `identity`, `log10`, and `log`. Categorical axes work
-here. `Makie.pseudolog10` and `Makie.Symlog10` raise `ArgumentError` at
-`masque()` time.
-
-`AxisInteractable` on `Axis3` or `PolarAxis` raises `ArgumentError`. Use
-scatter or lines on those axes instead. `payloads=` and `tooltip=` on
-`AxisInteractable` are a `MethodError`. `selected=` on `:axis` raises
-`ArgumentError`.
+Use it to mark a position — the start of a time window, a point to fit
+from — without needing a mark there. It works on linear and log axes,
+and on categorical axes, where it reads the category.
 
 ## Read a colorbar value
 
-Replace the previous `fig` and `@bind pick` cells.
-
-[`ColorbarInteractable`](@ref) is one hit region on the bar's pixel box.
-The layer kind is `:axis` with a bbox. Default `id` is `:colorbar`.
-`pick` is a [`ColorbarEvent`](@ref). `pick.value` is the data value
-under the pointer. A remount does not reopen a previous readout:
-`ColorbarInteractable` stores no position.
-
-`masque(fig)` **does** install a `Colorbar` block. You can also pass the
-colorbar yourself so the heatmap cells are not in the same widget:
-
-**1.** Draw a small heatmap, a `Colorbar`, and a `ColorbarInteractable`:
+[`ColorbarInteractable`](@ref) makes a colorbar answer "what value is
+this colour?". Hovering shows the value under the pointer; a click makes
+`pick` a [`ColorbarEvent`](@ref) with `pick.value`. `masque(fig)` adds
+one for every `Colorbar` in the figure; build it yourself when you want
+the colorbar without the heatmap's cells in the same widget:
 
 ```julia
 begin
@@ -65,59 +48,58 @@ begin
 end
 ```
 
-**2.** Bind a click:
-
 ```julia
 @bind pick masque(fig, cbint)
 ```
 
-Click the bar. `pick.value` is the data value under the pointer.
-The tooltip follows the pointer. Same invertible scales as the axis
-(`identity`, `log10`, `log`).
+A click on the colorbar could, for example, set a contour level or a
+threshold for the heatmap drawn in a later cell.
 
 ## Drag a threshold
 
-Replace the previous `fig` and `@bind pick` cells.
-
-[`ThresholdInteractable`](@ref) is a draggable line. `value` is
-required (a number or a [`ThresholdEvent`](@ref)). `:horizontal` is a
-constant-y line you drag vertically. `:vertical` is a constant-x line
-you drag horizontally.
-
-**1.** Draw a scatter and a horizontal threshold:
+[`ThresholdInteractable`](@ref) draws a line across the axis that you
+drag. It suits any cut-off you would otherwise set with a slider, with
+the advantage that you set it against the data itself. `value` is where
+the line starts; `:horizontal` gives a line at constant `y` that you drag
+up and down, `:vertical` one at constant `x`:
 
 ```julia
 begin
+    ys = [0.2, 0.8, 0.4, 0.9, 0.3, 0.6, 0.1, 0.7]
     fig = Figure(size = (560, 320))
     ax = Axis(fig[1, 1])
-    scatter!(ax, 1:8, [0.2, 0.8, 0.4, 0.9, 0.3, 0.6, 0.1, 0.7]; markersize = 16)
-    cutoff = ThresholdInteractable(
-        ax;
-        orientation = :horizontal,
-        value = 0.5,
-    )
+    scatter!(ax, 1:8, ys; markersize = 16)
+    cutoff = ThresholdInteractable(ax; orientation = :horizontal, value = 0.5)
     nothing
 end
 ```
 
-**2.** Bind the widget:
-
 ```julia
-@bind pick masque(fig, cutoff)
+@bind level masque(fig, cutoff)
 ```
 
-While you drag, the overlay moves the line. After you release the
-pointer, `pick` is a [`ThresholdEvent`](@ref): `layer` is `:threshold`,
-and `pick.value` is the data coordinate. `pick.y` raises an error; use
-`pick.value`. Pass `pick` back as `value=` when some other input
-rebuilds the figure.
+The line moves on the figure while you drag, and on release `level`
+becomes a [`ThresholdEvent`](@ref); `level.value` is the new position in
+data coordinates. Before the first drag `level` is `nothing`, so fall
+back to the starting value:
 
-This is not a slider of the continuum. Release writes one scalar. The
-pointer can stop anywhere on the dragged axis.
+```julia
+begin
+    t = level === nothing ? 0.5 : level.value
+    "$(count(>(t), ys)) of $(length(ys)) points above $(round(t; digits = 2))"
+end
+```
 
-The dragged axis must be invertible (`identity` / `log10` / `log`).
-Categorical axes work. `Axis3` and `PolarAxis` raise `ArgumentError`.
+A rebuilt figure starts the line at `value` again. Feeding `level` back
+into the same figure would make Pluto report a cyclic reference, for the
+same reason as `selected = pick` (see [Selection](@ref)), so keep the
+starting value in its own cell if other inputs rebuild the figure.
 
-If [`ViewInteractable`](@ref) is on the same axis, an ordinary drag
-moves the threshold. **Shift**+drag pans instead. For pan and orbit, see
-[Pan and orbit](@ref).
+## Where these work
+
+All three need to turn a pixel back into data, so they need a 2D `Axis`
+(or colorbar) with an `identity`, `log10`, or `log` scale; on an
+`Axis3` or a `PolarAxis` they raise an `ArgumentError` when `masque`
+runs. See [Supported plots and axes](@ref). If the axis also has a
+[`ViewInteractable`](@ref), a plain drag moves the threshold and
+Shift+drag pans.
