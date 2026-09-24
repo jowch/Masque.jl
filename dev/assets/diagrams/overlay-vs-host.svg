@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" width="800" height="470"
      role="img">
   <title>Overlay versus Julia versus host</title>
-  <desc>Four hosts: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind, including extra table cells, re-runs Julia on live Pluto, swaps embed-cell snapshots on a listed player, stays at the default bond on overlay-only, and is dead on static HTML. Listed ROI items or a few axis or threshold values follow the same split. Unlisted continuous drag keeps overlay chrome; Julia stays on the last listed set, the default bond, or dead. Heatmap inspect is live on Pluto, GIF or MP4 on this site, overlay-only tooltip chrome if that player is present, and dead Julia on static HTML. Cairo view frames use the gesture channel on live Pluto, GIF or MP4 on this site, overlay readout with no bind, and a dead gesture channel on static HTML.</desc>
+  <desc>Four hosts: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind, including extra table cells, re-runs Julia on live Pluto, swaps embed-cell snapshots on a listed player, stays at the default bond on overlay-only, and is dead on static HTML. Listed ROI items or a few axis or threshold values follow the same split. Unlisted continuous drag keeps overlay chrome; Julia stays on the last listed set, the default bond, or dead. Heatmap inspect is live on Pluto, the grids player on this site, overlay-only tooltip chrome if that player is present, and dead Julia on static HTML. Cairo view frames use the gesture channel on live Pluto, GIF or MP4 on this site, overlay readout with no bind, and a dead gesture channel on static HTML.</desc>
   <style>
     .ink { fill: #1b1f24; }
     .muted { fill: #5c6570; }
@@ -155,15 +155,15 @@
   <text class="ink" x="96" y="360" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">Heatmap inspect</text>
   <text class="ink" x="96" y="374" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">GIF/MP4</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">player</text>
   <text class="yes" x="251" y="360" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">Tooltip; Julia</text>
   <text class="yes" x="251" y="374" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">on click</text>
   <text class="muted" x="402" y="360" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">GIF/MP4 on site;</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Tooltip; listed</text>
   <text class="muted" x="402" y="374" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">do not list cells</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">click swaps</text>
   <text class="yes" x="553" y="360" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">Tooltip chrome</text>
   <text class="yes" x="553" y="374" text-anchor="middle" font-size="11"
