@@ -247,11 +247,10 @@ try {
         if (after !== before && /Seattle|Cascadia/i.test(after)) break;
         await sleep(80);
       }
-      if (after === before) {
-        console.error(`WARN  brush: readout unchanged (${JSON.stringify(before)}); keeping box-move gif`);
-      } else {
-        console.error(`OK  brush: ${after.slice(0, 120)}`);
+      if (after === before || !/Seattle|Cascadia/i.test(after)) {
+        throw new Error(`brush readout did not move onto Cascadia: ${JSON.stringify(after)}`);
       }
+      console.error(`OK  brush: ${after.slice(0, 120)}`);
       await sleep(1100);
     } else if (scenario === "legend") {
       const legend = layers.find((l) => l.id === "legend");

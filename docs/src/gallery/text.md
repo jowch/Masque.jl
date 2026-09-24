@@ -47,8 +47,7 @@ not a hit target.
 !!! note
 
     Label hits are the same on `:cairo` and `:webgl`. This player is the
-    Cairo figure. The static page hovers and highlights; it does not list
-    label clicks, because `masque(fig)` also publishes the scatter and the
-    two kinds share the widget. In a live notebook, branch on
-    `hasproperty(pick, :text)` before reading the string.
+    Cairo figure. The listed snapshots replay a label click and a marker
+    click. `masque(fig)` also publishes the scatter, so in a live notebook
+    branch on `hasproperty(pick, :text)` before reading the string.
 

@@ -87,9 +87,13 @@ function _hljs(class, text)
 end
 
 function _scan_string(code, i, n, q)
-    triple = i + 2 <= n && code[i:(i + 2)] == q^3
+    # `i + 2` is a byte offset. A string whose first character is multibyte
+    # (`"π"`) makes that index invalid.
+    i2 = nextind(code, i)
+    i3 = i2 <= n ? nextind(code, i2) : n + 1
+    triple = i3 <= n && code[i] == q && code[i2] == q && code[i3] == q
     delim = triple ? q^3 : string(q)
-    j = i + ncodeunits(delim)
+    j = triple ? nextind(code, i3) : i2
     while j <= n
         if code[j] == '\\'
             j = nextind(code, j)

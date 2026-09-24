@@ -50,14 +50,14 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-Before a click, `pick` is `nothing`. `pick.label` is the entry you clicked. This cell reads `pick`, so it re-runs on the click.
+Before a click, `pick` is `nothing`. A legend click is a `LegendEvent`, and `pick.label` is that entry. A click on a line is an `ElementEvent` with no `label`. This cell reads `pick`, so it re-runs on the click.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if pick === nothing
-    "click a legend entry"
-else
+if pick isa LegendEvent
     "$(pick.label) selected"
+else
+    "click a legend entry"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

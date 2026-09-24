@@ -82,17 +82,19 @@ more information, see [Read coordinates](@ref).
 
 ## Read a cell
 
-Hold the pointer over a cell. The tooltip is `(i,j) = value`, or `(i,j)`
-when a cell is smaller than about one screen pixel (Masque then drops
-`values[]` from the manifest and warns). That is not the auto name/value
-table used on scatter and bars. For more information, see
-[Tooltips](@ref).
+Hold the pointer over a cell. The tooltip is `(i,j) = value`. A real
+cell smaller than about one screen pixel still shows that form: Masque
+ships one sample per screen pixel instead of `values[]`, and does not
+warn. `(i,j)` with no value is the case where neither `values` nor
+`sample` was sent. A color image, or any other non-real matrix, takes
+that path. That is not the auto name/value table used on scatter and
+bars. For more information, see [Tooltips](@ref).
 
 Click the cell. In live Pluto, `pick` is a [`GridCellEvent`](@ref):
 `layer` is `:cells`, `pick.i` and `pick.j` are 1-based (column, then
 row), and `A[pick]` is `A[pick.i, pick.j]`. `pick.value` is the cell
-value when it was shipped, or `nothing` when values were dropped from the
-manifest (the click still carries the cell). The same
+when `values[]` was shipped, the screen-pixel sample when the cell is
+smaller than one screen pixel, or `nothing` when neither was sent. The same
 [`RectInteractable`](@ref) used as a bar list (`layout === :list`) is an
 [`ElementEvent`](@ref); `layout === :grid` is `GridCellEvent`. The cell
 is a highlight in the overlay. A click in empty space does not write

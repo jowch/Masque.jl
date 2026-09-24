@@ -41,10 +41,9 @@ and [Brush a region](@ref).
 
 ## Variations
 
-A live notebook slices each channel and reports min, p1, p50, p99, and
-max, then draws one histogram per channel. That cell runs once per
-committed box, not per pointer frame. A miss is a `GridWindowEvent`
-whose `i1:i2` is empty, not `[]`.
+The readout counts the pixels in the box and prints the median of each
+channel. That cell runs once per committed box, not per pointer frame.
+A miss is a `GridWindowEvent` whose `i1:i2` is empty, not `[]`.
 
 !!! note
 
@@ -52,5 +51,5 @@ whose `i1:i2` is empty, not `[]`.
     axis. `Axis3` and `PolarAxis` raise `ArgumentError`. This player shows
     the resting box on the Cairo figure. It does not scrub windows: every
     grid brush shares one snapshot key, so a static page cannot list two
-    different rectangles. Quantiles need the live notebook.
+    different rectangles.
 

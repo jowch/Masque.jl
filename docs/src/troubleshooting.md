@@ -38,14 +38,12 @@ pass `masque"..."` for a template, or `tooltip = false` to suppress it.
 
 ### Tried `payloads` of the wrong length
 
-**Error prefix:** `got N payloads for M elements` /
-`payloads must match points`
+**Error prefix:** `payloads has N entries, expected M`
 
-**Cause:** `payloads` does not have one entry per geometry element. Most
-constructors report "got N payloads for M elements".
-`PointInteractable` says "payloads must match points" instead — same
-mistake, different wording. `RegionInteractable` requires `payloads`
-(no auto default) and says `regions/payloads length mismatch`.
+**Cause:** `payloads` does not have one entry per geometry element.
+`expand_payloads` throws that `ArgumentError` for every length check,
+including `PointInteractable` and `RegionInteractable`. A DataFrame
+says `rows` instead of `entries`.
 
 **Fix:** match lengths 1:1, or omit `payloads` on constructors that
 have an auto default.
@@ -85,13 +83,13 @@ and `ymin < ymax`.
 
 ### Tried an unknown Region kind, or `selected=` on the base Region id
 
-**Error prefix:** `regions/payloads length mismatch` /
-`unknown region kind`
+**Error prefix:** `RegionInteractable: unknown region kind` /
+`RegionInteractable: payloads has N entries, expected M`
 
-**Cause:** `RegionInteractable`'s `regions` and `payloads` do not line
-up 1:1, or a region tuple's first element is not `:circle`, `:rect`, or
-`:polygon`. `selected = Dict(:cells => [1])` when `id = :cells` also
-fails: Region layers are `:cells_c` / `:cells_r` / `:cells_p`.
+**Cause:** a region tuple's first element is not `:circle`, `:rect`, or
+`:polygon`, or `regions` and `payloads` do not line up 1:1.
+`selected = Dict(:cells => [1])` when `id = :cells` also fails: Region
+layers are `:cells_c` / `:cells_r` / `:cells_p`.
 
 **Fix:** check the region tuple shapes against [Custom hits](@ref). Key
 `selected=` on the suffixed ids.

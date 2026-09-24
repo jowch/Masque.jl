@@ -98,8 +98,9 @@ of each side resizes that one axis, with no grip drawn there. The
 pointer shows a directional resize cursor on a corner or an edge
 midpoint, and a move cursor in the interior.
 
-If the same axis also has a [`ViewInteractable`](@ref), Shift+drag yields to
-the view: the plot pans (or orbits) instead of moving the box.
+If the same axis also has a [`ViewInteractable`](@ref), Shift+drag pans
+instead of moving the box. Orbit is the `Axis3` camera, and
+[`ROIInteractable`](@ref) raises `ArgumentError` on an `Axis3`.
 
 The keyboard cannot drag the box. Tab reaches scatter points, not the ROI.
 For more information, see [Keyboard and screen readers](@ref).

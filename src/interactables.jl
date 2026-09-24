@@ -1443,7 +1443,7 @@ present), so a single call can mix shapes freely.
 
 # Arguments
 - `regions` — a `Vector`, each element one of:
-  - `(:circle, (cx, cy), r)` — `r` in data units
+  - `(:circle, (cx, cy), r)` — `r` in logical pixels, multiplied by `ctx.scaling` (not data units)
   - `(:rect, (cx, cy), w, h)` — `w`, `h` in data units
   - `(:polygon, [(x, y), …])` — a ring of points
   Any other first element raises `ArgumentError`.

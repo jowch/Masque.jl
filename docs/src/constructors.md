@@ -197,12 +197,15 @@ inner `Text`. `text!` whose `space` is not `:data` is skipped with a
 specific warning. `lines!` and `stairs!` are one whole-line element.
 `series!` is one `:lines` layer with one element per series.
 
-`contourf!` is filled levels. A pointer in a hole misses that polygon
-and hits the polygon drawn there. `hexbin!` stays unconstructed: its
-scatter is data-space. A child whose `space` is not `:data`, such as
-`bracket!`'s label, is skipped with its own warning. Hidden children
-are not layers. `LScene` has no overlay; see [Troubleshooting](@ref).
-For a type you implement yourself, see [Custom hits](@ref).
+`contourf!` is filled levels. A pointer in a hole misses that polygon.
+It hits another polygon only when one is actually drawn in the hole.
+An empty hole, including a peak above the top level, hits nothing.
+`hexbin!` stays unconstructed: its scatter is data-space. `bracket!`'s
+label warns `masque: skipping non-data-space text`. A non-`Text` child
+whose `space` is not `:data` is skipped with no warning of its own.
+Hidden children are not layers. `LScene` has no overlay; see
+[Troubleshooting](@ref). For a type you implement yourself, see
+[Custom hits](@ref).
 
 ## Element constructors
 

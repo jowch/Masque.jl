@@ -32,8 +32,10 @@ Tooltips and interactions can be customized.
 ## Install
 
 ```julia
-julia> ] add Masque
+julia> import Pkg; Pkg.add(url = "https://github.com/jowch/Masque.jl")
 ```
+
+Masque is not in the General registry. The [Getting started](https://jowch.github.io/Masque.jl/dev/getting-started/) page has the Pluto cell.
 
 You'll also want `Pluto`, plus one Makie backend: `CairoMakie` for a static image, or
 `WGLMakie` for animation / large data / live 3D.

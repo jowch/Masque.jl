@@ -1,13 +1,11 @@
-# Limits slider
+# Limits
 
 The axis is built with `limits = (0, 6, 0, 40)`. Every marker inside
-that window is still a hit target. In a live notebook a PlutoUI slider
-is `@bind` to the upper x limit, the figure is rebuilt, and `masque`
-projects the overlay onto the new limits.
+that window is still a hit target. The point on the right edge stays
+clickable.
 
-This player is one setting of that window. Hover or click a marker.
-Dragging the axis is [Drag to pan](@ref), which does not rebuild the
-cell.
+This page is that one window. Hover or click a marker. Dragging the
+axis is [Drag to pan](@ref), which does not rebuild the cell.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -40,17 +38,16 @@ cell.
 
 ## Variations
 
-The same rebuild sets `azimuth` and `elevation` on an `Axis3`. Selection
-survives either rebuild when you pass `selected=` into the new
-`masque` call. A `Ref` that does not read the slider holds the indices
-between rebuilds. Do not pass `selected=` to store a camera pose.
+Rebuilding the figure with new limits, or setting `azimuth` and
+`elevation` on an `Axis3`, is a different notebook. Selection survives
+either rebuild when you pass `selected=` into the new `masque` call.
+A `Ref` that does not read the slider holds the indices between
+rebuilds. Do not pass `selected=` to store a camera pose.
 
 !!! note
 
     Re-projecting after a limits change is the same on `:cairo` and
-    `:webgl`. Each rebuild is a new PNG on Cairo and a new scene on WebGL,
-    so a slider is the expensive way to move a camera. This page cannot run
-    the PlutoUI slider: the player has no kernel. Use the slider in a
-    notebook. For in-drag frames without a rebuild, see [Drag to pan](@ref)
-    and [Drag to orbit](@ref).
+    `:webgl`. This notebook does not load PlutoUI or bind a slider.
+    For in-drag frames without a rebuild, see [Drag to pan](@ref) and
+    [Drag to orbit](@ref).
 
