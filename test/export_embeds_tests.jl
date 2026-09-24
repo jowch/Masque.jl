@@ -247,6 +247,8 @@ end
         "gallery_image",
         "gallery_limits",
         "gallery_polar",
+        "example_cluster",
+        "example_heatmap_trace",
     ]
     for name in names
         path = joinpath(root, "docs", "src", "embeds", name * ".jl")
@@ -264,6 +266,19 @@ end
             @test occursin("# ╔═╡ $id", src)
         end
     end
+
+    trace = parse_player_toml(joinpath(root, "docs", "src", "embeds", "example_heatmap_trace.jl"))
+    @test [snapshot_key(js_shape_from_toml(row)) for row in trace["states"]] ==
+        ["null", "cells:30", "cells:39", "cells:6", "cells:65"]
+    cluster = parse_player_toml(joinpath(root, "docs", "src", "embeds", "example_cluster.jl"))
+    ckeys = [snapshot_key(js_shape_from_toml(row)) for row in cluster["states"]]
+    @test ckeys[1] == "null"
+    @test all(startswith("items:pts:"), ckeys[2:end])
+    @test length(unique(ckeys)) == length(ckeys)
+    cidx = [Set(it["index"] for it in row["value"]["items"]) for row in cluster["states"][2:end]]
+    @test length.(cidx) == [63, 76]
+    @test isdisjoint(cidx[1], cidx[2])
+    @test all(>=(80), cidx[1]) && all(<(80), cidx[2])
 
     tips = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_tooltips.jl"))
     tip_keys = [snapshot_key(js_shape_from_toml(row)) for row in tips["states"]]

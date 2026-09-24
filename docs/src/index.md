@@ -55,6 +55,6 @@ you can orbit. See [Backends](@ref).
 - [Custom hits](@ref) — `RegionInteractable` / `FunctionInteractable`
 - [Backends](@ref) — `:cairo` vs `:webgl`, and when to reach for which
 - [Troubleshooting](@ref) — common errors and what causes them
-- [Gallery](@ref) — a screenshot and a player for each demo
+- [Examples](@ref) — worked examples and a page per plot type
 - [API](@ref) — full docstrings
 
