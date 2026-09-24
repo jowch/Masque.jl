@@ -1,8 +1,8 @@
 # Inspect a grid
 
-Hold your pointer over a heatmap or image cell to read its indices and
-value. Click the cell to select it; `@bind` captures that pick. The
-tooltip is `(i,j) = value`.
+A heatmap or an image is a grid of cells rather than a list of marks.
+Hover a cell and the card reads `(i,j) = value`; click it and your
+notebook gets the cell's column, row, and value.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -14,82 +14,62 @@ tooltip is `(i,j) = value`.
 Main.masque_fallback("grids_heatmap")
 ```
 
-Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
-notebook. The layer kind is `:grid`, not `:rects`. Bars from `barplot!`
-are `:rects` and are a different job.
+## Hover and click cells
 
-## Overlay a heatmap
-
-The notebook draws a small heatmap and passes that plot to
-[`RectInteractable`](@ref). A click fills `pick`, and the last cell
-reads the column, the row, and the value. `image!` uses the same
-method. `masque(fig)` walks a `Heatmap` or `Image` and installs this
-layer for you.
-
-Or pass edges and values yourself. Edges must be monotonic. `values`
-must have shape `(length(xedges) - 1, length(yedges) - 1)`:
+`masque(fig)` picks up every `heatmap!` and `image!` on its own. To
+choose the grid yourself — for example to give it an `id` when a figure
+has two — pass the plot to [`RectInteractable`](@ref):
 
 ```julia
-cells = RectInteractable(
-    ax;
-    grid = (0.5:1:4.5, 0.5:1:3.5, z),
-    id = :cells,
-)
+cells = RectInteractable(ax, p)
 ```
 
-`payloads=` on the `grid=` constructor is accepted and discarded. Cell
-payloads are always `(; i, j, value)` in the browser, not a Julia lookup
-table. `RectInteractable(ax, p::Makie.Heatmap; payloads = …)` is a
-`MethodError`.
+A click makes `pick` a [`GridCellEvent`](@ref). `pick.i` is the column
+and `pick.j` the row, both 1-based, so they index the matrix you plotted:
+`z[pick]` is the same as `z[pick.i, pick.j]`, and `pick.value` is the
+cell's value. As with other marks, the clicked cell stays highlighted,
+and a click outside the grid leaves the selection alone.
 
-A colorbar next to a heatmap is a value readout, not a cell pick. For
-more information, see [Read coordinates](@ref).
+If you have edges and values rather than a plot, pass them as a grid.
+Each edge vector must be monotonic (ascending or descending), and the
+values form a matrix of size `(length(xedges) - 1, length(yedges) - 1)`:
 
-## Read a cell
+```julia
+cells = RectInteractable(ax; grid = (0.5:1:4.5, 0.5:1:3.5, z), id = :cells)
+```
 
-Hold the pointer over a cell. The tooltip is `(i,j) = value`. A real
-cell smaller than about one screen pixel still shows that form: Masque
-ships one sample per screen pixel instead of `values[]`, and does not
-warn. `(i,j)` with no value is the case where neither `values` nor
-`sample` was sent. For a color image, or any other non-real matrix,
-that is only the sub-pixel path: `_grid_sample` returns `nothing` and
-the manifest keeps the edges. A cell at least one screen pixel wide
-still builds `values` with `Float32`, and a non-real cell throws, so
-the widget does not mount. That is not the auto name/value table used
-on scatter and bars. For more information, see [Tooltips](@ref).
+A cell's payload is always its `i`, `j`, and `value`; grids do not take
+`payloads`. Keep per-cell data in Julia and look it up with `pick`.
 
-Click the cell. In live Pluto, `pick` is a [`GridCellEvent`](@ref):
-`layer` is `:cells`, `pick.i` and `pick.j` are 1-based (column, then
-row), and `A[pick]` is `A[pick.i, pick.j]`. `pick.value` is the cell
-when `values[]` was shipped, the screen-pixel sample when a real cell
-is smaller than one screen pixel, or `nothing` when neither was sent. The same
-[`RectInteractable`](@ref) used as a bar list (`layout === :list`) is an
-[`ElementEvent`](@ref); `layout === :grid` is `GridCellEvent`. The cell
-is a highlight in the overlay. A click in empty space does not write
-the bond.
+## Large grids
 
-Tab and arrow keys skip `:grid`. Keyboard focus walks bars and scatter
-marks, not heatmap cells. For more information, see
-[Keyboard and screen readers](@ref).
+A heatmap can have far more cells than the screen has pixels, and
+shipping every value to the browser would make the notebook slow. When
+cells are smaller than a screen pixel, Masque sends one sample per
+pixel instead: hovering shows the cell under the pointer and its value,
+and a click still reports the true `i` and `j`. A 4000 × 4000 heatmap
+works this way without any setting.
 
-For `selected=` on `:grid`, see
-[Tried `selected=` on a kind that cannot hydrate](@ref).
+Colour images have no single value per cell. A large colour image
+(cells smaller than a pixel) reports `i` and `j` with `value = nothing`.
+A small colour image, whose cells are one screen pixel or wider, currently
+fails with a `MethodError` when `masque` runs; show a small RGB image
+with its cells as a real-valued matrix, or pass a
+[`RectInteractable`](@ref) grid with the values you want to read.
 
-## Brush cells with an ROI
+## Brush a block of cells
 
-Pair [`ROIInteractable`](@ref) with `selects = :cells`. On release, the
-bond is one [`GridWindowEvent`](@ref): `A[win]` is
-`A[win.i1:win.i2, win.j1:win.j2]`. A brush that misses the grid has
-empty ranges, not `[]`. The overlay fills the enclosed block and leaves
-the ROI box as the outline.
+Add an [`ROIInteractable`](@ref) with `selects` naming the grid, and a
+drag returns one [`GridWindowEvent`](@ref) for the block of cells under
+the box: `A[win]` is that sub-matrix. A box that misses the grid still
+returns one `GridWindowEvent`, with empty ranges (`win.i1:win.i2` is
+`1:0`), so `A[win]` is an empty matrix rather than an error. See
+[Brush a region](@ref).
 
-`selects` accepts `:circles` or `:grid`. Pointing it at a `:rects` bar
-layer raises `ArgumentError`.
+## What grids cannot do
 
-## Polar heatmaps
-
-`heatmap!` on a `PolarAxis` is skipped with `@warn` in
-`auto_interactables`. An explicit axis-aligned grid on polar is
-misaligned. Use scatter or lines on polar instead.
-
-`Axis3` heatmaps are skipped the same way.
+Heatmap cells cannot be reached with the keyboard — arrowing through
+thousands of cells is not useful — and they cannot start selected with
+`selected=`. Heatmaps and images on an `Axis3` or a `PolarAxis` are
+skipped with a warning. A colorbar next to a heatmap is a separate
+readout of values; see [Read coordinates](@ref).

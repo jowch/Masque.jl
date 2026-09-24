@@ -1,13 +1,20 @@
 # Click marks
 
-Click a bar, a polygon, or a polar point. Each notebook is the tutorial.
-Paste its cells into your own notebook, including the notes. On this site
-the **Simulating `@bind`** chip is a listed snapshot. In Pluto, the
-readout cell re-runs.
+Every plot `masque(fig)` recognizes is clickable, not only scatters. A
+click on a mark — a point, bar, polygon, line, or text label — hands it
+to your notebook as an [`ElementEvent`](@ref): its 1-based
+`pick.index`, plus fields that depend on what kind of mark it is.
+Heatmap cells, legend entries, and colorbars return their own event
+types (see [Concepts](@ref)). This page walks through bars, polygons,
+lines, and points on a polar axis. [Plot-object defaults](@ref) lists
+the fields each plot type reports, and [Supported plots and axes](@ref)
+which plots work on which axes.
 
-This page does not reuse `fig` or `sel` from [Getting started](@ref).
+## Bars
 
-## Click a bar
+A bar reports its `value` (the bar's height) and its `low` and `high`
+ends, so a stacked or dodged bar still tells you which segment you hit.
+Here each click reads the quarter and the value:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -19,11 +26,20 @@ This page does not reuse `fig` or `sel` from [Getting started](@ref).
 Main.masque_fallback("marks_bars")
 ```
 
-`barplot!` on a `PolarAxis` is skipped with `@warn`. Keyboard arrows reach
-bars. A heatmap cell is a different job. For more information, see
-[Inspect a grid](@ref).
+Histograms, waterfalls, and crossbars are clickable too, each with its
+own fields: a waterfall step reports `low`, `high`, and `value`; a
+histogram bin reports `value` (the bar's height, which is a count only
+with `normalization = :none`), `low`, and `high`; a crossbar reports
+`midpoint`, `low`, and `high`. A
+heatmap is a grid of cells rather than a list of bars; it has its own
+page, [Inspect a grid](@ref).
 
-## Click polygons
+## Polygons
+
+Each polygon of a `poly!` is one mark, reported by its `index` in the
+order you drew them. Pair the index with your own list of names, or
+pass `payloads` to [`PolygonInteractable`](@ref) so the name travels
+with the click:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -35,20 +51,26 @@ bars. A heatmap cell is a different job. For more information, see
 Main.masque_fallback("marks_poly")
 ```
 
-`poly!` on a `PolarAxis` is skipped with `@warn`. Band, density, contourf,
-violin, and voronoiplot are clickable the same way. For more information,
-see [Polygons](@ref).
+Bands, densities, filled contours, violins, and Voronoi cells are
+polygons too. A filled contour reports the `low` and `high` of its
+level. A click inside a hole of a contour level hits whatever polygon
+is drawn in the hole, not the ring around it, and hits nothing if the
+hole is empty (a peak above the top level, for example).
 
-## Click a line
+## Lines
 
-A `lines!` path is one element: the whole line. Four vertices still draw
-three edges, but a click anywhere along the path binds that one line.
+A `lines!` call is a single mark: clicking anywhere along the path
+selects the whole line, however many vertices it has, which matches how
+a line plot is read: as one series. To read the value at a particular
+`x` along a line instead, use a [`SliceInteractable`](@ref).
 
 ```julia
 begin
     fig = Figure()
     ax = Axis(fig[1, 1])
-    lines!(ax, [0, 1, 2, 3], [0, 1, 0, 1])
+    xs = 0:0.1:10
+    lines!(ax, xs, sin.(xs))
+    lines!(ax, xs, cos.(xs))
     nothing
 end
 ```
@@ -57,11 +79,17 @@ end
 @bind pick masque(fig)
 ```
 
-`stairs!` is the same whole-line kind. `series!` is one line layer with
-one element per series. Line segments, errorbars, rangebars, hlines, and
-vlines stay one element per piece.
+`pick.layer` tells the two lines apart (`:lines` and `:lines_2`, in the
+order you drew them). `stairs!` is also one mark per call, with ids
+`:stairs`, `:stairs_2`, and so on, and a `series!`
+call is one layer whose `pick.index` is the series. Plots made of
+separate pieces — `linesegments!`, error bars, range bars, `hlines!`,
+and `vlines!` — make each piece its own mark instead.
 
-## Click points on a polar axis
+## Points on a polar axis
+
+Scatters, lines, and segments work on a `PolarAxis`. A point's `x` is
+its angle and its `y` its radius, the same order you passed them in:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -73,8 +101,6 @@ vlines stay one element per piece.
 Main.masque_fallback("marks_polar")
 ```
 
-Scatter, lines, line segments, and `series!` work on a `PolarAxis`.
-`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`,
-`SliceInteractable`, and `ViewInteractable` on polar raise
-`ArgumentError`. `heatmap!`, `barplot!`, and `poly!` on polar are
-skipped with `@warn`.
+Bars, heatmaps, and polygons on a polar axis are skipped with a warning,
+and the readouts that need a flat axis are not available there; see
+[Supported plots and axes](@ref).
