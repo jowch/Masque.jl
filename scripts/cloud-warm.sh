@@ -53,7 +53,7 @@ for target in "$@"; do
             (cd "$REPO/test/e2e" && npm install)
             # The cloud image preinstalls one Chromium build under PLAYWRIGHT_BROWSERS_PATH, and
             # test/e2e pins the Playwright whose build matches it, so nothing is downloaded.
-            # Check the match, and say which pin is stale before falling back to a download.
+            # Check the match, and say what is missing before falling back to a download.
             browsers="${PLAYWRIGHT_BROWSERS_PATH:-}"
             if [ -n "$browsers" ] && [ -d "$browsers" ]; then
                 rev="$(node -p 'require(process.argv[1]).browsers.find(b => b.name === "chromium").revision' \
@@ -62,10 +62,15 @@ for target in "$@"; do
                     echo "Chromium build $rev already in $browsers; skipping download"
                     continue
                 fi
-                echo "test/e2e's Playwright wants Chromium build ${rev:-?}; $browsers has:" \
-                    "$(cd "$browsers" && ls -d chromium-* 2>/dev/null | tr '\n' ' ')" >&2
-                echo "Pin test/e2e/package.json to the Playwright release matching that build" \
-                    "(see CLAUDE.md, Cloud sessions). Trying a download anyway." >&2
+                if [ -d "$browsers/chromium-$rev" ]; then
+                    echo "$browsers has chromium-$rev but not chromium_headless_shell-$rev;" \
+                        "downloading the missing build." >&2
+                else
+                    echo "test/e2e's Playwright wants Chromium build ${rev:-?}; $browsers has:" \
+                        "$(cd "$browsers" && ls -d chromium-* chromium_headless_shell-* 2>/dev/null | tr '\n' ' ')" >&2
+                    echo "Pin test/e2e/package.json to the Playwright release matching that build" \
+                        "(see CLAUDE.md, Cloud sessions). Trying a download anyway." >&2
+                fi
             fi
             (cd "$REPO/test/e2e" && npx playwright install --with-deps chromium)
             ;;
