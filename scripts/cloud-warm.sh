@@ -12,7 +12,8 @@
 #             WGLMakie, JSON3 only), every dep is a direct dep here, because the test files
 #             `using` [extras] and indirect deps (Makie, FileIO, …) that `using` can't see.
 #   frontend  `npm ci` in frontend/.
-#   e2e       `npm install` + the Chromium build matching test/e2e's pinned Playwright.
+#   e2e       `npm install` + the Chromium build matching test/e2e's pinned Playwright
+#             (already preinstalled on the cloud image: no download, see CLAUDE.md).
 #
 # Start it in the background at the beginning of a task and read code meanwhile:
 #   scripts/cloud-warm.sh julia > /tmp/masque-warm.log 2>&1 &
@@ -49,7 +50,24 @@ for target in "$@"; do
             (cd "$REPO/frontend" && npm ci)
             ;;
         e2e)
-            (cd "$REPO/test/e2e" && npm install && npx playwright install --with-deps chromium)
+            (cd "$REPO/test/e2e" && npm install)
+            # The cloud image preinstalls one Chromium build under PLAYWRIGHT_BROWSERS_PATH, and
+            # test/e2e pins the Playwright whose build matches it, so nothing is downloaded.
+            # Check the match, and say which pin is stale before falling back to a download.
+            browsers="${PLAYWRIGHT_BROWSERS_PATH:-}"
+            if [ -n "$browsers" ] && [ -d "$browsers" ]; then
+                rev="$(node -p 'require(process.argv[1]).browsers.find(b => b.name === "chromium").revision' \
+                    "$REPO/test/e2e/node_modules/playwright-core/browsers.json" 2>/dev/null || true)"
+                if [ -d "$browsers/chromium-$rev" ] && [ -d "$browsers/chromium_headless_shell-$rev" ]; then
+                    echo "Chromium build $rev already in $browsers; skipping download"
+                    continue
+                fi
+                echo "test/e2e's Playwright wants Chromium build ${rev:-?}; $browsers has:" \
+                    "$(cd "$browsers" && ls -d chromium-* 2>/dev/null | tr '\n' ' ')" >&2
+                echo "Pin test/e2e/package.json to the Playwright release matching that build" \
+                    "(see CLAUDE.md, Cloud sessions). Trying a download anyway." >&2
+            fi
+            (cd "$REPO/test/e2e" && npx playwright install --with-deps chromium)
             ;;
         *)
             echo "unknown target: $target (expected julia, frontend, e2e)" >&2
