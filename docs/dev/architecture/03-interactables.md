@@ -42,7 +42,7 @@ data to resolve a hit to an element index and its payload.
 > **The grid is compact in geometry.** The edges are O(source cells along one side). The values
 > follow the screen: the full source matrix when a cell is at least one screen pixel, and one
 > source value per screen pixel of the axis viewport when cells are smaller ([§8](08-scaling.md)).
-> On that sub-pixel branch a matrix that is not real-valued ships edges only. A 2000²–4000²
+> On either branch a matrix that is not real-valued ships edges only. A 2000²–4000²
 > `heatmap!`/`image!` does not ship the source matrix.
 
 ```julia

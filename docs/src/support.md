@@ -21,10 +21,9 @@ panning — need a flat 2D axis whose scale the browser can invert.
 | Sample a series ([`SliceInteractable`](@ref)) | yes ² | no | no |
 | Pan or orbit ([`ViewInteractable`](@ref)) | pan ² | orbit | no |
 
-¹ Scale `identity`, `log10`, or `log`. On a categorical axis the hover
-card shows the category under the pointer, but a click or a release on
-the categorical dimension currently fails with an error instead of
-returning it, so commit readouts on numeric axes.
+¹ Scale `identity`, `log10`, or `log`. A categorical axis works too: the
+hover card shows the category, and the event holds its position with the
+label alongside (see [Read coordinates](@ref)).
 
 ² Scale `identity`, `log10`, or `log`, and numeric (not categorical)
 limits.
