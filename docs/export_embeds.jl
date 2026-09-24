@@ -2,7 +2,6 @@ import Pkg
 using Pluto
 using TOML
 using UUIDs
-using JSON3
 
 # Homebrew cell-series player harvest. Getting-started embed is the README GIF demo
 # (`docs/dev/readme-demo/notebook.jl`): nbpkg-on, in-process against docs/Project.toml.
@@ -42,7 +41,7 @@ end
 
 function manifest_bytes(published::AbstractDict)
     isempty(published) && return 0
-    return maximum(sizeof(JSON3.write(jsonable(v))) for v in values(published); init = 0)
+    return maximum(sizeof(json_write(jsonable(v))) for v in values(published); init = 0)
 end
 
 function harvest_session(; distributed::Bool)
@@ -342,6 +341,48 @@ pluto-trafficlight {
   visibility: visible;
   transform: none;
 }
+pluto-input {
+  display: block;
+  position: relative;
+}
+/* Unfolded source stands in for Pluto's CodeMirror box: same border, same token colors. */
+pre.masque-src {
+  display: block;
+  margin: 0;
+  padding: 2px 6px 2px 4px;
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 4;
+  font-family: var(--code-font-stack);
+  font-size: 15px;
+  line-height: 1.45;
+  font-variant-ligatures: none;
+  background: transparent;
+  color: var(--cm-color-editor-text);
+  border: 1px solid var(--normal-cell-color);
+  border-left: none;
+  border-bottom-right-radius: 4px;
+  min-height: 25px;
+}
+/* Same mapping as Pluto frontend/highlightjs.css: token classes onto the editor palette. */
+pre.masque-src .hljs-keyword { color: var(--cm-color-keyword); }
+pre.masque-src .hljs-built_in,
+pre.masque-src .hljs-type { color: var(--cm-color-builtin); }
+pre.masque-src .hljs-literal,
+pre.masque-src .hljs-number { color: var(--cm-color-literal); }
+pre.masque-src .hljs-string { color: var(--cm-color-string); }
+pre.masque-src .hljs-symbol { color: var(--cm-color-symbol); }
+pre.masque-src .hljs-comment { color: var(--cm-color-comment); }
+pre.masque-src .hljs-meta { color: var(--cm-color-macro); font-weight: 700; }
+pluto-cell.masque-note pluto-output {
+  font-family: var(--lato-ui-font-stack);
+  font-size: 15px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+pluto-cell.masque-note pluto-output p {
+  margin: 0.4em 0;
+}
 """
 
 function pluto_player_css()
@@ -404,31 +445,118 @@ function extra_snapshot_bytes(states, cells)
     return extra
 end
 
+function is_markdown_annotation(code::AbstractString)
+    s = lstrip(code)
+    return startswith(s, "md\"") || startswith(s, "md\"\"\"")
+end
+
+function masque_widget_cell(cells, bond)
+    needle = "@bind $bond"
+    hits = [c for c in cells if occursin(needle, c.code) && occursin("masque(", c.code)]
+    length(hits) == 1 || error("show_code player needs one `$needle masque(...)` cell")
+    return only(hits)
+end
+
+function source_pre_html(code::AbstractString)
+    body = highlight_julia_html(chomp(code))
+    return "<pluto-input><pre class=\"masque-src\"><code class=\"language-julia hljs\">$body</code></pre></pluto-input>"
+end
+
+# A `nothing` cell is source-only. Pluto prints that as an empty or literal output.
+function blank_cell_output(body::AbstractString)
+    text = strip(replace(body, r"<[^>]*>" => ""))
+    return isempty(text) || text == "nothing"
+end
+
+# `show_code` players list every teaching cell. Markdown cells stay folded
+# (rendered notes). Code cells stay unfolded (source above the output).
+function show_code_cells_html(cells, widget, htmls, widget_html::AbstractString)
+    parts = String[]
+    for c in cells
+        cid = string(c.cell_id)
+        body = get(htmls, cid, "")
+        if is_markdown_annotation(c.code)
+            push!(
+                parts, """
+                <pluto-cell class="masque-note">
+                  <pluto-output class="rich_output">$body</pluto-output>
+                </pluto-cell>
+                """
+            )
+        elseif c.cell_id == widget.cell_id
+            push!(
+                parts, """
+                <pluto-cell>
+                  <pluto-trafficlight></pluto-trafficlight>
+                  $(source_pre_html(c.code))
+                  <pluto-output class="rich_output">
+                    <div id="masque-widget">
+                      $widget_html
+                    </div>
+                  </pluto-output>
+                </pluto-cell>
+                """
+            )
+        else
+            output = if blank_cell_output(body)
+                ""
+            else
+                """
+                  <pluto-output>
+                    <div data-masque-cell="$cid">$body</div>
+                  </pluto-output>
+                """
+            end
+            push!(
+                parts, """
+                <pluto-cell>
+                  <pluto-trafficlight></pluto-trafficlight>
+                  $(source_pre_html(c.code))
+                  $output
+                </pluto-cell>
+                """
+            )
+        end
+    end
+    return join(parts, "\n")
+end
+
 function emit_player(path, outpath, player, cells, states, bond::Symbol)
-    widget = first(cells)
-    downstream = cells[2:end]
+    show_code = get(player, "show_code", false) === true
+    widget = show_code ? masque_widget_cell(cells, bond) : first(cells)
+    downstream = show_code ? [c for c in cells if c.cell_id != widget.cell_id] : cells[2:end]
     snapshots = Dict{String, Any}()
     n_inlined_total = 0
     png_b = 0
     man_b = 0
-    idle_html = nothing
+    widget_id = string(widget.cell_id)
+    idle_state = findfirst(st -> st.key == "null", states)
+    src_for_idle = idle_state === nothing ? first(states) : states[idle_state]
+    idle_html = src_for_idle.record.htmls[widget_id]
+    idle_png = png_data_url(idle_html)
     for st in states
         key = st.key
         rec = st.record
-        snapshots[key] = Dict(
+        cell_snaps = if show_code
+            Dict(string(c.cell_id) => rec.htmls[string(c.cell_id)] for c in downstream)
+        else
+            [rec.htmls[string(c.cell_id)] for c in downstream]
+        end
+        snap = Dict{String, Any}(
             "id" => st.id,
-            "cells" => [rec.htmls[string(c.cell_id)] for c in downstream],
+            "cells" => cell_snaps,
         )
+        png = png_data_url(get(rec.htmls, widget_id, ""))
+        if png !== nothing && png != idle_png
+            snap["png"] = png
+        end
+        snapshots[key] = snap
         n_inlined_total += rec.n_inlined
         png_b = max(png_b, rec.png_b)
         man_b = max(man_b, rec.man_b)
-        if idle_html === nothing || key == "null"
-            idle_html = rec.htmls[string(widget.cell_id)]
-        end
     end
     idle_down = String[]
-    idle_state = findfirst(st -> st.key == "null", states)
-    src_state = idle_state === nothing ? first(states) : states[idle_state]
+    src_state = src_for_idle
     src_state.record.n_inlined >= 1 || error(
         "idle masque cell in $(basename(path)) inlined $(src_state.record.n_inlined) published objects; rewrite_published_to_js missed getPublishedObject"
     )
@@ -437,13 +565,48 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     end
 
     n_states = length(states)
-    extra = extra_snapshot_bytes(states, cells)
+    budget_cells = show_code ? [widget; downstream] : cells
+    extra = extra_snapshot_bytes(states, budget_cells)
 
     widget_html = inject_manifest_snapshots(something(idle_html), snapshots)
     down_html = join(idle_down, "\n")
     bond_name = html_escape(string(bond))
     title = html_escape(get(player, "title", "Masque embed"))
     player_css = pluto_player_css()
+    show_chip = get(player, "chip", true) !== false
+    chip_html = show_chip ? SIM_CHIP_HTML : ""
+    downstream_cell = if show_code
+        ""
+    elseif isempty(downstream)
+        ""
+    else
+        """
+        <pluto-cell>
+          <pluto-trafficlight></pluto-trafficlight>
+          <pluto-output>
+            <assignee>$bond_name</assignee>
+            <div id="masque-out" data-masque-bind>
+              $down_html
+            </div>
+          </pluto-output>
+        </pluto-cell>
+        """
+    end
+    notebook_inner = if show_code
+        show_code_cells_html(cells, widget, src_state.record.htmls, widget_html)
+    else
+        """
+        <pluto-cell>
+          <pluto-trafficlight></pluto-trafficlight>
+          <pluto-output class="rich_output">
+            <div id="masque-widget">
+              $widget_html
+            </div>
+          </pluto-output>
+        </pluto-cell>
+        $downstream_cell
+        """
+    end
 
     html = """
     <!doctype html>
@@ -458,25 +621,9 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       </style>
     </head>
     <body>
-      $SIM_CHIP_HTML
+      $chip_html
       <pluto-notebook class="masque-player">
-        <pluto-cell>
-          <pluto-trafficlight></pluto-trafficlight>
-          <pluto-output class="rich_output">
-            <div id="masque-widget">
-              $widget_html
-            </div>
-          </pluto-output>
-        </pluto-cell>
-        <pluto-cell>
-          <pluto-trafficlight></pluto-trafficlight>
-          <pluto-output>
-            <assignee>$bond_name</assignee>
-            <div id="masque-out" data-masque-bind>
-              $down_html
-            </div>
-          </pluto-output>
-        </pluto-cell>
+        $notebook_inner
       </pluto-notebook>
       <script>
     {
@@ -506,16 +653,6 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         }
         return null;
       }
-      function applyFromHost(host) {
-        const man = host && host.masqueManifest;
-        const snaps = man && man.snapshots;
-        if (!snaps) return false;
-        const snap = snapFor(snaps, host.value);
-        if (!snap) return false;
-        const out = document.getElementById("masque-out");
-        out.innerHTML = snap.cells.join("\\n");
-        return true;
-      }
       function sizeFrame() {
         if (!window.frameElement) return;
         window.frameElement.style.overflow = "hidden";
@@ -526,6 +663,42 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         window.frameElement.style.height = Math.max(1, Math.ceil(bottom)) + "px";
       }
       const host = document.querySelector(".ip-host");
+      const idlePng = (host && host.querySelector("img") && host.querySelector("img").src) || "";
+      // innerHTML does not run scripts. A swapped cell can be another widget, so
+      // rebuild each inline script or the selected highlight never mounts.
+      function setCellHtml(el, html) {
+        el.innerHTML = html;
+        el.querySelectorAll("script").forEach(function (old) {
+          if (old.src) return;
+          const s = document.createElement("script");
+          for (let i = 0; i < old.attributes.length; i++) {
+            s.setAttribute(old.attributes[i].name, old.attributes[i].value);
+          }
+          s.text = old.textContent;
+          old.replaceWith(s);
+        });
+      }
+      function applyFromHost(host) {
+        const man = host && host.masqueManifest;
+        const snaps = man && man.snapshots;
+        if (!snaps) return false;
+        const snap = snapFor(snaps, host.value);
+        if (!snap) return false;
+        const img = host.querySelector("img");
+        if (img) {
+          const next = snap.png || idlePng;
+          if (next && img.src !== next) img.src = next;
+        }
+        const out = document.getElementById("masque-out");
+        if (out && Array.isArray(snap.cells)) setCellHtml(out, snap.cells.join("\\n"));
+        if (snap.cells && !Array.isArray(snap.cells)) {
+          Object.keys(snap.cells).forEach(function (id) {
+            const el = document.querySelector('[data-masque-cell="' + id + '"]');
+            if (el) setCellHtml(el, snap.cells[id]);
+          });
+        }
+        return true;
+      }
       if (host) {
         let cur = host.value;
         Object.defineProperty(host, "value", {
@@ -563,7 +736,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     mkpath(dirname(outpath))
     write(outpath, html)
     player_bytes = filesize(outpath)
-    idle_paid = sizeof(something(idle_html)) + sum(sizeof, idle_down)
+    idle_paid = sizeof(something(idle_html)) + sum(sizeof, idle_down; init = 0)
     if extra > EMBED_BUDGET
         @warn "embed extra snapshot bytes exceed budget (warn only; not failing)" path = basename(path) n_states extra budget = EMBED_BUDGET png_bytes = png_b manifest_bytes = man_b player_bytes idle_paid
     end
@@ -572,6 +745,8 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         size = player_bytes, idle_paid,
     )
 end
+
+include("pluto_html_export.jl")
 
 function harvest_one(session, path::AbstractString, outdir::AbstractString; retarget_docs::Bool)
     path = abspath(path)
@@ -591,6 +766,14 @@ function harvest_one(session, path::AbstractString, outdir::AbstractString; reta
         assert_no_errors(nb, path)
         cells = snapshot_cells(nb, player, bond)
         isempty(cells) && error("no cells to snapshot in $path")
+
+        outpath = joinpath(outdir, splitext(basename(path))[1] * ".html")
+        if get(player, "pluto_html", false) === true
+            info = emit_pluto_notebook(session, nb, path, outpath, player, cells, bond)
+            file_hash_after = hash(read(path))
+            file_hash_before == file_hash_after || error("harvest rewrote $path — disable_writing_notebook_files failed")
+            return (; failed_pkg = false, nb, info, cells, states = nothing)
+        end
 
         states = NamedTuple[]
         default_rec = record_state(cells)

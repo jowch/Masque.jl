@@ -1,110 +1,161 @@
 # Backends
 
-Masque has two backends. The interaction contract — `masque`, `@bind`, `InteractionEvent`, every
-interactable — is identical on both. The cost profile is not.
+Masque has two backends. The interaction contract — `masque`, `@bind`,
+[`InteractionEvent`](@ref), every interactable — is the same on both.
+Cost and view preview are not.
 
-## `:cairo` (the default)
+For your first overlay, see [Getting started](@ref).
 
-`using CairoMakie` selects it. CairoMakie renders the figure to a PNG once; Masque computes a
-hit-region manifest in Julia and ships both to the browser. A small TypeScript overlay
-(`assets/overlay.js`) sits over the static image, hit-tests pointer events against the
-manifest, draws highlights/tooltips locally, and only sends a deliberate click back through
-`@bind`. Cost-wise: one render per `masque()` call, independent of how many elements are
-interactive — cheap for a plot you build once and let the user hover/click, expensive if
-you're re-rendering on every animation frame (each frame re-rasterizes the whole scene).
+## Choose a backend
 
-Because the image and manifest are both embedded in the output HTML, **the inspection layer
-keeps working in an exported, offline static HTML** — hover and tooltips still work with no
-Julia kernel at all. Only a click that should trigger a Julia recompute needs a live kernel;
-without one, the click is inert (nothing to `@bind` to).
+Load a Makie backend before you call `masque`.
 
-## `:webgl` (WGLMakie)
+- Load neither `CairoMakie` nor `WGLMakie`: the first `masque` call
+  raises `ArgumentError`.
+- Load only `CairoMakie`: Masque uses the static PNG backend.
+- Load only `WGLMakie`: Masque uses the WebGL backend.
+- Load both: an unqualified `masque(fig)` stays on CairoMakie, so a
+  Cairo-baked session is not blocked by a stray `using WGLMakie`.
 
-> **Status: experimental / incubating.** Verified end-to-end in a real Pluto notebook
-> (render, server-free delivery, overlay, and the `@bind` round-trip).
-
-`using WGLMakie` instead of `CairoMakie` switches `masque` to a browser-GPU backend: the figure
-renders live in a WebGL `<canvas>` on the client GPU, with Masque's usual overlay layered on
-top — no code changes beyond the `using` line:
+`backend=` takes an extension instance, not a `:cairo` or `:webgl`
+symbol. `CairoBackend` and `WebGLBackend` are not in `Masque`'s exports.
+Reach them with `Base.get_extension` when you need a WebGL-only knob
+such as `px_per_unit`:
 
 ```julia
-begin
-    using Masque, WGLMakie
-    x, y, z = randn(200), randn(200), randn(200)
-    fig = Figure()
-    ax = Axis3(fig[1, 1])
-    scatter!(ax, x, y, z)
+masque(
+    fig, interactables;
+    backend = Base.get_extension(Masque, :MasqueWGLMakieExt).WebGLBackend(;
+        px_per_unit = 3.0,
+    ),
+)
+```
+
+`max_width` on `masque` applies when the backend is implicit (Pluto's
+column, in CSS px; default 700). An explicit backend struct uses that
+struct's own `max_width`.
+
+## CairoMakie
+
+`using CairoMakie` selects it. CairoMakie renders the figure to a PNG
+once. Masque ships a hit-region manifest with that image. A TypeScript
+overlay (`assets/overlay.js`) hit-tests pointer events, draws highlight
+in the overlay and the tooltip locally, and sends a deliberate click
+back through `@bind`.
+
+One render per `masque()` call, independent of how many elements are
+interactive. Cheap for a figure you build once and inspect. Expensive if
+you re-render every animation frame (each frame re-rasterizes the whole
+scene).
+
+A static `Axis3` figure on CairoMakie is a valid 3D plot. 3D does not
+require WGLMakie. Scatter on `Axis3` commits an
+[`ElementEvent`](@ref) with `x`, `y`, `z`. A `lines!` is one whole-line
+element whose default payload is `{index}`. MeshScatter derives
+`radius3d` from data-space `markersize`. Orbit is
+[`ViewInteractable`](@ref) on that axis. For which recipes
+`masque(fig)` extracts, see [Recipes masque(fig) extracts](@ref). For
+in-drag preview, see [Pan and orbit preview](@ref).
+
+## WGLMakie
+
+> **Status: experimental.** Verified end to end in a real Pluto
+> notebook (render, overlay, and the `@bind` round-trip).
+
+`using WGLMakie` (with CairoMakie **not** loaded) switches `masque` to a
+browser-GPU canvas. The overlay sits on top. The `masque` / `@bind` API
+does not change.
+
+### The widget is the figure
+
+Return `masque(f)` from the construction cell. That cell is already a
+masqued figure. `@bind` is optional. Displaying a WGLMakie `Figure`
+hangs on `.wglmakie-spinner`: its MIME show waits for a Bonito session
+Pluto never starts.
+
+```julia
+fig = let
+    f = Figure()
+    ax = Axis3(f[1, 1])
+    scatter!(ax, randn(200), randn(200), randn(200))
+    masque(f)
 end
 ```
 
-```julia
-@bind ev masque(fig)   # a live WebGL canvas + Masque's overlay; ev is an InteractionEvent on click
-```
-
-Reach for `:webgl` for **3D you want to actually rotate live**, **animation / frequent
-re-renders** (WebGL redraws a frame, `:cairo` re-rasterizes a whole PNG), and **large or
-live-updating data** where per-frame render cost dominates. For everything else — a figure
-you build once and let the user inspect — `:cairo`'s static PNG is lighter (both backends'
-static-export behavior is verified; see below).
-
-[`examples/webgl_demo.jl`](https://github.com/jowch/Masque.jl/blob/main/examples/webgl_demo.jl)
-is a runnable gallery of the `:webgl` backend (CI runs it headlessly, same as `demo.jl`).
-For the numeric cost model (bundle size, per-frame payload, click latency at scale), see
-[`docs/dev/perf-findings.md`](https://github.com/jowch/Masque.jl/blob/main/docs/dev/perf-findings.md)
-and [`docs/dev/backend-comparison.md`](https://github.com/jowch/Masque.jl/blob/main/docs/dev/backend-comparison.md)
-— this page describes the cost model in words, not numbers, so it can't drift out of sync
-with the measured ones.
-
-### What exported static HTML keeps and loses
-
-On either backend, a Pluto notebook exported to static HTML keeps hover and tooltip
-inspection: the hit-test manifest is baked into the exported page, and so is the base —
-the PNG on `:cairo`, and on `:webgl` the serialized scene, which Masque's shim redraws on the
-reader's GPU without a server (both verified end-to-end against real Pluto exports; the
-page still loads Pluto's own frontend from a CDN). What's lost on either backend is anything
-that needs Julia to recompute: a click that should update `ev` and re-run downstream cells
-does nothing without a live kernel behind it.
-
-### Choosing between them
-
-Masque resolves the backend from which extension is loaded — a missing `using` line raises an
-`ArgumentError` the first time `masque` runs; loading **both** `CairoMakie` and `WGLMakie` is
-fine, and then `backend=` picks one explicitly while an unqualified `masque(fig)` defaults to
-`:cairo` (so a Cairo-baked sysimage isn't blocked by a stray `using WGLMakie`).
-
-`max_width` — the display width to target (Pluto's column, in px; `CairoMakie` renders at
-roughly `2 × max_width` for a crisp static image) — is a keyword on `masque` itself, on both
-backends:
+A trailing `;` is only for `@bind`, so Pluto does not show the widget
+twice:
 
 ```julia
-masque(fig, interactables; max_width = 900)
+fig = let
+    f = Figure()
+    ax = Axis3(f[1, 1])
+    scatter!(ax, randn(200), randn(200), randn(200))
+    masque(f)
+end;
+
+@bind pick fig
 ```
 
-`CairoBackend`/`WebGLBackend` are the two concrete backend types `backend=` actually takes,
-but neither is exported from `Masque` — they live in Masque's package extensions
-(`ext/MasqueCairoMakieExt.jl`, `ext/MasqueWGLMakieExt.jl`), reachable only via
-`Base.get_extension`, which is how `masque` itself resolves them internally. You only need this
-for a WebGL-only knob `masque` doesn't expose directly, `px_per_unit` (the canvas's
-device-pixel ratio — raise it for a sharper `:webgl` canvas at a proportional GPU/bandwidth
-cost):
+CairoMakie can still `@bind pick masque(fig)` after displaying a
+`Figure`: a PNG show is fine. This layout is the WGLMakie
+recommendation, and a reasonable Pluto habit on either backend.
 
-```julia
-masque(fig, interactables; backend = Base.get_extension(Masque, :MasqueWGLMakieExt).WebGLBackend(; px_per_unit = 3.0))
-```
+Load WGLMakie for a live GPU canvas: animation, frequent re-renders, or
+large updating data, where per-frame PNG cost dominates.
+For a figure you build once and inspect, CairoMakie's static PNG is
+lighter.
 
-Because they're unexported extension types, `CairoBackend`/`WebGLBackend` aren't in the
-[API Reference](@ref)'s `@docs` blocks — see the note there.
+The WGLMakie JS bundle ships once per notebook. Each extra `masque(fig)`
+cell pays for its own scene, not another copy of the bundle. The
+extension is version-coupled to WGLMakie internals (`serialize_scene`).
+Treat a WGLMakie version bump as a re-check, not an automatic upgrade.
 
-### Caveats
+At most 8 `:webgl` plots hold a live WebGL context. Desktop Chrome and
+Safari allow 16, Android Chrome allows 8, and Firefox allows several
+hundred. 8 fits all of them and leaves room for another tab. A plot
+outside the viewport is not given a context until it scrolls into view,
+and a plot that leaves the viewport releases its context before the next
+plot takes one. If more than 8 are on screen together, the extras show a
+note instead of the browser blanking an arbitrary canvas. `:cairo` does
+not use a WebGL context.
 
-- **Version-coupled** to WGLMakie's internals (`serialize_scene` shape, `setup_scene_init`
-  signature). Pinned to a specific `WGLMakie` compat range; treat a WGLMakie version bump as
-  a re-verification, not an automatic upgrade.
-- The WGLMakie JS bundle ships **once per notebook**, so each additional `masque(fig)` cell's
-  own cost is just its own scene, not another copy of the bundle.
-- At most 8 `:webgl` plots hold a live WebGL context. Desktop Chrome and Safari allow
-  16, Android Chrome allows 8, and Firefox allows several hundred; 8 fits all of them
-  and leaves room for another tab. A plot outside the viewport is not given a context
-  until it scrolls into view. If more than 8 are on screen together, the extras show a
-  note instead of the browser blanking an arbitrary canvas. `:cairo` does not use a
-  WebGL context.
+`using WGLMakie` in a session that already loaded CairoMakie does not
+switch the PNG. Pick WebGL with `backend=` as shown earlier, or start a
+session that loads only WGLMakie.
+
+For a runnable gallery, see [Gallery](@ref).
+
+## Pan and orbit preview
+
+[`ViewInteractable`](@ref) commits nothing. The bond never carries
+`:view`. Drag is operational camera state, not analysis data.
+
+On both backends, in-drag frames stream over `with_js_link`. Julia
+mutates limits (2D pan or wheel zoom) or `azimuth` / `elevation`
+(`Axis3` orbit), recomputes hit regions, and ships a fresh frame.
+The wheel zooms a 2D view about the cursor. The axis frame stays put
+while the data inside it slides. `:cairo` ships a PNG. `:webgl` ships
+a serialized scene onto the canvas already on the page. That channel
+needs a live kernel. It is dead on static export.
+
+`ViewInteractable` on `Axis3` is allowed: that is orbit. Polar, Colorbar,
+categorical 2D, and non-invertible 2D scales raise `ArgumentError`.
+`LScene`: CairoMakie refuses the figure; WGLMakie renders with **no**
+overlay.
+
+Persist a camera across remount with an explicit `Ref` plus rebuild, not
+with `selected=`. The [Limits](@ref) shows that pattern. For the
+overlay-only embed and the cairo in-drag clip, see [Pan and orbit](@ref).
+
+## Export static HTML
+
+On either backend, a Pluto notebook exported to static HTML keeps
+pointer inspection (tooltip and highlight in the overlay): the hit-test
+manifest is baked in, and so is the base (PNG on `:cairo`; serialized
+scene on `:webgl`, redrawn on the reader's GPU with no Julia server).
+The page still loads Pluto's frontend from a CDN.
+
+Lost on either backend: anything that needs Julia to recompute. A click
+that updates `pick` and re-runs downstream cells does nothing without a
+live kernel. `with_js_link` view frames die. Inspection-without-kernel
+is true on both backends.

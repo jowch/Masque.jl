@@ -7,12 +7,12 @@
 // readout · polygon / region / text clicks · threshold drag commit · whole-axis readout click ·
 // selects-ROI box-select drag · selected= pre-highlight on mount.
 // Coordinates come from hidden `coords_*` spans the notebook exports from each widget's LIVE
-// manifest (examples/webgl_demo.jl `coordspan`) — no duplicated figure math.
+// manifest (test/notebooks/webgl_demo.jl `coordspan`) — no duplicated figure math.
 // Not CI: through-Pluto jobs are the flake-prone kind; the cell-level notebook already runs in
 // the Example notebooks job, and the bond/alignment fundamentals are CI-covered by test/e2e.
 //
 //   julia test/e2e/serve.jl 1234 &   # poll http://127.0.0.1:1234 for 200
-//   (cd test/e2e && npm install && node webgl_sweep.mjs http://127.0.0.1:1234 "$PWD/../../examples/webgl_demo.jl")
+//   (cd test/e2e && npm install && node webgl_sweep.mjs http://127.0.0.1:1234 "$PWD/../../test/notebooks/webgl_demo.jl")
 import { chromium } from "playwright";
 
 const [base, notebook] = process.argv.slice(2);

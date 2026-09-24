@@ -1,86 +1,81 @@
 # Masque.jl
 
-Masque lays a thin, client-side interactive layer over a Makie figure inside a
-[Pluto](https://plutojl.org) notebook: hover shows a tooltip, a click round-trips to Julia
-through `@bind`. It renders through [`CairoMakie`](https://docs.makie.org/stable/explanations/backends/cairomakie)
-by default (a static, publication-quality image with a transparent JS overlay doing the
-hit-testing — no server, no WebGL), or through [`WGLMakie`](https://docs.makie.org/stable/explanations/backends/wglmakie)
-for a live, browser-GPU canvas when you need animation, large data, or live 3D — same `masque`/
-`@bind` API either way.
+Masque adds an interactive layer over Makie figures inside a Pluto
+notebook. Add rich tooltips, hover interactions, selections, and more to
+your figures.
 
-## When to use it
+## Rich tooltips
 
-| | CairoMakie alone | WGLMakie alone | **Masque** |
-|---|---|---|---|
-| Output | static, publication-quality | live, GPU-rendered | static + thin overlay (`:cairo`) or live (`:webgl`) |
-| Interactivity | none | rich (pan/zoom/rotate) | light: hover tooltips, click-to-select, drag-to-pan/threshold/ROI |
-| Needs a live Julia process | no | yes | only for click → recompute |
-| Survives offline / static HTML export | yes | no | yes on both (verified — the inspection layer keeps working; on `:webgl` the canvas is redrawn client-side, no server needed) |
+![Holding the pointer over a star shows its name, spectral type, and distance](assets/home/hover.gif)
 
-Reach for Masque when you want a publication-quality static figure that also answers "what's
-this point?" on hover and "which one did I click?" in Julia — without standing up a WebGL
-scene. Reach for `WGLMakie` directly (no Masque) when you need free-form camera control, live
-data updates, or gestures Masque doesn't wire back to Julia (arbitrary free rotation, for
-example).
+Hold your pointer over a point, bar, heatmap cell, or polygon and a customizable tooltip appears on the figure. For templates and styling, see [Tooltips](@ref).
 
-## Install
+## Dynamic selections
 
-```julia
-julia> ] add Masque
+![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.gif)
+
+When you click a mark to select it, `@bind` captures that selection, the same way a PlutoUI slider does. Downstream cells re-run with the selected row, bar, or cell. For more information, see [Click marks](@ref) and [Selection](@ref).
+
+## Interactive view controls
+
+![Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera](assets/home/orbit.gif)
+
+Drag a 2D axis to pan, or an `Axis3` to orbit. The camera stays on the figure; it is not a selection. For more information, see [Pan and orbit](@ref).
+
+## Highlight from the legend
+
+![Clicking a species in the legend keeps that class and fades the others](assets/home/legend.gif)
+
+Click a legend entry to highlight the traces it labels, and a cell that reads that pick can fade the rest. See [Legend](@ref).
+
+## Inspect a static export
+
+Hover and click still work in a Pluto HTML export of the notebook.
+Re-running Julia cells needs a live session. CairoMakie is the default;
+WGLMakie is the live canvas when you want animation, large data, or 3D
+you can orbit. See [Backends](@ref).
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-home-export" title="New York City boroughs with overlay-only hover"
+        style="width:100%;height:520px;border:0;background:transparent;overflow:hidden;"
+        scrolling="no" loading="lazy"></iframe>
+</div>
+<script>
+(function () {
+  var el = document.getElementById("masque-home-export");
+  if (!el) return;
+  function isDocDark() {
+    var c = document.documentElement.className || "";
+    if (!c) return false;
+    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+    return /(^|\s)theme--/.test(c);
+  }
+  function pushTheme() {
+    var doc = el.contentDocument;
+    if (!doc) return;
+    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
+  }
+  el.addEventListener("load", pushTheme);
+  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  el.src = "embeds/home_export.html";
+})();
+</script>
 ```
-
-You'll also want `Pluto`, plus a Makie backend: `CairoMakie` for the default static path, or
-`WGLMakie` for animation / large data / live 3D — see [Backends](@ref) for what happens if
-you load neither or both.
-
-## Quick start
-
-In a Pluto notebook:
-
-```julia
-begin
-    using Masque, CairoMakie
-
-    # your figure, as usual
-    fig = Figure()
-    ax = Axis(fig[1, 1])
-    pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
-    scatter!(ax, first.(pts), last.(pts))
-end
-```
-
-```julia
-# declare what's interactable, bind the result
-@bind sel masque(fig, [PointInteractable(ax, pts; payloads = ["a", "b", "c"])])
-```
-
-```julia
-# react to clicks — `sel` is `nothing` until a click, then an ElementEvent
-sel === nothing ? "click a point" : "you picked $(sel.index)"
-```
-
-Hovering shows a tooltip (purely client-side, no Julia round-trip); clicking sets `sel` and
-re-runs downstream cells. Clicks on empty space are a no-op.
-
-Each of the three blocks above is a separate Pluto cell — Pluto runs exactly one top-level
-expression per cell, so any snippet on this site with more than one statement is wrapped in
-`begin ... end` (which counts as one expression) or split across cells the way it's shown
-here. Copy each fenced block into its own cell.
-
-Under the hood, `masque(...)` sends the browser a **manifest**: the rendered image plus hit
-regions grouped into **layers**, one per interactable, keyed by its `id`. The value a
-`@bind`-ed variable holds — `sel` above — is called the **bond** value.
 
 ## Where to go next
 
-- [Getting started](@ref) — a slower walkthrough: explicit vs. zero-config, choosing a
-  backend, what a bond value looks like
-- [Interactables](@ref) — every built-in kind, its constructor, and its default payload
-- [Selection](@ref) — reacting to clicks, linking plots, persisting a highlight
-- [Legend](@ref) — hover/click a `Makie.Legend` entry to highlight the trace(s) it labels
+- [Getting started](@ref) — install, overlay a figure, and read a click
+- [Constructors](@ref) — every built-in kind, its constructor, and its
+  default payload
+- [Selection](@ref) — reacting to clicks, linking plots, persisting a
+  highlight
+- [Legend](@ref) — hover/click a `Makie.Legend` entry to highlight the
+  trace(s) it labels
 - [Tooltips](@ref) — `masque"..."` templates and styling
-- [Custom interactions](@ref) — `RegionInteractable` / `FunctionInteractable`
+- [Custom hits](@ref) — `RegionInteractable` / `FunctionInteractable`
 - [Backends](@ref) — `:cairo` vs `:webgl`, and when to reach for which
 - [Troubleshooting](@ref) — common errors and what causes them
-- [Examples](@ref) — every runnable notebook in the repo
-- [API Reference](@ref) — full docstrings
+- [Gallery](@ref) — a screenshot and a player for each demo
+- [API](@ref) — full docstrings
+

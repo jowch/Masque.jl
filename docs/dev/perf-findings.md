@@ -310,10 +310,10 @@ Scene: `Axis3`, a 240-point helix `lines!` + a 12-marker `scatter!`,
 `[ViewInteractable(ax), PointInteractable(ax, pts)]` as the interactable set, figure 480×360 at
 `px_per_unit=2` (today's default). Driven through the real `masque(fig, ints)` with a deliberately
 constructed self-referencing camera-`Ref` cell — the shape the shipped examples avoid:
-`examples/demo.jl` has no view-manipulation cells at all, and `examples/view_manip.jl` uses the
+`test/notebooks/api_tour.jl` has no view-manipulation cells at all, and `test/notebooks/view_manip.jl` uses the
 opposite, acyclic shape (a plain `orb_seed` tuple, `@bind orb_ev`, and a separate
 `orbit_committed` cell) precisely because Pluto forbids feeding a bond back into the same figure
-cell (`examples/view_manip.jl`'s own markdown cell says so). Instrumented with `performance.now()`
+cell (`test/notebooks/view_manip.jl`'s own markdown cell says so). Instrumented with `performance.now()`
 at a synthetic `pointerup` dispatch, plus a poll on `.ip-host` node identity — identity-diffed
 every 15 ms (not a fixed-interval `waitChange` poll) so the ~100–300 ms window isn't buried in
 coarser polling noise. 12 drag-release trials.

@@ -71,8 +71,8 @@ Runic, and an advisory live kind sweep.
 - **Register v0.1.0 in General.** When the maintainer decides the API has stopped moving;
   there is no fixed cut. Mechanics are one row in `frontend-delivery.md` (register a CI-green
   `main` commit; TagBot tags).
-- **After registration:** drop `Pkg.develop` from the example notebooks (Pluto's package
-  manager takes over) and re-enable the Binder link in `docs/export_notebooks.jl`.
+- **After registration:** drop `Pkg.develop` from the fixture notebooks under
+  `test/notebooks/` (Pluto's package manager takes over).
 
 ### View manipulation and the remount (#82, tracking)
 
@@ -330,7 +330,7 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
   Interactables. Kept in lockstep with #91.
 - **#81 WGLMakie cell pattern**: return `masque(f)` from the construction cell instead of
   displaying a `Figure` (whose MIME show waits on a Bonito session Pluto never starts).
-  Update `backends.md`, `getting-started.md`, `troubleshooting.md`, and `examples/webgl_demo.jl`.
+  Update `backends.md`, `getting-started.md`, `troubleshooting.md`, and `test/notebooks/webgl_demo.jl`.
   - **Open: should Masque enforce this in code, not just docs?** Idea under discussion — when
     `WGLMakie` is loaded and we are inside Pluto, intercept the figure's HTML show so a raw
     `Figure` yields an `@info` pointing at `masque(fig)` instead of a spinner that never

@@ -1,13 +1,15 @@
-// Playwright against the harvested getting-started player on the Documenter page.
-// Design lock: docs/build/, not a standalone player file. Fails if wrap left
-// window.Masque.mount uncallable, if overlay host.value does not key a snapshot,
-// or if a listed city click does not swap #masque-out.
+// Playwright against the quick start Pluto export on the Documenter page.
+// The iframe is #masque-gs-quickstart (home_quickstart.html). Listed clicks
+// swap the readout cell through the export's editor_state_set snapshots.
+// Fails if the overlay never mounts, if host.value does not key a snapshot,
+// or if an overlay click does not update that readout.
 //
 //   node docs_player.mjs <docs/build>
 
 import { chromium } from "playwright";
 import { createServer } from "node:http";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { extname, join, normalize, sep } from "node:path";
 
 const rootArg = process.argv[2];
@@ -26,6 +28,12 @@ const MIME = {
   ".woff2": "font/woff2",
   ".woff": "font/woff",
 };
+
+const POINTS = [
+  { name: "one", y: "1.0" },
+  { name: "two", y: "4.0" },
+  { name: "three", y: "9.0" },
+];
 
 function gettingStartedPath() {
   if (existsSync(join(root, "getting-started", "index.html"))) return "/getting-started/";
@@ -50,35 +58,152 @@ function serve(dir) {
   });
 }
 
-const CITIES = ["Tokyo", "Delhi", "Shanghai", "São Paulo", "Mexico City", "Cairo", "Mumbai", "Beijing"];
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-async function waitMounted(frame, timeoutMs = 20000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const ok = await frame.evaluate(() => {
-      const host = document.querySelector(".ip-host");
-      if (!host) return false;
-      let sr = null;
-      host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      return !!(sr && sr.querySelector(".surface") && typeof window.Masque?.mount === "function");
-    });
-    if (ok) return;
-    await new Promise((r) => setTimeout(r, 250));
+// Pluto's static export loads its editor from jsDelivr. On the docs CI runner
+// that document reaches readyState "complete" and still never creates
+// .ip-host. The same file boots when those scripts load. Serve the copy
+// already in the Julia depot (the harvest that wrote the HTML used it).
+function plutoFrontendDirs() {
+  const depots = (process.env.JULIA_DEPOT_PATH || join(homedir(), ".julia")).split(":");
+  const dirs = [];
+  for (const depot of depots) {
+    if (!depot) continue;
+    const root = join(depot, "packages", "Pluto");
+    if (!existsSync(root)) continue;
+    for (const slug of readdirSync(root)) {
+      const dist = join(root, slug, "frontend-dist");
+      if (existsSync(dist)) dirs.push(dist);
+    }
   }
-  throw new Error("player overlay never mounted (host/.surface/window.Masque.mount within 20s)");
+  return dirs;
 }
 
-async function outText(frame) {
-  return frame.evaluate(() => (document.getElementById("masque-out")?.innerText || "").trim());
+const plutoDists = plutoFrontendDirs();
+
+function localPlutoAsset(url) {
+  const marker = "/frontend-dist/";
+  const i = url.indexOf(marker);
+  if (i < 0) return null;
+  let name = url.slice(i + marker.length).split("?")[0].split("#")[0];
+  try { name = decodeURIComponent(name); } catch { return null; }
+  if (!name || name.split("/").includes("..")) return null;
+  for (const dir of plutoDists) {
+    const file = normalize(join(dir, name));
+    const prefix = dir.endsWith(sep) ? dir : dir + sep;
+    if (file !== dir && !file.startsWith(prefix)) continue;
+    if (existsSync(file) && statSync(file).isFile()) return file;
+  }
+  return null;
 }
 
-async function clickCity(frame, index) {
+function mountSnapshot() {
+  const host = document.querySelector(".ip-host");
+  let shadowRoots = 0;
+  let surface = false;
+  if (host) {
+    host.querySelectorAll("*").forEach((el) => {
+      if (!el.shadowRoot) return;
+      shadowRoots++;
+      if (el.shadowRoot.querySelector(".surface")) surface = true;
+    });
+  }
+  return {
+    href: location.href,
+    ready: document.readyState,
+    host: !!host,
+    editor: typeof window.editor_state_set,
+    mount: window.Masque ? typeof window.Masque.mount : "undefined",
+    shadowRoots,
+    surface,
+  };
+}
+
+// about:blank's readyState is already "complete", so the first contentFrame
+// is not evidence that the embed loaded. Re-resolve the element each poll so
+// a replaced node is not a detached frame, and ignore about:blank until the
+// embed document is actually there.
+async function waitMounted(iframe, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = "iframe has no document";
+  while (Date.now() < deadline) {
+    const handle = await iframe.elementHandle();
+    const frame = handle && await handle.contentFrame();
+    if (!frame) {
+      last = "iframe has no contentFrame";
+      await sleep(250);
+      continue;
+    }
+    const url = frame.url();
+    if (!url || url === "about:blank") {
+      last = `iframe url ${url || "empty"}`;
+      await sleep(250);
+      continue;
+    }
+    const snap = await frame.evaluate(mountSnapshot).catch((e) => ({
+      href: url,
+      error: String(e).split("\n")[0],
+    }));
+    if (snap.host && snap.editor === "function" && snap.mount === "function" && snap.surface) return frame;
+    last = JSON.stringify(snap);
+    await sleep(250);
+  }
+  const tail = [...consoleLog, ...netLog]
+    .filter((l) => l.startsWith("error:") || l.startsWith("pageerror:") || l.startsWith("failed ") || l.startsWith("cdn "))
+    .slice(-8)
+    .map((l) => l.slice(0, 240));
+  const extra = tail.length ? ` | ${tail.join(" | ")}` : "";
+  throw new Error(`quick start overlay never mounted within 20s: ${last}${extra}`);
+}
+
+async function readout(frame) {
+  return frame.evaluate(() => {
+    const outs = [...document.querySelectorAll("pluto-output")];
+    for (const out of outs) {
+      const t = (out.innerText || "").replace(/"/g, "").trim();
+      if (t === "click a point" || / selected — y = /.test(t)) return t;
+    }
+    return "";
+  });
+}
+
+async function waitReadout(frame, pred, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = "";
+  while (Date.now() < deadline) {
+    last = await readout(frame);
+    if (pred(last)) return last;
+    await sleep(100);
+  }
+  throw new Error(`readout stayed ${JSON.stringify(last)}`);
+}
+
+async function setHost(frame, value) {
+  await frame.evaluate((v) => {
+    const host = document.querySelector(".ip-host");
+    if (!host) throw new Error("no .ip-host");
+    host.value = v;
+    host.dispatchEvent(new Event("input"));
+  }, value);
+}
+
+async function clickPoint(frame, index) {
   return frame.evaluate((idx) => {
     const host = document.querySelector(".ip-host");
-    const man = host.masqueManifest;
-    if (!man) throw new Error("host.masqueManifest missing — wrap did not attach the inlined manifest");
-    const layer = man.layers.find((l) => l.id === "cities");
-    if (!layer) throw new Error("no cities layer on inlined manifest");
+    if (!host) throw new Error("no .ip-host");
+    let man = host.masqueManifest;
+    if (!man || !man.layers) {
+      const pubs = (window.editor_state && window.editor_state.notebook && window.editor_state.notebook.published_objects) || {};
+      for (const v of Object.values(pubs)) {
+        const obj = typeof v === "string" ? JSON.parse(v) : v;
+        if (obj && obj.layers) { man = obj; break; }
+      }
+    }
+    if (!man || !man.layers) throw new Error("quick start manifest missing");
+    const layer = man.layers.find((l) => l.id === "scatter");
+    if (!layer) throw new Error("no scatter layer on the quick start manifest");
     const cx = layer.geometry[3 * idx];
     const cy = layer.geometry[3 * idx + 1];
     let sr = null;
@@ -105,70 +230,78 @@ const server = serve(root);
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const url = `http://127.0.0.1:${server.address().port}${path}`;
 
+const consoleLog = [];
+const netLog = [];
 const browser = await chromium.launch({ headless: true });
 let failed = null;
 try {
-  const page = await browser.newPage();
-  const consoleLog = [];
+  // GitHub runners have a minimal locale. Pluto's frontend then throws
+  // "Incorrect locale information provided" from a V8 Intl call and never
+  // creates .ip-host. Same context the live Pluto click test uses.
+  const context = await browser.newContext({ locale: "en-US", timezoneId: "UTC" });
+  const page = await context.newPage();
   page.on("console", (msg) => consoleLog.push(`${msg.type()}: ${msg.text()}`));
   page.on("pageerror", (err) => consoleLog.push(`pageerror: ${err.message}`));
+  page.on("requestfailed", (req) => {
+    const u = req.url();
+    if (!u.includes("jsdelivr") && !u.includes("frontend-dist")) return;
+    netLog.push(`failed ${u} ${req.failure()?.errorText || ""}`);
+  });
+  await page.route(/https:\/\/cdn\.jsdelivr\.net\/gh\/JuliaPluto\/Pluto\.jl@[^/]+\/frontend-dist\//, async (route) => {
+    const file = localPlutoAsset(route.request().url());
+    if (!file) {
+      netLog.push(`cdn miss ${route.request().url()}`);
+      await route.continue();
+      return;
+    }
+    await route.fulfill({ path: file });
+  });
   await page.goto(url, { waitUntil: "domcontentloaded" });
 
-  const iframe = page.locator("#masque-gs-player");
+  const iframe = page.locator("#masque-gs-quickstart");
   await iframe.waitFor({ state: "attached", timeout: 20000 });
-  await iframe.scrollIntoViewIfNeeded();
-  const handle = await iframe.elementHandle();
-  const frame = await handle.contentFrame();
-  if (!frame) throw new Error("getting-started iframe has no contentDocument");
-
-  await waitMounted(frame);
+  // The iframe is taller than the viewport, and Documenter keeps shifting
+  // layout while fonts settle, so scroll via the element instead of waiting
+  // for Playwright to call it stable. Force the embed fetch in case the
+  // iframe is still sitting on about:blank.
+  await iframe.evaluate((el) => {
+    el.loading = "eager";
+    el.scrollIntoView({ block: "center", inline: "nearest" });
+    const src = el.getAttribute("src");
+    if (src) el.src = src;
+  });
+  const frame = await waitMounted(iframe);
 
   const mountType = await frame.evaluate(() => typeof window.Masque.mount);
   if (mountType !== "function") {
-    throw new Error(`wrap left window.Masque.mount ${mountType}, expected function`);
+    throw new Error(`window.Masque.mount is ${mountType}, expected function`);
   }
 
-  const snapKeys = await frame.evaluate(() => {
-    const host = document.querySelector(".ip-host");
-    return Object.keys(host.masqueManifest?.snapshots || {}).sort();
-  });
-  const wantKeys = ["null", ...CITIES.map((_, i) => `cities:${i}`)].sort();
-  if (JSON.stringify(snapKeys) !== JSON.stringify(wantKeys)) {
-    throw new Error(`snapshot keys ${JSON.stringify(snapKeys)} !== ${JSON.stringify(wantKeys)}`);
+  const idle = await waitReadout(frame, (t) => t === "click a point");
+  if (idle !== "click a point") {
+    throw new Error(`idle readout was ${JSON.stringify(idle)}`);
   }
 
-  const idle = await outText(frame);
-  if (!/Hover a city/i.test(idle)) {
-    throw new Error(`idle #masque-out was ${JSON.stringify(idle)}`);
-  }
-
-  // host.value setter — applyFromHost / keyOf, no overlay hit-test. Every listed
-  // city must key even when two marks overlap on the PNG (São Paulo / Mexico City).
-  for (let i = 0; i < CITIES.length; i++) {
-    await frame.evaluate((idx) => {
-      const host = document.querySelector(".ip-host");
-      host.value = { layer: "cities", index: idx };
-      host.dispatchEvent(new Event("input"));
-    }, i);
-    const text = await outText(frame);
-    // host.value stays the 0-based wire envelope. The readout prints the Julia index.
-    const want = `${CITIES[i]} selected — index ${i + 1}`;
+  for (let i = 0; i < POINTS.length; i++) {
+    await setHost(frame, { layer: "scatter", index: i });
+    const want = `${POINTS[i].name} selected — y = ${POINTS[i].y}`;
+    const text = await waitReadout(frame, (t) => t.includes(want));
     if (!text.includes(want)) {
-      throw new Error(`host.value {layer:"cities",index:${i}} did not key a snapshot; #masque-out=${JSON.stringify(text)}`);
+      throw new Error(`host.value {layer:"scatter",index:${i}} did not key a snapshot; readout=${JSON.stringify(text)}`);
     }
+    await setHost(frame, null);
+    await waitReadout(frame, (t) => t === "click a point");
   }
 
-  // Overlay click still has to swap #masque-out. Hit-test returns the first covering
-  // mark, so assert against the emitted host.value, not the intended index.
-  for (let i = 0; i < CITIES.length; i++) {
-    const got = await clickCity(frame, i);
-    if (!got || got.layer !== "cities" || typeof got.index !== "number") {
-      throw new Error(`city ${i} (${CITIES[i]}) click emitted ${JSON.stringify(got)}`);
+  for (let i = 0; i < POINTS.length; i++) {
+    const got = await clickPoint(frame, i);
+    if (!got || got.layer !== "scatter" || typeof got.index !== "number") {
+      throw new Error(`point ${i} (${POINTS[i].name}) click emitted ${JSON.stringify(got)}`);
     }
-    const text = await outText(frame);
-    const want = `${CITIES[got.index]} selected — index ${got.index + 1}`;
+    const want = `${POINTS[got.index].name} selected — y = ${POINTS[got.index].y}`;
+    const text = await waitReadout(frame, (t) => t.includes(want));
     if (!text.includes(want)) {
-      throw new Error(`listed click (aimed ${i}, hit ${got.index}) did not swap #masque-out; got ${JSON.stringify(text)}`);
+      throw new Error(`listed click (aimed ${i}, hit ${got.index}) did not swap the readout; got ${JSON.stringify(text)}`);
     }
   }
 
@@ -179,7 +312,7 @@ try {
     return true;
   });
   if (errors.length) throw new Error(`console errors: ${errors.join(" | ")}`);
-  console.log("E2E OK [docs player] — mount callable, every listed host.value keyed, overlay clicks swapped #masque-out");
+  console.log("E2E OK [docs player] — mount callable, every listed host.value keyed, overlay clicks swapped the readout");
 } catch (e) {
   failed = e;
 } finally {
