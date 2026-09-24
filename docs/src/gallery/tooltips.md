@@ -40,8 +40,8 @@ masque(
 !!! note
 
     The overlay is the same code on `:cairo` and `:webgl`. This player is
-    the Cairo figure: hover is drawn on the page, and the listed clicks are
-    snapshots of the readout. Load `WGLMakie` alone when you want the figure
+    the Cairo figure: hover is drawn on the page, and each click swaps in a
+    snapshot of the readout. Load `WGLMakie` alone when you want the figure
     on a live canvas. Hover, highlight, and the click readout match on both
     backends.
 

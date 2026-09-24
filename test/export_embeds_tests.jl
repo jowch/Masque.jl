@@ -43,22 +43,102 @@ end
     @test snapshot_key(items) == "items:cities:0,cities:2"
 end
 
-@testset "getting-started TOML lists idle + all eight cities" begin
-    player = parse_player_toml(GS_NB)
-    @test player["bond"] == "pick"
-    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
-    @test keys[1] == "null"
-    @test keys[2:end] == ["cities:$i" for i in 0:7]
-    @test length(keys) == 9
-    @test get(player, "chip", true) !== false
+@testset "discrete_states lists every click in its wire shape" begin
+    grid = (; xedges = [0.0, 1, 2, 3], yedges = [0.0, 1, 2], ncols = 3, nrows = 2, values = [1.0, 2, 3, 4, 5, 6])
+    man = Dict{String, Any}(
+        "layers" => Any[
+            Dict{String, Any}("id" => "pts", "kind" => "circles", "events" => ["hover", "click"], "bond" => "element", "payloads" => Any[1, 2]),
+            Dict{String, Any}("id" => "legend", "kind" => "rects", "events" => ["hover", "click"], "bond" => "legend", "payloads" => Any["a"]),
+            Dict{String, Any}("id" => "tips", "kind" => "circles", "events" => ["hover"], "bond" => "element", "payloads" => Any[1, 2, 3]),
+            Dict{String, Any}("id" => "x", "kind" => "axis", "events" => ["hover", "click"], "bond" => "axis", "payloads" => Any[]),
+            Dict{String, Any}("id" => "cells", "kind" => "grid", "events" => ["hover", "click"], "bond" => "gridcell", "payloads" => Any[], "geometry" => grid),
+        ],
+    )
+    states = discrete_states(man)
+    @test [snapshot_key(v) for v in states] ==
+        ["pts:0", "pts:1", "legend:0", "cells:0", "cells:1", "cells:2", "cells:3", "cells:4", "cells:5"]
+    # `resolvePayload`: 0-based i (column), j (row), values[j * ncols + i]
+    @test states[end]["payload"] == Dict("i" => 2, "j" => 1, "value" => 6.0)
+    @test !haskey(states[1], "payload")
+
+    # A grid the `selects` box brushes belongs to the box.
+    brushed = merge(man, Dict{String, Any}("selection" => "grid", "selectionTarget" => "cells"))
+    @test !any(v -> v["layer"] == "cells", discrete_states(brushed))
+
+    # Sub-pixel cells ship no `values`: the clicks cannot be listed, so the notebook must change.
+    sampled = Dict{String, Any}(
+        "layers" => Any[
+            Dict{String, Any}(
+                "id" => "cells", "kind" => "grid", "events" => ["click"], "bond" => "gridcell", "payloads" => Any[],
+                "geometry" => Dict{String, Any}("ncols" => 500, "nrows" => 500, "sample" => [0.0]),
+            ),
+        ],
+    )
+    @test_throws r"coarsen the grid" discrete_states(sampled)
 end
 
-@testset "home quickstart TOML lists idle + three scatter points" begin
+@testset "discrete_states grid payload round-trips through bond_from_js" begin
+    z = [Float64(i + 3j) for i in 1:4, j in 1:3]
+    fig = Figure(size = (300, 200))
+    ax = Axis(fig[1, 1])
+    hm = heatmap!(ax, 1:4, 1:3, z)
+    w = masque(fig, RectInteractable(ax, hm))
+    states = discrete_states(w.manifest)
+    @test length(states) == 12
+    for v in states
+        ev = Masque.bond_from_js(w, v)
+        @test z[ev.i, ev.j] == ev.value
+    end
+end
+
+@testset "player_states: idle, every click, then hand-listed drags" begin
+    man = Dict{String, Any}(
+        "layers" => Any[
+            Dict{String, Any}("id" => "pts", "kind" => "circles", "events" => ["click"], "bond" => "element", "payloads" => Any[1, 2]),
+        ],
+    )
+    brush = Dict{String, Any}("items" => Any[Dict("layer" => "pts", "index" => 1)])
+    rows = player_states(Dict{String, Any}("states" => Any[Dict("id" => "b", "value" => brush)]), man)
+    @test [r.key for r in rows] == ["null", "pts:0", "pts:1", "items:pts:1"]
+    @test rows[1].value === nothing
+    @test [r.key for r in player_states(Dict{String, Any}(), man)] == ["null", "pts:0", "pts:1"]
+    click = Dict{String, Any}("layer" => "pts", "index" => 0)
+    @test_throws r"already records" player_states(Dict{String, Any}("states" => Any[Dict("id" => "c", "value" => click)]), man)
+    @test_throws r"idle is always recorded" player_states(Dict{String, Any}("states" => Any[Dict("id" => "idle")]), man)
+end
+
+@testset "snapshot_table stores each distinct snapshot once" begin
+    idle = Dict("cells" => Dict("c" => "idle"))
+    a = Dict("cells" => Dict("c" => "adelie"))
+    table, extra = snapshot_table(["null" => idle, "pts:0" => a, "pts:1" => copy(a), "pts:2" => copy(idle)])
+    @test length(table["snaps"]) == 2
+    @test table["keys"] == Dict("null" => 0, "pts:0" => 1, "pts:1" => 1, "pts:2" => 0)
+    @test table["snaps"][table["keys"]["pts:1"] + 1]["cells"]["c"] == "adelie"
+    one, extra1 = snapshot_table(["null" => idle, "pts:0" => a])
+    # Two aliased keys cost less than storing one more snapshot.
+    @test extra - extra1 < sizeof(json_write(a))
+    @test extra1 > sizeof(json_write(a))
+end
+
+@testset "player TOMLs hand-list drags only" begin
+    embeds = joinpath(@__DIR__, "..", "docs", "src", "embeds")
+    n = 0
+    for f in readdir(embeds; join = true)
+        endswith(f, ".jl") && startswith(readline(f), "### A Pluto.jl notebook ###") || continue
+        player = parse_player_toml(f)
+        @test player["bond"] isa AbstractString
+        for row in get(player, "states", Any[])
+            @test haskey(js_shape_from_toml(row), "items")
+        end
+        n += 1
+    end
+    @test n >= 30
+end
+
+@testset "home quickstart is the 3-point Pluto export" begin
     path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_quickstart.jl")
     player = parse_player_toml(path)
     @test player["bond"] == "sel"
-    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
-    @test keys == ["null", "scatter:0", "scatter:1", "scatter:2"]
     @test get(player, "chip", true) !== false
     @test player["show_code"] == true
     @test player["pluto_html"] == true
@@ -72,23 +152,21 @@ end
     @test occursin("PointInteractable(ax, s; payloads = points)", src)
 end
 
-@testset "overlay-only player TOML sets chip = false" begin
-    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "gallery_limits.jl")
-    player = parse_player_toml(path)
-    @test player["chip"] == false
-    @test player["bond"] == "pick"
-    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
-    @test keys == ["null"]
+@testset "overlay-only players set chip = false" begin
+    for name in ("gallery_limits", "home_hover_stars", "home_export", "gallery_bars", "gallery_image")
+        player = parse_player_toml(joinpath(@__DIR__, "..", "docs", "src", "embeds", name * ".jl"))
+        @test player["chip"] == false
+    end
 end
 
 @testset "ROI items snapshot keys match overlay commit" begin
     @test snapshot_key(Dict("items" => Any[])) == "items:"
-    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "roi_table.jl")
-    player = parse_player_toml(path)
-    @test player["bond"] == "picks"
-    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
-    @test keys[1] == "null"
-    @test "items:" in keys
+    for name in ("roi_table", "home_brush_stations", "gallery_boxselect")
+        player = parse_player_toml(joinpath(@__DIR__, "..", "docs", "src", "embeds", name * ".jl"))
+        keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
+        @test "items:" in keys
+        @test any(startswith(k, "items:pts:") for k in keys)
+    end
 end
 
 @testset "rewrite_published_to_js inlines getPublishedObject" begin
@@ -191,43 +269,6 @@ end
     @test obj["snapshots"]["legend:2"]["png"] == "data:image/png;base64,QUJD"
 end
 
-@testset "home hover stars TOML is overlay-only" begin
-    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_hover_stars.jl")
-    player = parse_player_toml(path)
-    @test player["chip"] == false
-    @test player["bond"] == "pick"
-    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
-    @test keys == ["null"]
-end
-
-@testset "home legend classes TOML lists idle plus three species" begin
-    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_legend_classes.jl")
-    player = parse_player_toml(path)
-    @test player["bond"] == "sel"
-    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
-    @test keys == ["null", "legend:0", "legend:1", "legend:2"]
-    @test get(player, "chip", true) !== false
-end
-
-@testset "home export TOML is overlay-only" begin
-    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_export.jl")
-    player = parse_player_toml(path)
-    @test player["chip"] == false
-    @test player["bond"] == "pick"
-    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
-    @test keys == ["null"]
-end
-
-@testset "home brush stations TOML lists region item sets" begin
-    path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_brush_stations.jl")
-    player = parse_player_toml(path)
-    @test player["bond"] == "picks"
-    keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
-    @test keys[1] == "null"
-    @test "items:" in keys
-    @test any(startswith(k, "items:pts:0") for k in keys)
-end
-
 @testset "gallery players cover the demo sections" begin
     root = joinpath(@__DIR__, "..")
     @test !isdir(joinpath(root, "examples"))
@@ -255,7 +296,6 @@ end
         @test isfile(path)
         player = parse_player_toml(path)
         @test player["bond"] isa AbstractString
-        @test !isempty(player["states"])
         @test player["show_code"] == true
         @test player["pluto_html"] == true
         @test length(player["cells"]) >= 2
@@ -267,51 +307,19 @@ end
         end
     end
 
-    trace = parse_player_toml(joinpath(root, "docs", "src", "embeds", "example_heatmap_trace.jl"))
-    @test [snapshot_key(js_shape_from_toml(row)) for row in trace["states"]] ==
-        ["null", "cells:30", "cells:39", "cells:6", "cells:65"]
     cluster = parse_player_toml(joinpath(root, "docs", "src", "embeds", "example_cluster.jl"))
     ckeys = [snapshot_key(js_shape_from_toml(row)) for row in cluster["states"]]
-    @test ckeys[1] == "null"
-    @test all(startswith("items:pts:"), ckeys[2:end])
+    @test all(startswith("items:pts:"), ckeys)
     @test length(unique(ckeys)) == length(ckeys)
-    cidx = [Set(it["index"] for it in row["value"]["items"]) for row in cluster["states"][2:end]]
+    cidx = [Set(it["index"] for it in row["value"]["items"]) for row in cluster["states"]]
     @test length.(cidx) == [63, 76]
     @test isdisjoint(cidx[1], cidx[2])
     @test all(>=(80), cidx[1]) && all(<(80), cidx[2])
 
-    tips = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_tooltips.jl"))
-    tip_keys = [snapshot_key(js_shape_from_toml(row)) for row in tips["states"]]
-    @test tip_keys == ["null", "cities:0", "cities:1", "cities:2", "cities:3"]
-    @test get(tips, "chip", true) !== false
-
     sel = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_selection.jl"))
-    sel_keys = [snapshot_key(js_shape_from_toml(row)) for row in sel["states"]]
-    @test sel_keys == ["null", "scatter:0", "scatter:2"]
     @test length(sel["cells"]) >= 5
     @test any(endswith(id, "0005") for id in sel["cells"])
     @test any(endswith(id, "0006") for id in sel["cells"])
-
-    box = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_boxselect.jl"))
-    box_keys = [snapshot_key(js_shape_from_toml(row)) for row in box["states"]]
-    @test box_keys[1] == "null"
-    @test "items:" in box_keys
-    @test any(startswith(k, "items:pts:") for k in box_keys)
-
-    polar = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_polar.jl"))
-    polar_keys = [snapshot_key(js_shape_from_toml(row)) for row in polar["states"]]
-    @test polar_keys == ["null", "scatter:0", "scatter:1", "scatter:2", "scatter:3"]
-
-    for name in ("gallery_bars", "gallery_image", "gallery_limits")
-        player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))
-        @test player["chip"] == false
-        keys = [snapshot_key(js_shape_from_toml(row)) for row in player["states"]]
-        @test keys == ["null"]
-    end
-
-    gs = read(joinpath(root, "docs", "src", "embeds", "getting_started.jl"), String)
-    @test occursin("bond = \"pick\"", gs)
-    @test occursin("id = \"tokyo\"", gs)
 
     guides = [
         "marks_bars", "marks_poly", "marks_polar", "legend_lines", "roi_table",
@@ -322,7 +330,6 @@ end
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))
         @test player["pluto_html"] == true
         @test player["show_code"] == true
-        @test any(js_shape_from_toml(row) === nothing for row in player["states"])
     end
 end
 

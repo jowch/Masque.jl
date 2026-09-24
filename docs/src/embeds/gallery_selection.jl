@@ -91,17 +91,6 @@ cells = [
   "a1410002-0001-4000-8000-000000000005",
   "a1410002-0001-4000-8000-000000000006",
 ]
-
-[[player.states]]
-id = "idle"
-
-[[player.states]]
-id = "first"
-value = { layer = "scatter", index = 0 }
-
-[[player.states]]
-id = "third"
-value = { layer = "scatter", index = 2 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

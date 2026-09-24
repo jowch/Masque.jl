@@ -2,8 +2,8 @@
 
 A heatmap summarizes. Clicking a cell should take you back to the data
 behind the summary. Here each cell is a station's mean temperature for
-one day; click one and the plot below shows that day's hourly readings,
-with the daily mean as a dashed line.
+one day of a week; click one and the plot below shows that day's hourly
+readings, with the daily mean as a dashed line.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -15,8 +15,8 @@ with the daily mean as a dashed line.
 Main.masque_fallback("example_heatmap_trace")
 ```
 
-On this page four cells are recorded as snapshots; in your own notebook,
-every click redraws the day.
+On this page every cell's trace is recorded as a snapshot; in your own
+notebook, every click redraws the day.
 
 ## How it works
 

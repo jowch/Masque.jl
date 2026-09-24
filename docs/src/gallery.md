@@ -1,8 +1,9 @@
 # Examples
 
 Each example is a small notebook you can copy. On an example's page,
-hovering works as it does in Pluto, clicks and brushes swap in results
-recorded for a few choices, and the notebook follows the player as text.
+hovering works as it does in Pluto, every click swaps in a recorded
+result, brushes swap in results recorded for a few boxes, and the
+notebook follows the player as text.
 Pan and orbit are recorded clips instead.
 
 ## Analyses

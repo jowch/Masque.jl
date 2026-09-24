@@ -1,5 +1,5 @@
 # Quick-start tutorials ship as a real Pluto static export, cropped to the
-# teaching cells, with listed `@bind` snapshots applied through the editor.
+# teaching cells, with recorded `@bind` snapshots applied through the editor.
 # Home GIF notebooks stay on `emit_player`. Guide and gallery tutorials use this path.
 
 # Downstream cell body as Pluto should render it. HTML inlines
@@ -181,7 +181,7 @@ $PARENT_IS_DOC_DARK_JS
 const PLUTO_EXPORT_SIM_JS = raw"""
 <script>
 {
-  const SNAPS = @@SNAPS@@;
+  const TABLE = @@SNAPS@@;
   const WIDGET_ID = "@@WIDGET@@";
   function layerIndexKey(layer, index) {
     return String(layer) + ":" + String(Number(index));
@@ -205,7 +205,7 @@ const PLUTO_EXPORT_SIM_JS = raw"""
       keys.push(String(v.layer) + ":" + String(v.index | 0));
     }
     for (let i = 0; i < keys.length; i++) {
-      if (Object.prototype.hasOwnProperty.call(SNAPS, keys[i])) return SNAPS[keys[i]];
+      if (Object.prototype.hasOwnProperty.call(TABLE.keys, keys[i])) return TABLE.snaps[TABLE.keys[keys[i]]];
     }
     return null;
   }
@@ -333,17 +333,15 @@ function write_fallback_assets(outpath::AbstractString, idle, widget_id::Abstrac
     return doc
 end
 
-function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Symbol)
+function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Symbol, rows)
     get(player, "show_code", false) === true || error("pluto_html player needs show_code in $(basename(path))")
     widget = masque_widget_cell(cells, bond)
-    downstream = [c for c in cells if c.cell_id != widget.cell_id]
     states = NamedTuple[]
     n_inlined_total = 0
     png_b = 0
     man_b = 0
-    for row in player["states"]
-        js_shape = js_shape_from_toml(row)
-        js_shape === nothing || set_bond!(session, nb, bond, js_shape)
+    for (; key, value) in rows
+        value === nothing || set_bond!(session, nb, bond, value)
         assert_no_errors(nb, path)
         cells_now = snapshot_cells(nb, player, bond)
         widget_now = masque_widget_cell(cells_now, bond)
@@ -362,11 +360,12 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
         end
         png_b = max(png_b, png_bytes_from_html(htmls[string(widget_now.cell_id)]))
         man_b = max(man_b, manifest_bytes(widget_now.published_objects))
-        key = snapshot_key(js_shape)
         n_inlined_total += n_inlined
-        push!(states, (; key, payloads, htmls, js_shape, n_inlined))
+        push!(states, (; key, payloads, htmls, n_inlined))
     end
-    any(st -> st.js_shape === nothing, states) || error("pluto_html player needs an idle state in $(basename(path))")
+    first(states).key == "null" || error("first player state must be idle in $(basename(path))")
+    snapshots, extra = snapshot_table([st.key => Dict("cells" => st.payloads) for st in states])
+    check_budget(path, length(states), length(snapshots["snaps"]), extra)
     set_bond!(session, nb, bond, nothing)
     assert_no_errors(nb, path)
     empty!(nb.cell_order)
@@ -374,7 +373,6 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
         push!(nb.cell_order, UUID(id))
     end
     raw = Pluto.generate_html(nb; disable_ui = true)
-    snapshots = Dict(st.key => Dict("cells" => st.payloads) for st in states)
     html = postprocess_pluto_export(
         raw;
         snapshots,
@@ -383,17 +381,12 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
     )
     mkpath(dirname(outpath))
     write(outpath, html)
-    sized = [(; key = st.key, record = (; htmls = st.htmls)) for st in states]
-    extra = extra_snapshot_bytes(sized, [widget; downstream])
     player_bytes = filesize(outpath)
-    idle = states[findfirst(st -> st.key == "null", states)]
+    idle = first(states)
     write_fallback_assets(outpath, idle, string(widget.cell_id))
     idle_paid = sum(sizeof, values(idle.htmls); init = 0)
-    if extra > EMBED_BUDGET
-        @warn "embed extra snapshot bytes exceed budget (warn only; not failing)" path = basename(path) n_states = length(states) extra budget = EMBED_BUDGET png_bytes = png_b manifest_bytes = man_b player_bytes idle_paid
-    end
     return (;
-        outpath, n_states = length(states), extra, png_b, man_b, n_inlined_total,
+        outpath, n_states = length(states), n_snaps = length(snapshots["snaps"]), extra, png_b, man_b, n_inlined_total,
         size = player_bytes, idle_paid,
     )
 end

@@ -28,7 +28,7 @@ not a hit target.
 !!! note
 
     Label hits are the same on `:cairo` and `:webgl`. This player is the
-    Cairo figure. The listed snapshots replay a label click and a marker
+    Cairo figure. The snapshots replay every label click and every marker
     click. `masque(fig)` also publishes the scatter, so in a live notebook
     branch on `hasproperty(pick, :text)` before reading the string.
 

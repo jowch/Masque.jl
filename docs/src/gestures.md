@@ -13,7 +13,7 @@ over a mark is not a click. A click is not a pan.
 
     Hover stays in the overlay. A click writes `@bind`. Pan uses the
     gesture channel and does not write `@bind`. This docs site swaps
-    listed snapshots; it does not run a Julia kernel. A static
+    recorded snapshots; it does not run a Julia kernel. A static
     `generate_html` export keeps overlay inspection only.
 
 The three-point scatter on [Getting started](@ref) already shows two of
@@ -125,16 +125,16 @@ not start a drag, and the bond stays unchanged.
 
 Live Pluto runs every `@bind` row except view. This docs site does not run
 those rows live. The quick start on [Getting started](@ref) is a Pluto
-export of the tutorial notebook, and the listed clicks swap the readout.
+export of the tutorial notebook, and every click swaps in a recorded readout.
 An overlay-only player keeps tooltip and highlight chrome. Julia stays at
 the default bond.
 
 ```@raw html
 <div class="masque-diagram">
   <img class="masque-diagram-light" src="assets/diagrams/overlay-vs-host.svg"
-       alt="Four hosts compared: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect goes through the grids player. Cairo view frames use GIF or MP4 on this site, with no bind on view.">
+       alt="Four hosts compared: live Pluto, a docs player that records every click and listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Element click bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect goes through the grids player. Cairo view frames use GIF or MP4 on this site, with no bind on view.">
   <img class="masque-diagram-dark" src="assets/diagrams/overlay-vs-host-dark.svg"
-       alt="Four hosts compared: live Pluto, a docs player with listed idle plus N or listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Listed element bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect goes through the grids player. Cairo view frames use GIF or MP4 on this site, with no bind on view.">
+       alt="Four hosts compared: live Pluto, a docs player that records every click and listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Element click bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect goes through the grids player. Cairo view frames use GIF or MP4 on this site, with no bind on view.">
 </div>
 <script>
 (function () {
@@ -155,23 +155,23 @@ the default bond.
 </script>
 ```
 
-The same gesture can run in the overlay, write `@bind`, swap a listed
+The same gesture can run in the overlay, write `@bind`, swap a recorded
 snapshot, or stay frozen, depending on the host.
 
 The following table is that split.
 
-| Gesture | Live Pluto | Docs player (listed idle+N / listed `items`) | Docs player (overlay-only) | Static `generate_html` |
+| Gesture | Live Pluto | Docs player (every click / listed `items`) | Docs player (overlay-only) | Static `generate_html` |
 |---|---|---|---|---|
 | Hover | Overlay tooltip and highlight | Overlay tooltip and highlight | Overlay tooltip and highlight | Overlay tooltip and highlight |
 | Click-echo | Highlight in the overlay | Highlight in the overlay | Highlight in the overlay | Highlight in the overlay |
-| Listed element `@bind` (incl. extra table cells) | Bond writes; every cell that reads it re-runs | Snapshot swap for every cell in the embed | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
+| Element click `@bind` (incl. extra table cells) | Bond writes; every cell that reads it re-runs | Snapshot swap for every cell in the embed | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
 | Listed ROI `items` / a few axis or threshold values | Bond writes on release | Snapshot swap for listed sets or values | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
 | Unlisted continuous drag | Overlay chrome during the drag; Julia on ROI or threshold release; view never writes `@bind` | Overlay chrome; Julia stays on the last listed set | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
-| Heatmap inspect | Overlay tooltip; Julia on click | Overlay tooltip; listed click swaps the readout | Overlay tooltip chrome if that player is present | Overlay tooltip; Julia click dead |
+| Heatmap inspect | Overlay tooltip; Julia on click | Overlay tooltip; every cell click swaps the readout | Overlay tooltip chrome if that player is present | Overlay tooltip; Julia click dead |
 | Cairo view frames (GIF/MP4, no `@bind`) | Gesture channel frames; no `@bind` | GIF/MP4 on this site; no `@bind` | Overlay readout; no frames; no `@bind` | Gesture channel dead; site uses GIF/MP4 |
 
-The grids player lists every cell (`c11` through `c43`), so a click
-swaps the readout. View pan never appears as an
+The docs build records every click a player's figure offers, so any
+click swaps the readout. View pan never appears as an
 `InteractionEvent`. For a box that filters a table, see
 [Brush a region](@ref). For that heatmap, see
 [Inspect a grid](@ref). For pan and orbit, see [Pan and orbit](@ref).
@@ -184,6 +184,8 @@ swaps the readout. View pan never appears as an
   write `@bind` in a notebook. On this site, a listed player snapshots those
   commits, heatmap hover and click go through the grids player, and view
   has no `@bind`.
-- Do not design a click demo around a miss. List every mark.
+- Do not design a click demo around more marks than a player can record.
+  The docs build records every click and fails a player over its size
+  budget; use a coarser grid or fewer marks.
 - Do not expect SliderServer or `Bonds.possible_values` to enumerate Masque
   bonds.

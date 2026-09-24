@@ -86,25 +86,6 @@ cells = [
   "a1b2c3d4-0011-4000-8000-000000000012",
   "a1b2c3d4-0011-4000-8000-000000000004",
 ]
-
-[[player.states]]
-id = "idle"
-
-[[player.states]]
-id = "tokyo"
-value = { layer = "points", index = 0 }
-
-[[player.states]]
-id = "delhi"
-value = { layer = "points", index = 1 }
-
-[[player.states]]
-id = "shanghai"
-value = { layer = "points", index = 2 }
-
-[[player.states]]
-id = "saopaulo"
-value = { layer = "points", index = 3 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
