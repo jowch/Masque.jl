@@ -14,14 +14,14 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
   newer deps than `$MASQUE_DEV_ENV`) — use it to reproduce a CI-only failure, not day to day.
 - Frontend gate: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` (build → `../assets/overlay.js` IIFE + `../assets/masque-webgl.js` ESM)
 - Format (Runic, CI-enforced): `julia -e 'using Runic; exit(Runic.main(["--inplace","src","test","bench","docs"]))'` — pass every dir with `.jl`, since CI's `runic-action` has no `paths:` filter and checks the whole repo (including `bench/` and `docs/make.jl`), and tracks the latest Runic (1.7+). Format every `.jl` you add, with current Runic.
-- Registry name-clash check (manual, not `Pkg.test`): packed General (typical
-  depot / CI) is a 129-byte `~/.julia/registries/General.toml` pointer +
-  `General.tar.gz`. Package rows are inline tables (`uuid = { name = "Masque",
-  path = "M/Masque" }`). `grep '^name = "X"$'` only hits `name = "General"` and
-  **false-passes** if the index is missing or packed. Use
-  `tar -xOf ~/.julia/registries/General.tar.gz Registry.toml | rg '{ name = "Masque"'`
-  (or the unpacked `General/Registry.toml` if present). Do not assert
-  unregistered in CI — that fails once General indexes the package and needs
+- Registry name-clash check (manual, not `Pkg.test`): ask Pkg, which reads General
+  however it is stored —
+  `julia -e 'using Pkg; println(any(e.name == "Masque" for r in Pkg.Registry.reachable_registries() for e in values(r.pkgs)))'`
+  (`false` = unregistered). Don't grep or untar the registry: packed General is a small
+  `General.toml` pointer + a tarball whose compression varies by Julia version
+  (`.tar.gz` on older, `.tar.zst` on 1.13, and the cloud image has no `zstd`), and
+  `grep '^name = "X"$'` only hits `name = "General"`, so it **false-passes**. Do not
+  assert unregistered in CI — that fails once General indexes the package and needs
   network.
 - **Always verify CI is green before merging.** A merged PR can leave `main` red (PR #11 merged with Runic failing). After a PR's checks finish, `gh run list` / `gh pr checks <n>` must show all green — don't merge on a stale or pending run.
 
@@ -132,13 +132,22 @@ text and the bond payload → it gets a live check on every backend × the kinds
 
 ## Cloud sessions (claude.ai/code)
 - The container is **not cached**: every session starts from the environment's setup script,
-  which only installs Julia (on PATH), the General registry, and Runic. Nothing Makie is
-  compiled, so question-only sessions stay cheap.
+  which only installs Julia (on PATH; the latest release, like CI's `'1'` job — 1.13 today),
+  the General registry, and Runic. Nothing Makie is compiled, so question-only
+  sessions stay cheap.
 - **Warm lazily, and early.** On a task that will run Julia, start
   `scripts/cloud-warm.sh julia > /tmp/masque-warm.log 2>&1 &` *first*, then read code while it
   compiles (~7 min cold). Add `frontend` before the frontend gate and `e2e` before live
-  verification (Chromium matching the pinned Playwright). Don't run Julia tests or Pluto until
-  the warm-up log says `done` — competing for the 4 cores slows both.
+  verification. Don't run Julia tests or Pluto until the warm-up log says `done` — competing
+  for the 4 cores slows both.
+- **Playwright is pinned to the image's Chromium.** The image preinstalls one Chromium build in
+  `$PLAYWRIGHT_BROWSERS_PATH` (`/opt/pw-browsers`), and `test/e2e/package.json` pins the
+  Playwright release whose build matches it (1.56.1 ↔ build 1194), so `cloud-warm.sh e2e`
+  downloads nothing. On a mismatch the script says so and falls back to a download, which
+  works only from Playwright releases that know the `cdn.playwright.dev` mirror (1.56 does;
+  1.49's three azureedge/microsoft hosts are all blocked by the network policy). To re-match:
+  find the release whose `playwright-core/browsers.json` names the image's build (`npm pack
+  playwright-core@<v>`), bump the pin, re-run both e2e drivers.
 - That one warmed env lives at `$MASQUE_DEV_ENV`, defaulting to
   `~/.julia/environments/masque-dev` when the variable is unset (the script and the test
   command both fall back to it). It serves the unit tests and, when `MASQUE_DEV_ENV` is set in

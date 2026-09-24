@@ -1,6 +1,6 @@
 // README demo recorder — drives docs/dev/readme-demo/notebook.jl in headless Chromium and
 // captures a frame sequence of a hover → tooltip → click → @bind round-trip, for assembly into
-// docs/src/assets/demo.gif. Run from test/e2e (playwright 1.49.1 lives in its node_modules):
+// docs/src/assets/demo.gif. Run from test/e2e (the playwright pinned in its package.json lives in its node_modules):
 //
 //   node ../../docs/dev/readme-demo/record.mjs <base-url> <notebook-abs-path> <frames-dir>
 import { chromium } from "playwright";
