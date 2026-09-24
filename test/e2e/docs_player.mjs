@@ -2,7 +2,9 @@
 // The iframe is #masque-gs-quickstart (home_quickstart.html). Listed clicks
 // swap the readout cell through the export's editor_state_set snapshots.
 // Fails if the overlay never mounts, if host.value does not key a snapshot,
-// or if an overlay click does not update that readout.
+// or if an overlay click does not update that readout. Then, with jsDelivr blocked, the
+// iframe must give way to its text twin (docs/player_fallback.jl): the `details` after it
+// opens with the notebook's code, and the search index carries that code.
 //
 //   node docs_player.mjs <docs/build>
 
@@ -305,6 +307,19 @@ try {
     }
   }
 
+  const twinClosed = await page.evaluate(() => {
+    const wrap = document.getElementById("masque-gs-quickstart").closest(".masque-embed-wrap");
+    const twin = wrap.nextElementSibling;
+    return {
+      twin: !!(twin && twin.matches("details.admonition.is-details")),
+      open: !!(twin && twin.open),
+      wrapShown: getComputedStyle(wrap).display !== "none",
+    };
+  });
+  if (!twinClosed.twin || twinClosed.open || !twinClosed.wrapShown) {
+    throw new Error(`with the player rendered, the text twin must sit closed after a shown iframe: ${JSON.stringify(twinClosed)}`);
+  }
+
   const errors = consoleLog.filter((l) => {
     if (l.startsWith("pageerror:")) return true;
     if (!l.startsWith("error:")) return false;
@@ -313,6 +328,43 @@ try {
   });
   if (errors.length) throw new Error(`console errors: ${errors.join(" | ")}`);
   console.log("E2E OK [docs player] — mount callable, every listed host.value keyed, overlay clicks swapped the readout");
+
+  // Pluto's frontend unreachable: the iframe never draws a cell, so the page hides it and
+  // opens the text twin, whose code, idle figure, and readout need no CDN.
+  const blocked = await browser.newContext({ locale: "en-US", timezoneId: "UTC" });
+  const page2 = await blocked.newPage();
+  await page2.route(/https:\/\/cdn\.jsdelivr\.net\//, (route) => route.abort());
+  await page2.goto(url, { waitUntil: "domcontentloaded" });
+  await page2.locator("#masque-gs-quickstart").evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await page2.waitForFunction(() => {
+    const wrap = document.getElementById("masque-gs-quickstart").closest(".masque-embed-wrap");
+    const twin = wrap.nextElementSibling;
+    return getComputedStyle(wrap).display === "none" && twin && twin.open;
+  }, null, { timeout: 30000 }).catch(() => {
+    throw new Error("with jsDelivr blocked, the quick start iframe never gave way to its text twin");
+  });
+  const twin = await page2.evaluate(async () => {
+    const d = document.getElementById("masque-gs-quickstart").closest(".masque-embed-wrap").nextElementSibling;
+    const img = d.querySelector("img");
+    if (img && !img.complete) await new Promise((r) => { img.onload = img.onerror = r; });
+    return {
+      text: d.innerText,
+      codeBlocks: d.querySelectorAll("pre code").length,
+      img: img ? img.naturalWidth : -1,
+    };
+  });
+  if (!twin.text.includes("PointInteractable(ax, s; payloads = points)") || !twin.text.includes("@bind sel masque(fig, pts)")) {
+    throw new Error(`text twin is missing the quick start code: ${JSON.stringify(twin.text.slice(0, 300))}`);
+  }
+  if (!twin.text.includes("click a point")) throw new Error("text twin is missing the idle readout");
+  if (!(twin.img > 0)) throw new Error(`text twin's idle figure did not load (naturalWidth ${twin.img})`);
+  await blocked.close();
+
+  const index = readFileSync(join(root, "search_index.js"), "utf8");
+  if (!index.includes("PointInteractable(ax, s; payloads = points)")) {
+    throw new Error("search_index.js does not carry the quick start's code");
+  }
+  console.log(`E2E OK [docs player] — CDN blocked: text twin opened (${twin.codeBlocks} code blocks, figure ${twin.img}px), code is in the search index`);
 } catch (e) {
   failed = e;
 } finally {

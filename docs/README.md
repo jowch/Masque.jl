@@ -8,6 +8,12 @@ Building the site harvests cell-series players (`docs/export_embeds.jl`) into
 longer cold. Set `MASQUE_SKIP_EMBED_EXPORT=true` to reuse players already in
 `docs/src/embeds/` when iterating on prose.
 
+Each Pluto-export player is followed by its text twin: a `details` block built from the same
+notebook by an `@eval Main.masque_fallback("<name>")` cell (`docs/player_fallback.jl`), so
+search indexes the tutorial code and a reader still gets it when Pluto's frontend cannot load
+from jsDelivr (`assets/masque-embed.js` then hides the iframe and opens the twin). Harvest adds
+the idle figure and plain-text readouts as `<name>.png` / `<name>.fallback.toml`.
+
 | Doc | What it covers |
 |---|---|
 | [`architecture.md`](dev/architecture.md) | The design contract: `AbstractBackend`/`AbstractInteractable`, the geometry primitives between them, the manifest shape, tooltips wire format. |

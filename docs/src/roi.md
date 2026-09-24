@@ -9,31 +9,12 @@ table stays on the last listed set.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-roi-table" title="Stations scatter with a region box and listed @bind table snapshots"
-        style="width:100%;height:1400px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-roi-table" data-masque-embed="roi_table" title="Stations scatter with a region box and listed @bind table snapshots" style="width:100%;height:1400px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-roi-table");
-  if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = (pretty ? "../embeds/" : "embeds/") + "roi_table.html";
-})();
-</script>
+```
+
+```@eval
+Main.masque_fallback("roi_table")
 ```
 
 Hold the pointer over a station to read its name. Drag the box interior to

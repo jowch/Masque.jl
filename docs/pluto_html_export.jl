@@ -303,6 +303,36 @@ function postprocess_pluto_export(html::AbstractString; snapshots, widget_id::Ab
     return replace(html, "</body>" => chip * "\n" * sim * "\n</body>", count = 1)
 end
 
+# Idle figure and plain-text readouts for the player's text twin (`player_fallback.jl`):
+# `<name>.png` plus `<name>.fallback.toml` beside `<name>.html`. The notes and code come
+# from the notebook file itself, so they need nothing from harvest.
+function write_fallback_assets(outpath::AbstractString, idle, widget_id::AbstractString)
+    stem = splitext(outpath)[1]
+    doc = Dict{String, Any}()
+    m = match(r"data:image/png;base64,([A-Za-z0-9+/=]+)", get(idle.htmls, widget_id, ""))
+    if m === nothing
+        rm(stem * ".png"; force = true)
+    else
+        write(stem * ".png", base64decode(m.captures[1]))
+        doc["image"] = basename(stem) * ".png"
+    end
+    outputs = Dict{String, String}()
+    for (id, payload) in idle.payloads
+        body = payload["body"]
+        payload["mime"] == "text/plain" && body isa AbstractString || continue
+        s = if length(body) >= 2 && startswith(body, '"') && endswith(body, '"')
+            unescape_string(body[2:(end - 1)])
+        else
+            body
+        end
+        (isempty(strip(s)) || s == "nothing") && continue
+        outputs[id] = s
+    end
+    doc["outputs"] = outputs
+    open(io -> TOML.print(io, doc), stem * ".fallback.toml", "w")
+    return doc
+end
+
 function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Symbol)
     get(player, "show_code", false) === true || error("pluto_html player needs show_code in $(basename(path))")
     widget = masque_widget_cell(cells, bond)
@@ -357,6 +387,7 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
     extra = extra_snapshot_bytes(sized, [widget; downstream])
     player_bytes = filesize(outpath)
     idle = states[findfirst(st -> st.key == "null", states)]
+    write_fallback_assets(outpath, idle, string(widget.cell_id))
     idle_paid = sum(sizeof, values(idle.htmls); init = 0)
     if extra > EMBED_BUDGET
         @warn "embed extra snapshot bytes exceed budget (warn only; not failing)" path = basename(path) n_states = length(states) extra budget = EMBED_BUDGET png_bytes = png_b manifest_bytes = man_b player_bytes idle_paid

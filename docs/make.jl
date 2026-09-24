@@ -8,16 +8,36 @@ else
     export_embeds(joinpath(@__DIR__, "src", "embeds"))
 end
 
+include("player_fallback.jl")
+
+const PRETTY_URLS = get(ENV, "CI", "false") == "true"
+const DOCS_BUILD = joinpath(@__DIR__, "build")
+const EMBEDS_DIR = joinpath(@__DIR__, "src", "embeds")
+
+# `@eval` entry point for a player's text twin. Harvest's `<name>.fallback.toml` adds the
+# idle figure and readouts; without it (MASQUE_SKIP_EMBED_EXPORT on a fresh checkout) the
+# twin still has every note and code cell.
+function masque_fallback(name::AbstractString)
+    side = joinpath(EMBEDS_DIR, name * ".fallback.toml")
+    doc = isfile(side) ? TOML.parsefile(side) : Dict{String, Any}()
+    image = haskey(doc, "image") && isfile(joinpath(EMBEDS_DIR, doc["image"])) ?
+        embeds_href(doc["image"]; build = DOCS_BUILD, pretty = PRETTY_URLS) : nothing
+    return fallback_markdown(
+        joinpath(EMBEDS_DIR, name * ".jl");
+        image, outputs = get(doc, "outputs", Dict{String, String}()),
+    )
+end
+
 makedocs(;
     modules = [Masque],
     authors = "Jonathan Chen <jwhc@ucla.edu>",
     sitename = "Masque.jl",
     format = Documenter.HTML(;
-        prettyurls = get(ENV, "CI", "false") == "true",
+        prettyurls = PRETTY_URLS,
         canonical = "https://jowch.github.io/Masque.jl",
         edit_link = "main",
         collapselevel = 2,
-        assets = ["assets/masque-embed.css"],
+        assets = ["assets/masque-embed.css", "assets/masque-embed.js"],
     ),
     pages = [
         "Home" => "index.md",

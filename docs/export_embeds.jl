@@ -1,4 +1,5 @@
 import Pkg
+using Base64
 using Pluto
 using TOML
 using UUIDs

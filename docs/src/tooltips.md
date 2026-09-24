@@ -6,31 +6,12 @@ Julia. A click still writes `@bind`, and the last cell names the city.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-template" title="Four-city scatter with templated tooltips"
-        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-template" data-masque-embed="tooltips_template" title="Four-city scatter with templated tooltips" style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-tt-template");
-  if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = (pretty ? "../embeds/" : "embeds/") + "tooltips_template.html";
-})();
-</script>
+```
+
+```@eval
+Main.masque_fallback("tooltips_template")
 ```
 
 ## Write a template
@@ -94,31 +75,12 @@ tooltip accent. The following embed is that dark-figure scatter.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-dark" title="Dark-figure scatter with figure-derived tooltip theme"
-        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-dark" data-masque-embed="tooltips_dark" title="Dark-figure scatter with figure-derived tooltip theme" style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-tt-dark");
-  if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = (pretty ? "../embeds/" : "embeds/") + "tooltips_dark.html";
-})();
-</script>
+```
+
+```@eval
+Main.masque_fallback("tooltips_dark")
 ```
 
 Hold the pointer over a mark. The card is dark because the figure is

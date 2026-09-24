@@ -9,31 +9,12 @@ The four panels are one widget. For a single `barplot!`, see
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-gal-bars" title="Bars and areas"
-        style="width:100%;height:1480px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-gal-bars" data-masque-embed="gallery_bars" title="Bars and areas" style="width:100%;height:1480px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-gal-bars");
-  if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = (pretty ? "../../embeds/" : "../embeds/") + "gallery_bars.html";
-})();
-</script>
+```
+
+```@eval
+Main.masque_fallback("gallery_bars")
 ```
 
 ## Variations
