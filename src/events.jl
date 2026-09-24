@@ -97,6 +97,8 @@ function Base.show(io::IO, ev::InteractionEvent)
     else
         for f in fieldnames(typeof(ev))
             f === :layer && continue
+            # A category label is only set on a categorical axis; omit the unset one.
+            f in (:xcat, :ycat, :category) && getfield(ev, f) === nothing && continue
             print(io, ", ", f, " = ")
             show(io, getfield(ev, f))
         end

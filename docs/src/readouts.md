@@ -25,10 +25,11 @@ Main.masque_fallback("readouts_axis")
 ```
 
 Use it to mark a position — the start of a time window, a point to fit
-from — without needing a mark there. It works on linear and log axes.
-On a categorical axis the card shows the category under the pointer,
-but a click there currently fails with an error instead of returning
-it, so use it to read, not to commit, on categorical axes.
+from — without needing a mark there. It works on linear and log axes,
+and on categorical ones. On a categorical axis the card shows the
+category under the pointer, and a click returns the category's position
+(Makie places categories at `1, 2, …, n`) with its label in `pick.xcat`
+or `pick.ycat`; on a numeric dimension that field is `nothing`.
 
 ## Read a colorbar value
 
@@ -103,7 +104,7 @@ All three need to turn a pixel back into data, so they need a 2D `Axis`
 (or colorbar) with an `identity`, `log10`, or `log` scale; on an
 `Axis3` or a `PolarAxis` they raise an `ArgumentError` when `masque`
 runs. A threshold dragged along a categorical dimension shows the
-category while you drag but fails on release, like the axis readout.
-See [Supported plots and axes](@ref). If the axis also has a
+category while you drag; on release `level.value` is that category's
+position and `level.category` its label. See [Supported plots and axes](@ref). If the axis also has a
 [`ViewInteractable`](@ref), a plain drag moves the threshold and
 Shift+drag pans.

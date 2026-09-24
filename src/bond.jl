@@ -330,13 +330,54 @@ function _manifest_layer(manifest::AbstractDict, id::AbstractString)
     return layers[i]
 end
 
+# On a categorical dimension the overlay sends the category label, not a number (`mapAxis` in
+# geometry.ts), so the hover card can show it. Makie places categories at `1:n`: the label
+# becomes its position here, before any `transform_bond`, and travels on as `xcat` / `ycat`
+# (axis) or `category` (threshold).
+function _decategorize(manifest::AbstractDict, d::AbstractDict, js_payload)
+    kind = d["kind"]
+    (kind == "axis" || kind == "threshold") || return js_payload
+    t = get(get(manifest, "transforms", Dict()), string(get(d, "axis", "")), nothing)
+    id = d["id"]
+    if kind == "axis"
+        js_payload isa AbstractDict || return js_payload
+        any(k -> get(js_payload, k, nothing) isa AbstractString, ("x", "y")) || return js_payload
+        out = Dict{String, Any}(string(k) => v for (k, v) in js_payload)
+        for k in ("x", "y")
+            v = get(out, k, nothing)
+            v isa AbstractString || continue
+            out[k] = _category_position(t, k, v, id)
+            out[k * "cat"] = String(v)
+        end
+        return out
+    end
+    js_payload isa AbstractString || return js_payload
+    g = get(d, "geometry", nothing)
+    dim = g isa AbstractDict && get(g, "orientation", "v") == "h" ? "y" : "x"
+    return Dict{String, Any}(
+        "value" => _category_position(t, dim, js_payload, id), "category" => String(js_payload),
+    )
+end
+
+function _category_position(t, dim, label, id)
+    cats = t === nothing ? nothing : get(t, dim * "cats", nothing)
+    cats === nothing && throw(
+        ArgumentError("bond: layer :$id sent $(repr(label)) for $dim, which is not a categorical axis"),
+    )
+    k = findfirst(==(label), cats)
+    k === nothing && throw(
+        ArgumentError("bond: layer :$id sent $(repr(label)), which is not a category on its $dim axis"),
+    )
+    return Float64(k)
+end
+
 function _one_event(manifest, owners, js; wrap::Bool)
     layer_id = String(js["layer"])
     d = _manifest_layer(manifest, layer_id)
     kind = Symbol(d["kind"])
     wire = Int(js["index"])
     index = julia_index(kind, wire)
-    js_payload = get(js, "payload", nothing)
+    js_payload = _decategorize(manifest, d, get(js, "payload", nothing))
     ev = if haskey(owners, layer_id)
         o = owners[layer_id]
         transform_bond(o.interactable, o.layer, index, js_payload)

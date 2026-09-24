@@ -2,15 +2,20 @@
 # and the constructor. None of these is an array index.
 
 """
-    AxisEvent(layer, x, y)
+    AxisEvent(layer, x, y[, xcat, ycat])
 
-An axis click at data coordinates `(x, y)`. Not an array index.
+An axis click at data coordinates `(x, y)`. Not an array index. On a categorical dimension the
+coordinate is the category's position (Makie places categories at `1:n`), and `xcat` / `ycat`
+holds its label; on a numeric dimension that field is `nothing`.
 """
 struct AxisEvent <: InteractionEvent
     layer::Symbol
     x::Float64
     y::Float64
+    xcat::Union{Nothing, String}
+    ycat::Union{Nothing, String}
 end
+AxisEvent(layer, x, y) = AxisEvent(layer, x, y, nothing, nothing)
 
 bondtype(::AxisInteractable) = AxisEvent
 
@@ -24,8 +29,12 @@ end
 function _axis_event(id::Symbol, js_payload)
     return AxisEvent(
         id, Float64(_js_req(js_payload, "x", id)), Float64(_js_req(js_payload, "y", id)),
+        _js_category(js_payload, "xcat"), _js_category(js_payload, "ycat"),
     )
 end
+
+_js_category(js_payload::AbstractDict, key) = (v = get(js_payload, key, nothing); v === nothing ? nothing : String(v))
+_js_category(js_payload, key) = nothing
 
 """
     ColorbarEvent(layer, value)
@@ -51,14 +60,18 @@ function _colorbar_event(id::Symbol, js_payload)
 end
 
 """
-    ThresholdEvent(layer, value)
+    ThresholdEvent(layer, value[, category])
 
 A threshold drag release at data coordinate `value`. Pass back as `value=` to restore the line.
+Along a categorical dimension, `value` is the category's position (Makie places categories at
+`1:n`) and `category` holds its label; otherwise `category` is `nothing`.
 """
 struct ThresholdEvent <: InteractionEvent
     layer::Symbol
     value::Float64
+    category::Union{Nothing, String}
 end
+ThresholdEvent(layer, value) = ThresholdEvent(layer, value, nothing)
 
 bondtype(::ThresholdInteractable) = ThresholdEvent
 
@@ -70,6 +83,10 @@ function transform_bond(i::ThresholdInteractable, layer::HitLayer, index, js_pay
 end
 
 function _threshold_event(id::Symbol, js_payload)
+    # A categorical release arrives from `_decategorize` as `{value, category}`.
+    if js_payload isa AbstractDict
+        return ThresholdEvent(id, Float64(_js_req(js_payload, "value", id)), _js_category(js_payload, "category"))
+    end
     js_payload isa Real || throw(
         ArgumentError("bond: layer :$id threshold payload must be a number, got $(typeof(js_payload))"),
     )

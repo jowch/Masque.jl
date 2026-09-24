@@ -83,6 +83,38 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test stamped isa LegendEvent && stamped.index == 1 && stamped.label == "trend"
     end
 
+    @testset "a categorical axis commits the category's position and label" begin
+        # The overlay sends the category label on a categorical dimension (geometry.ts `mapAxis`).
+        # It used to reach Float64(::String) and throw, so `pick` never got a value.
+        fig = Figure()
+        ax = Axis(fig[1, 1]; dim1_conversion = Makie.CategoricalConversion())
+        scatter!(ax, ["a", "b", "c"], [1.0, 2.0, 3.0])
+        tv = Masque.APD.Bonds.transform_value
+        w = masque(fig, AxisInteractable(ax))
+        id = only(w.manifest["layers"])["id"]
+        ev = tv(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => "b", "y" => 2.0)))
+        @test ev isa AxisEvent
+        @test ev.x == 2.0 && ev.xcat == "b"
+        @test ev.y == 2.0 && ev.ycat === nothing
+        @test sprint(show, ev) == "AxisEvent(:$id, x = 2.0, y = 2.0, xcat = \"b\")"
+        @test_throws ArgumentError tv(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => "z", "y" => 2.0)))
+        @test_throws ArgumentError tv(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => 1.0, "y" => "b")))
+        # A numeric click on the same axis is unchanged.
+        num = tv(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => 1.2, "y" => 2.0)))
+        @test num.x == 1.2 && num.xcat === nothing
+
+        vt = masque(fig, ThresholdInteractable(ax; orientation = :vertical, value = 2.0))
+        tev = tv(vt, Dict("layer" => "threshold", "index" => -1, "payload" => "c"))
+        @test tev isa ThresholdEvent && tev.value == 3.0 && tev.category == "c"
+        # Passing the event back restores the line at that category.
+        @test Masque._threshold_value(tev) == 3.0
+        ht = masque(fig, ThresholdInteractable(ax; orientation = :horizontal, value = 2.0))
+        hev = tv(ht, Dict("layer" => "threshold", "index" => -1, "payload" => 1.5))
+        @test hev.value == 1.5 && hev.category === nothing
+        @test sprint(show, hev) == "ThresholdEvent(:threshold, value = 1.5)"
+        @test_throws ArgumentError tv(ht, Dict("layer" => "threshold", "index" => -1, "payload" => "c"))
+    end
+
     @testset "FunctionInteractable follows the layer kind" begin
         fig = Figure(); ax = Axis(fig[1, 1])
         scatter!(ax, [1.0], [1.0])
