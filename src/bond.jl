@@ -16,9 +16,10 @@ end
 """
     bondtype(interactable) -> Type
 
-The type of one commit from this interactable. Default [`ElementEvent`](@ref). A widget that
-also carries a `selects` ROI aimed at points returns a `Vector{ElementEvent}` for every
-element commit; that is a property of the call, not of the point layer's `bondtype`.
+The type of one commit from this interactable. Default [`ElementEvent`](@ref). When the same
+widget carries a `selects` ROI aimed at this interactable's point layer, a click on one of its
+points arrives as a one-element `Vector{ElementEvent}`; that is a property of the call, not of
+the point layer's `bondtype`.
 """
 bondtype(::AbstractInteractable) = ElementEvent
 bondtype(::ViewInteractable) = Nothing

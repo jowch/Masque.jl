@@ -386,9 +386,10 @@ end
 Overlay `fig` with JS hit-testing and return a Pluto `@bind` source. `fig` is not mutated.
 
 The bond is `nothing` until the first commit, unless `selected=` restored one. A click is one
-[`InteractionEvent`](@ref). A `selects` [`ROIInteractable`](@ref) aimed at points makes every
-element commit a `Vector{ElementEvent}` (a click is a one-element vector; an empty box is
-`ElementEvent[]`). Aimed at a grid, the brush is one [`GridWindowEvent`](@ref).
+[`InteractionEvent`](@ref). A `selects` [`ROIInteractable`](@ref) aimed at points commits a
+`Vector{ElementEvent}`, and so does a click on a point of that target layer (a one-element
+vector; an empty box is `ElementEvent[]`). Clicks on other layers stay single events. Aimed at
+a grid, the brush is one [`GridWindowEvent`](@ref).
 
 # Keywords
 - `selected` — the selection's starting value, 1-based. One index on a point layer mounts as

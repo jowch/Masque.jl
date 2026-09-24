@@ -42,6 +42,7 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Getting started" => "getting-started.md",
+        "Concepts" => "concepts.md",
         "Guides" => [
             "Click marks" => "marks.md",
             "Tooltips" => "tooltips.md",

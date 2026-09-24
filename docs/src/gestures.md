@@ -1,9 +1,9 @@
 # Overlay, bind, and the host
 
-[Getting started](@ref) and the Guides teach how to overlay a figure and
-use the pick. This page is the overlay, `@bind`, and the docs-site
-player — for when a hover does not re-run Julia, or a docs embed is not
-a live notebook.
+[Concepts](@ref) explains hover, clicks, and `@bind` for everyday use.
+This page is the detailed version: the overlay, `@bind`, the gesture
+channel that streams pan frames, and the docs-site player — for when a
+hover does not re-run Julia, or a docs embed is not a live notebook.
 
 Masque splits pointer work across four channels: overlay chrome, the `@bind`
 bond, the gesture channel, and a downstream Julia cell. Holding the pointer
@@ -99,7 +99,7 @@ source.
 |---|---|---|---|---|
 | Hover tooltip / highlight | Yes | No | No | No |
 | Click-echo wash | Yes | No | No | No |
-| Click / Enter commit | Echo yes | Scalar `ElementEvent` | No | Re-runs if it reads the bond |
+| Click / Enter commit | Echo yes | One event (a one-element `Vector` on a `selects` target layer) | No | Re-runs if it reads the bond |
 | ROI / threshold **in-drag** | Box / line moves | No | No | No |
 | ROI / threshold **release** | Echo if `selects` | Bounds, scalar, or `Vector` | No | Re-runs |
 | View pan / orbit **in-drag** | Readout; new frames | No | Yes | No |

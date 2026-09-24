@@ -44,6 +44,7 @@ you can orbit. See [Backends](@ref).
 ## Where to go next
 
 - [Getting started](@ref) — install, overlay a figure, and read a click
+- [Concepts](@ref) — how hover, clicks, payloads, and `@bind` fit together
 - [Constructors](@ref) — every built-in kind, its constructor, and its
   default payload
 - [Selection](@ref) — reacting to clicks, linking plots, persisting a
