@@ -172,6 +172,8 @@ function mapAxis(lims: [number, number], scale: string, f: number, cats?: string
         v = lims[0] + f * (lims[1] - lims[0])
     }
     if (cats && cats.length) {
+        // The label, not the position, is what an axis click and a threshold release send to Julia.
+        // `_decategorize` in src/bond.jl expects it and maps it back to 1..n; keep the two in step.
         const i = Math.max(0, Math.min(cats.length - 1, Math.round(v) - 1)) // Makie categoricals sit at 1..n
         return cats[i]
     }
