@@ -8,23 +8,29 @@
 > contract (parity is CI-enforced by the golden-manifest harness, `test/fixtures/parity/`).
 > Both backends ship `Axis3` overlays (WS-3D core, 2026-07-02) — static base on `:cairo`, live on
 > `:webgl` — with identical manifests (the `axis3` parity goldens are byte-identical). View
-> manipulation via a **slider** ships as **backend-symmetric `@bind` re-render**.
-> `ViewInteractable` **drag** commits nothing on either backend (#102/§12.3) and has a live
-> gesture-channel preview on both (#133; a PNG on `:cairo`, a serialized scene on the existing
-> canvas on `:webgl` — see §1†). The client-side GPU camera is out of scope on both.
+> manipulation is backend-symmetric (§1†): a **slider** is an `@bind` re-render; a
+> `ViewInteractable` **drag** commits nothing and streams a live preview over the gesture channel.
+> The client-side GPU camera is out of scope on both.
 >
-> **Numbers reproduce** via `julia --project=. bench/vs_cairo.jl` (WebGL measured live in this
-> process, both sides `Random.seed!(0)`; Cairo measured in a subprocess, since Masque supports only
-> one backend extension per session — one command, nothing hand-stamped). The **size** figures are
-> byte-reproducible and reconcile with `bench/payload_envelope.jl` (`markersize=6`, same as here) for
-> the shared cases — scatter-1k 187/38 KB, scatter-10k 724/379 KB. The **scatter-100k** row is this
-> bench's own point; `bench/stress.jl` sweeps 100k too but at `markersize=4` (≈303 KB PNG; see
-> `perf-findings.md`'s stress table for its render time), so it is *not* a corroborating source
-> for the `markersize=6` numbers here — the marker size drives both the PNG and the raster time.
-> **Timings (ms) are wall-clock** (`~` throughout) and vary run-to-run; only sizes are exact.
-> Last run **2026-06-30**, WGLMakie 0.13.12 / CairoMakie 0.15 /
-> Julia 1.12. Size/latency figures reconcile with `perf-findings.md`'s `:webgl` section and its
-> `:cairo` envelope — see that file for the full methodology.
+> **Numbers reproduce** via
+> `julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/vs_cairo.jl`
+> (the dev env built by `scripts/cloud-warm.sh julia`, which holds Masque plus both Makies;
+> WebGL measured live in this process, both sides `Random.seed!(0)`; Cairo measured in a subprocess, since Masque
+> supports only one backend extension per session — one command, nothing hand-stamped). The
+> subprocess is launched with `--project=<repo root>` (hardcoded in the script), so `CairoMakie`
+> must also be loadable from there, e.g. through your default `@v1.x` env; if it is not, every Cairo
+> column reads `UNSUPPORTED` and the script warns. The **size** figures are byte-reproducible and
+> reconcile with `bench/payload_envelope.jl` (`markersize=6`, same as here) for the shared cases —
+> scatter-1k 187/38 KB, scatter-10k 724/379 KB. The **scatter-100k** row is this bench's own point;
+> `bench/stress.jl` sweeps 100k too but at `markersize=4` (≈303 KB PNG; see `perf-findings.md`'s
+> stress table for its render time), so it is *not* a corroborating source for the `markersize=6`
+> numbers here — the marker size drives both the PNG and the raster time. **Timings (ms) are
+> wall-clock** (`~` throughout) and vary run-to-run; only sizes are exact. Last run **2026-06-30**,
+> WGLMakie 0.13.12 / CairoMakie 0.15 / Julia 1.12. Size/latency figures reconcile with
+> `perf-findings.md`'s `:webgl` section and its `:cairo` envelope — see that file for the full
+> methodology. The **WebGL scene** column is a sum of the scene's numeric-array bytes
+> (`wire_blob!` in the script), not the MsgPack Pluto actually packs, so it understates the real
+> `:webgl` wire size (#178); the crossover column inherits that.
 
 ## 1. Interaction matrix — same contract, different cost
 
@@ -43,18 +49,15 @@ camera is deliberately not client-driven on either backend (§1†).
 | hover tooltip | overlay hit-test (client) | overlay hit-test (client) — same |
 | click → `@bind` | client hit-test + bind | client hit-test + bind — same |
 | data update (`@bind` drives the data) | **full** server render + encode + PNG re-ship | server serialize + client redraw |
-| animation, N frames | N × full PNG | N × scene (tier-1) → in-place patch (tier-2, roadmap) |
+| animation, N frames | N × full PNG | N × scene; in-place buffer patching (`find_plots`) is an unbuilt `roadmap.md` direction, gated on canvas identity (#86) |
 
 The rows that **match** are the current story: both backends do hover/click/`@bind` the same way
 (`Axis3` included — same overlays, same `{index,x,y,z}` payloads); `:webgl`'s edge is rendering
-**cost** (cheap re-renders; live rather than static 3D). Slider-driven pan/zoom/rotate **ships on
-both backends** as server-authoritative `@bind` re-render; `ViewInteractable` drag commits
-nothing on either and has a live gesture-channel preview on both (†).
+**cost** (cheap re-renders; live rather than static 3D). View manipulation is the same on both (†).
 
-> **(†) View manipulation: a slider ships backend-symmetric `@bind` re-render; `ViewInteractable`
-> drag commits nothing on either backend and has a live gesture-channel preview on both
-> (#102/#133); the client-side GPU camera stays out on both (a Masque-wide non-goal, alongside
-> GPU-pick occlusion).** What is true today, verified from source: the widget
+> **(†) View manipulation.** A slider is a server-authoritative `@bind` re-render on both
+> backends. A `ViewInteractable` drag commits nothing on either and has a live gesture-channel
+> preview on both (#102/#133). What is true today, verified from source: the widget
 > deliberately gates the client camera off — the shim sets `can_send_to_julia:()=>true` (needed for
 > the client-side camera/uniform *observable* animation path), so WGLMakie's
 > `use_orbit_cam = ()=>!(Bonito.can_send_to_julia && Bonito.can_send_to_julia())` **disables 3D
@@ -66,11 +69,9 @@ nothing on either and has a live gesture-channel preview on both (†).
 >
 > The **in-scope path** has Julia re-render from new view parameters: 2D `limits` or 3D
 > `azimuth`/`elevation` change → Julia re-renders → fresh base + freshly projected overlay. That is
-> drift-free *by construction* (Julia recomputes the overlay every step) — for a **slider**,
-> still backend-symmetric server-authoritative `@bind` re-render on both backends, unchanged by
-> any of the below.
-> `ViewInteractable` **drag** is a separate path since #102/§12.3: it commits nothing on either
-> backend — a camera is operational state, not an analysis value
+> drift-free *by construction* (Julia recomputes the overlay every step). A slider takes that path
+> as an `@bind` re-render. A `ViewInteractable` **drag** commits nothing — a camera is operational
+> state, not an analysis value
 > ([§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)). In-drag frames stream
 > over the `with_js_link` gesture channel instead of a bond, on both backends, so the
 > Julia-authored-projection guarantee holds per frame, not just at commit. `:cairo` ships a PNG;
@@ -81,22 +82,22 @@ nothing on either and has a live gesture-channel preview on both (†).
 > `perf-findings.md`'s "Gesture channel (#102)" section for measured numbers). `:webgl` drag
 > re-serializes the scene and rebuilds the three.js graph on the existing renderer — it does not
 > open a new WebGL context. A slider re-render still does, because that path replaces the cell.
-> **The former "gated on GL-context reuse" claim was measured FALSE**
-> (2026-07-02 — figures and mechanism in `perf-findings.md` §"WGL context lifecycle"): re-init
-> per step is a *cost* (the camera-only resident-scene patch is the planned optimization), not
-> a feasibility gate. Continuous *smooth* drag on large scenes remains expensive on both — a
-> shared cost wall, not a capability split. Status: sliders ship backend-symmetric `@bind`
-> re-render on both; `ViewInteractable` drag commits nothing on either and has a live
-> gesture-channel preview on both (#102/#133). The `:webgl` round-trip's own numbers are in
-> `perf-findings.md`.
+> GL-context reuse is not a feasibility gate: per-step re-init was measured to be a *cost*, not a
+> leak (2026-07-02; figures and mechanism in `perf-findings.md` §"WGL context lifecycle"). The
+> camera-only resident-scene patch that would have removed the per-frame `serialize_scene` is not
+> being built (#86, closed not planned): Pluto destroys the `<canvas>` on every cell replacement,
+> so the scene does not survive to be patched. Continuous *smooth* drag on large scenes remains
+> expensive on both — a shared cost wall, not a capability split. The `:webgl` round-trip's own
+> numbers are in `perf-findings.md`.
 
 ## 2. Wire + server cost — the measurable half
 
-Per-figure, identical seeded data (`Random.seed!(0)` on both sides). **Cairo/render** = PNG (decoded)
-+ manifest, re-shipped *every* render. **WebGL scene** = the per-render MsgPack-binary scene; the
-**1.09 MB WGLMakie bundle** ships **once per notebook** (M2) on top of the first cell only. **ms** =
-server work to turn a fresh figure into a shippable payload. Sizes are exact and reproducible; **ms
-are wall-clock and approximate** (`~`). Units: **KB = bytes/1024, MB = bytes/1 000 000** throughout.
+Per-figure, identical seeded data (`Random.seed!(0)` on both sides). **Cairo/render** = PNG
+(decoded) + manifest, re-shipped *every* render. **WebGL scene** = the per-render scene, counted as
+its numeric-array bytes (below the MsgPack Pluto packs, #178); the **1.09 MB WGLMakie bundle** ships
+**once per notebook** (M2) on top of the first cell only. **ms** = server work to turn a fresh
+figure into a shippable payload. Sizes are exact and reproducible; **ms are wall-clock and
+approximate** (`~`). Units: **KB = bytes/1024, MB = bytes/1 000 000** throughout.
 
 | figure | Cairo /render | Cairo ~ms | WebGL scene | WebGL ~ms | wire crossover N* |
 |---|--:|--:|--:|--:|--:|
@@ -106,13 +107,17 @@ are wall-clock and approximate** (`~`). Units: **KB = bytes/1024, MB = bytes/1 0
 | scatter, 100 000 | 3 973 KB (53+**3 920**) | **~2 280** | 861 KB | ~32 | **0.3** |
 | heatmap, 200² | 386 KB (190+197) | ~49 | 1 956 KB | ~30 | never |
 | heatmap, 500² | STRESS table in `perf-findings.md` | STRESS table in `perf-findings.md` | 11 843 KB | ~45 | never |
-| 3D helix, 300 | **unsupported** | — | 141 KB | ~30 | WebGL-only |
+| 3D helix, 300 | not measured‡ | — | 141 KB | ~30 | not measured‡ |
 
 *Renders after which cumulative `:webgl` (bundle + N·scene) < cumulative `:cairo` (N·(PNG+manifest)).
 `:cairo` has no bundle but re-rasterizes and re-ships everything each render; `:webgl` ships the bundle
 once, then only its compact scene. The heatmap 500² Cairo columns are the STRESS table in
 `perf-findings.md`. That manifest is the screen-pixel sample, and the render range there was not
 re-timed after the sample landed, so this row does not copy either number.
+
+‡The 2026-06-30 run predates `:cairo` `Axis3` support (WS-3D, 2026-07-02), so the Cairo subprocess
+failed on this figure and the script printed it as unsupported. `Axis3` ships on both backends
+today; the script now measures this row on `:cairo` too, and a re-run will fill it.
 
 Two terms move independently under stress, and both are UX terms:
 
@@ -173,36 +178,24 @@ the user's GPU anyway). Three facts, GL-independent:
   WGLMakie's own controls. View gestures go through Masque's overlay and the `with_js_link`
   channel instead (`ViewInteractable`, #102/#133). (The flag is true *on purpose* — it's what lets
   the client-side camera/uniform *observable* animation path fire; `update_cam` early-returns
-  when it's false. Note this is **not** roadmap tier-2 animation, which patches GL buffers via
-  `find_plots` with no observable.)
+  when it's false. This is **not** the `find_plots` in-place buffer patching direction in
+  `roadmap.md`, which patches GL buffers with no observable and is unbuilt.)
 - **If enabled, the wire/latency would be free but the overlay would drift.** Because the scene ships
-  through `Bonito.Session(Bonito.NoConnection())` (`src/MasqueWGL.jl:84`) with no transport back to the
-  kernel, a client-side camera move would cost **zero round-trip by construction**. But the overlay's
-  hit-regions are a static `Makie.project` snapshot (`src/MasqueWGL.jl:113-125`; its comment at the
-  time: "STATIC camera overlay… Axis3 / live-camera need client-side projection — TODO" — the
-  Axis3 half has since shipped server-side, WS-3D), so they would **not** track
-  the moving plot. Both facts are latent until the camera is turned on.
+  through `Bonito.Session(Bonito.NoConnection())` (`_headless_screen` in
+  `ext/MasqueWGLMakieExt.jl`) with no transport back to the kernel, a client-side camera move
+  would cost **zero round-trip by construction**. But the overlay's hit-regions are a
+  server-side `Makie.project` snapshot taken at render time (`Masque.context` in the same file,
+  through the projection closure shared with `:cairo`), so they would **not** track the moving
+  plot. Both facts are latent until the camera is turned on.
 - **Turning the *client* camera on would be large and backend-asymmetric — which is why that path
   is retired.** Its staged design (S1 2D magnifier → S2 3D-rotate via client re-projection → S3 JS
   data-space zoom → S4 GPU-pick occlusion) lands **only in `:webgl`** and exists to chase a camera
-  Julia can't see. The in-scope replacement — server-side `@bind` re-render (†) — needs none of
-  it: the overlay is re-projected by Julia each step, so the drift problem the client path had to
-  solve never arises.
+  Julia can't see. The in-scope path — server-side re-render (†) — needs none of it: the overlay
+  is re-projected by Julia each step, so the drift problem the client path had to solve never
+  arises.
 
-**Decision — superseded (2026-07-02): in scope, as parity.** The 2026-07-01 "investigated →
-deferred" call answered the wrong question — it scoped view manipulation as a *client-side camera*
-(which is indeed `:webgl`-only, drift-prone, and stays out). Server-authoritative `@bind`
-re-render gives pan/zoom/rotate on **both** backends with the overlay recomputed each step, so
-the backend-asymmetry objection dissolves; what remains is only a per-step **cost** difference
-(the once-suspected `:webgl` GL-context-reuse prerequisite dissolved when measured — see (†)
-and `perf-findings.md` §"WGL context lifecycle"; what does gate a resident scene is canvas
-identity across Pluto's cell replacement, #86). Both tracked in `roadmap.md` (Axis3 coverage +
-view manipulation via Julia re-render); the client-side GPU camera remains a Masque-wide non-goal
-(alongside GPU-pick occlusion).
-
-View parameters belong on the `with_js_link` gesture channel, not `@bind`, because a camera is
-operational state rather than an analysis value
-([§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when)). `ViewInteractable`
-commits nothing on either backend. In-drag frames stream over `with_js_link` instead of a bond:
-a PNG on `:cairo`, a serialized scene on the existing canvas on `:webgl`. The client-side GPU
-camera staying out is unaffected by any of this.
+**Decision: view manipulation is in scope, as parity.** Server-side re-render gives
+pan/zoom/rotate on **both** backends with the overlay recomputed each step, so the only
+difference between them is per-step **cost**, not capability. What stays out is the client-side
+GPU camera: it is `:webgl`-only and drift-prone, a Masque-wide non-goal alongside GPU-pick
+occlusion.
