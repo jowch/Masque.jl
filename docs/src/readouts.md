@@ -25,8 +25,10 @@ Main.masque_fallback("readouts_axis")
 ```
 
 Use it to mark a position — the start of a time window, a point to fit
-from — without needing a mark there. It works on linear and log axes,
-and on categorical axes, where it reads the category.
+from — without needing a mark there. It works on linear and log axes.
+On a categorical axis the card shows the category under the pointer,
+but a click there currently fails with an error instead of returning
+it, so use it to read, not to commit, on categorical axes.
 
 ## Read a colorbar value
 
@@ -100,6 +102,8 @@ starting value in its own cell if other inputs rebuild the figure.
 All three need to turn a pixel back into data, so they need a 2D `Axis`
 (or colorbar) with an `identity`, `log10`, or `log` scale; on an
 `Axis3` or a `PolarAxis` they raise an `ArgumentError` when `masque`
-runs. See [Supported plots and axes](@ref). If the axis also has a
+runs. A threshold dragged along a categorical dimension shows the
+category while you drag but fails on release, like the axis readout.
+See [Supported plots and axes](@ref). If the axis also has a
 [`ViewInteractable`](@ref), a plain drag moves the threshold and
 Shift+drag pans.

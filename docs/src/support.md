@@ -6,26 +6,33 @@ link here for the limits.
 
 ## Interactions by axis
 
-Marks you click or hover work on every axis type. The interactions that
-turn a pointer position back into a data value — reading coordinates,
-dragging a threshold or a box, panning — need a flat 2D axis whose scale
-the browser can invert.
+Hovering and clicking marks works on all three axis types, but `Axis3`
+and `PolarAxis` each build only some plot types (the recipe table below
+says exactly which). The interactions that turn a pointer position back
+into a data value — reading coordinates, dragging a threshold or a box,
+panning — need a flat 2D axis whose scale the browser can invert.
 
 | Interaction | `Axis` | `Axis3` | `PolarAxis` |
 |---|---|---|---|
-| Hover and click points, lines, and segments | yes | yes | yes |
-| Hover and click bars, heatmaps, polygons, and text | yes | skipped | skipped |
+| Hover and click marks | every recipe | some recipes ³ | some recipes ³ |
 | Read `(x, y)` ([`AxisInteractable`](@ref)) | yes ¹ | no | no |
 | Drag a threshold ([`ThresholdInteractable`](@ref)) | yes ¹ | no | no |
 | Brush a box ([`ROIInteractable`](@ref)) | yes ² | no | no |
 | Sample a series ([`SliceInteractable`](@ref)) | yes ² | no | no |
 | Pan or orbit ([`ViewInteractable`](@ref)) | pan ² | orbit | no |
 
-¹ Scale `identity`, `log10`, or `log`. Categorical axes work; the readout
-is the category.
+¹ Scale `identity`, `log10`, or `log`. On a categorical axis the hover
+card shows the category under the pointer, but a click or a release on
+the categorical dimension currently fails with an error instead of
+returning it, so commit readouts on numeric axes.
 
 ² Scale `identity`, `log10`, or `log`, and numeric (not categorical)
 limits.
+
+³ `Axis3` builds `scatter!`, `meshscatter!`, `lines!`, `linesegments!`,
+`wireframe!`, and `arrows3d!`. `PolarAxis` builds `scatter!`, `lines!`,
+`linesegments!`, `scatterlines!`, and `series!`. Every other plot on those
+axes is skipped.
 
 "Skipped" means `masque(fig)` leaves that plot out with a warning naming
 it; "no" means passing the interactable raises an `ArgumentError` when

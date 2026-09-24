@@ -31,7 +31,8 @@ cell's value. As with other marks, the clicked cell stays highlighted,
 and a click outside the grid leaves the selection alone.
 
 If you have edges and values rather than a plot, pass them as a grid.
-Edges must be increasing, and the matrix has one entry per cell:
+Each edge vector must be monotonic (ascending or descending), and the
+values form a matrix of size `(length(xedges) - 1, length(yedges) - 1)`:
 
 ```julia
 cells = RectInteractable(ax; grid = (0.5:1:4.5, 0.5:1:3.5, z), id = :cells)
@@ -51,7 +52,7 @@ works this way without any setting.
 
 Colour images have no single value per cell. A large colour image
 (cells smaller than a pixel) reports `i` and `j` with `value = nothing`.
-A small colour image, whose cells are wider than a pixel, currently
+A small colour image, whose cells are one screen pixel or wider, currently
 fails with a `MethodError` when `masque` runs; show a small RGB image
 with its cells as a real-valued matrix, or pass a
 [`RectInteractable`](@ref) grid with the values you want to read.
@@ -60,7 +61,10 @@ with its cells as a real-valued matrix, or pass a
 
 Add an [`ROIInteractable`](@ref) with `selects` naming the grid, and a
 drag returns one [`GridWindowEvent`](@ref) for the block of cells under
-the box: `A[win]` is that sub-matrix. See [Brush a region](@ref).
+the box: `A[win]` is that sub-matrix. A box that misses the grid still
+returns one `GridWindowEvent`, with empty ranges (`win.i1:win.i2` is
+`1:0`), so `A[win]` is an empty matrix rather than an error. See
+[Brush a region](@ref).
 
 ## What grids cannot do
 
