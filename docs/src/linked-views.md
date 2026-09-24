@@ -1,55 +1,65 @@
 # Linked views
 
-Put two axes in one figure. One `masque` call covers both: you get one
-overlay, and layers from every `Axis`, `Axis3`, and `PolarAxis` share
-the hit list. Hold your pointer over a mark, or click it, and the
-overlay responds on the axis you hit. For the first overlay, see
-[Getting started](@ref).
+Masque does not wire plots together itself; Pluto does. A click in a
+Masque widget becomes the value of a `@bind` variable, and every cell
+that reads that variable re-runs. So "linking" a scatter to a detail
+plot, a table, or a model fit is ordinary Pluto code: read `pick`, draw
+or compute something from it. This page shows that pattern first, then
+what one widget can do across several axes on its own.
 
-```@raw html
-<div class="masque-diagram">
-  <img class="masque-diagram-light" src="assets/diagrams/one-figure-several-axes.svg"
-       alt="One masque call produces one overlay and one manifest. Hits stay on the axis you hit. Holding the pointer over the xy legend entry highlights every xy mark; xz stays unchanged. Same-index highlight between two scatters is not shipped. A listed ROI item set updates a harvested table; an unlisted drag moves the box and leaves the table unchanged.">
-  <img class="masque-diagram-dark" src="assets/diagrams/one-figure-several-axes-dark.svg"
-       alt="One masque call produces one overlay and one manifest. Hits stay on the axis you hit. Holding the pointer over the xy legend entry highlights every xy mark; xz stays unchanged. Same-index highlight between two scatters is not shipped. A listed ROI item set updates a harvested table; an unlisted drag moves the box and leaves the table unchanged.">
-</div>
-<script>
-(function () {
-  var wrap = document.currentScript.previousElementSibling;
-  if (!wrap || !wrap.classList.contains("masque-diagram")) return;
-  var link = document.querySelector('link[href*="masque-embed.css"]');
-  var base = "assets/";
-  if (link) {
-    base = (link.getAttribute("href") || "assets/masque-embed.css")
-      .replace(/masque-embed\.css(?:\?.*)?$/, "");
-  }
-  var imgs = wrap.querySelectorAll("img");
-  for (var i = 0; i < imgs.length; i++) {
-    var src = imgs[i].getAttribute("src") || "";
-    imgs[i].src = base + src.replace(/^.*?assets\//, "");
-  }
-})();
-</script>
+## Drive a second plot from a click
+
+Put a key in each payload that identifies the row — an id, a name — and
+use it downstream. Here a map of cities drives a plot of the clicked
+city's series:
+
+```julia
+begin
+    cities = [
+        (id = "tok", name = "Tokyo", lon = 139.7, lat = 35.7),
+        (id = "del", name = "Delhi", lon = 77.2, lat = 28.6),
+        (id = "sha", name = "Shanghai", lon = 121.5, lat = 31.2),
+    ]
+    series = Dict(
+        "tok" => [3.1, 3.4, 3.2, 3.6],
+        "del" => [2.2, 2.5, 2.9, 3.0],
+        "sha" => [2.0, 2.4, 2.3, 2.7],
+    )
+    fig = Figure(size = (560, 320))
+    ax = Axis(fig[1, 1]; xlabel = "longitude", ylabel = "latitude")
+    s = scatter!(ax, [c.lon for c in cities], [c.lat for c in cities]; markersize = 16)
+    pts = PointInteractable(ax, s; payloads = cities)
+    nothing
+end
 ```
 
-One `masque` call covers every axis: independent hits, legend whole-layer
-wash, and a listed ROI item set that updates a harvested table.
-Same-index highlight between two scatters is not shipped.
+```julia
+@bind pick masque(fig, pts)
+```
 
-`auto_interactables` walks every axis it knows, plus every `Colorbar` and
-`Legend`. It does not install `AxisInteractable`, `ThresholdInteractable`,
-`ROIInteractable`, `ViewInteractable`, or `SliceInteractable`. Append
-those yourself. Layer ids
-must not collide; a second scatter becomes `:scatter_2`.
+```julia
+begin
+    detail = Figure(size = (560, 240))
+    dax = Axis(detail[1, 1]; title = pick === nothing ? "click a city" : pick.name)
+    pick === nothing || lines!(dax, series[pick.id])
+    detail
+end
+```
 
-## Inspect two views of the same points
+The detail cell reads `pick`, so it re-runs on each click. The same
+`pick.id` could filter a `DataFrame`, pick the data for a fit, or be
+passed to another Masque widget — the second figure can be interactive
+too. Hovering never re-runs these cells; only clicks and releases do.
 
-Four points, `xs`, `ys`, `zs`, two `Axis` panels. Zero-config
-`masque(fig)` overlays both scatters. Hold the pointer over a mark in
-either panel: the tooltip and highlight in the overlay stay on that
-panel. The other scatter does not highlight.
+To show the clicked point as selected in a *second* widget as well, pass
+it as that widget's `selected=`; [Selection round-trip](@ref) shows it.
 
-Do not use `Axis3` for this job. Two 2D axes are the 2D-of-3D shape.
+## Several axes in one figure
+
+One `masque` call covers every axis in a figure, and each axis keeps its
+own hits: hovering a point highlights that point on the panel you are
+on. Each scatter becomes its own layer (`:scatter`, `:scatter_2`, …), so
+`pick.layer` says which panel was clicked.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -61,29 +71,26 @@ Do not use `Axis3` for this job. Two 2D axes are the 2D-of-3D shape.
 Main.masque_fallback("linked_two_axis")
 ```
 
-The notebook is that figure. A click writes one [`ElementEvent`](@ref): `layer` is `:scatter` or
-`:scatter_2`, and `index` is 1-based in that layer. Same row order in
-both scatters is an authoring coincidence. Masque does not treat those
-indexes as one observation.
+Masque does not assume that the same index in two plots is the same
+observation, so hovering point 3 in one panel does not highlight point 3
+in the other. When they are the same row, make the connection
+explicitly: on a click, rebuild the figure with both layers selected,
 
-Optional: put `(; i, x, y, z)` on both [`PointInteractable`](@ref)s so
-the tooltip on either view can show the third coordinate. That tooltip
-still runs in the overlay. It still does not wash the other axis.
+```julia
+masque(fig; selected = Dict(:scatter => [i], :scatter_2 => [i]))
+```
 
-Do not add a second `@bind pick` cell. Do not `deepcopy(fig)`.
+where `i` comes from a cell that does not read this widget's own value.
+With one index on each of two layers the widget highlights both but
+starts with its value at `nothing`, so a cell reading this widget's
+`pick` goes back to its "nothing clicked" state after the rebuild.
 
-## Highlight a series across axes
+## Highlight a series across panels
 
-A legend entry highlights the traces it names, including layers on
-other axes. A spec is a layer id — every element of that layer — or
-`id:k` pinning element `k`. That wash is client-side: it does not
-write `@bind`. It is the only shipped cross-layer highlight. It is
-series-shaped, not observation `i`. Hold the pointer over **xy** and
-every mark of that series highlights in the overlay. Point 3 in both
-panels does not.
-
-Two lines on one axis stay on [Legend](@ref). The two-panel wash lives
-here.
+A legend entry is the one thing that highlights across axes by itself:
+hovering it lights up every mark of the series it names, on whatever
+axis the series is drawn. Clicking it returns the legend entry, which a
+downstream cell can use to filter (see [Legend](@ref)).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -95,76 +102,22 @@ here.
 Main.masque_fallback("linked_legend_wash")
 ```
 
-The notebook is that figure. `masque(fig)` picks up the `Legend`. Click still reports the legend
-entry (`layer === :legend`), not each washed mark. The overlay cannot
-hide Makie traces. Use the wash plus `@bind` so a Julia cell can
-filter the series. For `targets=` and a click readout, see
-[Legend](@ref).
-
-## Same-index highlight is not shipped
-
-Hold the pointer over, or click, index `i` of `:scatter`. Index `i` of
-`:scatter_2` does not highlight in the overlay. There is no JavaScript
-join on a payload field.
-
-Do not emit a custom [`HitLayer`](@ref) as a join on observation `i`.
-Naming other layers still washes every element of those layers.
-
 ## Filter a table from a region
 
-Drag the box; the overlay moves it. On release the bond is a
-`Vector{ElementEvent}` (empty `[]`, never `nothing`). A downstream
-cell slices the table. Before the first release the bond is `nothing`
-unless you pass `selected=`.
+Brushing is the many-marks version of a click: an
+[`ROIInteractable`](@ref) with `selects` returns every point inside the
+box on release, and a cell slices your table with it —
+`df[picks, :]`. [Brush a region](@ref) walks through it.
 
-That job is the listed `{ items }` player on [Brush a region](@ref):
-constructor, idle plus empty plus enclosed-point sets, and the harvested
-table cell. Unlisted drags keep the box moving; the table stays on the
-last listed set. One ROI, one `:circles` or `:grid` target, rectangle
-only. `masque(fig)` does not add the box.
+## What Masque does not link for you
 
-Do not snapshot pixel bounds. Do not expect a second axis's marks to
-fall in this box (viewports do not overlap).
+- Hover is local to the mark under the pointer; it does not echo into
+  other plots.
+- There is no shared data source between widgets. Two `masque` calls
+  are two independent widgets, connected only through the Pluto cells
+  you write.
+- Every box with `selects` in one widget must name the same layer, and
+  boxes are rectangles: there is no lasso and no cross-filtering
+  between brushes on different plots.
 
-## Drive a second plot from a click
-
-`layer` and `index` are plain data. One click can drive any
-number of downstream cells: filter a table, remount a second figure, or
-recompute a fit. Give the `payloads` on two interactables the same shape
-and key on it, with no extra Masque API:
-
-```julia
-rows = pick === nothing ? data : filter(r -> r.id == pick.id, data)
-```
-
-To wash the same index list on remount, pass `selected=` on both layer
-ids. That is a Julia rebuild, not live hover:
-
-```julia
-masque(
-    fig, ints;
-    selected = Dict(:scatter => [i], :scatter_2 => [i]),
-)
-```
-
-Last pick wins. A later click is an [`ElementEvent`](@ref) and
-replaces a hydrated vector wholesale. Two `masque` widgets do not share
-overlay state: each has its own overlay. [Selection round-trip](@ref)
-passes one widget's `@bind` into `selected=` on a second widget. To
-accumulate across clicks, keep a `Ref` in a cell that does not read the
-bond, as that page describes.
-
-A second plot that filters on a pick is a **click**, not a pointer hold.
-Holding the pointer over a mark does not write `@bind` and does not
-rebuild Julia. For `selected=` kinds and persist, see [Selection](@ref).
-
-## What is not shipped
-
-- No shared `ColumnDataSource`.
-- No same-index highlight between two scatters.
-- No automatic echo onto a second axis.
-- No lasso.
-- No SPLOM or crossfilter of several brushes (one ROI, one target).
-
-For overlay versus `@bind` timing, see [Overlay, bind, and the host](@ref).
-For the demos, see [Gallery](@ref).
+For how hover, clicks, and drags reach Julia, see [Concepts](@ref).

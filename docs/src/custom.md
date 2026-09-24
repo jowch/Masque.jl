@@ -1,8 +1,28 @@
 # Custom hits
 
-Declare hit regions Makie did not plot as marks: a circle, a rect, and a
-polygon over an image. Hold your pointer over a region to read its name.
-For constructor signatures, see [Constructors](@ref).
+Sometimes the thing you want people to click is not a mark Makie drew:
+regions of interest on a microscope image, zones on a map, the arms of a
+diagram. Sometimes it is, but a click should return something richer
+than an [`ElementEvent`](@ref). Masque has three levels for this, each
+more work and more control than the last:
+
+1. [`RegionInteractable`](@ref) — list circles, rectangles, and polygons
+   placed in data coordinates. Enough for most cases.
+2. [`FunctionInteractable`](@ref) — compute hit geometry yourself from
+   the figure's layout, for shapes the first level cannot express.
+3. A subtype of [`AbstractInteractable`](@ref) — also choose what a
+   click returns, with an event type of your own.
+
+None of them draws anything: the figure is still whatever Makie drew,
+and a custom interactable only says where the pointer can hit and what
+each hit means. Draw a visible outline with Makie if the regions should
+be visible.
+
+## Regions over a figure
+
+Pass a list of shapes and one payload per shape. Hovering a region shows
+its payload, and a click returns an [`ElementEvent`](@ref) that carries
+the payload's fields (`pick.name`):
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -14,60 +34,36 @@ For constructor signatures, see [Constructors](@ref).
 Main.masque_fallback("custom_regions")
 ```
 
-## Draw regions Makie did not plot
-
-[`RegionInteractable`](@ref) takes mixed shapes in one call. Each region is
-one of:
+Each region is one of
 
 ```julia
-(:circle,  (cx, cy), r)            # r is logical px × DPI
+(:circle,  (cx, cy), r)            # r in logical pixels
 (:rect,    (cx, cy), w, h)         # w, h in data space
 (:polygon, [(x, y), ...])          # a ring in data space
 ```
 
-A triangle is a `:polygon`. Do not reach for
-[`FunctionInteractable`](@ref) to hit a triangle.
+Rectangles and polygons are in data coordinates, so they stay on the
+features they outline. A circle's centre is in data coordinates too, but
+its radius is in logical pixels, like a scatter marker's size: `r = 8`
+is an eight-pixel target however wide the axis is. Pass the logical
+size; Masque scales it for the figure's resolution itself. `payloads` is required — a region
+has no data of its own — and `tooltip` works as elsewhere (see
+[Tooltips](@ref)).
 
-Circle `r` is logical pixels times the figure scale (`r * ctx.scaling`),
-the same formula as [`PointInteractable`](@ref)'s `radius`. It is not a
-projected data-space radius. `r = 8` is eight logical pixels, not eight
-data units on a wide axis. Rect `w`, `h` and polygon rings **are** data
-space: Masque projects their corners.
+Masque groups the regions by shape, so one `RegionInteractable` with
+`id = :cells` produces up to three layers: `:cells_c` (circles),
+`:cells_r` (rectangles), and `:cells_p` (polygons). `pick.layer` reports
+those ids, and `selected=` uses them.
 
-`payloads` is required and must match `regions` 1:1. There is no
-auto-generated default. `tooltip` takes the same three forms as other
-element constructors (`nothing` / `masque"..."` / `false`). For more
-information, see [Tooltips](@ref).
+## Compute hit geometry
 
-Masque groups regions by kind. Base `id = :cells` becomes `:cells_c`
-(circles), `:cells_r` (rects), and `:cells_p` (polygons). Key
-`selected=` on those suffixed ids, not on `:cells`.
-
-The notebook draws the image and the three regions, and the last cell
-names the one you click.
-
-Do not pass `selected = Dict(:cells => [1])`. Use `:cells_c`, `:cells_r`,
-or `:cells_p` for the kind you hydrated. Each split layer commits an
-[`ElementEvent`](@ref).
-
-## FunctionInteractable
-
-Use this after [Constructors](@ref), when [`RegionInteractable`](@ref)
-cannot express the geometry (`:segments`, `:grid`, or layers on more
-than one axis). The constructor is `FunctionInteractable(f;
-events = (:click, :hover))`. There is no `ax` and no `id`. `f` receives
-the figure's [`InteractionContext`](@ref) and must return
-`Vector{HitLayer}`. Layer ids live on those [`HitLayer`](@ref)s.
-
-Do not copy `FunctionInteractable(ax, f; id)` — that signature is not
-shipped.
-
-Replace the previous `fig` and `@bind pick` cells.
-
-Project data-space points with [`data_to_image_px`](@ref). Look up an
-axis transform with `Masque.axis_id(ctx, ax)` (not exported — qualify
-it). `:segments` geometry is a flat `[x1, y1, x2, y2, …]` vertex list in
-image pixels, disjoint pairs, one payload per pair.
+When the shapes are not circles, rectangles, or polygons — a set of line
+segments, say, or regions on several axes at once — build the hit layers
+yourself. [`FunctionInteractable`](@ref) takes a function that receives
+the figure's [`InteractionContext`](@ref) and returns a vector of
+[`HitLayer`](@ref)s. [`data_to_image_px`](@ref) converts a data point on
+an axis to the image pixels the overlay works in, and
+`Masque.axis_id(ctx, ax)` names the axis a layer belongs to.
 
 ```julia
 begin
@@ -104,33 +100,35 @@ end
 @bind pick masque(fig, track)
 ```
 
-`f` can emit one `HitLayer` per axis because `ctx` covers the whole
-figure. Each layer uses the bond type of its kind; the default is
-[`ElementEvent`](@ref). Prefer [`RegionInteractable`](@ref) when the
-shape is a circle, rect, or polygon. For the `HitLayer` field list, see
-[API](@ref).
+Each layer's `geometry` is in image pixels, laid out according to its
+kind — a flat vector for most kinds, a vector of paths or rings for
+`:lines` and `:polygons`:
+
+| Kind | `geometry` | One element is |
+|---|---|---|
+| `:circles` | `[cx, cy, r, cx, cy, r, …]` | one circle |
+| `:segments` | `[x0, y0, x1, y1, …]` | one segment (a pair of points) |
+| `:polyline` | `[x, y, x, y, …]` (`NaN` starts a gap) | one edge between consecutive points |
+| `:lines` | a vector of paths, each `[x, y, …]` | one whole path |
+| `:rects` | `[cx, cy, w, h, …]` | one rectangle |
+| `:polygons` | one ring `[x, y, …]` per element, or `[exterior, hole, …]` for an element with holes | one polygon |
+
+Heatmap-style `:grid` layers use a different, edge-based layout; build
+those with [`RectInteractable`](@ref)'s `grid=` keyword rather than by
+hand. `payloads` has one entry per element. A click on a layer returns an
+[`ElementEvent`](@ref), with the payload's fields on it. Because the
+function sees the whole figure, one `FunctionInteractable` can return
+layers on several axes.
 
 ## A custom interactable
 
-Subtype [`AbstractInteractable`](@ref) to own the hits and the bond type.
-[`FunctionInteractable`](@ref) maps each layer's kind onto a built-in
-event. A commit that is not one of those types is a struct of your own,
-subtyping [`InteractionEvent`](@ref).
-
-Every subtype implements [`hitlayers`](@ref). The default
-[`bondtype`](@ref) is [`ElementEvent`](@ref); a type that only wants
-that event writes `hitlayers` and inherits the rest. Implement
-`bondtype` and [`transform_bond`](@ref) when the commit is another type.
-
-This example hits a scatter of cities and commits a `CityPick`. `index`
-arriving at `transform_bond` is already 1-based for `:circles`. `layer`
-is a [`HitLayer`](@ref); annotate it so this method is not ambiguous
-with the default. `js_payload` is unused: the event is built from the
-struct. Names on that struct are how you read the pick. Field forwarding
-applies only to [`ElementEvent`](@ref) and [`LegendEvent`](@ref).
-
-Define the types in their own cell so a figure rebuild does not
-redefine them.
+To make a click return a struct of your own, subtype
+[`AbstractInteractable`](@ref) and implement three methods:
+[`hitlayers`](@ref) (the hit geometry, as above), [`bondtype`](@ref)
+(the type a click produces), and [`transform_bond`](@ref) (build that
+value from the clicked element). The event type subtypes
+[`InteractionEvent`](@ref). Put the type definitions in their own cell,
+so rebuilding the figure does not redefine them:
 
 ```julia
 begin
@@ -176,8 +174,6 @@ begin
 end
 ```
 
-Replace the previous `fig` and `@bind pick` cells.
-
 ```julia
 begin
     fig = Figure()
@@ -201,9 +197,6 @@ end
 pick === nothing ? "click a city" : "$(pick.city), $(pick.pop) million"
 ```
 
-Circle `r` is logical pixels times the figure scale (`8 * ctx.scaling`),
-the same formula as [`PointInteractable`](@ref)'s `radius`. Project
-data-space points with [`data_to_image_px`](@ref). Look up an axis
-transform with `Masque.axis_id(ctx, ax)` (not exported — qualify it).
-Extend the methods as `Masque.hitlayers`, `Masque.bondtype`, and
-`Masque.transform_bond`.
+`index` arrives at `transform_bond` already 1-based. A type that is
+happy with the default [`ElementEvent`](@ref) only needs
+[`hitlayers`](@ref).

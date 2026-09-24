@@ -1,10 +1,10 @@
 # Pan and orbit
 
-Drag a 2D axis to pan, or an `Axis3` to orbit. Pass
-[`ViewInteractable`](@ref) on the axis you want to move. The camera is
-not a selection: pan and orbit do not write `@bind`.
-
-The clip shows a pan: the axis limits move.
+Sometimes the point of interaction is just to look closer: drag a 2D
+plot to pan it, scroll to zoom, or drag an `Axis3` to turn it. A
+[`ViewInteractable`](@ref) on an axis enables that. Moving the view is
+about looking, not choosing, so it never changes a `@bind` value and
+never re-runs a cell.
 
 ```@raw html
 <video id="masque-view-clip" title="CairoMakie in-drag pan frames on a 2D scatter"
@@ -20,15 +20,10 @@ The clip shows a pan: the axis limits move.
 </script>
 ```
 
-Prerequisites: [Install](@ref) and [Getting started](@ref) cells in your
-notebook. `masque(fig)` does not install `ViewInteractable`. Pass it
-yourself.
+## Pan and zoom a 2D axis
 
-## Pan a 2D axis
-
-These cells scatter the points and add [`ViewInteractable`](@ref).
-`masque(fig)` does not add pan. After a pan, `pick` is unchanged.
-There is no camera value on the bond.
+`masque(fig)` does not add panning on its own; pass a `ViewInteractable`
+for the axis you want to move, along with any other interactables:
 
 ```julia
 begin
@@ -36,72 +31,64 @@ begin
     ys = Float64[1, 4, 9, 16, 25, 36]
     fig = Figure(size = (560, 320))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    scatter!(ax, xs, ys; color = :dodgerblue, markersize = 18)
-    view = ViewInteractable(ax)
+    s = scatter!(ax, xs, ys; color = :dodgerblue, markersize = 18)
+    pan = ViewInteractable(ax)
+    pts = PointInteractable(ax, s)
     nothing
 end
 ```
 
 ```julia
-@bind pick masque(fig, view)
+@bind pick masque(fig, [pan, pts])
 ```
 
-The wheel zooms that 2D view about the cursor. The axis frame stays
-put while the data inside it slides.
+Drag the plot to pan and use the scroll wheel to zoom about the pointer.
+The axis frame stays put while the data slides inside it, and the
+points stay hoverable and clickable wherever they end up. `pick` still
+changes only when you click a point.
 
-If a threshold or ROI shares the axis, an ordinary drag moves that
-handle. **Shift**+drag pans.
+While you drag, Julia re-renders the view and streams it to the page, so
+panning needs a running notebook: CairoMakie sends images, WGLMakie
+updates its live canvas. In a static HTML export the view cannot move.
+[Backends](@ref) has the details.
 
-## Preview while you drag
-
-Both backends stream frames over `with_js_link` (live kernel).
-CairoMakie ships a PNG. WGLMakie ships a serialized scene onto the
-canvas already on the page. During that pan, and during the wheel
-zoom, the axis frame stays put while the data inside it slides. For
-more information, see [Backends](@ref).
+If the same axis has a threshold line or a brushing box, a plain drag
+moves that handle and Shift+drag pans.
 
 ## Orbit an `Axis3`
 
-Replace the previous `fig` cell.
-
-`ViewInteractable` on `Axis3` is allowed. Drag orbits azimuth and
-elevation. Masque does not reject a 3D axis for this gesture. It still
-commits nothing.
+On an `Axis3`, dragging turns the camera around the plot (azimuth and
+elevation) instead of panning. It works on both backends, and marks on
+the 3D axis stay hoverable and clickable as the view turns.
 
 ```julia
 begin
     fig = Figure(size = (560, 360))
     ax = Axis3(fig[1, 1])
-    scatter!(
-        ax,
-        Makie.Point3f[(1, 2, 3), (4, 5, 6), (7, 8, 2)];
-        markersize = 16,
-    )
-    v = ViewInteractable(ax)
+    s = scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6), (7, 8, 2)]; markersize = 16)
+    orbit = ViewInteractable(ax)
     nothing
 end
 ```
 
-A static `Axis3` on CairoMakie is a valid 3D plot. Orbit through Masque
-still commits nothing. For in-drag frames on either backend, see
-[Backends](@ref).
+```julia
+@bind pick masque(fig, [orbit, PointInteractable(ax, s)])
+```
 
-## What does not pan
+## When the figure is rebuilt
 
-The following raise `ArgumentError` at `masque()` time:
+A pan or orbit is written onto the axis itself: Julia updates the
+axis's limits (or its azimuth and elevation) as you drag. So calling
+`masque` again on the same figure mounts at the view you dragged to.
+When the cell that draws the figure re-runs, it creates a new `Axis`,
+which starts from whatever limits or angles your code gives it. To keep
+a view across such a rebuild, set those values in the figure code
+yourself, for example from a slider bound to the limits.
 
-- `PolarAxis`
-- a `Colorbar`
-- a categorical 2D axis
-- a 2D axis whose scale is not `identity`, `log10`, or `log`
+## Where it works
 
-`LScene`: CairoMakie refuses the figure. WGLMakie renders with **no**
-overlay. For more information, see [Troubleshooting](@ref).
-
-## Persist a view across remount
-
-A fresh `Figure` resets the camera. Persist limits or
-azimuth/elevation in a `Ref` (or a slider) and rebuild, as on
-[Limits](@ref). [Drag to pan](@ref) and [Drag to orbit](@ref) are
-the drag half: a PNG frame on `:cairo`, a scene frame on `:webgl`. Do
-not pass `selected=` for a camera pose.
+Panning needs a 2D `Axis` with numeric limits on an `identity`, `log10`,
+or `log` scale; orbiting needs an `Axis3`. A `PolarAxis`, a
+`Colorbar`, a categorical axis, or another scale raises an
+`ArgumentError` when `masque` runs, and
+an `LScene` is not supported. See [Supported plots and axes](@ref).
