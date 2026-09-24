@@ -267,15 +267,23 @@ jobs:
   examples:
     name: Fixture notebooks
     runs-on: ubuntu-latest
-    # Each notebook devs the package + adds CairoMakie into a temp env (full Makie
-    # precompile on a cold cache); generous ceiling so a slow run fails loud, not hangs.
+    # Each notebook devs the package + adds a Makie backend into a temp env (full
+    # Makie precompile on a cold cache). ci_run.jl heartbeats during that silent
+    # stretch and fails the notebook at MASQUE_NOTEBOOK_TIMEOUT_S. This job
+    # timeout is only the backstop.
     timeout-minutes: 40
+    env:
+      MASQUE_NOTEBOOK_TIMEOUT_S: "1200"
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
       - uses: julia-actions/cache@v2
+      # Deadline and heartbeat, no Pluto. Catches a waiter regression before the
+      # notebooks themselves run.
+      - name: Fixture runner wait loop
+        run: julia test/notebooks/ci_run_tests.jl
       # Runs every Pluto notebook under test/notebooks headlessly; fails if any
       # cell errors, so a fixture can never silently drift out of sync with the API.
       - name: Run fixture notebooks headlessly
