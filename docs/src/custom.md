@@ -6,31 +6,12 @@ For constructor signatures, see [Constructors](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-custom-regions" title="Three RegionInteractable hits over an image, overlay-only"
-        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-custom-regions" data-masque-embed="custom_regions" title="Three RegionInteractable hits over an image, overlay-only" style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-custom-regions");
-  if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = (pretty ? "../embeds/" : "embeds/") + "custom_regions.html";
-})();
-</script>
+```
+
+```@eval
+Main.masque_fallback("custom_regions")
 ```
 
 ## Draw regions Makie did not plot

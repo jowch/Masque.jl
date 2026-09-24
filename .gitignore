@@ -9,6 +9,8 @@
 /docs/src/notebooks/
 # Generated cell-series players — harvested by docs/export_embeds.jl at build time.
 /docs/src/embeds/*.html
+# Their text twins' idle figure and readouts (docs/player_fallback.jl).
+/docs/src/embeds/*.fallback.toml
 
 # Node / TypeScript (`frontend/`). The built bundles assets/overlay.js and
 # assets/masque-webgl.js ARE committed.

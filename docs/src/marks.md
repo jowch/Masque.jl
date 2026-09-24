@@ -11,31 +11,12 @@ This page does not reuse `fig` or `sel` from [Getting started](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-marks-bars" title="Four-bar plot. Click a bar and the readout names its value."
-        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-marks-bars" data-masque-embed="marks_bars" title="Four-bar plot. Click a bar and the readout names its value." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-marks-bars");
-  if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = (pretty ? "../embeds/" : "embeds/") + "marks_bars.html";
-})();
-</script>
+```
+
+```@eval
+Main.masque_fallback("marks_bars")
 ```
 
 `barplot!` on a `PolarAxis` is skipped with `@warn`. Keyboard arrows reach
@@ -46,31 +27,12 @@ bars. A heatmap cell is a different job. For more information, see
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-marks-poly" title="Three polygons. Click one and the readout names it."
-        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-marks-poly" data-masque-embed="marks_poly" title="Three polygons. Click one and the readout names it." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-marks-poly");
-  if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = (pretty ? "../embeds/" : "embeds/") + "marks_poly.html";
-})();
-</script>
+```
+
+```@eval
+Main.masque_fallback("marks_poly")
 ```
 
 `poly!` on a `PolarAxis` is skipped with `@warn`. Band, density, contourf,
@@ -103,31 +65,12 @@ vlines stay one element per piece.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-marks-polar" title="Four polar points. Click one and the readout reads its radius."
-        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
-        scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-marks-polar" data-masque-embed="marks_polar" title="Four polar points. Click one and the readout reads its radius." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-marks-polar");
-  if (!el) return;
-  function isDocDark() {
-    var c = document.documentElement.className || "";
-    if (!c) return false;
-    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
-    return /(^|\s)theme--/.test(c);
-  }
-  function pushTheme() {
-    var doc = el.contentDocument;
-    if (!doc) return;
-    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
-  }
-  el.addEventListener("load", pushTheme);
-  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  el.src = (pretty ? "../embeds/" : "embeds/") + "marks_polar.html";
-})();
-</script>
+```
+
+```@eval
+Main.masque_fallback("marks_polar")
 ```
 
 Scatter, lines, line segments, and `series!` work on a `PolarAxis`.

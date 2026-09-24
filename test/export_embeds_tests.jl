@@ -310,3 +310,61 @@ end
         @test any(js_shape_from_toml(row) === nothing for row in player["states"])
     end
 end
+
+include(joinpath(@__DIR__, "..", "docs", "player_fallback.jl"))
+
+@testset "player text twin: notes, code, figure, readouts" begin
+    root = joinpath(@__DIR__, "..")
+    embeds = joinpath(root, "docs", "src", "embeds")
+    nb = joinpath(embeds, "home_quickstart.jl")
+    src = read(nb, String)
+
+    cells = notebook_cell_code(src)
+    @test cells["b0e1e001-0001-4000-8000-000000000003"] == "@bind sel masque(fig, pts)"
+    @test !any(occursin("# ╔═╡", c) for c in values(cells))
+    @test markdown_cell_text(cells["b0e1e001-0001-4000-8000-000000000009"]) ==
+        "Hover a point to read its name, then click it. The last cell names the point.\n"
+    @test markdown_cell_text("@bind sel masque(fig, pts)") === nothing
+    @test_throws ErrorException markdown_cell_text("md\"x = \$(1 + 1)\"")
+    @test_throws ErrorException markdown_cell_text("md\"x = \$x\"")
+    @test markdown_cell_text("md\"costs \\\$5\"") == "costs \\\$5"
+
+    readout = "b0e1e001-0001-4000-8000-000000000004"
+    md = fallback_markdown(nb; image = "../embeds/home_quickstart.png", outputs = Dict(readout => "click a point"))
+    @test length(md.content) == 1
+    twin = only(md.content)
+    @test twin isa Markdown.Admonition
+    @test twin.category == "details"
+    @test twin.title == FALLBACK_TITLE
+    code = [b.code for b in twin.content if b isa Markdown.Code && b.language == "julia"]
+    player = fallback_player(src)
+    code_ids = [id for id in player["cells"] if markdown_cell_text(cells[id]) === nothing]
+    @test code == [cells[id] for id in code_ids]
+    i_bind = findfirst(b -> b isa Markdown.Code && occursin("@bind sel", b.code), twin.content)
+    @test twin.content[i_bind + 1] isa Markdown.Paragraph
+    @test only(twin.content[i_bind + 1].content).url == "../embeds/home_quickstart.png"
+    @test any(b -> b isa Markdown.Code && b.language == "" && b.code == "click a point", twin.content)
+
+    plain = Markdown.plain(fallback_markdown(nb))
+    @test occursin("PointInteractable(ax, s; payloads = points)", plain)
+    @test !occursin("home_quickstart.png", plain)
+
+    # Every Pluto-export player on the site has a twin with its `@bind` cell.
+    n = 0
+    for f in readdir(embeds; join = true)
+        endswith(f, ".jl") || continue
+        s = read(f, String)
+        occursin("pluto_html = true", s) || continue
+        bond = fallback_player(s)["bond"]
+        t = only(fallback_markdown(f).content)
+        @test any(b -> b isa Markdown.Code && occursin("@bind $bond", b.code), t.content)
+        @test any(b -> b isa Markdown.Paragraph, t.content)
+        n += 1
+    end
+    @test n >= 23
+
+    @test embeds_href("a.png"; build = "/b", pretty = true, cwd = "/b/gallery") == "../../embeds/a.png"
+    @test embeds_href("a.png"; build = "/b", pretty = true, cwd = "/b") == "../embeds/a.png"
+    @test embeds_href("a.png"; build = "/b", pretty = false, cwd = "/b/gallery") == "../embeds/a.png"
+    @test embeds_href("a.png"; build = "/b", pretty = false, cwd = "/b") == "embeds/a.png"
+end
