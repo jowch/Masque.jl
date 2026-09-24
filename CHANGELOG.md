@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- Document `CairoMakie.activate!(type = "svg")` and `save("figure.svg", fig)`. The activation
+  chooses the MIME for a bare `Figure`, and `save` follows the file extension. `masque` draws a
+  PNG on CairoMakie and a canvas on WGLMakie, with the overlay on that picture.
 - The cursor follows what the pointer is over. An axis or colorbar readout, a grid cell, and
   empty axis interior stay on the `crosshair` cursor and draw no hairline. A hairline is drawn
   only by a `SliceInteractable` with `crosshair = true`, and only the one arm named by

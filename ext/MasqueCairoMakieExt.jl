@@ -12,13 +12,16 @@ import Makie: Point2f
 Static-image `Masque` backend (loaded when `CairoMakie` is `using`d): renders `fig` once to a
 PNG, with a transparent JS overlay doing hit-testing over it — no server, no WebGL, and the
 inspection layer keeps working in an exported, offline static HTML. This is the default
-backend `masque` picks when no `WGLMakie` extension is loaded.
+backend `masque` picks when no `WGLMakie` extension is loaded. `CairoMakie.activate!(type = "svg")`
+chooses the MIME for a bare `Figure`. `save("figure.svg", fig)` follows the file extension and
+writes SVG. This widget stays a PNG.
 
 # Arguments
 - `max_width` — the display width to target, in px (Pluto's column is 700). Render resolution
   is *derived* from it, not a fixed `px_per_unit`: output ≈ 2× `min(figure width, max_width)`
-  (retina-crisp, not wasteful). Owns the render call (DPI/format/background); the user's figure
-  spec is respected but its own save settings are not. Default `700`.
+  (retina-crisp, not wasteful). Owns this widget's DPI, format, and background. The figure's
+  plots and size are kept. Cairo's screen config from `CairoMakie.activate!` applies to a bare
+  `Figure` and to `save`, and this widget uses its own PNG resolution. Default `700`.
 
 # Examples
 ```julia
