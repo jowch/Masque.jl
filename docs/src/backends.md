@@ -48,27 +48,6 @@ interactive. Cheap for a figure you build once and inspect. Expensive if
 you re-render every animation frame (each frame re-rasterizes the whole
 scene).
 
-### SVG display and files
-
-`CairoMakie.activate!(type = "svg")` chooses the picture a bare `Figure`
-shows in Pluto, VS Code, and other rich displays. `save("figure.svg", fig)`
-writes that figure as an SVG file. Use both when a cell returns the
-`Figure`.
-
-`masque(fig)` draws the picture the overlay sits on. CairoMakie draws a
-PNG. WGLMakie draws a GPU canvas. Hover highlight, selection, and the
-tooltip are drawn in the overlay, so they stay sharp when you zoom the
-page. The picture under them is the PNG or the canvas.
-
-Return the `Figure` from a cell when you want the SVG display. Return
-`masque(fig)` when you want the overlay. The two can share a notebook.
-`save("figure.svg", fig)` follows the file extension and writes SVG.
-
-`WGLMakie.activate!` takes no `type`. Calling `CairoMakie.activate!`
-means CairoMakie is loaded. With both backends loaded, an unqualified
-`masque(fig)` uses the PNG. For more information, see
-[Choose a backend](@ref).
-
 A static `Axis3` figure on CairoMakie is a valid 3D plot. 3D does not
 require WGLMakie. Scatter on `Axis3` commits an
 [`ElementEvent`](@ref) with `x`, `y`, `z`. A `lines!` is one whole-line
@@ -77,6 +56,27 @@ element whose default payload is `{index}`. MeshScatter derives
 [`ViewInteractable`](@ref) on that axis. For which recipes
 `masque(fig)` extracts, see [Recipes masque(fig) extracts](@ref). For
 in-drag preview, see [Pan and orbit preview](@ref).
+
+### SVG display and files
+
+`CairoMakie.activate!(type = "svg")` chooses the picture a bare `Figure`
+shows in Pluto, VS Code, and other rich displays. Return the `Figure`
+from a cell when you want that display. Return `masque(fig)` when you
+want the overlay. The two can share a notebook.
+
+`save("figure.svg", fig)` writes an SVG file. The extension sets the
+format. Call it on the figure when you want that file, including from a
+cell whose return value is `masque(fig)`.
+
+`masque(fig)` draws the picture the overlay sits on. CairoMakie draws a
+PNG. WGLMakie draws a GPU canvas. Hover highlight, selection, and the
+tooltip are drawn in the overlay, so they stay sharp when you zoom the
+page. The picture under them is the PNG or the canvas.
+
+`WGLMakie.activate!` takes no `type`. Calling `CairoMakie.activate!`
+means CairoMakie is loaded. With both backends loaded, an unqualified
+`masque(fig)` uses the PNG. For more information, see
+[Choose a backend](@ref).
 
 ## WGLMakie
 

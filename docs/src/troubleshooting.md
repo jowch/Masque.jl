@@ -226,10 +226,10 @@ more information, see [Backends](@ref).
 the overlay on that picture. `save("figure.svg", fig)` writes SVG from
 the file extension.
 
-**Fix:** leave the activation in place for cells that return a `Figure`,
-and for files you save. Return `masque(fig)` from the cell that should
-show the overlay. For more information, see
-[SVG display and files](@ref).
+**Fix:** leave `CairoMakie.activate!(type = "svg")` in place for cells
+that return a `Figure`. Write the file with `save("figure.svg", fig)`.
+Return `masque(fig)` from the cell that should show the overlay. For
+more information, see [SVG display and files](@ref).
 
 ### Tried feeding this widget's bond into the same call's `selected=`
 
