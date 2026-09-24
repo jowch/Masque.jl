@@ -76,17 +76,6 @@ cells = [
   "a1b2c3d4-0001-4000-8000-000000000012",
   "a1b2c3d4-0001-4000-8000-000000000004",
 ]
-
-[[player.states]]
-id = "idle"
-
-[[player.states]]
-id = "a"
-value = { layer = "legend", index = 0 }
-
-[[player.states]]
-id = "b"
-value = { layer = "legend", index = 1 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

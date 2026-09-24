@@ -75,21 +75,6 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "sel"
 title = "Overlapping species scatter; legend click fades the other classes"
-
-[[player.states]]
-id = "idle"
-
-[[player.states]]
-id = "adelie"
-value = { layer = "legend", index = 0 }
-
-[[player.states]]
-id = "chinstrap"
-value = { layer = "legend", index = 1 }
-
-[[player.states]]
-id = "gentoo"
-value = { layer = "legend", index = 2 }
 """
 
 

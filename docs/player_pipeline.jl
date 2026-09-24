@@ -62,6 +62,110 @@ jsonable(x::NamedTuple) = Dict{String, Any}(string(k) => jsonable(v) for (k, v) 
 jsonable(x::AbstractDict) = Dict{String, Any}(string(k) => jsonable(v) for (k, v) in x)
 jsonable(x) = string(x)
 
+# A manifest field on a published geometry: a Dict once JSON round-tripped, a NamedTuple
+# straight from the widget.
+_field(g::AbstractDict, k::String) = get(g, k, get(g, Symbol(k), nothing))
+_field(g, k::String) = hasproperty(g, Symbol(k)) ? getproperty(g, Symbol(k)) : nothing
+
+"""
+    discrete_states(manifest) -> Vector{Dict{String, Any}}
+
+Every single-click `@bind` value the overlay can post, in its wire shape: one
+`{layer, index}` per element of each `element`/`legend` layer, and one
+`{layer, index, payload = {i, j, value}}` per cell of each `gridcell` layer, the payload
+built the way `resolvePayload` (frontend/src/geometry.ts) builds it. A grid whose cells are
+under a screen pixel ships no `values`, so its clicks cannot be listed: that fails, and the
+notebook needs a coarser grid. A grid that a `selects` box brushes is skipped, since the
+box owns that bond. Drags (`items`, axis, threshold, bounds) are continuous and stay
+hand-listed in the player TOML. `snapshot_key` keys an axis, threshold, or bounds value on
+`layer:index` and drops its payload (an axis hit is index `-1`, a threshold or bounds
+commit index `0`), and every grid brush on one layer shares `items:<layer>:0`, so such a
+layer can list one position only.
+"""
+function discrete_states(manifest::AbstractDict)
+    brushed = get(manifest, "selection", nothing) == "grid" ? get(manifest, "selectionTarget", nothing) : nothing
+    states = Dict{String, Any}[]
+    for L in manifest["layers"]
+        id = string(L["id"])
+        "click" in string.(L["events"]) || continue
+        bond = get(L, "bond", "none")
+        if bond == "element" || bond == "legend"
+            for k in 0:(length(L["payloads"]) - 1)
+                push!(states, Dict{String, Any}("layer" => id, "index" => k))
+            end
+        elseif bond == "gridcell" && id != brushed
+            g = L["geometry"]
+            vals = _field(g, "values")
+            vals === nothing && error(
+                "grid layer :$id has cells under a screen pixel, so the player cannot list its clicks; coarsen the grid"
+            )
+            nc = Int(_field(g, "ncols"))
+            nr = Int(_field(g, "nrows"))
+            for j in 0:(nr - 1), i in 0:(nc - 1)
+                idx = j * nc + i
+                payload = Dict{String, Any}("i" => i, "j" => j, "value" => vals[idx + 1])
+                push!(states, Dict{String, Any}("layer" => id, "index" => idx, "payload" => payload))
+            end
+        end
+    end
+    return states
+end
+
+"""
+    player_states(player, manifest) -> Vector{NamedTuple{(:key, :value)}}
+
+Idle first, then every click from [`discrete_states`](@ref), then the TOML's hand-listed
+`[[player.states]]` (drags only). A hand-listed click fails: the harvest already records it.
+"""
+function player_states(player::AbstractDict, manifest::AbstractDict)
+    out = NamedTuple{(:key, :value), Tuple{String, Any}}[(; key = "null", value = nothing)]
+    seen = Set(["null"])
+    for v in discrete_states(manifest)
+        k = snapshot_key(v)
+        k in seen && continue
+        push!(seen, k)
+        push!(out, (; key = k, value = v))
+    end
+    clicks = copy(seen)
+    for row in get(player, "states", Any[])
+        v = js_shape_from_toml(row)
+        v === nothing && error("player TOML lists an idle state; idle is always recorded")
+        k = snapshot_key(v)
+        k in clicks && error("player TOML lists $k, a click the harvest already records; drop that row")
+        k in seen && error(
+            "player TOML lists $k twice; the snapshot key drops the payload, so a layer can list one position only"
+        )
+        push!(seen, k)
+        push!(out, (; key = k, value = v))
+    end
+    return out
+end
+
+"""
+    snapshot_table(keyed) -> (table, extra_bytes)
+
+`keyed` is `key => snapshot` pairs, idle (`"null"`) first. Identical snapshots are stored
+once: a plot below the widget that reads only part of the bond (a legend, a cluster)
+repeats itself across many clicks. `table` is `{snaps, keys}` with `keys[key]` a 0-based
+index into `snaps`. `extra_bytes` is what the table ships beyond the idle snapshot.
+"""
+function snapshot_table(keyed)
+    snaps = Any[]
+    index = Dict{String, Int}()
+    keys = Dict{String, Int}()
+    for (k, snap) in keyed
+        s = json_write(jsonable(snap))
+        i = get!(index, s) do
+            push!(snaps, snap)
+            length(snaps) - 1
+        end
+        keys[k] = i
+    end
+    idle = sizeof(json_write(jsonable(first(snaps))))
+    extra = sizeof(json_write(jsonable(snaps))) - idle + sizeof(json_write(keys))
+    return Dict{String, Any}("snaps" => snaps, "keys" => keys), extra
+end
+
 function html_escape(s::AbstractString)
     s = replace(s, '&' => "&amp;")
     s = replace(s, '<' => "&lt;")
@@ -287,7 +391,7 @@ function extract_json_object(s::AbstractString, start::Int)
     return error("unterminated JSON object")
 end
 
-# Put listed @bind states on the same manifest object the overlay mounts, not a
+# Put the `snapshot_table` on the same manifest object the overlay mounts, not a
 # side-channel SNAPSHOTS table. Lookup is still host.value (overlay's existing bond).
 function inject_manifest_snapshots(html::AbstractString, snapshots)
     needle = "const manifest = "

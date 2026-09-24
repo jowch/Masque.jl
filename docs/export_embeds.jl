@@ -6,15 +6,33 @@ using UUIDs
 
 # Homebrew cell-series player harvest. Getting-started embed is the README GIF demo
 # (`docs/dev/readme-demo/notebook.jl`): nbpkg-on, in-process against docs/Project.toml.
-# Discrete demo rule: list every city (idle + all eight). The player should read like
-# live `@bind` on this finite scatter. Continuous kinds stay overlay-only.
+# Every click the overlay can post is recorded (`player_states`), so a player reads like
+# live `@bind`. Drags are continuous: the TOML lists a few, and the rest stay overlay-only.
 
 include("player_pipeline.jl")
 
 const PLAYER_CELL_ID = UUID("e1be0000-0000-4000-8000-000000000001")
-# Extra snapshot bytes (downstream HTML + rebuilt PNG/manifest beyond idle), not
-# n_states × png. Warn only — never fail make.jl, never drop listed cities.
+# Snapshot bytes a player ships beyond idle, after identical snapshots are merged
+# (`snapshot_table`). Over it fails the build: design the notebook so its clicks fit,
+# e.g. a coarser grid, rather than dropping clicks.
 const EMBED_BUDGET = 2 * 1024 * 1024
+
+function check_budget(path, n_states, n_snaps, extra)
+    extra > EMBED_BUDGET || return nothing
+    return error(
+        "embed $(basename(path)): $n_states states make $n_snaps distinct snapshots, " *
+            "$(round(extra / 1024^2; digits = 2)) MiB beyond idle (budget $(EMBED_BUDGET ÷ 1024^2) MiB). " *
+            "Fewer clickable marks, or a cheaper readout below the widget.",
+    )
+end
+
+# The manifest the widget cell published (`published_to_js`).
+function widget_manifest(cell)
+    for v in values(cell.published_objects)
+        v isa AbstractDict && haskey(v, "layers") && return v
+    end
+    return error("widget cell published no manifest")
+end
 
 function cell_output_html(c::Pluto.Cell)
     mime = string(c.output.mime)
@@ -421,31 +439,6 @@ const SIM_CHIP_HTML = raw"""
 """
 
 
-# Extra = listed-state payload beyond idle. Idle PNG + overlay IIFE + idle cell HTML
-# are paid once. Each non-idle row adds downstream HTML, plus a rebuilt PNG/manifest
-# only if masque() actually remounted (byte-identical widget HTML is not counted).
-function extra_snapshot_bytes(states, cells)
-    isempty(states) && return 0
-    idle_idx = findfirst(st -> st.key == "null", states)
-    idle = idle_idx === nothing ? first(states) : states[idle_idx]
-    widget_id = string(first(cells).cell_id)
-    idle_widget = get(idle.record.htmls, widget_id, "")
-    extra = 0
-    for st in states
-        st.key == idle.key && continue
-        for c in cells
-            cid = string(c.cell_id)
-            html = st.record.htmls[cid]
-            if cid == widget_id
-                html == idle_widget || (extra += sizeof(html))
-            else
-                extra += sizeof(html)
-            end
-        end
-    end
-    return extra
-end
-
 function is_markdown_annotation(code::AbstractString)
     s = lstrip(code)
     return startswith(s, "md\"") || startswith(s, "md\"\"\"")
@@ -526,13 +519,13 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     show_code = get(player, "show_code", false) === true
     widget = show_code ? masque_widget_cell(cells, bond) : first(cells)
     downstream = show_code ? [c for c in cells if c.cell_id != widget.cell_id] : cells[2:end]
-    snapshots = Dict{String, Any}()
+    keyed = Pair{String, Any}[]
     n_inlined_total = 0
     png_b = 0
     man_b = 0
     widget_id = string(widget.cell_id)
-    idle_state = findfirst(st -> st.key == "null", states)
-    src_for_idle = idle_state === nothing ? first(states) : states[idle_state]
+    src_for_idle = first(states)
+    src_for_idle.key == "null" || error("first player state must be idle")
     idle_html = src_for_idle.record.htmls[widget_id]
     idle_png = png_data_url(idle_html)
     for st in states
@@ -543,15 +536,12 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         else
             [rec.htmls[string(c.cell_id)] for c in downstream]
         end
-        snap = Dict{String, Any}(
-            "id" => st.id,
-            "cells" => cell_snaps,
-        )
+        snap = Dict{String, Any}("cells" => cell_snaps)
         png = png_data_url(get(rec.htmls, widget_id, ""))
         if png !== nothing && png != idle_png
             snap["png"] = png
         end
-        snapshots[key] = snap
+        push!(keyed, key => snap)
         n_inlined_total += rec.n_inlined
         png_b = max(png_b, rec.png_b)
         man_b = max(man_b, rec.man_b)
@@ -566,8 +556,8 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     end
 
     n_states = length(states)
-    budget_cells = show_code ? [widget; downstream] : cells
-    extra = extra_snapshot_bytes(states, budget_cells)
+    snapshots, extra = snapshot_table(keyed)
+    check_budget(path, n_states, length(snapshots["snaps"]), extra)
 
     widget_html = inject_manifest_snapshots(something(idle_html), snapshots)
     down_html = join(idle_down, "\n")
@@ -643,14 +633,14 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         }
         return JSON.stringify(v);
       }
-      function snapFor(snaps, v) {
+      function snapFor(table, v) {
         const keys = [keyOf(v)];
         if (v && v.layer != null && v.index != null && v.index !== "") {
           keys.push(String(v.layer) + ":" + String(v.index));
           keys.push(String(v.layer) + ":" + String(v.index | 0));
         }
         for (let i = 0; i < keys.length; i++) {
-          if (Object.prototype.hasOwnProperty.call(snaps, keys[i])) return snaps[keys[i]];
+          if (Object.prototype.hasOwnProperty.call(table.keys, keys[i])) return table.snaps[table.keys[keys[i]]];
         }
         return null;
       }
@@ -738,11 +728,8 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     write(outpath, html)
     player_bytes = filesize(outpath)
     idle_paid = sizeof(something(idle_html)) + sum(sizeof, idle_down; init = 0)
-    if extra > EMBED_BUDGET
-        @warn "embed extra snapshot bytes exceed budget (warn only; not failing)" path = basename(path) n_states extra budget = EMBED_BUDGET png_bytes = png_b manifest_bytes = man_b player_bytes idle_paid
-    end
     return (;
-        outpath, n_states, extra, png_b, man_b, n_inlined_total,
+        outpath, n_states, n_snaps = length(snapshots["snaps"]), extra, png_b, man_b, n_inlined_total,
         size = player_bytes, idle_paid,
     )
 end
@@ -754,7 +741,6 @@ function harvest_one(session, path::AbstractString, outdir::AbstractString; reta
     outdir = abspath(outdir)
     player = parse_player_toml(path)
     haskey(player, "bond") || error("player TOML missing bond in $path")
-    haskey(player, "states") || error("player TOML missing states in $path")
     bond = Symbol(player["bond"])
     file_hash_before = hash(read(path))
     assert_embed_masque_path_relative(path)
@@ -768,9 +754,11 @@ function harvest_one(session, path::AbstractString, outdir::AbstractString; reta
         cells = snapshot_cells(nb, player, bond)
         isempty(cells) && error("no cells to snapshot in $path")
 
+        widget = get(player, "show_code", false) === true ? masque_widget_cell(cells, bond) : first(cells)
+        rows = player_states(player, widget_manifest(widget))
         outpath = joinpath(outdir, splitext(basename(path))[1] * ".html")
         if get(player, "pluto_html", false) === true
-            info = emit_pluto_notebook(session, nb, path, outpath, player, cells, bond)
+            info = emit_pluto_notebook(session, nb, path, outpath, player, cells, bond, rows)
             file_hash_after = hash(read(path))
             file_hash_before == file_hash_after || error("harvest rewrote $path — disable_writing_notebook_files failed")
             return (; failed_pkg = false, nb, info, cells, states = nothing)
@@ -778,18 +766,15 @@ function harvest_one(session, path::AbstractString, outdir::AbstractString; reta
 
         states = NamedTuple[]
         default_rec = record_state(cells)
-        for row in player["states"]
-            id = string(row["id"])
-            js_shape = js_shape_from_toml(row)
-            key = snapshot_key(js_shape)
-            rec = if js_shape === nothing
+        for (; key, value) in rows
+            rec = if value === nothing
                 default_rec
             else
-                set_bond!(session, nb, bond, js_shape)
+                set_bond!(session, nb, bond, value)
                 assert_no_errors(nb, path)
                 record_state(cells)
             end
-            push!(states, (; id, key, js_shape, record = rec))
+            push!(states, (; key, record = rec))
         end
 
         outpath = joinpath(outdir, splitext(basename(path))[1] * ".html")
@@ -840,7 +825,7 @@ function export_embeds(outdir = joinpath(@__DIR__, "src", "embeds"))
         elapsed = round(time() - t0; digits = 1)
         size_kb = round(info.size / 1024; digits = 1)
         extra_kb = round(info.extra / 1024; digits = 1)
-        @info "✓ embed $(basename(path))" harvest = info.harvest elapsed_s = elapsed size_kb = size_kb extra_kb = extra_kb n_states = info.n_states png_bytes = info.png_b manifest_bytes = info.man_b inlined = info.n_inlined_total
+        @info "✓ embed $(basename(path))" harvest = info.harvest elapsed_s = elapsed size_kb = size_kb extra_kb = extra_kb n_states = info.n_states n_snaps = info.n_snaps png_bytes = info.png_b manifest_bytes = info.man_b inlined = info.n_inlined_total
     end
     return
 end

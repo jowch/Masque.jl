@@ -78,9 +78,6 @@ bond = "picks"
 title = "Western US weather stations with a region box"
 
 [[player.states]]
-id = "idle"
-
-[[player.states]]
 id = "empty"
 value = { items = [] }
 

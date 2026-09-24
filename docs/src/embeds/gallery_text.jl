@@ -83,33 +83,6 @@ cells = [
   "a1410006-0001-4000-8000-000000000012",
   "a1410006-0001-4000-8000-000000000004",
 ]
-
-[[player.states]]
-id = "idle"
-
-[[player.states]]
-id = "alpha"
-value = { layer = "text", index = 0 }
-
-[[player.states]]
-id = "beta"
-value = { layer = "text", index = 1 }
-
-[[player.states]]
-id = "gamma"
-value = { layer = "text", index = 2 }
-
-[[player.states]]
-id = "tilted"
-value = { layer = "text_2", index = 0 }
-
-[[player.states]]
-id = "annotated"
-value = { layer = "annotation", index = 0 }
-
-[[player.states]]
-id = "marker"
-value = { layer = "scatter", index = 0 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

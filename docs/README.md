@@ -5,7 +5,10 @@ User docs are the [Documenter site](https://jowch.github.io/Masque.jl), built fr
 
 Building the site harvests cell-series players (`docs/export_embeds.jl`) into
 `docs/src/embeds/*.html`, so a local build takes several minutes on a warm depot and
-longer cold. Set `MASQUE_SKIP_EMBED_EXPORT=true` to reuse players already in
+longer cold. A player records every click its figure offers, read from the widget's
+manifest (`player_states` in `docs/player_pipeline.jl`); its TOML lists only brushes.
+Identical snapshots are stored once, and a player over 2 MiB of snapshots fails the
+build: give the notebook fewer marks or a coarser grid. Set `MASQUE_SKIP_EMBED_EXPORT=true` to reuse players already in
 `docs/src/embeds/` when iterating on prose.
 
 Each Pluto-export player is followed by its text twin: a `details` block built from the same

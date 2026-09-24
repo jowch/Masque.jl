@@ -32,13 +32,13 @@ The heatmap is a summary: one daily mean per station and day. `temp` is the unde
 
 # ╔═╡ a1420002-0001-4000-8000-000000000002
 begin
-    stations = ["North", "East", "South", "West", "Center"]
+    stations = ["North", "East", "South", "West"]
     hours = 0:23
     temp(d, s, h) = 12 + 4 * sin(2π * (h - 9) / 24) + 0.6 * d * (s == 3 ? 1 : 0.3) + 1.5 * cos(d / 2 + s)
-    daily = [round(sum(temp(d, s, h) for h in hours) / 24; digits = 1) for d in 1:14, s in eachindex(stations)]
+    daily = [round(sum(temp(d, s, h) for h in hours) / 24; digits = 1) for d in 1:7, s in eachindex(stations)]
     fig = Figure(size = (560, 320))
     ax = Axis(fig[1, 1]; xlabel = "day", yticks = (eachindex(stations), stations), title = "daily mean temperature: click a cell")
-    hm = heatmap!(ax, 1:14, eachindex(stations), daily; colormap = :thermal)
+    hm = heatmap!(ax, 1:7, eachindex(stations), daily; colormap = :thermal)
     Colorbar(fig[1, 2], hm; label = "°C")
     cells = RectInteractable(ax, hm)
     nothing
@@ -89,25 +89,6 @@ cells = [
   "a1420002-0001-4000-8000-000000000012",
   "a1420002-0001-4000-8000-000000000004",
 ]
-
-[[player.states]]
-id = "idle"
-
-[[player.states]]
-id = "south_d3"
-value = { layer = "cells", index = 30, payload = { i = 2, j = 2, value = 13.5 } }
-
-[[player.states]]
-id = "south_d12"
-value = { layer = "cells", index = 39, payload = { i = 11, j = 2, value = 17.8 } }
-
-[[player.states]]
-id = "north_d7"
-value = { layer = "cells", index = 6, payload = { i = 6, j = 0, value = 12.9 } }
-
-[[player.states]]
-id = "center_d10"
-value = { layer = "cells", index = 65, payload = { i = 9, j = 4, value = 12.5 } }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
