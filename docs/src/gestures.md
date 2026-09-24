@@ -170,9 +170,10 @@ The following table is that split.
 | Heatmap inspect | Overlay tooltip; Julia on click | Overlay tooltip; listed click swaps the readout | Overlay tooltip chrome if that player is present | Overlay tooltip; Julia click dead |
 | Cairo view frames (GIF/MP4, no `@bind`) | Gesture channel frames; no `@bind` | GIF/MP4 on this site; no `@bind` | Overlay readout; no frames; no `@bind` | Gesture channel dead; site uses GIF/MP4 |
 
-Heatmaps are not listed cell by cell. View pan never appears as an
+The grids player lists every cell (`c11` through `c43`), so a click
+swaps the readout. View pan never appears as an
 `InteractionEvent`. For a box that filters a table, see
-[Brush a region](@ref). For a grid you inspect without enumerating cells, see
+[Brush a region](@ref). For that heatmap, see
 [Inspect a grid](@ref). For pan and orbit, see [Pan and orbit](@ref).
 
 ## Common mistakes
