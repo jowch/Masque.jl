@@ -26,7 +26,7 @@ yourself.
 
 ## Pan a 2D axis
 
-The notebook scatters the points and adds [`ViewInteractable`](@ref).
+These cells scatter the points and add [`ViewInteractable`](@ref).
 `masque(fig)` does not add pan. After a pan, `pick` is unchanged.
 There is no camera value on the bond.
 
