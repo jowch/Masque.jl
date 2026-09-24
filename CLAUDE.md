@@ -5,7 +5,12 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
 `assets/overlay.js`, read by Julia at `__init__`. Manifest shipped to JS via `published_to_js`.
 
 ## Commands
-- Julia tests: `julia --project=. test/runtests.jl`
+- Julia tests: `GROUP=Core julia --project=$MASQUE_DEV_ENV test/runtests.jl` (groups: `Core`
+  default, `NoBackend`, `WebGL`; warm env: ~6 min / ~20 s / ~70 s, all test time). **Not** `--project=.`: the test deps (CairoMakie, WGLMakie,
+  JSON3, …) are `[extras]`, invisible to the package env — it only "works" when your default
+  `@v1.x` env happens to stack them in. `scripts/cloud-warm.sh julia` builds `$MASQUE_DEV_ENV`.
+  CI runs `Pkg.test()`, which builds its own fresh env (~6 min precompile cold, may resolve
+  newer deps than `$MASQUE_DEV_ENV`) — use it to reproduce a CI-only failure, not day to day.
 - Frontend gate: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` (build → `../assets/overlay.js` IIFE + `../assets/masque-webgl.js` ESM)
 - Format (Runic, CI-enforced): `julia -e 'using Runic; exit(Runic.main(["--inplace","src","test","bench","docs"]))'` — pass every dir with `.jl`, since CI's `runic-action` has no `paths:` filter and checks the whole repo (including `bench/` and `docs/make.jl`), and tracks the latest Runic (1.7+). Format every `.jl` you add, with current Runic.
 - Registry name-clash check (manual, not `Pkg.test`): packed General (typical
@@ -124,8 +129,23 @@ text and the bond payload → it gets a live check on every backend × the kinds
   (`continue-on-error: true`) — agents still run the sweep locally before calling a
   user-facing change done, until the job is promoted to a required check.
 
+## Cloud sessions (claude.ai/code)
+- The container is **not cached**: every session starts from the environment's setup script,
+  which only installs Julia (on PATH), the General registry, and Runic. Nothing Makie is
+  compiled, so question-only sessions stay cheap.
+- **Warm lazily, and early.** On a task that will run Julia, start
+  `scripts/cloud-warm.sh julia > /tmp/masque-warm.log 2>&1 &` *first*, then read code while it
+  compiles (~7 min cold). Add `frontend` before the frontend gate and `e2e` before live
+  verification (Chromium matching the pinned Playwright). Don't run Julia tests or Pluto until
+  the warm-up log says `done` — competing for the 4 cores slows both.
+- `$MASQUE_DEV_ENV` (set in the environment) is that one warmed env; it serves the unit tests
+  and the kind-sweep notebooks alike.
+- Julia 1.10 (CI's floor) is not installed; 1.10-only breakage is caught by CI. Reproduce one
+  with `juliaup add 1.10` and `julia +1.10 …` (cold env, so another full precompile).
+
 ## Pluto integration testing (slow — minutes)
 - A fresh per-notebook env re-resolves + precompiles the Makie stack (~6 min first open).
+  The kind-sweep/contourf notebooks skip this when `MASQUE_DEV_ENV` points at a warmed env.
 - To test the local package: `Pkg.develop(path=...)` in a notebook cell (disables Pluto's pkg mgmt).
 - Headless: `Pluto.run(; port=1234, launch_browser=false, require_secret_for_open_links=false, require_secret_for_access=false)`; open `localhost:1234/open?path=…`; click "Run notebook code" to exit Safe preview; export HTML via `localhost:1234/notebookexport?id=…`.
 - **Readiness: poll the port (`curl localhost:1234` → 200), not the log** — Pluto doesn't reliably flush its "Go to…" line, so a log-grep readiness loop hangs on a server that's actually up.
