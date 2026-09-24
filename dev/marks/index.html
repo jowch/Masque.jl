@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Click marks · Masque.jl</title><meta name="title" content="Click marks · Masque.jl"/><meta property="og:title" content="Click marks · Masque.jl"/><meta property="twitter:title" content="Click marks · Masque.jl"/><meta name="description" content="Documentation for Masque.jl."/><meta property="og:description" content="Documentation for Masque.jl."/><meta property="twitter:description" content="Documentation for Masque.jl."/><meta property="og:url" content="https://jowch.github.io/Masque.jl/marks/"/><meta property="twitter:url" content="https://jowch.github.io/Masque.jl/marks/"/><link rel="canonical" href="https://jowch.github.io/Masque.jl/marks/"/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/masque-embed.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../"><img class="docs-light-only" src="../assets/logo.svg" alt="Masque.jl logo"/><img class="docs-dark-only" src="../assets/logo-dark.svg" alt="Masque.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../">Masque.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../getting-started/">Getting started</a></li><li><span class="tocitem">Guides</span><ul><li class="is-active"><a class="tocitem" href>Click marks</a><ul class="internal"><li><a class="tocitem" href="#Click-a-bar"><span>Click a bar</span></a></li><li><a class="tocitem" href="#Click-polygons"><span>Click polygons</span></a></li><li><a class="tocitem" href="#Click-a-line"><span>Click a line</span></a></li><li><a class="tocitem" href="#Click-points-on-a-polar-axis"><span>Click points on a polar axis</span></a></li></ul></li><li><a class="tocitem" href="../tooltips/">Tooltips</a></li><li><a class="tocitem" href="../grids/">Inspect a grid</a></li><li><a class="tocitem" href="../selection/">Selection</a></li><li><a class="tocitem" href="../roi/">Brush a region</a></li><li><a class="tocitem" href="../legend/">Legend</a></li><li><a class="tocitem" href="../readouts/">Read coordinates</a></li><li><a class="tocitem" href="../view/">Pan and orbit</a></li><li><a class="tocitem" href="../linked-views/">Linked views</a></li><li><a class="tocitem" href="../custom/">Custom hits</a></li></ul></li><li><span class="tocitem">Gallery</span><ul><li><a class="tocitem" href="../gallery/">Gallery</a></li><li><a class="tocitem" href="../gallery/tooltips/">Tooltip templates</a></li><li><a class="tocitem" href="../gallery/selection/">Selection round-trip</a></li><li><a class="tocitem" href="../gallery/bars/">Bars and areas</a></li><li><a class="tocitem" href="../gallery/polygons/">Polygons</a></li><li><a class="tocitem" href="../gallery/colorbar/">Colorbar</a></li><li><a class="tocitem" href="../gallery/text/">Text labels</a></li><li><a class="tocitem" href="../gallery/boxselect/">Box-select scatter</a></li><li><a class="tocitem" href="../gallery/image/">Image ROI</a></li><li><a class="tocitem" href="../gallery/limits/">Limits slider</a></li><li><a class="tocitem" href="../gallery/pan/">Drag to pan</a></li><li><a class="tocitem" href="../gallery/orbit/">Drag to orbit</a></li><li><a class="tocitem" href="../gallery/polar/">Polar points</a></li></ul></li><li><span class="tocitem">Reference</span><ul><li><a class="tocitem" href="../constructors/">Constructors</a></li><li><a class="tocitem" href="../api/">API</a></li><li><a class="tocitem" href="../backends/">Backends</a></li><li><a class="tocitem" href="../accessibility/">Keyboard and screen readers</a></li><li><a class="tocitem" href="../troubleshooting/">Troubleshooting</a></li><li><a class="tocitem" href="../contributing/">Contributing</a></li></ul></li><li><span class="tocitem">Advanced</span><ul><li><a class="tocitem" href="../gestures/">Overlay, bind, and the host</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Guides</a></li><li class="is-active"><a href>Click marks</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Click marks</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/jowch/Masque.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/jowch/Masque.jl/blob/main/docs/src/marks.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Click-marks"><a class="docs-heading-anchor" href="#Click-marks">Click marks</a><a id="Click-marks-1"></a><a class="docs-heading-anchor-permalink" href="#Click-marks" title="Permalink"></a></h1><p>Click a bar, a polygon, or a polar point. Each notebook is the tutorial. Paste its cells into your own notebook, including the notes. On this site the <strong>Simulating <code>@bind</code></strong> chip is a listed snapshot. In Pluto, the readout cell re-runs.</p><p>This page does not reuse <code>fig</code> or <code>sel</code> from <a href="../getting-started/#Getting-started">Getting started</a>.</p><h2 id="Click-a-bar"><a class="docs-heading-anchor" href="#Click-a-bar">Click a bar</a><a id="Click-a-bar-1"></a><a class="docs-heading-anchor-permalink" href="#Click-a-bar" title="Permalink"></a></h2><div class="masque-embed-wrap">
+<iframe id="masque-marks-bars" title="Four-bar plot. Click a bar and the readout names its value."
+        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
+        scrolling="no" loading="lazy"></iframe>
+</div>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-marks-bars");
+  if (!el) return;
+  function isDocDark() {
+    var c = document.documentElement.className || "";
+    if (!c) return false;
+    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+    return /(^|\s)theme--/.test(c);
+  }
+  function pushTheme() {
+    var doc = el.contentDocument;
+    if (!doc) return;
+    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
+  }
+  el.addEventListener("load", pushTheme);
+  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  el.src = (pretty ? "../embeds/" : "embeds/") + "marks_bars.html";
+})();
+</script><p><code>barplot!</code> on a <code>PolarAxis</code> is skipped with <code>@warn</code>. Keyboard arrows reach bars. A heatmap cell is a different job. For more information, see <a href="../grids/#Inspect-a-grid">Inspect a grid</a>.</p><h2 id="Click-polygons"><a class="docs-heading-anchor" href="#Click-polygons">Click polygons</a><a id="Click-polygons-1"></a><a class="docs-heading-anchor-permalink" href="#Click-polygons" title="Permalink"></a></h2><div class="masque-embed-wrap">
+<iframe id="masque-marks-poly" title="Three polygons. Click one and the readout names it."
+        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
+        scrolling="no" loading="lazy"></iframe>
+</div>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-marks-poly");
+  if (!el) return;
+  function isDocDark() {
+    var c = document.documentElement.className || "";
+    if (!c) return false;
+    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+    return /(^|\s)theme--/.test(c);
+  }
+  function pushTheme() {
+    var doc = el.contentDocument;
+    if (!doc) return;
+    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
+  }
+  el.addEventListener("load", pushTheme);
+  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  el.src = (pretty ? "../embeds/" : "embeds/") + "marks_poly.html";
+})();
+</script><p><code>poly!</code> on a <code>PolarAxis</code> is skipped with <code>@warn</code>. Band, density, contourf, violin, and voronoiplot are clickable the same way. For more information, see <a href="../gallery/polygons/#Polygons">Polygons</a>.</p><h2 id="Click-a-line"><a class="docs-heading-anchor" href="#Click-a-line">Click a line</a><a id="Click-a-line-1"></a><a class="docs-heading-anchor-permalink" href="#Click-a-line" title="Permalink"></a></h2><p>A <code>lines!</code> path is one element: the whole line. Four vertices still draw three edges, but a click anywhere along the path binds that one line.</p><pre><code class="language-julia hljs">begin
+    fig = Figure()
+    ax = Axis(fig[1, 1])
+    lines!(ax, [0, 1, 2, 3], [0, 1, 0, 1])
+    nothing
+end</code></pre><pre><code class="language-julia hljs">@bind pick masque(fig)</code></pre><p><code>stairs!</code> is the same whole-line kind. <code>series!</code> is one line layer with one element per series. Line segments, errorbars, rangebars, hlines, and vlines stay one element per piece.</p><h2 id="Click-points-on-a-polar-axis"><a class="docs-heading-anchor" href="#Click-points-on-a-polar-axis">Click points on a polar axis</a><a id="Click-points-on-a-polar-axis-1"></a><a class="docs-heading-anchor-permalink" href="#Click-points-on-a-polar-axis" title="Permalink"></a></h2><div class="masque-embed-wrap">
+<iframe id="masque-marks-polar" title="Four polar points. Click one and the readout reads its radius."
+        style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;"
+        scrolling="no" loading="lazy"></iframe>
+</div>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-marks-polar");
+  if (!el) return;
+  function isDocDark() {
+    var c = document.documentElement.className || "";
+    if (!c) return false;
+    if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+    return /(^|\s)theme--/.test(c);
+  }
+  function pushTheme() {
+    var doc = el.contentDocument;
+    if (!doc) return;
+    doc.documentElement.classList.toggle("pluto-dark", isDocDark());
+  }
+  el.addEventListener("load", pushTheme);
+  new MutationObserver(pushTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  el.src = (pretty ? "../embeds/" : "embeds/") + "marks_polar.html";
+})();
+</script><p>Scatter, lines, line segments, and <code>series!</code> work on a <code>PolarAxis</code>. <code>AxisInteractable</code>, <code>ThresholdInteractable</code>, <code>ROIInteractable</code>, <code>SliceInteractable</code>, and <code>ViewInteractable</code> on polar raise <code>ArgumentError</code>. <code>heatmap!</code>, <code>barplot!</code>, and <code>poly!</code> on polar are skipped with <code>@warn</code>.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../getting-started/">« Getting started</a><a class="docs-footer-nextpage" href="../tooltips/">Tooltips »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Thursday 24 September 2026 03:52">Thursday 24 September 2026</span>. Using Julia version 1.13.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
