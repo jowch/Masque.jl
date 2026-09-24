@@ -170,8 +170,10 @@ The following table is that split.
 | Heatmap inspect | Overlay tooltip; Julia on click | Overlay tooltip; every cell click swaps the readout | Overlay tooltip chrome if that player is present | Overlay tooltip; Julia click dead |
 | Cairo view frames (GIF/MP4, no `@bind`) | Gesture channel frames; no `@bind` | GIF/MP4 on this site; no `@bind` | Overlay readout; no frames; no `@bind` | Gesture channel dead; site uses GIF/MP4 |
 
-The docs build records every click a player's figure offers, so any
-click swaps the readout. View pan never appears as an
+The docs build records every element, legend, and grid-cell click a
+player's figure offers, so those clicks swap the readout. An axis or
+colorbar click, and a click on a grid that a box brushes, has no recorded
+snapshot. View pan never appears as an
 `InteractionEvent`. For a box that filters a table, see
 [Brush a region](@ref). For that heatmap, see
 [Inspect a grid](@ref). For pan and orbit, see [Pan and orbit](@ref).
@@ -182,10 +184,9 @@ click swaps the readout. View pan never appears as an
   the pointer over a mark. That path is overlay-only.
 - Do not treat a docs player as live Pluto. Axis, ROI, and threshold commits
   write `@bind` in a notebook. On this site, a listed player snapshots those
-  commits, heatmap hover and click go through the grids player, and view
-  has no `@bind`.
+  commits, and view has no `@bind`.
 - Do not design a click demo around more marks than a player can record.
-  The docs build records every click and fails a player over its size
-  budget; use a coarser grid or fewer marks.
+  The docs build records every element, legend, and grid-cell click and
+  fails a player over its size budget; use a coarser grid or fewer marks.
 - Do not expect SliderServer or `Bonds.possible_values` to enumerate Masque
   bonds.

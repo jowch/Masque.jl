@@ -105,6 +105,11 @@ end
     click = Dict{String, Any}("layer" => "pts", "index" => 0)
     @test_throws r"already records" player_states(Dict{String, Any}("states" => Any[Dict("id" => "c", "value" => click)]), man)
     @test_throws r"idle is always recorded" player_states(Dict{String, Any}("states" => Any[Dict("id" => "idle")]), man)
+    # A second threshold position keys the same as the first: `snapshot_key` drops the payload.
+    t1 = Dict{String, Any}("layer" => "thr", "index" => 0, "payload" => Dict("value" => 1.0))
+    t2 = Dict{String, Any}("layer" => "thr", "index" => 0, "payload" => Dict("value" => 2.0))
+    two = Dict{String, Any}("states" => Any[Dict("id" => "a", "value" => t1), Dict("id" => "b", "value" => t2)])
+    @test_throws r"one position only" player_states(two, man)
 end
 
 @testset "snapshot_table stores each distinct snapshot once" begin
@@ -254,19 +259,20 @@ end
         const manifest = {"layers":[],"width":2};
         window.Masque.mount(currentScript, manifest, invalidation);
     </script>"""
-    snaps = Dict(
-        "null" => Dict("id" => "idle", "cells" => ["<p>idle</p>"]),
-        "legend:2" => Dict(
-            "id" => "gentoo",
-            "cells" => ["<p>Gentoo</p>"],
-            "png" => "data:image/png;base64,QUJD",
-        ),
-    )
-    out = inject_manifest_snapshots(html, snaps)
+    idle = Dict("cells" => ["<p>idle</p>"])
+    gentoo = Dict("cells" => ["<p>Gentoo</p>"], "png" => "data:image/png;base64,QUJD")
+    table, _ = snapshot_table(["null" => idle, "legend:2" => gentoo, "legend:0" => copy(idle)])
+    out = inject_manifest_snapshots(html, table)
     start = last(findfirst("const manifest = ", out))
     json, _, _ = extract_json_object(out, start)
     obj = json_read(String(json))
-    @test obj["snapshots"]["legend:2"]["png"] == "data:image/png;base64,QUJD"
+    # What emit_player's `snapFor` reads: table.snaps[table.keys[key]].
+    t = obj["snapshots"]
+    snap(k) = t["snaps"][t["keys"][k] + 1]
+    @test snap("legend:2")["png"] == "data:image/png;base64,QUJD"
+    @test snap("legend:0") == snap("null")
+    @test !haskey(snap("null"), "png")
+    @test !haskey(t, "legend:2")
 end
 
 @testset "gallery players cover the demo sections" begin

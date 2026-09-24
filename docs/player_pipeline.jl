@@ -77,7 +77,10 @@ built the way `resolvePayload` (frontend/src/geometry.ts) builds it. A grid whos
 under a screen pixel ships no `values`, so its clicks cannot be listed: that fails, and the
 notebook needs a coarser grid. A grid that a `selects` box brushes is skipped, since the
 box owns that bond. Drags (`items`, axis, threshold, bounds) are continuous and stay
-hand-listed in the player TOML.
+hand-listed in the player TOML. `snapshot_key` keys an axis, threshold, or bounds value on
+`layer:index` and drops its payload (an axis hit is index `-1`, a threshold or bounds
+commit index `0`), and every grid brush on one layer shares `items:<layer>:0`, so such a
+layer can list one position only.
 """
 function discrete_states(manifest::AbstractDict)
     brushed = get(manifest, "selection", nothing) == "grid" ? get(manifest, "selectionTarget", nothing) : nothing
@@ -123,11 +126,15 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
         push!(seen, k)
         push!(out, (; key = k, value = v))
     end
+    clicks = copy(seen)
     for row in get(player, "states", Any[])
         v = js_shape_from_toml(row)
         v === nothing && error("player TOML lists an idle state; idle is always recorded")
         k = snapshot_key(v)
-        k in seen && error("player TOML lists $k, a click the harvest already records; drop that row")
+        k in clicks && error("player TOML lists $k, a click the harvest already records; drop that row")
+        k in seen && error(
+            "player TOML lists $k twice; the snapshot key drops the payload, so a layer can list one position only"
+        )
         push!(seen, k)
         push!(out, (; key = k, value = v))
     end
