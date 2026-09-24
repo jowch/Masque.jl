@@ -2,7 +2,8 @@
 # and the constructor. None of these is an array index.
 
 """
-    AxisEvent(layer, x, y[, xcat, ycat])
+    AxisEvent(layer, x, y)
+    AxisEvent(layer, x, y, xcat, ycat)
 
 An axis click at data coordinates `(x, y)`. Not an array index. On a categorical dimension the
 coordinate is the category's position (Makie places categories at `1:n`), and `xcat` / `ycat`
