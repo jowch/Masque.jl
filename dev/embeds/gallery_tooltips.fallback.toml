@@ -1,0 +1,4 @@
+image = "gallery_tooltips.png"
+
+[outputs]
+a1410001-0001-4000-8000-000000000004 = "hover a city, or click one"

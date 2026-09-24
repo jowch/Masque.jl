@@ -1,0 +1,4 @@
+image = "gallery_boxselect.png"
+
+[outputs]
+a1410007-0001-4000-8000-000000000004 = "Adjust the box to select points."
