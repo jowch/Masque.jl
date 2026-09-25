@@ -94,8 +94,68 @@ id = "empty"
 value = { items = [] }
 
 [[player.states]]
-id = "some"
-value = { items = [{ layer = "pts", index = 1 }, { layer = "pts", index = 2 }, { layer = "pts", index = 4 }] }
+id = "box_2_m2"
+value = { items = [{ layer = "pts", index = 13 }, { layer = "pts", index = 14 }, { layer = "pts", index = 15 }, { layer = "pts", index = 16 }, { layer = "pts", index = 17 }, { layer = "pts", index = 18 }, { layer = "pts", index = 19 }, { layer = "pts", index = 20 }, { layer = "pts", index = 21 }, { layer = "pts", index = 22 }, { layer = "pts", index = 23 }, { layer = "pts", index = 24 }, { layer = "pts", index = 25 }, { layer = "pts", index = 26 }, { layer = "pts", index = 27 }, { layer = "pts", index = 28 }, { layer = "pts", index = 29 }, { layer = "pts", index = 30 }] }
+
+[[player.states]]
+id = "box_2_0"
+value = { items = [{ layer = "pts", index = 9 }, { layer = "pts", index = 10 }, { layer = "pts", index = 11 }, { layer = "pts", index = 12 }, { layer = "pts", index = 13 }, { layer = "pts", index = 14 }, { layer = "pts", index = 15 }, { layer = "pts", index = 16 }, { layer = "pts", index = 17 }, { layer = "pts", index = 18 }, { layer = "pts", index = 23 }, { layer = "pts", index = 26 }, { layer = "pts", index = 27 }, { layer = "pts", index = 28 }, { layer = "pts", index = 29 }, { layer = "pts", index = 30 }, { layer = "pts", index = 31 }, { layer = "pts", index = 34 }] }
+
+[[player.states]]
+id = "box_2_2"
+value = { items = [{ layer = "pts", index = 5 }, { layer = "pts", index = 6 }, { layer = "pts", index = 7 }, { layer = "pts", index = 8 }, { layer = "pts", index = 9 }, { layer = "pts", index = 10 }, { layer = "pts", index = 11 }, { layer = "pts", index = 12 }, { layer = "pts", index = 13 }, { layer = "pts", index = 28 }, { layer = "pts", index = 30 }, { layer = "pts", index = 31 }, { layer = "pts", index = 33 }, { layer = "pts", index = 34 }, { layer = "pts", index = 35 }, { layer = "pts", index = 36 }] }
+
+[[player.states]]
+id = "box_2_4"
+value = { items = [{ layer = "pts", index = 0 }, { layer = "pts", index = 1 }, { layer = "pts", index = 5 }, { layer = "pts", index = 6 }, { layer = "pts", index = 7 }, { layer = "pts", index = 8 }, { layer = "pts", index = 33 }, { layer = "pts", index = 34 }, { layer = "pts", index = 35 }, { layer = "pts", index = 36 }, { layer = "pts", index = 40 }, { layer = "pts", index = 41 }] }
+
+[[player.states]]
+id = "box_3_m2"
+value = { items = [{ layer = "pts", index = 13 }, { layer = "pts", index = 14 }, { layer = "pts", index = 15 }, { layer = "pts", index = 18 }, { layer = "pts", index = 19 }, { layer = "pts", index = 20 }, { layer = "pts", index = 21 }, { layer = "pts", index = 22 }, { layer = "pts", index = 23 }, { layer = "pts", index = 24 }, { layer = "pts", index = 25 }, { layer = "pts", index = 26 }, { layer = "pts", index = 27 }, { layer = "pts", index = 28 }, { layer = "pts", index = 29 }, { layer = "pts", index = 30 }, { layer = "pts", index = 54 }, { layer = "pts", index = 55 }, { layer = "pts", index = 60 }] }
+
+[[player.states]]
+id = "box_3_0"
+value = { items = [{ layer = "pts", index = 12 }, { layer = "pts", index = 13 }, { layer = "pts", index = 14 }, { layer = "pts", index = 15 }, { layer = "pts", index = 18 }, { layer = "pts", index = 23 }, { layer = "pts", index = 26 }, { layer = "pts", index = 27 }, { layer = "pts", index = 28 }, { layer = "pts", index = 29 }, { layer = "pts", index = 30 }, { layer = "pts", index = 31 }, { layer = "pts", index = 32 }, { layer = "pts", index = 34 }, { layer = "pts", index = 54 }, { layer = "pts", index = 55 }] }
+
+[[player.states]]
+id = "box_3_2"
+value = { items = [{ layer = "pts", index = 7 }, { layer = "pts", index = 12 }, { layer = "pts", index = 13 }, { layer = "pts", index = 28 }, { layer = "pts", index = 30 }, { layer = "pts", index = 31 }, { layer = "pts", index = 32 }, { layer = "pts", index = 33 }, { layer = "pts", index = 34 }, { layer = "pts", index = 35 }, { layer = "pts", index = 36 }, { layer = "pts", index = 49 }, { layer = "pts", index = 53 }, { layer = "pts", index = 54 }, { layer = "pts", index = 55 }] }
+
+[[player.states]]
+id = "box_3_4"
+value = { items = [{ layer = "pts", index = 7 }, { layer = "pts", index = 32 }, { layer = "pts", index = 33 }, { layer = "pts", index = 34 }, { layer = "pts", index = 35 }, { layer = "pts", index = 36 }, { layer = "pts", index = 37 }, { layer = "pts", index = 38 }, { layer = "pts", index = 39 }, { layer = "pts", index = 40 }, { layer = "pts", index = 41 }, { layer = "pts", index = 44 }, { layer = "pts", index = 45 }, { layer = "pts", index = 46 }, { layer = "pts", index = 47 }, { layer = "pts", index = 48 }, { layer = "pts", index = 49 }, { layer = "pts", index = 53 }] }
+
+[[player.states]]
+id = "box_4_m2"
+value = { items = [{ layer = "pts", index = 19 }, { layer = "pts", index = 20 }, { layer = "pts", index = 25 }, { layer = "pts", index = 26 }, { layer = "pts", index = 27 }, { layer = "pts", index = 30 }, { layer = "pts", index = 54 }, { layer = "pts", index = 55 }, { layer = "pts", index = 56 }, { layer = "pts", index = 57 }, { layer = "pts", index = 58 }, { layer = "pts", index = 59 }, { layer = "pts", index = 60 }, { layer = "pts", index = 61 }, { layer = "pts", index = 62 }, { layer = "pts", index = 65 }, { layer = "pts", index = 66 }, { layer = "pts", index = 67 }, { layer = "pts", index = 73 }] }
+
+[[player.states]]
+id = "box_4_0"
+value = { items = [{ layer = "pts", index = 26 }, { layer = "pts", index = 27 }, { layer = "pts", index = 30 }, { layer = "pts", index = 31 }, { layer = "pts", index = 32 }, { layer = "pts", index = 34 }, { layer = "pts", index = 54 }, { layer = "pts", index = 55 }, { layer = "pts", index = 56 }, { layer = "pts", index = 57 }, { layer = "pts", index = 58 }, { layer = "pts", index = 73 }] }
+
+[[player.states]]
+id = "box_4_2"
+value = { items = [{ layer = "pts", index = 30 }, { layer = "pts", index = 31 }, { layer = "pts", index = 32 }, { layer = "pts", index = 33 }, { layer = "pts", index = 34 }, { layer = "pts", index = 35 }, { layer = "pts", index = 36 }, { layer = "pts", index = 49 }, { layer = "pts", index = 50 }, { layer = "pts", index = 51 }, { layer = "pts", index = 52 }, { layer = "pts", index = 53 }, { layer = "pts", index = 54 }, { layer = "pts", index = 55 }, { layer = "pts", index = 56 }, { layer = "pts", index = 57 }, { layer = "pts", index = 58 }, { layer = "pts", index = 73 }] }
+
+[[player.states]]
+id = "box_4_4"
+value = { items = [{ layer = "pts", index = 32 }, { layer = "pts", index = 33 }, { layer = "pts", index = 34 }, { layer = "pts", index = 35 }, { layer = "pts", index = 36 }, { layer = "pts", index = 37 }, { layer = "pts", index = 38 }, { layer = "pts", index = 39 }, { layer = "pts", index = 40 }, { layer = "pts", index = 41 }, { layer = "pts", index = 44 }, { layer = "pts", index = 45 }, { layer = "pts", index = 46 }, { layer = "pts", index = 47 }, { layer = "pts", index = 48 }, { layer = "pts", index = 49 }, { layer = "pts", index = 50 }, { layer = "pts", index = 51 }, { layer = "pts", index = 52 }, { layer = "pts", index = 53 }] }
+
+[[player.states]]
+id = "box_5_m2"
+value = { items = [{ layer = "pts", index = 54 }, { layer = "pts", index = 55 }, { layer = "pts", index = 56 }, { layer = "pts", index = 57 }, { layer = "pts", index = 58 }, { layer = "pts", index = 59 }, { layer = "pts", index = 60 }, { layer = "pts", index = 61 }, { layer = "pts", index = 62 }, { layer = "pts", index = 63 }, { layer = "pts", index = 64 }, { layer = "pts", index = 65 }, { layer = "pts", index = 66 }, { layer = "pts", index = 67 }, { layer = "pts", index = 68 }, { layer = "pts", index = 69 }, { layer = "pts", index = 70 }, { layer = "pts", index = 71 }, { layer = "pts", index = 72 }, { layer = "pts", index = 73 }, { layer = "pts", index = 74 }] }
+
+[[player.states]]
+id = "box_5_0"
+value = { items = [{ layer = "pts", index = 32 }, { layer = "pts", index = 54 }, { layer = "pts", index = 55 }, { layer = "pts", index = 56 }, { layer = "pts", index = 57 }, { layer = "pts", index = 58 }, { layer = "pts", index = 63 }, { layer = "pts", index = 68 }, { layer = "pts", index = 71 }, { layer = "pts", index = 72 }, { layer = "pts", index = 73 }, { layer = "pts", index = 74 }] }
+
+[[player.states]]
+id = "box_5_2"
+value = { items = [{ layer = "pts", index = 32 }, { layer = "pts", index = 49 }, { layer = "pts", index = 50 }, { layer = "pts", index = 51 }, { layer = "pts", index = 52 }, { layer = "pts", index = 53 }, { layer = "pts", index = 54 }, { layer = "pts", index = 55 }, { layer = "pts", index = 56 }, { layer = "pts", index = 57 }, { layer = "pts", index = 58 }, { layer = "pts", index = 73 }, { layer = "pts", index = 78 }, { layer = "pts", index = 79 }] }
+
+[[player.states]]
+id = "box_5_4"
+value = { items = [{ layer = "pts", index = 32 }, { layer = "pts", index = 37 }, { layer = "pts", index = 38 }, { layer = "pts", index = 39 }, { layer = "pts", index = 44 }, { layer = "pts", index = 45 }, { layer = "pts", index = 46 }, { layer = "pts", index = 47 }, { layer = "pts", index = 48 }, { layer = "pts", index = 49 }, { layer = "pts", index = 50 }, { layer = "pts", index = 51 }, { layer = "pts", index = 52 }, { layer = "pts", index = 53 }, { layer = "pts", index = 78 }, { layer = "pts", index = 79 }] }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
