@@ -1,10 +1,12 @@
 # Examples
 
 Each example is a small notebook you can copy. On an example's page,
-hovering works as it does in Pluto, every click swaps in a recorded
-result, brushes swap in results recorded for a few boxes, and the
-notebook follows the player as text.
-Pan and orbit are recorded clips instead.
+hovering works as it does in Pluto, every click on a mark swaps in the
+result the notebook computed for it, every box you can draw with a brush
+is recorded the same way, and the notebook follows the player as text.
+Pan, orbit, and Compare a cluster are recorded clips instead: the view
+needs a running notebook, and the cluster example has too many boxes to
+record.
 
 ## Analyses
 

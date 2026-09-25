@@ -1,9 +1,10 @@
 # Compare a cluster
 
 A brush is the natural way to ask "what is different about these
-points?". Drag the box over a cluster and release; the histogram under
-the scatter compares that cluster's `z` with every sample. Hover any
-point to read its measurements.
+points?". The clip below is a live notebook: the box is set down on one
+cluster, dragged to the other, then pulled in to half of it, and after
+each release the histogram under the scatter compares the `z` of the
+points in the box with every sample.
 
 ```@raw html
 <video id="masque-cluster-clip" title="Dragging a box between two clusters in a live notebook; the histogram below recomputes after each release"
@@ -19,12 +20,13 @@ point to read its measurements.
 </script>
 ```
 
-This is a recording of a live notebook: with 150 points there are far
-too many different boxes to record each one for an interactive player,
-so the clip shows the real thing. After each release Julia redraws the
-histogram; while you drag, the overlay counts the points in the box.
+This page is a clip rather than a player: with 150 points there are far
+too many different boxes to record each one. In the clip, the count
+beside the box is the overlay's own while the box moves; the histogram
+changes only when the box is released and Julia re-runs the last cell.
+In your notebook, hovering a point also shows its three measurements.
 
-The notebook is three cells. Draw the scatter and build the box:
+Copy the three cells to try it. Draw the scatter and build the box:
 
 ```julia
 begin

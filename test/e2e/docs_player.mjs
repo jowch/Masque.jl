@@ -376,9 +376,11 @@ try {
     console.log(`E2E OK [docs player] — image brush: ${windows.length} different windows each swapped to their own recording`);
   }
 
-  {
-    const bs = await openPlayer("boxselect", "gallery_boxselect");
-    const boxRect = () => bs.frame.evaluate(() => {
+  // Grab the resting box and drag it by each offset with the real pointer; each release
+  // must key a recording. `describe` names what the release committed, for messages.
+  const dragChecks = async (pl, embed, moves, describe) => {
+    let prevKey = "";
+    const boxCentre = () => pl.frame.evaluate(() => {
       const host = document.querySelector(".ip-host");
       let sr = null; host.querySelectorAll("*").forEach((n) => { if (n.shadowRoot) sr = n.shadowRoot; });
       const rs = [...sr.querySelectorAll("svg.masque-plain rect")].map((n) => n.getBoundingClientRect()).filter((q) => q.width > 20 && q.height > 20);
@@ -386,26 +388,58 @@ try {
       const q = rs[0];
       return { x: q.x + q.width / 2, y: q.y + q.height / 2 };
     });
-    const moves = [[-40, 30], [70, -50], [-20, 60]];
-    let prevKey = "";
     for (const [dx, dy] of moves) {
-      const fb = await bs.el.boundingBox();
-      const c = await boxRect();
+      // The iframe is taller than the viewport: bring the box, not the iframe top, into view,
+      // or the pointer lands outside the page and the drag never starts.
+      const vh = page.viewportSize().height;
+      const top = (await pl.el.boundingBox()).y + (await boxCentre()).y;
+      if (top < 100 || top > vh - 100) {
+        await page.evaluate((d) => window.scrollBy(0, d), top - vh / 2);
+        await sleep(200);
+      }
+      const fb = await pl.el.boundingBox();
+      const c = await pl.frame.evaluate(() => {
+        const host = document.querySelector(".ip-host");
+        let sr = null; host.querySelectorAll("*").forEach((n) => { if (n.shadowRoot) sr = n.shadowRoot; });
+        const rs = [...sr.querySelectorAll("svg.masque-plain rect")].map((n) => n.getBoundingClientRect()).filter((q) => q.width > 20 && q.height > 20);
+        rs.sort((a, b) => b.width * b.height - a.width * a.height);
+        const q = rs[0];
+        return { x: q.x + q.width / 2, y: q.y + q.height / 2 };
+      });
       const x = fb.x + c.x, y = fb.y + c.y;
-      const before = await bs.outputs();
+      const before = await pl.outputs();
       await page.mouse.move(x, y);
       await page.mouse.down();
       for (let k = 1; k <= 10; k++) await page.mouse.move(x + dx * k / 10, y + dy * k / 10);
       await page.mouse.up();
-      const v = await bs.frame.evaluate(() => { const v = document.querySelector(".ip-host").value; return v && v.items ? v.items.map((it) => it.index).join(",") : null; });
-      if (v === null) throw new Error("box-select: a drag did not commit an items value");
-      const n = v ? v.split(",").length : 0;
-      // The same enclosed set as the last drag leaves the page as it was; a miss still fails.
-      if (v !== prevKey) await bs.swapped(before, `a dragged box enclosing ${n} points`);
+      const items = await pl.frame.evaluate(() => { const v = document.querySelector(".ip-host").value; return v && v.items ? v.items : null; });
+      if (items === null) throw new Error(`${embed}: a drag did not commit an items value`);
+      const what = describe(items);
+      // Compare what the lookup keys on (points, or a grid window), not the raw value: two
+      // boxes pressed against the same edge commit different bounds but the same window.
+      const v = items.map((it) => `${it.layer}:${it.index}` + (it.payload ? `@${it.payload.i0}-${it.payload.i1}/${it.payload.j0}-${it.payload.j1}` : "")).join(",");
+      // The same release as the last drag leaves the page as it was; a miss still fails.
+      if (v !== prevKey) await pl.swapped(before, what);
       else await sleep(500);
-      if (bs.misses().length) throw new Error(`box-select: a dragged box enclosing ${n} points has no recording`);
+      if (pl.misses().length) throw new Error(`${embed}: ${what} has no recording`);
       prevKey = v;
     }
+  };
+
+  {
+    const img = await openPlayer("image", "gallery_image");
+    await dragChecks(img, "gallery_image", [[40, 20], [-70, 30], [30, -40]], (items) => {
+      const p = items[0] && items[0].payload;
+      return p ? `a dragged box on window ${p.i0}-${p.i1} x ${p.j0}-${p.j1}` : "a dragged box off the grid";
+    });
+    img.done();
+    console.log("E2E OK [docs player] — image brush: 3 pointer drags each swapped to their own recording");
+  }
+
+  {
+    const bs = await openPlayer("boxselect", "gallery_boxselect");
+    const moves = [[-40, 30], [70, -50], [-20, 60]];
+    await dragChecks(bs, "gallery_boxselect", moves, (items) => `a dragged box enclosing ${items.length} points`);
     bs.done();
     console.log(`E2E OK [docs player] — box-select: ${moves.length} pointer drags each swapped to their own recording`);
   }

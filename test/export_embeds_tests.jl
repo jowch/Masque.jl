@@ -97,9 +97,10 @@ end
             Dict{String, Any}("id" => "pts", "kind" => "circles", "events" => ["click"], "bond" => "element", "payloads" => Any[1, 2]),
         ],
     )
-    brush = Dict{String, Any}("items" => Any[Dict("layer" => "pts", "index" => 1)])
-    rows = player_states(Dict{String, Any}("states" => Any[Dict("id" => "b", "value" => brush)]), man)
-    @test [r.key for r in rows] == ["null", "pts:0", "pts:1", "items:pts:1"]
+    # A threshold position is the kind of drag a TOML may still hand-list.
+    level = Dict{String, Any}("layer" => "thr", "index" => 0, "payload" => 1.5)
+    rows = player_states(Dict{String, Any}("states" => Any[Dict("id" => "t", "value" => level)]), man)
+    @test [r.key for r in rows] == ["null", "pts:0", "pts:1", "thr:0"]
     @test rows[1].value === nothing
     @test [r.key for r in player_states(Dict{String, Any}(), man)] == ["null", "pts:0", "pts:1"]
     click = Dict{String, Any}("layer" => "pts", "index" => 0)
@@ -153,6 +154,15 @@ end
     @test keys[1] == "items:"
     @test Set(keys) == Set(["items:", "items:pts:0", "items:pts:1", "items:pts:2", "items:pts:0,pts:1", "items:pts:1,pts:2", "items:pts:0,pts:1,pts:2"])
     @test allunique(keys)
+    # Not monotone: points 0 and 2 share a y, so a flat box encloses {0, 2} without 1, a
+    # set that is not an index run.
+    vee = merge(pts, Dict{String, Any}("geometry" => Any[100, 150, 5, 200, 250, 5, 300, 150, 5]))
+    @test Set(snapshot_key(v) for v in brush_states(_brush_manifest(vee))) == Set(
+        [
+            "items:", "items:pts:0", "items:pts:1", "items:pts:2", "items:pts:0,pts:1",
+            "items:pts:0,pts:2", "items:pts:1,pts:2", "items:pts:0,pts:1,pts:2",
+        ]
+    )
     # A point outside the axis viewport cannot be enclosed.
     off = merge(pts, Dict{String, Any}("geometry" => Any[100, 250, 5, 500, 150, 5]))
     @test Set(snapshot_key(v) for v in brush_states(_brush_manifest(off))) == Set(["items:", "items:pts:0"])
@@ -166,8 +176,9 @@ end
     @test length(gs) == 19 && allunique(snapshot_key.(gs))
     w = only(v for v in gs if snapshot_key(v) == "items:img:0@1-2/0-1")
     p = only(w["items"])["payload"]
-    # Data bounds are the window's cell edges: x 1..4 (px 100..400), y 0..3 (px 300..0).
-    @test (p["xmin"], p["xmax"], p["ymin"], p["ymax"]) == (1.0, 4.0, 0.0, 3.0)
+    # Data bounds run from the centre of cell (1, 0) to the centre of cell (2, 1), a box the
+    # overlay would release for this window: x px 150..300, y px 225..75.
+    @test (p["xmin"], p["xmax"], p["ymin"], p["ymax"]) == (1.5, 3.0, 0.75, 2.25)
 
     # Too many to record: the harvest fails and says to shrink the example or record a clip.
     big = merge(grid, Dict{String, Any}("geometry" => Dict{String, Any}("xedges" => collect(0:4:400), "yedges" => collect(300:-3:0), "ncols" => 100, "nrows" => 100)))
@@ -185,7 +196,10 @@ end
     # Brushes are enumerated, not hand-listed: idle, the empty box, each point, both.
     @test [r.key for r in player_states(Dict{String, Any}(), brushed)] == ["null", "items:", "items:pts:0", "items:pts:1", "items:pts:0,pts:1"]
     one = Dict{String, Any}("states" => Any[Dict("id" => "b", "value" => Dict("items" => Any[Dict("layer" => "pts", "index" => 1)]))])
-    @test_throws r"already records" player_states(one, brushed)
+    @test_throws r"lists a brush" player_states(one, brushed)
+    # Also a brush the enumeration does not produce: point 5 does not exist.
+    stray = Dict{String, Any}("states" => Any[Dict("id" => "s", "value" => Dict("items" => Any[Dict("layer" => "pts", "index" => 5)]))])
+    @test_throws r"lists a brush" player_states(stray, brushed)
     # An axis readout cannot be recorded; the chip must say clicks are not simulated.
     axis = Dict{String, Any}("layers" => Any[Dict{String, Any}("id" => "axis", "kind" => "axis", "events" => ["click", "hover"], "bond" => "axis")])
     @test_throws r"chip = false" player_states(Dict{String, Any}(), axis)

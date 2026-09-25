@@ -33,5 +33,7 @@ the same axis.
     `PolarAxis`, and a categorical axis. This player is the Cairo figure.
     The scatter has 12 points so that every set of points a box can
     enclose is recorded: any box you drag shows its own counts, without a
-    kernel. A notebook with more points works the same way.
+    kernel. In a notebook, a brush over any number of points works the
+    same way; on this site, an example with too many boxes to record is
+    shown as a clip instead (see [Compare a cluster](@ref)).
 

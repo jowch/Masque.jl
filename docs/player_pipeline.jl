@@ -221,10 +221,15 @@ function brush_states(manifest::AbstractDict)
         xe = Float64.(_field(g, "xedges"))
         ye = Float64.(_field(g, "yedges"))
         nc, nr = Int(_field(g, "ncols")), Int(_field(g, "nrows"))
-        (nc * (nc + 1) ÷ 2) * (nr * (nr + 1) ÷ 2) > BRUSH_STATES_MAX && _too_many(target, "cell windows")
+        # Windows plus the empty box, counted the same way as the point sets.
+        (nc * (nc + 1) ÷ 2) * (nr * (nr + 1) ÷ 2) + 1 > BRUSH_STATES_MAX && _too_many(target, "cell windows")
+        mid(e, k) = (e[k + 1] + e[k + 2]) / 2
         for i0 in 0:(nc - 1), i1 in i0:(nc - 1), j0 in 0:(nr - 1), j1 in j0:(nr - 1)
-            x0, y0 = _invert_axis(t, xe[i0 + 1], ye[j0 + 1])
-            x1, y1 = _invert_axis(t, xe[i1 + 2], ye[j1 + 2])
+            # A box from the centre of cell (i0, j0) to the centre of cell (i1, j1): a release
+            # the overlay would actually post for this window. A box on the cell edges would
+            # not, since `findBin` gives an interior edge to the lower cell.
+            x0, y0 = _invert_axis(t, mid(xe, i0), mid(ye, j0))
+            x1, y1 = _invert_axis(t, mid(xe, i1), mid(ye, j1))
             payload = Dict{String, Any}(
                 "i0" => i0, "i1" => i1, "j0" => j0, "j1" => j1,
                 "xmin" => min(x0, x1), "xmax" => max(x0, x1), "ymin" => min(y0, y1), "ymax" => max(y0, y1),
@@ -263,11 +268,14 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
     for row in get(player, "states", Any[])
         v = js_shape_from_toml(row)
         v === nothing && error("player TOML lists an idle state; idle is always recorded")
+        v isa AbstractDict && haskey(v, "items") && error(
+            "player TOML lists a brush ($(snapshot_key(v))); brushes are enumerated by `brush_states`, so drop that row"
+        )
         k = snapshot_key(v)
-        k in clicks && error("player TOML lists $k, a click or brush the harvest already records; drop that row")
+        k in clicks && error("player TOML lists $k, a click the harvest already records; drop that row")
         k in seen && error(
             "player TOML lists $k twice: an axis, threshold, or bounds key drops its value, so such a layer " *
-                "can list one position only, and a brush or grid window can be listed once"
+                "can list one position only"
         )
         push!(seen, k)
         push!(out, (; key = k, value = v))

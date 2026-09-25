@@ -131,8 +131,10 @@ the values they were exported with.
 The interactive examples on this site are recordings of real notebooks.
 Hovering works as it does in Pluto; clicks swap in results that were
 computed ahead of time (the **Simulating `@bind`** badge marks these).
-Every mark you can click and every box you can drag is recorded, so what
-you see is what the notebook computed for that choice; examples are kept
-small enough for that, and a larger one is shown as a recorded clip
-instead. Each example also has a *Notebook as text*
+Every click on a mark, legend entry, or grid cell is recorded, and so is
+every box a brush can draw, so those show what the notebook computed for
+that choice. A brush example is kept small enough for that; a larger one
+is shown as a recorded clip instead. A click that picks a position, on
+an axis or a colorbar, is not recorded, and its page says so. Each
+example also has a *Notebook as text*
 section with the same cells, which you can copy into your own notebook.

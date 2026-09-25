@@ -91,9 +91,6 @@ cells = [
   "a1410008-0001-4000-8000-000000000012",
   "a1410008-0001-4000-8000-000000000004",
 ]
-
-# A box on data bounds a..a+30 commits cells max(a-1, 0)..a+29: the overlay's findBin
-# gives an interior edge to the lower cell. Record the windows it actually commits.
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
