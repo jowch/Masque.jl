@@ -197,13 +197,11 @@ const PLUTO_EXPORT_SIM_JS = raw"""
   }
   function patch(v) {
     if (!window.editor_state_set) return;
-    const hit = lookup(TABLE, v);
-    if (!hit) {
+    const snap = lookup(TABLE, v);
+    if (!snap) {
       console.warn("masque player: no snapshot for", keyOf(v));
       return;
     }
-    showApprox(hit.approx);
-    const snap = hit.snap;
     const t = nextStamp();
     window.editor_state_set(function (state) {
       const nb = state.notebook;

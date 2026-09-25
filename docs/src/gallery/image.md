@@ -30,8 +30,7 @@ A miss is a `GridWindowEvent` whose `i1:i2` is empty, not `[]`.
 
     An image brush is the same event on `:cairo` and `:webgl`, on a 2D
     axis. `Axis3` and `PolarAxis` raise `ArgumentError`. This player shows
-    the Cairo figure, with sixteen recorded windows the size of the
-    resting box. A box you drag shows the recorded window it overlaps
-    most, and the badge reads **Nearest recorded brush** until your box
-    matches one exactly; a live notebook slices the exact window.
+    the Cairo figure. The image is 8 × 6 cells so that every window a box
+    can cover, all 756 of them, is recorded: any box you drag shows its
+    own result. A real image works the same way in a notebook.
 

@@ -1,5 +1,5 @@
-// Playwright against the quick start Pluto export on the Documenter page, then the
-// cluster and image brush players (nearest recorded brush, point sets and grid windows).
+// Playwright against the quick start Pluto export on the Documenter page, then the image
+// and box-select brush players, which must record every box a reader can draw.
 // The iframe is #masque-gs-quickstart (home_quickstart.html). Listed clicks
 // swap the readout cell through the export's editor_state_set snapshots.
 // Fails if the overlay never mounts, if host.value does not key a snapshot,
@@ -330,82 +330,84 @@ try {
   if (errors.length) throw new Error(`console errors: ${errors.join(" | ")}`);
   console.log("E2E OK [docs player] — mount callable, every listed host.value keyed, overlay clicks swapped the readout");
 
-  // A brush a reader drags almost never encloses exactly a recorded set, so a brush player
-  // must show the nearest recorded brush (PLAYER_LOOKUP_JS in docs/player_pipeline.jl) and
-  // say so on the chip. Drive the cluster example: a near-miss of the recorded upper
-  // cluster must swap the histogram and relabel the chip; the exact set restores the label.
-  {
-    const clusterPath = existsSync(join(root, "gallery", "cluster", "index.html")) ? "/gallery/cluster/" : "/gallery/cluster.html";
-    const src = readFileSync(join(root, "embeds", "example_cluster.jl"), "utf8");
-    const upperRow = /id = "upper"\s*\nvalue = (\{.*\})/.exec(src);
-    if (!upperRow) throw new Error("example_cluster.jl has no `upper` state");
-    const upper = [...upperRow[1].matchAll(/index = (\d+)/g)].map((m) => Number(m[1]));
-    await page.goto(`http://127.0.0.1:${server.address().port}${clusterPath}`, { waitUntil: "domcontentloaded" });
-    const ciframe = page.locator('iframe[data-masque-embed="example_cluster"]');
-    await ciframe.waitFor({ state: "attached", timeout: 20000 });
-    await ciframe.evaluate((el) => {
-      el.loading = "eager";
-      el.scrollIntoView({ block: "center", inline: "nearest" });
-      const s = el.getAttribute("src");
-      if (s) el.src = s;
+  // Brush players record every box a reader can draw (`brush_states` in
+  // docs/player_pipeline.jl), so any release must key a snapshot exactly: the player logs
+  // "no snapshot for" on a miss and leaves the page alone. Image: set the bond to several
+  // windows; each must swap the readout. Box-select: drag the real box with the pointer;
+  // whatever set it encloses must be recorded.
+  const openPlayer = async (name, embed) => {
+    const p = existsSync(join(root, "gallery", name, "index.html")) ? `/gallery/${name}/` : `/gallery/${name}.html`;
+    const misses = [];
+    const onConsole = (m) => { if (/no snapshot for/.test(m.text())) misses.push(m.text()); };
+    page.on("console", onConsole);
+    await page.goto(`http://127.0.0.1:${server.address().port}${p}`, { waitUntil: "domcontentloaded" });
+    const el = page.locator(`iframe[data-masque-embed="${embed}"]`);
+    await el.waitFor({ state: "attached", timeout: 20000 });
+    await el.evaluate((f) => {
+      f.loading = "eager";
+      f.scrollIntoView({ block: "start", inline: "nearest" });
+      const s = f.getAttribute("src");
+      if (s) f.src = s;
     });
-    const cframe = await waitMounted(ciframe, 40000);
-    const outputs = () => cframe.evaluate(() => [...document.querySelectorAll("pluto-output")].map((o) => o.innerHTML).join("\u0000"));
-    const chip = () => cframe.evaluate(() => (document.querySelector(".masque-sim-chip-label") || {}).textContent || "");
-    const waitFor = async (pred, what) => {
+    const frame = await waitMounted(el, 40000);
+    const outputs = () => frame.evaluate(() => [...document.querySelectorAll("pluto-output")].map((o) => o.innerHTML).join("\u0000"));
+    const swapped = async (before, what) => {
       const deadline = Date.now() + 8000;
-      while (Date.now() < deadline) { if (await pred()) return; await sleep(100); }
-      throw new Error(`cluster player: ${what}`);
+      while (Date.now() < deadline) {
+        if (misses.length) throw new Error(`${embed}: ${what} has no recording (${misses[0]})`);
+        if ((await outputs()) !== before) return;
+        await sleep(100);
+      }
+      throw new Error(`${embed}: ${what} did not swap the page`);
     };
-    const idleOut = await outputs();
-    // Drop five recorded points and add two from the other cluster: close, not exact.
-    const near = upper.slice(5).concat([0, 2]).sort((a, b) => a - b);
-    await setHost(cframe, { items: near.map((i) => ({ layer: "pts", index: i })) });
-    await waitFor(async () => (await outputs()) !== idleOut, "a near-miss brush did not swap the histogram");
-    const nearOut = await outputs();
-    await waitFor(async () => /Nearest recorded brush/.test(await chip()), `chip did not say "Nearest recorded brush" (${await chip()})`);
-    await setHost(cframe, { items: upper.map((i) => ({ layer: "pts", index: i })) });
-    await waitFor(async () => /Simulating/.test(await chip()), `the exact recorded brush did not restore the chip (${await chip()})`);
-    if ((await outputs()) !== nearOut) throw new Error("cluster player: the near-miss and the exact brush showed different snapshots");
-    // A box over empty space overlaps no recording: the page keeps what it showed.
-    await setHost(cframe, { items: [] });
-    await sleep(500);
-    if ((await outputs()) !== nearOut) throw new Error("cluster player: an empty brush changed the page");
-    console.log(`E2E OK [docs player] — cluster brush: a near-miss of ${upper.length} recorded points showed the nearest recording and relabelled the chip`);
+    return { el, frame, outputs, swapped, misses: () => misses, done: () => page.off("console", onConsole) };
+  };
+
+  {
+    const img = await openPlayer("image", "gallery_image");
+    const win = (i0, i1, j0, j1) => ({ items: [{ layer: "img", index: 0, payload: { i0, i1, j0, j1, xmin: 0, xmax: 1, ymin: 0, ymax: 1 } }] });
+    const windows = [[0, 7, 0, 5], [3, 3, 2, 2], [1, 4, 0, 3], [6, 7, 4, 5]];
+    for (const [i0, i1, j0, j1] of windows) {
+      const before = await img.outputs();
+      await setHost(img.frame, win(i0, i1, j0, j1));
+      await img.swapped(before, `window ${i0}-${i1} x ${j0}-${j1}`);
+    }
+    img.done();
+    console.log(`E2E OK [docs player] — image brush: ${windows.length} different windows each swapped to their own recording`);
   }
 
-  // The grid-window path of the same lookup (cell IoU, not point Jaccard): the image
-  // player's resting box commits cells 9-39 on both axes. A box slid three cells right
-  // must show that recording and relabel the chip; the exact window restores the label.
   {
-    const imagePath = existsSync(join(root, "gallery", "image", "index.html")) ? "/gallery/image/" : "/gallery/image.html";
-    const win = (i0, i1, j0, j1) => ({ items: [{ layer: "img", index: 0, payload: { i0, i1, j0, j1, xmin: 0, xmax: 1, ymin: 0, ymax: 1 } }] });
-    await page.goto(`http://127.0.0.1:${server.address().port}${imagePath}`, { waitUntil: "domcontentloaded" });
-    const iiframe = page.locator('iframe[data-masque-embed="gallery_image"]');
-    await iiframe.waitFor({ state: "attached", timeout: 20000 });
-    await iiframe.evaluate((el) => {
-      el.loading = "eager";
-      el.scrollIntoView({ block: "center", inline: "nearest" });
-      const s = el.getAttribute("src");
-      if (s) el.src = s;
+    const bs = await openPlayer("boxselect", "gallery_boxselect");
+    const boxRect = () => bs.frame.evaluate(() => {
+      const host = document.querySelector(".ip-host");
+      let sr = null; host.querySelectorAll("*").forEach((n) => { if (n.shadowRoot) sr = n.shadowRoot; });
+      const rs = [...sr.querySelectorAll("svg.masque-plain rect")].map((n) => n.getBoundingClientRect()).filter((q) => q.width > 20 && q.height > 20);
+      rs.sort((a, b) => b.width * b.height - a.width * a.height);
+      const q = rs[0];
+      return { x: q.x + q.width / 2, y: q.y + q.height / 2 };
     });
-    const iframe2 = await waitMounted(iiframe, 40000);
-    const outputs = () => iframe2.evaluate(() => [...document.querySelectorAll("pluto-output")].map((o) => o.innerHTML).join("\u0000"));
-    const chip = () => iframe2.evaluate(() => (document.querySelector(".masque-sim-chip-label") || {}).textContent || "");
-    const waitFor = async (pred, what) => {
-      const deadline = Date.now() + 8000;
-      while (Date.now() < deadline) { if (await pred()) return; await sleep(100); }
-      throw new Error(`image player: ${what}`);
-    };
-    const idleOut = await outputs();
-    await setHost(iframe2, win(12, 42, 9, 39));
-    await waitFor(async () => (await outputs()) !== idleOut, "a slid window did not swap the readout");
-    const nearOut = await outputs();
-    await waitFor(async () => /Nearest recorded brush/.test(await chip()), `chip did not say "Nearest recorded brush" (${await chip()})`);
-    await setHost(iframe2, win(9, 39, 9, 39));
-    await waitFor(async () => /Simulating/.test(await chip()), `the resting window did not match exactly (${await chip()})`);
-    if ((await outputs()) !== nearOut) throw new Error("image player: the slid and the resting window showed different snapshots");
-    console.log("E2E OK [docs player] — image brush: a slid window showed the nearest recorded window; the resting box matches exactly");
+    const moves = [[-40, 30], [70, -50], [-20, 60]];
+    let prevKey = "";
+    for (const [dx, dy] of moves) {
+      const fb = await bs.el.boundingBox();
+      const c = await boxRect();
+      const x = fb.x + c.x, y = fb.y + c.y;
+      const before = await bs.outputs();
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      for (let k = 1; k <= 10; k++) await page.mouse.move(x + dx * k / 10, y + dy * k / 10);
+      await page.mouse.up();
+      const v = await bs.frame.evaluate(() => { const v = document.querySelector(".ip-host").value; return v && v.items ? v.items.map((it) => it.index).join(",") : null; });
+      if (v === null) throw new Error("box-select: a drag did not commit an items value");
+      const n = v ? v.split(",").length : 0;
+      // The same enclosed set as the last drag leaves the page as it was; a miss still fails.
+      if (v !== prevKey) await bs.swapped(before, `a dragged box enclosing ${n} points`);
+      else await sleep(500);
+      if (bs.misses().length) throw new Error(`box-select: a dragged box enclosing ${n} points has no recording`);
+      prevKey = v;
+    }
+    bs.done();
+    console.log(`E2E OK [docs player] — box-select: ${moves.length} pointer drags each swapped to their own recording`);
   }
 
   // Pluto's frontend unreachable: the iframe never draws a cell, so the page hides it and

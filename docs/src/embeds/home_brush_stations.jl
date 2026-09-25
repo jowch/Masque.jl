@@ -76,22 +76,6 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
 bond = "picks"
 title = "Western US weather stations with a region box"
-
-[[player.states]]
-id = "empty"
-value = { items = [] }
-
-[[player.states]]
-id = "interior"
-value = { items = [{ layer = "pts", index = 4 }, { layer = "pts", index = 5 }, { layer = "pts", index = 6 }] }
-
-[[player.states]]
-id = "cascadia"
-value = { items = [{ layer = "pts", index = 0 }, { layer = "pts", index = 1 }, { layer = "pts", index = 2 }, { layer = "pts", index = 3 }] }
-
-[[player.states]]
-id = "southwest"
-value = { items = [{ layer = "pts", index = 7 }, { layer = "pts", index = 8 }, { layer = "pts", index = 9 }, { layer = "pts", index = 10 }] }
 """
 
 

@@ -6,19 +6,68 @@ the scatter compares that cluster's `z` with every sample. Hover any
 point to read its measurements.
 
 ```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-ex-cluster" data-masque-embed="example_cluster" title="Scatter of 150 samples with a box; a histogram compares z inside the box with all samples" style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
-</div>
+<video id="masque-cluster-clip" title="Dragging a box between two clusters in a live notebook; the histogram below recomputes after each release"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:720px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-cluster-clip");
+  if (!el) return;
+  el.src = (pretty ? "../../assets/" : "../assets/") + "example-cluster.mp4";
+})();
+</script>
 ```
 
-```@eval
-Main.masque_fallback("example_cluster")
+This is a recording of a live notebook: with 150 points there are far
+too many different boxes to record each one for an interactive player,
+so the clip shows the real thing. After each release Julia redraws the
+histogram; while you drag, the overlay counts the points in the box.
+
+The notebook is three cells. Draw the scatter and build the box:
+
+```julia
+begin
+    # Deterministic noise, so the example looks the same every time it runs.
+    u(k) = mod(sin(k * 12.9898) * 43758.5453, 1.0)
+    g(k) = sqrt(-2log(u(k) + 1.0e-9)) * cos(2π * u(k + 0.5))
+    n = 150
+    xs = [i <= 80 ? 3.0 + 0.9g(i) : 7.0 + 0.9g(i) for i in 1:n]
+    ys = [i <= 80 ? 3.0 + 0.9g(i + 1000) : 6.0 + 0.8g(i + 1000) for i in 1:n]
+    zs = [i <= 80 ? 1.2 + 0.3g(i + 2000) : 2.8 + 0.35g(i + 2000) for i in 1:n]
+    fig = Figure(size = (560, 360))
+    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y", title = "drag the box over a cluster")
+    s = scatter!(ax, xs, ys; color = zs, colormap = :viridis, markersize = 9)
+    samples = [(; sample = i, x = round(xs[i]; digits = 2), y = round(ys[i]; digits = 2), z = round(zs[i]; digits = 2)) for i in 1:n]
+    pts = PointInteractable(ax, s; id = :pts, payloads = samples)
+    roi = ROIInteractable(ax; bounds = (5.2, 9.2, 4.4, 7.8), selects = :pts)
+    nothing
+end
 ```
 
-On this page the two clusters are recorded as snapshots. A box you drag
-shows the recorded cluster it overlaps most, and the badge reads
-**Nearest recorded brush** when your box is not an exact match. In your
-own notebook, every release recomputes the histogram.
+Bind the box:
+
+```julia
+@bind picks masque(fig, [pts, roi])
+```
+
+Compare what is inside with every sample:
+
+```julia
+begin
+    edges = range(minimum(zs), maximum(zs); length = 21)
+    inside = picks === nothing ? Float64[] : zs[picks]
+    cmp = Figure(size = (560, 260))
+    cax = Axis(
+        cmp[1, 1]; xlabel = "z", ylabel = "samples",
+        title = isempty(inside) ? "all samples" : "$(length(inside)) samples in the box, against all $(length(zs))"
+    )
+    hist!(cax, zs; bins = edges, color = (:gray, 0.45), label = "all")
+    isempty(inside) || hist!(cax, inside; bins = edges, color = (:darkorange, 0.85), label = "in the box")
+    axislegend(cax; position = :rt)
+    cmp
+end
+```
 
 ## How it works
 
