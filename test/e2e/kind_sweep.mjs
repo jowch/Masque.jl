@@ -801,7 +801,21 @@ try {
         passed.push(`${key}/cross-off`);
       }
       const before = await textOf(`#out_${key}`);
-      const ends = spec.layerKind === "threshold"
+      // A categorical threshold releases onto another category's row: a ±50 px drag stays in the
+      // starting category's bin, so a warm re-run (#114) would commit the text the bond already
+      // holds and never change. The target also differs from that leftover category, so the
+      // release always changes the bond, and "nearest category" is observable.
+      let catTarget = null;
+      if (spec.categorical) {
+        const t = (await transformsOf(key))[layer.axis];
+        const leftover = /category\s*=\s*"([^"]*)"/.exec(before)?.[1];
+        const i = (t?.ycats ?? []).findIndex((c) => c !== spec.startCategory && c !== leftover);
+        if (i < 0) throw new Error(`${key}: no target category in ${JSON.stringify(t?.ycats)} (start ${spec.startCategory}, leftover ${leftover})`);
+        catTarget = { k: i + 1, label: t.ycats[i], y: projectAxisJs(t, t.xlims[0], i + 1).y };
+      }
+      const ends = catTarget
+        ? [[p.x, catTarget.y]]
+        : spec.layerKind === "threshold"
         ? [[p.x, p.y - 50], [p.x, p.y + 50]]
         : spec.layerKind === "roi"
           ? (() => {
@@ -831,22 +845,15 @@ try {
       const re = spec.layerKind === "roi" ? /:roi|ElementEvent\[|BoundsEvent/i : /:threshold|:thr|ThresholdEvent/i;
       if (!re.test(after)) throw new Error(`${key}-drag: readout mismatch ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/drag-bind`);
-      if (spec.categorical) {
-        // A release on a categorical dimension commits the nearest category's 1-based position and
-        // its label (#192), and the line moves onto that category (#199). This fixture is a
-        // horizontal threshold, so the category axis is y.
+      if (catTarget) {
+        // The release commits the target category's 1-based position and its label (#192), and
+        // the line lands on that category's row (#199). This fixture is a horizontal threshold, so
+        // the category axis is y.
         const m = /value\s*=\s*(-?[\d.]+),\s*category\s*=\s*"([^"]*)"/.exec(after);
-        if (!m) throw new Error(`${key}-drag: expected a ThresholdEvent with a category, got ${JSON.stringify(after).slice(0, 200)}`);
-        const k = Number(m[1]);
-        const t = (await transformsOf(key))[layer.axis];
-        if (!Number.isInteger(k) || !t?.ycats || t.ycats[k - 1] !== m[2]) {
-          throw new Error(`${key}-drag: value ${m[1]} is not the position of category "${m[2]}" in ${JSON.stringify(t?.ycats)}`);
+        if (!m || Number(m[1]) !== catTarget.k || m[2] !== catTarget.label) {
+          throw new Error(`${key}-drag: expected value = ${catTarget.k}, category = "${catTarget.label}", got ${JSON.stringify(after).slice(0, 200)}`);
         }
         passed.push(`${key}/category-position`);
-        const [, vy, , vh] = t.viewport;
-        let f = (k - t.ylims[0]) / (t.ylims[1] - t.ylims[0]);
-        if (t.yreversed) f = 1 - f;
-        const want = vy + (1 - f) * vh;
         const lineY = await page.evaluate((kk) => {
           const span = document.querySelector(`#coords_${kk}`);
           const hosts = [...document.querySelectorAll(".ip-host")];
@@ -854,8 +861,8 @@ try {
           let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
           return Number(sr.querySelector(".masque-threshold-line")?.getAttribute("y1"));
         }, key);
-        if (!(Math.abs(lineY - want) <= 1.5)) {
-          throw new Error(`${key}-drag: line at y=${lineY} after release, expected category ${k} at y=${want.toFixed(1)} (#199 snap)`);
+        if (!(Math.abs(lineY - catTarget.y) <= 1.5)) {
+          throw new Error(`${key}-drag: line at y=${lineY} after release, expected category ${catTarget.k} at y=${catTarget.y.toFixed(1)} (#199 snap)`);
         }
         passed.push(`${key}/line-snaps-to-category`);
       }
@@ -901,22 +908,32 @@ try {
       // (#192); the hover card reads the label, as the ticks do.
       const t = (await transformsOf(key))[layer.axis];
       if (!t || !t.ycats) throw new Error(`${key}: expected a categorical y transform, got ${JSON.stringify(t)}`);
-      const [vx, vy, vw, vh] = t.viewport;
-      let f = (spec.position - t.ylims[0]) / (t.ylims[1] - t.ylims[0]);
-      if (t.yreversed) f = 1 - f;
-      const pt = { x: vx + 0.1 * vw, y: vy + (1 - f) * vh };
+      const [vx, , vw] = t.viewport;
+      const pt = { x: vx + 0.1 * vw, y: projectAxisJs(t, t.xlims[0], spec.position).y };
       const hover = await dispatchAt(key, pt.x, pt.y, "pointermove");
       if (!hover.show || !hover.text.includes(`y=${spec.category}`)) {
         throw new Error(`${key}/hover: card should read y=${spec.category}, got ${JSON.stringify(hover.text)}`);
       }
+      if (hover.cross) throw new Error(`${key}/hover: a readout with no slice draws no hairline`);
       passed.push(`${key}/hover-shows-category`);
-      const before = await textOf(`#out_${key}`);
-      await dispatchAt(key, pt.x, pt.y, "click");
-      const after = await waitChange(`#out_${key}`, before, `${key}-click`, 60);
-      const m = /AxisEvent\(:axis,\s*x\s*=\s*(-?[\d.e-]+),\s*y\s*=\s*(-?[\d.e-]+),\s*ycat\s*=\s*"([^"]*)"\)/.exec(after);
-      if (!m) throw new Error(`${key}/click: expected an AxisEvent with ycat, got ${JSON.stringify(after).slice(0, 200)}`);
-      if (Number(m[2]) !== spec.position || m[3] !== spec.category) {
-        throw new Error(`${key}/click: expected y = ${spec.position}, ycat = "${spec.category}", got ${after}`);
+      // Poll for the expected value rather than for a change: a warm re-run (#114) already holds
+      // this exact repr, the same reason the numeric axis case uses clickAndMatch.
+      const re = /AxisEvent\(:axis,\s*x\s*=\s*(-?[\d.e-]+),\s*y\s*=\s*(-?[\d.e-]+),\s*ycat\s*=\s*"([^"]*)"\)/;
+      const matches = (text) => {
+        const m = re.exec(text);
+        return !!m && Number(m[2]) === spec.position && m[3] === spec.category;
+      };
+      let after = null;
+      for (let attempt = 0; attempt < 3 && !(after && matches(after)); attempt++) {
+        await dispatchAt(key, pt.x, pt.y, "click");
+        for (let i = 0; i < 30; i++) {
+          after = await textOf(`#out_${key}`);
+          if (matches(after)) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+      if (!matches(after)) {
+        throw new Error(`${key}/click: expected AxisEvent with y = ${spec.position}, ycat = "${spec.category}", got ${JSON.stringify(after).slice(0, 200)}`);
       }
       passed.push(`${key}/click-position-and-category`);
       console.error(`OK  ${key}/click — ${after.slice(0, 100)}`);

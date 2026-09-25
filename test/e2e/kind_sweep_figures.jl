@@ -128,7 +128,7 @@ kind_sweep_meta() = [
         "key" => "threshold_cat", "layerId" => "threshold", "layerKind" => "threshold",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
-        "categorical" => true,
+        "categorical" => true, "startCategory" => "b",
     ),
     Dict(
         # An axis click on a categorical y axis: the category's position plus its label (#192).
