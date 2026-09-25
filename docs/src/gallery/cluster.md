@@ -15,8 +15,10 @@ point to read its measurements.
 Main.masque_fallback("example_cluster")
 ```
 
-On this page the two clusters are recorded as snapshots; in your own
-notebook, every release recomputes the histogram.
+On this page the two clusters are recorded as snapshots. A box you drag
+shows the recorded cluster it overlaps most, and the badge reads
+**Nearest recorded brush** when your box is not an exact match. In your
+own notebook, every release recomputes the histogram.
 
 ## How it works
 

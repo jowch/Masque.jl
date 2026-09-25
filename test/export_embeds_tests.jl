@@ -112,6 +112,43 @@ end
     @test_throws r"one position only" player_states(two, man)
 end
 
+@testset "a grid brush keys on its cell window" begin
+    win(i0, i1, j0, j1) = Dict{String, Any}(
+        "items" => Any[
+            Dict{String, Any}(
+                "layer" => "img", "index" => 0,
+                "payload" => Dict{String, Any}("i0" => i0, "i1" => i1, "j0" => j0, "j1" => j1, "xmin" => 0.0),
+            ),
+        ],
+    )
+    @test snapshot_key(win(10, 39, 10, 39)) == "items:img:0@10-39/10-39"
+    @test snapshot_key(win(10, 39, 10, 39)) != snapshot_key(win(0, 29, 0, 29))
+    # A point brush item has no payload window and keys as before.
+    @test snapshot_key(Dict("items" => Any[Dict("layer" => "pts", "index" => 3)])) == "items:pts:3"
+    # The lookup script parses the same window syntax `_item_key` writes.
+    @test occursin("@(\\d+)-(\\d+)\\/(\\d+)-(\\d+)", PLAYER_LOOKUP_JS)
+    img = parse_player_toml(joinpath(@__DIR__, "..", "docs", "src", "embeds", "gallery_image.jl"))
+    ikeys = [snapshot_key(js_shape_from_toml(r)) for r in img["states"]]
+    @test length(ikeys) == 16 && allunique(ikeys)
+    @test all(startswith("items:img:0@"), ikeys)
+end
+
+@testset "check_reachable: every player interaction reaches a recording" begin
+    roi = Dict{String, Any}("id" => "roi", "kind" => "roi", "events" => ["drag"], "bond" => "none")
+    pts = Dict{String, Any}("id" => "pts", "kind" => "circles", "events" => ["hover"], "bond" => "element", "payloads" => Any[1, 2])
+    brushed = Dict{String, Any}("layers" => Any[pts, roi], "selection" => "elements", "selectionTarget" => "pts")
+    # A selects box with no recorded brush never updates the page.
+    @test_throws r"lists no brush" player_states(Dict{String, Any}(), brushed)
+    empty = Dict{String, Any}("states" => Any[Dict("id" => "e", "value" => Dict("items" => Any[]))])
+    @test_throws r"lists no brush" player_states(empty, brushed)
+    one = Dict{String, Any}("states" => Any[Dict("id" => "b", "value" => Dict("items" => Any[Dict("layer" => "pts", "index" => 1)]))])
+    @test [r.key for r in player_states(one, brushed)] == ["null", "items:pts:1"]
+    # An axis readout cannot be recorded; the chip must say clicks are not simulated.
+    axis = Dict{String, Any}("layers" => Any[Dict{String, Any}("id" => "axis", "kind" => "axis", "events" => ["click", "hover"], "bond" => "axis")])
+    @test_throws r"chip = false" player_states(Dict{String, Any}(), axis)
+    @test [r.key for r in player_states(Dict{String, Any}("chip" => false), axis)] == ["null"]
+end
+
 @testset "snapshot_table stores each distinct snapshot once" begin
     idle = Dict("cells" => Dict("c" => "idle"))
     a = Dict("cells" => Dict("c" => "adelie"))
@@ -158,7 +195,7 @@ end
 end
 
 @testset "overlay-only players set chip = false" begin
-    for name in ("gallery_limits", "home_hover_stars", "home_export", "gallery_bars", "gallery_image")
+    for name in ("gallery_limits", "home_hover_stars", "home_export", "gallery_bars")
         player = parse_player_toml(joinpath(@__DIR__, "..", "docs", "src", "embeds", name * ".jl"))
         @test player["chip"] == false
     end

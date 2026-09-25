@@ -34,21 +34,120 @@ function _string_keys(x)
 end
 
 # Key the player lookup on the pre-transform JS shape the overlay posts.
-# Must stay in lockstep with `keyOf` in `emit_player` (docs/export_embeds.jl).
+# Must stay in lockstep with `keyOf` in `PLAYER_LOOKUP_JS` below.
 function snapshot_key(v)
     v === nothing && return "null"
     d = v isa AbstractDict ? _string_keys(v) : Dict{String, Any}("value" => v)
     if haskey(d, "items")
-        parts = String[]
-        for it in d["items"]
-            push!(parts, string(it["layer"], ":", Int(it["index"])))
-        end
-        return "items:" * join(parts, ",")
+        return "items:" * join((_item_key(it) for it in d["items"]), ",")
     end
     (haskey(d, "layer") && haskey(d, "index")) &&
         return string(d["layer"], ":", Int(d["index"]))
     return json_write(jsonable(d))
 end
+
+# A grid brush item carries its cell window (`i0:i1`, `j0:j1`, 0-based inclusive) in the
+# payload, and every grid brush on a layer has index 0, so the window is what tells two
+# brushes apart. A point brush item is just `layer:index`.
+function _item_key(it)
+    k = string(it["layer"], ":", Int(it["index"]))
+    p = get(it, "payload", nothing)
+    (p isa AbstractDict && haskey(p, "i0")) || return k
+    return string(k, "@", Int(p["i0"]), "-", Int(p["i1"]), "/", Int(p["j0"]), "-", Int(p["j1"]))
+end
+
+"""
+    PLAYER_LOOKUP_JS
+
+The docs players' snapshot lookup, shared by the static player (`emit_player`) and the
+Pluto export (`PLUTO_EXPORT_SIM_JS`). `lookup(table, v)` returns `{snap, approx}` or
+`null`. An exact key wins. A brush (`items`) release that matches no recording falls back
+to the recorded brush it overlaps most, if that overlap is at least `NEAREST_MIN` (0.2): point
+sets by Jaccard index, a grid window by intersection over union of its cells. 0.2 lets a
+box slid halfway between two recorded windows still resolve. A reader
+can almost never drag a box around exactly a recorded set, so without the fallback a
+brush player never updates. `showApprox` relabels the "Simulating @bind" chip while a
+nearby recording is shown.
+"""
+const PLAYER_LOOKUP_JS = raw"""
+const NEAREST_MIN = 0.2;
+function layerIndexKey(layer, index) {
+  return String(layer) + ":" + String(Number(index));
+}
+function itemKey(it) {
+  const k = layerIndexKey(it.layer, it.index);
+  const p = it.payload;
+  if (!p || p.i0 == null) return k;
+  return k + "@" + p.i0 + "-" + p.i1 + "/" + p.j0 + "-" + p.j1;
+}
+function keyOf(v) {
+  if (v == null) return "null";
+  if (Array.isArray(v.items)) return "items:" + v.items.map(itemKey).join(",");
+  if (v.layer != null && v.index != null && v.index !== "") {
+    return layerIndexKey(v.layer, v.index);
+  }
+  return JSON.stringify(v);
+}
+function brushParts(key) {
+  const body = key.slice("items:".length);
+  return body ? body.split(",") : [];
+}
+function windowOf(part) {
+  const m = /^(.*)@(\d+)-(\d+)\/(\d+)-(\d+)$/.exec(part);
+  return m ? { layer: m[1], i0: +m[2], i1: +m[3], j0: +m[4], j1: +m[5] } : null;
+}
+function brushOverlap(a, b) {
+  if (a.length === 1 && b.length === 1) {
+    const wa = windowOf(a[0]), wb = windowOf(b[0]);
+    if (wa && wb) {
+      if (wa.layer !== wb.layer) return 0;
+      const iw = Math.min(wa.i1, wb.i1) - Math.max(wa.i0, wb.i0) + 1;
+      const jw = Math.min(wa.j1, wb.j1) - Math.max(wa.j0, wb.j0) + 1;
+      const inter = iw > 0 && jw > 0 ? iw * jw : 0;
+      const area = function (w) { return (w.i1 - w.i0 + 1) * (w.j1 - w.j0 + 1); };
+      return inter / (area(wa) + area(wb) - inter);
+    }
+  }
+  if (!a.length || !b.length) return 0;
+  const sa = new Set(a);
+  let inter = 0;
+  b.forEach(function (x) { if (sa.has(x)) inter++; });
+  return inter / (sa.size + b.length - inter);
+}
+function lookup(table, v) {
+  const keys = [keyOf(v)];
+  if (v && v.layer != null && v.index != null && v.index !== "") {
+    keys.push(String(v.layer) + ":" + String(v.index));
+    keys.push(String(v.layer) + ":" + String(v.index | 0));
+  }
+  for (let i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(table.keys, keys[i])) {
+      return { snap: table.snaps[table.keys[keys[i]]], approx: false };
+    }
+  }
+  if (!v || !Array.isArray(v.items)) return null;
+  const mine = brushParts(keys[0]);
+  let best = null, bestScore = 0;
+  Object.keys(table.keys).forEach(function (k) {
+    if (k.indexOf("items:") !== 0) return;
+    const score = brushOverlap(mine, brushParts(k));
+    if (score > bestScore) { best = k; bestScore = score; }
+  });
+  if (!best || bestScore < NEAREST_MIN) return null;
+  return { snap: table.snaps[table.keys[best]], approx: true };
+}
+function showApprox(approx) {
+  const label = document.querySelector(".masque-sim-chip-label");
+  const tip = document.getElementById("masque-sim-tip");
+  if (!label) return;
+  label.innerHTML = approx ? "Nearest recorded brush" : "Simulating <code>@bind</code>";
+  if (tip) {
+    tip.textContent = approx
+      ? "No snapshot for this exact box; showing the recorded brush that overlaps it most."
+      : "Precomputed snapshots, not a live Julia process.";
+  }
+}
+"""
 
 jsonable(::Nothing) = nothing
 jsonable(x::Bool) = x
@@ -79,8 +178,9 @@ notebook needs a coarser grid. A grid that a `selects` box brushes is skipped, s
 box owns that bond. Drags (`items`, axis, threshold, bounds) are continuous and stay
 hand-listed in the player TOML. `snapshot_key` keys an axis, threshold, or bounds value on
 `layer:index` and drops its payload (an axis hit is index `-1`, a threshold or bounds
-commit index `0`), and every grid brush on one layer shares `items:<layer>:0`, so such a
-layer can list one position only.
+commit index `0`), so such a layer can list one position only. A grid brush keys on its
+cell window (`items:<layer>:0@i0-i1/j0-j1`), so a grid player can list many windows, and
+`PLAYER_LOOKUP_JS` shows the nearest one for a box the reader drags.
 """
 function discrete_states(manifest::AbstractDict)
     brushed = get(manifest, "selection", nothing) == "grid" ? get(manifest, "selectionTarget", nothing) : nothing
@@ -133,12 +233,47 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
         k = snapshot_key(v)
         k in clicks && error("player TOML lists $k, a click the harvest already records; drop that row")
         k in seen && error(
-            "player TOML lists $k twice; the snapshot key drops the payload, so a layer can list one position only"
+            "player TOML lists $k twice: an axis, threshold, or bounds key drops its value, so such a layer " *
+                "can list one position only, and a brush or grid window can be listed once"
         )
         push!(seen, k)
         push!(out, (; key = k, value = v))
     end
+    check_reachable(player, manifest, [r.key for r in out])
     return out
+end
+
+# Bonds whose value is a position, not a listed mark: the harvest can record at most the
+# positions a TOML hand-lists, so a reader's click or drag almost never lands on one.
+const _CONTINUOUS_BONDS = ("axis", "colorbar", "threshold", "bounds")
+
+"""
+    check_reachable(player, manifest, keys)
+
+Fail the harvest when a reader can do something in the player that no recording answers,
+so the page would silently not update. A `selects` box must list at least one non-empty
+brush (the lookup then shows the nearest recorded one). A layer that commits a position
+(axis, colorbar, threshold, bounds box) with no listed state must run with `chip = false`,
+and its page must say that clicks need a live notebook.
+"""
+function check_reachable(player::AbstractDict, manifest::AbstractDict, keys)
+    if get(manifest, "selection", nothing) !== nothing
+        any(k -> startswith(k, "items:") && k != "items:", keys) || error(
+            "player has a `selects` box but lists no brush: add an `items` [[player.states]] row, " *
+                "or a box the reader drags never updates the page"
+        )
+    end
+    get(player, "chip", true) === false && return nothing
+    for L in manifest["layers"]
+        string(get(L, "bond", "none")) in _CONTINUOUS_BONDS || continue
+        id = string(L["id"])
+        any(k -> startswith(k, id * ":"), keys) && continue
+        error(
+            "layer :$id commits a position the player cannot record, and the chip says clicks are simulated: " *
+                "set `chip = false` and say on the page that clicks need a live notebook"
+        )
+    end
+    return nothing
 end
 
 """

@@ -166,7 +166,7 @@ The following table is that split.
 | Click-echo | Highlight in the overlay | Highlight in the overlay | Highlight in the overlay | Highlight in the overlay |
 | Element click `@bind` (incl. extra table cells) | Bond writes; every cell that reads it re-runs | Snapshot swap for every cell in the embed | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
 | Listed ROI `items` / a few axis or threshold values | Bond writes on release | Snapshot swap for listed sets or values | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
-| Unlisted continuous drag | Overlay chrome during the drag; Julia on ROI or threshold release; view never writes `@bind` | Overlay chrome; Julia stays on the last listed set | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
+| Unlisted continuous drag | Overlay chrome during the drag; Julia on ROI or threshold release; view never writes `@bind` | A `selects` box swaps to the recorded brush it overlaps most (overlap at least 0.2), and the chip reads **Nearest recorded brush**; below that, or for an axis or threshold value, Julia stays on the last listed set | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
 | Heatmap inspect | Overlay tooltip; Julia on click | Overlay tooltip; every cell click swaps the readout | Overlay tooltip chrome if that player is present | Overlay tooltip; Julia click dead |
 | Cairo view frames (GIF/MP4, no `@bind`) | Gesture channel frames; no `@bind` | GIF/MP4 on this site; no `@bind` | Overlay readout; no frames; no `@bind` | Gesture channel dead; site uses GIF/MP4 |
 

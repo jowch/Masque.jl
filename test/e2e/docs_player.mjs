@@ -1,4 +1,5 @@
-// Playwright against the quick start Pluto export on the Documenter page.
+// Playwright against the quick start Pluto export on the Documenter page, then the
+// cluster and image brush players (nearest recorded brush, point sets and grid windows).
 // The iframe is #masque-gs-quickstart (home_quickstart.html). Listed clicks
 // swap the readout cell through the export's editor_state_set snapshots.
 // Fails if the overlay never mounts, if host.value does not key a snapshot,
@@ -328,6 +329,84 @@ try {
   });
   if (errors.length) throw new Error(`console errors: ${errors.join(" | ")}`);
   console.log("E2E OK [docs player] — mount callable, every listed host.value keyed, overlay clicks swapped the readout");
+
+  // A brush a reader drags almost never encloses exactly a recorded set, so a brush player
+  // must show the nearest recorded brush (PLAYER_LOOKUP_JS in docs/player_pipeline.jl) and
+  // say so on the chip. Drive the cluster example: a near-miss of the recorded upper
+  // cluster must swap the histogram and relabel the chip; the exact set restores the label.
+  {
+    const clusterPath = existsSync(join(root, "gallery", "cluster", "index.html")) ? "/gallery/cluster/" : "/gallery/cluster.html";
+    const src = readFileSync(join(root, "embeds", "example_cluster.jl"), "utf8");
+    const upperRow = /id = "upper"\s*\nvalue = (\{.*\})/.exec(src);
+    if (!upperRow) throw new Error("example_cluster.jl has no `upper` state");
+    const upper = [...upperRow[1].matchAll(/index = (\d+)/g)].map((m) => Number(m[1]));
+    await page.goto(`http://127.0.0.1:${server.address().port}${clusterPath}`, { waitUntil: "domcontentloaded" });
+    const ciframe = page.locator('iframe[data-masque-embed="example_cluster"]');
+    await ciframe.waitFor({ state: "attached", timeout: 20000 });
+    await ciframe.evaluate((el) => {
+      el.loading = "eager";
+      el.scrollIntoView({ block: "center", inline: "nearest" });
+      const s = el.getAttribute("src");
+      if (s) el.src = s;
+    });
+    const cframe = await waitMounted(ciframe, 40000);
+    const outputs = () => cframe.evaluate(() => [...document.querySelectorAll("pluto-output")].map((o) => o.innerHTML).join("\u0000"));
+    const chip = () => cframe.evaluate(() => (document.querySelector(".masque-sim-chip-label") || {}).textContent || "");
+    const waitFor = async (pred, what) => {
+      const deadline = Date.now() + 8000;
+      while (Date.now() < deadline) { if (await pred()) return; await sleep(100); }
+      throw new Error(`cluster player: ${what}`);
+    };
+    const idleOut = await outputs();
+    // Drop five recorded points and add two from the other cluster: close, not exact.
+    const near = upper.slice(5).concat([0, 2]).sort((a, b) => a - b);
+    await setHost(cframe, { items: near.map((i) => ({ layer: "pts", index: i })) });
+    await waitFor(async () => (await outputs()) !== idleOut, "a near-miss brush did not swap the histogram");
+    const nearOut = await outputs();
+    await waitFor(async () => /Nearest recorded brush/.test(await chip()), `chip did not say "Nearest recorded brush" (${await chip()})`);
+    await setHost(cframe, { items: upper.map((i) => ({ layer: "pts", index: i })) });
+    await waitFor(async () => /Simulating/.test(await chip()), `the exact recorded brush did not restore the chip (${await chip()})`);
+    if ((await outputs()) !== nearOut) throw new Error("cluster player: the near-miss and the exact brush showed different snapshots");
+    // A box over empty space overlaps no recording: the page keeps what it showed.
+    await setHost(cframe, { items: [] });
+    await sleep(500);
+    if ((await outputs()) !== nearOut) throw new Error("cluster player: an empty brush changed the page");
+    console.log(`E2E OK [docs player] — cluster brush: a near-miss of ${upper.length} recorded points showed the nearest recording and relabelled the chip`);
+  }
+
+  // The grid-window path of the same lookup (cell IoU, not point Jaccard): the image
+  // player's resting box commits cells 9-39 on both axes. A box slid three cells right
+  // must show that recording and relabel the chip; the exact window restores the label.
+  {
+    const imagePath = existsSync(join(root, "gallery", "image", "index.html")) ? "/gallery/image/" : "/gallery/image.html";
+    const win = (i0, i1, j0, j1) => ({ items: [{ layer: "img", index: 0, payload: { i0, i1, j0, j1, xmin: 0, xmax: 1, ymin: 0, ymax: 1 } }] });
+    await page.goto(`http://127.0.0.1:${server.address().port}${imagePath}`, { waitUntil: "domcontentloaded" });
+    const iiframe = page.locator('iframe[data-masque-embed="gallery_image"]');
+    await iiframe.waitFor({ state: "attached", timeout: 20000 });
+    await iiframe.evaluate((el) => {
+      el.loading = "eager";
+      el.scrollIntoView({ block: "center", inline: "nearest" });
+      const s = el.getAttribute("src");
+      if (s) el.src = s;
+    });
+    const iframe2 = await waitMounted(iiframe, 40000);
+    const outputs = () => iframe2.evaluate(() => [...document.querySelectorAll("pluto-output")].map((o) => o.innerHTML).join("\u0000"));
+    const chip = () => iframe2.evaluate(() => (document.querySelector(".masque-sim-chip-label") || {}).textContent || "");
+    const waitFor = async (pred, what) => {
+      const deadline = Date.now() + 8000;
+      while (Date.now() < deadline) { if (await pred()) return; await sleep(100); }
+      throw new Error(`image player: ${what}`);
+    };
+    const idleOut = await outputs();
+    await setHost(iframe2, win(12, 42, 9, 39));
+    await waitFor(async () => (await outputs()) !== idleOut, "a slid window did not swap the readout");
+    const nearOut = await outputs();
+    await waitFor(async () => /Nearest recorded brush/.test(await chip()), `chip did not say "Nearest recorded brush" (${await chip()})`);
+    await setHost(iframe2, win(9, 39, 9, 39));
+    await waitFor(async () => /Simulating/.test(await chip()), `the resting window did not match exactly (${await chip()})`);
+    if ((await outputs()) !== nearOut) throw new Error("image player: the slid and the resting window showed different snapshots");
+    console.log("E2E OK [docs player] — image brush: a slid window showed the nearest recorded window; the resting box matches exactly");
+  }
 
   // Pluto's frontend unreachable: the iframe never draws a cell, so the page hides it and
   // opens the text twin, whose code, idle figure, and readout need no CDN.

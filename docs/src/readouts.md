@@ -24,6 +24,10 @@ cursor; clicking makes `pick` an [`AxisEvent`](@ref) with `pick.x` and
 Main.masque_fallback("readouts_axis")
 ```
 
+On this page the card works as you move the pointer, but a click does
+nothing: an axis click is a position, not a listed mark, so there is no
+recording to show. In a notebook the click sets `pick`.
+
 Use it to mark a position — the start of a time window, a point to fit
 from — without needing a mark there. It works on linear and log axes,
 and on categorical ones. On a categorical axis the card shows the

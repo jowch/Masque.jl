@@ -183,32 +183,7 @@ const PLUTO_EXPORT_SIM_JS = raw"""
 {
   const TABLE = @@SNAPS@@;
   const WIDGET_ID = "@@WIDGET@@";
-  function layerIndexKey(layer, index) {
-    return String(layer) + ":" + String(Number(index));
-  }
-  function keyOf(v) {
-    if (v == null) return "null";
-    if (Array.isArray(v.items)) {
-      return "items:" + v.items.map(function (it) {
-        return layerIndexKey(it.layer, it.index);
-      }).join(",");
-    }
-    if (v.layer != null && v.index != null && v.index !== "") {
-      return layerIndexKey(v.layer, v.index);
-    }
-    return JSON.stringify(v);
-  }
-  function snapFor(v) {
-    const keys = [keyOf(v)];
-    if (v && v.layer != null && v.index != null && v.index !== "") {
-      keys.push(String(v.layer) + ":" + String(v.index));
-      keys.push(String(v.layer) + ":" + String(v.index | 0));
-    }
-    for (let i = 0; i < keys.length; i++) {
-      if (Object.prototype.hasOwnProperty.call(TABLE.keys, keys[i])) return TABLE.snaps[TABLE.keys[keys[i]]];
-    }
-    return null;
-  }
+  @@LOOKUP@@
   function sizeFrame() {
     if (!window.frameElement) return;
     const nb = document.querySelector("pluto-notebook");
@@ -222,11 +197,13 @@ const PLUTO_EXPORT_SIM_JS = raw"""
   }
   function patch(v) {
     if (!window.editor_state_set) return;
-    const snap = snapFor(v);
-    if (!snap) {
+    const hit = lookup(TABLE, v);
+    if (!hit) {
       console.warn("masque player: no snapshot for", keyOf(v));
       return;
     }
+    showApprox(hit.approx);
+    const snap = hit.snap;
     const t = nextStamp();
     window.editor_state_set(function (state) {
       const nb = state.notebook;
@@ -289,7 +266,9 @@ function postprocess_pluto_export(html::AbstractString; snapshots, widget_id::Ab
     theme = pluto_theme_css()
     chip = show_chip ? SIM_CHIP_HTML : ""
     payload = replace(json_write(snapshots), "<" => "\\u003c")
-    sim = replace(PLUTO_EXPORT_SIM_JS, "@@SNAPS@@" => payload, "@@WIDGET@@" => widget_id)
+    sim = replace(
+        PLUTO_EXPORT_SIM_JS, "@@SNAPS@@" => payload, "@@WIDGET@@" => widget_id, "@@LOOKUP@@" => PLAYER_LOOKUP_JS,
+    )
     occursin("</script>", payload) && error("snapshot JSON still contains a script close tag")
     head = """
     <!-- masque-pluto-export -->
