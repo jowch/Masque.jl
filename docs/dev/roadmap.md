@@ -78,38 +78,12 @@ without new evidence:
   remaining cost is a full `serialize_scene` per frame
   ([§12.10](architecture/12-gesture-channel.md#1210-open-questions)).
 
-## Housekeeping (no design work)
-
-- **Close #49.** It is a stale draft, and nothing in it is still wanted. Its registry
-  readiness test was dropped in #55. Its `releasing.md` was deleted. Its changelog freeze
-  was reversed. TagBot, the `Base64` bound, and the install line reached `main` by other
-  routes.
-- **Refresh #91's body.** Nothing in its table is ticked, and it predates several merged
-  changes: `series!` (`:series`) and `Legend` (`:legend`) are extracted, the #158 child walk
-  covers `ablines!`, `arc!`, `pie!`, `contour!` lines, `stephist!`, `ecdfplot!`,
-  `streamplot!`, `qqplot!`, and `triplot!`, and #157 is done. Make `support.md` the list
-  of what ships, and keep #91 for the gaps only, so the two cannot disagree.
-- **Finish #81.** The site already documents the WGLMakie cell pattern. What remains is
-  `test/notebooks/webgl_demo.jl`, which still displays a raw `Figure` and then binds
-  `masque(fig)` in a later cell. Do this before #175: if #175 lands first, that notebook
-  throws.
-
 ## Before registration
 
 ### Bugs
 
 Ordered cheapest first. None of them changes the manifest shape.
 
-- **#189: `masque` throws on a small RGB image.** On the branch where cells are at least one
-  screen pixel, a non-real matrix goes to `Float32` and throws. Give that branch what the
-  sub-pixel branch already does: edges only, with `value = nothing`. Add a small colour
-  image to the kind sweep.
-- **#188: an axis click or a threshold release on a categorical axis throws.** The browser
-  commits the category label, and Julia expects a number. This is a bug and also a
-  contract decision. One option commits the numeric position with the label beside it. The
-  other rejects a categorical dimension in `validate`, as ROI and pan already do. The first
-  keeps a feature that the hover card already implies works. Decide before registration,
-  because the choice changes what `AxisEvent` and `ThresholdEvent` hold.
 - **#165: wheel zoom can leave the inverse matrix applied after the settle frame.** This
   happens when the WebGL preview round trip outlasts the 150 ms settle. It can be reproduced
   deterministically from `photo.ts`. The result is wrong on screen until the next gesture.
@@ -130,15 +104,6 @@ Settle each one first.
   points to WGLMakie, and `:webgl` renders it with no overlay. The second is the silent
   behaviour the principles forbid. The recommendation is #172 as written: `LScene` is a
   non-goal on every backend, and the issue is reopened if a user asks for it.
-- **#175: throw when a WGLMakie `Figure` is displayed under Pluto.** Today that display hangs
-  on a spinner, which is a real trap. The fix #175 proposes is not free: a `Base.show`
-  method on Makie's `FigureLike`, plus methods on Bonito's session types, defined from
-  Masque's extension. That is type piracy. Every notebook that loads Masque and WGLMakie gets
-  it, including notebooks that never call `masque`, and it couples Masque to Bonito
-  internals that the canary would then have to track. Before building it, weigh the
-  narrower option. `masque` already has the figure, so it can refuse a figure whose WGLMakie
-  screen holds a live session, and the docs cover the raw `Figure` case. If the piracy
-  stays, #175 should say why the narrower guard is not enough.
 - **#167: a large highlighted element washes the plot.** The fix would add a size gate to
   the locked highlight recipe: drop the fill once an element covers much of the viewport,
   and keep the stroke. This changes the locked recipe in `CLAUDE.md` and
@@ -346,20 +311,17 @@ shipped, which is a better filter than what other libraries happen to have.
 A proposed sequence, not a decided one. The only hard dependency edges are these:
 - #180 before #181.
 - #168 before #169.
-- #81 before #175.
 - #99 and #165 before the kind sweep becomes a required check.
 
 Registration waits for the decisions listed under "Before registration".
 
-1. Housekeeping: close #49, refresh #91, finish #81.
-2. Julia-only bugs: #189, then #188 once its contract choice is made.
-3. The preview path: #165 and #171 together, then #99.
-4. #168.
-5. Decide and land #172, #175, and #167 (or defer #167 explicitly).
-6. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
-7. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
+1. The preview path: #165 and #171 together, then #99.
+2. #168.
+3. Decide and land #172 and #167 (or defer #167 explicitly).
+4. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
+5. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
    alongside, since none of it touches the package.
-8. Coverage items as users ask (#91).
-9. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
+6. Coverage items as users ask (#91).
+7. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
    per-frame or per-element cost. Spike-gated items (SVG output, spatial acceleration,
    GLMakie-static) wait for a real use.
