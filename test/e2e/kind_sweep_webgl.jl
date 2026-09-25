@@ -177,6 +177,26 @@ HTML(
         "<span id=\"coords_threshold\" style=\"display:none\">$(JSON3.write(sweep.threshold.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000062
+@bind ev_threshold_cat sweep.threshold_cat
+
+# ╔═╡ d1000000-0000-0000-0000-000000000063
+HTML(
+    "<span id=\"out_threshold_cat\">THRESHOLD_CAT=$(repr(ev_threshold_cat))</span>" *
+        "<span id=\"coords_threshold_cat\" style=\"display:none\">$(JSON3.write(sweep.threshold_cat.manifest["layers"]))</span>" *
+        "<span id=\"axes_threshold_cat\" style=\"display:none\">$(JSON3.write(sweep.threshold_cat.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000064
+@bind ev_axis_cat sweep.axis_cat
+
+# ╔═╡ d1000000-0000-0000-0000-000000000065
+HTML(
+    "<span id=\"out_axis_cat\">AXIS_CAT=$(repr(ev_axis_cat))</span>" *
+        "<span id=\"coords_axis_cat\" style=\"display:none\">$(JSON3.write(sweep.axis_cat.manifest["layers"]))</span>" *
+        "<span id=\"axes_axis_cat\" style=\"display:none\">$(JSON3.write(sweep.axis_cat.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000032
 @bind ev_roi sweep.roi
 
@@ -301,6 +321,10 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000029
 # ╠═d1000000-0000-0000-0000-000000000030
 # ╠═d1000000-0000-0000-0000-000000000031
+# ╠═d1000000-0000-0000-0000-000000000062
+# ╠═d1000000-0000-0000-0000-000000000063
+# ╠═d1000000-0000-0000-0000-000000000064
+# ╠═d1000000-0000-0000-0000-000000000065
 # ╠═d1000000-0000-0000-0000-000000000032
 # ╠═d1000000-0000-0000-0000-000000000033
 # ╠═d1000000-0000-0000-0000-000000000034

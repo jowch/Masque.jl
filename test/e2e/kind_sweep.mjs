@@ -801,7 +801,21 @@ try {
         passed.push(`${key}/cross-off`);
       }
       const before = await textOf(`#out_${key}`);
-      const ends = spec.layerKind === "threshold"
+      // A categorical threshold releases onto another category's row: a ±50 px drag stays in the
+      // starting category's bin, so a warm re-run (#114) would commit the text the bond already
+      // holds and never change. The target also differs from that leftover category, so the
+      // release always changes the bond, and "nearest category" is observable.
+      let catTarget = null;
+      if (spec.categorical) {
+        const t = (await transformsOf(key))[layer.axis];
+        const leftover = /category\s*=\s*"([^"]*)"/.exec(before)?.[1];
+        const i = (t?.ycats ?? []).findIndex((c) => c !== spec.startCategory && c !== leftover);
+        if (i < 0) throw new Error(`${key}: no target category in ${JSON.stringify(t?.ycats)} (start ${spec.startCategory}, leftover ${leftover})`);
+        catTarget = { k: i + 1, label: t.ycats[i], y: projectAxisJs(t, t.xlims[0], i + 1).y };
+      }
+      const ends = catTarget
+        ? [[p.x, catTarget.y]]
+        : spec.layerKind === "threshold"
         ? [[p.x, p.y - 50], [p.x, p.y + 50]]
         : spec.layerKind === "roi"
           ? (() => {
@@ -831,6 +845,27 @@ try {
       const re = spec.layerKind === "roi" ? /:roi|ElementEvent\[|BoundsEvent/i : /:threshold|:thr|ThresholdEvent/i;
       if (!re.test(after)) throw new Error(`${key}-drag: readout mismatch ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/drag-bind`);
+      if (catTarget) {
+        // The release commits the target category's 1-based position and its label (#192), and
+        // the line lands on that category's row (#199). This fixture is a horizontal threshold, so
+        // the category axis is y.
+        const m = /value\s*=\s*(-?[\d.]+),\s*category\s*=\s*"([^"]*)"/.exec(after);
+        if (!m || Number(m[1]) !== catTarget.k || m[2] !== catTarget.label) {
+          throw new Error(`${key}-drag: expected value = ${catTarget.k}, category = "${catTarget.label}", got ${JSON.stringify(after).slice(0, 200)}`);
+        }
+        passed.push(`${key}/category-position`);
+        const lineY = await page.evaluate((kk) => {
+          const span = document.querySelector(`#coords_${kk}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          return Number(sr.querySelector(".masque-threshold-line")?.getAttribute("y1"));
+        }, key);
+        if (!(Math.abs(lineY - catTarget.y) <= 1.5)) {
+          throw new Error(`${key}-drag: line at y=${lineY} after release, expected category ${catTarget.k} at y=${catTarget.y.toFixed(1)} (#199 snap)`);
+        }
+        passed.push(`${key}/line-snaps-to-category`);
+      }
       console.error(`OK  ${key}/drag — ${after.slice(0, 100)}`);
       continue;
     }
@@ -868,6 +903,43 @@ try {
     // text to CHANGE, so a warm-session re-run whose click reproduces byte-identical geometry
     // and hence a byte-identical payload (#114's collision hazard, deliberately sidestepped
     // rather than hit) still passes.
+    if (spec.mode === "axis_cat") {
+      // A click on a categorical y axis commits the category's 1-based position and its label
+      // (#192); the hover card reads the label, as the ticks do.
+      const t = (await transformsOf(key))[layer.axis];
+      if (!t || !t.ycats) throw new Error(`${key}: expected a categorical y transform, got ${JSON.stringify(t)}`);
+      const [vx, , vw] = t.viewport;
+      const pt = { x: vx + 0.1 * vw, y: projectAxisJs(t, t.xlims[0], spec.position).y };
+      const hover = await dispatchAt(key, pt.x, pt.y, "pointermove");
+      if (!hover.show || !hover.text.includes(`y=${spec.category}`)) {
+        throw new Error(`${key}/hover: card should read y=${spec.category}, got ${JSON.stringify(hover.text)}`);
+      }
+      if (hover.cross) throw new Error(`${key}/hover: a readout with no slice draws no hairline`);
+      passed.push(`${key}/hover-shows-category`);
+      // Poll for the expected value rather than for a change: a warm re-run (#114) already holds
+      // this exact repr, the same reason the numeric axis case uses clickAndMatch.
+      const re = /AxisEvent\(:axis,\s*x\s*=\s*(-?[\d.e-]+),\s*y\s*=\s*(-?[\d.e-]+),\s*ycat\s*=\s*"([^"]*)"\)/;
+      const matches = (text) => {
+        const m = re.exec(text);
+        return !!m && Number(m[2]) === spec.position && m[3] === spec.category;
+      };
+      let after = null;
+      for (let attempt = 0; attempt < 3 && !(after && matches(after)); attempt++) {
+        await dispatchAt(key, pt.x, pt.y, "click");
+        for (let i = 0; i < 30; i++) {
+          after = await textOf(`#out_${key}`);
+          if (matches(after)) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+      if (!matches(after)) {
+        throw new Error(`${key}/click: expected AxisEvent with y = ${spec.position}, ycat = "${spec.category}", got ${JSON.stringify(after).slice(0, 200)}`);
+      }
+      passed.push(`${key}/click-position-and-category`);
+      console.error(`OK  ${key}/click — ${after.slice(0, 100)}`);
+      continue;
+    }
+
     if (spec.mode === "axis") {
       const axisLayer = layers.find((l) => l.id === spec.layerId && l.kind === "axis");
       const cbLayer = layers.find((l) => l.id === spec.colorbarLayerId && l.kind === "axis");
