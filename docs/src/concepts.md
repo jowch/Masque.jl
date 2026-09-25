@@ -130,9 +130,11 @@ the values they were exported with.
 
 The interactive examples on this site are recordings of real notebooks.
 Hovering works as it does in Pluto; clicks swap in results that were
-computed ahead of time for a listed set of choices (the **Simulating
-`@bind`** badge marks these). A box you drag that is not an exact
-recording shows the recorded box it overlaps most, and the badge then
-reads **Nearest recorded brush**; a box that overlaps none leaves the
-page as it was. Each example also has a *Notebook as text*
+computed ahead of time (the **Simulating `@bind`** badge marks these).
+Every click on a mark, legend entry, or grid cell is recorded, and so is
+every box a brush can draw, so those show what the notebook computed for
+that choice. A brush example is kept small enough for that; a larger one
+is shown as a recorded clip instead. A click that picks a position, on
+an axis or a colorbar, is not recorded, and its page says so. Each
+example also has a *Notebook as text*
 section with the same cells, which you can copy into your own notebook.

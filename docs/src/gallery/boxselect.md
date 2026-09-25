@@ -31,8 +31,9 @@ the same axis.
     The brush is the same on `:cairo` and `:webgl` on a 2D axis with scale
     `identity`, `log10`, or `log`. It raises `ArgumentError` on `Axis3`,
     `PolarAxis`, and a categorical axis. This player is the Cairo figure.
-    The listed brushes are snapshots, so the counts update without a
-    kernel. A box you drag yourself shows the recorded brush it overlaps
-    most, and the badge reads **Nearest recorded brush** until it matches
-    one exactly; a live notebook recomputes the mean for your box.
+    The scatter has 12 points so that every set of points a box can
+    enclose is recorded: any box you drag shows its own counts, without a
+    kernel. In a notebook, a brush over any number of points works the
+    same way; on this site, an example with too many boxes to record is
+    shown as a clip instead (see [Compare a cluster](@ref)).
 

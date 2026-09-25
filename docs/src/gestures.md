@@ -160,18 +160,19 @@ snapshot, or stay frozen, depending on the host.
 
 The following table is that split.
 
-| Gesture | Live Pluto | Docs player (every click / listed `items`) | Docs player (overlay-only) | Static `generate_html` |
+| Gesture | Live Pluto | Docs player (every click and brush recorded) | Docs player (overlay-only) | Static `generate_html` |
 |---|---|---|---|---|
 | Hover | Overlay tooltip and highlight | Overlay tooltip and highlight | Overlay tooltip and highlight | Overlay tooltip and highlight |
 | Click-echo | Highlight in the overlay | Highlight in the overlay | Highlight in the overlay | Highlight in the overlay |
 | Element click `@bind` (incl. extra table cells) | Bond writes; every cell that reads it re-runs | Snapshot swap for every cell in the embed | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
-| Listed ROI `items` / a few axis or threshold values | Bond writes on release | Snapshot swap for listed sets or values | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
-| Unlisted continuous drag | Overlay chrome during the drag; Julia on ROI or threshold release; view never writes `@bind` | A `selects` box swaps to the recorded brush it overlaps most (overlap at least 0.2), and the chip reads **Nearest recorded brush**; below that, or for an axis or threshold value, Julia stays on the last listed set | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
+| ROI brush (`selects`) / a few axis or threshold values | Bond writes on release | Snapshot swap for every box, or for each listed value | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
+| Unlisted continuous drag | Overlay chrome during the drag; Julia on ROI or threshold release; view never writes `@bind` | An axis or threshold value that is not listed: Julia stays on the last listed set (a `selects` box has no unlisted drag, since every box is recorded) | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
 | Heatmap inspect | Overlay tooltip; Julia on click | Overlay tooltip; every cell click swaps the readout | Overlay tooltip chrome if that player is present | Overlay tooltip; Julia click dead |
 | Cairo view frames (GIF/MP4, no `@bind`) | Gesture channel frames; no `@bind` | GIF/MP4 on this site; no `@bind` | Overlay readout; no frames; no `@bind` | Gesture channel dead; site uses GIF/MP4 |
 
 The docs build records every element, legend, and grid-cell click a
-player's figure offers, so those clicks swap the readout. An axis or
+player's figure offers, and every box a `selects` brush can draw, so
+those clicks and releases swap the readout. An axis or
 colorbar click, and a click on a grid that a box brushes, has no recorded
 snapshot. View pan never appears as an
 `InteractionEvent`. For a box that filters a table, see

@@ -648,10 +648,11 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         const man = host && host.masqueManifest;
         const snaps = man && man.snapshots;
         if (!snaps) return false;
-        const hit = lookup(snaps, host.value);
-        if (!hit) return false;
-        showApprox(hit.approx);
-        const snap = hit.snap;
+        const snap = lookup(snaps, host.value);
+        if (!snap) {
+          if (host.value != null) console.warn("masque player: no snapshot for", keyOf(host.value));
+          return false;
+        }
         const img = host.querySelector("img");
         if (img) {
           const next = snap.png || idlePng;
