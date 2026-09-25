@@ -308,6 +308,10 @@ All notable changes to this project are documented here. The format is based on
   (`docs/dev/roadmap.md`), not groundwork already in place.
 
 ### Fixed
+- A `:webgl` widget no longer breaks raw WGLMakie figures on the same Pluto page. Its
+  Bonito stand-in used to replace `window.Bonito`, so a raw figure shown before the widget
+  stopped responding and one shown after it kept its spinner. The stand-in is now scoped to
+  Masque's own copy of WGLMakie's code.
 - `hlines!` `xmin`/`xmax` and `vlines!` `ymin`/`ymax` set the hit segment. They are fractions
   of the axis (default 0 and 1, the full limits), broadcast with the positions the way Makie
   draws the line. A log-scale fraction is taken on the transformed limits and inverse-transformed

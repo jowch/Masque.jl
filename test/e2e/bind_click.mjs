@@ -57,7 +57,7 @@ try {
   context = await browser.newContext({ locale: "en-US", timezoneId: "UTC" });
   page = await context.newPage();
   // Shim-leak guard, scoped to the leak SIGNATURE so it can't flake on unrelated browser noise.
-  // A missing window.Bonito.*/comm.* method surfaces as "Bonito.X is not a function" / "comm.X
+  // A missing Bonito-shim.*/comm.* method surfaces as "Bonito.X is not a function" / "comm.X
   // is not a function" (the lock_loading/notify gaps this PR fixed). We FAIL only on that — not on
   // arbitrary headless-Chromium/Pluto-SPA errors (ResizeObserver loops, transient WebSocket
   // teardown), which would otherwise make a ~10-min E2E flaky. Two binary-codec methods are
@@ -242,7 +242,7 @@ try {
   // Shim leak first: a leak that also breaks rendering would otherwise surface as the downstream
   // "bond did not round-trip" symptom, hiding the root cause. Check before deciding to retry.
   if (unexpectedErrors.length) {
-    throw new Error(`shim leak — missing window.Bonito/comm method(s): ${[...new Set(unexpectedErrors)].join(" | ")}`);
+    throw new Error(`shim leak — missing Bonito-shim/comm method(s): ${[...new Set(unexpectedErrors)].join(" | ")}`);
   }
 
   if (result.error === "no_pluto") {
@@ -255,7 +255,7 @@ try {
     // attempt 1, this would otherwise lose its root-cause label behind whatever error the retry
     // itself produces (no_pluto / unexpected readout).
     if (unexpectedErrors.length) {
-      throw new Error(`shim leak — missing window.Bonito/comm method(s): ${[...new Set(unexpectedErrors)].join(" | ")}`);
+      throw new Error(`shim leak — missing Bonito-shim/comm method(s): ${[...new Set(unexpectedErrors)].join(" | ")}`);
     }
   }
 
