@@ -32,10 +32,10 @@ Draw the image, and brush it with a box that selects the pixel grid.
 
 # ╔═╡ a1410008-0001-4000-8000-000000000002
 begin
-    nx, ny = 96, 64
+    nx, ny = 8, 6
     clamp01(v) = clamp(v, 0.0, 1.0)
-    R = clamp01.([0.5 + 0.45 * sin(i / 9) * cos(j / 7) for i in 1:nx, j in 1:ny])
-    G = clamp01.([0.5 + 0.4 * cos(i / 11) for i in 1:nx, j in 1:ny])
+    R = clamp01.([0.5 + 0.45 * sin(i / 1.4) * cos(j / 1.2) for i in 1:nx, j in 1:ny])
+    G = clamp01.([0.5 + 0.4 * cos(i / 1.7) for i in 1:nx, j in 1:ny])
     B = clamp01.([0.5 + 0.45 * (j / ny) for i in 1:nx, j in 1:ny])
     rgb = [RGBf(R[i, j], G[i, j], B[i, j]) for i in 1:nx, j in 1:ny]
     fig = Figure(size = (560, 400))
@@ -46,7 +46,7 @@ begin
     lum = [0.299 * R[i, j] + 0.587 * G[i, j] + 0.114 * B[i, j] for i in 1:nx, j in 1:ny]
     ints = [
         RectInteractable(ax; grid = (xe, ye, lum), id = :img),
-        ROIInteractable(ax; bounds = (10.0, 40.0, 10.0, 40.0), selects = :img),
+        ROIInteractable(ax; bounds = (2.0, 5.0, 1.0, 4.0), selects = :img),
     ]
     nothing
 end
@@ -91,72 +91,6 @@ cells = [
   "a1410008-0001-4000-8000-000000000012",
   "a1410008-0001-4000-8000-000000000004",
 ]
-
-# A box on data bounds a..a+30 commits cells max(a-1, 0)..a+29: the overlay's findBin
-# gives an interior edge to the lower cell. Record the windows it actually commits.
-[[player.states]]
-id = "w10_10"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 9, i1 = 39, j0 = 9, j1 = 39, xmin = 10.0, xmax = 40.0, ymin = 10.0, ymax = 40.0 } }] }
-
-[[player.states]]
-id = "w0_0"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 0, i1 = 29, j0 = 0, j1 = 29, xmin = 0.0, xmax = 30.0, ymin = 0.0, ymax = 30.0 } }] }
-
-[[player.states]]
-id = "w15_0"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 14, i1 = 44, j0 = 0, j1 = 29, xmin = 15.0, xmax = 45.0, ymin = 0.0, ymax = 30.0 } }] }
-
-[[player.states]]
-id = "w30_0"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 29, i1 = 59, j0 = 0, j1 = 29, xmin = 30.0, xmax = 60.0, ymin = 0.0, ymax = 30.0 } }] }
-
-[[player.states]]
-id = "w45_0"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 44, i1 = 74, j0 = 0, j1 = 29, xmin = 45.0, xmax = 75.0, ymin = 0.0, ymax = 30.0 } }] }
-
-[[player.states]]
-id = "w60_0"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 59, i1 = 89, j0 = 0, j1 = 29, xmin = 60.0, xmax = 90.0, ymin = 0.0, ymax = 30.0 } }] }
-
-[[player.states]]
-id = "w0_17"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 0, i1 = 29, j0 = 16, j1 = 46, xmin = 0.0, xmax = 30.0, ymin = 17.0, ymax = 47.0 } }] }
-
-[[player.states]]
-id = "w15_17"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 14, i1 = 44, j0 = 16, j1 = 46, xmin = 15.0, xmax = 45.0, ymin = 17.0, ymax = 47.0 } }] }
-
-[[player.states]]
-id = "w30_17"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 29, i1 = 59, j0 = 16, j1 = 46, xmin = 30.0, xmax = 60.0, ymin = 17.0, ymax = 47.0 } }] }
-
-[[player.states]]
-id = "w45_17"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 44, i1 = 74, j0 = 16, j1 = 46, xmin = 45.0, xmax = 75.0, ymin = 17.0, ymax = 47.0 } }] }
-
-[[player.states]]
-id = "w60_17"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 59, i1 = 89, j0 = 16, j1 = 46, xmin = 60.0, xmax = 90.0, ymin = 17.0, ymax = 47.0 } }] }
-
-[[player.states]]
-id = "w0_34"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 0, i1 = 29, j0 = 33, j1 = 63, xmin = 0.0, xmax = 30.0, ymin = 34.0, ymax = 64.0 } }] }
-
-[[player.states]]
-id = "w15_34"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 14, i1 = 44, j0 = 33, j1 = 63, xmin = 15.0, xmax = 45.0, ymin = 34.0, ymax = 64.0 } }] }
-
-[[player.states]]
-id = "w30_34"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 29, i1 = 59, j0 = 33, j1 = 63, xmin = 30.0, xmax = 60.0, ymin = 34.0, ymax = 64.0 } }] }
-
-[[player.states]]
-id = "w45_34"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 44, i1 = 74, j0 = 33, j1 = 63, xmin = 45.0, xmax = 75.0, ymin = 34.0, ymax = 64.0 } }] }
-
-[[player.states]]
-id = "w60_34"
-value = { items = [{ layer = "img", index = 0, payload = { i0 = 59, i1 = 89, j0 = 33, j1 = 63, xmin = 60.0, xmax = 90.0, ymin = 34.0, ymax = 64.0 } }] }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

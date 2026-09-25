@@ -104,30 +104,6 @@ cells = [
   "a1b2c3d4-0001-4000-8000-000000000012",
   "a1b2c3d4-0001-4000-8000-000000000004",
 ]
-
-[[player.states]]
-id = "empty"
-value = { items = [] }
-
-[[player.states]]
-id = "one"
-value = { items = [{ layer = "pts", index = 3 }] }
-
-[[player.states]]
-id = "two"
-value = { items = [{ layer = "pts", index = 0 }, { layer = "pts", index = 2 }] }
-
-[[player.states]]
-id = "north"
-value = { items = [{ layer = "pts", index = 0 }, { layer = "pts", index = 1 }, { layer = "pts", index = 2 }] }
-
-[[player.states]]
-id = "mid"
-value = { items = [{ layer = "pts", index = 3 }, { layer = "pts", index = 4 }, { layer = "pts", index = 5 }] }
-
-[[player.states]]
-id = "south"
-value = { items = [{ layer = "pts", index = 6 }, { layer = "pts", index = 7 }, { layer = "pts", index = 8 }] }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
