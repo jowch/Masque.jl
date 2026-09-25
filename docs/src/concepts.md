@@ -131,6 +131,8 @@ the values they were exported with.
 The interactive examples on this site are recordings of real notebooks.
 Hovering works as it does in Pluto; clicks swap in results that were
 computed ahead of time for a listed set of choices (the **Simulating
-`@bind`** badge marks these). A box you drag shows the recorded box it
-overlaps most, and the badge then reads **Nearest recorded brush**. Each example also has a *Notebook as text*
+`@bind`** badge marks these). A box you drag that is not an exact
+recording shows the recorded box it overlaps most, and the badge then
+reads **Nearest recorded brush**; a box that overlaps none leaves the
+page as it was. Each example also has a *Notebook as text*
 section with the same cells, which you can copy into your own notebook.

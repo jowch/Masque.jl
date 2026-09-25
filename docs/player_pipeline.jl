@@ -233,7 +233,8 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
         k = snapshot_key(v)
         k in clicks && error("player TOML lists $k, a click the harvest already records; drop that row")
         k in seen && error(
-            "player TOML lists $k twice; the snapshot key drops the payload, so a layer can list one position only"
+            "player TOML lists $k twice: an axis, threshold, or bounds key drops its value, so such a layer " *
+                "can list one position only, and a brush or grid window can be listed once"
         )
         push!(seen, k)
         push!(out, (; key = k, value = v))
