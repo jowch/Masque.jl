@@ -162,10 +162,11 @@ and each frame is a full `serialize_scene` (§12.10). A view gesture does not re
 photographic slide (#85) hides the wait for that frame: while a 2D pan
 or wheel zoom is ahead of the channel, the data inside the axis viewport slides under the cursor
 on an inner matrix. The base image itself is not transformed, so the axis frame, tick labels, and
-the rest of the figure stay where they are; a copy of those pixels, clipped to the viewport,
-carries the matrix, and so does the data `g` inside each overlay svg. A data-space hit uses the
-content pixel under the cursor, and only when that cursor is inside the pan view. A layout point
-outside the clip does not hit data the preview has hidden. The view rectangle stays in layout pixels, and legend, colorbar,
+the rest of the figure stay where they are; a copy of those pixels, clipped to the view layer's
+`clip` rect (the viewport inset past the spine, below), carries the matrix, and so does the data
+`g` inside each overlay svg. A data-space hit uses the content pixel under the cursor, and only
+when that cursor is inside the same `clip` rect. A layout point outside it does not hit data the
+preview has hidden. The view rectangle stays in layout pixels, and legend, colorbar,
 and axis chrome are siblings of that clip so a ring outside the viewport is not cut off. The
 matrix comes off in the turn
 the sent frame is actually visible — the image `load` on `:cairo`, the scene swap on `:webgl` —
@@ -176,8 +177,14 @@ that wait. Orbit ignores the wheel. A request's matrix is relative to the frame 
 was built, and one round trip at a time means a request can land after an earlier frame has
 already replaced that base (a wheel settle behind its own preview, a pan released mid-flight). The
 overlay re-expresses such a request through each frame that landed since it was built before
-taking the residual (#165). One known preview bug is open: the axis frame can move while a pan
-waits for its next frame (#171).
+taking the residual (#165). Only data pixels slide. The view layer's `clip` rect is the
+viewport inset past half the spine stroke plus a pixel. The copy is cropped to that rect, and the
+crop moves with it, so no spine, tick, label, or title enters the plot. It is shown through a
+fixed window of the same rect, painted with the layer's `fill` (the axis background over the
+figure's), so the strip the copy vacates reads as blank plot rather than the unmoved picture. Nor
+may a frame move the axis box under the held picture: `masque` pins a pan axis's automatic
+tick-label space to its width at mount (`_pin_pan_ticklabelspace!`, `src/render.jl`), so wider
+labels in a later frame hang into the margin instead (#171).
 **Backends differ in cost, never in the interaction contract:** conformance is judged
 against the obligations above, never against a particular backend's mechanism.
 

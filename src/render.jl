@@ -437,6 +437,7 @@ function masque(
     try
         fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
         _finalize!(fig)        # finalize once; render + context share it
+        _pin_pan_ticklabelspace!(fig, interactables)
         ppu = _ppu(backend, fig)
         ctx = context(backend, fig, ppu)
         tip_style = tip_style_dict(;
@@ -456,6 +457,31 @@ function masque(
     end
 end
 masque(fig, i::AbstractInteractable; kwargs...) = masque(fig, [i]; kwargs...)
+
+# A pan frame changes `ax.limits[]`, and a tick label that grows wider (a minus sign, one more
+# digit) moves Makie's axis box: every later frame, and the settle, would shift the frame the
+# preview held still (#171). Pin each pan axis's automatic tick-label space to the width it has
+# now, after layout, so the first picture is unchanged and no later frame moves the box. Labels
+# that later outgrow it hang into the margin instead. An explicit space is left alone.
+function _pin_pan_ticklabelspace!(fig, interactables)
+    pinned = false
+    for i in interactables
+        i isa ViewInteractable && i.ax isa Makie.Axis || continue
+        ax = i.ax
+        # `tight_*ticklabel_spacing!` returns the measured space; assign it, so the pin lives
+        # on the axis attribute the author can see rather than only in the axis internals.
+        if ax.xticklabelspace[] isa Makie.Automatic
+            ax.xticklabelspace = Float64(Makie.tight_xticklabel_spacing!(ax))
+            pinned = true
+        end
+        if ax.yticklabelspace[] isa Makie.Automatic
+            ax.yticklabelspace = Float64(Makie.tight_yticklabel_spacing!(ax))
+            pinned = true
+        end
+    end
+    pinned && _finalize!(fig)
+    return nothing
+end
 
 """
     masque(fig; selected=nothing)

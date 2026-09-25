@@ -3455,6 +3455,40 @@ describe("photographic pan / wheel zoom", () => {
         expect(rect.getAttribute("height")).toBe("640")
     })
 
+    it("the sliding copy carries only data pixels, over a blank-plot window, when the view carries a clip (#171)", () => {
+        const { host, img, script } = setup()
+        const m = viewManifest("pan")
+        m.transforms.ax1.viewport = [100, 80, 1000, 640]
+        const g = m.layers[0].geometry as { x: number; y: number; w: number; h: number; clip?: number[]; fill?: string }
+        g.x = 100; g.y = 80; g.w = 1000; g.h = 640
+        g.clip = [104, 84, 992, 632]
+        g.fill = "rgb(250, 250, 250)"
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
+        mount(script, m, undefined, requestFrame)
+        img.getBoundingClientRect = () =>
+            ({ left: 10, top: 20, width: 600, height: 400, right: 610, bottom: 420, x: 10, y: 20, toJSON() {} }) as DOMRect
+        host.getBoundingClientRect = () =>
+            ({ left: 10, top: 20, width: 600, height: 400, right: 610, bottom: 420, x: 10, y: 20, toJSON() {} }) as DOMRect
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        const clip = host.querySelector(".masque-data-clip") as HTMLElement
+        // clip (104, 84, 992, 632) on a 1200×800 image laid out at 600×400 → half scale
+        expect(clip.style.left).toBe("52px")
+        expect(clip.style.top).toBe("42px")
+        expect(clip.style.width).toBe("496px")
+        expect(clip.style.height).toBe("316px")
+        const copy = clip.firstElementChild as HTMLElement
+        expect(copy.style.left).toBe("-52px")
+        expect(copy.style.top).toBe("-42px")
+        // the copy is cropped to its own data pixels, so chrome outside the box never slides in
+        expect(copy.style.getPropertyValue("clip-path")).toBe("inset(42px 52px 42px 52px)")
+        // and the window behind it shows blank plot, not the unmoved picture underneath
+        expect(clip.style.background).toContain("rgb(250, 250, 250)")
+        const rect = shadowOf(host).querySelector("#masque-clip-plain rect") as SVGRectElement
+        expect([rect.getAttribute("x"), rect.getAttribute("y"), rect.getAttribute("width"), rect.getAttribute("height")])
+            .toEqual(["104", "84", "992", "632"])
+    })
+
     it("an orbit ignores the wheel, and a wheel during a drag does nothing", async () => {
         const { host, script } = setup()
         const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))

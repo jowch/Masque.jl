@@ -308,6 +308,14 @@ All notable changes to this project are documented here. The format is based on
   (`docs/dev/roadmap.md`), not groundwork already in place.
 
 ### Fixed
+- A pan no longer doubles the axis frame while it waits for its next frame. The sliding copy
+  holds only the data inside the spines, so no second axis edge, tick label, or title moves
+  with it, and the strip it leaves behind shows blank plot instead of the old picture. A pan
+  axis also keeps its box when a frame's tick labels grow wider (a minus sign, one more digit):
+  `masque` pins an automatic `xticklabelspace`/`yticklabelspace` on a `ViewInteractable`'s
+  axis to the width it measures at mount, so the first picture is unchanged and later frames
+  never move the box. Labels that outgrow the pinned space hang into the margin. An explicit
+  label space is left alone (#171).
 - A pan or wheel zoom no longer leaves the data shifted or scaled after the gesture ends.
   A request built while an earlier frame was still in flight, such as the wheel's settle
   or a pan's release, was measured against a picture that frame then replaced, so the

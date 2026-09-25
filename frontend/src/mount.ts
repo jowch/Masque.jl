@@ -717,14 +717,24 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 host.insertBefore(dataClip, shadowHost)
                 copyGen = -1
             }
-            dataClip.style.left = `${br.left - hr.left + view.x * sx}px`
-            dataClip.style.top = `${br.top - hr.top + view.y * sy}px`
-            dataClip.style.width = `${view.w * sx}px`
-            dataClip.style.height = `${view.h * sy}px`
-            dataCopy.style.left = `${-view.x * sx}px`
-            dataCopy.style.top = `${-view.y * sy}px`
+            // Only data pixels slide (#171). The copy is cropped to the clip rect, inside the
+            // spine stroke, and the crop moves with it, so the chrome outside the axis box never
+            // enters the window. The window, the same rect, is painted with the empty plot's
+            // colour, so the strip the copy leaves shows no stale picture from underneath.
+            const [cx, cy, cw, ch] = view.clip ?? [view.x, view.y, view.w, view.h]
+            dataClip.style.left = `${br.left - hr.left + cx * sx}px`
+            dataClip.style.top = `${br.top - hr.top + cy * sy}px`
+            dataClip.style.width = `${cw * sx}px`
+            dataClip.style.height = `${ch * sy}px`
+            dataClip.style.background = view.fill ?? ""
+            dataCopy.style.left = `${-cx * sx}px`
+            dataCopy.style.top = `${-cy * sy}px`
             dataCopy.style.width = `${ow}px`
             dataCopy.style.height = `${oh}px`
+            dataCopy.style.setProperty(
+                "clip-path",
+                `inset(${cy * sy}px ${ow - (cx + cw) * sx}px ${oh - (cy + ch) * sy}px ${cx * sx}px)`,
+            )
             dataCopy.style.transform = `translate(${m.tx * sx}px, ${m.ty * sy}px) scale(${m.s})`
             if (dataCopy instanceof HTMLImageElement && ctx.base_ instanceof HTMLImageElement) {
                 if (dataCopy.src !== ctx.base_.src) dataCopy.src = ctx.base_.src
@@ -750,10 +760,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                     svg.insertBefore(cp, svg.firstChild)
                 }
                 const rect = cp.firstElementChild as SVGRectElement
-                rect.setAttribute("x", String(view.x))
-                rect.setAttribute("y", String(view.y))
-                rect.setAttribute("width", String(view.w))
-                rect.setAttribute("height", String(view.h))
+                rect.setAttribute("x", String(cx))
+                rect.setAttribute("y", String(cy))
+                rect.setAttribute("width", String(cw))
+                rect.setAttribute("height", String(ch))
                 g.setAttribute("clip-path", `url(#${cid})`)
             })
         }

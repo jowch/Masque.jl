@@ -529,8 +529,9 @@ export function hitTest(manifest: Manifest, px: number, py: number, event: strin
     return null
 }
 
-// The pan view `paintPhoto` clips to, or null when the photograph is identity. Data outside
-// that rectangle is not on screen. `viewId` is the pan view that owns the live matrix.
+// The pan view's window `paintPhoto` clips to (its `clip` rect, inside the spines, when it has
+// one), or null when the photograph is identity. Data outside that rectangle is not on screen.
+// `viewId` is the pan view that owns the live matrix.
 export function photoClip(manifest: Manifest, photo: PhotoMatrix, viewId: string | null): { x: number; y: number; w: number; h: number } | null {
     if (isIdentity(photo)) return null
     const named = viewId ? manifest.layers.find((l) => l.id === viewId) : undefined
@@ -539,6 +540,10 @@ export function photoClip(manifest: Manifest, photo: PhotoMatrix, viewId: string
     if (!layer || layer.kind !== "view") return null
     const g = layer.geometry as ViewGeometry
     if (g.mode === "orbit" || !(g.w > 0) || !(g.h > 0)) return null
+    if (g.clip) {
+        const [x, y, w, h] = g.clip
+        return { x, y, w, h }
+    }
     return { x: g.x, y: g.y, w: g.w, h: g.h }
 }
 
