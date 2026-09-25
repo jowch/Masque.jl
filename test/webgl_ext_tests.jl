@@ -90,7 +90,9 @@ end
     @test occursin("mountWebGL", html)
     @test occursin("createObjectURL", html)      # blob delivery (no server / no file://)
     @test occursin("window.__MasqueWGL", html)     # M2: bundle/shim blob URLs cached once per notebook
-    @test occursin("const Bonito = globalThis.__MasqueWGL.bonito;", html)   # #175: shim scoped to our bundle copy
+    # #175: shim scoped to our bundle copy. The prelude sits inside a JS string literal, so it
+    # must carry an escaped `\n`, not a raw newline (a raw one is a JS SyntaxError).
+    @test occursin("\"const Bonito = globalThis.__MasqueWGL.bonito;\\n\" + ", html)
     @test occursin("window.Masque.mount", html)    # Masque's overlay reused verbatim
     @test occursin("requestFrame", html)
 end
