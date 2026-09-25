@@ -1278,6 +1278,14 @@ function validate(i::ViewInteractable, ctx::InteractionContext)
         "(x=$(t.xscale), y=$(t.yscale); supported: identity/log10/log)."
     return nothing
 end
+# The colour of an empty plot area: the axis background over the figure background.
+function _axis_fill(ax)
+    fg = Makie.RGBAf(Makie.to_color(ax.backgroundcolor[]))
+    bg = Makie.RGBAf(Makie.to_color(Makie.root(ax.scene).backgroundcolor[]))
+    a = fg.alpha
+    mix(f, b) = a * f + (1 - a) * b
+    return Makie.RGBAf(mix(fg.r, bg.r), mix(fg.g, bg.g), mix(fg.b, bg.b), 1)
+end
 function hitlayers(i::ViewInteractable, ctx)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     vx, vy, vw, vh = t.viewport
@@ -1289,10 +1297,15 @@ function hitlayers(i::ViewInteractable, ctx)
     if !t.is3d && i.ax isa Makie.Axis
         # The photographic preview (#85) slides a copy of the data inside the axis box. Makie
         # strokes each spine centred on the box edge, so half the stroke, plus a pixel when the
-        # edge rounds onto a device pixel, lies inside the viewport. Clip the sliding copy past
-        # it, or a second axis edge slides with the data (#171). The hit region stays `x, y, w, h`.
+        # edge rounds onto a device pixel, lies inside the viewport. The preview crops the copy
+        # to `clip` and shows it through a window of the same rect, so neither a spine nor the
+        # ticks, labels, or title outside the box slide in with the data (#171). The hit region
+        # stays `x, y, w, h`.
         ins = ceil(Float64(i.ax.spinewidth[]) * ctx.scaling / 2) + 1
         geom["clip"] = Float32[vx + ins, vy + ins, max(vw - 2ins, 0), max(vh - 2ins, 0)]
+        # The window is painted with the empty plot's colour, so the strip the copy leaves
+        # behind reads as blank plot, not as the unmoved picture underneath.
+        geom["fill"] = _css_color(_axis_fill(i.ax))
     end
     if t.is3d
         # Current camera — JS computes the drag's (azimuth, elevation) from the pixel delta, for

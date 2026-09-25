@@ -1054,9 +1054,10 @@ scrub 5.6 MB — reproduced; entries say how.
   Section F gained the holed-contourf row and a re-run of the no-hole 50×50 row (see "Scope bounds
   for downstream phases"); the sub-pixel heatmap manifests were remeasured after the sample landed
   (see the STRESS table note).
-- **2026-09-25 — pan `clip` rect (#171).** A 2-D pan view layer's geometry gains `clip`, four
-  `Float32`s: 26 bytes of MsgPack (the 5-byte key, a 1-byte array header, four 5-byte floats)
-  once per pan layer, not per element. No bench row carries a pan layer at mount, so the envelope
-  tables stand unchanged. The gesture channel's per-frame manifest carries the same 26 bytes;
-  against the frame sizes in "Gesture channel (#102)" that is below measurement noise, so those
-  rows were not re-run.
+- **2026-09-25 — pan `clip` rect and `fill` (#171).** A 2-D pan view layer's geometry gains
+  `clip`, four `Float32`s (26 bytes of MsgPack: the 5-byte key, a 1-byte array header, four
+  5-byte floats), and `fill`, a CSS colour string (about 22 bytes for `rgb(255,255,255)` and its
+  key). That is under 50 bytes once per pan layer, not per element. No bench row carries a pan
+  layer at mount, so the envelope tables stand unchanged. The gesture channel's per-frame
+  manifest carries the same bytes; against the frame sizes in "Gesture channel (#102)" that is
+  below measurement noise, so those rows were not re-run.

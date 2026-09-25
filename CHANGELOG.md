@@ -309,8 +309,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 - A pan no longer doubles the axis frame while it waits for its next frame. The sliding copy
-  now stops inside the spine's stroke, so no second axis edge moves with the data. A pan axis
-  also keeps its box when a frame's tick labels grow wider (a minus sign, one more digit):
+  holds only the data inside the spines, so no second axis edge, tick label, or title moves
+  with it, and the strip it leaves behind shows blank plot instead of the old picture. A pan
+  axis also keeps its box when a frame's tick labels grow wider (a minus sign, one more digit):
   `masque` pins an automatic `xticklabelspace`/`yticklabelspace` on a `ViewInteractable`'s
   axis to the width it measures at mount, so the first picture is unchanged and later frames
   never move the box. Labels that outgrow the pinned space hang into the margin. An explicit

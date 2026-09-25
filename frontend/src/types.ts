@@ -68,6 +68,8 @@ export interface ViewGeometry {
     // pan only: the viewport inset past the spine stroke, image px (#171). The photographic
     // preview clips its sliding copy to this, so no axis edge slides with the data.
     clip?: [number, number, number, number]
+    // pan only: the empty plot's colour (CSS), painted behind the sliding copy (#171).
+    fill?: string
     azimuth?: number    // radians; orbit only (current Axis3 camera)
     elevation?: number  // radians; orbit only
 }

@@ -717,16 +717,24 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 host.insertBefore(dataClip, shadowHost)
                 copyGen = -1
             }
-            // Only data pixels slide: the clip sits inside the spine stroke (#171).
+            // Only data pixels slide (#171). The copy is cropped to the clip rect, inside the
+            // spine stroke, and the crop moves with it, so the chrome outside the axis box never
+            // enters the window. The window, the same rect, is painted with the empty plot's
+            // colour, so the strip the copy leaves shows no stale picture from underneath.
             const [cx, cy, cw, ch] = view.clip ?? [view.x, view.y, view.w, view.h]
             dataClip.style.left = `${br.left - hr.left + cx * sx}px`
             dataClip.style.top = `${br.top - hr.top + cy * sy}px`
             dataClip.style.width = `${cw * sx}px`
             dataClip.style.height = `${ch * sy}px`
+            dataClip.style.background = view.fill ?? ""
             dataCopy.style.left = `${-cx * sx}px`
             dataCopy.style.top = `${-cy * sy}px`
             dataCopy.style.width = `${ow}px`
             dataCopy.style.height = `${oh}px`
+            dataCopy.style.setProperty(
+                "clip-path",
+                `inset(${cy * sy}px ${ow - (cx + cw) * sx}px ${oh - (cy + ch) * sy}px ${cx * sx}px)`,
+            )
             dataCopy.style.transform = `translate(${m.tx * sx}px, ${m.ty * sy}px) scale(${m.s})`
             if (dataCopy instanceof HTMLImageElement && ctx.base_ instanceof HTMLImageElement) {
                 if (dataCopy.src !== ctx.base_.src) dataCopy.src = ctx.base_.src

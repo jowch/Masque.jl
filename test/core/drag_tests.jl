@@ -80,6 +80,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         ins = ceil(Float64(ax.spinewidth[]) * ctx.scaling / 2) + 1
         vp = ctx.transforms[Lv.axis].viewport
         @test Lv.geometry["clip"] ≈ Float32[vp[1] + ins, vp[2] + ins, vp[3] - 2ins, vp[4] - 2ins]
+        # The window behind the sliding copy is the empty plot's colour: the axis background,
+        # over the figure background where the axis one is translucent.
+        @test Lv.geometry["fill"] == "rgb(255,255,255)"
+        ff = Figure(; backgroundcolor = :black)
+        axf = Axis(ff[1, 1]; backgroundcolor = (:white, 0.5))
+        @test Masque._css_color(Masque._axis_fill(axf)) == "rgb(128,128,128)"
         # view layers sort after ROI/threshold in the manifest (hit-test arbitration)
         roi = ROIInteractable(ax; bounds = (1.0, 2.0, 1.0, 2.0), id = :roi)
         morder = build_manifest([v, roi], ctx)["layers"]
@@ -99,6 +105,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test L3.geometry["azimuth"] ≈ 0.4
         @test L3.geometry["elevation"] ≈ 0.5
         @test !haskey(L3.geometry, "clip")   # orbit has no photographic preview
+        @test !haskey(L3.geometry, "fill")
         # #102/§12.3: a view gesture commits nothing, so the frontend never sends a :view bond
         # payload anymore — `_computed_payload`'s :view branch retired with it. A caller that
         # somehow reaches transform_value with one anyway (there is no such path in the shipped
