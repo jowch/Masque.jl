@@ -76,25 +76,6 @@ cells = [
   "a141000c-0001-4000-8000-000000000012",
   "a141000c-0001-4000-8000-000000000004",
 ]
-
-[[player.states]]
-id = "idle"
-
-[[player.states]]
-id = "east"
-value = { layer = "scatter", index = 0 }
-
-[[player.states]]
-id = "north"
-value = { layer = "scatter", index = 1 }
-
-[[player.states]]
-id = "west"
-value = { layer = "scatter", index = 2 }
-
-[[player.states]]
-id = "south"
-value = { layer = "scatter", index = 3 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

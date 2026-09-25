@@ -84,21 +84,6 @@ cells = [
   "a1b2c3d4-0001-4000-8000-000000000012",
   "a1b2c3d4-0001-4000-8000-000000000004",
 ]
-
-[[player.states]]
-id = "idle"
-
-[[player.states]]
-id = "circle"
-value = { layer = "cells_c", index = 0 }
-
-[[player.states]]
-id = "rect"
-value = { layer = "cells_r", index = 0 }
-
-[[player.states]]
-id = "triangle"
-value = { layer = "cells_p", index = 0 }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

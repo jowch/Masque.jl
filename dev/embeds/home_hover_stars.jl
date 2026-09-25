@@ -67,9 +67,6 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 bond = "pick"
 chip = false
 title = "Hertzsprung–Russell diagram of named stars, overlay-only hover"
-
-[[player.states]]
-id = "idle"
 """
 
 

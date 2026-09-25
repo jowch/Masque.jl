@@ -141,9 +141,6 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 bond = "pick"
 chip = false
 title = "NYC borough choropleth, overlay-only hover"
-
-[[player.states]]
-id = "idle"
 """
 
 

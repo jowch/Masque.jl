@@ -75,57 +75,6 @@ cells = [
   "b15a0001-0001-4000-8000-000000000012",
   "b15a0001-0001-4000-8000-000000000004",
 ]
-
-[[player.states]]
-id = "idle"
-
-[[player.states]]
-id = "c11"
-value = { layer = "cells", index = 0, payload = { i = 0, j = 0, value = 4.0 } }
-
-[[player.states]]
-id = "c21"
-value = { layer = "cells", index = 1, payload = { i = 1, j = 0, value = 5.0 } }
-
-[[player.states]]
-id = "c31"
-value = { layer = "cells", index = 2, payload = { i = 2, j = 0, value = 6.0 } }
-
-[[player.states]]
-id = "c41"
-value = { layer = "cells", index = 3, payload = { i = 3, j = 0, value = 7.0 } }
-
-[[player.states]]
-id = "c12"
-value = { layer = "cells", index = 4, payload = { i = 0, j = 1, value = 7.0 } }
-
-[[player.states]]
-id = "c22"
-value = { layer = "cells", index = 5, payload = { i = 1, j = 1, value = 8.0 } }
-
-[[player.states]]
-id = "c32"
-value = { layer = "cells", index = 6, payload = { i = 2, j = 1, value = 9.0 } }
-
-[[player.states]]
-id = "c42"
-value = { layer = "cells", index = 7, payload = { i = 3, j = 1, value = 10.0 } }
-
-[[player.states]]
-id = "c13"
-value = { layer = "cells", index = 8, payload = { i = 0, j = 2, value = 10.0 } }
-
-[[player.states]]
-id = "c23"
-value = { layer = "cells", index = 9, payload = { i = 1, j = 2, value = 11.0 } }
-
-[[player.states]]
-id = "c33"
-value = { layer = "cells", index = 10, payload = { i = 2, j = 2, value = 12.0 } }
-
-[[player.states]]
-id = "c43"
-value = { layer = "cells", index = 11, payload = { i = 3, j = 2, value = 13.0 } }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

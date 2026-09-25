@@ -106,9 +106,6 @@ cells = [
 ]
 
 [[player.states]]
-id = "idle"
-
-[[player.states]]
 id = "empty"
 value = { items = [] }
 
