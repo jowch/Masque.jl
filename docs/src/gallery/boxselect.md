@@ -32,6 +32,7 @@ the same axis.
     `identity`, `log10`, or `log`. It raises `ArgumentError` on `Axis3`,
     `PolarAxis`, and a categorical axis. This player is the Cairo figure.
     The listed brushes are snapshots, so the counts update without a
-    kernel. A drag you perform yourself on this page moves the box in the
-    overlay and does not recompute the mean.
+    kernel. A box you drag yourself shows the recorded brush it overlaps
+    most, and the badge reads **Nearest recorded brush** until it matches
+    one exactly; a live notebook recomputes the mean for your box.
 

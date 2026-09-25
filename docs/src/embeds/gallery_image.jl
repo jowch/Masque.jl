@@ -81,7 +81,6 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 bond = "region"
 show_code = true
 pluto_html = true
-chip = false
 
 cells = [
   "a1410008-0001-4000-8000-000000000009",
@@ -92,6 +91,70 @@ cells = [
   "a1410008-0001-4000-8000-000000000012",
   "a1410008-0001-4000-8000-000000000004",
 ]
+
+[[player.states]]
+id = "w10_10"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 10, i1 = 39, j0 = 10, j1 = 39, xmin = 10.0, xmax = 40.0, ymin = 10.0, ymax = 40.0 } }] }
+
+[[player.states]]
+id = "w0_0"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 0, i1 = 29, j0 = 0, j1 = 29, xmin = 0.0, xmax = 30.0, ymin = 0.0, ymax = 30.0 } }] }
+
+[[player.states]]
+id = "w15_0"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 15, i1 = 44, j0 = 0, j1 = 29, xmin = 15.0, xmax = 45.0, ymin = 0.0, ymax = 30.0 } }] }
+
+[[player.states]]
+id = "w30_0"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 30, i1 = 59, j0 = 0, j1 = 29, xmin = 30.0, xmax = 60.0, ymin = 0.0, ymax = 30.0 } }] }
+
+[[player.states]]
+id = "w45_0"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 45, i1 = 74, j0 = 0, j1 = 29, xmin = 45.0, xmax = 75.0, ymin = 0.0, ymax = 30.0 } }] }
+
+[[player.states]]
+id = "w60_0"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 60, i1 = 89, j0 = 0, j1 = 29, xmin = 60.0, xmax = 90.0, ymin = 0.0, ymax = 30.0 } }] }
+
+[[player.states]]
+id = "w0_17"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 0, i1 = 29, j0 = 17, j1 = 46, xmin = 0.0, xmax = 30.0, ymin = 17.0, ymax = 47.0 } }] }
+
+[[player.states]]
+id = "w15_17"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 15, i1 = 44, j0 = 17, j1 = 46, xmin = 15.0, xmax = 45.0, ymin = 17.0, ymax = 47.0 } }] }
+
+[[player.states]]
+id = "w30_17"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 30, i1 = 59, j0 = 17, j1 = 46, xmin = 30.0, xmax = 60.0, ymin = 17.0, ymax = 47.0 } }] }
+
+[[player.states]]
+id = "w45_17"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 45, i1 = 74, j0 = 17, j1 = 46, xmin = 45.0, xmax = 75.0, ymin = 17.0, ymax = 47.0 } }] }
+
+[[player.states]]
+id = "w60_17"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 60, i1 = 89, j0 = 17, j1 = 46, xmin = 60.0, xmax = 90.0, ymin = 17.0, ymax = 47.0 } }] }
+
+[[player.states]]
+id = "w0_34"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 0, i1 = 29, j0 = 34, j1 = 63, xmin = 0.0, xmax = 30.0, ymin = 34.0, ymax = 64.0 } }] }
+
+[[player.states]]
+id = "w15_34"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 15, i1 = 44, j0 = 34, j1 = 63, xmin = 15.0, xmax = 45.0, ymin = 34.0, ymax = 64.0 } }] }
+
+[[player.states]]
+id = "w30_34"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 30, i1 = 59, j0 = 34, j1 = 63, xmin = 30.0, xmax = 60.0, ymin = 34.0, ymax = 64.0 } }] }
+
+[[player.states]]
+id = "w45_34"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 45, i1 = 74, j0 = 34, j1 = 63, xmin = 45.0, xmax = 75.0, ymin = 34.0, ymax = 64.0 } }] }
+
+[[player.states]]
+id = "w60_34"
+value = { items = [{ layer = "img", index = 0, payload = { i0 = 60, i1 = 89, j0 = 34, j1 = 63, xmin = 60.0, xmax = 90.0, ymin = 34.0, ymax = 64.0 } }] }
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001

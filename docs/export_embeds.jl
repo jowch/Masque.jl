@@ -618,32 +618,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       </pluto-notebook>
       <script>
     {
-      function layerIndexKey(layer, index) {
-        return String(layer) + ":" + String(Number(index));
-      }
-      function keyOf(v) {
-        if (v == null) return "null";
-        if (Array.isArray(v.items)) {
-          return "items:" + v.items.map(function (it) {
-            return layerIndexKey(it.layer, it.index);
-          }).join(",");
-        }
-        if (v.layer != null && v.index != null && v.index !== "") {
-          return layerIndexKey(v.layer, v.index);
-        }
-        return JSON.stringify(v);
-      }
-      function snapFor(table, v) {
-        const keys = [keyOf(v)];
-        if (v && v.layer != null && v.index != null && v.index !== "") {
-          keys.push(String(v.layer) + ":" + String(v.index));
-          keys.push(String(v.layer) + ":" + String(v.index | 0));
-        }
-        for (let i = 0; i < keys.length; i++) {
-          if (Object.prototype.hasOwnProperty.call(table.keys, keys[i])) return table.snaps[table.keys[keys[i]]];
-        }
-        return null;
-      }
+      $PLAYER_LOOKUP_JS
       function sizeFrame() {
         if (!window.frameElement) return;
         window.frameElement.style.overflow = "hidden";
@@ -673,8 +648,10 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         const man = host && host.masqueManifest;
         const snaps = man && man.snapshots;
         if (!snaps) return false;
-        const snap = snapFor(snaps, host.value);
-        if (!snap) return false;
+        const hit = lookup(snaps, host.value);
+        if (!hit) return false;
+        showApprox(hit.approx);
+        const snap = hit.snap;
         const img = host.querySelector("img");
         if (img) {
           const next = snap.png || idlePng;
