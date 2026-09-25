@@ -127,8 +127,8 @@ this table is `docs/src/support.md`.
 | `LegendInteractable` | `:rects` | Legend — auto-extracted from `fig.content` | `(; label, group, targets)` — `targets` also ships as `HitLayer.links` |
 | `TextInteractable` | `:rects` | Text, Annotation (via `_descendant(p, Makie.Text)`) — data-space only | `(; text, index, x, y)` |
 | `ViewInteractable` | `:view` | the Axis/Axis3 view itself — declared, never auto-extracted | none — commits nothing ([§12](12-gesture-channel.md) §12.3); in-drag frames stream over the gesture channel instead (`:cairo` PNG, `:webgl` serialized scene) |
-| `ThresholdInteractable` | `:threshold` | a draggable horizontal/vertical line on an Axis — declared | a bare data scalar, not a `NamedTuple` (nothing to name) |
-| `ROIInteractable` | `:roi` | a draggable box on an Axis — declared; an `AbstractSelector` | `(; xmin, xmax, ymin, ymax)`, or a `Vector{ElementEvent}` of enclosed elements (`GridWindowEvent` on a grid) when `selects=` is set ([§5](05-bond-value.md)) |
+| `ThresholdInteractable` | `:threshold` | a draggable horizontal/vertical line on an Axis — declared | a `ThresholdEvent`: `value`, plus `category` on a categorical dimension (#192) |
+| `ROIInteractable` | `:roi` | a draggable box on an Axis — declared; an `AbstractSelector` | a `BoundsEvent` (`xmin`, `xmax`, `ymin`, `ymax`), or a `Vector{ElementEvent}` of enclosed elements (`GridWindowEvent` on a grid) when `selects=` is set ([§5](05-bond-value.md)) |
 | `SliceInteractable` | `:slice` (not a hit target) | declared 1-D series on an Axis, or Lines, Stairs, Series, Band, Density — declared, never auto-extracted | none — hover samples client-side; the live tooltip is the probe coordinate plus one field per series id. Bond stamp `"none"` |
 
 Layer ids are the plot kind (`:scatter`, `:lines`, `:cells`, `:bars`, `:poly`, …, `:colorbar`,
@@ -143,9 +143,10 @@ stopping at the first known one so a mark becomes one layer (`rainclouds!` yield
 `:scatter`, `:boxplot`, not also the violin's `:poly`). So `arc!` and `contour!` become `:lines`,
 `ablines!` becomes `:segments`, and `pie!` becomes `:poly`, under the child's layer id. Invisible
 children (`triplot!`'s ghost edges) are not layers, an empty construct (`qqplot!` with
-`qqline = :none`) takes no id, and a child whose geometry is not data-space is refused
-(`hexbin!`'s data-space marker Scatter, `bracket!`'s pixel-space Series). Only a parent that
-yields nothing warns, and the warning names that parent.
+`qqline = :none`) takes no id, and `_walk_refuses` turns down two kinds of child: a `Scatter`
+whose `markerspace` is not `:pixel` (`hexbin!`'s data-space hexagons, which a pixel radius
+cannot describe) and a plot whose `space` is not `:data` (`bracket!`'s pixel-space `Series`).
+Only a parent that yields nothing warns, and the warning names that parent.
 
 `SegmentInteractable` carries `mode ∈ {:polyline,:pairs}`; `RectInteractable` carries
 `layout ∈ {:grid,:list}`. Same JS test, different Julia extractor. The three drags are

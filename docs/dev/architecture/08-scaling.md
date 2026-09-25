@@ -15,9 +15,9 @@ the plotted data, not the display — see `backend-comparison.md` and `perf-find
 **The manifest is the scaling wall** — not the PNG, not render, not hit-test CPU. A realistic single
 plot is small and **render-bound**; high element counts reach multi-MB manifests and flip to
 **payload-bound**. A sub-pixel heatmap does not ship the source matrix (below), so the case that
-reaches the payload-bound regime by default is **high-N scatter**. Nothing crashes — it degrades
-into the half-second range — but tens of MB would lag the Pluto editor. The sizes and latencies
-are in `perf-findings.md`.
+reaches the payload-bound regime by default is **high-N scatter**. Nothing crashes, but a
+manifest of tens of MB would lag the Pluto editor. The sizes and latencies are in
+`perf-findings.md`.
 
 **Tooltip wire format.** Shipping per-element tooltip strings (the retired `tooltips[]` array)
 would add O(N × string-bytes) — the dominant inflation term at high element counts (bounds in

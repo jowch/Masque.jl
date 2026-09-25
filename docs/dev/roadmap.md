@@ -84,6 +84,14 @@ without new evidence:
 
 Ordered cheapest first. None of them changes the manifest shape.
 
+- **#175 and #81: a raw WGLMakie figure and a `masque` widget on one page.** The WebGL shim
+  replaced `window.Bonito`, so a `:webgl` widget broke every raw figure on the page. #200
+  scopes the shim to Masque's copy of WGLMakie's bundle, corrects the user docs on why a raw
+  figure can spin (the browser cannot reach Bonito's server), and hides the raw figure in the
+  bind E2E notebook. Merge #200.
+- **#196: a threshold released on a categorical axis stays between categories.** The committed
+  value names a category (#192) but the line stays where it was dropped. #199 snaps the line
+  on release.
 - **#165: wheel zoom can leave the inverse matrix applied after the settle frame.** This
   happens when the WebGL preview round trip outlasts the 150 ms settle. It can be reproduced
   deterministically from `photo.ts`. The result is wrong on screen until the next gesture.
@@ -100,6 +108,11 @@ Ordered cheapest first. None of them changes the manifest shape.
 Registration does not freeze 0.x, but it is when people start depending on these behaviours.
 Settle each one first.
 
+- **#195: a click outside a `selects` box replaces the selection while the box stays.** Over
+  points, a click commits a one-element vector and the box keeps its old region, so the
+  picture and the `@bind` value disagree. The issue recommends what the grid already does: the
+  box owns the bond, and a point click stops committing. That drops click-to-pick for anyone
+  who pairs it with a box, which is why it is a decision and not a bug fix.
 - **#172: reject `LScene` on both backends.** Today `:cairo` refuses it with a message that
   points to WGLMakie, and `:webgl` renders it with no overlay. The second is the silent
   behaviour the principles forbid. The recommendation is #172 as written: `LScene` is a
@@ -315,13 +328,14 @@ A proposed sequence, not a decided one. The only hard dependency edges are these
 
 Registration waits for the decisions listed under "Before registration".
 
-1. The preview path: #165 and #171 together, then #99.
-2. #168.
-3. Decide and land #172 and #167 (or defer #167 explicitly).
-4. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
-5. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
+1. Merge the open fixes: #200 (#175, #81) and #199 (#196).
+2. The preview path: #165 and #171 together, then #99.
+3. #168.
+4. Decide #195, and decide and land #172 and #167 (or defer #167 explicitly).
+5. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
+6. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
    alongside, since none of it touches the package.
-6. Coverage items as users ask (#91).
-7. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
+7. Coverage items as users ask (#91).
+8. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
    per-frame or per-element cost. Spike-gated items (SVG output, spatial acceleration,
    GLMakie-static) wait for a real use.

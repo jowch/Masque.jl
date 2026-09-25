@@ -49,7 +49,7 @@ camera is deliberately not client-driven on either backend (§1†).
 | hover tooltip | overlay hit-test (client) | overlay hit-test (client) — same |
 | click → `@bind` | client hit-test + bind | client hit-test + bind — same |
 | data update (`@bind` drives the data) | **full** server render + encode + PNG re-ship | server serialize + client redraw |
-| animation, N frames | N × full PNG | N × scene; in-place buffer patching (`find_plots`) is an unbuilt `roadmap.md` direction, gated on canvas identity (#86) |
+| animation, N frames | N × full PNG | N × scene; in-place buffer patching (`find_plots`) for data updates on a canvas that is still alive is an unbuilt `roadmap.md` direction |
 
 The rows that **match** are the current story: both backends do hover/click/`@bind` the same way
 (`Axis3` included — same overlays, same `{index,x,y,z}` payloads); `:webgl`'s edge is rendering
