@@ -5,7 +5,7 @@
 # Pluto + browser and are one-off measurements; this script covers only the Julia-side payload/
 # render terms (the rows labelled reproducible in that doc).
 #
-# Run: julia --project=. bench/stress.jl
+# Run: julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/stress.jl
 
 using Masque, CairoMakie, Printf, Random
 Random.seed!(0)

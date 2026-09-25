@@ -6,10 +6,11 @@ them cleanly:
 - **Tier 0 (overlay, 60 fps, no Julia):** hover, live coordinate readout, and dragging *overlay*
   geometry. Enabled by shipping `AxisTransform` to JS. `events(i)` with only `:hover` keeps it local.
 - **Tier 1 (precomputed):** `hitlayers(i, ctx)` *is* this tier — Julia computes regions once after
-  `update_state_before_display!`. Animation = a precomputed frame sequence (a future `frames` slot on
-  the manifest; the format is designed not to preclude it). **It is the one payload-unbounded feature**
-  (total = frames × per-frame PNG): ~5.5 MB (187 KB × 30) to ~22 MB (× 120) for a typical plot, 100s of MB
-  at scale. The `frames` slot must shrink per-frame cost (downscale / fewer frames) before it ships — [§8](08-scaling.md).
+  `update_state_before_display!`. Animation would be a precomputed frame sequence (a `frames` slot on
+  the manifest — not built; the format is designed not to preclude it). **It is the one
+  payload-unbounded feature** (total = frames × per-frame artifact; measured in `perf-findings.md`),
+  so the slot must shrink per-frame cost (downscale / fewer frames) before it ships —
+  [§8](08-scaling.md).
 - **Tier 2 (round-trip):** `:click` events → `@bind`. Discrete server re-render from new state is
   in scope on **both** backends for the *committed* value — a click, a keyboard commit, a slider-
   or widget-driven view change — each lands through `@bind` exactly as any other Tier 2 value,
@@ -27,15 +28,15 @@ them cleanly:
 
 **Named tensions (accepted, not bugs):**
 1. `AxisInteractable` returns no region geometry — it rides the `:axis` channel as an unbounded
-   catch-all. `ColorbarInteractable` (M3) also uses `:axis` but ships a bbox so the hit region is
+   catch-all. `ColorbarInteractable` also uses `:axis` but ships a bbox so the hit region is
    bounded to the colorbar's pixel extent. Worth the shared channel: both collapse into the
    `AxisTransform` already shipped, with no new JS primitive.
 2. No general z-order/`Consume` model for overlapping custom regions — JS is first-match-wins in
    manifest order. `build_manifest` now imposes one fixed precedence on that order (not a general
    layering model): `LegendInteractable` layers sort first (a legend drawn over plot geometry must
-   win the pixels under it, or it's unhoverable — M3 Legend, [§7](07-scope.md)),
+   win the pixels under it, or it's unhoverable — [§3](03-interactables.md)),
    `:view` layers sort last (an ordinary drag wins over the catch-all pan/orbit gesture without a
-   modifier — resolves the v1 ScatterLines points-over-segments collision too), everything else
+   modifier — resolves the ScatterLines points-over-segments collision too), everything else
    keeps its original relative order. We adopt Makie's `events` *vocabulary* now for
    forward-compat, not its propagation machinery. A general Consume/z-order model for user-stacked
    custom regions stays YAGNI until someone actually needs to control ordering between two of

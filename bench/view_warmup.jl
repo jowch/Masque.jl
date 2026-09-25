@@ -10,8 +10,8 @@
 # The Cairo PNG is already on the widget and is written into the `<img>` here.
 #
 # The masque-makie sysimage freezes Masque and will not see this branch:
-#   JULIA_NOSYSIMAGE=1 julia --project=. bench/view_warmup.jl
-#   JULIA_NOSYSIMAGE=1 julia --project=. bench/view_warmup.jl webgl
+#   JULIA_NOSYSIMAGE=1 julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/view_warmup.jl
+#   JULIA_NOSYSIMAGE=1 julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/view_warmup.jl webgl
 
 using Printf
 import Masque

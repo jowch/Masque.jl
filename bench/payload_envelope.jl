@@ -2,7 +2,7 @@
 # item after it (richer tooltips, animation frames, SVG, multi-select). Re-runnable so the
 # numbers can't rot as those features land. Findings live in docs/dev/perf-findings.md.
 #
-# Run: julia --project=. bench/payload_envelope.jl
+# Run: julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/payload_envelope.jl
 #
 # Two payload terms (see src/render.jl `show`):
 #   - base64 PNG  → embedded in the HTML <img src>; the "large base64 → editor lag" driver.

@@ -1,185 +1,51 @@
-# Masque.jl — Perf findings (Phase 0 spike)
+# Masque.jl — Payload and latency envelope
 
-> Resolves the payload/latency envelope left as an open unknown by the original design spike
-> (superseded notes, kept in git history).
-> A measurement spike, not a feature — it **bounds the scope** of every payload-heavy roadmap
-> item after it (M2.3 tooltips, M4 animation, SVG output, multi-select return shape).
->
-> Reproduce (numbers below re-run 2026-06-29, last reconciled for M2.3 template-tooltip design
-> on PR #10 and confirmed unchanged for M4 box-select (commit `d05318f`) on 2026-06-29 and for
-> Phase 2a bars/areas/spans on 2026-06-30 and Phase 2b polygon surfaces (commit `431bd99`) on
-> 2026-06-30 and colorbar readout `valueaxis` field (PR #27) on 2026-06-30 and text labels
-> (`TextInteractable`, this arc) on 2026-07-01 and re-run for WS-3D Axis3 core on 2026-07-02
-> (manifest-shape change: new per-transform `is3d` key + z in 3-coord point payloads — envelope
-> unchanged: scatter-1k manifest 38.0 KB, heatmap-200² 196.8 KB, 30-frame scrub 5.6 MB; the
-> `is3d` key costs ~10 B/transform and z one float per 3-coord point, both noise at this scale)
-> and re-run for the `SegmentInteractable` `tol` wiring (PR #66): manifest-shape change — a new
-> per-`:segments`/`:polyline`-layer `"tol"` field (one small int, present only on that layer,
-> not per element). Envelope unchanged: `bench/payload_envelope.jl`/`bench/stress.jl` don't
-> exercise `SegmentInteractable` (only `PointInteractable`/`:circles`), so re-running reproduces
-> the previous numbers byte-for-byte. Measured the delta by direct manifest inspection instead:
-> one MsgPack int header+value (1–3 B), added once per `:segments`/`:polyline` layer, not per
-> element/vertex — e.g. the parity corpus's `logscale`/`axis3`/`polaraxis`/`colorbar` line
-> layers each gained exactly one `"tol": 12` entry (`test/fixtures/parity/*.{cairo,webgl}.json`
-> diffs). Doesn't scale with plot size — negligible at any N.
-> Whole-line `:lines` (#89) is the same shape of change: geometry is one flat vertex list
-> per path, and each such layer ships that same per-layer `"tol"` int. The envelope benches
-> still construct `PointInteractable` and heatmap fixtures only, so they contain no `:lines`
-> layer and the published sizes are unchanged by construction;
-> and re-run for the keyboard-navigation `label` field (this PR, 2026-09-15):
-> manifest-shape change — a new optional per-layer `"label"` string field (screen-reader
-> announcement prefix), present only when the `label` keyword is set on
-> `PointInteractable`/`SegmentInteractable`/`RectInteractable`(list)/`PolygonInteractable`.
-> Envelope unchanged: neither `bench/payload_envelope.jl` nor `bench/stress.jl` sets `label`
-> on any fixture, so re-running reproduces the previous numbers byte-for-byte (scatter-1k
-> manifest still 38.0 KB, heatmap-200² still 196.8 KB, 30-frame scrub still 5.6 MB). Measured
-> the delta by direct manifest inspection instead, same method as the `tol` re-run above: one
-> MsgPack string key ("label", 6 B header+bytes) + one string value, added once per labeled
-> layer, not per element — `label = "Scatter"` costs 14 B total, `label = "Bars, quarterly
-> revenue"` costs 30 B. Doesn't scale with element count — negligible at any N.
-> and re-run for the figure-background tooltip theme + per-element `colors` accent (this PR,
-> 2026-09-15): two manifest-shape changes — an optional top-level `"background"` string
-> (always present; `masque()` ships the figure's own background colour) and an optional
-> per-layer `"colors"` field (a uniform CSS string, or a shared palette + one index per
-> element for colormap/categorical data), present only on a `PointInteractable(ax,
-> p::Makie.Scatter)`-derived `:circles` layer whose colour resolves. Envelope unchanged at the
-> KB-rounded numbers this file tracks: scatter-1k manifest still 38.0 KB, the ~50 B added
-> rounding away at this precision (corrected 2026-09-19, PR #116 — this and the blend-highlight
-> entry below previously misstated it as 38.1 KB), heatmap-200² still 196.8 KB (`:grid` layers
-> never carry `colors`), 30-frame scrub still
-> 5.6 MB (PNG-only, untouched by a manifest-only change). Measured the exact delta directly:
-> `background` costs 28 B (key + `"rgb(255,255,255)"` value), once per manifest, not per
-> layer or element; a uniform `colors` costs ~22 B (key + one CSS colour string), once per
-> Scatter layer. `masque(f)`'s default un-coloured scatter already carries a uniform `colors`
-> (Makie's own default marker colour) — 50 B total added to the scatter-1000 row above.
-> A colormapped/categorical `colors` instead ships a shared palette (`_COLOR_PALETTE_SIZE =
-> 32` stops) + one small int per element — bounded by the fixed palette size regardless of N,
-> plus ~1–2 B/element for the index, not measured directly here since neither bench fixture
-> sets a numeric/vector `color=`.
-> and re-run for `LegendInteractable` (this PR, 2026-09-18): manifest-shape change — a new
-> `:legend` transform + one `:rects` `HitLayer` per `Makie.Legend` block (auto-extracted the
-> same way as `ColorbarInteractable`), and `HitLayer`'s only cross-layer field, an optional
-> per-layer `"links"` (an array of string-id arrays, one per element, naming other layers to
-> highlight together with the hovered/selected entry) — present only on a `LegendInteractable`
-> layer. Envelope unchanged: neither `bench/payload_envelope.jl` nor `bench/stress.jl` builds a
-> `Legend` (grepped both for `Legend`/`legend` — no hits), so re-running reproduces the previous
-> numbers byte-for-byte. Measured the delta by direct manifest inspection instead, same method
-> as the `tol`/`label` re-runs above: a 3-entry `axislegend` (two `lines!`, one `scatter!`, each
-> auto-linked to its own layer), `build_manifest`'d and hand-sized with the same MsgPack byte
-> model `bench/payload_envelope.jl` itself uses (`mp(...)`, not MsgPack.jl — MsgPack.jl can't
-> pack the manifest's `NamedTuple` payloads without a declared `msgpack_type`, so it was not a
-> fit here either). The whole 3-entry legend layer dict (id/kind/geometry/payloads/events/
-> style/label/colors/template/links) is 341 B; its `"links"` field alone (`[["lines"],
-> ["lines_2"], ["scatter"]]`) is 26 B, 32 B including the `"links"` key itself — once per
-> legend layer, ~9–11 B/entry for a short single-id link list (grows with target-id-string
-> length and link-list length per entry, same as any other string-keyed field; bounded by
-> entry count, not plot size). Doesn't scale with plot size — negligible at any N.
-> and re-run for the split blend highlight (this PR, 2026-09-18): manifest-shape change — the
-> mark-derived hover outline dropped the per-layer default `"style"."stroke"` key (`hoverstyle`'s
-> stroke is now `nothing`; the highlight split itself — three sibling top-level svgs, `mix-blend-
-> mode` color-dodge/multiply/screen — is CSS/JS-only and adds nothing to the manifest). A later
-> change drops `multiply`/`screen` on the edge (flat chrome grey, same three svgs). Still
-> CSS/JS-only: `handle` stays in the manifest as the hit half-size, so the envelope below was
-> not re-measured. Envelope
-> unchanged: neither bench fixture sets a custom `hoverstyle`, so re-running reproduces the
-> previous numbers byte-for-byte (scatter-1k manifest still 38.0 KB, heatmap-200² still
-> 196.8 KB). Measured the exact delta the same way as the `tol`/`label`/`links` re-runs above,
-> with `bench/payload_envelope.jl`'s own `mp(...)` byte model: the dropped `"stroke" =>
-> "#3A6F7C"` key+value pair is `_str(6) + _str(7)` = 7 B + 8 B = 15 B, once per layer — 15 B off
-> the scatter-1k row's single `:circles` layer and 15 B off the heatmap-200² row's single
-> `:grid` layer, both noise at this scale. Doesn't scale with plot size — negligible at any N.
-> and re-run for the bond payload contract cleanup (#110/#109, this PR, 2026-09-19): #110
-> changes an `InteractionEvent.payload`'s Julia *type* after `transform_value` has already
-> received it — no manifest-shape change, no bench gate. #109 removes the element hit's
-> `payload` from the upload (`layer`/`index` already let Julia recover it from its own
-> manifest), which is the JS→Julia direction neither `bench/payload_envelope.jl` nor
-> `bench/stress.jl` measures at all (both scripts say so in their header comments — they cover
-> only the outbound base64/manifest terms; the "Full click round-trip" numbers below are the
-> only ones that touch the upload, and are one-off Playwright measurements, not re-run here).
-> Confirmed **neutral** by re-running both scripts: every manifest/PNG size byte-for-byte
-> identical to the pre-#110/#109 baseline (scatter-1k manifest still 38.0 KB, heatmap-200²
-> still 196.8 KB, 30-frame scrub still 5.6 MB, the STRESS A–C tables unchanged) — expected,
-> since neither change touches anything the manifest ships. `bench/stress.jl`'s STRESS D–E
-> rows failed to run under this reconciliation, from a pre-existing bug unrelated to this PR
-> (confirmed reproducing identically on unmodified `main`): `stress()`'s warm-up timing line
-> calls `mkfig()` a second time to build the `@elapsed` argument, so `mkint(mkfig())` builds
-> the interactable against a different `Figure`/`Axis` than the one passed to `masque()`,
-> which only breaks the sections (D onward) where `mkint` depends on the figure — the throw
-> aborts the script there, which is why STRESS E never ran either, not because E's own bare
-> `let` block (it has no `mkint` at all) depends on anything broken. Verified STRESS D's own
-> manifest size directly instead (bypassing the buggy warm-up call): 10.24 MB, identical on
-> this branch and on unmodified `main`.
-> and re-run after fixing `bench/stress.jl`'s timing bug (issue #119, commit `226d9f2`,
-> 2026-09-20): no manifest-shape change — the bug was purely in `stress()`'s `@elapsed` line,
-> which called `mkfig()` (and, for STRESS D, `mkint(mkfig())`) a second time inline, so the
-> interactable was keyed to a different `Figure` than the one rendered; `axis_id` failed loud
-> for STRESS D and the script never reached STRESS E. The fix hoists a `fig2`/`ints2` pair
-> before the timed call and times only `masque(fig2)`, warmed by the same `w` build as
-> before — for STRESS A–C, `mkfig()` is still called exactly twice per case in the same order
-> (once for `w`, once for the timed call), so the seeded RNG state — and every manifest/PNG
-> byte it produces — is unchanged by construction. Confirmed: scatter-50k/100k/200k manifests
-> still 1.88/3.83/7.72 MB, heatmap-300² still 442 KB (a 452 117-byte manifest — this doc
-> previously rounded it to 441 KB; four small additive fields that landed since that number
-> was last written account for the ~30 B difference, none of them from this fix: the
-> top-level `background` key (+28 B, once per manifest), the dropped per-layer `style.stroke`
-> (−15 B), and two per-transform fields that are always present regardless of value —
-> `valueaxis` (+11 B; `null` on a non-colorbar axis like this one) and `is3d` (+6 B; `false`
-> here). `tol`/`label`/`links` do **not** apply here — `tol` is code-gated to
-> `:segments`/`:polyline`/`:lines` layers only (`src/render.jl`), and neither `label` nor `links` is
-> set on this bench's heatmap fixture, so none of the three appear in its manifest; checked
-> directly against the layer's keys), heatmap-1000² was 6 KB on that run (edges only, before the screen-pixel sample; the current size is the STRESS table), and STRESS D still 10.24 MB —
-> matching the value already verified by direct inspection in the `#110`/`#109` entry above. This is the
-> **first run of `bench/stress.jl` to complete all five sections**; the corrected STRESS table
-> is below, reported as a range across repeated runs rather than a single sample — this machine
-> is a shared, multi-tenant box (other users' idle Pluto/Malt kernels run continuously in the
-> background, and sibling agents' Playwright/`kind_sweep` runs come and go unpredictably), so no
-> run here is truly isolated, and `stress()` takes one `@elapsed` sample per case with no
-> repetition. Only scatter-100k came down by more than its own run-to-run spread — a real
-> improvement, in the direction the fix predicts. Scatter-200k came out consistently *above* its
-> previous single contaminated sample across all three runs — the opposite direction the issue
-> predicted for the heaviest case — but by a margin comparable to its own spread, so call that a
-> weak signal, not a settled one. Every other row, **including all three heatmap rows**, is not
-> resolved at this sample size: scatter-50k's range nearly reaches its previous number, and the
-> three heatmap rows moved between three runs and seven — round-1 review supplied two
-> independent samples that fell outside a first three-run pass's reported ranges for two of
-> them, which is why those three rows now carry seven runs each instead of three and a longer
-> explanation than the other rows. See the STRESS table below for the exact ranges and that
-> explanation.
-> and re-run for the gesture channel (#102, commit `a9855b4`, 2026-09-20): no manifest-shape
-> change to the STATIC widget — `build_manifest`/`masque()`'s own output is untouched; #102 adds
-> a NEW per-frame response (`{png, manifest}`) on a separate channel (`with_js_link`), not a
-> change to what `show`/`published_to_js` ship at mount. Confirmed by re-running both scripts
-> twice each: every manifest/PNG size byte-for-byte identical between the two runs of each
-> script and to the pre-#102 baseline (scatter-1k manifest still 38.0 KB, heatmap-200² still
-> 196.8 KB, 30-frame scrub still 5.6 MB; every STRESS A–D manifest/PNG size identical across
-> both runs). Render timings varied run-to-run as this file already documents for a shared
-> machine. heatmap-1000² first measured at 302 ms and 316 ms during this reconciliation, above
-> the recorded 97–227 ms span; two further runs on an otherwise-idle machine landed at 143 ms and
-> 99 ms, inside it. The elevated pair was concurrent load from this session's own Pluto servers
-> and kind sweeps, not a shift in the row — the 500²/1000² ordering was correct throughout. The
-> row's 97–227 ms span stands unchanged, still with the "not resolved" caveat this file already
-> carries for it. The gesture channel's OWN numbers — the `with_js_link` round trip itself —
-> are new and are in their own section below
-> ("Gesture channel (#102): the shipped `with_js_link` round trip"), measured directly against
-> `Masque._view_render_frame` (the shipped closure, not the pre-implementation spike issue #102
-> cites) via the new committed `bench/gesture_channel.jl`.
-> #133 (2026-09-22) adds the `:webgl` per-frame response (`{scene, width, height, pxPerUnit,
-> manifest}`, no PNG) on that same channel. The static mount payload is unchanged —
-> `scene_payload` / `build_manifest` at `show` time are the same functions — so the envelope
-> tables above were not re-run for it. The new frame's own cost is in
-> "Gesture channel (#133): `:webgl` scene frames" below, measured by `bench/gesture_channel_webgl.jl`.
-> baseline established after int-pixel geometry quantization, CairoMakie 0.15, Julia 1.12):
-> - **base64-PNG / manifest / render numbers** — `julia --project=. bench/payload_envelope.jl`
->   (normal envelope) and `julia --project=. bench/stress.jl` (the 10× extremes). Both `seed!(0)`,
->   so PNG/manifest sizes reproduce *exactly* (render-ms is wall-clock, so it varies). These are the
->   committed, re-runnable numbers — they can't silently rot.
-> - **Live click round-trip numbers** (the ms in the round-trip tables) — *one-off* measurements
->   from a headless Pluto kernel + Chromium (method documented inline); there is no committed
->   harness for these, so they are dated snapshots, not regenerated by the benches above.
-> - **The `@bind` view-commit baseline** below is the same kind of one-off — a dated snapshot,
->   not regenerated by the benches above — and more so: its Playwright driver was run inline and
->   never saved as a file at all, so there is nothing to commit and nothing to re-run. The method
->   is written out next to the numbers instead, so it can be rebuilt by hand.
+The measured payload-size and latency envelope for both backends, and the **single source of every
+size/latency number** in the project: other docs cite this file and never restate its figures. It
+began as the Phase 0 measurement spike that resolved the payload/latency unknown left open by the
+original design spike (those notes are in git history) and bounded every payload-heavy roadmap item
+after it (M2.3 tooltips, M4 animation, SVG output, multi-select return shape). It is now the living
+envelope, reconciled whenever the wire format changes. Dated per-change reconciliations are in the
+"Reconciliation log" section at the end.
+
+**Reproduce.** Run the benches in the warmed dev env, not `--project=.`: CairoMakie, WGLMakie
+and JSON3 are `[extras]` test deps, invisible to the package env (see `CLAUDE.md`;
+`scripts/cloud-warm.sh julia` builds the env).
+
+```sh
+ENV_DIR="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}"
+julia --project="$ENV_DIR" bench/payload_envelope.jl        # :cairo envelope (sections A–H)
+julia --project="$ENV_DIR" bench/stress.jl                  # :cairo 10× extremes (STRESS A–E)
+julia --project="$ENV_DIR" bench/gesture_channel.jl         # :cairo gesture frames
+julia --project="$ENV_DIR" bench/gesture_channel_webgl.jl   # :webgl gesture frames
+JULIA_NOSYSIMAGE=1 julia --project="$ENV_DIR" bench/view_warmup.jl          # :cairo warmup
+JULIA_NOSYSIMAGE=1 julia --project="$ENV_DIR" bench/view_warmup.jl webgl    # :webgl warmup
+julia --project="$ENV_DIR" bench/webgl_payload_size.jl      # :webgl envelope
+julia --project="$ENV_DIR" bench/vs_cairo.jl                # cross-backend head-to-head
+julia bench/encoding_experiment.jl                          # own temp env (MsgPack.jl)
+(cd frontend && npm run bench)                              # JS hit-test microbenchmark
+```
+
+`payload_envelope.jl` and `stress.jl` both `seed!(0)`, so their PNG/manifest sizes reproduce
+*exactly*; render ms is wall-clock and varies run to run. Those two are the committed, re-runnable
+numbers that cannot silently rot. The `:cairo` baseline was established after int-pixel geometry
+quantization, on CairoMakie 0.15 and Julia 1.12 (numbers re-run 2026-06-29). Not everything here is
+regenerated by a bench:
+
+- **Live click round-trip numbers** (the ms in the round-trip tables) are *one-off* measurements
+  from a headless Pluto kernel + Chromium (method documented inline). There is no committed harness
+  for them, so they are dated snapshots.
+- **The `@bind` view-commit baseline** is the same kind of one-off, and more so: its Playwright
+  driver was run inline and never saved as a file, so there is nothing to commit or re-run. The
+  method is written out next to the numbers so it can be rebuilt by hand.
+- **The WGL context-lifecycle sweep** uses local e2e tools (`test/e2e/ctx_growth.mjs`), not CI.
+
+**When to re-run** (the standing practice in `CLAUDE.md`): on every manifest-shape change — a new
+interactable kind or geometry layout, a new payload field, an encoding change, an animation/frames
+slot — and, for `:webgl`, on any scene wire-format change. Re-run `payload_envelope.jl` +
+`stress.jl` (plus the `:webgl` benches for a scene change), update the affected tables, add a dated
+entry with the commit to the "Reconciliation log" section, then grep the other docs for
+size/latency claims that now contradict this file.
 
 ## The two payload terms
 
@@ -262,7 +128,7 @@ here. It becomes a real risk only at the extremes below.
 ### Render latency (Julia half of the click→re-render round-trip)
 `@elapsed masque(fig)`, warmed, best-of-3. The click message is tiny and Pluto auto-throttles stale
 events, so the felt latency is dominated by Julia re-rendering + re-encoding. Browser paint +
-websocket transfer ride on top (needs live Pluto to measure — see Not measured).
+websocket transfer ride on top; the next subsection measures them live.
 
 | Plot | render + encode |
 |------|----:|
@@ -294,11 +160,11 @@ localhost) lands well under ~400 ms. The client-side hit-test (~0 ms, not in thi
 nothing felt. Two caveats: localhost websocket (no network latency), and Pluto's selection
 *re-highlight* is cheaper still (overlay-drawn → no new PNG, manifest-only round-trip).
 
-### `@bind` view-commit baseline (drag-to-orbit release, this commit)
+### `@bind` view-commit baseline (drag-to-orbit release)
 
 Measured **2026-09-19 at commit `e9a71f3`**, Julia 1.12.7, Pluto **1.0.3**, CairoMakie 0.15.14,
 headless Chromium (Playwright) — a one-off measurement, more so than the round-trip numbers
-above — no committed driver at all (see the header note). Pluto's version is recorded because the
+above — no committed driver at all (see the header). Pluto's version is recorded because the
 double remount below depends on it: the scene's widget cell both defines the `@bind` and reads its
 own previous bond value back, and a cell that does that is not a sanctioned Pluto use case
 ([issue #83](https://github.com/jowch/Masque.jl/issues/83), closed not-planned after the
@@ -418,9 +284,14 @@ independent runs. No browser and no Pluto kernel — Julia-side only.
 `:webgl` does not rasterize a PNG. `render` serializes the figure once per frame and records
 `pxPerUnit` for the browser framebuffer (1 during the drag, the mount value on settle).
 `scene_payload` does not resample, so the serialized scene is the same number of bytes at both
-resolutions. Wire bytes are the binary length of every concrete numeric array in the value
-(the dominant MsgPack term; same definition as `bench/webgl_payload_size.jl`). The JSON column
-is `JSON3.write` of the scene alone, an upper bound, not the wire.
+resolutions. Wire bytes are the binary length of every concrete numeric array in the value (same
+definition as `bench/webgl_payload_size.jl`). The JSON column is `JSON3.write` of the scene
+alone, an upper bound, not the wire.
+
+> **Caveat (#178):** the "scene wire" column below is that numeric-vector byte sum, **not** the
+> bytes Pluto packs. #178 measured the packed `:webgl` scene at 2.5–3.6× the sum for the envelope
+> scenes, mostly structural MsgPack overhead. Read the column as a lower bound until #178 re-runs
+> this bench; the timings are unaffected. See the caveat at the top of ":webgl backend (WGLMakie)".
 
 | scene | in-drag (`ppu=1`) p50 | settle (mount `ppu`) p50 | scene wire (both phases) | scene JSON |
 |---|---:|---:|---:|---:|
@@ -527,9 +398,9 @@ the ~1 MB line.
 
 **The manifest is the high-N wall, not the PNG** (pure-Julia sweep, `bench/stress.jl` at commit
 `226d9f2` — the first run of this script to complete all five STRESS sections; see the
-reconciliation entry above). Render times are reported as the min–max **range across repeated
-runs**, not a single sample, because this machine is a shared multi-tenant box that cannot be
-verified quiet (see above) and `stress()` takes one `@elapsed` sample per case. Scatter and
+"Reconciliation log" section). Render times are reported as the min–max **range across
+repeated runs**, not a single sample, because this machine is a shared multi-tenant box that cannot
+be verified quiet (see the same log entry) and `stress()` takes one `@elapsed` sample per case. Scatter and
 STRESS D are from three runs; the three heatmap rows are from seven, after an initial three-run
 report of those rows turned out not to hold up under two more independently-run samples posted
 during round-1 review (see below the table):
@@ -588,7 +459,7 @@ not re-run; they remain the earlier seven-run ranges, and they are still not res
 
 - **PNG is non-monotonic in N** — past saturation, dense random scatter compresses to a near-solid mass
   (200 000 pts → only 71 KB), while the **manifest grows strictly O(N) to 7.7 MB** (int-pixel geometry,
-  this PR; was 9.28 MB at Float32). At high element counts the manifest, not the image, is the ceiling.
+  PR #9; was 9.28 MB at Float32). At high element counts the manifest, not the image, is the ceiling.
 - **Heatmap render is much cheaper than the multi-second high-N scatter case, though the exact
   figure is not resolved at this sample size** (33–227 ms across all rows and all runs recorded
   in the STRESS table above and its note — see there rather than a single bound here) — Cairo
@@ -612,7 +483,7 @@ under each scheme — replacing theoretical byte math with measured wire bytes:
 
 | Encoding | bytes/coord | 50k circles | note |
 |----------|------------:|------------:|------|
-| `Float32` (current, nested or typed) | 5.00 | 732 KB | baseline |
+| `Float32` (pre-PR #9 encoding, nested or typed) | 5.00 | 732 KB | baseline |
 | **int-pixel quantized** (generic) | **2.10** | **307 KB** | **−58%, no manifest-shape change** |
 | Int16 raw binary (Pluto TypedArray) | 2.00 | 293 KB | only ~5% beyond int-quant → not worth the rewrite |
 
@@ -676,7 +547,7 @@ is bounded by the viewport sample, not by dropping the values.
   **unchanged** — bench re-run (2026-06-30) confirms all existing scatter/heatmap numbers are
   identical; the `:polygons` term is an addition, not a modification of prior geometry kinds.
 
-- **Text labels** *(delivered, this arc, 2026-07-01)* — `text!` and `annotation!` labels
+- **Text labels** *(delivered, 2026-07-01)* — `text!` and `annotation!` labels
   auto-extracted as `:rects` click-to-pick buttons (`TextInteractable`); no new geometry kind (rides
   the same primitive as bars/heatmap cells). The only new wire term is the payload's `text` string —
   `(; text, index, x, y)` replaces `(; index, x, y)`. Bench §G (2026-07-01, `bench/payload_envelope.jl`):
@@ -701,8 +572,8 @@ is bounded by the viewport sample, not by dropping the values.
   prediction was correct: shipping per-element tooltip strings would grow the manifest by `Σ(tooltip
   bytes)`. Measured upper bounds (bench section B / Stress D): 1 000 elements × 200-byte HTML each =
   +196 KB (14 → 210 KB); 50 000 elements × 200 B each = **10.24 MB manifest**, 1.25–1.34 s render
-  alone across three runs (STRESS D, `bench/stress.jl` commit `226d9f2` — see the reconciliation
-  entry above; a live round-trip would add browser/transfer time on top). M2.3 avoided this by
+  alone across three runs (STRESS D, `bench/stress.jl` commit `226d9f2` — see the Reconciliation
+  log; a live round-trip would add browser/transfer time on top). M2.3 avoided this by
   design: the per-element `tooltips[]` array was **not shipped** in the manifest. Instead, each
   layer that has a tooltip carries two O(1)-per-layer terms — `template` (a small segments
   array evaluated per hover) and a top-level `tipStyle`
@@ -715,13 +586,14 @@ is bounded by the viewport sample, not by dropping the values.
   of the roadmap. Animation **must** shrink per-frame cost (smaller canvas / lower px_per_unit /
   fewer frames) or it trips the "framework-revisit" payload trigger. A naive full-res scrub is
   not viable. (Stress: a 1200×800 / 5 k-scatter frame is 492 KB → 300 frames = 144 MB, 1000 = 481 MB.)
-- **SVG output path** — out of this bench (raster only). The roadmap already gates SVG behind a
-  primitive-count viability spike; the PNG floor here (~50 KB even for 10 points) is the number
+- **SVG output path** — out of this bench (raster only; no SVG output path exists). The roadmap
+  gates one behind a primitive-count viability spike; the PNG floor here (~50 KB even for 10 points) is the number
   SVG must *beat* to be worth it for sparse plots.
-- **`ViewInteractable` / `:view` kind** *(drag-to-pan/orbit, this PR)* — one full-viewport bbox
-  layer + mode/`azimuth`/`elevation` fields. Envelope impact is noise relative to PNG + per-element
-  geometry (same order as a single ROI layer). Full `bench/payload_envelope.jl` re-run deferred;
-  reconcile on the next manifest-shape change that adds per-element or frame payload.
+- **`ViewInteractable` / `:view` kind** *(drag-to-pan/orbit)* — one full-viewport bbox layer +
+  mode/`azimuth`/`elevation` fields. Envelope impact is noise relative to PNG + per-element
+  geometry (same order as a single ROI layer). Neither envelope bench builds a `ViewInteractable`,
+  so the tables above contain no `:view` layer; the per-frame cost of a view gesture is measured
+  in the two "Gesture channel" sections.
 - **Multi-select / box-select** *(delivered, M4 commit `d05318f`)* — the M4 wire change is a
   single small `selects` string per selector ROI layer (added to the outbound manifest); the
   selection vector or region descriptor is the **inbound** `@bind` return value, not part of the
@@ -754,7 +626,7 @@ every element). The two diverge for `circles`/`rects`: `hitLayer` returns on the
 and growing N, mixed stops measuring a scan and starts measuring the early-return path. **miss**
 is the O(n) worst case (and the realistic case for hovering empty space on a sparse plot);
 `segments`/`polyline` have no early exit at all, so their mixed and miss numbers agree. `grid`
-(`findBin`, this PR's change) is timed the same way over an m×m-cell grid spanning the canvas —
+(`findBin`, the binary search PR #68 introduced) is timed the same way over an m×m-cell grid spanning the canvas —
 every mixed query lands in some cell (100% hit rate) so mixed and miss both exercise the binary
 search, just from different starting points.
 
@@ -784,8 +656,7 @@ call costs **~0.38 ms**. `segments`/`polyline` have no early exit (every query w
 element list to find the nearest segment) and scale linearly with N regardless of hit rate, ~10×
 per decade as expected for O(n). `grid`'s binary search stays sub-microsecond even at 1000 edges
 per axis (2000 comparisons/hover under the old linear scan, ~11 under the new binary search) —
-not literally O(1) as an earlier draft of this section and `roadmap.md` said, but fast enough that
-the distinction is invisible at these sizes.
+not literally O(1), but fast enough that the distinction is invisible at these sizes.
 
 **Conclusion: even at 200 000 circles (worst-case miss) or 10 000 segments, one `hitTest` call
 costs well under 0.5 ms — three orders of magnitude below the render floor (tens of ms) and
@@ -801,25 +672,33 @@ acceleration lines cite this section rather than restating these numbers.
 uses for published objects. The *TypedArray binary fast-path* (the Q5 "MsgPack fast-path") only
 kicks in for top-level typed numeric vectors (`Vector{UInt8}`/`Vector{Float64}`…). **Our manifest
 root is `Dict{String,Any}` with `Any[]` layers**, so the bulk serializes as generic MsgPack
-maps/arrays, *not* binary blobs — even though leaf geometry is `Vector{Float32}`, it's nested
-inside `Any` containers. Practical impact is small at normal sizes, but at the multi-MB extreme
-(scatter-200k → 9.3 MB, heatmap-1000² → 4.78 MB) the generic-map serialization is exactly the
+maps/arrays, *not* binary blobs — even though leaf geometry is a typed vector (`Vector{Int}`
+today, `Vector{Float32}` when this was measured), it's nested inside `Any` containers. Practical
+impact is small at normal sizes, but at the multi-MB extreme (pre-quantization and pre-sample:
+scatter-200k → 9.3 MB, heatmap-1000² → 4.78 MB) the generic-map serialization is exactly the
 ~290 ms non-render cost the stress round-trip exposed. **But the fix is *not* the fast-path** — the
 encoding experiment above measured that engaging it (lifting geometry to a top-level typed vector)
 buys only ~5% over plain int-pixel quantization, which already gets 58% *inside* the current
-`Dict/Any` structure. So the manifest-shape rewrite is rejected; int-pixel coords + capping
-`values[]` are the committed wins.
+`Dict/Any` structure. So the manifest-shape rewrite is rejected; int-pixel coords + the
+screen-pixel grid sample (which replaced capping `values[]`) are the committed wins.
 
 ## Not measured (deliberately deferred)
 
 - **Editor-lag knee** — the actual point where the Pluto *editor* (not the kernel) stutters from
   large cell output. Our payloads sit at/just above the anecdotal band; the only way to pin the
   real knee is to load increasingly heavy cells in a live notebook and watch the editor. Cheap
-  follow-up if MB-scale features (animation) get built. (The round-trip *latency* — distinct from
-  editor stutter — is now measured above.)
+  follow-up if MB-scale features (animation) get built. (The click round-trip *latency* —
+  distinct from editor stutter — is measured above.)
+- **Gesture-channel transfer and paint** — both gesture-channel benches time the Julia closure
+  only. The websocket transfer, `with_js_link` dispatch and browser decode/paint on top (the
+  `:cairo` PNG, the `:webgl` three.js deserialize) are not timed; `test/e2e/kind_sweep.mjs`
+  confirms a frame lands but does not time it.
+- **Pluto-packed `:webgl` scene bytes** — the `:webgl` scene sizes in this file are summed
+  numeric-array bytes, not what Pluto actually packs; #178 re-measures them (see the caveat in
+  ":webgl backend (WGLMakie)").
 
-Payload size, the thing that drives every cost here, is now known — and the live round-trip
-confirms render time, not the browser, is the latency bottleneck.
+For `:cairo`, payload size, the thing that drives every cost here, is known — and the live
+round-trip confirms render time, not the browser, is the click-latency bottleneck.
 
 ## :webgl backend (WGLMakie)
 
@@ -831,14 +710,23 @@ confirms render time, not the browser, is the latency bottleneck.
 > staying a separate registered package; it remains the single source of every `:webgl` size
 > number, same as the rest of this file is for `:cairo`.
 >
-> **Reproduce** (re-runnable, prints the live numbers — they can't silently rot):
-> `julia --project=. bench/webgl_payload_size.jl`. Last measured **2026-06-30** at commit
-> **`f763c6d`** (the M2 envelope correction, pre-fold-in PR #20), **WGLMakie 0.13.12, Julia 1.12**.
-> Re-run for WS-3D Axis3 core on **2026-07-02** (PR #35): all three wire figures unchanged —
-> bundle 1.09 MB, 2D lines-200 0.07 MB, 2D scatter+text-40 0.1 MB, 3D helix-300 0.14 MB (the
-> scene payload never carried Masque's manifest, and the manifest's `is3d`/z additions are noise).
-> Re-run and reconcile this section on any wire-format change (a new geometry layout, a new scene
-> field, an encoding change, an animation/frames slot) — and note the new commit here.
+> **Reproduce:** `bench/webgl_payload_size.jl` (command in the header). Last measured
+> **2026-06-30** at commit **`f763c6d`** (the M2 envelope correction, pre-fold-in PR #20),
+> **WGLMakie 0.13.12, Julia 1.12**; re-run unchanged for WS-3D on 2026-07-02 (PR #35 — see the
+> "Reconciliation log" section). Re-run and reconcile this section on any wire-format
+> change (a new geometry layout, a new scene field, an encoding change, an animation/frames slot),
+> and log the new commit.
+
+> **Caveat — the `:webgl` scene sizes in this file understate the wire (#178).** Every per-cell
+> and per-frame `:webgl` scene figure here (this section's envelope and stress tables, the
+> `vs_cairo.jl` rows, and the "scene wire" column of "Gesture channel (#133)") is the **sum of the
+> raw bytes of the scene's numeric vectors**, not the bytes Pluto's MsgPack actually packs. #178
+> measured the Pluto-packed scene at **2.5–3.6× larger** than that sum for the three envelope
+> scenes; the difference is structural MsgPack overhead (maps, keys, strings, non-vector values),
+> not glyph-atlas tiles. The numbers below are left as measured until #178 re-runs the benches and
+> replaces them; until then read every `:webgl` scene size as a lower bound, and any ratio built on
+> one (the bundle-vs-scene multiple, the crossover N in `backend-comparison.md`) as optimistic for
+> `:webgl`. The 1.09 MB bundle is a single string, so it is not affected.
 
 ### The payload terms
 
@@ -863,14 +751,18 @@ just the **scene**.
 | scene — 2D scatter + text (40) | per cell | **0.10 MB** | 0.03 | 0.08 | 0.44 |
 | scene — 3D helix (300 pts) | per cell | **0.14 MB** | 0.05 | 0.11 | 0.56 |
 
-So the first `:webgl` cell ships ~1.1 MB (bundle) + ~0.07–0.14 MB (scene); each **additional** cell —
-and each tier-1 reactive re-render — ships just its **0.07–0.14 MB** scene. That's **≈8–16×** below
-the 1.09 MB bundle.
+The scene `wire` column is the numeric-vector byte sum the caveat above describes, so the scene
+figures in this paragraph are lower bounds pending #178. On those figures, the first `:webgl` cell
+ships ~1.1 MB (bundle) + ~0.07–0.14 MB (scene); each **additional** cell — and each reactive
+re-render — ships just its **0.07–0.14 MB** scene, **≈8–16×** below the 1.09 MB bundle. At the
+2.5–3.6× packing factor #178 measured, that multiple is several times smaller.
 
 #### Stress + server cost (the terms the head-to-head turns on)
 
 Two `:webgl` facts under stress (measured **2026-06-30 by `bench/vs_cairo.jl`**, `Random.seed!(0)` —
-sizes exact, ms wall-clock/approximate; units MB = bytes/1 000 000):
+sizes exact, ms wall-clock/approximate; units MB = bytes/1 000 000). The `wire` column is the same
+numeric-vector byte sum as the envelope above — a lower bound on the packed scene (#178; see the
+caveat at the top of this section):
 
 | scene | wire | serialize ms |
 |---|---|---|
@@ -890,8 +782,8 @@ sizes exact, ms wall-clock/approximate; units MB = bytes/1 000 000):
 
 **Cross-backend comparison (wire + UX + cost regimes):** see
 [`backend-comparison.md`](backend-comparison.md), generated by `bench/vs_cairo.jl` — the
-head-to-head, the crossover-N analysis, and the interaction matrix (view manipulation is planned
-as backend-symmetric Julia re-render, on the gesture channel rather than `@bind` — #122,
+head-to-head, the crossover-N analysis, and the interaction matrix (view manipulation ships as a
+backend-symmetric Julia re-render on the gesture channel rather than `@bind` — #122, #102, #133,
 [§12.3](architecture/12-gesture-channel.md#123-what-commits-and-when); only the client-side GPU
 camera is out of scope — see `backend-comparison.md` §1†/§6, not restated here). It reconciles
 with this section and the `:cairo` envelope above.
@@ -902,8 +794,11 @@ with this section and the `:cairo` envelope above.
 numeric `Vector` (`Float32`/`Int32`/`UInt32`/`UInt8` — exactly what `_plain` emits) as a **binary**
 extension (`reinterpret(UInt8, x)`, `sizeof·length`). So the real wire is the **binary** column,
 **~4–5× under** `JSON3.write` (floats-as-text) — the proxy an earlier bench reported. The committed
-bench reports both; the `wire` column is what actually crosses the wire (dominant term; structural
-map/string overhead adds a little).
+bench reports both, but its `wire` column sums only the binary vector extensions: it leaves out the
+MsgPack maps, keys, strings and scalar values around them. That structural overhead is not small —
+#178 measured the Pluto-packed scene at 2.5–3.6× the vector sum, and the structure, not glyph-atlas
+tiles, is most of that gap. So the `wire` column is a lower bound on what crosses the wire, and the
+JSON proxy stays an upper bound.
 
 ### Bundle sharing — why it's once per notebook (M2 / PR #18)
 
@@ -916,7 +811,9 @@ bundle/shim blob URLs once on `window.__MasqueWGL` so the WGLMakie module import
 
 ### Deferred compression levers (measured, not yet built)
 
-The per-cell scene is already small (binary), so compression is **deferred** — both levers measured:
+The per-cell scene is small next to the bundle, so compression is **deferred** — both levers
+measured, both against the numeric-vector `wire` sum (so the absolute savings below are understated
+in the same way; #178):
 
 - **gzip.** The bench's `gzip-bin` column measures gzip-of-binary at **~3×** (0.07→0.02 MB), but to
   use it we'd have to bypass `published_to_js`'s object channel and hand-roll a **msgpack decoder in
@@ -928,8 +825,10 @@ The per-cell scene is already small (binary), so compression is **deferred** —
   so they're shareable like the bundle — but each is ~10–20 KB, gzip overlaps the win, and hoisting
   them to a shared channel is real complexity.
 
-**Revisit both only if tier-1 animation profiling (per-frame scene re-ship) shows the scene is the
-bottleneck** — tier-2 in-place patching (`roadmap.md`) already ships no new scene at all.
+**Revisit both only if per-frame scene re-ship profiling shows the scene is the bottleneck.** No
+in-place scene patch exists: the camera-only resident-scene patch (#86) was closed not planned, so
+every `:webgl` view-gesture frame re-ships the full serialized scene (see "Gesture channel (#133):
+`:webgl` scene frames" and [`12-gesture-channel.md`](architecture/12-gesture-channel.md)).
 
 ## Axis3 projection hinge spike (2026-07-01)
 
@@ -942,8 +841,8 @@ raster with 0.0 px deviation** — measured on a static camera *and* again after
 projection closure (post-PR #32, `transform_func` applied) and comparing against the rendered
 marker positions in the raster. `Point2f(x, y)` ≡ `Point3f(x, y, 0)` is byte-identical through
 the same closure, so widening the geometry path to 3D cannot regress 2D. This is the WS-3D
-"projection hinge" gate — cleared. Cited by `architecture.md`, `backend-comparison.md`, and
-`roadmap.md`.
+"projection hinge" gate — cleared. Cited by `architecture/07-scope.md`, `backend-comparison.md`,
+and `test/e2e/alignment.mjs`.
 
 **`:webgl` canvas half (2026-07-02, WS-3D core landing): 0.0 px.** The mirror check on the live
 canvas: render the E2E `page3d.html` (Axis3 scatter, red markers, explicit azimuth/elevation) in
@@ -987,14 +886,171 @@ stands until Pluto's UI or the tool's drive changes.)
 **What this kills and what it keeps.** The earlier claim ("naive re-mounting leaks WebGL
 contexts toward the browser's ~16 cap; all `:webgl` view-manip is gated on unbuilt context
 reuse") was reasoned-not-measured, and is **false** on the shipped stack. `:webgl` sliders work
-today (the sweep round-tripped the bond on every step). What survives as fact: each re-render
-pays context + scene re-initialization — a per-step *cost*, for which the **camera-only
-resident-scene patch** (ship only the new camera + freshly projected overlay to the still-live
-scene) is the candidate optimization, but it is gated on canvas identity, not payload size:
-Pluto destroys the `<canvas>` on every cell replacement (#86; `roadmap.md` §"View manipulation
-and the remount").
+today (the sweep round-tripped the bond on every step). What survives as fact: each cell
+re-render pays context + scene re-initialization — a per-step *cost*, since Pluto destroys the
+`<canvas>` on every cell replacement. A camera-only resident-scene patch (ship only the new camera
++ freshly projected overlay to a still-live scene) was proposed for it and closed not planned
+(#86); nothing on main implements it. View gestures avoid the cell re-render instead: they stream
+frames over the gesture channel (#133), and each frame swaps a full serialized scene into the live
+canvas — its cost is in "Gesture channel (#133): `:webgl` scene frames".
 
 **Reproduce**: `test/e2e/ctxgrowth_notebook.jl` + `test/e2e/ctx_growth.mjs` (local tools, same
 serve.jl harness as the through-Pluto E2E; not in CI — a through-Pluto job is the flake-prone
 kind, and the property is upstream-owned). Re-run on a WGLMakie major bump: if upstream ever
 drops the `check_screen` disposal, this is the measurement that notices.
+
+## Reconciliation log
+
+One entry per re-run or reconciliation, oldest first. "Envelope unchanged" means the three
+headline `:cairo` numbers — scatter-1k manifest 38.0 KB, heatmap-200² manifest 196.8 KB, 30-frame
+scrub 5.6 MB — reproduced; entries say how.
+
+- **2026-06-29 — M2.3 template tooltips (PR #10), M4 box-select (commit `d05318f`).** Numbers
+  re-run; the tables above were last reconciled for the M2.3 template-tooltip design and confirmed
+  unchanged for M4 box-select.
+- **2026-06-30 — Phase 2a bars/areas/spans, Phase 2b polygon surfaces (commit `431bd99`), colorbar
+  readout `valueaxis` field (PR #27).** Envelope confirmed unchanged for each; see "Scope bounds
+  for downstream phases" for the per-feature numbers.
+- **2026-06-30 — `:webgl` envelope measured** at commit `f763c6d` (the M2 envelope correction,
+  pre-fold-in PR #20), WGLMakie 0.13.12, Julia 1.12. See ":webgl backend (WGLMakie)".
+- **2026-07-01 — text labels (`TextInteractable`).** Envelope confirmed unchanged.
+- **2026-07-02 — WS-3D Axis3 core.** Manifest-shape change: a new per-transform `is3d` key + z in
+  3-coord point payloads. Envelope unchanged (scatter-1k manifest 38.0 KB, heatmap-200² 196.8 KB,
+  30-frame scrub 5.6 MB): the `is3d` key costs ~10 B/transform and z one float per 3-coord point,
+  both noise at this scale. The `:webgl` section was re-run the same day (PR #35): all three wire
+  figures unchanged — bundle 1.09 MB, 2D lines-200 0.07 MB, 2D scatter+text-40 0.1 MB, 3D helix-300
+  0.14 MB (the scene payload never carried Masque's manifest, and the manifest's `is3d`/z additions
+  are noise).
+- **`SegmentInteractable` `tol` wiring (PR #66).** Manifest-shape change: a new
+  per-`:segments`/`:polyline`-layer `"tol"` field (one small int, present only on that layer, not
+  per element). Envelope unchanged: `bench/payload_envelope.jl`/`bench/stress.jl` don't exercise
+  `SegmentInteractable` (only `PointInteractable`/`:circles`), so re-running reproduces the
+  previous numbers byte-for-byte. Delta measured by direct manifest inspection instead: one MsgPack
+  int header+value (1–3 B), added once per `:segments`/`:polyline` layer, not per element/vertex —
+  e.g. the parity corpus's `logscale`/`axis3`/`polaraxis`/`colorbar` line layers each gained
+  exactly one `"tol": 12` entry (`test/fixtures/parity/*.{cairo,webgl}.json` diffs). Doesn't scale
+  with plot size — negligible at any N.
+- **Whole-line `:lines` (#89, PR #142, 2026-09-22).** Same shape of change as `tol`: geometry is
+  one flat vertex list per path, and each such layer ships that same per-layer `"tol"` int. The
+  envelope benches still construct `PointInteractable` and heatmap fixtures only, so they contain
+  no `:lines` layer and the published sizes are unchanged by construction.
+- **2026-09-15 — keyboard-navigation `label` field.** Manifest-shape change: a new optional
+  per-layer `"label"` string (screen-reader announcement prefix), present only when the `label`
+  keyword is set on `PointInteractable`/`SegmentInteractable`/`RectInteractable`(list)/
+  `PolygonInteractable`. Envelope unchanged: neither bench sets `label` on any fixture, so
+  re-running reproduces the previous numbers byte-for-byte. Delta measured by direct manifest
+  inspection, same method as `tol`: one MsgPack string key ("label", 6 B header+bytes) + one string
+  value, added once per labeled layer, not per element — `label = "Scatter"` costs 14 B total,
+  `label = "Bars, quarterly revenue"` costs 30 B. Doesn't scale with element count — negligible at
+  any N.
+- **2026-09-15 — figure-background tooltip theme + per-element `colors` accent.** Two
+  manifest-shape changes: an optional top-level `"background"` string (always present; `masque()`
+  ships the figure's own background colour) and an optional per-layer `"colors"` field (a uniform
+  CSS string, or a shared palette + one index per element for colormap/categorical data), present
+  only on a `PointInteractable(ax, p::Makie.Scatter)`-derived `:circles` layer whose colour
+  resolves. Envelope unchanged at the KB-rounded numbers this file tracks: scatter-1k manifest
+  still 38.0 KB, the ~50 B added rounding away at this precision (corrected 2026-09-19, PR #116,
+  from an earlier misstatement of 38.1 KB here and in the split-blend-highlight entry);
+  heatmap-200² still 196.8 KB (`:grid` layers never carry `colors`); 30-frame scrub still 5.6 MB
+  (PNG-only, untouched by a manifest-only change). Exact delta measured directly: `background`
+  costs 28 B (key + `"rgb(255,255,255)"` value), once per manifest, not per layer or element; a
+  uniform `colors` costs ~22 B (key + one CSS colour string), once per Scatter layer. `masque(f)`'s
+  default un-coloured scatter already carries a uniform `colors` (Makie's own default marker
+  colour) — 50 B total added to the scatter-1000 row. A colormapped/categorical `colors` instead
+  ships a shared palette (`_COLOR_PALETTE_SIZE = 32` stops) + one small int per element — bounded
+  by the fixed palette size regardless of N, plus ~1–2 B/element for the index, not measured
+  directly since neither bench fixture sets a numeric/vector `color=`.
+- **2026-09-18 — `LegendInteractable`.** Manifest-shape change: a new `:legend` transform + one
+  `:rects` `HitLayer` per `Makie.Legend` block (auto-extracted the same way as
+  `ColorbarInteractable`), and `HitLayer`'s only cross-layer field, an optional per-layer `"links"`
+  (an array of string-id arrays, one per element, naming other layers to highlight together with
+  the hovered/selected entry) — present only on a `LegendInteractable` layer. Envelope unchanged:
+  neither bench builds a `Legend` (grepped both for `Legend`/`legend` — no hits), so re-running
+  reproduces the previous numbers byte-for-byte. Delta measured by direct manifest inspection,
+  same method as `tol`/`label`: a 3-entry `axislegend` (two `lines!`, one `scatter!`, each
+  auto-linked to its own layer), `build_manifest`'d and hand-sized with the same MsgPack byte model
+  `bench/payload_envelope.jl` itself uses (`mp(...)`, not MsgPack.jl — MsgPack.jl can't pack the
+  manifest's `NamedTuple` payloads without a declared `msgpack_type`). The whole 3-entry legend
+  layer dict (id/kind/geometry/payloads/events/style/label/colors/template/links) is 341 B; its
+  `"links"` field alone (`[["lines"], ["lines_2"], ["scatter"]]`) is 26 B, 32 B including the
+  `"links"` key — once per legend layer, ~9–11 B/entry for a short single-id link list (grows with
+  target-id-string length and link-list length per entry; bounded by entry count, not plot size).
+  Negligible at any N.
+- **2026-09-18 — split blend highlight.** Manifest-shape change: the mark-derived hover outline
+  dropped the per-layer default `"style"."stroke"` key (`hoverstyle`'s stroke is now `nothing`);
+  the highlight split itself — three sibling top-level svgs — is CSS/JS-only and adds nothing to
+  the manifest. (It first shipped with `color-dodge`/`multiply`/`screen` blends; the later flat
+  chrome-grey edge, PR #146, dropped `multiply`/`screen` and is also CSS/JS-only: `handle` stays in
+  the manifest as the hit half-size, so the envelope was not re-measured for it.) Envelope
+  unchanged: neither bench fixture sets a custom `hoverstyle`, so re-running reproduces the
+  previous numbers byte-for-byte (scatter-1k manifest still 38.0 KB, heatmap-200² still 196.8 KB).
+  Exact delta, with `bench/payload_envelope.jl`'s own `mp(...)` byte model: the dropped `"stroke"
+  => "#3A6F7C"` key+value pair is `_str(6) + _str(7)` = 7 B + 8 B = 15 B, once per layer — 15 B off
+  the scatter-1k row's single `:circles` layer and 15 B off the heatmap-200² row's single `:grid`
+  layer, both noise. Negligible at any N.
+- **2026-09-19 — bond payload contract cleanup (#110/#109, PR #116).** #110 changes an
+  `InteractionEvent.payload`'s Julia *type* after `transform_value` has already received it — no
+  manifest-shape change, no bench gate. #109 removes the element hit's `payload` from the upload
+  (`layer`/`index` already let Julia recover it from its own manifest), which is the JS→Julia
+  direction neither bench measures (both say so in their header comments — they cover only the
+  outbound base64/manifest terms; the "Full click round-trip" numbers are the only ones that touch
+  the upload, and are one-off Playwright measurements, not re-run here). Confirmed **neutral** by
+  re-running both scripts: every manifest/PNG size byte-for-byte identical to the pre-#110/#109
+  baseline (scatter-1k manifest 38.0 KB, heatmap-200² 196.8 KB, 30-frame scrub 5.6 MB, STRESS A–C
+  unchanged). STRESS D–E failed to run in this reconciliation from a pre-existing bug, reproducing
+  identically on unmodified `main`: `stress()`'s warm-up timing line called `mkfig()` a second time
+  to build the `@elapsed` argument, so `mkint(mkfig())` built the interactable against a different
+  `Figure`/`Axis` than the one passed to `masque()`. That only breaks the sections (D onward) where
+  `mkint` depends on the figure; the throw aborted the script there, which is why STRESS E (a bare
+  `let` block with no `mkint`) never ran either. STRESS D's manifest size, verified directly
+  (bypassing the buggy warm-up call): 10.24 MB, identical with and without the change.
+- **2026-09-20 — `bench/stress.jl` timing fix (issue #119, commit `226d9f2`).** No manifest-shape
+  change. The fix hoists a `fig2`/`ints2` pair before the timed call and times only
+  `masque(fig2)`, warmed by the same `w` build as before. For STRESS A–C, `mkfig()` is still called
+  exactly twice per case in the same order (once for `w`, once for the timed call), so the seeded
+  RNG state — and every manifest/PNG byte it produces — is unchanged by construction. Confirmed:
+  scatter-50k/100k/200k manifests still 1.88/3.83/7.72 MB; heatmap-300² still 442 KB (a
+  452 117-byte manifest — previously rounded here to 441 KB; four small additive fields that landed
+  since account for the ~30 B difference, none from this fix: the top-level `background` key
+  (+28 B, once per manifest), the dropped per-layer `style.stroke` (−15 B), and two per-transform
+  fields always present regardless of value — `valueaxis` (+11 B; `null` on a non-colorbar axis)
+  and `is3d` (+6 B; `false` here). `tol`/`label`/`links` do **not** apply: `tol` is code-gated to
+  `:segments`/`:polyline`/`:lines` layers only (`src/render.jl`), and neither `label` nor `links`
+  is set on this bench's heatmap fixture — checked directly against the layer's keys);
+  heatmap-1000² was 6 KB on that run (edges only, before the screen-pixel sample; the current size
+  is the STRESS table); STRESS D still 10.24 MB, matching the #110/#109 entry. This was the **first
+  run of `bench/stress.jl` to complete all five sections**. The STRESS table reports render time
+  as a range across repeated runs: this machine is a shared, multi-tenant box (other users' idle
+  Pluto/Malt kernels run continuously, and sibling agents' Playwright/`kind_sweep` runs come and go
+  unpredictably), so no run is truly isolated, and `stress()` takes one `@elapsed` sample per case.
+  Only scatter-100k came down by more than its own run-to-run spread — a real improvement, in the
+  direction the fix predicts. Scatter-200k came out consistently *above* its previous single
+  contaminated sample across all three runs — the opposite direction the issue predicted for the
+  heaviest case — but by a margin comparable to its spread, so a weak signal. Every other row,
+  **including all three heatmap rows**, is not resolved at this sample size: scatter-50k's range
+  nearly reaches its previous number, and the heatmap rows carry seven runs each, not three,
+  because round-1 review supplied two independent samples that fell outside a first three-run
+  pass's ranges for two of them (explained under the STRESS table).
+- **2026-09-20 — gesture channel (#102, commit `a9855b4`).** No manifest-shape change to the
+  STATIC widget — `build_manifest`/`masque()`'s own output is untouched; #102 adds a NEW per-frame
+  response (`{png, manifest}`) on a separate channel (`with_js_link`), not a change to what
+  `show`/`published_to_js` ship at mount. Confirmed by re-running both scripts twice each: every
+  manifest/PNG size byte-for-byte identical between the two runs of each script and to the
+  pre-#102 baseline (scatter-1k 38.0 KB, heatmap-200² 196.8 KB, 30-frame scrub 5.6 MB; every
+  STRESS A–D manifest/PNG size identical across both runs). Render timings varied run to run.
+  heatmap-1000² first measured 302 ms and 316 ms here, above the recorded 97–227 ms span; two
+  further runs on an otherwise idle machine landed at 143 ms and 99 ms, inside it. The elevated
+  pair was concurrent load from this session's own Pluto servers and kind sweeps, not a shift in
+  the row — the 500²/1000² ordering was correct throughout — so the row's span stands, still "not
+  resolved". The channel's own numbers are in "Gesture channel (#102): the shipped `with_js_link`
+  round trip", measured against `Masque._view_render_frame` (the shipped closure, not the
+  pre-implementation spike #102 cites) via the new committed `bench/gesture_channel.jl`.
+- **2026-09-22 — `:webgl` gesture frames (#133, PR #140).** Adds the `:webgl` per-frame response
+  (`{scene, width, height, pxPerUnit, manifest}`, no PNG) on the same channel. The static mount
+  payload is unchanged — `scene_payload`/`build_manifest` at `show` time are the same functions —
+  so the envelope tables were not re-run. The frame's own cost is in "Gesture channel (#133):
+  `:webgl` scene frames", measured by `bench/gesture_channel_webgl.jl`.
+- **2026-09-23 — contourf holes as ring groups (PR #164), screen-pixel grid sample (PR #156).**
+  Section F gained the holed-contourf row and a re-run of the no-hole 50×50 row (see "Scope bounds
+  for downstream phases"); the sub-pixel heatmap manifests were remeasured after the sample landed
+  (see the STRESS table note).

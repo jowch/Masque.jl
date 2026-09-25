@@ -2,7 +2,7 @@
 # bench/webgl_payload_size.jl (binary length of concrete numeric arrays). JSON3 length
 # is an upper bound.
 #
-# Run: julia --project=. bench/gesture_channel_webgl.jl
+# Run: julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/gesture_channel_webgl.jl
 
 using Masque, WGLMakie, Printf, Random
 import JSON3

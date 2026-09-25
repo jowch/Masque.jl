@@ -1,26 +1,29 @@
 # 8. Payload scaling & robustness to large inputs
 
-Measured in the Phase 0 spike (`perf-findings.md` is the single source of every number here; cite it,
-don't restate). A rendered cell ships **two** payloads — the JS→Julia click return is negligible:
+Measured by the committed benches (`perf-findings.md` is the single source of every number; cite
+it, don't restate). A rendered cell ships **two** payloads — the JS→Julia click return is
+negligible:
 
 | Term | Carried by | Bounded by |
 |---|---|---|
-| **base64 PNG** | HTML `<img>` | the **display** (DPI/`max_width` policy → output px), *not* source resolution |
+| **base64 PNG** (`:cairo`) | HTML `<img>` | the **display** (DPI/`max_width` policy → output px), *not* source resolution |
 | **manifest** | `published_to_js` (MsgPack) | O(#hit-elements). A grid is O(source-cells) only while a cell is at least one screen pixel; below that, one value per screen pixel of the axis viewport |
 
-**The manifest is the scaling wall** — not the PNG, not render, not hit-test CPU. A realistic single
-plot is **50–400 KB total and render-bound** (~65 ms round-trip). High element counts reach multi-MB and
-flip to **payload-bound** (~553 ms total measured at a 4.78 MB manifest). A sub-pixel heatmap no longer
-ships the source matrix (§8); the case that reaches this regime by default is **high-N scatter**
-(200k pts → 7.72 MB manifest). Nothing crashes — it degrades into the half-second range — but
-tens of MB would lag the Pluto editor.
+On `:webgl` the artifact term is the serialized WGLMakie scene instead of a PNG; it scales with
+the plotted data, not the display — see `backend-comparison.md` and `perf-findings.md`.
 
-**M2.3 (tooltip wire format):** shipping per-element tooltip strings as a retired `tooltips[]` array
-would have added O(N × string-bytes) — the dominant inflation term at high element counts (see
-`perf-findings.md` §"Scope bounds for downstream phases" for the measured upper bounds). M2.3 avoids
-this: tooltip content ships as two O(1)-per-layer fields — `template` (pre-parsed segments, present when
-`tooltip` is a `Markup`) and a top-level `tipStyle` dict — leaving the per-element envelope unchanged.
-See [§10](10-tooltips.md) Tooltips for the wire shape and authoring API.
+**The manifest is the scaling wall** — not the PNG, not render, not hit-test CPU. A realistic single
+plot is small and **render-bound**; high element counts reach multi-MB manifests and flip to
+**payload-bound**. A sub-pixel heatmap does not ship the source matrix (below), so the case that
+reaches the payload-bound regime by default is **high-N scatter**. Nothing crashes, but a
+manifest of tens of MB would lag the Pluto editor. The sizes and latencies are in
+`perf-findings.md`.
+
+**Tooltip wire format.** Shipping per-element tooltip strings (the retired `tooltips[]` array)
+would add O(N × string-bytes) — the dominant inflation term at high element counts (bounds in
+`perf-findings.md`). Instead tooltip content ships as two O(1)-per-layer fields — `template`
+(pre-parsed segments, present when `tooltip` is a `Markup`) and a top-level `tipStyle` dict —
+leaving the per-element envelope unchanged. See [§10](10-tooltips.md) Tooltips for the wire shape and authoring API.
 
 **Robustness to large inputs (assume a user *will* do this) — implemented.** We ship a tool to
 Pluto/Makie users, so assume someone overlays `masque` on a 2000²–4000² `heatmap!`/`image!` *because they

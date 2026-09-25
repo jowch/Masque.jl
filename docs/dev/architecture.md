@@ -12,21 +12,21 @@
  user's Makie figure + declared interactables
                  │
    ┌─────────────▼──────────────┐
-   │ AbstractBackend            │  render(fig)      → RenderResult (image bytes + dims + scaling)
-   │   (CairoBackend for v1)    │  context(fig)     → InteractionContext (projection + axis transforms)
+   │ AbstractBackend            │  render(fig, ppu)  → artifact (Cairo PNG bytes | WebGL scene)
+   │  Cairo / WebGL (co-equal)  │  context(fig, ppu) → InteractionContext (projection + axis transforms)
    └─────────────┬──────────────┘
                  │ ctx
    ┌─────────────▼──────────────┐
-   │ AbstractInteractable[]      │  hitlayers(i, ctx) → Vector{HitLayer}   (compact, image-px geometry)
-   │   Point/Segment/Rect/...    │  validate / events / tooltip / hoverstyle
+   │ AbstractInteractable[]     │  hitlayers(i, ctx) → Vector{HitLayer}   (compact, image-px geometry)
+   │   Point/Segment/Rect/...   │  validate / events / tooltip_spec / hoverstyle
    └─────────────┬──────────────┘
-                 │ layers + axis transforms + image
+                 │ layers + axis transforms + artifact
    ┌─────────────▼──────────────┐
-   │ masque           │  assembles ONE manifest, emits the @bind widget
+   │ masque                     │  assembles ONE manifest, emits the @bind widget
    └─────────────┬──────────────┘
-                 │ HTML (image + transparent overlay + JS)
+                 │ HTML (PNG or canvas + transparent overlay + JS)
    ┌─────────────▼──────────────┐
-   │ JS overlay (stateless view) │  hit-test by kind • hover=local • click=@bind round-trip
+   │ JS overlay (stateless view)│  hit-test by kind • hover=local • click=@bind round-trip
    └────────────────────────────┘
 ```
 
@@ -44,7 +44,7 @@ cited and linked precisely:
   tiers](architecture/04-custom-interactions.md)
 - [5. The bond value](architecture/05-bond-value.md)
 - [6. How it composes — the three interaction tiers](architecture/06-composition.md)
-- [7. v1 scope](architecture/07-scope.md)
+- [7. Scope](architecture/07-scope.md)
 - [8. Payload scaling & robustness to large inputs](architecture/08-scaling.md)
 - [9. Wire encoding & precision](architecture/09-wire-encoding.md)
 - [10. Tooltips](architecture/10-tooltips.md)

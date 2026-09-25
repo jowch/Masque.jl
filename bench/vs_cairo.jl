@@ -15,7 +15,7 @@
 # envelopes (Cairo's main envelope + the `:webgl` section) and bench/stress.jl — re-run all three
 # on any wire-format change.
 #
-#   julia --project=. bench/vs_cairo.jl
+#   julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/vs_cairo.jl
 #
 # NOTE: capability facts (pan/zoom/rotate = client-local on WebGL, impossible on Cairo's static PNG)
 # are architectural, not benched — they live in backend-comparison.md's matrix. This bench covers

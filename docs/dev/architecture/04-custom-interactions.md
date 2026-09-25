@@ -20,10 +20,11 @@ RegionInteractable(ax;
 `register_interaction!(f, …)` analog). Still emits `HitLayer`s.
 
 ```julia
-FunctionInteractable(ax, f; id, events=(:click,:hover))   # f(ctx)::Vector{HitLayer}
+FunctionInteractable(f; events=(:click,:hover))   # f(ctx)::Vector{HitLayer}; ids and axes are f's own
 ```
 
-**Tier C — full struct.** Implement `hitlayers` (+ optional `validate`/`hoverstyle`). A user
+**Tier C — full struct.** Implement `hitlayers` (+ optional `validate`/`events`/`hoverstyle`/
+`hit_tol`, and `bondtype`/`transform_bond` for a non-element commit, [§5](05-bond-value.md)). A user
 struct is *indistinguishable* from a built-in — same manifest path, same overlay, same `@bind`. Tooltip
 content comes from the per-layer `Masque.tooltip_spec(interactable)` seam (built-in interactables expose it
 as a `tooltip=` constructor kwarg; a custom struct overrides `Masque.tooltip_spec`). The `tooltip_*` kwargs
@@ -31,13 +32,14 @@ on `masque()` are styling only. See [§10](10-tooltips.md) Tooltips. Example:
 
 ```julia
 struct CityInteractable <: AbstractInteractable
-    positions::Vector{Point2f}; names::Vector{String}; radius::Float32
+    ax; positions::Vector{Point2f}; names::Vector{String}; radius::Float32
 end
 function Masque.hitlayers(c::CityInteractable, ctx)
     coords = Float32[]; for p in c.positions
         q = data_to_image_px(ctx, c.ax, p); append!(coords, (q[1], q[2], c.radius*ctx.scaling))
     end
-    [HitLayer(:cities, :circles, coords, [(; name=n) for n in c.names], :main, (:click,:hover))]
+    [HitLayer(:cities, :circles, coords, [(; name=n) for n in c.names],
+              Masque.axis_id(ctx, c.ax), (:click,:hover))]
 end
 # tooltip content: add a `tooltip` field to CityInteractable and override
 # `Masque.tooltip_spec(c::CityInteractable) = c.tooltip` — see §10 Tooltips

@@ -44,8 +44,12 @@ draws at `markersize`; anything else falls back to `markersize / 2`; the fill an
 share identical geometry, so `r` is checked on both). Hover is not selected. Motion is an
 80–120 ms opacity fade on tip / highlight — a plain opacity fade on each shape itself (the blend
 lives on `svg.masque-fill`, so a fading child doesn't isolate it); no pulse on a same-hit remount.
-Tooltip dark follows OS `prefers-color-scheme` — official Pluto has **no notebook light/dark
-toggle** (Settings → Dark mode is help text; Pluto itself uses the same media query).
+Tooltip theme is derived from the FIGURE's own background (CSS relative-colour syntax,
+`--masque-fig-bg`), not just OS `prefers-color-scheme` — official Pluto has **no notebook
+light/dark toggle** — so a dark Makie figure gets a dark tooltip on a light page; the OS media
+query is only the fallback for browsers without relative-colour support. The tooltip is anchored
+ABOVE the hovered mark (not the cursor) with a 10px gap and the caret on the anchor; it flips
+below on a top-clip, and shifts + moves the caret (`--masque-caret-x`) on a side-clip.
 
 These decisions are settled: cite the recipes above rather than re-litigating identity,
 wash vs ring, first-PR scope, or Pluto coupling.
@@ -56,12 +60,14 @@ Exactly one Makie backend per notebook process. Do not attach to an existing Try
 session — start a separate one.
 
 ```text
-# Fast loop when masque-dev already has Masque + both Makies:
-MASQUE_DEV_ENV=$HOME/.julia/environments/masque-dev julia test/e2e/serve.jl 1237 &
+# From the repo root. One-time setup (cloud session or fresh machine):
+#   scripts/cloud-warm.sh julia e2e   # dev env with Masque + both Makies; Playwright + Chromium
+export MASQUE_DEV_ENV="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}"
+julia test/e2e/serve.jl 1237 &
 # poll curl http://127.0.0.1:1237 → 200 (not the log)
 
 cd test/e2e
-# interaction + per-kind visual (wash/ring/hover-outline/pin/fade/no-red/color-scheme)
+# interaction + per-kind visual (wash/ring/hover-outline/pin/fade/no-red/tooltip theme)
 node kind_sweep.mjs http://127.0.0.1:1237 "$PWD/kind_sweep_cairo.jl" cairo
 # required visual-chrome sibling (same notebooks; not optional)
 node polish_verify.mjs http://127.0.0.1:1237 "$PWD/kind_sweep_cairo.jl" cairo
@@ -69,23 +75,24 @@ node polish_verify.mjs http://127.0.0.1:1237 "$PWD/kind_sweep_cairo.jl" cairo
 node keyboard_a11y.mjs http://127.0.0.1:1237 "$PWD/kind_sweep_cairo.jl" cairo
 
 # second Pluto process — WGLMakie cannot share a session with Cairo
-MASQUE_DEV_ENV=$HOME/.julia/environments/masque-dev JULIA_NOSYSIMAGE=1 julia test/e2e/serve.jl 1238 &
+JULIA_NOSYSIMAGE=1 julia serve.jl 1238 &   # still in test/e2e
 node kind_sweep.mjs http://127.0.0.1:1238 "$PWD/kind_sweep_webgl.jl" webgl
 node polish_verify.mjs http://127.0.0.1:1238 "$PWD/kind_sweep_webgl.jl" webgl
 node keyboard_a11y.mjs http://127.0.0.1:1238 "$PWD/kind_sweep_webgl.jl" webgl
 ```
 
-Portable notebooks (`Pkg.develop` via `@__DIR__`) work without `MASQUE_DEV_ENV`; first open
-re-resolves the Makie stack (~6 min). All three drivers also run in CI on the `kind-sweep` job
-(matrixed `cairo`/`webgl`), but only **advisorily** (`continue-on-error: true`) — agents still
-run this playbook locally before calling a user-facing change done, until the job is promoted
-to a required check.
-`polish_verify.mjs` is **required** and still **not sufficient** alone (one wash + one ring
-+ fade + color-scheme). `kind_sweep.mjs` is **required** and still **not sufficient**
-alone until `polish_verify.mjs` also PASSes on that backend. `keyboard_a11y.mjs` is required
-only for a change that can touch focus/keyboard/ARIA (the overlay's `keyboard.ts`/`mount.ts`
-hooks, or a manifest field it reads, e.g. `label`) — it is not a general substitute for the
-other two.
+Portable notebooks (`Pkg.develop` via `@__DIR__`) work without `MASQUE_DEV_ENV` (skip the `export`
+line so it stays unset); first open re-resolves the Makie stack (~6 min). All three drivers also run
+in CI on the `kind-sweep` job (matrixed `cairo`/`webgl`), but only **advisorily**
+(`continue-on-error: true`) — agents still run this playbook locally before calling a user-facing
+change done, until the job is promoted to a required check (#99, a WebGL hover-leave race in the
+sweep, blocks that).
+`polish_verify.mjs` is **required** and still **not sufficient** alone (one wash + one ring +
+caret-at-anchor + fade + tooltip theme). `kind_sweep.mjs` is **required** and still **not
+sufficient** alone until `polish_verify.mjs` also PASSes on that backend. `keyboard_a11y.mjs` is
+required only for a change that can touch focus/keyboard/ARIA (the overlay's
+`keyboard.ts`/`mount.ts` hooks, or a manifest field it reads, e.g. `label`) — it is not a general
+substitute for the other two.
 
 Through-Pluto `@bind` on one scatter is also `bind_click.mjs`. Frontend unit twins for
 hover outline / overlay-on-base / wash vs ring / remount identity / `prefers-color-scheme`
@@ -182,7 +189,8 @@ These are required visual-fidelity checks, not optional nice-to-haves. Drivers m
 | Flush-radius pixel check (Cairo only) | A pixel just outside the highlight `r` reads as the figure background; a pixel just inside reads as the marker's own colour — proves the outline sits on the drawn edge, not offset | `polish_verify.mjs` (scatter, `:cairo` — skipped on `:webgl`, canvas readback isn't reliable) |
 | Hover-on-selected no-op | Hovering the baked-`selected` element draws NO highlight — `svg.masque-fill > g.hi` and `svg.masque-edge > g.hi` both empty — while `g.sel` still holds the wash and the tooltip still shows | `kind_sweep.mjs` (scatter) |
 | Remount fade / no pulse | `.masque-enter` on first insert (on each highlight shape itself — no wrapper); same hover node on mousemove; `.masque-leave` on clear | both |
-| Pluto dark / `prefers-color-scheme` | Tooltip light `#ffffff`/`#1a1a1a` and dark `#1e1e1e`/`#e8e8e8` via `emulateMedia`. Official Pluto has no notebook toggle — both follow the OS media query. Dark **Makie** figure (`scatter_dark`) uses the flat `#c8c8c8` edge stroke, not OS colour-scheme (highlights do not follow OS). | `polish_verify.mjs` + `kind_sweep.mjs` (`prefers-color-scheme` + `scatter_dark`) |
+| Tooltip theme follows the figure | The overlay CSS keeps the no-relative-colour `prefers-color-scheme` fallback (`#1e1e1e`/`#e8e8e8` dark tokens); the tooltip on the light `scatter` is light and on the dark `scatter_dark` is dark; under `emulateMedia({colorScheme: "dark"})` the light figure's tooltip stays light (the OS setting does not override the figure). Dark **Makie** figure uses the flat `#c8c8c8` edge stroke (highlights do not follow OS). | `polish_verify.mjs` + `kind_sweep.mjs` (`scatter` + `scatter_dark`) |
+| Tooltip caret on the anchor | The caret apex sits on the hovered mark's anchor x (scatter element 0's centre), not the cursor | `polish_verify.mjs` (scatter) |
 | No fixed steel-teal `#3A6F7C`, no alert red `#ff3b30` | Highlight colour is the dodge fill / fixed-grey edge stroke, or (for an explicit `hoverstyle`) the verbatim stroke, never a fixed literal like the old teal, in overlay CSS, hover stroke, wash, or ring | both |
 
 `prefers-reduced-motion: reduce` stays instant (unit-tested). Live drivers use default
@@ -192,7 +200,7 @@ motion so fade is observable.
 
 - [ ] `kind_sweep.mjs` **PASS** on `:cairo` (every row, including `scatter_dark`, the tint-applied screenshot check on scatter/scatter_dark/barplot/heatmap/poly, the scatter hover-on-selected no-op, and axis/colorbar's click-preserves-selection + payload-shape + bounded-bbox checks)
 - [ ] `kind_sweep.mjs` **PASS** on `:webgl` (every row, including `scatter_dark`, the tint-applied screenshot check on scatter/scatter_dark/barplot/heatmap/poly, the scatter hover-on-selected no-op, and axis/colorbar's click-preserves-selection + payload-shape + bounded-bbox checks)
-- [ ] `polish_verify.mjs` **PASS** on `:cairo` (wash/ring/hover fill+edge/pin + flush-radius pixel check + dark-figure wash + dark-figure hover split-blend + remount fade + color-scheme + no `#ff3b30`)
+- [ ] `polish_verify.mjs` **PASS** on `:cairo` (wash/ring/hover fill+edge/pin + flush-radius pixel check + dark-figure wash + dark-figure hover split-blend + caret-at-anchor + remount fade + tooltip theme follows figure + no `#ff3b30`)
 - [ ] `polish_verify.mjs` **PASS** on `:webgl` (same boxes except the Cairo-only flush-radius check)
 - [ ] Every row in the table above was exercised (not a subset)
 - [ ] Verification was done by driving the playbook directly, not by asking someone else
