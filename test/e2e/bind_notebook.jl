@@ -32,12 +32,14 @@ begin
 end
 
 # ╔═╡ c0000000-0000-0000-0000-000000000010
+# The `;` keeps Pluto from displaying the raw WGLMakie Figure, which would render through
+# WGLMakie's own Bonito display rather than Masque (#81). Only the widget below is shown.
 fig = let
     f = Figure(; size = (400, 300))
     ax = Axis(f[1, 1])
     scatter!(ax, 1:5, (1:5) .^ 2)
     f
-end
+end;
 
 # ╔═╡ c0000000-0000-0000-0000-000000000011
 # The @bind under test: clicking a scatter marker in the :webgl widget round-trips an

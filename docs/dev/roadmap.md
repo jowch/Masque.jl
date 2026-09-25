@@ -84,11 +84,6 @@ without new evidence:
 
 Ordered cheapest first. None of them changes the manifest shape.
 
-- **#175 and #81: a raw WGLMakie figure and a `masque` widget on one page.** The WebGL shim
-  replaced `window.Bonito`, so a `:webgl` widget broke every raw figure on the page. #200
-  scopes the shim to Masque's copy of WGLMakie's bundle, corrects the user docs on why a raw
-  figure can spin (the browser cannot reach Bonito's server), and hides the raw figure in the
-  bind E2E notebook. Merge #200.
 - **#165: wheel zoom can leave the inverse matrix applied after the settle frame.** This
   happens when the WebGL preview round trip outlasts the 150 ms settle. It can be reproduced
   deterministically from `photo.ts`. The result is wrong on screen until the next gesture.
@@ -320,14 +315,13 @@ A proposed sequence, not a decided one. The only hard dependency edges are these
 
 Registration waits for the decisions listed under "Before registration".
 
-1. Merge #200 (#175, #81).
-2. The preview path: #165 and #171 together, then #99.
-3. #168.
-4. Decide and land #172 and #167 (or defer #167 explicitly).
-5. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
-6. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
+1. The preview path: #165 and #171 together, then #99.
+2. #168.
+3. Decide and land #172 and #167 (or defer #167 explicitly).
+4. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
+5. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
    alongside, since none of it touches the package.
-7. Coverage items as users ask (#91).
-8. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
+6. Coverage items as users ask (#91).
+7. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
    per-frame or per-element cost. Spike-gated items (SVG output, spatial acceleration,
    GLMakie-static) wait for a real use.

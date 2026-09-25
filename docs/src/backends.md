@@ -90,9 +90,10 @@ does not change.
 ### The widget is the figure
 
 Return `masque(f)` from the construction cell. That cell is already a
-masqued figure. `@bind` is optional. Displaying a WGLMakie `Figure`
-hangs on `.wglmakie-spinner`: its MIME show waits for a Bonito session
-Pluto never starts.
+masqued figure. `@bind` is optional. A WGLMakie `Figure` displayed on
+its own is WGLMakie's live display, with no Masque overlay. It needs a
+connection to Bonito's server in the notebook process, and it can sit
+beside `masque` widgets on the same page.
 
 ```julia
 fig = let
@@ -117,9 +118,10 @@ end;
 @bind pick fig
 ```
 
-CairoMakie can still `@bind pick masque(fig)` after displaying a
-`Figure`: a PNG show is fine. This layout is the WGLMakie
-recommendation, and a reasonable Pluto habit on either backend.
+Displaying a `Figure` and then writing `@bind pick masque(fig)` in
+another cell also works on both backends, but it shows the figure twice.
+This layout is the WGLMakie recommendation, and a reasonable Pluto habit
+on either backend.
 
 Load WGLMakie for a live GPU canvas: animation, frequent re-renders, or
 large updating data, where per-frame PNG cost dominates.

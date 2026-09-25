@@ -313,14 +313,20 @@ bug rather than assuming it is expected.
 
 ### Tried WGLMakie and the spinner never stops
 
-**Cause:** the cell displayed a WGLMakie `Figure`. Its MIME show waits
-for a Bonito session Pluto never starts, so the cell hangs on
-`.wglmakie-spinner`.
+**Cause:** the cell displayed a WGLMakie `Figure`, not a `masque`
+widget. That is WGLMakie's own display. It draws only after the browser
+connects to the Bonito server that WGLMakie starts in the notebook
+process, on `localhost:9384` by default. When Pluto runs on another
+machine, in a container, or behind a tunnel that forwards only Pluto's
+port, the browser cannot reach that address, and the spinner never
+stops. A `masque` widget does not use that connection.
 
-**Fix:** return `masque(f)` from the construction cell. That cell is
-already the overlay. `@bind` is optional. A trailing `;` is only so
-Pluto does not show the widget twice. For the cell layout, see
-[The widget is the figure](@ref).
+**Fix:** for the overlay, return `masque(f)` from the construction cell.
+That cell is already the overlay. `@bind` is optional. A trailing `;`
+is only so Pluto does not show the widget twice. For the cell layout,
+see [The widget is the figure](@ref). To keep WGLMakie's own display
+working remotely, forward port 9384 as well, or point Bonito at an
+address the browser can reach with `Bonito.configure_server!`.
 
 ### Tried WGLMakie and the canvas is blank
 

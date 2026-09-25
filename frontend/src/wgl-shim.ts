@@ -463,7 +463,7 @@ function initPlot(p: Pool, plot: Plot): void {
             obs([plot.width, plot.height]),
             obs([plot.width, plot.height]),
             obs(wrapped),
-            new ((window as any).Bonito._ConnStub)(),
+            new (scopedBonito()._ConnStub)(),
             30,
             obs(false),
         )
@@ -573,9 +573,19 @@ function enroll(host: WebGLHost, canvas: HTMLCanvasElement, WGL: WglBundle, scen
     pump()
 }
 
+// The shim lives at `window.__MasqueWGL.bonito`, never at `window.Bonito`. WGLMakie's bundle
+// reads a bare `Bonito` identifier, and `_widget_html` (ext/MasqueWGLMakieExt.jl) prepends
+// `const Bonito = globalThis.__MasqueWGL.bonito;` to Masque's copy of it, so only that copy
+// sees the shim. A raw WGLMakie figure on the same page keeps the real Bonito client and its
+// live connection (#175).
+export function scopedBonito(): ReturnType<typeof makeBonitoShim> {
+    const H = ((window as any).__MasqueWGL ??= {})
+    return (H.bonito ??= makeBonitoShim())
+}
+
 export async function mountWebGL({ canvas, wglBundleUrl, scene, width, height, pxPerUnit = 2, visible }: MountArgs) {
+    scopedBonito()    // must exist before the bundle's prelude reads it at module evaluation
     const WGL = await import(/* @vite-ignore */ wglBundleUrl)
-    ;(window as any).Bonito = makeBonitoShim()    // WGLMakie reads window.Bonito globals
     const sceneObj = rewrap(scene)
     const host = canvas.parentElement as WebGLHost | null
     // Return WGL so an animation driver can do BOTH tiers without re-importing:
