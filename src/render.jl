@@ -288,9 +288,9 @@ function build_manifest(
     _validate_slices(layers)
     _validate_links(layer_owners, layers)
     spec = _selection_spec(interactables, layers)
-    # The box owns a brushed grid's bond: a cell click would replace its GridWindowEvent with a
-    # GridCellEvent. The grid keeps hover (tooltip); the overlay hit-tests clicks by `events`.
-    if spec !== nothing && spec.mode == "grid"
+    # The box owns its target's bond: a click would replace the brushed selection while the box
+    # stays drawn over it. The target keeps hover (tooltip); the overlay hit-tests clicks by `events`.
+    if spec !== nothing
         target = only(filter(l -> l["id"] == string(spec.target), layers))
         filter!(!=("click"), target["events"])
     end
@@ -393,9 +393,9 @@ Overlay `fig` with JS hit-testing and return a Pluto `@bind` source. `fig` is no
 
 The bond is `nothing` until the first commit, unless `selected=` restored one. A click is one
 [`InteractionEvent`](@ref). A `selects` [`ROIInteractable`](@ref) aimed at points commits a
-`Vector{ElementEvent}`, and so does a click on a point of that target layer (a one-element
-vector; an empty box is `ElementEvent[]`). Clicks on other layers stay single events. Aimed at
-a grid, the brush is one [`GridWindowEvent`](@ref).
+`Vector{ElementEvent}` (an empty box is `ElementEvent[]`); aimed at a grid, one
+[`GridWindowEvent`](@ref). The box owns that bond: its target layer shows tooltips but commits no
+clicks. Clicks on other layers stay single events.
 
 # Keywords
 - `selected` — the selection's starting value, 1-based. One index on a point layer mounts as

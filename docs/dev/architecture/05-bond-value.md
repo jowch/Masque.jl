@@ -3,13 +3,19 @@
 `@bind sel masque(fig, interactables)` returns `nothing` until a commit, then one event or a
 `Vector{ElementEvent}`. The type matches the interactables in that call. A
 [`PointInteractable`](@ref) is always an [`ElementEvent`](@ref). A vector appears only when
-the same call contains an [`ROIInteractable`](@ref) whose `selects` aims at those points; a
-click on one of them is then a one-element vector. A `selects` ROI over a grid returns one
-[`GridWindowEvent`](@ref), and the box owns that bond: `build_manifest` ships the target grid
-hover-only (no `"click"` in its `events`), so a cell click outside the box commits nothing, and
-`bond_from_js` refuses a single-cell envelope for that layer. A one-cell window was the other
-option; it was rejected because the box would stay drawn over its old region while the value
-named a different cell. Axis, colorbar, threshold, and bounds-only ROI stay their own
+the same call contains an [`ROIInteractable`](@ref) whose `selects` aims at those points. A
+`selects` ROI over a grid returns one [`GridWindowEvent`](@ref). Either way the box owns that
+bond: `build_manifest` ships the target layer hover-only (no `"click"` in its `events`), so it
+takes no clicks and shows no `pointer` cursor, and `bond_from_js` refuses a single-element
+envelope for that layer. The target is transparent to clicks, not a click sink: a click on it
+falls through `hitTest` to the next layer with `"click"`, and an `AxisInteractable` (no bbox)
+catches everything on its axis, so there the click commits an `AxisEvent`, the same as a click on
+empty space. The alternatives were a one-element commit (a one-cell
+window, or a one-point vector, which is what points did before) and moving the box to the
+clicked mark. Both were rejected: the first leaves the box drawn over its old region while the
+value names a different mark, and the second builds further on one value per widget. Compound
+binds (a value keyed by layer) are deferred; a hover-only target is easy to make clickable again
+if they land. Axis, colorbar, threshold, and bounds-only ROI stay their own
 types even inside a widget that also selects. A view pan or orbit commits nothing.
 
 | Commit | Type | Fields the cell reads |
