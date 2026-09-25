@@ -195,7 +195,8 @@ end
 end
 
 @testset "shim-completeness canary (Bonito/Connection symbols the bundle references)" begin
-    # The bundle calls Bonito.<x> and Bonito.Connection.<x> (resolved to the scoped shim) with no
+    # The bundle calls bare Bonito.<x> and Bonito.Connection.<x> (the prelude points them at the
+    # scoped shim; the checks at the end of this testset lock that) with no
     # compile-time check against our shim (frontend/src/wgl-shim.ts) — a WGLMakie bump that
     # references a new one silently produces a browser TypeError (this guarded against
     # `send_warning`, added after `on_shader_error` started calling it). This asserts the
@@ -243,6 +244,15 @@ end
     missing_conn = setdiff(referenced_conn, provided_conn)
     @test missing_obj == Set{String}()    # `Evaluated:` on failure names exactly what's missing
     @test missing_conn == Set{String}()
+
+    # #175: `_widget_html` scopes the shim by prepending `const Bonito = …` to the bundle, which
+    # only shadows a bare `Bonito` identifier. A bundle that reached the global another way
+    # (`window.Bonito`, `globalThis.Bonito`, `self.Bonito`), or declared its own top-level
+    # `Bonito`, would bypass the prelude or make it a SyntaxError. The regex above matches
+    # `window.Bonito.x` too, so it cannot catch that; these can.
+    @test !occursin(r"(?:window|globalThis|self)\s*(?:\.\s*Bonito\b|\[\s*[\"']Bonito[\"']\s*\])", bundle)
+    @test !occursin(r"(?:^|[;{}\s])(?:const|let|var|function|class)\s+Bonito\b"m, bundle)
+    @test !occursin(r"\bimport\b[^;]*\bBonito\b", bundle)
 end
 
 @testset "WGL accessors rewrap a moved internal" begin

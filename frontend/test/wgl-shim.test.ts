@@ -177,6 +177,22 @@ describe("mountWebGL", () => {
         expect(result.scene.value).toBeInstanceOf(Float32Array)
     })
 
+    it("creates the scoped shim before the bundle evaluates, as the widget's prelude requires (#175)", async () => {
+        // The same prelude `_widget_html` (ext/MasqueWGLMakieExt.jl) prepends to the real bundle.
+        // This copy throws at module evaluation unless the shim already exists, so it locks the
+        // order: mountWebGL must create window.__MasqueWGL.bonito before import().
+        const prelude = "const Bonito = globalThis.__MasqueWGL.bonito;\n" +
+            "if (!Bonito) throw new Error(\"scoped Bonito shim missing at bundle evaluation\");\n" +
+            "export const seenBonito = Bonito;\n"
+        const url = `data:text/javascript;charset=utf-8,${encodeURIComponent(prelude + fixtureSrc)}`
+        delete (window as unknown as { __MasqueWGL?: unknown }).__MasqueWGL
+        const { canvas } = hostCanvas()
+        const result = await mountWebGL({ canvas, wglBundleUrl: url, scene: {}, width: 100, height: 50, visible: true })
+        const H = (window as unknown as { __MasqueWGL: { bonito: unknown } }).__MasqueWGL
+        expect((result.WGL as unknown as { seenBonito: unknown }).seenBonito).toBe(H.bonito)
+        expect((window as unknown as { Bonito?: unknown }).Bonito).toBeUndefined()
+    })
+
     it("defaults pxPerUnit to 2 when omitted", async () => {
         const { canvas } = hostCanvas()
         const result = await mountWebGL({ canvas, wglBundleUrl: bundleUrl, scene: {}, width: 100, height: 50, visible: true })

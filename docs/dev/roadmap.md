@@ -328,16 +328,6 @@ tick it and update the docs page (#90) whenever `_plotbase` grows a branch.
 - **#90 Supported-recipes page**: one lookup table (recipe, layer id, kind, hit unit, Axis /
   Axis3 / PolarAxis) sourced from `_plotbase`, linked from Home, Getting started, and
   Interactables. Kept in lockstep with #91.
-- **#81 WGLMakie cell pattern**: return `masque(f)` from the construction cell instead of
-  displaying a `Figure` (whose MIME show waits on a Bonito session Pluto never starts).
-  Update `backends.md`, `getting-started.md`, `troubleshooting.md`, and `test/notebooks/webgl_demo.jl`.
-  - **Open: should Masque enforce this in code, not just docs?** Idea under discussion — when
-    `WGLMakie` is loaded and we are inside Pluto, intercept the figure's HTML show so a raw
-    `Figure` yields an `@info` pointing at `masque(fig)` instead of a spinner that never
-    resolves. The decision is whether that is worth a `Base.show` method for a Makie type from
-    Masque's extension (piracy on another package's display path, affecting users who never
-    call `masque`), or whether the guidance stays documentation-only as #81 proposes. Not
-    decided; file an issue if we want it.
 
 ### Output and scale
 
@@ -484,7 +474,7 @@ nothing left to build, so it is not a dependency of anything below.)
 
 1. Resolve #49.
 2. Pre-registration revisions, including new work wanted in 0.1.0. Self-contained and cheap:
-   #88, #81, #90, and keyboard drag nudging. Unknown parents already contribute known children (#158).
+   #88, #90, and keyboard drag nudging. Unknown parents already contribute known children (#158).
 3. The remount path (#84 hold). Both backends, live-verified on view-pan.
 4. Register v0.1.0, then the notebook cleanup (drop `Pkg.develop`, re-enable Binder).
 5. Remaining coverage items as demand arrives (#91 list).
