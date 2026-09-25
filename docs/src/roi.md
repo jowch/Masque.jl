@@ -51,9 +51,8 @@ pts = PointInteractable(ax, s; id = :pts, payloads = df)
 picks === nothing || isempty(picks) ? df[1:0, :] : df[picks, :]
 ```
 
-Clicking one of those points in the same widget also returns a vector
-(with one event), so the downstream cell treats a click and a brush the
-same way.
+The box owns the value: the points still show their tooltips, but
+clicking one commits nothing, so `picks` is always what the box holds.
 
 ## Brush heatmap cells
 

@@ -333,7 +333,8 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
         }
     }
     const covered = hitIsCovered(sliceLayer, hit)
-    const press = !!hit && PRESS_KINDS.has(hit.layer.kind) && !covered
+    // `pointer` only where a click commits: a `selects` target is hover-only (the box owns the bond).
+    const press = !!hit && PRESS_KINDS.has(hit.layer.kind) && hit.layer.events.includes("click") && !covered
     const viewGrab = !hit && dragHit?.layer.kind === "view"
     const inSupport = !!sampled && sampled.samples.length > 0
     const colorbar = !!hit && hitIsColorbar(hit)

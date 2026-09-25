@@ -440,8 +440,16 @@ struct _NotReal end
         )
         w = Masque.MasqueWidget("", manifest, 100)
         @test tv(w, nothing) === nothing
-        # wire index 3 is the fourth element (Julia index 4)
-        single = tv(w, Dict("layer" => "pts", "index" => 3, "payload" => Dict("city" => "NYC")))
+        # the box owns the target's bond: a single click envelope on it is refused
+        err = try
+            tv(w, Dict("layer" => "pts", "index" => 3, "payload" => Dict("city" => "NYC")))
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("selects", err.msg) && occursin(":pts", err.msg)
+        # a one-item brush is still a one-element vector; wire index 3 is Julia index 4
+        single = tv(w, Dict("items" => [Dict("layer" => "pts", "index" => 3)]))
         @test single isa Vector{ElementEvent} && only(single).layer === :pts && only(single).index == 4
         @test only(single).payload == "d"
         multi = tv(
