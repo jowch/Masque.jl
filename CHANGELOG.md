@@ -8,8 +8,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 - A `selects` `ROIInteractable` owns the `@bind` value of the layer it brushes. That layer still
-  shows tooltips, but clicking it commits nothing and shows no `pointer` cursor, so the value is
-  always what the box holds. Over points this replaces the old one-element-vector click, which
+  shows tooltips, but takes no clicks and shows no `pointer` cursor; a click on it passes through
+  to any clickable layer underneath (an `AxisInteractable` catches clicks anywhere on its axis).
+  Over points this replaces the old one-element-vector click, which
   swapped the brushed selection for the clicked point while the box stayed where it was. Over a
   grid it fixes a cell click turning the value into a `GridCellEvent` (`… has no field i1` in a
   cell written for `GridWindowEvent`). Clicks on other layers in the same widget are unchanged.

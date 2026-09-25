@@ -52,7 +52,9 @@ picks === nothing || isempty(picks) ? df[1:0, :] : df[picks, :]
 ```
 
 The box owns the value: the points still show their tooltips, but
-clicking one commits nothing, so `picks` is always what the box holds.
+clicking one commits nothing from that layer, so `picks` stays what the
+box holds. The click passes through, so a clickable layer underneath
+(such as an [`AxisInteractable`](@ref)) still takes it.
 
 ## Brush heatmap cells
 

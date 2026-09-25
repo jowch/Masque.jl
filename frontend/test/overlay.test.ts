@@ -3298,6 +3298,36 @@ describe("crosshair", () => {
         expect(tip.innerHTML).not.toContain("wide")
     })
 
+    it("a hover-only circle beside a slice gets no pointer and no hair, and keeps its own tooltip", () => {
+        // A `selects` target ships without "click". It is not clickable, so no pointer, but it is
+        // still a discrete mark: the hair stays off and the tooltip is the mark's, not the slice's.
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [
+                {
+                    id: "pts", kind: "circles", geometry: [100, 100, 15], payloads: [{ i: 3 }],
+                    axis: "ax1", events: ["hover"],
+                },
+                {
+                    id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: {
+                        orientation: "v", crosshair: true, covers: ["fill"],
+                        series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                    },
+                },
+            ],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 50, 50) // image (100, 100)
+        expect(surface.classList.contains("hot")).toBe(false)
+        expect(crossOn(shadow)).toBe(false)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        expect(tip.innerHTML).toContain("3")
+        expect(tip.innerHTML).not.toContain("wide")
+    })
+
     it("a horizontal slice draws only the horizontal hair", () => {
         const { host, script } = setup()
         mount(script, {

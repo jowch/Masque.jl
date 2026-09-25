@@ -114,9 +114,12 @@ One widget can hold several interactables, so the value is whichever
 event came last; check `pick.layer` or the event's type when a cell has
 to tell them apart. One exception: the layer an ROI's `selects` names
 belongs to the box. Its points or cells still show their tooltips, but
-clicking them commits nothing, so the value stays what the box holds (a
-`Vector{ElementEvent}` or a `GridWindowEvent`). Clicks on any other
-layer in the widget still arrive as a single event.
+they take no clicks: a click on one passes through to whatever clickable
+layer is underneath. Usually nothing is, and the value stays what the
+box holds (a `Vector{ElementEvent}` or a `GridWindowEvent`). An
+[`AxisInteractable`](@ref) catches clicks anywhere on its axis, so in a
+widget that has one, that click becomes an `AxisEvent`. Clicks on any
+other layer in the widget still arrive as a single event.
 
 ## Live notebook, static export, and this site
 
