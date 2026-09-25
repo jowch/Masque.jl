@@ -172,9 +172,12 @@ the sent frame is actually visible — the image `load` on `:cairo`, the scene s
 leaving only the residual if the pointer has moved on. It is not a client camera, and it is not a
 substitute for the frame itself. A wheel has no pointer release, so the terminal request is one
 settle 150ms (`WHEEL_IDLE_MS`, `frontend/src/photo.ts`) after the last notch. A new notch resets
-that wait. Orbit ignores the wheel. Two known preview bugs are open: the axis frame can move while a
-pan waits for its next frame (#171), and a wheel zoom can leave an inverse photograph when the
-settle frame follows a preview (#165).
+that wait. Orbit ignores the wheel. A request's matrix is relative to the frame on screen when it
+was built, and one round trip at a time means a request can land after an earlier frame has
+already replaced that base (a wheel settle behind its own preview, a pan released mid-flight). The
+overlay re-expresses such a request through each frame that landed since it was built before
+taking the residual (#165). One known preview bug is open: the axis frame can move while a pan
+waits for its next frame (#171).
 **Backends differ in cost, never in the interaction contract:** conformance is judged
 against the obligations above, never against a particular backend's mechanism.
 

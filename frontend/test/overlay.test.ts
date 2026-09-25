@@ -3602,12 +3602,16 @@ describe("photographic pan / wheel zoom", () => {
         // Let the move's request go out before release, or settle() supersedes it unsent.
         for (let i = 0; i < 2; i++) await Promise.resolve()
         expect(requestFrame).toHaveBeenCalledTimes(1)
-        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
-        expect(host.dataset.masquePhoto).not.toBe("")
+        // The pointer moves on while that frame is in flight, so the settle's matrix differs
+        // from the in-flight one: only re-expressing it as residual(landed, sent) lands on
+        // identity (the reverse order leaves 1,200,0).
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 250, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 250, clientY: 200, bubbles: true }))
+        expect(host.dataset.masquePhoto).toBe("1,300,0")
         const frame = { scene: { tag: "p" }, pxPerUnit: 1, width: 400, height: 300, manifest: m }
-        releases[0](frame) // the move's frame lands
+        releases[0](frame) // the first move's frame lands; the later motion stays on the photograph
         for (let i = 0; i < 4; i++) await Promise.resolve()
-        expect(host.dataset.masquePhoto).toBe("")
+        expect(host.dataset.masquePhoto).toBe("1,100,0")
         expect(requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0].settle).toBe(true)
         releases[1](frame) // the settle lands on the same limits
         for (let i = 0; i < 4; i++) await Promise.resolve()
