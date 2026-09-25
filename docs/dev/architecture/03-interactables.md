@@ -118,7 +118,7 @@ this table is `docs/src/support.md`.
 
 | Type | kind(s) | Makie surfaces | payload |
 |---|---|---|---|
-| `PointInteractable` | `:circles` | Scatter, MeshScatter (3-D), Stem·pts, ScatterLines·pts | `(; index, x, y)` |
+| `PointInteractable` | `:circles` | Scatter, MeshScatter (3-D), Stem·pts, ScatterLines·pts | `(; index, x, y)`, plus `z` when the point has three coordinates (Scatter on `Axis3`, MeshScatter) |
 | `SegmentInteractable` | `:polyline` \| `:lines` \| `:segments` | Lines, Stairs, Series, ScatterLines·line (`:lines`, one element per path); an explicit `mode=:polyline` vertex list stays `:polyline` (per edge); LineSegments, Errorbars, Rangebars, HLines, VLines, Stem·stems, Wireframe, Arrows3D (`:pairs` → `:segments`) | `:lines` `(; index)` (a series adds `label` when Makie set one); `:polyline` / `:segments` `(; segment_index)`; Arrows3D `(; index, x, y, z, u, v, w)` |
 | `RectInteractable` | `:rects` \| `:grid` | BarPlot, Hist, Waterfall, CrossBar, HSpan, VSpan, Spy, BoxPlot (un-notched) (list); Heatmap, Image (grid) | grid `(; i, j, value)`; BarPlot/Waterfall `(; low, high, value)`; Hist `(; value, low, high)`; CrossBar `(; midpoint, low, high)`; HSpan/VSpan `(; low, high)`; BoxPlot `(; q1, median, q3)`; Spy `(; index)` |
 | `PolygonInteractable` | `:polygons` | Poly, Band, Density, Contourf, Violin, Voronoiplot, BoxPlot (notched) | Band/Density/Voronoiplot `(; index)`; Contourf `(; low, high)`; Violin `(; x)` |
