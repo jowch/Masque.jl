@@ -176,8 +176,11 @@ that wait. Orbit ignores the wheel. A request's matrix is relative to the frame 
 was built, and one round trip at a time means a request can land after an earlier frame has
 already replaced that base (a wheel settle behind its own preview, a pan released mid-flight). The
 overlay re-expresses such a request through each frame that landed since it was built before
-taking the residual (#165). One known preview bug is open: the axis frame can move while a pan
-waits for its next frame (#171).
+taking the residual (#165). The sliding copy is clipped to the view layer's `clip` rect, the
+viewport inset past half the spine stroke plus a pixel, so no spine slides with the data. Nor
+may a frame move the axis box under the held picture: `masque` pins a pan axis's automatic
+tick-label space to its width at mount (`_pin_pan_ticklabelspace!`, `src/render.jl`), so wider
+labels in a later frame hang into the margin instead (#171).
 **Backends differ in cost, never in the interaction contract:** conformance is judged
 against the obligations above, never against a particular backend's mechanism.
 

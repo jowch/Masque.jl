@@ -1286,6 +1286,14 @@ function hitlayers(i::ViewInteractable, ctx)
         "w" => Float32(vw), "h" => Float32(vh),
         "mode" => t.is3d ? "orbit" : "pan",
     )
+    if !t.is3d && i.ax isa Makie.Axis
+        # The photographic preview (#85) slides a copy of the data inside the axis box. Makie
+        # strokes each spine centred on the box edge, so half the stroke, plus a pixel when the
+        # edge rounds onto a device pixel, lies inside the viewport. Clip the sliding copy past
+        # it, or a second axis edge slides with the data (#171). The hit region stays `x, y, w, h`.
+        ins = ceil(Float64(i.ax.spinewidth[]) * ctx.scaling / 2) + 1
+        geom["clip"] = Float32[vx + ins, vy + ins, max(vw - 2ins, 0), max(vh - 2ins, 0)]
+    end
     if t.is3d
         # Current camera — JS computes the drag's (azimuth, elevation) from the pixel delta, for
         # the Tier-0 readout and the gesture-channel request payload. Never committed

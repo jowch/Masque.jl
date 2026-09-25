@@ -38,6 +38,33 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test isempty(mt["payloads"]) && !haskey(mt, "tooltips")   # computed client-side, no payloads/tooltips
     end
 
+    @testset "a pan axis keeps its box when tick labels grow (#171)" begin
+        box(ax) = Tuple(Float64.((ax.scene.viewport[].origin..., ax.scene.viewport[].widths...)))
+        # Reference: the same figure with no widget, to show masque() leaves the first picture as is.
+        fr = Figure(size = (500, 320)); axr = Axis(fr[1, 1]; limits = (0, 8, 0, 40))
+        scatter!(axr, 1:7, (1:7) .* 5)
+        Makie.update_state_before_display!(fr)
+        f = Figure(size = (500, 320)); ax = Axis(f[1, 1]; limits = (0, 8, 0, 40))
+        scatter!(ax, 1:7, (1:7) .* 5)
+        masque(f, [ViewInteractable(ax)])
+        b0 = box(ax)
+        @test b0 == box(axr)
+        @test !(ax.yticklabelspace[] isa Makie.Automatic)
+        # A pan that puts a minus sign on the y labels moves the unpinned reference box, and not
+        # the pinned one, nor a pan far enough that the labels outgrow the pinned space.
+        limits!(axr, 0, 8, -15, 25); Makie.update_state_before_display!(fr)
+        @test box(axr) != b0
+        for lims in ((0, 8, -15, 25), (0, 8, -1500, 2500))
+            limits!(ax, lims...); Makie.update_state_before_display!(f)
+            @test box(ax) == b0
+        end
+        # An explicit label space is the author's; masque() leaves it alone.
+        fe = Figure(); axe = Axis(fe[1, 1]; yticklabelspace = 40.0)
+        scatter!(axe, 1:3, 1:3)
+        masque(fe, [ViewInteractable(axe)])
+        @test axe.yticklabelspace[] == 40.0
+    end
+
     @testset "ViewInteractable (drag-to-pan / orbit)" begin
         # See the ThresholdInteractable note above — same clobbering, same fix.
         (; ax, ctx) = default_fixture()
@@ -49,6 +76,10 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test Lv.geometry["mode"] == "pan"
         @test Lv.geometry["w"] ≈ ctx.transforms[Lv.axis].viewport[3]
         @test !haskey(Lv.geometry, "azimuth")
+        # #171: the preview clips past the spine stroke (half the width, plus a rounding pixel).
+        ins = ceil(Float64(ax.spinewidth[]) * ctx.scaling / 2) + 1
+        vp = ctx.transforms[Lv.axis].viewport
+        @test Lv.geometry["clip"] ≈ Float32[vp[1] + ins, vp[2] + ins, vp[3] - 2ins, vp[4] - 2ins]
         # view layers sort after ROI/threshold in the manifest (hit-test arbitration)
         roi = ROIInteractable(ax; bounds = (1.0, 2.0, 1.0, 2.0), id = :roi)
         morder = build_manifest([v, roi], ctx)["layers"]
@@ -67,6 +98,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test L3.geometry["mode"] == "orbit"
         @test L3.geometry["azimuth"] ≈ 0.4
         @test L3.geometry["elevation"] ≈ 0.5
+        @test !haskey(L3.geometry, "clip")   # orbit has no photographic preview
         # #102/§12.3: a view gesture commits nothing, so the frontend never sends a :view bond
         # payload anymore — `_computed_payload`'s :view branch retired with it. A caller that
         # somehow reaches transform_value with one anyway (there is no such path in the shipped

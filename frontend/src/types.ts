@@ -65,6 +65,9 @@ export interface ViewGeometry {
     w: number
     h: number
     mode: "pan" | "orbit"
+    // pan only: the viewport inset past the spine stroke, image px (#171). The photographic
+    // preview clips its sliding copy to this, so no axis edge slides with the data.
+    clip?: [number, number, number, number]
     azimuth?: number    // radians; orbit only (current Axis3 camera)
     elevation?: number  // radians; orbit only
 }
