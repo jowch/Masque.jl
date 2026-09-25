@@ -4,7 +4,8 @@ import {
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles,
     anchorFor, computeAnchoredPlacement,
 } from "../src/geometry"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest } from "../src/types"
+import { begin as beginThreshold, end as endThreshold } from "../src/drag/threshold"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, ThresholdGeometry } from "../src/types"
 
 describe("primitives", () => {
     it("distToSegment", () => {
@@ -578,6 +579,34 @@ describe("view pan / orbit math", () => {
         }
         expect(hitLayer(layer, 150, 100)).toMatchObject({ index: 0 })
         expect(hitLayer(layer, 10, 10)).toBeNull()
+    })
+})
+
+// Julia's `_decategorize` (src/bond.jl) reads these exact payloads: the category label as `x`/`y`
+// for an axis click, and the bare label for a threshold release. A change here breaks the bond.
+describe("categorical wire payloads", () => {
+    const catT: AxisTransform = { xlims: [0.5, 3.5], ylims: [0, 10], xscale: "identity", yscale: "identity",
+        viewport: [0, 0, 300, 100], xreversed: false, yreversed: false, xcats: ["a", "b", "c"] }
+    const manifest = { transforms: { ax1: catT } } as unknown as Manifest
+    const axisLayer: HitLayer = { id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["hover", "click"] }
+
+    it("an axis click sends the category label on the categorical dimension", () => {
+        // px=150 is the middle of the viewport → data x = 2 → "b"; py=50 → data y = 5.
+        const p = resolvePayload({ layer: axisLayer, index: -1, axis_: "ax1" } as any, manifest, 150, 50) as { x: unknown; y: unknown }
+        expect(p.x).toBe("b")
+        expect(p.y).toBeCloseTo(5, 6)
+    })
+    it("a vertical threshold release sends the bare category label", () => {
+        const tg: ThresholdGeometry = { orientation: "v", pos: 50, span: [0, 100] }
+        const d = beginThreshold("threshold", null as unknown as SVGLineElement, tg, catT, 1)
+        expect(endThreshold(d as any, { x: 250, y: 50 })).toEqual({ layer: "threshold", index: 0, payload: "c" })
+    })
+    it("a horizontal threshold on a categorical y sends that axis's label", () => {
+        const yT: AxisTransform = { ...catT, xcats: null, xlims: [0, 10], ylims: [0.5, 3.5], ycats: ["lo", "mid", "hi"] }
+        const tg: ThresholdGeometry = { orientation: "h", pos: 50, span: [0, 300] }
+        const d = beginThreshold("threshold", null as unknown as SVGLineElement, tg, yT, 1)
+        // py=10 is near the top → fy ≈ 0.9 → data y ≈ 3.2 → "hi".
+        expect(endThreshold(d as any, { x: 150, y: 10 }).payload).toBe("hi")
     })
 })
 

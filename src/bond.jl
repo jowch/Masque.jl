@@ -333,7 +333,8 @@ end
 # On a categorical dimension the overlay sends the category label, not a number (`mapAxis` in
 # geometry.ts), so the hover card can show it. Makie places categories at `1:n`: the label
 # becomes its position here, before any `transform_bond`, and travels on as `xcat` / `ycat`
-# (axis) or `category` (threshold).
+# (axis) or `category` (threshold). The payload shapes are pinned in frontend/test/geometry.test.ts
+# ("categorical wire payloads").
 function _decategorize(manifest::AbstractDict, d::AbstractDict, js_payload)
     kind = d["kind"]
     (kind == "axis" || kind == "threshold") || return js_payload
