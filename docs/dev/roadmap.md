@@ -84,13 +84,9 @@ without new evidence:
 
 Ordered cheapest first. None of them changes the manifest shape.
 
-- **#165: wheel zoom can leave the inverse matrix applied after the settle frame.** This
-  happens when the WebGL preview round trip outlasts the 150 ms settle. It can be reproduced
-  deterministically from `photo.ts`. The result is wrong on screen until the next gesture.
-  It also keeps the kind sweep from becoming a required check.
 - **#171: the axis frame doubles while a pan waits for its frame.** The sliding copy is
-  clipped on the spine's centre line, so half the spine moves with it. Fix #171 together with
-  #165, since both are in the preview path (`mount.ts`, `photo.ts`).
+  clipped on the spine's centre line, so half the spine moves with it, and a frame whose tick
+  labels grow wider moves the axis box itself.
 - **#168: the browser's focus outline boxes the whole figure** on any widget where Masque
   draws no ring of its own (grids, readouts, drags). Draw Masque's own inset indicator
   instead of hiding the outline, so keyboard users keep a visible focus. #169 depends on this.
@@ -133,8 +129,8 @@ of them breaks an existing call.
   it.
 - **#169: arrow-key nudging for threshold, ROI, and view.** This is the WCAG 2.1.1 gap.
   Each drag layer gets one extra tab stop. The view nudge never writes `@bind`. It depends
-  on #168 for the focus indicator. Its view nudge reuses the pan and settle path, so fix #165
-  and #171 first. When #169 lands, `architecture/11-keyboard.md` changes from describing it
+  on #168 for the focus indicator. Its view nudge reuses the pan and settle path, so fix #171
+  first. When #169 lands, `architecture/11-keyboard.md` changes from describing it
   as a proposal to describing the shipped keys.
 - **#179: wide mode.** `max_width` already sets the render width, but Pluto's column shrinks
   the result. #179 widens the cell from inside the widget using `PlutoUI.WideCell`'s
@@ -219,7 +215,7 @@ update `support.md` whenever `_plotbase` grows a branch.
 ### Tooling
 
 - **Promote the `kind-sweep` job to a required check** once #99 (the WebGL hover-leave flake)
-  and #165 are fixed. Until then, agents run the sweep locally.
+  is fixed. Until then, agents run the sweep locally.
 - **#176: advisory CI against Makie's development branch.** The canaries only, on a schedule
   and not as a required check. It detects a moved internal before CompatHelper's bump PR
   does. Keep the one-minor compat pins.
@@ -311,11 +307,11 @@ shipped, which is a better filter than what other libraries happen to have.
 A proposed sequence, not a decided one. The only hard dependency edges are these:
 - #180 before #181.
 - #168 before #169.
-- #99 and #165 before the kind sweep becomes a required check.
+- #99 before the kind sweep becomes a required check.
 
 Registration waits for the decisions listed under "Before registration".
 
-1. The preview path: #165 and #171 together, then #99.
+1. The preview path: #171, then #99.
 2. #168.
 3. Decide and land #172 and #167 (or defer #167 explicitly).
 4. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.

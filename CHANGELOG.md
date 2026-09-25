@@ -308,6 +308,10 @@ All notable changes to this project are documented here. The format is based on
   (`docs/dev/roadmap.md`), not groundwork already in place.
 
 ### Fixed
+- A pan or wheel zoom no longer leaves the data shifted or scaled after the gesture ends.
+  A request built while an earlier frame was still in flight, such as the wheel's settle
+  or a pan's release, was measured against a picture that frame then replaced, so the
+  preview's inverse stayed on screen (#165).
 - A `:webgl` widget no longer breaks raw WGLMakie figures on the same Pluto page. Its
   Bonito stand-in used to replace `window.Bonito`, so a raw figure shown before the widget
   stopped responding and one shown after it kept its spinner. The stand-in is now scoped to
