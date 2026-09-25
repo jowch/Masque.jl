@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles,
-    anchorFor, computeAnchoredPlacement,
+    anchorFor, computeAnchoredPlacement, photoClip,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold } from "../src/drag/threshold"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, ThresholdGeometry } from "../src/types"
@@ -584,6 +584,24 @@ describe("view pan / orbit math", () => {
 
 // Julia's `_decategorize` (src/bond.jl) reads these exact payloads: the category label as `x`/`y`
 // for an axis click, and the bare label for a threshold release. A change here breaks the bond.
+describe("photoClip", () => {
+    const view = (clip?: [number, number, number, number]): Manifest => ({
+        width: 400, height: 300, transforms: {},
+        layers: [{
+            id: "v", kind: "view", axis: "ax1", events: ["drag"], hover: [], tooltips: false,
+            geometry: { x: 40, y: 30, w: 300, h: 200, mode: "pan", ...(clip ? { clip } : {}) },
+        }],
+    } as unknown as Manifest)
+    it("is the pan view's clip rect, inside the spines, while the photo is live (#171)", () => {
+        expect(photoClip(view([42, 32, 296, 196]), { s: 1, tx: 5, ty: 0 }, "v"))
+            .toEqual({ x: 42, y: 32, w: 296, h: 196 })
+    })
+    it("falls back to the viewport without a clip, and is null at identity", () => {
+        expect(photoClip(view(), { s: 1, tx: 5, ty: 0 }, "v")).toEqual({ x: 40, y: 30, w: 300, h: 200 })
+        expect(photoClip(view([42, 32, 296, 196]), { s: 1, tx: 0, ty: 0 }, "v")).toBeNull()
+    })
+})
+
 describe("categorical wire payloads", () => {
     const catT: AxisTransform = { xlims: [0.5, 3.5], ylims: [0, 10], xscale: "identity", yscale: "identity",
         viewport: [0, 0, 300, 100], xreversed: false, yreversed: false, xcats: ["a", "b", "c"] }
