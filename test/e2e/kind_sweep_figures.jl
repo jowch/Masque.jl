@@ -123,6 +123,21 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
     ),
     Dict(
+        # A threshold on a categorical y axis. Release commits the nearest category's position
+        # and label (#192), and the line snaps onto that category (#199).
+        "key" => "threshold_cat", "layerId" => "threshold", "layerKind" => "threshold",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        "categorical" => true,
+    ),
+    Dict(
+        # An axis click on a categorical y axis: the category's position plus its label (#192).
+        "key" => "axis_cat", "layerId" => "axis", "layerKind" => "axis",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "axis_cat",
+        "category" => "b", "position" => 2,
+    ),
+    Dict(
         "key" => "roi", "layerId" => "roi", "layerKind" => "roi",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
@@ -400,6 +415,20 @@ function build_kind_sweep()
         masque(fig, ThresholdInteractable(ax; orientation = :horizontal, value = 4.0, id = :threshold))
     end
 
+    threshold_cat = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "threshold (categorical y)", dim2_conversion = Makie.CategoricalConversion())
+        scatter!(ax, [1.0, 2.0, 3.0], ["a", "b", "c"]; markersize = 10, color = :gray)
+        masque(fig, ThresholdInteractable(ax; orientation = :horizontal, value = 2.0, id = :threshold))
+    end
+
+    axis_cat = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "axis (categorical y)", dim2_conversion = Makie.CategoricalConversion())
+        scatter!(ax, [1.0, 2.0, 3.0], ["a", "b", "c"]; markersize = 10, color = :gray)
+        masque(fig, AxisInteractable(ax; id = :axis))
+    end
+
     roi = let
         pts = [(1.0, 1.0), (3.0, 3.0), (5.0, 5.0), (7.0, 7.0), (9.0, 9.0)]
         fig = Figure(size = (480, 260))
@@ -548,7 +577,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly,
-        polar, scatter_dark, arrows3d, hlines, threshold, roi, view, legend, series_legend,
+        polar, scatter_dark, arrows3d, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
 end

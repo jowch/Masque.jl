@@ -831,6 +831,34 @@ try {
       const re = spec.layerKind === "roi" ? /:roi|ElementEvent\[|BoundsEvent/i : /:threshold|:thr|ThresholdEvent/i;
       if (!re.test(after)) throw new Error(`${key}-drag: readout mismatch ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/drag-bind`);
+      if (spec.categorical) {
+        // A release on a categorical dimension commits the nearest category's 1-based position and
+        // its label (#192), and the line moves onto that category (#199). This fixture is a
+        // horizontal threshold, so the category axis is y.
+        const m = /value\s*=\s*(-?[\d.]+),\s*category\s*=\s*"([^"]*)"/.exec(after);
+        if (!m) throw new Error(`${key}-drag: expected a ThresholdEvent with a category, got ${JSON.stringify(after).slice(0, 200)}`);
+        const k = Number(m[1]);
+        const t = (await transformsOf(key))[layer.axis];
+        if (!Number.isInteger(k) || !t?.ycats || t.ycats[k - 1] !== m[2]) {
+          throw new Error(`${key}-drag: value ${m[1]} is not the position of category "${m[2]}" in ${JSON.stringify(t?.ycats)}`);
+        }
+        passed.push(`${key}/category-position`);
+        const [, vy, , vh] = t.viewport;
+        let f = (k - t.ylims[0]) / (t.ylims[1] - t.ylims[0]);
+        if (t.yreversed) f = 1 - f;
+        const want = vy + (1 - f) * vh;
+        const lineY = await page.evaluate((kk) => {
+          const span = document.querySelector(`#coords_${kk}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          return Number(sr.querySelector(".masque-threshold-line")?.getAttribute("y1"));
+        }, key);
+        if (!(Math.abs(lineY - want) <= 1.5)) {
+          throw new Error(`${key}-drag: line at y=${lineY} after release, expected category ${k} at y=${want.toFixed(1)} (#199 snap)`);
+        }
+        passed.push(`${key}/line-snaps-to-category`);
+      }
       console.error(`OK  ${key}/drag — ${after.slice(0, 100)}`);
       continue;
     }
@@ -868,6 +896,33 @@ try {
     // text to CHANGE, so a warm-session re-run whose click reproduces byte-identical geometry
     // and hence a byte-identical payload (#114's collision hazard, deliberately sidestepped
     // rather than hit) still passes.
+    if (spec.mode === "axis_cat") {
+      // A click on a categorical y axis commits the category's 1-based position and its label
+      // (#192); the hover card reads the label, as the ticks do.
+      const t = (await transformsOf(key))[layer.axis];
+      if (!t || !t.ycats) throw new Error(`${key}: expected a categorical y transform, got ${JSON.stringify(t)}`);
+      const [vx, vy, vw, vh] = t.viewport;
+      let f = (spec.position - t.ylims[0]) / (t.ylims[1] - t.ylims[0]);
+      if (t.yreversed) f = 1 - f;
+      const pt = { x: vx + 0.1 * vw, y: vy + (1 - f) * vh };
+      const hover = await dispatchAt(key, pt.x, pt.y, "pointermove");
+      if (!hover.show || !hover.text.includes(`y=${spec.category}`)) {
+        throw new Error(`${key}/hover: card should read y=${spec.category}, got ${JSON.stringify(hover.text)}`);
+      }
+      passed.push(`${key}/hover-shows-category`);
+      const before = await textOf(`#out_${key}`);
+      await dispatchAt(key, pt.x, pt.y, "click");
+      const after = await waitChange(`#out_${key}`, before, `${key}-click`, 60);
+      const m = /AxisEvent\(:axis,\s*x\s*=\s*(-?[\d.e-]+),\s*y\s*=\s*(-?[\d.e-]+),\s*ycat\s*=\s*"([^"]*)"\)/.exec(after);
+      if (!m) throw new Error(`${key}/click: expected an AxisEvent with ycat, got ${JSON.stringify(after).slice(0, 200)}`);
+      if (Number(m[2]) !== spec.position || m[3] !== spec.category) {
+        throw new Error(`${key}/click: expected y = ${spec.position}, ycat = "${spec.category}", got ${after}`);
+      }
+      passed.push(`${key}/click-position-and-category`);
+      console.error(`OK  ${key}/click — ${after.slice(0, 100)}`);
+      continue;
+    }
+
     if (spec.mode === "axis") {
       const axisLayer = layers.find((l) => l.id === spec.layerId && l.kind === "axis");
       const cbLayer = layers.find((l) => l.id === spec.colorbarLayerId && l.kind === "axis");
