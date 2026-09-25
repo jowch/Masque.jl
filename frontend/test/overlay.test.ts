@@ -3536,6 +3536,84 @@ describe("photographic pan / wheel zoom", () => {
         expect(stamp.settle).toBe(false)
     })
 
+    it("a settle queued behind an in-flight preview leaves the photograph at identity (#165)", async () => {
+        // One notch sends a preview. Its round trip outlasts the 150ms idle timer, so the
+        // settle, built from the same live matrix relative to the SAME shown frame, queues
+        // behind it. The preview lands first and adopts that matrix; the settle then carries a
+        // matrix the shown frame already includes and must not re-apply its inverse.
+        vi.useFakeTimers()
+        try {
+            const m = viewManifest("pan")
+            const host = document.createElement("div")
+            const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+                masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
+            }
+            canvas.getBoundingClientRect = () =>
+                ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+            canvas.masqueReplaceScene = vi.fn()
+            const script = document.createElement("script")
+            host.append(canvas, script)
+            document.body.append(host)
+            const releases: ((r: unknown) => void)[] = []
+            const requestFrame = vi.fn((_input: Record<string, unknown>) =>
+                new Promise((r) => { releases.push(r) }))
+            mount(script, m, undefined, requestFrame as never)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            wheelAt(surface, -120)
+            expect(host.dataset.masquePhoto).not.toBe("")
+            await vi.advanceTimersByTimeAsync(0)
+            expect(requestFrame).toHaveBeenCalledTimes(1)
+            await vi.advanceTimersByTimeAsync(150) // idle timer fires while the preview is in flight
+            const frame = { scene: { tag: "z" }, pxPerUnit: 1, width: 400, height: 300, manifest: m }
+            releases[0](frame) // preview lands: the matrix comes off
+            await vi.advanceTimersByTimeAsync(0)
+            expect(host.dataset.masquePhoto).toBe("")
+            expect(requestFrame).toHaveBeenCalledTimes(2)
+            expect(requestFrame.mock.calls[1][0].settle).toBe(true)
+            releases[1](frame) // settle lands on the same limits
+            await vi.advanceTimersByTimeAsync(0)
+            expect(host.dataset.masquePhoto).toBe("")
+            expect(host.querySelector(".masque-data-clip")).toBeNull()
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it("a pan released while its last move is in flight leaves the photograph at identity (#165)", async () => {
+        // Same ordering as the wheel case: the pointer-up settle is built from the live matrix
+        // while the move's frame is still in flight, and lands after that frame adopted it.
+        const m = viewManifest("pan")
+        const host = document.createElement("div")
+        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+            masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
+        }
+        canvas.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        canvas.masqueReplaceScene = vi.fn()
+        const script = document.createElement("script")
+        host.append(canvas, script)
+        document.body.append(host)
+        const releases: ((r: unknown) => void)[] = []
+        const requestFrame = vi.fn((_input: Record<string, unknown>) => new Promise((r) => { releases.push(r) }))
+        mount(script, m, undefined, requestFrame as never)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+        // Let the move's request go out before release, or settle() supersedes it unsent.
+        for (let i = 0; i < 2; i++) await Promise.resolve()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        expect(host.dataset.masquePhoto).not.toBe("")
+        const frame = { scene: { tag: "p" }, pxPerUnit: 1, width: 400, height: 300, manifest: m }
+        releases[0](frame) // the move's frame lands
+        for (let i = 0; i < 4; i++) await Promise.resolve()
+        expect(host.dataset.masquePhoto).toBe("")
+        expect(requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0].settle).toBe(true)
+        releases[1](frame) // the settle lands on the same limits
+        for (let i = 0; i < 4; i++) await Promise.resolve()
+        expect(host.dataset.masquePhoto).toBe("")
+    })
+
     it("a second wheel notch stays on the cursor", () => {
         const { host, script } = setup()
         mount(script, viewManifest("pan"), undefined, vi.fn(async () => ({})))

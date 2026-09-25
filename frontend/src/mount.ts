@@ -8,6 +8,7 @@ import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import { limitsTip } from "./drag/view"
 import { createGestureChannel } from "./gesture"
+import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, MOTION_MS } from "./state"
 import type { HiGroups, OverlayCtx } from "./state"
@@ -387,7 +388,21 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     let paintPhoto: (m: PhotoMatrix) => void = () => {}
     // A frame that arrives while an ROI or threshold drag holds those nodes. Rebuilt when the drag ends.
     let pendingChrome: Manifest | null = null
-    const channel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto() })
+    const rawChannel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto() })
+    // A request's matrix is relative to the frame on screen when it was built. The channel runs
+    // one round trip at a time, so a request can be built while an earlier one is still in
+    // flight and land after that earlier frame has replaced the base (a wheel settle queued
+    // behind its own preview, #165; a pan's coalesced position or pointer-up settle). Record
+    // how many photo frames had landed when each request was built, and the matrix each landed
+    // frame adopted, so `adoptPhoto` can re-express a late request against the current base.
+    let photoFrames = 0
+    const adoptedMatrices = new Map<number, PhotoMatrix>()
+    const builtAt = new WeakMap<Record<string, unknown>, number>()
+    const channel: GestureChannel = {
+        request(input) { builtAt.set(input, photoFrames); rawChannel.request(input) },
+        settle(input) { builtAt.set(input, photoFrames); return rawChannel.settle(input) },
+        dispose() { rawChannel.dispose() },
+    }
 
     const ctx: OverlayCtx = {
         manifest_: manifest, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
@@ -606,7 +621,17 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const s = input.s, tx = input.tx, ty = input.ty
         if (typeof s !== "number" || typeof tx !== "number" || typeof ty !== "number") return
         if (!(s > 0) || !Number.isFinite(s + tx + ty)) return
-        const sent = { s, tx, ty }
+        let sent: PhotoMatrix = { s, tx, ty }
+        // Re-express the request's matrix in the current base: each frame that landed after it
+        // was built already applied that frame's own matrix.
+        const built = builtAt.get(input) ?? photoFrames
+        for (let k = built; k < photoFrames; k++) {
+            const m = adoptedMatrices.get(k)
+            if (m) sent = residual(m, sent)
+        }
+        adoptedMatrices.set(photoFrames, sent)
+        adoptedMatrices.delete(photoFrames - 8) // only a few requests are ever outstanding
+        photoFrames += 1
         if (state.photoAnchor_) state.photoAnchor_ = mapPoint(sent, state.photoAnchor_)
         const next = residual(sent, state.photo_)
         state.photo_ = isIdentity(next) || !Number.isFinite(next.s + next.tx + next.ty) ? IDENTITY : next
