@@ -340,4 +340,40 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test win isa GridWindowEvent && (win.i1, win.i2, win.j1, win.j2) == (2, 3, 2, 2)
         @test vals[win] == vals[2:3, 2:2]
     end
+
+    @testset "a selects box owns its point target's bond; a point click commits nothing" begin
+        pfig = Figure(size = (400, 300)); pax = Axis(pfig[1, 1])
+        pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0)]
+        scatter!(pax, first.(pts), last.(pts))
+        pi = PointInteractable(pax, pts; id = :pts, payloads = ["a", "b", "c", "d"])
+        other = PointInteractable(pax, [(5.0, 1.0)]; id = :other)
+        roi = ROIInteractable(pax; bounds = (1.5, 3.5, 1.5, 3.5), selects = :pts, id = :box)
+        tv = IP.APD.Bonds.transform_value
+
+        # Without a box the points are clickable: a click is one ElementEvent.
+        alone = masque(pfig, pi)
+        @test "click" in only(alone.manifest["layers"])["events"]
+        @test tv(alone, Dict("layer" => "pts", "index" => 1)) isa ElementEvent
+
+        # With the box, the target is hover-only; another point layer in the call keeps its clicks.
+        w = masque(pfig, [pi, other, roi])
+        ev_of(id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))["events"]
+        @test ev_of("pts") == ["hover"]
+        @test ev_of("other") == ["click", "hover"]
+        @test tv(w, Dict("layer" => "other", "index" => 0)) isa ElementEvent
+
+        err = try
+            tv(w, Dict("layer" => "pts", "index" => 1))
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("selects", err.msg) && occursin(":pts", err.msg)
+
+        # The brush still commits a Vector{ElementEvent}, and `selected=` still seeds it.
+        got = tv(w, Dict("items" => [Dict("layer" => "pts", "index" => 1), Dict("layer" => "pts", "index" => 2)]))
+        @test got isa Vector{ElementEvent} && [e.payload for e in got] == ["b", "c"]
+        seeded = IP.APD.Bonds.initial_value(masque(pfig, [pi, roi]; selected = 2))
+        @test seeded isa Vector{ElementEvent} && only(seeded).payload == "b"
+    end
 end

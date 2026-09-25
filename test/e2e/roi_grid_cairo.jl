@@ -46,6 +46,7 @@ include(joinpath(@__DIR__, "roi_grid_figures.jl"))
 # ╔═╡ e2000000-0000-0000-0000-000000000004
 begin
     widget = build_roi_grid()
+    pwidget = build_roi_points()
     nothing
 end
 
@@ -54,13 +55,25 @@ end
 
 # ╔═╡ e2000000-0000-0000-0000-000000000006
 HTML(
-    "<span id=\"out_region\">REGION=$(repr(region))</span>" *
-        "<span id=\"roi_grid_meta\" style=\"display:none\">$(JSON3.write(roi_grid_meta(widget)))</span>" *
+    "<span id=\"out_grid\">REGION=$(repr(region))</span>" *
+        "<span id=\"meta_grid\" style=\"display:none\">$(JSON3.write(roi_grid_meta(widget)))</span>" *
         "<span id=\"roi_grid_backend\">cairo</span>",
 )
 
 # ╔═╡ e2000000-0000-0000-0000-000000000007
-HTML("<span id=\"readout_region\">READOUT=$(roi_grid_readout(region))</span>")
+HTML("<span id=\"readout_grid\">READOUT=$(roi_grid_readout(region))</span>")
+
+# ╔═╡ e2000000-0000-0000-0000-000000000008
+@bind picks pwidget
+
+# ╔═╡ e2000000-0000-0000-0000-000000000009
+HTML(
+    "<span id=\"out_points\">PICKS=$(repr(picks))</span>" *
+        "<span id=\"meta_points\" style=\"display:none\">$(JSON3.write(roi_grid_meta(pwidget)))</span>",
+)
+
+# ╔═╡ e2000000-0000-0000-0000-000000000010
+HTML("<span id=\"readout_points\">READOUT=$(roi_points_readout(picks))</span>")
 
 # ╔═╡ Cell order:
 # ╠═e2000000-0000-0000-0000-000000000001
@@ -70,3 +83,6 @@ HTML("<span id=\"readout_region\">READOUT=$(roi_grid_readout(region))</span>")
 # ╠═e2000000-0000-0000-0000-000000000005
 # ╠═e2000000-0000-0000-0000-000000000006
 # ╠═e2000000-0000-0000-0000-000000000007
+# ╠═e2000000-0000-0000-0000-000000000008
+# ╠═e2000000-0000-0000-0000-000000000009
+# ╠═e2000000-0000-0000-0000-000000000010

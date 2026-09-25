@@ -508,10 +508,36 @@ describe("mount", () => {
         layers: [
             // three points (image px); box [200,600]×[200,600] encloses the first two
             { id: "pts", kind: "circles", geometry: [300, 300, 10, 500, 500, 10, 900, 700, 10],
-                payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["click", "hover"] },
+                payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["hover"] },
             { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
                 selects: "pts", geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } },
         ],
+    })
+
+    it("a click on a selects target point commits nothing, and it shows no pointer cursor", () => {
+        // Julia ships a `selects` target hover-only (build_manifest drops "click"): the box owns
+        // the bond, so a point click can't replace the brushed selection.
+        const { host, script } = setup()
+        mount(script, boxSelectManifest())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        let inputs = 0
+        host.addEventListener("input", () => { inputs++ })
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        // the click a browser fires after the drag's pointerup, which onClick swallows
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 200, clientY: 200, bubbles: true }))
+        expect(inputs).toBe(1)
+        const brushed = JSON.stringify((host as unknown as { value: unknown }).value)
+        const sel = selChildren(shadow).map((el) => el.outerHTML)
+        // pts[2] is image (900,700), outside the box [200,600]²: client (450,350).
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 450, clientY: 350, bubbles: true }))
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).textContent).not.toBe("") // hover still works
+        expect(surface.classList.contains("hot")).toBe(false)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 350, bubbles: true }))
+        expect(inputs).toBe(1)
+        expect(JSON.stringify((host as unknown as { value: unknown }).value)).toBe(brushed)
+        expect(selChildren(shadow).map((el) => el.outerHTML)).toEqual(sel)
     })
 
     it("box-select over points emits a Vector envelope of contained points + highlights them", () => {
@@ -698,7 +724,7 @@ describe("mount", () => {
         const brushed = JSON.stringify((host as unknown as { value: unknown }).value)
         const sel = selChildren(shadow).map((el) => el.outerHTML)
         // Cell (2,2) is image [400,600]², outside the box [100,400]²: client (250,250).
-        surface.dispatchEvent(new MouseEvent("mousemove", { clientX: 250, clientY: 250, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 250, clientY: 250, bubbles: true }))
         surface.dispatchEvent(new MouseEvent("click", { clientX: 250, clientY: 250, bubbles: true }))
         expect(inputs).toBe(1)
         expect(JSON.stringify((host as unknown as { value: unknown }).value)).toBe(brushed)
@@ -1558,7 +1584,7 @@ describe("tooltips (mount/showTip)", () => {
                 viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
             layers: [
                 { id: "pts", kind: "circles", geometry: [300, 300, 10, 500, 500, 10, 900, 700, 10],
-                    payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["click", "hover"],
+                    payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["hover"],
                     selected: [2] },  // only the third point pre-highlighted
                 { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
                     selects: "pts", geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } },
@@ -3251,7 +3277,7 @@ describe("crosshair", () => {
             layers: [
                 {
                     id: "pts", kind: "circles", geometry: [100, 100, 15], payloads: [{ i: 3 }],
-                    axis: "ax1", events: ["hover"],
+                    axis: "ax1", events: ["click", "hover"],
                 },
                 {
                     id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
@@ -3266,6 +3292,36 @@ describe("crosshair", () => {
         const surface = shadow.querySelector(".surface") as HTMLElement
         move(surface, 50, 50) // image (100, 100)
         expect(surface.classList.contains("hot")).toBe(true)
+        expect(crossOn(shadow)).toBe(false)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        expect(tip.innerHTML).toContain("3")
+        expect(tip.innerHTML).not.toContain("wide")
+    })
+
+    it("a hover-only circle beside a slice gets no pointer and no hair, and keeps its own tooltip", () => {
+        // A `selects` target ships without "click". It is not clickable, so no pointer, but it is
+        // still a discrete mark: the hair stays off and the tooltip is the mark's, not the slice's.
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: ax,
+            layers: [
+                {
+                    id: "pts", kind: "circles", geometry: [100, 100, 15], payloads: [{ i: 3 }],
+                    axis: "ax1", events: ["hover"],
+                },
+                {
+                    id: "slice", kind: "slice", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: {
+                        orientation: "v", crosshair: true, covers: ["fill"],
+                        series: [{ id: "wide", xy: [0, 0, 10, 10] }],
+                    },
+                },
+            ],
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        move(surface, 50, 50) // image (100, 100)
+        expect(surface.classList.contains("hot")).toBe(false)
         expect(crossOn(shadow)).toBe(false)
         const tip = shadow.querySelector(".masque-tip") as HTMLElement
         expect(tip.innerHTML).toContain("3")

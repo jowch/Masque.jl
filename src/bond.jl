@@ -17,9 +17,8 @@ end
     bondtype(interactable) -> Type
 
 The type of one commit from this interactable. Default [`ElementEvent`](@ref). When the same
-widget carries a `selects` ROI aimed at this interactable's point layer, a click on one of its
-points arrives as a one-element `Vector{ElementEvent}`; that is a property of the call, not of
-the point layer's `bondtype`.
+widget carries a `selects` ROI aimed at this interactable's layer, that layer commits no clicks
+at all: the box owns the bond. That is a property of the call, not of the layer's `bondtype`.
 """
 bondtype(::AbstractInteractable) = ElementEvent
 bondtype(::ViewInteractable) = Nothing
@@ -372,36 +371,18 @@ function _category_position(t, dim, label, id)
     return Float64(k)
 end
 
-function _one_event(manifest, owners, js; wrap::Bool)
+function _one_event(manifest, owners, js)
     layer_id = String(js["layer"])
     d = _manifest_layer(manifest, layer_id)
     kind = Symbol(d["kind"])
     wire = Int(js["index"])
     index = julia_index(kind, wire)
-    if get(manifest, "selection", nothing) == "grid" &&
-            get(manifest, "selectionTarget", nothing) == layer_id
-        throw(
-            ArgumentError(
-                "bond: grid :$layer_id is brushed by a `selects` box, which owns the bond; " *
-                    "a click on one of its cells commits nothing (expected an {items} window)",
-            ),
-        )
-    end
     js_payload = _decategorize(manifest, d, get(js, "payload", nothing))
     ev = if haskey(owners, layer_id)
         o = owners[layer_id]
         transform_bond(o.interactable, o.layer, index, js_payload)
     else
         event_from_stamp(d, index, js_payload)
-    end
-    if wrap && get(manifest, "selection", nothing) == "elements" &&
-            get(manifest, "selectionTarget", nothing) == layer_id
-        ev isa ElementEvent || throw(
-            ArgumentError(
-                "bond: selection target :$layer_id produced a $(typeof(ev)), expected ElementEvent",
-            ),
-        )
-        return ElementEvent[ev]
     end
     return ev
 end
@@ -429,7 +410,7 @@ function selection_value(manifest, owners, items)
     end
     out = ElementEvent[]
     for it in items
-        ev = _one_event(manifest, owners, it; wrap = false)
+        ev = _one_event(manifest, owners, it)
         ev isa ElementEvent || throw(
             ArgumentError("bond: selection item is a $(typeof(ev)), expected ElementEvent"),
         )
@@ -473,7 +454,16 @@ layer id strings to [`LayerOwner`](@ref) (empty for hand-built test manifests; t
 function bond_from_js(manifest::AbstractDict, owners, js)
     js === nothing && return nothing
     haskey(js, "items") && return selection_value(manifest, owners, js["items"])
-    return _one_event(manifest, owners, js; wrap = true)
+    target = get(manifest, "selectionTarget", nothing)
+    if target !== nothing && String(js["layer"]) == target
+        throw(
+            ArgumentError(
+                "bond: :$target is brushed by a `selects` box, which owns the bond; a click on it " *
+                    "commits nothing (expected an {items} envelope)",
+            ),
+        )
+    end
+    return _one_event(manifest, owners, js)
 end
 
 function bond_from_js(w, js)

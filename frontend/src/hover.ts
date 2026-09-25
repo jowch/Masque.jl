@@ -333,7 +333,10 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
         }
     }
     const covered = hitIsCovered(sliceLayer, hit)
-    const press = !!hit && PRESS_KINDS.has(hit.layer.kind) && !covered
+    // An uncovered discrete mark keeps its own tooltip and turns the slice hair off, clickable or not.
+    const mark = !!hit && PRESS_KINDS.has(hit.layer.kind) && !covered
+    // `pointer` only where a click commits: a `selects` target is hover-only (the box owns the bond).
+    const press = mark && hit.layer.events.includes("click")
     const viewGrab = !hit && dragHit?.layer.kind === "view"
     const inSupport = !!sampled && sampled.samples.length > 0
     const colorbar = !!hit && hitIsColorbar(hit)
@@ -342,9 +345,9 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     // unbounded axis readout on this transform, and only while at least one series contains
     // the probe. A colorbar is a different viewport. A discrete mark that is not covered keeps
     // its own tooltip. Outside every series' support the winning hit's tooltip stays.
-    const sliceTip = inSupport && !!sliceLayer && !viewGrab && !press && !colorbar && (covered || !hit || axisSame)
+    const sliceTip = inSupport && !!sliceLayer && !viewGrab && !mark && !colorbar && (covered || !hit || axisSame)
     const geom = sliceLayer ? (sliceLayer.geometry as SliceGeometry) : null
-    const hairOn = !!geom && geom.crosshair === true && !viewGrab && !press
+    const hairOn = !!geom && geom.crosshair === true && !viewGrab && !mark
     const showGuide = !!vp && (hairOn || sliceTip)
 
     if (showGuide && vp) {
