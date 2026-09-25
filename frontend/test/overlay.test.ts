@@ -648,6 +648,30 @@ describe("mount", () => {
         expect(r.ymax).toBeCloseTo(87.5)                          // image y 100 → 100*(1-100/800)
     })
 
+    it("a click on the brushed grid outside the box commits nothing — the box owns the bond", () => {
+        // Julia ships a `selects` target grid hover-only (build_manifest drops "click"), so a
+        // cell click can't replace the brushed GridWindowEvent with a GridCellEvent.
+        const { host, script } = setup()
+        mount(script, gridSelectManifest())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        let inputs = 0
+        host.addEventListener("input", () => { inputs++ })
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 125, clientY: 125, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 125, clientY: 125, bubbles: true }))
+        // the click a browser fires after the drag's pointerup, which onClick swallows
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 125, clientY: 125, bubbles: true }))
+        expect(inputs).toBe(1)
+        const brushed = JSON.stringify((host as unknown as { value: unknown }).value)
+        const sel = selChildren(shadow).map((el) => el.outerHTML)
+        // Cell (2,2) is image [400,600]², outside the box [100,400]²: client (250,250).
+        surface.dispatchEvent(new MouseEvent("mousemove", { clientX: 250, clientY: 250, bubbles: true }))
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 250, clientY: 250, bubbles: true }))
+        expect(inputs).toBe(1)
+        expect(JSON.stringify((host as unknown as { value: unknown }).value)).toBe(brushed)
+        expect(selChildren(shadow).map((el) => el.outerHTML)).toEqual(sel)
+    })
+
     it("the grid cell-block selection rect is fill-only (no stroke) — the ROI box is the outline", () => {
         // Regression: the cell-block rect used to draw the ordinary closed-selection stroke,
         // which sat right next to the ROI's own outline and read as two overlapping boxes with

@@ -5,7 +5,11 @@
 [`PointInteractable`](@ref) is always an [`ElementEvent`](@ref). A vector appears only when
 the same call contains an [`ROIInteractable`](@ref) whose `selects` aims at those points; a
 click on one of them is then a one-element vector. A `selects` ROI over a grid returns one
-[`GridWindowEvent`](@ref). Axis, colorbar, threshold, and bounds-only ROI stay their own
+[`GridWindowEvent`](@ref), and the box owns that bond: `build_manifest` ships the target grid
+hover-only (no `"click"` in its `events`), so a cell click outside the box commits nothing, and
+`bond_from_js` refuses a single-cell envelope for that layer. A one-cell window was the other
+option; it was rejected because the box would stay drawn over its old region while the value
+named a different cell. Axis, colorbar, threshold, and bounds-only ROI stay their own
 types even inside a widget that also selects. A view pan or orbit commits nothing.
 
 | Commit | Type | Fields the cell reads |

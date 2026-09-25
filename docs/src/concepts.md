@@ -115,8 +115,11 @@ event came last; check `pick.layer` or the event's type when a cell has
 to tell them apart. One exception: when an ROI's `selects` names a layer
 of points, clicking one of *those* points also arrives as a
 `Vector{ElementEvent}` — a one-element vector — so a downstream cell
-handles brushing and clicking those points the same way. Clicks on any
-other layer in the widget still arrive as a single event.
+handles brushing and clicking those points the same way. When `selects`
+names a heatmap or image instead, the box owns the value: clicking a
+cell shows its tooltip but commits nothing, so the value stays the
+`GridWindowEvent`. Clicks on any other layer in the widget still arrive
+as a single event.
 
 ## Live notebook, static export, and this site
 

@@ -164,6 +164,8 @@ end
     @test (win.xmin, win.xmax, win.ymin, win.ymax) == (0.0, 1.0, 2.0, 3.0)
     miss = tv(gridw, Dict("items" => []))
     @test miss isa GridWindowEvent && isempty(miss.i1:miss.i2) && isempty(miss.j1:miss.j2)
+    # the box owns a brushed grid's bond: a single-cell envelope is refused, not a GridCellEvent
+    @test_throws ArgumentError tv(gridw, Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1, "j" => 2)))
 
     ev = tv(wdg("roi", "bounds"), Dict("layer" => "L", "index" => 0, "payload" => Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 2.0, "ymax" => 3.0)))
     @test ev isa BoundsEvent && (ev.xmin, ev.xmax, ev.ymin, ev.ymax) == (0.0, 1.0, 2.0, 3.0)

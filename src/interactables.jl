@@ -1382,8 +1382,10 @@ compatible layer, reporting the contained elements. Produces one `:roi` [`HitLay
 
 Payload on commit (no `selects`): a [`BoundsEvent`](@ref). With `selects` set, the bond is a
 `Vector{ElementEvent}` for a `:circles` target (one per contained element), or one
-[`GridWindowEvent`](@ref) for a `:grid` target — see [`InteractionEvent`](@ref). `bounds=`
-accepts a `BoundsEvent` or a `(xmin, xmax, ymin, ymax)` tuple.
+[`GridWindowEvent`](@ref) for a `:grid` target — see [`InteractionEvent`](@ref). A brushed
+grid keeps its hover tooltip but no longer commits a click: the box owns the bond, so the value
+stays a `GridWindowEvent`. `bounds=` accepts a `BoundsEvent` or a `(xmin, xmax, ymin, ymax)`
+tuple.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data point), a `PolarAxis` (continuous inversion isn't shipped), a categorical axis (bounds

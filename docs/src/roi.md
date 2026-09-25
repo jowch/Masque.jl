@@ -60,7 +60,9 @@ same way.
 Point `selects` at a heatmap or image layer instead, and the box returns
 one [`GridWindowEvent`](@ref) describing the block of cells it covers:
 `win.i1:win.i2` columns and `win.j1:win.j2` rows, so `A[win]` is that
-sub-matrix. See [Inspect a grid](@ref).
+sub-matrix. The box owns the value: clicking a cell outside it shows the
+tooltip but leaves the value alone, so the value is always a
+`GridWindowEvent`. See [Inspect a grid](@ref).
 
 ## Read the box itself
 
