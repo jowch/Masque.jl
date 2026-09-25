@@ -596,17 +596,37 @@ describe("categorical wire payloads", () => {
         expect(p.x).toBe("b")
         expect(p.y).toBeCloseTo(5, 6)
     })
-    it("a vertical threshold release sends the bare category label", () => {
+    // Records the attributes `setLine` writes, so a test can read where the line was drawn.
+    const fakeLine = () => {
+        const attrs: Record<string, string> = {}
+        return { attrs, line: { setAttribute: (k: string, v: string) => { attrs[k] = v } } as unknown as SVGLineElement }
+    }
+    it("a vertical threshold release sends the bare category label and snaps the line onto it", () => {
         const tg: ThresholdGeometry = { orientation: "v", pos: 50, span: [0, 100] }
-        const d = beginThreshold("threshold", null as unknown as SVGLineElement, tg, catT, 1)
-        expect(endThreshold(d as any, { x: 250, y: 50 })).toEqual({ layer: "threshold", index: 0, payload: "c" })
+        const { attrs, line } = fakeLine()
+        const d = beginThreshold("threshold", line, tg, catT, 1)
+        // px=230 → data x = 2.8 → "c". Category 3 sits at data 3 → px (3 - 0.5) / 3 * 300 = 250.
+        expect(endThreshold(d as any, { x: 230, y: 50 })).toEqual({ layer: "threshold", index: 0, payload: "c" })
+        expect(tg.pos).toBeCloseTo(250, 6)
+        expect(Number(attrs.x1)).toBeCloseTo(250, 6)
     })
-    it("a horizontal threshold on a categorical y sends that axis's label", () => {
+    it("a horizontal threshold on a categorical y sends that axis's label and snaps onto it", () => {
         const yT: AxisTransform = { ...catT, xcats: null, xlims: [0, 10], ylims: [0.5, 3.5], ycats: ["lo", "mid", "hi"] }
         const tg: ThresholdGeometry = { orientation: "h", pos: 50, span: [0, 300] }
-        const d = beginThreshold("threshold", null as unknown as SVGLineElement, tg, yT, 1)
-        // py=10 is near the top → fy ≈ 0.9 → data y ≈ 3.2 → "hi".
+        const { attrs, line } = fakeLine()
+        const d = beginThreshold("threshold", line, tg, yT, 1)
+        // py=10 is near the top → fy = 0.9 → data y = 3.2 → "hi". Category 3 → fy 5/6 → py 100/6.
         expect(endThreshold(d as any, { x: 150, y: 10 }).payload).toBe("hi")
+        expect(tg.pos).toBeCloseTo(100 / 6, 6)
+        expect(Number(attrs.y1)).toBeCloseTo(100 / 6, 6)
+    })
+    it("a numeric threshold release does not snap", () => {
+        const numT: AxisTransform = { ...catT, xcats: null, xlims: [0, 10] }
+        const tg: ThresholdGeometry = { orientation: "v", pos: 50, span: [0, 100] }
+        const { line } = fakeLine()
+        const d = beginThreshold("threshold", line, tg, numT, 1)
+        expect(endThreshold(d as any, { x: 230, y: 50 }).payload).toBeCloseTo(230 / 30, 6)
+        expect(tg.pos).toBe(50) // `end` leaves the line where the last move put it
     })
 })
 

@@ -163,6 +163,39 @@ describe("mount", () => {
         expect(committed!.payload).toBeCloseTo(25)
     })
 
+    it("re-grab works at the moved threshold position (hit-test tracks the drawn line)", () => {
+        // Same class of bug as the ROI re-grab test: the drag moved the drawn line but hit-testing
+        // read the manifest's original `pos`, so a second drag only grabbed the line where it
+        // started. `move` now writes the live position back to the geometry.
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [{ id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { orientation: "h", pos: 400, span: [0, 1200] } }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const line = shadow.querySelector("line") as SVGLineElement
+        // First drag: image y 400 → 600.
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 300, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 300, bubbles: true }))
+        expect(line.getAttribute("y1")).toBe("600")
+        // Second grab at the moved line (image y 600), not the original one; drag to image y 700.
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 300, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 350, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 350, bubbles: true }))
+        expect(line.getAttribute("y1")).toBe("700")
+        // The original position no longer grabs the line.
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 100, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 100, bubbles: true }))
+        expect(line.getAttribute("y1")).toBe("700")
+    })
+
     it("synthesized click after drag does not overwrite threshold commit (justDragged guard)", () => {
         // Both a threshold layer and a click-enabled circles layer whose center sits at the drag-release point.
         // Release point: client (300,300) → image (600,600). Circle centered at (600,600) r=30 will be hit by click.

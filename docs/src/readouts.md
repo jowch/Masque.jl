@@ -104,7 +104,8 @@ All three need to turn a pixel back into data, so they need a 2D `Axis`
 (or colorbar) with an `identity`, `log10`, or `log` scale; on an
 `Axis3` or a `PolarAxis` they raise an `ArgumentError` when `masque`
 runs. A threshold dragged along a categorical dimension shows the
-category while you drag; on release `level.value` is that category's
-position and `level.category` its label. See [Supported plots and axes](@ref). If the axis also has a
+category while you drag; on release the line snaps onto that category,
+`level.value` is its position, and `level.category` its label. See
+[Supported plots and axes](@ref). If the axis also has a
 [`ViewInteractable`](@ref), a plain drag moves the threshold and
 Shift+drag pans.
