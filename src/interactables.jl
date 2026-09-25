@@ -209,7 +209,7 @@ function _sample_bin(origin, i, n, step, span)
 end
 
 # Real-valued cells can be sampled. `missing` is stored as `NaN32`. A color image, or any
-# other non-real eltype, cannot — `_grid_sample` returns `nothing` and the caller ships edges only.
+# other non-real eltype, cannot — the grid layer ships edges only, with neither `values` nor a sample.
 _sampleable(::Type{T}) where {T} = (R = nonmissingtype(T); R === Union{} || R <: Real)
 _sample_value(::Missing) = NaN32
 _sample_value(v::Real) = Float32(v)
@@ -728,7 +728,10 @@ function hitlayers(i::RectInteractable, ctx)
             abs(yedges[end] - yedges[1]) / nrows,
         ) * ctx.display_scale
         if cell_px >= GRID_VALUES_MIN_SCREEN_PX
-            geom["values"] = Float32[Float32(vals[c, r]) for r in 1:nrows for c in 1:ncols]  # row-major: r*ncols+c
+            # A non-real matrix (a color image) ships edges only, as on the sampled branch.
+            if _sampleable(eltype(vals))
+                geom["values"] = Float32[_sample_value(vals[c, r]) for r in 1:nrows for c in 1:ncols]  # row-major: r*ncols+c
+            end
         else
             vp = ctx.transforms[axis_id(ctx, i.ax)].viewport
             sampled = _grid_sample(xedges, yedges, vals, vp, ctx.display_scale)

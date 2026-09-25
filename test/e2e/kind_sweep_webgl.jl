@@ -105,6 +105,15 @@ HTML(
         "<span id=\"coords_image\" style=\"display:none\">$(JSON3.write(sweep.image.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000060
+@bind ev_image_rgb sweep.image_rgb
+
+# ╔═╡ d1000000-0000-0000-0000-000000000061
+HTML(
+    "<span id=\"out_image_rgb\">IMAGE_RGB=$(repr(ev_image_rgb))</span>" *
+        "<span id=\"coords_image_rgb\" style=\"display:none\">$(JSON3.write(sweep.image_rgb.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000020
 @bind ev_barplot sweep.barplot
 
@@ -276,6 +285,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000017
 # ╠═d1000000-0000-0000-0000-000000000018
 # ╠═d1000000-0000-0000-0000-000000000019
+# ╠═d1000000-0000-0000-0000-000000000060
+# ╠═d1000000-0000-0000-0000-000000000061
 # ╠═d1000000-0000-0000-0000-000000000020
 # ╠═d1000000-0000-0000-0000-000000000021
 # ╠═d1000000-0000-0000-0000-000000000022

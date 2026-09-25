@@ -18,9 +18,9 @@ types even inside a widget that also selects. A view pan or orbit commits nothin
 | legend entry | `LegendEvent` | `label`, `group`, `targets`; `index` is the entry, not a table row |
 | heatmap / image cell | `GridCellEvent` | `i`, `j` (1-based); `A[cell]` is `A[cell.i, cell.j]`; `value` is `nothing` when it was not shipped |
 | grid brush | `GridWindowEvent` | `i1:i2`, `j1:j2` (1-based inclusive); `A[win]` is that window; a miss is an empty range |
-| axis click | `AxisEvent` | `x`, `y` |
+| axis click | `AxisEvent` | `x`, `y`; `xcat`, `ycat` on a categorical dimension, else `nothing` |
 | colorbar click | `ColorbarEvent` | `value` |
-| threshold release | `ThresholdEvent` | `value`; `value=` accepts the event or a number |
+| threshold release | `ThresholdEvent` | `value`; `category` on a categorical dimension, else `nothing`; `value=` accepts the event or a number |
 | bounds-only ROI | `BoundsEvent` | `xmin`, `xmax`, `ymin`, `ymax`; `bounds=` accepts the event or the 4-tuple |
 
 `bondtype(interactable)` is the commit type. The default is `ElementEvent`. A custom

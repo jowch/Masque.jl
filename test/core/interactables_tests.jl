@@ -135,6 +135,24 @@ struct _NotReal end
         @test Masque._grid_sample(Float64[0, 1], Float64[0, 1], fill(_NotReal(), 1, 1), (0.0, 0.0, 4.0, 4.0), 0.5) === nothing
     end
 
+    @testset "a non-real grid of screen-pixel cells ships edges and no values" begin
+        # A 10² color image on a ~400px axis: each cell is many screen pixels, so this is the
+        # `values` branch, which used to throw in Float32(::RGB) before the widget mounted.
+        fc = Figure(size = (400, 400)); axc = Axis(fc[1, 1]); image!(axc, rand(RGBf, 10, 10))
+        w = masque(fc)
+        g = only(l for l in w.manifest["layers"] if l["kind"] == "grid")["geometry"]
+        @test g["ncols"] == 10 && g["nrows"] == 10
+        @test !haskey(g, "values")
+        @test !haskey(g, "sample")
+        # A `missing` cell on the same branch is NaN32, as on the sampled branch.
+        fm = Figure(); axm = Axis(fm[1, 1]); heatmap!(axm, rand(3, 2))
+        zm = Union{Missing, Float64}[1.0 missing; 2.0 3.0; 4.0 5.0]
+        Lm = only(hitlayers(RectInteractable(axm; grid = (0.5:1:3.5, 0.5:1:2.5, zm)), last(ctx_for(fm))))
+        vm = Lm.geometry["values"]
+        @test eltype(vm) === Float32 && length(vm) == 6
+        @test isnan(vm[4]) && count(isnan, vm) == 1   # row-major: (c=1, r=2) → index 1*3+0+1
+    end
+
     @testset "missing and non-finite source cells are stored as sample values" begin
         missing_cell = reshape(Union{Missing, Float64}[missing], 1, 1)
         sm = Masque._grid_sample(Float64[0, 10], Float64[0, 10], missing_cell, (0.0, 0.0, 4.0, 4.0), 0.5)

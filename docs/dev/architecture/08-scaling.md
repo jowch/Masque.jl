@@ -29,7 +29,9 @@ in the manifest rather than pulled per pointer move. What is pushed depends on w
 on one source cell:
 
 **When the average cell is at least one screen pixel, ship the source matrix.** `values[]` is row-major,
-`values[j * ncols + i]`. Hover, the tooltip, and `GridCellEvent` are the cell `findBin` hits.
+`values[j * ncols + i]`. Hover, the tooltip, and `GridCellEvent` are the cell `findBin` hits. A
+`missing` cell is stored as `NaN`. A matrix that is not real-valued ships no `values`, the same as on
+the sub-pixel branch below.
 
 **When the average cell is under one screen pixel, ship one source value per screen pixel of the axis
 viewport.** The number is the cell under that pixel's center, found with the same bin search the overlay
@@ -43,7 +45,7 @@ highlight. A source cell that is itself `NaN`, `Inf`, or `missing` is still that
 is stored as `NaN`); hover shows `(i, j) = NaN` the same way the full matrix does. The overlay
 tells a miss from a non-finite cell by running the bin search on the pixel center. A matrix that
 is not real-valued, such as an `image!` of `RGB` / `RGBA`, ships neither `values` nor `sample` on
-this branch: hover is the cell index with no numeric value. Source `xedges` / `yedges` stay at
+either branch: hover is the cell index with no numeric value. Source `xedges` / `yedges` stay at
 source resolution on both branches.
 
 The on-screen size is known at manifest-build. `cell_screen_px` is the tighter of the two average cell

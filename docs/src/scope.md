@@ -68,13 +68,6 @@ hidden by a farther one in an earlier layer.
 
 These are known problems rather than design choices:
 
-- On a categorical axis, the hover card shows the category, but a click
-  on an [`AxisInteractable`](@ref), or a threshold released along that
-  axis, fails with an error instead of returning the category. See
-  [Read coordinates](@ref).
-- A small RGB `image!`, whose pixels are at least one screen pixel wide,
-  fails when `masque` runs. See [Inspect a grid](@ref) for a
-  workaround.
 - Several plot types are skipped on `Axis3` and `PolarAxis`, `Surface`
   plots are not hit-tested, and `LScene` is not supported. [Supported plots and
   axes](@ref) has the full list.

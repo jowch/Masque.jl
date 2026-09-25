@@ -88,7 +88,9 @@ for `AxisInteractable` and for live hover-coordinate readout (the drag/Tier-0 en
 **Categorical axes are v1.** When an axis uses a categorical conversion, `xcats`/`ycats` carry the
 ordered tick labels so JS maps a pixel to the right category (and tooltips/readout show the category,
 not the integer index). Without this, bars/boxplots on categorical axes would report wrong coordinates —
-so it's shipped, not stubbed.
+so it's shipped, not stubbed. An axis click or threshold release on a categorical dimension sends that
+label on the wire; `bond_from_js` (`_decategorize`) maps it back to its `1:n` position before any
+`transform_bond` runs, and keeps the label as `xcat`/`ycat` or `category` on the event.
 
 **Colorbar `AxisTransform` and the figure-block walk (M3).** Colorbar blocks live in `fig.content`,
 not in any `Axis` scene, so `context()` runs a second walk over `fig.content` after collecting axes —
