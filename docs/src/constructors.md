@@ -41,7 +41,8 @@ Named fields on the event are how you read the pick. The wire stays
 A widget that mixes two of these holds whichever event came last. The
 exception is a `selects` ROI over points: a click on a point in the layer
 it `selects` also arrives as a one-element `Vector{ElementEvent}`, while
-clicks on other layers stay single events. See [Concepts](@ref). [`ViewInteractable`](@ref) is not in that list: a camera is
+clicks on other layers stay single events. A `selects` ROI over a grid
+owns the value instead: a cell click commits nothing. See [Concepts](@ref). [`ViewInteractable`](@ref) is not in that list: a camera is
 operational state. For `selected=`, see [Selection](@ref).
 
 ## Zero-config: `masque(fig)`
