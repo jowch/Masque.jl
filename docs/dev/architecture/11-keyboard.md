@@ -23,12 +23,16 @@ pointer hover overwrites it and a pointer miss restores it (`hover.ts`'s `restor
 a cache `keyboard.ts`'s `focusTo` populates on `OverlayState`) so there is never a moment with
 two rings, or a "focused but no ring" gap when the mouse merely passes over empty canvas.
 
-Until a Masque ring exists, the surface keeps the browser's own `:focus-visible` outline: the
-`kbd-ring` class (added by `keyboard.ts`'s `focusTo`, removed when focus clears) is the only thing
-that suppresses it (`frontend/src/mount.ts`). Tabbing in therefore shows the UA outline around the
-whole surface before the first arrow press — and indefinitely on a widget with nothing focusable,
-such as a heatmap-only figure, where arrows have no element to land on. There is no
-Masque-drawn focus indicator for the surface itself; #168 tracks one.
+Keyboard focus shows exactly one indicator (#168). Until a mark ring exists, the surface draws its
+own: `.surface:focus-visible:not(.kbd-ring)` is a 2px inset outline in `--masque-chrome` (the same
+grey as the ring, set at mount from the figure's background), falling back to `Highlight`, which
+forced-colours mode also uses. That covers the moment after Tab and before the first arrow, and
+every widget with nothing to arrow through: a heatmap or image, an axis or colorbar readout, a
+threshold, ROI, view, or slice. The `kbd-ring` class (added by `keyboard.ts`'s `focusTo`, removed
+when focus clears) switches it off once a mark ring is showing, so the two never stack. It is an
+`outline`, not a `box-shadow`, because forced colours drop shadows, and it keys on
+`:focus-visible`, not `:focus`, so a pointer click focuses the surface without drawing it.
+`keyboard_a11y.mjs` asserts the computed outline on both backends.
 
 **Announcements** go to a visually-hidden `aria-live="polite" aria-atomic="true"` `<div>` inside
 the shadow root — not the tooltip (`aria-hidden` toggling on the tooltip is a visibility signal,
@@ -45,8 +49,7 @@ The per-layer `label` field ([§3](03-interactables.md), `HitLayer`) is the only
 change here — see `perf-findings.md` for its measured wire cost.
 
 The drag interactables (threshold, ROI, view) have no keyboard equivalent today, and
-`docs/src/accessibility.md` says so. Arrow-key nudging for them is an open proposal (#169). It
-depends on the surface focus indicator (#168): a nudge needs a visible focused target before it
-has anything to move. The cost it carries is three drag state machines, each needing the same
+`docs/src/accessibility.md` says so. Arrow-key nudging for them is an open proposal (#169). A nudge
+stop draws no mark ring, so it shows the surface focus outline above. The cost it carries is three drag state machines, each needing the same
 live-verification pass across both backends.
 

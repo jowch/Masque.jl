@@ -93,10 +93,17 @@ const STYLE = `
 .masque-cross-halo { stroke: var(--masque-fig-bg, #ffffff); stroke-width: 1.5; }
 .masque-cross-hair { stroke: var(--masque-cross, #b0b0b0); stroke-width: 1; stroke-opacity: 0.8; }
 .masque-cross circle { fill: var(--masque-cross, #b0b0b0); stroke: var(--masque-fig-bg, #ffffff); stroke-width: 1; }
-/* Default :focus-visible outline stays until a focus ring is actually drawn (kbd-ring, set by
-   keyboard.ts's focusTo) — so tabbing in still shows *something* before the first arrow press,
-   but the browser outline doesn't double up with our own ring once one exists. */
+/* Keyboard focus shows exactly one indicator (#168). Until a mark ring is drawn (kbd-ring, set
+   by keyboard.ts's focusTo) — right after Tab, and always on a widget with nothing to arrow
+   through (grid, axis, threshold, ROI, view, slice) — the surface draws an inset chrome outline
+   in place of the user-agent rectangle. Once the ring is up it is the indicator and the outline
+   goes. :focus-visible, not :focus, so a pointer click draws neither. An outline, not a
+   box-shadow, so forced colours still paint it, in Highlight. */
+.surface:focus-visible:not(.kbd-ring) { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: -2px; }
 .surface.kbd-ring:focus-visible { outline: none; }
+@media (forced-colors: active) {
+  .surface:focus-visible:not(.kbd-ring) { outline-color: Highlight; }
+}
 svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
        clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

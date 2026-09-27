@@ -567,3 +567,47 @@ describe("keyboard navigation", () => {
         expect(tip.style.top).toBe("0px") // max(0, 2.5 - 10)
     })
 })
+
+// #168: exactly one keyboard-focus indicator. Before a mark ring (and always on a widget with
+// nothing to arrow through) the surface draws its own inset chrome outline; once kbd-ring is on,
+// the ring is the indicator and the outline rule no longer matches. happy-dom does not compute
+// :focus-visible, so these lock the class state and the rules; keyboard_a11y.mjs asserts the
+// computed outline in a real browser.
+describe("surface focus indicator", () => {
+    const gridManifest: Manifest = {
+        width: 1200, height: 800, scaling: 2,
+        transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+        layers: [{ id: "g", kind: "grid", axis: "ax1", events: ["click", "hover"], payloads: [],
+            geometry: { xedges: [0, 600, 1200], yedges: [0, 400, 800], ncols: 2, nrows: 2 } }],
+    }
+    const css = (shadow: ShadowRoot) => shadow.querySelector("style")!.textContent!
+
+    it("draws an inset chrome outline on :focus-visible without kbd-ring, with a Highlight fallback", () => {
+        const { shadow } = setup(manifest)
+        const s = css(shadow)
+        expect(s).toContain(".surface:focus-visible:not(.kbd-ring) { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: -2px; }")
+        expect(s).toContain(".surface.kbd-ring:focus-visible { outline: none; }")
+        expect(s).toMatch(/@media \(forced-colors: active\) \{\s*\.surface:focus-visible:not\(\.kbd-ring\) \{ outline-color: Highlight; \}/)
+        // The pitfall: styling :focus would show a ring on a mouse click.
+        expect(s).not.toMatch(/\.surface:focus[^-]/)
+    })
+
+    it("a grid never gains kbd-ring, so the surface outline stays the indicator", () => {
+        const { surface } = setup(gridManifest)
+        surface.focus()
+        down(surface, "ArrowRight")
+        down(surface, "End")
+        expect(surface.classList.contains("kbd-ring")).toBe(false)
+    })
+
+    it("a scatter gains kbd-ring on the first arrow and drops it on Escape", () => {
+        const { surface } = setup(manifest)
+        surface.focus()
+        expect(surface.classList.contains("kbd-ring")).toBe(false)
+        down(surface, "ArrowRight")
+        expect(surface.classList.contains("kbd-ring")).toBe(true)
+        down(surface, "Escape")
+        expect(surface.classList.contains("kbd-ring")).toBe(false)
+    })
+})
