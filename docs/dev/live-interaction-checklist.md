@@ -85,8 +85,8 @@ Portable notebooks (`Pkg.develop` via `@__DIR__`) work without `MASQUE_DEV_ENV` 
 line so it stays unset); first open re-resolves the Makie stack (~6 min). All three drivers also run
 in CI on the `kind-sweep` job (matrixed `cairo`/`webgl`), but only **advisorily**
 (`continue-on-error: true`) — agents still run this playbook locally before calling a user-facing
-change done, until the job is promoted to a required check (#99, a WebGL hover-leave race in the
-sweep, blocks that).
+change done, until the job is promoted to a required check (the roadmap's Tooling section has
+what that waits on).
 `polish_verify.mjs` is **required** and still **not sufficient** alone (one wash + one ring +
 caret-at-anchor + fade + tooltip theme). `kind_sweep.mjs` is **required** and still **not
 sufficient** alone until `polish_verify.mjs` also PASSes on that backend. `keyboard_a11y.mjs` is
