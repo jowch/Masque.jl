@@ -100,8 +100,8 @@ serialized to JS. The interactables that invert pixels (`AxisInteractable`, `Thr
 on those flags rather than read the placeholders; element hit-testing (points, segments, polys) works
 on all three because it only uses the forward projection. Serializing the polar transform so
 `AxisInteractable` gets a continuous θ/r readout is #170. Any other `Makie.AbstractAxis` (`LScene`
-today) gets no transform: `CairoBackend` refuses the figure with an `ArgumentError`, `WebGLBackend`
-renders it with no overlay for it (#172 proposes refusing on both).
+today) gets no transform, so both backends refuse the figure with the same `ArgumentError`
+(`_reject_unsupported_axes` in `src/backend.jl`, #172).
 
 **Categorical axes.** When an axis uses a categorical conversion, `xcats`/`ycats` carry the
 ordered tick labels so JS maps a pixel to the right category (and tooltips/readout show the category,

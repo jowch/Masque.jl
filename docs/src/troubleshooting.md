@@ -176,17 +176,19 @@ is allowed.)
 **Fix:** use `AxisInteractable` (reads the category) instead, or pass
 numeric limits. A slice needs a continuous axis.
 
-### Tried an `LScene` figure on CairoMakie
+### Tried an `LScene` figure
 
-**Error prefix:** `Masque's CairoMakie backend supports Makie.Axis,
-Makie.Axis3, and Makie.PolarAxis`
+**Error prefix:** `Masque supports Makie.Axis, Makie.Axis3, and
+Makie.PolarAxis`
 
-**Cause:** the figure contains an `LScene` block. The `:cairo` backend
-refuses to render it rather than silently drop it.
+**Cause:** the figure contains an `LScene` block. `LScene` is not
+supported on any backend, so `masque` refuses the figure rather than
+leave that block with nothing to hover. A figure that also holds a
+normal `Axis` is refused too.
 
-**Fix:** restart the session with `using WGLMakie` instead of
-`CairoMakie` — `:webgl` renders `LScene` live, with **no** hit-testing
-overlay. Masque builds no overlay for `LScene` on either backend.
+**Fix:** draw interactive 3D in an `Axis3`, which both backends
+support. To show an `LScene` without interaction, display the figure
+itself instead of `masque(fig)`.
 
 ### Tried `selected=` on a kind that cannot hydrate
 

@@ -47,6 +47,9 @@ These hold on every backend, by design:
   enters notebook state.
 - **GPU-pick occlusion.** Hit geometry stays Julia-projected on both backends; the WGL scene
   JSON scrubs non-finite floats in GPU buffers for transport only.
+- **`LScene`.** Both backends refuse a figure that holds one, at `masque` time
+  (`_reject_unsupported_axes` in `src/backend.jl`, #172). Interactive 3D is `Axis3`.
+  `roadmap.md`'s Non-goals has the reopen condition.
 - **Per-frame faithful redraw as a guarantee.** High-frequency live redraw is a shared cost wall
   ([§6](06-composition.md)), not a per-backend exclusion.
 
@@ -68,7 +71,6 @@ overlays ship on both backends the same way (`Makie.Polar` applied via `transfor
 | Item | State | Tracking |
 |---|---|---|
 | Polar continuous readout | Serialize `Makie.Polar` into `invertAxis`; scoped to `AxisInteractable` only — threshold, ROI, slice, and view stay gated on `ispolar` | #170 |
-| `LScene` | Cairo refuses it, `:webgl` renders it with no overlay; the proposal is to refuse on both | #172 |
 | `surface!` hit-testing | Deferred on both backends alike — a hit-test-complexity gap (unbounded per-cell payload + occlusion), not a backend-capability gap. `MeshScatter`/`Wireframe`/`Arrows3D` are extracted today | `roadmap.md` |
 | `TextLabel` | A `Block`, not a plot: needs the figure-block walk, not the plot-scene walk | `roadmap.md` |
 | Animation frames | A manifest `frames` slot; payload-unbounded, so gated on shrinking per-frame cost ([§6](06-composition.md), [§8](08-scaling.md)) | `roadmap.md` |

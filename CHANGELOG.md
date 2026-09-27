@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- `masque` refuses a figure that holds an `LScene` on both backends. `:webgl` used to render it
+  with no overlay on that block; it now throws the same `ArgumentError` as `:cairo`, mixed
+  figures included. The message no longer recommends WGLMakie and names `Axis3` as the
+  supported 3D block.
 - Keyboard focus on a plot draws a 2px grey outline just inside it, in place of the browser's
   rectangle around the whole figure. It shows after Tab until you arrow onto an element, whose
   ring then replaces it, and stays on a plot with nothing to step through (a heatmap, a readout,
@@ -480,8 +484,8 @@ All notable changes to this project are documented here. The format is based on
   both backends via the shared projection (`Makie.Polar` in `transform_func`); `ispolar`
   transforms ship degenerate lims so continuous θ/r consumers fail loud until the polar
   transform is serialized to JS. Separable-grid/rect recipes on polar warn-and-skip.
-- Current `:cairo` scoping: `LScene` is rejected at `masque()` time — a Masque guard, not a
-  CairoMakie limit (`LScene` disposition remains a roadmap decision item). High-frequency live
-  redraw is a shared cost limit on both backends.
+- `LScene` is a non-goal on both backends: `masque()` refuses a figure that holds one — a
+  Masque scoping guard, not a backend limit. High-frequency live redraw is a shared cost limit
+  on both backends.
 
 [Unreleased]: https://github.com/jowch/Masque.jl/commits/main

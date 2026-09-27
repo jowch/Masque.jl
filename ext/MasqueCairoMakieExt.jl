@@ -56,25 +56,9 @@ function Masque.context(b::CairoBackend, fig, ppu)
 
     project = Masque._project_closure(scaling, out_h)
 
-    # An axis-like block Masque builds no transform for (LScene today) would otherwise be
-    # silently dropped, and interactables would project against the wrong axis.
-    unsupported = unique(
-        typeof.(
-            c for c in fig.content if c isa Makie.AbstractAxis &&
-                !(c isa Union{Makie.Axis, Makie.Axis3, Makie.PolarAxis})
-        ),
-    )
-    isempty(unsupported) || throw(
-        ArgumentError(
-            "Masque's CairoMakie backend supports `Makie.Axis`, `Makie.Axis3`, and `Makie.PolarAxis`; found " *
-                "unsupported $(join(unsupported, ", ")). This is Masque's own scoping guard, not a " *
-                "CairoMakie limit — `LScene` support is still deferred (docs/dev/roadmap.md). " *
-                "Today: restart this session with `using WGLMakie` (instead of `using CairoMakie`) " *
-                "to render `LScene` live (Masque builds no overlays for it on either backend).",
-        ),
-    )
+    Masque._reject_unsupported_axes(fig)
 
-    axes = [c for c in fig.content if c isa Union{Makie.Axis, Makie.Axis3, Makie.PolarAxis}]
+    axes = [c for c in fig.content if c isa Masque._SUPPORTED_AXES]
     ids = IdDict{Any, Symbol}()
     transforms = Dict{Symbol, AxisTransform}()
     for (k, ax) in enumerate(axes)

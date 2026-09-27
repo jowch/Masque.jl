@@ -208,7 +208,8 @@ function Masque.context(b::WebGLBackend, fig, ppu)
 
     project = Masque._project_closure(scaling, out_h)
 
-    axes = [c for c in fig.content if c isa Union{Makie.Axis, Makie.Axis3, Makie.PolarAxis}]
+    Masque._reject_unsupported_axes(fig)
+    axes = [c for c in fig.content if c isa Masque._SUPPORTED_AXES]
     ids = IdDict{Any, Symbol}()
     transforms = Dict{Symbol, Masque.AxisTransform}()
     for (k, ax) in enumerate(axes)

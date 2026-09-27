@@ -85,20 +85,9 @@ without new evidence:
 
 ## Before registration
 
-### Decisions that change the public surface
-
-Registration does not freeze 0.x, but it is when people start depending on these behaviours.
-Settle each one first.
-
-- **#172: reject `LScene` on both backends.** Today `:cairo` refuses it with a message that
-  points to WGLMakie, and `:webgl` renders it with no overlay. The second is the silent
-  behaviour the principles forbid. The recommendation is #172 as written: `LScene` is a
-  non-goal on every backend, and the issue is reopened if a user asks for it.
-
 ### Register
 
-- **Register v0.1.0 in General** on a CI-green `main` commit once the items above are
-  settled. The mechanics are the Release row in `frontend-delivery.md`.
+- **Register v0.1.0 in General** on a CI-green `main` commit. The mechanics are the Release row in `frontend-delivery.md`.
 - **After registration:** drop `Pkg.develop` from the fixture notebooks under
   `test/notebooks/`, and let Pluto's package manager take over.
 
@@ -288,7 +277,8 @@ shipped, which is a better filter than what other libraries happen to have.
 - **Per-backend feature splits.** `:cairo` ships a static base and `:webgl` a live canvas.
   The difference is cost, not features.
 - **A live Bonito connection under `:webgl`.** That is a different product.
-- **`LScene`**, once #172 lands.
+- **`LScene`**, on every backend. `masque` refuses a figure that holds one (#172). Reopen
+  if a user asks for it.
 
 ## Order
 
@@ -299,11 +289,10 @@ A proposed sequence, not a decided one. The only hard dependency edges are these
 Registration waits for the decisions listed under "Before registration".
 
 1. The preview path: #99.
-2. Decide and land #172.
-3. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
-4. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
+2. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
+3. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
    alongside, since none of it touches the package.
-5. Coverage items as users ask (#91).
-6. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
+4. Coverage items as users ask (#91).
+5. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
    per-frame or per-element cost. Spike-gated items (SVG output, spatial acceleration,
    GLMakie-static) wait for a real use.

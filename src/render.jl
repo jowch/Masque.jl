@@ -494,6 +494,8 @@ function masque(fig; kwargs...)
     # Finalize layout before auto-extraction: introspection reads post-layout axis state
     # (e.g. `ax.finallimits[]`), which `masque(fig, ints)` only finalizes afterward.
     _finalize!(fig)
+    # Refuse before extracting, so an `LScene` figure does not first warn about a static image.
+    _reject_unsupported_axes(fig)
     ints = auto_interactables(fig)
     isempty(ints) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
     return masque(fig, ints; kwargs...)
