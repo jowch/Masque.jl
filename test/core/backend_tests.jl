@@ -184,6 +184,10 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # A mixed figure is refused too, not silently narrowed to its Axis.
         fm = Figure(); Axis(fm[1, 1]); LScene(fm[1, 2])
         @test_throws ArgumentError ctx_for(fm)
+        # Zero-config masque(fig) refuses before auto-extraction, so it does not first warn
+        # that it is overlaying nothing on a static image.
+        fz = Figure(); LScene(fz[1, 1])
+        @test_logs min_level = Base.CoreLogging.Warn (@test_throws ArgumentError masque(fz))
     end
 end
 

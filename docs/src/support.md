@@ -40,8 +40,9 @@ it; "no" means passing the interactable raises an `ArgumentError` when
 `log` colorbars. Other Makie scales, such as `Makie.pseudolog10` and
 `Makie.Symlog10`, raise `ArgumentError` for every interaction marked ¹ or
 ². Legend entries and colorbars are figure-level blocks rather than
-axis plots, so they work whatever axes the figure holds. `LScene` is
-not supported: `masque` refuses the figure on both backends.
+axis plots, so they work alongside any `Axis`, `Axis3`, or `PolarAxis`.
+`LScene` is not supported: `masque` refuses a figure that holds one,
+on both backends, legend and colorbar included.
 [Troubleshooting](@ref) has each error message and its fix.
 
 Keyboard focus reaches points, bars, polygons, lines, segments, text,

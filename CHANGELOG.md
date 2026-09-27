@@ -479,8 +479,8 @@ All notable changes to this project are documented here. The format is based on
   both backends via the shared projection (`Makie.Polar` in `transform_func`); `ispolar`
   transforms ship degenerate lims so continuous θ/r consumers fail loud until the polar
   transform is serialized to JS. Separable-grid/rect recipes on polar warn-and-skip.
-- Current `:cairo` scoping: `LScene` is rejected at `masque()` time — a Masque guard, not a
-  CairoMakie limit (`LScene` disposition remains a roadmap decision item). High-frequency live
-  redraw is a shared cost limit on both backends.
+- `LScene` is a non-goal on both backends: `masque()` refuses a figure that holds one — a
+  Masque scoping guard, not a backend limit. High-frequency live redraw is a shared cost limit
+  on both backends.
 
 [Unreleased]: https://github.com/jowch/Masque.jl/commits/main

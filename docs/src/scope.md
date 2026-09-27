@@ -32,6 +32,8 @@ Knowing them up front saves a search.
 - **The keyboard reaches marks, not handles.** Arrow keys walk points,
   bars, polygons, lines, and legend entries, but cannot move a brush box
   or a threshold line; see [Keyboard and screen readers](@ref).
+- **No `LScene`.** `masque` refuses a figure that holds one, on both
+  backends. Interactive 3D is an `Axis3`.
 
 ## Overlapping marks
 
@@ -68,6 +70,6 @@ hidden by a farther one in an earlier layer.
 
 These are known problems rather than design choices:
 
-- Several plot types are skipped on `Axis3` and `PolarAxis`, `Surface`
-  plots are not hit-tested, and `LScene` is not supported. [Supported plots and
-  axes](@ref) has the full list.
+- Several plot types are skipped on `Axis3` and `PolarAxis`, and `Surface`
+  plots are not hit-tested. [Supported plots and axes](@ref) has the full
+  list.

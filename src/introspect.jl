@@ -926,7 +926,7 @@ function auto_interactables(fig)
     # back to the layer(s) its plot(s) became.
     plotmap = IdDict{Any, Vector{Symbol}}()
     for ax in fig.content
-        ax isa Union{Makie.Axis, Makie.Axis3, Makie.PolarAxis} || continue
+        ax isa _SUPPORTED_AXES || continue
         for p in _child_plots(ax.scene)
             if _plotbase(p) === nothing
                 r = _walk_unknown!(ints, seen, plotmap, ax, p)
