@@ -189,10 +189,8 @@ update `support.md` whenever `_plotbase` grows a branch.
 
 ### Tooling
 
-- **Promote the `kind-sweep` job to a required check.** #99 is closed: its flake has not
-  recurred since `e9a71f3`. A WebGL-only `view-wheel: matrix still applied after the frame`
-  failure hit two unrelated PRs before #203 and #205 changed that path, and has not recurred
-  since. Promote once enough green runs have gone by to rule it out. Until then, agents run
+- **Promote the `kind-sweep` job to a required check.** Nothing known blocks it: #99 is
+  closed, and the WebGL `view-wheel` failure was #165, fixed in #203. Until then, agents run
   the sweep locally.
 - **#176: advisory CI against Makie's development branch.** The canaries only, on a schedule
   and not as a required check. It detects a moved internal before CompatHelper's bump PR
