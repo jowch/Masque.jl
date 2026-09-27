@@ -11,6 +11,11 @@ All notable changes to this project are documented here. The format is based on
   with no overlay on that block; it now throws the same `ArgumentError` as `:cairo`, mixed
   figures included. The message no longer recommends WGLMakie and names `Axis3` as the
   supported 3D block.
+- Keyboard focus on a plot draws a 2px grey outline just inside it, in place of the browser's
+  rectangle around the whole figure. It shows after Tab until you arrow onto an element, whose
+  ring then replaces it, and stays on a plot with nothing to step through (a heatmap, a readout,
+  a threshold, ROI, or view). A mouse click draws no outline. In forced-colours mode it uses the
+  system highlight colour.
 - A `selects` `ROIInteractable` owns the `@bind` value of the layer it brushes. That layer still
   shows tooltips, but takes no clicks and shows no `pointer` cursor; a click on it passes through
   to any clickable layer underneath (an `AxisInteractable` catches clicks anywhere on its axis).
