@@ -84,6 +84,4 @@ See [Backends](https://jowch.github.io/Masque.jl/stable/backends/) for the cost 
 
 ## Use of AI tools
 
-Masque is developed with substantial help from Claude Code, an LLM coding assistant. Much of
-the code, tests, and documentation was drafted with it. I direct the design and review every
-change, and CI runs the test suite and live browser checks on every pull request.
+Masque is designed and developed to make data analysis more interactive and rich with LLM coding assistance. The package has been tested and verified through a combination of human usage and automated testing, including required reviews, automated CI testing, and live browser verification on every pull request. 
