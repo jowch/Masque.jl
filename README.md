@@ -81,3 +81,9 @@ the `@bind` value are the same on both.
   rotate. The page is heavier and needs WebGL.
 
 See [Backends](https://jowch.github.io/Masque.jl/stable/backends/) for the cost model.
+
+## Use of AI tools
+
+Masque is developed with substantial help from Claude Code, an LLM coding assistant. Much of
+the code, tests, and documentation was drafted with it. I direct the design and review every
+change, and CI runs the test suite and live browser checks on every pull request.
