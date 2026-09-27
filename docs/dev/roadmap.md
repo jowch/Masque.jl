@@ -73,6 +73,10 @@ without new evidence:
 - #84, holding the last frame across a remount. Gestures no longer remount. The remaining
   gaps are too small to build for: the WebGL buffer clears on a `px_per_unit` switch, and a
   genuine cell re-run starts blank.
+- #167, an outline-only highlight for an element that covers much of the axis. It was built
+  and compared against `main`: over a large region the colour-dodge fill is a mild
+  brightening, not a flash, and on a dark or saturated fill it is not visible. Reopen if #181
+  lets a user raise the fill strength.
 - #86, a resident scene with camera-only patching. Canvas identity does not survive Pluto's
   cell replacement. The gesture path already paints on the canvas the cell holds. The
   remaining cost is a full `serialize_scene` per frame
@@ -97,12 +101,6 @@ Settle each one first.
   points to WGLMakie, and `:webgl` renders it with no overlay. The second is the silent
   behaviour the principles forbid. The recommendation is #172 as written: `LScene` is a
   non-goal on every backend, and the issue is reopened if a user asks for it.
-- **#167: a large highlighted element washes the plot.** The fix would add a size gate to
-  the locked highlight recipe: drop the fill once an element covers much of the viewport,
-  and keep the stroke. This changes the locked recipe in `CLAUDE.md` and
-  `live-interaction-checklist.md`, so it needs the maintainer's sign-off first. Land it
-  after #180, because both change `makeHiElement`.
-
 ### Register
 
 - **Register v0.1.0 in General** on a CI-green `main` commit once the items above are
@@ -309,7 +307,7 @@ Registration waits for the decisions listed under "Before registration".
 
 1. The preview path: #99.
 2. #168.
-3. Decide and land #172 and #167 (or defer #167 explicitly).
+3. Decide and land #172.
 4. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
 5. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
    alongside, since none of it touches the package.
