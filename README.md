@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/src/assets/logo-animated.svg" width="180" alt="Masque.jl logo: a gold Venetian eye mask set with four jewels in the Julia colors">
+  <img src="docs/src/assets/logo-animated.svg" width="180" alt="Masque.jl logo: a gold selection box moves across a grey scatter plot, coloring the points inside it red, green and purple like the Julia logo">
 </p>
 
 <h1 align="center">Masque.jl</h1>
