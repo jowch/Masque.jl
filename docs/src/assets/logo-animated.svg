@@ -1,12 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160" width="200" height="160" role="img" aria-label="Masque.jl logo: a gold selection box moves across a grey scatter plot, colouring the points inside it in the Julia colours">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160" width="200" height="160" role="img" aria-label="Masque.jl logo: a gold selection box moves across a grey scatter plot, coloring the points inside it red, green and purple like the Julia logo">
   <style>
     svg {
-      --axis: #BDBAB2; --grey: #C9C6BE; --roi: #B8893A;
+      --axis: #A3A098; --grey: #ABA8A0; --roi: #B8893A;
       --jr: #CB3C33; --jg: #389826; --jp: #9558B2;
     }
     @media (prefers-color-scheme: dark) {
       svg {
-        --axis: #4A5058; --grey: #4F5760; --roi: #D8B46A;
+        --axis: #5A636C; --grey: #606973; --roi: #D8B46A;
         --jr: #D66661; --jg: #6BAB5B; --jp: #AA79C1;
       }
     }
@@ -15,7 +15,7 @@
     .box { fill: var(--roi); stroke: var(--roi); }
     .handles { stroke: var(--roi); }
     .r { fill: var(--jr); } .g { fill: var(--jg); } .p { fill: var(--jp); }
-    /* home -> lower left -> upper right -> home; the colour layer is clipped to the moving box */
+    /* home -> lower left -> upper right -> home; the color layer is clipped to the moving box */
     .move { animation: masque-tour 9s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
     @keyframes masque-tour {
       0%, 12%   { transform: translate(0, 0); }
