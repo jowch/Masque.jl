@@ -109,8 +109,15 @@ try {
       || sr.querySelector("svg.masque-edge g.hi > *")
       || sr.querySelector("svg.masque-plain g.hi > *");
     const live = sr.querySelector('[aria-live="polite"]');
+    const surf = sr.querySelector(".surface");
+    const oc = getComputedStyle(surf);
     return {
-      focused: sr.activeElement === sr.querySelector(".surface"),
+      focused: sr.activeElement === surf,
+      // #168: the surface's own focus indicator, as the browser computes it.
+      focusVisible: surf.matches(":focus-visible"),
+      kbdRing: surf.classList.contains("kbd-ring"),
+      outline: { style: oc.outlineStyle, width: oc.outlineWidth, offset: oc.outlineOffset, color: oc.outlineColor },
+      chrome: getComputedStyle(sr.host).getPropertyValue("--masque-chrome").trim(),
       ring: hi ? { tag: hi.tagName.toLowerCase(), leaving: hi.classList.contains("masque-leave") } : null,
       liveText: live?.textContent ?? "",
       tipShown: sr.querySelector(".masque-tip")?.classList.contains("show") ?? false,
@@ -218,6 +225,9 @@ try {
     await surface.focus();
     await page.keyboard.press("ArrowRight");
     let s = await state(key);
+    // A warm re-run's Enter may have selected element 0, and focusing a selected mark draws no
+    // ring. Step once more.
+    if (!s.ring) { await page.keyboard.press("ArrowRight"); s = await state(key); }
     if (!s.ring) throw new Error(`${key}: ArrowRight (tab-away setup) drew no ring`);
     await page.keyboard.press("Tab");
     s = await state(key);
@@ -299,6 +309,65 @@ try {
     const s = await state("heatmap");
     if (s.ring) throw new Error("heatmap: :grid unexpectedly focusable (ring drawn)");
     passed.push("grid-excluded");
+  }
+
+  // #168: exactly one keyboard-focus indicator. A real Tab onto a widget with nothing to arrow
+  // through draws the surface's own inset chrome outline; a mark ring replaces it; a pointer
+  // click draws neither.
+  const rgbOf = (hex) => {
+    const n = parseInt(hex.replace("#", ""), 16);
+    return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+  };
+  const assertSurfaceOutline = (s, where) => {
+    if (!s.focused || !s.focusVisible) throw new Error(`${where}: expected keyboard focus (:focus-visible) ${JSON.stringify(s)}`);
+    if (s.kbdRing) throw new Error(`${where}: kbd-ring set with no mark ring ${JSON.stringify(s)}`);
+    const o = s.outline;
+    if (o.style !== "solid" || o.width !== "2px" || o.offset !== "-2px" || o.color !== rgbOf(s.chrome)) {
+      throw new Error(`${where}: expected a 2px solid inset outline in ${s.chrome}, got ${JSON.stringify(o)}`);
+    }
+  };
+  {
+    // Tab away and back, so focus arrives by keyboard, not by script.
+    const surface = await surfaceHandle("heatmap");
+    await surface.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+    let s = await state("heatmap");
+    assertSurfaceOutline(s, "heatmap/tab");
+    await page.keyboard.press("ArrowRight");
+    s = await state("heatmap");
+    assertSurfaceOutline(s, "heatmap/after-arrow");
+    passed.push("focus-outline-grid");
+
+    const sc = await surfaceHandle("scatter");
+    await sc.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+    s = await state("scatter");
+    assertSurfaceOutline(s, "scatter/before-arrow");
+    await page.keyboard.press("ArrowRight");
+    s = await state("scatter");
+    if (!s.ring) { await page.keyboard.press("ArrowRight"); s = await state("scatter"); } // see tab-away above
+    if (!s.kbdRing || !s.ring) throw new Error(`scatter: arrow drew no mark ring ${JSON.stringify(s)}`);
+    if (s.outline.style !== "none") throw new Error(`scatter: surface outline still drawn under the mark ring ${JSON.stringify(s.outline)}`);
+    passed.push("focus-outline-yields-to-ring");
+    // Escape clears the ring and leaves the plot (keyboard.ts blurs the surface): no indicator.
+    await page.keyboard.press("Escape");
+    s = await state("scatter");
+    if (s.focused || s.kbdRing || s.outline.style !== "none") {
+      throw new Error(`scatter: Escape left an indicator ${JSON.stringify(s)}`);
+    }
+    passed.push("focus-outline-cleared-on-escape");
+
+    // A pointer click draws nothing. The surface's pointer handlers keep it from taking focus
+    // at all; were it focused, a click is still not :focus-visible.
+    const box = await (await surfaceHandle("heatmap")).boundingBox();
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    s = await state("heatmap");
+    if (s.focusVisible || s.outline.style !== "none") {
+      throw new Error(`heatmap: a pointer click drew a focus outline ${JSON.stringify(s)}`);
+    }
+    passed.push("focus-outline-not-on-click");
   }
 
   if (unexpected.length) throw new Error(`page errors: ${unexpected.join(" | ")}`);

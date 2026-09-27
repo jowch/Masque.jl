@@ -57,7 +57,8 @@ v0.1.0 is unreleased. The pre-registration revisions can still carry new work.
 - View gestures on the `with_js_link` gesture channel, on both backends, committing nothing
   (#102, #122, #133). This covers 2D pan, wheel zoom with a photographic slide of the last
   frame (#85), and 3D orbit (#87).
-- Keyboard navigation and screen-reader announcements.
+- Keyboard navigation and screen-reader announcements, with a surface focus outline where
+  no mark ring is drawn (#168).
 - The split highlight recipe. Right-click passthrough to the base image (#88).
 - WebGL context caps (#125).
 - A Documenter site with guides, worked examples, and live players.
@@ -83,14 +84,6 @@ without new evidence:
   ([§12.10](architecture/12-gesture-channel.md#1210-open-questions)).
 
 ## Before registration
-
-### Bugs
-
-Ordered cheapest first. None of them changes the manifest shape.
-
-- **#168: the browser's focus outline boxes the whole figure** on any widget where Masque
-  draws no ring of its own (grids, readouts, drags). Draw Masque's own inset indicator
-  instead of hiding the outline, so keyboard users keep a visible focus. #169 depends on this.
 
 ### Decisions that change the public surface
 
@@ -123,8 +116,8 @@ of them breaks an existing call.
   ships, the recipe `CLAUDE.md` calls locked becomes the default, and a user can override
   it.
 - **#169: arrow-key nudging for threshold, ROI, and view.** This is the WCAG 2.1.1 gap.
-  Each drag layer gets one extra tab stop. The view nudge never writes `@bind`. It depends
-  on #168 for the focus indicator. When #169 lands, `architecture/11-keyboard.md` changes
+  Each drag layer gets one extra tab stop. The view nudge never writes `@bind`. A nudge stop
+  draws no mark ring, so it shows the surface focus outline from #168. When #169 lands, `architecture/11-keyboard.md` changes
   from describing it as a proposal to describing the shipped keys.
 - **#179: wide mode.** `max_width` already sets the render width, but Pluto's column shrinks
   the result. #179 widens the cell from inside the widget using `PlutoUI.WideCell`'s
@@ -300,18 +293,16 @@ shipped, which is a better filter than what other libraries happen to have.
 
 A proposed sequence, not a decided one. The only hard dependency edges are these:
 - #180 before #181.
-- #168 before #169.
 - #99 before the kind sweep becomes a required check.
 
 Registration waits for the decisions listed under "Before registration".
 
 1. The preview path: #99.
-2. #168.
-3. Decide and land #172.
-4. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
-5. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
+2. Decide and land #172.
+3. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
+4. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
    alongside, since none of it touches the package.
-6. Coverage items as users ask (#91).
-7. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
+5. Coverage items as users ask (#91).
+6. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
    per-frame or per-element cost. Spike-gated items (SVG output, spatial acceleration,
    GLMakie-static) wait for a real use.

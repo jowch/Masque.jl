@@ -1,8 +1,12 @@
 # Keyboard and screen readers
 
 Every overlay is a keyboard-navigable, screen-reader-announced widget.
-No extra setup. Tab focuses the surface (`tabindex="0"`). Then use the
-keys in the following table to move between interactive elements.
+No extra setup. Tab focuses the surface (`tabindex="0"`), which draws a
+grey outline just inside the plot. Then use the keys in the following
+table to move between interactive elements. The focused element gets
+the same ring a hover draws, and the outline goes away while it shows.
+A plot with nothing to step through, such as a heatmap, keeps the
+outline while it has focus. Clicking a plot does not draw either one.
 
 ## Keys
 
