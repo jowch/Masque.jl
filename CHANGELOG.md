@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- `masque` refuses a figure that holds an `LScene` on both backends. `:webgl` used to render it
+  with no overlay on that block; it now throws the same `ArgumentError` as `:cairo`, mixed
+  figures included. The message no longer recommends WGLMakie and names `Axis3` as the
+  supported 3D block.
 - A `selects` `ROIInteractable` owns the `@bind` value of the layer it brushes. That layer still
   shows tooltips, but takes no clicks and shows no `pointer` cursor; a click on it passes through
   to any clickable layer underneath (an `AxisInteractable` catches clicks anywhere on its axis).

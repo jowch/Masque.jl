@@ -90,6 +90,23 @@ function _ppu end         # (backend, fig) -> px_per_unit / device scale
 # (backend, result, manifest, display_css, fig, interactables, ppu) -> the @bind widget
 function make_widget end
 
+# An axis-like block Masque builds no transform for (`LScene` today) would otherwise be
+# silently dropped, and interactables would project against the wrong axis. Every backend's
+# `context` calls this first, so a figure is refused the same way wherever it renders (#172).
+const _SUPPORTED_AXES = Union{Makie.Axis, Makie.Axis3, Makie.PolarAxis}
+
+function _reject_unsupported_axes(fig)
+    unsupported = unique(typeof.(c for c in fig.content if c isa Makie.AbstractAxis && !(c isa _SUPPORTED_AXES)))
+    isempty(unsupported) && return nothing
+    throw(
+        ArgumentError(
+            "Masque supports `Makie.Axis`, `Makie.Axis3`, and `Makie.PolarAxis`; found unsupported " *
+                "$(join(unsupported, ", ")). This is Masque's own scoping guard, not a backend limit: " *
+                "`LScene` is not supported on any backend. For interactive 3D, use `Axis3`.",
+        ),
+    )
+end
+
 # `Makie.project` expects post-transform_func coordinates; transform in Float64 first —
 # an early Float32 cast can overflow (e.g. log10(1e39)) or lose precision. DomainError
 # (e.g. log10 of a negative) degrades to a NaN point rather than throwing; `_q` in

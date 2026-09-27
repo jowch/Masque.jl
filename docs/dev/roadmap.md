@@ -93,10 +93,6 @@ Ordered cheapest first. None of them changes the manifest shape.
 Registration does not freeze 0.x, but it is when people start depending on these behaviours.
 Settle each one first.
 
-- **#172: reject `LScene` on both backends.** Today `:cairo` refuses it with a message that
-  points to WGLMakie, and `:webgl` renders it with no overlay. The second is the silent
-  behaviour the principles forbid. The recommendation is #172 as written: `LScene` is a
-  non-goal on every backend, and the issue is reopened if a user asks for it.
 - **#167: a large highlighted element washes the plot.** The fix would add a size gate to
   the locked highlight recipe: drop the fill once an element covers much of the viewport,
   and keep the stroke. This changes the locked recipe in `CLAUDE.md` and
@@ -296,7 +292,8 @@ shipped, which is a better filter than what other libraries happen to have.
 - **Per-backend feature splits.** `:cairo` ships a static base and `:webgl` a live canvas.
   The difference is cost, not features.
 - **A live Bonito connection under `:webgl`.** That is a different product.
-- **`LScene`**, once #172 lands.
+- **`LScene`**, on every backend. `masque` refuses a figure that holds one (#172). Reopen
+  if a user asks for it.
 
 ## Order
 
@@ -309,7 +306,7 @@ Registration waits for the decisions listed under "Before registration".
 
 1. The preview path: #99.
 2. #168.
-3. Decide and land #172 and #167 (or defer #167 explicitly).
+3. Decide and land #167 (or defer it explicitly).
 4. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
 5. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
    alongside, since none of it touches the package.

@@ -108,6 +108,17 @@ end
     @test JSON3.write(w.manifest) isa String
 end
 
+@testset "LScene is refused on :webgl, the same as :cairo (#172)" begin
+    fu = Figure(; size = (400, 300)); LScene(fu[1, 1])
+    err = (@test_throws ArgumentError Masque.context(_WGLExt.WebGLBackend(), fu, 2.0)).value
+    @test occursin("LScene", err.msg)
+    @test occursin("Axis3", err.msg)
+    @test !occursin("WGLMakie", err.msg)
+    # A mixed figure is refused at masque() time, not rendered with the LScene left bare.
+    fm = Figure(; size = (400, 300)); ax = Axis(fm[1, 1]); scatter!(ax, 1:3, 1:3); LScene(fm[1, 2])
+    @test_throws ArgumentError masque(fm; backend = _WGLExt.WebGLBackend())
+end
+
 @testset "context populates per-axis transforms (axis-keyed interactable)" begin
     fig = Figure(; size = (400, 300))
     ax = Axis(fig[1, 1])

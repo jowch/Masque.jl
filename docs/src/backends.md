@@ -163,8 +163,7 @@ needs a live kernel. It is dead on static export.
 
 `ViewInteractable` on `Axis3` is allowed: that is orbit. Polar, Colorbar,
 categorical 2D, and non-invertible 2D scales raise `ArgumentError`.
-`LScene`: CairoMakie refuses the figure; WGLMakie renders with **no**
-overlay.
+`LScene` is refused on both backends; use `Axis3` for interactive 3D.
 
 Persist a camera across remount with an explicit `Ref` plus rebuild, not
 with `selected=`. The [Limits](@ref) shows that pattern. For the

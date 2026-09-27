@@ -41,9 +41,8 @@ it; "no" means passing the interactable raises an `ArgumentError` when
 `Makie.Symlog10`, raise `ArgumentError` for every interaction marked ¹ or
 ². Legend entries and colorbars are figure-level blocks rather than
 axis plots, so they work whatever axes the figure holds. `LScene` is
-not supported: CairoMakie refuses the figure, and WGLMakie draws it
-with no overlay. [Troubleshooting](@ref) has each error message
-and its fix.
+not supported: `masque` refuses the figure on both backends.
+[Troubleshooting](@ref) has each error message and its fix.
 
 Keyboard focus reaches points, bars, polygons, lines, segments, text,
 and legend entries, but not heatmap cells, axis or colorbar readouts,
@@ -109,6 +108,6 @@ An empty hole, including a peak above the top level, hits nothing.
 `hexbin!` stays unconstructed: its scatter is data-space. `bracket!`'s
 label warns `masque: skipping non-data-space text`. A non-`Text` child
 whose `space` is not `:data` is skipped with no warning of its own.
-Hidden children are not layers. `LScene` has no overlay; see
+Hidden children are not layers. A figure with an `LScene` is refused; see
 [Troubleshooting](@ref). For a type you implement yourself, see
 [Custom hits](@ref).

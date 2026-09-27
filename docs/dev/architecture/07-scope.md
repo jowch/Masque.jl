@@ -68,7 +68,7 @@ overlays ship on both backends the same way (`Makie.Polar` applied via `transfor
 | Item | State | Tracking |
 |---|---|---|
 | Polar continuous readout | Serialize `Makie.Polar` into `invertAxis`; scoped to `AxisInteractable` only — threshold, ROI, slice, and view stay gated on `ispolar` | #170 |
-| `LScene` | Cairo refuses it, `:webgl` renders it with no overlay; the proposal is to refuse on both | #172 |
+| `LScene` | Not deferred: a non-goal on every backend. Both refuse the figure at `masque` time; `roadmap.md`'s Non-goals has the reopen condition | #172 |
 | `surface!` hit-testing | Deferred on both backends alike — a hit-test-complexity gap (unbounded per-cell payload + occlusion), not a backend-capability gap. `MeshScatter`/`Wireframe`/`Arrows3D` are extracted today | `roadmap.md` |
 | `TextLabel` | A `Block`, not a plot: needs the figure-block walk, not the plot-scene walk | `roadmap.md` |
 | Animation frames | A manifest `frames` slot; payload-unbounded, so gated on shrinking per-frame cost ([§6](06-composition.md), [§8](08-scaling.md)) | `roadmap.md` |
