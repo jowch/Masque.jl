@@ -359,12 +359,13 @@ try {
     }
     passed.push("focus-outline-cleared-on-escape");
 
-    // A pointer click draws nothing. The surface's pointer handlers keep it from taking focus
-    // at all; were it focused, a click is still not :focus-visible.
-    const box = await (await surfaceHandle("heatmap")).boundingBox();
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    // A pointer click focuses the surface (onDown only preventDefaults a drag) but is not
+    // :focus-visible, so no outline. ElementHandle.click scrolls the surface into view first; a
+    // raw page.mouse.click at its box can land off-screen and focus nothing, which would pass
+    // this check for the wrong reason.
+    await (await surfaceHandle("heatmap")).click();
     s = await state("heatmap");
-    if (s.focusVisible || s.outline.style !== "none") {
+    if (!s.focused || s.focusVisible || s.outline.style !== "none") {
       throw new Error(`heatmap: a pointer click drew a focus outline ${JSON.stringify(s)}`);
     }
     passed.push("focus-outline-not-on-click");

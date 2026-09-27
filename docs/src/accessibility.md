@@ -6,7 +6,8 @@ grey outline just inside the plot. Then use the keys in the following
 table to move between interactive elements. The focused element gets
 the same ring a hover draws, and the outline goes away while it shows.
 A plot with nothing to step through, such as a heatmap, keeps the
-outline while it has focus. Clicking a plot does not draw either one.
+outline while it has focus. Clicking a plot focuses it without drawing
+the outline.
 
 ## Keys
 

@@ -94,6 +94,7 @@ Settle each one first.
   points to WGLMakie, and `:webgl` renders it with no overlay. The second is the silent
   behaviour the principles forbid. The recommendation is #172 as written: `LScene` is a
   non-goal on every backend, and the issue is reopened if a user asks for it.
+
 ### Register
 
 - **Register v0.1.0 in General** on a CI-green `main` commit once the items above are
