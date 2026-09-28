@@ -1,39 +1,43 @@
 # Masque.jl
 
-Masque adds an interactive layer over Makie figures inside a Pluto
-notebook. Add rich tooltips, hover interactions, selections, and more to
-your figures. [Ready to get started?](getting-started.md)
+Masque adds tooltips and click selection to Makie figures in a Pluto
+notebook. Clicking a mark updates a `@bind` variable, so the rest of your
+notebook can respond. [Ready to get started?](getting-started.md)
 
-## Rich tooltips
+## Tooltips
 
 ![Holding the pointer over a star shows its name, spectral type, and distance](assets/home/hover.gif)
 
-Hold your pointer over a point, bar, heatmap cell, or polygon and a customizable tooltip appears on the figure. For templates and styling, see [Tooltips](@ref).
+Hover over a point, bar, heatmap cell, or polygon to see its data in a
+tooltip. You choose what the tooltip says. See [Tooltips](@ref).
 
-## Dynamic selections
+## Select marks
 
 ![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.gif)
 
-When you click a mark to select it, `@bind` captures that selection, the same way a PlutoUI slider does. Downstream cells re-run with the selected row, bar, or cell. For more information, see [Click marks](@ref) and [Selection](@ref).
+Click a mark to select it. Like a PlutoUI slider, the selection goes to
+a `@bind` variable, and cells that use the variable respond. See
+[Click marks](@ref) and [Selection](@ref).
 
-## Interactive view controls
+## Pan and orbit
 
 ![Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera](assets/home/orbit.gif)
 
-Drag a 2D axis to pan, or an `Axis3` to orbit. The camera stays on the figure; it is not a selection. For more information, see [Pan and orbit](@ref).
+Drag a 2D axis to pan, or an `Axis3` to orbit. Moving the view does not
+change your selection. See [Pan and orbit](@ref).
 
 ## Highlight from the legend
 
 ![Clicking a species in the legend keeps that class and fades the others](assets/home/legend.gif)
 
-Click a legend entry to highlight the traces it labels, and a cell that reads that pick can fade the rest. See [Legend](@ref).
+Click a legend entry to highlight the traces it labels. A cell that uses
+the selection can fade the others, as in this example. See [Legend](@ref).
 
-## Inspect a static export
+## Static exports
 
-Hover and click still work in a Pluto HTML export of the notebook.
-Re-running Julia cells needs a live session. CairoMakie is the default;
-WGLMakie is the live canvas when you want animation, large data, or 3D
-you can orbit. See [Backends](@ref).
+In a static HTML export of your notebook, tooltips and selection still
+work. Other cells do not respond, because the export has no Julia behind
+it. The figure below is a static export; hover over a borough.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -41,20 +45,23 @@ you can orbit. See [Backends](@ref).
 </div>
 ```
 
+## Backends
+
+Masque works with CairoMakie and WGLMakie. CairoMakie is the default.
+Use WGLMakie for animation, large data, or 3D you can orbit. See
+[Backends](@ref).
+
 ## Where to go next
 
-- [Getting started](@ref) — install, overlay a figure, and read a click
-- [Concepts](@ref) — how hover, clicks, payloads, and `@bind` fit together
-- [Constructors](@ref) — every built-in kind, its constructor, and its
-  default payload
-- [Selection](@ref) — reacting to clicks, linking plots, persisting a
-  highlight
-- [Legend](@ref) — hover/click a `Makie.Legend` entry to highlight the
-  trace(s) it labels
-- [Tooltips](@ref) — `masque"..."` templates and styling
-- [Custom hits](@ref) — `RegionInteractable` / `FunctionInteractable`
-- [Backends](@ref) — `:cairo` vs `:webgl`, and when to reach for which
-- [Troubleshooting](@ref) — common errors and what causes them
-- [Examples](@ref) — worked examples and a page per plot type
-- [API](@ref) — full docstrings
-
+- [Getting started](@ref): install Masque and make a figure interactive
+- [Concepts](@ref): how hover, clicks, payloads, and `@bind` fit together
+- [Constructors](@ref): every interactable, its constructor, and its
+  default fields
+- [Selection](@ref): react to clicks, link plots, and keep a highlight
+- [Legend](@ref): highlight the traces a legend entry labels
+- [Tooltips](@ref): templates and styling
+- [Custom hits](@ref): `RegionInteractable` and `FunctionInteractable`
+- [Backends](@ref): CairoMakie or WGLMakie, and when to use each
+- [Troubleshooting](@ref): common errors and their causes
+- [Examples](@ref): worked examples, one page per plot type
+- [API](@ref): full docstrings
