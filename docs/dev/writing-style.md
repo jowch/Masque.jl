@@ -21,7 +21,8 @@ does and sees. Use US spelling ("color"), matching the API's keywords.
    "known problems rather than design choices" answer questions nobody asked. Say what the
    reader can do, and give a constraint only where they would hit it.
 5. **Don't state what the reader already assumes.** "In a running notebook everything above
-   works" tells them nothing.
+   works" tells them nothing. Don't explain Pluto either: why hover doesn't re-run cells
+   is obvious to a Pluto user and no help to someone who hasn't met `@bind`.
 6. **No announcements.** Skip "This page explains…" and "so that the guides read as…".
    Start with what the reader gets, then show it.
 7. **Point to the reference.** When a sentence mentions a set of options or defaults, link

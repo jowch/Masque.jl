@@ -61,25 +61,6 @@ the mark without changing the variable.
 | Release the ROI or threshold | Enclosed marks highlight (with `selects`) | The box, the enclosed marks, or the line's value | Respond |
 | Pan or orbit ([`ViewInteractable`](@ref)) | The view moves | Never changes | No change |
 
-## Why interactions work this way
-
-Your notebook's cells run only when you make a choice. Everything else
-happens in the browser.
-
-Hovering, highlighting, and dragging a box or line happen in the
-browser. They respond instantly and need no Julia, which is why they
-still work in a static HTML export. If hovering changed the `@bind`
-value, the cells that use it would run every time the pointer moved.
-
-A click, or releasing a box or line, is a choice. It changes the `@bind`
-value once, and the cells that use it respond once. That is why a box
-reports what it covers when you release it, not while you drag it.
-
-Panning and orbiting change how you look at the figure, not your
-result. Julia redraws the figure while you drag, so they need a running
-notebook, but the `@bind` value does not change and your cells do not
-run. See [Pan and orbit](@ref).
-
 ## What the `@bind` value holds
 
 A `masque` widget's `@bind` value starts as `nothing`. After a click
