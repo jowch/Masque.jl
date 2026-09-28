@@ -104,6 +104,7 @@ what "the other two" are.
 | create a figure | draw a figure |
 | click | make a deliberate choice, commit |
 | shows | surfaces |
+| the plots you want | the desired plots |
 
 ## Words to avoid
 
@@ -134,5 +135,6 @@ Source: [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia
 | Hovering never changes a `@bind` value. Tooltips and highlights work in the browser alone, so they are instant. | Tooltips and highlights respond in the browser without Julia, so they are instant. The `@bind` value changes only when you click. |
 | You select one mark at a time. A click replaces the selection, and there is no Shift-click or Ctrl-click to add to it. | A click selects one mark and replaces the previous selection. To select several marks at once, drag a box over them with an `ROIInteractable`. |
 | Pass the interactables yourself, points first: | To reach the points, pass in your own list of the interactables you want, with the scatter before the polygon: *(after a sentence saying what goes wrong, and followed by what changes)* |
+| pass in a list of desired interactables yourself | pass in your own list of the interactables you want *(everyday words, and say "your own" or "yourself", not both)* |
 | This page explains how Masque behaves today, so you can plan around it. | *(Cut it. Start with the first behavior.)* |
 | Masque does three things to a Makie figure you have already drawn: it decides which marks respond to the pointer, it shows information about a mark without re-running Julia, and it hands a deliberate choice back to your notebook through `@bind`. | Masque adds tooltips and click selection to a Makie figure. A click reaches the rest of your notebook through `@bind`. |

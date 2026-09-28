@@ -66,7 +66,7 @@ not decide which mark you reach. A mark on the far side of the scene
 can be reached through a nearer mark that comes later in the list, and
 a nearer mark can be blocked by a farther one that comes earlier.
 
-## Potential rough edges today
+## Rough edges today
 
 - In a static HTML export, tooltips and highlights still work, but other
   cells do not respond to a click and you cannot pan. See
