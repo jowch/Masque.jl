@@ -18,18 +18,6 @@ both, and the notebook records them in its own environment:
 using Masque, CairoMakie
 ```
 
-To add the packages from a Julia session instead, keep the notebook
-file closed and write them into that file.
-`Pluto.activate_notebook_environment` updates the environment embedded
-in the notebook, so package management stays on when you open it again.
-
-```julia
-import Pluto, Pkg
-Pluto.activate_notebook_environment("path/to/notebook.jl") do
-    Pkg.add(["Masque", "CairoMakie"])
-end
-```
-
 !!! info
 
     Masque supports CairoMakie and WGLMakie. `using Masque` with no Makie
