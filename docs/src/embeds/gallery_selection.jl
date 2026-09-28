@@ -73,7 +73,7 @@ begin
 end
 
 # ╔═╡ a1410002-0001-4000-8000-000000000006
-@bind pick_right masque(fig_r, right; selected = held)
+@bind right_click masque(fig_r, right; selected = held)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
