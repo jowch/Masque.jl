@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/src/assets/demo.gif" width="720" alt="A CairoMakie scatter in Pluto: holding the pointer over a point shows a tooltip, clicking it selects the point and updates the bound value in the following cell">
+  <img src="docs/src/assets/demo.gif" width="720" alt="A CairoMakie scatter in Pluto: hovering over a point shows a tooltip, clicking it selects the point and updates the bound value in the following cell">
 </p>
 
 Masque adds a thin JavaScript overlay to Makie figures in a Pluto notebook.
