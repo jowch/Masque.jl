@@ -35,9 +35,19 @@ To pick several marks at once, drag a box instead: an
 @bind pick masque(fig, cities; selected = 1)
 ```
 
-The widget mounts with the first city highlighted, and `pick` starts as
-its event rather than `nothing`, so downstream cells have something to
-show before anyone clicks.
+The widget opens with the first city highlighted, and `pick` starts as
+that city's event, so other cells have something to show before anyone
+clicks. Click another city to replace it:
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-selection-start" data-masque-embed="selection_start" title="Four cities with Tokyo selected. Click another and the readout names it." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("selection_start")
+```
 
 A few rules follow from "one widget holds one selection":
 

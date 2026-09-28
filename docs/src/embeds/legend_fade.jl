@@ -19,51 +19,50 @@ end
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000100
 md"""
-Click a polygon. The last cell names it.
+Click a legend entry. The second figure fades the other line.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
 md"""
-Create the polygons the way you normally would. `masque` makes each polygon clickable.
+Plot two labeled lines and add a legend.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000102
 begin
+    xs = range(0, 2π; length = 80)
     fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; aspect = DataAspect())
-    poly!(
-        ax,
-        [
-            Point2f[(0.0, 0.0), (1.0, 0.0), (0.5, 0.85)],
-            Point2f[(1.6, 0.0), (2.6, 0.0), (2.6, 1.0), (1.6, 1.0)],
-            Point2f[(0.1, 1.2), (1.1, 1.2), (0.9, 2.0), (0.3, 2.0)],
-        ];
-        color = [:steelblue, :tomato, :seagreen],
-    )
+    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
+    lines!(ax, xs, sin.(xs); label = "a")
+    lines!(ax, xs, cos.(xs); label = "b")
+    axislegend(ax)
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000103
 md"""
-`@bind pick` saves a click in `pick`. Hovering outlines the polygon without changing `pick`.
+`@bind pick` saves a legend click in `pick`.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000104
 @bind pick masque(fig)
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
 md"""
-`pick` starts as `nothing`. After a click, `pick.index` is the polygon's position in the order you plotted them. This cell responds to the click.
+This cell draws a second figure from `pick`. When you click a legend entry, it fades the other line.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if isnothing(pick)
-    "click a polygon"
-else
-    names = ["triangle", "square", "trapezoid"]
-    "$(names[pick.index]) selected"
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000106
+begin
+    focus = pick isa LegendEvent ? pick.label : nothing
+    fig2 = Figure(size = (560, 360))
+    ax2 = Axis(fig2[1, 1])
+    for (label, f) in (("a", sin), ("b", cos))
+        faded = !isnothing(focus) && label != focus
+        lines!(ax2, xs, f.(xs); label, alpha = faded ? 0.2 : 1.0)
+    end
+    fig2
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
@@ -74,13 +73,13 @@ show_code = true
 pluto_html = true
 
 cells = [
-  "a1b2c3d4-0001-4000-8000-000000000009",
-  "a1b2c3d4-0001-4000-8000-000000000010",
-  "a1b2c3d4-0001-4000-8000-000000000002",
-  "a1b2c3d4-0001-4000-8000-000000000011",
-  "a1b2c3d4-0001-4000-8000-000000000003",
-  "a1b2c3d4-0001-4000-8000-000000000012",
-  "a1b2c3d4-0001-4000-8000-000000000004",
+  "a1b2c3d4-0001-4000-8000-000000000100",
+  "a1b2c3d4-0001-4000-8000-000000000101",
+  "a1b2c3d4-0001-4000-8000-000000000102",
+  "a1b2c3d4-0001-4000-8000-000000000103",
+  "a1b2c3d4-0001-4000-8000-000000000104",
+  "a1b2c3d4-0001-4000-8000-000000000105",
+  "a1b2c3d4-0001-4000-8000-000000000106",
 ]
 """
 
@@ -1729,13 +1728,13 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
-# ╟─a1b2c3d4-0001-4000-8000-000000000009
-# ╟─a1b2c3d4-0001-4000-8000-000000000010
-# ╠═a1b2c3d4-0001-4000-8000-000000000002
-# ╟─a1b2c3d4-0001-4000-8000-000000000011
-# ╠═a1b2c3d4-0001-4000-8000-000000000003
-# ╟─a1b2c3d4-0001-4000-8000-000000000012
-# ╠═a1b2c3d4-0001-4000-8000-000000000004
+# ╟─a1b2c3d4-0001-4000-8000-000000000100
+# ╟─a1b2c3d4-0001-4000-8000-000000000101
+# ╠═a1b2c3d4-0001-4000-8000-000000000102
+# ╟─a1b2c3d4-0001-4000-8000-000000000103
+# ╠═a1b2c3d4-0001-4000-8000-000000000104
+# ╟─a1b2c3d4-0001-4000-8000-000000000105
+# ╠═a1b2c3d4-0001-4000-8000-000000000106
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

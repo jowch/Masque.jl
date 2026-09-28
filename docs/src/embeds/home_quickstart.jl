@@ -26,7 +26,7 @@ Hover a point to read its name, then click it. The last cell names the point.
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000010
 md"""
-Draw the scatter the way you already draw a Makie figure, and end the cell with `nothing` so this cell does not print the figure. `PointInteractable` takes that scatter, so the highlight sits on the marker. The tooltip reads `name` and `y` off each point.
+Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Pass the scatter to `PointInteractable` so the highlight sits on the marker. The tooltip shows each point's `name` and `y`.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000002
@@ -45,7 +45,7 @@ end
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000011
 md"""
-`masque` mounts the overlay on the figure. `@bind sel` stores a click in `sel`. Hover updates the tooltip and does not change `sel`.
+`@bind sel` saves a click in `sel`. Hovering shows the tooltip without changing `sel`.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000003
@@ -53,11 +53,11 @@ md"""
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000012
 md"""
-Before a click, `sel` is `nothing`. A click is an `ElementEvent`. `sel.name` is the payload's name, and `sel.index` is 1-based. This cell reads `sel`, so it re-runs on the click.
+`sel` starts as `nothing`. After a click, `sel.name` is the point's name and `sel.index` is its position in your data. This cell responds to the click.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000004
-if sel === nothing
+if isnothing(sel)
     "click a point"
 else
     "$(sel.name) selected — y = $(sel.y)"

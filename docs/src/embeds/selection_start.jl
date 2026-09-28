@@ -19,52 +19,43 @@ end
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000100
 md"""
-Click a polygon. The last cell names it.
+Tokyo starts selected. Click another city to replace the selection.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
 md"""
-Create the polygons the way you normally would. `masque` makes each polygon clickable.
+Plot the cities and attach each city's name as its payload.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000102
 begin
+    lon = [139.7, 77.2, 3.4, -77.0]
+    lat = [35.7, 28.6, 6.5, -12.0]
+    rows = [(city = "Tokyo",), (city = "Delhi",), (city = "Lagos",), (city = "Lima",)]
     fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; aspect = DataAspect())
-    poly!(
-        ax,
-        [
-            Point2f[(0.0, 0.0), (1.0, 0.0), (0.5, 0.85)],
-            Point2f[(1.6, 0.0), (2.6, 0.0), (2.6, 1.0), (1.6, 1.0)],
-            Point2f[(0.1, 1.2), (1.1, 1.2), (0.9, 2.0), (0.3, 2.0)],
-        ];
-        color = [:steelblue, :tomato, :seagreen],
-    )
+    ax = Axis(fig[1, 1]; xlabel = "Longitude", ylabel = "Latitude")
+    s = scatter!(ax, lon, lat; markersize = 18)
+    cities = PointInteractable(ax, s; id = :cities, payloads = rows)
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000103
 md"""
-`@bind pick` saves a click in `pick`. Hovering outlines the polygon without changing `pick`.
+`selected = 1` starts the widget with the first city selected, so `pick` already holds its event.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind pick masque(fig)
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000104
+@bind pick masque(fig, cities; selected = 1)
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
 md"""
-`pick` starts as `nothing`. After a click, `pick.index` is the polygon's position in the order you plotted them. This cell responds to the click.
+This cell shows the selected city from the start, and responds when you click another.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if isnothing(pick)
-    "click a polygon"
-else
-    names = ["triangle", "square", "trapezoid"]
-    "$(names[pick.index]) selected"
-end
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000106
+isnothing(pick) ? "click a city" : "$(pick.city) selected"
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
@@ -74,13 +65,13 @@ show_code = true
 pluto_html = true
 
 cells = [
-  "a1b2c3d4-0001-4000-8000-000000000009",
-  "a1b2c3d4-0001-4000-8000-000000000010",
-  "a1b2c3d4-0001-4000-8000-000000000002",
-  "a1b2c3d4-0001-4000-8000-000000000011",
-  "a1b2c3d4-0001-4000-8000-000000000003",
-  "a1b2c3d4-0001-4000-8000-000000000012",
-  "a1b2c3d4-0001-4000-8000-000000000004",
+  "a1b2c3d4-0001-4000-8000-000000000100",
+  "a1b2c3d4-0001-4000-8000-000000000101",
+  "a1b2c3d4-0001-4000-8000-000000000102",
+  "a1b2c3d4-0001-4000-8000-000000000103",
+  "a1b2c3d4-0001-4000-8000-000000000104",
+  "a1b2c3d4-0001-4000-8000-000000000105",
+  "a1b2c3d4-0001-4000-8000-000000000106",
 ]
 """
 
@@ -1729,13 +1720,13 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
-# ╟─a1b2c3d4-0001-4000-8000-000000000009
-# ╟─a1b2c3d4-0001-4000-8000-000000000010
-# ╠═a1b2c3d4-0001-4000-8000-000000000002
-# ╟─a1b2c3d4-0001-4000-8000-000000000011
-# ╠═a1b2c3d4-0001-4000-8000-000000000003
-# ╟─a1b2c3d4-0001-4000-8000-000000000012
-# ╠═a1b2c3d4-0001-4000-8000-000000000004
+# ╟─a1b2c3d4-0001-4000-8000-000000000100
+# ╟─a1b2c3d4-0001-4000-8000-000000000101
+# ╠═a1b2c3d4-0001-4000-8000-000000000102
+# ╟─a1b2c3d4-0001-4000-8000-000000000103
+# ╠═a1b2c3d4-0001-4000-8000-000000000104
+# ╟─a1b2c3d4-0001-4000-8000-000000000105
+# ╠═a1b2c3d4-0001-4000-8000-000000000106
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

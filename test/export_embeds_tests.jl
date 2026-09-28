@@ -247,9 +247,9 @@ end
     @test endswith(player["cells"][1], "0009")
     src = read(path, String)
     @test occursin("Hover a point to read its name", src)
-    @test occursin("`sel.index` is 1-based", src)
+    @test occursin("`sel.index` is its position in your data", src)
     @test occursin("name = \"one\"", src)
-    @test occursin("if sel === nothing", src)
+    @test occursin("if isnothing(sel)", src)
     @test occursin("PointInteractable(ax, s; payloads = points)", src)
 end
 
@@ -412,6 +412,7 @@ end
         "marks_bars", "marks_poly", "marks_polar", "legend_lines", "roi_table",
         "tooltips_template", "tooltips_dark", "grids_heatmap", "readouts_axis",
         "custom_regions", "linked_two_axis", "linked_legend_wash",
+        "marks_lines", "selection_start", "legend_fade",
     ]
     for name in guides
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))

@@ -19,51 +19,45 @@ end
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000100
 md"""
-Click a polygon. The last cell names it.
+Click a line. The last cell names the line you clicked.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
 md"""
-Create the polygons the way you normally would. `masque` makes each polygon clickable.
+Plot two lines. Each `lines!` call is one mark.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000102
 begin
     fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; aspect = DataAspect())
-    poly!(
-        ax,
-        [
-            Point2f[(0.0, 0.0), (1.0, 0.0), (0.5, 0.85)],
-            Point2f[(1.6, 0.0), (2.6, 0.0), (2.6, 1.0), (1.6, 1.0)],
-            Point2f[(0.1, 1.2), (1.1, 1.2), (0.9, 2.0), (0.3, 2.0)],
-        ];
-        color = [:steelblue, :tomato, :seagreen],
-    )
+    ax = Axis(fig[1, 1])
+    xs = 0:0.1:10
+    lines!(ax, xs, sin.(xs))
+    lines!(ax, xs, cos.(xs))
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000103
 md"""
-`@bind pick` saves a click in `pick`. Hovering outlines the polygon without changing `pick`.
+`@bind pick` saves the clicked line in `pick`.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000104
 @bind pick masque(fig)
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
 md"""
-`pick` starts as `nothing`. After a click, `pick.index` is the polygon's position in the order you plotted them. This cell responds to the click.
+`pick` starts as `nothing`. After a click, `pick.layer` is `:lines` for the first line and `:lines_2` for the second. This cell responds to the click.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000106
 if isnothing(pick)
-    "click a polygon"
+    "click a line"
 else
-    names = ["triangle", "square", "trapezoid"]
-    "$(names[pick.index]) selected"
+    names = Dict(:lines => "sine", :lines_2 => "cosine")
+    "you clicked the $(names[pick.layer]) line"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
@@ -74,13 +68,13 @@ show_code = true
 pluto_html = true
 
 cells = [
-  "a1b2c3d4-0001-4000-8000-000000000009",
-  "a1b2c3d4-0001-4000-8000-000000000010",
-  "a1b2c3d4-0001-4000-8000-000000000002",
-  "a1b2c3d4-0001-4000-8000-000000000011",
-  "a1b2c3d4-0001-4000-8000-000000000003",
-  "a1b2c3d4-0001-4000-8000-000000000012",
-  "a1b2c3d4-0001-4000-8000-000000000004",
+  "a1b2c3d4-0001-4000-8000-000000000100",
+  "a1b2c3d4-0001-4000-8000-000000000101",
+  "a1b2c3d4-0001-4000-8000-000000000102",
+  "a1b2c3d4-0001-4000-8000-000000000103",
+  "a1b2c3d4-0001-4000-8000-000000000104",
+  "a1b2c3d4-0001-4000-8000-000000000105",
+  "a1b2c3d4-0001-4000-8000-000000000106",
 ]
 """
 
@@ -1729,13 +1723,13 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
-# ╟─a1b2c3d4-0001-4000-8000-000000000009
-# ╟─a1b2c3d4-0001-4000-8000-000000000010
-# ╠═a1b2c3d4-0001-4000-8000-000000000002
-# ╟─a1b2c3d4-0001-4000-8000-000000000011
-# ╠═a1b2c3d4-0001-4000-8000-000000000003
-# ╟─a1b2c3d4-0001-4000-8000-000000000012
-# ╠═a1b2c3d4-0001-4000-8000-000000000004
+# ╟─a1b2c3d4-0001-4000-8000-000000000100
+# ╟─a1b2c3d4-0001-4000-8000-000000000101
+# ╠═a1b2c3d4-0001-4000-8000-000000000102
+# ╟─a1b2c3d4-0001-4000-8000-000000000103
+# ╠═a1b2c3d4-0001-4000-8000-000000000104
+# ╟─a1b2c3d4-0001-4000-8000-000000000105
+# ╠═a1b2c3d4-0001-4000-8000-000000000106
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

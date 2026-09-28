@@ -34,17 +34,14 @@ The highlight is drawn over the figure; it cannot hide or dim the lines
 Makie drew. To fade the unselected series, draw a second figure in a
 cell that reads `pick`:
 
-```julia
-begin
-    focus = pick isa LegendEvent ? pick.label : nothing
-    fig2 = Figure(size = (560, 360))
-    ax2 = Axis(fig2[1, 1])
-    for (label, f) in (("a", sin), ("b", cos))
-        faded = focus !== nothing && label != focus
-        lines!(ax2, xs, f.(xs); label, alpha = faded ? 0.2 : 1.0)
-    end
-    fig2
-end
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-legend-fade" data-masque-embed="legend_fade" title="Two lines with a legend. Click an entry and a second figure fades the other line." style="width:100%;height:1500px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("legend_fade")
 ```
 
 The same `pick.label` can filter a table, choose which series to fit, or

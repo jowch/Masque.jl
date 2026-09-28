@@ -76,19 +76,14 @@ A `lines!` call is one mark. Clicking anywhere along it selects the
 whole line, since a line plot is read as one series. To read the value
 at a particular `x` instead, use a [`SliceInteractable`](@ref).
 
-```julia
-begin
-    fig = Figure()
-    ax = Axis(fig[1, 1])
-    xs = 0:0.1:10
-    lines!(ax, xs, sin.(xs))
-    lines!(ax, xs, cos.(xs))
-    nothing
-end
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-marks-lines" data-masque-embed="marks_lines" title="Two lines. Click one and the readout names it." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
 ```
 
-```julia
-@bind pick masque(fig)
+```@eval
+Main.masque_fallback("marks_lines")
 ```
 
 `pick.layer` tells the two lines apart: `:lines` for the first and
