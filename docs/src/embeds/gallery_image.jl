@@ -22,7 +22,7 @@ using Masque, CairoMakie, Statistics
 
 # ╔═╡ a1410008-0001-4000-8000-000000000009
 md"""
-Drag the box over the image. The last cell reports the median color inside it.
+Drag the box over the image, and the last cell reports the median color inside it.
 """
 
 # ╔═╡ a1410008-0001-4000-8000-000000000010

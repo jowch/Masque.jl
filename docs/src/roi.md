@@ -50,9 +50,9 @@ point in the order you plotted them:
 pts = PointInteractable(ax, s; id = :pts, payloads = df)
 ```
 
-Then `df[picks, :]` is the rows inside the box. `df[1:0, :]` is an
-empty table with the same columns, for before the first release or when
-the box is empty:
+Then `df[picks, :]` is the rows inside the box. To show an empty table
+with the same columns before the first release or when the box is empty,
+use `df[1:0, :]`:
 
 ```julia
 if isnothing(picks) || isempty(picks)
@@ -62,8 +62,8 @@ else
 end
 ```
 
-Only the box sets `picks`. Hovering a point still shows its tooltip, but
-clicking it does not change `picks`. The exception is an
+Only the box sets `picks`: hovering a point still shows its tooltip,
+but clicking it does not change `picks`. The exception is an
 [`AxisInteractable`](@ref) in the same widget: it takes clicks anywhere
 on its axis, so a click there replaces `picks` with an
 [`AxisEvent`](@ref). To keep `picks` a vector, put the axis readout in a
@@ -75,10 +75,10 @@ Name a heatmap or image layer in `selects` instead, and the box returns
 one [`GridWindowEvent`](@ref) for the block of cells it covers.
 `win.i1:win.i2` is the range of the matrix's first index, drawn along
 x, and `win.j1:win.j2` the range of its second index, drawn along y, so
-`A[win]` is `A[win.i1:win.i2, win.j1:win.j2]`. Clicking a cell shows its tooltip but does not change the
-value, which stays the box's block (unless an `AxisInteractable` in the
-same widget takes the click, as above). See
-[Inspect a grid](@ref).
+`A[win]` is `A[win.i1:win.i2, win.j1:win.j2]`. Clicking a cell shows
+its tooltip but does not change the value, which stays the box's block
+unless an `AxisInteractable` in the same widget takes the click, as
+above. See [Inspect a grid](@ref).
 
 ## Read the box itself
 
@@ -91,18 +91,18 @@ widget's `BoundsEvent` as `bounds`.
 
 ## Moving and resizing
 
-Drag inside the box to move it. Drag a corner to resize it in both
-directions, or the middle of an edge to move only that edge. The pointer
-changes to show which. If the axis also has a
-[`ViewInteractable`](@ref), a plain drag moves the box and Shift+drag
-pans the plot. Moving the box needs a pointer; see
+Drag inside the box to move it, or drag a corner to resize it in both
+directions. Dragging the middle of an edge moves only that edge, and
+the pointer changes shape to show which one you are on. If the axis
+also has a [`ViewInteractable`](@ref), a plain drag moves the box and
+Shift+drag pans the plot. Moving the box needs a pointer; see
 [Keyboard and screen readers](@ref) for what the keyboard reaches.
 
 ## Where it works
 
 `selects` can name a layer of points, or a heatmap or image, and that
-layer must be in the same `masque` call. Every box in one widget names
-the same layer. The box needs a 2D `Axis`; see
+layer must be in the same `masque` call. All the boxes in one widget
+must name the same layer. The box needs a 2D `Axis`; see
 [Supported plots and axes](@ref) for which axes and scales.
 
 For larger examples, [Box-select scatter](@ref) summarizes two groups

@@ -44,7 +44,7 @@ begin
 end
 ```
 
-The detail cell uses `pick`, so it responds to each click, not to
+The detail cell uses `pick`, so it responds to each click but not to
 hovering. The same `pick.id` could filter a `DataFrame` or choose the
 data for a fit. The detail figure can be a Masque widget too.
 
@@ -53,8 +53,8 @@ that widget's `selected=`. [Selection round-trip](@ref) shows how.
 
 ## Several axes in one figure
 
-One `masque` call covers every axis in a figure. Hovering a point
-highlights it on its own panel only, even when the other panel plots
+One `masque` call covers every axis in a figure, and hovering a point
+highlights it only on its own panel, even when the other panel plots
 the same row of your data. Each scatter gets its own layer id
 (`:scatter`, `:scatter_2`, and so on), so `pick.layer` tells you which
 panel was clicked.
@@ -70,8 +70,8 @@ Main.masque_fallback("linked_two_axis")
 ```
 
 To highlight the same row on both panels, select it on both layers
-from a value `i` in another cell (not from this widget's own `pick`; see
-[Selection](@ref)):
+from a value `i` set in another cell. The value cannot come from this
+widget's own `pick`, for the reason given in [Selection](@ref):
 
 ```julia
 masque(fig; selected = Dict(:scatter => [i], :scatter_2 => [i]))

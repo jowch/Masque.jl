@@ -21,7 +21,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
 md"""
-Click a legend entry. The last cell names that series, and the line stays highlighted.
+Click a legend entry, and the last cell names that series while its line stays highlighted.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
@@ -42,7 +42,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click on a legend entry in `pick`. Hovering an entry highlights its line without changing `pick`.
+`@bind pick` saves a click on a legend entry in `pick`, while hovering over an entry only highlights its line and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -50,7 +50,7 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`. Clicking a legend entry makes `pick` a `LegendEvent`, and `pick.label` is the entry's text. Clicking a line gives an `ElementEvent`, which has no `label`. This cell responds to the click.
+`pick` starts as `nothing`, and this cell responds when you click. Clicking a legend entry makes `pick` a `LegendEvent`, and `pick.label` is the entry's text. Clicking a line gives an `ElementEvent`, which has no `label`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004

@@ -134,7 +134,7 @@ Source: [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia
 | Until the first click or release, the bound variable is `nothing`. | A `masque` widget's `@bind` value starts as `nothing`. |
 | In a running notebook everything above works. A static HTML export has no Julia behind it. | A static HTML export of your notebook keeps tooltips and highlights. Other cells do not respond, because the export has no Julia behind it. |
 | `rows = [(; r..., density = round(r.pop / r.area; digits = 1)) for r in rows]` | `rows = [(city = "Lyon", density = round(522_250 / 47.9)), …]`, written out |
-| Payload values are always escaped, so your data cannot add HTML to the tooltip. | Avoid putting HTML in your payload values. It will not be rendered; the tooltip shows the tags as plain text. To make something bold, use the template instead. *(Then show both in code.)* |
+| Payload values are always escaped, so your data cannot add HTML to the tooltip. | Avoid putting HTML in your payload values, because the tooltip shows the tags as plain text instead of rendering them. To make something bold, use the template instead. *(Then show both in code.)* |
 | See Tooltip chrome | See Tooltip styling |
 | Hovering never changes a `@bind` value. Tooltips and highlights work in the browser alone, so they are instant. | Tooltips and highlights respond in the browser without Julia, so they are instant. The `@bind` value changes only when you click. |
 | You select one mark at a time. A click replaces the selection, and there is no Shift-click or Ctrl-click to add to it. | A click selects one mark and replaces the previous selection. To select several marks at once, drag a box over them with an `ROIInteractable`. |

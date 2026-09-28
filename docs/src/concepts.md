@@ -1,8 +1,8 @@
 # Concepts
 
 Masque adds tooltips and selection to a Makie figure you have already
-made. Hovering a mark shows its data. Clicking a mark, or dragging a box
-or a threshold line, sends a value to your notebook through `@bind`.
+made: hovering a mark shows its data, and clicking a mark, or dragging a
+box or a threshold line, sends a value to your notebook through `@bind`.
 
 ## One figure, one widget
 
@@ -14,10 +14,10 @@ top. A figure with several axes still needs only one `masque` call.
 ```
 
 On its own, `masque(fig)` makes every plot it recognizes interactive,
-along with every legend and colorbar. [Recipes masque(fig) extracts](@ref) lists the
-plots it knows. Pass interactables yourself to choose the marks, attach
-your own data, or add something Makie did not draw, such as a draggable
-threshold.
+along with every legend and colorbar. [Recipes masque(fig) extracts](@ref)
+lists the plots it knows. To choose the marks, attach your own data, or
+add something Makie did not draw, such as a draggable threshold, pass in
+your own interactables.
 
 ## Interactables and payloads
 
@@ -27,9 +27,9 @@ An *interactable* tells Masque which marks respond to the pointer.
 [`ROIInteractable`](@ref) adds a box you drag. [Constructors](@ref)
 lists them all.
 
-A *payload* is the data that belongs to one mark. Pass `payloads` with
-one entry per mark, in the order you plotted them. It can be a vector of
-named tuples or a `DataFrame` with one row per mark:
+A *payload* is the data that belongs to one mark. To attach your data,
+pass `payloads` with one entry per mark, in the order you plotted them,
+as a vector of named tuples or a `DataFrame` with one row per mark:
 
 ```julia
 cities = PointInteractable(ax, s; payloads = rows)   # rows[i] belongs to point i
@@ -41,8 +41,8 @@ an `index` and its coordinates, such as `x` and `y` for a scatter point.
 
 ## Tooltips are templates
 
-A tooltip shows the payload of the mark under the pointer. By default
-it is a small table of the payload's fields. A `masque"..."` template
+A tooltip shows the payload of the mark under the pointer, by default as
+a small table of the payload's fields. A `masque"..."` template
 chooses which fields it shows and how they are formatted. A template can
 use only payload fields, so to show a value you compute, add it to the
 payload in Julia. See [Tooltips](@ref).
@@ -63,13 +63,12 @@ the mark without changing the variable.
 
 ## What the `@bind` value holds
 
-A `masque` widget's `@bind` value starts as `nothing`. After a click
-or release, the value is an *event*, a small struct whose fields you
-read directly. A clicked mark's event has the payload's fields, such as
-`pick.city`. It also has `pick.layer`, the interactable that was hit,
-and `pick.index`, the mark's position in your data. The event indexes
-your data too: `xs[pick]` is that mark's value and `df[pick, :]` is its
-row.
+A `masque` widget's `@bind` value starts as `nothing`, and after a click
+or release it is an *event*, a small struct whose fields you read
+directly. A clicked mark's event has the payload's fields, such as
+`pick.city`, along with `pick.layer`, the interactable you clicked, and
+`pick.index`, the mark's position in your data. The event indexes your
+data too: `xs[pick]` is that mark's value and `df[pick, :]` is its row.
 
 | Interaction | `@bind` value | Read it as |
 |---|---|---|
@@ -83,8 +82,8 @@ row.
 | Click a colorbar | [`ColorbarEvent`](@ref) | `pick.value` |
 | Release a threshold line | [`ThresholdEvent`](@ref) | `pick.value` |
 
-A widget with several interactables holds the most recent event. To tell
-them apart, check `pick.layer` or the event's type. Clicking another
+A widget with several interactables holds the most recent event, so to
+tell them apart, check `pick.layer` or the event's type. Clicking another
 mark replaces the event, and clicking empty space keeps it. To start
 with marks selected, see [Selection](@ref).
 

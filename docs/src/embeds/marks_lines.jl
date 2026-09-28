@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000100
 md"""
-Click a line. The last cell names the line you clicked.
+Click a line, and the last cell names it.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
 md"""
-Plot two lines. Each `lines!` call is one mark.
+Plot two lines with one `lines!` call each, so each line is one mark you can click.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000102
@@ -49,7 +49,7 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
 md"""
-`pick` starts as `nothing`. After a click, `pick.layer` is `:lines` for the first line and `:lines_2` for the second. This cell responds to the click.
+`pick` starts as `nothing`, and this cell responds when you click a line. After a click, `pick.layer` is `:lines` for the first line and `:lines_2` for the second.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000106

@@ -14,9 +14,9 @@ each mark reports its `index` and coordinates.
 
 `masque(fig)` is the same as `masque(fig, auto_interactables(fig))`.
 [`auto_interactables`](@ref) makes an interactable for every plot it
-knows on each axis, plus every `Colorbar` and `Legend`.
-[Recipes masque(fig) extracts](@ref) lists the plots. A plot it doesn't
-know is skipped with a warning.
+knows on each axis, plus every `Colorbar` and `Legend`, and skips any
+other plot with a warning. [Recipes masque(fig) extracts](@ref) lists
+the plots it knows.
 
 To change what it made, edit the vector and pass it to `masque`:
 
@@ -38,8 +38,9 @@ shortened: `heatmap!` and `image!` are `:cells`, `barplot!` is `:bars`,
 and `linesegments!` is `:segments`. `pick.layer` is that id.
 
 `masque(fig)` doesn't add axis readouts, thresholds, boxes, panning, or
-slices; pass those yourself. To give a layer a tooltip template or a
-`label`, build that interactable yourself from the plot, for example
+slices, so to use one, add it to the vector as above. To give a layer
+a tooltip template or a `label`, build that interactable yourself from
+the plot, for example
 `PointInteractable(ax, s; tooltip = masque"...")`.
 
 ## Marks
@@ -53,24 +54,24 @@ slices; pass those yourself. To give a layer a tooltip template or a
 | [`PolygonInteractable`](@ref) | `(ax, rings; holes=nothing, id=:polygons)` or `(ax, p::Poly)` | [`ElementEvent`](@ref): `index` | [Click marks](@ref) |
 | [`TextInteractable`](@ref) | `(ax, p::Text; id=:text)` | [`ElementEvent`](@ref): `text`, `index`, `x`, `y` | [Click marks](@ref) |
 
-For a scatter, pass the plot: the highlight then matches the drawn
-marker. With positions instead, pass `radius` (in pixels) if Masque
-can't find a scatter with those positions. On an `Axis3`, `radius3d`
-gives each point's size in data units.
+For a scatter, pass the plot, so the highlight matches the drawn
+marker. If you pass positions instead and Masque can't find a scatter
+with those positions, pass `radius` in pixels. On an `Axis3`,
+`radius3d` gives each point's size in data units.
 
 For segments, `mode = :pairs` treats the vertices as separate pairs
-instead of one path. `unit = :line` makes the whole path one mark. `tol`
-is how far from the line, in pixels, a hover still counts.
+instead of one path, and `unit = :line` makes the whole path one mark.
+`tol` is how far from the line, in pixels, a hover still counts.
 
-`holes` gives each polygon its hole rings. A point inside a hole does
-not count as that polygon. `clamp_to_viewport = true` trims a rectangle
-that reaches past the axis edge.
+`holes` gives each polygon its hole rings, so hovering inside a hole
+does not reach that polygon. `clamp_to_viewport = true` trims a
+rectangle that reaches past the axis edge.
 
 ## Plot-object defaults
 
-Pass a plot object and the constructor reads its geometry. These are
-the fields each plot type reports when you don't pass `payloads`, and
-the id `masque(fig)` gives it.
+When you pass a plot object, the constructor reads its geometry from
+the plot. The table lists the fields each plot type reports when you
+don't pass `payloads`, and the id `masque(fig)` gives it.
 
 | Plot | Constructor | Default fields | id |
 |---|---|---|---|
@@ -113,8 +114,8 @@ produce, so one widget can set where another starts. A legend made by
 `masque(fig)` links each entry to its plots; `LegendInteractable(leg)`
 on its own needs `targets` for that.
 
-Axis readouts, thresholds, boxes, and slices need a 2D `Axis`. Panning
-also works on an `Axis3`, where it orbits the camera. See
+Axis readouts, thresholds, boxes, and slices need a 2D `Axis`, while
+panning also works on an `Axis3`, where it orbits the camera. See
 [Supported plots and axes](@ref) for which work where.
 
 ## Custom

@@ -21,7 +21,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000100
 md"""
-Click a legend entry. The second figure fades the other line.
+Click a legend entry, and the second figure fades the other line.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
@@ -50,7 +50,7 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
 md"""
-This cell creates a second figure from `pick`. When you click a legend entry, it fades the other line.
+This cell creates a second figure from `pick`, so when you click a legend entry, the other line fades.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000106

@@ -22,12 +22,12 @@ using Masque, CairoMakie, Random
 
 # ╔═╡ a1410003-0001-4000-8000-000000000009
 md"""
-Hover over a bar, a band, or a span. One `masque` call covers every panel.
+Hover over a bar, a band, or a span in any panel, since one `masque` call covers them all.
 """
 
 # ╔═╡ a1410003-0001-4000-8000-000000000010
 md"""
-Create the panels the way you normally would. You do not need an interactable for each recipe.
+Create the panels the way you normally would. You do not need an interactable for each recipe, because `masque` finds the bars and spans on its own.
 """
 
 # ╔═╡ a1410003-0001-4000-8000-000000000002

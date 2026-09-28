@@ -3,8 +3,8 @@
 Drag a box around a group of points to see what is different about
 it. In this clip, the box starts on one cluster, moves to the other,
 then shrinks to cover half of it. The count beside the box updates as
-it moves. After each release, the histogram under the scatter compares
-the `z` of the points in the box with all the samples.
+it moves, and after each release, the histogram under the scatter
+compares the `z` of the points in the box with all the samples.
 
 ```@raw html
 <video id="masque-cluster-clip" title="Dragging a box between two clusters. The histogram below updates after each release."
@@ -20,7 +20,7 @@ the `z` of the points in the box with all the samples.
 </script>
 ```
 
-Create the scatter and the box:
+First, create the scatter and the box:
 
 ```julia
 begin
@@ -41,13 +41,13 @@ begin
 end
 ```
 
-Bind the box:
+Then show the figure and bind the points that the box selects:
 
 ```julia
 @bind picks masque(fig, [pts, roi])
 ```
 
-Compare what is inside with every sample:
+Finally, compare the points inside the box with every sample:
 
 ```julia
 begin

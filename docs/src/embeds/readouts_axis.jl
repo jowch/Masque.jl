@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ b18a0001-0001-4000-8000-000000000009
 md"""
-Move the pointer across the axis. The tooltip follows it and shows the data coordinates `(x, y)`.
+Move the pointer across the axis, and the tooltip follows it and shows the data coordinates `(x, y)`.
 """
 
 # ╔═╡ b18a0001-0001-4000-8000-000000000010
 md"""
-Create the line plot the way you normally would, and add an `AxisInteractable` for its axis. `masque(fig)` does not add one on its own.
+Create the line plot the way you normally would, and add an `AxisInteractable` for its axis, because `masque(fig)` does not add one on its own.
 """
 
 # ╔═╡ b18a0001-0001-4000-8000-000000000002

@@ -1,9 +1,9 @@
 # From a heatmap cell to its trace
 
 Click a heatmap cell to see the data behind it. Each cell is a
-station's mean temperature for one day of a week. Click one, and the
-plot below shows that day's hourly readings, with the daily mean as a
-dashed line.
+station's mean temperature for one day of a week, and clicking one
+plots that day's hourly readings below, with the daily mean as a dashed
+line.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -17,11 +17,12 @@ Main.masque_fallback("example_heatmap_trace")
 
 ## How it works
 
-[`RectInteractable`](@ref) makes each heatmap cell clickable. A click
-makes `pick` a [`GridCellEvent`](@ref): `daily[pick.i, pick.j]` is the
-clicked cell of the matrix you plotted, and `pick.value` is its value.
-The last cell uses `pick.i` and `pick.j` to recompute the detail: here
-from the hourly model, in practice from your raw measurements.
+[`RectInteractable`](@ref) makes each heatmap cell clickable, and a
+click makes `pick` a [`GridCellEvent`](@ref): `daily[pick.i, pick.j]`
+is the clicked cell of the matrix you plotted, and `pick.value` is its
+value. The last cell recomputes the detail from `pick.i` and `pick.j`,
+here from the hourly model and in practice from your raw
+measurements.
 
 ## Variations
 
