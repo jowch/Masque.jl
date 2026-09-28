@@ -447,6 +447,8 @@ include(joinpath(@__DIR__, "..", "docs", "player_fallback.jl"))
     @test is_bind_cell("@bind  pick masque(fig)", :pick)
     @test !is_bind_cell("@bind picks masque(fig, [pts, roi])", "pick")
     @test !is_bind_cell("@bind pick! masque(fig)", "pick")
+    @test !is_bind_cell("@bind pick_right masque(fig)", "pick")
+    @test !is_bind_cell("md\"\"\"\n`@bind pick` saves a click in `pick`.\n\"\"\"", "pick")
 
     readout = "b0e1e001-0001-4000-8000-000000000004"
     md = fallback_markdown(nb; image = "../embeds/home_quickstart.png", outputs = Dict(readout => "click a point"))
