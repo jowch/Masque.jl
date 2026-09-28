@@ -26,7 +26,7 @@ Click a point on the polar axis. The last cell reads its direction and radius.
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-Scatter the points the way you already scatter them on a `PolarAxis`. `masque` makes each point clickable.
+Scatter the points on a `PolarAxis` the way you normally would. `masque` makes each point clickable.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -40,7 +40,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores a click in `pick`. `pick.x` is the angle and `pick.y` is the radius.
+`@bind pick` saves a click in `pick`. `pick.x` is the angle and `pick.y` is the radius.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -48,11 +48,11 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-Before a click, `pick` is `nothing`. This cell reads `pick`, so it re-runs on the click.
+`pick` starts as `nothing`. This cell responds to the click.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "click a point"
 else
     dirs = ["east", "north", "west", "south"]

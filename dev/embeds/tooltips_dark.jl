@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000009
 md"""
-Hold the pointer over a point. The card is dark because the figure is dark. Click a point and the last cell names it.
+Hover over a point. The tooltip is dark because the figure is dark. Click a point and the last cell names it.
 """
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000010
 md"""
-Draw the scatter on a dark figure, and pass that scatter to `PointInteractable`. The tooltip picks up the figure background and the marker color.
+Create the scatter on a dark figure, and pass the scatter to `PointInteractable`. The tooltip takes its theme from the figure's background and its border color from the marker.
 """
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000002
@@ -62,7 +62,7 @@ end
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000011
 md"""
-`@bind pick` stores a click in `pick`. Hover updates the card and does not change `pick`.
+`@bind pick` saves a click in `pick`. Hovering shows the tooltip without changing `pick`.
 """
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000003
@@ -70,11 +70,11 @@ md"""
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000012
 md"""
-Before a click, `pick` is `nothing`. `pick.label` is the point's name. This cell reads `pick`, so it re-runs on the click.
+`pick` starts as `nothing`. `pick.label` is the point's name. This cell responds to the click.
 """
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "hover a point, or click one"
 else
     "$(pick.label) selected"

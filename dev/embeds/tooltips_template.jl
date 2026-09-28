@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000009
 md"""
-Hold the pointer over a city to read its name and population. Click one and the last cell names it.
+Hover over a city to see its name and population. Click one and the last cell names it.
 """
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000010
 md"""
-Scatter the cities the way you already would. The tooltip template reads `city` and `pop` off each point, and the border uses the same palette as the markers.
+Scatter the cities the way you normally would. The tooltip template shows each point's `city` and `pop`, and the tooltip's border uses the marker's color.
 """
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000002
@@ -52,7 +52,7 @@ end
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000011
 md"""
-`@bind pick` stores a click in `pick`. Hover updates the card and does not change `pick`.
+`@bind pick` saves a click in `pick`. Hovering shows the tooltip without changing `pick`.
 """
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000003
@@ -60,11 +60,11 @@ md"""
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000012
 md"""
-Before a click, `pick` is `nothing`. This cell reads `pick`, so it re-runs on the click.
+`pick` starts as `nothing`. This cell responds to the click.
 """
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "hover a city, or click one"
 else
     "$(pick.city) selected"

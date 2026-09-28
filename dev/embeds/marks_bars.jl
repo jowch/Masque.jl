@@ -26,7 +26,7 @@ Click a bar. The last cell reads its value.
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-Draw the bar plot the way you already draw it, and end the cell with `nothing` so this cell does not print the figure. `masque` makes each bar clickable.
+Create the bar plot the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. `masque` makes each bar clickable.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -44,7 +44,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`masque` mounts the overlay on the figure. `@bind pick` stores a click in `pick`. Hover highlights the bar and does not change `pick`.
+`@bind pick` saves a click in `pick`. Hovering highlights the bar without changing `pick`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -52,11 +52,11 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-Before a click, `pick` is `nothing`. A click reads the bar: `pick.value` is the height, and `pick.index` is 1-based. This cell reads `pick`, so it re-runs on the click.
+`pick` starts as `nothing`. After a click, `pick.value` is the bar's height and `pick.index` is its position in your data. This cell responds to the click.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "click a bar"
 else
     "Q$(pick.index) — value $(pick.value)"

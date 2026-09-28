@@ -26,7 +26,7 @@ Click a polygon. The last cell names it.
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-Draw the polygons the way you already draw them. `masque` makes each ring clickable.
+Create the polygons the way you normally would. `masque` makes each polygon clickable.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -47,7 +47,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores a click in `pick`. Hover outlines the polygon and does not change `pick`.
+`@bind pick` saves a click in `pick`. Hovering outlines the polygon without changing `pick`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -55,11 +55,11 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-Before a click, `pick` is `nothing`. `pick.index` is 1-based. This cell reads `pick`, so it re-runs on the click.
+`pick` starts as `nothing`. After a click, `pick.index` is the polygon's position in the order you plotted them. This cell responds to the click.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "click a polygon"
 else
     names = ["triangle", "square", "trapezoid"]
