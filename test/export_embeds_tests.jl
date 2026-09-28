@@ -254,7 +254,7 @@ end
     @test length(player["cells"]) == 7
     @test endswith(player["cells"][1], "0009")
     src = read(path, String)
-    @test occursin("Hover a point to read its name", src)
+    @test occursin("Hover over a point to see its name", src)
     @test occursin("`sel.index` is its position in your data", src)
     @test occursin("name = \"one\"", src)
     @test occursin("if isnothing(sel)", src)
