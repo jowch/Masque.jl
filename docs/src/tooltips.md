@@ -35,14 +35,11 @@ A template is a `masque"..."` string. Each `$(field)` is replaced by that
 field's value for the mark under the pointer:
 
 ```julia
-PointInteractable(ax, [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0), (4.0, 16.0)];
+PointInteractable(ax, s;
     payloads = cities,
     tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
 )
 ```
-
-Pass the points' positions here, not the scatter plot: the form that
-takes a plot doesn't accept `tooltip` yet.
 
 | In the template | Becomes |
 |---|---|

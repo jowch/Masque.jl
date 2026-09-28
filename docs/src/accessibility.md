@@ -68,10 +68,10 @@ masque(fig, [
 ])
 ```
 
-The forms that take a Makie plot, such as `PointInteractable(ax, s)`
-for a scatter `s`, do not accept `label`: passing it raises a
-`MethodError`. `masque(fig)` on its own sets no labels either. To name a
-layer, pass its positions instead.
+The forms that take a Makie plot accept `label` too, as in
+`PointInteractable(ax, s; label = "City")` for a scatter `s`.
+`masque(fig)` on its own sets no labels, so build the interactable
+yourself to name a layer.
 
 A payload field called `label`, as in `(city = "Tokyo", label =
 "capital")`, is different: it belongs to one mark and shows in that

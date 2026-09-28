@@ -948,4 +948,96 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test cx_px - w_px / 2 >= vp_x                     # left edge within viewport
         @test cx_px + w_px / 2 <= vp_x + vp_w             # right edge within viewport
     end
+
+    @testset "plot-object constructors take tooltip and label (#213)" begin
+        # Every plot-object method forwards `tooltip` and `label` to its layer, the same as
+        # the positions/geometry constructors do.
+        tpl = masque"hit"
+        layer(i, ctx) = only(build_manifest([i], ctx)["layers"])
+        function check(i, ctx)
+            L = layer(i, ctx)
+            @test L["template"] == ["hit"]
+            @test L["label"] == "L"
+        end
+
+        f = Figure(size = (900, 900))
+        a1 = Axis(f[1, 1]); a2 = Axis(f[1, 2]); a3 = Axis(f[2, 1]); a4 = Axis(f[2, 2])
+        a5 = Axis(f[3, 1]); a6 = Axis(f[3, 2])
+        sc = scatter!(a1, [1.0, 2.0, 3.0], [1.0, 4.0, 9.0])
+        ln = lines!(a1, [1.0, 2.0, 3.0], [2.0, 3.0, 1.0])
+        ls = linesegments!(a1, [1.0, 2.0, 2.0, 3.0], [1.0, 1.0, 2.0, 2.0])
+        st = stairs!(a1, [1.0, 2.0, 3.0], [1.0, 2.0, 1.5])
+        se = series!(a2, [1.0 2.0 3.0; 2.0 1.0 3.0])
+        eb = errorbars!(a2, [1.0, 2.0], [1.0, 2.0], [0.2, 0.3])
+        rb = rangebars!(a2, [1.0, 2.0], [0.5, 1.0], [1.5, 2.5])
+        hl = hlines!(a2, [1.5])
+        vl = vlines!(a2, [1.5])
+        hm = heatmap!(a3, [1.0 2.0; 3.0 4.0])
+        bp = barplot!(a4, [1, 2, 3], [2.0, 3.0, 1.0])
+        hs = hist!(a4, [1.0, 1.5, 2.0, 2.2, 3.0])
+        wf = waterfall!(a4, [1, 2, 3], [1.0, -0.5, 2.0])
+        cb = crossbar!(a4, [1, 2], [2.0, 3.0], [1.5, 2.5], [2.5, 3.5])
+        hsp = hspan!(a4, [0.5], [0.8])
+        vsp = vspan!(a4, [0.5], [0.8])
+        sp = spy!(a5, [1.0 0.0; 0.0 1.0])
+        po = poly!(a6, Point2f[(0, 0), (1, 0), (1, 1)])
+        bd = band!(a6, [1.0, 2.0, 3.0], [0.0, 0.5, 0.2], [1.0, 1.5, 1.2])
+        de = density!(a6, [1.0, 1.2, 1.9, 2.5, 3.0])
+        tx = text!(a1, [(1.0, 1.0)]; text = ["a"])
+        _, _, ctx = ctx_for(f)
+
+        for i in (
+                PointInteractable(a1, sc; tooltip = tpl, label = "L"),
+                SegmentInteractable(a1, ln; tooltip = tpl, label = "L"),
+                SegmentInteractable(a1, ls; tooltip = tpl, label = "L"),
+                SegmentInteractable(a1, st; tooltip = tpl, label = "L"),
+                SegmentInteractable(a2, se; tooltip = tpl, label = "L"),
+                SegmentInteractable(a2, eb; tooltip = tpl, label = "L"),
+                SegmentInteractable(a2, rb; tooltip = tpl, label = "L"),
+                SegmentInteractable(a2, hl; tooltip = tpl, label = "L"),
+                SegmentInteractable(a2, vl; tooltip = tpl, label = "L"),
+                RectInteractable(a3, hm; tooltip = tpl, label = "L"),
+                RectInteractable(a4, bp; tooltip = tpl, label = "L"),
+                RectInteractable(a4, hs; tooltip = tpl, label = "L"),
+                RectInteractable(a4, wf; tooltip = tpl, label = "L"),
+                RectInteractable(a4, cb; tooltip = tpl, label = "L"),
+                RectInteractable(a4, hsp; tooltip = tpl, label = "L"),
+                RectInteractable(a4, vsp; tooltip = tpl, label = "L"),
+                RectInteractable(a5, sp; tooltip = tpl, label = "L"),
+                PolygonInteractable(a6, po; tooltip = tpl, label = "L"),
+                PolygonInteractable(a6, bd; tooltip = tpl, label = "L"),
+                PolygonInteractable(a6, de; tooltip = tpl, label = "L"),
+                TextInteractable(a1, tx; tooltip = tpl, label = "L"),
+            )
+            check(i, ctx)
+        end
+
+        g = Figure(size = (600, 400))
+        b1 = Axis(g[1, 1]); b2 = Axis(g[1, 2]); b3 = Axis(g[2, 1])
+        cf = contourf!(b1, [1.0 2.0 3.0; 2.0 3.0 4.0; 3.0 4.0 5.0])
+        vi = violin!(b2, [1, 1, 1, 2, 2, 2], [1.0, 2.0, 1.5, 2.0, 3.0, 2.5])
+        vo = voronoiplot!(b3, [0.1, 0.8, 0.4], [0.2, 0.3, 0.9])
+        _, _, gctx = ctx_for(g)
+        for i in (
+                PolygonInteractable(b1, cf; tooltip = tpl, label = "L"),
+                PolygonInteractable(b2, vi; tooltip = tpl, label = "L"),
+                PolygonInteractable(b3, vo; tooltip = tpl, label = "L"),
+            )
+            check(i, gctx)
+        end
+
+        h = Figure(size = (500, 400))
+        c = Axis3(h[1, 1])
+        ms = meshscatter!(c, [1.0, 2.0], [1.0, 2.0], [1.0, 2.0]; markersize = 0.1)
+        wf3 = wireframe!(c, [0.0, 1.0], [0.0, 1.0], [0.0 1.0; 1.0 0.0])
+        ar = arrows3d!(c, [Point3f(0, 0, 0)], [Vec3f(1, 0, 0)])
+        _, _, hctx = ctx_for(h)
+        for i in (
+                PointInteractable(c, ms; tooltip = tpl, label = "L"),
+                SegmentInteractable(c, wf3; tooltip = tpl, label = "L"),
+                SegmentInteractable(c, ar; tooltip = tpl, label = "L"),
+            )
+            check(i, hctx)
+        end
+    end
 end

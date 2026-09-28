@@ -38,9 +38,9 @@ shortened: `heatmap!` and `image!` are `:cells`, `barplot!` is `:bars`,
 and `linesegments!` is `:segments`. `pick.layer` is that id.
 
 `masque(fig)` doesn't add axis readouts, thresholds, boxes, panning, or
-slices; pass those yourself. Its layers take no `tooltip` or `label`.
-To set them, build the interactable from the plot's positions, for
-example `PointInteractable(ax, points; tooltip = masque"...")`.
+slices; pass those yourself. To give a layer a tooltip template or a
+`label`, build that interactable yourself from the plot, for example
+`PointInteractable(ax, s; tooltip = masque"...")`.
 
 ## Marks
 
