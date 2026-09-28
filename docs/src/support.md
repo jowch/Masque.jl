@@ -61,7 +61,7 @@ id. Masque stops at the first plot it knows, so each mark becomes one
 layer: `rainclouds!` gives `:violin`, `:scatter`, and `:boxplot`, and
 not also the violin's `:poly`. A recipe with no known child is skipped
 with a warning that names it. Constructor signatures and default fields
-are in [Element constructors](@ref) and [Plot-object defaults](@ref).
+are in [Constructors](@ref) and [Plot-object defaults](@ref).
 
 In the table, `Axis` means a 2D `Makie.Axis`. `Colorbar` and `Legend`
 are blocks of the figure, not plots inside an axis.
