@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
 md"""
-Click a point on the polar axis. The last cell reads its direction and radius.
+Click a point on the polar axis, and the last cell reads its direction and radius.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-Scatter the points on a `PolarAxis` the way you normally would. `masque` makes each point clickable.
+Scatter the points on a `PolarAxis` the way you normally would, and `masque` makes each point clickable.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -40,7 +40,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`. `pick.x` is the angle and `pick.y` is the radius.
+`@bind pick` saves a click in `pick`: `pick.x` is the angle and `pick.y` is the radius.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -48,7 +48,7 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`. This cell responds to the click.
+`pick` starts as `nothing`, and this cell responds when you click a point.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
@@ -56,7 +56,7 @@ if isnothing(pick)
     "click a point"
 else
     dirs = ["east", "north", "west", "south"]
-    "$(dirs[pick.index]) — r = $(pick.y)"
+    "$(dirs[pick.index]): r = $(pick.y)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

@@ -20,13 +20,13 @@ Main.masque_fallback("tooltips_template")
 
 ## The default tooltip
 
-Without `tooltip`, the tooltip is a small table of the payload's fields.
-For a scatter without `payloads`, that is the point's `index`, `x`, and
-`y`. With your own payloads, it is your fields.
+Without `tooltip`, the tooltip is a small table of the payload's
+fields: your own fields when you pass `payloads`, and for a scatter
+without them, the point's `index`, `x`, and `y`.
 
 Two interactables work differently. A legend entry shows no tooltip by
-default, because its label is already next to the swatch; pass a
-template to add one (see [Legend](@ref)). A [`SliceInteractable`](@ref)
+default, because its label is already next to the swatch. To add one,
+pass a template, as [Legend](@ref) shows. A [`SliceInteractable`](@ref)
 shows the series values at the pointer instead of a payload.
 
 ## Write a template
@@ -48,8 +48,8 @@ PointInteractable(ax, s;
 | `\$` | a literal dollar sign |
 | anything else | copied into the tooltip as HTML, so `<b>` and `<br>` work |
 
-A `$(field)` names a payload field. It cannot be an expression such as
-`$(pop / area)`. To show a computed value, put it in the payload:
+A `$(field)` can only name a payload field, not an expression such as
+`$(pop / area)`, so to show a computed value, put it in the payload:
 
 ```julia
 cities = [
@@ -58,8 +58,8 @@ cities = [
 ]
 ```
 
-`tooltip = false` turns tooltips off. The hover highlight and clicks
-still work.
+To turn tooltips off, pass `tooltip = false`. The hover highlight and
+clicks keep working.
 
 ## Template errors
 
@@ -68,16 +68,16 @@ A template Masque cannot read, such as one with an expression like
 a `TemplateValidationError` when its cell runs.
 
 A template that names a field the payload does not have raises an
-`ArgumentError` when `masque` runs. The message lists the payload's
+`ArgumentError` when `masque` runs, and the message lists the payload's
 fields and suggests the closest match. This check needs named-tuple
-payloads. With a `DataFrame` or `Dict`, a misspelled field shows up as a
+payloads: with a `DataFrame` or `Dict`, a misspelled field shows up as a
 blank in the tooltip, so hover once after you write the template.
 
 ## HTML in payload values
 
-Avoid putting HTML in your payload values. It will not be rendered; the
-tooltip shows the tags as plain text. To make something bold, use the
-template instead:
+Avoid putting HTML in your payload values, because the tooltip shows
+the tags as plain text instead of rendering them. To make something
+bold, use the template instead:
 
 ```julia
 # The tooltip shows "<b>Lyon</b>", tags and all
@@ -99,9 +99,9 @@ without a single mark show their tooltip at the pointer.
 
 ## Dark figures
 
-A dark figure gets a dark tooltip, even on a light page. The tooltip's
-theme follows the figure's background, not the browser or system
-setting:
+A dark figure gets a dark tooltip, even on a light page, because the
+tooltip follows the figure's background rather than the browser or
+system setting:
 
 ```julia
 fig = Figure(size = (560, 360); backgroundcolor = :gray12)

@@ -26,10 +26,9 @@ Main.masque_fallback("readouts_axis")
 Use an axis readout to mark a position where there is no mark, such as
 the start of a time window or a point to fit from. It works on linear,
 log, and categorical axes. On a categorical axis, the tooltip shows the
-category under the pointer. A click returns the category's position
-(Makie places categories at `1, 2, …, n`) and puts its label in
-`pick.xcat` or `pick.ycat`. For a numeric `x` or `y`, that field is
-`nothing`.
+category under the pointer, and a click returns the category's position
+(Makie places categories at `1, 2, …, n`) with its label in `pick.xcat`
+or `pick.ycat`. On a numeric axis, that field is `nothing`.
 
 The example above shows only the tooltip, because this site does not
 record clicks on a position ([Static exports and this site](@ref)). In
@@ -37,11 +36,11 @@ your notebook, a click sets `pick`.
 
 ## Read a colorbar value
 
-Hover over a colorbar to see the value its color stands for. A click
-sets `pick` to a [`ColorbarEvent`](@ref) with `pick.value`. `masque(fig)`
-adds a [`ColorbarInteractable`](@ref) for every `Colorbar` in the
-figure. Create one yourself when you want the colorbar without the
-heatmap's cells in the same widget:
+Hover over a colorbar to see the value its color stands for, and click
+it to set `pick` to a [`ColorbarEvent`](@ref) with `pick.value`.
+`masque(fig)` adds a [`ColorbarInteractable`](@ref) for every
+`Colorbar` in the figure. To get the colorbar without the heatmap's
+cells in the same widget, create one yourself:
 
 ```julia
 begin
@@ -64,11 +63,11 @@ for the heatmap.
 
 ## Drag a threshold
 
-[`ThresholdInteractable`](@ref) draws a line across the axis that you
-drag. Use it for a cutoff you would otherwise set with a slider: you set
-it against the data itself. `value` is where the line starts.
-`:horizontal` gives a line at constant `y` that you drag up and down,
-and `:vertical` gives one at constant `x`:
+A [`ThresholdInteractable`](@ref) draws a line across the axis for you
+to drag. Use it for a cutoff you would otherwise set with a slider, so
+that you set it against the data itself. The line starts at `value`.
+With `orientation = :horizontal` it sits at constant `y` and you drag
+it up and down, and with `:vertical` it sits at constant `x`:
 
 ```julia
 begin
@@ -85,10 +84,10 @@ end
 @bind level masque(fig, cutoff)
 ```
 
-The line follows your drag. When you release it, `level` becomes a
-[`ThresholdEvent`](@ref), and `level.value` is the line's new position
-in data coordinates. Before the first drag, `level` is `nothing`, so use
-the starting value:
+The line follows your drag, and when you release it, `level` becomes a
+[`ThresholdEvent`](@ref) whose `level.value` is the line's new position
+in data coordinates. Before the first drag `level` is `nothing`, so fall
+back to the starting value:
 
 ```julia
 begin

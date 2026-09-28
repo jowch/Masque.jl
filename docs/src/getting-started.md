@@ -5,7 +5,8 @@ tooltips.
 
 ## Install
 
-Load Masque and a Makie backend in a Pluto cell. Pluto installs both:
+Load Masque and a Makie backend in a Pluto cell, and Pluto installs both
+for you:
 
 ```julia
 using Masque, CairoMakie
@@ -40,15 +41,15 @@ Pass the figure to `masque` and bind the result to a variable:
 @bind pick masque(fig)
 ```
 
-Hover over a point to see its `index`, `x`, and `y`. Click a point and
-`pick` holds it. Cells that use `pick` respond to the change:
+Hover over a point to see its `index`, `x`, and `y`. Clicking a point
+stores it in `pick`, and cells that use `pick` respond to the change:
 
 ```julia
 isnothing(pick) ? "click a point" : "point $(pick.index) at x = $(pick.x)"
 ```
 
-`pick` is an [`ElementEvent`](@ref). `pick.index` is the clicked point's
-position in the data you plotted, so `ys[pick]` is its `y`.
+`pick` is an [`ElementEvent`](@ref), and `pick.index` is the clicked
+point's position in the data you plotted, so `ys[pick]` is its `y`.
 
 `masque(fig)` works on scatters, lines, bars, heatmaps, polygons, text,
 legends, and colorbars. [Recipes masque(fig) extracts](@ref) has the
@@ -87,8 +88,8 @@ and pass `pts` to `masque` in the `@bind` cell:
 Hovering a point now shows its `name`, `x`, and `y`, and clicking it
 sets `pick.name`.
 
-The notebook below does the same with three points. It is a recording
-of a real notebook; see [Static exports and this site](@ref).
+The notebook below does the same with three points, recorded from a real
+notebook (see [Static exports and this site](@ref)).
 
 ```@raw html
 <div class="masque-embed-wrap">

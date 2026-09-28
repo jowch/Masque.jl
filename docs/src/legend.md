@@ -18,10 +18,10 @@ Main.masque_fallback("legend_lines")
 ## What a click returns
 
 Clicking an entry keeps its series highlighted and makes `pick` a
-[`LegendEvent`](@ref). `pick.label` is the entry's text, and
-`pick.group` is its group title in a grouped legend (`nothing`
-otherwise). `pick.targets` lists the layers the entry highlights.
-Clicking the plot itself still gives the plot's own events, so check
+[`LegendEvent`](@ref): `pick.label` is the entry's text,
+`pick.group` is the group title in a grouped legend (`nothing`
+otherwise), and `pick.targets` lists the layers the entry highlights.
+A click on the plot itself still gives the plot's own event, so check
 which kind you got:
 
 ```julia
@@ -65,28 +65,31 @@ that does not exist raises an `ArgumentError`, so you see a typo right
 away.
 
 A legend you build yourself from `LineElement`s has no plots linked to
-its entries. Give the elements Makie's own `plots=` keyword, or pass
-`targets=`. An entry with no targets can still be clicked, but it
-highlights nothing.
+its entries, so an entry can still be clicked but highlights nothing.
+To link them, give the elements Makie's own `plots=` keyword, or pass
+`targets=`.
 
 ## A tooltip for each entry
 
 Legend entries show no tooltip by default, because the label is already
-on screen and a tooltip would cover the neighboring entries. Pass a
-template to add one. Its fields are `label`, `group`, and `targets`:
+on screen and a tooltip would cover the neighboring entries. To add
+one, pass a template that uses the fields `label`, `group`, and
+`targets`:
 
 ```julia
-LegendInteractable(leg; tooltip = masque"$(label) — $(group)")
+LegendInteractable(leg; tooltip = masque"$(label) ($(group))")
 ```
 
 See [Tooltips](@ref) for how templates work.
 
 ## Keep a series highlighted after a rebuild
 
-Clicking an entry keeps its series highlighted, but a rebuilt figure
-forgets that. To keep it, select the series' own layer:
-`selected = Dict(:lines => [1])`. See [Selection](@ref).
+Clicking an entry keeps its series highlighted, but the highlight is
+gone when the figure is created again. To keep it, select the series'
+own layer, for example with `selected = Dict(:lines => [1])`. See
+[Selection](@ref).
 
 A legend can also highlight series on other axes of the same figure;
-[Linked views](@ref) shows this across two panels. The keyboard
-reaches legend entries too; see [Keyboard and screen readers](@ref).
+[Linked views](@ref) shows this across two panels. You can also reach
+legend entries with the keyboard; see
+[Keyboard and screen readers](@ref).

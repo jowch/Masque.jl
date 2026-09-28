@@ -21,7 +21,7 @@ using CairoMakie, Masque
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000009
 md"""
-Hover a point to read its name, then click it. The last cell names the point.
+Hover over a point to see its name, then click it, and the last cell names the point you clicked.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000010
@@ -45,7 +45,7 @@ end
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000011
 md"""
-`@bind sel` saves a click in `sel`. Hovering shows the tooltip without changing `sel`.
+`@bind sel` saves a click in `sel`, while hovering only shows the tooltip and leaves `sel` as it was.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000003
@@ -53,14 +53,14 @@ md"""
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000012
 md"""
-`sel` starts as `nothing`. After a click, `sel.name` is the point's name and `sel.index` is its position in your data. This cell responds to the click.
+`sel` starts as `nothing`, and this cell responds when you click a point. After a click, `sel.name` is the point's name and `sel.index` is its position in your data.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000004
 if isnothing(sel)
     "click a point"
 else
-    "$(sel.name) selected — y = $(sel.y)"
+    "$(sel.name) selected, y = $(sel.y)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

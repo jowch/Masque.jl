@@ -56,7 +56,7 @@ end
     ax = Axis(fig[1, 1]; xlabel = "Bill length (mm)", ylabel = "Bill depth (mm)")
     for cls in classes
         xs, ys = cluster(cls.cx, cls.cy, cls.sx, cls.sy, 28, cls.seed)
-        α = selected === nothing || selected == cls.name ? 1.0 : 0.14
+        α = isnothing(selected) || selected == cls.name ? 1.0 : 0.14
         scatter!(ax, xs, ys; color = (cls.color, α), label = cls.name, markersize = 11)
     end
     axislegend(ax)

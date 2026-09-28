@@ -18,8 +18,8 @@ Main.masque_fallback("gallery_polygons")
 
 ## Variations
 
-Pass the rings yourself when the shapes did not come from one of those
-recipes:
+When your shapes did not come from one of those recipes, pass in their
+rings yourself with a `PolygonInteractable`:
 
 ```julia
 rings = [

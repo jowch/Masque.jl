@@ -6,7 +6,7 @@ Click a label and `pick.text` is its string. `masque(fig)` makes
 `y`.
 
 The scatter on the same axis responds too, and a marker click has no
-`text` field. The last cell checks `hasproperty(pick, :text)` before
+`text` field, so the last cell checks `hasproperty(pick, :text)` before
 reading the string.
 
 ```@raw html
@@ -22,8 +22,8 @@ Main.masque_fallback("gallery_text")
 ## Variations
 
 The clickable area is a box around the label that follows its `offset`
-and `fontsize`. A rotated label gets one box, aligned with the axes and
-a little larger than the text. A label placed in screen space rather
+and `fontsize`, and a rotated label gets one box, aligned with the axes
+and a little larger than the text. A label placed in screen space rather
 than data space does not respond; `masque(fig)` skips it with a
 `@warn`.
 

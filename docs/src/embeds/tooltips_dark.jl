@@ -21,7 +21,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000009
 md"""
-Hover over a point. The tooltip is dark because the figure is dark. Click a point and the last cell names it.
+Hover over a point, and the tooltip is dark because the figure is. Click a point, and the last cell names it.
 """
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000010
@@ -62,7 +62,7 @@ end
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`. Hovering shows the tooltip without changing `pick`.
+`@bind pick` saves a click in `pick`, while hovering only shows the tooltip and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000003
@@ -70,7 +70,7 @@ md"""
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`. `pick.label` is the point's name. This cell responds to the click.
+`pick` starts as `nothing`, and this cell responds when you click a point. After a click, `pick.label` is the point's name.
 """
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000004

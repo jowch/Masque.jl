@@ -21,9 +21,9 @@ respond.
 
 ## Pan and zoom a 2D axis
 
-`masque(fig)` does not add panning on its own. Pass a
-`ViewInteractable` for the axis you want to move, along with any other
-interactables:
+`masque(fig)` does not add panning on its own, so pass a
+`ViewInteractable` for the axis you want to move, along with the other
+interactables you want:
 
 ```julia
 begin
@@ -43,13 +43,13 @@ end
 ```
 
 Drag the plot to pan, and scroll to zoom around the pointer. The axis
-frame stays in place while the data moves inside it. You can hover over
-and click the points wherever they move to. `pick` changes only when you
-click a point.
+frame stays in place while the data moves inside it, and you can hover
+over and click the points wherever they move to. `pick` changes only
+when you click a point.
 
-Panning and orbiting need a running notebook: in a static HTML export,
-the view does not move. The two backends show the moving view differently; see
-[Pan and orbit preview](@ref).
+Panning and orbiting need a running notebook, so in a static HTML
+export the view does not move. The two backends show the moving view
+differently; see [Pan and orbit preview](@ref).
 
 If the same axis has a threshold line or a brushing box, a plain drag
 moves the line or box, and Shift+drag pans.

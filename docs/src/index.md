@@ -28,13 +28,14 @@ Drag a 2D axis to pan, or an `Axis3` to orbit. See [Pan and orbit](@ref).
 
 ![Clicking a species in the legend keeps that class and fades the others](assets/home/legend.gif)
 
-Click a legend entry to highlight the traces it labels. A cell that uses
-the selection can fade the others, as in this example. See [Legend](@ref).
+Click a legend entry to highlight the traces it labels, and a cell that
+uses the selection can fade the others, as in this example. See
+[Legend](@ref).
 
 ## Static exports
 
 Tooltips and highlights keep working in a static HTML export of your
-notebook. The figure below is one; hover over a borough. See
+notebook, like the figure below: hover over a borough to try it. See
 [Static exports and this site](@ref).
 
 ```@raw html

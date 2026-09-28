@@ -14,20 +14,21 @@ cities = PointInteractable(ax, s; id = :cities, payloads = rows)
 
 ## What replaces a selection
 
-`pick` starts as `nothing`. Clicking a mark makes `pick` that mark's
-[`ElementEvent`](@ref). Clicking another mark replaces it, because one
-widget holds one selection. Clicking empty space changes nothing: the
-highlight stays and `pick` keeps its value, so a stray click does not
-lose your choice.
+`pick` starts as `nothing`, and clicking a mark makes `pick` that
+mark's [`ElementEvent`](@ref). Clicking another mark replaces it,
+because one widget holds one selection. Clicking empty space changes
+nothing: the highlight stays and `pick` keeps its value, so a stray
+click does not lose your choice.
 
-To select several marks at once, drag a box instead. An
-[`ROIInteractable`](@ref) with `selects` returns every mark inside it.
-See [Brush a region](@ref).
+To select several marks at once, drag a box over them instead: an
+[`ROIInteractable`](@ref) with `selects` returns every mark inside it,
+as [Brush a region](@ref) shows.
 
 ## Start with a mark selected
 
-`selected=` takes positions in the data you plotted, the same numbers
-`pick.index` gives. `selected = 1` is the first city:
+To start with a mark selected, pass its position in the data you
+plotted as `selected=`. These are the same numbers `pick.index` gives,
+so `selected = 1` is the first city:
 
 ```julia
 @bind pick masque(fig, cities; selected = 1)
@@ -52,16 +53,19 @@ layer: `selected = (; cities = 1)`, or `selected = Dict(:cities => [1, 3])`
 for several marks. In that case a bare number raises an
 `ArgumentError`, and so does a position outside your data.
 
-A few cases work differently:
+`selected = [1, 3]` highlights both cities, but `pick` stays `nothing`
+until the next click, because a click holds one mark. With a `selects`
+box in the widget, `pick` starts as both events.
 
-- `selected = [1, 3]` highlights both cities, but `pick` stays `nothing`
-  until the next click, because a click holds one mark. With a `selects`
-  box in the widget, `pick` starts as both events.
-- Points, bars, polygons, lines, and segments can start selected.
-  Heatmap cells, axis readouts, boxes, thresholds, and the view cannot.
-- A [`RegionInteractable`](@ref) makes one layer per shape, so name
-  those layers in `selected=`: `:cells_c`, `:cells_r`, and `:cells_p`
-  for the id `:cells`. See [Custom hits](@ref).
+Points, bars, polygons, lines, and segments can start selected, but
+heatmap cells, axis readouts, boxes, thresholds, and the view cannot. A
+box or a threshold line starts where its `bounds` or `value` puts it,
+so to start one somewhere else, set those instead; see
+[Read the box itself](@ref) and [Drag a threshold](@ref).
+
+A [`RegionInteractable`](@ref) makes one layer per shape, so name those
+layers in `selected=`: `:cells_c`, `:cells_r`, and `:cells_p` for the
+id `:cells`. See [Custom hits](@ref).
 
 ## Keep a selection when the figure rebuilds
 
@@ -71,8 +75,8 @@ old data can point at a different city in the new data, so Masque does
 not carry it over.
 
 To keep a selection, keep what identifies the mark, such as the city's
-name, and look up its position after the rebuild. Store the name in a
-cell that does not use `pick`:
+name, and look up its position after the rebuild. First, store the
+name in a cell that does not use `pick`:
 
 ```julia
 last_city = Ref("Delhi")
@@ -91,7 +95,11 @@ Then look up the city in the rebuilt data and pass its position as
 them:
 
 ```julia
-@bind pick masque(fig, cities; selected = findfirst(==(last_city[]), city_names))
+start = findfirst(name -> name == last_city[], city_names)
+```
+
+```julia
+@bind pick masque(fig, cities; selected = start)
 ```
 
 If the city is no longer in the data, `findfirst` returns `nothing` and

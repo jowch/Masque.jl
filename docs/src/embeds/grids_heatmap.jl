@@ -21,7 +21,7 @@ using Masque, CairoMakie
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000009
 md"""
-Click a cell. The last cell shows its indices and value.
+Click a cell, and the last cell shows its indices and value.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000010
@@ -46,7 +46,7 @@ end
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`. Hovering a cell shows its value without changing `pick`.
+`@bind pick` saves a click in `pick`, while hovering over a cell only shows its value and leaves `pick` as it was.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000003
@@ -54,7 +54,7 @@ md"""
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`. After a click, `pick.i` and `pick.j` are the cell's indices in `z`, so `z[pick]` is the clicked cell's value. Makie draws `z`'s first index along x, so `pick.i` counts across and `pick.j` counts up. This cell responds to the click.
+`pick` starts as `nothing`, and this cell responds when you click the heatmap. After a click, `pick.i` and `pick.j` are the cell's indices in `z`, so `z[pick]` is the clicked cell's value. Makie draws `z`'s first index along x, so `pick.i` counts across and `pick.j` counts up.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000004

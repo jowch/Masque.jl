@@ -40,28 +40,29 @@ Each region is one of
 Rectangles and polygons are in data coordinates, so they stay on the
 features they outline. A circle's center is in data coordinates too, but
 its radius is in pixels, like a scatter marker's size: `r = 8` is an
-eight-pixel target however wide the axis is. You do not need to adjust
-`r` for the figure's resolution. `payloads` is required, because a
-region has no data of its own. `tooltip` works as it does elsewhere; see
-[Tooltips](@ref).
+eight-pixel target however wide the axis is, and you do not need to
+adjust `r` for the figure's resolution. A region has no data of its
+own, so `payloads` is required. `tooltip` works as it does for any
+other plot; see [Tooltips](@ref).
 
-The regions are not drawn on the figure. Only the hover highlight shows
-where one is. To show them all the time, draw their outlines with Makie.
+The regions are not drawn on the figure, so only the hover highlight
+shows where one is. To show them all the time, draw their outlines with
+Makie.
 
-Each shape gets its own layer id, which `pick.layer` and `selected=`
-use: for `id = :cells`, `:cells_c` for circles, `:cells_r` for
-rectangles, and `:cells_p` for polygons.
+Each kind of shape gets its own layer id, which is what `pick.layer`
+reports and what `selected=` takes. With `id = :cells`, circles are
+`:cells_c`, rectangles are `:cells_r`, and polygons are `:cells_p`.
 
 ## Compute hit geometry
 
-For other shapes, such as line segments, build the layers yourself.
-[`FunctionInteractable`](@ref) takes a function that receives the
-figure's [`InteractionContext`](@ref) and returns a vector of
-[`HitLayer`](@ref)s. Because the function receives the whole figure,
-one `FunctionInteractable` can return layers on several axes. A layer's
-shapes are in image pixels, so convert each data point with
-[`data_to_image_px`](@ref). `Masque.axis_id(ctx, ax)` names the axis a
-layer belongs to.
+For other shapes, such as line segments, you build the layers yourself
+with a [`FunctionInteractable`](@ref). It takes a function that
+receives the figure's [`InteractionContext`](@ref) and returns a vector
+of [`HitLayer`](@ref)s, and because that function sees the whole
+figure, one `FunctionInteractable` can return layers on several axes.
+A layer's shapes are in image pixels, so convert each data point with
+[`data_to_image_px`](@ref), and name the axis a layer belongs to with
+`Masque.axis_id(ctx, ax)`.
 
 ```julia
 begin
@@ -95,9 +96,9 @@ end
 @bind pick masque(fig, track)
 ```
 
-Each layer's `geometry` is in image pixels. Its layout depends on the
-layer's kind: a flat vector for most kinds, and a vector of paths or
-rings for `:lines` and `:polygons`:
+How a layer's `geometry` is laid out depends on the layer's kind: it
+is a flat vector of image pixels for most kinds, and a vector of paths
+or rings for `:lines` and `:polygons`:
 
 | Kind | `geometry` | One element is |
 |---|---|---|

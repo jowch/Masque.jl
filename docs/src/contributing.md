@@ -1,7 +1,7 @@
 # Contributing
 
 The browser code for both backends is one TypeScript project in
-`frontend/`. `npm run build` writes both committed bundles:
+`frontend/`, and `npm run build` writes both committed bundles:
 `../assets/overlay.js` (IIFE) and `../assets/masque-webgl.js` (ESM).
 
 ```bash
@@ -26,7 +26,7 @@ GROUP=Core julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-d
 ```
 
 CI runs `Pkg.test()`, which builds a fresh environment each time and is
-slower. Use it to reproduce a failure that only CI shows:
+slower, so use it to reproduce a failure that only CI shows:
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.test()'                 # GROUP=Core
@@ -43,7 +43,8 @@ julia -e 'using Runic; exit(Runic.main(["--inplace", "src", "test", "bench", "do
 ```
 
 This site is built with Documenter from `docs/src/`. Maintainer notes
-are in `docs/dev/` and are not in the site's sidebar.
+are in `docs/dev/` and are not in the site's sidebar. To build the site
+locally, run:
 
 ```bash
 julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
@@ -57,8 +58,8 @@ tags.
 The interactive examples in `docs/src/embeds/` are Pluto notebooks. The
 docs build records the result of every mark, legend entry, and heatmap
 cell a reader can click, and every box a brush can draw, and fails when
-those recordings get too large. Keep an example's clickable marks few,
-and use a coarse grid.
+those recordings get too large, so keep an example's clickable marks
+few and its grid coarse.
 
 ## Live verification
 

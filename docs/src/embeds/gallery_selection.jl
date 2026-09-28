@@ -22,12 +22,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1410002-0001-4000-8000-000000000009
 md"""
-Click a point on the left. The plot on the right highlights the same sample, plotted against `z`.
+Click a point on the left, and the plot on the right highlights the same sample, plotted against `z`.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000010
 md"""
-Create the scatter and pass it to `PointInteractable`. `@bind pick` stores the click.
+Create the scatter, pass it to `PointInteractable`, and store the click with `@bind pick`.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000002
@@ -47,7 +47,7 @@ end
 
 # ╔═╡ a1410002-0001-4000-8000-000000000011
 md"""
-This cell responds to the click. So does the next figure, which uses `pick` too.
+This cell responds to the click, and so does the figure below, because it uses `pick` too.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000004
@@ -59,7 +59,7 @@ end
 
 # ╔═╡ a1410002-0001-4000-8000-000000000012
 md"""
-Plot `z` for the same samples, in the same order. `selected` highlights the one you clicked.
+Plot `z` for the same samples in the same order, so `selected` can highlight the one you clicked.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000005
