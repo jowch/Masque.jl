@@ -1,7 +1,7 @@
 # Inspect a grid
 
 Hover a heatmap or image cell and the tooltip reads `(i,j) = value`.
-Click it and your notebook gets the cell's column, row, and value.
+Click it and your notebook gets the cell's indices and value.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -23,9 +23,10 @@ this to give a grid its own `id`, for example when a figure has two:
 temps = RectInteractable(ax, p; id = :temps)
 ```
 
-A click makes `pick` a [`GridCellEvent`](@ref). `pick.i` is the column
-and `pick.j` is the row of the matrix you plotted, so `z[pick]` is the
-same as `z[pick.i, pick.j]`. `pick.value` is the cell's value. The
+A click makes `pick` a [`GridCellEvent`](@ref). `pick.i` is the cell's
+first index in the matrix you plotted and `pick.j` its second, so
+`z[pick]` is the same as `z[pick.i, pick.j]`. Makie draws the first
+index along x and the second along y. `pick.value` is the cell's value. The
 clicked cell stays highlighted, and clicking outside the grid keeps the
 current selection.
 

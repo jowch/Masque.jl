@@ -60,9 +60,11 @@ end
 ```
 
 Only the box sets `picks`. Hovering a point still shows its tooltip, but
-clicking it does not change `picks`. The click goes to the layer
-underneath instead, if it takes clicks, such as an
-[`AxisInteractable`](@ref).
+clicking it does not change `picks`. The exception is an
+[`AxisInteractable`](@ref) in the same widget: it takes clicks anywhere
+on its axis, so a click there replaces `picks` with an
+[`AxisEvent`](@ref). To keep `picks` a vector, put the axis readout in a
+separate `masque` call.
 
 ## Brush heatmap cells
 
@@ -70,7 +72,8 @@ Name a heatmap or image layer in `selects` instead, and the box returns
 one [`GridWindowEvent`](@ref) for the block of cells it covers:
 columns `win.i1:win.i2` and rows `win.j1:win.j2`. `A[win]` is that block
 of the matrix. Clicking a cell shows its tooltip but does not change the
-value, so the value is always a `GridWindowEvent`. See
+value, which stays the box's block (unless an `AxisInteractable` in the
+same widget takes the click, as above). See
 [Inspect a grid](@ref).
 
 ## Read the box itself

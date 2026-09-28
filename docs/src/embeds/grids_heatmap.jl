@@ -21,7 +21,7 @@ using Masque, CairoMakie
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000009
 md"""
-Click a cell. The last cell reads its column, row, and value.
+Click a cell. The last cell shows its indices and value.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000010
@@ -38,7 +38,7 @@ begin
         7.0 10.0 13.0
     ]
     fig = Figure(size = (560, 320))
-    ax = Axis(fig[1, 1]; xlabel = "column", ylabel = "row")
+    ax = Axis(fig[1, 1]; xlabel = "i", ylabel = "j")
     p = heatmap!(ax, 1:4, 1:3, z)
     cells = RectInteractable(ax, p)
     nothing
@@ -54,14 +54,14 @@ md"""
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`. After a click, `pick.i` is the cell's column and `pick.j` is its row in `z`, so `z[pick]` is the clicked cell's value. This cell responds to the click.
+`pick` starts as `nothing`. After a click, `pick.i` and `pick.j` are the cell's indices in `z`, so `z[pick]` is the clicked cell's value. Makie draws `z`'s first index along x, so `pick.i` counts across and `pick.j` counts up. This cell responds to the click.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000004
 if isnothing(pick)
     "click a cell"
 else
-    "column $(pick.i), row $(pick.j) — value $(pick.value)"
+    "z[$(pick.i), $(pick.j)] = $(pick.value)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

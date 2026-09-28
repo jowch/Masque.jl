@@ -109,6 +109,8 @@ its angle and its `y` is its radius, in the order you passed them:
 Main.masque_fallback("marks_polar")
 ```
 
-Bars, heatmaps, and polygons on a polar axis are skipped with a warning.
+On a polar axis, `masque(fig)` makes scatters, lines, segments,
+`scatterlines!`, and `series!` interactive, and skips other plots with a
+warning.
 Some readouts also need a flat axis. [Supported plots and axes](@ref)
 lists what works where.

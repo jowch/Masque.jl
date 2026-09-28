@@ -344,7 +344,7 @@ Hits are the same on `:cairo` and `:webgl`. For which plots
 On a `PolarAxis`, points and segments work on both backends. Clicking
 empty space gives no θ/r reading. `AxisInteractable`,
 `ThresholdInteractable`, `ROIInteractable`, `SliceInteractable`, and
-orbit-mode `ViewInteractable` do not work on polar. On `Axis3`, those
+`ViewInteractable` do not work on polar. On `Axis3`, those
 2D-only constructors raise `ArgumentError`; orbit-mode
 `ViewInteractable` is allowed. `LScene` is not supported on either
 backend. See [Troubleshooting](@ref).

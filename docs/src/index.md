@@ -34,8 +34,9 @@ the selection can fade the others, as in this example. See [Legend](@ref).
 
 ## Static exports
 
-In a static HTML export of your notebook, tooltips and selection still
-work. The figure below is a static export; hover over a borough. See
+In a static HTML export of your notebook, tooltips, highlights, and
+selection still work. Cells that use the `@bind` variable keep the
+values they had when you exported. The figure below is a static export; hover over a borough. See
 [Static exports and this site](@ref) for what an export can and cannot do.
 
 ```@raw html

@@ -28,6 +28,6 @@ event. `ViewInteractable` on a `PolarAxis` raises `ArgumentError`.
 
     Points respond the same way on `:cairo` and `:webgl`. This example
     uses CairoMakie, and every click was recorded ahead of time.
-    `masque(fig)` skips `heatmap!` and `barplot!` on a `PolarAxis` with a
-    `@warn`, on both backends. Load only `WGLMakie` when the polar figure
+    On a `PolarAxis`, `masque(fig)` makes only scatters, lines, segments,
+    `scatterlines!`, and `series!` interactive, on both backends. Load only `WGLMakie` when the polar figure
     should be a live canvas; the points respond the same way.

@@ -50,12 +50,12 @@ Main.masque_fallback("selection_start")
 
 Some cases need more care:
 
-- `selected = [1, 8]` highlights both marks, but `pick` stays `nothing`,
+- `selected = [1, 3]` highlights both marks, but `pick` stays `nothing`,
   because a click value holds one mark. The next click replaces the
   highlight. With a `selects` box in the widget the value is a vector,
-  and `selected = [1, 8]` starts as those two events.
+  and `selected = [1, 3]` starts as those two events.
 - When the widget has more than one layer you could select, name the
-  layer: `selected = (; cities = 1)` or `selected = Dict(:cities => [1, 8])`.
+  layer: `selected = (; cities = 1)` or `selected = Dict(:cities => [1, 3])`.
   A bare number is ambiguous there and raises an `ArgumentError`. So
   does an index outside `1:n`.
 - Points, bars, polygons, lines, and segments can start selected.
@@ -77,7 +77,7 @@ To keep a selection, store the indices you still want in a cell that
 does not use `pick`, and pass them in:
 
 ```julia
-held = [1, 8]   # computed from your data, not from `pick`
+held = [1, 3]   # computed from your data, not from `pick`
 ```
 
 ```julia

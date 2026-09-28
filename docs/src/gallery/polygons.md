@@ -41,5 +41,5 @@ A click gives an `ElementEvent` with `index` and the payload fields.
     `masque(fig)` picks up these filled areas the same way on `:cairo`
     and `:webgl`, and a `PolygonInteractable` you write yourself responds
     the same way on both. This example uses CairoMakie and has no cell
-    that uses a click. `masque(fig)` skips `heatmap!` on a `PolarAxis`
-    with a `@warn`.
+    that uses a click. On a `PolarAxis`, `masque(fig)` skips these
+    filled areas with a warning.
