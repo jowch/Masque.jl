@@ -22,7 +22,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1410002-0001-4000-8000-000000000009
 md"""
-Click a point on the left. The plot on the right marks the same point.
+Click a point on the left. The plot on the right highlights the same sample, plotted against `z`.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000010
@@ -32,10 +32,12 @@ Create the scatter and pass it to `PointInteractable`. `@bind pick` stores the c
 
 # ╔═╡ a1410002-0001-4000-8000-000000000002
 begin
-    data = [(1.0, 1.0), (2.0, 2.0), (3.0, 1.5), (4.0, 2.5), (5.0, 1.2)]
+    xs = [1.0, 2.0, 3.0, 4.0, 5.0]
+    ys = [1.0, 2.0, 1.5, 2.5, 1.2]
+    zs = [3.2, 2.1, 2.8, 1.4, 2.6]
     fig_l = Figure(size = (420, 300))
-    ax_l = Axis(fig_l[1, 1]; title = "click to select")
-    s_left = scatter!(ax_l, first.(data), last.(data); color = :teal, markersize = 20)
+    ax_l = Axis(fig_l[1, 1]; ylabel = "y", title = "click to select")
+    s_left = scatter!(ax_l, xs, ys; color = :teal, markersize = 20)
     left = PointInteractable(ax_l, s_left)
     nothing
 end
@@ -57,21 +59,21 @@ end
 
 # ╔═╡ a1410002-0001-4000-8000-000000000012
 md"""
-Build the second scatter from `pick`. `selected` highlights the point you clicked.
+Plot `z` for the same samples, in the same order. `selected` highlights the one you clicked.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000005
 begin
     fig_r = Figure(size = (420, 300))
-    ax_r = Axis(fig_r[1, 1]; title = "the same point, on the other plot")
-    s_right = scatter!(ax_r, first.(data), last.(data); color = :teal, markersize = 20)
+    ax_r = Axis(fig_r[1, 1]; ylabel = "z", title = "the same sample, against z")
+    s_right = scatter!(ax_r, xs, zs; color = :teal, markersize = 20)
     right = PointInteractable(ax_r, s_right)
     held = isnothing(pick) ? Int[] : Int[pick.index]
     nothing
 end
 
 # ╔═╡ a1410002-0001-4000-8000-000000000006
-@bind _echo masque(fig_r, right; selected = held)
+@bind pick_right masque(fig_r, right; selected = held)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

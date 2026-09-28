@@ -1,13 +1,13 @@
 # Box-select scatter
 
-Drag the box, or one of its corner handles, and release. `picks` becomes
-a `Vector{ElementEvent}` with one event per point inside the box,
-carrying that point's payload (`group`, `x`, `y`). An empty box gives
-`[]`, not `nothing`.
+Drag the box, or one of its corner handles, and release. The last cell
+counts the points inside by group and averages their coordinates.
 
-The last cell counts the points in each group and averages their
-coordinates. `xs[picks]` uses the events as indices. See
-[Brush a region](@ref).
+`picks` is a `Vector{ElementEvent}` with one event per point inside the
+box, carrying that point's payload (`group`, `x`, `y`), so
+`count(e -> e.group == "A", picks)` counts one group. `xs[picks]` uses
+the events as indices into your data. An empty box gives `[]`, not
+`nothing`. See [Brush a region](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -21,20 +21,13 @@ Main.masque_fallback("gallery_boxselect")
 
 ## Variations
 
-`selects` names a `:circles` or `:grid` layer in the same `masque`
-call. `selects = :bars` raises `ArgumentError`. A corner handle resizes
-the box in both directions. Dragging the middle of a side resizes it in
-that one direction, though no handle is drawn there. When a
-`ViewInteractable` is on the same axis, Shift+drag pans instead.
+- Dragging the middle of a side resizes the box in that one direction.
+- A box can also select heatmap or image cells: name a grid layer in
+  `selects`, as in [Image ROI](@ref).
+- To compare the selected points with the rest, plot a histogram from
+  them, as in [Compare a cluster](@ref).
 
-!!! note
-
-    The box works the same way on `:cairo` and `:webgl`, on a 2D axis
-    with scale `identity`, `log10`, or `log`. It raises `ArgumentError`
-    on `Axis3`, `PolarAxis`, and a categorical axis. This example uses
-    CairoMakie. The scatter has 12 points so that every set of points a
-    box can enclose could be recorded: any box you drag shows its own
-    counts, without Julia running. In a notebook, a box over any number
-    of points works the same way. On this site, an example with too many
-    possible boxes is shown as a video clip instead (see
-    [Compare a cluster](@ref)).
+`selects` must name a point or grid layer; `selects = :bars` raises
+`ArgumentError`. With a [`ViewInteractable`](@ref) on the same axis,
+Shift+drag pans instead of moving the box; see [Pan and orbit](@ref).
+For the axes a box works on, see [Supported plots and axes](@ref).

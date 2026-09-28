@@ -27,7 +27,7 @@ Click a cell. The plot below shows that station's readings, hour by hour, on the
 
 # ╔═╡ a1420002-0001-4000-8000-000000000010
 md"""
-The heatmap shows one daily mean per station and day. `temp` gives the hourly values behind each mean. `RectInteractable` makes each cell clickable.
+The heatmap shows one daily mean per station and day. `temp` gives the hourly values behind each mean.
 """
 
 # ╔═╡ a1420002-0001-4000-8000-000000000002

@@ -1,13 +1,14 @@
 # Image ROI
 
-Drag the box over the image and release. `region` becomes a
-[`GridWindowEvent`](@ref): the pixel ranges `i1:i2` and `j1:j2` inside
-the box, both ends included, plus the box's data bounds.
-`R[region]` is `R[region.i1:region.i2, region.j1:region.j2]`. The event
-holds indices, not pixel values, so you index your own arrays with it.
+Drag the box over the image. When you release, the last cell reports
+the number of pixels inside the box and the median of each color
+channel.
 
-A `RectInteractable` grid over the image gives the box cells to select.
-The box draws the outline, and the pixels inside it are highlighted. See
+`region` is a [`GridWindowEvent`](@ref) that holds the pixel ranges
+inside the box, not the pixel values, so you index your own arrays with
+it: `R[region]` is the block of `R` under the box. A
+[`RectInteractable`](@ref) grid over the image gives the box pixels to
+select, and `selects = :img` ties the box to it. See
 [Inspect a grid](@ref) and [Brush a region](@ref).
 
 ```@raw html
@@ -22,15 +23,13 @@ Main.masque_fallback("gallery_image")
 
 ## Variations
 
-The last cell counts the pixels in the box and prints the median of
-each channel. It updates when you release the box, not while you drag.
-A box that covers no cells gives a `GridWindowEvent` whose `i1:i2` is
-empty, not `[]`.
+- Pass another array of the same size as the image, such as a mask or a
+  second channel, and index it with the same event: `mask[region]`.
+- Read `region.i1:region.i2` and `region.j1:region.j2` when you need the
+  ranges themselves, for example to crop the image with `rgb[region]`
+  and plot the crop in another cell.
 
-!!! note
+A box that covers no pixels gives an event whose ranges are empty, so
+`R[region]` is an empty matrix rather than an error.
 
-    An image box gives the same event on `:cairo` and `:webgl`, on a 2D
-    axis. `Axis3` and `PolarAxis` raise `ArgumentError`. This example
-    uses CairoMakie. The image is 8 × 6 cells so that every window a box
-    can cover, all 756 of them, could be recorded: any box you drag shows
-    its own result. A real image works the same way in a notebook.
+Next, [Box-select scatter](@ref) uses the same box on points.

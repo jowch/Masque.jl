@@ -1,9 +1,8 @@
 # Polygons
 
-`masque(fig)` also picks up filled areas: `band!`, `density!`,
-`contourf!`, `violin!`, `voronoiplot!`, and `boxplot!`, with no
-`PolygonInteractable` written by hand. Hover over a region to see its
-payload.
+Hover over a region to see its payload. `masque(fig)` alone makes these
+filled areas respond: `band!`, `density!`, `contourf!`, `violin!`,
+`voronoiplot!`, and `boxplot!`.
 
 For a `poly!` you made from rings, see [Click marks](@ref).
 
@@ -34,12 +33,7 @@ PolygonInteractable(
 )
 ```
 
-A click gives an `ElementEvent` with `index` and the payload fields.
+A click gives an `ElementEvent` with `index` and the payload fields, so
+`pick.shape` is `"triangle"` or `"square"`.
 
-!!! note
-
-    `masque(fig)` picks up these filled areas the same way on `:cairo`
-    and `:webgl`, and a `PolygonInteractable` you write yourself responds
-    the same way on both. This example uses CairoMakie and has no cell
-    that uses a click. On a `PolarAxis`, `masque(fig)` skips these
-    filled areas with a warning.
+Next, [Text labels](@ref) makes labels clickable.

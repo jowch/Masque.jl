@@ -1,10 +1,10 @@
 # Compare a cluster
 
-To ask what is different about a group of points, draw a box around
-them. In this clip of a running notebook, the box starts on one
-cluster, moves to the other, then shrinks to cover half of it. After
-each release, the histogram under the scatter compares the `z` of the
-points in the box with all the samples.
+Drag a box around a group of points to see what is different about
+it. In this clip, the box starts on one cluster, moves to the other,
+then shrinks to cover half of it. The count beside the box updates as
+it moves. After each release, the histogram under the scatter compares
+the `z` of the points in the box with all the samples.
 
 ```@raw html
 <video id="masque-cluster-clip" title="Dragging a box between two clusters. The histogram below updates after each release."
@@ -20,13 +20,7 @@ points in the box with all the samples.
 </script>
 ```
 
-This example is a video clip because 150 points allow far too many
-different boxes to record. In the clip, the count beside the box
-updates as the box moves, and the histogram updates when you release
-the box. In your notebook, hovering over a point also shows its three
-measurements.
-
-Copy the three cells to try it. Create the scatter and the box:
+Create the scatter and the box:
 
 ```julia
 begin
@@ -73,12 +67,11 @@ end
 
 ## How it works
 
-Each point's payload carries its three measurements, so the tooltip
-shows them without any extra code. The [`ROIInteractable`](@ref) names
-the points' layer with `selects = :pts`, so when you release the box,
-`picks` becomes a vector with one event per point inside. You can index
-your data with it: `zs[picks]` is the `z` of the points in the box, and
-the last cell makes an ordinary Makie figure from it.
+Each point's payload carries its three measurements, so hovering over
+a point shows them. The [`ROIInteractable`](@ref) names the points'
+layer with `selects = :pts`, so when you release the box, `picks` is a
+vector with one event per point inside. Index your data with it:
+`zs[picks]` is the `z` of the points in the box.
 
 ## Variations
 

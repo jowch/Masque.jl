@@ -1,8 +1,9 @@
 # Examples
 
 Each example is a small notebook you can copy, with its code below it.
-Hover over the figure as you would in Pluto; a click or a box shows the
-result the notebook recorded for it.
+Hover over a figure, click a mark, or drag a box, and the cells below it
+respond. [Static exports and this site](@ref) says how the examples
+work without Julia running.
 
 ## Analyses
 

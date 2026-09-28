@@ -1,11 +1,11 @@
 # Bars and areas
 
-`masque(fig)` picks up histogram bins, waterfall bars, crossbar ranges,
-bar plots, and horizontal and vertical spans, with no interactable
-written by hand. Hover over a bar, a band, or a range to see its values.
+Hover over a bar, a band, or a range to see its values. `masque(fig)`
+alone makes these respond: histogram bins, waterfall bars, crossbar
+ranges, bar plots, and horizontal and vertical spans.
 
-The four panels are one widget. For a single `barplot!`, see
-[Click marks](@ref).
+The four panels are one widget. For a single `barplot!` whose click
+another cell uses, see [Click marks](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -20,13 +20,7 @@ Main.masque_fallback("gallery_bars")
 ## Variations
 
 The same call also covers the other bar-like recipes in
-[Recipes masque(fig) extracts](@ref). A recipe that is not in that table
-does not respond until you add an interactable for it yourself.
+[Recipes masque(fig) extracts](@ref). For a recipe that is not in that
+table, add an interactable yourself; see [Custom hits](@ref).
 
-!!! note
-
-    `masque(fig)` picks up these recipes the same way on `:cairo` and
-    `:webgl`. This example uses CairoMakie and has no cell that uses a
-    click. Use `:webgl` when the figure is large or you already work on
-    WGLMakie's live canvas. On a `PolarAxis`, `masque(fig)` skips
-    `barplot!` with a `@warn`.
+Next, [Polygons](polygons.md) covers filled areas.

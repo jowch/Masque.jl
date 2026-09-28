@@ -15,18 +15,13 @@ dashed line.
 Main.masque_fallback("example_heatmap_trace")
 ```
 
-On this page, the plot for each cell was recorded ahead of time. In
-your own notebook, the plot is redrawn when you click.
-
 ## How it works
 
 [`RectInteractable`](@ref) makes each heatmap cell clickable. A click
-makes `pick` a [`GridCellEvent`](@ref). `pick.i` is the column (the
-day) and `pick.j` the row (the station), so `daily[pick.i, pick.j]` is
-the clicked cell of the matrix you plotted, and `pick.value` is its
-value. The last cell uses `pick.i` and `pick.j` to recompute the
-detail: here from the hourly model, in practice from your raw
-measurements.
+makes `pick` a [`GridCellEvent`](@ref): `daily[pick.i, pick.j]` is the
+clicked cell of the matrix you plotted, and `pick.value` is its value.
+The last cell uses `pick.i` and `pick.j` to recompute the detail: here
+from the hourly model, in practice from your raw measurements.
 
 ## Variations
 
