@@ -166,7 +166,7 @@ async function readout(frame) {
     const outs = [...document.querySelectorAll("pluto-output")];
     for (const out of outs) {
       const t = (out.innerText || "").replace(/"/g, "").trim();
-      if (t === "click a point" || / selected — y = /.test(t)) return t;
+      if (t === "click a point" || / selected, y = /.test(t)) return t;
     }
     return "";
   });
@@ -287,7 +287,7 @@ try {
 
   for (let i = 0; i < POINTS.length; i++) {
     await setHost(frame, { layer: "scatter", index: i });
-    const want = `${POINTS[i].name} selected — y = ${POINTS[i].y}`;
+    const want = `${POINTS[i].name} selected, y = ${POINTS[i].y}`;
     const text = await waitReadout(frame, (t) => t.includes(want));
     if (!text.includes(want)) {
       throw new Error(`host.value {layer:"scatter",index:${i}} did not key a snapshot; readout=${JSON.stringify(text)}`);
@@ -301,7 +301,7 @@ try {
     if (!got || got.layer !== "scatter" || typeof got.index !== "number") {
       throw new Error(`point ${i} (${POINTS[i].name}) click emitted ${JSON.stringify(got)}`);
     }
-    const want = `${POINTS[got.index].name} selected — y = ${POINTS[got.index].y}`;
+    const want = `${POINTS[got.index].name} selected, y = ${POINTS[got.index].y}`;
     const text = await waitReadout(frame, (t) => t.includes(want));
     if (!text.includes(want)) {
       throw new Error(`listed click (aimed ${i}, hit ${got.index}) did not swap the readout; got ${JSON.stringify(text)}`);

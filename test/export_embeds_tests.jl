@@ -437,7 +437,7 @@ include(joinpath(@__DIR__, "..", "docs", "player_fallback.jl"))
     @test cells["b0e1e001-0001-4000-8000-000000000003"] == "@bind sel masque(fig, pts)"
     @test !any(occursin("# ╔═╡", c) for c in values(cells))
     @test markdown_cell_text(cells["b0e1e001-0001-4000-8000-000000000009"]) ==
-        "Hover a point to read its name, then click it. The last cell names the point.\n"
+        "Hover over a point to see its name, then click it, and the last cell names the point you clicked.\n"
     @test markdown_cell_text("@bind sel masque(fig, pts)") === nothing
     @test_throws ErrorException markdown_cell_text("md\"x = \$(1 + 1)\"")
     @test_throws ErrorException markdown_cell_text("md\"x = \$x\"")
