@@ -82,10 +82,12 @@ node keyboard_a11y.mjs http://127.0.0.1:1238 "$PWD/kind_sweep_webgl.jl" webgl
 ```
 
 Portable notebooks (`Pkg.develop` via `@__DIR__`) work without `MASQUE_DEV_ENV` (skip the `export`
-line so it stays unset); first open re-resolves the Makie stack (~6 min). All three drivers also run
-in CI on the `kind-sweep` job (matrixed `cairo`/`webgl`), but only **advisorily**
-(`continue-on-error: true`) — agents still run this playbook locally before calling a user-facing
-change done, until the job is promoted to a required check (`roadmap.md`, Tooling).
+line so it stays unset); first open re-resolves the Makie stack (~6 min). All three drivers run
+on every PR in CI's `kind-sweep` job (matrixed `cairo`/`webgl`), which is a required check: a
+failing driver on either backend blocks the merge. CI runs the notebooks as they are, so it only
+covers what they exercise. A user-facing change still runs this playbook locally before it is
+pushed, and a new kind, recipe, or interaction gets a case in `kind_sweep_figures.jl` and a check
+in the driver that owns it, so CI covers it on every later PR.
 `polish_verify.mjs` is **required** and still **not sufficient** alone (one wash + one ring +
 caret-at-anchor + fade + tooltip theme). `kind_sweep.mjs` is **required** and still **not
 sufficient** alone until `polish_verify.mjs` also PASSes on that backend. `keyboard_a11y.mjs` is

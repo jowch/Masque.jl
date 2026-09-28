@@ -65,7 +65,7 @@ attempt, the checks already run, and the steps before and after registering.
 - A Documenter site with guides, worked examples, and live players.
 - Nine CI jobs: Julia on two versions, the no-backend error path, the WGLMakie extension, a
   through-Pluto bind end-to-end, the fixture notebooks, the frontend and bundle, docs links,
-  Runic, and an advisory live kind sweep on both backends.
+  Runic, and a required live kind sweep on both backends.
 
 **Closed without building, and why.** These are listed so they are not proposed again
 without new evidence:
@@ -188,9 +188,6 @@ update `support.md` whenever `_plotbase` grows a branch.
 
 ### Tooling
 
-- **Promote the `kind-sweep` job to a required check.** Nothing known blocks it: #99 is
-  closed, and the WebGL `view-wheel` failure was #165, fixed in #203. Until then, agents run
-  the sweep locally.
 - **#176: advisory CI against Makie's development branch.** The canaries only, on a schedule
   and not as a required check. It detects a moved internal before CompatHelper's bump PR
   does. Keep the one-minor compat pins.

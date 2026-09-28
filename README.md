@@ -52,6 +52,7 @@ begin
     ax = Axis(fig[1, 1])
     pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
     scatter!(ax, first.(pts), last.(pts))
+    nothing
 end
 ```
 

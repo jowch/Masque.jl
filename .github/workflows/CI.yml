@@ -169,14 +169,11 @@ jobs:
           retention-days: 14
 
   kind-sweep:
-    # Advisory (continue-on-error): CLAUDE.md's live-verification playbook
-    # (docs/dev/live-interaction-checklist.md) mandates kind_sweep.mjs + polish_verify.mjs +
-    # keyboard_a11y.mjs on every backend before a user-facing change is "done", but until now
-    # only click.mjs/bind_click.mjs ran in CI. This job runs the full sweep so a regression
-    # shows up on the PR without gating merges yet — promote to required once it's proven stable.
+    # Required: the live-verification playbook (docs/dev/live-interaction-checklist.md) —
+    # kind_sweep.mjs + polish_verify.mjs + keyboard_a11y.mjs on both backends — runs on every PR
+    # and gates the merge. It ran advisorily until 60 consecutive CI runs showed no failure.
     name: Kind sweep (${{ matrix.backend }})
     runs-on: ubuntu-latest
-    continue-on-error: true
     # kind_sweep.mjs's own mount deadline is 25min, polish_verify.mjs's is 15min, keyboard_a11y.mjs's
     # is also 25min — well over an hour of driver budget alone before checkout/playwright-install/
     # cold-instantiate, and the run deliberately keeps going after an earlier script fails (every
@@ -342,9 +339,8 @@ jobs:
     # docs/dev/check_docs_links.mjs verifies every link into docs/dev/ (file existence +
     # heading anchor), both from within docs/dev/ itself and from any other docs/**/*.md file
     # that points in. No npm dependency (the slugger is vendored in the script), so no
-    # `npm install` step — checkout + node is enough. Deterministic and network-free, unlike
-    # `kind-sweep`, so this runs as a normal (non-advisory) job: a broken link fails the check
-    # like any other gate.
+    # `npm install` step — checkout + node is enough. Deterministic and network-free: a broken
+    # link fails the check like any other gate.
     name: Docs links
     runs-on: ubuntu-latest
     steps:
