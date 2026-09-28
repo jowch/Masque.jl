@@ -21,7 +21,7 @@ using Masque, CairoMakie, Markdown
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
 md"""
-Drag the box over some stations. The last cell lists the ones inside.
+Drag the box over some stations, and the last cell lists the ones inside.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
@@ -57,7 +57,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind picks` saves the stations inside the box when you release it. Dragging moves the box without changing `picks`.
+`@bind picks` saves the stations inside the box when you release it, so `picks` stays the same while you drag.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003

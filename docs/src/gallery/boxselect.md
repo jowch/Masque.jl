@@ -5,9 +5,10 @@ counts the points inside by group and averages their coordinates.
 
 `picks` is a `Vector{ElementEvent}` with one event per point inside the
 box, carrying that point's payload (`group`, `x`, `y`), so
-`count(e -> e.group == "A", picks)` counts one group. `xs[picks]` uses
-the events as indices into your data. An empty box gives `[]`, not
-`nothing`. See [Brush a region](@ref).
+`count(e -> e.group == "A", picks)` counts one group. The events also
+work as indices into your data, so `xs[picks]` is the `x` of the points
+in the box. An empty box gives `[]` rather than `nothing`. See
+[Brush a region](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">

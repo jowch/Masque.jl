@@ -22,12 +22,12 @@ using CairoMakie, Masque
 
 # ╔═╡ a1420002-0001-4000-8000-000000000009
 md"""
-Click a cell. The plot below shows that station's readings, hour by hour, on the day you clicked.
+Click a cell, and the plot below shows that station's readings, hour by hour, on the day you clicked.
 """
 
 # ╔═╡ a1420002-0001-4000-8000-000000000010
 md"""
-The heatmap shows one daily mean per station and day. `temp` gives the hourly values behind each mean.
+The heatmap shows one daily mean per station and day, and `temp` gives the hourly values behind each mean.
 """
 
 # ╔═╡ a1420002-0001-4000-8000-000000000002
@@ -46,7 +46,7 @@ end
 
 # ╔═╡ a1420002-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores the clicked cell. `pick.i` is the day (1 to 7), `pick.j` is the station's position in `stations`, and `pick.value` is the daily mean.
+`@bind pick` stores the clicked cell: `pick.i` is the day (1 to 7), `pick.j` is the station's position in `stations`, and `pick.value` is the daily mean.
 """
 
 # ╔═╡ a1420002-0001-4000-8000-000000000003

@@ -6,10 +6,10 @@ interactable work the same on both.
 
 ## Choose a backend
 
-Load a backend before you call `masque`. With only `CairoMakie` loaded,
-`masque` shows a PNG; with only `WGLMakie`, a GPU canvas. With both
-loaded, `masque(fig)` uses CairoMakie. With neither, it raises an
-`ArgumentError`.
+Load a backend before you call `masque`: with only `CairoMakie`
+loaded, `masque` shows a PNG, and with only `WGLMakie`, a GPU canvas.
+With both loaded, `masque(fig)` uses CairoMakie, and with neither, it
+raises an `ArgumentError`.
 
 To pick the backend yourself, or to set a WGLMakie-only option such as
 `px_per_unit`, pass a backend object to `backend=`. The backend types
@@ -33,7 +33,8 @@ object's `max_width` instead.
 CairoMakie draws the figure once, as a PNG, when `masque` runs.
 Tooltips and highlights are drawn on top of it in the browser, so they
 stay sharp when you zoom the page. Redrawing the figure means a new PNG,
-so a figure you rebuild every frame of an animation is slow.
+so an animation that rebuilds the figure every frame is slow; use
+WGLMakie for that.
 
 3D works without WGLMakie: points and segments on an `Axis3` respond,
 and a [`ViewInteractable`](@ref) orbits the camera.
@@ -41,7 +42,7 @@ and a [`ViewInteractable`](@ref) orbits the camera.
 ### SVG display and files
 
 `CairoMakie.activate!(type = "svg")` changes how a plain `Figure`
-displays. It doesn't change `masque(fig)`, which always shows a PNG on
+displays, but not `masque(fig)`, which always shows a PNG on
 CairoMakie. To write an SVG file, call `save("figure.svg", fig)`; you
 can do that in the same cell that returns `masque(fig)`.
 
@@ -55,11 +56,11 @@ can do that in the same cell that returns `masque(fig)`.
 With WGLMakie, `masque` shows the figure on a GPU canvas in the
 browser.
 
-### The widget is the figure
+### Return the widget from the figure's cell
 
-Return `masque(f)` from the cell that creates the figure. A WGLMakie
-`Figure` returned on its own is WGLMakie's own display, without
-Masque's tooltips.
+Return `masque(f)` from the cell that creates the figure, because a
+WGLMakie `Figure` returned on its own shows in WGLMakie's own display,
+without Masque's tooltips.
 
 ```julia
 fig = let
@@ -78,17 +79,18 @@ End the cell with `;` so Pluto doesn't show the figure twice.
 
 ### Many plots on one page
 
-A browser keeps only a limited number of GPU canvases live. At most 8
-WGLMakie plots are live at once; a plot that scrolls into view takes
-over from one that scrolled away. If more than 8 are on screen
-together, the extra plots show a note instead of the figure.
+A browser keeps only a limited number of GPU canvases live, so at most
+8 WGLMakie plots are live at once, and a plot that scrolls into view
+takes over from one that scrolled away. If more than 8 are on screen
+together, the extra plots show a note instead of the figure, so to keep
+them all live, use CairoMakie for the plots that do not need to move.
 
 ## Pan and orbit preview
 
 While you drag with a [`ViewInteractable`](@ref), Julia redraws the
-view. On CairoMakie each step is a new PNG; on WGLMakie the canvas
-already on the page updates. Either way, dragging
-the view needs a running notebook. See [Pan and orbit](@ref).
+view: on CairoMakie each step is a new PNG, and on WGLMakie the canvas
+already on the page updates. Either way, dragging the view needs a
+running notebook. See [Pan and orbit](@ref).
 
 ## Export static HTML
 

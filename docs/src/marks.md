@@ -2,9 +2,10 @@
 
 You can click any plot `masque(fig)` recognizes, not just scatters.
 Clicking a point, bar, polygon, line, or text label sets `pick` to an
-[`ElementEvent`](@ref). It has `pick.index`, the mark's position in your
-data, plus fields that depend on the kind of mark. Heatmap cells, legend
-entries, and colorbars give their own event types; see [Concepts](@ref).
+[`ElementEvent`](@ref), which holds `pick.index`, the mark's position
+in your data, and fields that depend on the kind of mark. Heatmap cells,
+legend entries, and colorbars give their own event types; see
+[Concepts](@ref).
 
 [Plot-object defaults](@ref) lists the fields each plot type reports,
 and [Supported plots and axes](@ref) lists which plots work on which
@@ -13,7 +14,7 @@ axes.
 ## Bars
 
 A bar reports its `value`, which is its height, and its `low` and `high`
-ends. In a stacked or dodged bar plot, that tells you which segment was
+ends, so in a stacked or dodged bar plot you can tell which segment was
 clicked. In this example, a click shows the quarter and the value:
 
 ```@raw html
@@ -39,9 +40,9 @@ Heatmaps have their own page: [Inspect a grid](@ref).
 
 ## Polygons
 
-Each polygon in a `poly!` is one mark. Its `index` is its position in
-the order you plotted them. The example below looks up each polygon's
-name by that index:
+Each polygon in a `poly!` is one mark, and its `index` is its position
+in the order you plotted them. The example below uses that index to look
+up the clicked polygon's name:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -65,8 +66,8 @@ regions = PolygonInteractable(ax, p;
 ```
 
 Bands, densities, filled contours, violins, and Voronoi cells are
-polygons too. A filled contour also reports the `low` and `high` of its
-level.
+polygons too, and a filled contour also reports the `low` and `high` of
+its level.
 
 ## Lines
 
@@ -84,11 +85,10 @@ at a particular `x` instead, use a [`SliceInteractable`](@ref).
 Main.masque_fallback("marks_lines")
 ```
 
-`pick.layer` tells the two lines apart: `:lines` for the first and
-`:lines_2` for the second. `stairs!` plots get `:stairs` and
-`:stairs_2` the same way. To choose
-the names yourself, pass each line to [`SegmentInteractable`](@ref)
-with an `id`:
+`pick.layer` tells the two lines apart: it is `:lines` for the first
+and `:lines_2` for the second, and `stairs!` plots get `:stairs` and
+`:stairs_2` the same way. To choose the names yourself, pass each line
+to [`SegmentInteractable`](@ref) with an `id`:
 
 ```julia
 begin

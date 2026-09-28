@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
 md"""
-Click a polygon. The last cell names it.
+Click a polygon, and the last cell names it.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-Create the polygons the way you normally would. `masque` makes each polygon clickable.
+Create the polygons the way you normally would, and `masque` makes each polygon clickable.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -47,7 +47,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`. Hovering outlines the polygon without changing `pick`.
+`@bind pick` saves a click in `pick`, while hovering only highlights the polygon and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -55,7 +55,7 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`. After a click, `pick.index` is the polygon's position in the order you plotted them. This cell responds to the click.
+`pick` starts as `nothing`, and this cell responds when you click a polygon. After a click, `pick.index` is the polygon's position in the order you plotted them.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004

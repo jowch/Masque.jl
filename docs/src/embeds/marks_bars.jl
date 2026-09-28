@@ -21,7 +21,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
 md"""
-Click a bar. The last cell reads its value.
+Click a bar, and the last cell reads its value.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
@@ -44,7 +44,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`. Hovering highlights the bar without changing `pick`.
+`@bind pick` saves a click in `pick`, while hovering only highlights the bar and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -52,14 +52,14 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`. After a click, `pick.value` is the bar's height and `pick.index` is its position in your data. This cell responds to the click.
+`pick` starts as `nothing`, and this cell responds when you click a bar. After a click, `pick.value` is the bar's height and `pick.index` is its position in your data.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
 if isnothing(pick)
     "click a bar"
 else
-    "Q$(pick.index) — value $(pick.value)"
+    "Q$(pick.index): value $(pick.value)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

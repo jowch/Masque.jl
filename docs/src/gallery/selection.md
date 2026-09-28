@@ -1,13 +1,11 @@
 # Selection round-trip
 
 Click a point on the left, and the same sample is highlighted on the
-right, where it is plotted against another column. The second `masque`
-call passes the clicked `pick.index` as `selected=`. Both use each
-point's position in the data you plotted, so the index matches as long
-as both plots list the samples in the same order.
-
-Nothing links the two plots except your code: the second `masque` call
-reads `pick.index`.
+right, where it is plotted against another column. Nothing links the
+two plots except your code: the second `masque` call passes the clicked
+`pick.index` as `selected=`. That index is the point's position in the
+data you plotted, so it finds the same sample as long as both plots
+list the samples in the same order.
 
 ```@raw html
 <div class="masque-embed-wrap">

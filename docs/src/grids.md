@@ -30,15 +30,16 @@ first index in the matrix you plotted and `pick.j` its second, so
 index along x and the second along y. `pick.value` is the cell's value,
 and the clicked cell stays highlighted.
 
-A grid does not take `payloads`. A cell always reports its `i`, `j`,
-and `value`. Keep other per-cell data in Julia and look it up with
-`pick`.
+A grid does not take `payloads`, so a cell always reports just its
+`i`, `j`, and `value`. To use other per-cell data, keep it in Julia and
+look it up with `pick`.
 
 ## Make a grid from edges and values
 
 If you have edges and values instead of a plot, pass them as `grid`.
-Each edge vector must be monotonic, ascending or descending. The values
-form a matrix of size `(length(xedges) - 1, length(yedges) - 1)`:
+Each edge vector must be monotonic, either ascending or descending, and
+the values form a matrix of size
+`(length(xedges) - 1, length(yedges) - 1)`:
 
 ```julia
 cells = RectInteractable(ax; grid = (0.5:1:4.5, 0.5:1:3.5, z), id = :cells)
@@ -52,13 +53,14 @@ and its value, and a click still reports the cell's true `i` and `j`.
 
 A color image has no single value per cell, so hovering or clicking it
 reports `i` and `j` with `value = nothing`, at any size. To read a
-number, pass a [`RectInteractable`](@ref) grid with the values you want,
-such as each pixel's intensity.
+number instead, pass a [`RectInteractable`](@ref) with a grid of the
+values you want, such as each pixel's intensity.
 
 ## Brush a block of cells
 
-Add an [`ROIInteractable`](@ref) with `selects` naming the grid, and
-pass both to `masque`:
+To select a block of cells by dragging a box over them, add an
+[`ROIInteractable`](@ref) with `selects` naming the grid, and pass both
+to `masque`:
 
 ```julia
 cells = RectInteractable(ax, p; id = :cells)
@@ -67,14 +69,18 @@ box = ROIInteractable(ax; bounds = (1.0, 3.0, 1.0, 2.0), selects = :cells)
 ```
 
 When you release the box, `win` is a [`GridWindowEvent`](@ref) for the
-block of cells under it, and `z[win]` is that block of the matrix.
+block of cells under it. `win.i1:win.i2` is the range of the matrix's
+first index, drawn along x, and `win.j1:win.j2` the range of its second
+index, drawn along y, so `z[win]` is `z[win.i1:win.i2, win.j1:win.j2]`,
+that block of the matrix.
 
 A box that misses the grid still gives a `GridWindowEvent`, with empty
-ranges (`win.i1:win.i2` is `1:0`). `z[win]` is then an empty matrix
+ranges (`win.i1:win.i2` is `1:0`), so `z[win]` is an empty matrix
 rather than an error.
 
-While the box selects the grid, clicking a cell does not change `win`;
-see [Brush a region](@ref).
+While the box selects the grid, clicking a cell shows its tooltip but
+does not change `win`, which stays the box's block. The one exception,
+an axis readout in the same widget, is in [Brush a region](@ref).
 
 ## Where to go next
 

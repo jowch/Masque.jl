@@ -56,7 +56,7 @@ end
 @bind pick masque(fig, cities)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-pick === nothing ? md"*Hover a city, then click one.*" : md"**$(pick.city)** selected — index $(pick.index)"
+isnothing(pick) ? md"*Hover over a city, then click one.*" : md"**$(pick.city)** selected, index $(pick.index)"
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

@@ -26,7 +26,7 @@ Hover over a region to see its name, then click it. The last cell shows the name
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-The figure is an image. `regions` adds a circle, a rectangle, and a triangle on top of it, and `payloads` gives each one a name.
+`regions` adds a circle, a rectangle, and a triangle on top of the image, and `payloads` gives each one a name.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -50,7 +50,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`. Hovering shows the tooltip without changing `pick`.
+`@bind pick` saves a click in `pick`, while hovering only shows the tooltip and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -58,7 +58,7 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`. After a click, `pick.name` is the region's name. This cell responds to the click.
+`pick` starts as `nothing`, and this cell responds when you click a region. After a click, `pick.name` is the region's name.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004

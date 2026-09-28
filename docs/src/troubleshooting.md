@@ -32,10 +32,10 @@ CairoMakie. For more information, see [Backends](@ref).
 
 **Cause:** an interactable was built with `tooltip = true`.
 
-**Fix:** omit `tooltip` for the default table of names and values, pass
-`masque"..."` for a template, or pass `tooltip = false` to hide the
-tooltip. `true` is not one of these three forms. For more information,
-see [Tooltips](@ref).
+**Fix:** `tooltip` takes one of three forms, and `true` is not one of
+them: leave `tooltip` out for the default table of names and values,
+pass `masque"..."` for a template, or pass `tooltip = false` to hide the
+tooltip. For more information, see [Tooltips](@ref).
 
 ### Tried `payloads` of the wrong length
 
@@ -137,7 +137,7 @@ raises `ArgumentError` there.
 **Fix:** on a `PolarAxis`, use points, lines, or segments, which
 respond to hover and click. See [Supported plots and axes](@ref).
 
-### Tried `heatmap!` or `barplot!` on PolarAxis
+### [Tried `heatmap!` or `barplot!` on PolarAxis](@id polar-skipped-plots)
 
 **Cause:** `masque(fig)` skips those plots on a `PolarAxis` with a
 warning, because their rectangles would not line up with the polar
@@ -169,8 +169,8 @@ against a numeric axis. See [Supported plots and axes](@ref).
 
 **Cause:** the figure contains an `LScene` block. `LScene` is not
 supported on any backend, so `masque` refuses the figure rather than
-leave that block with nothing to hover. A figure that also holds a
-normal `Axis` is refused too.
+leave that block with nothing to hover, even when the figure also holds
+a normal `Axis`.
 
 **Fix:** put interactive 3D in an `Axis3`, which both backends
 support. To show an `LScene` without interaction, display the figure
@@ -181,39 +181,41 @@ itself instead of `masque(fig)`.
 **Error prefix:** `does not support pre-highlight` /
 `out of range`
 
-**Cause:** the layer's kind cannot show a starting selection from
+**Cause:** either the layer's kind cannot start with a selection from
 `selected=`, or an index is out of range. Layers of kind `:circles`,
-`:rects`, `:polygons`, `:segments`, `:polyline`, and `:lines` can.
-`:grid`, `:axis`, `:threshold`, `:roi`, and `:view` cannot. For a
-`RegionInteractable`, the keys are the suffixed ids, not the base
-`id`.
+`:rects`, `:polygons`, `:segments`, `:polyline`, and `:lines` can start
+selected, while `:grid`, `:axis`, `:threshold`, `:roi`, and `:view`
+cannot.
 
-**Fix:** check the layer's kind against [Selection](@ref). Indices are
-1-based and must be in `1:n`.
+**Fix:** check the layer's kind against [Selection](@ref), and keep
+each index between 1 and the number of marks in that layer. For a
+`RegionInteractable`, use the suffixed ids as keys, not the base
+`id`.
 
 ### An error mentioning "Makie internals changed?"
 
 **Cause:** Masque reads fields of Makie's plot objects, and a new
-Makie, CairoMakie, or WGLMakie version can move or rename one of them.
-Your code is not the cause.
+Makie, CairoMakie, or WGLMakie version can move or rename one of them,
+so the problem is in Masque and not in your code.
 
 **Fix:** file an issue with your Makie, CairoMakie, and WGLMakie
-versions. Until it is fixed, pin those packages to a version that
-worked.
+versions. To keep working until it is fixed, pin those packages to a
+version that worked.
 
 ## Not errors, but surprising
 
 ### Tried `CairoMakie.activate!(type = "svg")` and the widget is a PNG
 
-**Cause:** `type = "svg"` chooses how a bare `Figure` displays.
+**Cause:** `type = "svg"` chooses how a bare `Figure` displays, but
 `masque` always shows a PNG on CairoMakie, or a canvas on WGLMakie,
 with tooltips and highlights drawn on top. `save("figure.svg", fig)`
-writes SVG because of the file extension.
+still writes SVG, because the file extension decides the format.
 
-**Fix:** leave `CairoMakie.activate!(type = "svg")` in place for cells
-that return a `Figure`. Write the file with `save("figure.svg", fig)`.
-Return `masque(fig)` from the cell that should show the interactive
-figure. For more information, see [SVG display and files](@ref).
+**Fix:** keep `CairoMakie.activate!(type = "svg")` for the cells that
+return a `Figure`, and write the SVG file with
+`save("figure.svg", fig)`. In the cell that should show the interactive
+figure, return `masque(fig)`. For more information, see
+[SVG display and files](@ref).
 
 ### Tried feeding this widget's bond into the same call's `selected=`
 
@@ -222,14 +224,14 @@ figure. For more information, see [SVG display and files](@ref).
 **Cause:** you passed this widget's own `@bind` value to its
 `selected=`.
 
-**Fix:** drop it. A click already keeps its highlight. To carry a
-selection through a rebuild, see
+**Fix:** remove it, because a click already keeps its highlight. To
+carry a selection through a rebuild, see
 [Keep a selection when the figure rebuilds](@ref).
 
 ### Tried reading pick on hover
 
-**Cause:** hovering shows the tooltip and highlight in the browser. It
-does not change the `@bind` value.
+**Cause:** hovering shows the tooltip and highlight in the browser
+without changing the `@bind` value.
 
 **Fix:** read `pick` after a click (or Enter on a focused mark). For
 what each gesture changes, and why, see [How interactions work](@ref).
@@ -237,9 +239,9 @@ what each gesture changes, and why, see [How interactions work](@ref).
 ### Right-click opens the context menu
 
 Right-clicking the figure opens the browser's context menu for the
-CairoMakie image or the WebGL canvas. Control-click does the same on
-macOS. That press does not start a drag, and the `@bind` value stays
-the same. For what each gesture changes, see
+CairoMakie image or the WebGL canvas, and Control-click does the same
+on macOS. That press does not start a drag or change the `@bind`
+value. For what each gesture changes, see
 [How interactions work](@ref).
 
 ### Tried a click and nothing happened
@@ -252,8 +254,8 @@ Check, in order:
    nothing, and it does not clear the selection.
 3. Is the mark you clicked interactive? `masque(fig)` skips an
    unsupported plot type with a warning in the notebook log, not an
-   error, so its marks do not respond. A heatmap or bar plot on a
-   `PolarAxis` is skipped this way.
+   error, so its marks do not respond, as with a
+   [heatmap or bar plot on a `PolarAxis`](@ref polar-skipped-plots).
    [Recipes masque(fig) extracts](@ref) lists the supported plots.
 
 ### Tried a tooltip and saw `[object Object]`
@@ -271,8 +273,9 @@ field with `masque"$(that_field)"`.
 **Cause:** dragging with `ViewInteractable` changes the view, not the
 `@bind` value.
 
-**Fix:** do not use the `@bind` value to track the view. The dragged
-limits or angles are kept on the axis itself; see [Pan and orbit](@ref).
+**Fix:** do not use the `@bind` value to track the view. The axis
+itself keeps the limits or angles you dragged to, as
+[Pan and orbit](@ref) describes.
 
 ### Browser console errors
 
@@ -283,20 +286,21 @@ console error as a bug, even when the widget otherwise works.
 
 ### Tried WGLMakie and the spinner never stops
 
-**Cause:** the cell displayed a WGLMakie `Figure`, not a `masque`
-widget. That is WGLMakie's own display. It draws only after the browser
+**Cause:** the cell displayed a WGLMakie `Figure` rather than a
+`masque` widget. WGLMakie's own display draws only after the browser
 connects to the Bonito server that WGLMakie starts in the notebook
 process, on `localhost:9384` by default. When Pluto runs on another
 machine, in a container, or behind a tunnel that forwards only Pluto's
-port, the browser cannot reach that address, and the spinner never
+port, the browser cannot reach that address, so the spinner never
 stops. A `masque` widget does not use that connection.
 
-**Fix:** return `masque(f)` from the cell that creates the figure. That
-cell then shows the interactive figure, and `@bind` is optional. If you
-do bind it, end that cell with `;` so Pluto does not show the widget
-twice. For the cell layout, see [The widget is the figure](@ref). To
-keep WGLMakie's own display working remotely, forward port 9384 as well,
-or point Bonito at an address the browser can reach with
+**Fix:** return `masque(f)` from the cell that creates the figure, so
+that cell shows the interactive figure whether or not you bind it. If
+you do bind it, end that cell with `;` so Pluto does not show the
+widget twice. For the cell layout, see
+[Return the widget from the figure's cell](@ref).
+To keep WGLMakie's own display working remotely, forward port 9384 as
+well, or point Bonito at an address the browser can reach with
 `Bonito.configure_server!`.
 
 ### Tried WGLMakie and the canvas is blank
@@ -314,11 +318,11 @@ see [Backends](@ref).
 ### A WebGL plot says its GPU context was released
 
 **Cause:** the browser caps how many WebGL contexts a page can keep
-(16 on desktop Chrome and Safari, 8 on Android Chrome). Masque keeps at
-most 8. A plot that scrolls out of view releases its context before the
-next plot takes one. More than 8 plots on screen at once cannot all be
-live, and the extra plots show this note. Hover and `@bind` still
-work.
+(16 on desktop Chrome and Safari, 8 on Android Chrome), so Masque keeps
+at most 8. A plot that scrolls out of view releases its context before
+the next plot takes one, but when more than 8 plots are on screen at
+once, they cannot all be live, and the extra plots show this note.
+Hover and `@bind` still work.
 
 **Fix:** scroll so fewer WGLMakie plots are on screen at once, or use
 CairoMakie for a plot that is a static picture.

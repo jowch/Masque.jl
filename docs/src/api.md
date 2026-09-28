@@ -71,8 +71,8 @@ masque(fig, interactables...;
 `nothing`, the default for every keyword except `tooltip_caret`, keeps
 the built-in style.
 
-You can also set the `--masque-tip-*` CSS custom properties on any
-element that contains the cell, without Julia:
+To style tooltips without Julia, set the `--masque-tip-*` CSS custom
+properties on any element that contains the cell:
 
 ```html
 <style>
@@ -83,8 +83,8 @@ main { --masque-tip-bg: #1a1a2e; --masque-tip-color: #e0e0e0; }
 By default, `--masque-tip-bg`, `--masque-tip-color`, and
 `--masque-tip-border` follow the figure's background, so a dark figure
 gets a dark tooltip. Older browsers without CSS relative-color syntax
-use the fixed values shown instead. Where a row lists light and dark
-values, the browser picks one by the system's color scheme:
+use the fixed values shown instead, and where a row lists light and
+dark values, the browser picks one by the system's color scheme:
 
 | Custom property | Default (light / dark) | Julia keyword |
 |---|---|---|

@@ -15,17 +15,18 @@ mark as you move to it. A `masque` widget needs no extra setup for this.
 | Enter / Space | Select the focused mark: the `@bind` value becomes what a click on it gives |
 | Escape | Clear focus and leave the plot |
 
-Arrow keys and Home / End stop at the first and last mark. They do not
-wrap.
+Arrow keys and Home / End stop at the first and last mark rather than
+wrapping around.
 
-Tab focuses the plot, not a mark. Home, or the first arrow key in
-either direction, moves to the first mark. If the figure has a legend,
-its entries come first, and Page Down steps from the legend into the
-plot. Focusing a legend entry highlights the series it labels, as
+Tab focuses the plot rather than a mark, and Home, or the first arrow
+key in either direction, then moves to the first mark. If the figure
+has a legend, its entries come first, and Page Down steps from the
+legend into the plot. Focusing a legend entry highlights the series it labels, as
 hovering over it does. See [Legend](@ref).
 
 The focused mark gets the same highlight and tooltip as a hovered one.
-A legend entry shows no tooltip unless you pass a template.
+A legend entry shows no tooltip, on hover or on focus, unless you pass a
+template.
 
 While the plot has focus and no mark is highlighted, as on a heatmap,
 a grey outline shows just inside it. Clicking a plot focuses it without
@@ -70,8 +71,8 @@ masque(fig, [
 
 The forms that take a Makie plot accept `label` too, as in
 `PointInteractable(ax, s; label = "City")` for a scatter `s`.
-`masque(fig)` on its own sets no labels, so build the interactable
-yourself to name a layer.
+`masque(fig)` on its own sets no labels, so to name a layer, build its
+interactable yourself.
 
 A payload field called `label`, as in `(city = "Tokyo", label =
 "capital")`, is different: it belongs to one mark and shows in that
@@ -79,14 +80,16 @@ mark's tooltip.
 
 ## [Limitations](@id accessibility-limitations)
 
-- The keyboard does not reach heatmap or image cells. The pointer and
-  touch drags still work on them.
-- A threshold line, an ROI box, and pan and orbit have no keyboard
-  controls. Drag them with the pointer.
-- Screen-reader announcements do not work the same in every browser and
-  screen reader. If yours stays silent, the highlight and tooltip still
-  work. Please file an issue with your browser and screen-reader
-  versions.
+The keyboard does not reach heatmap or image cells, so to inspect
+them, use the pointer or a touch drag.
+
+A threshold line, an ROI box, and pan and orbit have no keyboard
+controls, so drag them with the pointer.
+
+Screen-reader announcements do not work the same in every browser and
+screen reader. If yours stays silent, the highlight and tooltip still
+work; please file an issue with your browser and screen-reader
+versions.
 
 For the rest of what a click or Enter sends to your notebook, see
 [Concepts](@ref).

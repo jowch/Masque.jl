@@ -22,12 +22,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1410006-0001-4000-8000-000000000009
 md"""
-Click a label, including the tilted one and the annotation. The last cell quotes it.
+Click a label, including the tilted one and the annotation, and the last cell quotes it.
 """
 
 # ╔═╡ a1410006-0001-4000-8000-000000000010
 md"""
-Add `text!` and `annotation!` on the scatter you already have. `masque` makes the labels clickable.
+Add `text!` and `annotation!` on the scatter you already have, and `masque` makes the labels clickable.
 """
 
 # ╔═╡ a1410006-0001-4000-8000-000000000002
@@ -47,7 +47,7 @@ end
 
 # ╔═╡ a1410006-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores the click. A marker click is a different value from a label click.
+`@bind pick` stores the click, and a click on a marker gives a different value from a click on a label.
 """
 
 # ╔═╡ a1410006-0001-4000-8000-000000000003
@@ -64,7 +64,7 @@ if isnothing(pick)
 elseif hasproperty(pick, :text)
     "\"$(pick.text)\""
 else
-    "that was a marker — click a label"
+    "that was a marker; click a label"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

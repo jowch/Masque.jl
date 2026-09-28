@@ -34,7 +34,11 @@ does and sees. Use US spelling ("color"), matching the API's keywords.
    get. Edge cases, errors, and limits come after the basic case works, and only where a
    reader would hit them. State what a feature does, not what it can't do, unless the
    reader would expect it to.
-10. **End with where to go next,** as a link.
+10. **Pair a limit with what to do instead.** When the reader would expect something Masque
+    does not do, say what happens, then how to get what they wanted, in the same paragraph:
+    "A click selects one mark and replaces the previous selection. To select several marks
+    at once, drag a box over them." A limit on its own reads as a refusal.
+11. **End with where to go next,** as a link.
 
 ## Wording
 
@@ -43,32 +47,53 @@ sentence a person would say. Deleting words in place leaves fragments
 like "Pass the other two yourself.", where the reader has to work out
 what "the other two" are.
 
-11. **Use the reader's word, and one word per concept.** See the terms table below. A word
+12. **Keep a cause and its effect in one sentence.** Join them with "so", "and", or a colon
+    rather than splitting every clause into its own sentence. "Tooltips and highlights
+    respond in the browser without Julia, so they are instant" reads as one thought;
+    "Tooltips work in the browser. They are instant." reads as two facts the reader has to
+    connect. A paragraph of short sentences is choppy, not plain: plain is about the words,
+    not the sentence length.
+13. **Write it the way you would say it to someone sitting next to you.** Use full sentences
+    with their articles and linking words, and open an instruction with what it is for:
+    "To reach the points, pass in your own list of the interactables you want, with the
+    scatter before the polygon." Shorthand like "Pass the interactables yourself, points
+    first:" and formal words like "desired" make the page read like a spec, even when every
+    fact in it is right.
+14. **Use the reader's word, and one word per concept.** See the terms table below. A word
    that only makes sense if you know Masque's internals (chrome, echo, wash, "lands",
    "authoritative") is one of ours, not the reader's; name what they see instead.
-12. **Don't list three things when one or two carry the point.** No row of parallel verbs
+15. **Don't list three things when one or two carry the point.** No row of parallel verbs
     describing a component's duties, and no third item added for rhythm.
-13. **Keep the main point out of asides.** If it matters, give it its own sentence. In prose,
+16. **Keep the main point out of asides.** If it matters, give it its own sentence. In prose,
     end the sentence or use a colon instead of an em dash; em dashes are only for empty
     table cells.
-14. **Avoid the words in the list below.** They are the most common signs of LLM-written
+17. **Avoid the words in the list below.** They are the most common signs of LLM-written
     text, and each has a plainer word.
 
 ## Formatting
 
-15. **Headings name the topic plainly.** "How interactions work", not a row of verbs like
+18. **Headings name the topic plainly.** "How interactions work", not a row of verbs like
     "Hover, click, and drag", and not an adjective pitch like "Rich tooltips".
     A heading that matches another page's title breaks every `[Title](@ref)` link to that
     page; give it an explicit id: `## [Backends](@id home-backends)`.
-16. **No bold labels at the start of list items.** Use a plain list, or a table when each
+19. **No bold labels at the start of list items.** Use a plain list, or a table when each
     item has a name and a description. Bold is for a term's first use or a UI label.
+20. **Use short paragraphs, not bullets, when each item needs a reason or a way around it.**
+    A bullet invites a clipped fragment; a paragraph of two or three sentences has room for
+    what happens and what to do about it. Keep lists for short, parallel items that need no
+    explanation, such as a set of known gaps each followed by a link.
 
 ## Examples
 
-17. **Show it in code, in code a new Julia user can read.** When a sentence tells the reader
+21. **Show it in code, in code a new Julia user can read.** When a sentence tells the reader
     to do something in Julia, follow it with the snippet. Use literal values over
     comprehensions, splats, and chained calls: the example teaches Masque, not Julia.
     Write the idiom the reader already uses (`isnothing(x)`, not `x === nothing`).
+22. **Frame a fix with what the reader sees.** Before the snippet, say what goes wrong in
+    terms of the screen ("hovering a point shows the polygon's tooltip"). After it, say
+    what is different now, and any catch the change brings with it ("only the plots you
+    list are interactive"). A snippet introduced by an instruction alone ("Pass the
+    interactables yourself, points first:") leaves the reader to work out why it helps.
 
 ## Terms
 
@@ -109,6 +134,10 @@ Source: [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia
 | Until the first click or release, the bound variable is `nothing`. | A `masque` widget's `@bind` value starts as `nothing`. |
 | In a running notebook everything above works. A static HTML export has no Julia behind it. | A static HTML export of your notebook keeps tooltips and highlights. Other cells do not respond, because the export has no Julia behind it. |
 | `rows = [(; r..., density = round(r.pop / r.area; digits = 1)) for r in rows]` | `rows = [(city = "Lyon", density = round(522_250 / 47.9)), …]`, written out |
-| Payload values are always escaped, so your data cannot add HTML to the tooltip. | Avoid putting HTML in your payload values. It will not be rendered. To make something bold, use the template instead. *(Then show both in code.)* |
+| Payload values are always escaped, so your data cannot add HTML to the tooltip. | Avoid putting HTML in your payload values, because the tooltip shows the tags as plain text instead of rendering them. To make something bold, use the template instead. *(Then show both in code.)* |
 | See Tooltip chrome | See Tooltip styling |
+| Hovering never changes a `@bind` value. Tooltips and highlights work in the browser alone, so they are instant. | Tooltips and highlights respond in the browser without Julia, so they are instant. The `@bind` value changes only when you click. |
+| You select one mark at a time. A click replaces the selection, and there is no Shift-click or Ctrl-click to add to it. | A click selects one mark and replaces the previous selection. To select several marks at once, drag a box over them with an `ROIInteractable`. |
+| Pass the interactables yourself, points first: | To reach the points, pass in your own list of the interactables you want, with the scatter before the polygon: *(after a sentence saying what goes wrong, and followed by what changes)* |
+| This page explains how Masque behaves today, so you can plan around it. | *(Cut it. Start with the first behavior.)* |
 | Masque does three things to a Makie figure you have already drawn: it decides which marks respond to the pointer, it shows information about a mark without re-running Julia, and it hands a deliberate choice back to your notebook through `@bind`. | Masque adds tooltips and click selection to a Makie figure. A click reaches the rest of your notebook through `@bind`. |

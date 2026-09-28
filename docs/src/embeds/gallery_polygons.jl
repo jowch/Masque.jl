@@ -27,7 +27,7 @@ Hover over a band, a density, a filled contour, a violin, a Voronoi cell, or a b
 
 # ╔═╡ a1410004-0001-4000-8000-000000000010
 md"""
-Create the panels the way you normally would. `masque` makes each filled shape clickable.
+Create the panels the way you normally would, and `masque` makes each filled shape clickable.
 """
 
 # ╔═╡ a1410004-0001-4000-8000-000000000002

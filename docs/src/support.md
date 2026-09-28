@@ -1,8 +1,8 @@
 # Supported plots and axes
 
 Masque works on `Axis`, `Axis3`, and `PolarAxis`. The first table
-shows which interactions work on each axis type. The second lists the
-plot types `masque(fig)` makes interactive.
+shows which interactions work on each axis type, and the second lists
+the plot types `masque(fig)` makes interactive.
 
 ## Interactions by axis
 
@@ -27,7 +27,7 @@ too: the tooltip shows the category, and the event holds its position
 and its label (see [Read coordinates](@ref)).
 
 ² The x and y scales must be `identity`, `log10`, or `log`, and both
-axes numeric. A categorical axis is refused.
+axes must be numeric, so a categorical axis is refused.
 
 A "no", a scale outside that list (such as `Makie.pseudolog10` or
 `Makie.Symlog10`), or a categorical axis where ² requires a numeric one
@@ -40,21 +40,21 @@ next to any `Axis`, `Axis3`, or `PolarAxis`. A
 [`ColorbarInteractable`](@ref) reads values on `identity`, `log10`, and
 `log` colorbars.
 
-`LScene` is not supported. `masque` refuses a figure that contains one,
-on both backends, along with the figure's legend and colorbar. For
-interactive 3D, use an `Axis3`. [Troubleshooting](@ref) has each error
-message and its fix.
+`LScene` is not supported: on both backends, `masque` raises an error
+for a figure that contains one, so nothing in that figure responds, not
+even its legend and colorbar. For interactive 3D, use an `Axis3`.
+[Troubleshooting](@ref) has each error message and its fix.
 
 [Keyboard and screen readers](@ref) lists which marks the keyboard
 reaches.
 
 ## Recipes masque(fig) extracts
 
-`masque(fig)` makes these plots interactive; others are skipped with a
-warning that names the plot. Every recipe here works on a 2D `Axis`.
-The last two columns say which also work on `Axis3` and `PolarAxis`.
-Constructor signatures and default fields are in [Constructors](@ref)
-and [Plot-object defaults](@ref).
+`masque(fig)` makes these plots interactive and skips any other plot
+with a warning that names it. Every recipe here works on a 2D `Axis`,
+and the last two columns say which also work on `Axis3` and
+`PolarAxis`. Constructor signatures and default fields are in
+[Constructors](@ref) and [Plot-object defaults](@ref).
 
 | Recipe | Layer `id` | Kind | Axis3 | PolarAxis |
 |---|---|---|---|---|
@@ -92,9 +92,9 @@ and [Plot-object defaults](@ref).
 
 Each `lines!` and `stairs!` plot is one element for its whole line, and
 `series!` has one element per series. Only the body of a `boxplot!`
-responds, not its whiskers or outliers. An `annotation!` responds on
-its text. In a `contourf!` plot, a pointer in a hole of a filled level
-hits nothing unless another level is drawn there.
+responds, not its whiskers or outliers, and an `annotation!` responds
+on its text. In a `contourf!` plot, hovering inside a hole of a filled
+level reaches nothing unless another level is drawn there.
 
 A recipe not in the table, such as `rainclouds!`, still gets each
 visible part the table knows, under that part's layer id: `rainclouds!`
