@@ -16,8 +16,9 @@ masque(fig, probe)
 ```
 
 `masque(fig)` never adds a slice, so pass one yourself. A slice is for
-reading values: hovering does not change the `@bind` value. Use one
-slice per axis.
+reading values: hovering does not change the `@bind` value. Each axis
+takes one slice, so to read several lines, pass them all to the same
+slice.
 
 ## What it reads
 

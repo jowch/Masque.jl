@@ -109,9 +109,9 @@ rings for `:lines` and `:polygons`:
 | `:polygons` | one ring `[x, y, …]` per element, or `[exterior, hole, …]` for an element with holes | one polygon |
 
 Heatmap-style `:grid` layers use a different layout, based on cell
-edges. Build them with [`RectInteractable`](@ref)'s `grid=` keyword
-instead. `payloads` has one entry per element. A click returns an
-[`ElementEvent`](@ref) with the payload's fields.
+edges, so build them with [`RectInteractable`](@ref)'s `grid=` keyword
+instead. A layer's `payloads` has one entry per element, and a click
+returns an [`ElementEvent`](@ref) with that entry's fields.
 
 ## A custom interactable
 

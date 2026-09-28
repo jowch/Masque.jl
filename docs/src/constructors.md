@@ -1,8 +1,8 @@
 # Constructors
 
-Every built-in interactable, with its signature, what a click or
-release gives `@bind`, and the guide that shows it in use. For what
-each event holds, see [What the `@bind` value holds](@ref).
+The tables below list every built-in interactable with its signature,
+what a click or release gives `@bind`, and the guide that shows it in
+use. For what each event holds, see [What the `@bind` value holds](@ref).
 
 Most constructors take the axis first and `id` as a keyword: the
 `Symbol` an event reports as `pick.layer`. Constructors for marks also

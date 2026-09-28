@@ -4,8 +4,9 @@ Hover over a bar, a band, or a range to see its values. `masque(fig)`
 alone makes these respond: histogram bins, waterfall bars, crossbar
 ranges, bar plots, and horizontal and vertical spans.
 
-The four panels are one widget. For a single `barplot!` whose click
-another cell uses, see [Click marks](@ref).
+The four panels are one figure, so a single `masque(fig)` call covers
+them all. For a single `barplot!` whose click another cell uses, see
+[Click marks](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">

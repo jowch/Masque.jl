@@ -36,7 +36,8 @@ A click or a box feeds the next step of an analysis.
 
 ## Plot types
 
-What `masque(fig)` makes interactive for other kinds of plot.
+These pages show what `masque(fig)` makes interactive on other kinds
+of plot.
 
 ```@raw html
 <div class="masque-gallery">

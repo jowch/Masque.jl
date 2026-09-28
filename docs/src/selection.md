@@ -49,8 +49,8 @@ Main.masque_fallback("selection_start")
 
 When the widget has more than one layer you could select, name the
 layer: `selected = (; cities = 1)`, or `selected = Dict(:cities => [1, 3])`
-for several marks. There a bare number raises an `ArgumentError`, as
-does a position outside your data.
+for several marks. In that case a bare number raises an
+`ArgumentError`, and so does a position outside your data.
 
 A few cases work differently:
 
@@ -59,9 +59,9 @@ A few cases work differently:
   box in the widget, `pick` starts as both events.
 - Points, bars, polygons, lines, and segments can start selected.
   Heatmap cells, axis readouts, boxes, thresholds, and the view cannot.
-- A [`RegionInteractable`](@ref) makes one layer per shape, named
-  `:cells_c`, `:cells_r`, and `:cells_p` for the id `:cells`. See
-  [Custom hits](@ref).
+- A [`RegionInteractable`](@ref) makes one layer per shape, so name
+  those layers in `selected=`: `:cells_c`, `:cells_r`, and `:cells_p`
+  for the id `:cells`. See [Custom hits](@ref).
 
 ## Keep a selection when the figure rebuilds
 

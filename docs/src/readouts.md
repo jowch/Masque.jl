@@ -1,9 +1,11 @@
 # Read coordinates
 
-Three interactables give you a number from a position on the plot: the
-data coordinates under the pointer, the value a color stands for, or a
-cutoff you set by dragging a line. `masque(fig)` adds the colorbar
-readout on its own. Pass the other two yourself.
+Sometimes the value you want isn't a mark but a position on the plot:
+the data coordinates under the pointer, the value a color stands for,
+or a cutoff you set by dragging a line. `masque(fig)` makes every
+colorbar a readout for you. For the other two, pass an
+[`AxisInteractable`](@ref) or a [`ThresholdInteractable`](@ref) to
+`masque` yourself.
 
 ## Read `(x, y)` from the axis
 

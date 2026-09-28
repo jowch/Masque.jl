@@ -24,8 +24,9 @@ masque(
 )
 ```
 
-`max_width` is the width of Pluto's column in CSS pixels (default 700).
-A backend object you pass uses its own `max_width`.
+`masque`'s `max_width` keyword is the width of Pluto's column in CSS
+pixels (default 700). When you pass a backend object, `masque` uses that
+object's `max_width` instead.
 
 ## CairoMakie
 

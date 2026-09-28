@@ -134,8 +134,8 @@ accepted there.
 into θ and r, so an interactable that reads a position, drags, or pans
 raises `ArgumentError` there.
 
-**Fix:** on a `PolarAxis`, only points, lines, and segments respond,
-to hover and click. See [Supported plots and axes](@ref).
+**Fix:** on a `PolarAxis`, use points, lines, or segments, which
+respond to hover and click. See [Supported plots and axes](@ref).
 
 ### Tried `heatmap!` or `barplot!` on PolarAxis
 
@@ -267,11 +267,11 @@ field with `masque"$(that_field)"`.
 
 ### Tried a window resize and the highlights looked misaligned
 
-**Cause:** not the resize. The hover areas and highlights follow the
-figure as it is scaled on screen, so resizing the window or zooming the
-page keeps them on their marks. With CairoMakie, the picture's
-resolution is worked out from the figure's width and `max_width`, so
-there is no resolution setting to get wrong.
+**Cause:** the resize is not the problem. The hover areas and
+highlights follow the figure as it is scaled on screen, so resizing the
+window or zooming the page keeps them on their marks. With CairoMakie,
+the picture's resolution is worked out from the figure's width and
+`max_width`, so there is no resolution setting to get wrong.
 
 **Fix:** re-run the cell that calls `masque(...)`. If highlights still
 sit off their marks, report it as a bug with the code that creates the
@@ -313,14 +313,14 @@ or point Bonito at an address the browser can reach with
 ### Tried WGLMakie and the canvas is blank
 
 **Cause:** usually the installed `WGLMakie` is a release newer than
-Masque was tested with. Or the figure has no plot that `masque(fig)`
+Masque was tested with, or the figure has no plot that `masque(fig)`
 supports. `masque(fig)` on an empty `Axis3` shows the canvas with
 nothing interactive, which is expected.
 
 **Fix:** check that the figure has a plot in it before `masque(fig)`.
 If it does, pin `WGLMakie` to an earlier release and file an issue with
-the version that failed. For how orbit
-frames reach the canvas during a drag, see [Backends](@ref).
+the version that failed. For how the canvas updates while you orbit,
+see [Backends](@ref).
 
 ### A WebGL plot says its GPU context was released
 

@@ -45,8 +45,8 @@ on both backends, along with the figure's legend and colorbar. For
 interactive 3D, use an `Axis3`. [Troubleshooting](@ref) has each error
 message and its fix.
 
-Which marks the keyboard reaches is in
-[Keyboard and screen readers](@ref).
+[Keyboard and screen readers](@ref) lists which marks the keyboard
+reaches.
 
 ## Recipes masque(fig) extracts
 

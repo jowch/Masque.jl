@@ -38,6 +38,11 @@ does and sees. Use US spelling ("color"), matching the API's keywords.
 
 ## Wording
 
+When a sentence needs cutting, rewrite it so it still reads as a whole
+sentence a person would say. Deleting words in place leaves fragments
+like "Pass the other two yourself.", where the reader has to work out
+what "the other two" are.
+
 11. **Use the reader's word, and one word per concept.** See the terms table below. A word
    that only makes sense if you know Masque's internals (chrome, echo, wash, "lands",
    "authoritative") is one of ours, not the reader's; name what they see instead.
