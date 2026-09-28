@@ -41,13 +41,11 @@ begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "Longitude", ylabel = "Latitude")
     markersize = 16
-    scatter!(ax, xs, ys; color = palette, markersize)
+    sc = scatter!(ax, xs, ys; color = palette, markersize)
     pts = PointInteractable(
-        ax, collect(zip(xs, ys));
+        ax, sc;
         id = :pts,
-        radius = 0.3525 * markersize,
         payloads = [(; name = s.name, region = s.region) for s in samples],
-        colors = (; palette, index = collect(0:(length(samples) - 1))),
         tooltip = masque"<b>$(name)</b><br>$(region)",
     )
     roi = ROIInteractable(ax; bounds = (-117.5, -104.2, 38.8, 44.8), selects = :pts)

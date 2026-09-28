@@ -55,15 +55,12 @@ begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "Population (millions)", ylabel = "GDP (US\$bn)")
     markersize = 18
-    scatter!(ax, xs, ys; color = city_colors, markersize)
-    # Radius is looked up from that scatter (default `:circle` ≈ 0.3525×markersize).
-    # `colors` stays explicit: only `PointInteractable(ax, scatter)` reads `color=`.
-    # The accent is the tooltip border; the highlight is the split blend.
+    s = scatter!(ax, xs, ys; color = city_colors, markersize)
+    # Passing the scatter gives each tooltip a border in that city's color.
     cities = PointInteractable(
-        ax, collect(zip(xs, ys));
+        ax, s;
         id = :cities,
         payloads = [(; city = c.city, pop = c.pop) for c in cities_data],
-        colors = (; palette = city_colors, index = collect(0:(length(cities_data) - 1))),
         tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
     )
     nothing

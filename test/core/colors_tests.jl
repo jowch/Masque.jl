@@ -50,9 +50,10 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         _, _, c = ctx_for(f)
         colors = only(hitlayers(PointInteractable(a, p), c)).colors
         @test colors.palette == ["rgb(255,0,0)", "rgb(0,0,255)"]
-        @test colors.index == [0, 1, 0]
+        @test colors.index == [1, 2, 1]
+        # 1-based in Julia, 0-based on the wire (the overlay indexes a JS array)
         d = only(build_manifest([PointInteractable(a, p)], c)["layers"])["colors"]
-        @test d["palette"] == colors.palette && d["index"] == colors.index
+        @test d["palette"] == colors.palette && d["index"] == [0, 1, 0]
     end
 
     @testset "Scatter: numeric (colormap-driven) colour ships as palette + index" begin
@@ -61,7 +62,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         _, _, c = ctx_for(f)
         colors = only(hitlayers(PointInteractable(a, p), c)).colors
         @test length(colors.index) == 3
-        @test all(0 .<= colors.index .< length(colors.palette))
+        @test all(1 .<= colors.index .<= length(colors.palette))
         @test all(s -> startswith(s, "rgb"), colors.palette)
         # monotonic in the source values (1.0 < 2.0 < 3.0 -> non-decreasing palette index)
         @test colors.index[1] <= colors.index[2] <= colors.index[3]
@@ -94,16 +95,32 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
     @testset "colors= rejects malformed shapes on the bare-points constructor" begin
         @test_throws ArgumentError PointInteractable(ax, pts; colors = :red)               # not a String
-        @test_throws ArgumentError PointInteractable(ax, pts; colors = (["c"], [0, 0, 0])) # plain Tuple, not (; palette, index)
+        @test_throws ArgumentError PointInteractable(ax, pts; colors = (["c"], [1, 1, 1])) # plain Tuple, not (; palette, index)
         # index too short for 3 points
-        @test_throws ArgumentError PointInteractable(ax, pts; colors = (; palette = ["rgb(1,2,3)"], index = [0]))
+        @test_throws ArgumentError PointInteractable(ax, pts; colors = (; palette = ["rgb(1,2,3)"], index = [1]))
         # index value out of range for a 1-entry palette
         @test_throws ArgumentError PointInteractable(
-            ax, pts; colors = (; palette = ["rgb(1,2,3)"], index = [0, 0, 5])
+            ax, pts; colors = (; palette = ["rgb(1,2,3)"], index = [1, 1, 5])
         )
+        # 0 is out of range: the index is 1-based (#216)
+        @test_throws ArgumentError PointInteractable(
+            ax, pts; colors = (; palette = ["rgb(1,2,3)", "rgb(4,5,6)"], index = [0, 1, 0])
+        )
+        # a per-point colour vector of the wrong length
+        @test_throws ArgumentError PointInteractable(ax, pts; colors = ["rgb(1,2,3)", "rgb(4,5,6)"])
         # valid shape still works
-        ok = PointInteractable(ax, pts; colors = (; palette = ["rgb(1,2,3)", "rgb(4,5,6)"], index = [0, 1, 0]))
+        ok = PointInteractable(ax, pts; colors = (; palette = ["rgb(1,2,3)", "rgb(4,5,6)"], index = [1, 2, 1]))
         @test ok isa PointInteractable
+        @test only(build_manifest([ok], ctx)["layers"])["colors"]["index"] == [0, 1, 0]
+    end
+
+    @testset "colors= takes one CSS colour per point (#216)" begin
+        pin = PointInteractable(ax, pts; id = :percolor, colors = ["red", "#00f", "red"])
+        colors = only(hitlayers(pin, ctx)).colors
+        @test colors.palette == ["red", "#00f"]
+        @test colors.index == [1, 2, 1]
+        d = only(build_manifest([pin], ctx)["layers"])["colors"]
+        @test d == Dict("palette" => ["red", "#00f"], "index" => [0, 1, 0])
     end
 
     @testset "Scatter: NaN/Inf in a numeric colour vector doesn't crash" begin
@@ -113,12 +130,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         colors = only(hitlayers(PointInteractable(a, p), c)).colors
         @test colors isa NamedTuple
         @test length(colors.index) == 3
-        @test all(0 .<= colors.index .< length(colors.palette))
+        @test all(1 .<= colors.index .<= length(colors.palette))
 
         p2 = scatter!(a, [1.0, 2.0], [2.0, 2.0]; color = [Inf, 1.0], colormap = :viridis)
         colors2 = only(hitlayers(PointInteractable(a, p2), c)).colors
         @test colors2 isa NamedTuple
-        @test all(0 .<= colors2.index .< length(colors2.palette))
+        @test all(1 .<= colors2.index .<= length(colors2.palette))
 
         # every value NaN → no finite colorrange to derive a palette from → omit, not a crash
         p3 = scatter!(a, [1.0], [3.0]; color = [NaN], colormap = :viridis, colorrange = (NaN, NaN))
