@@ -26,33 +26,40 @@ does and sees. Use US spelling ("color"), matching the API's keywords.
    Start with what the reader gets, then show it.
 7. **Point to the reference.** When a sentence mentions a set of options or defaults, link
    the page that lists them.
-8. **End with where to go next,** as a link.
+8. **One page owns each fact.** Explain a behavior once, on the page a reader would look
+   for it, and link there from everywhere else with one clause. A caveat repeated on five
+   pages buries each page's own point, and the copies drift.
+9. **Common case first, exceptions last.** Open with what the reader does and what they
+   get. Edge cases, errors, and limits come after the basic case works, and only where a
+   reader would hit them. State what a feature does, not what it can't do, unless the
+   reader would expect it to.
+10. **End with where to go next,** as a link.
 
 ## Wording
 
-9. **Use the reader's word, and one word per concept.** See the terms table below. A word
+11. **Use the reader's word, and one word per concept.** See the terms table below. A word
    that only makes sense if you know Masque's internals (chrome, echo, wash, "lands",
    "authoritative") is one of ours, not the reader's; name what they see instead.
-10. **Don't list three things when one or two carry the point.** No row of parallel verbs
+12. **Don't list three things when one or two carry the point.** No row of parallel verbs
     describing a component's duties, and no third item added for rhythm.
-11. **Keep the main point out of asides.** If it matters, give it its own sentence. In prose,
+13. **Keep the main point out of asides.** If it matters, give it its own sentence. In prose,
     end the sentence or use a colon instead of an em dash; em dashes are only for empty
     table cells.
-12. **Avoid the words in the list below.** They are the most common signs of LLM-written
+14. **Avoid the words in the list below.** They are the most common signs of LLM-written
     text, and each has a plainer word.
 
 ## Formatting
 
-13. **Headings name the topic plainly.** "How interactions work", not a row of verbs like
+15. **Headings name the topic plainly.** "How interactions work", not a row of verbs like
     "Hover, click, and drag", and not an adjective pitch like "Rich tooltips".
     A heading that matches another page's title breaks every `[Title](@ref)` link to that
     page; give it an explicit id: `## [Backends](@id home-backends)`.
-14. **No bold labels at the start of list items.** Use a plain list, or a table when each
+16. **No bold labels at the start of list items.** Use a plain list, or a table when each
     item has a name and a description. Bold is for a term's first use or a UI label.
 
 ## Examples
 
-15. **Show it in code, in code a new Julia user can read.** When a sentence tells the reader
+17. **Show it in code, in code a new Julia user can read.** When a sentence tells the reader
     to do something in Julia, follow it with the snippet. Use literal values over
     comprehensions, splats, and chained calls: the example teaches Masque, not Julia.
     Write the idiom the reader already uses (`isnothing(x)`, not `x === nothing`).
