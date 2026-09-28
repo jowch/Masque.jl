@@ -261,7 +261,7 @@ commits nothing. `masque(fig)` does not add one, so a heatmap, a
 scatter, an axis readout, and empty space draw no hair.
 
 The default is one vertical hair, sampling `y` at the cursor's data
-`x`, plus a filled dot on each series in that series' colour. The hair
+`x`, plus a filled dot on each series in that series' color. The hair
 is a quieter grey than the selection edge (`#b0b0b0` on a light figure,
 `#929292` on a dark one), at 80% opacity, with a 1.5px fringe in the
 figure's background. `orientation = :horizontal` samples `x` at data

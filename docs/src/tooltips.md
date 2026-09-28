@@ -6,7 +6,7 @@ or no tooltip.
 
 In this notebook, each city's tooltip uses a template: the name in bold,
 the population with thousands separators, and a border in the marker's
-colour.
+color.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -61,9 +61,10 @@ cities = [
 Tooltips work even when Julia is not running, for example in a static
 HTML export, so a template can only read the payload.
 
-Payload values are always escaped, so your data cannot add HTML to the
-tooltip. A link is the exception to watch: in `<a href="$(url)">`, the
-link goes wherever the data says, so use it only with URLs you trust.
+Don't put HTML in your payload values. It shows up as plain text, not
+markup, so put formatting such as `<b>` in the template instead. Also
+avoid links built from your data, such as `<a href="$(url)">`, unless you
+trust every URL in it: the link goes wherever the data says.
 
 `tooltip = false` turns tooltips off. The hover highlight and clicks
 still work.
@@ -113,16 +114,16 @@ Older browsers use the system light or dark setting instead.
 
 ## Accent color
 
-When Masque knows a mark's colour, its tooltip gets a 3px border in that
-colour. The colour comes from:
+When Masque knows a mark's color, its tooltip gets a 3px border in that
+color. The color comes from:
 
 - `scatter!`'s `color=`, when you pass the `Scatter` itself to
   [`PointInteractable`](@ref), as the dark example does
 - the `colors=` keyword, as the city example does
 - a legend entry's swatch
 
-Without a known colour, the border is a plain 1px line.
+Without a known color, the border is a plain 1px line.
 
-To change the tooltip's background, text colour, font, or corner radius
+To change the tooltip's background, text color, font, or corner radius
 for a whole widget, pass the `tooltip_*` keywords to `masque`, or set the
 `--masque-tip-*` CSS properties on the page. See [Tooltip chrome](@ref).

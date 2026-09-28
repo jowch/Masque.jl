@@ -1,7 +1,7 @@
 # Read coordinates
 
 Not every question is about a mark. Sometimes you want a value off the
-plot itself: the data coordinates under the pointer, the value a colour
+plot itself: the data coordinates under the pointer, the value a color
 stands for, or a cutoff you set by dragging a line. This page covers the
 three interactables that turn a pointer position into a number. None of
 them is added by `masque(fig)` on its own except the colorbar, so pass
@@ -38,7 +38,7 @@ or `pick.ycat`; on a numeric dimension that field is `nothing`.
 ## Read a colorbar value
 
 [`ColorbarInteractable`](@ref) makes a colorbar answer "what value is
-this colour?". Hovering shows the value under the pointer; a click makes
+this color?". Hovering shows the value under the pointer; a click makes
 `pick` a [`ColorbarEvent`](@ref) with `pick.value`. `masque(fig)` adds
 one for every `Colorbar` in the figure; build it yourself when you want
 the colorbar without the heatmap's cells in the same widget:

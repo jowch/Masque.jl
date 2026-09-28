@@ -50,7 +50,7 @@ pixel instead: hovering shows the cell under the pointer and its value,
 and a click still reports the true `i` and `j`. A 4000 × 4000 heatmap
 works this way without any setting.
 
-Colour images have no single value per cell, so hovering or clicking
+Color images have no single value per cell, so hovering or clicking
 one reports `i` and `j` with `value = nothing`, whatever its size. To
 read a number, pass a [`RectInteractable`](@ref) grid with the values
 you want, such as each pixel's intensity.

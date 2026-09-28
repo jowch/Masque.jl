@@ -16,7 +16,7 @@ Knowing them up front saves a search.
 - **Rectangles only.** Brushes are boxes; there is no lasso, and one
   widget brushes one layer.
 - **The figure is never redrawn by the overlay.** Highlights are drawn
-  on top of the picture, so the overlay cannot hide a series, recolour a
+  on top of the picture, so the overlay cannot hide a series, recolor a
   mark, or zoom to a box. Do those in Julia from the `@bind` value — for
   example, fade the other series after a legend click (see
   [Legend](@ref)).
