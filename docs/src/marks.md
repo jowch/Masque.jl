@@ -1,20 +1,20 @@
 # Click marks
 
-Every plot `masque(fig)` recognizes is clickable, not only scatters. A
-click on a mark — a point, bar, polygon, line, or text label — hands it
-to your notebook as an [`ElementEvent`](@ref): its 1-based
-`pick.index`, plus fields that depend on what kind of mark it is.
-Heatmap cells, legend entries, and colorbars return their own event
-types (see [Concepts](@ref)). This page walks through bars, polygons,
-lines, and points on a polar axis. [Plot-object defaults](@ref) lists
-the fields each plot type reports, and [Supported plots and axes](@ref)
-which plots work on which axes.
+You can click any plot `masque(fig)` recognizes, not just scatters.
+Clicking a point, bar, polygon, line, or text label sets `pick` to an
+[`ElementEvent`](@ref). It has `pick.index`, the mark's position in your
+data, plus fields that depend on the kind of mark. Heatmap cells, legend
+entries, and colorbars give their own event types; see [Concepts](@ref).
+
+[Plot-object defaults](@ref) lists the fields each plot type reports,
+and [Supported plots and axes](@ref) lists which plots work on which
+axes.
 
 ## Bars
 
-A bar reports its `value` (the bar's height) and its `low` and `high`
-ends, so a stacked or dodged bar still tells you which segment you hit.
-Here each click reads the quarter and the value:
+A bar reports its `value`, which is its height, and its `low` and `high`
+ends. In a stacked or dodged bar plot, that tells you which segment was
+clicked. In this example, a click shows the quarter and the value:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -26,20 +26,22 @@ Here each click reads the quarter and the value:
 Main.masque_fallback("marks_bars")
 ```
 
-Histograms, waterfalls, and crossbars are clickable too, each with its
-own fields: a waterfall step reports `low`, `high`, and `value`; a
-histogram bin reports `value` (the bar's height, which is a count only
-with `normalization = :none`), `low`, and `high`; a crossbar reports
-`midpoint`, `low`, and `high`. A
-heatmap is a grid of cells rather than a list of bars; it has its own
-page, [Inspect a grid](@ref).
+Other bar-like plots report these fields:
+
+| Plot | Fields |
+|---|---|
+| `barplot!` | `value`, `low`, `high` |
+| `hist!` | `value` (the bin's height, a count with `normalization = :none`), `low`, `high` |
+| `waterfall!` | `value`, `low`, `high` |
+| `crossbar!` | `midpoint`, `low`, `high` |
+
+Heatmaps have their own page: [Inspect a grid](@ref).
 
 ## Polygons
 
-Each polygon of a `poly!` is one mark, reported by its `index` in the
-order you drew them. Pair the index with your own list of names, or
-pass `payloads` to [`PolygonInteractable`](@ref) so the name travels
-with the click:
+Each polygon in a `poly!` is one mark. Its `index` is its position in
+the order you plotted them. The example below looks up each polygon's
+name by that index:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -51,18 +53,28 @@ with the click:
 Main.masque_fallback("marks_poly")
 ```
 
+To get the name back with the click instead, pass `payloads` to
+[`PolygonInteractable`](@ref). Then `pick.name` is the clicked polygon's
+name:
+
+```julia
+regions = PolygonInteractable(ax, p;
+    payloads = [(name = "North",), (name = "South",), (name = "East",)],
+)
+@bind pick masque(fig, [regions])
+```
+
 Bands, densities, filled contours, violins, and Voronoi cells are
-polygons too. A filled contour reports the `low` and `high` of its
-level. A click inside a hole of a contour level hits whatever polygon
-is drawn in the hole, not the ring around it, and hits nothing if the
-hole is empty (a peak above the top level, for example).
+polygons too. A filled contour also reports the `low` and `high` of its
+level. Clicking inside a hole in a contour level selects the polygon
+drawn in the hole. If the hole is empty, for example a peak above the
+top level, the click selects nothing.
 
 ## Lines
 
-A `lines!` call is a single mark: clicking anywhere along the path
-selects the whole line, however many vertices it has, which matches how
-a line plot is read: as one series. To read the value at a particular
-`x` along a line instead, use a [`SliceInteractable`](@ref).
+A `lines!` call is one mark. Clicking anywhere along it selects the
+whole line, since a line plot is read as one series. To read the value
+at a particular `x` instead, use a [`SliceInteractable`](@ref).
 
 ```julia
 begin
@@ -79,17 +91,18 @@ end
 @bind pick masque(fig)
 ```
 
-`pick.layer` tells the two lines apart (`:lines` and `:lines_2`, in the
-order you drew them). `stairs!` is also one mark per call, with ids
-`:stairs`, `:stairs_2`, and so on, and a `series!`
-call is one layer whose `pick.index` is the series. Plots made of
-separate pieces — `linesegments!`, error bars, range bars, `hlines!`,
-and `vlines!` — make each piece its own mark instead.
+`pick.layer` tells the two lines apart: `:lines` for the first and
+`:lines_2` for the second. `stairs!` works the same way (`:stairs`,
+`:stairs_2`, and so on). A `series!` call is one layer, and `pick.index`
+says which series was clicked.
+
+Plots made of separate pieces make each piece its own mark:
+`linesegments!`, error bars, range bars, `hlines!`, and `vlines!`.
 
 ## Points on a polar axis
 
 Scatters, lines, and segments work on a `PolarAxis`. A point's `x` is
-its angle and its `y` its radius, the same order you passed them in:
+its angle and its `y` is its radius, in the order you passed them:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -101,6 +114,6 @@ its angle and its `y` its radius, the same order you passed them in:
 Main.masque_fallback("marks_polar")
 ```
 
-Bars, heatmaps, and polygons on a polar axis are skipped with a warning,
-and the readouts that need a flat axis are not available there; see
-[Supported plots and axes](@ref).
+Bars, heatmaps, and polygons on a polar axis are skipped with a warning.
+Some readouts also need a flat axis. [Supported plots and axes](@ref)
+lists what works where.
