@@ -13,8 +13,8 @@ top. A figure with several axes still needs only one `masque` call.
 @bind pick masque(fig)
 ```
 
-On its own, `masque(fig)` makes every axis, legend, and colorbar it
-recognizes interactive. [Recipes masque(fig) extracts](@ref) lists the
+On its own, `masque(fig)` makes every plot it recognizes interactive,
+along with every legend and colorbar. [Recipes masque(fig) extracts](@ref) lists the
 plots it knows. Pass interactables yourself to choose the marks, attach
 your own data, or add something Makie did not draw, such as a draggable
 threshold.

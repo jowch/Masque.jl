@@ -91,6 +91,14 @@ end
     end
 end
 
+@testset "exported player opens on a selected= widget's seeded value" begin
+    # A stored `nothing` bond would be restored over the value a `selected=` widget seeds at
+    # mount, and the player must show that value's snapshot when it arms.
+    src = read(joinpath(@__DIR__, "..", "docs", "pluto_html_export.jl"), String)
+    @test occursin("delete!(nb.bonds, bond)", src)
+    @test occursin("if (cur != null) patch(cur);", src)
+end
+
 @testset "player_states: idle, every click, then hand-listed drags" begin
     man = Dict{String, Any}(
         "layers" => Any[

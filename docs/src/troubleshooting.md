@@ -120,8 +120,8 @@ full list of what each interaction needs is in
 data value. On an `Axis3`, a point on the screen is a ray through the
 3D data, not a single data point.
 
-**Fix:** on 3D axes, use interactables for marks (points, segments,
-polygons). To orbit an `Axis3`, pass `ViewInteractable(ax)`, which is
+**Fix:** on 3D axes, use interactables for points, lines, and
+segments. To orbit an `Axis3`, pass `ViewInteractable(ax)`, which is
 accepted there.
 
 ### Tried continuous θ/r readout on PolarAxis
@@ -145,8 +145,9 @@ plot. A rectangle interactable you pass yourself, such as
 `RectInteractable`, is still built, but its hover areas sit in the
 wrong place.
 
-**Fix:** on a `PolarAxis`, only points, lines, and segments work. Use
-a Cartesian `Axis` for the rest. See [Supported plots and axes](@ref).
+**Fix:** on a `PolarAxis`, only scatter, line, segment,
+`scatterlines!`, and `series!` plots work. Use a Cartesian `Axis` for
+the rest. See [Supported plots and axes](@ref).
 
 ### Tried ROI or View pan on a categorical 2D axis
 

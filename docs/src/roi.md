@@ -72,9 +72,10 @@ separate `masque` call.
 ## Brush heatmap cells
 
 Name a heatmap or image layer in `selects` instead, and the box returns
-one [`GridWindowEvent`](@ref) for the block of cells it covers:
-columns `win.i1:win.i2` and rows `win.j1:win.j2`. `A[win]` is that block
-of the matrix. Clicking a cell shows its tooltip but does not change the
+one [`GridWindowEvent`](@ref) for the block of cells it covers.
+`win.i1:win.i2` is the range of the matrix's first index, drawn along
+x, and `win.j1:win.j2` the range of its second index, drawn along y, so
+`A[win]` is `A[win.i1:win.i2, win.j1:win.j2]`. Clicking a cell shows its tooltip but does not change the
 value, which stays the box's block (unless an `AxisInteractable` in the
 same widget takes the click, as above). See
 [Inspect a grid](@ref).

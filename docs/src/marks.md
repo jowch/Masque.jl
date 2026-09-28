@@ -85,7 +85,8 @@ Main.masque_fallback("marks_lines")
 ```
 
 `pick.layer` tells the two lines apart: `:lines` for the first and
-`:lines_2` for the second. `stairs!` is named the same way. To choose
+`:lines_2` for the second. `stairs!` plots get `:stairs` and
+`:stairs_2` the same way. To choose
 the names yourself, pass each line to [`SegmentInteractable`](@ref)
 with an `id`:
 
