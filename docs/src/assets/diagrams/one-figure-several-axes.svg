@@ -3,8 +3,8 @@
   <title id="d4-title">One masque call, one overlay, several axes</title>
   <desc id="d4-desc">
     One masque call produces one overlay and one manifest over every axis
-    in a figure. Hits are independent per axis. Holding the pointer over
-    the xy legend entry highlights every xy mark; xz stays unchanged.
+    in a figure. Hits are independent per axis. Hovering over the xy
+    legend entry highlights every xy mark; xz stays unchanged.
     Same-index highlight between two scatters is not shipped. A listed ROI
     item set updates a harvested table; an unlisted drag moves the box and
     leaves the table unchanged.
