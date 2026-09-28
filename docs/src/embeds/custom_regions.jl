@@ -50,28 +50,28 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind ev` saves a click in `ev`. Hovering shows the tooltip without changing `ev`.
+`@bind pick` saves a click in `pick`. Hovering shows the tooltip without changing `pick`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind ev masque(fig, hits)
+@bind pick masque(fig, hits)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`ev` starts as `nothing`. After a click, `ev.name` is the region's name. This cell responds to the click.
+`pick` starts as `nothing`. After a click, `pick.name` is the region's name. This cell responds to the click.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if isnothing(ev)
+if isnothing(pick)
     "click a region"
 else
-    "$(ev.name) selected"
+    "$(pick.name) selected"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
-bond = "ev"
+bond = "pick"
 show_code = true
 pluto_html = true
 

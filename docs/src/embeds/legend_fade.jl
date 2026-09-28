@@ -26,7 +26,7 @@ Click a legend entry. The second figure fades the other line.
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
 md"""
-Plot two labeled lines and add a legend.
+Create two labeled lines and an `axislegend` the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000102
@@ -50,7 +50,7 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
 md"""
-This cell draws a second figure from `pick`. When you click a legend entry, it fades the other line.
+This cell creates a second figure from `pick`. When you click a legend entry, it fades the other line.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000106

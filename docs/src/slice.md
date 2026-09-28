@@ -54,8 +54,8 @@ highlight of the line layers it covers. By default it covers `:lines` (then
 every plot on the axis. If you sliced only the second `lines!`, pass the
 layer yourself: `covers = [:lines_2]`.
 
-A slice needs a 2D `Axis` with an `identity`, `log10`, or `log` scale.
-See [Supported plots and axes](@ref).
+A slice needs a 2D `Axis`; see [Supported plots and axes](@ref) for
+which axes and scales.
 
 To read a single position instead of a series, see
 [Read coordinates](@ref).

@@ -1,12 +1,8 @@
 # Keyboard and screen readers
 
-A `masque` widget works with the keyboard and a screen reader, with no
-extra setup. Press Tab to focus the plot. A grey outline appears just
-inside it. Then use the keys below to move between marks. The focused
-mark gets the same highlight a hover draws, and the outline goes away
-while it shows. A plot with nothing to step through, such as a heatmap,
-keeps the outline while it has focus. Clicking a plot focuses it without
-drawing the outline.
+Press Tab to focus a plot, then use the arrow keys to move between its
+marks and Enter or Space to select one. A screen reader announces each
+mark as you move to it. A `masque` widget needs no extra setup for this.
 
 ## Keys
 
@@ -24,17 +20,16 @@ wrap.
 
 Tab focuses the plot, not a mark. Home, or the first arrow key in
 either direction, moves to the first mark. If the figure has a legend,
-its entries come first, so that mark is the first legend entry. Page
-Down then steps from the legend into the plot. This order matches the
-pointer: a legend drawn on top of a plot takes the clicks under it.
-Focusing a legend entry highlights the series it labels, as hovering
-over it does. See [Legend](@ref).
+its entries come first, and Page Down steps from the legend into the
+plot. Focusing a legend entry highlights the series it labels, as
+hovering over it does. See [Legend](@ref).
 
-A screen reader calls the first mark of a layer "element 1", the same
-numbering `selected=` uses, so `selected = 0` is out of range.
+The focused mark gets the same highlight and tooltip as a hovered one.
+A legend entry shows no tooltip unless you pass a template.
 
-A focused mark shows its tooltip, as a hovered one does. A legend entry
-shows none unless you pass a template.
+While the plot has focus and no mark is highlighted, as on a heatmap,
+a grey outline shows just inside it. Clicking a plot focuses it without
+drawing the outline.
 
 The keyboard reaches points, bars and other rectangles, polygons, line
 segments, and lines. That includes [`TextInteractable`](@ref) labels and

@@ -17,11 +17,12 @@ Main.masque_fallback("legend_lines")
 
 ## What a click returns
 
-Clicking an entry makes `pick` a [`LegendEvent`](@ref). `pick.label` is
-the entry's text, and `pick.group` is its group title in a grouped
-legend (`nothing` otherwise). `pick.targets` lists the layers the entry
-highlights. Clicking the plot itself still gives the plot's own events,
-so check which kind you got:
+Clicking an entry keeps its series highlighted and makes `pick` a
+[`LegendEvent`](@ref). `pick.label` is the entry's text, and
+`pick.group` is its group title in a grouped legend (`nothing`
+otherwise). `pick.targets` lists the layers the entry highlights.
+Clicking the plot itself still gives the plot's own events, so check
+which kind you got:
 
 ```julia
 pick isa LegendEvent ? "series $(pick.label)" : "click a legend entry"
@@ -29,9 +30,8 @@ pick isa LegendEvent ? "series $(pick.label)" : "click a legend entry"
 
 ## Fade the other series
 
-The highlight cannot hide or dim the other lines in the figure. To fade
-the series you did not click, create a second figure in a cell that
-uses `pick`:
+To fade the series you did not click, create a second figure in a cell
+that uses `pick`:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -83,12 +83,10 @@ See [Tooltips](@ref) for how templates work.
 
 ## Keep a series highlighted after a rebuild
 
-`selected=` on the legend layer highlights the entry's swatch. To keep
-the series itself highlighted when the figure is rebuilt, select the
-series' own layer instead, for example `selected = Dict(:lines => [1])`.
-See [Selection](@ref).
+Clicking an entry keeps its series highlighted, but a rebuilt figure
+forgets that. To keep it, select the series' own layer:
+`selected = Dict(:lines => [1])`. See [Selection](@ref).
 
 A legend can also highlight series on other axes of the same figure;
-[Linked views](@ref) shows this across two panels. With the keyboard,
-focus moves through the legend entries first, and a focused entry
-highlights its series as hover does.
+[Linked views](@ref) shows this across two panels. The keyboard
+reaches legend entries too; see [Keyboard and screen readers](@ref).

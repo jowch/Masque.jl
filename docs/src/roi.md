@@ -33,12 +33,15 @@ roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = :pts)
 ```
 
 `bounds` is where the box starts, as `(xmin, xmax, ymin, ymax)` in data
-coordinates. After you release the box, `picks` is a
-`Vector{ElementEvent}` with one event per point inside, and those points
-stay highlighted. An empty box gives an empty vector, not `nothing`, so
-one `isempty` check covers it. Each event has its point's payload
-(`e.name`, `e.group`), and `samples[picks]` is the rows of your data
-inside the box.
+coordinates.
+
+When you release the box, the points inside it stay highlighted, and
+`picks` lists them: one [`ElementEvent`](@ref) per point, holding that
+point's payload fields, such as `name` and `group`. A box with no points
+inside gives an empty list.
+
+Use `picks` to index your data: `samples[picks]` is the rows of
+`samples` inside the box.
 
 If your rows are a `DataFrame`, pass it as `payloads`, with one row per
 point in the order you plotted them:
@@ -82,9 +85,8 @@ Leave out `selects` and the value is the box: a [`BoundsEvent`](@ref)
 with `xmin`, `xmax`, `ymin`, and `ymax`. Use this when the region is
 what you want, such as a time window, a crop, or a range to fit over.
 
-`bounds` also accepts a `BoundsEvent`, so one widget's box can set where
-another's starts. Passing a widget its own box gives a cyclic reference
-error in Pluto.
+To start one widget's box where another's was released, pass that
+widget's `BoundsEvent` as `bounds`.
 
 ## Moving and resizing
 
@@ -92,16 +94,15 @@ Drag inside the box to move it. Drag a corner to resize it in both
 directions, or the middle of an edge to move only that edge. The pointer
 changes to show which. If the axis also has a
 [`ViewInteractable`](@ref), a plain drag moves the box and Shift+drag
-pans the plot. The box cannot be moved with the keyboard.
+pans the plot. Moving the box needs a pointer; see
+[Keyboard and screen readers](@ref) for what the keyboard reaches.
 
 ## Where it works
 
-The box needs a 2D `Axis` with numeric limits and an `identity`,
-`log10`, or `log` scale. On an `Axis3`, a `PolarAxis`, or a categorical
-axis, `masque` raises an `ArgumentError`. `selects` can name a layer of
-points or a heatmap or image, and that layer must be in the same
-`masque` call. Bars and lines cannot be brushed. See
-[Supported plots and axes](@ref).
+`selects` can name a layer of points, or a heatmap or image, and that
+layer must be in the same `masque` call. Every box in one widget names
+the same layer. The box needs a 2D `Axis`; see
+[Supported plots and axes](@ref) for which axes and scales.
 
 For larger examples, [Box-select scatter](@ref) summarizes two groups
 of points inside the box, and [Image ROI](@ref) brushes an image.

@@ -44,9 +44,8 @@ begin
 end
 ```
 
-The detail cell uses `pick`, so it responds to each click. Hovering
-does not change `pick`, so the detail plot changes only on a click or a
-release. The same `pick.id` could filter a `DataFrame` or choose the
+The detail cell uses `pick`, so it responds to each click, not to
+hovering. The same `pick.id` could filter a `DataFrame` or choose the
 data for a fit. The detail figure can be a Masque widget too.
 
 To show the clicked point as selected in a second widget, pass it as
@@ -55,7 +54,8 @@ that widget's `selected=`. [Selection round-trip](@ref) shows how.
 ## Several axes in one figure
 
 One `masque` call covers every axis in a figure. Hovering a point
-highlights it on its own panel. Each scatter gets its own layer id
+highlights it on its own panel only, even when the other panel plots
+the same row of your data. Each scatter gets its own layer id
 (`:scatter`, `:scatter_2`, and so on), so `pick.layer` tells you which
 panel was clicked.
 
@@ -69,24 +69,18 @@ panel was clicked.
 Main.masque_fallback("linked_two_axis")
 ```
 
-Hovering point 3 in one panel does not highlight point 3 in the other,
-even when both come from the same row of your data. To highlight both,
-rebuild the figure with both points selected:
+To highlight the same row on both panels, select it on both layers
+from a value `i` in another cell (not from this widget's own `pick`; see
+[Selection](@ref)):
 
 ```julia
 masque(fig; selected = Dict(:scatter => [i], :scatter_2 => [i]))
 ```
 
-Here `i` must come from another cell, not from this widget's own value.
-With one point selected on each of two layers, the widget highlights
-both, but its value starts as `nothing`. A cell that uses this widget's
-`pick` goes back to its "nothing clicked" state after the rebuild.
-
 ## Highlight a series across panels
 
 Hovering a legend entry highlights every mark of its series, on every
-axis where the series appears. No other hover highlights marks on more
-than one axis. Clicking an entry sets `pick` to a
+axis where the series appears. Clicking an entry sets `pick` to a
 [`LegendEvent`](@ref), which another cell can use to filter your data.
 See [Legend](@ref).
 
@@ -105,16 +99,8 @@ Main.masque_fallback("linked_legend_wash")
 To select many points at once, drag a box. When you release an
 [`ROIInteractable`](@ref) with `selects`, it returns every point inside
 the box, and another cell can take those rows from your table with
-`df[picks, :]`. [Brush a region](@ref) shows how.
-
-## What is not linked
-
-- Hovering a mark does not highlight anything in other plots.
-- Two `masque` calls make two separate widgets. They are connected only
-  through the cells you write.
-- Boxes are rectangles, and there is no lasso. Every box with `selects`
-  in one widget must name the same layer, and a box on one plot does
-  not filter another.
+`df[picks, :]`, or create another plot from them.
+[Brush a region](@ref) shows how.
 
 For what each click, release, and drag sets `pick` to, see
 [Concepts](@ref).

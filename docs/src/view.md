@@ -47,11 +47,9 @@ frame stays in place while the data moves inside it. You can hover over
 and click the points wherever they move to. `pick` changes only when you
 click a point.
 
-Julia redraws the figure as you drag, so panning needs a running
-notebook. With CairoMakie the page shows each new image, and with
-WGLMakie the canvas updates. In a static HTML export, the view cannot
-move. See [Pan and orbit preview](@ref) for how the two backends
-differ.
+Panning and orbiting need a running notebook: in a static HTML export,
+the view does not move. The two backends show the moving view differently; see
+[Pan and orbit preview](@ref).
 
 If the same axis has a threshold line or a brushing box, a plain drag
 moves the line or box, and Shift+drag pans.
@@ -98,16 +96,33 @@ end
 ## When the figure is rebuilt
 
 Dragging changes the axis itself: its limits, or its azimuth and
-elevation on an `Axis3`. So a new `masque` call on the same figure
-starts at the view you dragged to. A rebuilt figure has a new `Axis`,
-which starts from the limits or angles in your code. To keep a view
-across a rebuild, set those values in the figure code, for example from
-a slider bound to the limits.
+elevation on an `Axis3`. So if only the cell with `masque` runs again,
+the plot stays at the view you dragged to.
+
+When the cell that creates the figure runs again, for example because a
+slider changed the data, it creates a new `Axis`, which starts from the
+limits or angles in your code. To control where it starts, set them in
+that code, for example from a PlutoUI `Slider` in another cell:
+
+```julia
+@bind xmax Slider(2:12; default = 6)
+```
+
+```julia
+begin
+    xs = Float64[1, 2, 3, 4, 5, 6]
+    ys = Float64[1, 4, 9, 16, 25, 36]
+    fig = Figure(size = (560, 320))
+    ax = Axis(fig[1, 1]; limits = (0, xmax, 0, 40))
+    s = scatter!(ax, xs, ys; color = :dodgerblue, markersize = 18)
+    pan = ViewInteractable(ax)
+    nothing
+end
+```
+
+For an `Axis3`, set `azimuth` and `elevation` the same way.
 
 ## Where it works
 
-Panning needs a 2D `Axis` with numeric limits on an `identity`,
-`log10`, or `log` scale. Orbiting needs an `Axis3`. A `PolarAxis`, a
-`Colorbar`, a categorical axis, or another scale raises an
-`ArgumentError` when `masque` runs. An `LScene` is not supported. See
-[Supported plots and axes](@ref).
+Panning needs a 2D `Axis` and orbiting an `Axis3`; see
+[Supported plots and axes](@ref) for which axes and scales.
