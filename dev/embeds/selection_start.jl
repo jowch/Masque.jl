@@ -21,7 +21,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000100
 md"""
-Tokyo starts selected. Click another city to replace the selection.
+Tokyo starts selected, and clicking another city replaces the selection.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000101

@@ -51,7 +51,7 @@ end
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`. Hovering shows the tooltip without changing `pick`.
+`@bind pick` saves a click in `pick`, while hovering only shows the tooltip and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000003
@@ -59,7 +59,7 @@ md"""
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`. This cell responds to the click.
+`pick` starts as `nothing`, and this cell responds when you click a city.
 """
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000004

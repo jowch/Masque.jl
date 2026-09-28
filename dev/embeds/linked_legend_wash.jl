@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000009
 md"""
-Hover over a legend entry. Every point in that series highlights, on both axes.
+Hover over a legend entry, and every point in that series highlights on both axes.
 """
 
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000010
 md"""
-Label each scatter plot and put both in one `Legend`. Hovering an entry then highlights the series it names.
+Label each scatter plot and put both in one `Legend`, so hovering over an entry highlights the series it names.
 """
 
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000002
@@ -45,7 +45,7 @@ end
 
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000011
 md"""
-In your own notebook, `@bind pick` saves a click on an entry in `pick`. This page does not show that value.
+In your own notebook, `@bind pick` saves a click on an entry in `pick`, but this page does not show that value.
 """
 
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000003

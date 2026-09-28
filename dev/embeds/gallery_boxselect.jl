@@ -22,7 +22,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1410007-0001-4000-8000-000000000009
 md"""
-Drag the box. The last cell counts the points inside, by group.
+Drag the box, and the last cell counts the points inside it by group.
 """
 
 # ╔═╡ a1410007-0001-4000-8000-000000000010
@@ -50,7 +50,7 @@ end
 
 # ╔═╡ a1410007-0001-4000-8000-000000000011
 md"""
-`@bind picks` stores the points inside the box when you release.
+`@bind picks` stores the points inside the box when you release it.
 """
 
 # ╔═╡ a1410007-0001-4000-8000-000000000003
@@ -69,7 +69,7 @@ else
     na = count(e -> e.group == "A", picks)
     mx = round(sum(xs[picks]) / n; digits = 2)
     my = round(sum(ys[picks]) / n; digits = 2)
-    "$(n) points — group A $(na), group B $(n - na); mean ($(mx), $(my))"
+    "$(n) points: group A $(na), group B $(n - na); mean ($(mx), $(my))"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

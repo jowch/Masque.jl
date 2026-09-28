@@ -56,7 +56,7 @@ end
 @bind picks masque(fig, [pts, roi])
 
 # ╔═╡ c0e10004-0001-4000-8000-000000000004
-if picks === nothing
+if isnothing(picks)
     md"*Drag the box over a cluster of stations, then release.*"
 elseif isempty(picks)
     md"*No stations in the box.*"
