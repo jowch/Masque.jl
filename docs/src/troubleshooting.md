@@ -137,7 +137,7 @@ raises `ArgumentError` there.
 **Fix:** on a `PolarAxis`, use points, lines, or segments, which
 respond to hover and click. See [Supported plots and axes](@ref).
 
-### Tried `heatmap!` or `barplot!` on PolarAxis
+### [Tried `heatmap!` or `barplot!` on PolarAxis](@id polar-skipped-plots)
 
 **Cause:** `masque(fig)` skips those plots on a `PolarAxis` with a
 warning, because their rectangles would not line up with the polar
@@ -254,8 +254,8 @@ Check, in order:
    nothing, and it does not clear the selection.
 3. Is the mark you clicked interactive? `masque(fig)` skips an
    unsupported plot type with a warning in the notebook log, not an
-   error, so its marks do not respond. A heatmap or bar plot on a
-   `PolarAxis` is skipped this way.
+   error, so its marks do not respond, as with a
+   [heatmap or bar plot on a `PolarAxis`](@ref polar-skipped-plots).
    [Recipes masque(fig) extracts](@ref) lists the supported plots.
 
 ### Tried a tooltip and saw `[object Object]`
@@ -297,7 +297,8 @@ stops. A `masque` widget does not use that connection.
 **Fix:** return `masque(f)` from the cell that creates the figure, so
 that cell shows the interactive figure whether or not you bind it. If
 you do bind it, end that cell with `;` so Pluto does not show the
-widget twice. For the cell layout, see [The widget is the figure](@ref).
+widget twice. For the cell layout, see
+[Return the widget from the figure's cell](@ref).
 To keep WGLMakie's own display working remotely, forward port 9384 as
 well, or point Bonito at an address the browser can reach with
 `Bonito.configure_server!`.

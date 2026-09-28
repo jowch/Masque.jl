@@ -6,8 +6,12 @@ own, so pass the line plot to a [`SliceInteractable`](@ref) yourself:
 
 ```julia
 begin
-    s = lines!(ax, xs, ys)
+    xs = 0:0.1:10
+    fig = Figure()
+    ax = Axis(fig[1, 1])
+    s = lines!(ax, xs, sin.(xs))
     probe = SliceInteractable(ax, s)
+    nothing
 end
 ```
 

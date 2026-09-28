@@ -56,7 +56,7 @@ if isnothing(pick)
     "click a point"
 else
     dirs = ["east", "north", "west", "south"]
-    "$(dirs[pick.index]) — r = $(pick.y)"
+    "$(dirs[pick.index]): r = $(pick.y)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

@@ -60,7 +60,7 @@ md"""
 if isnothing(sel)
     "click a point"
 else
-    "$(sel.name) selected — y = $(sel.y)"
+    "$(sel.name) selected, y = $(sel.y)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

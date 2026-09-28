@@ -77,7 +77,7 @@ one, pass a template that uses the fields `label`, `group`, and
 `targets`:
 
 ```julia
-LegendInteractable(leg; tooltip = masque"$(label) — $(group)")
+LegendInteractable(leg; tooltip = masque"$(label) ($(group))")
 ```
 
 See [Tooltips](@ref) for how templates work.

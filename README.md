@@ -56,13 +56,13 @@ end
 ```
 
 ```julia
-# declare what's interactable, bind the result
+# choose which marks respond, and bind the result
 @bind sel masque(fig, [PointInteractable(ax, pts; payloads = ["a", "b", "c"])])
 ```
 
 ```julia
-# react to clicks — `sel` is `nothing` until a click, then an ElementEvent
-sel === nothing ? "click a point" : "you picked $(sel.index)"
+# react to clicks: `sel` is `nothing` until a click, then an ElementEvent
+isnothing(sel) ? "click a point" : "you picked $(sel.index)"
 ```
 
 For more information, see [Masque documentation](https://jowch.github.io/Masque.jl). Demos are in the [gallery](https://jowch.github.io/Masque.jl/dev/gallery/).

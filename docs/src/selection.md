@@ -58,7 +58,10 @@ until the next click, because a click holds one mark. With a `selects`
 box in the widget, `pick` starts as both events.
 
 Points, bars, polygons, lines, and segments can start selected, but
-heatmap cells, axis readouts, boxes, thresholds, and the view cannot.
+heatmap cells, axis readouts, boxes, thresholds, and the view cannot. A
+box or a threshold line starts where its `bounds` or `value` puts it,
+so to start one somewhere else, set those instead; see
+[Read the box itself](@ref) and [Drag a threshold](@ref).
 
 A [`RegionInteractable`](@ref) makes one layer per shape, so name those
 layers in `selected=`: `:cells_c`, `:cells_r`, and `:cells_p` for the
@@ -92,7 +95,11 @@ Then look up the city in the rebuilt data and pass its position as
 them:
 
 ```julia
-@bind pick masque(fig, cities; selected = findfirst(==(last_city[]), city_names))
+start = findfirst(name -> name == last_city[], city_names)
+```
+
+```julia
+@bind pick masque(fig, cities; selected = start)
 ```
 
 If the city is no longer in the data, `findfirst` returns `nothing` and

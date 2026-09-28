@@ -59,7 +59,7 @@ md"""
 if isnothing(pick)
     "click a bar"
 else
-    "Q$(pick.index) — value $(pick.value)"
+    "Q$(pick.index): value $(pick.value)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

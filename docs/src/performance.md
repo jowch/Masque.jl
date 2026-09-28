@@ -1,9 +1,9 @@
 # Performance
 
-Hovering costs nothing in Julia. On a large dataset, what grows is the
-number of interactive marks and the size of each payload, so trim
-those first (see [Keeping large figures fast](@ref)). The measured
-sizes and timings are in the maintainers'
+On a large dataset, what grows is the number of interactive marks and
+the size of each payload, so trim those first (see
+[Keeping large figures fast](@ref)). The measured sizes and timings are
+in the maintainers'
 [performance findings](https://github.com/jowch/Masque.jl/blob/main/docs/dev/perf-findings.md).
 
 ## What a widget sends to the browser
@@ -30,14 +30,12 @@ about the same as one that just fills the plot (see
 
 ## What happens on each interaction
 
-- Hovering does not run Julia, however large the data.
-- Clicking a mark, or releasing a box or a threshold line, updates the
-  `@bind` value, and cells that use it respond. That takes as long as
-  those cells take, including creating a new figure if one depends on
-  the click. A click in empty space, and the end of a pan or orbit,
-  change nothing.
-- Panning and orbiting render the figure again in Julia for each frame
-  while you drag, so they cost one render per frame.
+Hovering does not run Julia, so it stays fast however large the data
+is. A click or a release takes as long as the cells that use the
+`@bind` value take, including creating a new figure if one depends on
+the click. Panning and orbiting render the figure again in Julia for
+each frame while you drag, so they cost one render per frame. For what
+each gesture changes, see [How interactions work](@ref).
 
 ## Keeping large figures fast
 

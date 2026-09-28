@@ -24,18 +24,24 @@ First, create the scatter and the box:
 
 ```julia
 begin
-    # Deterministic noise, so the example looks the same every time it runs.
-    u(k) = mod(sin(k * 12.9898) * 43758.5453, 1.0)
-    g(k) = sqrt(-2log(u(k) + 1.0e-9)) * cos(2π * u(k + 0.5))
-    n = 150
-    xs = [i <= 80 ? 3.0 + 0.9g(i) : 7.0 + 0.9g(i) for i in 1:n]
-    ys = [i <= 80 ? 3.0 + 0.9g(i + 1000) : 6.0 + 0.8g(i + 1000) for i in 1:n]
-    zs = [i <= 80 ? 1.2 + 0.3g(i + 2000) : 2.8 + 0.35g(i + 2000) for i in 1:n]
+    using Random
+    Random.seed!(3)   # the same samples every time the notebook runs
+
+    # 80 samples in one cluster, then 70 in another
+    xs = [3.0 .+ 0.9 .* randn(80); 7.0 .+ 0.9 .* randn(70)]
+    ys = [3.0 .+ 0.9 .* randn(80); 6.0 .+ 0.8 .* randn(70)]
+    zs = [1.2 .+ 0.3 .* randn(80); 2.8 .+ 0.35 .* randn(70)]
+
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y", title = "drag the box over a cluster")
     s = scatter!(ax, xs, ys; color = zs, colormap = :viridis, markersize = 9)
-    samples = [(; sample = i, x = round(xs[i]; digits = 2), y = round(ys[i]; digits = 2), z = round(zs[i]; digits = 2)) for i in 1:n]
-    pts = PointInteractable(ax, s; id = :pts, payloads = samples)
+
+    samples = [(sample = i, x = xs[i], y = ys[i], z = zs[i]) for i in 1:150]
+    pts = PointInteractable(ax, s;
+        id = :pts,
+        payloads = samples,
+        tooltip = masque"sample $(sample)<br>x $(x:.2f), y $(y:.2f), z $(z:.2f)",
+    )
     roi = ROIInteractable(ax; bounds = (5.2, 9.2, 4.4, 7.8), selects = :pts)
     nothing
 end
@@ -59,7 +65,9 @@ begin
         title = isempty(inside) ? "all samples" : "$(length(inside)) samples in the box, against all $(length(zs))"
     )
     hist!(cax, zs; bins = edges, color = (:gray, 0.45), label = "all")
-    isempty(inside) || hist!(cax, inside; bins = edges, color = (:darkorange, 0.85), label = "in the box")
+    if !isempty(inside)
+        hist!(cax, inside; bins = edges, color = (:darkorange, 0.85), label = "in the box")
+    end
     axislegend(cax; position = :rt)
     cmp
 end
@@ -67,8 +75,8 @@ end
 
 ## How it works
 
-Each point's payload carries its three measurements, so hovering over
-a point shows them. The [`ROIInteractable`](@ref) names the points'
+Each point's payload carries its three measurements, and the template
+rounds them to two decimals, so hovering over a point shows them. The [`ROIInteractable`](@ref) names the points'
 layer with `selects = :pts`, so when you release the box, `picks` is a
 vector with one event per point inside. Index your data with it:
 `zs[picks]` is the `z` of the points in the box.
@@ -77,8 +85,8 @@ vector with one event per point inside. Index your data with it:
 
 - Keep your samples in a `DataFrame` and pass it as `payloads`. Then
   `df[picks, :]` is the rows inside the box. Before the first release,
-  `picks` is `nothing`, so check for it:
-  `isnothing(picks) || isempty(picks) ? df[1:0, :] : df[picks, :]`.
+  `picks` is `nothing`, so check for it as [Brush a region](@ref)
+  shows.
 - Replace the histogram with whatever the comparison needs: a table of
   means, a second scatter of two other columns, or a model fitted to the
   selected points only.

@@ -56,7 +56,7 @@ can do that in the same cell that returns `masque(fig)`.
 With WGLMakie, `masque` shows the figure on a GPU canvas in the
 browser.
 
-### The widget is the figure
+### Return the widget from the figure's cell
 
 Return `masque(f)` from the cell that creates the figure, because a
 WGLMakie `Figure` returned on its own shows in WGLMakie's own display,
@@ -82,7 +82,8 @@ End the cell with `;` so Pluto doesn't show the figure twice.
 A browser keeps only a limited number of GPU canvases live, so at most
 8 WGLMakie plots are live at once, and a plot that scrolls into view
 takes over from one that scrolled away. If more than 8 are on screen
-together, the extra plots show a note instead of the figure.
+together, the extra plots show a note instead of the figure, so to keep
+them all live, use CairoMakie for the plots that do not need to move.
 
 ## Pan and orbit preview
 

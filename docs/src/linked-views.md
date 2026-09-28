@@ -98,8 +98,9 @@ Main.masque_fallback("linked_legend_wash")
 
 To select many points at once, drag a box. When you release an
 [`ROIInteractable`](@ref) with `selects`, it returns every point inside
-the box, and another cell can take those rows from your table with
-`df[picks, :]`, or create another plot from them.
+the box. If you bind that result to `picks`, another cell can take those
+rows from your table with `df[picks, :]`, or create another plot from
+them.
 [Brush a region](@ref) shows how.
 
 For what each click, release, and drag sets `pick` to, see

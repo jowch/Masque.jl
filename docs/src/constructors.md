@@ -114,9 +114,8 @@ produce, so one widget can set where another starts. A legend made by
 `masque(fig)` links each entry to its plots; `LegendInteractable(leg)`
 on its own needs `targets` for that.
 
-Axis readouts, thresholds, boxes, and slices need a 2D `Axis`, while
-panning also works on an `Axis3`, where it orbits the camera. See
-[Supported plots and axes](@ref) for which work where.
+[Supported plots and axes](@ref) lists which of these work on which
+axes.
 
 ## Custom
 

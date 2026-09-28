@@ -69,7 +69,7 @@ else
     na = count(e -> e.group == "A", picks)
     mx = round(sum(xs[picks]) / n; digits = 2)
     my = round(sum(ys[picks]) / n; digits = 2)
-    "$(n) points — group A $(na), group B $(n - na); mean ($(mx), $(my))"
+    "$(n) points: group A $(na), group B $(n - na); mean ($(mx), $(my))"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

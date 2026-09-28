@@ -64,7 +64,7 @@ if isnothing(pick)
 elseif hasproperty(pick, :text)
     "\"$(pick.text)\""
 else
-    "that was a marker — click a label"
+    "that was a marker; click a label"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

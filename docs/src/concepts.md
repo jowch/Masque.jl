@@ -101,7 +101,8 @@ notebooks, and the **Simulating `@bind`** badge marks them. Hovering
 works as it does in Pluto, and a click shows the result recorded for it.
 A few interactions, such as a large brush or a pan, are shown as video
 clips instead. A click on an axis or a colorbar position is not
-recorded.
+recorded, so to see what those clicks return, run the example in your
+own notebook.
 
 Next: [Tooltips](@ref) to change what a tooltip says, or
 [Selection](@ref) for what a click selects and how to keep it.
