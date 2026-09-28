@@ -1,65 +1,61 @@
 # Performance
 
-Masque adds very little to a figure you were going to show anyway, and
-hovering costs nothing on the Julia side. What does cost something is
-worth knowing before you point it at a large dataset. This page explains
-what grows with what; the measured sizes and timings live in the
-maintainers' [performance findings](https://github.com/jowch/Masque.jl/blob/main/docs/dev/perf-findings.md),
+Masque adds little to a figure you were going to show anyway, and
+hovering does not run Julia at all. Some costs do grow with your data,
+and they are worth knowing before you use Masque on a large dataset.
+The measured sizes and timings are in the maintainers'
+[performance findings](https://github.com/jowch/Masque.jl/blob/main/docs/dev/perf-findings.md),
 which are kept up to date as the format changes.
 
 ## What a widget sends to the browser
 
-A Masque widget is two things:
+A Masque widget sends two things:
 
-- **The picture.** With CairoMakie, the figure rendered as an image. Its
-  size depends on the figure's width on the page and on how busy the
-  plot is, not on how many marks are interactive. WGLMakie sends the
-  scene to draw instead of a picture; see [Backends](@ref).
-- **The hit data.** Where every interactive mark is, plus its payload.
-  This grows with the number of interactive marks and with the size of
-  each payload.
+| Part | What it is | What makes it grow |
+|---|---|---|
+| The picture | With CairoMakie, the figure as an image. WGLMakie sends the scene to draw instead; see [Backends](@ref). | The figure's width on the page and how busy the plot is, not how many marks are interactive |
+| The hit data | Where each interactive mark is, plus its payload | The number of interactive marks and the size of each payload |
 
-For a typical interactive plot both are small and the notebook stays
-responsive. The picture stays roughly the same size however many marks
-there are, while the hit data keeps growing with them, so on a plot with
-very many interactive marks the hit data becomes the larger term and is
-what makes the notebook feel slow. The findings page has the measured
+For a typical interactive plot both are small, and the notebook stays
+responsive. The picture stays about the same size however many marks
+there are, while the hit data keeps growing with them. On a plot with
+very many interactive marks, the hit data becomes the larger part and
+makes the notebook feel slow. The findings page has the measured
 crossover.
 
-Heatmaps are the exception to "grows with the data". When a grid's
-cells are smaller than one screen pixel on its axis, Masque sends one
-value per screen pixel instead of the whole matrix (see
-[Inspect a grid](@ref)), so a very large heatmap costs about the same as
-one that just fills the plot.
+Heatmaps do not grow with the data this way. When a grid's cells are
+smaller than one screen pixel on its axis, Masque sends one value per
+screen pixel instead of the whole matrix (see [Inspect a grid](@ref)).
+A very large heatmap costs about the same as one that just fills the
+plot.
 
 ## What happens on each interaction
 
-- **Hover** is handled entirely in the browser: no Julia runs, whatever
-  the size of the data.
-- **A click on a mark, or releasing a box or a threshold,** sets the
-  `@bind` value, and Pluto re-runs every cell that reads it. The time
-  that takes is the time your cells take — including drawing a new
-  figure if one depends on the click. A click on empty space, and the
-  end of a pan or orbit, set nothing and re-run nothing.
-- **Pan and orbit** re-render the figure in Julia for each frame while
-  you drag, so they cost one render per frame.
+- Hovering does not run Julia, however large the data.
+- Clicking a mark, or releasing a box or a threshold line, updates the
+  `@bind` value, and cells that use it respond. That takes as long as
+  those cells take, including creating a new figure if one depends on
+  the click. A click in empty space, and the end of a pan or orbit,
+  change nothing.
+- Panning and orbiting render the figure again in Julia for each frame
+  while you drag, so they cost one render per frame.
 
 ## Keeping large figures fast
 
-- **Keep payloads to the fields you show.** Every field travels with
-  every mark. Put the data you need later in Julia, and look it up with
+- Keep payloads to the fields you show. Every field is sent with every
+  mark. Keep the data you need later in Julia, and look it up with
   `pick.index` or an id field.
-- **Use templates, not per-mark strings.** A `masque"..."` template is
-  sent once per layer; a formatted string in every payload is sent once
-  per mark.
-- **Make fewer marks interactive.** Draw all the points, but pass only
-  the interesting ones — outliers, a sample, the current selection — to
-  a [`PointInteractable`](@ref).
-- **Rebuild less often.** Every upstream change re-renders the figure and
-  re-sends the widget. If a figure is redrawn many times a second, or
-  animates, WGLMakie's live canvas is the better fit; see
-  [Backends](@ref).
-- **Mind the figure's width.** A wider figure is a bigger picture, though
+- Use a template instead of a formatted string in every payload. A
+  `masque"..."` template is sent once per layer; a string in each
+  payload is sent once per mark.
+- Make fewer marks interactive. Plot all the points, but pass only the
+  interesting ones, such as outliers, a sample, or the current
+  selection, to a [`PointInteractable`](@ref).
+- Rebuild the figure less often. Every change upstream renders the
+  figure again and sends the whole widget again. If a figure is redrawn
+  many times a second, or animates, WGLMakie's live canvas fits better;
+  see [Backends](@ref).
+- Mind the figure's width. A wider figure is a bigger picture, though
   it does not change the hit data. `masque`'s `max_width` keyword (700
-  pixels by default) caps the display width it renders for; a narrower
+  pixels by default) caps the display width it renders for. A narrower
   figure is rendered at its own width.

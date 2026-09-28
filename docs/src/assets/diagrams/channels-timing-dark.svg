@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" width="760" height="470"
      role="img">
-  <title>Four channels against each gesture</title>
-  <desc>Swimlanes for overlay chrome, the bind bond, the gesture channel, and a downstream Julia cell. Hover tooltip and highlight, and click-echo wash, use the overlay only. Click or Enter commit echoes in the overlay, writes one InteractionEvent to the bond (nothing from a selects target layer, which the box owns), and re-runs a cell that reads the bond. ROI or threshold in-drag moves the box or line in the overlay with no bond. ROI or threshold release echoes if selects is set, writes bounds, a scalar, or a Vector, and re-runs a reading cell. View pan or orbit in-drag shows a readout in the overlay while new frames of the view are streamed over the gesture channel on both backends (a PNG on cairo, a serialized scene on webgl), with no bond. View release writes nothing and the channel stops. Empty-space click leaves overlay and bond unchanged.</desc>
+  <title>What each gesture changes</title>
+  <desc>A table of gestures against what each one changes: on the figure, the @bind value, Julia redrawing the view, and cells that use @bind. Hovering shows a tooltip and highlight only. The highlight after a click needs no Julia. Clicking a mark or pressing Enter highlights it and sends one event to @bind, none if a box brushes that layer, and cells that use it respond. Dragging an ROI box or threshold line moves it on the figure only. Releasing it highlights the enclosed marks with selects, sends the box, the marks, or a value to @bind, and cells respond. Dragging to pan or orbit shows a tooltip while Julia redraws the view with CairoMakie or WGLMakie. Releasing a pan leaves @bind unchanged and the redrawing stops. Clicking empty space changes nothing.</desc>
   <style>
     .ink { fill: #e8eaed; }
     .muted { fill: #b0b8c0; }
@@ -16,9 +16,9 @@
   </style>
 
   <text class="ink" x="380" y="22" text-anchor="middle" font-size="14"
-        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Pointer gestures, four channels</text>
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">What each gesture changes</text>
   <text class="muted" x="380" y="40" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">Each row is one gesture. Each column is one channel.</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Each row is one gesture. Each column is one effect.</text>
 
   <!-- Lane backgrounds -->
   <rect class="lane0" x="188" y="52" width="138" height="400" rx="4"/>
@@ -31,21 +31,21 @@
   <text class="ink" x="100" y="79" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Gesture</text>
   <text class="ink" x="257" y="73" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Overlay</text>
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">On the</text>
   <text class="muted" x="257" y="87" text-anchor="middle" font-size="10"
-        font-family="ui-sans-serif, system-ui, sans-serif">chrome</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">figure</text>
   <text class="ink" x="395" y="73" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Bond</text>
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">@bind</text>
   <text class="muted" x="395" y="87" text-anchor="middle" font-size="10"
-        font-family="ui-sans-serif, system-ui, sans-serif">@bind</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">value</text>
   <text class="ink" x="533" y="73" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Gesture channel</text>
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Julia redraws</text>
   <text class="muted" x="533" y="87" text-anchor="middle" font-size="10"
-        font-family="ui-sans-serif, system-ui, sans-serif">with_js_link</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">the view</text>
   <text class="ink" x="671" y="73" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Downstream cell</text>
+        font-family="ui-sans-serif, system-ui, sans-serif" font-weight="600">Cells that</text>
   <text class="muted" x="671" y="87" text-anchor="middle" font-size="10"
-        font-family="ui-sans-serif, system-ui, sans-serif">Julia</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">use it</text>
 
   <!-- Row stripes -->
   <rect class="rowalt" x="16" y="140" width="724" height="44"/>
@@ -86,9 +86,9 @@
 
   <!-- Row 2 Click-echo -->
   <text class="ink" x="102" y="168" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">Click-echo</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Highlight</text>
   <text class="ink" x="102" y="182" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">wash</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">after a click</text>
   <text class="yes" x="257" y="175" text-anchor="middle" font-size="12"
         font-family="ui-sans-serif, system-ui, sans-serif">Yes</text>
   <text class="muted" x="395" y="175" text-anchor="middle" font-size="12"
@@ -102,25 +102,25 @@
   <text class="ink" x="102" y="212" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">Click / Enter</text>
   <text class="ink" x="102" y="226" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">commit</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">on a mark</text>
   <text class="yes" x="257" y="219" text-anchor="middle" font-size="12"
-        font-family="ui-sans-serif, system-ui, sans-serif">Echo yes</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Highlight</text>
   <text class="yes" x="395" y="213" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">One event</text>
   <text class="yes" x="395" y="227" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">(none on ROI target)</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">(none if brushed)</text>
   <text class="muted" x="533" y="219" text-anchor="middle" font-size="12"
         font-family="ui-sans-serif, system-ui, sans-serif">No</text>
   <text class="yes" x="671" y="213" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">Re-runs if it</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Respond to</text>
   <text class="yes" x="671" y="227" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">reads the bond</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">the click</text>
 
   <!-- Row 4 ROI in-drag -->
   <text class="ink" x="102" y="256" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">ROI / threshold</text>
   <text class="ink" x="102" y="270" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">in-drag</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">dragging</text>
   <text class="yes" x="257" y="256" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">Box / line</text>
   <text class="yes" x="257" y="270" text-anchor="middle" font-size="11"
@@ -138,41 +138,41 @@
   <text class="ink" x="102" y="314" text-anchor="middle" font-size="11"
         font-family="ui-sans-serif, system-ui, sans-serif">release</text>
   <text class="yes" x="257" y="300" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">Echo if</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Highlight</text>
   <text class="yes" x="257" y="314" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">selects</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">if selects</text>
   <text class="yes" x="395" y="300" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">Bounds, scalar,</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Box, marks,</text>
   <text class="yes" x="395" y="314" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">or Vector</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">or a value</text>
   <text class="muted" x="533" y="307" text-anchor="middle" font-size="12"
         font-family="ui-sans-serif, system-ui, sans-serif">No</text>
   <text class="yes" x="671" y="307" text-anchor="middle" font-size="12"
-        font-family="ui-sans-serif, system-ui, sans-serif">Re-runs</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Respond</text>
 
   <!-- Row 6 View in-drag -->
   <text class="ink" x="102" y="344" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">View pan / orbit</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Pan / orbit</text>
   <text class="ink" x="102" y="358" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">in-drag</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">dragging</text>
   <text class="yes" x="257" y="351" text-anchor="middle" font-size="12"
-        font-family="ui-sans-serif, system-ui, sans-serif">Readout</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Tooltip</text>
   <text class="muted" x="395" y="351" text-anchor="middle" font-size="12"
         font-family="ui-sans-serif, system-ui, sans-serif">No</text>
   <text class="yes" x="533" y="344" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">Yes: PNG (cairo)</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Yes: CairoMakie</text>
   <text class="yes" x="533" y="358" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">or scene (webgl)</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">or WGLMakie</text>
   <text class="muted" x="671" y="351" text-anchor="middle" font-size="12"
         font-family="ui-sans-serif, system-ui, sans-serif">No</text>
 
   <!-- Row 7 View release -->
   <text class="ink" x="102" y="388" text-anchor="middle" font-size="11"
-        font-family="ui-sans-serif, system-ui, sans-serif">View release</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Pan release</text>
   <text class="muted" x="257" y="395" text-anchor="middle" font-size="12"
         font-family="ui-sans-serif, system-ui, sans-serif">&#x2014;</text>
   <text class="yes" x="395" y="395" text-anchor="middle" font-size="12"
-        font-family="ui-sans-serif, system-ui, sans-serif">Nothing</text>
+        font-family="ui-sans-serif, system-ui, sans-serif">Unchanged</text>
   <text class="yes" x="533" y="395" text-anchor="middle" font-size="12"
         font-family="ui-sans-serif, system-ui, sans-serif">Stops</text>
   <text class="muted" x="671" y="395" text-anchor="middle" font-size="12"

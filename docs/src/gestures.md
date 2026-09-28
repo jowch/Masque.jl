@@ -1,73 +1,36 @@
 # Overlay, bind, and the host
 
-[Concepts](@ref) explains hover, clicks, and `@bind` for everyday use.
-This page is the detailed version: the overlay, `@bind`, the gesture
-channel that streams pan frames, and the docs-site player — for when a
-hover does not re-run Julia, or a docs embed is not a live notebook.
+Each gesture on a `masque` widget changes something different. Hovering
+a mark shows its tooltip. Clicking it changes the `@bind` value.
+Panning moves the view and changes neither. What a gesture does also
+depends on where the notebook runs: in Pluto, in a static HTML export,
+or on this site. [Concepts](@ref) covers the everyday case.
 
-Masque splits pointer work across four channels: overlay chrome, the `@bind`
-bond, the gesture channel, and a downstream Julia cell. Holding the pointer
-over a mark is not a click. A click is not a pan.
-
-!!! note
-
-    Hover stays in the overlay. A click writes `@bind`. Pan uses the
-    gesture channel and does not write `@bind`. This docs site swaps
-    recorded snapshots; it does not run a Julia kernel. A static
-    `generate_html` export keeps overlay inspection only.
-
-The three-point scatter on [Getting started](@ref) already shows two of
-those channels on one plot. Holding the pointer over a point reads its
-name in the overlay. A click writes `sel`. This page names every channel
-so a docs-site embed or a static export is not a Masque bug.
+The three-point scatter on [Getting started](@ref) shows the first two
+on one plot. Hovering a point shows its name, and clicking it sets
+`sel`.
 
 ## Pluto cells in these docs
 
-Paste each snippet into its own Pluto cell. Pluto runs one top-level
-expression per cell. Wrap multiple statements in `begin ... end`. Showing
-`fig` alone does not mount the overlay; `masque` returns the HTML that
-does. For installing Masque in a notebook, see [Install](@ref).
+Put each code block in its own Pluto cell. A cell holds one expression,
+so wrap several statements in `begin ... end`. Showing `fig` on its own
+gives a plain picture; `masque(fig)` gives the interactive one. To
+install Masque, see [Install](@ref).
 
-## One figure, one overlay
+## What each gesture changes
 
-At `masque()` time, one Makie `Figure` plus its interactables produces a
-backend image (PNG or GPU canvas) and hit geometry for every axis, then one
-manifest, then HTML: one image and one overlay. Several axes still share that
-overlay. They are not several `masque` calls.
-
-The overlay is a stateless view: tooltips, highlight in the overlay, and
-drag chrome. Authoritative analysis state lives in Julia as the `@bind`
-bond when a cell reads it.
-
-## Four channels
-
-These four are separate channels, not speeds of one channel.
-
-- **Overlay chrome.** Tooltips, highlight in the overlay, an ROI box, a
-  threshold line, and a view readout. No Julia round trip.
-- **Bond (`@bind`).** The analysis value a cell reads: a click, an Enter
-  commit, an ROI release, or a threshold release.
-- **Gesture channel (`with_js_link`).** In-drag pan and orbit frames on
-  both backends. Not a bond. Not a faster `@bind`.
-- **Downstream Julia cell.** Re-runs only when it reads a bond that changed.
-
-A Dash hover callback is a **click** in Masque. Altair `.interactive()`
-pan is overlay motion, not `@bind`. Holding the pointer over a mark
-never writes `@bind`.
-
-## Gesture timing
-
-Holding the pointer over a mark never assigns the bond. The highlight after a
-click also runs in the overlay. The PNG does not change. An in-drag ROI box
-or threshold line stays in the overlay until release. A view drag commits
-nothing: camera state is not analysis data.
+A figure with several axes is still one widget, from one `masque` call.
+Tooltips and highlights appear in the browser, without running Julia.
+The figure's image stays the same when you hover or click: highlights
+are drawn on top of it. The `@bind` value changes only on a click, or
+when you release a box or threshold line.
 
 ```@raw html
 <div class="masque-diagram">
   <img class="masque-diagram-light" src="assets/diagrams/channels-timing.svg"
-       alt="Swimlanes for overlay chrome, the bind bond, the gesture channel, and a downstream Julia cell for each gesture: hover tooltip and highlight, click-echo wash, click or Enter commit, ROI or threshold in-drag, ROI or threshold release, view pan or orbit in-drag, view release, and empty-space click.">
+       alt="A table of gestures against what each one changes: on the figure, the @bind value, Julia redrawing the view, and cells that use @bind. Hovering shows a tooltip and highlight only. The highlight after a click needs no Julia. Clicking a mark or pressing Enter highlights it and sends one event to @bind, none if a box brushes that layer, and cells that use it respond. Dragging an ROI box or threshold line moves it on the figure only. Releasing it highlights the enclosed marks with selects, sends the box, the marks, or a value to @bind, and cells respond. Dragging to pan or orbit shows a tooltip while Julia redraws the view with CairoMakie or WGLMakie. Releasing a pan leaves @bind unchanged and the redrawing stops. Clicking empty space changes nothing.">
   <img class="masque-diagram-dark" src="assets/diagrams/channels-timing-dark.svg"
-       alt="Swimlanes for overlay chrome, the bind bond, the gesture channel, and a downstream Julia cell for each gesture: hover tooltip and highlight, click-echo wash, click or Enter commit, ROI or threshold in-drag, ROI or threshold release, view pan or orbit in-drag, view release, and empty-space click.">
+       alt="A table of gestures against what each one changes: on the figure, the @bind value, Julia redrawing the view, and cells that use @bind. Hovering shows a tooltip and highlight only. The highlight after a click needs no Julia. Clicking a mark or pressing Enter highlights it and sends one event to @bind, none if a box brushes that layer, and cells that use it respond. Dragging an ROI box or threshold line moves it on the figure only. Releasing it highlights the enclosed marks with selects, sends the box, the marks, or a value to @bind, and cells respond. Dragging to pan or orbit shows a tooltip while Julia redraws the view with CairoMakie or WGLMakie. Releasing a pan leaves @bind unchanged and the redrawing stops. Clicking empty space changes nothing.">
 </div>
 <script>
 (function () {
@@ -88,52 +51,56 @@ nothing: camera state is not analysis data.
 </script>
 ```
 
-Each pointer gesture uses a different mix of overlay chrome, the `@bind`
-bond, the gesture channel, and a downstream Julia cell.
+The table below holds the same information as the diagram.
 
-The following table is the same data, so the figure is not the only
-source.
-
-| Gesture | Overlay | Bond | Gesture channel | Downstream cell |
+| Gesture | On the figure | `@bind` value | Julia redraws the view | Cells that use it |
 |---|---|---|---|---|
-| Hover tooltip / highlight | Yes | No | No | No |
-| Click-echo wash | Yes | No | No | No |
-| Click / Enter commit | Echo yes | One event (none on a `selects` target layer; the box owns it) | No | Re-runs if it reads the bond |
-| ROI / threshold **in-drag** | Box / line moves | No | No | No |
-| ROI / threshold **release** | Echo if `selects` | Bounds, scalar, or `Vector` | No | Re-runs |
-| View pan / orbit **in-drag** | Readout | No | Yes: new frames | No |
-| View **release** | — | **Nothing** | Stops | No |
-| Empty-space click | No | Unchanged | No | No |
+| Hover (tooltip and highlight) | Yes | No | No | No |
+| Highlight after a click | Yes | No | No | No |
+| Click or Enter on a mark | Highlight | One event (none if a box brushes the mark's layer) | No | Respond to the click |
+| ROI or threshold, while dragging | Box or line moves | No | No | No |
+| ROI or threshold, release | Highlight, with `selects` | The box, the enclosed marks, or the line's value | No | Respond |
+| Pan or orbit, while dragging | Tooltip with the new limits or angles | No | Yes, on both backends | No |
+| Pan or orbit, release | — | Unchanged | Stops | No |
+| Click empty space | No | Unchanged | No | No |
 
-ROI and threshold in-drag stay in the overlay: it already has what it
-needs, so the drag never leaves the browser. In-drag view frames still
-leave the overlay: both backends repaint over the gesture channel.
-CairoMakie ships a PNG; WGLMakie ships a serialized scene onto the
-canvas already on the page. Neither path writes `@bind`. On release the
-channel stops, and the bond still holds **nothing** from the pan.
+An ROI box or threshold line moves in the browser while you drag it,
+and nothing reaches Julia until you release it. A pan or orbit works
+differently: Julia redraws the view for each step of the drag.
+CairoMakie sends a new image, and WGLMakie updates the canvas already on
+the page. The `@bind` value does not change, during the drag or after
+it.
 
-A click in empty space does not write the bond and does not clear a
-selection. Enter or Space on a focused mark commits the same way a click
-does.
+A click in empty space does not change the value and keeps the current
+selection. Enter or Space on a focused mark does what a click does.
 
-Right-click opens the context menu on the figure: the Cairo image, or
-the WebGL canvas. Control-click does the same on macOS. That press does
-not start a drag, and the bond stays unchanged.
+Right-clicking the figure opens the browser's context menu for the
+image (CairoMakie) or the canvas (WGLMakie). On macOS, Control-click
+does the same. It does not start a drag, and the `@bind` value stays
+unchanged.
 
-## Overlay, Julia, and the host
+## [Where the notebook runs](@id gestures-where)
 
-Live Pluto runs every `@bind` row except view. This docs site does not run
-those rows live. The quick start on [Getting started](@ref) is a Pluto
-export of the tutorial notebook, and every click swaps in a recorded readout.
-An overlay-only player keeps tooltip and highlight chrome. Julia stays at
-the default bond.
+In a live Pluto notebook, every gesture works as the table above shows.
+A static HTML export (from Pluto's export menu, or
+`Pluto.generate_html`) and the examples on this site have no Julia
+behind them. Tooltips and highlights still work there, and you can
+still click marks and drag boxes.
+
+Most examples on this site replay recorded results, including the quick
+start on [Getting started](@ref). The docs build records every mark,
+legend entry, and heatmap cell you can click, and every box a brush can
+draw. A click or release then shows the matching result in every cell
+below the figure. For an axis, a threshold line, or a box without
+`selects`, only a few chosen positions are recorded, if any. A few
+examples show hover only, and their cells keep their starting values.
 
 ```@raw html
 <div class="masque-diagram">
   <img class="masque-diagram-light" src="assets/diagrams/overlay-vs-host.svg"
-       alt="Four hosts compared: live Pluto, a docs player that records every click and listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Element click bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect goes through the grids player. Cairo view frames use GIF or MP4 on this site, with no bind on view.">
+       alt="Where the notebook runs: live Pluto, a recorded example on this site, a hover-only example on this site, and a static HTML export. Hover and the highlight after a click work in all four. Clicking a mark updates @bind and cells respond in live Pluto, shows a recorded result in a recorded example, and leaves cells unchanged in a hover-only example or a static export. Releasing a brush box, or picking a recorded axis or threshold position, follows the same split. Other drag positions update @bind on release in live Pluto, and elsewhere cells keep the last recorded, starting, or exported value. Clicking a heatmap cell shows a tooltip everywhere, and a result in live Pluto or a recorded example. Pan and orbit need live Pluto; this site shows them as video clips, and they never change @bind.">
   <img class="masque-diagram-dark" src="assets/diagrams/overlay-vs-host-dark.svg"
-       alt="Four hosts compared: live Pluto, a docs player that records every click and listed items, a docs player that is overlay-only, and static generate_html. Hover and click-echo run on every host. Element click bind and listed ROI, axis, or threshold values re-run Julia on live Pluto, swap snapshots on a listed player, stay at the default bond on overlay-only, and are dead on static HTML. Unlisted drags keep chrome. Heatmap inspect goes through the grids player. Cairo view frames use GIF or MP4 on this site, with no bind on view.">
+       alt="Where the notebook runs: live Pluto, a recorded example on this site, a hover-only example on this site, and a static HTML export. Hover and the highlight after a click work in all four. Clicking a mark updates @bind and cells respond in live Pluto, shows a recorded result in a recorded example, and leaves cells unchanged in a hover-only example or a static export. Releasing a brush box, or picking a recorded axis or threshold position, follows the same split. Other drag positions update @bind on release in live Pluto, and elsewhere cells keep the last recorded, starting, or exported value. Clicking a heatmap cell shows a tooltip everywhere, and a result in live Pluto or a recorded example. Pan and orbit need live Pluto; this site shows them as video clips, and they never change @bind.">
 </div>
 <script>
 (function () {
@@ -154,39 +121,37 @@ the default bond.
 </script>
 ```
 
-The same gesture can run in the overlay, write `@bind`, swap a recorded
-snapshot, or stay frozen, depending on the host.
+The table below holds the same information as the diagram.
 
-The following table is that split.
-
-| Gesture | Live Pluto | Docs player (every click and brush recorded) | Docs player (overlay-only) | Static `generate_html` |
+| Gesture | Live Pluto | Recorded example on this site | Hover-only example on this site | Static HTML export |
 |---|---|---|---|---|
-| Hover | Overlay tooltip and highlight | Overlay tooltip and highlight | Overlay tooltip and highlight | Overlay tooltip and highlight |
-| Click-echo | Highlight in the overlay | Highlight in the overlay | Highlight in the overlay | Highlight in the overlay |
-| Element click `@bind` (incl. extra table cells) | Bond writes; every cell that reads it re-runs | Snapshot swap for every cell in the embed | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
-| ROI brush (`selects`) / a few axis or threshold values | Bond writes on release | Snapshot swap for every box, or for each listed value | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
-| Unlisted continuous drag | Overlay chrome during the drag; Julia on ROI or threshold release; view never writes `@bind` | An axis or threshold value that is not listed: Julia stays on the last listed set (a `selects` box has no unlisted drag, since every box is recorded) | Overlay chrome; Julia stays at the default bond | Overlay chrome; `@bind` dead |
-| Heatmap inspect | Overlay tooltip; Julia on click | Overlay tooltip; every cell click swaps the readout | Overlay tooltip chrome if that player is present | Overlay tooltip; Julia click dead |
-| Cairo view frames (GIF/MP4, no `@bind`) | Gesture channel frames; no `@bind` | GIF/MP4 on this site; no `@bind` | Overlay readout; no frames; no `@bind` | Gesture channel dead; site uses GIF/MP4 |
+| Hover | Tooltip and highlight | Tooltip and highlight | Tooltip and highlight | Tooltip and highlight |
+| Highlight after a click | Yes | Yes | Yes | Yes |
+| Click a mark (all cells below) | `@bind` updates, and cells that use it respond | Every cell shows the recorded result | Cells keep their starting values | Cells keep the values they had at export |
+| Release a brush box, or pick a recorded axis or threshold position | `@bind` updates on release | The recorded result, for every box or recorded position | Cells keep their starting values | Cells keep the values they had at export |
+| Drag to another position | The box or line moves, and `@bind` updates on release; a pan never changes it | Cells keep the last recorded result (every brush box is recorded, so this applies to an axis or threshold position) | Cells keep their starting values | Cells keep the values they had at export |
+| Click a heatmap cell | Tooltip; `@bind` updates on click | Tooltip; every cell click shows its recorded result | Tooltip; cells unchanged | Tooltip; cells unchanged |
+| Pan or orbit | Julia redraws the view; `@bind` never changes | Shown as a video clip instead | A tooltip shows the limits; the view does not move | The view does not move; this site uses video clips |
 
-The docs build records every element, legend, and grid-cell click a
-player's figure offers, and every box a `selects` brush can draw, so
-those clicks and releases swap the readout. An axis or
-colorbar click, and a click on a grid that a box brushes, has no recorded
-snapshot. View pan never appears as an
-`InteractionEvent`. For a box that filters a table, see
-[Brush a region](@ref). For that heatmap, see
-[Inspect a grid](@ref). For pan and orbit, see [Pan and orbit](@ref).
+A colorbar click, and a click on a heatmap that a box brushes, is not
+recorded on this site. A pan never produces a `@bind` value anywhere.
+For a box that filters a table, see [Brush a region](@ref). For
+heatmaps, see [Inspect a grid](@ref). For pan and orbit, see
+[Pan and orbit](@ref).
 
 ## Common mistakes
 
-- Do not write a cell that reads `pick` expecting it to update when you hold
-  the pointer over a mark. That path is overlay-only.
-- Do not treat a docs player as live Pluto. Axis, ROI, and threshold commits
-  write `@bind` in a notebook. On this site, a listed player snapshots those
-  commits, and view has no `@bind`.
-- Do not design a click demo around more marks than a player can record.
-  The docs build records every element, legend, and grid-cell click and
-  fails a player over its size budget; use a coarser grid or fewer marks.
-- Do not expect SliderServer or `Bonds.possible_values` to enumerate Masque
-  bonds.
+- A cell that uses `pick` does not respond when you hover over a mark.
+  Click the mark, or press Enter on it.
+- An example on this site is not a live notebook. In your own notebook,
+  clicking an axis or releasing a box or threshold line updates the
+  `@bind` value. On this site, those show a recorded result when one
+  exists. A pan has no `@bind` value anywhere.
+- If you contribute an example to these docs, keep its clickable marks
+  few. The docs build records every mark, legend entry, and heatmap cell
+  a reader can click, and fails when the recordings get too large. Use a
+  coarser grid or fewer marks.
+- PlutoSliderServer does not know the values a `masque` widget can
+  take, so it cannot precompute them.
+
+For other problems, see [Troubleshooting](@ref).

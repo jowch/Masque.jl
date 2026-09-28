@@ -1,81 +1,70 @@
 # Keyboard and screen readers
 
-Every overlay is a keyboard-navigable, screen-reader-announced widget.
-No extra setup. Tab focuses the surface (`tabindex="0"`), which draws a
-grey outline just inside the plot. Then use the keys in the following
-table to move between interactive elements. The focused element gets
-the same ring a hover draws, and the outline goes away while it shows.
-A plot with nothing to step through, such as a heatmap, keeps the
-outline while it has focus. Clicking a plot focuses it without drawing
-the outline.
+A `masque` widget works with the keyboard and a screen reader, with no
+extra setup. Press Tab to focus the plot. A grey outline appears just
+inside it. Then use the keys below to move between marks. The focused
+mark gets the same highlight a hover draws, and the outline goes away
+while it shows. A plot with nothing to step through, such as a heatmap,
+keeps the outline while it has focus. Clicking a plot focuses it without
+drawing the outline.
 
 ## Keys
 
-| Key | Moves to |
+| Key | What it does |
 |---|---|
-| → / ↓ | Next element |
-| ← / ↑ | Previous element |
-| Home / End | First / last element |
-| Page Down / Page Up | First element of the next / previous layer |
-| Enter / Space | Commit the focused element — the same `@bind` value a click would (`commitClick`) |
+| → / ↓ | Next mark |
+| ← / ↑ | Previous mark |
+| Home / End | First / last mark |
+| Page Down / Page Up | First mark of the next / previous layer |
+| Enter / Space | Select the focused mark: the `@bind` value becomes what a click on it gives |
 | Escape | Clear focus and leave the plot |
 
-Arrow keys and Home / End stop at the first and last element. They do
-not wrap.
+Arrow keys and Home / End stop at the first and last mark. They do not
+wrap.
 
-**Tab** focuses the surface. It does not land on an element. **Home**
-and the **first arrow** (either direction) land on the first focusable
-element. If a legend exists, its entries come first, so that element is
-the first legend entry. The announcement numbers it "element 1" of its
-layer, the same 1-based index `selected=` uses. `selected = 0` is out
-of range. Page Down then steps from the legend into the plot layers.
-That order matches the pointer: a legend drawn on top of a plot takes
-the clicks under it. Focusing an entry draws highlight in the overlay
-on the trace it labels, the same as holding the pointer over it. For
-more information, see [Legend](@ref).
+Tab focuses the plot, not a mark. Home, or the first arrow key in
+either direction, moves to the first mark. If the figure has a legend,
+its entries come first, so that mark is the first legend entry. Page
+Down then steps from the legend into the plot. This order matches the
+pointer: a legend drawn on top of a plot takes the clicks under it.
+Focusing a legend entry highlights the series it labels, as hovering
+over it does. See [Legend](@ref).
 
-Moving focus draws the same highlight in the overlay as holding the
-pointer over the mark (there is never a separate focus look). A layer
-that has a tooltip shows that same card on the focused element. A
-legend entry does not, unless you passed a template.
+A screen reader calls the first mark of a layer "element 1", the same
+numbering `selected=` uses, so `selected = 0` is out of range.
 
-Reachable kinds: `:circles`, `:rects`, `:polygons`, `:segments`,
-`:polyline`, and `:lines`. That includes [`TextInteractable`](@ref)
-(kind `:rects`) and Region circle / rect / polygon layers. Not
-reachable: `:grid` (heatmap / image cells), threshold, ROI, and view.
-Hold the pointer or use a touch drag for those. Keyboard does not
-arrow through heatmap cells.
+A focused mark shows its tooltip, as a hovered one does. A legend entry
+shows none unless you pass a template.
+
+The keyboard reaches points, bars and other rectangles, polygons, line
+segments, and lines. That includes [`TextInteractable`](@ref) labels and
+the circles, rectangles, and polygons of a
+[`RegionInteractable`](@ref). For what it does not reach, see
+[Limitations](@ref accessibility-limitations).
 
 ## What gets announced
 
-Screen readers announce each element you land on: an optional layer
-name, its position within that layer, and the same content the tooltip
-shows, as plain text. For example:
+When you move to a mark, a screen reader announces an optional layer
+name, the mark's position in its layer, and the text its tooltip shows.
+For example:
 
 ```julia
 PointInteractable(
-    ax, pts;
+    ax, [(1.0, 4.0), (2.0, 1.0), (3.0, 3.0)];
     label = "Scatter",
-    payloads = [(; x = 1.0, y = 4.0)],
+    payloads = [(x = 1.0, y = 4.0), (x = 2.0, y = 1.0), (x = 3.0, y = 3.0)],
 )
 ```
 
-might announce "Scatter, element 1 of 3: x 1.0, y 4.0". Without
-`label`, the announcement omits the prefix: "element 1 of 3: x 1.0, y
-4.0".
+Moving to the first point might announce "Scatter, element 1 of 3: x
+1.0, y 4.0". Without `label`, the announcement starts at the position:
+"element 1 of 3: x 1.0, y 4.0".
 
-`label=` is a single string per **layer** — set it once on the
-interactable, not per element. It is a screen-reader prefix on explicit
-element constructors: [`PointInteractable`](@ref),
-[`SegmentInteractable`](@ref), [`RectInteractable`](@ref) (list form),
-and [`PolygonInteractable`](@ref). It is not accepted on plot-object
-constructors (`PointInteractable(ax, p::Makie.Scatter)` and similar) or
-on `masque(fig)` auto-extraction. Build the interactable with the
-keyword form to set a label.
-
-Do not confuse `label=` with a payload key `label` (for example
-`(; label = "Tokyo")` in a tooltip). That is per-element tooltip data.
-`label=` is one string for the whole layer.
+`label` names the whole layer, so you set it once per interactable. The
+constructors that take positions accept it:
+[`PointInteractable`](@ref), [`SegmentInteractable`](@ref),
+[`RectInteractable`](@ref) with `rects =`, and
+[`PolygonInteractable`](@ref).
 
 ```julia
 masque(fig, [
@@ -84,15 +73,25 @@ masque(fig, [
 ])
 ```
 
-`label=` on `PointInteractable(ax, p::Makie.Scatter)` is a `MethodError`.
+The forms that take a Makie plot, such as `PointInteractable(ax, s)`
+for a scatter `s`, do not accept `label`: passing it raises a
+`MethodError`. `masque(fig)` on its own sets no labels either. To name a
+layer, pass its positions instead.
+
+A payload field called `label`, as in `(city = "Tokyo", label =
+"capital")`, is different: it belongs to one mark and shows in that
+mark's tooltip.
 
 ## [Limitations](@id accessibility-limitations)
 
-- **Grid layers** (`:grid` — heatmap / image cells) are not
-  keyboard-focusable. They stay mouse- and touch-interactive.
-- **Threshold, ROI, and view** have no keyboard equivalent. Drag them
-  with the pointer.
-- **Screen-reader support for `aria-live` inside a shadow DOM is
-  uneven** across browser and assistive-technology combinations. If
-  announcements are silent in your setup, the visual focus ring and
-  tooltip still work. File an issue with the browser and AT versions.
+- The keyboard does not reach heatmap or image cells. The pointer and
+  touch drags still work on them.
+- A threshold line, an ROI box, and pan and orbit have no keyboard
+  controls. Drag them with the pointer.
+- Screen-reader announcements do not work the same in every browser and
+  screen reader. If yours stays silent, the highlight and tooltip still
+  work. Please file an issue with your browser and screen-reader
+  versions.
+
+For the rest of what a click or Enter sends to your notebook, see
+[Concepts](@ref).

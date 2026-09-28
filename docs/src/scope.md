@@ -1,39 +1,40 @@
 # What Masque does not do
 
-Masque makes a static Makie figure respond to the pointer and hands the
-reader's choices to Pluto. Some things that interactive plotting
-libraries do are left out on purpose, and a few have rough edges today.
-Knowing them up front saves a search.
+Masque adds tooltips and click selection to a Makie figure, and sends a
+click to your notebook through `@bind`. Some things that interactive
+plotting libraries do are left out on purpose, and a few have rough
+edges today.
 
 ## By design
 
-- **Hover never reaches Julia.** Hovering is instant and works in a
-  static export because it stays in the browser. To react to a mark in
-  Julia, click it. See [Concepts](@ref).
-- **One selection at a time.** A click replaces the selection; there is
-  no Shift- or Ctrl-click to add to it. To pick several marks, brush
-  them with an [`ROIInteractable`](@ref).
-- **Rectangles only.** Brushes are boxes; there is no lasso, and one
-  widget brushes one layer.
-- **The figure is never redrawn by the overlay.** Highlights are drawn
-  on top of the picture, so the overlay cannot hide a series, recolor a
-  mark, or zoom to a box. Do those in Julia from the `@bind` value — for
-  example, fade the other series after a legend click (see
+- Hovering never changes a `@bind` value. Tooltips and highlights work
+  in the browser alone, so they are instant and still work in a static
+  export. To use a mark in Julia, click it. See [Concepts](@ref).
+- You select one mark at a time. A click replaces the selection, and
+  there is no Shift-click or Ctrl-click to add to it. To pick several
+  marks, brush them with an [`ROIInteractable`](@ref).
+- Brushes are rectangles. There is no lasso, and one widget brushes one
+  layer.
+- Hovering and clicking never change the figure itself. Highlights are
+  drawn on top of it, so a click cannot hide a series, recolor a mark,
+  or zoom to a box by itself. Do those in Julia from the `@bind` value,
+  for example to fade the other series after a legend click (see
   [Legend](@ref)).
-- **No double-click to reset the view.** A pan or orbit stays where you
-  left it until the figure is rebuilt; see [Pan and orbit](@ref).
-- **No automatic linking between plots.** Masque does not treat the same
-  row in two plots as one observation; link them in Pluto cells (see
-  [Linked views](@ref)).
-- **Clicks need a running notebook.** In a static HTML export, hover and
-  highlights still work, but nothing reaches `@bind` and the view cannot
-  pan. PlutoSliderServer cannot enumerate Masque's values ahead of time,
-  so it does not make clicks work in an export either.
-- **The keyboard reaches marks, not handles.** Arrow keys walk points,
-  bars, polygons, lines, and legend entries, but cannot move a brush box
-  or a threshold line; see [Keyboard and screen readers](@ref).
-- **No `LScene`.** `masque` refuses a figure that holds one, on both
-  backends. Interactive 3D is an `Axis3`.
+- Double-clicking does not reset the view. A pan or orbit stays where
+  you left it until the figure is rebuilt. See [Pan and orbit](@ref).
+- Plots are not linked for you. Masque does not know that a row in one
+  plot is the same observation as a row in another. Link them in Pluto
+  cells (see [Linked views](@ref)).
+- Clicks need a running notebook. In a static HTML export, tooltips and
+  highlights still work, but other cells do not respond to a click and
+  the view cannot pan. PlutoSliderServer cannot precompute a `masque`
+  widget's values, so it does not make clicks work in an export either.
+- The keyboard reaches marks, not handles. Arrow keys move through
+  points, bars, polygons, lines, and legend entries, but cannot move a
+  brush box or a threshold line. See
+  [Keyboard and screen readers](@ref).
+- `LScene` is not supported. `masque` refuses a figure that holds one,
+  on both backends. For interactive 3D, use an `Axis3`.
 
 ## Overlapping marks
 
@@ -60,16 +61,14 @@ end
 @bind pick masque(fig, [PointInteractable(ax, s), PolygonInteractable(ax, p)])
 ```
 
-In 3D there is no depth test either. Which mark the pointer hits
-depends on the same layer order, not on distance from the camera: a
-point on the far side of an `Axis3` scene can be hit through a nearer
-object in a later layer, and a nearer mark in a later layer can be
-hidden by a farther one in an earlier layer.
+In 3D, distance from the camera does not matter either. Which mark the
+pointer hits depends on the same layer order. A point on the far side
+of an `Axis3` scene can be hit through a nearer object in a later layer,
+and a nearer mark in a later layer can be hidden by a farther one in an
+earlier layer.
 
 ## Current rough edges
 
-These are known problems rather than design choices:
-
-- Several plot types are skipped on `Axis3` and `PolarAxis`, and `Surface`
-  plots are not hit-tested. [Supported plots and axes](@ref) has the full
-  list.
+Several plot types are skipped on `Axis3` and `PolarAxis`, and a
+`Surface` plot does not respond to the pointer.
+[Supported plots and axes](@ref) has the full list.
