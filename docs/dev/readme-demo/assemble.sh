@@ -1,5 +1,5 @@
 #!/bin/bash
-# Assemble the README demo GIF from the frames + timestamps.json written by record.mjs.
+# Assemble the README demo GIF from the frames + timestamps.json written by test/e2e/readme_demo_gif.mjs.
 #
 #   docs/dev/readme-demo/assemble.sh <frames-dir> <out.gif>
 set -euo pipefail

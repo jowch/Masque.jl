@@ -1,8 +1,9 @@
 // README demo recorder — drives docs/dev/readme-demo/notebook.jl in headless Chromium and
 // captures a frame sequence of a hover → tooltip → click → @bind round-trip, for assembly into
-// docs/src/assets/demo.gif. Run from test/e2e (the playwright pinned in its package.json lives in its node_modules):
+// docs/src/assets/demo.gif. It lives in test/e2e because Node resolves `playwright` from the
+// script's own directory, and the pinned playwright is in test/e2e/node_modules.
 //
-//   node ../../docs/dev/readme-demo/record.mjs <base-url> <notebook-abs-path> <frames-dir>
+//   node readme_demo_gif.mjs <base-url> <notebook-abs-path> <frames-dir>
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync, copyFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -10,7 +11,7 @@ import { tmpdir } from "node:os";
 
 const [base, notebook, framesDir] = process.argv.slice(2);
 if (!base || !notebook || !framesDir) {
-  console.error("usage: node record.mjs <base-url> <notebook-abs-path> <frames-dir>");
+  console.error("usage: node readme_demo_gif.mjs <base-url> <notebook-abs-path> <frames-dir>");
   process.exit(2);
 }
 mkdirSync(framesDir, { recursive: true });
@@ -274,7 +275,7 @@ try {
       if (after !== before && /selected/i.test(after)) break;
       await sleep(100);
     }
-    if (!/selected/i.test(after) || !/são paulo/i.test(after)) {
+    if (!/selected/i.test(after) || !/s[ãa]o paulo/i.test(after) || !/index 4\b/.test(after)) {
       throw new Error(`click: output cell didn't update — before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
     }
     console.error(`OK  click-bind: ${JSON.stringify(after)}`);

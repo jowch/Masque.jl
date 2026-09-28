@@ -15,7 +15,7 @@ notebook build a temp env), Playwright installed in `test/e2e` (`npm install` th
    Poll `curl localhost:1250` for 200; don't grep the log.
 2. Record frames (from `test/e2e`, where Playwright is installed):
    ```sh
-   node ../../docs/dev/readme-demo/record.mjs http://localhost:1250 "$PWD/../../docs/dev/readme-demo/notebook.jl" /tmp/demo-frames
+   node readme_demo_gif.mjs http://localhost:1250 "$PWD/../../docs/dev/readme-demo/notebook.jl" /tmp/demo-frames
    ```
    The script opens a throwaway copy of the notebook so Pluto starts a fresh kernel; reusing
    the same path would inherit the previous run's `@bind` value.

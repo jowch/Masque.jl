@@ -1,7 +1,7 @@
 # Home feature GIFs
 
-Source for `docs/src/assets/home/{hover,click,brush,legend,orbit}.gif`.
-Hover, click, brush, and legend are Playwright recordings against a
+Source for `docs/src/assets/home/{hover,click,legend,orbit}.gif`.
+Hover, click, and legend are Playwright recordings against a
 harvested docs player (static overlay HTML), not a live Pluto kernel.
 Orbit is a live Pluto drag: `ViewInteractable` streams PNG frames over
 `with_js_link`, which is dead on a static overlay-only harvest. The
@@ -22,7 +22,7 @@ MASQUE_DEV_ENV=~/.julia/environments/masque-dev \
 docs/dev/home-gifs/record-all.sh http://localhost:8765
 ```
 
-`record-all.sh` records hover/click/brush/legend from the docs server
+`record-all.sh` records hover/click/legend from the docs server
 and orbit from `MASQUE_ORBIT_PLUTO` (default `http://localhost:1240`).
 
 Or one overlay scenario from `test/e2e`:
@@ -46,6 +46,5 @@ node home_orbit_gif.mjs http://localhost:1240 \
 |---|---|---|
 | `hover.gif` | `home_hover_stars.html` | Pointer over Sirius, Rigel, Betelgeuse; tooltips |
 | `click.gif` | `getting_started.html` | Hover Tokyo, click São Paulo; readout |
-| `brush.gif` | `home_brush_stations.html` | Drag the ROI onto the Cascadia stations |
 | `legend.gif` | `home_legend_classes.html` | Hover Adelie, click Gentoo; fade + readout |
 | `orbit.gif` | live Pluto `orbit_notebook.jl` | Cursor-drag orbit of a trefoil-knot tube |
