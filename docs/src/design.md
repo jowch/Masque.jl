@@ -1,9 +1,9 @@
 # Current design and rough edges
 
-Masque works differently from interactive plotting libraries in a few
-places you might not expect, and some parts are unfinished. This page
-describes how it behaves today, so you can plan around it before you
-build a notebook on it.
+Masque works differently from other interactive plotting libraries in
+a few places, and a few features are not finished yet. Each entry below
+says how Masque behaves today and, where there is one, what to do
+instead.
 
 ## How Masque behaves
 
