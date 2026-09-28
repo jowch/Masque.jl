@@ -233,7 +233,7 @@ end
         end
         n += 1
     end
-    @test n >= 29
+    @test n >= 28
 end
 
 @testset "home quickstart is the 3-point Pluto export" begin
@@ -254,7 +254,7 @@ end
 end
 
 @testset "overlay-only players set chip = false" begin
-    for name in ("gallery_limits", "home_hover_stars", "home_export", "gallery_bars")
+    for name in ("home_hover_stars", "home_export", "gallery_bars")
         player = parse_player_toml(joinpath(@__DIR__, "..", "docs", "src", "embeds", name * ".jl"))
         @test player["chip"] == false
     end
@@ -375,16 +375,12 @@ end
     @test isfile(joinpath(root, "docs", "src", "embeds", "getting_started.jl"))
 
     names = [
-        "gallery_tooltips",
         "gallery_selection",
         "gallery_bars",
         "gallery_polygons",
-        "gallery_colorbar",
         "gallery_text",
         "gallery_boxselect",
         "gallery_image",
-        "gallery_limits",
-        "gallery_polar",
         "example_heatmap_trace",
     ]
     for name in names

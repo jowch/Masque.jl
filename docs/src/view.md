@@ -62,11 +62,30 @@ On an `Axis3`, dragging turns the camera around the plot (azimuth and
 elevation) instead of panning. It works on both backends, and you can
 hover over and click the marks as the view turns.
 
+```@raw html
+<video id="masque-view-orbit" title="Dragging an Axis3 to orbit three markers, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-view-orbit");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "view-orbit.mp4";
+})();
+</script>
+```
+
 ```julia
 begin
-    fig = Figure(size = (560, 360))
-    ax = Axis3(fig[1, 1])
-    s = scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6), (7, 8, 2)]; markersize = 16)
+    fig = Figure(size = (500, 380))
+    ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "drag to orbit")
+    s = scatter!(
+        ax,
+        Makie.Point3f[(1, 2, 3), (4, 5, 6), (7, 8, 2)];
+        color = :crimson,
+        markersize = 16,
+    )
     orbit = ViewInteractable(ax)
     nothing
 end
@@ -92,5 +111,3 @@ Panning needs a 2D `Axis` with numeric limits on an `identity`,
 `Colorbar`, a categorical axis, or another scale raises an
 `ArgumentError` when `masque` runs. An `LScene` is not supported. See
 [Supported plots and axes](@ref).
-
-For complete examples, see [Drag to pan](@ref) and [Drag to orbit](@ref).

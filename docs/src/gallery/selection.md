@@ -25,8 +25,7 @@ This example keeps only the last click. To collect indices across
 clicks, create a `Ref` in a cell that does not use `pick`, so it is not
 reset, add each click to it, and pass the collected indices as
 `selected=` on the second widget. A slider that rebuilds the figure
-drops the highlight unless you pass the indices again. See
-[Limits](@ref).
+drops the highlight unless you pass the indices again.
 
 !!! note
 

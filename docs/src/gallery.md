@@ -1,18 +1,12 @@
 # Examples
 
-Each example is a small notebook you can copy. On these pages,
-hovering works as it does in Pluto. Clicking a mark or drawing a box
-shows the result the notebook computed for it ahead of time. Under each
-example, the notebook is also written out as text. Pan, orbit, and
-Compare a cluster are video clips instead: moving the view needs a
-running notebook, and the cluster example has too many possible boxes
-to record.
+Each example is a small notebook you can copy, with its code below it.
+Hover over the figure as you would in Pluto; a click or a box shows the
+result the notebook recorded for it.
 
 ## Analyses
 
-Examples where a click or a box feeds an analysis: compare the points
-in a box, open the data behind a heatmap cell, or show a click on a
-second plot.
+A click or a box feeds the next step of an analysis.
 
 ```@raw html
 <div class="masque-gallery">
@@ -36,18 +30,12 @@ second plot.
   <img alt="An RGB image with a region box" src="assets/gallery/image.png">
   <span>Image ROI</span>
 </a>
-<a class="masque-gallery-card" data-page="tooltips">
-  <img alt="Four city markers with a template tooltip" src="assets/gallery/tooltips.png">
-  <span>Tooltip templates</span>
-</a>
 </div>
 ```
 
 ## Plot types
 
-One page per kind of plot, showing what you get when you hover over it
-or click it. Pan and orbit are video clips, since moving the view needs
-a running notebook.
+What `masque(fig)` makes interactive for other kinds of plot.
 
 ```@raw html
 <div class="masque-gallery">
@@ -59,29 +47,9 @@ a running notebook.
   <img alt="Band, density, contour, violin, Voronoi, and box plots" src="assets/gallery/polygons.png">
   <span>Polygons</span>
 </a>
-<a class="masque-gallery-card" data-page="colorbar">
-  <img alt="A gaussian heatmap with a colorbar" src="assets/gallery/colorbar.png">
-  <span>Colorbar</span>
-</a>
 <a class="masque-gallery-card" data-page="text">
   <img alt="Scatter points with Alpha, Beta, Gamma, a tilted label, and an annotation" src="assets/gallery/text.png">
   <span>Text labels</span>
-</a>
-<a class="masque-gallery-card" data-page="polar">
-  <img alt="Four points on a polar axis" src="assets/gallery/polar.png">
-  <span>Polar points</span>
-</a>
-<a class="masque-gallery-card" data-page="limits">
-  <img alt="A scatter clipped by axis limits" src="assets/gallery/limits.png">
-  <span>Limits slider</span>
-</a>
-<a class="masque-gallery-card" data-page="pan">
-  <img alt="A scatter you drag to pan" src="assets/gallery/pan.png">
-  <span>Drag to pan</span>
-</a>
-<a class="masque-gallery-card" data-page="orbit">
-  <img alt="Three markers on an Axis3" src="assets/gallery/orbit.png">
-  <span>Drag to orbit</span>
 </a>
 </div>
 <script>
