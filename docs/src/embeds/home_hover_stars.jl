@@ -46,13 +46,11 @@ begin
         xreversed = true,
     )
     markersize = 16
-    scatter!(ax, xs, ys; color = palette, markersize)
+    sc = scatter!(ax, xs, ys; color = palette, markersize)
     tips = PointInteractable(
-        ax, collect(zip(xs, ys));
+        ax, sc;
         id = :stars,
-        radius = 0.3525 * markersize,
         payloads = [(; name = s.name, type = s.type, dist = s.dist) for s in stars],
-        colors = (; palette, index = collect(0:(length(stars) - 1))),
         tooltip = masque"<b>$(name)</b><br>$(type)<br>$(dist) ly",
     )
     nothing

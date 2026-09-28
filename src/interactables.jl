@@ -44,7 +44,7 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
   from the manifest.
 - `colors` — an optional tooltip accent colour for this layer's elements: a single CSS colour
   string (uniform across the layer), or `(; palette, index)` with `palette::Vector{String}` (CSS
-  colours) and one 0-based `index` per element into it (colormapped/categorical data).
+  colours) and one 1-based `index` per element into it (colormapped/categorical data).
   `nothing` (default) omits it from the manifest — no accent border on the tooltip. Built by
   [`PointInteractable`](@ref)'s plot-object constructor when the source plot's colour is
   resolvable; not derived automatically for a bare-points/vertices interactable.
@@ -267,6 +267,15 @@ _check_tooltip(tooltip) =
 # `?? null` swallows (an out-of-range or short `index` just resolves to "no accent" there).
 function _check_colors(colors, npoints)
     (colors === nothing || colors isa AbstractString) && return colors
+    # One CSS colour per point: stored as the same deduplicated palette + 1-based index the
+    # plot-object constructor builds, so the manifest carries each distinct colour once.
+    if colors isa AbstractVector{<:AbstractString}
+        length(colors) == npoints ||
+            throw(ArgumentError("colors: expected one colour per point (got $(length(colors)) for $npoints points)"))
+        palette = unique(String.(colors))
+        slot = Dict(c => k for (k, c) in enumerate(palette))
+        return (; palette, index = [slot[c] for c in colors])
+    end
     if colors isa NamedTuple && haskey(colors, :palette) && haskey(colors, :index)
         palette, index = colors.palette, colors.index
         palette isa AbstractVector{<:AbstractString} ||
@@ -277,14 +286,14 @@ function _check_colors(colors, npoints)
             throw(ArgumentError("colors: index must have one entry per point (got $(length(index)) for $npoints points)"))
         isempty(palette) && !isempty(index) &&
             throw(ArgumentError("colors: index is non-empty but palette is empty"))
-        all(0 <= i < length(palette) for i in index) ||
-            throw(ArgumentError("colors: every index must be in 0:$(length(palette) - 1) (palette has $(length(palette)) entries)"))
+        all(1 <= i <= length(palette) for i in index) ||
+            throw(ArgumentError("colors: every index must be in 1:$(length(palette)) (palette has $(length(palette)) entries)"))
         return colors
     end
     throw(
         ArgumentError(
-            "colors must be `nothing`, a CSS colour String, or `(; palette::Vector{<:AbstractString}, " *
-                "index::Vector{<:Integer})`, got $(typeof(colors))",
+            "colors must be `nothing`, a CSS colour String, a Vector of CSS colour Strings (one per " *
+                "point), or `(; palette::Vector{<:AbstractString}, index::Vector{<:Integer})`, got $(typeof(colors))",
         ),
     )
 end
@@ -327,9 +336,10 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
   used by the overlay's keyboard navigation ("Scatter, element 3 of 10: …"). Default `nothing`
   (no prefix). Not the same thing as a `label` *payload* key (see the `PointInteractable`
   examples elsewhere in this file) — that's per-element tooltip data.
-- `colors` — an optional tooltip accent colour; see [`HitLayer`](@ref)'s `colors` field. Default
-  `nothing` (no accent). Not derived automatically here — only `PointInteractable(ax,
-  p::Makie.Scatter)` resolves it, from `p`'s own colour.
+- `colors` — an optional tooltip accent colour: one CSS colour string for every point, a
+  `Vector` of CSS colour strings (one per point), or `(; palette, index)` with one 1-based
+  `index` per point into `palette`. Default `nothing` (no accent). Not derived automatically
+  here — only `PointInteractable(ax, p::Makie.Scatter)` resolves it, from `p`'s own colour.
 
 # From a plot object
 `PointInteractable(ax, p::Makie.Scatter)` is the usual call. It reads points from `p`'s

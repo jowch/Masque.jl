@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- `PointInteractable`'s `colors = (; palette, index)` takes a 1-based `index`, like
+  `pick.index` and `selected=`. A 0-based index from before now throws an `ArgumentError` (or,
+  when every entry is still in range, shifts each accent one colour along). `colors` also takes
+  a `Vector` with one CSS colour per point, which needs no index. Passing the `Scatter` itself
+  still resolves the accent from its `color=`, with neither (#216).
 - `masque` refuses a figure that holds an `LScene` on both backends. `:webgl` used to render it
   with no overlay on that block; it now throws the same `ArgumentError` as `:cairo`, mixed
   figures included. The message no longer recommends WGLMakie and names `Axis3` as the

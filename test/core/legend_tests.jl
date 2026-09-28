@@ -396,7 +396,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         L = only(hitlayers(li, ctx))
         @test L.colors !== nothing
         pal, idx = L.colors.palette, L.colors.index
-        @test [pal[i + 1] for i in idx] == ["rgb(0,0,255)", "rgb(255,0,0)", "rgb(0,128,0)"]
+        @test pal[idx] == ["rgb(0,0,255)", "rgb(255,0,0)", "rgb(0,128,0)"]
     end
 
     @testset "N4: a non-AbstractString label (RichText) doesn't misreport as a Makie compat break" begin

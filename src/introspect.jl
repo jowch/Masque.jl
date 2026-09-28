@@ -105,7 +105,7 @@ function _point_radius(ax, pts::Vector{Point3f})
     return _default_circle_radius()
 end
 # Tooltip accent colour for a Scatter's points (HitLayer's `colors` field): a shared palette of
-# CSS strings + one 0-based index per point, or a single CSS string when every point is the same
+# CSS strings + one 1-based index per point, or a single CSS string when every point is the same
 # colour. `nothing` (no accent) for anything not shaped one of those two ways — not an error,
 # since an accent is a nice-to-have, not something a plot must support.
 const _COLOR_PALETTE_SIZE = 32
@@ -119,7 +119,7 @@ function _resolve_scatter_colors(p)
     # rather than the palette+index shape (whose `index` must have one entry per point).
     if c isa Real
         r = _colormap_palette_index(p, [c])
-        return r === nothing ? nothing : r.palette[only(r.index) + 1]
+        return r === nothing ? nothing : r.palette[only(r.index)]
     end
     c isa AbstractVector || return _css_color(c)
     if eltype(c) <: Real
@@ -142,7 +142,7 @@ function _categorical_palette_index(c)
         idx = get(seen, s, nothing)
         if idx === nothing
             push!(palette, s)
-            idx = length(palette) - 1
+            idx = length(palette)
             seen[s] = idx
         end
         index[k] = idx
@@ -178,11 +178,11 @@ function _colormap_palette_index(p, values)
     # rounding, not just after, so no magnitude of finite input can escape. Falls back to
     # palette[1] rather than erroring — the accent is a nice-to-have, not a rendering guarantee.
     index = if span == 0
-        fill(0, length(scaled))
+        fill(1, length(scaled))
     else
         [
             let idxf = (Float64(v) - lo) / span * (n - 1)
-                isfinite(idxf) ? round(Int, clamp(idxf, 0.0, Float64(n - 1))) : 0
+                isfinite(idxf) ? round(Int, clamp(idxf, 0.0, Float64(n - 1))) + 1 : 1
             end
                 for v in scaled
         ]

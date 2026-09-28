@@ -61,7 +61,8 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     s === nothing || (d["selects"] = string(s))
     L.label === nothing || (d["label"] = L.label)
     if L.colors !== nothing
-        d["colors"] = L.colors isa AbstractString ? L.colors : Dict("palette" => L.colors.palette, "index" => L.colors.index)
+        # `index` is 1-based in Julia and 0-based on the wire (the overlay indexes a JS array).
+        d["colors"] = L.colors isa AbstractString ? L.colors : Dict("palette" => L.colors.palette, "index" => L.colors.index .- 1)
     end
     L.links === nothing || (d["links"] = [[string(id) for id in ids] for ids in L.links])
     spec = tooltip_spec(i)
