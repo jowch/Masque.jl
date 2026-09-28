@@ -3,14 +3,14 @@
 //
 //   node home_feature_gifs.mjs http://localhost:8765 <scenario> <frames-dir>
 //
-// Scenarios: hover | click | brush | legend | export
+// Scenarios: hover | click | legend | export
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const [base, scenario, framesDir] = process.argv.slice(2);
 if (!base || !scenario || !framesDir) {
-  console.error("usage: node record.mjs <base-url> <hover|click|brush|legend> <frames-dir>");
+  console.error("usage: node home_feature_gifs.mjs <base-url> <hover|click|legend> <frames-dir>");
   process.exit(2);
 }
 mkdirSync(framesDir, { recursive: true });
@@ -20,7 +20,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SPECS = {
   hover: { path: "/embeds/home_hover_stars.html", showOut: false },
   click: { path: "/embeds/getting_started.html", showOut: true },
-  brush: { path: "/embeds/home_brush_stations.html", showOut: true },
   legend: { path: "/embeds/home_legend_classes.html", showOut: true },
 };
 
@@ -223,34 +222,6 @@ try {
         throw new Error(`click: readout did not update — before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
       }
       console.error(`OK  click: ${after}`);
-      await sleep(1100);
-    } else if (scenario === "brush") {
-      const roi = layers.find((l) => l.kind === "roi");
-      const pts = layers.find((l) => l.id === "pts");
-      const start = hitPoint(roi, 0);
-      const n0 = hitPoint(pts, 0);
-      const n1 = hitPoint(pts, 1);
-      const n2 = hitPoint(pts, 2);
-      const dest = { x: (n0.x + n1.x + n2.x) / 3, y: (n0.y + n1.y + n2.y) / 3 };
-      const [from, to] = await Promise.all([toCss(start.x, start.y), toCss(dest.x, dest.y)]);
-      await sleep(350);
-      await moveTo(from, 400);
-      await sleep(200);
-      const before = await outText();
-      await page.mouse.down();
-      await sleep(40);
-      await moveTo(to, 700, 24);
-      await page.mouse.up();
-      let after = before;
-      for (let i = 0; i < 40; i++) {
-        after = await outText();
-        if (after !== before && /Seattle|Cascadia/i.test(after)) break;
-        await sleep(80);
-      }
-      if (after === before || !/Seattle|Cascadia/i.test(after)) {
-        throw new Error(`brush readout did not move onto Cascadia: ${JSON.stringify(after)}`);
-      }
-      console.error(`OK  brush: ${after.slice(0, 120)}`);
       await sleep(1100);
     } else if (scenario === "legend") {
       const legend = layers.find((l) => l.id === "legend");
