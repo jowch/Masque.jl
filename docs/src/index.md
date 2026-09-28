@@ -6,7 +6,7 @@ notebook can respond. [Ready to get started?](getting-started.md)
 
 ## [Tooltips](@id home-tooltips)
 
-![Holding the pointer over a star shows its name, spectral type, and distance](assets/home/hover.gif)
+![Hovering over a star shows its name, spectral type, and distance](assets/home/hover.gif)
 
 Hover over a point, bar, heatmap cell, or polygon to see its data in a
 tooltip. You choose what the tooltip says. See [Tooltips](@ref).
@@ -15,9 +15,8 @@ tooltip. You choose what the tooltip says. See [Tooltips](@ref).
 
 ![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.gif)
 
-Click a mark to select it. Like a PlutoUI slider, the selection goes to
-a `@bind` variable, and cells that use the variable respond. See
-[Click marks](@ref) and [Selection](@ref).
+Click a mark to send it to your notebook. See [Click marks](@ref) and
+[Selection](@ref).
 
 ## [Pan and orbit](@id home-pan-orbit)
 
@@ -34,10 +33,9 @@ the selection can fade the others, as in this example. See [Legend](@ref).
 
 ## Static exports
 
-In a static HTML export of your notebook, tooltips, highlights, and
-selection still work. Cells that use the `@bind` variable keep the
-values they had when you exported. The figure below is a static export; hover over a borough. See
-[Static exports and this site](@ref) for what an export can and cannot do.
+Tooltips and highlights keep working in a static HTML export of your
+notebook. The figure below is one; hover over a borough. See
+[Static exports and this site](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -47,9 +45,8 @@ values they had when you exported. The figure below is a static export; hover ov
 
 ## [Backends](@id home-backends)
 
-Masque works with CairoMakie and WGLMakie. CairoMakie is the default.
-Use WGLMakie for animation, large data, or 3D you can orbit. See
-[Backends](@ref).
+Masque works with CairoMakie and WGLMakie. See [Backends](@ref) to
+choose between them.
 
 ## Where to go next
 

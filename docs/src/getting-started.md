@@ -1,8 +1,7 @@
 # Getting started
 
-Masque adds tooltips and click selection to a Makie figure in a Pluto
-notebook. This page makes one scatter plot interactive, then puts your
-own data in its tooltips.
+Make one scatter plot interactive, then show your own data in its
+tooltips.
 
 ## Install
 
@@ -12,9 +11,7 @@ Load Masque and a Makie backend in a Pluto cell. Pluto installs both:
 using Masque, CairoMakie
 ```
 
-Put each code block from these docs in its own cell. A Pluto cell holds
-one expression, so blocks with several statements are wrapped in
-`begin ... end`.
+Put each code block from these docs in its own cell.
 
 !!! info
 
@@ -61,8 +58,37 @@ full list.
 
 The default tooltip shows coordinates. To show your own fields instead,
 pass the scatter to [`PointInteractable`](@ref) with one `payloads`
-entry per point. In the notebook below, hovering a point shows its
-`name` and `y`, and clicking it sets `sel.name`.
+entry per point. Replace the figure cell with this one:
+
+```julia
+begin
+    xs = [1.0, 2.0, 3.0, 4.0]
+    ys = [2.0, 1.0, 4.0, 3.0]
+    fig = Figure(size = (560, 360))
+    ax = Axis(fig[1, 1])
+    s = scatter!(ax, xs, ys; markersize = 16)
+    points = [
+        (name = "one", x = 1.0, y = 2.0),
+        (name = "two", x = 2.0, y = 1.0),
+        (name = "three", x = 3.0, y = 4.0),
+        (name = "four", x = 4.0, y = 3.0),
+    ]
+    pts = PointInteractable(ax, s; payloads = points)
+    nothing
+end
+```
+
+and pass `pts` to `masque` in the `@bind` cell:
+
+```julia
+@bind pick masque(fig, pts)
+```
+
+Hovering a point now shows its `name`, `x`, and `y`, and clicking it
+sets `pick.name`.
+
+The notebook below does the same with three points. It is a recording
+of a real notebook; see [Static exports and this site](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -73,10 +99,6 @@ entry per point. In the notebook below, hovering a point shows its
 ```@eval
 Main.masque_fallback("home_quickstart")
 ```
-
-This notebook is a recording, so a click shows a result computed ahead
-of time (the **Simulating `@bind`** badge). In your own notebook, the
-last cell responds to your click.
 
 ## Where to go next
 

@@ -66,9 +66,7 @@ regions = PolygonInteractable(ax, p;
 
 Bands, densities, filled contours, violins, and Voronoi cells are
 polygons too. A filled contour also reports the `low` and `high` of its
-level. Clicking inside a hole in a contour level selects the polygon
-drawn in the hole. If the hole is empty, for example a peak above the
-top level, the click selects nothing.
+level.
 
 ## Lines
 
@@ -87,9 +85,29 @@ Main.masque_fallback("marks_lines")
 ```
 
 `pick.layer` tells the two lines apart: `:lines` for the first and
-`:lines_2` for the second. `stairs!` works the same way (`:stairs`,
-`:stairs_2`, and so on). A `series!` call is one layer, and `pick.index`
-says which series was clicked.
+`:lines_2` for the second. `stairs!` is named the same way. To choose
+the names yourself, pass each line to [`SegmentInteractable`](@ref)
+with an `id`:
+
+```julia
+begin
+    fig = Figure(size = (560, 360))
+    ax = Axis(fig[1, 1])
+    xs = 0:0.1:10
+    l1 = lines!(ax, xs, sin.(xs))
+    l2 = lines!(ax, xs, cos.(xs))
+    sine = SegmentInteractable(ax, l1; id = :sine)
+    cosine = SegmentInteractable(ax, l2; id = :cosine)
+    nothing
+end
+```
+
+```julia
+@bind pick masque(fig, [sine, cosine])
+```
+
+Then `pick.layer` is `:sine` or `:cosine`. A `series!` call is one
+layer, and `pick.index` says which series was clicked.
 
 Plots made of separate pieces make each piece its own mark:
 `linesegments!`, error bars, range bars, `hlines!`, and `vlines!`.
@@ -109,8 +127,5 @@ its angle and its `y` is its radius, in the order you passed them:
 Main.masque_fallback("marks_polar")
 ```
 
-On a polar axis, `masque(fig)` makes scatters, lines, segments,
-`scatterlines!`, and `series!` interactive, and skips other plots with a
-warning.
-Some readouts also need a flat axis. [Supported plots and axes](@ref)
-lists what works where.
+[Supported plots and axes](@ref) lists the other plots a polar axis
+supports.

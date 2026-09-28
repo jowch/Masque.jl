@@ -16,8 +16,9 @@ Main.masque_fallback("grids_heatmap")
 ## Hover and click cells
 
 `masque(fig)` makes every `heatmap!` and `image!` interactive. To choose
-the grid yourself, pass the plot to [`RectInteractable`](@ref). You need
-this to give a grid its own `id`, for example when a figure has two:
+the grid yourself, pass the plot to [`RectInteractable`](@ref). Give it
+an `id` so a `selects` box can name it and `pick.layer` tells it apart,
+for example when a figure has two grids:
 
 ```julia
 temps = RectInteractable(ax, p; id = :temps)
@@ -26,9 +27,14 @@ temps = RectInteractable(ax, p; id = :temps)
 A click makes `pick` a [`GridCellEvent`](@ref). `pick.i` is the cell's
 first index in the matrix you plotted and `pick.j` its second, so
 `z[pick]` is the same as `z[pick.i, pick.j]`. Makie draws the first
-index along x and the second along y. `pick.value` is the cell's value. The
-clicked cell stays highlighted, and clicking outside the grid keeps the
-current selection.
+index along x and the second along y. `pick.value` is the cell's value,
+and the clicked cell stays highlighted.
+
+A grid does not take `payloads`. A cell always reports its `i`, `j`,
+and `value`. Keep other per-cell data in Julia and look it up with
+`pick`.
+
+## Make a grid from edges and values
 
 If you have edges and values instead of a plot, pass them as `grid`.
 Each edge vector must be monotonic, ascending or descending. The values
@@ -37,10 +43,6 @@ form a matrix of size `(length(xedges) - 1, length(yedges) - 1)`:
 ```julia
 cells = RectInteractable(ax; grid = (0.5:1:4.5, 0.5:1:3.5, z), id = :cells)
 ```
-
-A grid does not take `payloads`. A cell always reports its `i`, `j`,
-and `value`. Keep other per-cell data in Julia and look it up with
-`pick`.
 
 ## Large grids
 
@@ -71,13 +73,13 @@ A box that misses the grid still gives a `GridWindowEvent`, with empty
 ranges (`win.i1:win.i2` is `1:0`). `z[win]` is then an empty matrix
 rather than an error.
 
-Once the box selects the grid, clicking a cell shows its tooltip but
-does not change the value, which stays the box's block. See
-[Brush a region](@ref).
+While the box selects the grid, clicking a cell does not change `win`;
+see [Brush a region](@ref).
 
-## What grids cannot do
+## Where to go next
 
-You cannot move between heatmap cells with the keyboard, and a cell
-cannot start selected with `selected=`. Heatmaps and images on an
-`Axis3` or a `PolarAxis` are skipped with a warning. To read values from
-the colorbar next to a heatmap, see [Read coordinates](@ref).
+- [Read coordinates](@ref): read values from the colorbar next to a
+  heatmap
+- [Supported plots and axes](@ref): which axes a heatmap works on
+- [Keyboard and screen readers](@ref accessibility-limitations): what
+  the keyboard reaches

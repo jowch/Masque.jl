@@ -26,7 +26,7 @@ Hover a point to read its name, then click it. The last cell names the point.
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000010
 md"""
-Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Pass the scatter to `PointInteractable` so the highlight sits on the marker. The tooltip shows each point's `name` and `y`.
+Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Pass the scatter to `PointInteractable` with one `payloads` entry per point, and the tooltip shows each point's fields.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000002

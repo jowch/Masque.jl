@@ -4,8 +4,8 @@ Clicking a mark selects it. The mark stays highlighted, and the `@bind`
 variable holds it until another click replaces it. You can also start
 with a mark selected, or keep a selection when the figure is rebuilt.
 
-The examples on this page use a scatter of cities with a name for each
-point:
+The examples on this page use a scatter of cities, with each city's
+name in its payload's `city` field:
 
 ```julia
 cities = PointInteractable(ax, s; id = :cities, payloads = rows)
@@ -18,8 +18,7 @@ cities = PointInteractable(ax, s; id = :cities, payloads = rows)
 [`ElementEvent`](@ref). Clicking another mark replaces it, because one
 widget holds one selection. Clicking empty space changes nothing: the
 highlight stays and `pick` keeps its value, so a stray click does not
-lose your choice. On a focused mark, Enter or Space selects it just as a
-click does.
+lose your choice.
 
 To select several marks at once, drag a box instead. An
 [`ROIInteractable`](@ref) with `selects` returns every mark inside it.
@@ -27,8 +26,8 @@ See [Brush a region](@ref).
 
 ## Start with a mark selected
 
-`selected=` sets the selection the widget starts with. `selected = 1`
-is the first city you plotted, the same number `pick.index` would give:
+`selected=` takes positions in the data you plotted, the same numbers
+`pick.index` gives. `selected = 1` is the first city:
 
 ```julia
 @bind pick masque(fig, cities; selected = 1)
@@ -48,55 +47,58 @@ city to replace it:
 Main.masque_fallback("selection_start")
 ```
 
-Some cases need more care:
+When the widget has more than one layer you could select, name the
+layer: `selected = (; cities = 1)`, or `selected = Dict(:cities => [1, 3])`
+for several marks. There a bare number raises an `ArgumentError`, as
+does a position outside your data.
 
-- `selected = [1, 3]` highlights both marks, but `pick` stays `nothing`,
-  because a click value holds one mark. The next click replaces the
-  highlight. With a `selects` box in the widget the value is a vector,
-  and `selected = [1, 3]` starts as those two events.
-- When the widget has more than one layer you could select, name the
-  layer: `selected = (; cities = 1)` or `selected = Dict(:cities => [1, 3])`.
-  A bare number is ambiguous there and raises an `ArgumentError`. So
-  does an index outside `1:n`.
+A few cases work differently:
+
+- `selected = [1, 3]` highlights both cities, but `pick` stays `nothing`
+  until the next click, because a click holds one mark. With a `selects`
+  box in the widget, `pick` starts as both events.
 - Points, bars, polygons, lines, and segments can start selected.
   Heatmap cells, axis readouts, boxes, thresholds, and the view cannot.
-  Passing `selected=` for them raises an `ArgumentError`.
-- For a [`RegionInteractable`](@ref), use the layer ids it creates for
-  each shape (`:cells_c`, `:cells_r`, `:cells_p` for a base id
-  `:cells`). See [Custom hits](@ref).
+- A [`RegionInteractable`](@ref) makes one layer per shape, named
+  `:cells_c`, `:cells_r`, and `:cells_p` for the id `:cells`. See
+  [Custom hits](@ref).
 
 ## Keep a selection when the figure rebuilds
 
 When the figure is rebuilt, for example because a slider changed the
-data, `masque` builds a new widget and the selection starts over. A
-selection is a position in the data you plotted. After the data changes,
-the same position can point at a different mark, so carrying it over
-could highlight the wrong city.
+data, the widget starts over with nothing selected. A position in the
+old data can point at a different city in the new data, so Masque does
+not carry it over.
 
-To keep a selection, store the indices you still want in a cell that
-does not use `pick`, and pass them in:
-
-```julia
-held = [1, 3]   # computed from your data, not from `pick`
-```
+To keep a selection, keep what identifies the mark, such as the city's
+name, and look up its position after the rebuild. Store the name in a
+cell that does not use `pick`:
 
 ```julia
-@bind pick masque(fig, cities; selected = held)
+last_city = Ref("Delhi")
 ```
 
-Passing the widget its own value, `selected = pick`, does not work.
-Pluto refuses that cell with a **Cyclic references** error, because the
-cell would both define `pick` and depend on it. You do not need it: the
-widget keeps its highlight between clicks until it is rebuilt.
+Update it from `pick` in another cell:
 
-Another widget can take the value, though. Passing one widget's `pick`
-as another widget's `selected=` copies a click from one figure to the
-other. [Selection round-trip](@ref) shows this, and
-[Linked views](@ref) shows how a click can update other plots and
-tables.
+```julia
+if !isnothing(pick)
+    last_city[] = pick.city
+end
+```
 
-## Highlight and value
+Then look up the city in the rebuilt data and pass its position as
+`selected=`. Here `city_names` lists the cities in the order you plotted
+them:
 
-The highlight shows what `pick` holds, with one exception: clicking a
-legend entry highlights every mark of the series it labels, while `pick`
-holds only the legend entry. See [Legend](@ref).
+```julia
+@bind pick masque(fig, cities; selected = findfirst(==(last_city[]), city_names))
+```
+
+If the city is no longer in the data, `findfirst` returns `nothing` and
+no city starts selected.
+
+Passing the widget its own value, `selected = pick`, does not work:
+Pluto refuses the cell with a **Cyclic references** error. Between
+rebuilds you do not need it, because the widget keeps its highlight.
+
+To select a mark from another widget's click, see [Linked views](@ref).

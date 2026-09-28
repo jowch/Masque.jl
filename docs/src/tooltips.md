@@ -58,8 +58,22 @@ cities = [
 ]
 ```
 
-Tooltips work even when Julia is not running, for example in a static
-HTML export, so a template can only read the payload.
+`tooltip = false` turns tooltips off. The hover highlight and clicks
+still work.
+
+## Template errors
+
+A template Masque cannot read, such as one with an expression like
+`$(pop + 1)`, an unclosed `$(`, or a format spec d3 does not know, raises
+a `TemplateValidationError` when its cell runs.
+
+A template that names a field the payload does not have raises an
+`ArgumentError` when `masque` runs. The message lists the payload's
+fields and suggests the closest match. This check needs named-tuple
+payloads. With a `DataFrame` or `Dict`, a misspelled field shows up as a
+blank in the tooltip, so hover once after you write the template.
+
+## HTML in payload values
 
 Avoid putting HTML in your payload values. It will not be rendered; the
 tooltip shows the tags as plain text. To make something bold, use the
@@ -77,29 +91,11 @@ tooltip = masque"<b>$(city)</b>"
 Also avoid links built from your data, such as `<a href="$(url)">`,
 unless you trust every URL in it: the link goes wherever the data says.
 
-`tooltip = false` turns tooltips off. The hover highlight and clicks
-still work.
-
-## Template errors
-
-A template Masque cannot read, such as one with an expression like
-`$(pop + 1)`, an unclosed `$(`, or a format spec d3 does not know, raises
-a `TemplateValidationError` when its cell runs.
-
-A template that names a field the payload does not have raises an
-`ArgumentError` when `masque` runs. The message lists the payload's
-fields and suggests the closest match. This check needs named-tuple
-payloads. With a `DataFrame` or `Dict`, a misspelled field shows up as a
-blank in the tooltip, so hover once after you write the template.
-
 ## Where the tooltip appears
 
-The tooltip sits above the mark under the pointer, with a small caret
-pointing at it. Near the top of the figure it flips below the mark, and
-near the sides it shifts inward. On a line, it follows the nearest point
-of the line. Axis readouts, thresholds, boxes, pan and orbit, and slices
-have no single mark, so their tooltip follows the pointer. A mark with
-keyboard focus gets its tooltip the same way as a hovered one.
+The tooltip sits above the hovered mark, and moves below it or inward
+near the figure's edges. Axis readouts, boxes, and other interactions
+without a single mark show their tooltip at the pointer.
 
 ## Dark figures
 
@@ -120,8 +116,6 @@ fig = Figure(size = (560, 360); backgroundcolor = :gray12)
 ```@eval
 Main.masque_fallback("tooltips_dark")
 ```
-
-Older browsers use the system light or dark setting instead.
 
 ## Accent color
 
