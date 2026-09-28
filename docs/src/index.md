@@ -23,8 +23,7 @@ a `@bind` variable, and cells that use the variable respond. See
 
 ![Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera](assets/home/orbit.gif)
 
-Drag a 2D axis to pan, or an `Axis3` to orbit. Moving the view does not
-change your selection. See [Pan and orbit](@ref).
+Drag a 2D axis to pan, or an `Axis3` to orbit. See [Pan and orbit](@ref).
 
 ## Highlight from the legend
 
@@ -36,8 +35,8 @@ the selection can fade the others, as in this example. See [Legend](@ref).
 ## Static exports
 
 In a static HTML export of your notebook, tooltips and selection still
-work. Other cells do not respond, because the export has no Julia behind
-it. The figure below is a static export; hover over a borough.
+work. The figure below is a static export; hover over a borough. See
+[Static exports and this site](@ref) for what an export can and cannot do.
 
 ```@raw html
 <div class="masque-embed-wrap">
