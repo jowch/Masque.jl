@@ -49,33 +49,38 @@ lets you customize what it says:
 PointInteractable(ax, s; payloads = rows, tooltip = masque"$(city) — pop $(pop:,)")
 ```
 
-In a template, `$(city)` is a payload field, not a Julia variable.
-`$(pop:,)` formats a number with a [d3-format](https://d3js.org/d3-format)
-spec.
+In this template, `$(city)` and `$(pop)` are fields of the `rows`
+payload, and `:,` adds thousands separators to `pop` (a
+[d3-format](https://d3js.org/d3-format) spec). A template can use any
+field you put in the payload. Without `payloads`, each plot type has its
+own default fields, listed in [Plot-object defaults](@ref).
 
-To show a value you compute, compute it in Julia and add it to the
-payload. Tooltips work without Julia running, for example in a static
-export, so a template can only read what the payload holds.
-`tooltip = false` turns tooltips off. See [Tooltips](@ref).
+To show a value you compute, add it to the payload in Julia:
 
-## Hover, click, and drag
+```julia
+rows = [(; r..., density = round(r.pop / r.area; digits = 1)) for r in rows]
+PointInteractable(ax, s; payloads = rows, tooltip = masque"$(city): $(density) per km²")
+```
 
-Hovering a mark shows its tooltip and highlights it, and nothing
-re-runs. Clicking a mark sets the `@bind` variable, and every cell that
-uses it re-runs.
+A template can only use payload fields, because tooltips work even when
+Julia is not running. For example, they still work in a static HTML
+export of the notebook. `tooltip = false` turns tooltips off. See
+[Tooltips](@ref).
 
-| Gesture | On the figure | The `@bind` value | Cells that read it |
+## How interactions work
+
+Clicking a mark updates the `@bind` variable, and cells that use the
+variable respond to the change. Hovering shows a tooltip and highlights
+the mark without changing the variable.
+
+| Gesture | On the figure | The `@bind` value | Cells that use it |
 |---|---|---|---|
-| Hover a mark | Tooltip and highlight | Unchanged | Do not re-run |
-| Click a mark (or Enter / Space on a focused mark) | Mark stays highlighted | The clicked mark's event | Re-run |
-| Click empty space | Nothing | Unchanged | Do not re-run |
-| Drag an ROI box or threshold line | Box or line moves | Unchanged while dragging | Do not re-run |
-| Release the ROI or threshold | Enclosed marks highlight (with `selects`) | The box, the enclosed marks, or the line's value | Re-run |
-| Pan or orbit ([`ViewInteractable`](@ref)) | The view moves | Never changes | Do not re-run |
-
-Panning and orbiting only move the view, so they never change the
-`@bind` value. In a running notebook the figure redraws as you drag. See
-[Pan and orbit](@ref).
+| Hover a mark | Tooltip and highlight | Unchanged | No change |
+| Click a mark (or Enter / Space on a focused mark) | Mark stays highlighted | The clicked mark's event | Respond |
+| Click empty space | Nothing | Unchanged | No change |
+| Drag an ROI box or threshold line | Box or line moves | Unchanged while dragging | No change |
+| Release the ROI or threshold | Enclosed marks highlight (with `selects`) | The box, the enclosed marks, or the line's value | Respond |
+| Pan or orbit ([`ViewInteractable`](@ref)) | The view moves | Never changes | No change |
 
 Clicking empty space keeps the current selection. Clicking another mark
 replaces it. To start with marks selected, or to keep a selection when
@@ -83,9 +88,10 @@ you rebuild the figure, see [Selection](@ref).
 
 ## What the `@bind` value holds
 
-Until the first click or release, the bound variable is `nothing`,
-unless you passed `selected=`. After that it holds an *event*, a small
-struct whose fields you read directly. A clicked mark's event has the
+A `masque` widget's `@bind` value starts as `nothing`. To start with
+marks selected, pass `selected=` (see [Selection](@ref)). After a click
+or release, the value is an *event*, a small struct whose fields you
+read directly. A clicked mark's event has the
 payload's fields, such as `pick.city`. It also has `pick.layer`, the
 interactable that was hit, and `pick.index`, the mark's position in your
 data. The event indexes your data too: `xs[pick]` is that mark's value
@@ -114,19 +120,17 @@ and the value stays what the box holds: a `Vector{ElementEvent}` or a
 on its axis, so if the widget has one, that click becomes an
 `AxisEvent`.
 
-## Live notebook, static export, and this site
+## Static exports and this site
 
-In a running notebook everything above works. A static HTML export has
-no Julia behind it. Tooltips, highlights, and dragging still work, but
-nothing reaches `@bind`, so the other cells keep the values they had
-when you exported.
+A static HTML export of your notebook keeps tooltips and highlights, and
+you can still select marks and drag. Other cells do not respond, because
+the export has no Julia behind it. They keep the values they had when
+you exported.
 
 The interactive examples on this site are recordings of real notebooks.
 Hovering works as it does in Pluto. A click shows a result computed
 ahead of time, and the **Simulating `@bind`** badge marks these
-examples. Every click on a mark, legend entry, or grid cell is recorded,
-and so is every box a brush can draw. Brush examples are kept small so
-that is possible; a larger one is shown as a recorded clip instead. A
-click that picks a position, on an axis or a colorbar, is not recorded,
-and its page says so. Each example has a *Notebook as text* section with
-the cells to copy.
+examples. Some examples, including brushes, are kept small so that they
+are practical to show on this site; a larger brush is shown as a
+recorded clip instead. A click that picks a position, on an axis or a
+colorbar, is not recorded, and its page says so.
