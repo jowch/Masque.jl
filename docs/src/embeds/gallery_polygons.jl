@@ -22,12 +22,12 @@ using Masque, CairoMakie, Random
 
 # ╔═╡ a1410004-0001-4000-8000-000000000009
 md"""
-Hover a band, a density, a filled contour, a violin, a voronoi cell, or a box.
+Hover over a band, a density, a filled contour, a violin, a Voronoi cell, or a box.
 """
 
 # ╔═╡ a1410004-0001-4000-8000-000000000010
 md"""
-Draw the panels the way you already draw them. `masque` makes each filled shape clickable.
+Create the panels the way you normally would. `masque` makes each filled shape clickable.
 """
 
 # ╔═╡ a1410004-0001-4000-8000-000000000002
@@ -49,11 +49,6 @@ begin
     nothing
 end
 
-# ╔═╡ a1410004-0001-4000-8000-000000000011
-md"""
-Hover stays on the figure. This page does not re-run a readout.
-"""
-
 # ╔═╡ a1410004-0001-4000-8000-000000000003
 @bind pick masque(pf)
 
@@ -69,7 +64,6 @@ cells = [
   "a1410004-0001-4000-8000-000000000009",
   "a1410004-0001-4000-8000-000000000010",
   "a1410004-0001-4000-8000-000000000002",
-  "a1410004-0001-4000-8000-000000000011",
   "a1410004-0001-4000-8000-000000000003",
 ]
 """
@@ -1722,7 +1716,6 @@ version = "4.1.0+0"
 # ╟─a1410004-0001-4000-8000-000000000009
 # ╟─a1410004-0001-4000-8000-000000000010
 # ╠═a1410004-0001-4000-8000-000000000002
-# ╟─a1410004-0001-4000-8000-000000000011
 # ╠═a1410004-0001-4000-8000-000000000003
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

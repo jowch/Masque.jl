@@ -55,11 +55,11 @@ md"""
 
 # ╔═╡ a1410006-0001-4000-8000-000000000012
 md"""
-This cell reads `pick`, so it re-runs on the click.
+This cell responds to the click.
 """
 
 # ╔═╡ a1410006-0001-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "click a label"
 elseif hasproperty(pick, :text)
     "\"$(pick.text)\""

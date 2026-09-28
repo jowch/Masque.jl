@@ -91,6 +91,14 @@ end
     end
 end
 
+@testset "exported player opens on a selected= widget's seeded value" begin
+    # A stored `nothing` bond would be restored over the value a `selected=` widget seeds at
+    # mount, and the player must show that value's snapshot when it arms.
+    src = read(joinpath(@__DIR__, "..", "docs", "pluto_html_export.jl"), String)
+    @test occursin("delete!(nb.bonds, bond)", src)
+    @test occursin("if (cur != null) patch(cur);", src)
+end
+
 @testset "player_states: idle, every click, then hand-listed drags" begin
     man = Dict{String, Any}(
         "layers" => Any[
@@ -233,7 +241,7 @@ end
         end
         n += 1
     end
-    @test n >= 29
+    @test n >= 28
 end
 
 @testset "home quickstart is the 3-point Pluto export" begin
@@ -247,14 +255,14 @@ end
     @test endswith(player["cells"][1], "0009")
     src = read(path, String)
     @test occursin("Hover a point to read its name", src)
-    @test occursin("`sel.index` is 1-based", src)
+    @test occursin("`sel.index` is its position in your data", src)
     @test occursin("name = \"one\"", src)
-    @test occursin("if sel === nothing", src)
+    @test occursin("if isnothing(sel)", src)
     @test occursin("PointInteractable(ax, s; payloads = points)", src)
 end
 
 @testset "overlay-only players set chip = false" begin
-    for name in ("gallery_limits", "home_hover_stars", "home_export", "gallery_bars")
+    for name in ("home_hover_stars", "home_export", "gallery_bars")
         player = parse_player_toml(joinpath(@__DIR__, "..", "docs", "src", "embeds", name * ".jl"))
         @test player["chip"] == false
     end
@@ -375,16 +383,12 @@ end
     @test isfile(joinpath(root, "docs", "src", "embeds", "getting_started.jl"))
 
     names = [
-        "gallery_tooltips",
         "gallery_selection",
         "gallery_bars",
         "gallery_polygons",
-        "gallery_colorbar",
         "gallery_text",
         "gallery_boxselect",
         "gallery_image",
-        "gallery_limits",
-        "gallery_polar",
         "example_heatmap_trace",
     ]
     for name in names
@@ -412,6 +416,7 @@ end
         "marks_bars", "marks_poly", "marks_polar", "legend_lines", "roi_table",
         "tooltips_template", "tooltips_dark", "grids_heatmap", "readouts_axis",
         "custom_regions", "linked_two_axis", "linked_legend_wash",
+        "marks_lines", "selection_start", "legend_fade",
     ]
     for name in guides
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))

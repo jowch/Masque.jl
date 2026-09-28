@@ -16,37 +16,49 @@ macro bind(def, element)
     #! format: on
 end
 
-
-# ╔═╡ a1410005-0001-4000-8000-000000000001
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
-# ╔═╡ a1410005-0001-4000-8000-000000000009
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000100
 md"""
-Hover the colorbar to read the value under the pointer.
+Click a line. The last cell names the line you clicked.
 """
 
-# ╔═╡ a1410005-0001-4000-8000-000000000010
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
 md"""
-Draw the heatmap and its colorbar. `masque` makes the colorbar a readout.
+Plot two lines. Each `lines!` call is one mark.
 """
 
-# ╔═╡ a1410005-0001-4000-8000-000000000002
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000102
 begin
-    xs = -3:0.1:3
     fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; title = "hover or click the colorbar")
-    hm = heatmap!(ax, xs, xs, [exp(-(x^2 + y^2)) for x in xs, y in xs])
-    Colorbar(fig[1, 2], hm)
+    ax = Axis(fig[1, 1])
+    xs = 0:0.1:10
+    lines!(ax, xs, sin.(xs))
+    lines!(ax, xs, cos.(xs))
     nothing
 end
 
-# ╔═╡ a1410005-0001-4000-8000-000000000011
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000103
 md"""
-Hover stays on the figure. This page does not re-run a readout.
+`@bind pick` saves the clicked line in `pick`.
 """
 
-# ╔═╡ a1410005-0001-4000-8000-000000000003
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000104
 @bind pick masque(fig)
+
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
+md"""
+`pick` starts as `nothing`. After a click, `pick.layer` is `:lines` for the first line and `:lines_2` for the second. This cell responds to the click.
+"""
+
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000106
+if isnothing(pick)
+    "click a line"
+else
+    names = Dict(:lines => "sine", :lines_2 => "cosine")
+    "you clicked the $(names[pick.layer]) line"
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
@@ -54,14 +66,15 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 bond = "pick"
 show_code = true
 pluto_html = true
-chip = false
 
 cells = [
-  "a1410005-0001-4000-8000-000000000009",
-  "a1410005-0001-4000-8000-000000000010",
-  "a1410005-0001-4000-8000-000000000002",
-  "a1410005-0001-4000-8000-000000000011",
-  "a1410005-0001-4000-8000-000000000003",
+  "a1b2c3d4-0001-4000-8000-000000000100",
+  "a1b2c3d4-0001-4000-8000-000000000101",
+  "a1b2c3d4-0001-4000-8000-000000000102",
+  "a1b2c3d4-0001-4000-8000-000000000103",
+  "a1b2c3d4-0001-4000-8000-000000000104",
+  "a1b2c3d4-0001-4000-8000-000000000105",
+  "a1b2c3d4-0001-4000-8000-000000000106",
 ]
 """
 
@@ -1709,12 +1722,14 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1410005-0001-4000-8000-000000000001
-# ╟─a1410005-0001-4000-8000-000000000009
-# ╟─a1410005-0001-4000-8000-000000000010
-# ╠═a1410005-0001-4000-8000-000000000002
-# ╟─a1410005-0001-4000-8000-000000000011
-# ╠═a1410005-0001-4000-8000-000000000003
+# ╠═a1b2c3d4-0001-4000-8000-000000000001
+# ╟─a1b2c3d4-0001-4000-8000-000000000100
+# ╟─a1b2c3d4-0001-4000-8000-000000000101
+# ╠═a1b2c3d4-0001-4000-8000-000000000102
+# ╟─a1b2c3d4-0001-4000-8000-000000000103
+# ╠═a1b2c3d4-0001-4000-8000-000000000104
+# ╟─a1b2c3d4-0001-4000-8000-000000000105
+# ╠═a1b2c3d4-0001-4000-8000-000000000106
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

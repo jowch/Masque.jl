@@ -26,7 +26,7 @@ Drag the box over some stations. The last cell lists the ones inside.
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-Draw the scatter the way you already draw it. Pass that scatter to `PointInteractable`, with the station rows as `payloads`, so a hover reads the name and the group. `ROIInteractable` brushes those points.
+Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Passing the scatter to `PointInteractable` with the station rows as `payloads` puts each station's name and group in its tooltip. `ROIInteractable` adds a box that collects the points inside it.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -43,19 +43,13 @@ begin
         (name = "South-3", x = 7.2, y = 2.0, group = "South"),
         (name = "East", x = 9.0, y = 6.5, group = "East"),
     ]
-    group_color = Dict(
-        "North" => "#4363d8",
-        "Mid" => "#f58231",
-        "South" => "#3cb44b",
-        "East" => "#911eb4",
-    )
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y", limits = (0.5, 10.0, 0.5, 10.0))
-    s = scatter!(
-        ax, [p.x for p in samples], [p.y for p in samples];
-        color = [group_color[p.group] for p in samples],
-        markersize = 18,
-    )
+    xs = [1.5, 2.5, 2.0, 5.0, 5.8, 4.5, 8.0, 8.8, 7.2, 9.0]
+    ys = [8.0, 7.2, 9.0, 5.0, 4.2, 5.8, 1.5, 2.4, 2.0, 6.5]
+    north, mid, south, east = "#4363d8", "#f58231", "#3cb44b", "#911eb4"
+    colors = [north, north, north, mid, mid, mid, south, south, south, east]
+    s = scatter!(ax, xs, ys; color = colors, markersize = 18)
     pts = PointInteractable(ax, s; id = :pts, payloads = samples)
     roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = :pts)
     nothing
@@ -63,7 +57,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind picks` stores the stations inside the box when you release. Dragging moves the box and does not change `picks`.
+`@bind picks` saves the stations inside the box when you release it. Dragging moves the box without changing `picks`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -71,11 +65,11 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-Before a drag, `picks` is `nothing`. An empty box is an empty list. Otherwise `picks` is the stations inside, and this cell builds the table.
+`picks` starts as `nothing`. After a release, `picks` lists the stations inside the box, or is empty if there are none. `samples[picks]` is their rows, and this cell shows them as a table.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if picks === nothing
+if isnothing(picks)
     md"*Drag the box over some stations, then release.*"
 elseif isempty(picks)
     md"*No stations in the box.*"

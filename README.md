@@ -31,14 +31,14 @@ Tooltips and interactions can be customized.
 
 ## Install
 
+Masque runs in Pluto. Load it with one Makie backend in a notebook cell:
+
 ```julia
-julia> import Pkg; Pkg.add(url = "https://github.com/jowch/Masque.jl")
+using Masque, CairoMakie
 ```
 
-Masque is not in the General registry. The [Getting started](https://jowch.github.io/Masque.jl/dev/getting-started/) page has the Pluto cell.
-
-You'll also want `Pluto`, plus one Makie backend: `CairoMakie` for a static image, or
-`WGLMakie` for animation / large data / live 3D.
+Pluto's package manager installs both. Use `CairoMakie` for a static image, or `WGLMakie`
+for animation, large data, or live 3D.
 
 ## Quick start
 

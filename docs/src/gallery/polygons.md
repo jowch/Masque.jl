@@ -1,10 +1,10 @@
 # Polygons
 
-`masque(fig)` also picks up filled areas: `band!`, `density!`,
-`contourf!`, `violin!`, `voronoiplot!`, and `boxplot!`. Hover a region
-to read its payload. Nothing here is wired with `PolygonInteractable`.
+Hover over a region to see its payload. `masque(fig)` alone makes these
+filled areas respond: `band!`, `density!`, `contourf!`, `violin!`,
+`voronoiplot!`, and `boxplot!`.
 
-For a `poly!` you authored as a ring, see [Click marks](@ref).
+For a `poly!` you made from rings, see [Click marks](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -18,24 +18,22 @@ Main.masque_fallback("gallery_polygons")
 
 ## Variations
 
-Pass the rings yourself when the geometry did not come from one of
-those recipes:
+Pass the rings yourself when the shapes did not come from one of those
+recipes:
 
 ```julia
+rings = [
+    [(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)],
+    [(2.0, 0.0), (3.0, 0.0), (3.0, 1.0), (2.0, 1.0)],
+]
 PolygonInteractable(
     ax, rings;
     id = :regions,
-    payloads = [(; index = k, shape = "ring$k") for k in eachindex(rings)],
+    payloads = [(shape = "triangle",), (shape = "square",)],
 )
 ```
 
-The bond is an `ElementEvent` with `index` and the payload fields.
+A click gives an `ElementEvent` with `index` and the payload fields, so
+`pick.shape` is `"triangle"` or `"square"`.
 
-!!! note
-
-    These filled-area recipes extract the same way on `:cairo` and
-    `:webgl`. This player is the Cairo figure. Hover is overlay-only on the
-    static page. A manual `PolygonInteractable` is the same hit on both
-    backends. `heatmap!` on a `PolarAxis` is skipped with `@warn`; it is not
-    a polygon layer.
-
+Next, [Text labels](@ref) makes labels clickable.

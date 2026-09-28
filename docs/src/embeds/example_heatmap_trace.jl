@@ -27,7 +27,7 @@ Click a cell. The plot below shows that station's readings, hour by hour, on the
 
 # ╔═╡ a1420002-0001-4000-8000-000000000010
 md"""
-The heatmap is a summary: one daily mean per station and day. `temp` is the underlying hourly model, so a click can go back to the detail behind the summary. `RectInteractable` makes each cell clickable.
+The heatmap shows one daily mean per station and day. `temp` gives the hourly values behind each mean.
 """
 
 # ╔═╡ a1420002-0001-4000-8000-000000000002
@@ -46,7 +46,7 @@ end
 
 # ╔═╡ a1420002-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores the clicked cell. `pick.i` is the day and `pick.j` the station, both 1-based, and `pick.value` is the daily mean.
+`@bind pick` stores the clicked cell. `pick.i` is the day (1 to 7), `pick.j` is the station's position in `stations`, and `pick.value` is the daily mean.
 """
 
 # ╔═╡ a1420002-0001-4000-8000-000000000003
@@ -54,13 +54,13 @@ md"""
 
 # ╔═╡ a1420002-0001-4000-8000-000000000012
 md"""
-This cell reads `pick`, so a click redraws the day behind the cell, with the daily mean as a dashed line.
+This cell responds to the click: it plots that day's hourly readings, with the daily mean as a dashed line.
 """
 
 # ╔═╡ a1420002-0001-4000-8000-000000000004
 begin
     trace = Figure(size = (560, 240))
-    if pick === nothing
+    if isnothing(pick)
         Axis(trace[1, 1]; xlabel = "hour", ylabel = "°C", title = "click a cell to see that day")
     else
         tax = Axis(

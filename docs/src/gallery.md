@@ -1,18 +1,13 @@
 # Examples
 
-Each example is a small notebook you can copy. On an example's page,
-hovering works as it does in Pluto, every click on a mark swaps in the
-result the notebook computed for it, every box you can draw with a brush
-is recorded the same way, and the notebook follows the player as text.
-Pan, orbit, and Compare a cluster are recorded clips instead: the view
-needs a running notebook, and the cluster example has too many boxes to
-record.
+Each example is a small notebook you can copy, with its code below it.
+Hover over a figure, click a mark, or drag a box, and the cells below it
+respond. [Static exports and this site](@ref) says how the examples
+work without Julia running.
 
 ## Analyses
 
-Worked examples of an interaction feeding an analysis: a brush that
-compares a cluster, a heatmap cell that opens the data behind it, a
-click mirrored into a second plot.
+A click or a box feeds the next step of an analysis.
 
 ```@raw html
 <div class="masque-gallery">
@@ -36,18 +31,13 @@ click mirrored into a second plot.
   <img alt="An RGB image with a region box" src="assets/gallery/image.png">
   <span>Image ROI</span>
 </a>
-<a class="masque-gallery-card" data-page="tooltips">
-  <img alt="Four city markers with a template tooltip" src="assets/gallery/tooltips.png">
-  <span>Tooltip templates</span>
-</a>
 </div>
 ```
 
 ## Plot types
 
-One page per kind of plot, showing what a hover or click on it returns.
-Pan and orbit are recorded clips, since moving the view needs a running
-notebook.
+These pages show what `masque(fig)` makes interactive on other kinds
+of plot.
 
 ```@raw html
 <div class="masque-gallery">
@@ -59,29 +49,9 @@ notebook.
   <img alt="Band, density, contour, violin, Voronoi, and box plots" src="assets/gallery/polygons.png">
   <span>Polygons</span>
 </a>
-<a class="masque-gallery-card" data-page="colorbar">
-  <img alt="A gaussian heatmap with a colorbar" src="assets/gallery/colorbar.png">
-  <span>Colorbar</span>
-</a>
 <a class="masque-gallery-card" data-page="text">
   <img alt="Scatter points with Alpha, Beta, Gamma, a tilted label, and an annotation" src="assets/gallery/text.png">
   <span>Text labels</span>
-</a>
-<a class="masque-gallery-card" data-page="polar">
-  <img alt="Four points on a polar axis" src="assets/gallery/polar.png">
-  <span>Polar points</span>
-</a>
-<a class="masque-gallery-card" data-page="limits">
-  <img alt="A scatter clipped by axis limits" src="assets/gallery/limits.png">
-  <span>Limits slider</span>
-</a>
-<a class="masque-gallery-card" data-page="pan">
-  <img alt="A scatter you drag to pan" src="assets/gallery/pan.png">
-  <span>Drag to pan</span>
-</a>
-<a class="masque-gallery-card" data-page="orbit">
-  <img alt="Three markers on an Axis3" src="assets/gallery/orbit.png">
-  <span>Drag to orbit</span>
 </a>
 </div>
 <script>

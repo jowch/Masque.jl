@@ -240,6 +240,9 @@ const PLUTO_EXPORT_SIM_JS = raw"""
       },
     });
     host.addEventListener("input", function () { patch(host.value); });
+    // A widget built with `selected=` starts with a value; the export shows the idle
+    // (`nothing`) outputs, so swap in that value's snapshot now.
+    if (cur != null) patch(cur);
     return true;
   }
   function boot() {
@@ -345,6 +348,9 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
     check_budget(path, length(states), length(snapshots["snaps"]), extra)
     set_bond!(session, nb, bond, nothing)
     assert_no_errors(nb, path)
+    # Ship no stored bond value: Pluto would restore `nothing` over the value a `selected=`
+    # widget seeds at mount. The player swaps in that value's snapshot when it arms.
+    delete!(nb.bonds, bond)
     empty!(nb.cell_order)
     for id in player["cells"]
         push!(nb.cell_order, UUID(id))

@@ -1,8 +1,9 @@
 """
     GridCellEvent(layer, i, j, value)
 
-One heatmap or image cell. `i` and `j` are 1-based column and row of the author's
-`(ncols, nrows)` matrix. `A[cell]` is `A[cell.i, cell.j]`. `value` is the shipped cell value,
+One heatmap or image cell. `i` and `j` are the cell's first and second index in the matrix
+you plotted; Makie draws the first index along x and the second along y. `A[cell]` is
+`A[cell.i, cell.j]`. `value` is the shipped cell value,
 or `nothing` when values were not sent.
 """
 struct GridCellEvent <: InteractionEvent

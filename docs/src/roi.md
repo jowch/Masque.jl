@@ -1,15 +1,15 @@
 # Brush a region
 
-Drag a box across a plot and release it; the notebook gets what the box
-covers. That can be the points inside it, a block of heatmap cells, or
-just the box's coordinates. While you drag, only the box moves — Julia
-runs once, when you let go.
+Drag a box across a plot and release it. Your notebook gets what the box
+covers: the points inside it, a block of heatmap cells, or the box's own
+coordinates. Cells that use the value respond when you release the box,
+not while you drag it.
 
 Drag the box over the stations below. The table lists the ones inside:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-roi-table" data-masque-embed="roi_table" title="Stations scatter with a region box and listed @bind table snapshots" style="width:100%;height:1400px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-roi-table" data-masque-embed="roi_table" title="Stations scatter with a box. Drag the box and the table lists the stations inside." style="width:100%;height:1400px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -19,9 +19,9 @@ Main.masque_fallback("roi_table")
 
 ## Pick the points inside a box
 
-An [`ROIInteractable`](@ref) draws the box; `selects` names the layer
-whose marks it collects. Give the points an `id` so the box can refer to
-them, and pass both to the same `masque` call:
+An [`ROIInteractable`](@ref) adds the box, and `selects` names the layer
+whose points it collects. Give the points an `id` so the box can refer
+to them, and pass both to the same `masque` call:
 
 ```julia
 pts = PointInteractable(ax, s; id = :pts, payloads = samples)
@@ -33,62 +33,77 @@ roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = :pts)
 ```
 
 `bounds` is where the box starts, as `(xmin, xmax, ymin, ymax)` in data
-coordinates. After a release, `picks` is a `Vector{ElementEvent}` with
-one event per enclosed point, and the points inside stay highlighted. An
-empty box gives an empty vector, not `nothing`, so one `isempty` check
-covers it. Each event carries its point's payload (`e.name`,
-`e.group`), and the vector indexes your data directly: `samples[picks]`
-is the rows inside the box.
+coordinates.
 
-If your rows are a `DataFrame`, pass it as `payloads` — one row per
-point, in the order you plotted them — and slice it with the events:
+When you release the box, the points inside it stay highlighted, and
+`picks` lists them: one [`ElementEvent`](@ref) per point, holding that
+point's payload fields, such as `name` and `group`. A box with no points
+inside gives an empty list.
+
+Use `picks` to index your data: `samples[picks]` is the rows of
+`samples` inside the box.
+
+If your rows are a `DataFrame`, pass it as `payloads`, with one row per
+point in the order you plotted them:
 
 ```julia
 pts = PointInteractable(ax, s; id = :pts, payloads = df)
 ```
 
+Then `df[picks, :]` is the rows inside the box. `df[1:0, :]` is an
+empty table with the same columns, for before the first release or when
+the box is empty:
+
 ```julia
-picks === nothing || isempty(picks) ? df[1:0, :] : df[picks, :]
+if isnothing(picks) || isempty(picks)
+    df[1:0, :]
+else
+    df[picks, :]
+end
 ```
 
-The box owns the value: the points still show their tooltips, but
-clicking one commits nothing from that layer, so `picks` stays what the
-box holds. The click passes through, so a clickable layer underneath
-(such as an [`AxisInteractable`](@ref)) still takes it.
+Only the box sets `picks`. Hovering a point still shows its tooltip, but
+clicking it does not change `picks`. The exception is an
+[`AxisInteractable`](@ref) in the same widget: it takes clicks anywhere
+on its axis, so a click there replaces `picks` with an
+[`AxisEvent`](@ref). To keep `picks` a vector, put the axis readout in a
+separate `masque` call.
 
 ## Brush heatmap cells
 
-Point `selects` at a heatmap or image layer instead, and the box returns
-one [`GridWindowEvent`](@ref) describing the block of cells it covers:
-`win.i1:win.i2` columns and `win.j1:win.j2` rows, so `A[win]` is that
-sub-matrix. The box owns the value: clicking a cell outside it shows the
-tooltip but leaves the value alone, so the value is always a
-`GridWindowEvent`. See [Inspect a grid](@ref).
+Name a heatmap or image layer in `selects` instead, and the box returns
+one [`GridWindowEvent`](@ref) for the block of cells it covers.
+`win.i1:win.i2` is the range of the matrix's first index, drawn along
+x, and `win.j1:win.j2` the range of its second index, drawn along y, so
+`A[win]` is `A[win.i1:win.i2, win.j1:win.j2]`. Clicking a cell shows its tooltip but does not change the
+value, which stays the box's block (unless an `AxisInteractable` in the
+same widget takes the click, as above). See
+[Inspect a grid](@ref).
 
 ## Read the box itself
 
 Leave out `selects` and the value is the box: a [`BoundsEvent`](@ref)
-with `xmin`, `xmax`, `ymin`, and `ymax`. Use this when the region is the
-result — a time window, a crop, a range to fit over. `bounds` accepts a
-`BoundsEvent` too, so one widget's box can seed another's; passing a
-widget its own box back would be a cyclic reference in Pluto.
+with `xmin`, `xmax`, `ymin`, and `ymax`. Use this when the region is
+what you want, such as a time window, a crop, or a range to fit over.
+
+To start one widget's box where another's was released, pass that
+widget's `BoundsEvent` as `bounds`.
 
 ## Moving and resizing
 
-Drag inside the box to move it, a corner to resize it in both
-directions, or the middle of an edge to move just that edge; the pointer
+Drag inside the box to move it. Drag a corner to resize it in both
+directions, or the middle of an edge to move only that edge. The pointer
 changes to show which. If the axis also has a
-[`ViewInteractable`](@ref), a plain drag moves the box and Shift+drag pans
-the plot. The box cannot be moved with the keyboard.
+[`ViewInteractable`](@ref), a plain drag moves the box and Shift+drag
+pans the plot. Moving the box needs a pointer; see
+[Keyboard and screen readers](@ref) for what the keyboard reaches.
 
 ## Where it works
 
-The box needs a 2D `Axis` with numeric limits and a scale the browser can
-invert (`identity`, `log10`, or `log`); on an `Axis3`, a `PolarAxis`, or
-a categorical axis it raises an `ArgumentError` when `masque` runs.
-`selects` can name a layer of points or a heatmap/image, and that layer
-must be in the same `masque` call; bars and lines cannot be brushed. See
-[Supported plots and axes](@ref).
+`selects` can name a layer of points, or a heatmap or image, and that
+layer must be in the same `masque` call. Every box in one widget names
+the same layer. The box needs a 2D `Axis`; see
+[Supported plots and axes](@ref) for which axes and scales.
 
-For a larger example, [Box-select scatter](@ref) summarizes two groups of
-points inside the box, and [Image ROI](@ref) brushes an image.
+For larger examples, [Box-select scatter](@ref) summarizes two groups
+of points inside the box, and [Image ROI](@ref) brushes an image.

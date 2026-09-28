@@ -1,13 +1,13 @@
 # Text labels
 
-`masque(fig)` turns data-space `text!` and `annotation!` into clickable
-boxes. The box comes from Makie's own string bounds. A rotated label is
-still one box, axis-aligned and a little loose. Click a label in a live
-notebook and the bond is an `ElementEvent` with `text`, `index`, `x`,
-and `y`.
+Click a label and `pick.text` is its string. `masque(fig)` makes
+`text!` and `annotation!` labels clickable, including the tilted one.
+`pick` is an `ElementEvent` that also has the label's `index`, `x`, and
+`y`.
 
-The scatter on the same axes is also detected. A marker click has no
-`text` field. The readout guards on that.
+The scatter on the same axis responds too, and a marker click has no
+`text` field. The last cell checks `hasproperty(pick, :text)` before
+reading the string.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -21,14 +21,10 @@ Main.masque_fallback("gallery_text")
 
 ## Variations
 
-`offset` and `fontsize` follow the label. `annotation!` is the same
-button as `text!`. A label in screen space, rather than data space, is
-not a hit target.
+The clickable area is a box around the label that follows its `offset`
+and `fontsize`. A rotated label gets one box, aligned with the axes and
+a little larger than the text. A label placed in screen space rather
+than data space does not respond; `masque(fig)` skips it with a
+`@warn`.
 
-!!! note
-
-    Label hits are the same on `:cairo` and `:webgl`. This player is the
-    Cairo figure. The snapshots replay every label click and every marker
-    click. `masque(fig)` also publishes the scatter, so in a live notebook
-    branch on `hasproperty(pick, :text)` before reading the string.
-
+Next, [Click marks](@ref) covers clicking other kinds of mark.

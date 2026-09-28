@@ -21,19 +21,24 @@ using Masque, CairoMakie
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000009
 md"""
-Click a cell. The last cell reads its column, row, and value.
+Click a cell. The last cell shows its indices and value.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000010
 md"""
-Draw the heatmap the way you already draw it, and pass that plot to `RectInteractable` so each cell is a hit. Hover reads the cell; the click is what this notebook stores.
+Create the heatmap the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Passing the plot to `RectInteractable` makes each cell clickable.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000002
 begin
-    z = [Float64(i + 3j) for i in 1:4, j in 1:3]
+    z = [
+        4.0 7.0 10.0
+        5.0 8.0 11.0
+        6.0 9.0 12.0
+        7.0 10.0 13.0
+    ]
     fig = Figure(size = (560, 320))
-    ax = Axis(fig[1, 1]; xlabel = "column", ylabel = "row")
+    ax = Axis(fig[1, 1]; xlabel = "i", ylabel = "j")
     p = heatmap!(ax, 1:4, 1:3, z)
     cells = RectInteractable(ax, p)
     nothing
@@ -41,7 +46,7 @@ end
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores a click in `pick`. Hover updates the tooltip and does not change `pick`.
+`@bind pick` saves a click in `pick`. Hovering a cell shows its value without changing `pick`.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000003
@@ -49,14 +54,14 @@ md"""
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000012
 md"""
-Before a click, `pick` is `nothing`. `pick.i` is the column and `pick.j` is the row, both 1-based. `z[pick]` is the same cell. This cell reads `pick`, so it re-runs on the click.
+`pick` starts as `nothing`. After a click, `pick.i` and `pick.j` are the cell's indices in `z`, so `z[pick]` is the clicked cell's value. Makie draws `z`'s first index along x, so `pick.i` counts across and `pick.j` counts up. This cell responds to the click.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "click a cell"
 else
-    "column $(pick.i), row $(pick.j) — value $(pick.value)"
+    "z[$(pick.i), $(pick.j)] = $(pick.value)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

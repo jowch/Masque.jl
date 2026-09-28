@@ -1,13 +1,13 @@
 # Compare a cluster
 
-A brush is the natural way to ask "what is different about these
-points?". The clip below is a live notebook: the box is set down on one
-cluster, dragged to the other, then pulled in to half of it, and after
-each release the histogram under the scatter compares the `z` of the
-points in the box with every sample.
+Drag a box around a group of points to see what is different about
+it. In this clip, the box starts on one cluster, moves to the other,
+then shrinks to cover half of it. The count beside the box updates as
+it moves. After each release, the histogram under the scatter compares
+the `z` of the points in the box with all the samples.
 
 ```@raw html
-<video id="masque-cluster-clip" title="Dragging a box between two clusters in a live notebook; the histogram below recomputes after each release"
+<video id="masque-cluster-clip" title="Dragging a box between two clusters. The histogram below updates after each release."
        controls muted loop playsinline autoplay
        style="width:100%;max-width:720px;height:auto;border:0;background:transparent;"></video>
 <script>
@@ -20,13 +20,7 @@ points in the box with every sample.
 </script>
 ```
 
-This page is a clip rather than a player: with 150 points there are far
-too many different boxes to record each one. In the clip, the count
-beside the box is the overlay's own while the box moves; the histogram
-changes only when the box is released and Julia re-runs the last cell.
-In your notebook, hovering a point also shows its three measurements.
-
-Copy the three cells to try it. Draw the scatter and build the box:
+Create the scatter and the box:
 
 ```julia
 begin
@@ -58,7 +52,7 @@ Compare what is inside with every sample:
 ```julia
 begin
     edges = range(minimum(zs), maximum(zs); length = 21)
-    inside = picks === nothing ? Float64[] : zs[picks]
+    inside = isnothing(picks) ? Float64[] : zs[picks]
     cmp = Figure(size = (560, 260))
     cax = Axis(
         cmp[1, 1]; xlabel = "z", ylabel = "samples",
@@ -73,23 +67,21 @@ end
 
 ## How it works
 
-Each point's payload carries its three measurements, so the tooltip
-shows them without any extra code. The [`ROIInteractable`](@ref) names
-the points' layer with `selects = :pts`, so releasing the box makes
-`picks` a vector with one event per point inside. That vector indexes
-your data directly — `zs[picks]` is the `z` of the points in the box —
-and the last cell draws an ordinary Makie figure from it.
+Each point's payload carries its three measurements, so hovering over
+a point shows them. The [`ROIInteractable`](@ref) names the points'
+layer with `selects = :pts`, so when you release the box, `picks` is a
+vector with one event per point inside. Index your data with it:
+`zs[picks]` is the `z` of the points in the box.
 
 ## Variations
 
-- Keep your samples in a `DataFrame` and pass it as `payloads`; then
-  `df[picks, :]` is the rows inside the box, ready for any summary.
-  Guard it for the state before the first release, when `picks` is
-  `nothing`:
-  `picks === nothing || isempty(picks) ? df[1:0, :] : df[picks, :]`.
+- Keep your samples in a `DataFrame` and pass it as `payloads`. Then
+  `df[picks, :]` is the rows inside the box. Before the first release,
+  `picks` is `nothing`, so check for it:
+  `isnothing(picks) || isempty(picks) ? df[1:0, :] : df[picks, :]`.
 - Replace the histogram with whatever the comparison needs: a table of
   means, a second scatter of two other columns, or a model fitted to the
   selected points only.
 
-[Brush a region](@ref) covers the box itself; [Linked views](@ref)
-covers driving other plots from a selection.
+Next, see [Brush a region](@ref) for more on the box, and
+[Linked views](@ref) for updating other plots from a selection.

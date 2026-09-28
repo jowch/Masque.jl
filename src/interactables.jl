@@ -107,11 +107,11 @@ Optional (default shown; all non-exported — extend as `Masque.<name>`):
 - `Masque.hoverstyle(i) -> NamedTuple` — one `(; stroke, width)` hover outline style per *layer*
   (the manifest ships one style per layer, not per element). Default: `(; stroke = nothing,
   width = 2)` — `stroke = nothing` means the overlay draws its own split highlight: a
-  brightening `color-dodge` fill plus a flat chrome edge stroke (`#7a7a7a` on a light figure,
-  `#c8c8c8` on a dark one; the stroke is not blended into the mark), instead of a stroke colour,
-  so every layer brightens without Masque resolving the element's colour; a CSS colour string
+  brightening `color-dodge` fill plus a flat grey edge stroke (`#7a7a7a` on a light figure,
+  `#c8c8c8` on a dark one; the stroke is not blended into the mark), instead of a stroke color,
+  so every layer brightens without Masque resolving the element's color; a CSS color string
   overrides it verbatim for that layer (no blend, single unblended element, the outline is
-  exactly that colour). `colors` (see [`HitLayer`](@ref)) no longer affects the hover/selection
+  exactly that color). `colors` (see [`HitLayer`](@ref)) no longer affects the hover/selection
   outline at all — it only drives the tooltip's accent border.
 - `Masque.hit_tol(i) -> Union{Nothing,Real}` — logical-px hit-test slack for `:segments`/
   `:polyline`/`:lines` layers, shipped in the manifest as image px (`round(Int, hit_tol(i) *
