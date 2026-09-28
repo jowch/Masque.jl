@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- `colors = (; palette, index)` takes a 1-based `index`, like `pick.index` and `selected=`, both
+  in `PointInteractable` and in a `HitLayer` you build yourself. Add 1 to an index written for
+  an earlier version. If you don't, `PointInteractable` throws an `ArgumentError` for a `0`
+  entry, and an index with no `0` in it gives each point the palette colour before the one it
+  had. A `HitLayer` doesn't check its index, so a point whose entry is `0` shows no accent.
+  `colors` also takes a `Vector` with one CSS colour per point, which needs no index. Passing
+  the `Scatter` itself still takes the accent from its `color=`, with neither (#216).
 - `masque` refuses a figure that holds an `LScene` on both backends. `:webgl` used to render it
   with no overlay on that block; it now throws the same `ArgumentError` as `:cairo`, mixed
   figures included. The message no longer recommends WGLMakie and names `Axis3` as the

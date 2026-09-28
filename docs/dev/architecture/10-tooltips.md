@@ -105,7 +105,7 @@ from it client-side via CSS relative-colour syntax (`lch(from var(--masque-fig-b
 static-light/OS-dark `@supports not (…)` fallback for browsers without it), not just OS
 `prefers-color-scheme`, so a dark figure on a light Pluto page still gets a dark tooltip. A
 per-layer `colors` field (optional; a single CSS string, or a shared palette + one index per
-element) drives a 3px accent border in the hovered element's own colour — resolved only for a
+element — 1-based in Julia, 0-based on the wire, converted in `_layer_dict`) drives a 3px accent border in the hovered element's own colour — resolved only for a
 `PointInteractable(ax, p::Makie.Scatter)`-derived layer whose colour is resolvable; omitted
 (no accent) otherwise. Both are O(1)-per-manifest/per-layer, same cost-model rationale as
 `tipStyle` above (measured in `perf-findings.md`).
