@@ -38,10 +38,9 @@ and carries the reasoning for each branch.
 
 ## Where things stand
 
-v0.1.0 is unreleased. The pre-registration revisions can still carry new work.
-`CHANGELOG.md` `[Unreleased]` is the running record. #210 tracks registration: the
-General review of the first attempt, the checks already run, and the steps before and after
-registering.
+v0.1.0 is unreleased. `CHANGELOG.md` `[0.1.0]` describes what it contains, and changes
+after it go under `[Unreleased]`. #210 tracks registration: the General review of the first
+attempt, the checks already run, and the steps before and after registering.
 
 **Shipped.**
 - `masque(fig)` auto-extraction over the recipes in the site's
