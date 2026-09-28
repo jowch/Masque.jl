@@ -1,6 +1,7 @@
 # Writing style for the user docs
 
-Applies to `docs/src/`, the README, and docstrings that render on the API page. The
+Applies to `docs/src/` (including the prose cells of the embedded notebooks in
+`docs/src/embeds/`), the README, and docstrings that render on the API page. The
 maintainer docs in `docs/dev/` can go into mechanism; the user docs describe what the reader
 does and sees. Use US spelling ("color"), matching the API's keywords.
 
