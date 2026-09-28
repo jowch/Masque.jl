@@ -26,7 +26,7 @@ Drag the box over some stations. The last cell lists the ones inside.
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-Draw the scatter the way you already draw it. Pass that scatter to `PointInteractable`, with the station rows as `payloads`, so a hover reads the name and the group. `ROIInteractable` brushes those points.
+Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Passing the scatter to `PointInteractable` with the station rows as `payloads` puts each station's name and group in its tooltip. `ROIInteractable` adds a box that collects the points inside it.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -63,7 +63,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind picks` stores the stations inside the box when you release. Dragging moves the box and does not change `picks`.
+`@bind picks` saves the stations inside the box when you release it. Dragging moves the box without changing `picks`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -71,11 +71,11 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-Before a drag, `picks` is `nothing`. An empty box is an empty list. Otherwise `picks` is the stations inside, and this cell builds the table.
+`picks` starts as `nothing`. After a release, `picks` lists the stations inside the box, or is empty if there are none. `samples[picks]` is their rows, and this cell shows them as a table.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if picks === nothing
+if isnothing(picks)
     md"*Drag the box over some stations, then release.*"
 elseif isempty(picks)
     md"*No stations in the box.*"

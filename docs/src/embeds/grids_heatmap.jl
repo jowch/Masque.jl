@@ -26,7 +26,7 @@ Click a cell. The last cell reads its column, row, and value.
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000010
 md"""
-Draw the heatmap the way you already draw it, and pass that plot to `RectInteractable` so each cell is a hit. Hover reads the cell; the click is what this notebook stores.
+Create the heatmap the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Passing the plot to `RectInteractable` makes each cell clickable.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000002
@@ -41,7 +41,7 @@ end
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores a click in `pick`. Hover updates the tooltip and does not change `pick`.
+`@bind pick` saves a click in `pick`. Hovering a cell shows its value without changing `pick`.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000003
@@ -49,11 +49,11 @@ md"""
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000012
 md"""
-Before a click, `pick` is `nothing`. `pick.i` is the column and `pick.j` is the row, both 1-based. `z[pick]` is the same cell. This cell reads `pick`, so it re-runs on the click.
+`pick` starts as `nothing`. After a click, `pick.i` is the cell's column and `pick.j` is its row in `z`, so `z[pick]` is the clicked cell's value. This cell responds to the click.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "click a cell"
 else
     "column $(pick.i), row $(pick.j) — value $(pick.value)"

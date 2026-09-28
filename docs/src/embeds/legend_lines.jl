@@ -26,7 +26,7 @@ Click a legend entry. The last cell names that series, and the line stays highli
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-Draw two labeled lines and add `axislegend`, the way you already build a figure. `masque` links each entry to its line.
+Create two labeled lines and an `axislegend` the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. `masque` links each legend entry to its line.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -42,7 +42,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores a click on a legend entry in `pick`. Hover highlights that line and does not change `pick`.
+`@bind pick` saves a click on a legend entry in `pick`. Hovering an entry highlights its line without changing `pick`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -50,7 +50,7 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-Before a click, `pick` is `nothing`. A legend click is a `LegendEvent`, and `pick.label` is that entry. A click on a line is an `ElementEvent` with no `label`. This cell reads `pick`, so it re-runs on the click.
+`pick` starts as `nothing`. Clicking a legend entry makes `pick` a `LegendEvent`, and `pick.label` is the entry's text. Clicking a line gives an `ElementEvent`, which has no `label`. This cell responds to the click.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
