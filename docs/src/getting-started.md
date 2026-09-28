@@ -11,28 +11,25 @@ In a Pluto notebook, paste each snippet from these docs into its own
 cell. Pluto runs one top-level expression per cell. Wrap multiple
 statements in `begin ... end`, which counts as one expression.
 
-Paste this cell into the notebook. Pluto's package manager stays on:
+Load Masque and one Makie backend. Pluto's package manager installs
+both, and the notebook records them in its own environment:
 
 ```julia
-begin
-    using Pkg
-    Pkg.add(url = "https://github.com/jowch/Masque.jl")
-    Pkg.add("CairoMakie")
-    using Masque, CairoMakie
-end
+using Masque, CairoMakie
 ```
 
-To install from a Julia session instead, keep the notebook file closed
-and write the packages into that file.
+The first run in a new notebook takes several minutes, most of it
+Makie's precompilation. Later runs reuse the compiled packages.
+
+To add the packages from a Julia session instead, keep the notebook
+file closed and write them into that file.
 `Pluto.activate_notebook_environment` updates the environment embedded
 in the notebook, so package management stays on when you open it again.
-`Pkg.activate(; temp = true)` turns package management off.
 
 ```julia
 import Pluto, Pkg
 Pluto.activate_notebook_environment("path/to/notebook.jl") do
-    Pkg.add(url = "https://github.com/jowch/Masque.jl")
-    Pkg.add("CairoMakie")
+    Pkg.add(["Masque", "CairoMakie"])
 end
 ```
 

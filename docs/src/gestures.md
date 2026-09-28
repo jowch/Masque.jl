@@ -26,8 +26,7 @@ so a docs-site embed or a static export is not a Masque bug.
 Paste each snippet into its own Pluto cell. Pluto runs one top-level
 expression per cell. Wrap multiple statements in `begin ... end`. Showing
 `fig` alone does not mount the overlay; `masque` returns the HTML that
-does. For `Pkg.add(url=…)` and `Pluto.activate_notebook_environment`, see
-[Install](@ref).
+does. For installing Masque in a notebook, see [Install](@ref).
 
 ## One figure, one overlay
 
