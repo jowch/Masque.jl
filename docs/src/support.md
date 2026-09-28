@@ -1,16 +1,17 @@
 # Supported plots and axes
 
-This page is the one place that lists what Masque can overlay and where
-each interaction works. The guides describe what an interaction does and
-link here for the limits.
+Masque works on `Axis`, `Axis3`, and `PolarAxis`. The first table
+shows which interactions work on each axis type. The second lists the
+plot types `masque(fig)` makes interactive.
 
 ## Interactions by axis
 
 Hovering and clicking marks works on all three axis types, but `Axis3`
-and `PolarAxis` each build only some plot types (the recipe table below
-says exactly which). The interactions that turn a pointer position back
-into a data value — reading coordinates, dragging a threshold or a box,
-panning — need a flat 2D axis whose scale the browser can invert.
+and `PolarAxis` support only some plot types
+([Recipes masque(fig) extracts](@ref) says which). Reading coordinates,
+dragging a threshold or a box, and panning turn a pointer position into
+a data value. They need a 2D `Axis` with a scale the browser can
+invert.
 
 | Interaction | `Axis` | `Axis3` | `PolarAxis` |
 |---|---|---|---|
@@ -22,46 +23,48 @@ panning — need a flat 2D axis whose scale the browser can invert.
 | Pan or orbit ([`ViewInteractable`](@ref)) | pan ² | orbit | no |
 
 ¹ Scale `identity`, `log10`, or `log`. A categorical axis works too: the
-hover card shows the category, and the event holds its position with the
-label alongside (see [Read coordinates](@ref)).
+tooltip shows the category, and the event holds its position and its
+label (see [Read coordinates](@ref)).
 
 ² Scale `identity`, `log10`, or `log`, and numeric (not categorical)
 limits.
 
-³ `Axis3` builds `scatter!`, `meshscatter!`, `lines!`, `linesegments!`,
-`wireframe!`, and `arrows3d!`. `PolarAxis` builds `scatter!`, `lines!`,
-`linesegments!`, `scatterlines!`, and `series!`. Every other plot on those
-axes is skipped.
+³ `Axis3` supports `scatter!`, `meshscatter!`, `lines!`, `linesegments!`,
+`wireframe!`, and `arrows3d!`. `PolarAxis` supports `scatter!`, `lines!`,
+`linesegments!`, `scatterlines!`, and `series!`. `masque(fig)` skips
+every other plot on those axes, with a warning that names the plot.
 
-"Skipped" means `masque(fig)` leaves that plot out with a warning naming
-it; "no" means passing the interactable raises an `ArgumentError` when
-`masque` runs, rather than reporting a wrong coordinate. A
-[`ColorbarInteractable`](@ref) reads values on `identity`, `log10`, and
-`log` colorbars. Other Makie scales, such as `Makie.pseudolog10` and
-`Makie.Symlog10`, raise `ArgumentError` for every interaction marked ¹ or
-². Legend entries and colorbars are figure-level blocks rather than
-axis plots, so they work alongside any `Axis`, `Axis3`, or `PolarAxis`.
-`LScene` is not supported: `masque` refuses a figure that holds one,
-on both backends, legend and colorbar included.
-[Troubleshooting](@ref) has each error message and its fix.
+A "no" in the table means that passing the interactable raises an
+`ArgumentError` when `masque` runs. You get the error instead of a wrong
+coordinate. A [`ColorbarInteractable`](@ref) reads values on
+`identity`, `log10`, and `log` colorbars. Other Makie scales, such as
+`Makie.pseudolog10` and `Makie.Symlog10`, raise `ArgumentError` for
+every interaction marked ¹ or ².
+
+Legends and colorbars belong to the figure, not to an axis, so they work
+next to any `Axis`, `Axis3`, or `PolarAxis`. `LScene` is not supported:
+`masque` refuses a figure that contains one, on both backends, and the
+figure's legend and colorbar with it. [Troubleshooting](@ref) has each
+error message and its fix.
 
 Keyboard focus reaches points, bars, polygons, lines, segments, text,
-and legend entries, but not heatmap cells, axis or colorbar readouts,
-boxes, thresholds, or the view; see [Keyboard and screen readers](@ref).
+and legend entries. It does not reach heatmap cells, axis or colorbar
+readouts, boxes, thresholds, or the view. See
+[Keyboard and screen readers](@ref).
 
 ## Recipes masque(fig) extracts
 
-[`auto_interactables`](@ref) walks every axis and applies this table. A
-recipe missing from the table
-still contributes each visible child the table already knows, under that
-child's layer id. The walk stops at the child, so a parent that later
-gets its own row is not registered twice. A recipe with nothing to
-contribute is skipped with `@warn`, and the warning names the recipe.
-Constructor signatures and default fields stay in
-[Element constructors](@ref) and [Plot-object defaults](@ref).
+`masque(fig)` makes the plots in this table interactive, through
+[`auto_interactables`](@ref). A recipe that is not in the table still
+gets each visible child plot the table knows, under that child's layer
+id. Masque stops at the first plot it knows, so each mark becomes one
+layer: `rainclouds!` gives `:violin`, `:scatter`, and `:boxplot`, and
+not also the violin's `:poly`. A recipe with no known child is skipped
+with a warning that names it. Constructor signatures and default fields
+are in [Element constructors](@ref) and [Plot-object defaults](@ref).
 
-`Axis` is a 2D `Makie.Axis`. `Colorbar` and `Legend` are figure-content
-blocks, not scene plots.
+In the table, `Axis` means a 2D `Makie.Axis`. `Colorbar` and `Legend`
+are blocks of the figure, not plots inside an axis.
 
 | Recipe | Layer `id` | Kind | Axis | Axis3 | PolarAxis |
 |---|---|---|---|---|---|
@@ -97,18 +100,22 @@ blocks, not scene plots.
 | `Colorbar` (block) | `:colorbar` | `:axis` | figure content | | |
 | `Legend` (block) | `:legend` | `:rects` | figure content | | |
 
-`stem!` and `scatterlines!` become two layers. `boxplot!` hits the box
-body; whiskers and outliers are not hit-tested. `annotation!` is the
-inner `Text`. `text!` whose `space` is not `:data` is skipped with a
-specific warning. `lines!` and `stairs!` are one whole-line element.
-`series!` is one `:lines` layer with one element per series.
+`stem!` and `scatterlines!` become two layers. Only the body of a
+`boxplot!` responds to the pointer. Its whiskers and outliers do not.
+An `annotation!` responds on its text. A `text!` whose `space` is not
+`:data` is skipped with its own warning. Each `lines!` and `stairs!`
+plot is one element for its whole line. `series!` is one `:lines` layer
+with one element per series.
 
-`contourf!` is filled levels. A pointer in a hole misses that polygon.
-It hits another polygon only when one is actually drawn in the hole.
-An empty hole, including a peak above the top level, hits nothing.
-`hexbin!` stays unconstructed: its scatter is data-space. `bracket!`'s
-label warns `masque: skipping non-data-space text`. A non-`Text` child
-whose `space` is not `:data` is skipped with no warning of its own.
-Hidden children are not layers. A figure with an `LScene` is refused; see
-[Troubleshooting](@ref). For a type you implement yourself, see
-[Custom hits](@ref).
+A `contourf!` plot responds on its filled levels. A pointer in a hole
+of a level's polygon misses that polygon. It hits another polygon only
+where one is drawn in the hole. An empty hole, including a peak above
+the top level, hits nothing.
+
+`hexbin!` is not made interactive, because its hexagons are sized in
+data units. The label of a `bracket!` warns
+`masque: skipping non-data-space text`. A child plot other than text
+whose `space` is not `:data` is skipped without a warning of its own.
+Hidden child plots are not layers. A figure with an `LScene` is
+refused; see [Troubleshooting](@ref). To make a plot type interactive
+yourself, see [Custom hits](@ref).

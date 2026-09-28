@@ -1,13 +1,14 @@
 # Troubleshooting
 
-Each heading is the failed try or the error prefix you searched for. For
-constructor signatures, see [Constructors](@ref).
+Each entry starts with what you tried or the start of the error you
+saw, then gives the cause and the fix. For constructor signatures, see
+[Constructors](@ref).
 
 ## Most common
 
 - No Makie backend loaded: see
   [Tried `masque` with no Makie backend](@ref).
-- Cyclic `@bind` / `selected=pick`: see
+- Pluto reports cyclic references for `selected=pick`: see
   [Tried feeding this widget's bond into the same call's `selected=`](@ref).
 - Hover does not update `pick`: see
   [Tried reading pick on hover](@ref).
@@ -22,7 +23,7 @@ constructor signatures, see [Constructors](@ref).
 
 **Fix:** add `using CairoMakie` (static PNG, the default) or
 `using WGLMakie` (live GPU canvas; experimental) before calling
-`masque`. Loading both is fine; unqualified `masque` then stays on
+`masque`. Loading both is fine: `masque` without `backend=` then uses
 CairoMakie. For more information, see [Backends](@ref).
 
 ### Tried `tooltip = true`
@@ -31,22 +32,22 @@ CairoMakie. For more information, see [Backends](@ref).
 
 **Cause:** an interactable was built with `tooltip = true`.
 
-**Fix:** omit `tooltip` for the auto name/value table (the default),
-pass `masque"..."` for a template, or `tooltip = false` to suppress it.
-`true` is not one of the three valid forms. For more information, see
-[Tooltips](@ref).
+**Fix:** omit `tooltip` for the default table of names and values, pass
+`masque"..."` for a template, or pass `tooltip = false` to hide the
+tooltip. `true` is not one of these three forms. For more information,
+see [Tooltips](@ref).
 
 ### Tried `payloads` of the wrong length
 
 **Error prefix:** `payloads has N entries, expected M`
 
-**Cause:** `payloads` does not have one entry per geometry element.
-`expand_payloads` throws that `ArgumentError` for every length check,
-including `PointInteractable` and `RegionInteractable`. A DataFrame
-says `rows` instead of `entries`.
+**Cause:** `payloads` does not have one entry per mark. Every
+interactable that takes `payloads`, including `PointInteractable` and
+`RegionInteractable`, raises this `ArgumentError`. For a DataFrame the
+message says `rows` instead of `entries`.
 
-**Fix:** match lengths 1:1, or omit `payloads` on constructors that
-have an auto default.
+**Fix:** give one entry per mark, or omit `payloads` on constructors
+that have a default.
 
 ### Tried `mode` or `orientation` other than the two valid symbols
 
@@ -56,9 +57,9 @@ have an auto default.
 **Cause:** `SegmentInteractable(...; mode = ...)` or
 `ThresholdInteractable(...; orientation = ...)` got an unknown symbol.
 
-**Fix:** use `:polyline` (connected path) or `:pairs` (disjoint
-segments); `:horizontal` (constant-y, dragged vertically) or
-`:vertical`.
+**Fix:** for `mode`, use `:polyline` (one connected path) or `:pairs`
+(separate segments). For `orientation`, use `:horizontal` (a line at
+constant y, dragged up and down) or `:vertical`.
 
 ### Tried `unit = :line` with `mode = :pairs`
 
@@ -67,9 +68,9 @@ segments); `:horizontal` (constant-y, dragged vertically) or
 **Cause:** `SegmentInteractable(...; unit = :line)` was combined with
 `mode = :pairs` (or any mode other than `:polyline`).
 
-**Fix:** drop `unit` (the default `:segment` is one element per edge or
-pair) or keep `mode = :polyline`. `lines!` / `stairs!` / `series!`
-already pass `unit = :line`.
+**Fix:** drop `unit` (the default `:segment` makes each edge or pair
+one element), or keep `mode = :polyline`. `lines!`, `stairs!`, and
+`series!` already pass `unit = :line`.
 
 ### Tried ROI `bounds` that are not a 4-tuple in order
 
@@ -87,12 +88,12 @@ and `ymin < ymax`.
 `RegionInteractable: payloads has N entries, expected M`
 
 **Cause:** a region tuple's first element is not `:circle`, `:rect`, or
-`:polygon`, or `regions` and `payloads` do not line up 1:1.
-`selected = Dict(:cells => [1])` when `id = :cells` also fails: Region
-layers are `:cells_c` / `:cells_r` / `:cells_p`.
+`:polygon`, or `regions` and `payloads` differ in length.
+`selected = Dict(:cells => [1])` with `id = :cells` also fails, because
+the region layers are named `:cells_c`, `:cells_r`, and `:cells_p`.
 
-**Fix:** check the region tuple shapes against [Custom hits](@ref). Key
-`selected=` on the suffixed ids.
+**Fix:** check the region tuples against [Custom hits](@ref). Use the
+suffixed ids as the keys of `selected=`.
 
 ### Tried a scale Masque cannot invert in the browser
 
@@ -100,43 +101,45 @@ layers are `:cells_c` / `:cells_r` / `:cells_p`.
 `needs client-side invertible`
 
 **Cause:** `AxisInteractable`, `ColorbarInteractable`,
-`ThresholdInteractable`, `ROIInteractable`, `SliceInteractable`, and
-**2D** `ViewInteractable` invert a pixel back to a data value in the
+`ThresholdInteractable`, `ROIInteractable`, `SliceInteractable`, and a
+2D `ViewInteractable` turn a pointer position into a data value in the
 browser. That works for `identity`, `log10`, or `log`. Any other Makie
 scale (`Makie.pseudolog10`, `Makie.Symlog10`, a custom
-`ReversibleScale`) fails loud at `masque()` time instead of reporting
-the wrong coordinate. `SliceInteractable` says "needs client-side
+`ReversibleScale`) raises this error when `masque` runs, so you never
+get a wrong coordinate. `SliceInteractable` says "needs client-side
 invertible x and y scales".
 
-**Fix:** switch the axis to a supported scale, or use an element
-interactable (`PointInteractable`, `SegmentInteractable`, …) instead of
-a continuous-readout one.
+**Fix:** switch the axis to a supported scale, or use an interactable
+for marks (`PointInteractable`, `SegmentInteractable`, …) instead of
+one that reads positions.
 
-This is **not** the Axis3 orbit path. `ViewInteractable` on `Axis3`
-does not invert a pixel to data. Orbit is allowed; a pixel→data error
-comes from Axis, Threshold, ROI, or Slice, not from View.
+Orbiting an `Axis3` with `ViewInteractable` does not raise this error,
+because orbit does not turn a pointer position into a data value.
 
 ### Tried `AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, or `SliceInteractable` on Axis3
 
 **Error prefix:** `continuous pixel→data readout is undefined on an Axis3` /
 `undefined on an Axis3`
 
-**Cause:** those four kinds need a 2D pixel→data inverse. A screen
-pixel on `Axis3` is a ray, not a data point.
+**Cause:** those four interactables turn a pointer position into a 2D
+data value. On an `Axis3`, a point on the screen is a ray through the
+3D data, not a single data point.
 
-**Fix:** pick marks with element interactables (points, segments,
-polygons) on 3D axes. Do not attach Axis, Threshold, ROI, or Slice to
-`Axis3`.
+**Fix:** on 3D axes, use interactables for marks (points, segments,
+polygons). Do not pass Axis, Threshold, ROI, or Slice interactables for
+an `Axis3`.
 
 ### Tried `ViewInteractable` orbit on Axis3
 
-**Cause:** orbit **is allowed**. `ViewInteractable` on `Axis3` validates
-and sorts as a `:view` layer. If you saw a continuous pixel→data error,
-that error came from Axis, Threshold, ROI, or Slice, not from View.
+**Cause:** orbit works. `ViewInteractable` on an `Axis3` is accepted as
+a `:view` layer. An error about continuous pixel→data readout comes
+from an Axis, Threshold, ROI, or Slice interactable, not from
+`ViewInteractable`.
 
-**Fix:** pass `ViewInteractable(ax)` for orbit. In-drag frames on both
-backends need a live kernel. The bond never carries `:view`. For more
-information, see [Backends](@ref).
+**Fix:** pass `ViewInteractable(ax)` to orbit. On both backends, the
+view updates during a drag only in a running notebook. The `@bind`
+value never holds a `:view` event. For more information, see
+[Backends](@ref).
 
 ### Tried continuous θ/r readout on PolarAxis
 
@@ -144,19 +147,21 @@ information, see [Backends](@ref).
 `PolarAxis view gestures need continuous θ/r` /
 `PolarAxis continuous θ/r inversion is not yet shipped`
 
-**Cause:** continuous polar inversion is not shipped.
-`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`,
-`SliceInteractable`, and `ViewInteractable` on `PolarAxis` raise
-`ArgumentError`.
+**Cause:** Masque cannot yet turn a pointer position on a `PolarAxis`
+into θ and r. `AxisInteractable`, `ThresholdInteractable`,
+`ROIInteractable`, `SliceInteractable`, and `ViewInteractable` on a
+`PolarAxis` raise `ArgumentError`.
 
-**Fix:** use element interactables (Scatter, Lines, LineSegments,
-ScatterLines) for discrete hits. Polar is not WebGL-only.
+**Fix:** use interactables for marks (Scatter, Lines, LineSegments,
+ScatterLines) to hover and click. Polar plots work on both backends.
 
 ### Tried `heatmap!` or `barplot!` on PolarAxis
 
-**Cause:** `masque(fig)` skips those kinds on `PolarAxis` with `@warn`
-(an axis-aligned hit layer would misalign). Explicit AABB constructors
-can still build and sit in the wrong place.
+**Cause:** `masque(fig)` skips those plots on a `PolarAxis` with a
+warning, because their rectangles would not line up with the polar
+plot. A rectangle interactable you pass yourself, such as
+`RectInteractable`, is still built, but its hover areas sit in the
+wrong place.
 
 **Fix:** stick to the polar rows of
 [Recipes masque(fig) extracts](@ref), or use a Cartesian `Axis`.
@@ -167,71 +172,72 @@ can still build and sit in the wrong place.
 `pan needs continuous numeric axes`
 
 **Cause:** `ROIInteractable` and 2D `ViewInteractable` pan need numeric
-axis limits; a categorical axis has none. `SliceInteractable` also
-rejects a categorical axis: interpolation needs a numeric coordinate,
-unlike `AxisInteractable`, which reads the category.
-(`ViewInteractable` orbit on `Axis3` is a different gate — that path
-is allowed.)
+axis limits, and a categorical axis has none. `SliceInteractable` also
+rejects a categorical axis, because it interpolates between numeric
+positions. `AxisInteractable` works there and reads the category.
+Orbiting an `Axis3` with `ViewInteractable` is not affected.
 
 **Fix:** use `AxisInteractable` (reads the category) instead, or pass
 numeric limits. A slice needs a continuous axis.
 
 ### Tried an `LScene` figure
 
-**Error prefix:** `Masque supports Makie.Axis, Makie.Axis3, and
-Makie.PolarAxis`
+**Error prefix:** ```Masque supports `Makie.Axis`, `Makie.Axis3`, and `Makie.PolarAxis`; found unsupported```
 
 **Cause:** the figure contains an `LScene` block. `LScene` is not
 supported on any backend, so `masque` refuses the figure rather than
 leave that block with nothing to hover. A figure that also holds a
 normal `Axis` is refused too.
 
-**Fix:** draw interactive 3D in an `Axis3`, which both backends
+**Fix:** put interactive 3D in an `Axis3`, which both backends
 support. To show an `LScene` without interaction, display the figure
 itself instead of `masque(fig)`.
 
-### Tried `selected=` on a kind that cannot hydrate
+### Tried `selected=` on a layer that cannot start selected
 
 **Error prefix:** `does not support pre-highlight` /
 `out of range`
 
-**Cause:** the layer id does not support highlight in the overlay from
-`selected=` (`:grid`, `:axis`, `:threshold`, `:roi`, `:view` cannot;
-only `:circles` / `:rects` / `:polygons` / `:segments` / `:polyline` /
-`:lines` can), or an index is out of range. Region keys are the suffixed ids,
-not the base `id`.
+**Cause:** the layer's kind cannot show a starting selection from
+`selected=`, or an index is out of range. Layers of kind `:circles`,
+`:rects`, `:polygons`, `:segments`, `:polyline`, and `:lines` can.
+`:grid`, `:axis`, `:threshold`, `:roi`, and `:view` cannot. For a
+`RegionInteractable`, the keys are the suffixed ids, not the base
+`id`.
 
 **Fix:** check the layer's kind against [Selection](@ref). Indices are
 1-based and must be in `1:n`.
 
 ### An error mentioning "Makie internals changed?"
 
-**Cause:** an internal-invariant guard tripped. Masque introspects a
-live Makie plot object's fields, and a Makie / CairoMakie / WGLMakie
-version bump can move or rename one of them. This is not user misuse.
+**Cause:** Masque reads fields of Makie's plot objects, and a new
+Makie, CairoMakie, or WGLMakie version can move or rename one of them.
+Your code is not the cause.
 
-**Fix:** file an issue with your Makie / CairoMakie / WGLMakie
-versions; pin to a known-good version in the meantime.
+**Fix:** file an issue with your Makie, CairoMakie, and WGLMakie
+versions. Until it is fixed, pin those packages to a version that
+worked.
 
 ## Not errors, but surprising
 
 ### Tried loading neither backend, or both
 
-Loading neither raises the `ArgumentError` earlier on this page.
-Loading both is fine; unqualified `masque` defaults to CairoMakie. For
-more information, see [Backends](@ref).
+Loading neither raises the `ArgumentError` in
+[Tried `masque` with no Makie backend](@ref). Loading both is fine:
+`masque` without `backend=` uses CairoMakie. For more information, see
+[Backends](@ref).
 
 ### Tried `CairoMakie.activate!(type = "svg")` and the widget is a PNG
 
-**Cause:** `type = "svg"` chooses the MIME for a bare `Figure`.
-`masque` draws a PNG on CairoMakie, or a canvas on WGLMakie, and lays
-the overlay on that picture. `save("figure.svg", fig)` writes SVG from
-the file extension.
+**Cause:** `type = "svg"` chooses how a bare `Figure` displays.
+`masque` always shows a PNG on CairoMakie, or a canvas on WGLMakie,
+with tooltips and highlights drawn on top. `save("figure.svg", fig)`
+writes SVG because of the file extension.
 
 **Fix:** leave `CairoMakie.activate!(type = "svg")` in place for cells
 that return a `Figure`. Write the file with `save("figure.svg", fig)`.
-Return `masque(fig)` from the cell that should show the overlay. For
-more information, see [SVG display and files](@ref).
+Return `masque(fig)` from the cell that should show the interactive
+figure. For more information, see [SVG display and files](@ref).
 
 ### Tried feeding this widget's bond into the same call's `selected=`
 
@@ -241,57 +247,59 @@ more information, see [SVG display and files](@ref).
 call's `selected=` in one cell. Pluto detects the self-reference and
 refuses to run the cell.
 
-**Fix:** a click already updates the overlay selection on its own.
-`selected=` is only for a starting value your Julia code computes, and
-that has to come from a cell that does not read this widget's bond. For
+**Fix:** a click already shows the selected highlight on its own.
+Use `selected=` only for a starting selection your Julia code computes,
+in a cell that does not use this widget's `@bind` variable. For
 more information, see [Keep a selection when the figure rebuilds](@ref)
 in [Selection](@ref).
 
 ### Tried reading pick on hover
 
-**Cause:** hover is overlay-only. The tooltip and highlight run in the
-browser. They do not assign `@bind`.
+**Cause:** hovering shows the tooltip and highlight in the browser. It
+does not change the `@bind` value.
 
 **Fix:** read `pick` after a click (or Enter on a focused mark). For
-channel timing, see [Overlay, bind, and the host](@ref).
+what each gesture sends to Julia, and when, see
+[Overlay, bind, and the host](@ref).
 
 ### Right-click opens the context menu
 
-Right-click the figure to open the context menu on the Cairo image or
-the WebGL canvas. Control-click does the same on macOS. That press does
-not start a drag, and `@bind` stays unchanged. For channel timing, see
+Right-clicking the figure opens the browser's context menu for the
+CairoMakie image or the WebGL canvas. Control-click does the same on
+macOS. That press does not start a drag, and the `@bind` value stays
+the same. For what each gesture sends to Julia, see
 [Overlay, bind, and the host](@ref).
 
 ### Tried a click and nothing happened
 
 Check, in order:
 
-1. Is the bond actually read somewhere? `@bind pick masque(...)` with no
-   cell reading `pick` looks like nothing happened.
-2. Did you click empty space? Clicks that do not land on a hit region
-   are a no-op, by design. A miss does not clear the selection.
-3. Is the element you clicked actually interactive? An unsupported plot
-   type in `masque(fig)` is skipped with a `@warn` in the notebook log,
-   not an error, so it silently is not clickable. Polar heatmap /
-   barplot is this skip. The allowlist is
-   [Recipes masque(fig) extracts](@ref).
+1. Does any cell use the variable? With `@bind pick masque(...)` and no
+   cell that uses `pick`, a click changes nothing you can see.
+2. Did you click empty space? A click that misses every mark does
+   nothing, and it does not clear the selection.
+3. Is the mark you clicked interactive? `masque(fig)` skips an
+   unsupported plot type with a warning in the notebook log, not an
+   error, so its marks do not respond. A heatmap or bar plot on a
+   `PolarAxis` is skipped this way.
+   [Recipes masque(fig) extracts](@ref) lists the supported plots.
 
 ### Tried a tooltip and saw `[object Object]`
 
-**Cause:** the auto-table (or a `$(field)` template) is rendering a
-payload value that is itself a nested `Dict` or array. That stringifies
-to `[object Object]` in JavaScript.
+**Cause:** the default tooltip table, or a `$(field)` template, is
+showing a payload value that is itself a nested `Dict` or array. The
+browser turns that value into the text `[object Object]`.
 
 **Fix:** flatten the field to a scalar (string or number) in Julia
 before it goes into `payloads`, or reference a pre-formatted string
 field with `masque"$(that_field)"`.
 
-### Tried a window resize and the overlay looked misaligned
+### Tried a window resize and the highlights looked misaligned
 
-**Cause:** almost always a `px_per_unit` / `max_width` mismatch between
-what was rendered and what the display shows. Hit-testing re-reads the
-element's actual on-screen size at runtime, so page zoom or window
-resizing after the widget mounted is not the cause.
+**Cause:** almost always a `px_per_unit` or `max_width` mismatch between
+the rendered figure and the width it is shown at. The hover areas follow
+the figure's size on screen, so zooming the page or resizing the window
+after the widget appears is not the cause.
 
 **Fix:** re-run the cell that calls `masque(...)`. If the misalignment
 persists, check that `max_width` on `masque` or the explicit backend
@@ -299,19 +307,19 @@ struct matches the column width you expect.
 
 ### Tried reading `pick` after a pan or orbit
 
-**Cause:** `ViewInteractable` commits nothing. The bond does not change
-when you drag the view.
+**Cause:** dragging with `ViewInteractable` changes the view, not the
+`@bind` value.
 
-**Fix:** do not read `@bind` for camera state. Live frames on both
-backends use `with_js_link`.
+**Fix:** do not use the `@bind` value to track the camera. On both
+backends, the view updates during a drag through `with_js_link`, not
+through `@bind`.
 
 ### Browser console errors
 
-Open the browser developer-tools console. A serialization error there
-on `:webgl` usually means the installed `WGLMakie` version is outside
-Masque's pinned compat range — see [Backends](@ref). Any other console
-error alongside a widget that otherwise renders is worth reporting as a
-bug rather than assuming it is expected.
+Open the console in the browser's developer tools. A serialization error
+there on `:webgl` usually means the installed `WGLMakie` version is
+outside Masque's compat range. See [Backends](@ref). Report any other
+console error as a bug, even when the widget otherwise works.
 
 ### Tried WGLMakie and the spinner never stops
 
@@ -323,24 +331,24 @@ machine, in a container, or behind a tunnel that forwards only Pluto's
 port, the browser cannot reach that address, and the spinner never
 stops. A `masque` widget does not use that connection.
 
-**Fix:** for the overlay, return `masque(f)` from the construction cell.
-That cell is already the overlay. `@bind` is optional. A trailing `;`
-is only so Pluto does not show the widget twice. For the cell layout,
+**Fix:** return `masque(f)` from the cell that creates the figure. That
+cell then shows the interactive figure, and `@bind` is optional. If you
+do bind it, end that cell with `;` so Pluto does not show the widget
+twice. For the cell layout,
 see [The widget is the figure](@ref). To keep WGLMakie's own display
 working remotely, forward port 9384 as well, or point Bonito at an
 address the browser can reach with `Bonito.configure_server!`.
 
 ### Tried WGLMakie and the canvas is blank
 
-**Cause:** typically a version mismatch between the installed
-`WGLMakie` and the one Masque's `:webgl` extension was verified
-against, or the figure has no supported plot for `masque(fig)` to
-introspect (zero-config on an empty `Axis3` renders the canvas but
-nothing is interactive — that is expected).
+**Cause:** usually the installed `WGLMakie` is a version Masque's
+`:webgl` backend was not checked against. Or the figure has no plot
+that `masque(fig)` supports. `masque(fig)` on an empty `Axis3` shows
+the canvas with nothing interactive, which is expected.
 
-**Fix:** check the `WGLMakie` compat bound in `Project.toml`; confirm
-the figure actually has a plot call in it before `masque(fig)`.
-Drag-orbit on `:webgl` streams live scene frames; see [Backends](@ref).
+**Fix:** check the `WGLMakie` compat bound in `Project.toml`, and check
+that the figure has a plot in it before `masque(fig)`. For how orbit
+frames reach the canvas during a drag, see [Backends](@ref).
 
 ### A WebGL plot says its GPU context was released
 
@@ -348,7 +356,8 @@ Drag-orbit on `:webgl` streams live scene frames; see [Backends](@ref).
 (16 on desktop Chrome and Safari, 8 on Android Chrome). Masque keeps at
 most 8. A plot that scrolls out of view releases its context before the
 next plot takes one. More than 8 plots on screen at once cannot all be
-live; the extras show this note. Hover and `@bind` still work.
+live, and the extra plots show this note. Hover and `@bind` still
+work.
 
 **Fix:** scroll so fewer `:webgl` plots are on screen at once, or use
 `:cairo` for a plot that is a static picture.
