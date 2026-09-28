@@ -1,12 +1,12 @@
 # Drag to pan
 
-`ViewInteractable` on a 2D axis pans while you drag. The wheel zooms
-about the cursor. The axis frame stays put while the data inside it
-slides. The bond does not update when the camera moves. A click on a
-marker still reports that point. The camera is not an analysis value.
+Drag a 2D axis that has a [`ViewInteractable`](@ref) to pan it, and use
+the scroll wheel to zoom about the pointer. The axis frame stays put
+while the data slides inside it. Moving the view does not change the
+`@bind` value, but clicking a marker still gives you that point.
 
-In-drag frames need a live kernel. They travel on `with_js_link`, not
-on `@bind`. See [Pan and orbit](@ref). The clip is that drag.
+Panning needs a running notebook, and other cells cannot read the view.
+See [Pan and orbit](@ref). The clip shows the drag.
 
 ```@raw html
 <video id="masque-gal-pan" title="Drag to pan a 2D scatter"
@@ -40,16 +40,15 @@ end
 
 ## Variations
 
-Shift+drag pans when an ROI or a threshold is on the same axis.
+When an ROI or a threshold is on the same axis, Shift+drag pans.
 `PolarAxis`, a `Colorbar`, a categorical axis, and a scale other than
-`identity`, `log10`, or `log` raise `ArgumentError` at `masque` time.
-A second figure whose limits are computed from this bond does not
-follow the drag: the bond never carries `:view`.
+`identity`, `log10`, or `log` raise `ArgumentError` when `masque` runs.
+A second figure cannot follow the drag through `pick`, because the
+`@bind` value never includes the view.
 
 !!! note
 
-    The gesture commits nothing on both backends. On a live kernel,
-    `:cairo` ships a PNG each frame and `:webgl` ships a serialized scene
-    onto the canvas already on the page. The clip above is that Cairo
-    drag. Reach for `:webgl` when those frames have to stay on the GPU.
-
+    On both backends, panning leaves the `@bind` value unchanged. While
+    you drag in a running notebook, CairoMakie sends a new image for each
+    frame and WGLMakie updates its live canvas. The clip uses CairoMakie.
+    Use `:webgl` when the redraw should stay on WGLMakie's canvas.

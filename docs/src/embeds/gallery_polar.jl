@@ -49,11 +49,11 @@ md"""
 
 # ╔═╡ a141000c-0001-4000-8000-000000000012
 md"""
-This cell reads `pick`, so it re-runs on the click.
+This cell responds to the click.
 """
 
 # ╔═╡ a141000c-0001-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "click a point"
 else
     dirs = ["east", "north", "west", "south"]

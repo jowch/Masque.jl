@@ -27,7 +27,7 @@ Hover the colorbar to read the value under the pointer.
 
 # ╔═╡ a1410005-0001-4000-8000-000000000010
 md"""
-Draw the heatmap and its colorbar. `masque` makes the colorbar a readout.
+Create the heatmap and its colorbar. `masque` makes the colorbar a readout.
 """
 
 # ╔═╡ a1410005-0001-4000-8000-000000000002
@@ -42,7 +42,7 @@ end
 
 # ╔═╡ a1410005-0001-4000-8000-000000000011
 md"""
-Hover stays on the figure. This page does not re-run a readout.
+`@bind pick` holds the click, though no cell here uses it.
 """
 
 # ╔═╡ a1410005-0001-4000-8000-000000000003

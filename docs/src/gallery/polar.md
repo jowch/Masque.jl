@@ -1,10 +1,12 @@
 # Polar points
 
-Four scatter points on a `PolarAxis`. Hover for the default tooltip.
-Click for an `ElementEvent`: `index` is 1-based, `x` is θ, and `y` is
-r. `masque(fig)` names the layer `:scatter`.
+Four scatter points on a `PolarAxis`. Hover over a point to see the
+default tooltip, and click it to get an [`ElementEvent`](@ref): `index`
+is the point's position in your data, `x` is θ, and `y` is r.
+`masque(fig)` names the layer `:scatter`.
 
-Polar is not a WebGL-only feature. See [Click marks](@ref).
+Polar axes work with CairoMakie as well as WGLMakie. See
+[Click marks](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -18,15 +20,14 @@ Main.masque_fallback("gallery_polar")
 
 ## Variations
 
-Continuous θ/r readout, the way an `AxisInteractable` reports `(x, y)`,
-is not shipped. A click in empty space does not produce an event.
-`ViewInteractable` on a `PolarAxis` raises `ArgumentError`.
+A polar axis has no readout for empty space, like the `(x, y)` an
+`AxisInteractable` gives on a 2D axis: a click in empty space gives no
+event. `ViewInteractable` on a `PolarAxis` raises `ArgumentError`.
 
 !!! note
 
-    Discrete point hits match on `:cairo` and `:webgl`. This player is the
-    Cairo figure, including the listed clicks. `heatmap!` and `barplot!` on
-    a `PolarAxis` are skipped with `@warn` on both backends. Load
-    `WGLMakie` alone when the polar figure should be a live canvas; the
-    hits do not change.
-
+    Points respond the same way on `:cairo` and `:webgl`. This example
+    uses CairoMakie, and every click was recorded ahead of time.
+    `masque(fig)` skips `heatmap!` and `barplot!` on a `PolarAxis` with a
+    `@warn`, on both backends. Load only `WGLMakie` when the polar figure
+    should be a live canvas; the points respond the same way.

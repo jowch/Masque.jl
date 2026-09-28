@@ -27,7 +27,7 @@ Click a point on the left. The plot on the right marks the same point.
 
 # ╔═╡ a1410002-0001-4000-8000-000000000010
 md"""
-Draw the scatter and pass it to `PointInteractable`. `@bind pick` stores the click.
+Create the scatter and pass it to `PointInteractable`. `@bind pick` stores the click.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000002
@@ -45,11 +45,11 @@ end
 
 # ╔═╡ a1410002-0001-4000-8000-000000000011
 md"""
-This cell reads `pick`. The next figure uses that same variable, so it updates with the click.
+This cell responds to the click. So does the next figure, which uses `pick` too.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "click a point"
 else
     "point $(pick.index) selected"
@@ -57,7 +57,7 @@ end
 
 # ╔═╡ a1410002-0001-4000-8000-000000000012
 md"""
-Build the second scatter from `pick`. `selected` paints the point the click named.
+Build the second scatter from `pick`. `selected` highlights the point you clicked.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000005
@@ -66,7 +66,7 @@ begin
     ax_r = Axis(fig_r[1, 1]; title = "the same point, on the other plot")
     s_right = scatter!(ax_r, first.(data), last.(data); color = :teal, markersize = 20)
     right = PointInteractable(ax_r, s_right)
-    held = pick === nothing ? Int[] : Int[pick.index]
+    held = isnothing(pick) ? Int[] : Int[pick.index]
     nothing
 end
 

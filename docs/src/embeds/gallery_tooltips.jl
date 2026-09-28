@@ -22,7 +22,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1410001-0001-4000-8000-000000000009
 md"""
-Hold the pointer over a city, then click it. The last cell names the city.
+Hover over a city, then click it. The last cell names the city.
 """
 
 # ╔═╡ a1410001-0001-4000-8000-000000000010
@@ -52,7 +52,7 @@ end
 
 # ╔═╡ a1410001-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores the click. Hover updates the card and does not change `pick`.
+`@bind pick` stores the click. Hovering shows the tooltip and does not change `pick`.
 """
 
 # ╔═╡ a1410001-0001-4000-8000-000000000003
@@ -60,11 +60,11 @@ md"""
 
 # ╔═╡ a1410001-0001-4000-8000-000000000012
 md"""
-This cell reads `pick`, so it re-runs on the click.
+This cell responds to the click.
 """
 
 # ╔═╡ a1410001-0001-4000-8000-000000000004
-if pick === nothing
+if isnothing(pick)
     "hover a city, or click one"
 else
     "$(pick.city) — pop $(pick.pop)"

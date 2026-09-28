@@ -1,8 +1,8 @@
 # Bars and areas
 
-`masque(fig)` walks the figure and picks up histogram bins, waterfall
-bars, crossbar ranges, bar plots, and horizontal and vertical spans. No
-interactable is written by hand. Hover a bar, a band, or a range.
+`masque(fig)` picks up histogram bins, waterfall bars, crossbar ranges,
+bar plots, and horizontal and vertical spans, with no interactable
+written by hand. Hover over a bar, a band, or a range to see its values.
 
 The four panels are one widget. For a single `barplot!`, see
 [Click marks](@ref).
@@ -21,13 +21,12 @@ Main.masque_fallback("gallery_bars")
 
 The same call also covers the other bar-like recipes in
 [Recipes masque(fig) extracts](@ref). A recipe that is not in that table
-is not a hit target until you add an interactable yourself.
+does not respond until you add an interactable for it yourself.
 
 !!! note
 
-    Auto-extraction of these recipes is the same on `:cairo` and `:webgl`.
-    This player is the Cairo figure, and hover stays in the overlay: the
-    page does not re-run Julia on a click. Reach for `:webgl` when the
-    figure is large or you are already on the live canvas. `barplot!` on a
-    `PolarAxis` is not this figure; that call is skipped with `@warn`.
-
+    `masque(fig)` picks up these recipes the same way on `:cairo` and
+    `:webgl`. This example uses CairoMakie and has no cell that uses a
+    click. Use `:webgl` when the figure is large or you already work on
+    WGLMakie's live canvas. On a `PolarAxis`, `masque(fig)` skips
+    `barplot!` with a `@warn`.

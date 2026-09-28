@@ -22,12 +22,12 @@ using Masque, CairoMakie, Random
 
 # ╔═╡ a1410003-0001-4000-8000-000000000009
 md"""
-Hover a bar, a band, or a span. One `masque` call covers every panel.
+Hover over a bar, a band, or a span. One `masque` call covers every panel.
 """
 
 # ╔═╡ a1410003-0001-4000-8000-000000000010
 md"""
-Draw the panels the way you already draw them. You do not add an interactable for each recipe.
+Create the panels the way you normally would. You do not need an interactable for each recipe.
 """
 
 # ╔═╡ a1410003-0001-4000-8000-000000000002
@@ -52,7 +52,7 @@ end
 
 # ╔═╡ a1410003-0001-4000-8000-000000000011
 md"""
-Hover stays on the figure. This page does not re-run a readout.
+`@bind pick` holds the click, though no cell here uses it.
 """
 
 # ╔═╡ a1410003-0001-4000-8000-000000000003

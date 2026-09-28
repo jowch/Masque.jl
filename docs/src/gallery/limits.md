@@ -1,11 +1,11 @@
 # Limits
 
-The axis is built with `limits = (0, 6, 0, 40)`. Every marker inside
-that window is still a hit target. The point on the right edge stays
-clickable.
+The axis has `limits = (0, 6, 0, 40)`. Every marker inside those limits
+responds to hover and clicks, including the point on the right edge.
+Hover over or click a marker.
 
-This page is that one window. Hover or click a marker. Dragging the
-axis is [Drag to pan](@ref), which does not rebuild the cell.
+To move the view by dragging, without rebuilding the widget, see
+[Drag to pan](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -19,16 +19,15 @@ Main.masque_fallback("gallery_limits")
 
 ## Variations
 
-Rebuilding the figure with new limits, or setting `azimuth` and
-`elevation` on an `Axis3`, is a different notebook. Selection survives
-either rebuild when you pass `selected=` into the new `masque` call.
-A `Ref` that does not read the slider holds the indices between
-rebuilds. Do not pass `selected=` to store a camera pose.
+To change the limits from a slider, rebuild the figure with the new
+limits, or with a new `azimuth` and `elevation` on an `Axis3`. The hit
+areas follow the new view. To keep a selection across the rebuild, pass
+it as `selected=` in the new `masque` call, and keep the indices in a
+`Ref` in a cell that does not use the slider. `selected=` holds
+selected marks, not a camera position.
 
 !!! note
 
-    Re-projecting after a limits change is the same on `:cairo` and
-    `:webgl`. This notebook does not load PlutoUI or bind a slider.
-    For in-drag frames without a rebuild, see [Drag to pan](@ref) and
-    [Drag to orbit](@ref).
-
+    Hit areas follow new limits the same way on `:cairo` and `:webgl`.
+    This notebook has no slider. To move the view while you drag, see
+    [Drag to pan](@ref) and [Drag to orbit](@ref).

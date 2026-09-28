@@ -1,12 +1,12 @@
 # Drag to orbit
 
-`ViewInteractable` on an `Axis3` orbits the camera while you drag.
-`azimuth` and `elevation` change in the live session. The bond stays
-empty of any view payload, same as a 2D pan.
+Drag an `Axis3` that has a [`ViewInteractable`](@ref) to turn the
+camera around the plot. In a running notebook, `azimuth` and
+`elevation` change as you drag, and the `@bind` value does not change,
+as with a 2D pan.
 
-A static `Axis3` is a valid figure on CairoMakie. You do not need
-WGLMakie to draw the three markers. See [Pan and orbit](@ref). The clip
-is that drag.
+CairoMakie is enough for this; you do not need WGLMakie. The clip shows
+the drag. See [Pan and orbit](@ref).
 
 ```@raw html
 <video id="masque-gal-orbit" title="Drag to orbit three markers on an Axis3"
@@ -43,16 +43,14 @@ end
 
 ## Variations
 
-A slider that sets `azimuth` and `elevation` and rebuilds the figure is
-the other way to orbit. That path re-runs the cell. This drag does not.
-Persisting a pose across a remount means storing the two angles
-yourself and rebuilding. `selected=` does not store a camera.
+The other way to orbit is a slider that sets `azimuth` and `elevation`
+and rebuilds the figure. That re-runs the cell; dragging does not. To
+keep a camera angle when the figure rebuilds, store the two angles
+yourself and pass them to `Axis3`. `selected=` does not store a camera.
 
 !!! note
 
-    Orbit commits nothing on both backends. In-drag frames need a live
-    kernel: a PNG from `:cairo`, a serialized scene from `:webgl`. The
-    clip above is that Cairo drag. Reach for `:webgl` when you want the
-    orbit on the GPU canvas. `PolarAxis` and a `Colorbar` are not orbit
-    targets.
-
+    On both backends, orbiting leaves the `@bind` value unchanged and
+    needs a running notebook, because Julia redraws the view while you
+    drag. The clip uses CairoMakie. Use `:webgl` to orbit on WGLMakie's
+    live canvas. A `PolarAxis` and a `Colorbar` cannot orbit.

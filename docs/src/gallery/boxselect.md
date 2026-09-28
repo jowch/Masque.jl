@@ -1,10 +1,11 @@
 # Box-select scatter
 
-Drag the box, or a corner grip, and release. The bond is a
-`Vector{ElementEvent}`, one event per enclosed point, with that point's
-payload (`group`, `x`, `y`). An empty box is `[]`, not `nothing`.
+Drag the box, or one of its corner handles, and release. `picks` becomes
+a `Vector{ElementEvent}` with one event per point inside the box,
+carrying that point's payload (`group`, `x`, `y`). An empty box gives
+`[]`, not `nothing`.
 
-The readout counts the two groups and the mean of the enclosed
+The last cell counts the points in each group and averages their
 coordinates. `xs[picks]` uses the events as indices. See
 [Brush a region](@ref).
 
@@ -21,19 +22,19 @@ Main.masque_fallback("gallery_boxselect")
 ## Variations
 
 `selects` names a `:circles` or `:grid` layer in the same `masque`
-call. `selects = :bars` raises `ArgumentError`. A corner grip resizes
-both axes. The middle of a side resizes that one axis, with no grip
-drawn there. Shift+drag pans instead, when a `ViewInteractable` is on
-the same axis.
+call. `selects = :bars` raises `ArgumentError`. A corner handle resizes
+the box in both directions. Dragging the middle of a side resizes it in
+that one direction, though no handle is drawn there. When a
+`ViewInteractable` is on the same axis, Shift+drag pans instead.
 
 !!! note
 
-    The brush is the same on `:cairo` and `:webgl` on a 2D axis with scale
-    `identity`, `log10`, or `log`. It raises `ArgumentError` on `Axis3`,
-    `PolarAxis`, and a categorical axis. This player is the Cairo figure.
-    The scatter has 12 points so that every set of points a box can
-    enclose is recorded: any box you drag shows its own counts, without a
-    kernel. In a notebook, a brush over any number of points works the
-    same way; on this site, an example with too many boxes to record is
-    shown as a clip instead (see [Compare a cluster](@ref)).
-
+    The box works the same way on `:cairo` and `:webgl`, on a 2D axis
+    with scale `identity`, `log10`, or `log`. It raises `ArgumentError`
+    on `Axis3`, `PolarAxis`, and a categorical axis. This example uses
+    CairoMakie. The scatter has 12 points so that every set of points a
+    box can enclose could be recorded: any box you drag shows its own
+    counts, without Julia running. In a notebook, a box over any number
+    of points works the same way. On this site, an example with too many
+    possible boxes is shown as a video clip instead (see
+    [Compare a cluster](@ref)).

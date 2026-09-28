@@ -27,7 +27,7 @@ Drag the box. The last cell counts the points inside, by group.
 
 # ╔═╡ a1410007-0001-4000-8000-000000000010
 md"""
-Scatter the points, keep each point's group on the payload, and brush them with a box.
+Plot the points with each point's group in its payload, and add a box that selects them.
 """
 
 # ╔═╡ a1410007-0001-4000-8000-000000000002
@@ -58,11 +58,11 @@ md"""
 
 # ╔═╡ a1410007-0001-4000-8000-000000000012
 md"""
-This cell reads `picks`, so it re-runs when you release the box.
+This cell responds when you release the box.
 """
 
 # ╔═╡ a1410007-0001-4000-8000-000000000004
-if picks === nothing || isempty(picks)
+if isnothing(picks) || isempty(picks)
     "Adjust the box to select points."
 else
     n = length(picks)

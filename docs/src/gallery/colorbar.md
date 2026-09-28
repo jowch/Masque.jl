@@ -1,12 +1,11 @@
 # Colorbar
 
-`masque(fig)` finds a `Colorbar` in the figure layout and adds a
-readout. Hover the bar for the data value under the pointer. A click in
-a live notebook round-trips a `ColorbarEvent` with `value`. The layer
+`masque(fig)` finds a `Colorbar` in the figure and makes it a readout.
+Hover over the bar to see the data value under the pointer. The layer
 kind is `:axis`.
 
-`masque(fig)` builds that [`ColorbarInteractable`](@ref) for you. Write
-one yourself when you are not using `masque(fig)`. See
+`masque(fig)` builds the [`ColorbarInteractable`](@ref) for you. Create
+one yourself when you pass your own interactables to `masque`. See
 [Read coordinates](@ref).
 
 ```@raw html
@@ -21,15 +20,17 @@ Main.masque_fallback("gallery_colorbar")
 
 ## Variations
 
-A click is a [`ColorbarEvent`](@ref). `pick.value` is the data value
-under the pointer. `ColorbarInteractable` takes the bar and `id` only,
-so there is no `value=` to reopen a position. The heatmap cells are a
-separate layer. Hovering a cell is the grid readout, not the bar.
+In a running notebook, a click gives a [`ColorbarEvent`](@ref), and
+`pick.value` is the data value under the pointer.
+`ColorbarInteractable` takes the bar and `id` only, so you cannot start
+it at a given value. The heatmap cells are a separate layer: hovering
+over a cell shows that cell's value, not the bar's.
 
 !!! note
 
-    The colorbar readout is the same on `:cairo` and `:webgl`. This player
-    is the Cairo figure. Hover works here; the click bond is a live
-    notebook, because a colorbar click is a value rather than a listed
-    mark. `Colorbar` is not a pan or orbit target.
+    The colorbar readout is the same on `:cairo` and `:webgl`. This
+    example uses CairoMakie. Hover works on this page, but a click needs a
+    running notebook: a colorbar click can be any value, so it cannot be
+    recorded ahead of time. A `ViewInteractable` cannot pan or orbit a
+    `Colorbar`.
 

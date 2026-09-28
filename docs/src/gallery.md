@@ -1,18 +1,18 @@
 # Examples
 
-Each example is a small notebook you can copy. On an example's page,
-hovering works as it does in Pluto, every click on a mark swaps in the
-result the notebook computed for it, every box you can draw with a brush
-is recorded the same way, and the notebook follows the player as text.
-Pan, orbit, and Compare a cluster are recorded clips instead: the view
-needs a running notebook, and the cluster example has too many boxes to
-record.
+Each example is a small notebook you can copy. On these pages,
+hovering works as it does in Pluto. Clicking a mark or drawing a box
+shows the result the notebook computed for it ahead of time. Under each
+example, the notebook is also written out as text. Pan, orbit, and
+Compare a cluster are video clips instead: moving the view needs a
+running notebook, and the cluster example has too many possible boxes
+to record.
 
 ## Analyses
 
-Worked examples of an interaction feeding an analysis: a brush that
-compares a cluster, a heatmap cell that opens the data behind it, a
-click mirrored into a second plot.
+Examples where a click or a box feeds an analysis: compare the points
+in a box, open the data behind a heatmap cell, or show a click on a
+second plot.
 
 ```@raw html
 <div class="masque-gallery">
@@ -45,9 +45,9 @@ click mirrored into a second plot.
 
 ## Plot types
 
-One page per kind of plot, showing what a hover or click on it returns.
-Pan and orbit are recorded clips, since moving the view needs a running
-notebook.
+One page per kind of plot, showing what you get when you hover over it
+or click it. Pan and orbit are video clips, since moving the view needs
+a running notebook.
 
 ```@raw html
 <div class="masque-gallery">

@@ -27,7 +27,7 @@ Drag the box over the image. In your notebook, the last cell slices the arrays i
 
 # ╔═╡ a1410008-0001-4000-8000-000000000010
 md"""
-Draw the image, and brush it with a box that selects the pixel grid.
+Plot the image, and add a box that selects cells of the pixel grid.
 """
 
 # ╔═╡ a1410008-0001-4000-8000-000000000002
@@ -53,7 +53,7 @@ end
 
 # ╔═╡ a1410008-0001-4000-8000-000000000011
 md"""
-`@bind region` stores the window when you release. Dragging does not re-run the cell below until then.
+`@bind region` stores the pixels inside the box when you release it. The cell below does not change while you drag.
 """
 
 # ╔═╡ a1410008-0001-4000-8000-000000000003
@@ -61,11 +61,11 @@ md"""
 
 # ╔═╡ a1410008-0001-4000-8000-000000000012
 md"""
-This cell reads `region`, so it re-runs when you release the box.
+This cell responds when you release the box.
 """
 
 # ╔═╡ a1410008-0001-4000-8000-000000000004
-if region === nothing || isempty(region.i1:region.i2)
+if isnothing(region) || isempty(region.i1:region.i2)
     "Adjust the box. A live notebook slices the array on release."
 else
     Rs = vec(R[region.i1:region.i2, region.j1:region.j2])

@@ -1,15 +1,14 @@
 # Tooltip templates
 
-Hover a marker. The tooltip is a `masque"..."` template: `$(city)` is a
-field on that point's payload, and `$(pop:,)` is a
+Hover over a city to see its tooltip, then click it. The tooltip is a
+`masque"..."` template: `$(city)` is a field of that point's payload,
+and `$(pop:,)` formats `pop` with a
 [d3-format](https://d3js.org/d3-format) spec, so `37000000` reads as
-`37,000,000`. A value that contains HTML is escaped. Markup you write in
-the template is not.
+`37,000,000`. HTML you write in the template is rendered. HTML inside a
+payload value is shown as plain text.
 
-Click writes `@bind`. The readout below the figure names the city. Hover
-does not change the bond.
-
-For the template rules, see [Tooltips](@ref).
+Clicking a city updates `pick`, and the last cell names it. Hovering
+does not change `pick`. For the template rules, see [Tooltips](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -23,9 +22,9 @@ Main.masque_fallback("gallery_tooltips")
 
 ## Variations
 
-Leave `tooltip` unset and the overlay draws a name/value table from the
-payload. `tooltip_bg`, `tooltip_color`, `tooltip_caret`, and
-`tooltip_radius` on `masque` theme that card for the whole figure:
+Without `tooltip`, the tooltip is a table of the payload's fields. To
+change the tooltip's style for the whole figure, pass `tooltip_*`
+keywords to `masque`. [Tooltip styling](@ref) lists them all.
 
 ```julia
 masque(
@@ -39,9 +38,6 @@ masque(
 
 !!! note
 
-    The overlay is the same code on `:cairo` and `:webgl`. This player is
-    the Cairo figure: hover is drawn on the page, and each click swaps in a
-    snapshot of the readout. Load `WGLMakie` alone when you want the figure
-    on a live canvas. Hover, highlight, and the click readout match on both
-    backends.
-
+    Tooltips work the same way on `:cairo` and `:webgl`. This example
+    uses CairoMakie, and each click shows a result recorded ahead of
+    time. Load only `WGLMakie` when you want the figure on a live canvas.

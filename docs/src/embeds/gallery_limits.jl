@@ -46,7 +46,7 @@ end
 
 # ╔═╡ a1410009-0001-4000-8000-000000000011
 md"""
-Hover and click stay on the figure. This page does not re-run a readout.
+`@bind pick` holds the click, though no cell here uses it.
 """
 
 # ╔═╡ a1410009-0001-4000-8000-000000000003
