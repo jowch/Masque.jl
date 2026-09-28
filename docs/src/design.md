@@ -1,15 +1,14 @@
 # Current design and rough edges
 
 Masque works differently from other interactive plotting libraries in
-a few places, and a few features are not finished yet. Each entry below
-says how Masque behaves today and, where there is one, what to do
-instead.
+a few places, and a few features are not finished yet. Below is how
+Masque behaves today and, where there is one, what to do instead.
 
 ## How Masque behaves
 
-Tooltips and highlights respond in the browser alone, so they are
-instant. The `@bind` value changes only when you click. To use a mark in
-Julia, click it. See [How interactions work](@ref).
+Tooltips and highlights respond in the browser without Julia, so they
+are instant. The `@bind` value changes only when you click. To use a
+mark in Julia, click it. See [How interactions work](@ref).
 
 A click selects one mark and replaces the previous selection. To select
 several marks at once, drag a box over them with an
@@ -51,8 +50,8 @@ begin
 end
 ```
 
-To reach the points, pass the interactables yourself and list the
-scatter before the polygon:
+To reach the points, pass in your own list of the interactables you
+want, with the scatter before the polygon:
 
 ```julia
 @bind pick masque(fig, [PointInteractable(ax, s), PolygonInteractable(ax, p)])
@@ -67,7 +66,7 @@ not decide which mark you reach. A mark on the far side of the scene
 can be reached through a nearer mark that comes later in the list, and
 a nearer mark can be blocked by a farther one that comes earlier.
 
-## Rough edges today
+## Potential rough edges today
 
 - In a static HTML export, tooltips and highlights still work, but other
   cells do not respond to a click and you cannot pan. See

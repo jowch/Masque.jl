@@ -49,7 +49,7 @@ what "the other two" are.
 
 12. **Keep a cause and its effect in one sentence.** Join them with "so", "and", or a colon
     rather than splitting every clause into its own sentence. "Tooltips and highlights
-    respond in the browser alone, so they are instant" reads as one thought; "Tooltips work
+    respond in the browser without Julia, so they are instant" reads as one thought; "Tooltips work
     in the browser. They are instant." reads as two facts the reader has to connect. A
     paragraph of short sentences is choppy, not plain: plain is about the words, not the
     sentence length.
@@ -130,7 +130,7 @@ Source: [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia
 | `rows = [(; r..., density = round(r.pop / r.area; digits = 1)) for r in rows]` | `rows = [(city = "Lyon", density = round(522_250 / 47.9)), …]`, written out |
 | Payload values are always escaped, so your data cannot add HTML to the tooltip. | Avoid putting HTML in your payload values. It will not be rendered. To make something bold, use the template instead. *(Then show both in code.)* |
 | See Tooltip chrome | See Tooltip styling |
-| Hovering never changes a `@bind` value. Tooltips and highlights work in the browser alone, so they are instant. | Tooltips and highlights respond in the browser alone, so they are instant. The `@bind` value changes only when you click. |
+| Hovering never changes a `@bind` value. Tooltips and highlights work in the browser alone, so they are instant. | Tooltips and highlights respond in the browser without Julia, so they are instant. The `@bind` value changes only when you click. |
 | You select one mark at a time. A click replaces the selection, and there is no Shift-click or Ctrl-click to add to it. | A click selects one mark and replaces the previous selection. To select several marks at once, drag a box over them with an `ROIInteractable`. |
 | Pass the interactables yourself, points first: | To reach the points, pass the interactables yourself and list the scatter before the polygon: *(after a sentence saying what goes wrong, and followed by what changes)* |
 | This page explains how Masque behaves today, so you can plan around it. | *(Cut it. Start with the first behavior.)* |
