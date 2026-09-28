@@ -86,7 +86,6 @@ makedocs(;
         "Advanced" => [
             "Performance" => "performance.md",
             "What Masque does not do" => "scope.md",
-            "Overlay, bind, and the host" => "gestures.md",
         ],
     ],
     doctest = false,

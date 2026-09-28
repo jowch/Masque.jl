@@ -44,6 +44,12 @@ Run locally, `make.jl` writes HTML to `docs/build/` and skips
 `deploydocs`. CI deploys the site to GitHub Pages from `main` and from
 tags.
 
+The interactive examples in `docs/src/embeds/` are Pluto notebooks. The
+docs build records the result of every mark, legend entry, and heatmap
+cell a reader can click, and every box a brush can draw, and fails when
+those recordings get too large. Keep an example's clickable marks few,
+and use a coarse grid.
+
 ## Live verification
 
 A change to what users see or interact with needs a check in a live

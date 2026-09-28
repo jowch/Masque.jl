@@ -259,16 +259,15 @@ in [Selection](@ref).
 does not change the `@bind` value.
 
 **Fix:** read `pick` after a click (or Enter on a focused mark). For
-what each gesture sends to Julia, and when, see
-[Overlay, bind, and the host](@ref).
+what each gesture changes, and why, see [How interactions work](@ref).
 
 ### Right-click opens the context menu
 
 Right-clicking the figure opens the browser's context menu for the
 CairoMakie image or the WebGL canvas. Control-click does the same on
 macOS. That press does not start a drag, and the `@bind` value stays
-the same. For what each gesture sends to Julia, see
-[Overlay, bind, and the host](@ref).
+the same. For what each gesture changes, see
+[How interactions work](@ref).
 
 ### Tried a click and nothing happened
 
