@@ -9,7 +9,7 @@ Drag the box over the stations below. The table lists the ones inside:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-roi-table" data-masque-embed="roi_table" title="Stations scatter with a region box and listed @bind table snapshots" style="width:100%;height:1400px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-roi-table" data-masque-embed="roi_table" title="Stations scatter with a box. Drag the box and the table lists the stations inside." style="width:100%;height:1400px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

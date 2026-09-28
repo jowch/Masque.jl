@@ -66,7 +66,7 @@ entry per point. In the notebook below, hovering a point shows its
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-gs-quickstart" data-masque-embed="home_quickstart" title="Three-point scatter with a tooltip, @bind, and a readout" style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no"></iframe>
+<iframe id="masque-gs-quickstart" data-masque-embed="home_quickstart" title="Three-point scatter. Click a point and the readout names it." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no"></iframe>
 </div>
 ```
 

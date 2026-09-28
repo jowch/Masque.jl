@@ -5,7 +5,7 @@ Click it and your notebook gets the cell's column, row, and value.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-grids-player" data-masque-embed="grids_heatmap" title="Tiny heatmap with overlay cell inspection" style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-grids-player" data-masque-embed="grids_heatmap" title="Small heatmap. Hover a cell to see its value, or click it." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

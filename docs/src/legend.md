@@ -7,7 +7,7 @@ it describes.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-legend-lines" data-masque-embed="legend_lines" title="two-line axislegend with listed @bind snapshots" style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-legend-lines" data-masque-embed="legend_lines" title="Two lines with a legend. Click an entry and the readout names that series." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

@@ -40,7 +40,7 @@ work. The figure below is a static export; hover over a borough. See
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-home-export" data-masque-embed="home_export" title="New York City boroughs with overlay-only hover" style="width:100%;height:520px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-home-export" data-masque-embed="home_export" title="New York City boroughs. Hover a borough to see its name." style="width:100%;height:520px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

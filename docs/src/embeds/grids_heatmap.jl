@@ -31,7 +31,12 @@ Create the heatmap the way you normally would, and end the cell with `nothing` s
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000002
 begin
-    z = [Float64(i + 3j) for i in 1:4, j in 1:3]
+    z = [
+        4.0 7.0 10.0
+        5.0 8.0 11.0
+        6.0 9.0 12.0
+        7.0 10.0 13.0
+    ]
     fig = Figure(size = (560, 320))
     ax = Axis(fig[1, 1]; xlabel = "column", ylabel = "row")
     p = heatmap!(ax, 1:4, 1:3, z)

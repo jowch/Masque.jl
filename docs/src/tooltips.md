@@ -10,7 +10,7 @@ color.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-template" data-masque-embed="tooltips_template" title="Four-city scatter with templated tooltips" style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-template" data-masque-embed="tooltips_template" title="Four-city scatter. Hover a city to see its tooltip." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -113,7 +113,7 @@ fig = Figure(size = (560, 360); backgroundcolor = :gray12)
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-dark" data-masque-embed="tooltips_dark" title="Dark-figure scatter with figure-derived tooltip theme" style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-dark" data-masque-embed="tooltips_dark" title="Scatter on a dark figure. Hover a point to see a dark tooltip." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

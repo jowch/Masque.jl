@@ -43,19 +43,13 @@ begin
         (name = "South-3", x = 7.2, y = 2.0, group = "South"),
         (name = "East", x = 9.0, y = 6.5, group = "East"),
     ]
-    group_color = Dict(
-        "North" => "#4363d8",
-        "Mid" => "#f58231",
-        "South" => "#3cb44b",
-        "East" => "#911eb4",
-    )
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y", limits = (0.5, 10.0, 0.5, 10.0))
-    s = scatter!(
-        ax, [p.x for p in samples], [p.y for p in samples];
-        color = [group_color[p.group] for p in samples],
-        markersize = 18,
-    )
+    xs = [1.5, 2.5, 2.0, 5.0, 5.8, 4.5, 8.0, 8.8, 7.2, 9.0]
+    ys = [8.0, 7.2, 9.0, 5.0, 4.2, 5.8, 1.5, 2.4, 2.0, 6.5]
+    north, mid, south, east = "#4363d8", "#f58231", "#3cb44b", "#911eb4"
+    colors = [north, north, north, mid, mid, mid, south, south, south, east]
+    s = scatter!(ax, xs, ys; color = colors, markersize = 18)
     pts = PointInteractable(ax, s; id = :pts, payloads = samples)
     roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = :pts)
     nothing
