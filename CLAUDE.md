@@ -185,6 +185,8 @@ Profiling exists to inform the design, not to sit in a file. The loop is anchore
   (architecture.md = the contract; perf-findings.md = the measured payload/latency envelope +
   the single source of those numbers; frontend-delivery.md = build/delivery decisions).
   `spike/` is gitignored scratch; `bench/` holds the committed, re-runnable benchmarks.
+- Before writing or editing `docs/src/` or the README, read `docs/dev/writing-style.md`: plain
+  words, the reader's side, no mechanism the reader doesn't act on.
 - Process docs (brainstorming specs, implementation plans) go in `.superpowers/` — gitignored, local-only, not part of the package.
 - The package was renamed from `Holo` to `Masque` on 2026-09-17 (same UUID). The local checkout folder and the GitHub remote may still be called `Holo.jl` until renamed; the package, module, and all in-repo references are `Masque`.
 - Cross-references within `docs/dev/**` cite by file, not by heading anchor —

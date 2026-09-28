@@ -1,34 +1,30 @@
 # Getting started
 
-Masque makes a Makie figure in a Pluto notebook respond to the pointer:
-hover a mark to see its data, click it to hand that mark to the rest of
-your notebook. This page installs Masque, overlays a figure with one
-call, and then attaches your own data to the marks.
+Masque adds tooltips and click selection to a Makie figure in a Pluto
+notebook. This page makes one scatter plot interactive, then puts your
+own data in its tooltips.
 
 ## Install
 
-In a Pluto notebook, paste each snippet from these docs into its own
-cell. Pluto runs one top-level expression per cell. Wrap multiple
-statements in `begin ... end`, which counts as one expression.
-
-Load Masque and one Makie backend. Pluto's package manager installs
-both, and the notebook records them in its own environment:
+Load Masque and a Makie backend in a Pluto cell. Pluto installs both:
 
 ```julia
 using Masque, CairoMakie
 ```
 
+Put each code block from these docs in its own cell. A Pluto cell holds
+one expression, so blocks with several statements are wrapped in
+`begin ... end`.
+
 !!! info
 
-    Masque supports CairoMakie and WGLMakie. `using Masque` with no Makie
-    backend raises `ArgumentError` the first time `masque` runs. If both
-    CairoMakie and WGLMakie are loaded, `masque` defaults to CairoMakie.
-    For more information, see [Backends](@ref).
+    Masque works with CairoMakie and WGLMakie. If you load both, `masque`
+    uses CairoMakie. See [Backends](@ref) to choose between them.
 
-## Overlay a figure
+## Make a figure interactive
 
-Create a figure the way you normally would. End the cell with `nothing`
-so Pluto does not also print the plain figure:
+Create a figure the way you normally would. End the cell with `nothing`,
+or Pluto shows a second, static copy of the figure:
 
 ```julia
 begin
@@ -41,34 +37,32 @@ begin
 end
 ```
 
-Then hand the figure to `masque` and bind the result:
+Pass the figure to `masque` and bind the result to a variable:
 
 ```julia
 @bind pick masque(fig)
 ```
 
-Hover a point and a tooltip lists its `index`, `x`, and `y`. Hovering
-never re-runs Julia; it only happens on the figure. Click a point and
-`pick` becomes that point, so a cell that reads `pick` re-runs:
+Hover over a point to see its `index`, `x`, and `y`. Click a point and
+`pick` holds it. Every cell that uses `pick` then re-runs:
 
 ```julia
 isnothing(pick) ? "click a point" : "point $(pick.index) at x = $(pick.x)"
 ```
 
-`pick` is an [`ElementEvent`](@ref). `pick.index` corresponds to your plotted data, and you can use `pick`
-to index your data directly: `ys[pick]` is the clicked point's `y`.
+`pick` is an [`ElementEvent`](@ref). `pick.index` is the clicked point's
+position in the data you plotted, so `ys[pick]` is its `y`.
 
-`masque(fig)` finds everything it knows how to overlay on its own:
-scatters, lines, bars, heatmaps, polygons, text, legends, and colorbars
-(see [Recipes masque(fig) extracts](@ref)).
+`masque(fig)` works on scatters, lines, bars, heatmaps, polygons, text,
+legends, and colorbars. [Recipes masque(fig) extracts](@ref) has the
+full list.
 
-## Attach your own data
+## Show your own data
 
-A tooltip that says `x = 3.0` is only a start. Pass the scatter to
-[`PointInteractable`](@ref) with one `payloads` entry per point, and the
-tooltip and the click carry your fields instead. The notebook below does
-that for three named points: hover reads `name` and `y`, and a click
-fills `sel.name`.
+The default tooltip shows coordinates. To show your own fields instead,
+pass the scatter to [`PointInteractable`](@ref) with one `payloads`
+entry per point. In the notebook below, hovering a point shows its
+`name` and `y`, and clicking it sets `sel.name`.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -80,18 +74,17 @@ fills `sel.name`.
 Main.masque_fallback("home_quickstart")
 ```
 
-On this site the notebook is a recording, so a click swaps in a result
-computed ahead of time (the **Simulating `@bind`** badge); in your own
-notebook the last cell re-runs. *Notebook as text* has the same cells to
-copy.
+This notebook is a recording, so a click shows a result computed ahead
+of time (the **Simulating `@bind`** badge). In your own notebook, the
+last cell re-runs. *Notebook as text* has the cells to copy.
 
 ## Where to go next
 
-- [Concepts](@ref) — how hover, clicks, payloads, and `@bind` fit together
-- [Tooltips](@ref) — templates, number formatting, and a dark figure
-- [Click marks](@ref) — bars, polygons, lines, and polar points
-- [Brush a region](@ref) — drag a box and get the points inside it
-- [Selection](@ref) — start with a mark selected, or keep one across a rebuild
-- [Linked views](@ref) — drive another plot or a table from a click
-- [Examples](@ref) — worked examples to copy
-- [Backends](@ref) — CairoMakie or WGLMakie
+- [Concepts](@ref): how hover, clicks, payloads, and `@bind` fit together
+- [Tooltips](@ref): templates, number formatting, and dark figures
+- [Click marks](@ref): bars, polygons, lines, and polar points
+- [Brush a region](@ref): drag a box and get the points inside it
+- [Selection](@ref): start with a mark selected, or keep one across a rebuild
+- [Linked views](@ref): update another plot or a table from a click
+- [Examples](@ref): worked examples to copy
+- [Backends](@ref): CairoMakie or WGLMakie
