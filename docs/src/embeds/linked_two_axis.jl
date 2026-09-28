@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000009
 md"""
-Hold the pointer over a point. The highlight stays on the panel you are on.
+Hover over a point. It highlights on its own panel only.
 """
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000010
 md"""
-Draw both scatters in one figure, the way you already would. One `masque` call covers both axes.
+Create both scatter plots in one figure, the way you normally would. One `masque` call covers both axes.
 """
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000002
@@ -44,7 +44,7 @@ end
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000011
 md"""
-Hover stays on the figure. A click can still land in `pick` in your own notebook; this page does not re-run a readout.
+In your own notebook, `@bind pick` saves a click in `pick`. This page does not show that value.
 """
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000003

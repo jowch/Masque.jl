@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ b18a0001-0001-4000-8000-000000000009
 md"""
-Move the pointer across the axis. The tooltip reads data `(x, y)` and follows the cursor.
+Move the pointer across the axis. The tooltip follows it and shows the data coordinates `(x, y)`.
 """
 
 # ╔═╡ b18a0001-0001-4000-8000-000000000010
 md"""
-Draw the line the way you already draw it, and add `AxisInteractable` on that axis. `masque(fig)` does not add this on its own.
+Create the line plot the way you normally would, and add an `AxisInteractable` for its axis. `masque(fig)` does not add one on its own.
 """
 
 # ╔═╡ b18a0001-0001-4000-8000-000000000002
@@ -41,7 +41,7 @@ end
 
 # ╔═╡ b18a0001-0001-4000-8000-000000000011
 md"""
-`@bind pick` is there for a click in your own notebook. A click stores `pick.x` and `pick.y`. This page keeps the readout on the figure, so the cell below does not re-run.
+In your own notebook, `@bind pick` saves a click in `pick`, with its position in `pick.x` and `pick.y`. This page does not record clicks, so only the tooltip works here.
 """
 
 # ╔═╡ b18a0001-0001-4000-8000-000000000003

@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
 md"""
-Hold the pointer over a region to read its name, then click it. The last cell names the region.
+Hover over a region to see its name, then click it. The last cell shows the name of the region you clicked.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-The image is the figure. The circle, the rectangle, and the triangle are extra hit regions, with a name on each one.
+The figure is an image. `regions` adds a circle, a rectangle, and a triangle on top of it, and `payloads` gives each one a name.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -50,7 +50,7 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind ev` stores a click in `ev`. Hover updates the card and does not change `ev`.
+`@bind ev` saves a click in `ev`. Hovering shows the tooltip without changing `ev`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
@@ -58,11 +58,11 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-Before a click, `ev` is `nothing`. `ev.name` is the region's name. This cell reads `ev`, so it re-runs on the click.
+`ev` starts as `nothing`. After a click, `ev.name` is the region's name. This cell responds to the click.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if ev === nothing
+if isnothing(ev)
     "click a region"
 else
     "$(ev.name) selected"

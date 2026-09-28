@@ -1,17 +1,15 @@
 # Linked views
 
-Masque does not wire plots together itself; Pluto does. A click in a
-Masque widget becomes the value of a `@bind` variable, and every cell
-that reads that variable re-runs. So "linking" a scatter to a detail
-plot, a table, or a model fit is ordinary Pluto code: read `pick`, draw
-or compute something from it. This page shows that pattern first, then
-what one widget can do across several axes on its own.
+A click in a Masque widget updates its `@bind` variable, and cells that
+use the variable respond to the change. So linking a scatter to a detail
+plot, a table, or a model fit is ordinary Pluto code: use `pick` in
+another cell to create a plot or compute a result.
 
 ## Drive a second plot from a click
 
-Put a key in each payload that identifies the row — an id, a name — and
-use it downstream. Here a map of cities drives a plot of the clicked
-city's series:
+Give each payload a key that identifies its row, such as an id or a
+name, and use the key in other cells. Here, clicking a city on a map
+plots that city's series:
 
 ```julia
 begin
@@ -27,7 +25,7 @@ begin
     )
     fig = Figure(size = (560, 320))
     ax = Axis(fig[1, 1]; xlabel = "longitude", ylabel = "latitude")
-    s = scatter!(ax, [c.lon for c in cities], [c.lat for c in cities]; markersize = 16)
+    s = scatter!(ax, [139.7, 77.2, 121.5], [35.7, 28.6, 31.2]; markersize = 16)
     pts = PointInteractable(ax, s; payloads = cities)
     nothing
 end
@@ -40,30 +38,30 @@ end
 ```julia
 begin
     detail = Figure(size = (560, 240))
-    dax = Axis(detail[1, 1]; title = pick === nothing ? "click a city" : pick.name)
-    pick === nothing || lines!(dax, series[pick.id])
+    dax = Axis(detail[1, 1]; title = isnothing(pick) ? "click a city" : pick.name)
+    isnothing(pick) || lines!(dax, series[pick.id])
     detail
 end
 ```
 
-The detail cell reads `pick`, so it re-runs on each click. The same
-`pick.id` could filter a `DataFrame`, pick the data for a fit, or be
-passed to another Masque widget — the second figure can be interactive
-too. Hovering never re-runs these cells; only clicks and releases do.
+The detail cell uses `pick`, so it responds to each click. Hovering
+does not change `pick`, so the detail plot changes only on a click or a
+release. The same `pick.id` could filter a `DataFrame` or choose the
+data for a fit. The detail figure can be a Masque widget too.
 
-To show the clicked point as selected in a *second* widget as well, pass
-it as that widget's `selected=`; [Selection round-trip](@ref) shows it.
+To show the clicked point as selected in a second widget, pass it as
+that widget's `selected=`. [Selection round-trip](@ref) shows how.
 
 ## Several axes in one figure
 
-One `masque` call covers every axis in a figure, and each axis keeps its
-own hits: hovering a point highlights that point on the panel you are
-on. Each scatter becomes its own layer (`:scatter`, `:scatter_2`, …), so
-`pick.layer` says which panel was clicked.
+One `masque` call covers every axis in a figure. Hovering a point
+highlights it on its own panel. Each scatter gets its own layer id
+(`:scatter`, `:scatter_2`, and so on), so `pick.layer` tells you which
+panel was clicked.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-lv-two-axis" data-masque-embed="linked_two_axis" title="Two Axis panels, four points, overlay-only hover" style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-lv-two-axis" data-masque-embed="linked_two_axis" title="Two scatter panels. Hover a point to highlight it on its own panel." style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -71,30 +69,30 @@ on. Each scatter becomes its own layer (`:scatter`, `:scatter_2`, …), so
 Main.masque_fallback("linked_two_axis")
 ```
 
-Masque does not assume that the same index in two plots is the same
-observation, so hovering point 3 in one panel does not highlight point 3
-in the other. When they are the same row, make the connection
-explicitly: on a click, rebuild the figure with both layers selected,
+Hovering point 3 in one panel does not highlight point 3 in the other,
+even when both come from the same row of your data. To highlight both,
+rebuild the figure with both points selected:
 
 ```julia
 masque(fig; selected = Dict(:scatter => [i], :scatter_2 => [i]))
 ```
 
-where `i` comes from a cell that does not read this widget's own value.
-With one index on each of two layers the widget highlights both but
-starts with its value at `nothing`, so a cell reading this widget's
+Here `i` must come from another cell, not from this widget's own value.
+With one point selected on each of two layers, the widget highlights
+both, but its value starts as `nothing`. A cell that uses this widget's
 `pick` goes back to its "nothing clicked" state after the rebuild.
 
 ## Highlight a series across panels
 
-A legend entry is the one thing that highlights across axes by itself:
-hovering it lights up every mark of the series it names, on whatever
-axis the series is drawn. Clicking it returns the legend entry, which a
-downstream cell can use to filter (see [Legend](@ref)).
+Hovering a legend entry highlights every mark of its series, on every
+axis where the series appears. No other hover highlights marks on more
+than one axis. Clicking an entry sets `pick` to a
+[`LegendEvent`](@ref), which another cell can use to filter your data.
+See [Legend](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-lv-legend-wash" data-masque-embed="linked_legend_wash" title="Legend whole-layer wash across two Axis panels" style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-lv-legend-wash" data-masque-embed="linked_legend_wash" title="Two scatter panels with a legend. Hover an entry to highlight its series on both." style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -104,20 +102,19 @@ Main.masque_fallback("linked_legend_wash")
 
 ## Filter a table from a region
 
-Brushing is the many-marks version of a click: an
-[`ROIInteractable`](@ref) with `selects` returns every point inside the
-box on release, and a cell slices your table with it —
-`df[picks, :]`. [Brush a region](@ref) walks through it.
+To select many points at once, drag a box. When you release an
+[`ROIInteractable`](@ref) with `selects`, it returns every point inside
+the box, and another cell can take those rows from your table with
+`df[picks, :]`. [Brush a region](@ref) shows how.
 
-## What Masque does not link for you
+## What is not linked
 
-- Hover is local to the mark under the pointer; it does not echo into
-  other plots.
-- There is no shared data source between widgets. Two `masque` calls
-  are two independent widgets, connected only through the Pluto cells
-  you write.
-- Every box with `selects` in one widget must name the same layer, and
-  boxes are rectangles: there is no lasso and no cross-filtering
-  between brushes on different plots.
+- Hovering a mark does not highlight anything in other plots.
+- Two `masque` calls make two separate widgets. They are connected only
+  through the cells you write.
+- Boxes are rectangles, and there is no lasso. Every box with `selects`
+  in one widget must name the same layer, and a box on one plot does
+  not filter another.
 
-For how hover, clicks, and drags reach Julia, see [Concepts](@ref).
+For what each click, release, and drag sets `pick` to, see
+[Concepts](@ref).
