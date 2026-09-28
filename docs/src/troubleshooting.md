@@ -265,18 +265,6 @@ browser turns that value into the text `[object Object]`.
 before it goes into `payloads`, or reference a pre-formatted string
 field with `masque"$(that_field)"`.
 
-### Tried a window resize and the highlights looked misaligned
-
-**Cause:** the resize is not the problem. The hover areas and
-highlights follow the figure as it is scaled on screen, so resizing the
-window or zooming the page keeps them on their marks. With CairoMakie,
-the picture's resolution is worked out from the figure's width and
-`max_width`, so there is no resolution setting to get wrong.
-
-**Fix:** re-run the cell that calls `masque(...)`. If highlights still
-sit off their marks, report it as a bug with the code that creates the
-figure.
-
 ### Tried reading `pick` after a pan or orbit
 
 **Cause:** dragging with `ViewInteractable` changes the view, not the
