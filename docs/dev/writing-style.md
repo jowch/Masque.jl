@@ -6,6 +6,8 @@ mechanism; the user docs describe what the reader does and sees.
 ## Rules
 
 Use US spelling ("color"), matching the API's keywords.
+Don't say "chrome" for what the overlay draws; name the thing (the tooltip's style, the ROI
+box and its handles).
 
 1. **Write from the reader's side.** Say what they do and what happens on screen, not what
    Masque does internally. Hit-testing, projection, manifests, and the JS layer belong in

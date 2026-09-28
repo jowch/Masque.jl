@@ -50,7 +50,7 @@ Markup
 
 For usage, see [Tooltips](@ref).
 
-## Tooltip chrome
+## Tooltip styling
 
 Set any of these on `masque` to lock that property (and opt it out of
 dark-mode inversion):

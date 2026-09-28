@@ -61,10 +61,21 @@ cities = [
 Tooltips work even when Julia is not running, for example in a static
 HTML export, so a template can only read the payload.
 
-Don't put HTML in your payload values. It shows up as plain text, not
-markup, so put formatting such as `<b>` in the template instead. Also
-avoid links built from your data, such as `<a href="$(url)">`, unless you
-trust every URL in it: the link goes wherever the data says.
+Avoid putting HTML in your payload values. It will not be rendered; the
+tooltip shows the tags as plain text. To make something bold, use the
+template instead:
+
+```julia
+# The tooltip shows "<b>Lyon</b>", tags and all
+cities = [(city = "<b>Lyon</b>", pop = 522_250)]
+
+# The tooltip shows "Lyon" in bold
+cities = [(city = "Lyon", pop = 522_250)]
+tooltip = masque"<b>$(city)</b>"
+```
+
+Also avoid links built from your data, such as `<a href="$(url)">`,
+unless you trust every URL in it: the link goes wherever the data says.
 
 `tooltip = false` turns tooltips off. The hover highlight and clicks
 still work.
@@ -126,4 +137,4 @@ Without a known color, the border is a plain 1px line.
 
 To change the tooltip's background, text color, font, or corner radius
 for a whole widget, pass the `tooltip_*` keywords to `masque`, or set the
-`--masque-tip-*` CSS properties on the page. See [Tooltip chrome](@ref).
+`--masque-tip-*` CSS properties on the page. See [Tooltip styling](@ref).
