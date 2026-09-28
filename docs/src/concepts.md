@@ -58,8 +58,11 @@ own default fields, listed in [Plot-object defaults](@ref).
 To show a value you compute, add it to the payload in Julia:
 
 ```julia
-rows = [(; r..., density = round(r.pop / r.area; digits = 1)) for r in rows]
-PointInteractable(ax, s; payloads = rows, tooltip = masque"$(city): $(density) per km²")
+rows = [
+    (city = "Lyon", density = round(522_250 / 47.9)),
+    (city = "Nice", density = round(342_669 / 71.9)),
+]
+PointInteractable(ax, s; payloads = rows, tooltip = masque"$(city): $(density:,) per km²")
 ```
 
 A template can only use payload fields, because tooltips work even when

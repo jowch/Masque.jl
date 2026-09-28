@@ -34,7 +34,9 @@ mechanism; the user docs describe what the reader does and sees.
     the page that lists them.
 12. **Don't state what the reader already assumes.** "In a running notebook everything above
     works" tells them nothing.
-13. **End with where to go next,** as a link.
+13. **Write examples a new Julia user can read.** Literal values over comprehensions, splats,
+    and chained calls. The example teaches Masque, not Julia.
+14. **End with where to go next,** as a link.
 
 ## Examples
 
@@ -50,4 +52,5 @@ mechanism; the user docs describe what the reader does and sees.
 | Clicking a mark sets the `@bind` variable, and every cell that uses it re-runs. | Clicking a mark updates the `@bind` variable, and cells that use the variable respond to the change. |
 | Until the first click or release, the bound variable is `nothing`. | A `masque` widget's `@bind` value starts as `nothing`. |
 | In a running notebook everything above works. A static HTML export has no Julia behind it. | A static HTML export of your notebook keeps tooltips and highlights. Other cells do not respond, because the export has no Julia behind it. |
+| `rows = [(; r..., density = round(r.pop / r.area; digits = 1)) for r in rows]` | `rows = [(city = "Lyon", density = round(522_250 / 47.9)), …]`, written out |
 | Masque does three things to a Makie figure you have already drawn: it decides which marks respond to the pointer, it shows information about a mark without re-running Julia, and it hands a deliberate choice back to your notebook through `@bind`. | Masque adds tooltips and click selection to a Makie figure. A click reaches the rest of your notebook through `@bind`. |
