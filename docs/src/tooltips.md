@@ -123,8 +123,8 @@ When Masque knows a mark's color, its tooltip gets a 3px border in that
 color. The color comes from:
 
 - `scatter!`'s `color=`, when you pass the `Scatter` itself to
-  [`PointInteractable`](@ref), as the dark example does
-- the `colors=` keyword, as the city example does
+  [`PointInteractable`](@ref), as both examples on this page do
+- the `colors=` keyword, when you pass positions instead of the plot
 - a legend entry's swatch
 
 Without a known color, the border is a plain 1px line.

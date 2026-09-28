@@ -298,7 +298,7 @@ _check_tol(tol) =
 
 # ============================ PointInteractable ============================
 """
-    PointInteractable(ax, points; id=:points, payloads=<auto>, radius=nothing, radius3d=nothing, tooltip=nothing)
+    PointInteractable(ax, points; id=:points, payloads=<auto>, radius=nothing, radius3d=nothing, tooltip=nothing, label=nothing)
     PointInteractable(ax, p::Makie.Scatter; id=:scatter, payloads=nothing, radius=nothing, tooltip=nothing, label=nothing)
     PointInteractable(ax, p::Makie.MeshScatter; id=:meshscatter, payloads=nothing, radius=nothing, radius3d=nothing, tooltip=nothing, label=nothing)
 
@@ -423,7 +423,7 @@ end
 
 # ============================ SegmentInteractable ==========================
 """
-    SegmentInteractable(ax, vertices; mode=:polyline, unit=:segment, id=:segments, payloads=nothing, tol=6, tooltip=nothing)
+    SegmentInteractable(ax, vertices; mode=:polyline, unit=:segment, id=:segments, payloads=nothing, tol=6, tooltip=nothing, label=nothing)
     SegmentInteractable(ax, p; id=<kind-specific>, payloads=nothing, tol=6, tooltip=nothing, label=nothing)   # from a plot object
 
 Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`, or `:segments`
@@ -574,8 +574,8 @@ end
 
 # ============================ RectInteractable =============================
 """
-    RectInteractable(ax; rects, id=:rects, payloads=nothing, tooltip=nothing, clamp_to_viewport=false)
-    RectInteractable(ax; grid, id=:rects, payloads=nothing, tooltip=nothing)
+    RectInteractable(ax; rects, id=:rects, payloads=nothing, tooltip=nothing, clamp_to_viewport=false, label=nothing)
+    RectInteractable(ax; grid, id=:rects, payloads=nothing, tooltip=nothing, label=nothing)
     RectInteractable(ax, p; id=<kind-specific>, payloads=nothing, tooltip=nothing, label=nothing)   # from a plot object
 
 Axis-aligned rectangles: an explicit list (bars, boxes) or a compact heatmap/image grid. Pass
@@ -827,7 +827,7 @@ end
 
 # ============================ PolygonInteractable ==========================
 """
-    PolygonInteractable(ax, rings; id=:polygons, payloads=nothing, tooltip=nothing, holes=nothing)
+    PolygonInteractable(ax, rings; id=:polygons, payloads=nothing, tooltip=nothing, holes=nothing, label=nothing)
     PolygonInteractable(ax, p; id=<kind-specific>, payloads=nothing, tooltip=nothing, label=nothing)   # from a plot object
 
 Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLayer`](@ref).
