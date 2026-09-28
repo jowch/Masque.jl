@@ -1,11 +1,10 @@
 # Performance
 
-Masque adds little to a figure you were going to show anyway, and
-hovering does not run Julia at all. Some costs do grow with your data,
-and they are worth knowing before you use Masque on a large dataset.
-The measured sizes and timings are in the maintainers'
-[performance findings](https://github.com/jowch/Masque.jl/blob/main/docs/dev/perf-findings.md),
-which are kept up to date as the format changes.
+Hovering costs nothing in Julia. On a large dataset, what grows is the
+number of interactive marks and the size of each payload, so trim
+those first (see [Keeping large figures fast](@ref)). The measured
+sizes and timings are in the maintainers'
+[performance findings](https://github.com/jowch/Masque.jl/blob/main/docs/dev/perf-findings.md).
 
 ## What a widget sends to the browser
 
@@ -55,7 +54,5 @@ plot.
   figure again and sends the whole widget again. If a figure is redrawn
   many times a second, or animates, WGLMakie's live canvas fits better;
   see [Backends](@ref).
-- Mind the figure's width. A wider figure is a bigger picture, though
-  it does not change the hit data. `masque`'s `max_width` keyword (700
-  pixels by default) caps the display width it renders for. A narrower
-  figure is rendered at its own width.
+- To send a smaller picture of a wide figure, lower `masque`'s
+  `max_width` keyword (700 pixels by default).

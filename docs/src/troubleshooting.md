@@ -100,21 +100,16 @@ suffixed ids as the keys of `selected=`.
 **Error prefix:** `is not invertible client-side` /
 `needs client-side invertible`
 
-**Cause:** `AxisInteractable`, `ColorbarInteractable`,
-`ThresholdInteractable`, `ROIInteractable`, `SliceInteractable`, and a
-2D `ViewInteractable` turn a pointer position into a data value in the
-browser. That works for `identity`, `log10`, or `log`. Any other Makie
-scale (`Makie.pseudolog10`, `Makie.Symlog10`, a custom
-`ReversibleScale`) raises this error when `masque` runs, so you never
-get a wrong coordinate. `SliceInteractable` says "needs client-side
+**Cause:** an interactable that reads a position, drags, or pans was
+given an axis or colorbar whose scale is not `identity`, `log10`, or
+`log`, such as `Makie.pseudolog10`, `Makie.Symlog10`, or a custom
+`ReversibleScale`. `SliceInteractable` says "needs client-side
 invertible x and y scales".
 
 **Fix:** switch the axis to a supported scale, or use an interactable
-for marks (`PointInteractable`, `SegmentInteractable`, …) instead of
-one that reads positions.
-
-Orbiting an `Axis3` with `ViewInteractable` does not raise this error,
-because orbit does not turn a pointer position into a data value.
+for marks (`PointInteractable`, `SegmentInteractable`, …) instead. The
+full list of what each interaction needs is in
+[Supported plots and axes](@ref).
 
 ### Tried `AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, or `SliceInteractable` on Axis3
 
@@ -126,20 +121,8 @@ data value. On an `Axis3`, a point on the screen is a ray through the
 3D data, not a single data point.
 
 **Fix:** on 3D axes, use interactables for marks (points, segments,
-polygons). Do not pass Axis, Threshold, ROI, or Slice interactables for
-an `Axis3`.
-
-### Tried `ViewInteractable` orbit on Axis3
-
-**Cause:** orbit works. `ViewInteractable` on an `Axis3` is accepted as
-a `:view` layer. An error about continuous pixel→data readout comes
-from an Axis, Threshold, ROI, or Slice interactable, not from
-`ViewInteractable`.
-
-**Fix:** pass `ViewInteractable(ax)` to orbit. On both backends, the
-view updates during a drag only in a running notebook. The `@bind`
-value never holds a `:view` event. For more information, see
-[Backends](@ref).
+polygons). To orbit an `Axis3`, pass `ViewInteractable(ax)`, which is
+accepted there.
 
 ### Tried continuous θ/r readout on PolarAxis
 
@@ -148,12 +131,11 @@ value never holds a `:view` event. For more information, see
 `PolarAxis continuous θ/r inversion is not yet shipped`
 
 **Cause:** Masque cannot yet turn a pointer position on a `PolarAxis`
-into θ and r. `AxisInteractable`, `ThresholdInteractable`,
-`ROIInteractable`, `SliceInteractable`, and `ViewInteractable` on a
-`PolarAxis` raise `ArgumentError`.
+into θ and r, so an interactable that reads a position, drags, or pans
+raises `ArgumentError` there.
 
-**Fix:** use interactables for marks (Scatter, Lines, LineSegments,
-ScatterLines) to hover and click. Polar plots work on both backends.
+**Fix:** on a `PolarAxis`, only points, lines, and segments respond,
+to hover and click. See [Supported plots and axes](@ref).
 
 ### Tried `heatmap!` or `barplot!` on PolarAxis
 
@@ -163,22 +145,22 @@ plot. A rectangle interactable you pass yourself, such as
 `RectInteractable`, is still built, but its hover areas sit in the
 wrong place.
 
-**Fix:** stick to the polar rows of
-[Recipes masque(fig) extracts](@ref), or use a Cartesian `Axis`.
+**Fix:** on a `PolarAxis`, only points, lines, and segments work. Use
+a Cartesian `Axis` for the rest. See [Supported plots and axes](@ref).
 
 ### Tried ROI or View pan on a categorical 2D axis
 
 **Error prefix:** `bounds need continuous axes` /
-`pan needs continuous numeric axes`
+`pan needs continuous numeric axes` /
+`sampling needs continuous axes`
 
-**Cause:** `ROIInteractable` and 2D `ViewInteractable` pan need numeric
-axis limits, and a categorical axis has none. `SliceInteractable` also
-rejects a categorical axis, because it interpolates between numeric
-positions. `AxisInteractable` works there and reads the category.
-Orbiting an `Axis3` with `ViewInteractable` is not affected.
+**Cause:** a box, a slice, and panning need numeric axis limits, and a
+categorical axis has none. Of the interactions that read a position,
+only reading coordinates and dragging a threshold work on a categorical
+axis.
 
-**Fix:** use `AxisInteractable` (reads the category) instead, or pass
-numeric limits. A slice needs a continuous axis.
+**Fix:** use `AxisInteractable`, which reads the category, or plot
+against a numeric axis. See [Supported plots and axes](@ref).
 
 ### Tried an `LScene` figure
 
@@ -220,13 +202,6 @@ worked.
 
 ## Not errors, but surprising
 
-### Tried loading neither backend, or both
-
-Loading neither raises the `ArgumentError` in
-[Tried `masque` with no Makie backend](@ref). Loading both is fine:
-`masque` without `backend=` uses CairoMakie. For more information, see
-[Backends](@ref).
-
 ### Tried `CairoMakie.activate!(type = "svg")` and the widget is a PNG
 
 **Cause:** `type = "svg"` chooses how a bare `Figure` displays.
@@ -243,15 +218,12 @@ figure. For more information, see [SVG display and files](@ref).
 
 **Pluto says:** cyclic references.
 
-**Cause:** you passed this `@bind` value into the same `masque(...)`
-call's `selected=` in one cell. Pluto detects the self-reference and
-refuses to run the cell.
+**Cause:** you passed this widget's own `@bind` value to its
+`selected=`.
 
-**Fix:** a click already shows the selected highlight on its own.
-Use `selected=` only for a starting selection your Julia code computes,
-in a cell that does not use this widget's `@bind` variable. For
-more information, see [Keep a selection when the figure rebuilds](@ref)
-in [Selection](@ref).
+**Fix:** drop it. A click already keeps its highlight. To carry a
+selection through a rebuild, see
+[Keep a selection when the figure rebuilds](@ref).
 
 ### Tried reading pick on hover
 
@@ -295,29 +267,29 @@ field with `masque"$(that_field)"`.
 
 ### Tried a window resize and the highlights looked misaligned
 
-**Cause:** almost always a `px_per_unit` or `max_width` mismatch between
-the rendered figure and the width it is shown at. The hover areas follow
-the figure's size on screen, so zooming the page or resizing the window
-after the widget appears is not the cause.
+**Cause:** not the resize. The hover areas and highlights follow the
+figure as it is scaled on screen, so resizing the window or zooming the
+page keeps them on their marks. With CairoMakie, the picture's
+resolution is worked out from the figure's width and `max_width`, so
+there is no resolution setting to get wrong.
 
-**Fix:** re-run the cell that calls `masque(...)`. If the misalignment
-persists, check that `max_width` on `masque` or the explicit backend
-struct matches the column width you expect.
+**Fix:** re-run the cell that calls `masque(...)`. If highlights still
+sit off their marks, report it as a bug with the code that creates the
+figure.
 
 ### Tried reading `pick` after a pan or orbit
 
 **Cause:** dragging with `ViewInteractable` changes the view, not the
 `@bind` value.
 
-**Fix:** do not use the `@bind` value to track the camera. On both
-backends, the view updates during a drag through `with_js_link`, not
-through `@bind`.
+**Fix:** do not use the `@bind` value to track the view. The dragged
+limits or angles are kept on the axis itself; see [Pan and orbit](@ref).
 
 ### Browser console errors
 
 Open the console in the browser's developer tools. A serialization error
-there on `:webgl` usually means the installed `WGLMakie` version is
-outside Masque's compat range. See [Backends](@ref). Report any other
+there with WGLMakie usually means the installed `WGLMakie` is a release
+newer than Masque was tested with. See [Backends](@ref). Report any other
 console error as a bug, even when the widget otherwise works.
 
 ### Tried WGLMakie and the spinner never stops
@@ -333,20 +305,21 @@ stops. A `masque` widget does not use that connection.
 **Fix:** return `masque(f)` from the cell that creates the figure. That
 cell then shows the interactive figure, and `@bind` is optional. If you
 do bind it, end that cell with `;` so Pluto does not show the widget
-twice. For the cell layout,
-see [The widget is the figure](@ref). To keep WGLMakie's own display
-working remotely, forward port 9384 as well, or point Bonito at an
-address the browser can reach with `Bonito.configure_server!`.
+twice. For the cell layout, see [The widget is the figure](@ref). To
+keep WGLMakie's own display working remotely, forward port 9384 as well,
+or point Bonito at an address the browser can reach with
+`Bonito.configure_server!`.
 
 ### Tried WGLMakie and the canvas is blank
 
-**Cause:** usually the installed `WGLMakie` is a version Masque's
-`:webgl` backend was not checked against. Or the figure has no plot
-that `masque(fig)` supports. `masque(fig)` on an empty `Axis3` shows
-the canvas with nothing interactive, which is expected.
+**Cause:** usually the installed `WGLMakie` is a release newer than
+Masque was tested with. Or the figure has no plot that `masque(fig)`
+supports. `masque(fig)` on an empty `Axis3` shows the canvas with
+nothing interactive, which is expected.
 
-**Fix:** check the `WGLMakie` compat bound in `Project.toml`, and check
-that the figure has a plot in it before `masque(fig)`. For how orbit
+**Fix:** check that the figure has a plot in it before `masque(fig)`.
+If it does, pin `WGLMakie` to an earlier release and file an issue with
+the version that failed. For how orbit
 frames reach the canvas during a drag, see [Backends](@ref).
 
 ### A WebGL plot says its GPU context was released
@@ -358,5 +331,5 @@ next plot takes one. More than 8 plots on screen at once cannot all be
 live, and the extra plots show this note. Hover and `@bind` still
 work.
 
-**Fix:** scroll so fewer `:webgl` plots are on screen at once, or use
-`:cairo` for a plot that is a static picture.
+**Fix:** scroll so fewer WGLMakie plots are on screen at once, or use
+CairoMakie for a plot that is a static picture.

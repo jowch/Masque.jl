@@ -16,7 +16,17 @@ your local build is optional.
 The Julia tests run in three groups, chosen with the `GROUP` environment
 variable. Each group loads a different set of backends: `Core` loads
 CairoMakie only, `WebGL` loads WGLMakie first and then both at the end,
-and `NoBackend` loads neither. `GROUP` defaults to `Core`:
+and `NoBackend` loads neither. `GROUP` defaults to `Core`.
+
+Day to day, run a group against a prepared environment, which
+`scripts/cloud-warm.sh julia` builds once:
+
+```bash
+GROUP=Core julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" test/runtests.jl
+```
+
+CI runs `Pkg.test()`, which builds a fresh environment each time and is
+slower. Use it to reproduce a failure that only CI shows:
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.test()'                 # GROUP=Core
@@ -53,5 +63,6 @@ and use a coarse grid.
 ## Live verification
 
 A change to what users see or interact with needs a check in a live
-Pluto notebook on each backend. Follow
+Pluto notebook, on every backend, for each kind of plot the change
+touches. Follow
 [`docs/dev/live-interaction-checklist.md`](https://github.com/jowch/Masque.jl/blob/main/docs/dev/live-interaction-checklist.md).

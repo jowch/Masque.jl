@@ -80,16 +80,17 @@ main { --masque-tip-bg: #1a1a2e; --masque-tip-color: #e0e0e0; }
 </style>
 ```
 
-`--masque-tip-bg`, `--masque-tip-color`, and `--masque-tip-border`
-follow the figure's background unless you set them here or with a
-`tooltip_*` keyword. Older browsers without CSS relative-color syntax
-use the "Legacy fallback" column instead:
+By default, `--masque-tip-bg`, `--masque-tip-color`, and
+`--masque-tip-border` follow the figure's background, so a dark figure
+gets a dark tooltip. Older browsers without CSS relative-color syntax
+use the fixed values shown instead. Where a row lists light and dark
+values, the browser picks one by the system's color scheme:
 
-| Custom property | Legacy fallback (light / dark) | Julia keyword |
+| Custom property | Default (light / dark) | Julia keyword |
 |---|---|---|
-| `--masque-tip-bg` | `#ffffff` / `#1e1e1e` | `tooltip_bg` |
-| `--masque-tip-color` | `#1a1a1a` / `#e8e8e8` | `tooltip_color` |
-| `--masque-tip-border` | `rgba(0,0,0,0.1)` / `rgba(255,255,255,0.15)` | CSS only |
+| `--masque-tip-bg` | follows the figure; older browsers `#ffffff` / `#1e1e1e` | `tooltip_bg` |
+| `--masque-tip-color` | follows the figure; older browsers `#1a1a1a` / `#e8e8e8` | `tooltip_color` |
+| `--masque-tip-border` | follows the figure; older browsers `rgba(0,0,0,0.1)` / `rgba(255,255,255,0.15)` | CSS only |
 | `--masque-tip-accent` | `#6b7280` | `tooltip_accent` |
 | `--masque-tip-font` | `system-ui, -apple-system, sans-serif` | `tooltip_font` |
 | `--masque-tip-font-size` | `11px` | `tooltip_font_size` |
