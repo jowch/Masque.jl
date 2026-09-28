@@ -39,11 +39,11 @@ The tooltip shows the payload, and a click returns it to Julia as
 `pick.city`, `pick.pop`, and so on. Without `payloads`, each mark gets
 an `index` and its coordinates, such as `x` and `y` for a scatter point.
 
-## Tooltips are templates, not functions
+## Tooltips are templates
 
 A tooltip shows the payload of the mark under the pointer. By default
 it is a small table of the payload's fields. A `masque"..."` template
-arranges them your way:
+lets you customize what it says:
 
 ```julia
 PointInteractable(ax, s; payloads = rows, tooltip = masque"$(city) — pop $(pop:,)")
@@ -53,10 +53,10 @@ In a template, `$(city)` is a payload field, not a Julia variable.
 `$(pop:,)` formats a number with a [d3-format](https://d3js.org/d3-format)
 spec.
 
-A tooltip cannot be a Julia function, because it has to work without
-Julia running, for example in a static export. Compute what you want to
-show and put it in the payload. `tooltip = false` turns tooltips off.
-See [Tooltips](@ref).
+To show a value you compute, compute it in Julia and add it to the
+payload. Tooltips work without Julia running, for example in a static
+export, so a template can only read what the payload holds.
+`tooltip = false` turns tooltips off. See [Tooltips](@ref).
 
 ## Hover, click, and drag
 

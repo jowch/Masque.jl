@@ -19,7 +19,10 @@ mechanism; the user docs describe what the reader does and sees.
    Start with what the reader gets, then show it.
 6. **Keep the main point out of asides.** If it matters, give it its own sentence instead of
    a parenthesis or a dash clause.
-7. **End with where to go next,** as a link.
+7. **Don't define a thing by what it isn't.** "Templates, not functions" answers a question
+   only the designers asked. Say what the reader can do, and give the constraint only where
+   they would hit it.
+8. **End with where to go next,** as a link.
 
 ## Examples
 
@@ -29,4 +32,6 @@ mechanism; the user docs describe what the reader does and sees.
 | Draw the figure the way you normally would. | Create a figure the way you normally would. |
 | `pick === nothing ? … : …` | `isnothing(pick) ? … : …` |
 | `pick.index` is 1-based, and `pick` indexes your data directly. | `pick.index` is the clicked point's position in the data you plotted, so `ys[pick]` is its `y`. |
+| Tooltips are templates, not functions | Tooltips are templates |
+| A `masque"..."` template arranges them your way. | A `masque"..."` template lets you customize what it says. |
 | Masque does three things to a Makie figure you have already drawn: it decides which marks respond to the pointer, it shows information about a mark without re-running Julia, and it hands a deliberate choice back to your notebook through `@bind`. | Masque adds tooltips and click selection to a Makie figure. A click reaches the rest of your notebook through `@bind`. |
