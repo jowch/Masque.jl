@@ -38,8 +38,7 @@ using Masque, CairoMakie
 ```
 
 Pluto's package manager installs both. Use `CairoMakie` for a static image, or `WGLMakie`
-for animation, large data, or live 3D. The first run in a new notebook takes several
-minutes, most of it Makie's precompilation.
+for animation, large data, or live 3D.
 
 ## Quick start
 

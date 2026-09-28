@@ -18,9 +18,6 @@ both, and the notebook records them in its own environment:
 using Masque, CairoMakie
 ```
 
-The first run in a new notebook takes several minutes, most of it
-Makie's precompilation. Later runs reuse the compiled packages.
-
 To add the packages from a Julia session instead, keep the notebook
 file closed and write them into that file.
 `Pluto.activate_notebook_environment` updates the environment embedded
