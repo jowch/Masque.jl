@@ -12,8 +12,9 @@ mark in Julia, click it. See [How interactions work](@ref).
 
 A click selects one mark and replaces the previous selection. To select
 several marks at once, drag a box over them with an
-[`ROIInteractable`](@ref). The box is a rectangle, and it selects marks
-from one plot.
+[`ROIInteractable`](@ref). The box is a rectangle, and every box in one
+widget selects from the same layer: a set of points, or a heatmap or
+image.
 
 Your figure stays as you created it. Highlights are drawn on top of the
 image, so a click on its own cannot hide a series, recolor a mark, or
@@ -69,7 +70,7 @@ a nearer mark can be blocked by a farther one that comes earlier.
 ## Rough edges today
 
 - In a static HTML export, tooltips and highlights still work, but other
-  cells do not respond to a click and you cannot pan. See
+  cells do not respond to a click and the view does not pan or orbit. See
   [Static exports and this site](@ref).
 - The keyboard cannot move a brush box, a threshold line, or the view.
   See [Keyboard and screen readers](@ref).

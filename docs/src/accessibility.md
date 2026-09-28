@@ -24,8 +24,9 @@ has a legend, its entries come first, and Page Down steps from the
 legend into the plot. Focusing a legend entry highlights the series it labels, as
 hovering over it does. See [Legend](@ref).
 
-The focused mark gets the same highlight and tooltip as a hovered one,
-except that a legend entry shows no tooltip unless you pass a template.
+The focused mark gets the same highlight and tooltip as a hovered one.
+A legend entry shows no tooltip, on hover or on focus, unless you pass a
+template.
 
 While the plot has focus and no mark is highlighted, as on a heatmap,
 a grey outline shows just inside it. Clicking a plot focuses it without

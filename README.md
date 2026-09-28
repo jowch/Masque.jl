@@ -73,8 +73,8 @@ Loading `CairoMakie` or `WGLMakie` activates the matching extension, and the `ma
 call and the `@bind` value are the same on both.
 
 CairoMakie renders the figure once to a static image, and tooltips and
-clicks work on top of it. Every change renders the whole figure again, so
-CairoMakie is a poor fit for animation.
+clicks work on top of it. Rebuilding the figure renders all of it again,
+so CairoMakie is a poor fit for animation.
 
 WGLMakie (`:webgl`, experimental) renders the figure live on the browser
 GPU. Use it for animation, large or live-updating data, or 3D you want to

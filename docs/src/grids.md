@@ -53,8 +53,8 @@ and its value, and a click still reports the cell's true `i` and `j`.
 
 A color image has no single value per cell, so hovering or clicking it
 reports `i` and `j` with `value = nothing`, at any size. To read a
-number instead, pass a [`RectInteractable`](@ref) a grid of the values
-you want, such as each pixel's intensity.
+number instead, pass a [`RectInteractable`](@ref) with a grid of the
+values you want, such as each pixel's intensity.
 
 ## Brush a block of cells
 
