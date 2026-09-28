@@ -27,7 +27,7 @@ using Masque, CairoMakie
 
 ## Overlay a figure
 
-Draw the figure the way you normally would. End the cell with `nothing`
+Create a figure the way you normally would. End the cell with `nothing`
 so Pluto does not also print the plain figure:
 
 ```julia
@@ -52,11 +52,11 @@ never re-runs Julia; it only happens on the figure. Click a point and
 `pick` becomes that point, so a cell that reads `pick` re-runs:
 
 ```julia
-pick === nothing ? "click a point" : "point $(pick.index) at x = $(pick.x)"
+isnothing(pick) ? "click a point" : "point $(pick.index) at x = $(pick.x)"
 ```
 
-`pick` is an [`ElementEvent`](@ref). `pick.index` is 1-based, and `pick`
-indexes your data directly: `ys[pick]` is the clicked point's `y`.
+`pick` is an [`ElementEvent`](@ref). `pick.index` corresponds to your plotted data, and you can use `pick`
+to index your data directly: `ys[pick]` is the clicked point's `y`.
 
 `masque(fig)` finds everything it knows how to overlay on its own:
 scatters, lines, bars, heatmaps, polygons, text, legends, and colorbars

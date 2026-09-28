@@ -2,7 +2,7 @@
 
 Masque adds an interactive layer over Makie figures inside a Pluto
 notebook. Add rich tooltips, hover interactions, selections, and more to
-your figures.
+your figures. [Ready to get started?](getting-started.md)
 
 ## Rich tooltips
 
