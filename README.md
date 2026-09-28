@@ -18,14 +18,14 @@
 </p>
 
 Masque adds a thin JavaScript overlay to Makie figures in a Pluto notebook.
-When you hold the pointer over a plot element, a tooltip appears. A click
-selects the element and reaches Julia through `@bind`. The figure itself is
+When you hover over a plot element, a tooltip appears. A click selects the
+element and reaches Julia through `@bind`. The figure itself is
 rendered by CairoMakie or WGLMakie as usual.
 
 - Points, lines, heatmap cells, bars, polygons, and text, on 2D, polar, and 3D axes.
 - Drag gestures: region of interest, threshold line, pan.
-- Holding the pointer over a plot element and selecting it still work in a
-  static HTML export of the notebook.
+- Tooltips and click selection still work in a static HTML export of the
+  notebook.
 
 Tooltips and interactions can be customized.
 

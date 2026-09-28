@@ -3,7 +3,7 @@
 //
 //   node home_feature_gifs.mjs http://localhost:8765 <scenario> <frames-dir>
 //
-// Scenarios: hover | click | legend | export
+// Scenarios: hover | click | legend
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -39,7 +39,6 @@ function hitPoint(layer, index) {
     const i = index % g.ncols, j = Math.floor(index / g.ncols);
     return { x: (g.xedges[i] + g.xedges[i + 1]) / 2, y: (g.yedges[j] + g.yedges[j + 1]) / 2 };
   }
-  if (k === "roi") return { x: g.x + g.w / 2, y: g.y + g.h / 2, w: g.w, h: g.h };
   throw new Error(`hitPoint: unhandled kind ${k}`);
 }
 

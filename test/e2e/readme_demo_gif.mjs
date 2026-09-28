@@ -275,7 +275,7 @@ try {
       if (after !== before && /selected/i.test(after)) break;
       await sleep(100);
     }
-    if (!/selected/i.test(after) || !/são paulo/i.test(after)) {
+    if (!/selected/i.test(after) || !/s[ãa]o paulo/i.test(after) || !/index 4\b/.test(after)) {
       throw new Error(`click: output cell didn't update — before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
     }
     console.error(`OK  click-bind: ${JSON.stringify(after)}`);
