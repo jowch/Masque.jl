@@ -170,7 +170,13 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
     const layer = hit.layer
     if (layer.tooltip === false) return null
     if (layer.template) {
-        return renderTemplate(layer.template, resolvePayload(hit, ctx.manifest_, x, y))
+        const payload = resolvePayload(hit, ctx.manifest_, x, y)
+        // Wire i/j are 0-based (the @bind payload keeps them so); a template, like the default
+        // tooltip below, shows the Julia 1-based cell that pick.i/pick.j report.
+        return renderTemplate(
+            layer.template,
+            hit.grid_ ? { ...(payload as object), i: hit.grid_[0] + 1, j: hit.grid_[1] + 1 } : payload,
+        )
     } else if (hit.grid_) {
         // Wire i/j are 0-based; the tooltip shows the Julia 1-based cell.
         const i = hit.grid_[0] + 1, j = hit.grid_[1] + 1
