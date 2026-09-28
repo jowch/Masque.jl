@@ -44,7 +44,7 @@ Pass the figure to `masque` and bind the result to a variable:
 ```
 
 Hover over a point to see its `index`, `x`, and `y`. Click a point and
-`pick` holds it. Every cell that uses `pick` then re-runs:
+`pick` holds it. Cells that use `pick` respond to the change:
 
 ```julia
 isnothing(pick) ? "click a point" : "point $(pick.index) at x = $(pick.x)"
@@ -76,7 +76,7 @@ Main.masque_fallback("home_quickstart")
 
 This notebook is a recording, so a click shows a result computed ahead
 of time (the **Simulating `@bind`** badge). In your own notebook, the
-last cell re-runs. *Notebook as text* has the cells to copy.
+last cell responds to your click.
 
 ## Where to go next
 
