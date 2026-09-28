@@ -10,10 +10,9 @@ All notable changes to this project are documented here. The format is based on
 
 First registered release. It adds hover tooltips and click selection to Makie figures in a
 Pluto notebook, and sends the clicked element to the rest of the notebook through `@bind`.
-This entry describes what 0.1.0 contains. Earlier development versions were installed from
-the repository, the oldest under the name `Holo`. To move code written for one, replace
-`using Holo` with `using Masque` and `holo(` with `masque(`, and add 1 to the `index` in
-`colors = (; palette, index)`, which is now 1-based like every other Masque index.
+This entry describes what 0.1.0 contains. Code written for an earlier development version,
+installed from the repository, needs 1 added to the `index` in `colors = (; palette, index)`,
+which is now 1-based like every other Masque index.
 
 ### Added
 - `masque(fig)` makes a figure interactive in a Pluto cell, and `@bind pick masque(fig)` binds
