@@ -39,7 +39,9 @@ and carries the reasoning for each branch.
 ## Where things stand
 
 v0.1.0 is unreleased. The pre-registration revisions can still carry new work.
-`CHANGELOG.md` `[Unreleased]` is the running record.
+`CHANGELOG.md` `[Unreleased]` is the running record. #210 tracks registration: the
+General review of the first attempt, the checks already run, and the steps before and after
+registering.
 
 **Shipped.**
 - `masque(fig)` auto-extraction over the recipes in the site's
@@ -83,13 +85,9 @@ without new evidence:
   remaining cost is a full `serialize_scene` per frame
   ([§12.10](architecture/12-gesture-channel.md#1210-open-questions)).
 
-## Before registration
+## Registration
 
-### Register
-
-- **Register v0.1.0 in General** on a CI-green `main` commit. The mechanics are the Release row in `frontend-delivery.md`.
-- **After registration:** drop `Pkg.develop` from the fixture notebooks under
-  `test/notebooks/`, and let Pluto's package manager take over.
+#210 holds the checklist. The mechanics are the Release row in `frontend-delivery.md`.
 
 ## After registration
 
@@ -191,8 +189,9 @@ update `support.md` whenever `_plotbase` grows a branch.
 
 ### Tooling
 
-- **Promote the `kind-sweep` job to a required check** once #99 (the WebGL hover-leave flake)
-  is fixed. Until then, agents run the sweep locally.
+- **Promote the `kind-sweep` job to a required check.** Nothing known blocks it: #99 is
+  closed, and the WebGL `view-wheel` failure was #165, fixed in #203. Until then, agents run
+  the sweep locally.
 - **#176: advisory CI against Makie's development branch.** The canaries only, on a schedule
   and not as a required check. It detects a moved internal before CompatHelper's bump PR
   does. Keep the one-minor compat pins.
@@ -282,17 +281,12 @@ shipped, which is a better filter than what other libraries happen to have.
 
 ## Order
 
-A proposed sequence, not a decided one. The only hard dependency edges are these:
-- #180 before #181.
-- #99 before the kind sweep becomes a required check.
+A proposed sequence, not a decided one. The only hard dependency edge is #180 before #181.
 
-Registration waits for the decisions listed under "Before registration".
-
-1. The preview path: #99.
-2. Register v0.1.0, then drop `Pkg.develop` from the fixture notebooks.
-3. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
+1. Register v0.1.0 (#210).
+2. Additive work by demand: #180 → #181, #169, #179, #170. Tooling (#176, #177, #178) runs
    alongside, since none of it touches the package.
-4. Coverage items as users ask (#91).
-5. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
+3. Coverage items as users ask (#91).
+4. Payload-gated items (animation, level-of-detail layers) wait for a measured cut in
    per-frame or per-element cost. Spike-gated items (SVG output, spatial acceleration,
    GLMakie-static) wait for a real use.
