@@ -45,6 +45,8 @@ does and sees. Use US spelling ("color"), matching the API's keywords.
 
 13. **Headings name the topic plainly.** "How interactions work", not a row of verbs like
     "Hover, click, and drag", and not an adjective pitch like "Rich tooltips".
+    A heading that matches another page's title breaks every `[Title](@ref)` link to that
+    page; give it an explicit id: `## [Backends](@id home-backends)`.
 14. **No bold labels at the start of list items.** Use a plain list, or a table when each
     item has a name and a description. Bold is for a term's first use or a UI label.
 

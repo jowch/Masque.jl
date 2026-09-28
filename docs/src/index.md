@@ -4,7 +4,7 @@ Masque adds tooltips and click selection to Makie figures in a Pluto
 notebook. Clicking a mark updates a `@bind` variable, so the rest of your
 notebook can respond. [Ready to get started?](getting-started.md)
 
-## Tooltips
+## [Tooltips](@id home-tooltips)
 
 ![Holding the pointer over a star shows its name, spectral type, and distance](assets/home/hover.gif)
 
@@ -19,7 +19,7 @@ Click a mark to select it. Like a PlutoUI slider, the selection goes to
 a `@bind` variable, and cells that use the variable respond. See
 [Click marks](@ref) and [Selection](@ref).
 
-## Pan and orbit
+## [Pan and orbit](@id home-pan-orbit)
 
 ![Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera](assets/home/orbit.gif)
 
@@ -44,7 +44,7 @@ work. The figure below is a static export; hover over a borough. See
 </div>
 ```
 
-## Backends
+## [Backends](@id home-backends)
 
 Masque works with CairoMakie and WGLMakie. CairoMakie is the default.
 Use WGLMakie for animation, large data, or 3D you can orbit. See
