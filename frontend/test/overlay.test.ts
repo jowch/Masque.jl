@@ -2661,6 +2661,24 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         expect(tip.innerHTML).toBe("(2,1) = 12")
     })
 
+    it("a grid template sees the Julia 1-based cell, the same as pick.i/pick.j and the default tooltip", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{ id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+                template: ["cell ", { f: "i" }, ",", { f: "j" }, " = ", { f: "value" }],
+                geometry: { xedges: [0, 10, 20], yedges: [0, 10, 20], ncols: 2, nrows: 2, values: [11, 12, 21, 22] } }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        // Same point as above: wire cell i=1,j=0 is Julia cell (2, 1).
+        ;(shadow.querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 2.5, bubbles: true }))
+        expect(tip.classList.contains("show")).toBe(true)
+        expect(tip.innerHTML).toBe("cell 2,1 = 12")
+    })
+
     it("grid sample hover shows the pixel-center value, and a NaN sample shows nothing", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},

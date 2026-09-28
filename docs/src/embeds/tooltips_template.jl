@@ -40,11 +40,10 @@ begin
     palette = ["#e6194b", "#3cb44b", "#4363d8", "#f58231"]
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    scatter!(ax, [c.x for c in cities], [c.y for c in cities]; color = palette, markersize = 20)
+    s = scatter!(ax, [1.0, 2.0, 3.0, 4.0], [1.0, 4.0, 9.0, 16.0]; color = palette, markersize = 20)
     tips = PointInteractable(
-        ax, [(c.x, c.y) for c in cities];
+        ax, s;
         payloads = cities,
-        colors = (; palette, index = collect(0:(length(cities) - 1))),
         tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
     )
     nothing

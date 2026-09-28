@@ -57,6 +57,10 @@ All notable changes to this project are documented here. The format is based on
   leave the card off. A screen reader still announces the entry's label.
 
 ### Added
+- Plot-object constructors (`PointInteractable(ax, p::Scatter)`, `SegmentInteractable(ax,
+  p::Lines)`, `RectInteractable(ax, p::BarPlot)`, `PolygonInteractable(ax, p::Poly)`, and the
+  rest) take `tooltip` and `label`, as the geometry constructors do. Passing either used to raise
+  a `MethodError`. `TextInteractable` takes `label` too.
 - `SliceInteractable`: hover samples one or more 1-D series at the cursor (piecewise linear in
   data space) and shows those values in the tooltip. `orientation` chooses the sample coordinate
   and the one hair that is drawn. `crosshair = false` keeps the filled dots and the tooltip and
@@ -317,6 +321,8 @@ All notable changes to this project are documented here. The format is based on
   (`docs/dev/roadmap.md`), not groundwork already in place.
 
 ### Fixed
+- A heatmap or image tooltip template shows the 1-based cell in `$(i)` and `$(j)`, the same
+  numbers as the default tooltip and `pick.i`/`pick.j`. It used to show the 0-based indices.
 - A pan no longer doubles the axis frame while it waits for its next frame. The sliding copy
   holds only the data inside the spines, so no second axis edge, tick label, or title moves
   with it, and the strip it leaves behind shows blank plot instead of the old picture. A pan

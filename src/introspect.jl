@@ -190,10 +190,10 @@ function _colormap_palette_index(p, values)
     return (; palette, index)
 end
 
-function PointInteractable(ax, p::Makie.Scatter; id = :scatter, payloads = nothing, radius = nothing, colors = _resolve_scatter_colors(p))
+function PointInteractable(ax, p::Makie.Scatter; id = :scatter, payloads = nothing, radius = nothing, colors = _resolve_scatter_colors(p), tooltip = nothing, label = nothing)
     pts = _conv(p)[1]
     r = radius === nothing ? _marker_radius(p) : radius
-    kw = (; id, radius = r, colors)
+    kw = (; id, radius = r, colors, tooltip, label)
     return payloads === nothing ?
         PointInteractable(ax, pts; kw...) :
         PointInteractable(ax, pts; kw..., payloads)
@@ -214,29 +214,29 @@ function _meshscatter_extents(ms, n)
             "$(typeof(ms)) for $(n) elements; pass radius= (pixels) or radius3d= explicitly."
     )
 end
-function PointInteractable(ax, p::Makie.MeshScatter; id = :meshscatter, payloads = nothing, radius = nothing, radius3d = nothing)
+function PointInteractable(ax, p::Makie.MeshScatter; id = :meshscatter, payloads = nothing, radius = nothing, radius3d = nothing, tooltip = nothing, label = nothing)
     pts = _conv(p)[1]
     r3 = radius !== nothing || radius3d !== nothing ? radius3d : _meshscatter_extents(p.markersize[], length(pts))
-    kw = (; id, radius = something(radius, 9), radius3d = r3)
+    kw = (; id, radius = something(radius, 9), radius3d = r3, tooltip, label)
     return payloads === nothing ?
         PointInteractable(ax, pts; kw...) :
         PointInteractable(ax, pts; kw..., payloads)
 end
 
-SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = 6) =
-    SegmentInteractable(ax, _conv(p)[1]; mode = :polyline, unit = :line, id, payloads, tol)
-SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothing, tol = 6) =
-    SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol)
+SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+    SegmentInteractable(ax, _conv(p)[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
+SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+    SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol, tooltip, label)
 
 # The rendered edges live in the child LineSegments' converted (DATA space), including
 # mesh-triangulation diagonals a grid-edge reconstruction would miss.
-SegmentInteractable(ax, p::Makie.Wireframe; id = :wireframe, payloads = nothing, tol = 6) =
-    SegmentInteractable(ax, _conv(_childof(p, Makie.LineSegments))[1]; mode = :pairs, id, payloads, tol)
+SegmentInteractable(ax, p::Makie.Wireframe; id = :wireframe, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+    SegmentInteractable(ax, _conv(_childof(p, Makie.LineSegments))[1]; mode = :pairs, id, payloads, tol, tooltip, label)
 
 # Raw pos→pos+dir is wrong: arrows3d autoscales and renders via MeshScatter children in a
 # normalized, anisotropically-scaled space. Read the processed startpoints/endpoints instead
 # (already post-align/lengthscale/normalize, in DATA coords).
-function SegmentInteractable(ax, p::Makie.Arrows3D; id = :arrows3d, payloads = nothing, tol = 6)
+function SegmentInteractable(ax, p::Makie.Arrows3D; id = :arrows3d, payloads = nothing, tol = 6, tooltip = nothing, label = nothing)
     starts, ends_ = p.startpoints[], p.endpoints[]
     length(starts) == length(ends_) || error(
         "Arrows3D introspection: startpoints/endpoints length mismatch ($(length(starts)) vs $(length(ends_)))"
@@ -260,17 +260,17 @@ function SegmentInteractable(ax, p::Makie.Arrows3D; id = :arrows3d, payloads = n
                 for k in eachindex(pts)
         ]
     end
-    return SegmentInteractable(ax, verts; mode = :pairs, id, payloads, tol)
+    return SegmentInteractable(ax, verts; mode = :pairs, id, payloads, tol, tooltip, label)
 end
 
 # Makie converts cell centers to an edge vector (length n+1); the coordinate-free form gives
 # `EndPoints` (length 2), expanded here to n+1 uniform edges.
 _edges(e, n) = length(e) == n + 1 ? collect(Float64, e) :
     collect(range(Float64(e[1]), Float64(e[end]); length = n + 1))
-function RectInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells)
+function RectInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells, tooltip = nothing, label = nothing)
     xr, yr, vals = _conv(p)
     ncols, nrows = size(vals)
-    return RectInteractable(ax; grid = (_edges(xr, ncols), _edges(yr, nrows), vals), id)
+    return RectInteractable(ax; grid = (_edges(xr, ncols), _edges(yr, nrows), vals), id, tooltip, label)
 end
 
 # The child Poly carries the final laid-out rectangles (dodge/stack/automatic-width applied);
@@ -298,32 +298,32 @@ function _bar_payloads(rects, direction)
             for r in rects
     ]
 end
-function RectInteractable(ax, p::Makie.BarPlot; id = :bars, payloads = nothing)
+function RectInteractable(ax, p::Makie.BarPlot; id = :bars, payloads = nothing, tooltip = nothing, label = nothing)
     rs = _bar_rects(p)
     pl = payloads === nothing ? _bar_payloads(rs, p.direction[]) : payloads
-    return RectInteractable(ax; rects = rs, id, payloads = pl)
+    return RectInteractable(ax; rects = rs, id, payloads = pl, tooltip, label)
 end
 
 # converted[1] is a single ring (Vector{Point}) or a vector of rings (Vector{Vector{Point}}).
-function PolygonInteractable(ax, p::Makie.Poly; id = :poly, payloads = nothing)
+function PolygonInteractable(ax, p::Makie.Poly; id = :poly, payloads = nothing, tooltip = nothing, label = nothing)
     g = _conv(p)[1]
     rings = (isempty(g) || first(g) isa _GB.Point) ? [g] : g
-    return PolygonInteractable(ax, rings; id, payloads)
+    return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
 end
 
 # Ring = lower curve followed by the reversed upper curve, in data space. Open ring (last
 # vertex ≠ first); the :polygons even-odd hit-test closes it implicitly.
 _band_ring(lower, upper) = vcat(collect(lower), reverse(collect(upper)))
-function PolygonInteractable(ax, p::Makie.Band; id = :band, payloads = nothing)
+function PolygonInteractable(ax, p::Makie.Band; id = :band, payloads = nothing, tooltip = nothing, label = nothing)
     lower, upper = _conv(p)
-    return PolygonInteractable(ax, [_band_ring(lower, upper)]; id, payloads)
+    return PolygonInteractable(ax, [_band_ring(lower, upper)]; id, payloads, tooltip, label)
 end
 
 # density! renders its KDE fill as a descendant Band; read that instead of recomputing the KDE.
-function PolygonInteractable(ax, p::Makie.Density; id = :density, payloads = nothing)
+function PolygonInteractable(ax, p::Makie.Density; id = :density, payloads = nothing, tooltip = nothing, label = nothing)
     b = _descendant(p, Makie.Band)
     lower, upper = _conv(b)
-    return PolygonInteractable(ax, [_band_ring(lower, upper)]; id, payloads)
+    return PolygonInteractable(ax, [_band_ring(lower, upper)]; id, payloads, tooltip, label)
 end
 
 # Voronoi cells are Polygons whose interior list is empty (Makie clips an exterior only).
@@ -345,13 +345,13 @@ function _contourf_payloads(p, poly)
             for c in colors
     ]
 end
-function PolygonInteractable(ax, p::Makie.Contourf; id = :contourf, payloads = nothing)
+function PolygonInteractable(ax, p::Makie.Contourf; id = :contourf, payloads = nothing, tooltip = nothing, label = nothing)
     poly = _childof(p, Makie.Poly)
     polys = _conv(poly)[1]
     rings = [piece.exterior for piece in polys]
     holes = [piece.interiors for piece in polys]
     pl = payloads === nothing ? _contourf_payloads(p, poly) : payloads
-    return PolygonInteractable(ax, rings; id, payloads = pl, holes)
+    return PolygonInteractable(ax, rings; id, payloads = pl, holes, tooltip, label)
 end
 
 # Payload x is read from Makie's converted category data (not ring geometry) to avoid Float32
@@ -366,19 +366,19 @@ function _violin_payloads(p, rings)
             for ring in rings
     ]
 end
-function PolygonInteractable(ax, p::Makie.Violin; id = :violin, payloads = nothing)
+function PolygonInteractable(ax, p::Makie.Violin; id = :violin, payloads = nothing, tooltip = nothing, label = nothing)
     poly = _childof(p, Makie.Poly)
     rings = _conv(poly)[1]
     pl = payloads === nothing ? _violin_payloads(p, rings) : payloads
-    return PolygonInteractable(ax, rings; id, payloads = pl)
+    return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
 end
 
 # Cells come back in tessellation order, not input-site order, so there's no cheap
 # cell→generator mapping; default payload is (; index) only.
-function PolygonInteractable(ax, p::Makie.Voronoiplot; id = :voronoiplot, payloads = nothing)
+function PolygonInteractable(ax, p::Makie.Voronoiplot; id = :voronoiplot, payloads = nothing, tooltip = nothing, label = nothing)
     poly = _descendant(p, Makie.Poly)
     rings = _poly_exterior_rings(_conv(poly)[1])
-    return PolygonInteractable(ax, rings; id, payloads)
+    return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
 end
 
 # Stats come from Makie's computed-stats node (converted is a 4-tuple centers/medians/q1s/q3s,
@@ -449,8 +449,8 @@ end
 
 # The parent `converted` is the raw input points; the rendered staircase (the actual click
 # target) lives in the child Lines as the pre-expanded step polyline.
-SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothing, tol = 6) =
-    SegmentInteractable(ax, _converted(_childof(p, Makie.Lines))[1]; mode = :polyline, unit = :line, id, payloads, tol)
+SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+    SegmentInteractable(ax, _converted(_childof(p, Makie.Lines))[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
 
 # Each child line (or a ScatterLines child's line, when markers are on) is one element.
 # BezierPath curves aren't sampled here — a child that isn't Lines/ScatterLines fails loud.
@@ -469,12 +469,12 @@ function _series_payloads(children)
             for k in eachindex(children)
     ]
 end
-function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothing, tol = 6)
+function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothing, tol = 6, tooltip = nothing, label = nothing)
     children = _child_plots(p)
     isempty(children) && error("Series introspection: no child lines (Makie internals changed?)")
     paths = [_conv(_series_line(c))[1] for c in children]
     pl = payloads === nothing ? _series_payloads(children) : payloads
-    return _whole_lines(ax, paths, id, pl, tol, nothing)
+    return _whole_lines(ax, paths, id, pl, tol, label; tooltip)
 end
 
 # Errorbars `converted` is Vec4 (x, y, low, high) with low/high RELATIVE offsets; Rangebars is
@@ -499,10 +499,10 @@ function _rangebar_pairs(p)
     end
     return vs
 end
-SegmentInteractable(ax, p::Makie.Errorbars; id = :errorbars, payloads = nothing, tol = 6) =
-    SegmentInteractable(ax, _errorbar_pairs(p); mode = :pairs, id, payloads, tol)
-SegmentInteractable(ax, p::Makie.Rangebars; id = :rangebars, payloads = nothing, tol = 6) =
-    SegmentInteractable(ax, _rangebar_pairs(p); mode = :pairs, id, payloads, tol)
+SegmentInteractable(ax, p::Makie.Errorbars; id = :errorbars, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+    SegmentInteractable(ax, _errorbar_pairs(p); mode = :pairs, id, payloads, tol, tooltip, label)
+SegmentInteractable(ax, p::Makie.Rangebars; id = :rangebars, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+    SegmentInteractable(ax, _rangebar_pairs(p); mode = :pairs, id, payloads, tol, tooltip, label)
 
 # `xmin`/`xmax` (HLines) and `ymin`/`ymax` (VLines) are fractions of the axis in relative
 # units. Default 0 and 1 is the full limits. Makie applies the fraction on the transformed
@@ -549,17 +549,17 @@ end
 
 _frac_to_data(finv, tlo, thi, frac) = Float64(_apply_transform(finv, tlo + (thi - tlo) * Float64(frac)))
 
-function SegmentInteractable(ax, p::Makie.HLines; id = :hlines, payloads = nothing, tol = 6)
+function SegmentInteractable(ax, p::Makie.HLines; id = :hlines, payloads = nothing, tol = 6, tooltip = nothing, label = nothing)
     vs = _span_pairs(ax, p, true)
     nseg = length(vs) ÷ 2
     pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
-    return _segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, true))
+    return _segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, true); tooltip, label)
 end
-function SegmentInteractable(ax, p::Makie.VLines; id = :vlines, payloads = nothing, tol = 6)
+function SegmentInteractable(ax, p::Makie.VLines; id = :vlines, payloads = nothing, tol = 6, tooltip = nothing, label = nothing)
     vs = _span_pairs(ax, p, false)
     nseg = length(vs) ÷ 2
     pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
-    return _segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, false))
+    return _segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, false); tooltip, label)
 end
 
 # Spy renders nonzeros as a child Scatter with markerspace=:data, so markersize IS the cell
@@ -575,8 +575,8 @@ function _spy_rects(p)
     w, h = ms isa AbstractVector ? (Float64(ms[1]), Float64(ms[2])) : (Float64(ms), Float64(ms))
     return [(Float64(c[1]), Float64(c[2]), w, h) for c in _converted(sc)[1]]
 end
-RectInteractable(ax, p::Makie.Spy; id = :spy, payloads = nothing) =
-    RectInteractable(ax; rects = _spy_rects(p), id, payloads)
+RectInteractable(ax, p::Makie.Spy; id = :spy, payloads = nothing, tooltip = nothing, label = nothing) =
+    RectInteractable(ax; rects = _spy_rects(p), id, payloads, tooltip, label)
 
 # Hist bar height is the bin value: a count only for default normalization=:none; with
 # :pdf/:density/:probability it's a density/fraction (hence `value`, not `count`).
@@ -600,17 +600,17 @@ function _waterfall_payloads(p, rects)
             for k in eachindex(rects)
     ]
 end
-function RectInteractable(ax, p::Makie.Hist; id = :hist, payloads = nothing)
+function RectInteractable(ax, p::Makie.Hist; id = :hist, payloads = nothing, tooltip = nothing, label = nothing)
     bar = _childof(p, Makie.BarPlot)
     rs = _bar_rects(bar)
     pl = payloads === nothing ? _hist_payloads(rs, bar.direction[]) : payloads
-    return RectInteractable(ax; rects = rs, id, payloads = pl)
+    return RectInteractable(ax; rects = rs, id, payloads = pl, tooltip, label)
 end
-function RectInteractable(ax, p::Makie.Waterfall; id = :waterfall, payloads = nothing)
+function RectInteractable(ax, p::Makie.Waterfall; id = :waterfall, payloads = nothing, tooltip = nothing, label = nothing)
     bar = _childof(p, Makie.BarPlot)
     rs = _bar_rects(bar)
     pl = payloads === nothing ? _waterfall_payloads(p, rs) : payloads
-    return RectInteractable(ax; rects = rs, id, payloads = pl)
+    return RectInteractable(ax; rects = rs, id, payloads = pl, tooltip, label)
 end
 
 function _span_payloads(p)
@@ -636,25 +636,25 @@ function _span_rects(ax, p, full::Symbol)
             for k in eachindex(lo_vec)
     ]
 end
-function RectInteractable(ax, p::Makie.HSpan; id = :hspan, payloads = nothing)
+function RectInteractable(ax, p::Makie.HSpan; id = :hspan, payloads = nothing, tooltip = nothing, label = nothing)
     rs = _span_rects(ax, p, :x)
     pl = payloads === nothing ? _span_payloads(p) : _check_payloads(payloads, length(rs), "RectInteractable")
-    return _rect_with_resolve(ax, rs, id, pl, true, _ax -> _span_rects(_ax, p, :x))
+    return _rect_with_resolve(ax, rs, id, pl, true, _ax -> _span_rects(_ax, p, :x); tooltip, label)
 end
-function RectInteractable(ax, p::Makie.VSpan; id = :vspan, payloads = nothing)
+function RectInteractable(ax, p::Makie.VSpan; id = :vspan, payloads = nothing, tooltip = nothing, label = nothing)
     rs = _span_rects(ax, p, :y)
     pl = payloads === nothing ? _span_payloads(p) : _check_payloads(payloads, length(rs), "RectInteractable")
-    return _rect_with_resolve(ax, rs, id, pl, true, _ax -> _span_rects(_ax, p, :y))
+    return _rect_with_resolve(ax, rs, id, pl, true, _ax -> _span_rects(_ax, p, :y); tooltip, label)
 end
 
 function _crossbar_payloads(p)
     _, midpts, lows, highs = _converted(p)
     return Any[(; midpoint = Float64(midpts[i]), low = Float64(lows[i]), high = Float64(highs[i])) for i in eachindex(midpts)]
 end
-function RectInteractable(ax, p::Makie.CrossBar; id = :crossbar, payloads = nothing)
+function RectInteractable(ax, p::Makie.CrossBar; id = :crossbar, payloads = nothing, tooltip = nothing, label = nothing)
     rs = _bar_rects(p)
     pl = payloads === nothing ? _crossbar_payloads(p) : payloads
-    return RectInteractable(ax; rects = rs, id, payloads = pl)
+    return RectInteractable(ax; rects = rs, id, payloads = pl, tooltip, label)
 end
 
 # Point layer keeps the base id; the line/segment layer gets a suffix so the two ids stay

@@ -63,7 +63,9 @@ only runs when the layer's payloads are `NamedTuple`s (the default for the built
 interactables); for `Dict`-valued or heterogeneous payloads, it's skipped and a missing
 `$(field)` renders empty at hover instead. `:grid` (heatmap/image) layers carry no per-element
 payload; a template there resolves the synthesised fields `$(i)`, `$(j)`, and `$(value)`, which
-are likewise not field-validated at build.
+are likewise not field-validated at build. `$(i)` and `$(j)` are the Julia 1-based cell, the same
+numbers as the default `(i,j)` tooltip and `GridCellEvent`; the overlay adds 1 to the 0-based
+wire indices for the tooltip only, and the `@bind` payload keeps the wire indices.
 
 d3-format spec *structure* (the type character and arrangement of flags) is validated in Julia
 against d3's canonical grammar; the *meaning* of precision, trim, and sign modifiers is only

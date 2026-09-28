@@ -298,9 +298,9 @@ _check_tol(tol) =
 
 # ============================ PointInteractable ============================
 """
-    PointInteractable(ax, points; id=:points, payloads=<auto>, radius=nothing, radius3d=nothing, tooltip=nothing)
-    PointInteractable(ax, p::Makie.Scatter; id=:scatter, payloads=nothing, radius=nothing)
-    PointInteractable(ax, p::Makie.MeshScatter; id=:meshscatter, payloads=nothing, radius=nothing, radius3d=nothing)
+    PointInteractable(ax, points; id=:points, payloads=<auto>, radius=nothing, radius3d=nothing, tooltip=nothing, label=nothing)
+    PointInteractable(ax, p::Makie.Scatter; id=:scatter, payloads=nothing, radius=nothing, tooltip=nothing, label=nothing)
+    PointInteractable(ax, p::Makie.MeshScatter; id=:meshscatter, payloads=nothing, radius=nothing, radius3d=nothing, tooltip=nothing, label=nothing)
 
 Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`](@ref).
 
@@ -423,8 +423,8 @@ end
 
 # ============================ SegmentInteractable ==========================
 """
-    SegmentInteractable(ax, vertices; mode=:polyline, unit=:segment, id=:segments, payloads=nothing, tol=6, tooltip=nothing)
-    SegmentInteractable(ax, p; id=<kind-specific>, payloads=nothing, tol=6)   # from a plot object
+    SegmentInteractable(ax, vertices; mode=:polyline, unit=:segment, id=:segments, payloads=nothing, tol=6, tooltip=nothing, label=nothing)
+    SegmentInteractable(ax, p; id=<kind-specific>, payloads=nothing, tol=6, tooltip=nothing, label=nothing)   # from a plot object
 
 Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`, or `:segments`
 [`HitLayer`](@ref).
@@ -455,8 +455,8 @@ Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`,
   [`PointInteractable`](@ref)). Default `nothing`.
 
 # From a plot object
-`SegmentInteractable(ax, p)` reads vertices from `p` (no `mode`/`unit`/`tooltip` keyword — those
-are fixed by the plot type):
+`SegmentInteractable(ax, p)` reads vertices from `p` (no `mode`/`unit` keyword — those are fixed
+by the plot type):
 
 | `p` | default `id` | hit | vertices from |
 |---|---|---|---|
@@ -524,23 +524,26 @@ end
 # constructor above — validate `tol` here too, or a user-supplied bad `tol` on those two
 # recipes skips the check entirely. Those recipes are per-segment pairs, so `unit` stays
 # `:segment`.
-function _segment_with_resolve(ax, vertices, mode, id, payloads, tol, resolve)
+function _segment_with_resolve(ax, vertices, mode, id, payloads, tol, resolve; tooltip = nothing, label = nothing)
     _check_tol(tol)
+    _check_tooltip(tooltip)
     return SegmentInteractable(
-        ax, [_pt3(v) for v in vertices], mode, id, payloads, Float64(tol), nothing, resolve, nothing, :segment, nothing,
+        ax, [_pt3(v) for v in vertices], mode, id, payloads, Float64(tol), tooltip, resolve,
+        label === nothing ? nothing : String(label), :segment, nothing,
     )
 end
 # One `:lines` layer whose elements are whole polylines (a `series!`, or any caller that
 # already has N paths). `paths` entries are data-space vertex lists; NaN gaps stay inside
 # the path they belong to.
-function _whole_lines(ax, paths, id, payloads, tol, label)
+function _whole_lines(ax, paths, id, payloads, tol, label; tooltip = nothing)
     _check_tol(tol)
+    _check_tooltip(tooltip)
     ps = [[_pt3(v) for v in path] for path in paths]
     n = length(ps)
     pl = payloads === nothing ? Any[(; index = k) for k in 1:n] : _check_payloads(payloads, n, "SegmentInteractable")
     vs = n == 0 ? Point3f[] : ps[1]
     return SegmentInteractable(
-        ax, vs, :polyline, id, pl, Float64(tol), nothing, nothing,
+        ax, vs, :polyline, id, pl, Float64(tol), tooltip, nothing,
         label === nothing ? nothing : String(label), :line, ps,
     )
 end
@@ -571,9 +574,9 @@ end
 
 # ============================ RectInteractable =============================
 """
-    RectInteractable(ax; rects, id=:rects, payloads=nothing, tooltip=nothing, clamp_to_viewport=false)
-    RectInteractable(ax; grid, id=:rects, payloads=nothing, tooltip=nothing)
-    RectInteractable(ax, p; id=<kind-specific>, payloads=nothing)   # from a plot object
+    RectInteractable(ax; rects, id=:rects, payloads=nothing, tooltip=nothing, clamp_to_viewport=false, label=nothing)
+    RectInteractable(ax; grid, id=:rects, payloads=nothing, tooltip=nothing, label=nothing)
+    RectInteractable(ax, p; id=<kind-specific>, payloads=nothing, tooltip=nothing, label=nothing)   # from a plot object
 
 Axis-aligned rectangles: an explicit list (bars, boxes) or a compact heatmap/image grid. Pass
 exactly one of `rects`/`grid` — passing both, or neither, raises `ArgumentError` at
@@ -674,9 +677,12 @@ function RectInteractable(
     end
 end
 # Internal-only: construct a :list RectInteractable with a lazy `resolve(ax) -> rects`.
-function _rect_with_resolve(ax, rects, id, payloads, clamp_to_viewport, resolve)
+function _rect_with_resolve(ax, rects, id, payloads, clamp_to_viewport, resolve; tooltip = nothing, label = nothing)
+    _check_tooltip(tooltip)
     rs = [(Float64(r[1]), Float64(r[2]), Float64(r[3]), Float64(r[4])) for r in rects]
-    return RectInteractable(ax, :list, rs, id, payloads, nothing, clamp_to_viewport, resolve, nothing)
+    return RectInteractable(
+        ax, :list, rs, id, payloads, tooltip, clamp_to_viewport, resolve, label === nothing ? nothing : String(label),
+    )
 end
 tooltip_spec(i::RectInteractable) = i.tooltip
 function hitlayers(i::RectInteractable, ctx)
@@ -750,7 +756,7 @@ end
 
 # ============================ TextInteractable =============================
 """
-    TextInteractable(ax, p::Makie.Text; id=:text, payloads=nothing, tooltip=nothing)
+    TextInteractable(ax, p::Makie.Text; id=:text, payloads=nothing, tooltip=nothing, label=nothing)
 
 Click-to-pick text labels (from `text!`/`annotation!`), hit-tested as bounding-box rects. Has
 **no explicit-geometry constructor** — this from-a-plot-object form is the only way to build
@@ -765,6 +771,8 @@ one. Produces one `:rects` [`HitLayer`](@ref), one box per string.
   anchor.
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
+- `label` — an optional screen-reader announcement prefix for this layer (see
+  [`PointInteractable`](@ref)).
 
 Geometry is each string's axis-aligned bounding box (`Makie.string_boundingboxes`), not
 projected data coordinates — a rotated label gets its expanded axis-aligned box. Boxes are
@@ -779,8 +787,9 @@ TextInteractable(ax, p)
 """
 struct TextInteractable <: AbstractInteractable
     ax; p; id::Symbol; payloads::Vector{Any}; tooltip::Union{Nothing, Markup, Bool}   # p::Makie.Text
+    label::Union{Nothing, String}
 end
-function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, tooltip = nothing)
+function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, tooltip = nothing, label = nothing)
     _check_tooltip(tooltip)
     strs = p.text[]
     anchors = p.positions[]
@@ -794,7 +803,7 @@ function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, too
     else
         _check_payloads(payloads, length(strs), "TextInteractable")
     end
-    return TextInteractable(ax, p, id, pl, tooltip)
+    return TextInteractable(ax, p, id, pl, tooltip, label === nothing ? nothing : String(label))
 end
 tooltip_spec(i::TextInteractable) = i.tooltip
 function hitlayers(i::TextInteractable, ctx)
@@ -813,13 +822,13 @@ function hitlayers(i::TextInteractable, ctx)
         w = bw * ctx.scaling; h = bh * ctx.scaling
         append!(g, (_q(x_left + w / 2), _q(y_top + h / 2), _q(w), _q(h)))   # :rects list = (cx, cy, w, h)
     end
-    return [HitLayer(i.id, :rects, g, i.payloads, axis_id(ctx, i.ax), events(i))]
+    return [HitLayer(i.id, :rects, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
 end
 
 # ============================ PolygonInteractable ==========================
 """
-    PolygonInteractable(ax, rings; id=:polygons, payloads=nothing, tooltip=nothing, holes=nothing)
-    PolygonInteractable(ax, p; id=<kind-specific>, payloads=nothing)   # from a plot object
+    PolygonInteractable(ax, rings; id=:polygons, payloads=nothing, tooltip=nothing, holes=nothing, label=nothing)
+    PolygonInteractable(ax, p; id=<kind-specific>, payloads=nothing, tooltip=nothing, label=nothing)   # from a plot object
 
 Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLayer`](@ref).
 
