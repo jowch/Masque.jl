@@ -10,6 +10,7 @@ using UUIDs
 # live `@bind`. Drags are continuous: the TOML lists a few, and the rest stay overlay-only.
 
 include("player_pipeline.jl")
+include("bind_cell.jl")
 
 const PLAYER_CELL_ID = UUID("e1be0000-0000-4000-8000-000000000001")
 # Snapshot bytes a player ships beyond idle, after identical snapshots are merged
@@ -109,7 +110,7 @@ end
 
 function bind_cell(nb, bond::Symbol)
     needle = "@bind $bond"
-    hits = [c for c in nb.cells if occursin(needle, c.code)]
+    hits = [c for c in nb.cells if is_bind_cell(c.code, bond)]
     isempty(hits) && error("no cell with `$needle`")
     length(hits) == 1 || error("multiple `$needle` cells")
     return only(hits)
@@ -446,7 +447,7 @@ end
 
 function masque_widget_cell(cells, bond)
     needle = "@bind $bond"
-    hits = [c for c in cells if occursin(needle, c.code) && occursin("masque(", c.code)]
+    hits = [c for c in cells if is_bind_cell(c.code, bond) && occursin("masque(", c.code)]
     length(hits) == 1 || error("show_code player needs one `$needle masque(...)` cell")
     return only(hits)
 end

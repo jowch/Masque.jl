@@ -30,8 +30,7 @@ function notebook_cell_code(src::AbstractString)
     return cells
 end
 
-# Whether `code` is the cell that binds `bond`: `@bind pick` must not match `@bind picks`.
-is_bind_cell(code::AbstractString, bond) = occursin(Regex("@bind\\s+" * string(bond) * raw"(?![\w!])"), code)
+include("bind_cell.jl")
 
 # The string inside a cell that is only `md"..."` / `md"""..."""`, else `nothing`.
 function markdown_cell_text(code::AbstractString)
