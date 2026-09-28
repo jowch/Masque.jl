@@ -177,17 +177,17 @@ function _colormap_palette_index(p, values)
     # overflows Int64 in round(Int, huge*n) — clamp the FLOAT index into [0, n-1] before
     # rounding, not just after, so no magnitude of finite input can escape. Falls back to
     # palette[1] rather than erroring — the accent is a nice-to-have, not a rendering guarantee.
-    index = if span == 0
-        fill(1, length(scaled))
+    offset = if span == 0
+        fill(0, length(scaled))
     else
         [
             let idxf = (Float64(v) - lo) / span * (n - 1)
-                isfinite(idxf) ? round(Int, clamp(idxf, 0.0, Float64(n - 1))) + 1 : 1
+                isfinite(idxf) ? round(Int, clamp(idxf, 0.0, Float64(n - 1))) : 0
             end
                 for v in scaled
         ]
     end
-    return (; palette, index)
+    return (; palette, index = offset .+ 1)
 end
 
 function PointInteractable(ax, p::Makie.Scatter; id = :scatter, payloads = nothing, radius = nothing, colors = _resolve_scatter_colors(p), tooltip = nothing, label = nothing)
