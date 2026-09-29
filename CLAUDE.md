@@ -127,9 +127,11 @@ text and the bond payload → it gets a live check on every backend × the kinds
 - Mechanics below. Kind-sweep notebooks: `test/e2e/kind_sweep_cairo.jl` / `kind_sweep_webgl.jl`
   (both drivers). Demo envs (`test/notebooks/api_tour.jl`, `test/notebooks/webgl_demo.jl`) and
   `test/e2e/webgl_sweep.mjs` remain useful extras, not a substitute.
-- CI's `kind-sweep` job runs both drivers on both backends advisorily
-  (`continue-on-error: true`) — agents still run the sweep locally before calling a
-  user-facing change done, until the job is promoted to a required check.
+- CI's `kind-sweep` job runs all three drivers (`kind_sweep.mjs`, `polish_verify.mjs`,
+  `keyboard_a11y.mjs`) on both backends on every PR, as a required check. It only covers what
+  the kind-sweep notebooks exercise, so agents still run the sweep locally before pushing a
+  user-facing change, and add a case to `kind_sweep_figures.jl` plus a check in the owning
+  driver for any new kind, recipe, or interaction.
 
 ## Cloud sessions (claude.ai/code)
 - The container is **not cached**: every session starts from the environment's setup script,
