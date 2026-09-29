@@ -85,4 +85,4 @@ See [Backends](https://jowch.github.io/Masque.jl/stable/backends/) for the cost 
 
 ## Use of AI tools
 
-Masque is designed and developed with LLMs to make data analysis more interactive and rich. The package has been tested and verified through a combination of human usage and automated testing, including required reviews, automated CI testing, and live browser verification by agents on every pull request. 
+Masque is designed and developed with LLMs to make data analysis more interactive and rich. The package has been tested and verified through a combination of human usage and automated testing, including code review, automated CI testing, and live browser verification by agents for user-facing changes. 
