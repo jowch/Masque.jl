@@ -24,4 +24,4 @@ the idle figure and plain-text readouts as `<name>.png` / `<name>.fallback.toml`
 | [`frontend-delivery.md`](dev/frontend-delivery.md) | Browser-side build/delivery decisions: bundling, manifest transport, DPI/sizing, JS testing, CI. |
 | [`live-interaction-checklist.md`](dev/live-interaction-checklist.md) | The live-verification playbook run against a real Pluto + browser before any user-facing change is called done. |
 | [`perf-findings.md`](dev/perf-findings.md) | The measured payload-size and click-latency envelope; the single source of those numbers for the rest of the docs. |
-| [`roadmap.md`](dev/roadmap.md) | Open work, non-goals, and the order to tackle it. |
+| [`roadmap.md`](dev/roadmap.md) | What is left to build, by topic, and what we decided not to build. Release plans are GitHub milestones. |

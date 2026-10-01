@@ -2,7 +2,7 @@
 
 What Masque covers today, what it leaves out on purpose, and what is deferred. The per-type
 detail lives in [§3](03-interactables.md); the user-facing support table is
-`docs/src/support.md`; open work and its ordering is `roadmap.md`. Milestone history is in git.
+`docs/src/support.md`; open work is `roadmap.md`. Milestone history is in git.
 
 ## In
 
@@ -49,7 +49,7 @@ These hold on every backend, by design:
   JSON scrubs non-finite floats in GPU buffers for transport only.
 - **`LScene`.** Both backends refuse a figure that holds one, at `masque` time
   (`_reject_unsupported_axes` in `src/backend.jl`, #172). Interactive 3D is `Axis3`.
-  `roadmap.md`'s Non-goals has the reopen condition.
+  `roadmap.md`'s "Not doing" has the reopen condition.
 - **Per-frame faithful redraw as a guarantee.** High-frequency live redraw is a shared cost wall
   ([§6](06-composition.md)), not a per-backend exclusion.
 
