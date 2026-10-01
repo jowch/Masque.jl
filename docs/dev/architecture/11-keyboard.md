@@ -48,8 +48,6 @@ non-live usage hint in the same shadow root (ARIA idrefs don't cross shadow boun
 The per-layer `label` field ([§3](03-interactables.md), `HitLayer`) is the only manifest-shape
 change here — see `perf-findings.md` for its measured wire cost.
 
-The drag interactables (threshold, ROI, view) have no keyboard equivalent today, and
-`docs/src/accessibility.md` says so. Arrow-key nudging for them is an open proposal (#169). A nudge
-stop draws no mark ring, so it shows the surface focus outline above. The cost it carries is three drag state machines, each needing the same
-live-verification pass across both backends.
-
+The drag interactables (threshold, ROI, view) have no keyboard equivalent yet;
+`docs/src/accessibility.md` says so, and #169 adds arrow-key nudging. A nudge stop draws no mark
+ring, so it shows the surface focus outline above.
