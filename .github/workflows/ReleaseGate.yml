@@ -59,7 +59,7 @@ jobs:
             if (labels.includes("breaking") && patch) {
               problems.push(
                 `This PR is labelled \`breaking\`, but patch milestone ${patch.title} is still open. ` +
-                `A breaking change can only go in a minor release; merge it after ${patch.title} ships.`)
+                `Before 1.0, a breaking change can only go in a minor release; merge it after ${patch.title} ships.`)
             }
 
             const where = open.map((m) => m.title).join(", ") || "none"
