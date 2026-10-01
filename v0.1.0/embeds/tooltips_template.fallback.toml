@@ -1,0 +1,4 @@
+image = "tooltips_template.png"
+
+[outputs]
+a1b2c3d4-0011-4000-8000-000000000004 = "hover a city, or click one"
