@@ -12,8 +12,10 @@ What is planned has an issue, and what is committed to a release has a
 `0.2.0` for the next minor. An issue that changes existing behavior carries the `breaking`
 label and can only go in a minor. Julia's package manager treats `0.1.0` → `0.1.1` as
 compatible and `0.1` → `0.2` as breaking, so before 1.0 a patch may add features, as long as
-no existing call changes. What landed since the last release is `CHANGELOG.md`'s
-`[Unreleased]`.
+no existing call changes. What has landed since 0.1.0 is `CHANGELOG.md`'s `[Unreleased]`.
+
+0.1.0 is registered in General; #210 tracks what is left of that release (the `v0.1.0` tag and
+GitHub release, and the follow-ups after registration).
 
 ## Principles
 
@@ -47,8 +49,9 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
   `interactables` function doubles as the hook for user recipes.
 
 ### Overlay and chrome
-- #180, then #181 — chrome colors and strokes as CSS custom properties, then `masque()`
-  keywords over them. #181 depends on #180.
+- #180, then #181 — every chrome literal (colors, stroke widths, opacities, the handle fill)
+  as a CSS custom property with nothing painted changing, then `masque()` keywords over them.
+  #181 depends on #180.
 - #169 — arrow-key nudging for threshold, ROI, and view (the WCAG 2.1.1 gap).
 - #179 — wide mode: widen the Pluto cell from inside the widget.
 - *idea* — pin a tooltip so its numbers can be read or copied.
@@ -69,18 +72,21 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 - *idea* — a 2D profile probe on a heatmap cell; a delta readout between two parked probes.
 
 ### Gestures and animation
-- *idea* — decide the default between live preview and a single settle frame from use of
-  the shipped preview ([§12.10](architecture/12-gesture-channel.md#1210-open-questions)).
-- *idea* — render a coarser frame during a gesture on heavy scenes.
-- *idea* — animation and scrubbing, pulling frame *k* on demand over the gesture channel.
-  Gated on per-frame payload (`perf-findings.md`).
+- *idea* — decide the default between live preview and a single settle frame, from use of the
+  shipped preview.
+- *idea* — render a coarser frame during a gesture on heavy scenes
+  ([§12.10](architecture/12-gesture-channel.md#1210-open-questions)).
+- *idea* — animation and scrubbing: precomputed frames in a manifest `frames` slot, a JS
+  scrubber, and a bond value that is the frame. Gated on per-frame payload, whose hard ceiling
+  is frames × per-frame PNG (`perf-findings.md`). The container is unresolved; a static export
+  must not be worse than a plain GIF, which argues for embedding by default, with a live pull of
+  frame *k* over the gesture channel as an opt-in.
 
 ### Plot coverage
 - #91 — tracking issue for the recipes `masque(fig)` does not extract yet. Tick it and
   update `docs/src/support.md` when `_plotbase` grows a branch.
 - #170 — continuous readout on `PolarAxis`.
 - *idea* — informative default payloads for `density!`, `band!`, and `voronoiplot!`.
-- *idea* — `TextLabel`, through the figure-block walk `Colorbar` and `Legend` use.
 - *idea* — a legend entry that targets a `:grid` layer.
 - *idea* — `heatmap!`/`image!` and `surface!` designed together as dense cell fields;
   occlusion policy is in `architecture/07-scope.md`.
@@ -91,9 +97,12 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
   inspector and inspection-only IJulia and Quarto.
 - *idea* — GLMakie rendering to PNG behind `AbstractBackend`.
 - *idea* — `:webgl` in-place data patching on a canvas that is still alive.
-- *idea* — level-of-detail hit layers and manifest compaction for high-N plots, decided by
-  re-running `bench/payload_envelope.jl`.
-- *idea* — spatial acceleration, only if a profile shows the hit test itself is slow.
+- *idea* — level-of-detail hit layers for high-N plots: a decimated layer, with exact
+  membership resolved in Julia on click.
+- *idea* — manifest compaction (delta or column-wise encoding), decided by re-running
+  `bench/payload_envelope.jl`.
+- *idea* — spatial acceleration, only if a profile shows the hit test itself is slow;
+  `perf-findings.md`'s "JS hit-test microbenchmark" has the numbers.
 - *idea* — Tables.jl payloads beyond the DataFrames extension.
 
 ### Tooling
@@ -116,8 +125,11 @@ Kept so these are not proposed again without new evidence.
 - **`LScene`**: refused on both backends (#172). Reopen if a user asks.
 - **#83** — the double remount of a self-referencing `@bind` cell: not a sanctioned Pluto
   shape, and gestures no longer remount.
-- **#84** — holding the last frame across a remount: gestures no longer remount.
-- **#86** — a resident scene with camera-only patching: canvas identity does not survive
-  Pluto's cell replacement.
+- **#84** — holding the last frame across a remount: gestures no longer remount. The two gaps
+  left on purpose: the WebGL buffer clears when `px_per_unit` is restored, and a genuine cell
+  re-run starts blank.
+- **#86** — a resident scene with camera-only patching: a view gesture already paints on the
+  canvas the current output holds, and the cost that stays is a full `serialize_scene` per frame
+  ([§12.5](architecture/12-gesture-channel.md#125-backend-obligations-mechanism-independent)).
 - **#167** — an outline-only highlight for large marks: the dodge fill is a mild brightening,
   not a flash. Reopen if #181 lets a user raise the fill strength.
