@@ -1,0 +1,69 @@
+name: Release gate
+
+# Keeps work for a later release off `main` until the earlier release ships. Milestones named
+# by version (`0.1.1`, `0.2.0`) are the release plan; see CLAUDE.md's Releases section.
+#
+# Fails when:
+# - the PR's milestone is later than the earliest open version milestone, or
+# - the PR is labelled `breaking` while a patch milestone (x.y.z, z > 0) is open.
+#
+# A PR with no milestone and no `breaking` label passes (docs, CI). Closing a milestone does
+# not re-run this check: re-run the job from the PR's Checks tab, or add or remove any label.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, milestoned, demilestoned]
+
+permissions:
+  issues: read
+  pull-requests: read
+
+jobs:
+  gate:
+    name: Release gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const parse = (title) => {
+              const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec((title || "").trim())
+              return m ? m.slice(1, 4).map(Number) : null
+            }
+            const cmp = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
+
+            const open = (await github.paginate(github.rest.issues.listMilestones, {
+              owner: context.repo.owner, repo: context.repo.repo, state: "open", per_page: 100,
+            }))
+              .map((m) => ({ title: m.title, v: parse(m.title) }))
+              .filter((m) => m.v !== null)
+              .sort((a, b) => cmp(a.v, b.v))
+
+            // Read the PR fresh: a re-run replays the original event payload, which can carry
+            // stale labels or a stale milestone.
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner, repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            })
+            const labels = pr.labels.map((l) => l.name)
+            const own = pr.milestone ? { title: pr.milestone.title, v: parse(pr.milestone.title) } : null
+            const earliest = open[0]
+            const patch = open.find((m) => m.v[2] > 0)
+
+            const problems = []
+            if (own && own.v && earliest && cmp(own.v, earliest.v) > 0) {
+              problems.push(
+                `This PR is in milestone ${own.title}, but ${earliest.title} is still open. ` +
+                `Merge it after ${earliest.title} is released and its milestone is closed.`)
+            }
+            if (labels.includes("breaking") && patch) {
+              problems.push(
+                `This PR is labelled \`breaking\`, but patch milestone ${patch.title} is still open. ` +
+                `Before 1.0, a breaking change can only go in a minor release; merge it after ${patch.title} ships.`)
+            }
+
+            const where = open.map((m) => m.title).join(", ") || "none"
+            core.info(`Open version milestones: ${where}`)
+            core.info(`This PR: milestone ${own ? own.title : "none"}, labels [${labels.join(", ")}]`)
+            if (problems.length) core.setFailed(problems.join("\n"))
+            else core.info("OK: nothing here waits on an earlier release.")

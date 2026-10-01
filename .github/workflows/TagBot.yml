@@ -8,6 +8,16 @@ on:
       lookback:
         description: "[DEPRECATED] No longer has any effect"
         default: "3"
+# TagBot pushes the version tag, creates the GitHub release, reads merged PRs for the changelog,
+# and, when it cannot release, opens an issue for manual intervention. This repo's default token
+# is read-only, so without this block v0.1.0's run got a 403 on the tag push and on opening that
+# issue. TagBot's README advises no block at all, which works only with a read-write default; a
+# block must list every scope it uses, since unlisted ones become `none`. A commit that changes a
+# workflow file still cannot be tagged with GITHUB_TOKEN: the `ssh` key below covers that.
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
 jobs:
   TagBot:
     if: github.event_name == 'workflow_dispatch' || github.actor == 'JuliaTagBot'

@@ -25,6 +25,14 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
   network.
 - **Always verify CI is green before merging.** A merged PR can leave `main` red (PR #11 merged with Runic failing). After a PR's checks finish, `gh run list` / `gh pr checks <n>` must show all green — don't merge on a stale or pending run.
 
+## Releases
+- **Milestones are the release plan.** `0.1.1`-style milestones hold the next patch, `0.2.0`-style the next minor. Planned work is an issue; give it a milestone when it is committed to a release. `docs/dev/roadmap.md` keeps the unscheduled backlog.
+- **Before 1.0, a patch may add features but never break a call; anything that breaks goes in a minor** and carries the `breaking` label. Pkg treats `0.1.0` → `0.1.1` as compatible, so every user with `0.1` compat receives a patch unasked.
+- **`main` always holds the next release.** A PR stays a draft while it waits on an earlier release: one in a later milestone than the earliest open one (patch or minor), or a `breaking` one while a patch milestone is open. Mark it ready once that release is registered and its milestone closed. The `Release gate` check (`.github/workflows/ReleaseGate.yml`) fails such a PR; it blocks merging once it is a required check in ruleset `main-2`. After closing a milestone, re-run the gate on waiting PRs (Checks tab → Re-run, or add/remove any label).
+- **Give a PR the milestone of the issue it closes.** A PR with no milestone (docs, CI) passes the gate.
+- **A 0.1.x fix after 0.2 work has landed** goes on a `release-0.1` branch cut from the last `v0.1.x` tag; register from that branch's commit. Create the branch only when needed.
+- **Releasing:** move `CHANGELOG.md`'s `[Unreleased]` entries under the new version heading and bump `Project.toml` in one PR; once `main` is green on its merge commit, comment the Registrator command on that commit's page (never quote it in GitHub text); TagBot tags the version; then close the milestone.
+
 ## Gotchas (verified this session)
 - Bundle injection: inject the esbuild IIFE **unconditionally** — wrapping it in `if(!window.Masque){…}` installs `{}` not `{mount}` (block-scope heisenbug).
 - Makie `Figure`s **can't `deepcopy`** (module refs) — save/restore `fig.scene.backgroundcolor[]` instead.
