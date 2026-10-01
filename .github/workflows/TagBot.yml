@@ -8,6 +8,12 @@ on:
       lookback:
         description: "[DEPRECATED] No longer has any effect"
         default: "3"
+# TagBot pushes the version tag and creates the GitHub release and, when it cannot, opens an
+# issue for manual intervention. Without these the job's token is read-only and every push
+# fails with a 403, as v0.1.0's did.
+permissions:
+  contents: write
+  issues: write
 jobs:
   TagBot:
     if: github.event_name == 'workflow_dispatch' || github.actor == 'JuliaTagBot'
