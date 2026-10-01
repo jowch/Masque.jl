@@ -22,7 +22,8 @@ for hover and selected — Firefox only honours `mix-blend-mode` on a top-level 
 SVG content, which is why the dodge fill is its own sibling svg; the edge svg stays a sibling
 so the stroke paints above that fill and below the plain chrome. Dodge against the near-black `#141414` source was, across a measured
 10-colour palette, the only fill candidate that never rotated hue more than 8° and never dimmed
-a mark; a single darkening layer alone made a highlighted mark read muddy on a light figure,
+a mark (`bar_blue` is the limiting case for hue rotation, so the source stays deliberately
+conservative); a single darkening layer alone made a highlighted mark read muddy on a light figure,
 which is why the highlight split into two layers. Because the fill is identical between hover
 and selected (fill strength alone is sub-JND), the 1.5px-vs-2px edge-stroke width carries the
 entire hover-vs-selected distinction. **Hovering a mark that is already selected draws no
@@ -49,7 +50,15 @@ Tooltip theme is derived from the FIGURE's own background (CSS relative-colour s
 light/dark toggle** — so a dark Makie figure gets a dark tooltip on a light page; the OS media
 query is only the fallback for browsers without relative-colour support. The tooltip is anchored
 ABOVE the hovered mark (not the cursor) with a 10px gap and the caret on the anchor; it flips
-below on a top-clip, and shifts + moves the caret (`--masque-caret-x`) on a side-clip.
+below on a top-clip, and shifts + moves the caret (`--masque-caret-x`) on a side-clip. A
+resolvable per-element `colors` (today `scatter!`'s `color=`) adds a 3px tooltip accent border
+in that colour (`--masque-mark-border`); the text stays neutral.
+
+ROI chrome: 4 corner handles (7 CSS px, white fill, 1px chrome stroke, ~1.5 CSS px corner
+radius); a corner resizes two axes. The sides have no grip, but the manifest `handle` on each
+edge midpoint (8 logical px × scaling, at least 6 image px) still resizes that one edge, with the
+matching resize cursor. The ROI outline is 1px chrome unless an explicit `hoverstyle` stroke sets
+its own width and colour.
 
 These decisions are settled: cite the recipes above rather than re-litigating identity,
 wash vs ring, first-PR scope, or Pluto coupling.
