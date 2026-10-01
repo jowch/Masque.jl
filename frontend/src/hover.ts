@@ -1,6 +1,6 @@
 import { anchorFor, computeAnchoredPlacement, hitTestAt, photoClip, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layoutSpaceLayer } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
-import { renderTemplate, renderAutoTable, esc } from "./template"
+import { renderTemplate, renderAutoTable, esc, fmtNum } from "./template"
 import { drawHover, clearHover, drawLink, clearLink, markColorFor } from "./highlight"
 import { hideCross, syncCross } from "./cross"
 import { linkedHits } from "./selection"
@@ -176,16 +176,18 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
         return renderTemplate(
             layer.template,
             hit.grid_ ? { ...(payload as object), i: hit.grid_[0] + 1, j: hit.grid_[1] + 1 } : payload,
+            ctx.tipDigits_,
         )
     } else if (hit.grid_) {
         // Wire i/j are 0-based; the tooltip shows the Julia 1-based cell.
         const i = hit.grid_[0] + 1, j = hit.grid_[1] + 1
-        return hit.grid_[2] === undefined ? `(${i},${j})` : `(${i},${j}) = ${esc(hit.grid_[2])}`
+        return hit.grid_[2] === undefined ? `(${i},${j})` : `(${i},${j}) = ${esc(fmtNum(hit.grid_[2], ctx.tipDigits_))}`
     } else if (hit.axis_) {
         const v = resolvePayload(hit, ctx.manifest_, x, y) as { x?: unknown; y?: unknown; value?: unknown }
-        return "value" in v ? esc(fmt(v.value)) : `x=${esc(fmt(v.x))}, y=${esc(fmt(v.y))}`
+        const d = ctx.tipDigits_
+        return "value" in v ? esc(fmt(v.value, d)) : `x=${esc(fmt(v.x, d))}, y=${esc(fmt(v.y, d))}`
     }
-    return renderAutoTable(hit.layer.payloads[hit.index])
+    return renderAutoTable(hit.layer.payloads[hit.index], ctx.tipDigits_)
 }
 
 export function applyTipHtml(ctx: OverlayCtx, state: OverlayState, html: string, hit: Hit | null): void {
@@ -301,11 +303,11 @@ function hitIsColorbar(hit: Hit): boolean {
     return hit.layer.kind === "axis" && Array.isArray(g) && g.length === 4
 }
 
-function sliceTipHtml(layer: HitLayer, payload: Record<string, number>): string | null {
+function sliceTipHtml(layer: HitLayer, payload: Record<string, number>, digits: number): string | null {
     if (layer.tooltip === false) return null
-    if (layer.template) return renderTemplate(layer.template, payload)
+    if (layer.template) return renderTemplate(layer.template, payload, digits)
     const shown: Record<string, string> = {}
-    for (const [k, v] of Object.entries(payload)) shown[k] = fmt(v)
+    for (const [k, v] of Object.entries(payload)) shown[k] = fmt(v, digits)
     return renderAutoTable(shown)
 }
 
@@ -382,7 +384,7 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
         const payload: Record<string, number> = {}
         payload[geom.orientation === "v" ? "x" : "y"] = sampled.probe
         for (const s of sampled.samples) payload[s.id] = s.value
-        const html = sliceTipHtml(sliceLayer, payload)
+        const html = sliceTipHtml(sliceLayer, payload, ctx.tipDigits_)
         if (html === null) hideTip(ctx, state)
         else {
             applyTipHtml(ctx, state, html, null)

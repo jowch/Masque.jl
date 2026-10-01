@@ -74,3 +74,10 @@ describe("plainTextForHit", () => {
         expect(plainTextForHit(hit)).toBe("A & B")
     })
 })
+
+describe("rounding in the plain-text (screen reader) renderings", () => {
+    it("renderAutoTablePlain rounds numbers like the visible table", () => {
+        expect(renderAutoTablePlain({ x: 0.1 + 0.2, y: 2.718281828 })).toBe("x 0.3, y 2.718")
+        expect(renderAutoTablePlain({ y: 2.718281828 }, 2)).toBe("y 2.7")
+    })
+})

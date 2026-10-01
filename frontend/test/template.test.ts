@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { esc, renderTemplate, renderAutoTable } from "../src/template"
+import { esc, renderTemplate, renderAutoTable, fmtNum } from "../src/template"
 
 // d3-format's own specs never throw once parsed (a bad spec throws at parse time, already
 // covered above) — so exercising applySpec's *second* try/catch (the formatter call itself
@@ -79,5 +79,55 @@ describe("renderAutoTable", () => {
     it("a nested object value stringifies via String() and is escaped", () => {
         const html = renderAutoTable({ point: { x: 1, y: 2 } })
         expect(html).toContain(esc(String({ x: 1, y: 2 })))
+    })
+})
+
+describe("fmtNum (a tooltip number with no format spec)", () => {
+    it("rounds to 4 significant figures by default and drops trailing zeros", () => {
+        expect(fmtNum(0.30000000000000004)).toBe("0.3")
+        expect(fmtNum(Math.PI)).toBe("3.142")
+        expect(fmtNum(2.5)).toBe("2.5")
+        expect(fmtNum(-0.000123456)).toBe("-0.0001235")
+    })
+    it("keeps integers whole", () => {
+        expect(fmtNum(42)).toBe("42")
+        expect(fmtNum(123456789)).toBe("123456789")
+        expect(fmtNum(0)).toBe("0")
+    })
+    it("keeps the whole-number part at or above 10^digits instead of zeroing digits", () => {
+        expect(fmtNum(123456.789)).toBe("123457")
+        expect(fmtNum(9999.6)).toBe("10000")
+        expect(fmtNum(999.96)).toBe("1000")
+    })
+    it("takes the digits setting", () => {
+        expect(fmtNum(Math.PI, 2)).toBe("3.1")
+        expect(fmtNum(Math.PI, 8)).toBe("3.1415927")
+        expect(fmtNum(123.456, 2)).toBe("123")
+    })
+    it("passes non-numbers and non-finite numbers through String()", () => {
+        expect(fmtNum("0.30000000000000004")).toBe("0.30000000000000004")
+        expect(fmtNum(NaN)).toBe("NaN")
+        expect(fmtNum(Infinity)).toBe("Infinity")
+        expect(fmtNum(true)).toBe("true")
+        expect(fmtNum(null)).toBe("null")
+    })
+})
+
+describe("rounding in the tooltip renderers", () => {
+    it("the auto table rounds each number", () => {
+        const html = renderAutoTable({ index: 3, x: 0.1 + 0.2, y: 2.718281828 })
+        expect(html).toContain(">0.3<")
+        expect(html).toContain(">2.718<")
+        expect(html).toContain(">3<")
+        expect(html).not.toContain("0.30000000000000004")
+    })
+    it("the auto table takes the digits setting, and rounds a scalar payload", () => {
+        expect(renderAutoTable({ y: 2.718281828 }, 2)).toContain(">2.7<")
+        expect(renderAutoTable(2.718281828, 3)).toBe("2.72")
+    })
+    it("a bare template field rounds; a field with a spec follows the spec alone", () => {
+        const segs = [{ f: "x" }, " | ", { f: "x", spec: ".6f" }]
+        expect(renderTemplate(segs, { x: 0.1 + 0.2 })).toBe("0.3 | 0.300000")
+        expect(renderTemplate([{ f: "x" }], { x: Math.PI }, 2)).toBe("3.1")
     })
 })

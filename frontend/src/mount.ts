@@ -8,6 +8,7 @@ import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import { limitsTip } from "./drag/view"
 import { createGestureChannel } from "./gesture"
+import { DEFAULT_SIGDIGITS } from "./template"
 import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, MOTION_MS } from "./state"
@@ -412,7 +413,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
 
     const ctx: OverlayCtx = {
-        manifest_: manifest, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
+        manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
         hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
@@ -872,7 +873,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const lim = matrixLimits(ctx.manifest_.transforms[axis], next)
         if (lim) {
             ctx.gesture_.request({ id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
-            setTipText(ctx, state, limitsTip(lim))
+            setTipText(ctx, state, limitsTip(lim, ctx.tipDigits_))
             setTipVisible(ctx, true)
             const tp = tipOffset(ctx, e)
             placeTip(ctx, state, tp.x, tp.y)

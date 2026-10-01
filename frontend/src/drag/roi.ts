@@ -136,7 +136,8 @@ export function move(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { ki
         return `${sel.items.length} selected`
     }
     const b = roiBounds(box)
-    return `x:[${fmt(b.xmin)}, ${fmt(b.xmax)}] y:[${fmt(b.ymin)}, ${fmt(b.ymax)}]`
+    const n = ctx.tipDigits_
+    return `x:[${fmt(b.xmin, n)}, ${fmt(b.xmax, n)}] y:[${fmt(b.ymin, n)}, ${fmt(b.ymax, n)}]`
 }
 
 export function end(

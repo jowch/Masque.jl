@@ -7,6 +7,15 @@ function _css_color(c)
 end
 
 # Only set kwargs are emitted; unset ones fall through to the overlay's built-in defaults.
+# Significant figures for a tooltip number with no format spec (the frontend's DEFAULT_SIGDIGITS).
+# Past 17 a Float64 has no more digits to show.
+const _DEFAULT_SIGDIGITS = 4
+
+function _check_sigdigits(n)
+    n isa Integer && 1 <= n <= 17 && return Int(n)
+    throw(ArgumentError("tooltip_sigdigits must be an integer from 1 to 17, got $(repr(n))"))
+end
+
 function tip_style_dict(;
         tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
         tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing,
@@ -273,7 +282,8 @@ the published manifest.
 """
 function build_manifest(
         interactables, ctx::InteractionContext;
-        selected = nothing, tip_style = nothing, background = nothing, owners_out = nothing,
+        selected = nothing, tip_style = nothing, tip_digits = _DEFAULT_SIGDIGITS, background = nothing,
+        owners_out = nothing,
     )
     built = Tuple{Any, HitLayer, Dict{String, Any}}[]
     for i in interactables
@@ -339,6 +349,7 @@ function build_manifest(
         end
     end
     (tip_style === nothing || isempty(tip_style)) || (m["tipStyle"] = tip_style)
+    tip_digits == _DEFAULT_SIGDIGITS || (m["tipDigits"] = tip_digits)
     background === nothing || (m["background"] = _css_color(background))
     if owners_out !== nothing
         owners = Dict{String, LayerOwner}()
@@ -413,6 +424,12 @@ clicks. Clicks on other layers stay single events.
   own keywords. Defaults to whichever of `CairoMakie` / `WGLMakie` is loaded, Cairo if both,
   `ArgumentError` if neither.
 - `max_width` — target display width in px (Pluto's column). Default `700`.
+- `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
+  Default `4`, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`; integers,
+  and the whole-number part of a value at or above `10^tooltip_sigdigits`, show in full.
+  Readouts and drag labels keep their trailing zeros (`2.500`), so they don't change width as
+  the pointer moves. A template field with a spec, such as `\$(x:.2f)`, ignores it, and the
+  `@bind` value is never rounded.
 - `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`, `tooltip_font_size`,
   `tooltip_radius`, `tooltip_caret` — tooltip card styling; each defaults to the built-in
   style. See the Tooltips page for the full system, including the `--masque-tip-*` CSS
@@ -432,7 +449,9 @@ function masque(
         max_width = 700, selected = nothing,
         tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
         tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing, tooltip_caret = true,
+        tooltip_sigdigits = _DEFAULT_SIGDIGITS,
     )
+    tip_digits = _check_sigdigits(tooltip_sigdigits)
     backend = _resolve_backend(backend; max_width)
     bg0 = fig.scene.backgroundcolor[]
     try
@@ -446,7 +465,7 @@ function masque(
         )
         owners_out = Ref(Dict{String, LayerOwner}())
         manifest = build_manifest(
-            interactables, ctx; selected, tip_style,
+            interactables, ctx; selected, tip_style, tip_digits,
             background = fig.scene.backgroundcolor[], owners_out,
         )
         result = render(backend, fig, ppu)

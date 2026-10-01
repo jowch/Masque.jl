@@ -1381,6 +1381,19 @@ describe("tooltips (mount/showTip)", () => {
         expect(tip.innerHTML).toBe("<b>&lt;x&gt;</b>")   // the <b> stays live; the payload value is escaped
     })
 
+    it("rounds auto-table numbers to the manifest's tipDigits, and to 4 without one", () => {
+        for (const [digits, shown] of [[undefined, "3.142"], [2, "3.1"]] as const) {
+            const { host, script } = setup()
+            const m = tipManifest({ payloads: [{ y: Math.PI }] })
+            mount(script, digits === undefined ? m : { ...m, tipDigits: digits })
+            const shadow = shadowOf(host)
+            hoverMarker(shadow)
+            const tip = shadow.querySelector(".masque-tip") as HTMLElement
+            expect(tip.innerHTML).toContain(`>${shown}<`)
+            host.remove()
+        }
+    })
+
     it("renders the auto-table default when no template is set", () => {
         const { host, script } = setup()
         mount(script, tipManifest({}))
@@ -1419,6 +1432,20 @@ describe("tooltips (mount/showTip)", () => {
         expect(tip.classList.contains("show")).toBe(true)
         expect(tip.innerHTML).toBe("5.000")
         expect(tip.innerHTML).not.toContain("undefined")
+    })
+
+    it("a colorbar readout keeps trailing zeros at the manifest's tipDigits", () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, tipDigits: 2,
+            transforms: { cb1: { xlims: [0, 1], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                viewport: [200, 100, 24, 400], xreversed: false, yreversed: false, valueaxis: "y" } },
+            layers: [{ id: "colorbar", kind: "axis", geometry: [200, 100, 24, 400], payloads: [], axis: "cb1", events: ["hover"] }],
+        })
+        const shadow = shadowOf(host)
+        ;(shadow.querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 110, clientY: 150, bubbles: true }))
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("5.0")
     })
 
     it("cursor-following tooltip offset uses the surface's real rect, not the raw event offset, when one is available", () => {
