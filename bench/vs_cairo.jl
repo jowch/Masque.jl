@@ -1,5 +1,5 @@
 # Cross-backend head-to-head: :webgl vs :cairo (both now backends of the same Masque package) on
-# the SAME seeded figures — the artifact behind docs/dev/backend-comparison.md. Reports, per figure:
+# the SAME seeded figures — the artifact behind perf-findings.md's "Backend comparison". Reports, per figure:
 #   - WIRE: Cairo PNG+manifest (per render) vs WebGL scene (per render) + the once-per-notebook bundle
 #   - SERVER COST per update: Cairo render+encode+PNG ms vs WebGL serialize ms. WebGL's number
 #     EXCLUDES the GPU draw *by design* — it's offloaded to the client; that offload is the win,
@@ -17,9 +17,8 @@
 #
 #   julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/vs_cairo.jl
 #
-# NOTE: capability facts (pan/zoom/rotate = client-local on WebGL, impossible on Cairo's static PNG)
-# are architectural, not benched — they live in backend-comparison.md's matrix. This bench covers
-# the measurable payload/latency terms only.
+# NOTE: the interaction contract is identical on both backends and is not benched here (see
+# docs/dev/architecture/02-backends.md). This bench covers the measurable payload/latency terms only.
 
 using Masque, WGLMakie, Printf, Random
 Random.seed!(0)   # mirror the Cairo subprocess seed so both sides build the SAME figures reproducibly
