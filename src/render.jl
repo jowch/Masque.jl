@@ -12,7 +12,7 @@ end
 const _DEFAULT_SIGDIGITS = 4
 
 function _check_sigdigits(n)
-    n isa Integer && 1 <= n <= 17 && return Int(n)
+    n isa Integer && !(n isa Bool) && 1 <= n <= 17 && return Int(n)
     throw(ArgumentError("tooltip_sigdigits must be an integer from 1 to 17, got $(repr(n))"))
 end
 

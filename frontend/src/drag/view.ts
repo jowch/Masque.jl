@@ -18,8 +18,7 @@ export function tip(d: Extract<Drag, { kind: "view" }>, p: { x: number; y: numbe
 }
 
 export function limitsTip(lim: { xmin: number; xmax: number; ymin: number; ymax: number }, digits: number): string {
-    const n = digits
-    return `x:[${fmt(lim.xmin, n)}, ${fmt(lim.xmax, n)}] y:[${fmt(lim.ymin, n)}, ${fmt(lim.ymax, n)}]`
+    return `x:[${fmt(lim.xmin, digits)}, ${fmt(lim.xmax, digits)}] y:[${fmt(lim.ymin, digits)}, ${fmt(lim.ymax, digits)}]`
 }
 
 // The gesture-channel request body for one frame (§12.6/#102): the same camera value `tip`

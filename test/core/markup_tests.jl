@@ -98,7 +98,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test !haskey(masque(tfig, PointInteractable(tax, pts2)).manifest, "tipDigits")
         @test masque(tfig, PointInteractable(tax, pts2); tooltip_sigdigits = 2).manifest["tipDigits"] == 2
         @test masque(tfig; tooltip_sigdigits = 7).manifest["tipDigits"] == 7     # zero-config path too
-        for bad in (0, 18, 2.5, "3", nothing)
+        for bad in (0, 18, 2.5, "3", nothing, true)
             @test_throws ArgumentError masque(tfig, PointInteractable(tax, pts2); tooltip_sigdigits = bad)
         end
         msg = sprint(
