@@ -18,7 +18,7 @@ end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000001
 # Self-contained env: dev the local package via a checkout-relative path, add CairoMakie.
-# Pkg.develop disables Pluto's own pkg management (the local package is unregistered).
+# Pkg.develop disables Pluto's own pkg management; it tests this checkout, not the registered release.
 begin
     import Pkg
     Pkg.activate(; temp = true)

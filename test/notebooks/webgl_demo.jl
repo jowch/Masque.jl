@@ -18,9 +18,9 @@ end
 
 # ╔═╡ d0000000-0000-0000-0000-000000000001
 # Self-contained env: dev the local package via a checkout-relative path, add WGLMakie.
-# Pkg.develop disables Pluto's own pkg management (the local package is unregistered). Masque
-# resolves exactly one backend per session from which extension loads — `using WGLMakie` here
-# (not CairoMakie) selects the `:webgl` backend automatically.
+# Pkg.develop disables Pluto's own pkg management; it tests this checkout, not the registered
+# release. Masque resolves exactly one backend per session from which extension loads —
+# `using WGLMakie` here (not CairoMakie) selects the `:webgl` backend automatically.
 begin
     import Pkg
     Pkg.activate(; temp = true)
