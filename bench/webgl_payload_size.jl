@@ -1,9 +1,9 @@
 # Re-runnable size bench for the :webgl wire format. The `:webgl` payload is a NEW format
 # (scene_payload + the vendored WGLMakie bundle), separate from Masque core's PNG+manifest envelope in
 # docs/dev/perf-findings.md — so per the profiling standing practice it gets its own committed bench
-# here. This prints the live numbers; the recorded envelope (+ reconcile note) lives in
-# docs/dev/perf-findings.md's "## :webgl backend (WGLMakie)" section — re-run this and update that
-# section when the wire format changes.
+# here. This prints the live numbers; the recorded envelope lives in
+# docs/dev/perf-findings.md's "`:webgl` envelope" section — re-run this and update that section
+# when the wire format changes.
 #
 #   julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/webgl_payload_size.jl
 #

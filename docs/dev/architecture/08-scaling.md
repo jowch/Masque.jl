@@ -10,7 +10,7 @@ negligible:
 | **manifest** | `published_to_js` (MsgPack) | O(#hit-elements). A grid is O(source-cells) only while a cell is at least one screen pixel; below that, one value per screen pixel of the axis viewport |
 
 On `:webgl` the artifact term is the serialized WGLMakie scene instead of a PNG; it scales with
-the plotted data, not the display — see `backend-comparison.md` and `perf-findings.md`.
+the plotted data, not the display — see `perf-findings.md`.
 
 **The manifest is the scaling wall** — not the PNG, not render, not hit-test CPU. A realistic single
 plot is small and **render-bound**; high element counts reach multi-MB manifests and flip to

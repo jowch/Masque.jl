@@ -2,7 +2,7 @@
 // Link checker for docs/dev/**/*.md.
 //
 // docs/dev is full of relative markdown links and heading-anchor cross-references (the
-// architecture.md split, backend-comparison.md, perf-findings.md, roadmap.md, ...) that were
+// architecture.md split, perf-findings.md, roadmap.md, ...) that were
 // previously only checkable by eye. This script covers every place that can point into docs/dev:
 //
 //   - every file under docs/dev/ (full link coverage: file existence + anchor); and

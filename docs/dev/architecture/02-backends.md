@@ -37,10 +37,22 @@ pixel grid.
 
 `_resolve_backend` in `src/render.jl` honors an explicit `backend=`, otherwise picks the loaded
 extension, and prefers Cairo when both are loaded. The interaction feature set is identical on both
-— parity is CI-enforced by the golden-manifest harness; see `backend-comparison.md` for the
-cost/regime tradeoff. Both `context` methods share `_project_closure` and the per-block transform
-builders in `src/backend.jl`, so the two differ only in the artifact. The seam also admits a future
+— parity is CI-enforced by the golden-manifest harness; `perf-findings.md`'s "Backend
+comparison" has the cost of each and which regime suits which. Both `context` methods share
+`_project_closure` and the per-block transform builders in `src/backend.jl`, so the two differ
+only in the artifact. The seam also admits a future
 GLMakie-static backend (GPU offscreen → PNG, same contract) or a pure-image backend.
+
+**WGLMakie's own camera controls stay off, on purpose.** The shim sets `can_send_to_julia: () =>
+true` (`frontend/src/wgl-shim.ts`), which the client-side observable animation path needs, and
+WGLMakie's `use_orbit_cam = () => !(Bonito.can_send_to_julia && Bonito.can_send_to_julia())` then
+disables 3-D OrbitControls; 2-D `Axis` zoom and pan are Julia-side in WGLMakie and do nothing
+under the server-free `Bonito.NoConnection()` session (`_headless_screen` in
+`ext/MasqueWGLMakieExt.jl`). A client-driven camera would move the plot without Julia knowing, so
+the overlay, projected in Julia at render time, would drift off the marks, and it could exist
+only on `:webgl`. View gestures go through `ViewInteractable` and the gesture channel instead,
+re-projected in Julia each frame on both backends
+([§12](12-gesture-channel.md)).
 
 **Don't corrupt the user's figure.** Makie `Figure`s can't be `deepcopy`'d (they hold module refs),
 so instead the one mutation we introduce — forcing an opaque background — is **saved and restored**

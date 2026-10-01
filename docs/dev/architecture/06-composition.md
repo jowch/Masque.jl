@@ -20,7 +20,7 @@ them cleanly:
   click's own selection highlight is drawn client-side with no round trip ([§5](05-bond-value.md)), so a re-render
   happens only if the notebook's own reactive graph feeds the committed value into a new cell.
   What differs when a re-render *does* happen is **cost**: `:webgl` re-serializes (~flat) while
-  `:cairo` re-rasterizes (scales with the scene) — see `backend-comparison.md`. The **in-drag
+  `:cairo` re-rasterizes (scales with the scene) — see `perf-findings.md`'s "Backend comparison". The **in-drag
   frames** of a view-manipulation gesture are not Tier 2 traffic at all — they never touch
   `@bind`, never re-execute a cell, and the two backends implement them by completely different
   mechanisms; see [§12](12-gesture-channel.md) for the contract those frames follow. *Per-frame* faithful redraw
