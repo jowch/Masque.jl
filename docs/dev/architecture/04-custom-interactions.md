@@ -6,7 +6,7 @@ everything else. The three tiers, with worked examples, are on the user site's
 [Custom hits](../../src/custom.md) page:
 
 - **A — declarative regions** (`RegionInteractable`): circles, rectangles, and polygons in data
-  space, one payload each. The framework owns how they react.
+  space (a circle's radius is in logical pixels, times `ctx.scaling`), one payload each. The framework owns how they react.
 - **B — a closure against the live context** (`FunctionInteractable`): `f(ctx)::Vector{HitLayer}`,
   for geometry computed after layout. One function can return layers on several axes.
 - **C — a full struct**: implement `hitlayers` (plus optional `validate`, `events`, `hoverstyle`,

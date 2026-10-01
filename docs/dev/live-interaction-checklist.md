@@ -22,7 +22,8 @@ for hover and selected — Firefox only honours `mix-blend-mode` on a top-level 
 SVG content, which is why the dodge fill is its own sibling svg; the edge svg stays a sibling
 so the stroke paints above that fill and below the plain chrome. Dodge against the near-black `#141414` source was, across a measured
 10-colour palette, the only fill candidate that never rotated hue more than 8° and never dimmed
-a mark; a single darkening layer alone made a highlighted mark read muddy on a light figure,
+a mark (`bar_blue` is the limiting case for hue rotation, so the source stays deliberately
+conservative); a single darkening layer alone made a highlighted mark read muddy on a light figure,
 which is why the highlight split into two layers. Because the fill is identical between hover
 and selected (fill strength alone is sub-JND), the 1.5px-vs-2px edge-stroke width carries the
 entire hover-vs-selected distinction. **Hovering a mark that is already selected draws no
@@ -52,11 +53,6 @@ ABOVE the hovered mark (not the cursor) with a 10px gap and the caret on the anc
 below on a top-clip, and shifts + moves the caret (`--masque-caret-x`) on a side-clip. A
 resolvable per-element `colors` (today `scatter!`'s `color=`) adds a 3px tooltip accent border
 in that colour (`--masque-mark-border`); the text stays neutral.
-
-Why the fill is a `#141414` color-dodge: across a measured 10-colour palette it was the only fill
-candidate that never rotated hue more than 8° and never dimmed a mark (`bar_blue` is the limiting
-case for hue rotation, so the source stays deliberately conservative). A single darkening layer
-made a highlighted mark read muddy on a light figure, which is why the highlight is two layers.
 
 ROI chrome: 4 corner handles (7 CSS px, white fill, 1px chrome stroke, ~1.5 CSS px corner
 radius); a corner resizes two axes. The sides have no grip, but the manifest `handle` on each

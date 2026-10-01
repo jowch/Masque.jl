@@ -49,5 +49,5 @@ The per-layer `label` field ([§3](03-interactables.md), `HitLayer`) is the only
 change here — see `perf-findings.md` for its measured wire cost.
 
 The drag interactables (threshold, ROI, view) have no keyboard equivalent yet;
-`docs/src/accessibility.md` says so, and #169 adds arrow-key nudging. A nudge stop draws no mark
-ring, so it shows the surface focus outline above.
+`docs/src/accessibility.md` says so. #169 proposes arrow-key nudging; a nudge stop would draw no
+mark ring, so the surface focus outline above (the #168 indicator) is what stays visible.
