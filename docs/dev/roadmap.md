@@ -14,8 +14,8 @@ label and can only go in a minor. Julia's package manager treats `0.1.0` → `0.
 compatible and `0.1` → `0.2` as breaking, so before 1.0 a patch may add features, as long as
 no existing call changes. What has landed since 0.1.0 is `CHANGELOG.md`'s `[Unreleased]`.
 
-0.1.0 is registered in General; #210 tracks what is left of that release (the `v0.1.0` tag and
-GitHub release, and the follow-ups after registration).
+0.1.0 is registered in General and tagged `v0.1.0`; #210 tracks what is left of that release
+(the GitHub release, and the follow-ups after registration).
 
 ## Principles
 
