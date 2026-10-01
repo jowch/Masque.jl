@@ -4,7 +4,8 @@ import {
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles,
     anchorFor, computeAnchoredPlacement, photoClip,
 } from "../src/geometry"
-import { begin as beginThreshold, end as endThreshold } from "../src/drag/threshold"
+import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
+import { begin as beginView, tip as viewTip, limitsTip } from "../src/drag/view"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, ThresholdGeometry } from "../src/types"
 
 describe("primitives", () => {
@@ -834,5 +835,29 @@ describe("projectAxis / sampleSlice", () => {
         expect(viewportUnder(m, 45, 45)!.id).toBe("bar")
         expect(viewportUnder(m, 10, 10)!.id).toBe("plot")
         expect(viewportUnder(m, 200, 200)).toBeNull()
+    })
+})
+
+describe("drag labels follow tooltip_sigdigits and keep trailing zeros", () => {
+    const t: AxisTransform = {
+        xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+        viewport: [0, 0, 1000, 500], xreversed: false, yreversed: false,
+    }
+    const line = { setAttribute: () => {} } as unknown as SVGLineElement
+    it("a vertical threshold labels data x, a horizontal one data y", () => {
+        const v = beginThreshold("th", line, { orientation: "v", pos: 0, span: [0, 500] }, t, 1)
+        expect(moveThreshold(v as any, { x: 250, y: 100 }, 4)).toBe("2.500")
+        expect(moveThreshold(v as any, { x: 250, y: 100 }, 2)).toBe("2.5")
+        const h = beginThreshold("th", line, { orientation: "h", pos: 0, span: [0, 1000] }, t, 1)
+        expect(moveThreshold(h as any, { x: 0, y: 125 }, 3)).toBe("75.0")
+    })
+    it("a pan label shows the limits; an orbit label the angles", () => {
+        const pan = beginView("view", { x: 0, y: 0, w: 1000, h: 500, mode: "pan" } as any, t, 100, 250, 1)
+        expect(viewTip(pan as any, { x: 200, y: 250 }, 3)).toBe("x:[-1.00, 9.00] y:[0.00, 100]")
+        const orbit = beginView("view", { x: 0, y: 0, w: 1000, h: 500, mode: "orbit", azimuth: 0, elevation: 0 } as any, t, 0, 0, 1)
+        expect(viewTip(orbit as any, { x: 0, y: 0 }, 2)).toBe("az=0.0 el=0.0")
+    })
+    it("limitsTip formats each bound at the given digits", () => {
+        expect(limitsTip({ xmin: 0.123456, xmax: 2, ymin: -3.5, ymax: 40 }, 2)).toBe("x:[0.12, 2.0] y:[-3.5, 40]")
     })
 })
