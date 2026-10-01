@@ -47,12 +47,14 @@ A rendered cell ships these. The click's return value (`{layer, index}`) is tiny
 | **scene** | `:webgl` | `published_to_js` (MsgPack binary) | #plots × geometry + glyph atlas | every render or gesture frame |
 | **manifest** | both | `published_to_js` (MsgPack) | #hit-elements × per-element payload | every render or gesture frame |
 | **overlay bundle** | both | inlined in the cell, idempotent | fixed | per cell, parsed once per page |
+| **WGLMakie shim** | `:webgl` | `published_to_js` → blob URL on `window.__MasqueWGL` | fixed | once per notebook |
 
 The PNG is what makes a large cell slow to load in the editor; the manifest is the term new
-features inflate (tooltips, animation frames, multi-select). The overlay bundles at `cc160c7` are
-`assets/overlay.js` **69 534 B** and `assets/masque-webgl.js` **7 762 B**, minified, with
-esbuild's `mangleProps: /_$/` shortening internal property names (`frontend-delivery.md`, Bundle
-row). `d3-format` is the only runtime JS dependency.
+features inflate (tooltips, animation frames, multi-select). At `cc160c7` the overlay bundle,
+`assets/overlay.js`, is **69 534 B** and the shim, `assets/masque-webgl.js`, is **7 762 B**, both
+minified, with esbuild's `mangleProps: /_$/` shortening internal property names
+(`frontend-delivery.md`, Bundle row). `d3-format`, the only runtime JS dependency, is bundled into
+`overlay.js`.
 
 ## `:cairo` envelope
 
@@ -85,7 +87,7 @@ becomes a risk only at the extremes in "Stress".
   raster stays the empty-axis floor (9.8 KB). A view gesture rebuilds the manifest every frame,
   so a slice on a panned axis pays this again per camera move.
 - **Not display width.** `px_per_unit` scales the PNG roughly with the square of the width but
-  leaves the manifest alone: scatter-1000's PNG is 90 KB at 300 px and 187 KB at 700 px, its
+  leaves the manifest alone: scatter-1000's PNG is 90 KB at 300 px and 188 KB at 700 px, its
   manifest 38 KB at both.
 
 ### Per-kind manifest costs
@@ -297,7 +299,8 @@ so WGLMakie imports once.
 
 **Compression is deferred.** gzip of the binary is ~3×, but using it means bypassing
 `published_to_js` and writing a MsgPack decoder in JS; gzip of JSON through the browser's
-`DecompressionStream` buys only ~25%. Glyph-atlas tiles repeat across scenes and could be shared
+`DecompressionStream` saves only ~25% against the binary wire (0.05 MB against 0.07 MB on the
+lines row). Glyph-atlas tiles repeat across scenes and could be shared
 like the bundle, but each is 10–20 KB and gzip overlaps the win. Revisit only if per-frame scene
 re-shipping shows up as the bottleneck; every `:webgl` view-gesture frame re-ships the full scene
 (#86, closed not planned).

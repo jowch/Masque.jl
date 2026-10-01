@@ -38,8 +38,9 @@ pixel grid.
 `_resolve_backend` in `src/render.jl` honors an explicit `backend=`, otherwise picks the loaded
 extension, and prefers Cairo when both are loaded. The interaction feature set is identical on both
 — parity is CI-enforced by the golden-manifest harness; `perf-findings.md`'s "Backend
-comparison" has the cost of each and which regime suits which. Both `context` methods share `_project_closure` and the per-block transform
-builders in `src/backend.jl`, so the two differ only in the artifact. The seam also admits a future
+comparison" has the cost of each and which regime suits which. Both `context` methods share
+`_project_closure` and the per-block transform builders in `src/backend.jl`, so the two differ
+only in the artifact. The seam also admits a future
 GLMakie-static backend (GPU offscreen → PNG, same contract) or a pure-image backend.
 
 **WGLMakie's own camera controls stay off, on purpose.** The shim sets `can_send_to_julia: () =>
