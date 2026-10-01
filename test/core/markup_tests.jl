@@ -92,6 +92,24 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test off["layers"][1]["tooltip"] === false
         @test !haskey(build_manifest([PointInteractable(tax, pts2)], tctx), "tipStyle")
 
+        # tooltip_sigdigits: the default ships nothing (the frontend default is the same 4)
+        @test !haskey(build_manifest([PointInteractable(tax, pts2)], tctx), "tipDigits")
+        @test build_manifest([PointInteractable(tax, pts2)], tctx; tip_digits = 6)["tipDigits"] == 6
+        @test !haskey(masque(tfig, PointInteractable(tax, pts2)).manifest, "tipDigits")
+        @test masque(tfig, PointInteractable(tax, pts2); tooltip_sigdigits = 2).manifest["tipDigits"] == 2
+        @test masque(tfig; tooltip_sigdigits = 7).manifest["tipDigits"] == 7     # zero-config path too
+        for bad in (0, 18, 2.5, "3", nothing, true)
+            @test_throws ArgumentError masque(tfig, PointInteractable(tax, pts2); tooltip_sigdigits = bad)
+        end
+        msg = sprint(
+            showerror, try
+                masque(tfig, PointInteractable(tax, pts2); tooltip_sigdigits = 0)
+            catch e
+                e
+            end
+        )
+        @test occursin("tooltip_sigdigits", msg) && occursin("1 to 17", msg)
+
         # bad field → build-time error
         bad = PointInteractable(tax, pts2; tooltip = masque"$(nope)")
         @test_throws ArgumentError build_manifest([bad], tctx)

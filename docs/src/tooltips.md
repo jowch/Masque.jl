@@ -24,6 +24,16 @@ Without `tooltip`, the tooltip is a small table of the payload's
 fields: your own fields when you pass `payloads`, and for a scatter
 without them, the point's `index`, `x`, and `y`.
 
+Numbers show up to four significant figures, so `0.30000000000000004`
+reads `0.3` and `2.71828` reads `2.718`. Whole numbers show in full. To
+show more or fewer figures, pass `tooltip_sigdigits` to `masque`:
+
+```julia
+@bind pick masque(fig; tooltip_sigdigits = 6)
+```
+
+The value in `pick` keeps every digit; only the tooltip is rounded.
+
 Two interactables work differently. A legend entry shows no tooltip by
 default, because its label is already next to the swatch. To add one,
 pass a template, as [Legend](@ref) shows. A [`SliceInteractable`](@ref)
@@ -43,7 +53,7 @@ PointInteractable(ax, s;
 
 | In the template | Becomes |
 |---|---|
-| `$(field)` | the payload's `field` |
+| `$(field)` | the payload's `field`, a number rounded as in the default tooltip |
 | `$(field:spec)` | the same, formatted with a [d3-format](https://d3js.org/d3-format) `spec`: `:,` adds thousands separators, `:.2f` gives two decimals, `:.1%` a percentage |
 | `\$` | a literal dollar sign |
 | anything else | copied into the tooltip as HTML, so `<b>` and `<br>` work |

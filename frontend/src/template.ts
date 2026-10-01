@@ -16,25 +16,36 @@ function applySpec(spec: string, v: unknown): string {
     try { return esc(f(v)) } catch { return esc(v) }
 }
 
+// A number with no format spec: at most `digits` significant figures, trailing zeros dropped,
+// so 0.30000000000000004 reads "0.3". Integers, and the integer part of a value at or above
+// 10^digits, are kept whole: 123456.789 reads "123457", not "123500". Display only — the
+// `@bind` value keeps the exact number. `tooltip_sigdigits` on masque() sets `digits`.
+export const DEFAULT_SIGDIGITS = 4
+export function fmtNum(v: unknown, digits: number = DEFAULT_SIGDIGITS): string {
+    if (typeof v !== "number" || !Number.isFinite(v) || Number.isInteger(v)) return String(v)
+    if (Math.abs(v) >= 10 ** digits) return String(Math.round(v))
+    return String(Number(v.toPrecision(digits)))
+}
+
 // Missing fields (undefined) emit nothing.
-export function renderTemplate(segments: TemplateSegment[], payload: unknown): string {
+export function renderTemplate(segments: TemplateSegment[], payload: unknown, digits: number = DEFAULT_SIGDIGITS): string {
     const obj = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>
     let html = ""
     for (const seg of segments) {
         if (typeof seg === "string") { html += seg; continue }
         const v = obj[seg.f]
         if (v === undefined) continue
-        html += seg.spec ? applySpec(seg.spec, v) : esc(v)
+        html += seg.spec ? applySpec(seg.spec, v) : esc(fmtNum(v, digits))
     }
     return html
 }
 
 // Auto name/value table from a payload object (the zero-config default). All values escaped.
-export function renderAutoTable(payload: unknown): string {
+export function renderAutoTable(payload: unknown, digits: number = DEFAULT_SIGDIGITS): string {
     if (payload == null) return ""
-    if (typeof payload !== "object") return esc(payload)
+    if (typeof payload !== "object") return esc(fmtNum(payload, digits))
     return Object.entries(payload as Record<string, unknown>)
-        .map(([k, v]) => `<div class="masque-tip-row"><span class="masque-tip-key">${esc(k)}</span><span class="masque-tip-val">${esc(v)}</span></div>`)
+        .map(([k, v]) => `<div class="masque-tip-row"><span class="masque-tip-key">${esc(k)}</span><span class="masque-tip-val">${esc(fmtNum(v, digits))}</span></div>`)
         .join("")
 }
 
@@ -42,11 +53,11 @@ export function renderAutoTable(payload: unknown): string {
 // The live region takes plain text, not markup — a tag-stripped renderAutoTable output would
 // read "index0x1y4" (its markup is all in the tags); this builds the same key/value pairs
 // without HTML. Values are NOT run through esc() (no HTML context to escape for).
-export function renderAutoTablePlain(payload: unknown): string {
+export function renderAutoTablePlain(payload: unknown, digits: number = DEFAULT_SIGDIGITS): string {
     if (payload == null) return ""
-    if (typeof payload !== "object") return String(payload)
+    if (typeof payload !== "object") return fmtNum(payload, digits)
     return Object.entries(payload as Record<string, unknown>)
-        .map(([k, v]) => `${k} ${String(v)}`)
+        .map(([k, v]) => `${k} ${fmtNum(v, digits)}`)
         .join(", ")
 }
 
@@ -69,7 +80,7 @@ export function stripToPlain(html: string): string {
 // Plain-text tooltip content for one hit — the announcement body in keyboard.ts's live region.
 // `:axis`/`:grid` hits never reach here (keyboard.ts's focus list excludes those kinds), so
 // unlike hover.ts's tipHtmlForHit this needs no manifest/px/py for continuous-axis inversion.
-export function plainTextForHit(hit: Hit): string {
+export function plainTextForHit(hit: Hit, digits: number = DEFAULT_SIGDIGITS): string {
     const layer = hit.layer
     if (layer.tooltip === false) {
         // A legend entry has no visual card by default — the label is already in the row —
@@ -85,6 +96,6 @@ export function plainTextForHit(hit: Hit): string {
         return ""
     }
     const payload = layer.payloads[hit.index]
-    if (layer.template) return stripToPlain(renderTemplate(layer.template, payload))
-    return renderAutoTablePlain(payload)
+    if (layer.template) return stripToPlain(renderTemplate(layer.template, payload, digits))
+    return renderAutoTablePlain(payload, digits)
 }

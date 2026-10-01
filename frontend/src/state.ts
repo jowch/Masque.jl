@@ -4,10 +4,13 @@ import type { GestureChannel } from "./gesture"
 import { IDENTITY, type PhotoMatrix } from "./photo"
 import type { AxisTransform, FocusRef, Hit, HitLayer, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
+// A value that changes as the pointer moves (an axis readout, a slice sample, a drag label):
+// fixed significant figures, trailing zeros kept, so the label does not change width with
+// every move. A per-element tooltip value uses template.ts's fmtNum, which trims them.
+export const fmt = (v: unknown, digits = 4): string => (typeof v === "number" ? v.toPrecision(digits) : String(v))
+
 export const MOTION_MS = 100 // 80–120 ms window; prefers-reduced-motion disables below
 export const VIEW_MIN_PX = 3 // image-px; ignore accidental micro-drags
-
-export const fmt = (v: unknown): string => (typeof v === "number" ? v.toPrecision(4) : String(v))
 
 export const clampX = (t: AxisTransform, x: number): number => Math.max(t.viewport[0], Math.min(t.viewport[0] + t.viewport[2], x))
 export const clampY = (t: AxisTransform, y: number): number => Math.max(t.viewport[1], Math.min(t.viewport[1] + t.viewport[3], y))
@@ -122,6 +125,9 @@ export type Drag =
 // hover/drag/bond as `ctx`. Distinct from OverlayState, which is the mutable interaction state.
 export interface OverlayCtx {
     manifest_: Manifest
+    // Significant figures for a tooltip number with no format spec. Read once from the mount
+    // manifest: a pan frame's manifest (mount.ts's revealFrame) does not carry it.
+    tipDigits_: number
     host_: HTMLElement
     base_: HTMLElement
     surface_: HTMLElement

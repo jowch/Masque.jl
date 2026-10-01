@@ -47,10 +47,10 @@ function place(d: Extract<Drag, { kind: "threshold" }>, pos: number): void {
     setLine(d.line_, d.tg_, pos)
 }
 
-export function move(d: Extract<Drag, { kind: "threshold" }>, p: { x: number; y: number }): string {
+export function move(d: Extract<Drag, { kind: "threshold" }>, p: { x: number; y: number }, digits: number): string {
     place(d, d.tg_.orientation === "h" ? clampY(d.t_, p.y) : clampX(d.t_, p.x))
     const v = invertAxis(d.t_, clampX(d.t_, p.x), clampY(d.t_, p.y))
-    return fmt(d.tg_.orientation === "h" ? v.y : v.x)
+    return fmt(d.tg_.orientation === "h" ? v.y : v.x, digits)
 }
 
 export function end(d: Extract<Drag, { kind: "threshold" }>, p: { x: number; y: number }): { layer: string; index: number; payload: unknown } {

@@ -9,17 +9,16 @@ export function begin(id: string, g: ViewGeometry, t: AxisTransform, x0: number,
     return { kind: "view", id_: id, g_: g, t_: t, x0_: x0, y0_: y0, pointerId_: pointerId }
 }
 
-export function tip(d: Extract<Drag, { kind: "view" }>, p: { x: number; y: number }): string {
+export function tip(d: Extract<Drag, { kind: "view" }>, p: { x: number; y: number }, digits: number): string {
     if (d.g_.mode === "orbit") {
         const o = orbitAngles(d.g_, d.x0_, d.y0_, p.x, p.y)
-        return `az=${fmt(o.azimuth)} el=${fmt(o.elevation)}`
+        return `az=${fmt(o.azimuth, digits)} el=${fmt(o.elevation, digits)}`
     }
-    const lim = panLimits(d.t_, d.x0_, d.y0_, p.x, p.y)
-    return `x:[${fmt(lim.xmin)}, ${fmt(lim.xmax)}] y:[${fmt(lim.ymin)}, ${fmt(lim.ymax)}]`
+    return limitsTip(panLimits(d.t_, d.x0_, d.y0_, p.x, p.y), digits)
 }
 
-export function limitsTip(lim: { xmin: number; xmax: number; ymin: number; ymax: number }): string {
-    return `x:[${fmt(lim.xmin)}, ${fmt(lim.xmax)}] y:[${fmt(lim.ymin)}, ${fmt(lim.ymax)}]`
+export function limitsTip(lim: { xmin: number; xmax: number; ymin: number; ymax: number }, digits: number): string {
+    return `x:[${fmt(lim.xmin, digits)}, ${fmt(lim.xmax, digits)}] y:[${fmt(lim.ymin, digits)}, ${fmt(lim.ymax, digits)}]`
 }
 
 // The gesture-channel request body for one frame (§12.6/#102): the same camera value `tip`

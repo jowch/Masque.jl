@@ -97,7 +97,7 @@ export function focusTo(ctx: OverlayCtx, state: OverlayState, i: number | null):
     const html = showTipAt(ctx, state, hit, anchor.x, anchor.y, css)
     state.focusTipHtml_ = html
     state.focusTipCss_ = html === null ? null : css
-    scheduleAnnounce(ctx, state, announceText(ref, plainTextForHit(hit)))
+    scheduleAnnounce(ctx, state, announceText(ref, plainTextForHit(hit, ctx.tipDigits_)))
 }
 
 // First index of each distinct layer run in `list` (list is manifest-order, so a layer's

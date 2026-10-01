@@ -70,10 +70,10 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
     const { layout, content } = pointerSpace(ctx, state, e)
     let text: string
     if (d.kind === "threshold") {
-        text = thresholdDrag.move(d, content)
+        text = thresholdDrag.move(d, content, ctx.tipDigits_)
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {
-            text = viewDrag.tip(d, layout)
+            text = viewDrag.tip(d, layout, ctx.tipDigits_)
             if (Math.hypot(layout.x - d.x0_, layout.y - d.y0_) >= viewDrag.VIEW_MIN_PX) {
                 const input = viewDrag.requestInput(d, layout, false)
                 ctx.gesture_.request(input)
@@ -86,7 +86,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
             const anchor = state.photoAnchor_ ?? unmapPoint(state.photo_, { x: d.x0_, y: d.y0_ })
             const next = panTo(anchor, cur, state.photo_.s)
             const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), next)
-            text = lim ? viewDrag.limitsTip(lim) : viewDrag.tip(d, layout)
+            text = lim ? viewDrag.limitsTip(lim, ctx.tipDigits_) : viewDrag.tip(d, layout, ctx.tipDigits_)
             if (Math.hypot(cur.x - d.x0_, cur.y - d.y0_) >= viewDrag.VIEW_MIN_PX && lim) {
                 state.photo_ = next
                 ctx.photoPaint_(next)

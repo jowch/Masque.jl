@@ -134,6 +134,7 @@ export interface Manifest {
     layers: HitLayer[]
     transforms: Record<string, AxisTransform>
     tipStyle?: Record<string, string> // figure-level --masque-tip-* custom properties
+    tipDigits?: number // tooltip_sigdigits; absent means the frontend default (4)
     background?: string // the figure's background colour (CSS string) — drives the tooltip's light/dark theme
     // Set when the widget contains a selects-ROI. "elements" hydrates and commits a vector of
     // element hits; "grid" commits one window. selectionTarget is that layer's id.

@@ -65,11 +65,17 @@ masque(fig, interactables...;
     tooltip_font_size = nothing,   # Real, in px
     tooltip_radius    = nothing,   # Real, in px
     tooltip_caret     = true,      # Bool: draw the caret pointing at the mark
+    tooltip_sigdigits = 4,         # Int, 1 to 17: significant figures for numbers
 )
 ```
 
-`nothing`, the default for every keyword except `tooltip_caret`, keeps
-the built-in style.
+`nothing`, the default for every keyword except `tooltip_caret` and
+`tooltip_sigdigits`, keeps the built-in style. `tooltip_sigdigits` sets
+how many significant figures a tooltip number shows: in the default
+tooltip, a heatmap cell, and a template field with no format spec,
+trailing zeros are dropped; axis, colorbar, and slice readouts and drag
+labels keep them, so they don't change width as you move. See
+[Tooltips](@ref).
 
 To style tooltips without Julia, set the `--masque-tip-*` CSS custom
 properties on any element that contains the cell:

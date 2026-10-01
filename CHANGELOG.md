@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- Tooltip numbers show up to four significant figures, so `0.30000000000000004` reads `0.3`.
+  This covers the default tooltip, a heatmap cell's value, and a template field with no
+  format spec. Whole numbers show in full. Axis and colorbar readouts, slice samples, and
+  drag labels keep their trailing zeros (`2.500`), so the label does not change width as the
+  pointer moves. The `@bind` value is not rounded.
+
+### Added
+- `masque(...; tooltip_sigdigits = 4)` sets those significant figures, from 1 to 17.
+
 ## [0.1.0] - 2026-09-28
 
 First registered release. It adds hover tooltips and click selection to Makie figures in a
