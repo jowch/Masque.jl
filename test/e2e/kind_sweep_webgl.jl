@@ -168,6 +168,15 @@ HTML(
         "<span id=\"coords_scatter_sizes\" style=\"display:none\">$(JSON3.write(sweep.scatter_sizes.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000070
+@bind ev_poly_shapes sweep.poly_shapes
+
+# ╔═╡ d1000000-0000-0000-0000-000000000071
+HTML(
+    "<span id=\"out_poly_shapes\">POLY_SHAPES=$(repr(ev_poly_shapes))</span>" *
+        "<span id=\"coords_poly_shapes\" style=\"display:none\">$(JSON3.write(sweep.poly_shapes.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000026
 @bind ev_arrows3d sweep.arrows3d
 
@@ -337,6 +346,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000037
 # ╠═d1000000-0000-0000-0000-000000000068
 # ╟─d1000000-0000-0000-0000-000000000069
+# ╠═d1000000-0000-0000-0000-000000000070
+# ╟─d1000000-0000-0000-0000-000000000071
 # ╠═d1000000-0000-0000-0000-000000000026
 # ╠═d1000000-0000-0000-0000-000000000027
 # ╠═d1000000-0000-0000-0000-000000000028

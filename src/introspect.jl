@@ -323,11 +323,43 @@ function RectInteractable(ax, p::Makie.BarPlot; id = :bars, payloads = nothing, 
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
-# converted[1] is a single ring (Vector{Point}) or a vector of rings (Vector{Vector{Point}}).
+# One element per mesh Makie draws, which is also what a per-element `color` vector indexes
+# (`Makie.poly_convert`): a vector gives one element per entry, and a lone `MultiPolygon`
+# gives one per polygon. A `Polygon` keeps its interiors as holes. A `MultiPolygon` entry is
+# one element whose rings after the first ride along as holes; the even-odd hit-test fills
+# disjoint pieces and leaves their interiors out. `Rect`, `Circle`, and other primitives are
+# sampled by `coordinates`, the outline Makie tessellates. A mesh keeps one element per
+# triangle.
+_poly_point(x) = x isa _GB.Point || x isa Makie.VecTypes || x isa Tuple
+function _poly_element(x)
+    x isa AbstractVector && return (collect(x), Vector{Any}[])
+    if x isa _GB.Polygon
+        return (_GB.coordinates(x.exterior), [_GB.coordinates(h) for h in x.interiors])
+    end
+    if x isa _GB.MultiPolygon
+        parts = [_poly_element(q) for q in x.polygons]
+        isempty(parts) && return (Any[], Vector{Any}[])
+        others = Any[]
+        for (k, (ext, hs)) in enumerate(parts)
+            k == 1 || push!(others, ext)
+            append!(others, hs)
+        end
+        return (first(parts)[1], others)
+    end
+    return (_GB.coordinates(x), Vector{Any}[])
+end
+function _poly_elements(g)
+    g isa _GB.AbstractMesh && return [(collect(t), Vector{Any}[]) for t in g]
+    (g isa AbstractVector && (isempty(g) || _poly_point(first(g)))) && return [_poly_element(g)]
+    g isa _GB.MultiPolygon && return [_poly_element(q) for q in g.polygons]
+    g isa AbstractVector && return [_poly_element(x) for x in g]
+    return [_poly_element(g)]
+end
 function PolygonInteractable(ax, p::Makie.Poly; id = :poly, payloads = nothing, tooltip = nothing, label = nothing)
-    g = _conv(p)[1]
-    rings = (isempty(g) || first(g) isa _GB.Point) ? [g] : g
-    return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
+    els = _poly_elements(_conv(p)[1])
+    rings = [first(e) for e in els]
+    holes = [last(e) for e in els]
+    return PolygonInteractable(ax, rings; id, payloads, holes, tooltip, label)
 end
 
 # Ring = lower curve followed by the reversed upper curve, in data space. Open ring (last

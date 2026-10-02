@@ -250,6 +250,37 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test length(only(hitlayers(PolygonInteractable(a, multi), c)).payloads) == 2
         end
 
+        @testset "poly from shapes: one element per mesh Makie draws" begin
+            GB = Makie.GeometryBasics
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1])
+            tri(x) = Point2f[(x, 0), (x + 1, 0), (x + 1, 1)]
+            holed = GB.Polygon(Point2f[(0, 0), (4, 0), (4, 4), (0, 4)], [Point2f[(1, 1), (3, 1), (3, 3), (1, 3)]])
+            multi = GB.MultiPolygon([GB.Polygon(tri(0)), GB.Polygon(tri(2))])
+            cases = [
+                (Rect2f(0, 0, 2, 1), 1), ([Rect2f(0, 0, 1, 1), Rect2f(2, 0, 1, 2)], 2),
+                (Circle(Point2f(0, 0), 1.0f0), 1), ([Circle(Point2f(0, 0), 1.0f0), Circle(Point2f(3, 0), 0.5f0)], 2),
+                (GB.Polygon(tri(0)), 1), ([GB.Polygon(tri(0)), GB.Polygon(tri(2))], 2), (holed, 1),
+                # a lone MultiPolygon draws one mesh per polygon; a vector of them, one per entry
+                (multi, 2), ([multi, GB.MultiPolygon([GB.Polygon(tri(4))])], 2),
+            ]
+            plots = [poly!(a, g) for (g, _) in cases]
+            _, _, c = ctx_for(f)
+            for ((g, n), p) in zip(cases, plots)
+                @test length(only(hitlayers(PolygonInteractable(a, p), c)).payloads) == n
+            end
+            # a rect is its four corners
+            @test geom(PolygonInteractable(a, plots[1]), c) ==
+                geom(PolygonInteractable(a, [[(0.0, 0), (2, 0), (2, 1), (0, 1)]]), c)
+            # a polygon keeps its interior as a hole
+            i_holed = PolygonInteractable(a, plots[7])
+            @test length(only(i_holed.holes)) == 1
+            # a vector-of-MultiPolygon entry keeps its second piece, as a further ring
+            i_multi = PolygonInteractable(a, plots[9])
+            @test length(i_multi.holes[1]) == 1 && isempty(i_multi.holes[2])
+            # every default builds, so masque(fig) no longer throws on these
+            @test masque(f) isa Masque.MasqueWidget
+        end
+
         @testset "introspected interactable flows through masque unchanged" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             p = scatter!(a, [1.0, 2.0], [1.0, 2.0]; markersize = 18)

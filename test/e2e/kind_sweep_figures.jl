@@ -97,6 +97,12 @@ kind_sweep_meta() = [
         "tintColor" => "rgb(235,206,132)", "mode" => "element",
     ),
     Dict(
+        # `poly!` given shapes (`Vector{Rect2f}`) rather than point rings: one element per rect.
+        "key" => "poly_shapes", "layerId" => "poly", "layerKind" => "polygons",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "rect-a", "hoverIndex" => 1, "hoverTip" => "rect-b", "mode" => "element",
+    ),
+    Dict(
         # RegionInteractable's rects layer: the base id `:zone` plus the `_r` suffix.
         "key" => "regions", "layerId" => "zone_r", "layerKind" => "rects",
         "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
@@ -368,6 +374,17 @@ function build_kind_sweep()
         )
     end
 
+    poly_shapes = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "poly shapes", limits = (0, 5, 0, 3))
+        p = poly!(ax, [Rect2f(0.5, 0.6, 1.6, 1.8), Rect2f(2.8, 0.6, 1.6, 1.8)]; color = (:steelblue, 0.55), strokewidth = 2)
+        masque(
+            fig,
+            interactables(p; payloads = [(; label = "rect-a"), (; label = "rect-b")]);
+            selected = Dict(:poly => [1]),
+        )
+    end
+
     regions = let
         zones = [(:rect, (1.5, 1.5), 1.6, 1.2), (:rect, (3.5, 1.5), 1.6, 1.2)]
         fig = Figure(size = (480, 260))
@@ -628,7 +645,7 @@ function build_kind_sweep()
     end
 
     return (;
-        scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, regions,
+        scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
         polar, scatter_dark, scatter_sizes, arrows3d, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
