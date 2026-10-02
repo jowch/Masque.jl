@@ -268,6 +268,107 @@ describe("drag-layer tab stops", () => {
         expect(inputs).toHaveLength(0)
     })
 
+    it("threshold: PageDown, a reversed axis's Home/End, and keys that mean nothing to a line", () => {
+        const m = thresholdManifest("h")
+        m.transforms.ax1 = { ...ax1, yreversed: true }
+        const { shadow } = setup(m)
+        const stop = stopOf(shadow, "thr")
+        const line = shadow.querySelector(".masque-threshold-line") as SVGLineElement
+        stop.focus()
+        press(stop, "PageDown")
+        expect(line.getAttribute("y1")).toBe("420")
+        // Reversed y: the smallest value is at the top.
+        press(stop, "Home")
+        expect(line.getAttribute("y1")).toBe("0")
+        press(stop, "End")
+        expect(line.getAttribute("y1")).toBe("800")
+        expect(press(stop, "+").defaultPrevented).toBe(false)
+        const v = setup(thresholdManifest("v"))
+        const vstop = stopOf(v.shadow, "thr")
+        const vline = v.shadow.querySelector(".masque-threshold-line") as SVGLineElement
+        vstop.focus()
+        expect(press(vstop, "ArrowDown").defaultPrevented).toBe(true)
+        press(vstop, "ArrowLeft")
+        expect(vline.getAttribute("x1")).toBe("598")
+    })
+
+    it("threshold: a categorical axis steps one category per press", () => {
+        const m = thresholdManifest("h")
+        // Categories a, b, c sit at data 1, 2, 3; limits [0.5, 3.5] put them 800/3 px apart.
+        m.transforms.ax1 = { ...ax1, ylims: [0.5, 3.5], ycats: ["a", "b", "c"] }
+        m.layers[1].geometry = { orientation: "h", pos: 400, span: [0, 1200] }
+        const { shadow, inputs } = setup(m)
+        const stop = stopOf(shadow, "thr")
+        stop.focus()
+        press(stop, "ArrowUp")
+        release(stop, "ArrowUp")
+        expect(inputs[0]).toMatchObject({ payload: "c" })
+    })
+
+    it("a key while a pointer drag holds the line does nothing", () => {
+        const { shadow, inputs } = setup(thresholdManifest("h"))
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const line = shadow.querySelector(".masque-threshold-line") as SVGLineElement
+        const stop = stopOf(shadow, "thr")
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        stop.focus()
+        expect(press(stop, "ArrowUp").defaultPrevented).toBe(false)
+        expect(line.getAttribute("y1")).toBe("400")
+        expect(inputs).toHaveLength(0)
+    })
+
+    it("before layout, a CSS px falls back to the manifest's scaling", () => {
+        const host = document.createElement("div")
+        const img = document.createElement("img")
+        const script = document.createElement("script")
+        host.append(img, script)
+        document.body.append(host)
+        mount(script, { ...thresholdManifest("h"), scaling: 3 })
+        const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
+        const stop = stopOf(shadow, "thr")
+        stop.focus()
+        press(stop, "ArrowUp")
+        expect((shadow.querySelector(".masque-threshold-line") as SVGLineElement).getAttribute("y1")).toBe("397")
+    })
+
+    it("ROI: ArrowUp and Alt+ArrowRight; keys an ROI ignores pass through", () => {
+        const { shadow } = setup(roiManifest())
+        const stop = stopOf(shadow, "roi")
+        const rect = shadow.querySelector("rect.masque-hi") as SVGRectElement
+        stop.focus()
+        press(stop, "ArrowUp")
+        expect(rect.getAttribute("y")).toBe("198")
+        press(stop, "ArrowRight", { altKey: true })
+        expect(rect.getAttribute("x")).toBe("200")
+        expect(rect.getAttribute("width")).toBe("402")
+        expect(press(stop, "Home").defaultPrevented).toBe(false)
+    })
+
+    it("view pan: Up, Down, Left and - each send a request; a pending wheel settle is taken over", async () => {
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]) }))
+        const { shadow } = setup(viewManifest("pan"), requestFrame)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        // happy-dom's WheelEvent drops clientX/clientY, so set them on the instance.
+        const we = new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true })
+        Object.defineProperties(we, { clientX: { value: 300 }, clientY: { value: 200 } })
+        surface.dispatchEvent(we)
+        const stop = stopOf(shadow, "view")
+        stop.focus()
+        const sent: Record<string, unknown>[] = []
+        for (const k of ["ArrowUp", "ArrowDown", "ArrowLeft", "-"]) {
+            expect(press(stop, k).defaultPrevented).toBe(true)
+            release(stop, k)
+            await new Promise((r) => setTimeout(r, 10))
+            sent.push(requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0])
+        }
+        expect(sent.every((i) => i.settle === true)).toBe(true)
+        expect(press(stop, "Home").defaultPrevented).toBe(false)
+        // The wheel's idle timer would have settled again; the keys' settles replaced it.
+        const n = requestFrame.mock.calls.length
+        await new Promise((r) => setTimeout(r, 300))
+        expect(requestFrame.mock.calls.length).toBe(n)
+    })
+
     it("cleanup removes the stops' listeners", () => {
         const host = document.createElement("div")
         const img = document.createElement("img")
