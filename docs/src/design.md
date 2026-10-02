@@ -39,9 +39,9 @@ to `masque` for one of those plots takes that plot's place, and any
 other comes after them. With `auto = false`, the order is the one you
 pass them in.
 
-A shape drawn over points covers them. Here the shaded band is created
+A shape drawn over points covers them. Here the polygon is created
 after the scatter, so with `masque(fig)` hovering a point shows the
-band's tooltip, and you cannot click the point.
+polygon's tooltip, and you cannot click the point.
 
 ```julia
 begin
