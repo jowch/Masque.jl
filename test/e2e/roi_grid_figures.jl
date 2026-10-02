@@ -14,7 +14,8 @@ function build_roi_grid()
         [
             RectInteractable(ax; grid = (collect(0.0:1.0:nx), collect(0.0:1.0:ny), vals), id = :img),
             ROIInteractable(ax; bounds = (2.0, 6.0, 2.0, 6.0), selects = :img, id = :roi),
-        ],
+        ];
+        auto = false,
     )
 end
 
@@ -28,7 +29,8 @@ function build_roi_points()
         [
             PointInteractable(ax, pts; id = :pts, payloads = ["a", "b", "c", "d", "e"]),
             ROIInteractable(ax; bounds = (2.0, 6.0, 2.0, 6.0), selects = :pts, id = :roi),
-        ],
+        ];
+        auto = false,
     )
 end
 

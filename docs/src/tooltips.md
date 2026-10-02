@@ -45,7 +45,7 @@ A template is a `masque"..."` string. Each `$(field)` is replaced by that
 field's value for the mark under the pointer:
 
 ```julia
-PointInteractable(ax, s;
+interactables(s;
     payloads = cities,
     tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
 )
@@ -132,8 +132,9 @@ Main.masque_fallback("tooltips_dark")
 When Masque knows a mark's color, its tooltip gets a 3px border in that
 color. The color comes from:
 
-- `scatter!`'s `color=`, when you pass the `Scatter` itself to
-  [`PointInteractable`](@ref), as both examples on this page do
+- `scatter!`'s `color=`, for the layer `masque` builds for a scatter,
+  as in both examples on this page, or when you pass the `Scatter`
+  itself to [`PointInteractable`](@ref)
 - the `colors=` keyword, when you pass positions instead of the plot
 - a legend entry's swatch
 

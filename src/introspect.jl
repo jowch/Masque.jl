@@ -413,16 +413,16 @@ function _boxplot_payloads(statscv)
             for k in eachindex(medians)
     ]
 end
-function _boxplot_interactable(ax, p; id = :boxplot, payloads = nothing)
+function _boxplot_interactable(ax, p; id = :boxplot, payloads = nothing, kw...)
     node = _boxplot_stats_node(p)
     boxpoly = _childof(node, Makie.Poly)
     geom = _conv(boxpoly)[1]
     pl = payloads === nothing ? _boxplot_payloads(_conv(node)) : payloads
     if eltype(geom) <: _GB.HyperRectangle
         rects = [(r.origin[1] + r.widths[1] / 2, r.origin[2] + r.widths[2] / 2, r.widths[1], r.widths[2]) for r in geom]
-        return RectInteractable(ax; rects, id, payloads = pl)
+        return RectInteractable(ax; rects, id, payloads = pl, kw...)
     else
-        return PolygonInteractable(ax, geom; id, payloads = pl)   # notched: Vector{Vector{Point}}
+        return PolygonInteractable(ax, geom; id, payloads = pl, kw...)   # notched: Vector{Vector{Point}}
     end
 end
 
@@ -659,23 +659,40 @@ end
 
 # Point layer keeps the base id; the line/segment layer gets a suffix so the two ids stay
 # distinct in the manifest.
-_stem_parts(ax, p, base) = AbstractInteractable[
-    PointInteractable(ax, _childof(p, Makie.Scatter); id = base),
-    SegmentInteractable(ax, _childof(p, Makie.LineSegments); id = Symbol(base, :_stems)),
-]
-_scatterlines_parts(ax, p, base) = AbstractInteractable[
-    PointInteractable(ax, _childof(p, Makie.Scatter); id = base),
-    SegmentInteractable(ax, _childof(p, Makie.Lines); id = Symbol(base, :_line)),
-]
+# `tooltip` and `label` apply to both parts. `payloads` would need one list per part, so a
+# composite refuses it; build the two parts yourself for that.
+function _composite_kwargs(p, kw)
+    haskey(kw, :payloads) && throw(
+        ArgumentError(
+            "interactables($(Makie.plotkey(p))): `payloads` can't apply to both of this plot's layers; " *
+                "build them with PointInteractable and SegmentInteractable instead",
+        ),
+    )
+    return kw
+end
+function _stem_parts(ax, p, base; kw...)
+    _composite_kwargs(p, kw)
+    return AbstractInteractable[
+        PointInteractable(ax, _childof(p, Makie.Scatter); id = base, kw...),
+        SegmentInteractable(ax, _childof(p, Makie.LineSegments); id = Symbol(base, :_stems), kw...),
+    ]
+end
+function _scatterlines_parts(ax, p, base; kw...)
+    _composite_kwargs(p, kw)
+    return AbstractInteractable[
+        PointInteractable(ax, _childof(p, Makie.Scatter); id = base, kw...),
+        SegmentInteractable(ax, _childof(p, Makie.Lines); id = Symbol(base, :_line), kw...),
+    ]
+end
 
 # Only DATA-anchored text projects to a meaningful (x, y); other space= text is skipped loudly
 # but specifically, not via the generic "unsupported plot type" path.
-function _text_interactables(ax, p::Makie.Text, id)
+function _text_interactables(ax, p::Makie.Text, id; kw...)
     if p.space[] !== :data
         @warn "masque: skipping non-data-space text (space=$(p.space[]))" maxlog = 16
         return AbstractInteractable[]
     end
-    return AbstractInteractable[TextInteractable(ax, p; id)]
+    return AbstractInteractable[TextInteractable(ax, p; id, kw...)]
 end
 
 # the layer-id base for a plot, or nothing if Masque can't introspect it
@@ -715,41 +732,43 @@ function _plotbase(p)
 end
 
 # returns a Vector{AbstractInteractable} — usually one, two for composites (Stem, ScatterLines).
-function _construct(ax, p, id)
-    p isa Makie.Scatter && return [PointInteractable(ax, p; id)]
-    p isa Makie.MeshScatter && return [PointInteractable(ax, p; id)]
+function _construct(ax, p, id; kw...)
+    p isa Makie.Scatter && return [PointInteractable(ax, p; id, kw...)]
+    p isa Makie.MeshScatter && return [PointInteractable(ax, p; id, kw...)]
     (p isa Makie.Lines || p isa Makie.LineSegments || p isa Makie.Wireframe || p isa Makie.Arrows3D) &&
-        return [SegmentInteractable(ax, p; id)]
+        return [SegmentInteractable(ax, p; id, kw...)]
     (
         p isa Makie.Stairs || p isa Makie.Errorbars || p isa Makie.Rangebars ||
             p isa Makie.HLines || p isa Makie.VLines
-    ) && return [SegmentInteractable(ax, p; id)]
+    ) && return [SegmentInteractable(ax, p; id, kw...)]
     (p isa Makie.Heatmap || p isa Makie.Image || p isa Makie.BarPlot || p isa Makie.Spy) &&
-        return [RectInteractable(ax, p; id)]
-    (p isa Makie.Hist || p isa Makie.Waterfall || p isa Makie.CrossBar) && return [RectInteractable(ax, p; id)]
-    (p isa Makie.HSpan || p isa Makie.VSpan) && return [RectInteractable(ax, p; id)]
-    p isa Makie.Band && return [PolygonInteractable(ax, p; id)]
-    p isa Makie.Density && return [PolygonInteractable(ax, p; id)]
-    p isa Makie.Poly && return [PolygonInteractable(ax, p; id)]
-    p isa Makie.Contourf && return [PolygonInteractable(ax, p; id)]
-    p isa Makie.Violin && return [PolygonInteractable(ax, p; id)]
-    p isa Makie.Voronoiplot && return [PolygonInteractable(ax, p; id)]
-    p isa Makie.Stem && return _stem_parts(ax, p, id)
-    p isa Makie.ScatterLines && return _scatterlines_parts(ax, p, id)
-    p isa Makie.Series && return [SegmentInteractable(ax, p; id)]
-    p isa Makie.BoxPlot && return [_boxplot_interactable(ax, p; id)]
-    p isa Makie.Text && return _text_interactables(ax, p, id)
-    p isa Makie.Annotation && return _text_interactables(ax, _descendant(p, Makie.Text), id)
+        return [RectInteractable(ax, p; id, kw...)]
+    (p isa Makie.Hist || p isa Makie.Waterfall || p isa Makie.CrossBar) && return [RectInteractable(ax, p; id, kw...)]
+    (p isa Makie.HSpan || p isa Makie.VSpan) && return [RectInteractable(ax, p; id, kw...)]
+    p isa Makie.Band && return [PolygonInteractable(ax, p; id, kw...)]
+    p isa Makie.Density && return [PolygonInteractable(ax, p; id, kw...)]
+    p isa Makie.Poly && return [PolygonInteractable(ax, p; id, kw...)]
+    p isa Makie.Contourf && return [PolygonInteractable(ax, p; id, kw...)]
+    p isa Makie.Violin && return [PolygonInteractable(ax, p; id, kw...)]
+    p isa Makie.Voronoiplot && return [PolygonInteractable(ax, p; id, kw...)]
+    p isa Makie.Stem && return _stem_parts(ax, p, id; kw...)
+    p isa Makie.ScatterLines && return _scatterlines_parts(ax, p, id; kw...)
+    p isa Makie.Series && return [SegmentInteractable(ax, p; id, kw...)]
+    p isa Makie.BoxPlot && return [_boxplot_interactable(ax, p; id, kw...)]
+    p isa Makie.Text && return _text_interactables(ax, p, id; kw...)
+    p isa Makie.Annotation && return _text_interactables(ax, _descendant(p, Makie.Text), id; kw...)
     # unreachable while _plotbase gates callers; loud if the two ever drift (kind added to one, not the other)
-    return error("auto_interactables: $(typeof(p).name.name) passed _plotbase but has no _construct branch")
+    return error("interactables: $(typeof(p).name.name) passed _plotbase but has no _construct branch")
 end
 
-# Recursive `_child_plots` walk: registers `ids` for every descendant of `p` that isn't
-# already in `plotmap` (a leaf plot's `_child_plots` is `[]`, so this terminates there).
-function _register_descendants!(plotmap, p, ids)
+# Recursive `_child_plots` walk: registers `ids` for every descendant of `p` (a leaf plot's
+# `_child_plots` is `[]`, so this terminates there). The auto walk keeps an entry already in
+# `plotmap`, so a plot's own entry wins over its parent's. A replacement passes
+# `overwrite = true`, so the descendants stop pointing at the layer it replaced.
+function _register_descendants!(plotmap, p, ids; overwrite = false)
     for c in _child_plots(p)
-        haskey(plotmap, c) || (plotmap[c] = ids)
-        _register_descendants!(plotmap, c, ids)
+        (overwrite || !haskey(plotmap, c)) && (plotmap[c] = ids)
+        _register_descendants!(plotmap, c, ids; overwrite)
     end
     return nothing
 end
@@ -757,11 +776,22 @@ end
 # A Series child's legend entry (`Makie.get_plots` returns the child Lines/ScatterLines, not
 # the Series) must pin that one element of the parent `:lines` layer, not every series. The
 # spec is `id:k` (1-based); the bare layer id still means the whole layer.
-function _register_series_elements!(plotmap, p, layer_id)
+function _register_series_elements!(plotmap, p, layer_id; overwrite = false)
     for (k, c) in enumerate(_child_plots(p))
         ids = [Symbol(layer_id, :(:), k)]
-        haskey(plotmap, c) || (plotmap[c] = ids)
-        _register_descendants!(plotmap, c, ids)
+        (overwrite || !haskey(plotmap, c)) && (plotmap[c] = ids)
+        _register_descendants!(plotmap, c, ids; overwrite)
+    end
+    return nothing
+end
+
+# `plotmap` is plot -> the layer ids it became: what a legend entry links through.
+function _register_plot!(plotmap, p, ids; overwrite = false)
+    plotmap[p] = ids
+    if p isa Makie.Series
+        _register_series_elements!(plotmap, p, first(ids); overwrite)
+    else
+        _register_descendants!(plotmap, p, ids; overwrite)
     end
     return nothing
 end
@@ -831,105 +861,98 @@ function _warned_empty(p)
     return t !== nothing && hasproperty(t, :space) && t.space[] !== :data
 end
 
-# Construct `p` (`_plotbase` already accepted it) and register every descendant under the new
+# A method a recipe defined for itself (`Masque.interactables(ax, p::MyPlot; kwargs...)`)
+# rather than the built-in one.
+function _has_custom(ax, p)
+    m = which(interactables, Tuple{typeof(ax), typeof(p)})
+    return m.sig != Tuple{typeof(interactables), Any, Makie.AbstractPlot}
+end
+_known(ax, p) = _plotbase(p) !== nothing || _has_custom(ax, p)
+# The id a plot's first layer takes before numbering. A recipe with its own method takes its
+# plot function's name (`myplot!` gives `:myplot`).
+_base(ax, p) = something(_plotbase(p), Symbol(Makie.plotkey(p)))
+
+# Construct `p` (`_known` already accepted it) and register every descendant under the new
 # layer ids. `haskey` in `_register_descendants!` keeps a plot's own entry. A later parent
-# constructor, or a second visit, must not `_construct` those descendants again — that is the
+# constructor, or a second visit, must not construct those descendants again — that is the
 # double layer (`:violin` plus the violin's `:poly`). Series children register as `id:k`.
 # An empty construct — non-data text, or a construct with no vertices — does not consume a
 # layer id. Returns `(built, warned)`: `warned` is the axis-skip warning or the non-data
-# text warning, so the caller can suppress a second, generic one.
-function _install_known!(ints, seen, plotmap, ax, p)
-    _skip_for_axis(ax, p) && return (built = false, warned = true)
-    base = _plotbase(p)
-    n = get(seen, base, 0) + 1
-    seen[base] = n
+# text warning, so the caller can suppress a second, generic one. A recipe's own method is
+# trusted on every axis kind; the axis skip is for the built-in extraction.
+function _install_known!(d, ax, p)
+    _has_custom(ax, p) || !_skip_for_axis(ax, p) || return (built = false, warned = true)
+    base = _base(ax, p)
+    n = get(d.seen, base, 0) + 1
+    d.seen[base] = n
     id = n == 1 ? base : Symbol(base, :_, n)
-    built = _construct(ax, p, id)
+    built = interactables(ax, p; id)
     if isempty(built) || all(i -> _nverts(i) == 0, built)
         if n == 1
-            delete!(seen, base)
+            delete!(d.seen, base)
         else
-            seen[base] = n - 1
+            d.seen[base] = n - 1
         end
         return (built = false, warned = isempty(built) && _warned_empty(p))
     end
-    append!(ints, built)
-    ids = [ii.id for ii in built]
-    plotmap[p] = ids
-    if p isa Makie.Series
-        _register_series_elements!(plotmap, p, id)
-    else
-        _register_descendants!(plotmap, p, ids)
-    end
+    append!(d.ints, built)
+    ids = Symbol[ii.id for ii in built]
+    d.installed[p] = ids
+    _register_plot!(d.plotmap, p, ids)
     return (built = true, warned = false)
 end
 
-# Children of a recipe `_plotbase` does not know. Stop at the first known plot: constructing
+# Children of a recipe Masque does not know. Stop at the first known plot: constructing
 # a `Violin` and also its `Poly` would be two layers for one mark. A zero-string `Text`
 # (`contour!` with labels off) is not a layer; keep walking so the sibling `Lines` is still
 # found. A child with `visible[] == false` is not drawn (`triplot!` ghost edges, convex hull,
 # constrained edges, point scatter) and is not a layer; do not walk into it. Descendants of
 # a plot just installed are already in `plotmap` and are skipped. Returns `(built, warned)`.
-function _walk_unknown!(ints, seen, plotmap, ax, parent)
+function _walk_unknown!(d, ax, parent)
     built_any = false
     warned_any = false
     for c in _child_plots(parent)
-        haskey(plotmap, c) && continue
+        haskey(d.plotmap, c) && continue
         if hasproperty(c, :visible) && c.visible[] == false
             continue
         end
-        if _plotbase(c) === nothing
-            r = _walk_unknown!(ints, seen, plotmap, ax, c)
+        if !_known(ax, c)
+            r = _walk_unknown!(d, ax, c)
             built_any |= r.built
             warned_any |= r.warned
             continue
         end
         if c isa Makie.Text && c.text[] isa AbstractVector && isempty(c.text[])
-            r = _walk_unknown!(ints, seen, plotmap, ax, c)
+            r = _walk_unknown!(d, ax, c)
             built_any |= r.built
             warned_any |= r.warned
             continue
         end
         _walk_refuses(c) && continue
-        r = _install_known!(ints, seen, plotmap, ax, c)
+        r = _install_known!(d, ax, c)
         built_any |= r.built
         warned_any |= r.warned
     end
     return (built = built_any, warned = warned_any)
 end
 
-"""
-    auto_interactables(fig) -> Vector{AbstractInteractable}
-
-Introspect a Makie `Figure`: for every supported plot in every `Axis`, `Axis3`, or `PolarAxis`,
-build the interactable its explicit constructor would. On `Axis3`, only `Scatter`/`Lines`/
-`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D` are supported; on `PolarAxis`, only
-`Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`. Other kinds are skipped with a warning.
-A recipe with no branch of its own still contributes each child that has one (`arc!` is the
-`lines!` it draws), under that child's layer id. A child with `visible[] == false` is not a
-layer (`triplot!`'s ghost edges). A construct with no vertices does not take a layer id
-(`qqplot!` with `qqline = :none`). A data-space `Scatter` child is left alone (`hexbin!`),
-and so is a child whose `space` is not `:data` (`bracket!`).
-Layer ids are the plot kind (`:scatter`, `:lines`, …), suffixed `_2`, `_3`, … when a kind
-repeats. Returns the same concrete vector you could pass to [`masque`](@ref) yourself — edit or
-extend it freely.
-
-Each interactable inherits its constructor's default per-element payloads, so the zero-config
-path on a very large plot allocates one payload per element; construct with a lean `payloads=`
-yourself for huge data.
-"""
-function auto_interactables(fig)
-    ints = AbstractInteractable[]
-    seen = Dict{Symbol, Int}()
-    # plot -> the id(s) of the interactable(s) `_construct` built from it — the only thing
-    # LegendInteractable's plotmap-based resolution (priority (c)) needs to link a legend entry
-    # back to the layer(s) its plot(s) became.
-    plotmap = IdDict{Any, Vector{Symbol}}()
+# Every default of `fig`. `plotmap` is plot -> layer ids for the legend links, descendants
+# included. `installed` holds only the plots built directly, so a replacement can find the
+# layers its plot's default took.
+function _defaults(fig)
+    # Introspection reads post-layout axis state (e.g. `ax.finallimits[]`).
+    _finalize!(fig)
+    d = (
+        ints = AbstractInteractable[],
+        seen = Dict{Symbol, Int}(),
+        plotmap = IdDict{Any, Vector{Symbol}}(),
+        installed = IdDict{Any, Vector{Symbol}}(),
+    )
     for ax in fig.content
         ax isa _SUPPORTED_AXES || continue
         for p in _child_plots(ax.scene)
-            if _plotbase(p) === nothing
-                r = _walk_unknown!(ints, seen, plotmap, ax, p)
+            if !_known(ax, p)
+                r = _walk_unknown!(d, ax, p)
                 # A child already warned (non-data text, or an axis skip). A second warning
                 # that names the parent only repeats that, which `bracket!` used to do.
                 if !r.built && !r.warned
@@ -937,7 +960,7 @@ function auto_interactables(fig)
                 end
                 continue
             end
-            _install_known!(ints, seen, plotmap, ax, p)
+            _install_known!(d, ax, p)
         end
     end
     # Colorbar blocks live in fig.content, not in an Axis's scene.
@@ -946,18 +969,62 @@ function auto_interactables(fig)
         c isa Makie.Colorbar || continue
         nc += 1
         id = nc == 1 ? :colorbar : Symbol(:colorbar_, nc)
-        push!(ints, ColorbarInteractable(c; id))
+        push!(d.ints, ColorbarInteractable(c; id))
     end
-    # Likewise Legend blocks; resolved via the plotmap built above (priority (c) in
-    # LegendInteractable's own targets resolution — see src/interactables.jl).
+    # Likewise Legend blocks, linked through the plotmap built above.
     nl = 0
     for c in fig.content
         c isa Makie.Legend || continue
         nl += 1
         id = nl == 1 ? :legend : Symbol(:legend_, nl)
-        push!(ints, LegendInteractable(c; id, plotmap))
+        push!(d.ints, _legend_interactable(c; id, plotmap = d.plotmap))
     end
-    return ints
+    return d
+end
+
+"""
+    interactables(fig) -> Vector{AbstractInteractable}
+    interactables(ax)  -> Vector{AbstractInteractable}
+
+The interactables `masque(fig)` builds by default: for every supported plot in every `Axis`,
+`Axis3`, or `PolarAxis`, the interactable its explicit constructor would build, then one
+[`ColorbarInteractable`](@ref) per `Colorbar` and one [`LegendInteractable`](@ref) per
+`Legend`, linked to the layers of the plots each entry stands for. `interactables(ax)` is the
+part of that list on one axis, with the same ids.
+
+On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D` are
+supported; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
+Other kinds are skipped with a warning. A recipe with its own
+`Masque.interactables(ax, p::MyPlot)` method uses it. Any other recipe contributes each child
+that has a default (`arc!` is the `lines!` it draws), under that child's layer id. A child
+with `visible[] == false` is not a layer (`triplot!`'s ghost edges). A construct with no
+vertices does not take a layer id (`qqplot!` with `qqline = :none`). A data-space `Scatter`
+child is left alone (`hexbin!`), and so is a child whose `space` is not `:data` (`bracket!`).
+
+Layer ids are the plot kind (`:scatter`, `:lines`, …), suffixed `_2`, `_3`, … when a kind
+repeats across the figure. Passing an entry of this list to `masque` replaces the default with
+the same id, so an edited copy of the list is a valid call.
+
+Each interactable inherits its constructor's default per-element payloads, so the zero-config
+path on a very large plot allocates one payload per element; construct with a lean `payloads=`
+yourself for huge data.
+"""
+interactables(fig::Makie.Figure) = _defaults(fig).ints
+function interactables(ax::_SUPPORTED_AXES)
+    fig = ax.parent
+    fig isa Makie.Figure ||
+        throw(ArgumentError("interactables(ax): this axis is not in a Figure"))
+    return filter(i -> hasproperty(i, :ax) && i.ax === ax, interactables(fig))
+end
+
+"""
+    auto_interactables(fig) -> Vector{AbstractInteractable}
+
+Deprecated: use [`interactables(fig)`](@ref interactables). Removed in 0.3.
+"""
+function auto_interactables(fig)
+    Base.depwarn("`auto_interactables(fig)` is deprecated, use `interactables(fig)`", :auto_interactables)
+    return interactables(fig)
 end
 
 # --- SliceInteractable from a plot -----------------------------------------------------------

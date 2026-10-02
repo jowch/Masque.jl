@@ -35,8 +35,8 @@ begin
     apts = Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3)]
     adirs = Makie.Vec3f[(1, 0, 0), (0, 1, 0.5), (-0.5, 0, 1)]
     arrows3d!(ax, apts, adirs; color = :red)
-    ints = auto_interactables(fig)
-    arrow_widget = masque(fig, ints)
+    ints = interactables(fig)
+    arrow_widget = masque(fig, ints; auto = false)
     L = only(arrow_widget.manifest["layers"])
     g = L["geometry"]
     mids = [[(g[4k + 1] + g[4k + 3]) / 2, (g[4k + 2] + g[4k + 4]) / 2] for k in 0:2]

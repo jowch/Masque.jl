@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** `masque(fig, xs...)` adds to the interactions `masque(fig)` builds instead of
+  replacing them, so `masque(fig, ViewInteractable(ax))` keeps every hover and click and adds
+  panning. An interactable whose `id` matches a default layer's replaces that layer. To keep
+  the old behavior, where only the interactables you pass respond, add `auto = false`:
+  `masque(fig, ints; auto = false)`. Two layers with the same id now raise an error.
+- A legend with no `targets` links to the layers of the `masque` call it is in, including
+  layers built with `interactables(plot)` and calls with `auto = false`.
+
+### Added
+- `interactables(plot; tooltip, payloads, label, id)` changes one plot's layer without
+  rebuilding the rest: `masque(fig, interactables(s; tooltip = masque"…"))`. It keeps the
+  layer's id, so `selected=` and legend links still work. `stem!`, `scatterlines!`,
+  `boxplot!`, and `annotation!` can be customized this way too.
+- `interactables(fig)` and `interactables(ax)` return the interactables `masque(fig)` builds,
+  for the whole figure or one axis.
+- A recipe can define `Masque.interactables(ax, p::MyPlot; id, kwargs...)`, and `masque(fig)`
+  uses it for every plot of that type.
+
+### Deprecated
+- `auto_interactables(fig)`: use `interactables(fig)`. It will be removed in 0.3.
+
 ## [0.1.1] - 2026-10-01
 
 ### Changed

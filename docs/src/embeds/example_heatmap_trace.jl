@@ -46,11 +46,11 @@ end
 
 # ╔═╡ a1420002-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores the clicked cell: `pick.i` is the day (1 to 7), `pick.j` is the station's position in `stations`, and `pick.value` is the daily mean.
+`@bind pick` stores the clicked cell: `pick.i` is the day (1 to 7), `pick.j` is the station's position in `stations`, and `pick.value` is the daily mean. `auto = false` leaves the colorbar out, so `pick` is always a cell.
 """
 
 # ╔═╡ a1420002-0001-4000-8000-000000000003
-@bind pick masque(fig, cells)
+@bind pick masque(fig, cells; auto = false)
 
 # ╔═╡ a1420002-0001-4000-8000-000000000012
 md"""

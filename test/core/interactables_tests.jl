@@ -337,7 +337,10 @@ struct _NotReal end
                 selected = Dict(:scatter => Int[])
             )["layers"][1], "selected"
         )   # empty omitted
-        @test masque(bfig, PointInteractable(bax, pts; id = :scatter); selected = Dict(:scatter => [2])).manifest["layers"][1]["selected"] == [1]
+        @test masque(
+            bfig, PointInteractable(bax, pts; id = :scatter);
+            selected = Dict(:scatter => [2]), auto = false,
+        ).manifest["layers"][1]["selected"] == [1]
 
         # selected= fail-loud (issue #39): still-unsupported kinds (grid/axis/…) and OOB
         # indices throw at build_manifest. Open kinds (segments/polyline) now accept
@@ -396,7 +399,7 @@ struct _NotReal end
             @test ml["layers"][1]["kind"] == "polyline"
         end
 
-        w = masque(bfig, PointInteractable(bax, pts; id = :scatter))
+        w = masque(bfig, PointInteractable(bax, pts; id = :scatter); auto = false)
         @test w isa MasqueWidget
         @test w.manifest["layers"][1]["kind"] == "circles"
         @test !isempty(w.b64)

@@ -26,7 +26,7 @@ Hover over a point to see its name, then click it, and the last cell names the p
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000010
 md"""
-Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Pass the scatter to `PointInteractable` with one `payloads` entry per point, and the tooltip shows each point's fields.
+Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Pass the scatter to `interactables` with one `payloads` entry per point, and the tooltip shows each point's fields.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000002
@@ -39,7 +39,7 @@ begin
         (name = "three", x = 3.0, y = 9.0),
     ]
     s = scatter!(ax, [p.x for p in points], [p.y for p in points]; markersize = 18)
-    pts = PointInteractable(ax, s; payloads = points)
+    pts = interactables(s; payloads = points)
     nothing
 end
 

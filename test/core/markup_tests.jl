@@ -95,15 +95,19 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # tooltip_sigdigits: the default ships nothing (the frontend default is the same 4)
         @test !haskey(build_manifest([PointInteractable(tax, pts2)], tctx), "tipDigits")
         @test build_manifest([PointInteractable(tax, pts2)], tctx; tip_digits = 6)["tipDigits"] == 6
-        @test !haskey(masque(tfig, PointInteractable(tax, pts2)).manifest, "tipDigits")
-        @test masque(tfig, PointInteractable(tax, pts2); tooltip_sigdigits = 2).manifest["tipDigits"] == 2
+        @test !haskey(masque(tfig, PointInteractable(tax, pts2); auto = false).manifest, "tipDigits")
+        @test masque(
+            tfig, PointInteractable(tax, pts2); tooltip_sigdigits = 2, auto = false
+        ).manifest["tipDigits"] == 2
         @test masque(tfig; tooltip_sigdigits = 7).manifest["tipDigits"] == 7     # zero-config path too
         for bad in (0, 18, 2.5, "3", nothing, true)
-            @test_throws ArgumentError masque(tfig, PointInteractable(tax, pts2); tooltip_sigdigits = bad)
+            @test_throws ArgumentError masque(
+                tfig, PointInteractable(tax, pts2); tooltip_sigdigits = bad, auto = false
+            )
         end
         msg = sprint(
             showerror, try
-                masque(tfig, PointInteractable(tax, pts2); tooltip_sigdigits = 0)
+                masque(tfig, PointInteractable(tax, pts2); tooltip_sigdigits = 0, auto = false)
             catch e
                 e
             end
@@ -130,12 +134,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test man["background"] == "rgb(26,26,26)"
 
         # masque() itself ships the FIGURE's own background — not just whatever's passed through
-        w = masque(tfig, pi)
+        w = masque(tfig, pi; auto = false)
         @test w.manifest["background"] == "rgb(255,255,255)"   # Figure's default background
 
         dfig = Figure(size = (200, 150); backgroundcolor = :gray12)
         dax = Axis(dfig[1, 1])
-        dw = masque(dfig, PointInteractable(dax, pts2))
+        dw = masque(dfig, PointInteractable(dax, pts2); auto = false)
         @test dw.manifest["background"] == Masque._css_color(:gray12)
     end
 end

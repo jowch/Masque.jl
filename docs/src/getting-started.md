@@ -58,7 +58,7 @@ full list.
 ## Show your own data
 
 The default tooltip shows coordinates. To show your own fields instead,
-pass the scatter to [`PointInteractable`](@ref) with one `payloads`
+pass the scatter to [`interactables`](@ref) with one `payloads`
 entry per point. Replace the figure cell with this one:
 
 ```julia
@@ -74,7 +74,7 @@ begin
         (name = "three", x = 3.0, y = 4.0),
         (name = "four", x = 4.0, y = 3.0),
     ]
-    pts = PointInteractable(ax, s; payloads = points)
+    pts = interactables(s; payloads = points)
     nothing
 end
 ```

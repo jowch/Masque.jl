@@ -51,14 +51,14 @@ begin
     fig = Figure()
     ax = Axis(fig[1, 1])
     pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
-    scatter!(ax, first.(pts), last.(pts))
+    s = scatter!(ax, first.(pts), last.(pts))
     nothing
 end
 ```
 
 ```julia
-# choose which marks respond, and bind the result
-@bind sel masque(fig, [PointInteractable(ax, pts; payloads = ["a", "b", "c"])])
+# give each point a payload, and bind the result
+@bind sel masque(fig, interactables(s; payloads = ["a", "b", "c"]))
 ```
 
 ```julia

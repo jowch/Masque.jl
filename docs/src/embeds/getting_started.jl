@@ -43,8 +43,8 @@ begin
     markersize = 18
     s = scatter!(ax, xs, ys; color = city_colors, markersize)
     # Passing the scatter gives each tooltip a border in that city's color.
-    cities = PointInteractable(
-        ax, s;
+    cities = interactables(
+        s;
         id = :cities,
         payloads = [(; city = c.city, pop = c.pop) for c in cities_data],
         tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",

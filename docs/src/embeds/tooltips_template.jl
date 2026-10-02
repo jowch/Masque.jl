@@ -41,8 +41,8 @@ begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
     s = scatter!(ax, [1.0, 2.0, 3.0, 4.0], [1.0, 4.0, 9.0, 16.0]; color = palette, markersize = 20)
-    tips = PointInteractable(
-        ax, s;
+    tips = interactables(
+        s;
         payloads = cities,
         tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
     )

@@ -90,7 +90,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         ax = Axis(fig[1, 1]; dim1_conversion = Makie.CategoricalConversion())
         scatter!(ax, ["a", "b", "c"], [1.0, 2.0, 3.0])
         tv = Masque.APD.Bonds.transform_value
-        w = masque(fig, AxisInteractable(ax))
+        w = masque(fig, AxisInteractable(ax); auto = false)
         id = only(w.manifest["layers"])["id"]
         ev = tv(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => "b", "y" => 2.0)))
         @test ev isa AxisEvent
@@ -103,12 +103,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         num = tv(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => 1.2, "y" => 2.0)))
         @test num.x == 1.2 && num.xcat === nothing
 
-        vt = masque(fig, ThresholdInteractable(ax; orientation = :vertical, value = 2.0))
+        vt = masque(fig, ThresholdInteractable(ax; orientation = :vertical, value = 2.0); auto = false)
         tev = tv(vt, Dict("layer" => "threshold", "index" => -1, "payload" => "c"))
         @test tev isa ThresholdEvent && tev.value == 3.0 && tev.category == "c"
         # Passing the event back restores the line at that category.
         @test Masque._threshold_value(tev) == 3.0
-        ht = masque(fig, ThresholdInteractable(ax; orientation = :horizontal, value = 2.0))
+        ht = masque(fig, ThresholdInteractable(ax; orientation = :horizontal, value = 2.0); auto = false)
         hev = tv(ht, Dict("layer" => "threshold", "index" => -1, "payload" => 1.5))
         @test hev.value == 1.5 && hev.category === nothing
         @test sprint(show, hev) == "ThresholdEvent(:threshold, value = 1.5)"
@@ -125,7 +125,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
                 ctx -> [
                     HitLayer(:el, :circles, Float32[1, 1, 4], Any[(; v = "a")], axis(ctx), (:click,)),
                 ]
-            )
+            );
+            auto = false,
         )
         got = tv(el, Dict("layer" => "el", "index" => 0))
         @test got isa ElementEvent && got.index == 1 && got.v == "a"
@@ -134,7 +135,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
                 ctx -> [
                     HitLayer(:g, :grid, Dict{String, Any}(), Any[], axis(ctx), (:click,)),
                 ]
-            )
+            );
+            auto = false,
         )
         cell = tv(grid, Dict("layer" => "g", "index" => -1, "payload" => Dict("i" => 1, "j" => 0, "value" => 12)))
         @test cell isa GridCellEvent && cell.i == 2 && cell.j == 1 && cell.value == 12
@@ -143,7 +145,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
                 ctx -> [
                     HitLayer(:ax, :axis, Any[], Any[], axis(ctx), (:click,)),
                 ]
-            )
+            );
+            auto = false,
         )
         aev = tv(axisw, Dict("layer" => "ax", "index" => -1, "payload" => Dict("x" => 1.5, "y" => 2.5)))
         @test aev isa AxisEvent && aev.x == 1.5 && aev.y == 2.5
@@ -152,7 +155,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
                 ctx -> [
                     HitLayer(:thr, :threshold, Any[], Any[], axis(ctx), (:drag,)),
                 ]
-            )
+            );
+            auto = false,
         )
         tev = tv(thr, Dict("layer" => "thr", "index" => 0, "payload" => 3.25))
         @test tev isa ThresholdEvent && tev.value == 3.25
@@ -161,7 +165,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
                 ctx -> [
                     HitLayer(:box, :roi, Any[], Any[], axis(ctx), (:drag,)),
                 ]
-            )
+            );
+            auto = false,
         )
         bev = tv(
             roi, Dict(
@@ -175,7 +180,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
                 ctx -> [
                     HitLayer(:view, :view, Any[], Any[], axis(ctx), (:drag,)),
                 ]
-            )
+            );
+            auto = false,
         )
         @test_throws ArgumentError tv(view, Dict("layer" => "view", "index" => -1, "payload" => nothing))
     end

@@ -20,16 +20,17 @@ Main.masque_fallback("roi_table")
 ## Pick the points inside a box
 
 An [`ROIInteractable`](@ref) adds the box, and `selects` names the layer
-whose points it collects. Give the points an `id` so the box can refer
-to them, and pass both to the same `masque` call:
+whose points it collects. Give the scatter an `id` with
+[`interactables`](@ref) so the box can refer to it, and pass both to the
+same `masque` call:
 
 ```julia
-pts = PointInteractable(ax, s; id = :pts, payloads = samples)
+pts = interactables(s; id = :pts, payloads = samples)
 roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = :pts)
 ```
 
 ```julia
-@bind picks masque(fig, [pts, roi])
+@bind picks masque(fig, pts, roi)
 ```
 
 `bounds` is where the box starts, as `(xmin, xmax, ymin, ymax)` in data
@@ -47,7 +48,7 @@ If your rows are a `DataFrame`, pass it as `payloads`, with one row per
 point in the order you plotted them:
 
 ```julia
-pts = PointInteractable(ax, s; id = :pts, payloads = df)
+pts = interactables(s; id = :pts, payloads = df)
 ```
 
 Then `df[picks, :]` is the rows inside the box. To show an empty table

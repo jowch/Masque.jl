@@ -774,7 +774,7 @@ one. Produces one `:rects` [`HitLayer`](@ref), one box per string.
 
 # Arguments
 - `p` — a `Makie.Text` plot (for `annotation!`, pass its descendant `Text`, e.g. via
-  [`auto_interactables`](@ref)).
+  [`interactables`](@ref)).
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:text`.
 - `payloads` — one entry per string; `ArgumentError` if the length doesn't match. Default:
   `(; text, index, x, y)` — `text` is the string, `index` 1-based, `(x, y)` its data-space
@@ -1153,11 +1153,12 @@ for: hover/click an entry to highlight the layer(s) named in `targets`. Produces
 - `leg` — a `Makie.Legend`.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:legend`.
 - `targets` — how each entry links to other layers, resolved once at construction:
-  - `nothing` (default) — `masque(fig)` links each entry to the layers of the plots its
-    elements were built with (`Makie.get_plots`). That lookup runs during auto extraction.
-    Calling `LegendInteractable` yourself, or a hand-built entry whose elements carry no
-    plots, leaves the link list empty. The entry stays a hit target: hover leaves the other
-    layers as they are, and a click reports a [`LegendEvent`](@ref).
+  - `nothing` (default) — `masque` links each entry to the layers of the plots its elements
+    were built with (`Makie.get_plots`): the default layers, and any built with
+    `interactables(plot)` in the same call. An entry whose plots have no layer in the call,
+    or a hand-built entry whose elements carry no plots, links to nothing. The entry stays a
+    hit target: hover leaves the other layers as they are, and a click reports a
+    [`LegendEvent`](@ref).
   - a `Dict{<:AbstractString}` keyed by entry **label** — `Symbol` or `Vector{Symbol}` of layer
     ids for that entry. A key matching no entry label raises `ArgumentError`.
   - a `Vector` with one entry per legend entry (`nothing`/`Symbol`/`Vector{Symbol}`), in entry
@@ -1185,7 +1186,7 @@ nothing to auto-link — pass `plots=` on the element (Makie's own kwarg) or use
 l1 = lines!(ax, xs, ys1; label = "a")
 l2 = lines!(ax, xs, ys2; label = "b")
 leg = axislegend(ax)
-LegendInteractable(leg)   # hit targets only; `masque(fig)` is what fills in the links
+LegendInteractable(leg)   # `masque` fills in the links
 
 LegendInteractable(leg; targets = Dict("a" => :lines, "b" => [:lines_2, :scatter]))
 ```
@@ -1200,9 +1201,13 @@ struct LegendInteractable <: AbstractInteractable
     # than a user-given Dict/Vector — see `_resolve_legend_targets`.
     lenient::Bool
 end
-function LegendInteractable(
-        leg; id = :legend, targets = nothing, events = (:click, :hover), tooltip = nothing,
-        plotmap = nothing,   # internal: IdDict{Any,Vector{Symbol}} plot -> layer ids, set by auto_interactables
+function LegendInteractable(leg; id = :legend, targets = nothing, events = (:click, :hover), tooltip = nothing)
+    return _legend_interactable(leg; id, targets, events, tooltip)
+end
+# `plotmap` is plot -> layer ids. `masque` passes the one for the layers it assembled, so an
+# entry with no `targets` links to whatever its plots became in this call.
+function _legend_interactable(
+        leg; id = :legend, targets = nothing, events = (:click, :hover), tooltip = nothing, plotmap = nothing,
     )
     _check_tooltip(tooltip)
     entries = _legend_entries_meta(leg)   # pre-render metadata only — bbox comes later, in hitlayers

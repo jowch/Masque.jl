@@ -54,15 +54,15 @@ up the clicked polygon's name:
 Main.masque_fallback("marks_poly")
 ```
 
-To get the name back with the click instead, pass `payloads` to
-[`PolygonInteractable`](@ref). Then `pick.name` is the clicked polygon's
-name:
+To get the name back with the click instead, pass the polygon plot `p`
+to [`interactables`](@ref) with `payloads`. Then `pick.name` is the
+clicked polygon's name:
 
 ```julia
-regions = PolygonInteractable(ax, p;
+regions = interactables(p;
     payloads = [(name = "North",), (name = "South",), (name = "East",)],
 )
-@bind pick masque(fig, [regions])
+@bind pick masque(fig, regions)
 ```
 
 Bands, densities, filled contours, violins, and Voronoi cells are
@@ -88,7 +88,7 @@ Main.masque_fallback("marks_lines")
 `pick.layer` tells the two lines apart: it is `:lines` for the first
 and `:lines_2` for the second, and `stairs!` plots get `:stairs` and
 `:stairs_2` the same way. To choose the names yourself, pass each line
-to [`SegmentInteractable`](@ref) with an `id`:
+to [`interactables`](@ref) with an `id`:
 
 ```julia
 begin
@@ -97,14 +97,14 @@ begin
     xs = 0:0.1:10
     l1 = lines!(ax, xs, sin.(xs))
     l2 = lines!(ax, xs, cos.(xs))
-    sine = SegmentInteractable(ax, l1; id = :sine)
-    cosine = SegmentInteractable(ax, l2; id = :cosine)
+    sine = interactables(l1; id = :sine)
+    cosine = interactables(l2; id = :cosine)
     nothing
 end
 ```
 
 ```julia
-@bind pick masque(fig, [sine, cosine])
+@bind pick masque(fig, sine, cosine)
 ```
 
 Then `pick.layer` is `:sine` or `:cosine`. A `series!` call is one

@@ -13,7 +13,7 @@ end
 @testset "Gesture channel (#102)" begin
     @testset "no ViewInteractable -> no render_frame" begin
         (; fig, ax, pts) = default_fixture()
-        w = masque(fig, [PointInteractable(ax, pts)])
+        w = masque(fig, [PointInteractable(ax, pts)]; auto = false)
         @test w.render_frame === nothing
     end
 
@@ -22,7 +22,7 @@ end
         ax = Axis(fig[1, 1])
         pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
         scatter!(ax, first.(pts), last.(pts))
-        w = masque(fig, [ViewInteractable(ax), PointInteractable(ax, pts)])
+        w = masque(fig, [ViewInteractable(ax), PointInteractable(ax, pts)]; auto = false)
         @test w.render_frame isa Function
 
         aid = only(k for (k, t) in w.manifest["transforms"] if t["is3d"] == false)
@@ -77,7 +77,7 @@ end
         fig = Figure(size = (400, 400))
         ax = Axis3(fig[1, 1])
         scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
-        w = masque(fig, [ViewInteractable(ax)])
+        w = masque(fig, [ViewInteractable(ax)]; auto = false)
         @test w.render_frame isa Function
 
         resp = w.render_frame(Dict("id" => "view", "azimuth" => 0.7, "elevation" => 0.2, "settle" => false))
@@ -90,7 +90,7 @@ end
 
     @testset "unknown layer id fails loud" begin
         (; fig, ax, pts) = default_fixture()
-        w = masque(fig, [ViewInteractable(ax; id = :view), PointInteractable(ax, pts)])
+        w = masque(fig, [ViewInteractable(ax; id = :view), PointInteractable(ax, pts)]; auto = false)
         @test_throws ArgumentError w.render_frame(Dict("id" => "nope", "xmin" => 0.0, "xmax" => 1.0, "ymin" => 0.0, "ymax" => 1.0))
     end
 
@@ -99,7 +99,7 @@ end
         ax3 = Axis3(fig3[1, 1])
         scatter!(ax3, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
         az0, el0 = ax3.azimuth[], ax3.elevation[]
-        w3 = masque(fig3, [ViewInteractable(ax3)])
+        w3 = masque(fig3, [ViewInteractable(ax3)]; auto = false)
         @test w3.render_frame isa Function
         @test !Masque._view_warmup_finished(w3.render_frame)
         sender3 = @async begin
@@ -125,7 +125,7 @@ end
         pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
         scatter!(ax2, first.(pts), last.(pts))
         lim0 = ax2.limits[]
-        w2 = masque(fig2, [ViewInteractable(ax2), PointInteractable(ax2, pts)])
+        w2 = masque(fig2, [ViewInteractable(ax2), PointInteractable(ax2, pts)]; auto = false)
         sender2 = @async begin
             io, buf = _pluto_display_io()
             show(io, MIME"text/html"(), w2)
@@ -164,7 +164,7 @@ end
         ax = Axis3(fig[1, 1])
         scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
         az0, el0 = ax.azimuth[], ax.elevation[]
-        w = masque(fig, [ViewInteractable(ax)])
+        w = masque(fig, [ViewInteractable(ax)]; auto = false)
         nudged = Channel{Nothing}(1)
         release = Channel{Nothing}(1)
         _pause_after_first_frame!(w.render_frame, nudged, release)
@@ -189,7 +189,7 @@ end
         @test ax.azimuth[] ≈ az0 atol = 1.0e-12
         @test ax.elevation[] ≈ el0 atol = 1.0e-12
         # The next mount on this figure must sample the restored camera, not the nudge.
-        w2 = masque(fig, [ViewInteractable(ax)])
+        w2 = masque(fig, [ViewInteractable(ax)]; auto = false)
         @test ax.azimuth[] ≈ az0 atol = 1.0e-12
         @test ax.elevation[] ≈ el0 atol = 1.0e-12
         Masque._sync_view_warmup!(w2.render_frame)
@@ -201,7 +201,7 @@ end
         scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
         az0, el0 = ax.azimuth[], ax.elevation[]
         requested_az, requested_el = az0 + 0.4, el0 - 0.15
-        w = masque(fig, [ViewInteractable(ax)])
+        w = masque(fig, [ViewInteractable(ax)]; auto = false)
         go = Channel{Nothing}(1)
         entered = Ref(false)
         result = Ref{Any}(nothing)
@@ -245,7 +245,7 @@ end
         scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
         az0, el0 = ax.azimuth[], ax.elevation[]
         requested_az, requested_el = az0 + 0.25, el0 + 0.1
-        w = masque(fig, [ViewInteractable(ax)])
+        w = masque(fig, [ViewInteractable(ax)]; auto = false)
         worker = @async begin
             io, _ = _pluto_display_io()
             show(io, MIME"text/html"(), w)

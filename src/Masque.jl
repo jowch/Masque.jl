@@ -4,8 +4,9 @@
 Overlay JS interactivity — hover tooltips, click-to-select, drag-to-pan/rotate — on a static
 or live Makie `Figure` for use in a [Pluto](https://plutojl.org) notebook.
 
-Declare [`AbstractInteractable`](@ref)s (or call [`masque`](@ref)`(fig)` for zero-config
-auto-extraction via [`auto_interactables`](@ref)) and bind the result with `@bind`; the bond
+Call [`masque`](@ref)`(fig)` for every default interaction (see [`interactables`](@ref)),
+pass [`AbstractInteractable`](@ref)s to add to or replace them, and bind the result with
+`@bind`; the bond
 reports the current selection — `nothing` when nothing is selected, otherwise an
 [`InteractionEvent`](@ref). Needs a rendering backend
 loaded: `using CairoMakie` for a static image with a JS hit-test overlay, or `using WGLMakie`
@@ -52,6 +53,7 @@ include("backend.jl")
 include("markup.jl")
 include("interactables.jl")
 include("introspect.jl")
+include("compose.jl")
 include("events.jl")
 include("bond.jl")
 include("render.jl")
@@ -61,7 +63,7 @@ export AbstractInteractable, AbstractSelector, HitLayer, InteractionContext, Axi
 export PointInteractable, SegmentInteractable, RectInteractable, PolygonInteractable,
     AxisInteractable, ColorbarInteractable, LegendInteractable, RegionInteractable, FunctionInteractable,
     ThresholdInteractable, ROIInteractable, TextInteractable, ViewInteractable, SliceInteractable
-export masque, auto_interactables, data_to_image_px, hitlayers, bondtype, transform_bond
+export masque, interactables, auto_interactables, data_to_image_px, hitlayers, bondtype, transform_bond
 export InteractionEvent, ElementEvent, LegendEvent, GridCellEvent, GridWindowEvent,
     AxisEvent, ThresholdEvent, ColorbarEvent, BoundsEvent
 export Markup, @masque_str

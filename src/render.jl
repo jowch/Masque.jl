@@ -398,10 +398,22 @@ function _resolve_backend(explicit; max_width)
 end
 
 """
-    masque(fig, interactables; kwargs...) -> MasqueWidget
-    masque(fig, interactable; kwargs...)    # single-interactable convenience
+    masque(fig, xs...; auto = true, kwargs...) -> MasqueWidget
 
 Overlay `fig` with JS hit-testing and return a Pluto `@bind` source. `fig` is not mutated.
+
+`masque(fig)` overlays the figure's defaults, the list [`interactables(fig)`](@ref
+interactables) returns. Each argument after `fig` adds to them: an interactable, a vector of
+them, or `interactables(plot; …)` for one plot.
+
+- `interactables(plot; …)` replaces that plot's default layers, at the same position and with
+  the same ids.
+- An interactable whose layer id matches a default's replaces that default.
+- Anything else (`ViewInteractable`, `ThresholdInteractable`, `ROIInteractable`,
+  `PointInteractable(ax, pts)`, …) is added after the defaults, in argument order.
+
+Two layers with the same id raise `ArgumentError`. Legends link to the layers of this call.
+`auto = false` drops the defaults, so only the arguments are overlaid.
 
 The bond is `nothing` until the first commit, unless `selected=` restored one. A click is one
 [`InteractionEvent`](@ref). A `selects` [`ROIInteractable`](@ref) aimed at points commits a
@@ -410,6 +422,7 @@ The bond is `nothing` until the first commit, unless `selected=` restored one. A
 clicks. Clicks on other layers stay single events.
 
 # Keywords
+- `auto` — start from the figure's defaults. Default `true`.
 - `selected` — the selection's starting value, 1-based. One index on a point layer mounts as
   that [`ElementEvent`](@ref); `1` and `[1]` are the same. Several indices highlight those marks
   and leave the bond `nothing` (a point layer holds one event). On a `selects` point brush, `1`
@@ -440,11 +453,20 @@ clicks. Clicks on other layers stay single events.
 using Masque, CairoMakie
 fig = Figure(); ax = Axis(fig[1, 1])
 pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
-scatter!(ax, first.(pts), last.(pts))
-@bind sel masque(fig, [PointInteractable(ax, pts; payloads = ["a", "b", "c"])])
+s = scatter!(ax, first.(pts), last.(pts))
+@bind sel masque(fig)                                                # every default
+@bind sel masque(fig, interactables(s; payloads = ["a", "b", "c"]))  # one plot customised
+@bind sel masque(fig, ViewInteractable(ax))                          # defaults plus pan
+@bind sel masque(fig, PointInteractable(ax, pts); auto = false)      # only this layer
 ```
 """
-function masque(
+function masque(fig, xs...; auto::Bool = true, kwargs...)
+    ints = _assemble(fig, xs; auto)
+    auto && isempty(ints) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
+    return _masque(fig, ints; kwargs...)
+end
+
+function _masque(
         fig, interactables::AbstractVector; backend::Union{Nothing, AbstractBackend} = nothing,
         max_width = 700, selected = nothing,
         tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
@@ -476,7 +498,6 @@ function masque(
         fig.scene.backgroundcolor[] = bg0
     end
 end
-masque(fig, i::AbstractInteractable; kwargs...) = masque(fig, [i]; kwargs...)
 
 # A pan frame changes `ax.limits[]`, and a tick label that grows wider (a minus sign, one more
 # digit) moves Makie's axis box: every later frame, and the settle, would shift the frame the
@@ -503,23 +524,6 @@ function _pin_pan_ticklabelspace!(fig, interactables)
     return nothing
 end
 
-"""
-    masque(fig; selected=nothing)
-
-Auto-extract interactables from `fig` (see [`auto_interactables`](@ref)) and overlay them —
-the zero-config path. Equivalent to `masque(fig, auto_interactables(fig))`; unsupported plot
-types are skipped with a warning. For control over ids/payloads, build the vector yourself.
-"""
-function masque(fig; kwargs...)
-    # Finalize layout before auto-extraction: introspection reads post-layout axis state
-    # (e.g. `ax.finallimits[]`), which `masque(fig, ints)` only finalizes afterward.
-    _finalize!(fig)
-    # Refuse before extracting, so an `LScene` figure does not first warn about a static image.
-    _reject_unsupported_axes(fig)
-    ints = auto_interactables(fig)
-    isempty(ints) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
-    return masque(fig, ints; kwargs...)
-end
 
 # One gesture closure's compile-ahead call. `show` schedules it and returns; the closure waits
 # if a drag arrives while it is still running. Keyed by the closure so display and cancellation

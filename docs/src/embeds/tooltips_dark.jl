@@ -26,7 +26,7 @@ Hover over a point, and the tooltip is dark because the figure is. Click a point
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000010
 md"""
-Create the scatter on a dark figure, and pass the scatter to `PointInteractable`. The tooltip takes its theme from the figure's background and its border color from the marker.
+Create the scatter on a dark figure, and pass the scatter to `interactables`. The tooltip takes its theme from the figure's background and its border color from the marker.
 """
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000002
@@ -56,7 +56,7 @@ begin
         color = ["#e6194b", "#3cb44b", "#4363d8"],
         markersize = 22,
     )
-    pts = PointInteractable(ax, s; payloads = points)
+    pts = interactables(s; payloads = points)
     nothing
 end
 

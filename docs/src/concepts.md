@@ -15,9 +15,10 @@ top. A figure with several axes still needs only one `masque` call.
 
 On its own, `masque(fig)` makes every plot it recognizes interactive,
 along with every legend and colorbar. [Recipes masque(fig) extracts](@ref)
-lists the plots it knows. To choose the marks, attach your own data, or
-add something Makie did not draw, such as a draggable threshold, pass in
-your own interactables.
+lists the plots it knows. To attach your own data to a plot, or to add
+something Makie did not draw, such as a draggable threshold, pass your
+own interactables after `fig`, and the other plots stay interactive. To
+make only the marks you pass interactive, add `auto = false`.
 
 ## Interactables and payloads
 
@@ -32,7 +33,7 @@ pass `payloads` with one entry per mark, in the order you plotted them,
 as a vector of named tuples or a `DataFrame` with one row per mark:
 
 ```julia
-cities = PointInteractable(ax, s; payloads = rows)   # rows[i] belongs to point i
+cities = interactables(s; payloads = rows)   # rows[i] belongs to point i
 ```
 
 The tooltip shows the payload, and a click returns it to Julia as

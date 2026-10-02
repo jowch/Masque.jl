@@ -15,13 +15,14 @@ Main.masque_fallback("grids_heatmap")
 
 ## Hover and click cells
 
-`masque(fig)` makes every `heatmap!` and `image!` interactive. To choose
-the grid yourself, pass the plot to [`RectInteractable`](@ref). Give it
-an `id` so a `selects` box can name it and `pick.layer` tells it apart,
-for example when a figure has two grids:
+`masque(fig)` makes every `heatmap!` and `image!` interactive. Each
+grid gets a layer id, `:cells` for the first and `:cells_2` for the
+second, which a `selects` box names and `pick.layer` reports. To give a
+grid a name of your own, for example when a figure has two grids, pass
+the plot to [`interactables`](@ref) with an `id`:
 
 ```julia
-temps = RectInteractable(ax, p; id = :temps)
+@bind pick masque(fig, interactables(p; id = :temps))
 ```
 
 A click makes `pick` a [`GridCellEvent`](@ref). `pick.i` is the cell's
@@ -54,18 +55,18 @@ and its value, and a click still reports the cell's true `i` and `j`.
 A color image has no single value per cell, so hovering or clicking it
 reports `i` and `j` with `value = nothing`, at any size. To read a
 number instead, pass a [`RectInteractable`](@ref) with a grid of the
-values you want, such as each pixel's intensity.
+values you want, such as each pixel's intensity, and give it the
+image's layer id, such as `id = :cells`, so it takes the image's place.
 
 ## Brush a block of cells
 
-To select a block of cells by dragging a box over them, add an
-[`ROIInteractable`](@ref) with `selects` naming the grid, and pass both
-to `masque`:
+To select a block of cells by dragging a box over them, pass an
+[`ROIInteractable`](@ref) to `masque`, with `selects` naming the grid's
+layer id:
 
 ```julia
-cells = RectInteractable(ax, p; id = :cells)
 box = ROIInteractable(ax; bounds = (1.0, 3.0, 1.0, 2.0), selects = :cells)
-@bind win masque(fig, [cells, box])
+@bind win masque(fig, box)
 ```
 
 When you release the box, `win` is a [`GridWindowEvent`](@ref) for the

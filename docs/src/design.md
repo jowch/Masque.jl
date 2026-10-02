@@ -33,8 +33,10 @@ cells. See [Linked views](@ref).
 When two interactive plots overlap, the pointer reaches the plot that
 comes first in Masque's list, not the one drawn on top. Legend entries
 always come first and pan or orbit always comes last. In between, the
-plots keep the order you passed them in, or, with `masque(fig)`, the
-order you created them in.
+plots keep the order you created them in. An interactable you pass to
+`masque` for one of those plots takes that plot's place, and any other
+comes after them. With `auto = false`, the order is the one you pass
+them in.
 
 This matters most when you draw points over a filled shape. Here the
 polygon is created first, so with `masque(fig)` it covers the points:
@@ -52,15 +54,20 @@ end
 ```
 
 To reach the points, pass in your own list of the interactables you
-want, with the scatter before the polygon:
+want, with the scatter before the polygon, and add `auto = false` so
+that `masque` uses your list in place of its own:
 
 ```julia
-@bind pick masque(fig, [PointInteractable(ax, s), PolygonInteractable(ax, p)])
+@bind pick masque(
+    fig,
+    [PointInteractable(ax, s), PolygonInteractable(ax, p)];
+    auto = false,
+)
 ```
 
 Now each point responds when you hover or click it, and the polygon
-still responds everywhere else. Only the plots you list are
-interactive, so include every plot you want to respond.
+still responds everywhere else. With `auto = false`, only the plots you
+list are interactive, so include every plot you want to respond.
 
 The same order applies on an `Axis3`: distance from the camera does
 not decide which mark you reach. A mark on the far side of the scene

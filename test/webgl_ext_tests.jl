@@ -60,7 +60,7 @@ end
     fig = Figure(; size = (400, 300))
     ax = Axis(fig[1, 1])
     scatter!(ax, 1:5, rand(5))
-    w = masque(fig, Masque.AbstractInteractable[]; backend = _WGLExt.WebGLBackend())
+    w = masque(fig, Masque.AbstractInteractable[]; backend = _WGLExt.WebGLBackend(), auto = false)
     @test w isa _WGLExt.WebGLWidget
     @test w.scene isa Dict{String, Any}
     @test (w.width, w.height) == (400, 300)
@@ -68,7 +68,7 @@ end
     fig_v = Figure(; size = (400, 300))
     ax_v = Axis(fig_v[1, 1])
     scatter!(ax_v, 1:5, rand(5))
-    wv = masque(fig_v, [ViewInteractable(ax_v)]; backend = _WGLExt.WebGLBackend())
+    wv = masque(fig_v, [ViewInteractable(ax_v)]; backend = _WGLExt.WebGLBackend(), auto = false)
     @test wv isa _WGLExt.WebGLWidget
     @test wv.render_frame isa Function
 
@@ -131,7 +131,7 @@ end
 
     # an axis-keyed interactable must build its manifest without KeyError now
     thr = Masque.ThresholdInteractable(ax; value = 10.0)
-    w = masque(fig, [thr]; backend = _WGLExt.WebGLBackend())
+    w = masque(fig, [thr]; backend = _WGLExt.WebGLBackend(), auto = false)
     @test w isa _WGLExt.WebGLWidget
     @test !isempty(w.manifest["transforms"])
 end
@@ -315,7 +315,7 @@ end
     scatter!(ax, first.(pts), last.(pts))
     payloads = [(; label = "p1"), (; label = "p2"), (; label = "p3")]
     pt = PointInteractable(ax, pts; id = :scatter, payloads = payloads)
-    w = masque(fig, pt; backend = _WGLExt.WebGLBackend())
+    w = masque(fig, pt; backend = _WGLExt.WebGLBackend(), auto = false)
 
     ev = APD.Bonds.transform_value(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "wrong"))
     @test ev isa Masque.ElementEvent && ev.index == 2
@@ -405,7 +405,10 @@ end
     ax = Axis(fig[1, 1]; limits = (0.0, 10.0, 0.0, 5.0))
     pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]
     scatter!(ax, first.(pts), last.(pts))
-    w = masque(fig, [ViewInteractable(ax), PointInteractable(ax, pts)]; backend = _WGLExt.WebGLBackend())
+    w = masque(
+        fig, [ViewInteractable(ax), PointInteractable(ax, pts)];
+        backend = _WGLExt.WebGLBackend(), auto = false,
+    )
     @test w.render_frame isa Function
 
     resp = w.render_frame(
@@ -442,7 +445,7 @@ end
     fig3 = Figure(; size = (300, 300))
     ax3 = Axis3(fig3[1, 1])
     scatter!(ax3, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
-    w3 = masque(fig3, [ViewInteractable(ax3)]; backend = _WGLExt.WebGLBackend())
+    w3 = masque(fig3, [ViewInteractable(ax3)]; backend = _WGLExt.WebGLBackend(), auto = false)
     orb = w3.render_frame(Dict("id" => "view", "azimuth" => 0.7, "elevation" => 0.2, "settle" => false))
     @test ax3.azimuth[] ≈ 0.7 atol = 1.0e-9
     @test ax3.elevation[] ≈ 0.2 atol = 1.0e-9
@@ -456,6 +459,7 @@ end
     w0 = masque(
         fig0, [PointInteractable(ax0, [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)])];
         backend = _WGLExt.WebGLBackend(),
+        auto = false,
     )
     @test w0.render_frame === nothing
 
@@ -481,7 +485,7 @@ end
     ax = Axis3(fig[1, 1])
     scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
     az0, el0 = ax.azimuth[], ax.elevation[]
-    w = masque(fig, [ViewInteractable(ax)]; backend = _WGLExt.WebGLBackend())
+    w = masque(fig, [ViewInteractable(ax)]; backend = _WGLExt.WebGLBackend(), auto = false)
     sender = @async begin
         buf = IOBuffer()
         io = IOContext(buf, :pluto_published_to_js => (io, x) -> print(io, "null"))

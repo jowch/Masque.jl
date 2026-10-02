@@ -82,7 +82,7 @@ end
     fig = Figure(size = (300, 200))
     ax = Axis(fig[1, 1])
     hm = heatmap!(ax, 1:4, 1:3, z)
-    w = masque(fig, RectInteractable(ax, hm))
+    w = masque(fig, RectInteractable(ax, hm); auto = false)
     states = discrete_states(w.manifest)
     @test length(states) == 12
     for v in states
@@ -258,7 +258,7 @@ end
     @test occursin("`sel.index` is its position in your data", src)
     @test occursin("name = \"one\"", src)
     @test occursin("if isnothing(sel)", src)
-    @test occursin("PointInteractable(ax, s; payloads = points)", src)
+    @test occursin("interactables(s; payloads = points)", src)
 end
 
 @testset "overlay-only players set chip = false" begin
@@ -467,7 +467,7 @@ include(joinpath(@__DIR__, "..", "docs", "player_fallback.jl"))
     @test any(b -> b isa Markdown.Code && b.language == "" && b.code == "click a point", twin.content)
 
     plain = Markdown.plain(fallback_markdown(nb))
-    @test occursin("PointInteractable(ax, s; payloads = points)", plain)
+    @test occursin("interactables(s; payloads = points)", plain)
     @test !occursin("home_quickstart.png", plain)
 
     # Every Pluto-export player on the site has a twin with its `@bind` cell.

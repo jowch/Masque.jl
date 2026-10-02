@@ -49,7 +49,16 @@ string in each payload is sent once per mark, so use a template instead.
 
 To send fewer marks, plot all the points but pass only the interesting
 ones, such as outliers, a sample, or the current selection, to a
-[`PointInteractable`](@ref).
+[`PointInteractable`](@ref), and pass it to `masque` with `auto = false`
+so the other points are left out:
+
+```julia
+outliers = PointInteractable(ax, [(2.0, 9.5), (7.0, 0.3)])
+@bind pick masque(fig, outliers; auto = false)
+```
+
+With `auto = false`, only what you pass is interactive, so to keep
+another plot interactive, pass its interactables in the same call.
 
 Every change upstream renders the figure again and sends the whole
 widget again, so rebuild the figure as rarely as you can. If a figure

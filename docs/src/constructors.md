@@ -10,38 +10,48 @@ take `payloads` (a vector or a `DataFrame`, one entry per mark) and
 `tooltip` (a `masque"..."` template, or `false`). Without `payloads`,
 each mark reports its `index` and coordinates.
 
-## `masque(fig)` without interactables
+## What `masque(fig)` builds
 
-`masque(fig)` is the same as `masque(fig, auto_interactables(fig))`.
-[`auto_interactables`](@ref) makes an interactable for every plot it
-knows on each axis, plus every `Colorbar` and `Legend`, and skips any
-other plot with a warning. [Recipes masque(fig) extracts](@ref) lists
-the plots it knows.
-
-To change what it made, edit the vector and pass it to `masque`:
-
-```julia
-ints = let
-    ints = auto_interactables(fig)
-    push!(ints, AxisInteractable(ax))
-    ints
-end
-```
-
-```julia
-@bind pick masque(fig, ints)
-```
+`masque(fig)` makes an interactable for every plot it knows on each
+axis, plus every `Colorbar` and `Legend`, and skips any other plot with
+a warning. [Recipes masque(fig) extracts](@ref) lists the plots it
+knows, and [`interactables(fig)`](@ref interactables) returns the same
+list.
 
 Each layer's id is its plot type in lowercase, such as `:scatter` or
 `:lines`, with `_2`, `_3` added when a type repeats. Three are
 shortened: `heatmap!` and `image!` are `:cells`, `barplot!` is `:bars`,
 and `linesegments!` is `:segments`. `pick.layer` is that id.
 
+## Adding to what `masque(fig)` builds
+
 `masque(fig)` doesn't add axis readouts, thresholds, boxes, panning, or
-slices, so to use one, add it to the vector as above. To give a layer
-a tooltip template or a `label`, build that interactable yourself from
-the plot, for example
-`PointInteractable(ax, s; tooltip = masque"...")`.
+slices. To use one, pass it after the figure, and the plots keep their
+hover and click:
+
+```julia
+@bind pick masque(fig, AxisInteractable(ax), ViewInteractable(ax))
+```
+
+To change one plot, such as giving it a tooltip template, `payloads`,
+or a `label`, pass `interactables(plot; ...)` with the keywords you
+want. It replaces that plot's layer and keeps its id:
+
+```julia
+s = scatter!(ax, xs, ys)
+@bind pick masque(fig, interactables(s; tooltip = masque"{name}", payloads = df))
+```
+
+An interactable whose `id` matches a default layer's id also replaces
+that layer, and two layers with the same id raise an error. To overlay
+only what you pass, add `auto = false`:
+
+```julia
+@bind pick masque(fig, PointInteractable(ax, s); auto = false)
+```
+
+A recipe of your own gets layers from the plots it draws. To give it
+its own, define a method of [`interactables`](@ref) for its type.
 
 ## Marks
 
@@ -92,10 +102,10 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Contourf` | `PolygonInteractable` | `low`, `high` | `:contourf` |
 | `Violin` | `PolygonInteractable` | `x` | `:violin` |
 | `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
-| `Stem` | `masque(fig)` only | points, and stems as a second layer | `:stem`, `:stem_stems` |
-| `ScatterLines` | `masque(fig)` only | points, and the line as a second layer | `:scatterlines`, `:scatterlines_line` |
-| `BoxPlot` | `masque(fig)` only | `q1`, `median`, `q3` (the box only) | `:boxplot` |
-| `Annotation` | `masque(fig)` only | the text's fields | `:annotation` |
+| `Stem` | `interactables(p)` | points, and stems as a second layer | `:stem`, `:stem_stems` |
+| `ScatterLines` | `interactables(p)` | points, and the line as a second layer | `:scatterlines`, `:scatterlines_line` |
+| `BoxPlot` | `interactables(p)` | `q1`, `median`, `q3` (the box only) | `:boxplot` |
+| `Annotation` | `interactables(p)` | the text's fields | `:annotation` |
 
 ## Axis, legend, and drag
 
@@ -110,9 +120,9 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | [`SliceInteractable`](@ref) | `(ax, plot)` or `(ax; series, orientation=:vertical, crosshair=true, covers, tooltip)` | none; hover only | [Sample a series](@ref) |
 
 A threshold's `value` and a box's `bounds` also accept the event they
-produce, so one widget can set where another starts. A legend made by
-`masque(fig)` links each entry to its plots; `LegendInteractable(leg)`
-on its own needs `targets` for that.
+produce, so one widget can set where another starts. Without `targets`, a
+legend links each entry to the layers its plots have in the same
+`masque` call.
 
 [Supported plots and axes](@ref) lists which of these work on which
 axes.

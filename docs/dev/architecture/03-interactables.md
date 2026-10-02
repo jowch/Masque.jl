@@ -113,7 +113,7 @@ Twelve built-in types, plus the two custom-interaction types of [ยง4](04-custom-
 (`RegionInteractable`, `FunctionInteractable`). Roughly one type per hit primitive, with the
 exceptions noted inline: `:axis` is shared by two, `LegendInteractable` and `TextInteractable`
 reuse `:rects`, and the three drags each own a kind no other type produces. The "Makie surfaces"
-column is what `auto_interactables` (`src/introspect.jl`) extracts; the user-facing version of
+column is what `interactables(fig)` (`src/introspect.jl`) extracts; the user-facing version of
 this table is `docs/src/support.md`.
 
 | Type | kind(s) | Makie surfaces | payload |
@@ -137,8 +137,19 @@ Layer ids are the plot kind (`:scatter`, `:lines`, `:cells`, `:bars`, `:poly`, โ
 Wireframe/Arrows3D extract; on `PolarAxis` only Scatter/Lines/LineSegments/ScatterLines/Series.
 Other kinds on those axes are skipped with a warning.
 
+**Composing a call.** `masque(fig, xs...)` starts from `interactables(fig)` and applies each
+argument to it (`_assemble`, `src/compose.jl`). `interactables(plot; kwargs...)` is a request
+resolved once the figure is known: it rebuilds that plot's default layers with the kwargs, under
+the same ids and in the same position. Any other interactable whose `id` equals a default's
+replaces it in place; the rest are appended after the defaults, in argument order, and that
+order is hit precedence. Two layers with one id raise `ArgumentError`, and legends with no
+explicit `targets=` are relinked to the call's layers. `auto = false` starts from an empty list
+instead, so only the arguments are overlaid. A recipe supplies its own defaults by defining
+`Masque.interactables(ax, p::MyPlot; id, kwargs...)`, which the walk uses instead of the
+recipe's children.
+
 **Unknown recipes: the child walk.** A plot type with no branch of its own is not skipped
-outright. `auto_interactables` walks its `plots` children and installs each child it knows,
+outright. `interactables(fig)` walks its `plots` children and installs each child it knows,
 stopping at the first known one so a mark becomes one layer (`rainclouds!` yields `:violin`,
 `:scatter`, `:boxplot`, not also the violin's `:poly`). So `arc!` and `contour!` become `:lines`,
 `ablines!` becomes `:segments`, and `pie!` becomes `:poly`, under the child's layer id. Invisible
