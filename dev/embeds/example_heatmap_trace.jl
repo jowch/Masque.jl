@@ -40,7 +40,7 @@ begin
     ax = Axis(fig[1, 1]; xlabel = "day", yticks = (eachindex(stations), stations), title = "daily mean temperature: click a cell")
     hm = heatmap!(ax, 1:7, eachindex(stations), daily; colormap = :thermal)
     Colorbar(fig[1, 2], hm; label = "°C")
-    cells = RectInteractable(ax, hm)
+    cells = GridInteractable(ax, hm)
     nothing
 end
 

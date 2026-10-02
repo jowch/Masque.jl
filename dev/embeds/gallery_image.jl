@@ -45,7 +45,7 @@ begin
     ye = collect(0.0:1.0:ny)
     lum = [0.299 * R[i, j] + 0.587 * G[i, j] + 0.114 * B[i, j] for i in 1:nx, j in 1:ny]
     ints = [
-        RectInteractable(ax; grid = (xe, ye, lum), id = :img),
+        GridInteractable(ax, xe, ye, lum; id = :img),
         ROIInteractable(ax; bounds = (2.0, 5.0, 1.0, 4.0), selects = :img),
     ]
     nothing
