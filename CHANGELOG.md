@@ -21,6 +21,10 @@ All notable changes to this project are documented here. The format is based on
   the other element constructors: `RectInteractable(ax, rects)` and
   `RegionInteractable(ax, regions; payloads)`. `payloads` is now optional for
   `RegionInteractable` and defaults to each region's `index`.
+- Where two plots overlap, the one drawn on top now gets the pointer: on each axis, the plot
+  created last. A graph's nodes respond over its edges, and points respond over the line or
+  shape drawn before them. `interactables(fig)` lists each axis's plots in that order, the
+  plot created last first; layer ids are unchanged.
 - A legend with no `targets` links to the layers of the `masque` call it is in, including
   layers built with `interactables(plot)` and calls with `auto = false`.
 
