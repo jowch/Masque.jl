@@ -37,8 +37,8 @@ look it up with `pick`.
 
 ## Make a grid from edges and values
 
-If you have edges and values instead of a plot, pass them as `grid`.
-Each edge vector must be monotonic, either ascending or descending, and
+If you have edges and values instead of a plot, pass the x edges, the y
+edges and the values to [`GridInteractable`](@ref). Each edge vector must be monotonic, either ascending or descending, and
 the values form a matrix of size
 `(length(xedges) - 1, length(yedges) - 1)`:
 

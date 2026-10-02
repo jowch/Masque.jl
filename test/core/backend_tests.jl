@@ -116,7 +116,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test all(isfinite, q)
         @test red_near(q[1], q[2])
         # grid edges: finite, monotonic in image px (y flips: data ↑ → image y ↓), inside viewport
-        Lg = only(hitlayers(RectInteractable(axg, hm), ctxh))
+        Lg = only(hitlayers(GridInteractable(axg, hm), ctxh))
         ye = Lg.geometry["yedges"]
         vp = ctxh.transforms[:ax2].viewport
         @test all(isfinite, ye) && issorted(ye; rev = true)
