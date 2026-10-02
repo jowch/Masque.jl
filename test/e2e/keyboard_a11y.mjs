@@ -82,7 +82,6 @@ try {
   console.error(`phase: widgets mounted (${backend})`);
 
   const meta = await page.evaluate(() => JSON.parse(document.querySelector("#kind_meta").textContent));
-  const transformsOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#axes_${k}`).textContent), key);
   const layersOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#coords_${k}`).textContent), key);
   const textOf = (sel) => page.evaluate((q) => document.querySelector(q)?.innerText ?? "", sel);
 
@@ -506,24 +505,30 @@ try {
       const key = "view", id = "view";
       let s = await tabToStop(key, id);
       const n0 = s.inputs, before = await textOf(`#out_${key}`);
-      const f0 = s.frame?.n ?? 0;
-      const t0 = (await transformsOf(key));
-      const lay = (await layersOf(key)).find((l) => l.id === id);
-      // An earlier driver may have panned this view; its last frame stamp is the live window.
-      const lims0 = s.frame && Number.isFinite(s.frame.xmin) ? [s.frame.xmin, s.frame.xmax] : t0[lay.axis].xlims;
+      // Earlier drivers may have panned this view, so measure one press against the window a
+      // first press settled on.
+      const settleAfter = (n, what) => waitFor(async () => {
+        const d = await dragState(key, id);
+        return { ok: d.frame && d.frame.n > n && d.frame.settle, f: d.frame };
+      }, what);
       await page.keyboard.press("ArrowRight");
-      const settled = await waitFor(async () => { const d = await dragState(key, id); return { ok: d.frame && d.frame.n > f0 && d.frame.settle, f: d.frame }; }, `${key} settle frame`);
-      const span = lims0[1] - lims0[0];
-      if (Math.abs((settled.f.xmin - lims0[0]) - 0.1 * span) > 0.02 * span) throw new Error(`${key}: ArrowRight panned to ${JSON.stringify(settled.f)} from ${JSON.stringify(lims0)}, expected +10%`);
+      const first = await settleAfter(s.frame?.n ?? 0, `${key} settle frame`);
+      await page.keyboard.press("ArrowRight");
+      const settled = await settleAfter(first.f.n, `${key} second settle frame`);
+      const span = first.f.xmax - first.f.xmin;
+      if (Math.abs((settled.f.xmin - first.f.xmin) - 0.1 * span) > 0.02 * span) {
+        throw new Error(`${key}: ArrowRight panned ${JSON.stringify(first.f)} -> ${JSON.stringify(settled.f)}, expected +10%`);
+      }
       const f1 = settled.f.n;
       await page.keyboard.press("+");
-      const zoomed = await waitFor(async () => { const d = await dragState(key, id); return { ok: d.frame && d.frame.n > f1 && d.frame.settle, f: d.frame }; }, `${key} zoom frame`);
+      const zoomed = await settleAfter(f1, `${key} zoom frame`);
       if (!(zoomed.f.xmax - zoomed.f.xmin < span)) throw new Error(`${key}: + did not zoom in: ${JSON.stringify(zoomed.f)}`);
       s = await dragState(key, id);
       if (s.inputs !== n0) throw new Error(`${key}: a view nudge wrote the bond`);
       if ((await textOf(`#out_${key}`)) !== before) throw new Error(`${key}: a view nudge changed #out_${key}`);
       // Put the camera back for the drivers that run after this one.
       await page.keyboard.press("-");
+      await page.keyboard.press("ArrowLeft");
       await page.keyboard.press("ArrowLeft");
       await page.waitForTimeout(1500);
       passed.push(`${key}/arrow-pan+zoom+settle-no-bind`);
