@@ -1184,6 +1184,18 @@ try {
           }
           passed.push(`${key}/drawn-r`);
         }
+        // Per-point markersize: every mark ships its own drawn radius (≈0.3525·ms·2 at
+        // px_per_unit 2), so the selected smallest mark's wash is not the largest mark's size.
+        if (spec.markersizes) {
+          spec.markersizes.forEach((ms, k) => {
+            const r = Number(hitPoint(layer, k).r);
+            const drawn = Math.round(0.3525 * ms * 2);
+            if (Math.abs(r - drawn) > 1) {
+              throw new Error(`${key}: element ${k} r=${r} is not its own drawn marker (~${drawn}, markersize ${ms})`);
+            }
+          });
+          passed.push(`${key}/per-point-r`);
+        }
       }
       if (layer.kind === "rects") {
         const hp = hitPoint(layer, spec.selectedIndex);

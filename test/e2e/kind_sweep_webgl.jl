@@ -159,6 +159,15 @@ HTML(
         "<span id=\"coords_scatter_dark\" style=\"display:none\">$(JSON3.write(sweep.scatter_dark.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000068
+@bind ev_scatter_sizes sweep.scatter_sizes
+
+# ╔═╡ d1000000-0000-0000-0000-000000000069
+HTML(
+    "<span id=\"out_scatter_sizes\">SCATTER_SIZES=$(repr(ev_scatter_sizes))</span>" *
+        "<span id=\"coords_scatter_sizes\" style=\"display:none\">$(JSON3.write(sweep.scatter_sizes.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000026
 @bind ev_arrows3d sweep.arrows3d
 
@@ -326,6 +335,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000025
 # ╠═d1000000-0000-0000-0000-000000000036
 # ╠═d1000000-0000-0000-0000-000000000037
+# ╠═d1000000-0000-0000-0000-000000000068
+# ╟─d1000000-0000-0000-0000-000000000069
 # ╠═d1000000-0000-0000-0000-000000000026
 # ╠═d1000000-0000-0000-0000-000000000027
 # ╠═d1000000-0000-0000-0000-000000000028
