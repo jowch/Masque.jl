@@ -257,14 +257,11 @@ function build_kind_sweep()
         # Built from the plot object (not raw pts) so PointInteractable resolves `colors` from
         # `color=` — the mark-colour-derivation check needs a resolvable mark colour.
         sc = scatter!(ax, first.(pts), last.(pts); color = :gray, markersize = 22)
+        # `interactables(sc; …)` replaces the scatter's default layer and keeps its id.
         masque(
             fig,
-            PointInteractable(
-                ax, sc; id = :scatter,
-                payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")],
-            );
+            interactables(sc; payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")]);
             selected = Dict(:scatter => [2]),
-            auto = false,
         )
     end
 
@@ -445,14 +442,12 @@ function build_kind_sweep()
         pts = [(1.0, 1.0), (3.0, 3.0), (5.0, 5.0), (7.0, 7.0), (9.0, 9.0)]
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "roi", limits = (0, 10, 0, 10))
-        scatter!(ax, first.(pts), last.(pts); markersize = 14, color = :gray)
+        sc = scatter!(ax, first.(pts), last.(pts); markersize = 14, color = :gray)
+        # The scatter's default layer, renamed, plus a box added after it.
         masque(
             fig,
-            [
-                PointInteractable(ax, pts; id = :pts),
-                ROIInteractable(ax; bounds = (2.0, 6.0, 2.0, 6.0), selects = :pts, id = :roi),
-            ];
-            auto = false,
+            interactables(sc; id = :pts),
+            ROIInteractable(ax; bounds = (2.0, 6.0, 2.0, 6.0), selects = :pts, id = :roi),
         )
     end
 
@@ -460,8 +455,8 @@ function build_kind_sweep()
         pts = [(1.0, 1.0), (7.0, 1.0), (1.0, 7.0), (7.0, 7.0)]
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "view-pan", limits = (0, 8, 0, 8))
-        scatter!(ax, first.(pts), last.(pts); markersize = 14, color = :gray)
-        masque(fig, [PointInteractable(ax, pts; id = :pts), ViewInteractable(ax; id = :view)]; auto = false)
+        sc = scatter!(ax, first.(pts), last.(pts); markersize = 14, color = :gray)
+        masque(fig, interactables(sc; id = :pts), ViewInteractable(ax; id = :view))
     end
 
     legend = let
