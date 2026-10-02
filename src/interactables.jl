@@ -319,11 +319,12 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
 - `payloads` — one entry per point (`ArgumentError` if the length doesn't match `points`), or a
   `DataFrame` with one row per point once DataFrames is loaded. Default: `(; index, x, y)`, or
   `(; index, x, y, z)` for 3-coordinate points — `index` is 1-based.
-- `radius` — highlight and click-target radius in px (scaled to the rendered image's DPI),
-  the same for every point. Default `nothing`: use the drawn radius of the one `Scatter` on
-  `ax` with these positions (see below). If none matches, or more than one does, assume
-  Makie's default `:circle` at the theme `markersize` (radius ≈0.3525×`markersize`; the theme
-  default markersize is 9). Pass a number to override. A matched marker with no readable bbox
+- `radius` — highlight and click-target radius in px (scaled to the rendered image's DPI): a
+  number for every point, or a vector with one per point. Default `nothing`: use the drawn
+  radius of the one `Scatter` on `ax` with these positions (see below), per point when its
+  `markersize` is per point. If none matches, or more than one does, assume Makie's default
+  `:circle` at the theme `markersize` (radius ≈0.3525×`markersize`; the theme default
+  markersize is 9). Pass a number or vector to override. A matched marker with no readable bbox
   (a `Char`, an image, a per-element vector of markers) keeps the `markersize / 2` bound.
 - `radius3d` — per-point data-space half-extents (`Vector{Makie.Vec3f}`), for markers whose
   on-screen size is camera/depth-dependent (e.g. `meshscatter`). When set, overrides `radius`
@@ -376,7 +377,9 @@ PointInteractable(ax, p)   # the usual call; same radius, and colors from p
 ```
 """
 struct PointInteractable <: AbstractInteractable
-    ax; points::Vector{Point3f}; id::Symbol; payloads::Vector{Any}; radius::Float64
+    ax; points::Vector{Point3f}; id::Symbol; payloads::Vector{Any}
+    # px, one for every point or one per point
+    radius::Union{Float64, Vector{Float64}}
     # Data-space half-extents (meshscatter markers are data-sized); overrides `radius` via an
     # axis-aligned pixel-radius approximation that can underestimate the true silhouette
     # (worst case ~29%, at adversarial azimuth/elevation).
@@ -404,8 +407,14 @@ function PointInteractable(
     colors = _check_colors(colors, length(pts))
     # `nothing` looks the radius up (`_point_radius`, introspect.jl). A passed number wins,
     # including the `9` the MeshScatter constructor still forwards when it has no pixel radius.
-    r = radius === nothing ? _point_radius(ax, pts) : Float64(radius)
+    r = _check_radius(radius === nothing ? _point_radius(ax, pts) : radius, length(pts))
     return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors)
+end
+function _check_radius(r, n)
+    r isa AbstractVector || return Float64(r)
+    length(r) == n ||
+        throw(ArgumentError("radius must be a number or have one entry per point (got $(length(r)) for $n)"))
+    return Vector{Float64}(r)
 end
 tooltip_spec(i::PointInteractable) = i.tooltip
 # Max projected displacement over the ±axis half-extents; non-finite offsets are skipped.
@@ -425,7 +434,11 @@ function hitlayers(i::PointInteractable, ctx)
     g = Real[]
     for (k, p) in enumerate(i.points)
         q = _proj(ctx, i.ax, p)
-        r = i.radius3d === nothing ? i.radius * ctx.scaling : _px_radius3d(ctx, i.ax, p, i.radius3d[k], q)
+        r = if i.radius3d !== nothing
+            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q)
+        else
+            (i.radius isa Vector ? i.radius[k] : i.radius) * ctx.scaling
+        end
         append!(g, (_q(q[1]), _q(q[2]), _q(r)))
     end
     return [HitLayer(i.id, :circles, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label, i.colors)]

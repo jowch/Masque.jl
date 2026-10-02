@@ -113,6 +113,14 @@ kind_sweep_meta() = [
         "tip" => "beta", "hoverIndex" => 0, "hoverTip" => "alpha", "mode" => "element",
     ),
     Dict(
+        # Per-point markersize (graphplot's `node_size`): each mark keeps its own radius, so the
+        # selected small mark's wash hugs it rather than the largest mark's size.
+        "key" => "scatter_sizes", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 0, "clickIndex" => 2,
+        "tip" => "small", "hoverIndex" => 2, "hoverTip" => "large", "mode" => "element",
+        "markersizes" => [10, 20, 34],
+    ),
+    Dict(
         "key" => "arrows3d", "layerId" => "arrows3d", "layerKind" => "segments",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "index", "hoverIndex" => 1, "hoverTip" => "index", "mode" => "element",
@@ -414,6 +422,17 @@ function build_kind_sweep()
         )
     end
 
+    scatter_sizes = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "scatter-sizes")
+        sc = scatter!(ax, [1.0, 2.0, 3.0], [1.0, 2.0, 1.2]; color = :gray, markersize = [10, 20, 34])
+        masque(
+            fig,
+            interactables(sc; payloads = [(; label = "small"), (; label = "medium"), (; label = "large")]);
+            selected = Dict(:scatter => [1]),
+        )
+    end
+
     arrows3d = let
         fig = Figure(size = (480, 320))
         ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "arrows3d")
@@ -610,7 +629,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, regions,
-        polar, scatter_dark, arrows3d, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, scatter_dark, scatter_sizes, arrows3d, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
 end

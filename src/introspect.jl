@@ -14,9 +14,21 @@ function _marker_radius(p)
             "derived from markersize for :pixel markers (the default). Pass radius=… explicitly."
     )
     ms = p.markersize[]
-    d = ms isa AbstractVector ? (isempty(ms) ? 0.0 : Float64(maximum(ms))) : Float64(ms)
-    return d * _marker_extent_factor(p.marker[]) / 2
+    f = _marker_extent_factor(p.marker[])
+    # A per-point markersize gives a per-point radius, so a small marker does not take the
+    # largest one's ring (graphplot's `node_size`, `scatter(…; markersize = [...])`).
+    _per_point(ms) || return _ms_extent(ms) * f / 2
+    return Float64[_ms_extent(m) * f / 2 for m in ms]
 end
+
+# One diameter for a markersize element: a number, or a `Vec2f` (width, height), which is what
+# Makie converts a per-point vector of numbers to. A non-square marker takes its larger side, so
+# the click target never undershoots it.
+_ms_extent(m::Real) = Float64(m)
+_ms_extent(m) = Float64(maximum(m))
+# A `Vec2f` is itself an `AbstractVector`: one size, not one per point.
+_per_point(ms) = ms isa AbstractVector && !(ms isa Makie.VecTypes)
+_ms_diameter(ms) = !_per_point(ms) ? _ms_extent(ms) : isempty(ms) ? 0.0 : maximum(_ms_extent, ms)
 
 # Drawn extent of one marker as a fraction of markersize (1.0 = fills the markersize square, e.g.
 # Makie's default :circle draws a BezierPath disc scaled to a 0.705·markersize bounding box, not
@@ -49,8 +61,7 @@ end
 # constructor's fallback when no single scatter matches — default `:circle`, not a fixed 9.
 function _theme_markersize()
     ms = Makie.theme(:markersize)
-    v = ms isa Makie.Observable ? ms[] : ms
-    return v isa AbstractVector ? (isempty(v) ? 0.0 : Float64(maximum(v))) : Float64(v)
+    return _ms_diameter(ms isa Makie.Observable ? ms[] : ms)
 end
 _default_circle_radius() = _theme_markersize() * _marker_extent_factor(:circle) / 2
 
