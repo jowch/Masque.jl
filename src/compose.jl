@@ -116,20 +116,30 @@ function _flatten_args!(out, x)
     return out
 end
 
-# Build `r` under `id` when given, else under the first free id from its base. Building
-# once under the base gives each part's suffix (`:stem` and `:stem_stems`); numbering keeps
-# the suffix, as the defaults do (`:stem_2`, `:stem_2_stems`).
+# Build `r` under `id` when given, else under the first free id from its base. Layers of one
+# plot share its first id as a prefix (`:stem`, `:stem_stems`), and numbering keeps the
+# suffix, as the defaults do (`:stem_2`, `:stem_2_stems`). So an id is free when it is not
+# taken and no taken id extends it with a suffix: `:stem_stems` claims `:stem`, while
+# `:stem_2` and `:stem_2_stems` do not, since their tail starts with a digit.
 function _build_fresh(r::_PlotRequest, ax, taken)
     haskey(r.kwargs, :id) && return interactables(ax, r.plot; r.kwargs...)
     base = _base(ax, r.plot)
-    built = interactables(ax, r.plot; r.kwargs..., id = base)
-    suffixes = [chopprefix(string(_layer_id(b)), string(base)) for b in built]
     n = 1
-    while any(sfx -> Symbol(n == 1 ? base : Symbol(base, :_, n), sfx) in taken, suffixes)
+    while _claimed(n == 1 ? base : Symbol(base, :_, n), taken)
         n += 1
     end
-    n == 1 && return built
-    return interactables(ax, r.plot; r.kwargs..., id = Symbol(base, :_, n))
+    return interactables(ax, r.plot; r.kwargs..., id = n == 1 ? base : Symbol(base, :_, n))
+end
+
+function _claimed(id, taken)
+    pre = string(id, "_")
+    return any(taken) do t
+        t === id && return true
+        s = string(t)
+        startswith(s, pre) || return false
+        tail = chopprefix(s, pre)
+        return !isempty(tail) && !isdigit(first(tail))
+    end
 end
 
 """

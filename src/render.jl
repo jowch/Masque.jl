@@ -462,7 +462,7 @@ s = scatter!(ax, first.(pts), last.(pts))
 """
 function masque(fig, xs...; auto::Bool = true, kwargs...)
     ints = _assemble(fig, xs; auto)
-    isempty(ints) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
+    auto && isempty(ints) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
     return _masque(fig, ints; kwargs...)
 end
 

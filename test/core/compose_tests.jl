@@ -9,7 +9,9 @@ function Makie.plot!(p::ComposeDots)
     scatter!(p, p.positions)
     return p
 end
+const COMPOSEDOTS_BUILDS = Ref(0)
 function Masque.interactables(ax, p::ComposeDots; id = :composedots, kwargs...)
+    COMPOSEDOTS_BUILDS[] += 1
     return AbstractInteractable[PointInteractable(ax, p.positions[]; id, payloads = ["dot $k" for k in eachindex(p.positions[])], kwargs...)]
 end
 
@@ -122,6 +124,27 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         out = assemble(f, interactables(d; tooltip = false))
         @test ids(out) == [:composedots, :composedots_2]
         @test out[1].tooltip === false
+        # A fresh id is picked before the method runs, so each request builds once.
+        COMPOSEDOTS_BUILDS[] = 0
+        e = composedots!(ax, [Point2f(4, 4)])
+        @test ids(assemble(f, interactables(d), interactables(e); auto = false)) == [:composedots, :composedots_2]
+        @test COMPOSEDOTS_BUILDS[] == 2
+    end
+
+    @testset "fresh ids skip a taken id and the layers that extend it" begin
+        f = Figure(); ax = Axis(f[1, 1])
+        st1 = stem!(ax, xs, ys); st2 = stem!(ax, xs, ys .+ 1)
+        @test ids(assemble(f, interactables(st1), interactables(st2); auto = false)) ==
+            [:stem, :stem_stems, :stem_2, :stem_2_stems]
+        @test ids(assemble(f, PointInteractable(ax, collect(zip(xs, ys)); id = :stem_stems), interactables(st1); auto = false)) ==
+            [:stem_stems, :stem_2, :stem_2_stems]
+    end
+
+    @testset "interactables(boxplot) passes the box keywords through" begin
+        f = Figure(); ax = Axis(f[1, 1])
+        b = boxplot!(ax, repeat(1:2, 10), randn(20))
+        out = assemble(f, interactables(b; clamp_to_viewport = true))
+        @test only(out) isa RectInteractable && only(out).clamp_to_viewport
     end
 
     @testset "errors point at the call" begin
@@ -158,6 +181,9 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test [L["id"] for L in w.manifest["layers"]] == ["lines", "scatter", "view"]
         w = masque(f, ViewInteractable(ax); auto = false)
         @test [L["id"] for L in w.manifest["layers"]] == ["view"]
+        # No defaults asked for, so an empty overlay is not a failed walk.
+        w = @test_logs masque(f; auto = false)
+        @test isempty(w.manifest["layers"])
         w = masque(f; selected = Dict(:scatter => [2]))
         @test only(filter(L -> L["id"] == "scatter", w.manifest["layers"]))["selected"] == [1]
     end

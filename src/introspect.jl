@@ -413,16 +413,16 @@ function _boxplot_payloads(statscv)
             for k in eachindex(medians)
     ]
 end
-function _boxplot_interactable(ax, p; id = :boxplot, payloads = nothing, tooltip = nothing, label = nothing)
+function _boxplot_interactable(ax, p; id = :boxplot, payloads = nothing, kw...)
     node = _boxplot_stats_node(p)
     boxpoly = _childof(node, Makie.Poly)
     geom = _conv(boxpoly)[1]
     pl = payloads === nothing ? _boxplot_payloads(_conv(node)) : payloads
     if eltype(geom) <: _GB.HyperRectangle
         rects = [(r.origin[1] + r.widths[1] / 2, r.origin[2] + r.widths[2] / 2, r.widths[1], r.widths[2]) for r in geom]
-        return RectInteractable(ax; rects, id, payloads = pl, tooltip, label)
+        return RectInteractable(ax; rects, id, payloads = pl, kw...)
     else
-        return PolygonInteractable(ax, geom; id, payloads = pl, tooltip, label)   # notched: Vector{Vector{Point}}
+        return PolygonInteractable(ax, geom; id, payloads = pl, kw...)   # notched: Vector{Vector{Point}}
     end
 end
 
