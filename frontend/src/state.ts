@@ -209,6 +209,9 @@ export interface OverlayState {
     photoAnchor_: { x: number; y: number } | null
     photoViewId_: string | null
     wheelTimer_: ReturnType<typeof setTimeout> | null
+    // A keyboard pan or orbit (dragkeys.ts) is between its first keydown and its keyup settle.
+    // A frame that lands meanwhile keeps the readout, as it does for a pointer pan or a wheel.
+    keyView_: boolean
 }
 
 export function createOverlayState(): OverlayState {
@@ -244,6 +247,7 @@ export function createOverlayState(): OverlayState {
         photoAnchor_: null,
         photoViewId_: null,
         wheelTimer_: null,
+        keyView_: false,
     }
 }
 

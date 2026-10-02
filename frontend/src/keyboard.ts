@@ -57,7 +57,7 @@ function announceText(ref: FocusRef, plain: string): string {
     return plain ? `${prefix}${pos}: ${plain}` : `${prefix}${pos}`
 }
 
-function scheduleAnnounce(ctx: OverlayCtx, state: OverlayState, text: string): void {
+export function scheduleAnnounce(ctx: OverlayCtx, state: OverlayState, text: string): void {
     if (state.announceTimer_ != null) clearTimeout(state.announceTimer_)
     state.announceTimer_ = setTimeout(() => {
         state.announceTimer_ = null
