@@ -39,8 +39,8 @@ begin
     fig = Figure(size = (560, 380))
     ax = Axis(fig[1, 1]; title = "drag the box")
     s = scatter!(ax, xs, ys; color = map(g -> g == "A" ? :steelblue : :darkorange, grp), markersize = 14)
-    pts = PointInteractable(
-        ax, s;
+    pts = interactables(
+        s;
         id = :pts,
         payloads = [(; group = grp[i], x = xs[i], y = ys[i]) for i in eachindex(xs)],
     )
@@ -54,7 +54,7 @@ md"""
 """
 
 # ╔═╡ a1410007-0001-4000-8000-000000000003
-@bind picks masque(fig, [pts, roi])
+@bind picks masque(fig, pts, roi)
 
 # ╔═╡ a1410007-0001-4000-8000-000000000012
 md"""

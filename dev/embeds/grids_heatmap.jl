@@ -26,7 +26,7 @@ Click a cell, and the last cell shows its indices and value.
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000010
 md"""
-Create the heatmap the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Passing the plot to `RectInteractable` makes each cell clickable.
+Create the heatmap the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. `masque` makes each cell clickable.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000002
@@ -40,7 +40,6 @@ begin
     fig = Figure(size = (560, 320))
     ax = Axis(fig[1, 1]; xlabel = "i", ylabel = "j")
     p = heatmap!(ax, 1:4, 1:3, z)
-    cells = RectInteractable(ax, p)
     nothing
 end
 
@@ -50,7 +49,7 @@ md"""
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000003
-@bind pick masque(fig, cells)
+@bind pick masque(fig)
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000012
 md"""

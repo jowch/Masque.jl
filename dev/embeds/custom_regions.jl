@@ -50,11 +50,11 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`, while hovering only shows the tooltip and leaves `pick` as it was.
+`auto = false` leaves out the image's own cells, so only the regions respond. `@bind pick` saves a click in `pick`, while hovering only shows the tooltip and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind pick masque(fig, hits)
+@bind pick masque(fig, hits; auto = false)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""

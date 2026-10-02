@@ -47,9 +47,8 @@ begin
     )
     markersize = 16
     sc = scatter!(ax, xs, ys; color = palette, markersize)
-    tips = PointInteractable(
-        ax, sc;
-        id = :stars,
+    tips = interactables(
+        sc;
         payloads = [(; name = s.name, type = s.type, dist = s.dist) for s in stars],
         tooltip = masque"<b>$(name)</b><br>$(type)<br>$(dist) ly",
     )

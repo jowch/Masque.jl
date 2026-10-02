@@ -42,8 +42,8 @@ begin
     ax = Axis(fig[1, 1]; xlabel = "Longitude", ylabel = "Latitude")
     markersize = 16
     sc = scatter!(ax, xs, ys; color = palette, markersize)
-    pts = PointInteractable(
-        ax, sc;
+    pts = interactables(
+        sc;
         id = :pts,
         payloads = [(; name = s.name, region = s.region) for s in samples],
         tooltip = masque"<b>$(name)</b><br>$(region)",
@@ -53,7 +53,7 @@ begin
 end
 
 # ╔═╡ c0e10004-0001-4000-8000-000000000003
-@bind picks masque(fig, [pts, roi])
+@bind picks masque(fig, pts, roi)
 
 # ╔═╡ c0e10004-0001-4000-8000-000000000004
 if isnothing(picks)

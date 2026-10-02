@@ -27,7 +27,7 @@ Click a point on the left, and the plot on the right highlights the same sample,
 
 # ╔═╡ a1410002-0001-4000-8000-000000000010
 md"""
-Create the scatter, pass it to `PointInteractable`, and store the click with `@bind pick`.
+Create the scatter and store the click with `@bind pick`.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000002
@@ -38,12 +38,11 @@ begin
     fig_l = Figure(size = (420, 300))
     ax_l = Axis(fig_l[1, 1]; ylabel = "y", title = "click to select")
     s_left = scatter!(ax_l, xs, ys; color = :teal, markersize = 20)
-    left = PointInteractable(ax_l, s_left)
     nothing
 end
 
 # ╔═╡ a1410002-0001-4000-8000-000000000003
-@bind pick masque(fig_l, left)
+@bind pick masque(fig_l)
 
 # ╔═╡ a1410002-0001-4000-8000-000000000011
 md"""
@@ -67,13 +66,12 @@ begin
     fig_r = Figure(size = (420, 300))
     ax_r = Axis(fig_r[1, 1]; ylabel = "z", title = "the same sample, against z")
     s_right = scatter!(ax_r, xs, zs; color = :teal, markersize = 20)
-    right = PointInteractable(ax_r, s_right)
     held = isnothing(pick) ? Int[] : Int[pick.index]
     nothing
 end
 
 # ╔═╡ a1410002-0001-4000-8000-000000000006
-@bind right_click masque(fig_r, right; selected = held)
+@bind right_click masque(fig_r; selected = held)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
