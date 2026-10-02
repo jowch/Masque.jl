@@ -62,17 +62,17 @@ constructors that take positions accept it:
 [`RectInteractable`](@ref) with `rects =`, and
 [`PolygonInteractable`](@ref).
 
-```julia
-masque(fig, [
-    PointInteractable(ax, pts; id = :cities, label = "City"),
-    RectInteractable(ax; rects = bars, id = :bars, label = "Revenue by quarter"),
-])
-```
+`masque(fig)` on its own sets no labels. To name the layers it builds
+for your plots, pass each plot to [`interactables`](@ref) with a
+`label`, here for a scatter `s` and a barplot `b`:
 
-The forms that take a Makie plot accept `label` too, as in
-`PointInteractable(ax, s; label = "City")` for a scatter `s`.
-`masque(fig)` on its own sets no labels, so to name a layer, build its
-interactable yourself.
+```julia
+masque(
+    fig,
+    interactables(s; label = "City"),
+    interactables(b; label = "Revenue by quarter"),
+)
+```
 
 A payload field called `label`, as in `(city = "Tokyo", label =
 "capital")`, is different: it belongs to one mark and shows in that

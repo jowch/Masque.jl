@@ -40,7 +40,8 @@ Hover over a colorbar to see the value its color stands for, and click
 it to set `pick` to a [`ColorbarEvent`](@ref) with `pick.value`.
 `masque(fig)` adds a [`ColorbarInteractable`](@ref) for every
 `Colorbar` in the figure. To get the colorbar without the heatmap's
-cells in the same widget, create one yourself:
+cells in the same widget, create one yourself and pass it with
+`auto = false`, which leaves out everything else `masque` would add:
 
 ```julia
 begin
@@ -55,7 +56,7 @@ end
 ```
 
 ```julia
-@bind pick masque(fig, cbint)
+@bind pick masque(fig, cbint; auto = false)
 ```
 
 A later cell could use `pick.value` as a contour level or a threshold
@@ -81,8 +82,11 @@ end
 ```
 
 ```julia
-@bind level masque(fig, cutoff)
+@bind level masque(fig, cutoff; auto = false)
 ```
+
+`auto = false` keeps the points from responding to clicks, so `level`
+only ever holds the line's position.
 
 The line follows your drag, and when you release it, `level` becomes a
 [`ThresholdEvent`](@ref) whose `level.value` is the line's new position

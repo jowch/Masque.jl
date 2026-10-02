@@ -26,7 +26,7 @@ begin
     fig = Figure(size = (560, 320))
     ax = Axis(fig[1, 1]; xlabel = "longitude", ylabel = "latitude")
     s = scatter!(ax, [139.7, 77.2, 121.5], [35.7, 28.6, 31.2]; markersize = 16)
-    pts = PointInteractable(ax, s; payloads = cities)
+    pts = interactables(s; payloads = cities)
     nothing
 end
 ```

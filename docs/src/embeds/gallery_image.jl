@@ -53,11 +53,11 @@ end
 
 # ╔═╡ a1410008-0001-4000-8000-000000000011
 md"""
-`@bind region` stores the pixel ranges inside the box when you release it.
+`@bind region` stores the pixel ranges inside the box when you release it. `auto = false` leaves out the image's own cells, so the pointer reaches only the brightness grid and the box.
 """
 
 # ╔═╡ a1410008-0001-4000-8000-000000000003
-@bind region masque(fig, ints)
+@bind region masque(fig, ints; auto = false)
 
 # ╔═╡ a1410008-0001-4000-8000-000000000012
 md"""

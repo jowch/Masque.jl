@@ -22,8 +22,8 @@ respond.
 ## Pan and zoom a 2D axis
 
 `masque(fig)` does not add panning on its own, so pass a
-`ViewInteractable` for the axis you want to move, along with the other
-interactables you want:
+`ViewInteractable` for the axis you want to move. The plots on the axis
+still respond as they do with `masque(fig)`:
 
 ```julia
 begin
@@ -33,13 +33,12 @@ begin
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
     s = scatter!(ax, xs, ys; color = :dodgerblue, markersize = 18)
     pan = ViewInteractable(ax)
-    pts = PointInteractable(ax, s)
     nothing
 end
 ```
 
 ```julia
-@bind pick masque(fig, [pan, pts])
+@bind pick masque(fig, pan)
 ```
 
 Drag the plot to pan, and scroll to zoom around the pointer. The axis
@@ -90,7 +89,7 @@ end
 ```
 
 ```julia
-@bind pick masque(fig, [orbit, PointInteractable(ax, s)])
+@bind pick masque(fig, orbit)
 ```
 
 ## When the figure is rebuilt

@@ -45,7 +45,7 @@ In your own notebook, `@bind pick` saves a click in `pick`, with its position in
 """
 
 # ╔═╡ b18a0001-0001-4000-8000-000000000003
-@bind pick masque(fig, ints)
+@bind pick masque(fig, ints; auto = false)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

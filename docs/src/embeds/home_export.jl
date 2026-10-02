@@ -123,9 +123,8 @@ begin
     )
     xlims!(ax, -74.28, -73.68)
     ylims!(ax, 40.48, 40.93)
-    regions = PolygonInteractable(
-        ax, rings;
-        id = :boroughs,
+    regions = interactables(
+        p;
         payloads = [(; borough = b.name, pop = b.pop) for b in boroughs],
         tooltip = masque"<b>$(borough)</b><br>$(pop:,) people",
     )

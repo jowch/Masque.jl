@@ -17,7 +17,7 @@ are not exported, so get them with `Base.get_extension`:
 
 ```julia
 masque(
-    fig, interactables;
+    fig;
     backend = Base.get_extension(Masque, :MasqueWGLMakieExt).WebGLBackend(;
         px_per_unit = 3.0,
     ),

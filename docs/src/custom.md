@@ -93,8 +93,12 @@ end
 ```
 
 ```julia
-@bind pick masque(fig, track)
+@bind pick masque(fig, track; auto = false)
 ```
+
+`auto = false` leaves out the layer `masque` would add for the
+`linesegments!` plot itself, so each segment responds once, through
+`track`.
 
 How a layer's `geometry` is laid out depends on the layer's kind: it
 is a flat vector of image pixels for most kinds, and a vector of paths
@@ -184,8 +188,11 @@ end
 ```
 
 ```julia
-@bind pick masque(fig, cities)
+@bind pick masque(fig, cities; auto = false)
 ```
+
+`auto = false` leaves out the layer `masque` would add for the scatter
+itself, so a click on a city reaches `cities` and returns a `CityPick`.
 
 ```julia
 isnothing(pick) ? "click a city" : "$(pick.city), $(pick.pop) million"

@@ -8,7 +8,7 @@ The examples on this page use a scatter of cities, with each city's
 name in its payload's `city` field:
 
 ```julia
-cities = PointInteractable(ax, s; id = :cities, payloads = rows)
+cities = interactables(s; id = :cities, payloads = rows)
 @bind pick masque(fig, cities)
 ```
 

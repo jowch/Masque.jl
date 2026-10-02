@@ -37,7 +37,7 @@ begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "Longitude", ylabel = "Latitude")
     s = scatter!(ax, lon, lat; markersize = 18)
-    cities = PointInteractable(ax, s; id = :cities, payloads = rows)
+    cities = interactables(s; id = :cities, payloads = rows)
     nothing
 end
 
