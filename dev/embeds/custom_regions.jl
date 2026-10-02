@@ -42,7 +42,7 @@ begin
     ]
     names = [(; name = "cell A"), (; name = "cell B"), (; name = "cell C")]
     hits = RegionInteractable(
-        ax; regions, payloads = names, id = :cells,
+        ax, regions; payloads = names, id = :cells,
         tooltip = masque"<b>$(name)</b>",
     )
     nothing
