@@ -110,6 +110,25 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test PointInteractable(axp, pp).radius ≈ 0.3525 * 22
         end
 
+        @testset "per-point markersize -> per-point radius" begin
+            # Makie converts a per-point markersize vector to `Vector{Vec2f}`; that used to
+            # throw a MethodError and take the whole widget down (graphplot's `node_size`).
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1])
+            p = scatter!(a, [1.0, 2.0, 3.0], [1.0, 4.0, 9.0]; markersize = [10, 20, 30])
+            q = scatter!(a, [5.0, 6.0], [1.0, 2.0]; markersize = (8, 24))   # one non-square size
+            _, _, c = ctx_for(f)
+            @test PointInteractable(a, p).radius ≈ 0.3525 .* [10, 20, 30]
+            L = only(hitlayers(PointInteractable(a, p), c))
+            rs = L.geometry[3:3:end]
+            @test rs[1] < rs[2] < rs[3]
+            @test geom(PointInteractable(a, p), c) == geom(PointInteractable(a, p.converted[][1]; radius = 0.3525 .* [10, 20, 30]), c)
+            @test PointInteractable(a, q).radius ≈ 0.3525 * 24
+            # the points constructor picks the per-point radii up from the matching scatter
+            @test PointInteractable(a, [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]).radius ≈ 0.3525 .* [10, 20, 30]
+            @test_throws ArgumentError PointInteractable(a, [(1.0, 1.0)]; radius = [3, 4])
+            @test length(masque(f).manifest["layers"]) == 2
+        end
+
         @testset "lines -> one whole line, linesegments -> (:pairs)" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             pl = lines!(a, [0.0, 1.0, 2.0, 3.0], [0.0, 2.0, 1.0, 3.0])

@@ -47,6 +47,12 @@ All notable changes to this project are documented here. The format is based on
   positionally, `RectInteractable(ax, rects)` and `RegionInteractable(ax, regions)`. The keyword
   forms will be removed in 0.3.
 
+### Fixed
+- `masque(fig)` no longer fails when a scatter has one marker size per point
+  (`scatter!(…; markersize = [10, 20, 30])`, or a GraphMakie `graphplot` with `node_size` or
+  `ilabels`). Each point now gets a highlight and click target the size of its own marker.
+  `PointInteractable`'s `radius` also takes one value per point.
+
 ## [0.1.1] - 2026-10-01
 
 ### Changed
