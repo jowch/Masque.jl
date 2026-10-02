@@ -468,7 +468,7 @@ try {
       img: img ? img.naturalWidth : -1,
     };
   });
-  if (!twin.text.includes("PointInteractable(ax, s; payloads = points)") || !twin.text.includes("@bind sel masque(fig, pts)")) {
+  if (!twin.text.includes("interactables(s; payloads = points)") || !twin.text.includes("@bind sel masque(fig, pts)")) {
     throw new Error(`text twin is missing the quick start code: ${JSON.stringify(twin.text.slice(0, 300))}`);
   }
   if (!twin.text.includes("click a point")) throw new Error("text twin is missing the idle readout");
@@ -476,7 +476,7 @@ try {
   await blocked.close();
 
   const index = readFileSync(join(root, "search_index.js"), "utf8");
-  if (!index.includes("PointInteractable(ax, s; payloads = points)")) {
+  if (!index.includes("interactables(s; payloads = points)")) {
     throw new Error("search_index.js does not carry the quick start's code");
   }
   console.log(`E2E OK [docs player] — CDN blocked: text twin opened (${twin.codeBlocks} code blocks, figure ${twin.img}px), code is in the search index`);
