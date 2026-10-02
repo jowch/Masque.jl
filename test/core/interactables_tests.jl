@@ -207,7 +207,7 @@ struct _NotReal end
         # other kinds are untouched — no "tol" key, manifest byte-identical to before this feature
         d_pt = only(build_manifest([PointInteractable(axt, [(1.0, 1.0)])], ctxt)["layers"])
         @test !haskey(d_pt, "tol")
-        d_rect = only(build_manifest([RectInteractable(axt; rects = [(1.0, 1.0, 1.0, 1.0)])], ctxt)["layers"])
+        d_rect = only(build_manifest([RectInteractable(axt, [(1.0, 1.0, 1.0, 1.0)])], ctxt)["layers"])
         @test !haskey(d_rect, "tol")
         # Masque.hit_tol interface: nothing by default, i.tol for SegmentInteractable
         @test Masque.hit_tol(PointInteractable(axt, [(1.0, 1.0)])) === nothing
@@ -289,7 +289,7 @@ struct _NotReal end
         @test only(hitlayers(SegmentInteractable(ax, pts; mode = :polyline), ctx)).kind === :polyline
         @test only(hitlayers(AxisInteractable(ax), ctx)).geometry === nothing
         ri = RegionInteractable(
-            ax; regions = [(:circle, (1.0, 1.0), 10), (:rect, (2.0, 4.0), 1.0, 2.0)],
+            ax, [(:circle, (1.0, 1.0), 10), (:rect, (2.0, 4.0), 1.0, 2.0)];
             payloads = ["a", "b"], tooltip = masque"region"
         )
         @test Set(L.kind for L in hitlayers(ri, ctx)) == Set([:circles, :rects])
@@ -387,7 +387,7 @@ struct _NotReal end
             @test occursin("1:3", sprint(showerror, err_oob))
 
             # supported kinds still accept in-range indices (rects list + polygons + polyline)
-            rects = RectInteractable(bax; rects = [(1.0, 1.0, 0.5, 0.5), (2.0, 2.0, 0.5, 0.5)], id = :boxes)
+            rects = RectInteractable(bax, [(1.0, 1.0, 0.5, 0.5), (2.0, 2.0, 0.5, 0.5)]; id = :boxes)
             mr = build_manifest([rects], bctx; selected = Dict(:boxes => [2]))
             @test mr["layers"][1]["selected"] == [1]
             polys = PolygonInteractable(bax, [[(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]]; id = :poly)
@@ -476,9 +476,9 @@ struct _NotReal end
         fig = Figure(); ax = Axis(fig[1, 1])
         # RectInteractable list: 2 rects, wrong + right payload counts
         rects = [(0.0, 0.0, 1.0, 1.0), (2.0, 2.0, 1.0, 1.0)]
-        @test_throws ArgumentError RectInteractable(ax; rects, payloads = [(; a = 1)])           # too short
-        @test_throws ArgumentError RectInteractable(ax; rects, payloads = [(; a = 1), (; a = 2), (; a = 3)])  # too long
-        @test RectInteractable(ax; rects, payloads = [(; a = 1), (; a = 2)]) isa RectInteractable  # exact
+        @test_throws ArgumentError RectInteractable(ax, rects; payloads = [(; a = 1)])           # too short
+        @test_throws ArgumentError RectInteractable(ax, rects; payloads = [(; a = 1), (; a = 2), (; a = 3)])  # too long
+        @test RectInteractable(ax, rects; payloads = [(; a = 1), (; a = 2)]) isa RectInteractable  # exact
         # SegmentInteractable :pairs — 2 vertices = 1 segment
         @test_throws ArgumentError SegmentInteractable(ax, [Point2f(0, 0), Point2f(1, 1)]; mode = :pairs, payloads = [(; a = 1), (; a = 2)])  # too long
         @test_throws ArgumentError SegmentInteractable(ax, [Point2f(0, 0), Point2f(1, 1), Point2f(2, 2), Point2f(3, 3)]; mode = :pairs, payloads = [(; a = 1)])  # too short: 2 segments, 1 payload
@@ -516,9 +516,12 @@ struct _NotReal end
         @test_throws ArgumentError GridInteractable(ax, xe, ye, nothing)
         @test_throws ArgumentError GridInteractable(ax, xe, ye, [1.0, 2.0, 3.0])
 
-        # exactly one of rects/grid — both, and neither, are construction-time errors
-        @test_throws ArgumentError RectInteractable(ax)
-        @test_throws ArgumentError RectInteractable(ax; rects = [(0.0, 0.0, 1.0, 1.0)], grid = (xe, ye, good))
+        # deprecated keyword form: exactly one of rects/grid — both, and neither, are
+        # construction-time errors
+        neither = @test_throws ArgumentError RectInteractable(ax)
+        @test occursin("RectInteractable(ax, rects)", sprint(showerror, neither.value))
+        both = @test_throws ArgumentError RectInteractable(ax; rects = [(0.0, 0.0, 1.0, 1.0)], grid = (xe, ye, good))
+        @test occursin("GridInteractable", sprint(showerror, both.value))
 
         # tol must be finite and positive — a raw round(Int, ...) InexactError/silent
         # unhittable layer otherwise (same "raw downstream error" class this PR closes for
@@ -542,13 +545,13 @@ struct _NotReal end
         # accepts `tooltip` shares the `_check_tooltip` helper; pin the contract on all of them.
         @test_throws ArgumentError PointInteractable(ax, [(0.0, 0.0)]; tooltip = true)
         @test_throws ArgumentError SegmentInteractable(ax, pts; tooltip = true)
-        @test_throws ArgumentError RectInteractable(ax; rects = [(0.0, 0.0, 1.0, 1.0)], tooltip = true)
+        @test_throws ArgumentError RectInteractable(ax, [(0.0, 0.0, 1.0, 1.0)]; tooltip = true)
         tp = text!(ax, [0.0], [0.0]; text = ["a"])
         @test_throws ArgumentError TextInteractable(ax, tp; tooltip = true)
         ring = [Point2f(0, 0), Point2f(1, 0), Point2f(1, 1)]
         @test_throws ArgumentError PolygonInteractable(ax, [ring]; tooltip = true)
         @test_throws ArgumentError RegionInteractable(
-            ax; regions = [(:circle, (1.0, 1.0), 0.5)], payloads = [(; n = "a")], tooltip = true
+            ax, [(:circle, (1.0, 1.0), 0.5)]; payloads = [(; n = "a")], tooltip = true
         )
     end
 
@@ -562,7 +565,7 @@ struct _NotReal end
         _, _, ctx = ctx_for(fig)
         # Inject a rect with a NaN center directly (clamp_to_viewport=true, so the clamp path
         # would be taken — the fix makes it fall back to _q instead).
-        ri = RectInteractable(ax; rects = [(NaN, 0.0, 1.0, 1.0)], clamp_to_viewport = true)
+        ri = RectInteractable(ax, [(NaN, 0.0, 1.0, 1.0)]; clamp_to_viewport = true)
         @test_nowarn hitlayers(ri, ctx)   # must not throw
         L = only(hitlayers(ri, ctx))
         @test !isfinite(L.geometry[1])    # NaN center passes through as Float32(NaN) via _q

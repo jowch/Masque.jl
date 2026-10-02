@@ -171,8 +171,7 @@ begin
             f, [
                 PolygonInteractable(ax, [[(1.0, 1.0), (3.0, 1.0), (2.0, 3.0)]]; id = :tri),
                 RegionInteractable(
-                    ax;
-                    regions = [(:circle, (6.0, 2.0), 14), (:rect, (8.5, 2.0), 2.0, 1.5)],
+                    ax, [(:circle, (6.0, 2.0), 14), (:rect, (8.5, 2.0), 2.0, 1.5)];
                     payloads = ["circ", "box"], id = :reg,
                 ),
                 TextInteractable(ax, txt; id = :lbl),

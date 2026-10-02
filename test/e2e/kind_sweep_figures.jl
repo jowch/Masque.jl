@@ -97,6 +97,12 @@ kind_sweep_meta() = [
         "tintColor" => "rgb(235,206,132)", "mode" => "element",
     ),
     Dict(
+        # RegionInteractable's rects layer: the base id `:zone` plus the `_r` suffix.
+        "key" => "regions", "layerId" => "zone_r", "layerKind" => "rects",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "zone-a", "hoverIndex" => 1, "hoverTip" => "zone-b", "mode" => "element",
+    ),
+    Dict(
         "key" => "polar", "layerId" => "polar", "layerKind" => "circles",
         "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
         "tip" => "north", "hoverIndex" => 0, "hoverTip" => "east", "mode" => "element",
@@ -354,6 +360,21 @@ function build_kind_sweep()
         )
     end
 
+    regions = let
+        zones = [(:rect, (1.5, 1.5), 1.6, 1.2), (:rect, (3.5, 1.5), 1.6, 1.2)]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "regions", limits = (0, 5, 0, 3))
+        for (_, (xc, yc), w, h) in zones
+            poly!(ax, Rect2f(xc - w / 2, yc - h / 2, w, h); color = (:steelblue, 0.35), strokewidth = 2)
+        end
+        masque(
+            fig,
+            RegionInteractable(ax, zones; id = :zone, payloads = [(; label = "zone-a"), (; label = "zone-b")]);
+            selected = Dict(:zone_r => [1]),
+            auto = false,
+        )
+    end
+
     polar = let
         pts = Point2f[(0.0, 1.0), (π / 2, 2.0), (π, 1.5), (3π / 2, 2.5)]
         fig = Figure(size = (480, 320))
@@ -588,7 +609,7 @@ function build_kind_sweep()
     end
 
     return (;
-        scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly,
+        scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, regions,
         polar, scatter_dark, arrows3d, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )

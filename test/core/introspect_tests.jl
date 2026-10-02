@@ -169,12 +169,27 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test Masque.bondtype(g) === Masque.GridCellEvent
         end
 
+        @testset "keyword geometry forms of Rect and Region are deprecated" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]); _, _, c = ctx_for(f)
+            rs = [(1.0, 1.0, 0.5, 0.5), (2.0, 2.0, 0.5, 0.5)]
+            r = @test_deprecated RectInteractable(a; rects = rs, id = :boxes, payloads = ["p", "q"])
+            new = RectInteractable(a, rs; id = :boxes, payloads = ["p", "q"])
+            @test r.id === :boxes && r.payloads == new.payloads && geom(r, c) == geom(new, c)
+            regs = [(:circle, (1.0, 1.0), 10), (:rect, (2.0, 4.0), 1.0, 2.0)]
+            g = @test_deprecated RegionInteractable(a; regions = regs, payloads = ["a", "b"], id = :reg)
+            gnew = RegionInteractable(a, regs; payloads = ["a", "b"], id = :reg)
+            @test g.id === :reg && g.payloads == gnew.payloads &&
+                [L.geometry for L in hitlayers(g, c)] == [L.geometry for L in hitlayers(gnew, c)]
+            # the positional form's payloads default to (; index), like the other element kinds
+            @test RegionInteractable(a, regs).payloads == [(; index = 1), (; index = 2)]
+        end
+
         @testset "barplot -> Rect(:list), dodge/stack via child rects" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             p = barplot!(a, [1, 2, 3], [3.0, 5.0, 2.0])
             _, _, c = ctx_for(f)
             @test geom(RectInteractable(a, p), c) ==
-                geom(RectInteractable(a; rects = [(1.0, 1.5, 0.8, 3.0), (2.0, 2.5, 0.8, 5.0), (3.0, 1.0, 0.8, 2.0)]), c)
+                geom(RectInteractable(a, [(1.0, 1.5, 0.8, 3.0), (2.0, 2.5, 0.8, 5.0), (3.0, 1.0, 0.8, 2.0)]), c)
             # dodge: 4 distinct laid-out rects pulled from the child Poly (solver already applied)
             fd = Figure(size = (500, 350)); ad = Axis(fd[1, 1])
             pd = barplot!(ad, [1, 1, 2, 2], [3.0, 1.0, 5.0, 2.0]; dodge = [1, 2, 1, 2])

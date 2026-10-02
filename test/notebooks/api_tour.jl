@@ -101,7 +101,7 @@ hm_sel === nothing ? "grid: click a cell" :
     "grid: i=$(hm_sel.i) j=$(hm_sel.j) value=$(hm_sel.value)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000040
-md"## Rect — `RectInteractable(; rects)` (explicit boxes)"
+md"## Rect — `RectInteractable(ax, rects)` (explicit boxes)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000041
 begin
@@ -113,7 +113,7 @@ begin
         poly!(rl_ax, Rect2f(xc - w / 2, yc - h / 2, w, h); color = (:seagreen, 0.5), strokewidth = 2)
     end
     rl_int = RectInteractable(
-        rl_ax; id = :boxes, rects = rl_rects,
+        rl_ax, rl_rects; id = :boxes,
         payloads = [(; index = k, name = "box$k") for k in eachindex(rl_rects)],
     )
 end

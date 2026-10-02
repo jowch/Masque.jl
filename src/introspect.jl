@@ -309,7 +309,7 @@ end
 function RectInteractable(ax, p::Makie.BarPlot; id = :bars, payloads = nothing, tooltip = nothing, label = nothing)
     rs = _bar_rects(p)
     pl = payloads === nothing ? _bar_payloads(rs, p.direction[]) : payloads
-    return RectInteractable(ax; rects = rs, id, payloads = pl, tooltip, label)
+    return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
 # converted[1] is a single ring (Vector{Point}) or a vector of rings (Vector{Vector{Point}}).
@@ -428,7 +428,7 @@ function _boxplot_interactable(ax, p; id = :boxplot, payloads = nothing, kw...)
     pl = payloads === nothing ? _boxplot_payloads(_conv(node)) : payloads
     if eltype(geom) <: _GB.HyperRectangle
         rects = [(r.origin[1] + r.widths[1] / 2, r.origin[2] + r.widths[2] / 2, r.widths[1], r.widths[2]) for r in geom]
-        return RectInteractable(ax; rects, id, payloads = pl, kw...)
+        return RectInteractable(ax, rects; id, payloads = pl, kw...)
     else
         return PolygonInteractable(ax, geom; id, payloads = pl, kw...)   # notched: Vector{Vector{Point}}
     end
@@ -584,7 +584,7 @@ function _spy_rects(p)
     return [(Float64(c[1]), Float64(c[2]), w, h) for c in _converted(sc)[1]]
 end
 RectInteractable(ax, p::Makie.Spy; id = :spy, payloads = nothing, tooltip = nothing, label = nothing) =
-    RectInteractable(ax; rects = _spy_rects(p), id, payloads, tooltip, label)
+    RectInteractable(ax, _spy_rects(p); id, payloads, tooltip, label)
 
 # Hist bar height is the bin value: a count only for default normalization=:none; with
 # :pdf/:density/:probability it's a density/fraction (hence `value`, not `count`).
@@ -612,13 +612,13 @@ function RectInteractable(ax, p::Makie.Hist; id = :hist, payloads = nothing, too
     bar = _childof(p, Makie.BarPlot)
     rs = _bar_rects(bar)
     pl = payloads === nothing ? _hist_payloads(rs, bar.direction[]) : payloads
-    return RectInteractable(ax; rects = rs, id, payloads = pl, tooltip, label)
+    return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 function RectInteractable(ax, p::Makie.Waterfall; id = :waterfall, payloads = nothing, tooltip = nothing, label = nothing)
     bar = _childof(p, Makie.BarPlot)
     rs = _bar_rects(bar)
     pl = payloads === nothing ? _waterfall_payloads(p, rs) : payloads
-    return RectInteractable(ax; rects = rs, id, payloads = pl, tooltip, label)
+    return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
 function _span_payloads(p)
@@ -662,7 +662,7 @@ end
 function RectInteractable(ax, p::Makie.CrossBar; id = :crossbar, payloads = nothing, tooltip = nothing, label = nothing)
     rs = _bar_rects(p)
     pl = payloads === nothing ? _crossbar_payloads(p) : payloads
-    return RectInteractable(ax; rects = rs, id, payloads = pl, tooltip, label)
+    return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
 # Point layer keeps the base id; the line/segment layer gets a suffix so the two ids stay
