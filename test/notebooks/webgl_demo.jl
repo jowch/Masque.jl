@@ -116,7 +116,8 @@ begin
                     payloads = [(; index = k, label = ("alpha", "beta", "gamma")[k]) for k in 1:3],
                     tooltip = masque"point $(label)",
                 ),
-            ]
+            ];
+            auto = false,
         )
     end
     nothing
@@ -175,7 +176,8 @@ begin
                     payloads = ["circ", "box"], id = :reg,
                 ),
                 TextInteractable(ax, txt; id = :lbl),
-            ]
+            ];
+            auto = false,
         )
     end
     nothing
@@ -203,7 +205,8 @@ begin
             f, [
                 ThresholdInteractable(ax; orientation = :horizontal, value = 4.0, id = :thr),
                 AxisInteractable(ax; id = :axis),
-            ]
+            ];
+            auto = false,
         )
     end
     nothing
@@ -234,6 +237,7 @@ begin
                 ROIInteractable(ax; bounds = (2.0, 6.0, 2.0, 6.0), selects = :pts, id = :roi),
             ];
             selected = Dict(:pts => [1]),
+            auto = false,
         )
     end
     nothing

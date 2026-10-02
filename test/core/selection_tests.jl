@@ -58,7 +58,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     end
 
     @testset "HSpan + VSpan extraction" begin
-        using Masque: RectInteractable, auto_interactables
+        using Masque: RectInteractable, interactables
         fig = Figure(); ax = Axis(fig[1, 1]); lines!(ax, 0 .. 10, sin)   # give the axis finite limits
         hspan!(ax, [1.0, 3.0], [2.0, 4.0])
         Makie.update_state_before_display!(fig)
@@ -217,7 +217,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
         # no explicit payloads= (the common case): PointInteractable auto-fills one
         # `(; index, x, y)` NamedTuple per point. `selected = 2` is the second point.
-        w_auto = masque(hfig, PointInteractable(hax, pts; id = :scatter); selected = 2)
+        w_auto = masque(hfig, PointInteractable(hax, pts; id = :scatter); selected = 2, auto = false)
         iv_auto = IP.APD.Bonds.initial_value(w_auto)
         @test iv_auto isa ElementEvent
         @test iv_auto.layer === :scatter && iv_auto.index == 2
@@ -231,7 +231,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         payloads = ["p$k" for k in 1:8]
         pi = PointInteractable(ax, pts; id = :pts, payloads)
         roi = ROIInteractable(ax; bounds = (1.0, 3.0, 0.0, 2.0), selects = :pts, id = :box)
-        iv(sel) = IP.APD.Bonds.initial_value(masque(fig, [pi, roi]; selected = sel))
+        iv(sel) = IP.APD.Bonds.initial_value(masque(fig, [pi, roi]; selected = sel, auto = false))
         one = iv(1)
         @test one isa Vector{ElementEvent} && length(one) == 1
         @test one[1].layer === :pts && one[1].index == 1 && one[1].payload == "p1"
@@ -242,7 +242,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test [e.payload for e in two] == ["p1", "p8"]
         empty = iv(Int[])
         @test empty isa Vector{ElementEvent} && isempty(empty)
-        @test masque(fig, [pi, roi]; selected = Int[]).manifest["hydrate"] == "items"
+        @test masque(fig, [pi, roi]; selected = Int[], auto = false).manifest["hydrate"] == "items"
     end
 
     @testset "transform_value reconstructs the payload from the manifest, not the wire" begin
@@ -250,7 +250,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         pts = DEFAULT_PTS
         scatter!(bax, first.(pts), last.(pts))
         payloads = [(; name = "a"), (; name = "b"), (; name = "c")]
-        w = masque(bfig, PointInteractable(bax, pts; id = :scatter, payloads = payloads))
+        w = masque(bfig, PointInteractable(bax, pts; id = :scatter, payloads = payloads); auto = false)
         tv = IP.APD.Bonds.transform_value
 
         # element kind: the identical object comes back, not a JSON-shaped copy of it — a
@@ -267,14 +267,21 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test ev0.index == 1 && ev0.payload === payloads[1]
 
         # an axis click is an AxisEvent, not a payload NamedTuple
-        w2 = masque(bfig, [PointInteractable(bax, pts; id = :scatter, payloads = payloads), AxisInteractable(bax; id = :readout)])
+        w2 = masque(
+            bfig,
+            [PointInteractable(bax, pts; id = :scatter, payloads = payloads), AxisInteractable(bax; id = :readout)];
+            auto = false,
+        )
         computed = Dict("x" => 1.23, "y" => 4.56)
         evax = tv(w2, Dict("layer" => "readout", "index" => -1, "payload" => computed))
         @test evax isa AxisEvent && evax.x == 1.23 && evax.y == 4.56
 
         # a selects-ROI makes the items envelope a Vector{ElementEvent}
         roi = ROIInteractable(bax; bounds = (0.0, 1.0, 0.0, 1.0), selects = :scatter, id = :roi)
-        wselroi = masque(bfig, [PointInteractable(bax, pts; id = :scatter, payloads = payloads), roi])
+        wselroi = masque(
+            bfig, [PointInteractable(bax, pts; id = :scatter, payloads = payloads), roi];
+            auto = false,
+        )
         multi = tv(
             wselroi, Dict(
                 "items" => [
@@ -294,6 +301,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         wsel = masque(
             bfig, PointInteractable(bax, pts; id = :scatter, payloads = payloads);
             selected = 2,
+            auto = false,
         )
         iv = IP.APD.Bonds.initial_value(wsel)
         @test iv isa ElementEvent && iv.payload === payloads[2] && iv.index == 2
@@ -311,13 +319,13 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         tv = IP.APD.Bonds.transform_value
 
         # Without a box the grid is clickable: a click is a GridCellEvent.
-        alone = masque(gfig, grid)
+        alone = masque(gfig, grid; auto = false)
         @test "click" in only(alone.manifest["layers"])["events"]
         cell = tv(alone, Dict("layer" => "img", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
         @test cell isa GridCellEvent && (cell.i, cell.j) == (1, 1)
 
         # With the box, the grid layer is hover-only, so the overlay never posts a cell.
-        w = masque(gfig, [grid, roi])
+        w = masque(gfig, [grid, roi]; auto = false)
         @test w.manifest["selection"] == "grid" && w.manifest["selectionTarget"] == "img"
         img = only(filter(l -> l["id"] == "img", w.manifest["layers"]))
         @test img["events"] == ["hover"]
@@ -351,12 +359,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         tv = IP.APD.Bonds.transform_value
 
         # Without a box the points are clickable: a click is one ElementEvent.
-        alone = masque(pfig, pi)
+        alone = masque(pfig, pi; auto = false)
         @test "click" in only(alone.manifest["layers"])["events"]
         @test tv(alone, Dict("layer" => "pts", "index" => 1)) isa ElementEvent
 
         # With the box, the target is hover-only; another point layer in the call keeps its clicks.
-        w = masque(pfig, [pi, other, roi])
+        w = masque(pfig, [pi, other, roi]; auto = false)
         ev_of(id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))["events"]
         @test ev_of("pts") == ["hover"]
         @test ev_of("other") == ["click", "hover"]
@@ -373,7 +381,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # The brush still commits a Vector{ElementEvent}, and `selected=` still seeds it.
         got = tv(w, Dict("items" => [Dict("layer" => "pts", "index" => 1), Dict("layer" => "pts", "index" => 2)]))
         @test got isa Vector{ElementEvent} && [e.payload for e in got] == ["b", "c"]
-        seeded = IP.APD.Bonds.initial_value(masque(pfig, [pi, roi]; selected = 2))
+        seeded = IP.APD.Bonds.initial_value(masque(pfig, [pi, roi]; selected = 2, auto = false))
         @test seeded isa Vector{ElementEvent} && only(seeded).payload == "b"
     end
 end

@@ -205,7 +205,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @testset "introspected interactable flows through masque unchanged" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             p = scatter!(a, [1.0, 2.0], [1.0, 2.0]; markersize = 18)
-            w = masque(f, PointInteractable(a, p))
+            w = masque(f, PointInteractable(a, p); auto = false)
             @test w.manifest["layers"][1]["kind"] == "circles"
             @test w.manifest["layers"][1]["id"] == "scatter"
         end
@@ -223,7 +223,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             a2 = Axis(f[1, 2])
             scatter!(a2, [5.0], [5.0])             # second scatter -> :scatter_2
 
-            ints = auto_interactables(f)
+            ints = interactables(f)
             @test length(ints) == 6
             _, _, c = ctx_for(f)
             ids = [only(hitlayers(i, c)).id for i in ints]
@@ -238,7 +238,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             scatter!(a, [1.0], [1.0])
             # hexbin's only child is a data-space hex Scatter. The walk must not construct it.
             hexbin!(a, rand(40), rand(40))
-            ints = @test_logs (:warn, r"plot type hexbin") auto_interactables(f)
+            ints = @test_logs (:warn, r"plot type hexbin") interactables(f)
             @test length(ints) == 1
             @test only(ints) isa PointInteractable
         end
@@ -269,7 +269,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             pie!(a, [1.0, 2.0, 3.0])
             contour!(a, 1:8, 1:8, [sin(i / 2) * cos(j / 2) for i in 1:8, j in 1:8])
             Makie.update_state_before_display!(f)
-            ints = @test_logs auto_interactables(f)
+            ints = @test_logs interactables(f)
             _, _, c = ctx_for(f)
             ids = [only(hitlayers(i, c)).id for i in ints]
             @test ids == [:lines, :segments, :poly, :lines_2]
@@ -286,7 +286,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             fr = Figure(size = (640, 360)); ar = Axis(fr[1, 1])
             rainclouds!(ar, ["a", "a", "a", "b", "b", "b"], [1.0, 1.2, 0.8, 2.0, 2.3, 1.9])
             Makie.update_state_before_display!(fr)
-            rints = @test_logs auto_interactables(fr)
+            rints = @test_logs interactables(fr)
             _, _, cr = ctx_for(fr)
             rids = [only(hitlayers(i, cr)).id for i in rints]
             # violin, raindrop scatter, box — not the violin's poly or the box's crossbar
@@ -297,14 +297,14 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             Makie.update_state_before_display!(fb)
             # The pixel-space label warns once. The parent has nothing else to install,
             # and must not add a second "unsupported plot type" warning.
-            bints = @test_logs (:warn, r"non-data-space text") auto_interactables(fb)
+            bints = @test_logs (:warn, r"non-data-space text") interactables(fb)
             @test isempty(bints)
 
             # A top-level data-space scatter still fails in PointInteractable. The refusal
             # applies to children discovered under an unknown parent, not to this plot.
             fd = Figure(size = (400, 300)); ad = Axis(fd[1, 1])
             scatter!(ad, [1.0, 2.0], [1.0, 2.0]; markersize = 0.3, markerspace = :data)
-            @test_throws ErrorException auto_interactables(fd)
+            @test_throws ErrorException interactables(fd)
 
             # Default `triplot!` draws the triangles and also ghost edges, the convex hull,
             # constrained edges, and a point scatter, all with `visible[] == false`. Those
@@ -313,7 +313,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             triplot!(at, [0.0, 1.0, 0.2, 0.8], [0.0, 0.0, 1.0, 0.6])
             scatter!(at, [0.4], [0.3]; markersize = 12)
             Makie.update_state_before_display!(ft)
-            tints = @test_logs auto_interactables(ft)
+            tints = @test_logs interactables(ft)
             _, _, ct = ctx_for(ft)
             @test [only(hitlayers(i, ct)).id for i in tints] == [:poly, :scatter]
 
@@ -323,7 +323,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             qqplot!(aq, [1.0, 2.0, 3.0, 4.0], [1.1, 1.9, 3.2, 3.8]; qqline = :none)
             linesegments!(aq, [0.0, 1.0], [0.0, 1.0])
             Makie.update_state_before_display!(fq)
-            qints = @test_logs auto_interactables(fq)
+            qints = @test_logs interactables(fq)
             _, _, cq = ctx_for(fq)
             @test [only(hitlayers(i, cq)).id for i in qints] == [:scatter, :segments]
             @test !isempty(only(i for i in qints if i.id === :segments).vertices)
@@ -333,14 +333,14 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             f = Figure(); ax = Axis(f[1, 1]); scatter!(ax, 1:3, 1:3)
             text!(ax, [1.5], [2.0]; text = ["Hi"])
             Makie.update_state_before_display!(f)
-            ints = auto_interactables(f)
+            ints = interactables(f)
             @test count(i -> i isa TextInteractable, ints) == 1
         end
         @testset "masque auto-detects annotation!" begin
             f = Figure(); ax = Axis(f[1, 1]); scatter!(ax, 1:3, 1:3)
             annotation!(ax, [1.5], [2.0]; text = ["note"])
             Makie.update_state_before_display!(f)
-            ints = auto_interactables(f)
+            ints = interactables(f)
             ti = only(filter(i -> i isa TextInteractable, ints))
             @test ti.payloads[1].text == "note"
             # x,y come from the Text descendant's positions[] — the DATA-space anchor
@@ -350,7 +350,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             f = Figure(); ax = Axis(f[1, 1]); scatter!(ax, 1:3, 1:3)
             text!(ax, [10.0], [10.0]; text = ["px"], space = :pixel)
             Makie.update_state_before_display!(f)
-            ints = auto_interactables(f)
+            ints = interactables(f)
             @test count(i -> i isa TextInteractable, ints) == 0
         end
         @testset "rotated text still yields one box" begin
@@ -483,7 +483,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             pr = hlines!(ar, [4.0]; xmin = 0.25, xmax = 0.75)
             seg = SegmentInteractable(ar, pr)
             xlims!(ar, -20, 20)
-            masque(fr, [seg])
+            masque(fr, [seg]; auto = false)
             _, _, cr = ctx_for(fr)
             @test geom(seg, cr) ==
                 geom(SegmentInteractable(ar, [(-10.0, 4.0), (10.0, 4.0)]; mode = :pairs), cr)
@@ -499,7 +499,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             ph = hlines!(a, [1.0, 3.0])
             seg = SegmentInteractable(a, ph)   # constructed BEFORE any finalize call
             xlims!(a, -20, 20)                 # widen limits after construction
-            w = masque(f, [seg])                 # finalizes internally, after seg was already built
+            w = masque(f, [seg]; auto = false)   # finalizes internally, after seg was already built
             ref = masque(f)                      # masque(fig): finalizes first, then auto-extracts (ground truth)
             seg_layer = only(filter(l -> l["id"] == "hlines", w.manifest["layers"]))
             ref_layer = only(filter(l -> l["id"] == "hlines", ref.manifest["layers"]))
@@ -513,7 +513,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             pv = vlines!(av, [1.0, 3.0])
             segv = SegmentInteractable(av, pv)   # constructed BEFORE any finalize call
             ylims!(av, -20, 20)                  # widen limits after construction
-            wv = masque(fv, [segv])
+            wv = masque(fv, [segv]; auto = false)
             refv = masque(fv)
             segv_layer = only(filter(l -> l["id"] == "vlines", wv.manifest["layers"]))
             refv_layer = only(filter(l -> l["id"] == "vlines", refv.manifest["layers"]))
@@ -534,7 +534,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             ph = hspan!(a, [1.0], [3.0])
             rect = RectInteractable(a, ph)       # constructed BEFORE any finalize call
             xlims!(a, -20, 20)                   # widen limits after construction
-            w = masque(f, [rect])
+            w = masque(f, [rect]; auto = false)
             ref = masque(f)
             rect_layer = only(filter(l -> l["id"] == "hspan", w.manifest["layers"]))
             ref_layer = only(filter(l -> l["id"] == "hspan", ref.manifest["layers"]))
@@ -548,7 +548,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             pv = vspan!(av, [1.0], [3.0])
             rectv = RectInteractable(av, pv)     # constructed BEFORE any finalize call
             ylims!(av, -20, 20)                  # widen limits after construction
-            wv = masque(fv, [rectv])
+            wv = masque(fv, [rectv]; auto = false)
             refv = masque(fv)
             rectv_layer = only(filter(l -> l["id"] == "vspan", wv.manifest["layers"]))
             refv_layer = only(filter(l -> l["id"] == "vspan", refv.manifest["layers"]))
@@ -584,7 +584,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @testset "stem -> Point + Segment(:pairs) (composite, two layers)" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             stem!(a, [1.0, 2.0, 3.0], [3.0, 1.0, 2.0]); _, _, c = ctx_for(f)
-            ints = auto_interactables(f)
+            ints = interactables(f)
             @test length(ints) == 2
             kinds = [only(hitlayers(i, c)).kind for i in ints]
             ids = [only(hitlayers(i, c)).id for i in ints]
@@ -595,7 +595,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @testset "scatterlines -> Point + one whole line (composite)" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             scatterlines!(a, [1.0, 2.0, 3.0], [1.0, 4.0, 9.0]; markersize = 16); _, _, c = ctx_for(f)
-            ints = auto_interactables(f)
+            ints = interactables(f)
             @test length(ints) == 2
             @test [only(hitlayers(i, c)).kind for i in ints] == [:circles, :lines]
             @test [only(hitlayers(i, c)).id for i in ints] == [:scatterlines, :scatterlines_line]
@@ -608,7 +608,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             ys = [1.0 1.5 2.2 2.8; 3.0 2.4 1.2 1.5; 0.6 1.4 2.6 2.0]
             series!(a, ys)
             _, _, c = ctx_for(f)
-            ints = auto_interactables(f)
+            ints = interactables(f)
             @test length(ints) == 1
             L = only(hitlayers(only(ints), c))
             @test L.kind === :lines && L.id === :series && length(L.payloads) == 3
@@ -633,7 +633,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     end
 
     @testset "Hist + Waterfall extraction" begin
-        using Masque: RectInteractable, auto_interactables
+        using Masque: RectInteractable, interactables
         # Hist: counts + bin edges
         fig = Figure(); ax = Axis(fig[1, 1])
         data = [0.5, 0.6, 1.5, 1.6, 1.7, 2.5]
@@ -647,7 +647,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test !haskey(pairs(ri.payloads[1]), :index)
         @test !haskey(pairs(ri.payloads[1]), :count)                   # field is :value, not :count
         # auto path picks it up as :hist
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         @test any(i -> i isa RectInteractable, ints)
 
         # Waterfall: signed delta — value must reflect direction (Fix 2)
@@ -665,7 +665,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     end
 
     @testset "CrossBar extraction" begin
-        using Masque: RectInteractable, auto_interactables
+        using Masque: RectInteractable, interactables
         fig = Figure(); ax = Axis(fig[1, 1])
         crossbar!(ax, [1, 2], [5.0, 6.0], [3.0, 4.0], [7.0, 8.0])
         Makie.update_state_before_display!(fig)
@@ -677,13 +677,13 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test !haskey(pairs(ri.payloads[1]), :index)
         # auto path: _plotbase returns :crossbar, _construct returns RectInteractable
         _, _, c = ctx_for(fig)
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa RectInteractable
         @test only(hitlayers(ints[1], c)).id === :crossbar
     end
 
     @testset "Band extraction" begin
-        using Masque: PolygonInteractable, auto_interactables
+        using Masque: PolygonInteractable, interactables
         fig = Figure(); ax = Axis(fig[1, 1])
         band!(ax, 1:5, [0.0, 0.1, 0.2, 0.1, 0.0], [1.0, 1.2, 1.4, 1.2, 1.0])
         Makie.update_state_before_display!(fig)
@@ -693,7 +693,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test length(pi.rings[1]) == 10                   # 5 lower + 5 upper, stitched
         @test pi.payloads[1] == (; index = 1)             # default; no semantic per-element value
         # auto path picks it up as :band, exactly one layer (no stray :poly from the child)
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         @test length(ints) == 1
         @test ints[1] isa PolygonInteractable
         _, _, c = ctx_for(fig)
@@ -701,7 +701,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     end
 
     @testset "Density extraction" begin
-        using Masque: PolygonInteractable, auto_interactables
+        using Masque: PolygonInteractable, interactables
         fig = Figure(); ax = Axis(fig[1, 1])
         density!(ax, randn(300))
         Makie.update_state_before_display!(fig)
@@ -710,12 +710,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test length(pi.rings) == 1                       # the KDE fill is one region
         @test length(pi.rings[1]) > 50                    # dense outline (Makie's KDE band)
         @test pi.payloads[1] == (; index = 1)
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
     end
 
     @testset "Violin extraction" begin
-        using Masque: PolygonInteractable, auto_interactables
+        using Masque: PolygonInteractable, interactables
         fig = Figure(); ax = Axis(fig[1, 1])
         violin!(ax, repeat([1, 2, 3], inner = 80), randn(240))
         Makie.update_state_before_display!(fig)
@@ -726,12 +726,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test [pl.x for pl in pi.payloads] == [1.0, 2.0, 3.0]   # exact clean categories from converted (no Float32 noise)
         @test all(pl.x isa Float64 for pl in pi.payloads)
         @test !haskey(pairs(pi.payloads[1]), :index)
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
     end
 
     @testset "Voronoiplot extraction" begin
-        using Masque: PolygonInteractable, auto_interactables
+        using Masque: PolygonInteractable, interactables
         fig = Figure(); ax = Axis(fig[1, 1])
         voronoiplot!(ax, [0.1, 0.4, 0.7, 0.3, 0.9, 0.5, 0.2, 0.8], [0.2, 0.6, 0.1, 0.9, 0.4, 0.5, 0.8, 0.3])
         Makie.update_state_before_display!(fig)
@@ -740,12 +740,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test length(pi.rings) == 8                        # one cell per generator site
         @test all(isempty, pi.holes)                       # cells have no interiors; the shared helper stays exterior-only
         @test pi.payloads == Any[(; index = k) for k in 1:8]   # cell order ≠ site order → index only
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
     end
 
     @testset "Contourf extraction" begin
-        using Masque: PolygonInteractable, auto_interactables
+        using Masque: PolygonInteractable, interactables
         fig = Figure(); ax = Axis(fig[1, 1])
         z = [sin(i / 3) * cos(j / 3) for i in 1:20, j in 1:20]
         contourf!(ax, 1:20, 1:20, z; levels = 6)
@@ -758,7 +758,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test all(pl.low isa Float64 && pl.high isa Float64 for pl in pi.payloads)
         @test all(pl.low < pl.high for pl in pi.payloads)        # band interval ordered
         @test !haskey(pairs(pi.payloads[1]), :index)
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
 
         # explicit levels → intervals are the true bands [edge_k, edge_{k+1}] (caught the midpoint-vs-edge bug)
@@ -890,7 +890,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     end
 
     @testset "BoxPlot extraction" begin
-        using Masque: RectInteractable, PolygonInteractable, auto_interactables
+        using Masque: RectInteractable, PolygonInteractable, interactables
         import Statistics
         cats = repeat([1, 2], inner = 120)
         vals = [randn(120) .- 1; randn(120) .+ 2]
@@ -910,7 +910,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test bi.payloads[g].q3 ≈ q[3]
         end
         @test !haskey(pairs(bi.payloads[1]), :index)
-        @test any(i -> i isa RectInteractable, auto_interactables(fig))
+        @test any(i -> i isa RectInteractable, interactables(fig))
 
         # notch on → PolygonInteractable; same stats payload
         fig2 = Figure(); ax2 = Axis(fig2[1, 1])

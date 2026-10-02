@@ -1,6 +1,6 @@
 module MasqueWGLMakieExt
 
-using Masque: Masque, AbstractBackend, InteractionContext, build_manifest, InteractionEvent, auto_interactables
+using Masque: Masque, AbstractBackend, InteractionContext, build_manifest, InteractionEvent
 using WGLMakie
 import Makie
 import Makie: Observable, Point2f

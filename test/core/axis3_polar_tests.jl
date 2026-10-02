@@ -59,7 +59,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         scatter!(axpi, [0.0, π / 2], [1.0, 2.0]; markersize = 10)
         lines!(axpi, [0.0, π], [1.0, 1.5])
         Makie.update_state_before_display!(fpi)
-        ints = auto_interactables(fpi)
+        ints = interactables(fpi)
         @test any(i -> i isa PointInteractable, ints)
         @test any(i -> i isa SegmentInteractable, ints)
         _, _, ctxpi = ctx_for(fpi)
@@ -73,7 +73,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         heatmap!(axpg, 0:0.5:π, 1:3, rand(7, 3))
         scatter!(axpg, [0.0], [1.0]; markersize = 10)
         Makie.update_state_before_display!(fpg)
-        gints = @test_logs (:warn, r"heatmap on PolarAxis") auto_interactables(fpg)
+        gints = @test_logs (:warn, r"heatmap on PolarAxis") interactables(fpg)
         @test length(gints) == 1
         @test only(gints) isa PointInteractable
     end
@@ -85,7 +85,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         ys = [ones(1, 8); fill(1.5, 1, 8)]
         series!(ax, θ, ys)
         Makie.update_state_before_display!(f)
-        ints = @test_logs auto_interactables(f)
+        ints = @test_logs interactables(f)
         @test length(ints) == 1
         @test only(ints) isa SegmentInteractable
         _, _, ctx = ctx_for(f)
@@ -158,7 +158,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         scatter!(ax3i, Makie.Point3f[(1, 2, 3), (4, 5, 6)]; markersize = 10)
         lines!(ax3i, Makie.Point3f[(0, 0, 0), (2, 2, 2), (4, 0, 1)])
         Makie.update_state_before_display!(f3i)
-        ints = auto_interactables(f3i)
+        ints = interactables(f3i)
         @test any(i -> i isa PointInteractable, ints)
         @test any(i -> i isa SegmentInteractable, ints)
         _, _, ctx3i = ctx_for(f3i)
@@ -176,7 +176,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         heatmap!(ax3g, 1:3, 1:3, [Float64(i + j) for i in 1:3, j in 1:3])
         scatter!(ax3g, Makie.Point3f[(1, 2, 3)]; markersize = 10)
         Makie.update_state_before_display!(f3g)
-        gints = @test_logs (:warn, r"heatmap on Axis3") auto_interactables(f3g)
+        gints = @test_logs (:warn, r"heatmap on Axis3") interactables(f3g)
         @test length(gints) == 1
         @test only(gints) isa PointInteractable
     end
@@ -201,7 +201,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         mpts = Makie.Point3f[(1, 2, 3), (4, 5, 6), (7, 8, 2)]
         msp = meshscatter!(axm, mpts; markersize = 0.6, color = :red)
         Makie.update_state_before_display!(fm)
-        mints = @test_logs auto_interactables(fm)       # no logs: meshscatter must NOT re-gate
+        mints = @test_logs interactables(fm)       # no logs: meshscatter must NOT re-gate
         mi = only(mints)
         @test mi isa PointInteractable
         @test mi.radius3d !== nothing && length(mi.radius3d) == 3
@@ -233,7 +233,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         axv = Axis3(fv[1, 1]; azimuth = 0.4, elevation = 0.5)
         meshscatter!(axv, mpts; markersize = [0.2, 0.5, 0.9], color = :red)
         Makie.update_state_before_display!(fv)
-        vi = only(@test_logs auto_interactables(fv))
+        vi = only(@test_logs interactables(fv))
         @test vi.radius3d == [Makie.Vec3f(0.2, 0.2, 0.2), Makie.Vec3f(0.5, 0.5, 0.5), Makie.Vec3f(0.9, 0.9, 0.9)]
         _, _, ctxv = ctx_for(fv)
         Lv = only(hitlayers(vi, ctxv))
@@ -247,7 +247,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         axp = Axis3(fp[1, 1]; azimuth = 0.4, elevation = 0.5, perspectiveness = 1.0)
         meshscatter!(axp, Makie.Point3f[(1, 1, 1), (9, 9, 9)]; markersize = 0.6, color = :red)
         Makie.update_state_before_display!(fp)
-        pi3 = only(@test_logs auto_interactables(fp))
+        pi3 = only(@test_logs interactables(fp))
         _, _, ctxp = ctx_for(fp)
         Lp = only(hitlayers(pi3, ctxp))
         rp = [Lp.geometry[3k + 3] for k in 0:1]
@@ -263,7 +263,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         wzs = [sin(x) * cos(y) + 3 for x in wxs, y in wxs]
         wireframe!(axw, wxs, wxs, wzs; color = :blue)
         Makie.update_state_before_display!(fw)
-        wints = auto_interactables(fw)
+        wints = interactables(fw)
         wi = only(wints)
         @test wi isa SegmentInteractable && wi.mode === :pairs
         @test iseven(length(wi.vertices)) && length(wi.vertices) >= 80   # grid edges + triangulation diagonals
@@ -290,7 +290,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         adirs = Makie.Vec3f[(1, 0, 0), (0, 1, 0.5), (-0.5, 0, 1)]
         arrows3d!(axa, apts, adirs; color = :red)
         Makie.update_state_before_display!(fa)
-        aints = @test_logs auto_interactables(fa)       # no logs: arrows3d must NOT re-gate
+        aints = @test_logs interactables(fa)       # no logs: arrows3d must NOT re-gate
         ai = only(aints)
         @test ai isa SegmentInteractable && ai.mode === :pairs
         @test length(ai.vertices) == 6                  # 3 arrows × (start, end)
@@ -310,7 +310,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         axls = Axis3(fls[1, 1]; azimuth = 0.4, elevation = 0.5)
         arrows3d!(axls, apts, Makie.Vec3f[(2, 0, 0), (0, 2, 1), (-1, 0, 2)]; lengthscale = 0.5f0, color = :red)
         Makie.update_state_before_display!(fls)
-        li = only(@test_logs auto_interactables(fls))
+        li = only(@test_logs interactables(fls))
         _, ppuls, ctxls = ctx_for(fls)
         imgls = Makie.colorbuffer(fls; px_per_unit = ppuls)
         Lls = only(hitlayers(li, ctxls))
@@ -343,7 +343,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             color = :red,
         )
         Makie.update_state_before_display!(fan)
-        ani = only(@test_logs auto_interactables(fan))
+        ani = only(@test_logs interactables(fan))
         _, ppuan, ctxan = ctx_for(fan)
         imgan = Makie.colorbuffer(fan; px_per_unit = ppuan)
         Lan = only(hitlayers(ani, ctxan))

@@ -277,11 +277,11 @@ end
 end
 
 @testset "masque(fig) auto-detects Colorbar" begin
-    using Masque: auto_interactables, ColorbarInteractable
+    using Masque: interactables, ColorbarInteractable
     fig = Figure(); ax = Axis(fig[1, 1]); hm = heatmap!(ax, rand(10, 10))
     Colorbar(fig[1, 2], hm)
     Makie.update_state_before_display!(fig)
-    ints = auto_interactables(fig)
+    ints = interactables(fig)
     cbs = filter(i -> i isa ColorbarInteractable, ints)
     @test length(cbs) == 1
     @test cbs[1].id === :colorbar
@@ -298,7 +298,7 @@ end
     Colorbar(fig2[1, 2], hm2a)
     Colorbar(fig2[2, 2], hm2b)
     Makie.update_state_before_display!(fig2)
-    cbs2 = filter(i -> i isa ColorbarInteractable, auto_interactables(fig2))
+    cbs2 = filter(i -> i isa ColorbarInteractable, interactables(fig2))
     @test length(cbs2) == 2
     @test Set(c.id for c in cbs2) == Set([:colorbar, :colorbar_2])
 end

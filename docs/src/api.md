@@ -8,6 +8,7 @@ examples, start with [Getting started](@ref).
 ```@docs
 Masque
 masque
+interactables
 auto_interactables
 InteractionEvent
 ElementEvent
@@ -57,7 +58,7 @@ for the whole widget. A property you set stays the same on light and
 dark figures:
 
 ```julia
-masque(fig, interactables...;
+masque(fig, xs...;
     tooltip_bg        = nothing,   # background: CSS string or Makie color
     tooltip_color     = nothing,   # text color: CSS string or Makie color
     tooltip_accent    = nothing,   # accent (emphasis, links)

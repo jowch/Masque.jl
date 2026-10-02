@@ -56,7 +56,7 @@ begin
 end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000012
-@bind pt_sel masque(pt_fig, pt_int)
+@bind pt_sel masque(pt_fig, pt_int; auto = false)
 
 # ╔═╡ 40000000-0000-0000-0000-000000000013
 pt_sel === nothing ? "point: click a marker" :
@@ -75,7 +75,7 @@ begin
 end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000022
-@bind sg_sel masque(sg_fig, sg_int)
+@bind sg_sel masque(sg_fig, sg_int; auto = false)
 
 # ╔═╡ 40000000-0000-0000-0000-000000000023
 sg_sel === nothing ? "segment: click a line segment" :
@@ -94,7 +94,7 @@ begin
 end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000032
-@bind hm_sel masque(hm_fig, hm_int)
+@bind hm_sel masque(hm_fig, hm_int; auto = false)
 
 # ╔═╡ 40000000-0000-0000-0000-000000000033
 hm_sel === nothing ? "grid: click a cell" :
@@ -119,7 +119,7 @@ begin
 end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000042
-@bind rl_sel masque(rl_fig, rl_int)
+@bind rl_sel masque(rl_fig, rl_int; auto = false)
 
 # ╔═╡ 40000000-0000-0000-0000-000000000043
 rl_sel === nothing ? "list: click a box" :
@@ -146,7 +146,7 @@ begin
 end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000052
-@bind pg_sel masque(pg_fig, pg_int)
+@bind pg_sel masque(pg_fig, pg_int; auto = false)
 
 # ╔═╡ 40000000-0000-0000-0000-000000000053
 pg_sel === nothing ? "polygon: click a filled region" :
@@ -164,7 +164,7 @@ begin
 end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000062
-@bind ar_sel masque(ar_fig, ar_int)
+@bind ar_sel masque(ar_fig, ar_int; auto = false)
 
 # ╔═╡ 40000000-0000-0000-0000-000000000063
 ar_sel === nothing ? "axis: click in the plot area" :

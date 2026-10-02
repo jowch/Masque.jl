@@ -2,7 +2,7 @@ using Test, Masque, CairoMakie, Makie
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
 @testset "LegendInteractable" begin
-    using Masque: LegendInteractable, hitlayers, validate, build_manifest, axis_id, auto_interactables
+    using Masque: LegendInteractable, hitlayers, validate, build_manifest, axis_id, interactables
 
     @testset "auto legend: lines + scatter" begin
         fig = Figure(size = (600, 400)); ax = Axis(fig[1, 1])
@@ -12,7 +12,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         leg = axislegend(ax; position = :lt)
         Makie.update_state_before_display!(fig)
 
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         lis = filter(i -> i isa LegendInteractable, ints)
         @test length(lis) == 1
         li = only(lis)
@@ -100,7 +100,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         axislegend(ax)
         Makie.update_state_before_display!(fig)
 
-        ints = @test_logs auto_interactables(fig)   # no warnings — every plot is supported
+        ints = @test_logs interactables(fig)   # no warnings — every plot is supported
         non_legend = filter(i -> !(i isa LegendInteractable), ints)
         li = only(filter(i -> i isa LegendInteractable, ints))
 
@@ -123,7 +123,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         scatter!(ax, 1:3; label = "x")
         axislegend(ax; merge = true)
         Makie.update_state_before_display!(fig)
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         li = only(filter(i -> i isa LegendInteractable, ints))
         @test length(li.targets) == 1
         @test Set(li.targets[1]) == Set([:lines, :scatter])
@@ -134,7 +134,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         els = [LineElement(color = :red), MarkerElement(color = :blue, marker = :circle)]
         Legend(fig[1, 2], els, ["a", "b"])
         Makie.update_state_before_display!(fig)
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         li = only(filter(i -> i isa LegendInteractable, ints))
         @test li.targets == [Symbol[], Symbol[]]
         _, _, ctx = ctx_for(fig)
@@ -204,7 +204,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
         # auto (plotmap) path: entry "a"'s plot (l1) resolving to BOTH a selectable and an
         # unselectable-kind id -> the bad one is warned-and-dropped, not a build_manifest error.
-        li_lenient = LegendInteractable(leg; plotmap = IdDict{Any, Vector{Symbol}}(l1 => [:lines, :cells]))
+        li_lenient = Masque._legend_interactable(leg; plotmap = IdDict{Any, Vector{Symbol}}(l1 => [:lines, :cells]))
         @test li_lenient.lenient
         @test li_lenient.targets == [[:lines, :cells]]
         m = @test_logs (:warn, r"cannot be highlighted"i) build_manifest([line_int, rect_int, li_lenient], ctx)
@@ -221,7 +221,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         end
         leg = axislegend(ax; nbanks = 2, position = :rt)
         Makie.update_state_before_display!(fig)
-        li = only(filter(i -> i isa LegendInteractable, auto_interactables(fig)))
+        li = only(filter(i -> i isa LegendInteractable, interactables(fig)))
         @test li.targets == [[Symbol(:lines, k == 1 ? "" : "_$k")] for k in 1:6]
 
         _, _, ctx = ctx_for(fig)
@@ -247,7 +247,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         end
         leg = axislegend(ax; orientation = :horizontal)
         Makie.update_state_before_display!(fig)
-        li = only(filter(i -> i isa LegendInteractable, auto_interactables(fig)))
+        li = only(filter(i -> i isa LegendInteractable, interactables(fig)))
         @test li.targets == [[:lines], [:lines_2], [:lines_3]]
 
         _, _, ctx = ctx_for(fig)
@@ -264,7 +264,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         axislegend(ax)
         Makie.update_state_before_display!(fig)
 
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         li = only(filter(i -> i isa LegendInteractable, ints))
         @test li.targets == [[Symbol("series:1")], [Symbol("series:2")], [Symbol("series:3")]]
 
@@ -345,7 +345,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         Legend(fig[1, 2], [[l1], [l2]], [["a"], ["b"]], ["G1", "G2"])
         Makie.update_state_before_display!(fig)
 
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         li = only(filter(i -> i isa LegendInteractable, ints))
         @test length(li.targets) == 2
         @test li.targets == [[:lines], [:lines_2]]
@@ -379,7 +379,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         ax1 = Axis(fig[1, 1]); lines!(ax1, 1:3; label = "a"); axislegend(ax1)
         ax2 = Axis(fig[2, 1]); lines!(ax2, 1:3; label = "b"); axislegend(ax2)
         Makie.update_state_before_display!(fig)
-        ints = auto_interactables(fig)
+        ints = interactables(fig)
         lis = filter(i -> i isa LegendInteractable, ints)
         @test length(lis) == 2
         @test Set(l.id for l in lis) == Set([:legend, :legend_2])
@@ -391,7 +391,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         poly!(ax, Point2f[(0, 0), (1, 0), (1, 1)]; color = :green, label = "p")
         leg = axislegend(ax)
         Makie.update_state_before_display!(fig)
-        li = only(filter(i -> i isa LegendInteractable, auto_interactables(fig)))
+        li = only(filter(i -> i isa LegendInteractable, interactables(fig)))
         _, _, ctx = ctx_for(fig)
         L = only(hitlayers(li, ctx))
         @test L.colors !== nothing

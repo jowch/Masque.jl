@@ -70,7 +70,7 @@ begin
 end
 
 # ╔═╡ 50000000-0000-0000-0000-000000000014
-@bind zoom_sel masque(zoom_fig, zoom_int)
+@bind zoom_sel masque(zoom_fig, zoom_int; auto = false)
 
 # ╔═╡ 50000000-0000-0000-0000-000000000015
 HTML("<span id=\"zoomout\">ZOOM=$(repr(zoom_sel)) xmax=$(xmax)</span>")
@@ -99,7 +99,7 @@ begin
 end
 
 # ╔═╡ 50000000-0000-0000-0000-000000000023
-@bind vm_sel masque(vm_fig_l, vm_int_l)
+@bind vm_sel masque(vm_fig_l, vm_int_l; auto = false)
 
 # ╔═╡ 50000000-0000-0000-0000-000000000024
 # accumulate clicked indices (acyclic: depends on vm_sel + the once-init Ref)
@@ -120,7 +120,7 @@ begin
 end
 
 # ╔═╡ 50000000-0000-0000-0000-000000000027
-@bind _vm_ignore masque(vm_fig_r, vm_int_r; selected = Dict(:scatter => vm_picked))
+@bind _vm_ignore masque(vm_fig_r, vm_int_r; selected = Dict(:scatter => vm_picked), auto = false)
 
 # ╔═╡ 50000000-0000-0000-0000-000000000028
 HTML("<span id=\"pickout\">PICKED=$(vm_picked)</span>")
@@ -179,7 +179,7 @@ begin
 end
 
 # ╔═╡ 50000000-0000-0000-0000-000000000043
-@bind pan_ev masque(pan_fig, [pan_pts, pan_view])
+@bind pan_ev masque(pan_fig, [pan_pts, pan_view]; auto = false)
 
 # ╔═╡ 50000000-0000-0000-0000-000000000044
 # Always pan_seed: a ViewInteractable's bond never reports `:view` (§12.3), so this branch is
@@ -201,7 +201,7 @@ begin
     pan_fig2 = Figure(size = (500, 320))
     pan_ax2 = Axis(pan_fig2[1, 1]; limits = pan_committed, title = "committed pan view")
     scatter!(pan_ax2, first.(zoom_data), last.(zoom_data); color = :dodgerblue, markersize = 18)
-    masque(pan_fig2, PointInteractable(pan_ax2, zoom_data; id = :scatter))
+    masque(pan_fig2, PointInteractable(pan_ax2, zoom_data; id = :scatter); auto = false)
 end
 
 # ╔═╡ 50000000-0000-0000-0000-000000000050
@@ -225,7 +225,7 @@ begin
 end
 
 # ╔═╡ 50000000-0000-0000-0000-000000000053
-@bind orb_ev masque(orb_fig, orb_view)
+@bind orb_ev masque(orb_fig, orb_view; auto = false)
 
 # ╔═╡ 50000000-0000-0000-0000-000000000054
 # Always orb_seed — same dead branch as pan_committed above, for the same reason (§12.3).

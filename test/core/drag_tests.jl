@@ -46,7 +46,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         Makie.update_state_before_display!(fr)
         f = Figure(size = (500, 320)); ax = Axis(f[1, 1]; limits = (0, 8, 0, 40))
         scatter!(ax, 1:7, (1:7) .* 5)
-        masque(f, [ViewInteractable(ax)])
+        masque(f, [ViewInteractable(ax)]; auto = false)
         b0 = box(ax)
         @test b0 == box(axr)
         @test !(ax.yticklabelspace[] isa Makie.Automatic)
@@ -61,7 +61,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # An explicit label space is the author's; masque() leaves it alone.
         fe = Figure(); axe = Axis(fe[1, 1]; yticklabelspace = 40.0)
         scatter!(axe, 1:3, 1:3)
-        masque(fe, [ViewInteractable(axe)])
+        masque(fe, [ViewInteractable(axe)]; auto = false)
         @test axe.yticklabelspace[] == 40.0
     end
 

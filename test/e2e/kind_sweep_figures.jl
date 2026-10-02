@@ -264,6 +264,7 @@ function build_kind_sweep()
                 payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")],
             );
             selected = Dict(:scatter => [2]),
+            auto = false,
         )
     end
 
@@ -276,6 +277,7 @@ function build_kind_sweep()
             fig,
             SegmentInteractable(ax, p; id = :lines, payloads = [(; label = "curve")]);
             selected = Dict(:lines => [1]),
+            auto = false,
         )
     end
 
@@ -300,6 +302,7 @@ function build_kind_sweep()
                 payloads = [(; label = "pair-a"), (; label = "pair-b")],
             );
             selected = Dict(:segments => [1]),
+            auto = false,
         )
     end
 
@@ -350,6 +353,7 @@ function build_kind_sweep()
                 payloads = [(; shape = "ring1"), (; shape = "ring2")],
             );
             selected = Dict(:poly => [1]),
+            auto = false,
         )
     end
 
@@ -365,6 +369,7 @@ function build_kind_sweep()
                 payloads = [(; label = "east"), (; label = "north"), (; label = "west"), (; label = "south")],
             );
             selected = Dict(:polar => [2]),
+            auto = false,
         )
     end
 
@@ -387,6 +392,7 @@ function build_kind_sweep()
                 payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")],
             );
             selected = Dict(:scatter_dark => [2]),
+            auto = false,
         )
     end
 
@@ -412,21 +418,27 @@ function build_kind_sweep()
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "threshold", limits = (0, 10, 0, 10))
         scatter!(ax, [2.0, 8.0], [2.0, 8.0]; markersize = 10, color = :gray)
-        masque(fig, ThresholdInteractable(ax; orientation = :horizontal, value = 4.0, id = :threshold))
+        masque(
+            fig, ThresholdInteractable(ax; orientation = :horizontal, value = 4.0, id = :threshold);
+            auto = false,
+        )
     end
 
     threshold_cat = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "threshold (categorical y)", dim2_conversion = Makie.CategoricalConversion())
         scatter!(ax, [1.0, 2.0, 3.0], ["a", "b", "c"]; markersize = 10, color = :gray)
-        masque(fig, ThresholdInteractable(ax; orientation = :horizontal, value = 2.0, id = :threshold))
+        masque(
+            fig, ThresholdInteractable(ax; orientation = :horizontal, value = 2.0, id = :threshold);
+            auto = false,
+        )
     end
 
     axis_cat = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "axis (categorical y)", dim2_conversion = Makie.CategoricalConversion())
         scatter!(ax, [1.0, 2.0, 3.0], ["a", "b", "c"]; markersize = 10, color = :gray)
-        masque(fig, AxisInteractable(ax; id = :axis))
+        masque(fig, AxisInteractable(ax; id = :axis); auto = false)
     end
 
     roi = let
@@ -439,7 +451,8 @@ function build_kind_sweep()
             [
                 PointInteractable(ax, pts; id = :pts),
                 ROIInteractable(ax; bounds = (2.0, 6.0, 2.0, 6.0), selects = :pts, id = :roi),
-            ],
+            ];
+            auto = false,
         )
     end
 
@@ -448,7 +461,7 @@ function build_kind_sweep()
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "view-pan", limits = (0, 8, 0, 8))
         scatter!(ax, first.(pts), last.(pts); markersize = 14, color = :gray)
-        masque(fig, [PointInteractable(ax, pts; id = :pts), ViewInteractable(ax; id = :view)])
+        masque(fig, [PointInteractable(ax, pts; id = :pts), ViewInteractable(ax; id = :view)]; auto = false)
     end
 
     legend = let
@@ -476,7 +489,7 @@ function build_kind_sweep()
     # into), and the `:lt` inset legend sits inside that axis viewport — so every legend-entry
     # pixel is also a heatmap-cell pixel. Regression case for the `build_manifest` layer
     # precedence fix: without it, the heatmap's `:grid` layer (added after the legend by
-    # `auto_interactables`) would win every hit under the legend box.
+    # `interactables(fig)`) would win every hit under the legend box.
     legend_overlap = let
         n = 6
         z = [Float64(i + j) for i in 1:n, j in 1:n]
@@ -509,7 +522,8 @@ function build_kind_sweep()
                     tooltip = masque"series $(label)",
                     targets = Dict("quad" => :lines, "lin" => :lines_2, "pts" => :scatter),
                 ),
-            ],
+            ];
+            auto = false,
         )
     end
 
@@ -542,6 +556,7 @@ function build_kind_sweep()
                 AxisInteractable(ax; id = :axis),
             ];
             selected = Dict(:pts => [2]),
+            auto = false,
         )
     end
 
@@ -556,7 +571,8 @@ function build_kind_sweep()
                 SegmentInteractable(ax, wide; id = :wide, payloads = [(; label = "wide")]),
                 SegmentInteractable(ax, narrow; id = :narrow, payloads = [(; label = "narrow")]),
                 SliceInteractable(ax, [wide, narrow]; covers = (:wide, :narrow)),
-            ],
+            ];
+            auto = false,
         )
     end
 
@@ -571,7 +587,8 @@ function build_kind_sweep()
                 PolygonInteractable(ax, d1; id = :wide),
                 PolygonInteractable(ax, d2; id = :narrow),
                 SliceInteractable(ax, [d1, d2]; covers = (:wide, :narrow)),
-            ],
+            ];
+            auto = false,
         )
     end
 
