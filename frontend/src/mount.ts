@@ -594,9 +594,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.surface_.classList.remove("kbd-ring")
         clearHiImmediate(state, ctx.hiGroup_, ctx.hiFixed_)
         clearLinkImmediate(state, ctx.linkGroup_)
-        // A frame that lands mid-pan or mid-wheel would wipe the readout the gesture is still
-        // showing. Pointer-up and the wheel idle timer hide it themselves once the gesture ends.
-        if (state.drag_?.kind !== "view" && state.wheelTimer_ === null) hideTip(ctx, state)
+        // A frame that lands mid-pan, mid-wheel, or mid-key would wipe the readout the gesture is
+        // still showing. Pointer-up, the wheel idle timer, and the key's settle frame hide it.
+        if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideTip(ctx, state)
 
         // Re-key the LIVE selection against the new layer objects — do NOT re-derive it from
         // the new manifest's own `selected=` field, which is only the mount-time hydration seed;

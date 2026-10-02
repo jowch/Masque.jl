@@ -44,7 +44,7 @@ Each threshold line, ROI box, and pan or orbit view is its own Tab stop
 after the plot, so the arrow keys on the plot keep moving between marks.
 Press Tab from the plot to reach the first one. The value shows as you
 press a key, and the `@bind` value changes once, when you let go, so
-holding a key down does not re-run your cells on every step.
+cells that use it update when you release the key, not at every step.
 
 | Stop | Key | What it does |
 |---|---|---|

@@ -95,8 +95,11 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
         }
 
         // What keyup (or blur) still owes: the bond write for a line or box, the settle for a
-        // view. Null between presses.
+        // view. Null between presses. `held` is the keys whose keydown changed the gesture and
+        // are still down: the commit waits for the last of them, so a key the stop swallows, or
+        // the first key let go from a chord, does not commit in the middle of a hold.
         let pending: (() => void) | null = null
+        const held = new Set<string>()
         // Orbit has no matrix to accumulate into, so it keeps the camera it last asked for.
         // A frame's geometry carries the camera it rendered, which can trail a held key's
         // later requests, so it is only the starting point; leaving the stop drops this.
@@ -105,6 +108,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
         const flush = () => {
             const p = pending
             pending = null
+            held.clear()
             p?.()
         }
 
@@ -127,8 +131,8 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             if (!t || !line) return false
             const h = tg.orientation === "h"
             const [vx, vy, vw, vh] = t.viewport
-            // Keys are spatial: Up moves the line up, Right moves it right. Page Up and Home
-            // follow the APG slider (larger value), which is up or right unless reversed.
+            // Arrows and Page keys are spatial: Up and Page Up move the line up, Right moves it
+            // right. Home and End follow the value, so they swap on a reversed axis.
             const cats = h ? t.ycats : t.xcats
             let step = pxPerCss(ctx) * (e.key === "PageUp" || e.key === "PageDown" ? PAGE_CSS : STEP_CSS)
             // A categorical axis snaps to the nearest category on release, so a sub-category
@@ -157,6 +161,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             const p = h ? { x: mid, y: pos } : { x: pos, y: mid }
             const text = thresholdDrag.move(d, p, ctx.tipDigits_)
             el.setAttribute("aria-valuetext", text)
+            place()
             showReadout(text)
             pending = () => {
                 (ctx.host_ as unknown as { value: unknown }).value = thresholdDrag.end(d, { x: h ? mid : d.tg_.pos, y: h ? d.tg_.pos : mid })
@@ -203,8 +208,9 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                 d = roiDrag.begin(id, box, { move: true }, 0, 0, -1) as typeof d
                 p = { x: g.x + dx, y: g.y + dy }
             }
-            showReadout(roiDrag.move(ctx, state, d, p))
+            const text = roiDrag.move(ctx, state, d, p)
             place()
+            showReadout(text)
             pending = () => {
                 (ctx.host_ as unknown as { value: unknown }).value = roiDrag.end(ctx, state, d)
                 ctx.host_.dispatchEvent(new CustomEvent("input"))
@@ -234,9 +240,10 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                 const p = { x: dx * VIEW_STEP * g.w, y: dy * VIEW_STEP * g.h }
                 const input = viewDrag.requestInput(o, p, false)
                 orbitCam = { azimuth: input.azimuth as number, elevation: input.elevation as number }
+                state.keyView_ = true
                 ctx.gesture_.request(input)
                 showReadout(viewDrag.tip(o, p, ctx.tipDigits_))
-                pending = () => { ctx.gesture_.settle({ ...input, settle: true }) }
+                pending = () => { state.keyView_ = false; ctx.gesture_.settle({ ...input, settle: true }) }
                 return true
             }
             const d = viewDrag.begin(id, g, t, g.x + g.w / 2, g.y + g.h / 2, -1) as Extract<Drag, { kind: "view" }>
@@ -253,9 +260,10 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             if (!lim) return true
             state.photo_ = next
             ctx.photoPaint_(next)
+            state.keyView_ = true
             ctx.gesture_.request({ id, ...lim, settle: false, s: next.s, tx: next.tx, ty: next.ty })
             showReadout(viewDrag.limitsTip(lim, ctx.tipDigits_))
-            pending = () => settleCurrentPan(ctx, state, d)
+            pending = () => { state.keyView_ = false; settleCurrentPan(ctx, state, d) }
             return true
         }
 
@@ -302,13 +310,16 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             const l = layerById(ctx, id)
             // A pointer drag owns the geometry until it is released.
             if (!l || state.drag_) return
+            const before = pending
             const handled = l.kind === "threshold" ? nudgeThreshold(l, e)
                 : l.kind === "roi" ? nudgeROI(e)
                     : l.kind === "view" ? nudgeView(l, e) : false
+            if (pending !== before) held.add(e.key)
             if (handled) { e.preventDefault(); e.stopPropagation() }
         }
         const onKeyup = (e: KeyboardEvent) => {
-            if (NUDGE_KEYS.has(e.key)) flush()
+            if (!held.delete(e.key) || held.size > 0) return
+            flush()
         }
         const onFocus = () => place()
         const onBlur = () => {

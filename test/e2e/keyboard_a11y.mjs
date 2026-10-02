@@ -511,7 +511,17 @@ try {
         const d = await dragState(key, id);
         return { ok: d.frame && d.frame.n > n && d.frame.settle, f: d.frame };
       }, what);
-      await page.keyboard.press("ArrowRight");
+      // Hold the first press until its preview frame lands: the frame brings a manifest, and
+      // the readout must survive it until the key comes up.
+      await page.keyboard.down("ArrowRight");
+      const preview = await waitFor(async () => {
+        const d = await dragState(key, id);
+        return { ok: d.frame && d.frame.n > (s.frame?.n ?? 0), d };
+      }, `${key} preview frame`);
+      await page.waitForTimeout(200);
+      const held = await dragState(key, id);
+      if (!held.tip || !/x:\[/.test(held.tip)) throw new Error(`${key}: a preview frame hid the readout ${JSON.stringify({ tip: held.tip, frame: preview.d.frame })}`);
+      await page.keyboard.up("ArrowRight");
       const first = await settleAfter(s.frame?.n ?? 0, `${key} settle frame`);
       await page.keyboard.press("ArrowRight");
       const settled = await settleAfter(first.f.n, `${key} second settle frame`);

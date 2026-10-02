@@ -108,8 +108,10 @@ describe("drag-layer tab stops", () => {
         release(stop, "ArrowLeft")
         expect(inputs).toHaveLength(0)
         press(stop, "PageUp")
+        release(stop, "PageUp")
         expect(line.getAttribute("y1")).toBe("380")
         press(stop, "End")
+        release(stop, "End")
         expect(line.getAttribute("y1")).toBe("0")
         press(stop, "Home")
         expect(line.getAttribute("y1")).toBe("800")
@@ -172,17 +174,19 @@ describe("drag-layer tab stops", () => {
         release(stop, "ArrowRight")
         expect(inputs).toHaveLength(1)
         press(stop, "ArrowLeft", { altKey: true })
+        release(stop, "ArrowLeft")
         expect(rect.getAttribute("x")).toBe("202")
         expect(rect.getAttribute("width")).toBe("402")
         press(stop, "ArrowDown", { altKey: true })
         expect(rect.getAttribute("height")).toBe("402")
         press(stop, "ArrowDown", { altKey: true, shiftKey: true })
+        release(stop, "ArrowDown")
         expect(rect.getAttribute("height")).toBe("400")
         press(stop, "PageDown")
         expect(rect.getAttribute("y")).toBe("220")
         release(stop, "PageDown")
-        expect(inputs).toHaveLength(2)
-        expect((inputs[1] as { payload: { xmin: number } }).payload.xmin).toBeCloseTo(202 / 120)
+        expect(inputs).toHaveLength(4)
+        expect((inputs[3] as { payload: { xmin: number } }).payload.xmin).toBeCloseTo(202 / 120)
     })
 
     it("ROI: translation clamps at the viewport edge and shrinking never flips the box", () => {
@@ -367,6 +371,67 @@ describe("drag-layer tab stops", () => {
         const n = requestFrame.mock.calls.length
         await new Promise((r) => setTimeout(r, 300))
         expect(requestFrame.mock.calls.length).toBe(n)
+    })
+
+    it("commits when the last key that moved comes up, not on a swallowed key or the first of a chord", () => {
+        const { shadow, inputs } = setup(thresholdManifest("h"))
+        const stop = stopOf(shadow, "thr")
+        stop.focus()
+        press(stop, "ArrowUp")
+        press(stop, "ArrowLeft") // a horizontal line swallows it
+        release(stop, "ArrowLeft")
+        expect(inputs).toHaveLength(0)
+        press(stop, "PageUp")
+        release(stop, "ArrowUp")
+        expect(inputs).toHaveLength(0)
+        press(stop, "PageUp", { repeat: true })
+        release(stop, "PageUp")
+        expect(inputs).toHaveLength(1)
+    })
+
+    it("the stop and its readout follow the line on every keydown", () => {
+        const { shadow } = setup(thresholdManifest("h"))
+        const stop = stopOf(shadow, "thr")
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        stop.focus()
+        press(stop, "End")
+        expect(stop.style.top).toBe("0%")
+        const atTop = tip.style.top
+        press(stop, "Home")
+        expect(stop.style.top).toBe("100%")
+        expect(tip.style.top).not.toBe(atTop)
+        const r = setup(roiManifest())
+        const rstop = stopOf(r.shadow, "roi")
+        rstop.focus()
+        press(rstop, "PageDown")
+        expect(rstop.style.top).toBe(`${(220 / 800) * 100}%`)
+    })
+
+    it("view pan: a preview frame that brings a manifest keeps the readout until the settle", async () => {
+        const host = document.createElement("div")
+        const canvas = document.createElement("canvas") as HTMLCanvasElement & {
+            masqueReplaceScene?: (scene: unknown, px?: number, w?: number, h?: number) => void
+        }
+        canvas.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        canvas.masqueReplaceScene = vi.fn()
+        const script = document.createElement("script")
+        host.append(canvas, script)
+        document.body.append(host)
+        const m = viewManifest("pan")
+        const requestFrame = vi.fn(async () => ({ scene: { tag: "frame" }, pxPerUnit: 1, width: 600, height: 400, manifest: viewManifest("pan") }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
+        const stop = stopOf(shadow, "view")
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        stop.focus()
+        press(stop, "ArrowRight")
+        await new Promise((r) => setTimeout(r, 10))
+        expect(requestFrame).toHaveBeenCalled()
+        expect(tip.classList.contains("show")).toBe(true)
+        release(stop, "ArrowRight")
+        await new Promise((r) => setTimeout(r, 10))
+        expect(tip.classList.contains("show")).toBe(false)
     })
 
     it("cleanup removes the stops' listeners", () => {
