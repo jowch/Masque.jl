@@ -48,6 +48,23 @@ non-live usage hint in the same shadow root (ARIA idrefs don't cross shadow boun
 The per-layer `label` field ([§3](03-interactables.md), `HitLayer`) is the only manifest-shape
 change here — see `perf-findings.md` for its measured wire cost.
 
-The drag interactables (threshold, ROI, view) have no keyboard equivalent yet;
-`docs/src/accessibility.md` says so. #169 proposes arrow-key nudging; a nudge stop would draw no
-mark ring, so the surface focus outline above (the #168 indicator) is what stays visible.
+The drag interactables (threshold, ROI, view) get one tab stop each (#169), built by
+`dragkeys.ts` and appended to the shadow root after the surface, so Tab reaches the plot first and
+arrows on the surface keep walking marks; `buildFocusable` never sees these layers. A stop is an
+invisible, `pointer-events: none` box over the line, the box, or the view's viewport (re-placed on
+every photographic repaint and pointer release); its own `:focus-visible` outline is its
+indicator, since it draws no mark ring. A threshold stop is `role="slider"` with
+`aria-orientation` along the free axis; ROI and view stops are `role="application"`. Each has its
+own `aria-describedby` hint.
+
+Keys drive the pointer path's geometry, not a second state machine: `drag/threshold.ts`'s
+`begin`/`move`/`end`, `drag/roi.ts`'s move and edge branches, the photographic matrix plus
+`bond.ts`'s `settleCurrentPan` for pan, and `drag/view.ts`'s `requestInput` for orbit. Each
+keydown updates the geometry and the readout; keyup (or blur, or Escape) commits once — the
+`@bind` write for threshold and ROI, the `gesture_.settle` for a view, which never writes `@bind`
+(#122). Steps: threshold and ROI 1 CSS px (10 with Page), converted by `manifest.width / cssWidth`
+(fallback `scaling`), or one category on a categorical threshold axis; view 10% of the viewport
+(pan translate, or the orbit offset fed to `orbitAngles`); `+`/`-` one wheel notch of `zoomAt` at
+the viewport centre, pan only. Ctrl/Cmd chords and Tab pass through; handled keys
+`preventDefault` and `stopPropagation`. Alt+Shift+Arrow shrinks an ROI side, which the issue's
+grow-only Alt+Arrow could not.

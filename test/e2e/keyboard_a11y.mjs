@@ -371,6 +371,181 @@ try {
     passed.push("focus-outline-not-on-click");
   }
 
+
+  // #169: each drag layer is its own tab stop after the plot surface. Arrows there nudge the
+  // line, the box, or the camera; the readout updates per keydown and the bond (a view: the
+  // settle) goes out once, on keyup, even after a held key's repeats.
+  {
+    // Tracks the stop, its layer's chrome, the bond writes (`input` events on the host) and
+    // the gesture-frame stamp for one widget.
+    const dragState = (key, layerId) => page.evaluate(([k, id]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const hosts = [...document.querySelectorAll(".ip-host")];
+      const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      window.__masqueKbdInputs ??= {};
+      if (!(k in window.__masqueKbdInputs)) {
+        window.__masqueKbdInputs[k] = 0;
+        host.addEventListener("input", () => { window.__masqueKbdInputs[k] += 1; });
+      }
+      const stop = sr.querySelector(`.drag-stop[data-layer="${id}"]`);
+      const oc = stop ? getComputedStyle(stop) : null;
+      const line = sr.querySelector(".masque-threshold-line");
+      const rect = sr.querySelector("svg.masque-plain rect.masque-hi");
+      const live = sr.querySelector('[aria-live="polite"]');
+      return {
+        exists: !!stop,
+        role: stop?.getAttribute("role") ?? null,
+        valuetext: stop?.getAttribute("aria-valuetext") ?? null,
+        hint: stop ? (sr.getElementById(stop.getAttribute("aria-describedby"))?.textContent ?? "") : "",
+        focused: !!stop && sr.activeElement === stop,
+        focusVisible: !!stop && stop.matches(":focus-visible"),
+        outline: oc ? { style: oc.outlineStyle, width: oc.outlineWidth, color: oc.outlineColor } : null,
+        chrome: getComputedStyle(sr.host).getPropertyValue("--masque-chrome").trim(),
+        lineY: line ? Number(line.getAttribute("y1")) : null,
+        rect: rect ? ["x", "y", "width", "height"].map((a) => Number(rect.getAttribute(a))) : null,
+        tip: sr.querySelector(".masque-tip")?.classList.contains("show") ? sr.querySelector(".masque-tip").textContent : null,
+        liveText: live?.textContent ?? "",
+        inputs: window.__masqueKbdInputs[k],
+        frame: host.dataset.masqueGestureFrame ? JSON.parse(host.dataset.masqueGestureFrame) : null,
+        scrollY: window.scrollY,
+        // Image px per CSS px: the overlay svg's viewBox is the manifest's image size.
+        pxPerCss: Number(sr.querySelector("svg.masque-plain").getAttribute("viewBox").split(/\s+/)[2]) /
+          sr.querySelector(".surface").getBoundingClientRect().width,
+      };
+    }, [key, layerId]);
+    const rgbOfChrome = (hex) => {
+      const n = parseInt(hex.replace("#", ""), 16);
+      return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+    };
+    // Reach the stop the way a keyboard user does: focus the plot, then Tab once.
+    const tabToStop = async (key, layerId) => {
+      const surface = await surfaceHandle(key);
+      await surface.evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await surface.focus();
+      await page.keyboard.press("Tab");
+      const s = await dragState(key, layerId);
+      if (!s.exists) throw new Error(`${key}: no drag stop for layer ${layerId}`);
+      if (!s.focused || !s.focusVisible) throw new Error(`${key}: Tab from the surface did not land on the drag stop ${JSON.stringify(s)}`);
+      const o = s.outline;
+      if (o.style !== "solid" || o.width !== "2px" || o.color !== rgbOfChrome(s.chrome)) {
+        throw new Error(`${key}: drag stop focus outline ${JSON.stringify(o)}, expected 2px solid ${s.chrome}`);
+      }
+      return s;
+    };
+    // Hold a key through `n` keydowns (the first plus n-1 repeats), then release it.
+    const hold = async (k, n, mid) => {
+      for (let i = 0; i < n; i++) await page.keyboard.down(k);
+      if (mid) await mid();
+      await page.keyboard.up(k);
+    };
+    const waitFor = async (fn, what, tries = 60, ms = 200) => {
+      let v = null;
+      for (let i = 0; i < tries; i++) { v = await fn(); if (v.ok) return v; await page.waitForTimeout(ms); }
+      throw new Error(`timed out waiting for ${what}: ${JSON.stringify(v)}`);
+    };
+
+    // Threshold: a horizontal line, so Up/Down move it and Left/Right are swallowed.
+    {
+      const key = "threshold", id = "threshold";
+      let s = await tabToStop(key, id);
+      if (s.role !== "slider") throw new Error(`${key}: stop role ${s.role}`);
+      if (!/Up or Down/.test(s.hint)) throw new Error(`${key}: hint ${JSON.stringify(s.hint)}`);
+      const pxPerCss = s.pxPerCss;
+      const y0 = s.lineY, n0 = s.inputs, scroll0 = s.scrollY, before = await textOf(`#out_${key}`);
+      await page.keyboard.press("ArrowLeft");
+      s = await dragState(key, id);
+      if (s.lineY !== y0 || s.inputs !== n0 || s.scrollY !== scroll0) throw new Error(`${key}: ArrowLeft moved the line, wrote the bond, or scrolled ${JSON.stringify(s)}`);
+      passed.push(`${key}/cross-axis-swallowed`);
+      let mid = null;
+      await hold("ArrowUp", 5, async () => { await page.waitForTimeout(300); mid = await dragState(key, id); });
+      if (mid.inputs !== n0) throw new Error(`${key}: bond written while the key was down (${mid.inputs - n0} writes)`);
+      if (!mid.tip) throw new Error(`${key}: no readout while the key was down`);
+      if (Math.abs((y0 - mid.lineY) - 5 * pxPerCss) > 0.5) throw new Error(`${key}: 5 presses moved ${y0 - mid.lineY} image px, expected ${5 * pxPerCss}`);
+      s = await dragState(key, id);
+      if (s.inputs !== n0 + 1) throw new Error(`${key}: expected one bond write on keyup, got ${s.inputs - n0}`);
+      if (mid.valuetext === null || !mid.tip.includes(mid.valuetext)) throw new Error(`${key}: aria-valuetext ${mid.valuetext} vs readout ${mid.tip}`);
+      const after = await waitFor(async () => { const t = await textOf(`#out_${key}`); return { ok: t !== before, t }; }, `${key} bond`);
+      if (!/ThresholdEvent|:threshold/.test(after.t)) throw new Error(`${key}: bond readout ${after.t.slice(0, 200)}`);
+      s = await waitForLiveRegion(key, /\d/);
+      if (!/\d/.test(s.liveText)) throw new Error(`${key}: live region did not announce the value: ${JSON.stringify(s.liveText)}`);
+      passed.push(`${key}/arrow-nudge+single-bind+announce`);
+      await page.keyboard.press("Escape");
+      s = await dragState(key, id);
+      if (s.focused) throw new Error(`${key}: Escape did not blur the stop`);
+      passed.push(`${key}/escape`);
+    }
+
+    // ROI: arrows translate, Alt+Arrow grows a side. Each release writes the bond once.
+    {
+      const key = "roi", id = "roi";
+      let s = await tabToStop(key, id);
+      const pxPerCss = s.pxPerCss;
+      const r0 = s.rect, n0 = s.inputs, before = await textOf(`#out_${key}`);
+      await hold("ArrowRight", 4);
+      s = await dragState(key, id);
+      if (Math.abs(s.rect[0] - r0[0] - 4 * pxPerCss) > 0.5 || s.rect[2] !== r0[2]) throw new Error(`${key}: ArrowRight ×4 gave ${JSON.stringify(s.rect)} from ${JSON.stringify(r0)}`);
+      if (s.inputs !== n0 + 1) throw new Error(`${key}: expected one bond write, got ${s.inputs - n0}`);
+      if (!/selected/.test(s.tip ?? "")) throw new Error(`${key}: selects readout missing: ${s.tip}`);
+      await page.keyboard.press("Alt+ArrowDown");
+      const s2 = await dragState(key, id);
+      if (Math.abs(s2.rect[3] - s.rect[3] - pxPerCss) > 0.5 || s2.rect[1] !== s.rect[1]) throw new Error(`${key}: Alt+ArrowDown gave ${JSON.stringify(s2.rect)} from ${JSON.stringify(s.rect)}`);
+      await page.keyboard.press("Alt+Shift+ArrowDown");
+      const s3 = await dragState(key, id);
+      if (Math.abs(s3.rect[3] - s.rect[3]) > 0.5) throw new Error(`${key}: Alt+Shift+ArrowDown did not shrink back: ${JSON.stringify(s3.rect)}`);
+      if (s3.inputs !== n0 + 3) throw new Error(`${key}: expected three bond writes, got ${s3.inputs - n0}`);
+      await waitFor(async () => { const t = await textOf(`#out_${key}`); return { ok: t !== before, t }; }, `${key} bond`);
+      passed.push(`${key}/arrow-move+alt-resize+single-bind`);
+      await page.keyboard.press("Escape");
+    }
+
+    // View (pan): arrows and + preview through the gesture channel and settle once on keyup.
+    // The bond never moves.
+    {
+      const key = "view", id = "view";
+      let s = await tabToStop(key, id);
+      const n0 = s.inputs, before = await textOf(`#out_${key}`);
+      // Earlier drivers may have panned this view, so measure one press against the window a
+      // first press settled on.
+      const settleAfter = (n, what) => waitFor(async () => {
+        const d = await dragState(key, id);
+        return { ok: d.frame && d.frame.n > n && d.frame.settle, f: d.frame };
+      }, what);
+      // Hold the first press until its preview frame lands: the frame brings a manifest, and
+      // the readout must survive it until the key comes up.
+      await page.keyboard.down("ArrowRight");
+      const preview = await waitFor(async () => {
+        const d = await dragState(key, id);
+        return { ok: d.frame && d.frame.n > (s.frame?.n ?? 0), d };
+      }, `${key} preview frame`);
+      await page.waitForTimeout(200);
+      const held = await dragState(key, id);
+      if (!held.tip || !/x:\[/.test(held.tip)) throw new Error(`${key}: a preview frame hid the readout ${JSON.stringify({ tip: held.tip, frame: preview.d.frame })}`);
+      await page.keyboard.up("ArrowRight");
+      const first = await settleAfter(s.frame?.n ?? 0, `${key} settle frame`);
+      await page.keyboard.press("ArrowRight");
+      const settled = await settleAfter(first.f.n, `${key} second settle frame`);
+      const span = first.f.xmax - first.f.xmin;
+      if (Math.abs((settled.f.xmin - first.f.xmin) - 0.1 * span) > 0.02 * span) {
+        throw new Error(`${key}: ArrowRight panned ${JSON.stringify(first.f)} -> ${JSON.stringify(settled.f)}, expected +10%`);
+      }
+      const f1 = settled.f.n;
+      await page.keyboard.press("+");
+      const zoomed = await settleAfter(f1, `${key} zoom frame`);
+      if (!(zoomed.f.xmax - zoomed.f.xmin < span)) throw new Error(`${key}: + did not zoom in: ${JSON.stringify(zoomed.f)}`);
+      s = await dragState(key, id);
+      if (s.inputs !== n0) throw new Error(`${key}: a view nudge wrote the bond`);
+      if ((await textOf(`#out_${key}`)) !== before) throw new Error(`${key}: a view nudge changed #out_${key}`);
+      // Put the camera back for the drivers that run after this one.
+      await page.keyboard.press("-");
+      await page.keyboard.press("ArrowLeft");
+      await page.keyboard.press("ArrowLeft");
+      await page.waitForTimeout(1500);
+      passed.push(`${key}/arrow-pan+zoom+settle-no-bind`);
+      await page.keyboard.press("Escape");
+    }
+  }
+
   if (unexpected.length) throw new Error(`page errors: ${unexpected.join(" | ")}`);
   passed.push("no-console-errors");
   console.log(`KEYBOARD A11Y OK — ${backend}: ${passed.join(", ")}`);

@@ -53,7 +53,7 @@ function viewNeedsSettle(d: Extract<Drag, { kind: "view" }>): boolean {
     return d.lastInput_ !== undefined || d.settleOwed_ === true
 }
 
-function settleCurrentPan(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { kind: "view" }>): void {
+export function settleCurrentPan(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { kind: "view" }>): void {
     const lim = matrixLimits(shownViewTransform(ctx, d.id_, d.t_), state.photo_)
     if (lim) ctx.gesture_.settle({ id: d.id_, ...lim, settle: true, s: state.photo_.s, tx: state.photo_.tx, ty: state.photo_.ty })
 }
