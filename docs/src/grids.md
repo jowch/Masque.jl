@@ -43,7 +43,7 @@ the values form a matrix of size
 `(length(xedges) - 1, length(yedges) - 1)`:
 
 ```julia
-cells = RectInteractable(ax; grid = (0.5:1:4.5, 0.5:1:3.5, z), id = :cells)
+cells = GridInteractable(ax, 0.5:1:4.5, 0.5:1:3.5, z; id = :cells)
 ```
 
 ## Large grids
@@ -54,7 +54,7 @@ and its value, and a click still reports the cell's true `i` and `j`.
 
 A color image has no single value per cell, so hovering or clicking it
 reports `i` and `j` with `value = nothing`, at any size. To read a
-number instead, pass a [`RectInteractable`](@ref) with a grid of the
+number instead, pass a [`GridInteractable`](@ref) with a grid of the
 values you want, such as each pixel's intensity, and give it the
 image's layer id, such as `id = :cells`, so it takes the image's place.
 

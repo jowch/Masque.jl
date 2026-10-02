@@ -29,6 +29,7 @@ transform_bond
 PointInteractable
 SegmentInteractable
 RectInteractable
+GridInteractable
 PolygonInteractable
 AxisInteractable
 ColorbarInteractable

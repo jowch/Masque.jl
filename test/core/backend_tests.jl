@@ -137,7 +137,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test allint(only(hitlayers(RectInteractable(ax; rects = [(2.0, 5.0, 1.0, 2.0)]), ctx)).geometry)
         @test allint(only(hitlayers(PolygonInteractable(ax, [[(1.0, 1.0), (2.0, 4.0), (3.0, 1.0)]]), ctx)).geometry[1])
         # grid edges are quantized too — the sub-pixel cap math reads these Int edges
-        gridL = only(hitlayers(RectInteractable(ax; grid = (0.5:1:3.5, 0.5:1:3.5, rand(3, 3))), ctx))
+        gridL = only(hitlayers(GridInteractable(ax, 0.5:1:3.5, 0.5:1:3.5, rand(3, 3)), ctx))
         @test allint(gridL.geometry["xedges"]) && allint(gridL.geometry["yedges"])
         # AxisTransform stays Float64 — the drag path inverts pixel→data through it (must not quantize)
         @test ctx.transforms[:ax1].viewport[3] isa Float64

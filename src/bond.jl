@@ -22,9 +22,7 @@ at all: the box owns the bond. That is a property of the call, not of the layer'
 """
 bondtype(::AbstractInteractable) = ElementEvent
 bondtype(::ViewInteractable) = Nothing
-function bondtype(i::RectInteractable)
-    return i.layout === :grid ? GridCellEvent : ElementEvent
-end
+bondtype(::GridInteractable) = GridCellEvent
 
 """
     transform_bond(interactable, layer, index, js_payload) -> InteractionEvent
@@ -43,8 +41,7 @@ function transform_bond(::Type{Nothing}, i, layer::HitLayer, index, js_payload)
     throw(ArgumentError("bond: layer :$(layer.id) commits nothing"))
 end
 
-function transform_bond(i::RectInteractable, layer::HitLayer, index, js_payload)
-    i.layout === :list && return _element_event(i.id, index, layer.payloads)
+function transform_bond(i::GridInteractable, layer::HitLayer, index, js_payload)
     return _grid_cell_event(i.id, js_payload)
 end
 function transform_bond(i::ViewInteractable, layer::HitLayer, index, js_payload)
@@ -84,9 +81,7 @@ function bond_stamp(i::AbstractInteractable, L::HitLayer)
     if i isa ROIInteractable
         return i.selects === nothing ? "bounds" : "none"
     end
-    if i isa RectInteractable
-        return i.layout === :grid ? "gridcell" : "element"
-    end
+    i isa GridInteractable && return "gridcell"
     i isa SliceInteractable && return "none"
     i isa FunctionInteractable && return kind_bond_stamp(L.kind)
     L.kind === :view && return "none"

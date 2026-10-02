@@ -137,22 +137,36 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test ev isa ElementEvent && ev.index == 1 && ev.payload == (; index = 1)
         end
 
-        @testset "heatmap/image -> Rect(:grid), incl. EndPoints expansion" begin
+        @testset "heatmap/image -> GridInteractable, incl. EndPoints expansion" begin
             z = [Float64((i + j) % 5) for i in 1:4, j in 1:3]
             # explicit coords: Makie hands back full edge vectors
             f1 = Figure(size = (500, 350)); a1 = Axis(f1[1, 1]); p1 = heatmap!(a1, 1:4, 1:3, z)
             _, _, c1 = ctx_for(f1)
-            @test geom(RectInteractable(a1, p1), c1) ==
-                geom(RectInteractable(a1; grid = (collect(0.5:1:4.5), collect(0.5:1:3.5), z)), c1)
+            @test geom(GridInteractable(a1, p1), c1) ==
+                geom(GridInteractable(a1, collect(0.5:1:4.5), collect(0.5:1:3.5), z), c1)
             # coordinate-free: converted gives EndPoints (length 2) -> we expand to n+1 edges
             f2 = Figure(size = (500, 350)); a2 = Axis(f2[1, 1]); p2 = heatmap!(a2, z)
             _, _, c2 = ctx_for(f2)
-            @test geom(RectInteractable(a2, p2), c2) ==
-                geom(RectInteractable(a2; grid = (collect(0.5:1:4.5), collect(0.5:1:3.5), z)), c2)
+            @test geom(GridInteractable(a2, p2), c2) ==
+                geom(GridInteractable(a2, collect(0.5:1:4.5), collect(0.5:1:3.5), z), c2)
             # image! shares the method body but advertises its own row -> exercise it
             f3 = Figure(size = (500, 350)); a3 = Axis(f3[1, 1]); p3 = image!(a3, rand(4, 3))
             _, _, c3 = ctx_for(f3)
-            @test only(hitlayers(RectInteractable(a3, p3), c3)).kind === :grid
+            @test only(hitlayers(GridInteractable(a3, p3), c3)).kind === :grid
+            # The defaults build a grid for a heatmap.
+            @test only(interactables(f1)) isa GridInteractable
+        end
+
+        @testset "deprecated grid forms of RectInteractable return a GridInteractable" begin
+            z = [Float64((i + j) % 5) for i in 1:4, j in 1:3]
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]); p = heatmap!(a, 1:4, 1:3, z)
+            _, _, c = ctx_for(f)
+            g = @test_deprecated RectInteractable(a; grid = (0.5:1:4.5, 0.5:1:3.5, z))
+            @test g isa GridInteractable && g.id === :rects
+            @test geom(g, c) == geom(GridInteractable(a, 0.5:1:4.5, 0.5:1:3.5, z), c)
+            g = @test_deprecated RectInteractable(a, p; tooltip = false)
+            @test g isa GridInteractable && g.id === :cells && g.tooltip === false
+            @test Masque.bondtype(g) === Masque.GridCellEvent
         end
 
         @testset "barplot -> Rect(:list), dodge/stack via child rects" begin
@@ -996,7 +1010,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
                 SegmentInteractable(a2, rb; tooltip = tpl, label = "L"),
                 SegmentInteractable(a2, hl; tooltip = tpl, label = "L"),
                 SegmentInteractable(a2, vl; tooltip = tpl, label = "L"),
-                RectInteractable(a3, hm; tooltip = tpl, label = "L"),
+                GridInteractable(a3, hm; tooltip = tpl, label = "L"),
                 RectInteractable(a4, bp; tooltip = tpl, label = "L"),
                 RectInteractable(a4, hs; tooltip = tpl, label = "L"),
                 RectInteractable(a4, wf; tooltip = tpl, label = "L"),
