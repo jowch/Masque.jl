@@ -12,6 +12,11 @@ All notable changes to this project are documented here. The format is based on
   panning. An interactable whose `id` matches a default layer's replaces that layer. To keep
   the old behavior, where only the interactables you pass respond, add `auto = false`:
   `masque(fig, ints; auto = false)`. Two layers with the same id now raise an error.
+- **Breaking:** heatmap and image grids are now a `GridInteractable` instead of a
+  `RectInteractable`, and `masque(fig)` builds one for each `heatmap!` and `image!`. Build one
+  with `GridInteractable(ax, xedges, yedges, values)` or `GridInteractable(ax, p)` for a heatmap
+  or image plot. `RectInteractable` is now the list of rectangles only. Code that checks
+  `isa RectInteractable` for a heatmap layer needs `GridInteractable`.
 - A legend with no `targets` links to the layers of the `masque` call it is in, including
   layers built with `interactables(plot)` and calls with `auto = false`.
 
@@ -27,6 +32,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Deprecated
 - `auto_interactables(fig)`: use `interactables(fig)`. It will be removed in 0.3.
+- `RectInteractable(ax; grid = (xedges, yedges, values))` and `RectInteractable(ax, p)` for a
+  heatmap or image: use `GridInteractable`. They return a `GridInteractable` until they are
+  removed in 0.3.
 
 ## [0.1.1] - 2026-10-01
 

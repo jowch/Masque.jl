@@ -17,7 +17,7 @@ Main.masque_fallback("example_heatmap_trace")
 
 ## How it works
 
-[`RectInteractable`](@ref) makes each heatmap cell clickable, and a
+[`GridInteractable`](@ref) makes each heatmap cell clickable, and a
 click makes `pick` a [`GridCellEvent`](@ref): `daily[pick.i, pick.j]`
 is the clicked cell of the matrix you plotted, and `pick.value` is its
 value. The last cell recomputes the detail from `pick.i` and `pick.j`,

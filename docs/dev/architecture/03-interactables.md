@@ -88,8 +88,8 @@ own fixed `SEG_TOL`. Every other kind's manifest is untouched by this field.
 
 `label` (optional, per-layer, `String`) is a screen-reader announcement prefix for the
 keyboard-navigation overlay ([§11](11-keyboard.md)) — e.g. `"Scatter"` in "Scatter, element 3 of 10: …". Set via
-the `label` keyword on `PointInteractable`/`SegmentInteractable`/`RectInteractable`
-(list form)/`PolygonInteractable` (the kinds keyboard nav visits); absent by default, and
+the `label` keyword on `PointInteractable`/`SegmentInteractable`/`RectInteractable`/
+`PolygonInteractable` (the kinds keyboard nav visits); absent by default, and
 omitted from the manifest entirely when unset (same idiom as `selects`/`tol` above) — see
 `perf-findings.md` for the measured per-layer wire cost.
 
@@ -109,7 +109,7 @@ one hair, and which arm. A plot with no slice draws none.
 
 ## Built-in interactables
 
-Twelve built-in types, plus the two custom-interaction types of [§4](04-custom-interactions.md)
+Thirteen built-in types, plus the two custom-interaction types of [§4](04-custom-interactions.md)
 (`RegionInteractable`, `FunctionInteractable`). Roughly one type per hit primitive, with the
 exceptions noted inline: `:axis` is shared by two, `LegendInteractable` and `TextInteractable`
 reuse `:rects`, and the three drags each own a kind no other type produces. The "Makie surfaces"
@@ -120,7 +120,8 @@ this table is `docs/src/support.md`.
 |---|---|---|---|
 | `PointInteractable` | `:circles` | Scatter, MeshScatter (3-D), Stem·pts, ScatterLines·pts | `(; index, x, y)`, plus `z` when the point has three coordinates (Scatter on `Axis3`, MeshScatter) |
 | `SegmentInteractable` | `:polyline` \| `:lines` \| `:segments` | Lines, Stairs, Series, ScatterLines·line (`:lines`, one element per path); an explicit `mode=:polyline` vertex list stays `:polyline` (per edge); LineSegments, Errorbars, Rangebars, HLines, VLines, Stem·stems, Wireframe, Arrows3D (`:pairs` → `:segments`) | `:lines` `(; index)` (a series adds `label` when Makie set one); `:polyline` / `:segments` `(; segment_index)`; Arrows3D `(; index, x, y, z, u, v, w)` |
-| `RectInteractable` | `:rects` \| `:grid` | BarPlot, Hist, Waterfall, CrossBar, HSpan, VSpan, Spy, BoxPlot (un-notched) (list); Heatmap, Image (grid) | grid `(; i, j, value)`; BarPlot/Waterfall `(; low, high, value)`; Hist `(; value, low, high)`; CrossBar `(; midpoint, low, high)`; HSpan/VSpan `(; low, high)`; BoxPlot `(; q1, median, q3)`; Spy `(; index)` |
+| `RectInteractable` | `:rects` | BarPlot, Hist, Waterfall, CrossBar, HSpan, VSpan, Spy, BoxPlot (un-notched) | BarPlot/Waterfall `(; low, high, value)`; Hist `(; value, low, high)`; CrossBar `(; midpoint, low, high)`; HSpan/VSpan `(; low, high)`; BoxPlot `(; q1, median, q3)`; Spy `(; index)` |
+| `GridInteractable` | `:grid` | Heatmap, Image | none: the client resolves `(; i, j, value)`, and a click commits a `GridCellEvent` |
 | `PolygonInteractable` | `:polygons` | Poly, Band, Density, Contourf, Violin, Voronoiplot, BoxPlot (notched) | Band/Density/Voronoiplot `(; index)`; Contourf `(; low, high)`; Violin `(; x)` |
 | `AxisInteractable` | `:axis` (unbounded) | the Axis area itself (linear + log) — declared | `(; x, y)` inverted client-side |
 | `ColorbarInteractable` | `:axis` (bounded bbox) | Colorbar — auto-extracted from `fig.content` | `(; value)` inverted client-side via `AxisTransform.valueaxis` |
@@ -159,8 +160,9 @@ whose `markerspace` is not `:pixel` (`hexbin!`'s data-space hexagons, which a pi
 cannot describe) and a plot whose `space` is not `:data` (`bracket!`'s pixel-space `Series`).
 Only a parent that yields nothing warns, and the warning names that parent.
 
-`SegmentInteractable` carries `mode ∈ {:polyline,:pairs}`; `RectInteractable` carries
-`layout ∈ {:grid,:list}`. Same JS test, different Julia extractor. The three drags are
+`SegmentInteractable` carries `mode ∈ {:polyline,:pairs}`: same JS test, different Julia
+extractor. A grid is its own type, `GridInteractable`, so `bondtype` dispatches on the type
+(`GridCellEvent`) instead of branching on a field. The three drags are
 declared against an axis rather than extracted from a plot, they are the only types whose
 *declared* `events` is `(:drag,)` (`RegionInteractable`/`LegendInteractable`/`FunctionInteractable`
 take a caller-supplied `events`, so an instance can carry it too). `ThresholdInteractable`/

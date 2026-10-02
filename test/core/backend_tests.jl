@@ -116,7 +116,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test all(isfinite, q)
         @test red_near(q[1], q[2])
         # grid edges: finite, monotonic in image px (y flips: data ↑ → image y ↓), inside viewport
-        Lg = only(hitlayers(RectInteractable(axg, hm), ctxh))
+        Lg = only(hitlayers(GridInteractable(axg, hm), ctxh))
         ye = Lg.geometry["yedges"]
         vp = ctxh.transforms[:ax2].viewport
         @test all(isfinite, ye) && issorted(ye; rev = true)
@@ -137,7 +137,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test allint(only(hitlayers(RectInteractable(ax; rects = [(2.0, 5.0, 1.0, 2.0)]), ctx)).geometry)
         @test allint(only(hitlayers(PolygonInteractable(ax, [[(1.0, 1.0), (2.0, 4.0), (3.0, 1.0)]]), ctx)).geometry[1])
         # grid edges are quantized too — the sub-pixel cap math reads these Int edges
-        gridL = only(hitlayers(RectInteractable(ax; grid = (0.5:1:3.5, 0.5:1:3.5, rand(3, 3))), ctx))
+        gridL = only(hitlayers(GridInteractable(ax, 0.5:1:3.5, 0.5:1:3.5, rand(3, 3)), ctx))
         @test allint(gridL.geometry["xedges"]) && allint(gridL.geometry["yedges"])
         # AxisTransform stays Float64 — the drag path inverts pixel→data through it (must not quantize)
         @test ctx.transforms[:ax1].viewport[3] isa Float64

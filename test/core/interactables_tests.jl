@@ -17,7 +17,7 @@ struct _NotReal end
     @testset "RectInteractable grid is compact" begin
         fh = Figure(); axh = Axis(fh[1, 1]); z = rand(20, 30); heatmap!(axh, 1:20, 1:30, z)
         _, _, ctxh = ctx_for(fh)
-        L = only(hitlayers(RectInteractable(axh; grid = (0.5:1:20.5, 0.5:1:30.5, z)), ctxh))
+        L = only(hitlayers(GridInteractable(axh, 0.5:1:20.5, 0.5:1:30.5, z), ctxh))
         @test L.kind === :grid
         @test L.geometry["ncols"] == 20 && L.geometry["nrows"] == 30
         @test length(L.geometry["xedges"]) == 21 && length(L.geometry["values"]) == 600
@@ -29,7 +29,7 @@ struct _NotReal end
         # edges and ships one source value per screen pixel, not the source matrix.
         fb = Figure(); axb = Axis(fb[1, 1]); zb = rand(Float32, 1000, 1000); heatmap!(axb, zb)
         _, _, ctxb = ctx_for(fb)
-        L = only(hitlayers(RectInteractable(axb; grid = (0.5:1:1000.5, 0.5:1:1000.5, zb)), ctxb))
+        L = only(hitlayers(GridInteractable(axb, 0.5:1:1000.5, 0.5:1:1000.5, zb), ctxb))
         g = L.geometry
         @test L.kind === :grid
         @test g["ncols"] == 1000 && length(g["xedges"]) == 1001
@@ -66,7 +66,7 @@ struct _NotReal end
         _, _, ctxw = ctx_for(fw)
         zw = rand(Float32, n, n)
         edges = range(0, n; length = n + 1)
-        L = only(hitlayers(RectInteractable(axw; grid = (edges, edges, zw)), ctxw))
+        L = only(hitlayers(GridInteractable(axw, edges, edges, zw), ctxw))
         g = L.geometry
         @test !haskey(g, "values")
         sample = g["sample"]
@@ -127,7 +127,7 @@ struct _NotReal end
         fb = Figure(); axb = Axis(fb[1, 1]); heatmap!(axb, rand(Float32, n, n))
         _, _, ctxb = ctx_for(fb)
         zb = fill(_NotReal(), n, n)
-        L = only(hitlayers(RectInteractable(axb; grid = (0.5:1:(n + 0.5), 0.5:1:(n + 0.5), zb)), ctxb))
+        L = only(hitlayers(GridInteractable(axb, 0.5:1:(n + 0.5), 0.5:1:(n + 0.5), zb), ctxb))
         g = L.geometry
         @test g["ncols"] == n && length(g["xedges"]) == n + 1
         @test !haskey(g, "values")
@@ -147,7 +147,7 @@ struct _NotReal end
         # A `missing` cell on the same branch is NaN32, as on the sampled branch.
         fm = Figure(); axm = Axis(fm[1, 1]); heatmap!(axm, rand(3, 2))
         zm = Union{Missing, Float64}[1.0 missing; 2.0 3.0; 4.0 5.0]
-        Lm = only(hitlayers(RectInteractable(axm; grid = (0.5:1:3.5, 0.5:1:2.5, zm)), last(ctx_for(fm))))
+        Lm = only(hitlayers(GridInteractable(axm, 0.5:1:3.5, 0.5:1:2.5, zm), last(ctx_for(fm))))
         vm = Lm.geometry["values"]
         @test eltype(vm) === Float32 && length(vm) == 6
         @test isnan(vm[4]) && count(isnan, vm) == 1   # row-major: (c=1, r=2) → index 1*3+0+1
@@ -166,10 +166,10 @@ struct _NotReal end
     @testset "RectInteractable grid rejects non-monotonic edges and non-finite projections" begin
         (; ax) = default_fixture()
         # non-monotonic edges: caught at construction, before any projection happens
-        @test_throws ArgumentError RectInteractable(ax; grid = ([0.0, 2.0, 1.0, 3.0], [0.0, 1.0, 2.0], rand(3, 2)))
-        @test_throws ArgumentError RectInteractable(ax; grid = ([0.0, 1.0, 2.0], [0.0, 2.0, 1.0], rand(2, 2)))
+        @test_throws ArgumentError GridInteractable(ax, [0.0, 2.0, 1.0, 3.0], [0.0, 1.0, 2.0], rand(3, 2))
+        @test_throws ArgumentError GridInteractable(ax, [0.0, 1.0, 2.0], [0.0, 2.0, 1.0], rand(2, 2))
         e = try
-            RectInteractable(ax; grid = ([0.0, 2.0, 1.0, 3.0], [0.0, 1.0, 2.0], rand(3, 2)))
+            GridInteractable(ax, [0.0, 2.0, 1.0, 3.0], [0.0, 1.0, 2.0], rand(3, 2))
             nothing
         catch err
             err
@@ -183,7 +183,7 @@ struct _NotReal end
         # boundingbox throwing first — the negative edge only ever reaches our own projection.
         fn = Figure(size = (600, 400)); axn = Axis(fn[1, 1]; yscale = log10)
         _, _, ctxn = ctx_for(fn)
-        badgrid = RectInteractable(axn; grid = ([0.0, 1.0, 2.0], [-1.0, 1.0, 10.0], rand(2, 2)))
+        badgrid = GridInteractable(axn, [0.0, 1.0, 2.0], [-1.0, 1.0, 10.0], rand(2, 2))
         eg = try
             hitlayers(badgrid, ctxn)
             nothing
@@ -351,7 +351,7 @@ struct _NotReal end
             @test ms_seg["layers"][1]["selected"] == [0]
             @test ms_seg["layers"][1]["kind"] == "segments"
 
-            grid_i = RectInteractable(bax; grid = (0.5:1:3.5, 0.5:1:3.5, rand(3, 3)), id = :heat)
+            grid_i = GridInteractable(bax, 0.5:1:3.5, 0.5:1:3.5, rand(3, 3); id = :heat)
             @test_throws ArgumentError build_manifest([grid_i], bctx; selected = Dict(:heat => [0]))
             err_grid = try
                 build_manifest([grid_i], bctx; selected = Dict(:heat => [0])); nothing
@@ -508,13 +508,13 @@ struct _NotReal end
         # grid `values` must be (length(xedges)-1, length(yedges)-1)
         xe = 0.0:1.0:3.0; ye = 0.0:1.0:2.0   # 3x2 cells expected
         good = zeros(3, 2)
-        @test RectInteractable(ax; grid = (xe, ye, good)) isa RectInteractable
+        @test GridInteractable(ax, xe, ye, good) isa GridInteractable
         bad = zeros(2, 3)   # transposed — wrong shape
-        @test_throws ArgumentError RectInteractable(ax; grid = (xe, ye, bad))
+        @test_throws ArgumentError GridInteractable(ax, xe, ye, bad)
         # non-Matrix `values` (e.g. a vector, or nothing) must raise the same friendly
         # ArgumentError, not a bare MethodError from `size(nothing)` deep inside the check.
-        @test_throws ArgumentError RectInteractable(ax; grid = (xe, ye, nothing))
-        @test_throws ArgumentError RectInteractable(ax; grid = (xe, ye, [1.0, 2.0, 3.0]))
+        @test_throws ArgumentError GridInteractable(ax, xe, ye, nothing)
+        @test_throws ArgumentError GridInteractable(ax, xe, ye, [1.0, 2.0, 3.0])
 
         # exactly one of rects/grid — both, and neither, are construction-time errors
         @test_throws ArgumentError RectInteractable(ax)

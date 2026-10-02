@@ -267,10 +267,18 @@ end
 # `EndPoints` (length 2), expanded here to n+1 uniform edges.
 _edges(e, n) = length(e) == n + 1 ? collect(Float64, e) :
     collect(range(Float64(e[1]), Float64(e[end]); length = n + 1))
-function RectInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells, tooltip = nothing, label = nothing)
+function GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells, tooltip = nothing, label = nothing)
     xr, yr, vals = _conv(p)
     ncols, nrows = size(vals)
-    return RectInteractable(ax; grid = (_edges(xr, ncols), _edges(yr, nrows), vals), id, tooltip, label)
+    return GridInteractable(ax, _edges(xr, ncols), _edges(yr, nrows), vals; id, tooltip, label)
+end
+function RectInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; kwargs...)
+    Base.depwarn(
+        "`RectInteractable(ax, p)` for a heatmap or image is deprecated; use `GridInteractable(ax, p)`. " *
+            "Removed in 0.3.",
+        :RectInteractable,
+    )
+    return GridInteractable(ax, p; kwargs...)
 end
 
 # The child Poly carries the final laid-out rectangles (dodge/stack/automatic-width applied);
@@ -741,8 +749,8 @@ function _construct(ax, p, id; kw...)
         p isa Makie.Stairs || p isa Makie.Errorbars || p isa Makie.Rangebars ||
             p isa Makie.HLines || p isa Makie.VLines
     ) && return [SegmentInteractable(ax, p; id, kw...)]
-    (p isa Makie.Heatmap || p isa Makie.Image || p isa Makie.BarPlot || p isa Makie.Spy) &&
-        return [RectInteractable(ax, p; id, kw...)]
+    (p isa Makie.Heatmap || p isa Makie.Image) && return [GridInteractable(ax, p; id, kw...)]
+    (p isa Makie.BarPlot || p isa Makie.Spy) && return [RectInteractable(ax, p; id, kw...)]
     (p isa Makie.Hist || p isa Makie.Waterfall || p isa Makie.CrossBar) && return [RectInteractable(ax, p; id, kw...)]
     (p isa Makie.HSpan || p isa Makie.VSpan) && return [RectInteractable(ax, p; id, kw...)]
     p isa Makie.Band && return [PolygonInteractable(ax, p; id, kw...)]
@@ -844,7 +852,8 @@ end
 _nverts(i::PointInteractable) = length(i.points)
 _nverts(i::SegmentInteractable) = i.paths === nothing ? length(i.vertices) : sum(length, i.paths; init = 0)
 _nverts(i::PolygonInteractable) = sum(length, i.rings; init = 0)
-_nverts(i::RectInteractable) = i.layout === :list ? length(i.data) : 1
+_nverts(i::RectInteractable) = length(i.data)
+_nverts(::GridInteractable) = 1
 _nverts(i::TextInteractable) = length(i.payloads)
 _nverts(::AbstractInteractable) = 1
 

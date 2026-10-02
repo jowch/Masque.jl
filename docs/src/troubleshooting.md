@@ -142,7 +142,7 @@ respond to hover and click. See [Supported plots and axes](@ref).
 **Cause:** `masque(fig)` skips those plots on a `PolarAxis` with a
 warning, because their rectangles would not line up with the polar
 plot. A rectangle interactable you pass yourself, such as
-`RectInteractable`, is still built, but its hover areas sit in the
+`RectInteractable` or `GridInteractable`, is still built, but its hover areas sit in the
 wrong place.
 
 **Fix:** on a `PolarAxis`, only scatter, line, segment,

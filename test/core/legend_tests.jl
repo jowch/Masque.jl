@@ -68,7 +68,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         Makie.update_state_before_display!(fig)
         _, _, ctx = ctx_for(fig)
 
-        grid_int = Masque.RectInteractable(ax, hm; id = :cells)
+        grid_int = Masque.GridInteractable(ax, hm; id = :cells)
         seg_int = Masque.SegmentInteractable(ax, l1; id = :lines)
         li = LegendInteractable(leg; targets = Dict("line" => :lines))
         view_int = Masque.ViewInteractable(ax)
@@ -192,7 +192,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         Makie.update_state_before_display!(fig)
         _, _, ctx = ctx_for(fig)
         line_int = Masque.SegmentInteractable(ax, l1)   # :lines, id :lines
-        rect_int = Masque.RectInteractable(ax, hm)      # :grid, id :cells
+        rect_int = Masque.GridInteractable(ax, hm)      # :grid, id :cells
 
         # explicit target naming the :grid layer -> ArgumentError from build_manifest
         li_bad = LegendInteractable(leg; targets = Dict("a" => :cells))

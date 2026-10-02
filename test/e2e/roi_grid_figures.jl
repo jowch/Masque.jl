@@ -12,7 +12,7 @@ function build_roi_grid()
     return masque(
         fig,
         [
-            RectInteractable(ax; grid = (collect(0.0:1.0:nx), collect(0.0:1.0:ny), vals), id = :img),
+            GridInteractable(ax, collect(0.0:1.0:nx), collect(0.0:1.0:ny), vals; id = :img),
             ROIInteractable(ax; bounds = (2.0, 6.0, 2.0, 6.0), selects = :img, id = :roi),
         ];
         auto = false,

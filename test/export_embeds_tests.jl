@@ -82,7 +82,7 @@ end
     fig = Figure(size = (300, 200))
     ax = Axis(fig[1, 1])
     hm = heatmap!(ax, 1:4, 1:3, z)
-    w = masque(fig, RectInteractable(ax, hm); auto = false)
+    w = masque(fig, GridInteractable(ax, hm); auto = false)
     states = discrete_states(w.manifest)
     @test length(states) == 12
     for v in states

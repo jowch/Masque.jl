@@ -24,7 +24,8 @@ make only the marks you pass interactive, add `auto = false`.
 
 An *interactable* tells Masque which marks respond to the pointer.
 [`PointInteractable`](@ref) covers the points of a scatter,
-[`RectInteractable`](@ref) covers bars or heatmap cells, and
+[`RectInteractable`](@ref) covers bars, [`GridInteractable`](@ref) covers
+heatmap cells, and
 [`ROIInteractable`](@ref) adds a box you drag. [Constructors](@ref)
 lists them all.
 

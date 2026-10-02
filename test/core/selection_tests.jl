@@ -314,7 +314,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         gfig = Figure(size = (400, 300)); gax = Axis(gfig[1, 1])
         vals = [Float64(i + 10j) for i in 1:4, j in 1:3]
         heatmap!(gax, 0 .. 4.0, 0 .. 3.0, vals)
-        grid = RectInteractable(gax; grid = (collect(0.0:4.0), collect(0.0:3.0), vals), id = :img)
+        grid = GridInteractable(gax, collect(0.0:4.0), collect(0.0:3.0), vals; id = :img)
         roi = ROIInteractable(gax; bounds = (1.0, 3.0, 1.0, 2.0), selects = :img, id = :roi)
         tv = IP.APD.Bonds.transform_value
 

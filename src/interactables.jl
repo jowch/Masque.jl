@@ -585,14 +585,12 @@ end
 # ============================ RectInteractable =============================
 """
     RectInteractable(ax; rects, id=:rects, payloads=nothing, tooltip=nothing, clamp_to_viewport=false, label=nothing)
-    RectInteractable(ax; grid, id=:rects, payloads=nothing, tooltip=nothing, label=nothing)
     RectInteractable(ax, p; id=<kind-specific>, payloads=nothing, tooltip=nothing, label=nothing)   # from a plot object
 
-Axis-aligned rectangles: an explicit list (bars, boxes) or a compact heatmap/image grid. Pass
-exactly one of `rects`/`grid` — passing both, or neither, raises `ArgumentError` at
-construction. Produces one `:rects` or `:grid` [`HitLayer`](@ref).
+Axis-aligned rectangles from an explicit list (bars, boxes). Produces one `:rects`
+[`HitLayer`](@ref). For a heatmap or image grid, use [`GridInteractable`](@ref).
 
-# Arguments (list form: `rects=`)
+# Arguments
 - `rects` — data-space boxes `[(xc, yc, w, h), …]` (center + width/height).
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:rects`.
 - `payloads` — one entry per rect; `ArgumentError` if the length doesn't match. Default:
@@ -604,53 +602,39 @@ construction. Produces one `:rects` or `:grid` [`HitLayer`](@ref).
   internally by the `HSpan`/`VSpan` introspection methods below; rarely needed directly.
   Default `false`.
 - `label` — an optional screen-reader announcement prefix for this layer (see
-  [`PointInteractable`](@ref)). Default `nothing`. Accepted for both forms, but inert on a
-  `:grid` layer — it's still stored and shipped in the manifest, but has no effect, since a
-  `:grid` layer is not keyboard-navigable (element count is unbounded).
+  [`PointInteractable`](@ref)). Default `nothing`.
 
-# Arguments (grid form: `grid=`)
-- `grid` — `(xedges, yedges, values)`: `xedges`/`yedges` are cell-edge vectors (length
-  `ncols+1`/`nrows+1`), `values` an `(ncols, nrows)` `Matrix` of per-cell values. Shape mismatch
-  raises `ArgumentError`. `id`/`tooltip` as above; `payloads` is unused (cell `(i, j, value)`
-  is resolved client-side). When a cell is at least one screen pixel, the manifest carries
-  `values` (row-major). Below that it carries `sample`: one source value per screen pixel of
-  the axis viewport, the cell under that pixel's center. A pixel whose center misses the grid
-  is `NaN` and is not a hit. A source cell that is itself `NaN`, `Inf`, or `missing` is still
-  that cell (`missing` is stored as `NaN`). A matrix that is not real-valued (a color `image!`)
-  ships edges only on this branch: the cell index, no numeric value. Clicks still carry that
-  center cell, so `A[cell]` indexes it.
+`RectInteractable(ax; grid = (xedges, yedges, values))` and `RectInteractable(ax, p)` for a
+`Heatmap` or `Image` are deprecated: they return a [`GridInteractable`](@ref) and are removed
+in 0.3.
 
 # From a plot object
-`RectInteractable(ax, p)` builds `rects`/`grid` and default payloads from `p`:
+`RectInteractable(ax, p)` builds `rects` and default payloads from `p`:
 
-| `p` | default `id` | form | notes |
-|---|---|---|---|
-| `Makie.Heatmap` / `Makie.Image` | `:cells` | grid | edges from converted coordinate/coordinate-free ranges |
-| `Makie.BarPlot` | `:bars` | list | reads the laid-out child `Poly` (dodge/stack/auto-width honored); payload `(; low, high, value)` |
-| `Makie.Spy` | `:spy` | list | cell size from the child `Scatter`'s data-space `markersize` (length-2 vector or scalar; other shapes error) |
-| `Makie.Hist` | `:hist` | list | payload `(; value, low, high)` (`value` is a count only for `normalization = :none`) |
-| `Makie.Waterfall` | `:waterfall` | list | payload `(; low, high, value)` |
-| `Makie.CrossBar` | `:crossbar` | list | payload `(; midpoint, low, high)` |
-| `Makie.HSpan` | `:hspan` | list | spans the full x-range of `ax`'s current limits; `clamp_to_viewport = true`; payload `(; low, high)` (y-bounds); re-resolved on limit changes |
-| `Makie.VSpan` | `:vspan` | list | spans the full y-range of `ax`'s current limits; `clamp_to_viewport = true`; payload `(; low, high)` (x-bounds); re-resolved on limit changes |
+| `p` | default `id` | notes |
+|---|---|---|
+| `Makie.BarPlot` | `:bars` | reads the laid-out child `Poly` (dodge/stack/auto-width honored); payload `(; low, high, value)` |
+| `Makie.Spy` | `:spy` | cell size from the child `Scatter`'s data-space `markersize` (length-2 vector or scalar; other shapes error) |
+| `Makie.Hist` | `:hist` | payload `(; value, low, high)` (`value` is a count only for `normalization = :none`) |
+| `Makie.Waterfall` | `:waterfall` | payload `(; low, high, value)` |
+| `Makie.CrossBar` | `:crossbar` | payload `(; midpoint, low, high)` |
+| `Makie.HSpan` | `:hspan` | spans the full x-range of `ax`'s current limits; `clamp_to_viewport = true`; payload `(; low, high)` (y-bounds); re-resolved on limit changes |
+| `Makie.VSpan` | `:vspan` | spans the full y-range of `ax`'s current limits; `clamp_to_viewport = true`; payload `(; low, high)` (x-bounds); re-resolved on limit changes |
 
 # Examples
 ```julia
 RectInteractable(ax; rects = [(0.0, 0.0, 1.0, 1.0)], payloads = [(; label = "a")])
 
-xedges = 0:0.5:2; yedges = 0:1:3; vals = rand(4, 3)
-RectInteractable(ax; grid = (xedges, yedges, vals))
-
-p = heatmap!(ax, X, Y, Z)
+p = barplot!(ax, 1:3, [2, 5, 3])
 RectInteractable(ax, p)
 ```
 """
 struct RectInteractable <: AbstractInteractable
-    ax; layout::Symbol; data::Any; id::Symbol; payloads::Vector{Any}; tooltip::Union{Nothing, Markup, Bool}
+    ax; data::Vector{NTuple{4, Float64}}; id::Symbol; payloads::Vector{Any}; tooltip::Union{Nothing, Markup, Bool}
     # Spans only: clamp the pixel rect to the axis viewport with inward rounding (ceil near
     # edge, floor far edge) so integer quantization never expands it past the bounds.
     clamp_to_viewport::Bool
-    # :list only. Same resolve-in-hitlayers mechanism as SegmentInteractable.resolve.
+    # Same resolve-in-hitlayers mechanism as SegmentInteractable.resolve.
     resolve::Union{Nothing, Function}
     label::Union{Nothing, String}
 end
@@ -658,110 +642,160 @@ function RectInteractable(
         ax; rects = nothing, grid = nothing, id = :rects, payloads = nothing,
         tooltip = nothing, clamp_to_viewport = false, label = nothing
     )
-    _check_tooltip(tooltip)
     (rects === nothing) == (grid === nothing) &&
         throw(ArgumentError("RectInteractable: pass exactly one of `rects` or `grid`"))
-    lbl = label === nothing ? nothing : String(label)
-    return if grid !== nothing
-        xe, ye, vals = grid
-        xe = collect(Float64, xe); ye = collect(Float64, ye)
-        # geometry.ts's findBin binary-searches these edges assuming strict monotonicity (asc or
-        # desc); a non-monotone array silently picks a different (still-plausible-looking) bin
-        # instead of erroring, so reject it here rather than let it degrade silently client-side.
-        (issorted(xe) || issorted(xe; rev = true)) ||
-            throw(ArgumentError("RectInteractable: grid `xedges` must be monotonic (ascending or descending)"))
-        (issorted(ye) || issorted(ye; rev = true)) ||
-            throw(ArgumentError("RectInteractable: grid `yedges` must be monotonic (ascending or descending)"))
-        expected = (length(xe) - 1, length(ye) - 1)
-        vals isa AbstractMatrix && size(vals) == expected || throw(
-            ArgumentError(
-                "RectInteractable: grid `values` must be a Matrix with shape (length(xedges)-1, length(yedges)-1) " *
-                    "= $(expected), got $(vals isa AbstractMatrix ? size(vals) : typeof(vals))",
-            ),
+    if grid !== nothing
+        Base.depwarn(
+            "`RectInteractable(ax; grid = (xedges, yedges, values))` is deprecated; use " *
+                "`GridInteractable(ax, xedges, yedges, values)`. Removed in 0.3.",
+            :RectInteractable,
         )
-        RectInteractable(ax, :grid, (xe, ye, vals), id, Any[], tooltip, false, nothing, lbl)
-    else
-        rs = [(Float64(r[1]), Float64(r[2]), Float64(r[3]), Float64(r[4])) for r in rects]
-        pl = payloads === nothing ? Any[(; index = k) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "RectInteractable")
-        RectInteractable(ax, :list, rs, id, pl, tooltip, clamp_to_viewport, nothing, lbl)
+        return GridInteractable(ax, grid...; id, tooltip, label)
     end
+    _check_tooltip(tooltip)
+    lbl = label === nothing ? nothing : String(label)
+    rs = [(Float64(r[1]), Float64(r[2]), Float64(r[3]), Float64(r[4])) for r in rects]
+    pl = payloads === nothing ? Any[(; index = k) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "RectInteractable")
+    return RectInteractable(ax, rs, id, pl, tooltip, clamp_to_viewport, nothing, lbl)
 end
-# Internal-only: construct a :list RectInteractable with a lazy `resolve(ax) -> rects`.
+# Internal-only: construct a RectInteractable with a lazy `resolve(ax) -> rects`.
 function _rect_with_resolve(ax, rects, id, payloads, clamp_to_viewport, resolve; tooltip = nothing, label = nothing)
     _check_tooltip(tooltip)
     rs = [(Float64(r[1]), Float64(r[2]), Float64(r[3]), Float64(r[4])) for r in rects]
     return RectInteractable(
-        ax, :list, rs, id, payloads, tooltip, clamp_to_viewport, resolve, label === nothing ? nothing : String(label),
+        ax, rs, id, payloads, tooltip, clamp_to_viewport, resolve, label === nothing ? nothing : String(label),
     )
 end
 tooltip_spec(i::RectInteractable) = i.tooltip
 function hitlayers(i::RectInteractable, ctx)
-    if i.layout === :list
-        rects = i.resolve === nothing ? i.data : i.resolve(i.ax)
-        g = Real[]
-        vp = i.clamp_to_viewport ? ctx.transforms[axis_id(ctx, i.ax)].viewport : nothing
-        for (xc, yc, w, h) in rects
-            a = _proj(ctx, i.ax, (xc - w / 2, yc - h / 2)); b = _proj(ctx, i.ax, (xc + w / 2, yc + h / 2))
-            cx = (a[1] + b[1]) / 2; cy = (a[2] + b[2]) / 2
-            ww = abs(b[1] - a[1]); hh = abs(b[2] - a[2])
-            if vp === nothing || !all(isfinite, (cx, cy, ww, hh))
-                append!(g, (_q(cx), _q(cy), _q(ww), _q(hh)))
-            else
-                # ceil/floor on NaN/Inf throws, so non-finite coords take the _q path above.
-                vp_x, vp_y, vp_w, vp_h = vp
-                x_lo = ceil(Int, max(cx - ww / 2, vp_x))
-                x_hi = floor(Int, min(cx + ww / 2, vp_x + vp_w))
-                y_lo = ceil(Int, max(cy - hh / 2, vp_y))
-                y_hi = floor(Int, min(cy + hh / 2, vp_y + vp_h))
-                px_w = max(0, x_hi - x_lo); px_h = max(0, y_hi - y_lo)
-                append!(g, (round(Int, (x_lo + x_hi) / 2), round(Int, (y_lo + y_hi) / 2), px_w, px_h))
-            end
-        end
-        return [HitLayer(i.id, :rects, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
-    else
-        xe, ye, vals = i.data
-        y0 = ye[1]
-        xedges = Real[_q(_proj(ctx, i.ax, (x, y0))[1]) for x in xe]
-        x0 = xe[1]
-        yedges = Real[_q(_proj(ctx, i.ax, (x0, y))[2]) for y in ye]
-        # A DomainError inside the projection closure (e.g. log10 of a non-positive edge on a
-        # log-scale axis) degrades to a NaN point (`backend.jl`'s `_project_closure`), and `_q`
-        # passes non-finite values through unchanged. geometry.ts's findBin assumes finite,
-        # strictly monotonic edges — a NaN edge would silently pick a bogus bin (wrong tooltip/
-        # bond) instead of the old linear scan's clean no-hit. Fail loud instead.
-        all(isfinite, xedges) && all(isfinite, yedges) || throw(
-            ArgumentError(
-                "RectInteractable: grid xedges/yedges projected to a non-finite pixel coordinate " *
-                    "(check for a log-scale axis with a non-positive bin edge)",
-            ),
-        )
-        ncols, nrows = length(xe) - 1, length(ye) - 1
-        geom = Dict{String, Any}(
-            "xedges" => xedges, "yedges" => yedges, "ncols" => ncols, "nrows" => nrows
-        )
-        cell_px = min(
-            abs(xedges[end] - xedges[1]) / ncols,
-            abs(yedges[end] - yedges[1]) / nrows,
-        ) * ctx.display_scale
-        if cell_px >= GRID_VALUES_MIN_SCREEN_PX
-            # A non-real matrix (a color image) ships edges only, as on the sampled branch.
-            if _sampleable(eltype(vals))
-                geom["values"] = Float32[_sample_value(vals[c, r]) for r in 1:nrows for c in 1:ncols]  # row-major: r*ncols+c
-            end
+    rects = i.resolve === nothing ? i.data : i.resolve(i.ax)
+    g = Real[]
+    vp = i.clamp_to_viewport ? ctx.transforms[axis_id(ctx, i.ax)].viewport : nothing
+    for (xc, yc, w, h) in rects
+        a = _proj(ctx, i.ax, (xc - w / 2, yc - h / 2)); b = _proj(ctx, i.ax, (xc + w / 2, yc + h / 2))
+        cx = (a[1] + b[1]) / 2; cy = (a[2] + b[2]) / 2
+        ww = abs(b[1] - a[1]); hh = abs(b[2] - a[2])
+        if vp === nothing || !all(isfinite, (cx, cy, ww, hh))
+            append!(g, (_q(cx), _q(cy), _q(ww), _q(hh)))
         else
-            vp = ctx.transforms[axis_id(ctx, i.ax)].viewport
-            sampled = _grid_sample(xedges, yedges, vals, vp, ctx.display_scale)
-            if sampled !== nothing
-                geom["sample"] = sampled.sample
-                geom["sncols"] = sampled.sncols
-                geom["snrows"] = sampled.snrows
-                geom["sample_origin"] = sampled.origin
-                geom["sample_span"] = sampled.span
-                geom["sample_px"] = sampled.sample_px
-            end
+            # ceil/floor on NaN/Inf throws, so non-finite coords take the _q path above.
+            vp_x, vp_y, vp_w, vp_h = vp
+            x_lo = ceil(Int, max(cx - ww / 2, vp_x))
+            x_hi = floor(Int, min(cx + ww / 2, vp_x + vp_w))
+            y_lo = ceil(Int, max(cy - hh / 2, vp_y))
+            y_hi = floor(Int, min(cy + hh / 2, vp_y + vp_h))
+            px_w = max(0, x_hi - x_lo); px_h = max(0, y_hi - y_lo)
+            append!(g, (round(Int, (x_lo + x_hi) / 2), round(Int, (y_lo + y_hi) / 2), px_w, px_h))
         end
-        return [HitLayer(i.id, :grid, geom, Any[], axis_id(ctx, i.ax), events(i), i.label)]
     end
+    return [HitLayer(i.id, :rects, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
+end
+
+# ============================ GridInteractable =============================
+"""
+    GridInteractable(ax, xedges, yedges, values; id=:cells, tooltip=nothing, label=nothing)
+    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, tooltip=nothing, label=nothing)
+
+A binned grid, such as a heatmap or image. Produces one `:grid` [`HitLayer`](@ref). A click
+commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value.
+
+# Arguments
+- `xedges`, `yedges` — cell-edge vectors (length `ncols+1`/`nrows+1`), each strictly
+  ascending or descending; `ArgumentError` otherwise.
+- `values` — an `(ncols, nrows)` `Matrix` of per-cell values. Shape mismatch raises
+  `ArgumentError`.
+- `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:cells`.
+- `tooltip` — `nothing` for the auto table of `i`, `j` and `value` (default), `masque"..."` for
+  a template, or `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
+- `label` — an optional screen-reader announcement prefix (see [`PointInteractable`](@ref)).
+  It is stored and shipped, but has no effect yet: a grid is not keyboard-navigable.
+
+When a cell is at least one screen pixel, the manifest carries `values` (row-major). Below
+that it carries `sample`: one source value per screen pixel of the axis viewport, the cell
+under that pixel's center. A pixel whose center misses the grid is `NaN` and is not a hit. A
+source cell that is itself `NaN`, `Inf`, or `missing` is still that cell (`missing` is stored
+as `NaN`). A matrix that is not real-valued (a color `image!`) ships edges only on this
+branch: the cell index, no numeric value. Clicks still carry that center cell, so `A[cell]`
+indexes it.
+
+The plot-object form reads edges and values from a `heatmap!` or `image!` plot.
+
+# Examples
+```julia
+xedges = 0:0.5:2; yedges = 0:1:3; vals = rand(4, 3)
+GridInteractable(ax, xedges, yedges, vals)
+
+p = heatmap!(ax, X, Y, Z)
+GridInteractable(ax, p)
+```
+"""
+struct GridInteractable <: AbstractInteractable
+    ax; xedges::Vector{Float64}; yedges::Vector{Float64}; values::AbstractMatrix
+    id::Symbol; tooltip::Union{Nothing, Markup, Bool}; label::Union{Nothing, String}
+end
+function GridInteractable(ax, xedges, yedges, values; id = :cells, tooltip = nothing, label = nothing)
+    _check_tooltip(tooltip)
+    xe = collect(Float64, xedges); ye = collect(Float64, yedges)
+    # geometry.ts's findBin binary-searches these edges assuming strict monotonicity (asc or
+    # desc); a non-monotone array silently picks a different (still-plausible-looking) bin
+    # instead of erroring, so reject it here rather than let it degrade silently client-side.
+    (issorted(xe) || issorted(xe; rev = true)) ||
+        throw(ArgumentError("GridInteractable: `xedges` must be monotonic (ascending or descending)"))
+    (issorted(ye) || issorted(ye; rev = true)) ||
+        throw(ArgumentError("GridInteractable: `yedges` must be monotonic (ascending or descending)"))
+    expected = (length(xe) - 1, length(ye) - 1)
+    values isa AbstractMatrix && size(values) == expected || throw(
+        ArgumentError(
+            "GridInteractable: `values` must be a Matrix with shape (length(xedges)-1, length(yedges)-1) " *
+                "= $(expected), got $(values isa AbstractMatrix ? size(values) : typeof(values))",
+        ),
+    )
+    return GridInteractable(ax, xe, ye, values, id, tooltip, label === nothing ? nothing : String(label))
+end
+tooltip_spec(i::GridInteractable) = i.tooltip
+function hitlayers(i::GridInteractable, ctx)
+    xe, ye, vals = i.xedges, i.yedges, i.values
+    y0 = ye[1]
+    xedges = Real[_q(_proj(ctx, i.ax, (x, y0))[1]) for x in xe]
+    x0 = xe[1]
+    yedges = Real[_q(_proj(ctx, i.ax, (x0, y))[2]) for y in ye]
+    # A DomainError inside the projection closure (e.g. log10 of a non-positive edge on a
+    # log-scale axis) degrades to a NaN point (`backend.jl`'s `_project_closure`), and `_q`
+    # passes non-finite values through unchanged. geometry.ts's findBin assumes finite,
+    # strictly monotonic edges — a NaN edge would silently pick a bogus bin (wrong tooltip/
+    # bond) instead of the old linear scan's clean no-hit. Fail loud instead.
+    all(isfinite, xedges) && all(isfinite, yedges) || throw(
+        ArgumentError(
+            "GridInteractable: xedges/yedges projected to a non-finite pixel coordinate " *
+                "(check for a log-scale axis with a non-positive bin edge)",
+        ),
+    )
+    ncols, nrows = length(xe) - 1, length(ye) - 1
+    geom = Dict{String, Any}(
+        "xedges" => xedges, "yedges" => yedges, "ncols" => ncols, "nrows" => nrows
+    )
+    cell_px = min(
+        abs(xedges[end] - xedges[1]) / ncols,
+        abs(yedges[end] - yedges[1]) / nrows,
+    ) * ctx.display_scale
+    if cell_px >= GRID_VALUES_MIN_SCREEN_PX
+        # A non-real matrix (a color image) ships edges only, as on the sampled branch.
+        if _sampleable(eltype(vals))
+            geom["values"] = Float32[_sample_value(vals[c, r]) for r in 1:nrows for c in 1:ncols]  # row-major: r*ncols+c
+        end
+    else
+        vp = ctx.transforms[axis_id(ctx, i.ax)].viewport
+        sampled = _grid_sample(xedges, yedges, vals, vp, ctx.display_scale)
+        if sampled !== nothing
+            geom["sample"] = sampled.sample
+            geom["sncols"] = sampled.sncols
+            geom["snrows"] = sampled.snrows
+            geom["sample_origin"] = sampled.origin
+            geom["sample_span"] = sampled.span
+            geom["sample_px"] = sampled.sample_px
+        end
+    end
+    return [HitLayer(i.id, :grid, geom, Any[], axis_id(ctx, i.ax), events(i), i.label)]
 end
 
 # ============================ TextInteractable =============================

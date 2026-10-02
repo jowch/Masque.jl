@@ -35,7 +35,7 @@ function _parity_corpus()
             Makie.update_state_before_display!(fig)
             return (
                 fig, [
-                    RectInteractable(ax, hm), PointInteractable(ax, sc),
+                    GridInteractable(ax, hm), PointInteractable(ax, sc),
                     SegmentInteractable(ax, ln), ColorbarInteractable(cb),
                 ],
             )

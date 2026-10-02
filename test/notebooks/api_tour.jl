@@ -82,7 +82,7 @@ sg_sel === nothing ? "segment: click a line segment" :
     "segment: segment_index=$(sg_sel.segment_index)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000030
-md"## Rect (grid) — `RectInteractable(; grid)` (heatmap cells)"
+md"## Grid — `GridInteractable` (heatmap cells)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000031
 begin
@@ -90,7 +90,7 @@ begin
     hm_fig = Figure(size = (500, 350))
     hm_ax = Axis(hm_fig[1, 1]; title = "click a heatmap cell")
     heatmap!(hm_ax, 1:8, 1:6, hm_z)
-    hm_int = RectInteractable(hm_ax; id = :cells, grid = (0.5:1:8.5, 0.5:1:6.5, hm_z))
+    hm_int = GridInteractable(hm_ax, 0.5:1:8.5, 0.5:1:6.5, hm_z; id = :cells)
 end
 
 # ╔═╡ 40000000-0000-0000-0000-000000000032
@@ -101,7 +101,7 @@ hm_sel === nothing ? "grid: click a cell" :
     "grid: i=$(hm_sel.i) j=$(hm_sel.j) value=$(hm_sel.value)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000040
-md"## Rect (list) — `RectInteractable(; rects)` (explicit boxes)"
+md"## Rect — `RectInteractable(; rects)` (explicit boxes)"
 
 # ╔═╡ 40000000-0000-0000-0000-000000000041
 begin

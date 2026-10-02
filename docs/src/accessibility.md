@@ -59,7 +59,7 @@ Moving to the first point might announce "Scatter, element 1 of 3: x
 `label` names the whole layer, so you set it once per interactable. The
 constructors that take positions accept it:
 [`PointInteractable`](@ref), [`SegmentInteractable`](@ref),
-[`RectInteractable`](@ref) with `rects =`, and
+[`RectInteractable`](@ref), and
 [`PolygonInteractable`](@ref).
 
 `masque(fig)` on its own sets no labels. To name the layers it builds
