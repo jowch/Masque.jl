@@ -52,7 +52,6 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 - #180, then #181 — every chrome literal (colors, stroke widths, opacities, the handle fill)
   as a CSS custom property with nothing painted changing, then `masque()` keywords over them.
   #181 depends on #180.
-- #169 — arrow-key nudging for threshold, ROI, and view (the WCAG 2.1.1 gap).
 - #179 — wide mode: widen the Pluto cell from inside the widget.
 - *idea* — pin a tooltip so its numbers can be read or copied.
 - *idea* — high-contrast mode (`prefers-contrast`).

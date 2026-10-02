@@ -25,6 +25,10 @@ All notable changes to this project are documented here. The format is based on
   layers built with `interactables(plot)` and calls with `auto = false`.
 
 ### Added
+- Threshold lines, ROI boxes, and pan and orbit views each get a Tab stop after the plot.
+  Arrow keys move the line or the box, or pan or rotate the view; Alt with an arrow resizes an
+  ROI box, and `+` / `-` zoom a pan view. The `@bind` value updates once, when the key is
+  released.
 - `interactables(plot; tooltip, payloads, label, id)` changes one plot's layer without
   rebuilding the rest: `masque(fig, interactables(s; tooltip = masque"…"))`. It keeps the
   layer's id, so `selected=` and legend links still work. `stem!`, `scatterlines!`,

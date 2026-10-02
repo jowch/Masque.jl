@@ -4,6 +4,8 @@ import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncF
 import { buildCross, hideCross } from "./cross"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
+import { buildDragStops } from "./dragkeys"
+import type { DragStops } from "./dragkeys"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import { limitsTip } from "./drag/view"
@@ -102,8 +104,16 @@ const STYLE = `
    box-shadow, so forced colours still paint it, in Highlight. */
 .surface:focus-visible:not(.kbd-ring) { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: -2px; }
 .surface.kbd-ring:focus-visible { outline: none; }
+/* Drag-layer tab stops (#169): invisible boxes over the line, the box, or the viewport. They
+   take keys only, never the pointer. The focus outline is the stop's whole indicator: outside
+   the line and the box, inset on the viewport like the surface's. */
+.drag-stop { position: absolute; box-sizing: border-box; pointer-events: none; }
+.drag-stop:focus { outline: none; }
+.drag-stop:focus-visible { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 3px; }
+.drag-stop-view:focus-visible { outline-offset: -2px; }
 @media (forced-colors: active) {
   .surface:focus-visible:not(.kbd-ring) { outline-color: Highlight; }
+  .drag-stop:focus-visible { outline-color: Highlight; }
 }
 svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
@@ -394,6 +404,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // Bumps when the base pixels change, so the viewport copy is not redrawn on every pan sample.
     let frameGen = 0
     let paintPhoto: (m: PhotoMatrix) => void = () => {}
+    // The drag-layer tab stops (dragkeys.ts), built once the ctx exists. They follow the
+    // line, the box, and the photograph, so every repaint re-places them.
+    let dragStops: DragStops | null = null
     // A frame that arrives while an ROI or threshold drag holds those nodes. Rebuilt when the drag ends.
     let pendingChrome: Manifest | null = null
     const rawChannel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto() })
@@ -603,6 +616,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         state.selHits_ = nextSel
         renderSelection(ctx, state)
         adoptPhoto(input)
+        dragStops?.sync_()
 
         // A paired, atomic stamp — written in the SAME synchronous block as the swap above, not
         // sampled separately — so an observer (e2e's kind_sweep.mjs) can tell "a frame actually
@@ -686,6 +700,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         for (const g of clipGroups) g.removeAttribute("clip-path")
     }
     paintPhoto = (m) => {
+        paintMatrix(m)
+        dragStops?.sync_()
+    }
+    const paintMatrix = (m: PhotoMatrix) => {
         const id = isIdentity(m)
         const w = ctx.manifest_.width
         const h = ctx.manifest_.height
@@ -819,6 +837,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const kind = state.drag_?.kind
         onUp(ctx, state, e)
         releaseChrome(kind)
+        dragStops?.sync_()
     }
     const cancel = (e: PointerEvent) => {
         const kind = state.drag_?.kind
@@ -902,6 +921,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     surface.addEventListener("click", click)
     surface.addEventListener("keydown", keydown)
     surface.addEventListener("focusout", focusout)
+    // After the surface in the shadow root, so Tab reaches the plot first, then each drag layer.
+    dragStops = buildDragStops(ctx, state, shadow)
 
     // Drawn into g.sel, not g.hi: it must survive hovers (onMove clears g.hi on every miss)
     // and support multiple selected indices (drawHi keeps only the last).
@@ -924,6 +945,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         surface.removeEventListener("click", click)
         surface.removeEventListener("keydown", keydown)
         surface.removeEventListener("focusout", focusout)
+        dragStops?.cleanup_()
         window.removeEventListener("resize", syncOverlayToBase)
         overlayRO?.disconnect()
         overlayFrames = 24
