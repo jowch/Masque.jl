@@ -134,7 +134,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         q = data_to_image_px(ctx, ax, pts[1])
         @test L.geometry[1] == round(Int, q[1]) && L.geometry[2] == round(Int, q[2])  # within ≤0.5px of the projection
         @test allint(only(hitlayers(SegmentInteractable(ax, pts), ctx)).geometry)
-        @test allint(only(hitlayers(RectInteractable(ax; rects = [(2.0, 5.0, 1.0, 2.0)]), ctx)).geometry)
+        @test allint(only(hitlayers(RectInteractable(ax, [(2.0, 5.0, 1.0, 2.0)]), ctx)).geometry)
         @test allint(only(hitlayers(PolygonInteractable(ax, [[(1.0, 1.0), (2.0, 4.0), (3.0, 1.0)]]), ctx)).geometry[1])
         # grid edges are quantized too — the sub-pixel cap math reads these Int edges
         gridL = only(hitlayers(GridInteractable(ax, 0.5:1:3.5, 0.5:1:3.5, rand(3, 3)), ctx))

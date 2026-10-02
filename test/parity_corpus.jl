@@ -86,11 +86,10 @@ function _parity_corpus()
             return (
                 fig, [
                     RegionInteractable(
-                        ax;
-                        regions = [
+                        ax, [
                             (:circle, (2.0, 2.0), 12), (:rect, (5.0, 5.0), 2.0, 1.0),
                             (:polygon, [(7.0, 1.0), (9.0, 1.0), (8.0, 3.0)]),
-                        ],
+                        ];
                         payloads = ["c", "r", "p"],
                     ),
                 ],

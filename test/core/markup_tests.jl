@@ -71,7 +71,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         pi = PointInteractable(ax, pts; tooltip = masque"$(x)")
         @test Masque.tooltip_spec(pi) isa Masque.Markup
         @test Masque.tooltip_spec(PointInteractable(ax, pts; tooltip = false)) === false
-        ri = RegionInteractable(ax; regions = [(:circle, (1.0, 1.0), 0.5)], payloads = [(; n = "a")], tooltip = masque"$(n)")
+        ri = RegionInteractable(ax, [(:circle, (1.0, 1.0), 0.5)]; payloads = [(; n = "a")], tooltip = masque"$(n)")
         @test Masque.tooltip_spec(ri) isa Masque.Markup
     end
 

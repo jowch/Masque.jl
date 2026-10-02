@@ -131,6 +131,15 @@ HTML(
         "<span id=\"coords_poly\" style=\"display:none\">$(JSON3.write(sweep.poly.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000066
+@bind ev_regions sweep.regions
+
+# ╔═╡ c1000000-0000-0000-0000-000000000067
+HTML(
+    "<span id=\"out_regions\">REGIONS=$(repr(ev_regions))</span>" *
+        "<span id=\"coords_regions\" style=\"display:none\">$(JSON3.write(sweep.regions.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000024
 @bind ev_polar sweep.polar
 
@@ -310,6 +319,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000021
 # ╠═c1000000-0000-0000-0000-000000000022
 # ╠═c1000000-0000-0000-0000-000000000023
+# ╠═c1000000-0000-0000-0000-000000000066
+# ╠═c1000000-0000-0000-0000-000000000067
 # ╠═c1000000-0000-0000-0000-000000000024
 # ╠═c1000000-0000-0000-0000-000000000025
 # ╠═c1000000-0000-0000-0000-000000000036

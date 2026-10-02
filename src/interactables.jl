@@ -584,7 +584,7 @@ end
 
 # ============================ RectInteractable =============================
 """
-    RectInteractable(ax; rects, id=:rects, payloads=nothing, tooltip=nothing, clamp_to_viewport=false, label=nothing)
+    RectInteractable(ax, rects; id=:rects, payloads=nothing, tooltip=nothing, clamp_to_viewport=false, label=nothing)
     RectInteractable(ax, p; id=<kind-specific>, payloads=nothing, tooltip=nothing, label=nothing)   # from a plot object
 
 Axis-aligned rectangles from an explicit list (bars, boxes). Produces one `:rects`
@@ -604,9 +604,10 @@ Axis-aligned rectangles from an explicit list (bars, boxes). Produces one `:rect
 - `label` — an optional screen-reader announcement prefix for this layer (see
   [`PointInteractable`](@ref)). Default `nothing`.
 
+`RectInteractable(ax; rects = …)` is deprecated in favor of `RectInteractable(ax, rects)`.
 `RectInteractable(ax; grid = (xedges, yedges, values))` and `RectInteractable(ax, p)` for a
-`Heatmap` or `Image` are deprecated: they return a [`GridInteractable`](@ref) and are removed
-in 0.3.
+`Heatmap` or `Image` are deprecated too: they return a [`GridInteractable`](@ref). All three
+are removed in 0.3.
 
 # From a plot object
 `RectInteractable(ax, p)` builds `rects` and default payloads from `p`:
@@ -623,7 +624,7 @@ in 0.3.
 
 # Examples
 ```julia
-RectInteractable(ax; rects = [(0.0, 0.0, 1.0, 1.0)], payloads = [(; label = "a")])
+RectInteractable(ax, [(0.0, 0.0, 1.0, 1.0)]; payloads = [(; label = "a")])
 
 p = barplot!(ax, 1:3, [2, 5, 3])
 RectInteractable(ax, p)
@@ -639,11 +640,23 @@ struct RectInteractable <: AbstractInteractable
     label::Union{Nothing, String}
 end
 function RectInteractable(
+        ax, rects::AbstractVector; id = :rects, payloads = nothing,
+        tooltip = nothing, clamp_to_viewport = false, label = nothing
+    )
+    _check_tooltip(tooltip)
+    lbl = label === nothing ? nothing : String(label)
+    rs = [(Float64(r[1]), Float64(r[2]), Float64(r[3]), Float64(r[4])) for r in rects]
+    pl = payloads === nothing ? Any[(; index = k) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "RectInteractable")
+    return RectInteractable(ax, rs, id, pl, tooltip, clamp_to_viewport, nothing, lbl)
+end
+# Deprecated keyword forms: `rects =` (positional since 0.2.0) and `grid =` (now
+# GridInteractable). Both removed in 0.3.
+function RectInteractable(
         ax; rects = nothing, grid = nothing, id = :rects, payloads = nothing,
         tooltip = nothing, clamp_to_viewport = false, label = nothing
     )
     (rects === nothing) == (grid === nothing) &&
-        throw(ArgumentError("RectInteractable: pass exactly one of `rects` or `grid`"))
+        throw(ArgumentError("RectInteractable: pass the rects positionally, `RectInteractable(ax, rects)`"))
     if grid !== nothing
         Base.depwarn(
             "`RectInteractable(ax; grid = (xedges, yedges, values))` is deprecated; use " *
@@ -652,11 +665,11 @@ function RectInteractable(
         )
         return GridInteractable(ax, grid...; id, tooltip, label)
     end
-    _check_tooltip(tooltip)
-    lbl = label === nothing ? nothing : String(label)
-    rs = [(Float64(r[1]), Float64(r[2]), Float64(r[3]), Float64(r[4])) for r in rects]
-    pl = payloads === nothing ? Any[(; index = k) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "RectInteractable")
-    return RectInteractable(ax, rs, id, pl, tooltip, clamp_to_viewport, nothing, lbl)
+    Base.depwarn(
+        "`RectInteractable(ax; rects = …)` is deprecated; use `RectInteractable(ax, rects)`. Removed in 0.3.",
+        :RectInteractable,
+    )
+    return RectInteractable(ax, collect(rects); id, payloads, tooltip, clamp_to_viewport, label)
 end
 # Internal-only: construct a RectInteractable with a lazy `resolve(ax) -> rects`.
 function _rect_with_resolve(ax, rects, id, payloads, clamp_to_viewport, resolve; tooltip = nothing, label = nothing)
@@ -1520,7 +1533,7 @@ end
 
 # ============================ custom: RegionInteractable (Tier A) =========
 """
-    RegionInteractable(ax; regions, payloads, id=:region, tooltip=nothing, events=(:click, :hover))
+    RegionInteractable(ax, regions; payloads=nothing, id=:region, tooltip=nothing, events=(:click, :hover))
 
 Declarative mixed hit regions in data space — circles, rects, and polygons in one call, no
 JavaScript required. Grouped into up to three [`HitLayer`](@ref)s (one per geometry kind
@@ -1533,7 +1546,7 @@ present), so a single call can mix shapes freely.
   - `(:polygon, [(x, y), …])` — a ring of points
   Any other first element raises `ArgumentError`.
 - `payloads` — one entry per region, matched 1:1 by position (`ArgumentError` on a length
-  mismatch); no auto-generated default (unlike the other built-ins, this keyword is required).
+  mismatch). Default: `(; index)`, 1-based.
 - `id` — the base layer id. The generated layers are `Symbol(id, :_c)` (circles),
   `Symbol(id, :_r)` (rects), `Symbol(id, :_p)` (polygons) — only the kinds actually present are
   emitted. `InteractionEvent.layer` and `selected=` keys use these suffixed ids, not `id`
@@ -1543,11 +1556,13 @@ present), so a single call can mix shapes freely.
   (`ArgumentError`).
 - `events` — the pointer events all generated layers respond to. Default `(:click, :hover)`.
 
+`RegionInteractable(ax; regions = …, payloads = …)` is deprecated in favor of
+`RegionInteractable(ax, regions; payloads = …)` and is removed in 0.3.
+
 # Examples
 ```julia
 RegionInteractable(
-    ax;
-    regions = [(:circle, (0.0, 0.0), 1.0), (:rect, (3.0, 0.0), 2.0, 1.0)],
+    ax, [(:circle, (0.0, 0.0), 1.0), (:rect, (3.0, 0.0), 2.0, 1.0)];
     payloads = [(; label = "circle"), (; label = "rect")],
 )
 ```
@@ -1556,12 +1571,21 @@ struct RegionInteractable <: AbstractInteractable
     ax; regions::Vector; payloads::Vector{Any}; id::Symbol; tooltip::Union{Nothing, Markup, Bool}; evs::Tuple
 end
 function RegionInteractable(
-        ax; regions, payloads, id = :region,
+        ax, regions::AbstractVector; payloads = nothing, id = :region,
         tooltip = nothing, events = (:click, :hover)
     )
     _check_tooltip(tooltip)
-    pl = expand_payloads(payloads, length(regions), "RegionInteractable")
+    pl = payloads === nothing ? Any[(; index = k) for k in 1:length(regions)] :
+        expand_payloads(payloads, length(regions), "RegionInteractable")
     return RegionInteractable(ax, collect(regions), pl, id, tooltip, events)
+end
+# Deprecated keyword form, removed in 0.3.
+function RegionInteractable(ax; regions, kwargs...)
+    Base.depwarn(
+        "`RegionInteractable(ax; regions = …)` is deprecated; use `RegionInteractable(ax, regions)`. Removed in 0.3.",
+        :RegionInteractable,
+    )
+    return RegionInteractable(ax, collect(regions); kwargs...)
 end
 events(i::RegionInteractable) = i.evs
 tooltip_spec(i::RegionInteractable) = i.tooltip

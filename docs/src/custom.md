@@ -42,8 +42,9 @@ features they outline. A circle's center is in data coordinates too, but
 its radius is in pixels, like a scatter marker's size: `r = 8` is an
 eight-pixel target however wide the axis is, and you do not need to
 adjust `r` for the figure's resolution. A region has no data of its
-own, so `payloads` is required. `tooltip` works as it does for any
-other plot; see [Tooltips](@ref).
+own, so give each one a payload. Without `payloads`, a click reports
+only the region's `index`. `tooltip` works as it does for any other
+plot; see [Tooltips](@ref).
 
 The regions are not drawn on the figure, so only the hover highlight
 shows where one is. To show them all the time, draw their outlines with
