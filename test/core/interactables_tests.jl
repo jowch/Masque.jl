@@ -518,8 +518,10 @@ struct _NotReal end
 
         # deprecated keyword form: exactly one of rects/grid — both, and neither, are
         # construction-time errors
-        @test_throws ArgumentError RectInteractable(ax)
-        @test_throws ArgumentError RectInteractable(ax; rects = [(0.0, 0.0, 1.0, 1.0)], grid = (xe, ye, good))
+        neither = @test_throws ArgumentError RectInteractable(ax)
+        @test occursin("RectInteractable(ax, rects)", sprint(showerror, neither.value))
+        both = @test_throws ArgumentError RectInteractable(ax; rects = [(0.0, 0.0, 1.0, 1.0)], grid = (xe, ye, good))
+        @test occursin("GridInteractable", sprint(showerror, both.value))
 
         # tol must be finite and positive — a raw round(Int, ...) InexactError/silent
         # unhittable layer otherwise (same "raw downstream error" class this PR closes for

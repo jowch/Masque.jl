@@ -655,8 +655,14 @@ function RectInteractable(
         ax; rects = nothing, grid = nothing, id = :rects, payloads = nothing,
         tooltip = nothing, clamp_to_viewport = false, label = nothing
     )
-    (rects === nothing) == (grid === nothing) &&
+    rects === nothing && grid === nothing &&
         throw(ArgumentError("RectInteractable: pass the rects positionally, `RectInteractable(ax, rects)`"))
+    rects === nothing || grid === nothing || throw(
+        ArgumentError(
+            "RectInteractable: pass either `rects` or `grid`, not both. For a grid, use " *
+                "`GridInteractable(ax, xedges, yedges, values)`"
+        )
+    )
     if grid !== nothing
         Base.depwarn(
             "`RectInteractable(ax; grid = (xedges, yedges, values))` is deprecated; use " *
