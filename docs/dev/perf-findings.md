@@ -213,9 +213,10 @@ for the heatmap sample sizes). Render times are a range across repeated runs on 
 
 ## Wire encoding decisions
 
-`published_to_js` always serializes MsgPack. Its binary fast path applies only to a top-level
-typed numeric vector, and the manifest is a `Dict{String,Any}` with `Any[]` layers, so geometry
-serializes as generic MsgPack arrays even though each leaf is a typed vector.
+`published_to_js` always serializes MsgPack. Its binary fast path applies to a typed numeric
+vector (`Vector{Float32}`, `Vector{Int32}`, and Pluto's other typed-array eltypes) at any depth,
+including as a value in a `Dict{String,Any}`. The manifest's geometry is an `Any[]` of scalars, not
+a typed vector, so it serializes as generic MsgPack arrays.
 `bench/encoding_experiment.jl` measured the options on a real 50k-circle geometry:
 
 | Encoding | bytes/coord | 50k circles | |
