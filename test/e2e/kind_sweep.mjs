@@ -1775,12 +1775,15 @@ try {
       // The one element may be the `selected=` seed, which a click now clears (the toggle off).
       // Click once more so the checks below see it selected.
       if ((await inspect(key)).bond === null) {
-        await dispatchAt(key, clickPt.x, clickPt.y, "click");
-        // The clear and the reselect each round-trip; wait for the reselected event, not the
-        // `nothing` the clear printed.
-        for (let i = 0; i < 80 && /=nothing\s*$/.test(await textOf(`#out_${key}`)); i++) {
-          await new Promise((r) => setTimeout(r, 200));
+        // Let the clear's `nothing` print before reselecting. Until it lands, #out_${key} still
+        // shows the seed, so polling for "not nothing" right after the second click can stop on
+        // the stale seed and then read the `nothing` that arrives next.
+        const cleared = await waitChange(`#out_${key}`, before, `${key}-click (seed clear)`);
+        if (!/=nothing\s*$/.test(cleared)) {
+          throw new Error(`${key}-click: clearing the seed printed ${JSON.stringify(cleared).slice(0, 220)}, expected nothing`);
         }
+        await dispatchAt(key, clickPt.x, clickPt.y, "click");
+        await waitChange(`#out_${key}`, cleared, `${key}-click (reselect)`);
       }
       after = await textOf(`#out_${key}`);
     } else {
