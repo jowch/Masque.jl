@@ -215,7 +215,7 @@ still writes SVG, because the file extension decides the format.
 return a `Figure`, and write the SVG file with
 `save("figure.svg", fig)`. In the cell that should show the interactive
 figure, return `masque(fig)`. For more information, see
-[SVG display and files](@ref).
+[Makie's settings don't change the widget](@ref makie-settings).
 
 ### Tried feeding this widget's bond into the same call's `selected=`
 

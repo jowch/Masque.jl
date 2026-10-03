@@ -171,7 +171,6 @@ hitlayers
 AbstractBackend
 ```
 
-`CairoBackend` and `WebGLBackend` are the two concrete backends. Each
-exists only once you load `CairoMakie` or `WGLMakie`, so their
-docstrings are not on this page. [Backends](@ref) describes what each
-one does, and `masque`'s docstring above covers the `backend=` keyword.
+The two built-in backends are `:cairo` and `:webgl`, chosen with
+`masque`'s `backend=` keyword once `CairoMakie` or `WGLMakie` is
+loaded. [Backends](@ref) describes what each one does.

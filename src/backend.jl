@@ -86,8 +86,8 @@ end
 # every backend extension implements methods for these (bodies stay empty here)
 function render end
 function context end
-function _ppu end         # (backend, fig) -> px_per_unit / device scale
-# (backend, result, manifest, display_css, fig, interactables, ppu) -> the @bind widget
+function _ppu end         # (backend, fig, max_width) -> default px_per_unit when `masque`'s is `nothing`
+# (backend, result, manifest, display_css, fig, interactables, ppu, max_width) -> the @bind widget
 function make_widget end
 
 # An axis-like block Masque builds no transform for (`LScene` today) would otherwise be

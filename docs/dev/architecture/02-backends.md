@@ -8,10 +8,10 @@ it knows what rendered the image.
 abstract type AbstractBackend end
 
 # every backend extension implements these (generic stubs in src/backend.jl)
-_ppu(::AbstractBackend, fig)                         # px_per_unit / device scale
+_ppu(::AbstractBackend, fig, max_width)              # default px_per_unit (masque's px_per_unit = nothing)
 render(::AbstractBackend, fig, ppu)                  # the displayable artifact
-context(::AbstractBackend, fig, ppu)::InteractionContext  # projection + per-axis transforms
-make_widget(::AbstractBackend, result, manifest, display_css, fig, interactables, ppu)  # the @bind widget
+context(::AbstractBackend, fig, ppu, max_width)::InteractionContext  # projection + per-axis transforms
+make_widget(::AbstractBackend, result, manifest, display_css, fig, interactables, ppu, max_width)  # the @bind widget
 
 struct RenderResult                                   # CairoBackend's artifact
     mime    :: String                                 # always "image/png"
@@ -22,9 +22,14 @@ struct RenderResult                                   # CairoBackend's artifact
 end
 ```
 
-`masque` finalizes the figure once (`_finalize!`), computes `ppu = _ppu(backend, fig)`, and passes
-the same `ppu` to `context` and `render`, so the manifest's geometry and the artifact agree on one
-pixel grid.
+`masque` finalizes the figure once (`_finalize!`), takes `ppu` from its `px_per_unit` keyword or,
+when that is `nothing`, from `_ppu(backend, fig, max_width)`, and passes the same `ppu` to `context`
+and `render`, so the manifest's geometry and the artifact agree on one pixel grid. `max_width` and
+`px_per_unit` are `masque` keywords, never backend fields (#236): the roadmap rules out
+per-backend settings, so every setting reaches every backend through these signatures. The
+built-in backend structs are fieldless; `CairoBackend(; max_width)` / `WebGLBackend(; …)`
+survive in 0.2.x only as deprecated constructors returning a `_LegacyBackend` wrapper whose
+settings `masque`'s own keywords override (removed in 0.3).
 
 **Two co-equal backends**, each a weak-dep extension:
 
@@ -35,8 +40,10 @@ pixel grid.
   `<canvas>`. Its `render` returns a `WebGLResult` (a serialized WGLMakie scene plus size and
   `px_per_unit`) rather than a `RenderResult`; everything else goes through the same contract.
 
-`_resolve_backend` in `src/render.jl` honors an explicit `backend=`, otherwise picks the loaded
-extension, and prefers Cairo when both are loaded. The interaction feature set is identical on both
+`_resolve_backend` in `src/render.jl` maps `backend = :cairo` / `:webgl` to the extension's
+instance (`_builtin_backend(::Val{name})`), failing with the package to load when that extension
+is absent; passes an `AbstractBackend` instance through (the third-party extension point);
+otherwise picks the loaded extension, and prefers Cairo when both are loaded. The interaction feature set is identical on both
 — parity is CI-enforced by the golden-manifest harness; `perf-findings.md`'s "Backend
 comparison" has the cost of each and which regime suits which. Both `context` methods share
 `_project_closure` and the per-block transform builders in `src/backend.jl`, so the two differ

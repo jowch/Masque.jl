@@ -433,15 +433,60 @@ function with_owners(w::MasqueWidget, owners::Dict{String, LayerOwner})
     return MasqueWidget(w.b64, w.manifest, w.display_css, w.render_frame, owners)
 end
 
+# The built-in backends by `backend=` symbol: the extension that defines each, and the package
+# that loads it. Each extension adds a `_builtin_backend(::Val{name})` method.
+const _BUILTIN_BACKENDS = (
+    cairo = (:MasqueCairoMakieExt, "CairoMakie"),
+    webgl = (:MasqueWGLMakieExt, "WGLMakie"),
+)
+function _builtin_backend end
+
+# The token the built-in backend structs' constructors take, so their public keyword
+# constructors (deprecated in 0.2.0) are the only ones a user reaches.
+struct _Builtin end
+
+# A built-in backend object built with the deprecated keyword constructors
+# (`CairoBackend(; max_width)`, `WebGLBackend(; px_per_unit, max_width)`). `masque` reads the
+# settings it carries when its own keywords are not given. Removed in 0.3 with the constructors.
+struct _LegacyBackend <: AbstractBackend
+    backend::AbstractBackend
+    max_width::Union{Nothing, Int}
+    px_per_unit::Union{Nothing, Float64}
+end
+
+function _legacy_backend(backend, name, max_width, px_per_unit)
+    kws = String[]
+    max_width === nothing || push!(kws, "max_width = $max_width")
+    px_per_unit === nothing || push!(kws, "px_per_unit = $px_per_unit")
+    Base.depwarn(
+        "`$(nameof(typeof(backend)))(…)` is deprecated; use `masque(fig; " *
+            join(["backend = :$name"; kws], ", ") * ")`. Removed in 0.3.",
+        nameof(typeof(backend)),
+    )
+    return _LegacyBackend(backend, max_width, px_per_unit)
+end
+
 # Backend choice follows which package extension is loaded, never sniffed from Makie's global
-# `current_backend()` state. `explicit` is the caller's `backend=` override.
-function _resolve_backend(explicit; max_width)
-    cairo_ext = Base.get_extension(@__MODULE__, :MasqueCairoMakieExt)
-    wgl_ext = Base.get_extension(@__MODULE__, :MasqueWGLMakieExt)
-    explicit !== nothing && return explicit
+# `current_backend()` state. `explicit` is the caller's `backend=`.
+function _resolve_backend(explicit)
+    explicit isa AbstractBackend && return explicit
+    if explicit isa Symbol
+        valid = join((":$k" for k in keys(_BUILTIN_BACKENDS)), ", ")
+        haskey(_BUILTIN_BACKENDS, explicit) ||
+            throw(ArgumentError("masque: unknown backend `:$explicit`; use one of $valid"))
+        ext, pkg = _BUILTIN_BACKENDS[explicit]
+        Base.get_extension(@__MODULE__, ext) === nothing && throw(
+            ArgumentError(
+                "masque: `backend = :$explicit` needs `using $pkg` first (it loads that backend), " *
+                    "then call `masque` again",
+            ),
+        )
+        return _builtin_backend(Val(explicit))
+    end
     # Both loaded: prefer Cairo so a preloaded WGLMakie doesn't block the default static path.
-    cairo_ext !== nothing && return cairo_ext.CairoBackend(; max_width)
-    wgl_ext !== nothing && return wgl_ext.WebGLBackend(; max_width)
+    for (name, (ext, _)) in pairs(_BUILTIN_BACKENDS)
+        Base.get_extension(@__MODULE__, ext) === nothing || return _builtin_backend(Val(name))
+    end
     throw(
         ArgumentError(
             "masque(fig) needs a rendering backend loaded: `using CairoMakie` for a static base, or " *
@@ -450,6 +495,28 @@ function _resolve_backend(explicit; max_width)
                 "is a cost profile.)",
         ),
     )
+end
+
+_check_max_width(w::Real) = isfinite(w) && w > 0 ? w :
+    throw(ArgumentError("masque: `max_width` must be a positive number of pixels, got $w"))
+_check_max_width(w) = throw(ArgumentError("masque: `max_width` must be a positive number of pixels, got $(repr(w))"))
+_check_px_per_unit(::Nothing) = nothing
+_check_px_per_unit(p::Real) = isfinite(p) && p > 0 ? Float64(p) :
+    throw(ArgumentError("masque: `px_per_unit` must be a positive number or `nothing`, got $p"))
+_check_px_per_unit(p) = throw(ArgumentError("masque: `px_per_unit` must be a positive number or `nothing`, got $(repr(p))"))
+
+# The backend that renders, and the `max_width` / `px_per_unit` it renders with. `masque`'s own
+# keywords win over the settings a deprecated backend object carries.
+function _backend_settings(backend, max_width, px_per_unit)
+    b = _resolve_backend(backend)
+    legacy_w, legacy_ppu = nothing, nothing
+    if b isa _LegacyBackend
+        legacy_w, legacy_ppu = b.max_width, b.px_per_unit
+        b = b.backend
+    end
+    w = _check_max_width(something(max_width, legacy_w, 700))
+    ppu = _check_px_per_unit(something(px_per_unit, legacy_ppu, Some(nothing)))
+    return b, w, ppu
 end
 
 """
@@ -488,10 +555,14 @@ clicks. Clicks on other layers stay single events.
   index (`0` included), raises `ArgumentError` naming `1:n`. Clicking replaces the selection, so
   this is only needed to carry one through a rebuild — and it must come from a cell that doesn't
   read this widget's own bond, which Pluto rejects as a cyclic reference.
-- `backend` — `CairoBackend()` (static image) or `WebGLBackend()` (live canvas), each with its
-  own keywords. Defaults to whichever of `CairoMakie` / `WGLMakie` is loaded, Cairo if both,
-  `ArgumentError` if neither.
-- `max_width` — target display width in px (Pluto's column). Default `700`.
+- `backend` — `:cairo` (a static image) or `:webgl` (a live canvas). Defaults to whichever of
+  `CairoMakie` / `WGLMakie` is loaded, `:cairo` if both. Raises `ArgumentError` if neither is
+  loaded, if the named backend's package is not loaded, or for an unknown name.
+- `max_width` — the widest the plot shows on the page, in CSS px (Pluto's column). Default `700`.
+- `px_per_unit` — image pixels per figure unit, on either backend. Default `nothing`: on
+  `:cairo`, `2 * min(figure width, max_width) / figure width`, so the PNG is twice the width it
+  shows at; on `:webgl`, `2`. A larger number gives a sharper, heavier picture. Neither this
+  nor `max_width` follows `CairoMakie.activate!` or `WGLMakie.activate!`.
 - `tooltip_sigdigits` — significant figures for a tooltip number that has no format spec.
   Default `4`, so `0.30000000000000004` shows as `0.3` and `2.71828` as `2.718`; integers,
   and the whole-number part of a value at or above `10^tooltip_sigdigits`, show in full.
@@ -525,22 +596,22 @@ function masque(fig, xs...; auto::Bool = true, kwargs...)
 end
 
 function _masque(
-        fig, interactables::AbstractVector; backend::Union{Nothing, AbstractBackend} = nothing,
-        max_width = 700, selected = nothing,
+        fig, interactables::AbstractVector; backend::Union{Nothing, Symbol, AbstractBackend} = nothing,
+        max_width = nothing, px_per_unit = nothing, selected = nothing,
         tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
         tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing, tooltip_caret = true,
         tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
     overlay_style = overlay_style_dict(overlaystyle)
-    backend = _resolve_backend(backend; max_width)
+    backend, max_width, px_per_unit = _backend_settings(backend, max_width, px_per_unit)
     bg0 = fig.scene.backgroundcolor[]
     try
         fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
         _finalize!(fig)        # finalize once; render + context share it
         _pin_pan_ticklabelspace!(fig, interactables)
-        ppu = _ppu(backend, fig)
-        ctx = context(backend, fig, ppu)
+        ppu = something(px_per_unit, _ppu(backend, fig, max_width))
+        ctx = context(backend, fig, ppu, max_width)
         tip_style = tip_style_dict(;
             tooltip_bg, tooltip_color, tooltip_accent, tooltip_font, tooltip_font_size, tooltip_radius, tooltip_caret,
         )
@@ -550,8 +621,8 @@ function _masque(
             background = fig.scene.backgroundcolor[], overlay_style, owners_out,
         )
         result = render(backend, fig, ppu)
-        display_css = round(Int, min(size(fig.scene)[1], backend.max_width))
-        w = make_widget(backend, result, manifest, display_css, fig, interactables, ppu)
+        display_css = round(Int, min(size(fig.scene)[1], max_width))
+        w = make_widget(backend, result, manifest, display_css, fig, interactables, ppu, max_width)
         return with_owners(w, owners_out[])
     finally
         fig.scene.backgroundcolor[] = bg0
@@ -741,11 +812,11 @@ function _sync_view_warmup!(render_frame)
     return nothing
 end
 
-function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu)
+function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu, max_width)
     view_axes = Dict{Symbol, Any}(i.id => i.ax for i in interactables if i isa ViewInteractable)
     isempty(view_axes) && return nothing
     state = _ViewWarmup(
-        input -> _apply_view_frame(input, view_axes, backend, fig, interactables, ppu),
+        input -> _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, max_width),
         view_axes, nothing, nothing, false, false, false,
     )
     frame = function (input)
@@ -758,7 +829,7 @@ function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu)
     return frame
 end
 
-function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu)
+function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, max_width)
     id = Symbol(input["id"])
     ax = get(view_axes, id, nothing)
     ax === nothing && throw(
@@ -786,7 +857,7 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu)
         # `finally` before this closure ever runs, so each frame has to redo it.
         fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
         _finalize!(fig)
-        ctx = context(backend, fig, ppu)
+        ctx = context(backend, fig, ppu, max_width)
         manifest = build_manifest(interactables, ctx)
         result = render(backend, fig, render_ppu)
         frame = _gesture_frame(result)
