@@ -922,17 +922,22 @@ function _placement(ax, p)
         return nothing
     end
     rot = is3d ? any(off(r, c) for r in 1:3, c in 1:3 if r != c) : (off(1, 2) || off(2, 1))
-    place = function (pt)
+    # `o` is a data-space `marker_offset`, already folded into the point as `f⁻¹(f(x) + o)` (see
+    # `_shift_data_markers`). Makie adds it after the model, so it is taken out before the model
+    # and added back after: the marker is drawn at `M * f(x) + o`.
+    place = function (pt, o = zero(Makie.Vec3d))
         x = _pt3(pt)
-        t = _apply_transform(tf, Makie.Point3d(x[1], x[2], x[3]))
+        t = _apply_transform(tf, Makie.Point3d(x[1], x[2], x[3])) .- o
         m = M * Makie.Vec4d(t[1], t[2], t[3], 1)
-        d = _apply_transform(finv, Makie.Point3d(m[1], m[2], m[3]))
+        d = _apply_transform(finv, Makie.Point3d(m[1] + o[1], m[2] + o[2], m[3] + o[3]))
         return Point3f(d[1], d[2], is3d ? d[3] : x[3])
     end
-    # A marker sized in data units (`meshscatter`) grows with the model when `transform_marker`.
-    marker = hasproperty(p, :transform_marker) && p.transform_marker[] === true ?
-        abs.(Matrix(M)[1:3, 1:3]) : nothing
-    return (; place, rotated = rot, marker)
+    tm = hasproperty(p, :transform_marker) && p.transform_marker[] === true
+    # A marker sized in data units (`meshscatter`) grows with the model's scale when
+    # `transform_marker`; a rotation turns it but leaves its size alone.
+    marker = tm ? Makie.Vec3d((sqrt(sum(abs2, M[r, c] for r in 1:3)) for c in 1:3)...) : nothing
+    dataoffset = p isa Makie.Scatter && p.markerspace[] === :data && !tm ? p.marker_offset[] : nothing
+    return (; place, rotated = rot, marker, dataoffset)
 end
 
 # A drawn (world) position back to the data point drawn there: `f⁻¹(inv(scene model) * w)`.
@@ -951,9 +956,15 @@ _place(i::AbstractInteractable, f) = i
 _place(i::TextInteractable, f) = i   # string_boundingboxes already include the transformation
 function _place(i::PointInteractable, f)
     r3 = i.radius3d === nothing || f.marker === nothing ? i.radius3d :
-        [Makie.Vec3f((f.marker * Float64[r...])...) for r in i.radius3d]
+        [Makie.Vec3f((Makie.Vec3d(r...) .* f.marker)...) for r in i.radius3d]
+    pts = if f.dataoffset === nothing
+        map(f.place, i.points)
+    else
+        offs = _marker_offset_vec(f.dataoffset, length(i.points))
+        [f.place(i.points[k], offs[k]) for k in eachindex(i.points)]
+    end
     return PointInteractable(
-        i.ax, map(f.place, i.points), i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset,
+        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset,
     )
 end
 function _place(i::SegmentInteractable, f)
