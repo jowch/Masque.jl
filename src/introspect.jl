@@ -552,7 +552,7 @@ function PolygonInteractable(ax, p::Makie.Hexbin; id = :hexbin, payloads = nothi
         d = back(c)
         push!(pl, (; x = clean(d[1]), y = clean(d[2]), count = n))
     end
-    return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
+    return PolygonInteractable(ax, rings; id, payloads = _unconvert_payloads(ax, pl), tooltip, label)
 end
 
 # Cells come back in tessellation order, not input-site order, so there's no cheap

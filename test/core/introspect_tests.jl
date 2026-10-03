@@ -1174,6 +1174,12 @@ end
         @test sum(cnt) == 2 * length(xs) && any(iszero, cnt)
         # its hexagon Scatter is a descendant, not a second layer
         @test only(masque(fig).manifest["layers"])["id"] == "hexbin"
+
+        # on a date axis the center shows as a date, like the other default payloads
+        fd = Figure(); ad = Axis(fd[1, 1])
+        hexbin!(ad, Makie.Dates.DateTime(2024, 1, 1) .+ Makie.Dates.Day.(1:20), collect(range(0, 1; length = 20)); bins = 3)
+        Makie.update_state_before_display!(fd)
+        @test all(pl.x isa String && startswith(pl.x, "2024-01") for pl in only(interactables(fd)).payloads)
     end
 
     @testset "Contourf extraction" begin
