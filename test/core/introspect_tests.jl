@@ -572,10 +572,10 @@ end
                 )
                 px(k) = (c = center(k); img[round(Int, c[2]), round(Int, c[1])])
                 @test px(argmax(v)) != px(findfirst(iszero, v))
-                # With the default `operation`, the value is the histogram-equalized colour
-                # value, not the count (#276).
+                # With the default `operation` the value is still the count, not the
+                # histogram-equalized colour value (#276).
                 Ld, _ = layers(a -> datashader!(a, pts))
-                @test_broken sum(Ld[1]["geometry"]["values"]) == length(pts)
+                @test sum(Ld[1]["geometry"]["values"]) == length(pts)
             end
         end
 
