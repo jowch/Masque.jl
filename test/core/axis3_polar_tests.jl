@@ -499,4 +499,45 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test color_near(isredc, imgan, mx, my; tol = 4)
         end
     end
+
+    @testset "Axis3 ScatterLines: a :circles and a :lines layer, as on 2D (#273)" begin
+        isredc(c) = Float64(Makie.red(c)) > 0.6 && Float64(Makie.green(c)) < 0.4 && Float64(Makie.blue(c)) < 0.4
+        function red_near(img, cx, cy; tol = 5)
+            ih, iw = size(img)
+            x, y = round(Int, cx), round(Int, cy)
+            for dy in -tol:tol, dx in -tol:tol
+                xx, yy = x + dx, y + dy
+                (1 <= xx <= iw && 1 <= yy <= ih) || continue
+                isredc(img[yy, xx]) && return true
+            end
+            return false
+        end
+        f = Figure(; size = (600, 450))
+        ax = Axis3(f[1, 1]; azimuth = 0.4, elevation = 0.5)
+        pts = Makie.Point3f[(1, 2, 3), (4, 5, 6), (7, 8, 2)]
+        scatterlines!(ax, pts; color = :red, markersize = 14)
+        Makie.update_state_before_display!(f)
+        ints = @test_logs interactables(f)       # no logs: scatterlines must NOT be skipped
+        @test length(ints) == 2
+        pt = only(filter(i -> i isa PointInteractable, ints))
+        ln = only(filter(i -> i isa SegmentInteractable, ints))
+        @test pt.id === :scatterlines && ln.id === :scatterlines_line
+        @test pt.payloads[1] == (; index = 1, x = 1.0, y = 2.0, z = 3.0)
+        _, ppu, ctx = ctx_for(f)
+        img = Makie.colorbuffer(f; px_per_unit = ppu)
+        Lp = only(hitlayers(pt, ctx))
+        Ll = only(hitlayers(ln, ctx))
+        @test Lp.kind === :circles && length(Lp.geometry) == 9
+        @test Ll.kind === :lines
+        for k in 0:2
+            @test red_near(img, Lp.geometry[3k + 1], Lp.geometry[3k + 2])
+        end
+        # the line's projected path runs through the drawn line between the markers
+        g = only(Ll.geometry)
+        for k in 0:1
+            mx = (g[2k + 1] + g[2k + 3]) / 2
+            my = (g[2k + 2] + g[2k + 4]) / 2
+            @test red_near(img, mx, my; tol = 3)
+        end
+    end
 end

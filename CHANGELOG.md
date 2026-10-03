@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `scatterlines!` on an `Axis3` responds to hover and click, with the same `:scatterlines`
+  (markers) and `:scatterlines_line` (line) layers it gives on a 2D `Axis`. Before, `masque`
+  skipped it with a warning.
+
 ## [0.2.0] - 2026-10-03
 
 Some calls written for 0.1 behave differently: each is marked **Breaking** below, and the
