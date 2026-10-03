@@ -13,6 +13,8 @@ categorical and date payloads under Fixed are a change too. The forms listed und
 still work and are removed in 0.3.
 
 ### Changed
+- Clicking the selected mark or legend entry again clears the selection, and the `@bind`
+  value goes back to `nothing`. Before, a selection could only be replaced by another click.
 - **Breaking:** `masque(fig, xs...)` adds to the interactions `masque(fig)` builds instead of
   replacing them, so `masque(fig, ViewInteractable(ax))` keeps every hover and click and adds
   panning. An interactable whose `id` matches a default layer's replaces that layer. To keep
