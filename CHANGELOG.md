@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- A slice built from plots no longer needs `covers = []` when `auto = false` leaves those
+  plots out of the widget. Before, `masque` raised an error that their layers were missing.
+  A layer you name in `covers` yourself must still be in the call.
+
 ## [0.2.0] - 2026-10-03
 
 Some calls written for 0.1 behave differently: each is marked **Breaking** below, and the

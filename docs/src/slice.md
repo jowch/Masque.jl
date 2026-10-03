@@ -1,4 +1,4 @@
-# Sample a series
+# Slice across series
 
 A slice reads several lines at once. As you move the pointer, a
 vertical line follows it, a dot sits where it crosses each line you
@@ -80,18 +80,15 @@ saves the position:
 ```julia
 @bind at masque(
     fig,
-    SliceInteractable(ax, [a, b]; covers = []),
+    SliceInteractable(ax, [a, b]),
     AxisInteractable(ax);
     auto = false,
 )
 ```
 
 `auto = false` keeps the lines from taking the click, so a click on a
-line still saves a position rather than the line. It also takes the
-lines out of the widget, and a slice built from plots expects to
-replace their hover highlight, so `masque` raises an error unless you
-pass `covers = []` to the slice. `at` is `nothing` until the first
-click. After that, `at.x` is the `x` you clicked, and a later cell can
+line still saves a position rather than the line. `at` is `nothing`
+until the first click. After that, `at.x` is the `x` you clicked, and a later cell can
 read your data there:
 
 ```julia

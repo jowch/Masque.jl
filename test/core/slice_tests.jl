@@ -152,6 +152,23 @@ end
         @test_throws ArgumentError build_manifest([missing], ctx)
     end
 
+    @testset "default covers skip layers not in the call (#271)" begin
+        fl = Figure(); axl = Axis(fl[1, 1])
+        a = lines!(axl, [0.0, 1.0, 2.0], [0.0, 1.0, 0.0])
+        b = lines!(axl, [0.0, 1.0, 2.0], [1.0, 0.0, 1.0])
+        # `auto = false`: the lines are not layers, so the default covers drop out quietly.
+        w = masque(fl, SliceInteractable(axl, [a, b]), AxisInteractable(axl); auto = false)
+        sl = only(filter(L -> L["kind"] == "slice", w.manifest["layers"]))
+        @test sl["geometry"]["covers"] == String[]
+        # With the lines in the call, the default still covers both.
+        w = masque(fl, SliceInteractable(axl, [a, b]))
+        sl = only(filter(L -> L["kind"] == "slice", w.manifest["layers"]))
+        @test sl["geometry"]["covers"] == ["lines", "lines_2"]
+        # Covers the caller names are checked as before.
+        err = (@test_throws ArgumentError masque(fl, SliceInteractable(axl, [a, b]; covers = [:lines]); auto = false)).value
+        @test occursin("not a layer in this masque() call", err.msg)
+    end
+
     @testset "scale, categorical" begin
         fs = Figure(); axs = Axis(fs[1, 1]; yscale = sqrt); scatter!(axs, [1.0, 2.0], [1.0, 2.0])
         _, _, ctxs = ctx_for(fs)

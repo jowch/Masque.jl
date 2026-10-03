@@ -1554,7 +1554,7 @@ One slice from a `Lines`, `Stairs`, `Series`, `Band`, or `Density`, or from a ve
 See [`SliceInteractable`](@ref) for the series constructor. `covers=nothing` (the default) names
 each plot's auto-extract layer id (`:lines`, `:stairs`, `:series`, `:band`, `:density`, with
 `_2`, `_3`, … when the vector repeats a kind). That count is inside this vector, not across
-the figure. `orientation=nothing` follows the plot: a `Density` uses its own `direction`, and
+the figure, and a named layer that is not in the `masque` call (`auto = false`) is skipped. `orientation=nothing` follows the plot: a `Density` uses its own `direction`, and
 a `Band` uses its `direction`; `:y` is `:horizontal` and everything else is `:vertical`.
 A vector that mixes those raises `ArgumentError` unless `orientation` is passed.
 """
@@ -1596,7 +1596,9 @@ function SliceInteractable(
     for s in series
         _flip_if_decreasing!(s.x, s.y, orient)
     end
-    return SliceInteractable(ax; series, orientation = orient, crosshair, id, covers = cover_ids, tooltip)
+    sl = SliceInteractable(ax; series, orientation = orient, crosshair, id, covers = cover_ids, tooltip)
+    covers === nothing || return sl
+    return SliceInteractable(sl.ax, sl.orientation, sl.series, sl.id, sl.covers, sl.tooltip, sl.crosshair, true)
 end
 
 function SliceInteractable(ax, p; orientation = nothing, crosshair = true, id = :slice, covers = nothing, tooltip = nothing)

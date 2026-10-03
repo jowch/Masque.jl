@@ -52,7 +52,7 @@ makedocs(;
             "Brush a region" => "roi.md",
             "Legend" => "legend.md",
             "Read coordinates" => "readouts.md",
-            "Sample a series" => "slice.md",
+            "Slice across series" => "slice.md",
             "Pan and orbit" => "view.md",
             "Linked views" => "linked-views.md",
             "Custom hits" => "custom.md",

@@ -19,7 +19,7 @@ pointer position into a data value, so they need a 2D `Axis`. A
 | Read `(x, y)` ([`AxisInteractable`](@ref)) | yes ¹ | no | yes ³ |
 | Drag a threshold ([`ThresholdInteractable`](@ref)) | yes ¹ | no | no |
 | Brush a box ([`ROIInteractable`](@ref)) | yes ² | no | no |
-| Sample a series ([`SliceInteractable`](@ref)) | yes ² | no | no |
+| Slice across series ([`SliceInteractable`](@ref)) | yes ² | no | no |
 | Pan or orbit ([`ViewInteractable`](@ref)) | pan ² | orbit | no |
 
 ¹ The axis scale must be `identity`, `log10`, or `log` (for a
