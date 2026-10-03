@@ -56,7 +56,7 @@ end
 ```
 
 Now hovering a row anywhere along its bar shows its values, and a click
-sets `pick.change`:
+sets `pick` to that row, so `pick.change` is how much the row changed:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -84,10 +84,15 @@ second is `:dumbbell_2`, and `pick.layer` and `selected=` use these
 names.
 
 Pass `kwargs...` on to the constructors. A caller who wants a different
-tooltip or payloads for one plot writes
-`masque(fig, interactables(d; tooltip = masque"change $(change)"))`,
-and those keywords reach your method. Without `kwargs...` in its signature, that
-call fails with a `MethodError`. The method above also takes `payloads`
+tooltip or payloads for one plot passes them with the plot:
+
+```julia
+d = dumbbell!(ax, before, after)
+@bind pick masque(fig, interactables(d; tooltip = masque"change $(change)"))
+```
+
+Those keywords reach your method, and without `kwargs...` in its
+signature this call fails with a `MethodError`. The method above also takes `payloads`
 by name, so a caller's payloads replace the rows it builds.
 
 ## Hit size from the drawn plot
@@ -103,8 +108,11 @@ not draw as a plot of its own. Then you give the hit size yourself, as
 `radius` for points and `tol` for lines:
 
 ```julia
-pairs = [Point2f(x, k) for k in eachindex(before) for x in (before[k], after[k])]
-SegmentInteractable(ax, pairs; mode = :pairs, tol = 6, id, payloads = rows, kwargs...)
+function Masque.interactables(ax, p::Dumbbell; id = :dumbbell, kwargs...)
+    before, after = p.before[], p.after[]
+    pairs = [Point2f(x, k) for k in eachindex(before) for x in (before[k], after[k])]
+    return [SegmentInteractable(ax, pairs; mode = :pairs, tol = 6, id, kwargs...)]
+end
 ```
 
 ## Several layers
