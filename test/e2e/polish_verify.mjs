@@ -87,12 +87,13 @@ try {
         scatter: !!document.querySelector("#coords_scatter"),
         lines: !!document.querySelector("#coords_lines"),
         dark: !!document.querySelector("#coords_scatter_dark"),
+        styled: !!document.querySelector("#coords_scatter_styled"),
         errText: [...document.querySelectorAll("pluto-cell.errored")].map((c) => c.innerText).slice(0, 1).join(""),
       };
     });
     if (st.errored) throw new Error(`${backend} errored: ${st.errText.slice(0, 400)}`);
     const wglQuiet = !lastWglChurnAt || (Date.now() - lastWglChurnAt) > WGL_QUIET_MS;
-    if (!st.busy && st.surfaces >= 3 && st.scatter && st.lines && st.dark && wglQuiet) { ready = true; break; }
+    if (!st.busy && st.surfaces >= 3 && st.scatter && st.lines && st.dark && st.styled && wglQuiet) { ready = true; break; }
     if (tick % 20 === 0) console.error(`  …${backend} [${tick}s] busy=${st.busy} hosts=${st.hosts} surfaces=${st.surfaces} wglQuiet=${wglQuiet}`);
     tick++;
     await new Promise((r) => setTimeout(r, 1000));
@@ -420,6 +421,30 @@ try {
   const darkTip = await hoverAt("scatter_dark", dhx, dhy);
   assertHoverRecipe(darkTip.hi, "scatter_dark", true, true);
   passed.push("dark-figure-hover");
+
+  // overlaystyle (#181): the figure sets color, hover_width 3 and selected_width 4. The baked
+  // selection's edge and a hover's edge both take that colour; the dodge fill half is unchanged.
+  const STYLED = "rgb(0, 102, 204)";
+  const styled = await inspect("scatter_styled");
+  pin(styled, "scatter_styled");
+  const sEdge = styled.kids.find((k) => k.layer === "edge" && k.kind === "closed");
+  if (!sEdge || sEdge.stroke !== STYLED || sEdge.width !== "4") {
+    throw new Error(`scatter_styled: selected edge ${JSON.stringify(sEdge)} (want stroke ${STYLED}, width 4)`);
+  }
+  if (!styled.kids.some((k) => k.layer === "fill" && k.kind === "closed")) {
+    throw new Error("scatter_styled: selected dodge fill missing");
+  }
+  const stPts = (await layersOf("scatter_styled")).find((l) => l.kind === "circles");
+  let sTip = null;
+  for (let a = 0; a < 8; a++) {
+    sTip = await hoverAt("scatter_styled", stPts.geometry[0], stPts.geometry[1]);
+    if (sTip.hi.edge) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!sTip?.hi.edge || sTip.hi.edge.stroke !== STYLED || sTip.hi.edge.width !== "3" || !sTip.hi.fill) {
+    throw new Error(`scatter_styled: hover ${JSON.stringify(sTip?.hi)} (want edge ${STYLED} at width 3, plus the fill)`);
+  }
+  passed.push("overlaystyle");
 
   await assertTooltipColorScheme(page, {
     css: () => inspect("scatter").then((m) => m.css),

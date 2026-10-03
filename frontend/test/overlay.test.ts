@@ -4269,3 +4269,30 @@ describe("chrome metrics are custom properties (#180)", () => {
         }
     })
 })
+
+describe("overlayStyle from Julia (#181)", () => {
+    it("writes each property on the shadow host, after the derived chrome colours", () => {
+        const { host, script } = setup()
+        mount(script, {
+            ...manifest,
+            overlayStyle: { "--masque-chrome": "rgb(0,0,255)", "--masque-hover-width": "3px" },
+        })
+        const sh = host.lastElementChild as HTMLElement
+        expect(sh.style.getPropertyValue("--masque-chrome")).toBe("rgb(0,0,255)") // wins over the derived grey
+        expect(sh.style.getPropertyValue("--masque-hover-width")).toBe("3px")
+        expect(sh.style.getPropertyValue("--masque-cross")).toBe("#b0b0b0") // unset keys keep the derivation
+        const shadow = shadowOf(host)
+        ;(shadow.querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+        const edge = edgeHiGroup(shadow).firstElementChild as SVGElement
+        expect(getComputedStyle(edge).strokeWidth).toBe("3px")
+    })
+
+    it("no overlayStyle leaves the host with only the derived colours", () => {
+        const { host, script } = setup()
+        mount(script, manifest)
+        const sh = host.lastElementChild as HTMLElement
+        expect(sh.style.getPropertyValue("--masque-chrome")).toBe("#7a7a7a")
+        expect(sh.style.getPropertyValue("--masque-hover-width")).toBe("")
+    })
+})

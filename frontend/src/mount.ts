@@ -396,6 +396,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     shadowHost.style.setProperty("--masque-chrome", hiStyle.chrome)
     shadowHost.style.setProperty("--masque-hi-fill", hiStyle.fillSrc)
     shadowHost.style.setProperty("--masque-cross", hiStyle.cross)
+    // overlaystyle from Julia: written after the derived greys so a colour key wins over them.
+    // Per-layer hoverstyle values sit inline on their own elements and still win there.
+    if (manifest.overlayStyle) for (const [k, v] of Object.entries(manifest.overlayStyle)) shadowHost.style.setProperty(k, v)
 
     // Threshold lines and ROI boxes slide with the photograph. The hair stays on the plain svg,
     // after the clip, so the first <line> in the shadow is still a threshold line.
