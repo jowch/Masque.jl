@@ -150,6 +150,16 @@ HTML(
         "<span id=\"coords_polar\" style=\"display:none\">$(JSON3.write(sweep.polar.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000074
+@bind ev_axis_polar sweep.axis_polar
+
+# ╔═╡ d1000000-0000-0000-0000-000000000075
+HTML(
+    "<span id=\"out_axis_polar\">AXIS_POLAR=$(repr(ev_axis_polar))</span>" *
+        "<span id=\"coords_axis_polar\" style=\"display:none\">$(JSON3.write(sweep.axis_polar.manifest["layers"]))</span>" *
+        "<span id=\"axes_axis_polar\" style=\"display:none\">$(JSON3.write(sweep.axis_polar.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000036
 @bind ev_scatter_dark sweep.scatter_dark
 
@@ -213,10 +223,10 @@ HTML(
         "<span id=\"coords_band_y\" style=\"display:none\">$(JSON3.write(sweep.band_y.manifest["layers"]))</span>",
 )
 
-# ╔═╡ d1000000-0000-0000-0000-000000000074
+# ╔═╡ d1000000-0000-0000-0000-000000000078
 @bind ev_bar_stroke sweep.bar_stroke
 
-# ╔═╡ d1000000-0000-0000-0000-000000000075
+# ╔═╡ d1000000-0000-0000-0000-000000000079
 HTML(
     "<span id=\"out_bar_stroke\">BAR_STROKE=$(repr(ev_bar_stroke))</span>" *
         "<span id=\"coords_bar_stroke\" style=\"display:none\">$(JSON3.write(sweep.bar_stroke.manifest["layers"]))</span>",
@@ -378,6 +388,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000067
 # ╠═d1000000-0000-0000-0000-000000000024
 # ╠═d1000000-0000-0000-0000-000000000025
+# ╠═d1000000-0000-0000-0000-000000000074
+# ╠═d1000000-0000-0000-0000-000000000075
 # ╠═d1000000-0000-0000-0000-000000000036
 # ╠═d1000000-0000-0000-0000-000000000037
 # ╠═d1000000-0000-0000-0000-000000000068
@@ -392,8 +404,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000006d
 # ╠═d1000000-0000-0000-0000-00000000006a
 # ╠═d1000000-0000-0000-0000-00000000006b
-# ╠═d1000000-0000-0000-0000-000000000074
-# ╠═d1000000-0000-0000-0000-000000000075
+# ╠═d1000000-0000-0000-0000-000000000078
+# ╠═d1000000-0000-0000-0000-000000000079
 # ╠═d1000000-0000-0000-0000-000000000028
 # ╠═d1000000-0000-0000-0000-000000000029
 # ╠═d1000000-0000-0000-0000-000000000030

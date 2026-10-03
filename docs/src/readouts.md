@@ -34,6 +34,14 @@ The example above shows only the tooltip, because this site does not
 record clicks on a position ([Static exports and this site](@ref)). In
 your notebook, a click sets `pick`.
 
+On a `PolarAxis`, the readout is the angle and radius under the
+pointer, in the same order as your data: `pick.x` is the angle in
+radians and `pick.y` the radius, swapped when the axis has
+`theta_as_x = false`. On an axis that shows only part of the circle, a
+point drawn below zero degrees reads back as a negative angle. Past the
+edge of the circle the readout keeps going, as it does past the limits
+of an ordinary axis.
+
 ## Read a colorbar value
 
 Hover over a colorbar to see the value its color stands for, and click

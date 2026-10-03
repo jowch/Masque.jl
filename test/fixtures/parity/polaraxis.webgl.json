@@ -1,43 +1,9 @@
 {
-    "transforms": {
-        "ax1": {
-            "xscale": "identity",
-            "xreversed": false,
-            "yscale": "identity",
-            "ylims": [
-                0,
-                1
-            ],
-            "xlims": [
-                0,
-                1
-            ],
-            "yreversed": false,
-            "ispolar": true,
-            "xcats": null,
-            "is3d": false,
-            "ycats": null,
-            "viewport": [
-                32,
-                32,
-                1136,
-                836
-            ],
-            "valueaxis": null
-        }
-    },
-    "scaling": 2,
     "height": 900,
-    "width": 1200,
     "layers": [
         {
-            "events": [
-                "click",
-                "hover"
-            ],
             "kind": "circles",
-            "bond": "element",
-            "axis": "ax1",
+            "id": "scatter",
             "geometry": [
                 743,
                 450,
@@ -52,11 +18,6 @@
                 809,
                 10
             ],
-            "id": "scatter",
-            "style": {
-                "width": 2
-            },
-            "colors": "rgb(0,114,178)",
             "payloads": [
                 {
                     "index": 1,
@@ -78,17 +39,22 @@
                     "x": 4.71238899230957,
                     "y": 2.5
                 }
-            ]
-        },
-        {
+            ],
+            "colors": "rgb(0,114,178)",
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "bond": "element",
             "events": [
                 "click",
                 "hover"
-            ],
+            ]
+        },
+        {
             "kind": "lines",
+            "id": "lines",
             "tol": 12,
-            "bond": "element",
-            "axis": "ax1",
             "geometry": [
                 [
                     772,
@@ -157,15 +123,59 @@
                     450
                 ]
             ],
-            "id": "lines",
-            "style": {
-                "width": 2
-            },
             "payloads": [
                 {
                     "index": 1
                 }
+            ],
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "bond": "element",
+            "events": [
+                "click",
+                "hover"
             ]
         }
-    ]
+    ],
+    "transforms": {
+        "ax1": {
+            "xscale": "identity",
+            "ylims": [
+                -2.9139369742426076,
+                2.9139369742426076
+            ],
+            "xlims": [
+                -3.9596081272760304,
+                3.9596081272760304
+            ],
+            "valueaxis": null,
+            "polar": {
+                "direction": 1,
+                "r0": 0,
+                "branch": [
+                    0,
+                    6.283185307179586
+                ],
+                "theta_as_x": true,
+                "theta_0": 0
+            },
+            "is3d": false,
+            "xreversed": false,
+            "ycats": null,
+            "xcats": null,
+            "yreversed": false,
+            "yscale": "identity",
+            "viewport": [
+                32,
+                32,
+                1136,
+                836
+            ],
+            "ispolar": true
+        }
+    },
+    "width": 1200,
+    "scaling": 2
 }

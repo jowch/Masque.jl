@@ -14,6 +14,23 @@ end
 _gesture_frame(result::RenderResult) = Dict{String, Any}("png" => result.payload)
 
 """
+    PolarFrame
+
+The resolved `Makie.Polar` fields of one `PolarAxis`, so JS can turn the Cartesian point under
+the pointer into `(θ, r)`: `θ = mod(direction·atan2(y, x) − theta_0, branch)` and
+`r = hypot(x, y) + r0`, swapped when `theta_as_x` is false. `branch` is the 2π-wide interval θ is
+folded into: `thetacenter ± π` on a sector narrower than 2π (as `PolarAxis`'s own zoom handler
+does), else `0..2π` (as `inverse_transform(::Polar)` does).
+"""
+struct PolarFrame
+    theta_as_x::Bool
+    direction::Int
+    theta_0::Float64
+    r0::Float64
+    branch::Tuple{Float64, Float64}
+end
+
+"""
     AxisTransform
 
 One axis expressed declaratively, in the artifact's pixel space, so JS can invert
@@ -32,8 +49,11 @@ struct AxisTransform
     ycats::Union{Nothing, Vector{String}}
     valueaxis::Union{Nothing, Symbol}       # nothing = 2-D {x,y}; :x/:y = 1-D colorbar readout axis
     is3d::Bool                              # pixel→data inversion is undefined on a 3D axis; lims are degenerate
-    ispolar::Bool                           # continuous θ/r readout not shipped to JS; lims are degenerate
+    ispolar::Bool                           # lims are the Cartesian window of the viewport; `polar` maps it to (θ, r)
+    polar::Union{Nothing, PolarFrame}       # PolarAxis only: the resolved `Makie.Polar` fields JS needs to invert
 end
+AxisTransform(id, xlims, ylims, xscale, yscale, viewport, xreversed, yreversed, xcats, ycats, valueaxis, is3d, ispolar) =
+    AxisTransform(id, xlims, ylims, xscale, yscale, viewport, xreversed, yreversed, xcats, ycats, valueaxis, is3d, ispolar, nothing)
 
 """
     InteractionContext
@@ -164,14 +184,27 @@ function _axis3_transform(id, ax, scaling, out_h)
     )
 end
 
-# Continuous θ/r inversion needs the polar transform serialized to JS, not shipped yet;
-# lims are placeholders and Axis/Threshold/ROI must fail loud in validate() on ispolar.
+# The pixel inverts in two steps, the split Makie itself uses. First the linear map over `lims`,
+# which are the Cartesian window of the scene viewport: its corners unprojected the way
+# `mouseposition` / `Makie.to_world` does, so the letterbox and the tick inset come with it.
+# Then the `PolarFrame` turns that Cartesian point into (θ, r). Identity scale, not reversed.
 function _polar_transform(id, ax, scaling, out_h)
     vp = _scene_viewport(ax); o = vp.origin; wv = vp.widths
     vpx = (o[1] * scaling, out_h - (o[2] + wv[2]) * scaling, wv[1] * scaling, wv[2] * scaling)
+    lo = Makie.to_world(ax.scene, Makie.Point2d(0, 0))
+    hi = Makie.to_world(ax.scene, Makie.Point2d(wv[1], wv[2]))
     return AxisTransform(
-        id, (0.0, 1.0), (0.0, 1.0), :identity, :identity,
-        vpx, false, false, nothing, nothing, nothing, false, true
+        id, (Float64(lo[1]), Float64(hi[1])), (Float64(lo[2]), Float64(hi[2])), :identity, :identity,
+        vpx, false, false, nothing, nothing, nothing, false, true, _polar_frame(ax)
+    )
+end
+
+function _polar_frame(ax)
+    t1, t2 = ax.target_thetalims[]
+    lo = abs(t2 - t1) < 2π ? 0.5 * (t1 + t2) - π : 0.0
+    return PolarFrame(
+        ax.theta_as_x[], Int(ax.direction[]), Float64(ax.target_theta_0[]),
+        Float64(ax.target_r0[]), (lo, lo + 2π)
     )
 end
 
@@ -193,7 +226,7 @@ function _colorbar_transform(id, cb, scaling, out_h)
     end
 end
 
-# A Legend has no data-space readout — lims are degenerate placeholders (like Axis3/PolarAxis
+# A Legend has no data-space readout — lims are degenerate placeholders (like Axis3
 # above), never inverted client-side. Only the pixel viewport (the legend's whole bbox) is real.
 function _legend_transform(id, leg, scaling, out_h)
     bb = _legend_bbox(leg)

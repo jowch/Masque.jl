@@ -84,7 +84,6 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 ### Plot coverage
 - #91 — tracking issue for the recipes `masque(fig)` does not extract yet. Tick it and
   update `docs/src/support.md` when `_plotbase` grows a branch.
-- #170 — continuous readout on `PolarAxis`.
 - *idea* — informative default payloads for `density!`, `band!`, and `voronoiplot!`.
 - *idea* — a legend entry that targets a `:grid` layer.
 - *idea* — `heatmap!`/`image!` and `surface!` designed together as dense cell fields;

@@ -86,7 +86,19 @@ export interface AxisTransform {
     ycats?: string[] | null
     valueaxis?: "x" | "y" | null // 1-D colorbar readout: which axis carries the value; absent/null = 2-D {x,y}
     is3d?: boolean // lims are degenerate; Julia validate() rejects inversion consumers on is3d, so invertAxis is never reached with one
-    ispolar?: boolean // continuous θ/r inversion not yet shipped to JS; Julia validate() rejects inversion consumers the same way as is3d
+    ispolar?: boolean // lims are the viewport's Cartesian window; `polar` turns that point into (θ, r)
+    polar?: PolarFrame | null // PolarAxis only; mirrors Julia's PolarFrame (src/backend.jl)
+}
+
+// The resolved Makie.Polar fields of one PolarAxis. invertAxis maps a pixel to the Cartesian
+// point (x, y) over the transform's lims, then θ = mod(direction·atan2(y, x) − theta_0, branch)
+// and r = hypot(x, y) + r0, swapped when theta_as_x is false.
+export interface PolarFrame {
+    theta_as_x: boolean
+    direction: number // +1 or -1
+    theta_0: number   // radians
+    r0: number        // the radius drawn at the origin
+    branch: [number, number] // the 2π-wide interval θ is folded into
 }
 
 export interface LayerStyle {
