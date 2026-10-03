@@ -91,9 +91,10 @@ d = dumbbell!(ax, before, after)
 @bind pick masque(fig, interactables(d; tooltip = masque"change $(change)"))
 ```
 
-Those keywords reach your method, and without `kwargs...` in its
-signature this call fails with a `MethodError`. The method above also takes `payloads`
-by name, so a caller's payloads replace the rows it builds.
+Those keywords reach your method, so without `kwargs...` in its
+signature this call fails with an error that names your plot type. The
+method above also takes `payloads` by name, so a caller's payloads
+replace the rows it builds.
 
 ## Hit size from the drawn plot
 

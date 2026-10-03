@@ -39,6 +39,28 @@ function interactables(ax, p::Makie.AbstractPlot; id = nothing, kwargs...)
     return _construct(ax, p, something(id, base); kwargs...)
 end
 
+# `interactables(ax, p; kwargs...)` as `masque` calls it. A recipe's own method written
+# without keywords (`Masque.interactables(ax, p::MyPlot)`) would fail with a bare
+# `MethodError` about `id`; name the method and the fix instead. A `MethodError` raised
+# inside the method's body is not this case and passes through.
+function _plot_interactables(ax, p; kwargs...)
+    if _has_custom(ax, p)
+        sig = Tuple{typeof(ax), typeof(p)}
+        rejected = [k for k in keys(kwargs) if !hasmethod(interactables, sig, (k,))]
+        isempty(rejected) && return interactables(ax, p; kwargs...)
+        T = nameof(typeof(p))
+        kws = (length(rejected) == 1 ? "keyword " : "keywords ") * join(("`$k`" for k in rejected), ", ")
+        throw(
+            ArgumentError(
+                "masque: the interactables method for $T does not take the $kws, which `masque` " *
+                    "passes it. Add `; id, kwargs...` to its signature, " *
+                    "`Masque.interactables(ax, p::$T; id, kwargs...)`, and give the first layer it builds that `id`",
+            ),
+        )
+    end
+    return interactables(ax, p; kwargs...)
+end
+
 # `interactables(plot)` before `masque` has found its axis and its default id.
 struct _PlotRequest <: AbstractInteractable
     plot::Makie.AbstractPlot
@@ -124,13 +146,13 @@ end
 # taken and no taken id extends it with a suffix: `:stem_stems` claims `:stem`, while
 # `:stem_2` and `:stem_2_stems` do not, since their tail starts with a digit.
 function _build_fresh(r::_PlotRequest, ax, taken)
-    haskey(r.kwargs, :id) && return interactables(ax, r.plot; r.kwargs...)
+    haskey(r.kwargs, :id) && return _plot_interactables(ax, r.plot; r.kwargs...)
     base = _base(ax, r.plot)
     n = 1
     while _claimed(n == 1 ? base : Symbol(base, :_, n), taken)
         n += 1
     end
-    return interactables(ax, r.plot; r.kwargs..., id = n == 1 ? base : Symbol(base, :_, n))
+    return _plot_interactables(ax, r.plot; r.kwargs..., id = n == 1 ? base : Symbol(base, :_, n))
 end
 
 function _claimed(id, taken)

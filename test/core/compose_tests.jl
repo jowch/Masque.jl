@@ -15,6 +15,21 @@ function Masque.interactables(ax, p::ComposeDots; id = :composedots, kwargs...)
     return AbstractInteractable[PointInteractable(ax, p.positions[]; id, payloads = ["dot $k" for k in eachindex(p.positions[])], kwargs...)]
 end
 
+# #270: the natural first attempt at a recipe's method, with no keywords; one that takes `id`
+# but no other keyword; and one whose body raises a MethodError of its own.
+Makie.@recipe NoKwDots (positions,) begin
+end
+Makie.plot!(p::NoKwDots) = (scatter!(p, p.positions); p)
+Masque.interactables(ax, p::NoKwDots) = AbstractInteractable[PointInteractable(ax, p.positions[])]
+Makie.@recipe IdOnlyDots (positions,) begin
+end
+Makie.plot!(p::IdOnlyDots) = (scatter!(p, p.positions); p)
+Masque.interactables(ax, p::IdOnlyDots; id) = AbstractInteractable[PointInteractable(ax, p.positions[]; id)]
+Makie.@recipe BrokenDots (positions,) begin
+end
+Makie.plot!(p::BrokenDots) = (scatter!(p, p.positions); p)
+Masque.interactables(ax, p::BrokenDots; id, kwargs...) = AbstractInteractable[PointInteractable(ax, p.positions[], "not a keyword")]
+
 ids(xs) = [i.id for i in xs]
 assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
 
@@ -187,5 +202,24 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test isempty(w.manifest["layers"])
         w = masque(f; selected = Dict(:scatter => [2]))
         @test only(filter(L -> L["id"] == "scatter", w.manifest["layers"]))["selected"] == [1]
+    end
+
+    @testset "a recipe method without keywords gets an error naming the fix (#270)" begin
+        pts = Point2f[(1, 1), (2, 4)]
+        f = Figure(); ax = Axis(f[1, 1])
+        nokwdots!(ax, pts)
+        err = (@test_throws ArgumentError masque(f)).value
+        @test occursin("NoKwDots", err.msg) && occursin("`id`", err.msg) &&
+            occursin("; id, kwargs...", err.msg)
+        # Through `interactables(plot; …)`: `id` is accepted, `tooltip` is the one refused.
+        f = Figure(); ax = Axis(f[1, 1])
+        p = idonlydots!(ax, pts)
+        @test ids(assemble(f)) == [:idonlydots]
+        err = (@test_throws ArgumentError assemble(f, interactables(p; tooltip = false))).value
+        @test occursin("IdOnlyDots", err.msg) && occursin("`tooltip`", err.msg) && !occursin("`id`", err.msg)
+        # A MethodError from inside the method's own body is the user's, and passes through.
+        f = Figure(); ax = Axis(f[1, 1])
+        brokendots!(ax, pts)
+        @test_throws MethodError masque(f)
     end
 end

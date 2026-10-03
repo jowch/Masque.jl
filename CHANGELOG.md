@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- An `interactables` method for your own plot type written without keywords,
+  `Masque.interactables(ax, p::MyPlot)`, now fails with an error that names the plot type and
+  says to add `; id, kwargs...`. Before, it was a `MethodError` about an unsupported keyword.
+
 ## [0.2.0] - 2026-10-03
 
 Some calls written for 0.1 behave differently: each is marked **Breaking** below, and the
