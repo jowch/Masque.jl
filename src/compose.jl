@@ -40,21 +40,24 @@ function interactables(ax, p::Makie.AbstractPlot; id = nothing, kwargs...)
 end
 
 # `interactables(ax, p; kwargs...)` as `masque` calls it. A recipe's own method written
-# without keywords (`Masque.interactables(ax, p::MyPlot)`) would fail with a bare
-# `MethodError` about `id`; name the method and the fix instead. A `MethodError` raised
-# inside the method's body is not this case and passes through.
+# without keywords (`Masque.interactables(ax, p::MyPlot)`) is never reached with keywords:
+# Julia sends the call to the built-in method, which reports no default for the plot. One
+# that lacks a keyword the caller passed raises a bare `MethodError`. Read the keywords the
+# method declares and name the fix instead. A `MethodError` raised inside the method's body is
+# not this case and passes through.
 function _plot_interactables(ax, p; kwargs...)
     if _has_custom(ax, p)
-        sig = Tuple{typeof(ax), typeof(p)}
-        rejected = [k for k in keys(kwargs) if !hasmethod(interactables, sig, (k,))]
+        declared = Base.kwarg_decl(which(interactables, Tuple{typeof(ax), typeof(p)}))
+        slurps = any(k -> endswith(string(k), "..."), declared)
+        rejected = [k for k in keys(kwargs) if !slurps && k ∉ declared]
         isempty(rejected) && return interactables(ax, p; kwargs...)
-        T = nameof(typeof(p))
+        T = Makie.plotsym(typeof(p))   # the name `@recipe` gave the type, `MyPlot`
         kws = (length(rejected) == 1 ? "keyword " : "keywords ") * join(("`$k`" for k in rejected), ", ")
         throw(
             ArgumentError(
                 "masque: the interactables method for $T does not take the $kws, which `masque` " *
                     "passes it. Add `; id, kwargs...` to its signature, " *
-                    "`Masque.interactables(ax, p::$T; id, kwargs...)`, and give the first layer it builds that `id`",
+                    "`Masque.interactables(ax, p::$T; id, kwargs...)`, and give the first layer it builds that id",
             ),
         )
     end
@@ -203,7 +206,7 @@ function _assemble(fig, xs; auto::Bool)
                 push!(fresh, (length(groups), g, ax))
                 continue
             end
-            built = interactables(ax, g.plot; id = first(old), g.kwargs...)
+            built = _plot_interactables(ax, g.plot; id = first(old), g.kwargs...)
             push!(groups, built)
             for o in old
                 replaces[o] = length(groups)
