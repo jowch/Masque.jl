@@ -97,7 +97,7 @@ write(joinpath(outdir, "expected3d.json"), JSON3.write(expected3))
 
 # --- PolarAxis case: discrete hits via shared projection (Makie.Polar in transform_func).
 # Clicking marker 0 asserts the polar-projected hit geometry + {index,x,y} payload survive
-# the wire. Continuous θ/r readout is deferred (ispolar transform; validate gates).
+# the wire. The θ/r readout is covered by the kind sweep (axis_polar).
 figp = Figure(; size = (400, 300))
 axp = PolarAxis(figp[1, 1])
 scatter!(

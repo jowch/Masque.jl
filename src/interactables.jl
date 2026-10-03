@@ -1004,15 +1004,16 @@ the cursor. No per-element geometry — the browser inverts pixels→data live v
 with `geometry = nothing`.
 
 # Arguments
-- `ax` — a `Makie.Axis` (linear, log, or categorical). `id` — the layer id; becomes
-  `InteractionEvent.layer` on a hit. Default `:axis`.
+- `ax` — a `Makie.Axis` (linear, log, or categorical) or a `Makie.PolarAxis`. `id` — the layer
+  id; becomes `InteractionEvent.layer` on a hit. Default `:axis`.
 
-Payload on hit (client-side): `(; x, y)`.
+Payload on hit (client-side): `(; x, y)`, in the plot's own coordinates. On a `PolarAxis`, `x` is
+θ in radians and `y` is r when `theta_as_x` is true (the default), swapped otherwise. Past the
+edge of the disc the readout keeps extrapolating, as it does past a Cartesian axis's limits.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
-a data point — continuous readout is undefined), a `PolarAxis` (continuous θ/r inversion isn't
-shipped to JS yet), or either scale isn't client-invertible (supported: `identity`, `log10`,
-`log`; categorical axes are fine).
+a data point — continuous readout is undefined), or either scale isn't client-invertible
+(supported: `identity`, `log10`, `log`; categorical axes are fine).
 
 # Examples
 ```julia
@@ -1029,9 +1030,6 @@ function validate(i::AxisInteractable, ctx::InteractionContext)
     t.is3d && return "AxisInteractable: continuous pixel→data readout is undefined on an Axis3 " *
         "(a screen pixel is a ray, not a data point). Use element interactables " *
         "(points/segments/polygons) on 3D axes."
-    t.ispolar && return "AxisInteractable: continuous θ/r readout on PolarAxis needs the polar " *
-        "transform serialized to JS (not yet shipped). Use element interactables " *
-        "(points/segments) on PolarAxis for discrete hits."
     (t.xscale in _JS_INVERTIBLE && t.yscale in _JS_INVERTIBLE) ||
         return "AxisInteractable: scale (x=$(t.xscale), y=$(t.yscale)) is not invertible client-side; " *
         "supported: identity/log10/log (categorical is fine)."
@@ -1333,8 +1331,8 @@ resolution. Because nothing commits, `ax`'s camera stays wherever the gesture le
 cell re-runs (a fresh `Figure`/`Axis` resets it); to persist a view across re-renders, bind it
 explicitly with the `Ref` + `@bind` pattern (§12.8).
 
-`masque` raises `ArgumentError` at build time if `ax` is a `PolarAxis` (continuous θ/r view
-gestures aren't shipped), a `Colorbar`'s value axis (no pan/orbit view applies), a categorical
+`masque` raises `ArgumentError` at build time if `ax` is a `PolarAxis` (a polar pan or zoom
+moves r and θ limits, not Cartesian ones), a `Colorbar`'s value axis (no pan/orbit view applies), a categorical
 2D axis (pan needs numeric limits to shift), or (2D only) either scale isn't client-invertible
 (supported: `identity`, `log10`, `log`). `Axis3` has no scale/categorical restriction — camera
 angles are read live from `ax` at render time.
@@ -1352,8 +1350,8 @@ events(::ViewInteractable) = (:drag,)
 function validate(i::ViewInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ViewInteractable: ax is a Legend, not an Axis/Axis3 — a legend has no pan/orbit view."
     t = ctx.transforms[axis_id(ctx, i.ax)]
-    t.ispolar && return "ViewInteractable: PolarAxis view gestures need continuous θ/r " *
-        "transforms (not yet shipped). Use element interactables for discrete hits."
+    t.ispolar && return "ViewInteractable: PolarAxis view gestures are not supported (a polar " *
+        "pan or zoom moves r and θ limits, not Cartesian ones). Use element interactables for discrete hits."
     t.valueaxis !== nothing && return "ViewInteractable: a Colorbar has no pan/orbit view; " *
         "key ViewInteractable to an Axis or Axis3."
     if t.is3d
@@ -1427,7 +1425,8 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 Payload on commit (client-side): the scalar data coordinate.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
-a data value — inversion is undefined), a `PolarAxis` (continuous inversion isn't shipped), or
+a data value — inversion is undefined), a `PolarAxis` (a straight line is neither a constant r nor
+a constant θ), or
 the dragged axis's scale isn't client-invertible (`:horizontal` needs the y-scale, `:vertical`
 the x-scale; supported: `identity`, `log10`, `log`).
 
@@ -1450,8 +1449,8 @@ function validate(i::ThresholdInteractable, ctx::InteractionContext)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     t.is3d && return "ThresholdInteractable: drag inverts a pixel to a data scalar via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
-    t.ispolar && return "ThresholdInteractable: drag inverts a pixel via Cartesian axis scales; " *
-        "PolarAxis continuous θ/r inversion is not yet shipped. Use element interactables for discrete hits."
+    t.ispolar && return "ThresholdInteractable: a threshold is not supported on PolarAxis (it drags a " *
+        "straight line, and constant r is a circle, constant θ a ray). Use AxisInteractable to read (θ, r)."
     sc = i.orientation === :horizontal ? t.yscale : t.xscale
     sc in _JS_INVERTIBLE || return "ThresholdInteractable: $(i.orientation) drag needs a client-side " *
         "invertible $(i.orientation === :horizontal ? "y" : "x")-scale ($(sc) is not; supported: identity/log10/log)."
@@ -1500,7 +1499,7 @@ on its axis); with none there, the value stays the brush. `bounds=` accepts a `B
 tuple.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
-a data point), a `PolarAxis` (continuous inversion isn't shipped), a categorical axis (bounds
+a data point), a `PolarAxis` (a screen rectangle is not an annular sector), a categorical axis (bounds
 need numeric limits), or either scale isn't client-invertible (supported: `identity`, `log10`,
 `log`).
 
@@ -1529,8 +1528,8 @@ function validate(i::ROIInteractable, ctx::InteractionContext)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     t.is3d && return "ROIInteractable: drag inverts pixel corners to data-space bounds via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data point)."
-    t.ispolar && return "ROIInteractable: drag inverts pixel corners via Cartesian axis scales; " *
-        "PolarAxis continuous θ/r inversion is not yet shipped. Use element interactables for discrete hits."
+    t.ispolar && return "ROIInteractable: a box is not supported on PolarAxis (a screen rectangle is " *
+        "not an annular sector). Use AxisInteractable to read (θ, r)."
     (t.xscale in _JS_INVERTIBLE && t.yscale in _JS_INVERTIBLE) ||
         return "ROIInteractable: drag needs client-side invertible x and y scales " *
         "(x=$(t.xscale), y=$(t.yscale); supported: identity/log10/log)."
@@ -1802,8 +1801,8 @@ function validate(i::SliceInteractable, ctx::InteractionContext)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     t.is3d && return "SliceInteractable: sampling inverts a pixel to a data coordinate via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
-    t.ispolar && return "SliceInteractable: sampling inverts a pixel via Cartesian axis scales; " *
-        "PolarAxis continuous θ/r inversion is not yet shipped. Use element interactables for discrete hits."
+    t.ispolar && return "SliceInteractable: a slice is not supported on PolarAxis (it samples along a " *
+        "straight screen line, and a constant-θ probe is a ray). Use AxisInteractable to read (θ, r)."
     (t.xscale in _JS_INVERTIBLE && t.yscale in _JS_INVERTIBLE) ||
         return "SliceInteractable: sampling needs client-side invertible x and y scales " *
         "(x=$(t.xscale), y=$(t.yscale); supported: identity/log10/log)."

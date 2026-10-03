@@ -52,6 +52,10 @@ All notable changes to this project are documented here. The format is based on
   for the whole figure or one axis.
 - A recipe can define `Masque.interactables(ax, p::MyPlot; id, kwargs...)`, and `masque(fig)`
   uses it for every plot of that type.
+- `AxisInteractable` works on a `PolarAxis`: hovering shows the angle and radius under the
+  pointer, and a click returns them as `x` and `y` in the order the axis plots them (angle in
+  radians first, unless `theta_as_x = false`). It works in a static export too. Thresholds,
+  ROI boxes, slices, and pan views still raise an error on a `PolarAxis`.
 
 ### Deprecated
 - `auto_interactables(fig)`: use `interactables(fig)`. It will be removed in 0.3.
