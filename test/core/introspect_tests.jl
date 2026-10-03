@@ -471,6 +471,114 @@ end
             @test !isempty(only(i for i in qints if i.id === :segments).vertices)
         end
 
+        @testset "recipes reached only through their children (#275)" begin
+            # Each recipe here has no constructor of its own; its layers come from the child
+            # walk. A Makie release that changes how one builds its children breaks these.
+            function layers(build)
+                f = Figure(size = (500, 350)); a = Axis(f[1, 1])
+                build(a)
+                m = (@test_logs masque(f)).manifest
+                return m["layers"], Makie.colorbuffer(f; px_per_unit = m["scaling"])
+            end
+            shape(Ls) = [(L["id"], L["kind"], length(L["payloads"])) for L in Ls]
+            firstvertex(line) = (i = findfirst(isfinite, line); (line[i], line[i + 1]))
+
+            @testset "qqnorm! -> scatter, plus segments with a qqline" begin
+                ys = [-1.2, -0.4, 0.1, 0.5, 1.3]
+                Ls, img = layers(a -> qqnorm!(a, ys))
+                @test shape(Ls) == [("scatter", "circles", 5)]
+                # Makie plots sample quantiles against normal quantiles; the median is exact
+                @test Ls[1]["payloads"][3].x ≈ 0 atol = 1.0e-6
+                @test Ls[1]["payloads"][3].y ≈ 0.1
+                g = Ls[1]["geometry"]
+                @test drawn_near(img, g[1], g[2]; tol = 2)
+                Ls, img = layers(a -> qqnorm!(a, ys; qqline = :fit))
+                @test shape(Ls) == [("segments", "segments", 1), ("scatter", "circles", 5)]
+                g = Ls[1]["geometry"]
+                @test drawn_near(img, (g[1] + g[3]) / 2, (g[2] + g[4]) / 2; tol = 2)
+            end
+
+            @testset "stephist! and ecdfplot! -> one stairs line" begin
+                for build in (
+                        a -> stephist!(a, [1.0, 1.5, 2.0, 2.2, 3.0, 3.1, 3.2]; bins = 3),
+                        a -> ecdfplot!(a, [1.0, 2.0, 2.0, 3.0]),
+                    )
+                    Ls, img = layers(build)
+                    @test shape(Ls) == [("stairs", "lines", 1)]
+                    @test drawn_near(img, firstvertex(only(Ls[1]["geometry"]))...; tol = 2)
+                end
+            end
+
+            @testset "streamplot! -> one lines element plus arrow-head scatter" begin
+                Ls, img = layers(a -> streamplot!(a, p -> Point2f(-p[2], p[1]), -2 .. 2, -2 .. 2))
+                @test [(L["id"], L["kind"]) for L in Ls] == [("scatter", "circles"), ("lines", "lines")]
+                # all stream lines are one NaN-separated element; each arrow head is its own point
+                @test length(Ls[2]["payloads"]) == 1
+                @test length(Ls[1]["payloads"]) > 1
+                g = Ls[1]["geometry"]
+                @test drawn_near(img, g[1], g[2]; tol = 2)
+                @test drawn_near(img, firstvertex(only(Ls[2]["geometry"]))...; tol = 2)
+            end
+
+            xs = [0.0, 1.0, 0.0, 1.0, 0.5]; ys = [0.0, 0.0, 1.0, 1.0, 0.5]
+            zs = [0.0, 1.0, 1.0, 2.0, 1.0]
+            @testset "tricontourf! -> one polygon per band" begin
+                Ls, img = layers(a -> tricontourf!(a, xs, ys, zs; levels = 3))
+                @test shape(Ls) == [("poly", "polygons", 3)]
+                @test all(Ls[1]["geometry"]) do ring
+                    r = ring[1] isa AbstractVector ? ring[1] : ring
+                    drawn_near(img, r[1], r[2]; tol = 2)
+                end
+            end
+
+            @testset "tricontour! -> one lines element" begin
+                Ls, img = layers(a -> tricontour!(a, xs, ys, zs; levels = 3))
+                @test shape(Ls) == [("lines", "lines", 1)]
+                @test drawn_near(img, firstvertex(only(Ls[1]["geometry"]))...; tol = 2)
+            end
+
+            @testset "dendrogram! -> the whole tree as one lines element" begin
+                Ls, img = layers(a -> dendrogram!(a, Point2f[(0, 0), (1, 0), (2, 0)], [(1, 2), (3, 4)]))
+                @test shape(Ls) == [("lines", "lines", 1)]
+                @test drawn_near(img, firstvertex(only(Ls[1]["geometry"]))...; tol = 2)
+            end
+
+            @testset "timeseries! -> one lines element" begin
+                Ls, img = layers() do a
+                    o = Observable(1.0)
+                    timeseries!(a, o)
+                    for v in (2.0, 0.5, 3.0)
+                        o[] = v
+                    end
+                end
+                @test shape(Ls) == [("lines", "lines", 1)]
+                @test drawn_near(img, firstvertex(only(Ls[1]["geometry"]))...; tol = 2)
+            end
+
+            @testset "datashader! -> one grid cell per canvas pixel" begin
+                pts = Point2f[(0, 0), (1, 1), (1, 1), (2, 0.5)]
+                Ls, img = layers(a -> datashader!(a, pts; operation = identity))
+                @test shape(Ls) == [("cells", "grid", 0)]
+                g = Ls[1]["geometry"]
+                v = g["values"]
+                @test length(v) == g["ncols"] * g["nrows"]
+                @test length(g["xedges"]) == g["ncols"] + 1 && length(g["yedges"]) == g["nrows"] + 1
+                @test sum(v) == length(pts) && maximum(v) == 2   # a value is a point count
+                # the cell holding both (1, 1) points is drawn in a different colour than an
+                # empty cell
+                center(k) = (
+                    (j, i) = divrem(k - 1, g["ncols"]) .+ 1;
+                    ((g["xedges"][i] + g["xedges"][i + 1]) / 2, (g["yedges"][j] + g["yedges"][j + 1]) / 2)
+                )
+                px(k) = (c = center(k); img[round(Int, c[2]), round(Int, c[1])])
+                @test px(argmax(v)) != px(findfirst(iszero, v))
+                # With the default `operation`, the value is the histogram-equalized colour
+                # value, not the count (#276).
+                Ld, _ = layers(a -> datashader!(a, pts))
+                @test_broken sum(Ld[1]["geometry"]["values"]) == length(pts)
+            end
+        end
+
         @testset "masque auto-detects text!" begin
             f = Figure(); ax = Axis(f[1, 1]); scatter!(ax, 1:3, 1:3)
             text!(ax, [1.5], [2.0]; text = ["Hi"])
