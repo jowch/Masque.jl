@@ -208,12 +208,12 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: non
 /* left's containing block is .masque-tip's PADDING box (absolute-position offsets are measured
    from the padding edge, CSS 2.1 §10.1), 1px inside its own 1px border — and the 5px transparent
    left/right borders below put the visible apex at the horizontal CENTRE of this element's own
-   box, 5px right of its left edge. --masque-caret-x (geometry.ts's caretX) is "px from the anchored
-   tooltip's OUTER left edge to the anchor" — landing the apex exactly there needs both offsets
-   backed out: -1 (border) -5 (this element's own half-width) = -6. The 14px fallback (used only
-   when --masque-caret-x is unset, i.e. every cursor-following, non-anchored placement) preserves
-   the pre-existing default apex position (14-6=8, the literal this replaced). The -1 above assumed
-   the default 1px border-left; the 3px accent border (hover.ts's setMarkAccent, --masque-mark-border)
+   box, 5px right of its left edge. --masque-caret-x (geometry.ts's caretX, or the pointer for
+   hover.ts's placeTip) is "px from the tooltip's OUTER left edge to the anchor" — landing the
+   apex exactly there needs both offsets backed out: -1 (border) -5 (this element's own
+   half-width) = -6. The 14px fallback (hover.ts's CARET_INSET) covers placeAnchored's zero-size
+   path, which removes the property; placeTip always sets it.
+   The -1 above assumed the default 1px border-left; the 3px accent border (hover.ts's setMarkAccent, --masque-mark-border)
    pushes the padding box 2px further right, so the extra width beyond the baked-in 1px
    (--masque-mark-border-w, set alongside the accent) is backed out too. */
 .masque-tip::before { content: ""; position: absolute; top: -5px;
@@ -222,7 +222,6 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: non
        display: var(--masque-tip-caret, block); }
 .masque-tip.flip-y::before { top: auto; bottom: -5px; border-bottom: none;
        border-top: 5px solid var(--masque-tip-bg-resolved); }
-.masque-tip.flip-x::before { left: auto; right: 8px; }
 .masque-tip-row { display: flex; gap: 8px; justify-content: space-between; }
 .masque-tip-key { color: var(--masque-tip-accent, #6b7280); }
 .masque-tip-val { font-variant-numeric: tabular-nums; }
