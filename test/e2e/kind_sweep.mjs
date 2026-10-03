@@ -356,6 +356,8 @@ try {
       kids,
       sel: count("g.sel"),
       hi: count("g.hi"),
+      // The overlay's own bond value, read before any kernel round-trip.
+      bond: host.value ?? null,
     };
   }, key);
 
@@ -1770,10 +1772,18 @@ try {
       // there is nothing to retry toward here; a genuine dispatch failure would still throw from
       // `dispatchAt` itself.
       await dispatchAt(key, clickPt.x, clickPt.y, "click");
+      // The one element may be the `selected=` seed, which a click now clears (the toggle off).
+      // Click once more so the checks below see it selected.
+      if ((await inspect(key)).bond === null) await dispatchAt(key, clickPt.x, clickPt.y, "click");
       after = await textOf(`#out_${key}`);
     } else {
       for (let a = 0; a < 3; a++) {
-        await dispatchAt(key, clickPt.x, clickPt.y, "click");
+        // A second click on the element the first one selected would clear it, so retry the
+        // click only when the overlay never took the first one.
+        const held = (await inspect(key)).bond;
+        if (a === 0 || !(held && held.layer === layer.id && held.index === clickIdx)) {
+          await dispatchAt(key, clickPt.x, clickPt.y, "click");
+        }
         try {
           after = await waitChange(`#out_${key}`, before, `${key}-click`);
           break;
@@ -1825,6 +1835,26 @@ try {
       passed.push(`${key}/click-echo`);
     } else if (echo.sel !== afterLeave.sel) {
       throw new Error(`${key}/click-echo: unpinned ${layer.kind} click changed g.sel ${afterLeave.sel} -> ${echo.sel}`);
+    }
+
+    // Click-again deselect: a second click on the selected element clears g.sel and sends
+    // `nothing` through the bond; a third selects it again, so later checks see the click above.
+    if (echo.sel > 0 && (hasLinks || SELF_PIN_KINDS.has(layer.kind))) {
+      await dispatchAt(key, clickPt.x, clickPt.y, "click");
+      const off = await inspect(key);
+      if (off.sel !== 0 || off.bond !== null) {
+        throw new Error(`${key}/click-deselect: second click left g.sel=${off.sel}, bond=${JSON.stringify(off.bond)}`);
+      }
+      const cleared = await waitChange(`#out_${key}`, after, `${key}/click-deselect`);
+      if (!/=nothing\s*$/.test(cleared)) {
+        throw new Error(`${key}/click-deselect: bond printed ${JSON.stringify(cleared).slice(0, 220)}, expected nothing`);
+      }
+      await dispatchAt(key, clickPt.x, clickPt.y, "click");
+      const on = await inspect(key);
+      if (on.sel !== echo.sel) throw new Error(`${key}/click-deselect: third click g.sel=${on.sel}, expected ${echo.sel}`);
+      const back = await waitChange(`#out_${key}`, cleared, `${key}/click-deselect`);
+      if (back !== after) throw new Error(`${key}/click-deselect: bond after reselect ${JSON.stringify(back).slice(0, 220)} != ${JSON.stringify(after).slice(0, 220)}`);
+      passed.push(`${key}/click-deselect`);
     }
 
     // Every event prints `Type(:layerId, …)`. The ":<layerId>," prefix pins which layer won
