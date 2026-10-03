@@ -238,6 +238,44 @@ describe("hitLayer + hitTest", () => {
         expect(hitLayer(rects, 121, 100)).toBeNull()                  // just outside half-width
         expect(hitLayer(rects, 500, 500)).toBeNull()
     })
+    it("rects with tol: the outline reach responds, inside a neighbour still wins", () => {
+        // two touching bars, 40 wide, with a 4 px outline reach
+        const rects: HitLayer = {
+            id: "bars", kind: "rects", geometry: [100, 100, 40, 20, 140, 100, 40, 20], tol: 4,
+            payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click"],
+        }
+        expect(hitLayer(rects, 100, 113)).toMatchObject({ index: 0 })   // 3 px below the edge
+        expect(hitLayer(rects, 100, 115)).toBeNull()                     // 5 px below
+        expect(hitLayer(rects, 77, 112)).toMatchObject({ index: 0 })     // corner: hypot(3, 2) <= 4
+        expect(hitLayer(rects, 77, 113)).toBeNull()                      // hypot(3, 3) > 4
+        expect(hitLayer(rects, 122, 100)).toMatchObject({ index: 1 })   // inside bar 1, in bar 0's reach
+        expect(hitLayer(rects, 100, 113)?.geom_).toEqual(["rect", 100, 100, 40, 20])   // highlight is the bar itself
+    })
+    it("polygons with tol: the outline reach responds, inside a neighbour still wins", () => {
+        const polys: HitLayer = {
+            id: "polys", kind: "polygons", axis: "ax1", events: ["click"], payloads: [{ i: 0 }, { i: 1 }], tol: 4,
+            geometry: [[0, 0, 10, 0, 10, 10, 0, 10], [10, 0, 20, 0, 20, 10, 10, 10]],
+        }
+        expect(hitLayer(polys, 5, 13)).toMatchObject({ index: 0 })
+        expect(hitLayer(polys, 5, 15)).toBeNull()
+        expect(hitLayer(polys, 12, 5)).toMatchObject({ index: 1 })
+        expect(hitLayer({ ...polys, tol: undefined }, 5, 13)).toBeNull()
+    })
+    it("between two outlines, the nearer one wins", () => {
+        // a 6 px gap with a 4 px reach: a point 4 px from the first and 2 px from the second
+        const rects: HitLayer = {
+            id: "bars", kind: "rects", geometry: [100, 100, 40, 20, 146, 100, 40, 20], tol: 4,
+            payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click"],
+        }
+        expect(hitLayer(rects, 124, 100)).toMatchObject({ index: 1 })
+        expect(hitLayer(rects, 122, 100)).toMatchObject({ index: 0 })
+        const polys: HitLayer = {
+            id: "polys", kind: "polygons", axis: "ax1", events: ["click"], payloads: [{ i: 0 }, { i: 1 }], tol: 4,
+            geometry: [[0, 0, 10, 0, 10, 10, 0, 10], [16, 0, 26, 0, 26, 10, 16, 10]],
+        }
+        expect(hitLayer(polys, 14, 5)).toMatchObject({ index: 1 })
+        expect(hitLayer(polys, 12, 5)).toMatchObject({ index: 0 })
+    })
     it("polyline: nearest segment wins, NaN vertices create a gap that's skipped, tolerance applies", () => {
         // three sub-lines: [0,0]-[10,0], a NaN gap, [20,0]-[30,0], another gap, [40,0]-[50,10]
         const pl: HitLayer = {

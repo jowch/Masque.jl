@@ -396,6 +396,16 @@ end
     @test w.px_per_unit == 1.5 && w.display_css == 500
 end
 
+@testset "a scatter's outline lies outside the marker on WebGL (#246)" begin
+    fig = Figure(; size = (400, 300)); ax = Axis(fig[1, 1])
+    s = scatter!(ax, [1.0], [1.0]; markersize = 20, strokewidth = 8)
+    bk = Masque._resolve_backend(:webgl)
+    ctx = Masque.context(bk, fig, Masque._ppu(bk, fig, 700), 700)
+    @test ctx.marker_stroke == 1.0
+    r = only(Masque.hitlayers(only(interactables(ax, s)), ctx)).geometry[3]
+    @test r == round(Int, (0.3525 * 20 + 8) * ctx.scaling)
+end
+
 @testset "masque(fig) with both backends loaded defaults to Cairo" begin
     using CairoMakie
     cairo_ext = Base.get_extension(Masque, :MasqueCairoMakieExt)

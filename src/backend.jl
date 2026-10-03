@@ -60,7 +60,10 @@ AxisTransform(id, xlims, ylims, xscale, yscale, viewport, xreversed, yreversed, 
 
 Backend-produced bridge handed to every interactable. `project` is the backend's
 data→image-px closure (so projection is not hard-wired to Makie). `transforms` are
-serialized to JS; `ids` maps an axis object to its transform id.
+serialized to JS; `ids` maps an axis object to its transform id. `marker_stroke` is the share
+of a scatter marker's `strokewidth` drawn outside the marker: `0.5` when the backend centers
+the outline on the marker's edge (CairoMakie, the default), `1.0` when it paints the whole
+outline outside (WGLMakie).
 """
 struct InteractionContext
     project::Function                       # (ax, point) -> Point2f, image px
@@ -70,7 +73,10 @@ struct InteractionContext
     height::Int
     scaling::Float64
     display_scale::Float64                  # CSS px per image px on screen (image is rendered above display res)
+    marker_stroke::Float64
 end
+InteractionContext(project, transforms, ids, width, height, scaling, display_scale) =
+    InteractionContext(project, transforms, ids, width, height, scaling, display_scale, 0.5)
 
 """
     data_to_image_px(ctx::InteractionContext, ax, p) -> Point2f

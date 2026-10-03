@@ -151,6 +151,12 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
+        # Bars with a thick outline ship a `tol` reach on their `:rects` layer, #246.
+        "key" => "bar_stroke", "layerId" => "bars", "layerKind" => "rects",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "value", "hoverIndex" => 2, "hoverTip" => "value", "mode" => "element",
+    ),
+    Dict(
         "key" => "scatter_moved", "layerId" => "scatter", "layerKind" => "circles",
         "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
         "tip" => "index", "hoverIndex" => 2, "hoverTip" => "index", "mode" => "element",
@@ -529,6 +535,17 @@ function build_kind_sweep()
         masque(fig)
     end
 
+    # Thick bar outlines respond too, #246: the layer carries a `tol` reach past each bar.
+    bar_stroke = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "bar-stroke")
+        barplot!(ax, 1:3, [2, 5, 3]; color = :lightgray, strokewidth = 8, strokecolor = :black)
+        # A stroked marker clear of the bars: Cairo draws half its outline outside the marker,
+        # WebGL all of it, and the hit circle follows the outline's outer edge on each.
+        scatter!(ax, [0.2], [4.0]; markersize = 20, color = :red, strokewidth = 8, strokecolor = :blue)
+        masque(fig; selected = Dict(:bars => [2]))
+    end
+
     # A scatter moved by translate! and drawn with marker_offset, #245. The hit circles sit on
     # the drawn markers, two data units right and one up plus 20 px each way, not at the data.
     scatter_moved = let
@@ -728,7 +745,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, scatter_moved, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, scatter_moved, bar_stroke, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
 end

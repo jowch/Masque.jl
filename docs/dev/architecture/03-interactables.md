@@ -74,19 +74,24 @@ Geometry layout by `kind` (all coords image-px, top-left origin):
 
 | kind | geometry | JS hit-test | element index |
 |---|---|---|---|
-| `:circles` | `Float32[cx,cy,r, …]` | distance ≤ r | triple index |
+| `:circles` | `Float32[cx,cy,r, …]` | distance ≤ r + the overlay's fixed `HIT_TOL` | triple index |
 | `:polyline` | `Float32[x,y, …]` (NaN = gap) | nearest segment, dist ≤ tol | segment i = (v[i],v[i+1]) |
 | `:lines` | `Vector{Real}[]` paths, one flat `[x,y,…]` per element (NaN = a gap inside that path) | nearest edge of any path, dist ≤ tol | path index — one element per plotted line |
 | `:segments` | `Float32[x0,y0,x1,y1, …]` | nearest of disjoint pairs | pair index |
-| `:rects` | `Float32[cx,cy,w,h, …]` | point-in-rect | quad index |
+| `:rects` | `Float32[cx,cy,w,h, …]` | point-in-rect, else the nearest rect within `tol` of its edge | quad index |
 | `:grid` | `(xedges, yedges, ncols, nrows)` plus `values[]` **or** `sample` (screen pixels; [§8](08-scaling.md)) | source bin, or the screen pixel then the cell at its center | `j*ncols+i` |
-| `:polygons` | one flat ring per element, or a list of rings when that element has holes (exterior, then each hole) | even-odd across that element's rings | element index |
+| `:polygons` | one flat ring per element, or a list of rings when that element has holes (exterior, then each hole) | even-odd across that element's rings, else the nearest element within `tol` of a ring | element index |
 | `:axis` | `nothing` (unbounded, `AxisInteractable`) or `Real[x,y,w,h]` bbox (bounded, `ColorbarInteractable`) | absent geometry = always-hit; bbox present = point-in-bbox; invert pixel via `AxisTransform` | `-1` (continuous); `valueaxis ≠ nothing` → 1-D `(; value)` |
 
-`:polyline`/`:lines`/`:segments`' `tol` (the hit-test slack above) is an optional per-layer manifest
-field, `"tol"` (image px) — present only when `hit_tol(i) !== nothing` (`SegmentInteractable`
-sets it from its `tol` keyword, scaled like `radius`); absent, the overlay falls back to its
-own fixed `SEG_TOL`. Every other kind's manifest is untouched by this field.
+`tol` (the hit-test slack above) is an optional per-layer manifest field, `"tol"` (image px),
+present only when `hit_tol(i) !== nothing`. `SegmentInteractable` sets it from its `tol`
+keyword, scaled like `radius`; absent, the overlay falls back to its own fixed `SEG_TOL`.
+`RectInteractable` and `PolygonInteractable` built from a plot set it to half the plot's
+`strokewidth`, so the drawn outline responds; absent, they reach no further than their edge.
+A point inside an element still wins over another element's outline. `:circles` has no
+`tol`: a scatter's outline is part of its `radius` (half of `strokewidth` on Cairo, which
+centers the outline on the marker's edge, and all of it on WebGL, which paints it outside).
+`:circles` and the other kinds' manifests are untouched by this field.
 
 `label` (optional, per-layer, `String`) is a screen-reader announcement prefix for the
 keyboard-navigation overlay ([§11](11-keyboard.md)) — e.g. `"Scatter"` in "Scatter, element 3 of 10: …". Set via
