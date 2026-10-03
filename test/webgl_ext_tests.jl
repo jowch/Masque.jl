@@ -60,7 +60,7 @@ end
     fig = Figure(; size = (400, 300))
     ax = Axis(fig[1, 1])
     scatter!(ax, 1:5, rand(5))
-    w = masque(fig, Masque.AbstractInteractable[]; backend = _WGLExt.WebGLBackend(), auto = false)
+    w = masque(fig, Masque.AbstractInteractable[]; backend = :webgl, auto = false)
     @test w isa _WGLExt.WebGLWidget
     @test w.scene isa Dict{String, Any}
     @test (w.width, w.height) == (400, 300)
@@ -68,7 +68,7 @@ end
     fig_v = Figure(; size = (400, 300))
     ax_v = Axis(fig_v[1, 1])
     scatter!(ax_v, 1:5, rand(5))
-    wv = masque(fig_v, [ViewInteractable(ax_v)]; backend = _WGLExt.WebGLBackend(), auto = false)
+    wv = masque(fig_v, [ViewInteractable(ax_v)]; backend = :webgl, auto = false)
     @test wv isa _WGLExt.WebGLWidget
     @test wv.render_frame isa Function
 
@@ -102,7 +102,7 @@ end
     fig = Figure(; size = (400, 300))
     ax = PolarAxis(fig[1, 1])
     scatter!(ax, Point2f[(0.0, 1.0), (π / 2, 2.0)]; markersize = 14, color = :red)
-    w = masque(fig; backend = _WGLExt.WebGLBackend())
+    w = masque(fig; backend = :webgl)
     @test w.manifest["transforms"]["ax1"]["ispolar"] === true
     @test JSON3.write(w.scene) isa String
     @test JSON3.write(w.manifest) isa String
@@ -110,13 +110,13 @@ end
 
 @testset "LScene is refused on :webgl, the same as :cairo (#172)" begin
     fu = Figure(; size = (400, 300)); LScene(fu[1, 1])
-    err = (@test_throws ArgumentError Masque.context(_WGLExt.WebGLBackend(), fu, 2.0)).value
+    err = (@test_throws ArgumentError Masque.context(Masque._resolve_backend(:webgl), fu, 2.0, 700)).value
     @test occursin("LScene", err.msg)
     @test occursin("Axis3", err.msg)
     @test !occursin("WGLMakie", err.msg)
     # A mixed figure is refused at masque() time, not rendered with the LScene left bare.
     fm = Figure(; size = (400, 300)); ax = Axis(fm[1, 1]); scatter!(ax, 1:3, 1:3); LScene(fm[1, 2])
-    @test_throws ArgumentError masque(fm; backend = _WGLExt.WebGLBackend())
+    @test_throws ArgumentError masque(fm; backend = :webgl)
 end
 
 @testset "context populates per-axis transforms (axis-keyed interactable)" begin
@@ -125,13 +125,13 @@ end
     lines!(ax, 1:5, (1:5) .^ 2)
     Makie.update_state_before_display!(fig)
 
-    ctx = Masque.context(_WGLExt.WebGLBackend(), fig, 2.0)
+    ctx = Masque.context(Masque._resolve_backend(:webgl), fig, 2.0, 700)
     @test ctx.transforms isa Dict{Symbol, Masque.AxisTransform}   # not Dict{Symbol,Any}
     @test haskey(ctx.transforms, :ax1)                           # was empty -> KeyError
 
     # an axis-keyed interactable must build its manifest without KeyError now
     thr = Masque.ThresholdInteractable(ax; value = 10.0)
-    w = masque(fig, [thr]; backend = _WGLExt.WebGLBackend(), auto = false)
+    w = masque(fig, [thr]; backend = :webgl, auto = false)
     @test w isa _WGLExt.WebGLWidget
     @test !isempty(w.manifest["transforms"])
 end
@@ -145,7 +145,8 @@ end
 end
 
 @testset "backend wiring" begin
-    b = _WGLExt.WebGLBackend()
+    b = Masque._resolve_backend(:webgl)
+    @test b isa _WGLExt.WebGLBackend
     @test b isa Masque.AbstractBackend
     @test isfile(_WGLExt.SHIM_JS)
     @test isfile(_WGLExt._wgl_bundle_path())   # the version-matched renderer is on disk
@@ -281,7 +282,7 @@ end
 
     fig = Figure(; size = (400, 300)); ax = Axis(fig[1, 1])
     scatter!(ax, 1:5, (1:5) .^ 2)
-    w = masque(fig; backend = _WGLExt.WebGLBackend())   # auto-extract -> one :scatter circles layer
+    w = masque(fig; backend = :webgl)   # auto-extract -> one :scatter circles layer
     layer = only(w.manifest["layers"])
     @test layer["id"] == "scatter"
 
@@ -315,7 +316,7 @@ end
     scatter!(ax, first.(pts), last.(pts))
     payloads = [(; label = "p1"), (; label = "p2"), (; label = "p3")]
     pt = PointInteractable(ax, pts; id = :scatter, payloads = payloads)
-    w = masque(fig, pt; backend = _WGLExt.WebGLBackend(), auto = false)
+    w = masque(fig, pt; backend = :webgl, auto = false)
 
     ev = APD.Bonds.transform_value(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "wrong"))
     @test ev isa Masque.ElementEvent && ev.index == 2
@@ -338,7 +339,7 @@ end
 
     fig = Figure(; size = (400, 300)); ax = Axis(fig[1, 1])
     scatter!(ax, 1:5, (1:5) .^ 2)
-    w = masque(fig; backend = _WGLExt.WebGLBackend(), selected = 2)
+    w = masque(fig; backend = :webgl, selected = 2)
     layer = only(w.manifest["layers"])
     @test layer["id"] == "scatter"
     @test layer["selected"] == [1]
@@ -349,7 +350,7 @@ end
     @test hydrated.payload == layer["payloads"][2]
 
     # several indices highlight and leave the bond nothing
-    wmany = masque(fig; backend = _WGLExt.WebGLBackend(), selected = [2, 4])
+    wmany = masque(fig; backend = :webgl, selected = [2, 4])
     @test only(wmany.manifest["layers"])["selected"] == [1, 3]
     @test APD.Bonds.initial_value(wmany) === nothing
 end
@@ -367,12 +368,32 @@ include("parity_corpus.jl")
     dir = joinpath(@__DIR__, "fixtures", "parity")
     for (name, build) in _parity_corpus()
         fig, ints = build()
-        bk = _WGLExt.WebGLBackend()
-        ctx = Masque.context(bk, fig, Masque._ppu(bk, fig))
+        bk = Masque._resolve_backend(:webgl)
+        ctx = Masque.context(bk, fig, Masque._ppu(bk, fig, 700), 700)
         live = JSON3.read(JSON3.write(Masque.build_manifest(ints, ctx)))
         golden = JSON3.read(read(joinpath(dir, "$name.webgl.json"), String))
         @test live == golden
     end
+end
+
+@testset "backend = :webgl, max_width and px_per_unit keywords (#236)" begin
+    fig = Figure(; size = (600, 400)); scatter!(Axis(fig[1, 1]), 1:3, 1:3)
+    @test Masque._resolve_backend(nothing) isa _WGLExt.WebGLBackend   # the one loaded
+    w = masque(fig)
+    @test w isa _WGLExt.WebGLWidget && w.px_per_unit == 2.0 && w.display_css == 600
+    @test w.manifest["scaling"] == 2.0
+    err = (@test_throws ArgumentError masque(fig; backend = :cairo)).value
+    @test occursin("using CairoMakie", err.msg)
+    w = masque(fig; backend = :webgl, max_width = 300)
+    @test w.display_css == 300 && w.px_per_unit == 2.0    # WebGL's density ignores max_width
+    w = masque(fig; px_per_unit = 3)
+    @test w.px_per_unit == 3.0 && w.manifest["scaling"] == 3.0 && w.manifest["width"] == 1800
+
+    b = @test_deprecated _WGLExt.WebGLBackend(; px_per_unit = 3.0, max_width = 300)
+    w = masque(fig; backend = b)
+    @test w.px_per_unit == 3.0 && w.display_css == 300
+    w = masque(fig; backend = b, px_per_unit = 1.5, max_width = 500)   # masque's keywords win
+    @test w.px_per_unit == 1.5 && w.display_css == 500
 end
 
 @testset "masque(fig) with both backends loaded defaults to Cairo" begin
@@ -383,10 +404,10 @@ end
     implicit = masque(fig)
     @test implicit isa Masque.MasqueWidget
 
-    cairo = masque(fig; backend = cairo_ext.CairoBackend())
+    cairo = masque(fig; backend = :cairo)
     @test cairo isa Masque.MasqueWidget
 
-    wgl = masque(fig; backend = _WGLExt.WebGLBackend())
+    wgl = masque(fig; backend = :webgl)
     @test wgl isa _WGLExt.WebGLWidget
 end
 
@@ -407,7 +428,7 @@ end
     scatter!(ax, first.(pts), last.(pts))
     w = masque(
         fig, [ViewInteractable(ax), PointInteractable(ax, pts)];
-        backend = _WGLExt.WebGLBackend(), auto = false,
+        backend = :webgl, auto = false,
     )
     @test w.render_frame isa Function
 
@@ -445,7 +466,7 @@ end
     fig3 = Figure(; size = (300, 300))
     ax3 = Axis3(fig3[1, 1])
     scatter!(ax3, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
-    w3 = masque(fig3, [ViewInteractable(ax3)]; backend = _WGLExt.WebGLBackend(), auto = false)
+    w3 = masque(fig3, [ViewInteractable(ax3)]; backend = :webgl, auto = false)
     orb = w3.render_frame(Dict("id" => "view", "azimuth" => 0.7, "elevation" => 0.2, "settle" => false))
     @test ax3.azimuth[] ≈ 0.7 atol = 1.0e-9
     @test ax3.elevation[] ≈ 0.2 atol = 1.0e-9
@@ -458,7 +479,7 @@ end
     scatter!(ax0, 1:3, 1:3)
     w0 = masque(
         fig0, [PointInteractable(ax0, [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)])];
-        backend = _WGLExt.WebGLBackend(),
+        backend = :webgl,
         auto = false,
     )
     @test w0.render_frame === nothing
@@ -485,7 +506,7 @@ end
     ax = Axis3(fig[1, 1])
     scatter!(ax, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
     az0, el0 = ax.azimuth[], ax.elevation[]
-    w = masque(fig, [ViewInteractable(ax)]; backend = _WGLExt.WebGLBackend(), auto = false)
+    w = masque(fig, [ViewInteractable(ax)]; backend = :webgl, auto = false)
     sender = @async begin
         buf = IOBuffer()
         io = IOContext(buf, :pluto_published_to_js => (io, x) -> print(io, "null"))

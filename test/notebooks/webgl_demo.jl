@@ -38,7 +38,7 @@ md"""
 
 Each figure renders **live on the browser GPU** (a WGLMakie `<canvas>`) with Masque's interactive
 overlay on top — same `@bind` / `InteractionEvent` contract as the `:cairo` backend's `masque`, but
-it handles **3D** and large/animated data the static `CairoBackend` can't. Click a marker; the
+it handles **3D** and large/animated data the static CairoMakie backend can't. Click a marker; the
 bond below reports the typed event. (As of M3.1 the overlay binds straight to the canvas — no
 sizer shim.)
 """

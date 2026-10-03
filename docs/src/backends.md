@@ -11,22 +11,45 @@ loaded, `masque` shows a PNG, and with only `WGLMakie`, a GPU canvas.
 With both loaded, `masque(fig)` uses CairoMakie, and with neither, it
 raises an `ArgumentError`.
 
-To pick the backend yourself, or to set a WGLMakie-only option such as
-`px_per_unit`, pass a backend object to `backend=`. The backend types
-are not exported, so get them with `Base.get_extension`:
+To pick the backend yourself, name it with `backend=`:
 
 ```julia
-masque(
-    fig;
-    backend = Base.get_extension(Masque, :MasqueWGLMakieExt).WebGLBackend(;
-        px_per_unit = 3.0,
-    ),
-)
+masque(fig; backend = :webgl)   # or :cairo
 ```
 
-`masque`'s `max_width` keyword is the width of Pluto's column in CSS
-pixels (default 700). When you pass a backend object, `masque` uses that
-object's `max_width` instead.
+The package for that backend must be loaded; if it isn't, the error
+says which one to load.
+
+## Size and sharpness
+
+Two `masque` keywords work the same on both backends:
+
+- `max_width` is the widest the plot shows on the page, in CSS pixels.
+  The default, 700, is the width of Pluto's column. A wider figure
+  shrinks to fit.
+- `px_per_unit` is how many image pixels each unit of the figure's
+  `size` gets. By default, CairoMakie draws the PNG at twice the width
+  it shows at, and WGLMakie draws 2 pixels per unit, so a wide figure
+  that `max_width` shrinks is sharper on WGLMakie. A larger number
+  gives a sharper picture when the reader zooms the page, and a heavier
+  page to load.
+
+```julia
+masque(fig; max_width = 500, px_per_unit = 3)
+```
+
+## [Makie's settings don't change the widget](@id makie-settings)
+
+Masque's settings belong to the widget. `CairoMakie.activate!` and
+`WGLMakie.activate!` (`type`, `px_per_unit`, and the rest) change how a
+plain `Figure` displays and how `save` writes it, but never a `masque`
+widget. To change the widget, pass `masque`'s own keywords.
+
+For example, `CairoMakie.activate!(type = "svg")` makes a plain
+`Figure` display as SVG, while `masque(fig)` still shows a PNG with
+tooltips and highlights drawn on top. To write an SVG file, call
+`save("figure.svg", fig)`; you can do that in the same cell that
+returns `masque(fig)`.
 
 ## CairoMakie
 
@@ -38,13 +61,6 @@ WGLMakie for that.
 
 3D works without WGLMakie: points and segments on an `Axis3` respond,
 and a [`ViewInteractable`](@ref) orbits the camera.
-
-### SVG display and files
-
-`CairoMakie.activate!(type = "svg")` changes how a plain `Figure`
-displays, but not `masque(fig)`, which always shows a PNG on
-CairoMakie. To write an SVG file, call `save("figure.svg", fig)`; you
-can do that in the same cell that returns `masque(fig)`.
 
 ## WGLMakie
 

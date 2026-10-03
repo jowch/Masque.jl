@@ -17,6 +17,13 @@ All notable changes to this project are documented here. The format is based on
   with `GridInteractable(ax, xedges, yedges, values)` or `GridInteractable(ax, p)` for a heatmap
   or image plot. `RectInteractable` is now the list of rectangles only. Code that checks
   `isa RectInteractable` for a heatmap layer needs `GridInteractable`.
+- **Breaking:** choose the backend by name, `masque(fig; backend = :cairo)` or
+  `backend = :webgl`, and set `max_width` and `px_per_unit` as `masque` keywords, which both
+  backends now accept: `px_per_unit = 3` also sharpens a CairoMakie PNG. The
+  `CairoBackend(; max_width)` and `WebGLBackend(; px_per_unit, max_width)` objects still work
+  with a deprecation warning and are removed in 0.3; when a call passes both a backend object
+  and `masque`'s `max_width`, the keyword now wins. A third-party `AbstractBackend`'s `_ppu`,
+  `context`, and `make_widget` methods take `max_width` as a new last argument.
 - `RectInteractable` and `RegionInteractable` take their shapes as the second argument, like
   the other element constructors: `RectInteractable(ax, rects)` and
   `RegionInteractable(ax, regions; payloads)`. `payloads` is now optional for

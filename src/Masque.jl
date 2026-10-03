@@ -33,11 +33,14 @@ const APD = AbstractPlutoDingetjes
 """
     AbstractBackend
 
-Supertype for a Masque rendering backend. Concrete backends live in package extensions —
-`CairoBackend` (static image, from the `CairoMakie` extension) and `WebGLBackend` (live
-browser-GPU canvas, from the `WGLMakie` extension) — and implement `render`, `context`,
-`_ppu`, and `make_widget`. [`masque`](@ref) resolves one automatically from whichever
-extension is loaded, or takes one explicitly via its `backend=` keyword.
+Supertype for a Masque rendering backend. The built-in backends live in package extensions and
+are chosen by name with [`masque`](@ref)'s `backend=` keyword: `:cairo` (a static image, once
+`CairoMakie` is loaded) and `:webgl` (a live browser-GPU canvas, once `WGLMakie` is loaded).
+`masque` picks one automatically from whichever is loaded.
+
+A third-party backend subtypes `AbstractBackend`, implements `render`, `context`, `_ppu`, and
+`make_widget`, and is passed as an instance: `masque(fig; backend = MyBackend())`. `masque`'s
+`max_width` and `px_per_unit` keywords reach it through those methods.
 """
 abstract type AbstractBackend end
 
