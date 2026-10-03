@@ -5,6 +5,24 @@ use the variable respond to the change. So linking a scatter to a detail
 plot, a table, or a model fit is ordinary Pluto code: use `pick` in
 another cell to create a plot or compute a result.
 
+Click a point in the xy plot below, and the same sample is selected in
+the xz plot:
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-lv-click" data-masque-embed="linked_click" title="Two scatter plots. Click a point in the xy plot to select the same sample in the xz plot." style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("linked_click")
+```
+
+The xz plot follows clicks, not hovering: hovering a point highlights
+it only on the plot under the pointer. To highlight a whole series on
+every plot as you hover, use a legend, as shown in
+[Highlight a series across panels](@ref).
+
 ## Drive a second plot from a click
 
 Give each payload a key that identifies its row, such as an id or a
@@ -53,29 +71,23 @@ that widget's `selected=`. [Selection round-trip](@ref) shows how.
 
 ## Several axes in one figure
 
-One `masque` call covers every axis in a figure, and hovering a point
-highlights it only on its own panel, even when the other panel plots
-the same row of your data. Each scatter gets its own layer id
-(`:scatter`, `:scatter_2`, and so on), so `pick.layer` tells you which
-panel was clicked.
-
-```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-lv-two-axis" data-masque-embed="linked_two_axis" title="Two scatter panels. Hover a point to highlight it on its own panel." style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
-</div>
-```
-
-```@eval
-Main.masque_fallback("linked_two_axis")
-```
+One `masque` call covers every axis in a figure. Each scatter gets its
+own layer id (`:scatter`, `:scatter_2`, and so on), so `pick.layer`
+tells you which panel was clicked. Hovering or clicking a point
+highlights it only on its own panel, even when another panel plots the
+same row of your data.
 
 To highlight the same row on both panels, select it on both layers
-from a value `i` set in another cell. The value cannot come from this
-widget's own `pick`, for the reason given in [Selection](@ref):
+from a value `i` set in another cell, such as a slider. The value cannot
+come from this widget's own `pick`, for the reason given in
+[Selection](@ref):
 
 ```julia
 masque(fig; selected = Dict(:scatter => [i], :scatter_2 => [i]))
 ```
+
+To link clicks between panels, put each panel in its own figure, as in
+the example at the top of this page.
 
 ## Highlight a series across panels
 
