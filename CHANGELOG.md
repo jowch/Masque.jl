@@ -29,7 +29,7 @@ still work and are removed in 0.3.
   `backend = :webgl`, and set `max_width` and `px_per_unit` as `masque` keywords, which both
   backends now accept: `px_per_unit = 3` also sharpens a CairoMakie PNG. The
   `CairoBackend(; max_width)` and `WebGLBackend(; px_per_unit, max_width)` objects still work,
-  deprecated, and are removed in 0.3; when a call passes both a backend object
+  are deprecated, and are removed in 0.3; when a call passes both a backend object
   and `masque`'s `max_width`, the keyword now wins. A third-party `AbstractBackend`'s `_ppu`,
   `context`, and `make_widget` methods take `max_width` as a new last argument.
 - `RectInteractable` and `RegionInteractable` take their shapes as the second argument, like

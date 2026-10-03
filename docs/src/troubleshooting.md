@@ -248,12 +248,20 @@ warning:
 | `masque(fig; backend = CairoBackend(; max_width))` | `masque(fig; backend = :cairo, max_width)` |
 | `masque(fig; backend = WebGLBackend(; px_per_unit, max_width))` | `masque(fig; backend = :webgl, px_per_unit, max_width)` |
 
-Two changes have no old form to fall back on. `masque(fig, xs...)` now
-keeps the plots' own hover and click and adds `xs` to them; add
-`auto = false` to overlay only what you pass, as in 0.1. And on a
-categorical or date axis, a mark's default `x` and `y` are now the
-label or date as text, not a number. The full list is in the
-[changelog](https://github.com/jowch/Masque.jl/blob/main/CHANGELOG.md).
+Four changes have no old form to fall back on:
+
+- `masque(fig, xs...)` now keeps the plots' own hover and click and
+  adds `xs` to them. Add `auto = false` to overlay only what you pass,
+  as in 0.1.
+- On a categorical or date axis, a mark's default `x` and `y` are now
+  the label or date as text, not a number.
+- A heatmap or image layer is a `GridInteractable`, so code that checks
+  `isa RectInteractable` for one needs the new type.
+- If you wrote your own backend, its `_ppu`, `context`, and
+  `make_widget` methods take `max_width` as a new last argument.
+
+The [changelog](https://github.com/jowch/Masque.jl/blob/main/CHANGELOG.md)
+has the details.
 
 ### Tried `CairoMakie.activate!(type = "svg")` and the widget is a PNG
 

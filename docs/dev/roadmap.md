@@ -12,7 +12,9 @@ What is planned has an issue, and what is committed to a release has a
 `0.2.0` for the next minor. An issue that changes existing behavior carries the `breaking`
 label and can only go in a minor. Julia's package manager treats `0.1.0` → `0.1.1` as
 compatible and `0.1` → `0.2` as breaking, so before 1.0 a patch may add features, as long as
-no existing call changes. What has landed since 0.1.0 is `CHANGELOG.md`'s `[Unreleased]`.
+no existing call changes. `CHANGELOG.md` lists what each release shipped under its version
+heading (`[0.1.1]`, `[0.2.0]`, …), and what has landed since the last release under
+`[Unreleased]`.
 
 ## Principles
 
