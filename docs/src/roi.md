@@ -91,8 +91,9 @@ Drag inside the box to move it, or drag a corner to resize it in both
 directions. Dragging the middle of an edge moves only that edge, and
 the pointer changes shape to show which one you are on. If the axis
 also has a [`ViewInteractable`](@ref), a plain drag moves the box and
-Shift+drag pans the plot. Moving the box needs a pointer; see
-[Keyboard and screen readers](@ref) for what the keyboard reaches.
+Shift+drag pans the plot. To move or resize the box from the
+keyboard, press Tab until it has focus, then use the arrow keys; see
+[Keyboard and screen readers](@ref).
 
 ## Where it works
 

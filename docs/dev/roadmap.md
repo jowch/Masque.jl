@@ -14,9 +14,6 @@ label and can only go in a minor. Julia's package manager treats `0.1.0` → `0.
 compatible and `0.1` → `0.2` as breaking, so before 1.0 a patch may add features, as long as
 no existing call changes. What has landed since 0.1.0 is `CHANGELOG.md`'s `[Unreleased]`.
 
-0.1.0 is registered in General and tagged `v0.1.0`; #210 tracks what is left of that release
-(the GitHub release, and the follow-ups after registration).
-
 ## Principles
 
 - **Explicit declaration is the contract; introspection is sugar** on top of it.
@@ -44,14 +41,7 @@ One line per item. An issue number means it is filed; *idea* means it fits the c
 waits for a real use, and gets an issue when one appears. Items are additive unless marked
 **breaking**. The PR that closes an issue deletes its line here.
 
-### API and composition
-- #223 **breaking** — `masque(fig, xs...)` adds to the default interactables, and a public
-  `interactables` function doubles as the hook for user recipes.
-
 ### Overlay and chrome
-- #180, then #181 — every chrome literal (colors, stroke widths, opacities, the handle fill)
-  as a CSS custom property with nothing painted changing, then `masque()` keywords over them.
-  #181 depends on #180.
 - #179 — wide mode: widen the Pluto cell from inside the widget.
 - *idea* — pin a tooltip so its numbers can be read or copied.
 - *idea* — high-contrast mode (`prefers-contrast`).
@@ -127,4 +117,4 @@ Kept so these are not proposed again without new evidence.
   canvas the current output holds, and the cost that stays is a full `serialize_scene` per frame
   ([§12.5](architecture/12-gesture-channel.md#125-backend-obligations-mechanism-independent)).
 - **#167** — an outline-only highlight for large marks: the dodge fill is a mild brightening,
-  not a flash. Reopen if #181 lets a user raise the fill strength.
+  not a flash, and `overlaystyle`'s `dodge_fill` (#181) sets its strength.

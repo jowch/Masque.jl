@@ -79,8 +79,8 @@ mark can be blocked by a farther one created after it.
 - In a static HTML export, tooltips and highlights still work, but other
   cells do not respond to a click and the view does not pan or orbit. See
   [Static exports and this site](@ref).
-- The keyboard cannot move a brush box, a threshold line, or the view.
-  See [Keyboard and screen readers](@ref).
+- The keyboard does not reach heatmap or image cells. See
+  [Keyboard and screen readers](@ref accessibility-limitations).
 - Some plot types are skipped on `Axis3` and `PolarAxis`, a `surface!`
   does not respond to the pointer, and `LScene` is not supported.
   [Supported plots and axes](@ref) has the full list.
