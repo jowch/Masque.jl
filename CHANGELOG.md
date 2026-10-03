@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `arrows2d!` (and `arrows!` on a 2D `Axis`) responds to hover and click: each arrow is one
+  element of an `:arrows2d` layer, hit along the drawn arrow from tail to tip, with payload
+  `(; index, x, y, u, v)`. Before, `masque` made no layer for it.
+
 ## [0.2.0] - 2026-10-03
 
 Some calls written for 0.1 behave differently: each is marked **Breaking** below, and the
