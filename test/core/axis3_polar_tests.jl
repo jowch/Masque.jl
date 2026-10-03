@@ -322,6 +322,23 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test color_near(isredc, imgsh, mx, my; tol = 3)
         end
 
+        # one start point shared by every direction is broadcast the same way
+        fsp = Figure(; size = (600, 450))
+        axsp = Axis3(fsp[1, 1]; azimuth = 0.4, elevation = 0.5)
+        arrows3d!(axsp, Makie.Point3f(1, 1, 1), adirs; color = :red)
+        Makie.update_state_before_display!(fsp)
+        spi = only(@test_logs interactables(fsp))
+        @test length(spi.vertices) == 6
+        @test spi.payloads[3] == (; index = 3, x = 1.0, y = 1.0, z = 1.0, u = -0.5, v = 0.0, w = 1.0)
+        _, ppusp, ctxsp = ctx_for(fsp)
+        imgsp = Makie.colorbuffer(fsp; px_per_unit = ppusp)
+        Lsp = only(hitlayers(spi, ctxsp))
+        for k in 0:2
+            mx = (Lsp.geometry[4k + 1] + Lsp.geometry[4k + 3]) / 2
+            my = (Lsp.geometry[4k + 2] + Lsp.geometry[4k + 4]) / 2
+            @test color_near(isredc, imgsp, mx, my; tol = 3)
+        end
+
         # lengthscale ≠ 1: raw pos→pos+dir overshoots the drawn arrow; processed ends must hit
         fls = Figure(; size = (600, 450))
         axls = Axis3(fls[1, 1]; azimuth = 0.4, elevation = 0.5)

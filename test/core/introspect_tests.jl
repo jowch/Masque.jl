@@ -769,7 +769,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
         # direction = :y draws the transpose of converted[]; the hit ring must follow (#247).
         fy = Figure(); axy = Axis(fy[1, 1])
-        lo, hi = [1.0, 3.0, 0.0, 2.0, 4.0], [3.0, 5.0, 2.0, 4.0, 6.0]
+        lo, hi = [2.5, 3.0, 0.0, 2.0, 4.0], [4.5, 5.0, 2.0, 4.0, 6.0]   # lo[1] ≠ its position, so the swap shows
         band!(axy, 1:5, lo, hi; direction = :y, color = :red)
         Makie.update_state_before_display!(fy)
         piy = PolygonInteractable(axy, axy.scene.plots[1])
