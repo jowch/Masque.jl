@@ -89,6 +89,10 @@ All notable changes to this project are documented here. The format is based on
   no longer axis-aligned.
 - A plot drawn with `space = :relative`, `:pixel`, or `:clip` is now skipped with a warning, as
   such text already was. Before, its targets were placed as if its positions were data.
+- Thick strokes respond over their whole width. A line's hover and click target now covers
+  its `linewidth` (it was a fixed 6 px either side), a scatter marker's covers its
+  `strokewidth`, bars and polygons respond over their drawn outline, and `errorbars!` and
+  `rangebars!` respond on their whiskers.
 
 ## [0.1.1] - 2026-10-01
 

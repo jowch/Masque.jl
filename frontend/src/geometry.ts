@@ -87,6 +87,17 @@ export function polygonRings(elem: number[] | number[][]): number[][] {
     return typeof elem[0] === "number" ? [elem as number[]] : (elem as number[][])
 }
 
+// distance from (px,py) to a closed ring's edges (flat [x0,y0,x1,y1,…]); Infinity if empty
+export function distToRing(px: number, py: number, ring: number[]): number {
+    const n = ring.length / 2
+    let d = Infinity
+    for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n
+        d = Math.min(d, distToSegment(px, py, ring[2 * i], ring[2 * i + 1], ring[2 * j], ring[2 * j + 1]))
+    }
+    return d
+}
+
 // even-odd across every ring of one element. A hole ring flips the exterior back to outside.
 export function pointInRings(px: number, py: number, rings: number[][]): boolean {
     let inside = false
@@ -248,11 +259,20 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
             return null
         }
         case "rects": {
+            // `tol` reaches past each rect's edge, over its drawn outline (absent → none).
+            // Inside wins over any rect's reach, so touching bars split at their edge; between
+            // rects, the nearest outline wins.
             const a = g as number[]
+            const tol = layer.tol ?? 0
+            let near = -1, nd = tol * tol
             for (let k = 0; k < a.length / 4; k++) {
                 const cx = a[4 * k], cy = a[4 * k + 1], w = a[4 * k + 2], h = a[4 * k + 3]
-                if (Math.abs(px - cx) <= w / 2 && Math.abs(py - cy) <= h / 2) return { index: k, geom_: ["rect", cx, cy, w, h] }
+                const dx = Math.max(Math.abs(px - cx) - w / 2, 0), dy = Math.max(Math.abs(py - cy) - h / 2, 0)
+                if (dx === 0 && dy === 0) return { index: k, geom_: ["rect", cx, cy, w, h] }
+                const d = dx * dx + dy * dy
+                if (d <= nd && (near < 0 || d < nd)) { near = k; nd = d }
             }
+            if (near >= 0) return { index: near, geom_: ["rect", a[4 * near], a[4 * near + 1], a[4 * near + 2], a[4 * near + 3]] }
             return null
         }
         case "polyline": {
@@ -294,10 +314,21 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
             return null
         }
         case "polygons": {
+            // Inside wins over any element's outline reach (`tol`, absent → none); between
+            // elements, the nearest outline wins.
             const elems = g as (number[] | number[][])[]
+            const tol = layer.tol ?? 0
+            let near = -1, nd = tol
             for (let k = 0; k < elems.length; k++) {
                 const rings = polygonRings(elems[k])
                 if (pointInRings(px, py, rings)) return { index: k, geom_: ["poly", rings.length === 1 ? rings[0] : rings] }
+                if (tol <= 0) continue
+                const d = Math.min(...rings.map((r) => distToRing(px, py, r)))
+                if (d <= nd && (near < 0 || d < nd)) { near = k; nd = d }
+            }
+            if (near >= 0) {
+                const rings = polygonRings(elems[near])
+                return { index: near, geom_: ["poly", rings.length === 1 ? rings[0] : rings] }
             }
             return null
         }

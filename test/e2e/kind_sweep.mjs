@@ -1839,6 +1839,48 @@ try {
     if (spec.overlapsGrid && new RegExp(`:${spec.overlapsGrid},`).test(after)) {
       throw new Error(`${key}-click: bond resolved to grid layer "${spec.overlapsGrid}", not legend: ${after.slice(0, 220)}`);
     }
+    // A `:rects` layer with `tol` (bars with a drawn outline, #246) answers past each rect's
+    // edge: a hover `tol - 1` image px right of the last bar's edge, outside the rect itself,
+    // must still hit that bar and highlight the bar's own rect.
+    if (layer.kind === "rects" && layer.tol) {
+      const n = layer.geometry.length / 4 - 1;
+      const hp = hitPoint(layer, n);
+      const out = await dispatchAt(key, hp.x + hp.w / 2 + layer.tol - 1, hp.y, "pointermove");
+      const shape = out.hi.fill || out.hi.edge || out.hi.plain;
+      if (!out.show || !shape || Math.abs(Number(shape.w) - hp.w) > 1.2) {
+        throw new Error(`${key}/stroke-reach: hover ${layer.tol - 1} px outside bar ${n} gave ${JSON.stringify(out)}`);
+      }
+      const far = await dispatchAt(key, hp.x + hp.w / 2 + layer.tol + 3, hp.y, "pointermove");
+      if (far.show) throw new Error(`${key}/stroke-reach: hover past the reach still hit: ${far.text}`);
+      await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+      }, key);
+      passed.push(`${key}/stroke-reach`);
+    }
+    // bar_stroke's scatter has markersize 20 and strokewidth 8, like its bars' outline. Its hit
+    // radius reaches the outline's outer edge: half the stroke past the marker on Cairo, the
+    // whole stroke on WebGL. The bars' `tol` (half the stroke, scaled) gives the image scale.
+    const stroked = key === "bar_stroke" && layers.find((l) => l.kind === "circles");
+    if (key === "bar_stroke") {
+      if (!stroked || !layer.tol) throw new Error(`${key}/marker-stroke: no stroked scatter or bar tol in ${layers.map((l) => l.id + ":" + l.kind)}`);
+      const s = layer.tol / 4, share = backend === "webgl" ? 1 : 0.5;
+      const hp = hitPoint(stroked, 0), want = (0.3525 * 20 + 8 * share) * s;
+      if (Math.abs(hp.r - want) > 1.5) {
+        throw new Error(`${key}/marker-stroke: hit radius ${hp.r} image px, want ${want.toFixed(1)} on ${backend}`);
+      }
+      const on = await dispatchAt(key, hp.x + hp.r - 1, hp.y, "pointermove");
+      if (!on.show) throw new Error(`${key}/marker-stroke: hover on the outline's outer edge missed: ${JSON.stringify(on)}`);
+      await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+      }, key);
+      passed.push(`${key}/marker-stroke`);
+    }
     console.error(`OK  ${key} — ${after.slice(0, 110)}`);
 
     if (spec.links) {
