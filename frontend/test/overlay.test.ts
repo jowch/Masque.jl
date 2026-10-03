@@ -543,6 +543,31 @@ describe("mount", () => {
         expect(selChildren(shadow).map((el) => el.outerHTML)).toEqual(sel)
     })
 
+    it("a click after a selects brush selects again, not clears: the brush owns the selection", () => {
+        const m = boxSelectManifest()
+        // a legend entry at image [1080,1120]x[90,110], outside the box: client (550,50)
+        m.layers.push({ id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"],
+            geometry: [1100, 100, 40, 20], payloads: [{ name: "a" }], links: [["pts"]] })
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const value = () => (host as unknown as { value: unknown }).value
+        const clickLegend = () => surface.dispatchEvent(new MouseEvent("click", { clientX: 550, clientY: 50, bubbles: true }))
+        clickLegend()
+        expect(value()).toEqual({ layer: "legend", index: 0 })
+        expect(selChildren(shadow).length).toBe(6)
+        // release the box without moving: it brushes pts 0 and 1
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 200, clientY: 200, bubbles: true }))
+        expect(value()).toEqual({ items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }] })
+        expect(selChildren(shadow).length).toBe(4)
+        clickLegend()
+        expect(value()).toEqual({ layer: "legend", index: 0 })
+        expect(selChildren(shadow).length).toBe(6)
+    })
+
     it("box-select over points emits a Vector envelope of contained points + highlights them", () => {
         const { host, script } = setup()
         mount(script, boxSelectManifest())

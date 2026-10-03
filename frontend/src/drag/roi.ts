@@ -132,6 +132,7 @@ export function move(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { ki
     if (d.target_) {
         const sel = computeSelection(box.g_, d.target_, ctx.manifest_.transforms[d.target_.axis])
         state.selHits_ = sel.hits
+        state.selSource_ = null // the box owns this selection, not a click
         renderSelection(ctx, state)
         return `${sel.items.length} selected`
     }
@@ -148,6 +149,7 @@ export function end(
     if (d.target_) {
         const sel = computeSelection(d.box_.g_, d.target_, ctx.manifest_.transforms[d.target_.axis])
         state.selHits_ = sel.hits
+        state.selSource_ = null // the box owns this selection, not a click
         renderSelection(ctx, state)
         return { items: sel.items }
     }

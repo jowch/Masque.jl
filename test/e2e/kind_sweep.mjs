@@ -1774,7 +1774,14 @@ try {
       await dispatchAt(key, clickPt.x, clickPt.y, "click");
       // The one element may be the `selected=` seed, which a click now clears (the toggle off).
       // Click once more so the checks below see it selected.
-      if ((await inspect(key)).bond === null) await dispatchAt(key, clickPt.x, clickPt.y, "click");
+      if ((await inspect(key)).bond === null) {
+        await dispatchAt(key, clickPt.x, clickPt.y, "click");
+        // The clear and the reselect each round-trip; wait for the reselected event, not the
+        // `nothing` the clear printed.
+        for (let i = 0; i < 80 && /=nothing\s*$/.test(await textOf(`#out_${key}`)); i++) {
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
       after = await textOf(`#out_${key}`);
     } else {
       for (let a = 0; a < 3; a++) {
