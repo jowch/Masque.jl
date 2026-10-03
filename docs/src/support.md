@@ -10,12 +10,13 @@ Hovering and clicking marks works on all three axis types, but `Axis3`
 and `PolarAxis` support only some plot types
 ([Recipes masque(fig) extracts](@ref) says which). Reading coordinates,
 dragging a threshold or a box, sampling a series, and panning turn a
-pointer position into a data value, so they need a 2D `Axis`.
+pointer position into a data value, so they need a 2D `Axis`. A
+`PolarAxis` can read the angle and radius under the pointer.
 
 | Interaction | `Axis` | `Axis3` | `PolarAxis` |
 |---|---|---|---|
 | Hover and click marks | every recipe | some recipes | some recipes |
-| Read `(x, y)` ([`AxisInteractable`](@ref)) | yes ¹ | no | no |
+| Read `(x, y)` ([`AxisInteractable`](@ref)) | yes ¹ | no | yes ³ |
 | Drag a threshold ([`ThresholdInteractable`](@ref)) | yes ¹ | no | no |
 | Brush a box ([`ROIInteractable`](@ref)) | yes ² | no | no |
 | Sample a series ([`SliceInteractable`](@ref)) | yes ² | no | no |
@@ -28,6 +29,9 @@ and its label (see [Read coordinates](@ref)).
 
 ² The x and y scales must be `identity`, `log10`, or `log`, and both
 axes must be numeric, so a categorical axis is refused.
+
+³ The readout is the angle in radians and the radius (see
+[Read coordinates](@ref)).
 
 A "no", a scale outside that list (such as `Makie.pseudolog10` or
 `Makie.Symlog10`), or a categorical axis where ² requires a numeric one

@@ -950,8 +950,8 @@ function _skip_for_axis(ax, p)
             }
         )
         @warn "masque: skipping $(Makie.plotkey(p)) on PolarAxis — only Scatter/Lines/" *
-            "LineSegments/ScatterLines/Series have polar-valid extraction today; continuous " *
-            "θ/r readout and grid/rect recipes are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
+            "LineSegments/ScatterLines/Series have polar-valid extraction today; grid and rect " *
+            "recipes are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
         return true
     end
     return false

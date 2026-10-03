@@ -149,6 +149,16 @@ HTML(
         "<span id=\"coords_polar\" style=\"display:none\">$(JSON3.write(sweep.polar.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000074
+@bind ev_axis_polar sweep.axis_polar
+
+# ╔═╡ c1000000-0000-0000-0000-000000000075
+HTML(
+    "<span id=\"out_axis_polar\">AXIS_POLAR=$(repr(ev_axis_polar))</span>" *
+        "<span id=\"coords_axis_polar\" style=\"display:none\">$(JSON3.write(sweep.axis_polar.manifest["layers"]))</span>" *
+        "<span id=\"axes_axis_polar\" style=\"display:none\">$(JSON3.write(sweep.axis_polar.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000036
 @bind ev_scatter_dark sweep.scatter_dark
 
@@ -212,10 +222,10 @@ HTML(
         "<span id=\"coords_band_y\" style=\"display:none\">$(JSON3.write(sweep.band_y.manifest["layers"]))</span>",
 )
 
-# ╔═╡ c1000000-0000-0000-0000-000000000074
+# ╔═╡ c1000000-0000-0000-0000-00000000007a
 @bind ev_scatter_dates sweep.scatter_dates
 
-# ╔═╡ c1000000-0000-0000-0000-000000000075
+# ╔═╡ c1000000-0000-0000-0000-00000000007b
 HTML(
     "<span id=\"out_scatter_dates\">SCATTER_DATES=$(repr(ev_scatter_dates))</span>" *
         "<span id=\"coords_scatter_dates\" style=\"display:none\">$(JSON3.write(sweep.scatter_dates.manifest["layers"]))</span>",
@@ -377,6 +387,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000067
 # ╠═c1000000-0000-0000-0000-000000000024
 # ╠═c1000000-0000-0000-0000-000000000025
+# ╠═c1000000-0000-0000-0000-000000000074
+# ╠═c1000000-0000-0000-0000-000000000075
 # ╠═c1000000-0000-0000-0000-000000000036
 # ╠═c1000000-0000-0000-0000-000000000037
 # ╠═c1000000-0000-0000-0000-000000000068
@@ -391,8 +403,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000006d
 # ╠═c1000000-0000-0000-0000-00000000006a
 # ╠═c1000000-0000-0000-0000-00000000006b
-# ╠═c1000000-0000-0000-0000-000000000074
-# ╠═c1000000-0000-0000-0000-000000000075
+# ╠═c1000000-0000-0000-0000-00000000007a
+# ╠═c1000000-0000-0000-0000-00000000007b
 # ╠═c1000000-0000-0000-0000-000000000028
 # ╠═c1000000-0000-0000-0000-000000000029
 # ╠═c1000000-0000-0000-0000-000000000030
