@@ -328,11 +328,18 @@ end
 # gives one per polygon. A `Polygon` keeps its interiors as holes. A `MultiPolygon` entry is
 # one element whose rings after the first ride along as holes; the even-odd hit-test fills
 # disjoint pieces and leaves their interiors out. `Rect`, `Circle`, and other primitives are
-# sampled by `coordinates`, the outline Makie tessellates. A mesh keeps one element per
-# triangle.
+# sampled by `coordinates`, the outline Makie tessellates. A lone mesh keeps one element per
+# triangle. A mesh in a vector is one element whose rings are its faces: `coordinates` would
+# be the vertex buffer, which is not an outline, and the even-odd test over faces that do
+# not overlap is their union.
 _poly_point(x) = x isa _GB.Point || x isa Makie.VecTypes || x isa Tuple
 function _poly_element(x)
     x isa AbstractVector && return (collect(x), Vector{Any}[])
+    if x isa _GB.AbstractMesh
+        faces = [collect(t) for t in x]
+        isempty(faces) && return (Any[], Vector{Any}[])
+        return (first(faces), faces[2:end])
+    end
     if x isa _GB.Polygon
         return (_GB.coordinates(x.exterior), [_GB.coordinates(h) for h in x.interiors])
     end

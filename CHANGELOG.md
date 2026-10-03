@@ -58,7 +58,9 @@ All notable changes to this project are documented here. The format is based on
   `PointInteractable`'s `radius` also takes one value per point.
 - `masque(fig)` no longer fails when `poly!` draws shapes instead of point rings: a `Rect2f`,
   a `Circle`, a `Polygon`, a `MultiPolygon`, or a vector of them, and so `tricontourf!` works
-  too. Each shape is one hover and click target, and a polygon's holes are not part of it.
+  too. Each entry of the vector is one hover and click target, the same element its `color`
+  colors, and a polygon's holes are not part of it. A single `MultiPolygon` is one target per
+  polygon, since Makie colors each one separately.
 
 ## [0.1.1] - 2026-10-01
 
