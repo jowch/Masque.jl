@@ -51,7 +51,8 @@ only what you pass, add `auto = false`:
 ```
 
 A recipe of your own gets layers from the plots it draws. To give it
-its own, define a method of [`interactables`](@ref) for its type.
+its own, define a method of [`interactables`](@ref) for its type; see
+[Your own plot types](@ref).
 
 ## Marks
 

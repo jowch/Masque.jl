@@ -21,7 +21,8 @@ Clicking an entry keeps its series highlighted and makes `pick` a
 [`LegendEvent`](@ref): `pick.label` is the entry's text,
 `pick.group` is the group title in a grouped legend (`nothing`
 otherwise), and `pick.targets` lists the layers the entry highlights.
-A click on the plot itself still gives the plot's own event, so check
+Click the entry again to clear the highlight, and `pick` is `nothing`
+again. A click on the plot itself still gives the plot's own event, so check
 which kind you got:
 
 ```julia

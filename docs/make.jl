@@ -56,6 +56,7 @@ makedocs(;
             "Pan and orbit" => "view.md",
             "Linked views" => "linked-views.md",
             "Custom hits" => "custom.md",
+            "Your own plot types" => "recipes.md",
         ],
         "Examples" => [
             "Examples" => "gallery.md",
