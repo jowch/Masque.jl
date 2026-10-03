@@ -167,6 +167,46 @@ describe("invertAxis", () => {
     })
 })
 
+describe("invertAxis / projectAxis on a polar axis", () => {
+    // A 400×200 viewport over the Cartesian window [-4, 4] × [-2, 2]: uniform scale, letterboxed.
+    const frame = { theta_as_x: true, direction: 1, theta_0: 0, r0: 0, branch: [0, 2 * Math.PI] as [number, number] }
+    const polar: AxisTransform = { xlims: [-4, 4], ylims: [-2, 2], xscale: "identity", yscale: "identity",
+        viewport: [10, 20, 400, 200], xreversed: false, yreversed: false, ispolar: true, polar: frame }
+    it("reads θ counterclockwise from +x with y up, and r from the centre", () => {
+        const right = invertAxis(polar, 10 + 300, 20 + 100) // Cartesian (2, 0)
+        expect(right.x).toBeCloseTo(0); expect(right.y).toBeCloseTo(2)
+        const up = invertAxis(polar, 10 + 200, 20 + 50) // Cartesian (0, 1): image up is +y
+        expect(up.x).toBeCloseTo(Math.PI / 2); expect(up.y).toBeCloseTo(1)
+        const down = invertAxis(polar, 10 + 200, 20 + 150) // (0, -1) folds into 0..2π
+        expect(down.x).toBeCloseTo(3 * Math.PI / 2)
+    })
+    it("the origin reads θ = 0 and r = r0", () => {
+        const o = invertAxis({ ...polar, polar: { ...frame, r0: 0.5 } }, 10 + 200, 20 + 100)
+        expect(o.x).toBe(0); expect(o.y).toBeCloseTo(0.5)
+    })
+    it("keeps extrapolating past the disc, in the letterbox", () => {
+        const c = invertAxis(polar, 10, 20) // top-left corner = Cartesian (-4, 2)
+        expect(c.y).toBeCloseTo(Math.hypot(4, 2))
+        expect(c.x).toBeCloseTo(Math.atan2(2, -4))
+    })
+    it("applies direction, theta_0, r0, and the sector branch", () => {
+        const f = { ...frame, direction: -1, theta_0: 0.3, r0: 1, branch: [-Math.PI, Math.PI] as [number, number] }
+        const t: AxisTransform = { ...polar, polar: f }
+        for (const [theta, r] of [[-0.2, 2], [0.4, 3.5], [-2.9, 1.5], [3.0, 2.5]]) {
+            const p = projectAxis(t, theta, r)
+            const v = invertAxis(t, p.x, p.y)
+            expect(v.x).toBeCloseTo(theta, 9); expect(v.y).toBeCloseTo(r, 9)
+        }
+    })
+    it("swaps the pair when theta_as_x is false", () => {
+        const t: AxisTransform = { ...polar, polar: { ...frame, theta_as_x: false } }
+        const v = invertAxis(t, 10 + 200, 20 + 50)
+        expect(v.x).toBeCloseTo(1); expect(v.y).toBeCloseTo(Math.PI / 2)
+        const p = projectAxis(t, 1, Math.PI / 2)
+        expect(p.x).toBeCloseTo(210); expect(p.y).toBeCloseTo(70)
+    })
+})
+
 describe("hitLayer + hitTest", () => {
     const circles: HitLayer = { id: "pts", kind: "circles", geometry: [100, 100, 10, 300, 300, 10],
         payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"] }

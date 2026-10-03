@@ -124,18 +124,20 @@ data value. On an `Axis3`, a point on the screen is a ray through the
 segments. To orbit an `Axis3`, pass `ViewInteractable(ax)`, which is
 accepted there.
 
-### Tried continuous θ/r readout on PolarAxis
+### Tried a threshold, box, slice, or pan on PolarAxis
 
-**Error prefix:** `continuous θ/r readout on PolarAxis` /
-`PolarAxis view gestures need continuous θ/r` /
-`PolarAxis continuous θ/r inversion is not yet shipped`
+**Error prefix:** `not supported on PolarAxis` /
+`PolarAxis view gestures are not supported`
 
-**Cause:** Masque cannot yet turn a pointer position on a `PolarAxis`
-into θ and r, so an interactable that reads a position, drags, or pans
-raises `ArgumentError` there.
+**Cause:** a threshold, a box, and a slice each follow a straight line
+or a rectangle on the screen, and on a `PolarAxis` those are not a
+constant angle, a constant radius, or a sector. Panning a polar axis
+changes its angle and radius limits, which Masque does not do.
 
-**Fix:** on a `PolarAxis`, use points, lines, or segments, which
-respond to hover and click. See [Supported plots and axes](@ref).
+**Fix:** to read the angle and radius under the pointer, pass an
+[`AxisInteractable`](@ref). To pick out points, use points, lines, or
+segments, which respond to hover and click. See
+[Supported plots and axes](@ref).
 
 ### [Tried `heatmap!` or `barplot!` on PolarAxis](@id polar-skipped-plots)
 
