@@ -121,6 +121,8 @@ try {
       ring: hi ? { tag: hi.tagName.toLowerCase(), leaving: hi.classList.contains("masque-leave") } : null,
       liveText: live?.textContent ?? "",
       tipShown: sr.querySelector(".masque-tip")?.classList.contains("show") ?? false,
+      // The overlay's own bond value: on a fresh mount, the `selected=` seed.
+      bond: host.value ?? null,
     };
   }, key);
 
@@ -192,7 +194,12 @@ try {
     // The bond prints a 1-based Julia index. Arrow steps and `target` stay 0-based wire indices.
     const beforeIdxMatch = new RegExp(`:${layer.id},\\s*(\\d+)\\b`).exec(before);
     const beforeWire = beforeIdxMatch ? Number(beforeIdxMatch[1]) - 1 : -1;
-    const target = (beforeWire + 1) % n; // guaranteed != beforeWire as long as n > 1
+    // Enter on the element the overlay already holds would clear it (the toggle off), and on a
+    // remount the overlay holds the `selected=` seed while the kernel keeps an earlier run's
+    // value, so step past both.
+    const heldWire = s.bond && s.bond.layer === layer.id ? s.bond.index : -1;
+    let target = (beforeWire + 1) % n;
+    if (target === heldWire && n > 2) target = (target + 1) % n;
     // We're at `landed` — walk to `target`. ArrowRight/ArrowLeft clamp at the ends, they don't
     // wrap, so step in whichever direction `target` actually is from here.
     const delta = target - landed;
