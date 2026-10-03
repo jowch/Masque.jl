@@ -1,0 +1,4 @@
+image = "slice_spectra.png"
+
+[outputs]
+5c1ce000-0001-4000-8000-000000000004 = "click a wavelength"
