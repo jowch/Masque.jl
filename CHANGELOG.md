@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Hovering a `datashader!` pixel shows how many points fell in it. Before, with the default
+  `operation`, it showed the histogram-equalized colour value, a number near 1 such as
+  `0.99998`.
+
 ## [0.2.0] - 2026-10-03
 
 Some calls written for 0.1 behave differently: each is marked **Breaking** below, and the

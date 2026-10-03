@@ -174,4 +174,15 @@
         end
         @test_throws "USER CALLBACK BOOM" Masque._finalize!(fig2)
     end
+
+    @testset "_datashader_aggregate reads a datashader's canvas (#276)" begin
+        fd = Figure(; size = (300, 200)); ad = Axis(fd[1, 1])
+        ds = datashader!(ad, Makie.Point2f[(0, 0), (1, 1), (1, 1), (2, 0.5)])
+        Masque._finalize!(fd)
+        img = only(Masque._child_plots(ds))
+        agg = Masque._datashader_aggregate(img)
+        @test agg isa AbstractMatrix{<:Real} && size(agg) == size(Masque._converted(img)[3])
+        @test sum(agg) == 4   # one count per point
+        @test Masque._datashader_aggregate(hm) === nothing   # not a datashader's image
+    end
 end

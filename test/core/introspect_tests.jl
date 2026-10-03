@@ -1509,4 +1509,14 @@ end
             check(i, hctx)
         end
     end
+
+    @testset "datashader hover reads the count, whatever its operation (#276)" begin
+        pts = Point2f[(0, 0), (1, 1), (1, 1), (2, 0.5)]
+        for kw in ((;), (; operation = identity), (; local_operation = log1p))
+            f = Figure(; size = (500, 350)); a = Axis(f[1, 1])
+            datashader!(a, pts; kw...)
+            v = only(masque(f).manifest["layers"])["geometry"]["values"]
+            @test sort(unique(v)) == [0, 1, 2] && sum(v) == 4
+        end
+    end
 end
