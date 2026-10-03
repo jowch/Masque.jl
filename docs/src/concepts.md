@@ -59,6 +59,7 @@ the mark without changing the variable.
 |---|---|---|---|
 | Hover a mark | Tooltip and highlight | Unchanged | No change |
 | Click a mark (or Enter / Space on a focused mark) | Mark stays highlighted | The clicked mark's event | Respond |
+| Click the selected mark again | Highlight clears | `nothing` | Respond |
 | Drag an ROI box or threshold line | Box or line moves | Unchanged while dragging | No change |
 | Release the ROI or threshold | Enclosed marks highlight (with `selects`) | The box, the enclosed marks, or the line's value | Respond |
 | Pan or orbit ([`ViewInteractable`](@ref)) | The view moves | Never changes | No change |

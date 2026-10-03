@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- Clicking the selected mark or legend entry again clears the selection, and the `@bind`
+  value goes back to `nothing`. Before, a selection could only be replaced by another click.
 - **Breaking:** `masque(fig, xs...)` adds to the interactions `masque(fig)` builds instead of
   replacing them, so `masque(fig, ViewInteractable(ax))` keeps every hover and click and adds
   panning. An interactable whose `id` matches a default layer's replaces that layer. To keep

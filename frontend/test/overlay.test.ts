@@ -3046,6 +3046,75 @@ describe("click-echo (#103)", () => {
         expect(cxs).toEqual(["600", "620"]) // the linked circles, not the legend swatch (which has no cx)
     })
 
+    it("clicking the selected legend entry again clears its series and sends null", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20, 620, 420, 20], payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"] },
+                { id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"],
+                    geometry: [100, 100, 40, 20], payloads: [{ name: "a" }], links: [["pts"]] },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const value = () => (host as unknown as { value: unknown }).value
+        let inputs = 0
+        host.addEventListener("input", () => { inputs++ })
+        // legend rect image [80,120]x[90,110] -> client center (50,50)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
+        expect(selChildren(shadow).length).toBe(4)
+        expect(value()).toEqual({ layer: "legend", index: 0 })
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
+        expect(selChildren(shadow).length).toBe(0)
+        expect(value()).toBeNull()
+        expect(inputs).toBe(2)
+        // a third click selects it again
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
+        expect(selChildren(shadow).length).toBe(4)
+        expect(value()).toEqual({ layer: "legend", index: 0 })
+    })
+
+    it("clicking a selected point again clears it; clicking another point moves the selection", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20, 1000, 400, 20], payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"] },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const value = () => (host as unknown as { value: unknown }).value
+        const click = (x: number) => surface.dispatchEvent(new MouseEvent("click", { clientX: x, clientY: 200, bubbles: true }))
+        click(300) // pts[0]
+        click(500) // pts[1]: a different point replaces the selection, it does not clear it
+        expect(value()).toEqual({ layer: "pts", index: 1 })
+        expect(selChildren(shadow).length).toBe(2)
+        click(500)
+        expect(value()).toBeNull()
+        expect(selChildren(shadow).length).toBe(0)
+    })
+
+    it("clicking the point `selected=` hydrated clears it", () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [
+                { id: "pts", kind: "circles", geometry: [600, 400, 20], payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"], selected: [0] },
+            ],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect(selChildren(shadow).length).toBe(2)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
+        expect(selChildren(shadow).length).toBe(0)
+        expect((host as unknown as { value: unknown }).value).toBeNull()
+    })
+
     it("clicking a legend entry whose own links[index] is empty clears a previously-echoed mark", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
