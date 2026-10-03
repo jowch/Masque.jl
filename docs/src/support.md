@@ -98,8 +98,11 @@ level reaches nothing unless another level is drawn there.
 
 A recipe not in the table, such as `rainclouds!`, still gets each
 visible part the table knows, under that part's layer id: `rainclouds!`
-gives `:violin`, `:scatter`, and `:boxplot`. A `text!` whose `space` is
-not `:data`, including a `bracket!` label, is skipped with the warning
-`masque: skipping non-data-space text`. `surface!` and `hexbin!` are not
-made interactive. To make another plot type interactive yourself, see
-[Custom hits](@ref).
+gives `:violin`, `:scatter`, and `:boxplot`. A plot whose `space` is not
+`:data`, such as a `bracket!` label or a `scatter!` placed with
+`space = :relative`, is skipped with a warning that names its `space`.
+`surface!` and `hexbin!` are not made interactive. To make another plot
+type interactive yourself, see [Custom hits](@ref).
+
+Bars or cells turned with `rotate!` are skipped with a warning. To make
+rotated bars respond, draw them with `poly!`.
