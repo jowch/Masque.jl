@@ -4258,6 +4258,18 @@ describe("chrome metrics are custom properties (#180)", () => {
         expect(getComputedStyle(box2).strokeWidth).toBe("4")
     })
 
+    it("an explicit hoverstyle stroke's hover outline reads --masque-hover-width", () => {
+        const { host, script } = setup()
+        mount(script, { ...manifest, layers: [{ ...manifest.layers[0], style: { stroke: "#123456", width: 2 } }] })
+        const shadow = shadowOf(host)
+        surfaceHover(shadow, 300, 200)
+        const el = plainHiGroup(shadow).firstElementChild as SVGElement
+        expect(el.classList.contains("masque-w-hover")).toBe(true)
+        expect(getComputedStyle(el).strokeWidth).toBe("1.5")
+        shadowHostOf(host).style.setProperty("--masque-hover-width", "3")
+        expect(getComputedStyle(el).strokeWidth).toBe("3")
+    })
+
     it("no stroke-width or stroke-opacity presentation attribute is left on highlight chrome", () => {
         const { host, script } = setup()
         mount(script, manifest)
