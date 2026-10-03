@@ -11,6 +11,8 @@ on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
+  push:  # TEMP: prove the workflow on 1.10 before merge; removed before ready
+    branches: [claude/issue-176-300edp]
 
 permissions:
   contents: read
