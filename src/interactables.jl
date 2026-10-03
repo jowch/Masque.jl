@@ -116,7 +116,9 @@ Optional (default shown; all non-exported — extend as `Masque.<name>`):
 - `Masque.hit_tol(i) -> Union{Nothing,Real}` — logical-px hit-test slack for `:segments`/
   `:polyline`/`:lines` layers, shipped in the manifest as image px (`round(Int, hit_tol(i) *
   ctx.scaling)`). `nothing` (default) omits the field; the overlay then falls back to its
-  own fixed slack. Only [`SegmentInteractable`](@ref) sets this.
+  own fixed slack. A `:rects` or `:polygons` layer takes it as a reach outside each shape
+  (none when absent): a plot-object `RectInteractable`/`PolygonInteractable` sets it to half
+  the plot's `strokewidth`, so the drawn outline responds too.
 
 [`AbstractSelector`](@ref) subtypes additionally implement `Masque.selects`/`Masque.compatible_kinds`.
 """
@@ -349,7 +351,9 @@ square — Makie's default `:circle` marker draws a disc of diameter ≈0.705·`
 ≈0.3525·`markersize`), so that's what ships; other `default_marker_map()` symbols/`BezierPath`s
 use their own bbox in the same way, a `GeometryBasics` `Circle`/`Rect` marker draws at the full
 `markersize` (radius = `markersize / 2`), and anything else (a `Char` glyph, an image, a
-per-element vector of markers) falls back to `markersize / 2` as a conservative bound. This
+per-element vector of markers) falls back to `markersize / 2` as a conservative bound. The
+marker's outline is added where it is drawn: half of `strokewidth` on CairoMakie, which
+centers the outline on the marker's edge, and all of it on WebGL, which paints it outside. This
 requires `markerspace = :pixel` (the default); pass `radius=` explicitly for any other
 markerspace, or it errors. The points constructor above takes the same radius when exactly one
 `Scatter` on `ax` has the same positions (including a `scatterlines!`/`stem!` child scatter);
@@ -390,6 +394,9 @@ struct PointInteractable <: AbstractInteractable
     # A scatter's `marker_offset`: how far each marker is drawn from its point, in px (y up),
     # one for every point or one per point. Moves the hit circle with the marker.
     offset::Union{Makie.Vec2f, Vector{Makie.Vec2f}}
+    # A scatter's `strokewidth` in px. How much of it lies outside the marker depends on the
+    # backend (`InteractionContext.marker_stroke`), so it is added to `radius` in `hitlayers`.
+    stroke::Float64
 end
 function PointInteractable(
         ax, points; id = :points,
@@ -412,8 +419,9 @@ function PointInteractable(
     colors = _check_colors(colors, length(pts))
     # `nothing` looks the radius up (`_point_radius`, introspect.jl). A passed number wins,
     # including the `9` the MeshScatter constructor still forwards when it has no pixel radius.
-    r = _check_radius(radius === nothing ? _point_radius(ax, pts) : radius, length(pts))
-    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0))
+    r, s = radius === nothing ? _point_radius(ax, pts) : (radius, 0.0)
+    r = _check_radius(r, length(pts))
+    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0), s)
 end
 function _check_radius(r, n)
     r isa AbstractVector || return Float64(r)
@@ -442,7 +450,7 @@ function hitlayers(i::PointInteractable, ctx)
         r = if i.radius3d !== nothing
             _px_radius3d(ctx, i.ax, p, i.radius3d[k], q)
         else
-            (i.radius isa Vector ? i.radius[k] : i.radius) * ctx.scaling
+            ((i.radius isa Vector ? i.radius[k] : i.radius) + i.stroke * ctx.marker_stroke) * ctx.scaling
         end
         o = i.offset isa Vector ? i.offset[k] : i.offset
         cx, cy = q[1] + o[1] * ctx.scaling, q[2] - o[2] * ctx.scaling   # image px are y-down
@@ -454,7 +462,7 @@ end
 # ============================ SegmentInteractable ==========================
 """
     SegmentInteractable(ax, vertices; mode=:polyline, unit=:segment, id=:segments, payloads=nothing, tol=6, tooltip=nothing, label=nothing)
-    SegmentInteractable(ax, p; id=<kind-specific>, payloads=nothing, tol=6, tooltip=nothing, label=nothing)   # from a plot object
+    SegmentInteractable(ax, p; id=<kind-specific>, payloads=nothing, tol=<from p's linewidth>, tooltip=nothing, label=nothing)   # from a plot object
 
 Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`, or `:segments`
 [`HitLayer`](@ref).
@@ -478,7 +486,9 @@ Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`,
   like [`PointInteractable`](@ref)'s `radius`). Must be finite and positive (`ArgumentError`
   otherwise). Shipped in the manifest as a per-layer `"tol"` field; the overlay's client-side
   default (`SEG_TOL` in `frontend/src/geometry.ts`, 8 image px) applies only when this field
-  is absent.
+  is absent. From a plot object the default is `max(6, linewidth / 2)`, so the whole drawn
+  stroke responds (the largest `linewidth` of a per-element vector; `errorbars!`/`rangebars!`
+  also take `whiskerwidth / 2`, so their whiskers respond).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
 - `label` — an optional screen-reader announcement prefix for this layer (see
@@ -658,7 +668,11 @@ struct RectInteractable <: AbstractInteractable
     # Same resolve-in-hitlayers mechanism as SegmentInteractable.resolve.
     resolve::Union{Nothing, Function}
     label::Union{Nothing, String}
+    # px of hit slack outside each rect: half a plot's drawn outline. 0 = none.
+    tol::Float64
 end
+RectInteractable(ax, data, id, payloads, tooltip, clamp_to_viewport, resolve, label) =
+    RectInteractable(ax, data, id, payloads, tooltip, clamp_to_viewport, resolve, label, 0.0)
 function RectInteractable(
         ax, rects::AbstractVector; id = :rects, payloads = nothing,
         tooltip = nothing, clamp_to_viewport = false, label = nothing
@@ -706,6 +720,7 @@ function _rect_with_resolve(ax, rects, id, payloads, clamp_to_viewport, resolve;
     )
 end
 tooltip_spec(i::RectInteractable) = i.tooltip
+hit_tol(i::RectInteractable) = i.tol > 0 ? i.tol : nothing
 function hitlayers(i::RectInteractable, ctx)
     rects = i.resolve === nothing ? i.data : i.resolve(i.ax)
     g = Real[]
@@ -967,7 +982,11 @@ struct PolygonInteractable <: AbstractInteractable
     ax; rings::Vector; id::Symbol; payloads::Vector{Any}; tooltip::Union{Nothing, Markup, Bool}
     label::Union{Nothing, String}
     holes::Vector # one vector of hole-rings per element; empty when that element is solid
+    # px of hit slack outside each ring: half a plot's drawn outline. 0 = none.
+    tol::Float64
 end
+PolygonInteractable(ax, rings, id, payloads, tooltip, label, holes) =
+    PolygonInteractable(ax, rings, id, payloads, tooltip, label, holes, 0.0)
 # `nothing` → every element is solid. A group is the hole rings of one element.
 function _hole_groups(holes, n)
     holes === nothing && return [Vector{Point3f}[] for _ in 1:n]
@@ -988,6 +1007,7 @@ function PolygonInteractable(ax, rings; id = :polygons, payloads = nothing, tool
     return PolygonInteractable(ax, rs, id, pl, tooltip, label === nothing ? nothing : String(label), _hole_groups(holes, length(rs)))
 end
 tooltip_spec(i::PolygonInteractable) = i.tooltip
+hit_tol(i::PolygonInteractable) = i.tol > 0 ? i.tol : nothing
 function _project_ring(ctx, ax, ring)
     flat = Real[]
     for p in ring
