@@ -34,7 +34,7 @@ md"""
 # PolarAxis discrete hits — `:webgl` live-verify
 
 Scatter on `PolarAxis` with Masque overlay. Hover for tooltip; click for `@bind` event.
-Continuous θ/r readout is deferred (`ispolar`); this notebook checks **discrete** hits only.
+This notebook checks **discrete** hits only; the θ/r readout is covered by the kind sweep.
 """
 
 # ╔═╡ a1000000-0000-0000-0000-000000000020
