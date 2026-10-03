@@ -169,9 +169,18 @@ HTML(
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000070
-@bind ev_poly_shapes sweep.poly_shapes
+@bind ev_scatter_styled sweep.scatter_styled
 
 # ╔═╡ d1000000-0000-0000-0000-000000000071
+HTML(
+    "<span id=\"out_scatter_styled\">SCATTER_STYLED=$(repr(ev_scatter_styled))</span>" *
+        "<span id=\"coords_scatter_styled\" style=\"display:none\">$(JSON3.write(sweep.scatter_styled.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000072
+@bind ev_poly_shapes sweep.poly_shapes
+
+# ╔═╡ d1000000-0000-0000-0000-000000000073
 HTML(
     "<span id=\"out_poly_shapes\">POLY_SHAPES=$(repr(ev_poly_shapes))</span>" *
         "<span id=\"coords_poly_shapes\" style=\"display:none\">$(JSON3.write(sweep.poly_shapes.manifest["layers"]))</span>",
@@ -348,6 +357,8 @@ HTML(
 # ╟─d1000000-0000-0000-0000-000000000069
 # ╠═d1000000-0000-0000-0000-000000000070
 # ╟─d1000000-0000-0000-0000-000000000071
+# ╠═d1000000-0000-0000-0000-000000000072
+# ╟─d1000000-0000-0000-0000-000000000073
 # ╠═d1000000-0000-0000-0000-000000000026
 # ╠═d1000000-0000-0000-0000-000000000027
 # ╠═d1000000-0000-0000-0000-000000000028

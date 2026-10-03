@@ -439,6 +439,26 @@ function build_kind_sweep()
         )
     end
 
+    # overlaystyle (#181): the selected and hovered outlines take the given colour and widths.
+    # Not in kind_sweep_meta(), whose generic checks assert the default recipe; polish_verify.mjs
+    # checks this one.
+    scatter_styled = let
+        pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 1.2)]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "scatter-styled")
+        sc = scatter!(ax, first.(pts), last.(pts); color = :gray, markersize = 22)
+        masque(
+            fig,
+            PointInteractable(
+                ax, sc; id = :scatter_styled,
+                payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")],
+            );
+            selected = Dict(:scatter_styled => [2]),
+            auto = false,
+            overlaystyle = (; color = "rgb(0, 102, 204)", hover_width = 3, selected_width = 4),
+        )
+    end
+
     scatter_sizes = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "scatter-sizes")
@@ -648,7 +668,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, scatter_dark, scatter_sizes, arrows3d, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
 end

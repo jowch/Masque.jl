@@ -32,6 +32,60 @@ function tip_style_dict(;
     return d
 end
 
+# `overlaystyle` key => (custom property, value kind). The colour keys override the light/dark
+# derivation mount.ts writes; the rest override the stylesheet fallbacks (the locked recipe).
+const _OVERLAY_STYLE_KEYS = (
+    color = ("--masque-chrome", :color),
+    dodge_fill = ("--masque-hi-fill", :color),
+    cross_color = ("--masque-cross", :color),
+    handle_fill = ("--masque-handle-fill", :color),
+    hover_width = ("--masque-hover-width", :length),
+    selected_width = ("--masque-selected-width", :length),
+    ring_width = ("--masque-ring-width", :length),
+    ring_halo_width = ("--masque-ring-halo-width", :length),
+    roi_width = ("--masque-roi-width", :length),
+    handle_width = ("--masque-handle-width", :length),
+    cross_width = ("--masque-cross-width", :length),
+    cross_halo_width = ("--masque-cross-halo-width", :length),
+    hover_fill_opacity = ("--masque-hover-fill-opacity", :opacity),
+    selected_fill_opacity = ("--masque-selected-fill-opacity", :opacity),
+    ring_halo_opacity = ("--masque-ring-halo-opacity", :opacity),
+    cross_opacity = ("--masque-cross-opacity", :opacity),
+)
+
+function _overlay_style_value(k, kind, v)
+    kind === :color && return _css_color(v)
+    ok = v isa Real && !(v isa Bool) && isfinite(v) && v >= 0 && (kind === :length || v <= 1)
+    ok || throw(
+        ArgumentError(
+            "overlaystyle: `$k` must be " *
+                (kind === :length ? "a width in px, a number ≥ 0" : "an opacity from 0 to 1") *
+                ", got $(repr(v))",
+        ),
+    )
+    return kind === :length ? "$(v)px" : string(v)
+end
+
+# Only set keys are emitted; unset ones keep the overlay's built-in look.
+function overlay_style_dict(style)
+    d = Dict{String, String}()
+    style === nothing && return d
+    style isa NamedTuple || throw(
+        ArgumentError("overlaystyle must be a NamedTuple such as `(; hover_width = 3)`, got $(repr(style))"),
+    )
+    for (k, v) in pairs(style)
+        haskey(_OVERLAY_STYLE_KEYS, k) || throw(
+            ArgumentError(
+                "overlaystyle: unknown key `$k`. Valid keys: " *
+                    join(string.(keys(_OVERLAY_STYLE_KEYS)), ", "),
+            ),
+        )
+        prop, kind = _OVERLAY_STYLE_KEYS[k]
+        d[prop] = _overlay_style_value(k, kind, v)
+    end
+    return d
+end
+
 # A `:slice` template interpolates the live sample, not `payloads` (always empty).
 function _slice_template_keys(L::HitLayer)
     geom = L.geometry
@@ -283,7 +337,7 @@ the published manifest.
 function build_manifest(
         interactables, ctx::InteractionContext;
         selected = nothing, tip_style = nothing, tip_digits = _DEFAULT_SIGDIGITS, background = nothing,
-        owners_out = nothing,
+        overlay_style = nothing, owners_out = nothing,
     )
     built = Tuple{Any, HitLayer, Dict{String, Any}}[]
     for i in interactables
@@ -349,6 +403,7 @@ function build_manifest(
         end
     end
     (tip_style === nothing || isempty(tip_style)) || (m["tipStyle"] = tip_style)
+    (overlay_style === nothing || isempty(overlay_style)) || (m["overlayStyle"] = overlay_style)
     tip_digits == _DEFAULT_SIGDIGITS || (m["tipDigits"] = tip_digits)
     background === nothing || (m["background"] = _css_color(background))
     if owners_out !== nothing
@@ -447,6 +502,9 @@ clicks. Clicks on other layers stay single events.
   `tooltip_radius`, `tooltip_caret` — tooltip card styling; each defaults to the built-in
   style. See the Tooltips page for the full system, including the `--masque-tip-*` CSS
   escape hatch.
+- `overlaystyle` — the look of highlights, the selection, the crosshair, and ROI boxes, as a
+  `NamedTuple`: `overlaystyle = (; color = :steelblue, hover_width = 2)`. Each key you leave
+  out keeps the built-in look. See [Overlay styling](@ref) for the keys.
 
 # Examples
 ```julia
@@ -471,9 +529,10 @@ function _masque(
         max_width = 700, selected = nothing,
         tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
         tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing, tooltip_caret = true,
-        tooltip_sigdigits = _DEFAULT_SIGDIGITS,
+        tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
+    overlay_style = overlay_style_dict(overlaystyle)
     backend = _resolve_backend(backend; max_width)
     bg0 = fig.scene.backgroundcolor[]
     try
@@ -488,7 +547,7 @@ function _masque(
         owners_out = Ref(Dict{String, LayerOwner}())
         manifest = build_manifest(
             interactables, ctx; selected, tip_style, tip_digits,
-            background = fig.scene.backgroundcolor[], owners_out,
+            background = fig.scene.backgroundcolor[], overlay_style, owners_out,
         )
         result = render(backend, fig, ppu)
         display_css = round(Int, min(size(fig.scene)[1], backend.max_width))
