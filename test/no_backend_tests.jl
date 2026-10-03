@@ -89,3 +89,31 @@ else
         end
     end
 end
+
+# #269: Pluto and the REPL run with `--depwarn=no`, which hides a plain `Base.depwarn`. Run a
+# deprecated form in a child process with that flag and check the warning still shows, once
+# per call site.
+@testset "deprecations warn without --depwarn=yes (#269)" begin
+    code = """
+    using Masque, Test
+    regs = [(:circle, 0.0, 0.0, 1.0)]
+    @noinline site() = RegionInteractable(nothing; regions = regs)
+    @test_logs (:warn, r"`RegionInteractable\\(ax, regions\\)`. Removed in 0.3") (site(); site(); site())
+    """
+    julia(flag, code) = `$(Base.julia_cmd()) $flag --startup-file=no --project=$(Base.active_project()) -e $code`
+    @test success(pipeline(julia("--depwarn=no", code); stdout, stderr))
+    # `--depwarn=error` still turns the warning into an error.
+    code = """
+    using Masque, Test
+    @test_throws ErrorException RegionInteractable(nothing; regions = [(:circle, 0.0, 0.0, 1.0)])
+    """
+    @test success(pipeline(julia("--depwarn=error", code); stdout, stderr))
+    # Every deprecation goes through `_deprecate`, which forces the warning.
+    root = pkgdir(Masque)
+    calls = String[]
+    for dir in ("src", "ext"), (path, _, files) in walkdir(joinpath(root, dir)), f in files
+        endswith(f, ".jl") && occursin("Base.depwarn(", read(joinpath(path, f), String)) &&
+            push!(calls, relpath(joinpath(path, f), root))
+    end
+    @test calls == [joinpath("src", "Masque.jl")]
+end

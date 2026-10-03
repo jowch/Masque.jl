@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- The 0.2 deprecations now show their warning in Pluto and the REPL. Before, Julia showed
+  them only when it ran with `--depwarn=yes`, so a notebook still using `CairoBackend(…)`,
+  `auto_interactables`, or a keyword form of `RectInteractable` or `RegionInteractable` got
+  no warning before 0.3 removes them.
+
 ## [0.2.0] - 2026-10-03
 
 Some calls written for 0.1 behave differently: each is marked **Breaking** below, and the
