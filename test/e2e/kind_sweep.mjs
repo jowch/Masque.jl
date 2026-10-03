@@ -952,10 +952,14 @@ try {
         return m ? { x: Number(m[1]), y: Number(m[2]) } : null;
       };
       const near = (v, want, tol) => v !== null && Math.abs(v - want) <= tol;
-      // The anchor is rounded to whole image px: 0.02 is a few px at r = 2 on this figure.
+      // The anchor is rounded to whole image px, and Chromium truncates a synthetic click's
+      // clientX/Y to whole CSS px (2 image px here; a pointermove keeps the fraction), so allow
+      // 3 image px: in r that is 3 px of the Cartesian window, and in θ that arc at radius r.
+      const perPx = (t.xlims[1] - t.xlims[0]) / t.viewport[2];
+      const tolR = 3 * perPx, tolT = tolR / spec.r;
       const hover = await dispatchAt(key, pt.x, pt.y, "pointermove");
       const hv = read(hover?.text);
-      if (!hover?.show || !hv || !near(hv.x, spec.theta, 0.02) || !near(hv.y, spec.r, 0.02)) {
+      if (!hover?.show || !hv || !near(hv.x, spec.theta, tolT) || !near(hv.y, spec.r, tolR)) {
         throw new Error(`${key}/hover: card should read θ≈${spec.theta}, r≈${spec.r}, got ${JSON.stringify(hover?.text)}`);
       }
       if (hover.cross) throw new Error(`${key}/hover: a readout with no slice draws no hairline`);
@@ -969,7 +973,7 @@ try {
       const re = /AxisEvent\(:axis,\s*x\s*=\s*(-?[\d.e+-]+),\s*y\s*=\s*(-?[\d.e+-]+)/;
       const matches = (text) => {
         const m = re.exec(text ?? "");
-        return !!m && near(Number(m[1]), spec.theta, 0.02) && near(Number(m[2]), spec.r, 0.02);
+        return !!m && near(Number(m[1]), spec.theta, tolT) && near(Number(m[2]), spec.r, tolR);
       };
       let after = null;
       for (let attempt = 0; attempt < 3 && !matches(after); attempt++) {
@@ -982,7 +986,7 @@ try {
       }
       if (!matches(after)) throw new Error(`${key}/click: expected AxisEvent at θ≈${spec.theta}, r≈${spec.r}, got ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/click-theta-r`);
-      console.error(`OK  ${key}/click — ${after.slice(0, 100)}`);
+      console.error(`OK  ${key}/click — ${after.slice(0, 100)} (tolerance r ±${tolR.toFixed(3)}, θ ±${tolT.toFixed(3)})`);
       continue;
     }
 
