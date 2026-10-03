@@ -142,7 +142,7 @@ this table is `docs/src/support.md`.
 Layer ids are the plot kind (`:scatter`, `:lines`, `:cells`, `:bars`, `:poly`, …, `:colorbar`,
 `:legend`), suffixed `_2`, `_3`, … when a kind repeats; a composite's second layer takes a suffix
 (`:stem_stems`, `:scatterlines_line`). On `Axis3` only Scatter/Lines/LineSegments/MeshScatter/
-Wireframe/Arrows3D extract; on `PolarAxis` only Scatter/Lines/LineSegments/ScatterLines/Series.
+Wireframe/Arrows3D/ScatterLines extract; on `PolarAxis` only Scatter/Lines/LineSegments/ScatterLines/Series.
 Other kinds on those axes are skipped with a warning.
 
 **Default order.** `interactables(fig)` lists each axis's plot layers in reverse drawing order
