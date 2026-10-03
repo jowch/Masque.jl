@@ -12,6 +12,10 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
   `--project=`, which silently means `@v1.x`. `scripts/cloud-warm.sh julia` builds that env.
   CI runs `Pkg.test()`, which builds its own fresh env (~6 min precompile cold, may resolve
   newer deps than `$MASQUE_DEV_ENV`) — use it to reproduce a CI-only failure, not day to day.
+- Upstream canary (`.github/workflows/UpstreamCanary.yml`, nightly + manual, advisory): runs
+  `test/makie_compat_tests.jl` and `test/wgl_compat_tests.jl` against Makie master via
+  `test/upstream/canary.jl` (usage at its top). A red run's annotation says whether resolution,
+  loading, or a canary broke.
 - Frontend gate: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` (build → `../assets/overlay.js` IIFE + `../assets/masque-webgl.js` ESM)
 - Format (Runic, CI-enforced): `julia -e 'using Runic; exit(Runic.main(["--inplace","src","test","bench","docs"]))'` — pass every dir with `.jl`, since CI's `runic-action` has no `paths:` filter and checks the whole repo (including `bench/` and `docs/make.jl`), and tracks the latest Runic (1.7+). Format every `.jl` you add, with current Runic.
 - Registry name-clash check (manual, not `Pkg.test`): ask Pkg, which reads General

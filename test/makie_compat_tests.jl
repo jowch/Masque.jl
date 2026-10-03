@@ -1,7 +1,7 @@
 # Canary for src/makie_compat.jl (and the WGL-only compat block in
-# ext/MasqueWGLMakieExt.jl, exercised separately in test/webgl_ext_tests.jl's "version-coupling
-# guard"). Runs FIRST in the Core group so a Makie internal that changed shape fails loudly
-# here, at the accessor, rather than as a scattered downstream MethodError/wrong-pixel bug.
+# ext/MasqueWGLMakieExt.jl, exercised separately in test/wgl_compat_tests.jl). Runs FIRST in
+# the Core group so a Makie internal that changed shape fails loudly here, at the accessor,
+# rather than as a scattered downstream MethodError/wrong-pixel bug.
 # Asserts the actual return TYPE/SHAPE each accessor's caller relies on, not just `isdefined`.
 
 @testset "makie_compat: accessors hold their shape (Makie v$(pkgversion(Makie)))" begin
