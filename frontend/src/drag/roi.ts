@@ -71,9 +71,10 @@ export function buildROIBoxes(manifest: Manifest, svg: SVGElement, base: HTMLEle
         const rg = layer.geometry as ROIGeometry
         const st = layer.style ?? DEFAULT_STYLE
         const rect = document.createElementNS(SVG_NS, "rect")
-        rect.classList.add("masque-hi")
-        // 1px outline unless an explicit hoverstyle stroke names its own width.
-        rect.setAttribute("stroke-width", st.stroke ? String(st.width) : "1")
+        rect.classList.add("masque-hi", "masque-roi")
+        // 1px outline (--masque-roi-width) unless an explicit hoverstyle stroke names its own
+        // width, which is set inline so it wins over the host's value for this layer.
+        if (st.stroke) rect.style.setProperty("--masque-roi-width", String(st.width))
         rect.setAttribute("vector-effect", "non-scaling-stroke")
         if (st.stroke) rect.style.setProperty("--masque-hi-stroke", st.stroke)
         svg.appendChild(rect)
@@ -81,7 +82,6 @@ export function buildROIBoxes(manifest: Manifest, svg: SVGElement, base: HTMLEle
         for (let k = 0; k < 4; k++) {
             const hdl = document.createElementNS(SVG_NS, "rect")
             hdl.classList.add("masque-handle")
-            hdl.setAttribute("stroke-width", "1")
             hdl.setAttribute("vector-effect", "non-scaling-stroke")
             if (st.stroke) hdl.style.setProperty("--masque-hi-stroke", st.stroke)
             svg.appendChild(hdl); handles.push(hdl)

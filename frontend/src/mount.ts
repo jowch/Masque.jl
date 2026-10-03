@@ -93,8 +93,8 @@ const STYLE = `
 /* Halo first (figure background, wider), hairline on top at 80%. The fringe only shows where
    the line crosses a mark; on the empty axis it matches the background. The halo is 1.5px,
    half the earlier 3px, so the guide stays a hairline. */
-.masque-cross-halo { stroke: var(--masque-fig-bg, #ffffff); stroke-width: 1.5; }
-.masque-cross-hair { stroke: var(--masque-cross, #b0b0b0); stroke-width: 1; stroke-opacity: 0.8; }
+.masque-cross-halo { stroke: var(--masque-fig-bg, #ffffff); stroke-width: var(--masque-cross-halo-width, 1.5); }
+.masque-cross-hair { stroke: var(--masque-cross, #b0b0b0); stroke-width: var(--masque-cross-width, 1); stroke-opacity: var(--masque-cross-opacity, 0.8); }
 .masque-cross circle { fill: var(--masque-cross, #b0b0b0); stroke: var(--masque-fig-bg, #ffffff); stroke-width: 1; }
 /* Keyboard focus shows exactly one indicator (#168). Until a mark ring is drawn (kbd-ring, set
    by keyboard.ts's focusTo) — right after Tab, and always on a widget with nothing to arrow
@@ -172,8 +172,18 @@ svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: n
    the fill as chrome at 0.18 opacity; the edge stroke stays the flat chrome grey. */
 :host { --masque-ink: var(--masque-tip-color-resolved); }
 .masque-hi { --masque-hi-c: var(--masque-hi-stroke, var(--masque-chrome)); stroke: var(--masque-hi-c); fill: none; }
-.masque-hi.masque-hover { fill: var(--masque-hi-c); fill-opacity: ${HOVER_FILL_OPACITY}; }
-.masque-hi.masque-wash { fill: var(--masque-hi-c); fill-opacity: ${SELECTED_FILL_OPACITY}; }
+.masque-hi.masque-hover { fill: var(--masque-hi-c); fill-opacity: var(--masque-hover-fill-opacity, ${HOVER_FILL_OPACITY}); }
+.masque-hi.masque-wash { fill: var(--masque-hi-c); fill-opacity: var(--masque-selected-fill-opacity, ${SELECTED_FILL_OPACITY}); }
+/* Chrome metrics. Each width and opacity is a custom property whose fallback is the locked
+   recipe, so a property set on the shadow host (or by a notebook rule) changes that metric
+   alone. Classes, not stroke-width attributes: an attribute would hide the property. A
+   per-layer hoverstyle width arrives inline on the element (--masque-roi-width,
+   --masque-line-w) and wins over the host's value for that layer. */
+.masque-w-hover { stroke-width: var(--masque-hover-width, 1.5); }
+.masque-w-selected { stroke-width: var(--masque-selected-width, 2); }
+.masque-ring-inner { stroke-width: var(--masque-ring-width, 2); stroke-opacity: 1; }
+.masque-ring-outer { stroke-width: var(--masque-ring-halo-width, 4); stroke-opacity: var(--masque-ring-halo-opacity, 0.25); }
+.masque-roi { stroke-width: var(--masque-roi-width, 1); }
 .masque-hi.masque-nostroke { stroke: none; }
 /* Element-prefixed, not bare .masque-fillshape: the dodge fill must not leak onto plain-svg
    chrome. ROI grips are .masque-handle (white fill, chrome stroke), not .masque-hi. */
@@ -181,9 +191,9 @@ svg.masque-fill { mix-blend-mode: color-dodge; }
 svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-hi-fill); fill-opacity: 1; stroke: none; }
 svg.masque-edge .masque-hi.masque-hover,
 svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: none; }
-.masque-handle { fill: #ffffff; stroke: var(--masque-hi-stroke, var(--masque-chrome)); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.masque-handle { fill: var(--masque-handle-fill, #ffffff); stroke: var(--masque-hi-stroke, var(--masque-chrome)); stroke-width: var(--masque-handle-width, 1); vector-effect: non-scaling-stroke; }
 @supports not (mix-blend-mode: color-dodge) {
-  svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-chrome); fill-opacity: 0.18; }
+  svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-chrome); fill-opacity: var(--masque-noblend-fill-opacity, 0.18); }
 }
 .masque-tip { position: absolute; opacity: 0; pointer-events: none; z-index: 10;
        padding: var(--masque-tip-padding, 8px 12px); border-radius: var(--masque-tip-radius, 4px);

@@ -126,14 +126,14 @@ try {
             const cs = getComputedStyle(ln);
             return {
               className: ln.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
-              width: ln.getAttribute("stroke-width"), opacity: ln.getAttribute("stroke-opacity"),
+              width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
             };
           }),
           paths: [...el.querySelectorAll("path")].map((p) => {
             const cs = getComputedStyle(p);
             return {
               className: p.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
-              width: p.getAttribute("stroke-width"), opacity: p.getAttribute("stroke-opacity"),
+              width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
               d: p.getAttribute("d"),
             };
           }),
@@ -143,7 +143,7 @@ try {
       return {
         layer: layerName, kind: "closed", tag: el.tagName.toLowerCase(),
         className: el.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
-        width: el.getAttribute("stroke-width"), r: el.getAttribute("r"),
+        width: String(parseFloat(cs.strokeWidth)), r: el.getAttribute("r"),
         cx: el.getAttribute("cx"), cy: el.getAttribute("cy"),
         blend: layerName === "plain" ? null : getComputedStyle(svg).mixBlendMode,
       };
@@ -198,7 +198,7 @@ try {
       return {
         layer: layerName, className: el.getAttribute("class"),
         fill: cs.fill, stroke: cs.stroke, fillOpacity: cs.fillOpacity,
-        width: el.getAttribute("stroke-width"), opacity: el.getAttribute("stroke-opacity"),
+        width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
         r: el.getAttribute("r"), enter: el.classList.contains("masque-enter"),
         blend: layerName === "plain" ? null : getComputedStyle(svg).mixBlendMode,
       };
