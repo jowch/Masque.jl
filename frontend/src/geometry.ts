@@ -260,15 +260,17 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
         }
         case "rects": {
             // `tol` reaches past each rect's edge, over its drawn outline (absent → none).
-            // Inside wins over an earlier rect's reach, so touching bars split at their edge.
+            // Inside wins over any rect's reach, so touching bars split at their edge; between
+            // rects, the nearest outline wins.
             const a = g as number[]
             const tol = layer.tol ?? 0
-            let near = -1
+            let near = -1, nd = tol * tol
             for (let k = 0; k < a.length / 4; k++) {
                 const cx = a[4 * k], cy = a[4 * k + 1], w = a[4 * k + 2], h = a[4 * k + 3]
                 const dx = Math.max(Math.abs(px - cx) - w / 2, 0), dy = Math.max(Math.abs(py - cy) - h / 2, 0)
                 if (dx === 0 && dy === 0) return { index: k, geom_: ["rect", cx, cy, w, h] }
-                if (near < 0 && dx * dx + dy * dy <= tol * tol) near = k
+                const d = dx * dx + dy * dy
+                if (d <= nd && (near < 0 || d < nd)) { near = k; nd = d }
             }
             if (near >= 0) return { index: near, geom_: ["rect", a[4 * near], a[4 * near + 1], a[4 * near + 2], a[4 * near + 3]] }
             return null
@@ -312,14 +314,17 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
             return null
         }
         case "polygons": {
-            // Inside wins over the outline reach (`tol`, absent → none) of an earlier element.
+            // Inside wins over any element's outline reach (`tol`, absent → none); between
+            // elements, the nearest outline wins.
             const elems = g as (number[] | number[][])[]
             const tol = layer.tol ?? 0
-            let near = -1
+            let near = -1, nd = tol
             for (let k = 0; k < elems.length; k++) {
                 const rings = polygonRings(elems[k])
                 if (pointInRings(px, py, rings)) return { index: k, geom_: ["poly", rings.length === 1 ? rings[0] : rings] }
-                if (near < 0 && tol > 0 && rings.some((r) => distToRing(px, py, r) <= tol)) near = k
+                if (tol <= 0) continue
+                const d = Math.min(...rings.map((r) => distToRing(px, py, r)))
+                if (d <= nd && (near < 0 || d < nd)) { near = k; nd = d }
             }
             if (near >= 0) {
                 const rings = polygonRings(elems[near])

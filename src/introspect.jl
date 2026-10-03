@@ -15,22 +15,22 @@ function _marker_radius(p)
     )
     ms = p.markersize[]
     f = _marker_extent_factor(p.marker[])
-    # The marker's outline is centered on its edge, so half of `strokewidth` lies outside it.
-    sw = _stroke_half(p)
     # A per-point markersize gives a per-point radius, so a small marker does not take the
     # largest one's ring (graphplot's `node_size`, `scatter(…; markersize = [...])`).
-    _per_point(ms) || return _ms_extent(ms) * f / 2 + sw
-    return Float64[_ms_extent(m) * f / 2 + sw for m in ms]
+    _per_point(ms) || return _ms_extent(ms) * f / 2
+    return Float64[_ms_extent(m) * f / 2 for m in ms]
 end
 
-# Half the drawn outline width in px: `strokewidth / 2`, the largest of a per-element vector.
-function _stroke_half(p)
+# The drawn outline width in px: `strokewidth`, the largest of a per-element vector.
+function _stroke_width(p)
     hasproperty(p, :strokewidth) || return 0.0
     sw = p.strokewidth[]
-    sw isa Real && return max(0.0, Float64(sw)) / 2
-    sw isa AbstractVector{<:Real} && !isempty(sw) && return max(0.0, Float64(maximum(sw))) / 2
+    sw isa Real && return max(0.0, Float64(sw))
+    sw isa AbstractVector{<:Real} && !isempty(sw) && return max(0.0, Float64(maximum(sw)))
     return 0.0
 end
+# Lines, bars and polygons center their outline on the path, on every backend.
+_stroke_half(p) = _stroke_width(p) / 2
 
 # One diameter for a markersize element: a number, or a `Vec2f` (width, height), which is what
 # Makie converts a per-point vector of numbers to. A non-square marker takes its larger side, so
@@ -117,14 +117,14 @@ end
 function _point_radius(ax, pts::Vector{Point3f})
     matches = [p for p in _scatters_on(ax) if _scatter_matches(p, pts)]
     if length(matches) == 1
-        return _marker_radius(only(matches))
+        return _marker_radius(only(matches)), _stroke_width(only(matches))
     end
     if length(matches) > 1
         @warn "PointInteractable: $(length(matches)) scatters on this axis share these " *
             "positions, so the highlight radius is ambiguous; using the default :circle. " *
             "Pass radius= or PointInteractable(ax, scatter)."
     end
-    return _default_circle_radius()
+    return _default_circle_radius(), 0.0
 end
 # Tooltip accent colour for a Scatter's points (HitLayer's `colors` field): a shared palette of
 # CSS strings + one 1-based index per point, or a single CSS string when every point is the same
@@ -219,6 +219,8 @@ function PointInteractable(ax, p::Makie.Scatter; id = :scatter, payloads = nothi
     i = payloads === nothing ?
         PointInteractable(ax, pts; kw...) :
         PointInteractable(ax, pts; kw..., payloads)
+    # An explicit radius is the whole target; otherwise the outline adds to the marker.
+    i = _with_marker_stroke(i, radius === nothing ? _stroke_width(p) : 0.0)
     p.markerspace[] === :data && return _shift_data_markers(ax, i, p.marker_offset[])
     return _with_offset(i, _marker_offset(p, length(i.points)))
 end
@@ -249,7 +251,7 @@ function _shift_data_markers(ax, i::PointInteractable, mo)
         Point3f(d[1], d[2], ax isa Makie.Axis3 ? d[3] : x[3])
     end
     return PointInteractable(
-        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset,
+        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke,
     )
 end
 function _marker_offset_vec(mo, n)
@@ -266,7 +268,10 @@ function _warn_no_inverse(id)
     return nothing
 end
 _with_offset(i::PointInteractable, o) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o, i.stroke,
+)
+_with_marker_stroke(i::PointInteractable, s) = PointInteractable(
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, s,
 )
 
 # markersize is DATA-space (no markerspace attribute), so pixel radius is camera/depth-dependent;
@@ -1002,7 +1007,7 @@ function _place(i::PointInteractable, f)
         [f.place(i.points[k], offs[k]) for k in eachindex(i.points)]
     end
     return PointInteractable(
-        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset,
+        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset, i.stroke,
     )
 end
 function _place(i::SegmentInteractable, f)

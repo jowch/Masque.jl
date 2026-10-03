@@ -77,7 +77,8 @@ function Masque.context(b::CairoBackend, fig, ppu, max_width)
         id = k == 1 ? :legend : Symbol(:legend_, k); ids[leg] = id
         transforms[id] = Masque._legend_transform(id, leg, scaling, out_h)
     end
-    return InteractionContext(project, transforms, ids, out_w, out_h, scaling, display_scale)
+    # CairoMakie centers a marker's outline on its edge.
+    return InteractionContext(project, transforms, ids, out_w, out_h, scaling, display_scale, 0.5)
 end
 
 Masque.make_widget(b::CairoBackend, result::RenderResult, manifest, display_css, fig, interactables, ppu, max_width) =

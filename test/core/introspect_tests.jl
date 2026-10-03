@@ -514,7 +514,10 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test built(a, hl).tol == 8
         @test built(a, eb).tol == 10           # the whiskers reach whiskerwidth / 2 from the bar end
         @test only(interactables(a, thick; tol = 3)).tol == 3   # an explicit tol wins
-        @test built(a, s).radius ≈ 0.3525 * 20 + 4   # the outline is centered on the marker edge
+        @test built(a, s).radius ≈ 0.3525 * 20 && built(a, s).stroke == 8
+        # Cairo centers the outline on the marker edge, so half of it reaches past the marker
+        @test only(Masque.hitlayers(built(a, s), c)).geometry[3] == round(Int, (0.3525 * 20 + 4) * c.scaling)
+        @test only(interactables(a, s; radius = 5)).stroke == 0   # an explicit radius is the target
         @test Masque.hit_tol(built(a, b)) == 4 && Masque.hit_tol(built(a, b0)) === nothing
         @test Masque.hit_tol(built(a, pl)) == 5
         # rects and polygons ship it as image px, like line layers

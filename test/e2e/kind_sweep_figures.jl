@@ -540,6 +540,9 @@ function build_kind_sweep()
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "bar-stroke")
         barplot!(ax, 1:3, [2, 5, 3]; color = :lightgray, strokewidth = 8, strokecolor = :black)
+        # A stroked marker clear of the bars: Cairo draws half its outline outside the marker,
+        # WebGL all of it, and the hit circle follows the outline's outer edge on each.
+        scatter!(ax, [0.2], [4.0]; markersize = 20, color = :red, strokewidth = 8, strokecolor = :blue)
         masque(fig; selected = Dict(:bars => [2]))
     end
 
