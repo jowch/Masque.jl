@@ -7,36 +7,32 @@ import Makie
 import Makie: Point2f
 
 """
-    CairoBackend(; max_width=700)
+    CairoBackend
 
-Static-image `Masque` backend (loaded when `CairoMakie` is `using`d): renders `fig` once to a
-PNG, with a transparent JS overlay doing hit-testing over it — no server, no WebGL, and the
-inspection layer keeps working in an exported, offline static HTML. This is the default
-backend `masque` picks when no `WGLMakie` extension is loaded. `CairoMakie.activate!(type = "svg")`
-chooses the MIME for a bare `Figure`. `save("figure.svg", fig)` follows the file extension and
-writes SVG. This widget stays a PNG.
+Static-image `Masque` backend, chosen with `masque(fig; backend = :cairo)` once `CairoMakie` is
+loaded: renders `fig` once to a PNG, with a transparent JS overlay doing hit-testing over it —
+no server, no WebGL, and the inspection layer keeps working in an exported, offline static HTML.
+This is the default backend `masque` picks when `CairoMakie` is loaded. Its density follows
+`masque`'s `max_width` (output ≈ 2× `min(figure width, max_width)`) unless `masque`'s
+`px_per_unit` sets it.
 
-# Arguments
-- `max_width` — the display width to target, in px (Pluto's column is 700). Render resolution
-  is *derived* from it, not a fixed `px_per_unit`: output ≈ 2× `min(figure width, max_width)`
-  (retina-crisp, not wasteful). Owns this widget's DPI, format, and background. The figure's
-  plots and size are kept. Cairo's screen config from `CairoMakie.activate!` applies to a bare
-  `Figure` and to `save`, and this widget uses its own PNG resolution. Default `700`.
+The widget owns its DPI, format, and background; the figure's plots and size are kept.
+`CairoMakie.activate!` settings apply to a bare `Figure` and to `save`, never to the widget.
 
-# Examples
-```julia
-using Masque, CairoMakie
-masque(fig; backend = CairoBackend(; max_width = 900))
-```
+`CairoBackend(; max_width)` is deprecated: use `masque(fig; backend = :cairo, max_width)`.
+Removed in 0.3.
 """
 struct CairoBackend <: AbstractBackend
-    max_width::Int
+    CairoBackend(::Masque._Builtin) = new()
 end
-CairoBackend(; max_width = 700) = CairoBackend(max_width)
+function CairoBackend(; max_width = nothing)
+    return Masque._legacy_backend(CairoBackend(Masque._Builtin()), :cairo, max_width, nothing)
+end
+Masque._builtin_backend(::Val{:cairo}) = CairoBackend(Masque._Builtin())
 
-function Masque._ppu(b::CairoBackend, fig)
+function Masque._ppu(::CairoBackend, fig, max_width)
     sw = size(fig.scene)[1]
-    return 2 * min(sw, b.max_width) / sw
+    return 2 * min(sw, max_width) / sw
 end
 
 function Masque.render(::CairoBackend, fig, ppu)
@@ -47,12 +43,12 @@ function Masque.render(::CairoBackend, fig, ppu)
     return RenderResult("image/png", take!(io), size(img, 2), size(img, 1), Float64(ppu))
 end
 
-function Masque.context(b::CairoBackend, fig, ppu)
+function Masque.context(b::CairoBackend, fig, ppu, max_width)
     w, h = size(fig.scene)
     scaling = Float64(ppu)
     out_w, out_h = round(Int, w * scaling), round(Int, h * scaling)
     # Lets grid hitlayers reason in true on-screen px instead of hardcoding the 2× DPI factor.
-    display_scale = min(w, b.max_width) / out_w
+    display_scale = min(w, max_width) / out_w
 
     project = Masque._project_closure(scaling, out_h)
 
@@ -84,10 +80,10 @@ function Masque.context(b::CairoBackend, fig, ppu)
     return InteractionContext(project, transforms, ids, out_w, out_h, scaling, display_scale)
 end
 
-Masque.make_widget(b::CairoBackend, result::RenderResult, manifest, display_css, fig, interactables, ppu) =
+Masque.make_widget(b::CairoBackend, result::RenderResult, manifest, display_css, fig, interactables, ppu, max_width) =
     Masque.MasqueWidget(
     Masque.base64encode(result.payload), manifest, display_css,
-    Masque._view_render_frame(b, fig, interactables, ppu),
+    Masque._view_render_frame(b, fig, interactables, ppu, max_width),
 )
 
 end # module MasqueCairoMakieExt

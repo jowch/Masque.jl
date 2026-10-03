@@ -12,6 +12,50 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test ppw == 2 * 700 / 1400                   # = 1.0  → output 1400 px = 2× column
     end
 
+    @testset "backend = symbol, max_width and px_per_unit keywords (#236)" begin
+        f = Figure(size = (600, 400)); scatter!(Axis(f[1, 1]), 1:3, 1:3)
+        @test IP._resolve_backend(nothing) isa _CairoExt.CairoBackend      # the one loaded
+        @test IP._resolve_backend(:cairo) isa _CairoExt.CairoBackend
+        w = masque(f; backend = :cairo)
+        @test w isa MasqueWidget && w.manifest["scaling"] == 2.0 && w.display_css == 600
+        err = (@test_throws ArgumentError masque(f; backend = :webgl)).value
+        @test occursin("using WGLMakie", err.msg)
+        err = (@test_throws ArgumentError masque(f; backend = :svg)).value
+        @test occursin(":cairo", err.msg) && occursin(":webgl", err.msg)
+
+        # max_width sets the display width and, by default, the density
+        w = masque(f; max_width = 300)
+        @test w.display_css == 300
+        @test w.manifest["scaling"] == 2 * 300 / 600 && w.manifest["width"] == 600
+        # px_per_unit sets the density on Cairo too, independent of max_width
+        w = masque(f; px_per_unit = 3)
+        @test w.manifest["scaling"] == 3.0 && w.manifest["width"] == 1800 && w.display_css == 600
+        png = parentmodule(Masque.base64encode).base64decode(w.b64)   # IHDR: width, height
+        @test ntoh.(reinterpret(UInt32, png[17:24])) == [1800, 1200]
+        w = masque(f; px_per_unit = 3, max_width = 300)
+        @test w.manifest["scaling"] == 3.0 && w.display_css == 300
+        @test_throws ArgumentError masque(f; px_per_unit = 0)
+        @test_throws ArgumentError masque(f; px_per_unit = :big)
+        @test_throws ArgumentError masque(f; max_width = -1)
+        @test_throws ArgumentError masque(f; max_width = 0.4)            # rounds to a 0 px box
+        @test_throws ArgumentError masque(f; px_per_unit = 1.0e-4)       # a 0 px picture
+        w = masque(f; max_width = 300.6)                                 # one rounded width throughout
+        @test w.display_css == 301 && w.manifest["scaling"] == 2 * 301 / 600
+    end
+
+    @testset "deprecated CairoBackend(; max_width) forwards (#236)" begin
+        f = Figure(size = (600, 400)); scatter!(Axis(f[1, 1]), 1:3, 1:3)
+        b = @test_deprecated _CairoExt.CairoBackend(; max_width = 300)
+        @test b isa AbstractBackend
+        w = masque(f; backend = b)
+        @test w.display_css == 300 && w.manifest["scaling"] == 1.0
+        # masque's own keyword wins over the object's
+        w = masque(f; backend = b, max_width = 500)
+        @test w.display_css == 500
+        b0 = @test_deprecated _CairoExt.CairoBackend()
+        @test masque(f; backend = b0).display_css == 600
+    end
+
     @testset "context / transforms" begin
         (; ctx) = default_fixture()
         t = ctx.transforms[:ax1]
