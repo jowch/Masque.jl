@@ -141,7 +141,7 @@ scheme survives escaping and can execute — author responsibility if a template
 | Per-layer `tooltip_*` style override | Deferred | Non-breaking kwarg on the per-layer interactable constructor |
 | Compile-time field validation (`@generated`) | Deferred | No-op on heterogeneous payloads; build-time Phase 2 runs for `NamedTuple` payloads |
 | Mark-anchored tooltip placement (circles/rects/segments/polyline/lines/polygons/grid) | **Shipped** (tooltip-anchor-chrome PR) | Box centred above the mark's top edge, gap 10px; flips below on top-clip, shifts + moves the caret (`--masque-caret-x`) on side-clip. `frontend/src/geometry.ts`'s `anchorFor`/`computeAnchoredPlacement`. A `:lines` anchor slides to the nearest point on the whole path. |
-| Caret edge-flipping / viewport-collision clamping (axis/threshold/ROI/view — cursor-following) | **Shipped** (first overlay polish PR) | Card stays inside the overlay; caret flips via `.flip-x` / `.flip-y` |
+| Caret edge-flipping / viewport-collision clamping (axis/threshold/ROI/view — cursor-following) | **Shipped** (first overlay polish PR) | Card sits below the pointer with the caret on it and stays inside the overlay: a side clip shifts the box and moves the caret (`--masque-caret-x`), a bottom clip puts the box above the pointer (`.flip-y`). `frontend/src/hover.ts`'s `placeTip` |
 | Inline date formatting | Deferred (would add `d3-time-format`) | Format dates in Julia into a payload string field |
 | Following a Pluto notebook theme toggle | **N/A** — official Pluto has none | OS `prefers-color-scheme` *is* Pluto's theme (Settings is help text; no class / `data-theme` / JS event). Revisit only if Pluto ships a real override with a stable signal. |
 

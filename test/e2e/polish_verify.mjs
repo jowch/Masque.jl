@@ -446,9 +446,9 @@ try {
   }
   passed.push("overlaystyle");
 
-  // Cursor-following tooltips (axis and colorbar readouts, threshold, ROI, view, slice): the
-  // caret apex sits on the pointer, both in open space and where the box clamps at the right
-  // edge (the caret then moves along the box). Before, it sat a fixed 14px into a box offset
+  // The axis readout's cursor-following tooltip: the caret apex sits on the pointer, both in
+  // open space and where the box clamps at the right edge (the caret then moves along the box).
+  // The bottom flip (.flip-y) leaves this horizontal apex unchanged; overlay.test.ts pins it. Before, it sat a fixed 14px into a box offset
   // 10px from the pointer, so it pointed beside the crosshair cursor.
   for (const [fx, fy, where] of [[0.15, 0.25, "open"], [0.8, 0.25, "right-edge"]]) {
     const r = await page.evaluate(async ([fx, fy]) => {

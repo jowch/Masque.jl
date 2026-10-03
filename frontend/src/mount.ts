@@ -211,7 +211,8 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: non
    box, 5px right of its left edge. --masque-caret-x (geometry.ts's caretX, or the pointer for
    hover.ts's placeTip) is "px from the tooltip's OUTER left edge to the anchor" — landing the
    apex exactly there needs both offsets backed out: -1 (border) -5 (this element's own
-   half-width) = -6. Both placements always set it; the 14px fallback is hover.ts's CARET_INSET.
+   half-width) = -6. The 14px fallback (hover.ts's CARET_INSET) covers placeAnchored's zero-size
+   path, which removes the property; placeTip always sets it.
    The -1 above assumed the default 1px border-left; the 3px accent border (hover.ts's setMarkAccent, --masque-mark-border)
    pushes the padding box 2px further right, so the extra width beyond the baked-in 1px
    (--masque-mark-border-w, set alongside the accent) is backed out too. */
