@@ -36,9 +36,11 @@ Only the types that rely on **client-side** pixel→data inversion — `AxisInte
 `ColorbarInteractable`, `ThresholdInteractable`, `ROIInteractable`, `SliceInteractable`, and
 `ViewInteractable`'s 2-D pan — restrict to the scales the JS `invert` implements
 (`_JS_INVERTIBLE`: identity, log10, log; categorical rides the shipped category map where the type
-supports it). The same `validate` methods refuse `Axis3` (`is3d`) and `PolarAxis` (`ispolar`)
-where inversion is undefined or not serialized ([§2](02-backends.md)); `ViewInteractable` accepts
-`Axis3` as an orbit. Default `validate` stays permissive.
+supports it). The same `validate` methods refuse `Axis3` (`is3d`), where inversion is undefined;
+`ViewInteractable` accepts it as an orbit. On `PolarAxis` (`ispolar`) only `AxisInteractable`
+inverts, through the shipped polar frame; `ThresholdInteractable`, `ROIInteractable`,
+`SliceInteractable`, and `ViewInteractable` refuse it, because a straight screen line or rectangle
+is not a polar shape ([§2](02-backends.md)). Default `validate` stays permissive.
 
 ## `HitLayer` — the serialized unit (per interactable, per kind)
 

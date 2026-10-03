@@ -114,6 +114,14 @@ kind_sweep_meta() = [
         "tip" => "north", "hoverIndex" => 0, "hoverTip" => "east", "mode" => "element",
     ),
     Dict(
+        # AxisInteractable on the `polar` case's figure (#170): the pointer reads (θ, r). The
+        # anchor is the `polar` widget's Julia-projected "north" marker at (π/2, 2).
+        "key" => "axis_polar", "layerId" => "axis", "layerKind" => "axis",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "axis_polar",
+        "anchorKey" => "polar", "anchorIndex" => 1, "theta" => π / 2, "r" => 2.0, "rmax" => 2.5,
+    ),
+    Dict(
         "key" => "scatter_dark", "layerId" => "scatter_dark", "layerKind" => "circles",
         "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
         "tip" => "beta", "hoverIndex" => 0, "hoverTip" => "alpha", "mode" => "element",
@@ -427,6 +435,14 @@ function build_kind_sweep()
         )
     end
 
+    axis_polar = let
+        pts = Point2f[(0.0, 1.0), (π / 2, 2.0), (π, 1.5), (3π / 2, 2.5)]
+        fig = Figure(size = (480, 320))
+        ax = PolarAxis(fig[1, 1])
+        scatter!(ax, pts; color = :gray, markersize = 22)
+        masque(fig, AxisInteractable(ax; id = :axis); auto = false)
+    end
+
     scatter_dark = let
         pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 1.2)]
         fig = Figure(size = (480, 260); backgroundcolor = :gray12)
@@ -697,7 +713,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
 end

@@ -4,7 +4,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 @testset "Axis3 / PolarAxis" begin
     @testset "PolarAxis: context + projection + payloads + gates" begin
         # Discrete hits project through the shared closure (Makie.Polar in transform_func).
-        # Continuous θ/r readout is deferred — ispolar transforms + validate gates.
+        # Continuous θ/r readout is the next testset; the straight-line consumers are gated.
         fp = Figure(; size = (600, 450))
         axp = PolarAxis(fp[1, 1])
         # (θ, r) data coords — four cardinal points so the projection hinge is unambiguous
@@ -41,9 +41,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test red_near_in(imgp, Lp.geometry[3k + 1], Lp.geometry[3k + 2])
         end
 
-        # continuous consumers fail loud on ispolar (polar transform not yet in JS)
+        # AxisInteractable reads (θ, r) on a polar axis (#170); the straight-line consumers still fail loud
+        @test validate(AxisInteractable(axp), ctxp) === nothing
         for bad in (
-                AxisInteractable(axp),
                 ThresholdInteractable(axp; orientation = :horizontal, value = 1.0),
                 ROIInteractable(axp; bounds = (0.0, 1.0, 0.5, 1.5)),
                 SliceInteractable(axp; series = [(; x = [0.0, 1.0], y = [0.0, 1.0])]),
@@ -76,6 +76,118 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         gints = @test_logs (:warn, r"heatmap on PolarAxis") interactables(fpg)
         @test length(gints) == 1
         @test only(gints) isa PointInteractable
+    end
+
+    @testset "PolarAxis: θ/r readout round-trips through the shipped transform (#170)" begin
+        # Mirror of `invertAxis` in frontend/src/geometry.ts on a polar transform: the linear map
+        # over the Cartesian window (image y-down → Makie y-up), then Makie's inverse of Polar
+        # folded into the branch. Reads the serialized dict, so it checks what JS receives.
+        function js_invert(td, px, py)
+            vx, vy, vw, vh = td["viewport"]
+            fx = (px - vx) / vw; fy = 1 - (py - vy) / vh
+            xl, yl = td["xlims"], td["ylims"]
+            x = xl[1] + fx * (xl[2] - xl[1]); y = yl[1] + fy * (yl[2] - yl[1])
+            p = td["polar"]; lo = p["branch"][1]
+            θ = lo + mod(p["direction"] * atan(y, x) - p["theta_0"] - lo, 2π)
+            r = hypot(x, y) + p["r0"]
+            return p["theta_as_x"] ? (θ, r) : (r, θ)
+        end
+        # Makie's own reading of an image pixel: the scene-relative pixel through `to_world`
+        # (what `mouseposition` does), then the axis handler's atan, folded into the same branch.
+        function makie_world(ctx, ax, px, py)
+            o = Makie.viewport(ax.scene)[].origin
+            return Makie.to_world(ax.scene, Makie.Point2d(px / ctx.scaling - o[1], (ctx.height - py) / ctx.scaling - o[2]))
+        end
+        function makie_reading(ctx, ax, px, py)
+            mp = makie_world(ctx, ax, px, py)
+            t1, t2 = ax.target_thetalims[]
+            lo = abs(t2 - t1) < 2π ? 0.5 * (t1 + t2) - π : 0.0
+            θ = lo + mod(ax.direction[] * atan(mp[2], mp[1]) - ax.target_theta_0[] - lo, 2π)
+            r = hypot(mp[1], mp[2]) + ax.target_r0[]
+            return ax.theta_as_x[] ? (θ, r) : (r, θ)
+        end
+        angdiff(a, b) = abs(rem2pi(a - b, RoundNearest))
+        # Points go through the unrounded projection closure (hit geometry is rounded to whole
+        # px). The camera is Float32: 1e-3 is ~0.2 px on these figures, far above Float32 noise.
+        tol = 1.0e-3
+
+        # Full circle (the default): marker centres invert back to their (θ, r).
+        f = Figure(; size = (600, 450))
+        ax = PolarAxis(f[1, 1])
+        pts = [Point2f(0.0, 1.0), Point2f(π / 2, 2.0), Point2f(π, 1.5), Point2f(3π / 2, 2.5), Point2f(5.5, 0.7)]
+        scatter!(ax, pts)
+        _, _, ctx = ctx_for(f)
+        td = IP._transform_dict(ctx.transforms[IP.axis_id(ctx, ax)])
+        @test td["polar"]["branch"] ≈ [0.0, 2π]
+        @test td["polar"]["direction"] == 1 && td["polar"]["theta_0"] == 0.0 && td["polar"]["r0"] == 0.0
+        for p in pts
+            θ, r = js_invert(td, ctx.project(ax, p)...)
+            @test angdiff(θ, p[1]) < tol
+            @test isapprox(r, p[2]; atol = tol)
+        end
+        # A letterbox pixel (the 600×450 figure makes the viewport wider than the disc) and the
+        # viewport's top-left corner both read past the disc, as Makie reads them.
+        vx, vy, vw, vh = td["viewport"]
+        for (px, py) in ((vx + 2, vy + vh / 2), (vx + 1, vy + 1))
+            θ, r = js_invert(td, px, py)
+            mθ, mr = makie_reading(ctx, ax, px, py)
+            @test angdiff(θ, mθ) < tol && isapprox(r, mr; rtol = tol)
+            @test r > ax.target_rlims[][2]
+        end
+        # Makie's own inverse_transform agrees off the 0/2π seam.
+        q = ctx.project(ax, pts[2])
+        θ, r = js_invert(td, q...)
+        itf = Makie.inverse_transform(ax.scene.transformation.transform_func[])
+        mp = Makie.apply_transform(itf, makie_world(ctx, ax, q...))
+        @test isapprox(θ, mp[1]; atol = tol) && isapprox(r, mp[2]; atol = tol)
+        # The origin reads θ = atan2(0, 0) = 0 and r = r0.
+        o = ctx.project(ax, Point2f(0.0, 0.0))
+        @test js_invert(td, o[1], o[2])[2] < tol
+
+        # A sector around 0, clockwise, rotated, with a negative radius at the origin: a point
+        # drawn at θ < 0 reads back below 0, not near 2π (the branch is thetacenter ± π).
+        fs = Figure(; size = (500, 500))
+        axs = PolarAxis(
+            fs[1, 1]; thetalimits = (-π / 3, π / 3), theta_0 = π / 4, direction = -1,
+            radius_at_origin = -0.5, rlimits = (0, 3),
+        )
+        spts = [Point2f(-0.2, 1.0), Point2f(-0.9, 2.5), Point2f(0.6, 0.3), Point2f(0.0, 2.0)]
+        scatter!(axs, spts)
+        _, _, ctxs = ctx_for(fs)
+        tds = IP._transform_dict(ctxs.transforms[IP.axis_id(ctxs, axs)])
+        @test tds["polar"]["branch"] ≈ [-π, π]
+        @test tds["polar"]["direction"] == -1 && isapprox(tds["polar"]["theta_0"], π / 4; atol = 1.0e-6) && tds["polar"]["r0"] == -0.5
+        for p in spts
+            θ, r = js_invert(tds, ctxs.project(axs, p)...)
+            @test isapprox(θ, p[1]; atol = tol) && isapprox(r, p[2]; atol = tol)
+        end
+        vx, vy, vw, vh = tds["viewport"]
+        for (px, py) in ((vx + 1, vy + 1), (vx + vw - 1, vy + vh - 1), (vx + vw / 2, vy + vh - 2))
+            θ, r = js_invert(tds, px, py)
+            mθ, mr = makie_reading(ctxs, axs, px, py)
+            @test isapprox(θ, mθ; atol = tol) && isapprox(r, mr; rtol = tol)
+        end
+
+        # theta_as_x = false: data is (r, θ), and the readout is swapped to match.
+        fr = Figure(; size = (450, 600))
+        axr = PolarAxis(fr[1, 1]; theta_as_x = false)
+        rpts = [Point2f(1.0, 0.3), Point2f(2.0, 2.2)]
+        scatter!(axr, rpts)
+        _, _, ctxr = ctx_for(fr)
+        tdr = IP._transform_dict(ctxr.transforms[IP.axis_id(ctxr, axr)])
+        @test tdr["polar"]["theta_as_x"] === false
+        for p in rpts
+            r, θ = js_invert(tdr, ctxr.project(axr, p)...)
+            @test isapprox(r, p[1]; atol = tol) && angdiff(θ, p[2]) < tol
+        end
+
+        # Builds into an :axis layer; non-polar transforms ship `polar = nothing`.
+        m = build_manifest([AxisInteractable(ax)], ctx)
+        @test only(m["layers"])["kind"] == "axis"
+        @test m["transforms"][string(IP.axis_id(ctx, ax))]["polar"] isa Dict
+        fc = Figure(); axc = Axis(fc[1, 1]); scatter!(axc, [1, 2], [1, 2])
+        _, _, ctxc = ctx_for(fc)
+        @test IP._transform_dict(ctxc.transforms[IP.axis_id(ctxc, axc)])["polar"] === nothing
     end
 
     @testset "PolarAxis Series auto-extracts (children are polar-valid Lines)" begin

@@ -1,68 +1,9 @@
 {
-    "transforms": {
-        "cb1": {
-            "xscale": "identity",
-            "xreversed": false,
-            "yscale": "identity",
-            "ylims": [
-                4,
-                19
-            ],
-            "xlims": [
-                0,
-                1
-            ],
-            "yreversed": false,
-            "ispolar": false,
-            "xcats": null,
-            "is3d": false,
-            "ycats": null,
-            "viewport": [
-                1096.864013671875,
-                32.0,
-                24.0,
-                689.3800048828125
-            ],
-            "valueaxis": "y"
-        },
-        "ax1": {
-            "xscale": "identity",
-            "xreversed": false,
-            "yscale": "identity",
-            "ylims": [
-                0.5,
-                5.5
-            ],
-            "xlims": [
-                0.5,
-                4.5
-            ],
-            "yreversed": false,
-            "ispolar": false,
-            "xcats": null,
-            "is3d": false,
-            "ycats": null,
-            "viewport": [
-                66,
-                32,
-                994,
-                690
-            ],
-            "valueaxis": null
-        }
-    },
-    "scaling": 2,
     "height": 800,
-    "width": 1200,
     "layers": [
         {
-            "events": [
-                "click",
-                "hover"
-            ],
             "kind": "grid",
-            "bond": "gridcell",
-            "axis": "ax1",
+            "id": "cells",
             "geometry": {
                 "yedges": [
                     722,
@@ -72,7 +13,7 @@
                     170,
                     32
                 ],
-                "nrows": 5,
+                "ncols": 4,
                 "values": [
                     4,
                     5,
@@ -102,23 +43,23 @@
                     812,
                     1060
                 ],
-                "ncols": 4
+                "nrows": 5
             },
-            "id": "cells",
+            "payloads": [
+            ],
+            "axis": "ax1",
             "style": {
                 "width": 2
             },
-            "payloads": [
-            ]
-        },
-        {
+            "bond": "gridcell",
             "events": [
                 "click",
                 "hover"
-            ],
+            ]
+        },
+        {
             "kind": "circles",
-            "bond": "element",
-            "axis": "ax1",
+            "id": "scatter",
             "geometry": [
                 190,
                 584,
@@ -130,11 +71,6 @@
                 170,
                 6
             ],
-            "id": "scatter",
-            "style": {
-                "width": 2
-            },
-            "colors": "rgb(0,114,178)",
             "payloads": [
                 {
                     "index": 1,
@@ -151,17 +87,22 @@
                     "x": 4,
                     "y": 4.5
                 }
-            ]
-        },
-        {
+            ],
+            "colors": "rgb(0,114,178)",
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "bond": "element",
             "events": [
                 "click",
                 "hover"
-            ],
+            ]
+        },
+        {
             "kind": "lines",
+            "id": "lines",
             "tol": 12,
-            "bond": "element",
-            "axis": "ax1",
             "geometry": [
                 [
                     190,
@@ -174,36 +115,97 @@
                     653
                 ]
             ],
-            "id": "lines",
-            "style": {
-                "width": 2
-            },
             "payloads": [
                 {
                     "index": 1
                 }
-            ]
-        },
-        {
+            ],
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "bond": "element",
             "events": [
                 "click",
                 "hover"
-            ],
+            ]
+        },
+        {
             "kind": "axis",
-            "bond": "colorbar",
-            "axis": "cb1",
+            "id": "colorbar",
             "geometry": [
                 1096.864013671875,
                 32.0,
                 24.0,
                 689.3800048828125
             ],
-            "id": "colorbar",
+            "payloads": [
+            ],
+            "axis": "cb1",
             "style": {
                 "width": 2
             },
-            "payloads": [
+            "bond": "colorbar",
+            "events": [
+                "click",
+                "hover"
             ]
         }
-    ]
+    ],
+    "transforms": {
+        "ax1": {
+            "xscale": "identity",
+            "ylims": [
+                0.5,
+                5.5
+            ],
+            "xlims": [
+                0.5,
+                4.5
+            ],
+            "valueaxis": null,
+            "polar": null,
+            "is3d": false,
+            "xreversed": false,
+            "ycats": null,
+            "xcats": null,
+            "yreversed": false,
+            "yscale": "identity",
+            "viewport": [
+                66,
+                32,
+                994,
+                690
+            ],
+            "ispolar": false
+        },
+        "cb1": {
+            "xscale": "identity",
+            "ylims": [
+                4,
+                19
+            ],
+            "xlims": [
+                0,
+                1
+            ],
+            "valueaxis": "y",
+            "polar": null,
+            "is3d": false,
+            "xreversed": false,
+            "ycats": null,
+            "xcats": null,
+            "yreversed": false,
+            "yscale": "identity",
+            "viewport": [
+                1096.864013671875,
+                32.0,
+                24.0,
+                689.3800048828125
+            ],
+            "ispolar": false
+        }
+    },
+    "width": 1200,
+    "scaling": 2
 }

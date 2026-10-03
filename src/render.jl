@@ -318,6 +318,13 @@ _transform_dict(t::AxisTransform) = Dict{String, Any}(
     "valueaxis" => t.valueaxis === nothing ? nothing : string(t.valueaxis),
     "is3d" => t.is3d,
     "ispolar" => t.ispolar,
+    "polar" => _polar_dict(t.polar),
+)
+
+_polar_dict(::Nothing) = nothing
+_polar_dict(p::PolarFrame) = Dict{String, Any}(
+    "theta_as_x" => p.theta_as_x, "direction" => p.direction, "theta_0" => p.theta_0,
+    "r0" => p.r0, "branch" => collect(p.branch),
 )
 
 """
