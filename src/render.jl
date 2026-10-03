@@ -497,8 +497,11 @@ function _resolve_backend(explicit)
     )
 end
 
-_check_max_width(w::Real) = isfinite(w) && w > 0 ? w :
-    throw(ArgumentError("masque: `max_width` must be a positive number of pixels, got $w"))
+# Rounded once, so the CSS width, the density, and `display_scale` all use the same box.
+function _check_max_width(w::Real)
+    isfinite(w) && round(Int, w) >= 1 && return round(Int, w)
+    throw(ArgumentError("masque: `max_width` must be at least 1 pixel, got $w"))
+end
 _check_max_width(w) = throw(ArgumentError("masque: `max_width` must be a positive number of pixels, got $(repr(w))"))
 _check_px_per_unit(::Nothing) = nothing
 _check_px_per_unit(p::Real) = isfinite(p) && p > 0 ? Float64(p) :
@@ -611,6 +614,9 @@ function _masque(
         _finalize!(fig)        # finalize once; render + context share it
         _pin_pan_ticklabelspace!(fig, interactables)
         ppu = something(px_per_unit, _ppu(backend, fig, max_width))
+        round(Int, size(fig.scene)[1] * ppu) >= 1 || throw(
+            ArgumentError("masque: `px_per_unit = $ppu` makes the picture less than 1 pixel wide"),
+        )
         ctx = context(backend, fig, ppu, max_width)
         tip_style = tip_style_dict(;
             tooltip_bg, tooltip_color, tooltip_accent, tooltip_font, tooltip_font_size, tooltip_radius, tooltip_caret,

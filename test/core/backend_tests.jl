@@ -37,6 +37,10 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws ArgumentError masque(f; px_per_unit = 0)
         @test_throws ArgumentError masque(f; px_per_unit = :big)
         @test_throws ArgumentError masque(f; max_width = -1)
+        @test_throws ArgumentError masque(f; max_width = 0.4)            # rounds to a 0 px box
+        @test_throws ArgumentError masque(f; px_per_unit = 1.0e-4)       # a 0 px picture
+        w = masque(f; max_width = 300.6)                                 # one rounded width throughout
+        @test w.display_css == 301 && w.manifest["scaling"] == 2 * 301 / 600
     end
 
     @testset "deprecated CairoBackend(; max_width) forwards (#236)" begin

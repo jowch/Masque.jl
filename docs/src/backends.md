@@ -29,8 +29,10 @@ Two `masque` keywords work the same on both backends:
   shrinks to fit.
 - `px_per_unit` is how many image pixels each unit of the figure's
   `size` gets. By default, CairoMakie draws the PNG at twice the width
-  it shows at, and WGLMakie draws at 2. A larger number gives a sharper
-  picture when the reader zooms the page, and a heavier page to load.
+  it shows at, and WGLMakie draws 2 pixels per unit, so a wide figure
+  that `max_width` shrinks is sharper on WGLMakie. A larger number
+  gives a sharper picture when the reader zooms the page, and a heavier
+  page to load.
 
 ```julia
 masque(fig; max_width = 500, px_per_unit = 3)
