@@ -59,6 +59,7 @@ the mark without changing the variable.
 |---|---|---|---|
 | Hover a mark | Tooltip and highlight | Unchanged | No change |
 | Click a mark (or Enter / Space on a focused mark) | Mark stays highlighted | The clicked mark's event | Respond |
+| Click the selected mark again (or Enter / Space on it) | Highlight clears | `nothing` | Respond |
 | Drag an ROI box or threshold line | Box or line moves | Unchanged while dragging | No change |
 | Release the ROI or threshold | Enclosed marks highlight (with `selects`) | The box, the enclosed marks, or the line's value | Respond |
 | Pan or orbit ([`ViewInteractable`](@ref)) | The view moves | Never changes | No change |
@@ -71,6 +72,7 @@ directly. A clicked mark's event has the payload's fields, such as
 `pick.city`, along with `pick.layer`, the interactable you clicked, and
 `pick.index`, the mark's position in your data. The event indexes your
 data too: `xs[pick]` is that mark's value and `df[pick, :]` is its row.
+Clicking the selected mark again sets the value back to `nothing`.
 
 | Interaction | `@bind` value | Read it as |
 |---|---|---|
@@ -86,7 +88,8 @@ data too: `xs[pick]` is that mark's value and `df[pick, :]` is its row.
 
 A widget with several interactables holds the most recent event, so to
 tell them apart, check `pick.layer` or the event's type. Clicking another
-mark replaces the event, and clicking empty space keeps it. To start
+mark replaces the event, clicking the selected mark again clears it to
+`nothing`, and clicking empty space keeps it. To start
 with marks selected, see [Selection](@ref).
 
 ## Static exports and this site

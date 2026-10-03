@@ -448,6 +448,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     const state = createOverlayState()
     state.selHits_ = selHits
+    // A brush seed belongs to the box, not a click, so only a scalar seed can be clicked off.
+    if (!seedItems && hydrated.length === 1) state.selSource_ = hydrated[0]
 
     type GestureCanvas = HTMLCanvasElement & {
         masqueReplaceScene?: (scene: unknown, pxPerUnit?: number, width?: number, height?: number) => void
