@@ -132,6 +132,17 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 1, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
+        "key" => "arrows3d_shared", "layerId" => "arrows3d", "layerKind" => "segments",
+        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "index", "hoverIndex" => 1, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
+        # One band is one element, so nothing is baked selected and hover takes element 0.
+        "key" => "band_y", "layerId" => "band", "layerKind" => "polygons",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
         "key" => "hlines", "layerId" => "hlines", "layerKind" => "segments",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "segment_index", "hoverIndex" => 1, "hoverTip" => "segment_index",
@@ -479,6 +490,24 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:arrows3d => [1]))
     end
 
+    # One direction shared by every arrow (Makie broadcasts it), #248.
+    arrows3d_shared = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "arrows3d-shared")
+        apts = Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3)]
+        arrows3d!(ax, apts, Makie.Vec3f(1, 0, 1); color = :gray)
+        masque(fig; selected = Dict(:arrows3d => [1]))
+    end
+
+    # direction = :y draws the transpose of the band's converted points, #247. Values run
+    # along x, so a hit ring left unflipped would sit across the axis from the drawn band.
+    band_y = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "band-y", limits = (0, 8, 0, 6))
+        band!(ax, 1:5, [1.0, 1.5, 1.0, 1.5, 1.0], [3.0, 3.5, 3.0, 3.5, 3.0]; direction = :y, color = :gray)
+        masque(fig)
+    end
+
     hlines = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "hlines", limits = (0, 5, 0, 5))
@@ -668,7 +697,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
 end

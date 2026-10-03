@@ -929,7 +929,7 @@ Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLa
 | `p` | default `id` | rings from | notes |
 |---|---|---|---|
 | `Makie.Poly` | `:poly` | converted geometry | one element per shape: a point ring, `Rect`, `Circle`, `Polygon` (holes kept), or `MultiPolygon`; a lone `MultiPolygon` is one element per polygon, as Makie colors it |
-| `Makie.Band` | `:band` | lower curve + reversed upper curve | always exactly one open ring |
+| `Makie.Band` | `:band` | lower curve + reversed upper curve, as drawn (`direction = :y` swaps x and y) | always exactly one open ring |
 | `Makie.Density` | `:density` | its descendant `Band`'s KDE fill | same shape as `Band` |
 | `Makie.Contourf` | `:contourf` | each filled polygon's exterior, plus its holes as further rings of the same element | payload `(; low, high)`, the band edges nearest each polygon's fill color |
 | `Makie.Violin` | `:violin` | each violin's outline | payload `(; x)`, the nearest category to the ring's geometric center |

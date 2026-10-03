@@ -244,6 +244,8 @@ SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothin
 SegmentInteractable(ax, p::Makie.Wireframe; id = :wireframe, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
     SegmentInteractable(ax, _conv(_childof(p, Makie.LineSegments))[1]; mode = :pairs, id, payloads, tol, tooltip, label)
 
+_bcast(v, k) = length(v) == 1 ? v[1] : v[k]
+
 # Raw pos→pos+dir is wrong: arrows3d autoscales and renders via MeshScatter children in a
 # normalized, anisotropically-scaled space. Read the processed startpoints/endpoints instead
 # (already post-align/lengthscale/normalize, in DATA coords).
@@ -258,17 +260,23 @@ function SegmentInteractable(ax, p::Makie.Arrows3D; id = :arrows3d, payloads = n
         push!(verts, Makie.Point3f(a...), Makie.Point3f(b...))
     end
     if payloads === nothing
+        # Makie broadcasts a single point or direction over every arrow, so either can have
+        # length 1 while startpoints has one entry per arrow.
         pts, dirs = p.points[], p.directions[]
-        length(pts) == length(starts) || error(
-            "Arrows3D introspection: points/startpoints length mismatch ($(length(pts)) vs $(length(starts)))"
-        )
-        payloads = [
-            (;
-                index = k,
-                x = Float64(pts[k][1]), y = Float64(pts[k][2]), z = Float64(pts[k][3]),
-                u = Float64(dirs[k][1]), v = Float64(dirs[k][2]), w = Float64(dirs[k][3]),
+        for (name, v) in (("points", pts), ("directions", dirs))
+            length(v) in (1, length(starts)) || error(
+                "Arrows3D introspection: $name/startpoints length mismatch ($(length(v)) vs $(length(starts)))"
             )
-                for k in eachindex(pts)
+        end
+        payloads = [
+            let pt = _bcast(pts, k), d = _bcast(dirs, k)
+                (;
+                    index = k,
+                    x = Float64(pt[1]), y = Float64(pt[2]), z = Float64(pt[3]),
+                    u = Float64(d[1]), v = Float64(d[2]), w = Float64(d[3]),
+                )
+            end
+                for k in eachindex(starts)
         ]
     end
     return SegmentInteractable(ax, verts; mode = :pairs, id, payloads, tol, tooltip, label)
@@ -372,8 +380,12 @@ end
 # Ring = lower curve followed by the reversed upper curve, in data space. Open ring (last
 # vertex ≠ first); the :polygons even-odd hit-test closes it implicitly.
 _band_ring(lower, upper) = vcat(collect(lower), reverse(collect(upper)))
+# direction=:y flips only the mesh; converted[] stays Point2(x, y), so swap to match the drawn band.
 function PolygonInteractable(ax, p::Makie.Band; id = :band, payloads = nothing, tooltip = nothing, label = nothing)
     lower, upper = _conv(p)
+    if p.direction[] === :y
+        lower, upper = reverse.(lower), reverse.(upper)
+    end
     return PolygonInteractable(ax, [_band_ring(lower, upper)]; id, payloads, tooltip, label)
 end
 

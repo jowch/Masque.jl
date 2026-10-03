@@ -65,6 +65,10 @@ All notable changes to this project are documented here. The format is based on
   too. Each entry of the vector is one hover and click target, the same element its `color`
   colors, and a polygon's holes are not part of it. A single `MultiPolygon` is one target per
   polygon, since Makie colors each one separately.
+- A `band!` drawn with `direction = :y` now responds where it is drawn. Before, its hover and
+  click target was the band mirrored across the diagonal.
+- `masque(fig)` no longer fails when an `arrows3d!` gives one direction for every arrow
+  (`arrows3d!(ax, points, Vec3f(1, 0, 1))`).
 
 ## [0.1.1] - 2026-10-01
 

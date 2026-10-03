@@ -831,6 +831,25 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test ints[1] isa PolygonInteractable
         _, _, c = ctx_for(fig)
         @test only(hitlayers(ints[1], c)).id === :band
+
+        # direction = :y draws the transpose of converted[]; the hit ring must follow (#247).
+        fy = Figure(); axy = Axis(fy[1, 1])
+        lo, hi = [2.5, 3.0, 0.0, 2.0, 4.0], [4.5, 5.0, 2.0, 4.0, 6.0]   # lo[1] ≠ its position, so the swap shows
+        band!(axy, 1:5, lo, hi; direction = :y, color = :red)
+        Makie.update_state_before_display!(fy)
+        piy = PolygonInteractable(axy, axy.scene.plots[1])
+        @test piy.rings[1][1][1:2] ≈ [lo[1], 1.0]         # (value, position), not (position, value)
+        @test piy.rings[1][end][1:2] ≈ [hi[1], 1.0]
+        _, ppuy, cy = ctx_for(fy)
+        imgy = Makie.colorbuffer(fy; px_per_unit = ppuy)
+        g = only(only(hitlayers(piy, cy)).geometry)
+        n = length(lo)
+        for k in 2:(n - 1)                             # midpoint of lower k and upper k is on the band
+            j = 2n + 1 - k
+            mx, my = (g[2k - 1] + g[2j - 1]) / 2, (g[2k] + g[2j]) / 2
+            px = imgy[round(Int, my), round(Int, mx)]
+            @test Float64(Makie.red(px)) > 0.6 && Float64(Makie.green(px)) < 0.4
+        end
     end
 
     @testset "Density extraction" begin
