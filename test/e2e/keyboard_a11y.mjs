@@ -121,8 +121,6 @@ try {
       ring: hi ? { tag: hi.tagName.toLowerCase(), leaving: hi.classList.contains("masque-leave") } : null,
       liveText: live?.textContent ?? "",
       tipShown: sr.querySelector(".masque-tip")?.classList.contains("show") ?? false,
-      // The overlay's own bond value: on a fresh mount, the `selected=` seed.
-      bond: host.value ?? null,
     };
   }, key);
 
@@ -194,12 +192,7 @@ try {
     // The bond prints a 1-based Julia index. Arrow steps and `target` stay 0-based wire indices.
     const beforeIdxMatch = new RegExp(`:${layer.id},\\s*(\\d+)\\b`).exec(before);
     const beforeWire = beforeIdxMatch ? Number(beforeIdxMatch[1]) - 1 : -1;
-    // Enter on the element the overlay already holds would clear it (the toggle off), and on a
-    // remount the overlay holds the `selected=` seed while the kernel keeps an earlier run's
-    // value, so step past both.
-    const heldWire = s.bond && s.bond.layer === layer.id ? s.bond.index : -1;
-    let target = (beforeWire + 1) % n;
-    if (target === heldWire && n > 2) target = (target + 1) % n;
+    const target = (beforeWire + 1) % n; // guaranteed != beforeWire as long as n > 1
     // We're at `landed` — walk to `target`. ArrowRight/ArrowLeft clamp at the ends, they don't
     // wrap, so step in whichever direction `target` actually is from here.
     const delta = target - landed;
@@ -209,6 +202,14 @@ try {
     let after = before;
     for (let i = 0; i < 40 && after === before; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
     if (after === before) throw new Error(`${key}: Enter never updated #out_${key} (wire index ${target}, was ${beforeWire})`);
+    // Enter on the element the overlay already shows selected clears it. After a page reload
+    // the overlay shows the `selected=` seed while Pluto restores the kernel's last value, so
+    // the target can be that element: a second Enter selects it.
+    if (/=nothing\s*$/.test(after)) {
+      const cleared = after;
+      await page.keyboard.press("Enter");
+      for (let i = 0; i < 40 && after === cleared; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
+    }
     const idRe = new RegExp(`:${layer.id}|${layer.id}`, "i");
     if (!idRe.test(after)) throw new Error(`${key}: Enter bond value missing layer id: ${after.slice(0, 200)}`);
     if (!new RegExp(`:${layer.id},\\s*${target + 1}\\b`).test(after)) {
