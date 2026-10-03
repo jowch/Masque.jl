@@ -306,10 +306,29 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test length(ints) == 6
             _, _, c = ctx_for(f)
             ids = [only(hitlayers(i, c)).id for i in ints]
-            @test ids == [:scatter, :lines, :cells, :bars, :poly, :scatter_2]
+            # Ids follow drawing order; the list puts each axis's last-drawn plot first, so
+            # the mark drawn on top wins an overlap.
+            @test ids == [:poly, :bars, :cells, :lines, :scatter, :scatter_2]
             @test length(unique(ids)) == 6      # no collisions across axes
             # a2's scatter resolves to a2's transform (its own axis), not a1's
-            @test only(hitlayers(ints[6], c)).axis != only(hitlayers(ints[1], c)).axis
+            @test only(hitlayers(ints[6], c)).axis != only(hitlayers(ints[5], c)).axis
+        end
+
+        @testset "the plot drawn on top comes first (nodes over edges)" begin
+            # A graph: edges drawn first, nodes over them. Every edge passes through the
+            # centre of the nodes it joins, so the first-match hit test must reach the nodes.
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1])
+            pts = Point2f[(0, 0), (1, 1), (2, 0)]
+            lines!(a, pts)
+            scatter!(a, pts; markersize = 20)
+            text!(a, "label"; position = (1.0, 0.5))
+            w = masque(f)
+            @test [L["id"] for L in w.manifest["layers"]] == ["text", "scatter", "lines"]
+            # A plot's own layers keep their order: a stem's points still precede its stems.
+            fs = Figure(size = (500, 350)); as = Axis(fs[1, 1])
+            lines!(as, [0.0, 3.0], [0.0, 3.0])
+            stem!(as, [1.0, 2.0], [1.0, 2.0])
+            @test [i.id for i in interactables(fs)] == [:stem, :stem_stems, :lines]
         end
 
         @testset "skips unsupported plot types with a warning" begin
@@ -327,8 +346,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             scatter!(a, [1.0, 2.0], [1.0, 2.0]; markersize = 18)
             heatmap!(a, 1:3, 1:3, rand(3, 3))
             w = masque(f)
-            @test [L["id"] for L in w.manifest["layers"]] == ["scatter", "cells"]
-            @test [L["kind"] for L in w.manifest["layers"]] == ["circles", "grid"]
+            @test [L["id"] for L in w.manifest["layers"]] == ["cells", "scatter"]
+            @test [L["kind"] for L in w.manifest["layers"]] == ["grid", "circles"]
         end
 
         @testset "no introspectable plots -> warn, render image only" begin
@@ -351,11 +370,11 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             ints = @test_logs interactables(f)
             _, _, c = ctx_for(f)
             ids = [only(hitlayers(i, c)).id for i in ints]
-            @test ids == [:lines, :segments, :poly, :lines_2]
+            @test ids == [:lines_2, :poly, :segments, :lines]
             @test ints[1] isa SegmentInteractable && ints[4] isa SegmentInteractable
-            @test ints[3] isa PolygonInteractable
+            @test ints[2] isa PolygonInteractable
             # The arc is one polyline. Its image-px vertices sit on the stroke Cairo drew.
-            g = only(hitlayers(ints[1], c)).geometry[1]
+            g = only(hitlayers(ints[4], c)).geometry[1]
             img = Makie.colorbuffer(f; px_per_unit = 2.0)
             @test drawn_near(img, g[1], g[2])
             mid = length(g) ÷ 2
@@ -368,8 +387,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             rints = @test_logs interactables(fr)
             _, _, cr = ctx_for(fr)
             rids = [only(hitlayers(i, cr)).id for i in rints]
-            # violin, raindrop scatter, box — not the violin's poly or the box's crossbar
-            @test rids == [:violin, :scatter, :boxplot]
+            # box, raindrop scatter, violin (topmost first) — not the violin's poly or the
+            # box's crossbar
+            @test rids == [:boxplot, :scatter, :violin]
 
             fb = Figure(size = (400, 300)); ab = Axis(fb[1, 1])
             bracket!(ab, 0.0, 0.0, 1.0, 1.0)
@@ -394,7 +414,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             Makie.update_state_before_display!(ft)
             tints = @test_logs interactables(ft)
             _, _, ct = ctx_for(ft)
-            @test [only(hitlayers(i, ct)).id for i in tints] == [:poly, :scatter]
+            @test [only(hitlayers(i, ct)).id for i in tints] == [:scatter, :poly]
 
             # `qqline = :none` leaves a visible `LineSegments` with no vertices. That must
             # not publish `:segments`, so a real segment layer still gets the first id.
@@ -404,7 +424,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             Makie.update_state_before_display!(fq)
             qints = @test_logs interactables(fq)
             _, _, cq = ctx_for(fq)
-            @test [only(hitlayers(i, cq)).id for i in qints] == [:scatter, :segments]
+            @test [only(hitlayers(i, cq)).id for i in qints] == [:segments, :scatter]
             @test !isempty(only(i for i in qints if i.id === :segments).vertices)
         end
 
@@ -706,8 +726,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             stairs!(a, [0.0, 1.0, 2.0], [0.0, 1.0, 0.5])
             hlines!(a, [2.0])
             w = masque(f)
-            @test [L["id"] for L in w.manifest["layers"]] == ["stairs", "hlines"]
-            @test [L["kind"] for L in w.manifest["layers"]] == ["lines", "segments"]
+            @test [L["id"] for L in w.manifest["layers"]] == ["hlines", "stairs"]
+            @test [L["kind"] for L in w.manifest["layers"]] == ["segments", "lines"]
         end
     end
 

@@ -6,8 +6,8 @@ Each table says when it was measured. How a number got here, and the numbers it 
 git history.
 
 **Reproduce.** Run the benches in the warmed dev env, not `--project=.`: CairoMakie, WGLMakie
-and JSON3 are `[extras]` test deps, invisible to the package env (see `CLAUDE.md`;
-`scripts/cloud-warm.sh julia` builds the env).
+and JSON3 are `[extras]` test deps, invisible to the package env, and the `:webgl` benches also
+load Pluto (see `CLAUDE.md`; `scripts/cloud-warm.sh julia` builds the env with all of them).
 
 ```sh
 ENV_DIR="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}"
@@ -44,7 +44,7 @@ A rendered cell ships these. The click's return value (`{layer, index}`) is tiny
 |------|---------|-----------|-------------|---------|
 | **base64 PNG** | `:cairo` | HTML `<img src="data:…">` | output pixel area × visual density | every render |
 | **WGLMakie bundle** | `:webgl` | `published_to_js` → blob URL → `import()` | fixed (vendored bundle, three.js, atlas) | once per notebook |
-| **scene** | `:webgl` | `published_to_js` (MsgPack binary) | #plots × geometry + glyph atlas | every render or gesture frame |
+| **scene** | `:webgl` | `published_to_js` (MsgPack) | #plots × (shader source + geometry) + glyph atlas | every render or gesture frame |
 | **manifest** | both | `published_to_js` (MsgPack) | #hit-elements × per-element payload | every render or gesture frame |
 | **overlay bundle** | both | inlined in the cell, idempotent | fixed | per cell, parsed once per page |
 | **WGLMakie shim** | `:webgl` | `published_to_js` → blob URL on `window.__MasqueWGL` | fixed | once per notebook |
@@ -213,9 +213,10 @@ for the heatmap sample sizes). Render times are a range across repeated runs on 
 
 ## Wire encoding decisions
 
-`published_to_js` always serializes MsgPack. Its binary fast path applies only to a top-level
-typed numeric vector, and the manifest is a `Dict{String,Any}` with `Any[]` layers, so geometry
-serializes as generic MsgPack arrays even though each leaf is a typed vector.
+`published_to_js` always serializes MsgPack. Its binary fast path applies to a typed numeric
+vector (`Vector{Float32}`, `Vector{Int32}`, and Pluto's other typed-array eltypes) at any depth,
+including as a value in a `Dict{String,Any}`. The manifest's geometry is an `Any[]` of scalars, not
+a typed vector, so it serializes as generic MsgPack arrays.
 `bench/encoding_experiment.jl` measured the options on a real 50k-circle geometry:
 
 | Encoding | bytes/coord | 50k circles | |
@@ -270,80 +271,86 @@ SVG output path would have to beat for sparse plots.
 
 ## `:webgl` envelope
 
-Measured by `bench/webgl_payload_size.jl` on 2026-06-30 (commit `f763c6d`), WGLMakie 0.13.12,
-Julia 1.12; re-run unchanged 2026-07-02.
+Measured by `bench/webgl_payload_size.jl` on 2026-10-03 at `b204758`, WGLMakie 0.13.15, Makie
+0.24.15, Pluto 0.20.28, Julia 1.13. **packed** is `Pluto.pack` of `scene_payload`: the MsgPack
+Pluto sends over the websocket and base64-encodes into a static export (`bench/pluto_packed.jl`).
+**shaders** and **atlas** are the parts of it under the GLSL source and glyph-atlas keys.
+**numeric** is the raw bytes of the scene's numeric vectors alone, with no maps, keys, or strings;
+it is a lower bound, and it is the figure this section reported as the wire before #178. Sizes
+move by a few tens of bytes from run to run.
 
-> **Caveat (#178).** Every `:webgl` scene size in this file (this section, "Backend comparison",
-> and the scene column of the `:webgl` gesture frames) is the **sum of the scene's numeric-vector
-> bytes**, not what Pluto packs. #178 measured the packed scene at **2.5–3.6×** that sum for the
-> envelope scenes, mostly MsgPack structure (maps, keys, strings, scalars) rather than glyph-atlas
-> tiles. Read every scene size as a lower bound, and any ratio built on one (the
-> bundle-to-scene multiple, the crossover N) as optimistic for `:webgl`, until #178 re-runs the
-> benches. The bundle is a single string and is not affected.
-
-| | shipped | wire | gzip-bin | gzip-json | JSON proxy |
-|---|---|---:|---:|---:|---:|
-| WGLMakie bundle | once per notebook | **1.09 MB** | — | — | — |
-| scene, 2D lines (200 pts) | per cell | **0.07 MB** | 0.02 | 0.05 | 0.33 |
-| scene, 2D scatter + text (40) | per cell | **0.10 MB** | 0.03 | 0.08 | 0.44 |
-| scene, 3D helix (300 pts) | per cell | **0.14 MB** | 0.05 | 0.11 | 0.56 |
+| | shipped | packed | shaders | atlas | numeric | gzip-packed | gzip-json | JSON proxy |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| WGLMakie bundle | once per notebook | **1.09 MB** | — | — | — | — | — | — |
+| scene, 2D lines (200 pts) | per cell | **0.24 MB** | 0.14 | 0.05 | 0.07 | 0.05 | 0.05 | 0.33 |
+| scene, 2D scatter + text (40) | per cell | **0.29 MB** | 0.16 | 0.09 | 0.10 | 0.07 | 0.08 | 0.44 |
+| scene, 3D helix (300 pts) | per cell | **0.35 MB** | 0.18 | 0.13 | 0.14 | 0.09 | 0.11 | 0.56 |
 
 The first `:webgl` cell ships the bundle plus its scene; each later cell, and each re-render,
-ships only its scene. Pluto's MsgPack encodes each typed numeric vector as a binary extension, so
-the real wire is the binary column, ~4–5× under `JSON3.write`; the JSON proxy is an upper bound.
+ships only its scene. Pluto's MsgPack ships each typed numeric vector as its raw bytes plus a short
+header, so the numeric data packs at about its raw size, and the packed scene is still 2.5–3.6×
+the numeric column. **Shader source is the largest part**: every plot, the axis decorations
+included, carries its own vertex and fragment shader as text, which is 50–60% of each packed
+scene (143 631 B for the lines scene's eight plots). Glyph-atlas tiles are 22–36%. Keys, the
+other numeric vectors, and scalars are the remaining 41–51 KB. The JSON proxy is an upper bound.
+
+**Glyph tiles.** Makie ships each new glyph as `atlas_updates[hash] => [uv, sdf, width,
+minimum]`. On these scenes one tile's packed entry is 3.9–22.1 KB, a mean of 10–12 KB, and the
+scenes carry 5, 7, and 10 tiles.
 
 **The bundle ships once per notebook.** `published_to_js` ids are content-addressed, so the one
 cached bundle string has a stable id: Pluto keeps one copy across cells and skips already-known
 ids when a cell re-runs. The browser caches the bundle and shim blob URLs on `window.__MasqueWGL`,
 so WGLMakie imports once.
 
-**Compression is deferred.** gzip of the binary is ~3×, but using it means bypassing
-`published_to_js` and writing a MsgPack decoder in JS; gzip of JSON through the browser's
-`DecompressionStream` saves only ~25% against the binary wire (0.05 MB against 0.07 MB on the
-lines row). Glyph-atlas tiles repeat across scenes and could be shared
-like the bundle, but each is 10–20 KB and gzip overlaps the win. Revisit only if per-frame scene
-re-shipping shows up as the bottleneck; every `:webgl` view-gesture frame re-ships the full scene
-(#86, closed not planned).
+**Compression is deferred.** gzip cuts the packed scene ~4–5× (0.05 MB against 0.24 MB on the
+lines row), but using it means bypassing `published_to_js` and writing a MsgPack decoder in JS;
+gzip of JSON through the browser's `DecompressionStream` lands at about the same size. Shader
+source and glyph-atlas tiles repeat across scenes and could be shared like the bundle; the shaders
+are the larger share. Revisit only if per-frame scene re-shipping shows up as the bottleneck;
+every `:webgl` view-gesture frame re-ships the full scene (#86, closed not planned).
 
 ## Backend comparison
 
 `bench/vs_cairo.jl` builds the same seeded figures on both backends (WebGL in-process, Cairo in a
 subprocess, since one session loads one backend extension). The subprocess runs with
 `--project=<repo root>`, so `CairoMakie` must be loadable from there, for example through your
-default `@v1.x` env; if it is not, every Cairo column reads `UNSUPPORTED` and the script warns.
-Sizes are exact; ms are wall-clock. Last run 2026-06-30, WGLMakie 0.13.12, CairoMakie 0.15, Julia
-1.12. KB = bytes/1024, MB = bytes/1 000 000.
+default `@v1.x` env or `JULIA_LOAD_PATH="@:$ENV_DIR:@stdlib"`; if it is not, every Cairo column
+reads `UNSUPPORTED` and the script warns. Sizes are exact; ms are wall-clock. Last run 2026-10-03
+at `b204758`, WGLMakie 0.13.15, CairoMakie 0.15.15, Pluto 0.20.28, Julia 1.13. KB = bytes/1024,
+MB = bytes/1 000 000.
 
 **Cairo /render** is PNG + manifest, re-shipped every render. **WebGL scene** is the per-render
-scene (a lower bound, #178); the 1.09 MB bundle rides on the first cell only. **ms** is the server
-work to turn a fresh figure into a shippable payload.
+scene, packed as in the envelope above; the 1.09 MB bundle rides on the first cell only. **ms**
+is the server work to turn a fresh figure into a shippable payload.
 
 | figure | Cairo /render | Cairo ~ms | WebGL scene | WebGL ~ms | crossover N* |
 |---|--:|--:|--:|--:|--:|
-| line, 10 | 51 KB (51+1) | ~48 | 118 KB | ~25 | never |
-| scatter, 1 000 | 225 KB (187+38) | ~75 | 87 KB | ~31 | **7.7** |
-| scatter, 10 000 | 1 103 KB (724+379) | ~300 | 158 KB | ~26 | **1.1** |
-| scatter, 100 000 | 3 973 KB (53+**3 920**) | **~2 280** | 861 KB | ~32 | **0.3** |
-| heatmap, 200² | 386 KB (190+197) | ~49 | 1 956 KB | ~30 | never |
-| heatmap, 500² | the STRESS table | the STRESS table | 11 843 KB | ~45 | never |
-| 3D helix, 300 | not measured‡ | — | 141 KB | ~30 | not measured‡ |
+| line, 10 | 51 KB (51+0) | ~61 | 286 KB | ~26 | never |
+| scatter, 1 000 | 225 KB (187+38) | ~75 | 275 KB | ~27 | never |
+| scatter, 10 000 | 1 103 KB (724+379) | ~267 | 345 KB | ~27 | **1.4** |
+| scatter, 100 000 | 3 973 KB (53+**3 920**) | **~1 954** | 1 049 KB | ~32 | **0.4** |
+| heatmap, 200² | 386 KB (190+197) | ~64 | 2 137 KB | ~35 | never |
+| heatmap, 500² | 1 915 KB (1 009+906) | ~117 | 12 024 KB | ~61 | never |
+| 3D helix, 300 | 166 KB (164+2) | ~68 | 345 KB | ~32 | never |
 
 \*Renders after which cumulative `:webgl` (bundle + N·scene) is below cumulative `:cairo`
-(N·(PNG + manifest)). ‡This run predates `:cairo` `Axis3` support; the script measures it now, and
-the next run fills the row. The scatter rows use `markersize=6`, matching `payload_envelope.jl`;
+(N·(PNG + manifest)). The scatter rows use `markersize=6`, matching `payload_envelope.jl`;
 `stress.jl`'s scatter-100 000 uses `markersize=4`, which is why its PNG and render time are lower.
 
-- **Cairo's server time scales with the data** (~48 → ~2 280 ms from line-10 to scatter-100 000),
-  because it rasterizes. **WebGL stays at ~25–32 ms**, because it only serializes; the client
-  GPU draws.
+- **Cairo's server time scales with the data** (~61 → ~1 954 ms from line-10 to scatter-100 000),
+  because it rasterizes. **WebGL stays at ~26–35 ms** (61 ms for the 500² heatmap), because it
+  only serializes; the client GPU draws.
+- **A WebGL scene has a floor of ~275–345 KB**, mostly shader source, so up to scatter-1 000 a
+  Cairo render ships less and `:webgl` never catches up.
 - **Cairo's interactive cost is the manifest, not the PNG.** At 100 000 points the PNG collapses
   to 53 KB while the manifest is 3.9 MB, re-shipped every render.
-- **Dense rasters favour Cairo.** A heatmap ships to WebGL as a value grid: 500² is 11.8 MB against
-  a ~1 MB PNG.
+- **Dense rasters favour Cairo.** A heatmap ships to WebGL as a value grid: 500² is 12.0 MB against
+  a 1.0 MB PNG.
 
 The regimes that follow. Static small-to-mid 2D: `:cairo`, smaller per render and no bundle.
-Large, animated, or repeatedly updated 2D: `:webgl` (scatter-10 000 crosses over after about one
-re-render; scatter-100 000 wins on the first cell and costs ~70× less server time). 3D: `:webgl`
+Large, animated, or repeatedly updated 2D: `:webgl` (scatter-10 000 crosses over after 1.4
+renders; scatter-100 000 wins on the first cell and costs ~60× less server time). 3D: `:webgl`
 for a scene you rotate or animate, `:cairo` for a static 3D figure with hover and click. First
 paint is `:cairo`'s: a PNG decodes at once, while `:webgl`'s first cell downloads and compiles the
 bundle and initializes three.js before it draws. The interaction contract is the same on both;
@@ -386,16 +393,17 @@ manifest rebuild, is what it pays for.
 
 `bench/gesture_channel_webgl.jl`, 2026-09-22, Julia 1.10.12, WGLMakie 0.13.15, same scenes and
 method. No PNG: `render` serializes the figure once per frame and records `pxPerUnit` for the
-browser framebuffer. The scene is the same size at both resolutions, and its wire column is a
-lower bound (#178).
+browser framebuffer. The scene is the same size at both resolutions. Scene sizes are packed as in
+the `:webgl` envelope, re-measured 2026-10-03 at `b204758` on Julia 1.13 and Pluto 0.20.28; the
+numeric column matches the timing run's, so the scenes have not changed shape.
 
-| scene | in-drag p50 | settle p50 | scene wire | scene JSON |
-|---|---:|---:|---:|---:|
-| helix + 12 markers, orbit | 3.4–3.5 ms | 4.4–4.5 ms | 132.3 KB | 545.9 KB |
-| + 80×80 `surface!`, orbit | 3.4–3.5 ms | 4.5–4.6 ms | 522.2 KB | 1392.0 KB |
-| 6-point scatter, 2-D pan | 1.1–1.2 ms | 1.1–1.2 ms | 136.8 KB | 521.3 KB |
+| scene | in-drag p50 | settle p50 | scene packed | scene numeric | scene JSON |
+|---|---:|---:|---:|---:|---:|
+| helix + 12 markers, orbit | 3.4–3.5 ms | 4.4–4.5 ms | 357.3 KB | 132.3 KB | 545.9 KB |
+| + 80×80 `surface!`, orbit | 3.4–3.5 ms | 4.5–4.6 ms | 761.6 KB | 522.2 KB | 1392.0 KB |
+| 6-point scatter, 2-D pan | 1.1–1.2 ms | 1.1–1.2 ms | 324.9 KB | 136.8 KB | 521.3 KB |
 
-The frame's manifest adds 0.1 KB or less. The heavy scene is not render-bound here: it costs what
+The frame's manifest adds 1–3 KB packed. The heavy scene is not render-bound here: it costs what
 the light one does and pays in payload instead. Transfer and three.js deserialize and paint are
 not timed; `test/e2e/kind_sweep.mjs` confirms a frame lands on both backends but does not time it.
 
@@ -463,4 +471,3 @@ WGLMakie major bump, since this is upstream behaviour.
   Pinning it means loading heavier and heavier cells in a live notebook; worth doing if MB-scale
   features such as animation get built.
 - **Gesture-frame transfer and paint.** Both gesture benches time the Julia closure only.
-- **Pluto-packed `:webgl` scene bytes** (#178).

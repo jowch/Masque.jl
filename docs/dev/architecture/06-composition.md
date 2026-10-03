@@ -37,7 +37,9 @@ them cleanly:
    win the pixels under it, or it's unhoverable — [§3](03-interactables.md)),
    `:view` layers sort last (an ordinary drag wins over the catch-all pan/orbit gesture without a
    modifier — resolves the ScatterLines points-over-segments collision too), everything else
-   keeps its original relative order. We adopt Makie's `events` *vocabulary* now for
+   keeps its original relative order. That original order lists each axis's plots topmost
+   first (reverse drawing order, [§3](03-interactables.md)), so an overlap resolves to the mark
+   drawn on top. We adopt Makie's `events` *vocabulary* now for
    forward-compat, not its propagation machinery. A general Consume/z-order model for user-stacked
    custom regions stays YAGNI until someone actually needs to control ordering between two of
    their OWN overlapping interactables — the two cases handled by the fixed rule above are
