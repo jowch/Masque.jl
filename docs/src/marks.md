@@ -65,9 +65,9 @@ regions = interactables(p;
 @bind pick masque(fig, regions)
 ```
 
-Bands, densities, filled contours, violins, and Voronoi cells are
-polygons too, and a filled contour also reports the `low` and `high` of
-its level.
+Bands, densities, filled contours, violins, Voronoi cells, and hexbin
+hexagons are polygons too. A filled contour also reports the `low` and
+`high` of its level, and a hexagon reports its center and its `count`.
 
 ## Lines
 

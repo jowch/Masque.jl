@@ -154,8 +154,8 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         other = Figure(); oax = Axis(other[1, 1]); os = scatter!(oax, xs, ys)
         @test_throws ArgumentError assemble(f, interactables(os))
         # A recipe with no default and no method of its own fails at the caller's line.
-        hb = hexbin!(Axis(Figure()[1, 1]), rand(10), rand(10))
-        @test_throws ArgumentError interactables(hb)
+        m = mesh!(Axis(Figure()[1, 1]), [Point2f(0, 0), Point2f(1, 0), Point2f(0, 1)], [1 2 3])
+        @test_throws ArgumentError interactables(m)
         @test_throws ArgumentError assemble(f, s)
         @test_throws ArgumentError assemble(f, 1)
         # A request reaches build_manifest only through masque, which builds it.

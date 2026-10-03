@@ -101,6 +101,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
 | `Contourf` | `PolygonInteractable` | `low`, `high` | `:contourf` |
 | `Violin` | `PolygonInteractable` | `x` | `:violin` |
+| `Hexbin` | `PolygonInteractable` | `x`, `y`, `count` | `:hexbin` |
 | `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
 | `Stem` | `interactables(p)` | points, and stems as a second layer | `:stem`, `:stem_stems` |
 | `ScatterLines` | `interactables(p)` | points, and the line as a second layer | `:scatterlines`, `:scatterlines_line` |

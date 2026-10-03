@@ -173,8 +173,8 @@ stopping at the first known one so a mark becomes one layer (`rainclouds!` yield
 `ablines!` becomes `:segments`, and `pie!` becomes `:poly`, under the child's layer id. Invisible
 children (`triplot!`'s ghost edges) are not layers, an empty construct (`qqplot!` with
 `qqline = :none`) takes no id, and `_walk_refuses` turns down two kinds of child: a `Scatter`
-whose `markerspace` is not `:pixel` (`hexbin!`'s data-space hexagons, which a pixel radius
-cannot describe) and a plot whose `space` is not `:data` (`bracket!`'s pixel-space `Series`).
+whose `markerspace` is not `:pixel` (a data-space marker, which a pixel radius cannot
+describe; `hexbin!` avoids it with its own constructor) and a plot whose `space` is not `:data` (`bracket!`'s pixel-space `Series`).
 Only a parent that yields nothing warns, and the warning names that parent.
 
 `SegmentInteractable` carries `mode ∈ {:polyline,:pairs}`: same JS test, different Julia
