@@ -29,6 +29,10 @@ All notable changes to this project are documented here. The format is based on
   layers built with `interactables(plot)` and calls with `auto = false`.
 
 ### Added
+- `masque(fig; overlaystyle = (; …))` sets the look of highlights, the selection, the
+  crosshair, and ROI boxes for one widget: their color, outline widths, fill opacities, and
+  the ROI grips. Keys you leave out keep the built-in look. See the Overlay styling section of
+  the API page.
 - Threshold lines, ROI boxes, and pan and orbit views each get a Tab stop after the plot.
   Arrow keys move the line or the box, or pan or rotate the view; Alt with an arrow resizes an
   ROI box, and `+` / `-` zoom a pan view. The `@bind` value updates once, when the key is

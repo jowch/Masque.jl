@@ -89,8 +89,9 @@ function realColor(c) {
 // shape (if any) found in `svg.masque-fill`'s g.sel/g.hi, `edge` the one in `svg.masque-edge`,
 // `plain` the one in `svg.masque-plain` (an explicit-`hoverstyle` layer, or — only for
 // assertRing below — a selected-open-geometry ring). Each captured shape is `{ layer, tag,
-// className, stroke, fill, fillOpacity (all getComputedStyle), width, opacity (stroke-width/
-// stroke-opacity attributes), blend (getComputedStyle(svg).mixBlendMode, null for `plain`), …
+// className, stroke, fill, fillOpacity (all getComputedStyle), width, opacity (computed
+// stroke-width without "px", and computed stroke-opacity with 1 read as null), blend
+// (getComputedStyle(svg).mixBlendMode, null for `plain`), …
 // geometry }`. `wantDark` selects the figure-relative grey edge stroke (GREY.dark on a dark
 // figure, GREY.light otherwise) — irrelevant for the `plain` (explicit-hoverstyle) path.
 export function assertWash(wash, where, wantDark) {

@@ -39,10 +39,8 @@ export function makeRing(shape: SVGElement, stroke: string | undefined): SVGGEle
         el.classList.add("masque-hi")
         el.setAttribute("vector-effect", "non-scaling-stroke")
     }
-    inner.setAttribute("stroke-width", "2")
-    inner.setAttribute("stroke-opacity", "1")
-    outer.setAttribute("stroke-width", "4")
-    outer.setAttribute("stroke-opacity", "0.25")
+    inner.classList.add("masque-ring-inner")
+    outer.classList.add("masque-ring-outer")
     setHiStroke(g, stroke) // custom property inherits — set once on the wrapper
     g.append(outer, inner) // outer under inner so the 2px stroke stays crisp
     return g
@@ -108,13 +106,12 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
         el.setAttribute("vector-effect", "non-scaling-stroke")
         setHiStroke(el, st.stroke)
         if (mode === "hover") {
-            el.setAttribute("stroke-width", "1.5")
+            el.classList.add("masque-w-hover")
             if (!open) el.classList.add("masque-hover")
         } else if (rectfill) {
             el.classList.add("masque-wash", "masque-nostroke")
         } else {
-            el.classList.add("masque-wash")
-            el.setAttribute("stroke-width", "2")
+            el.classList.add("masque-wash", "masque-w-selected")
         }
         return { plain: el }
     }
@@ -133,9 +130,8 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
 
     if (open) {
         // A line has no interior — hover is edge (stroke) only, no fill shape.
-        el.classList.add("masque-hi", "masque-hover")
+        el.classList.add("masque-hi", "masque-hover", "masque-w-hover")
         el.setAttribute("vector-effect", "non-scaling-stroke")
-        el.setAttribute("stroke-width", "1.5")
         return { edge: el }
     }
 
@@ -148,11 +144,9 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
     edgeEl.classList.add("masque-hi")
     edgeEl.setAttribute("vector-effect", "non-scaling-stroke")
     if (mode === "hover") {
-        edgeEl.classList.add("masque-hover")
-        edgeEl.setAttribute("stroke-width", "1.5")
+        edgeEl.classList.add("masque-hover", "masque-w-hover")
     } else {
-        edgeEl.classList.add("masque-wash")
-        edgeEl.setAttribute("stroke-width", "2")
+        edgeEl.classList.add("masque-wash", "masque-w-selected")
     }
     return { fill: fillEl, edge: edgeEl }
 }

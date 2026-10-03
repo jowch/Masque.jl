@@ -59,6 +59,32 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test !haskey(Masque.tip_style_dict(; tooltip_bg = :red), "--masque-tip-color")  # unset omitted
     end
 
+    @testset "overlaystyle" begin
+        @test isempty(Masque.overlay_style_dict(nothing))                      # unset → empty
+        @test isempty(Masque.overlay_style_dict((;)))
+        d = Masque.overlay_style_dict((; color = :red, hover_width = 3, ring_halo_opacity = 0.5, handle_fill = "#000"))
+        @test d["--masque-chrome"] == "rgb(255,0,0)"                           # Makie color → CSS
+        @test d["--masque-hover-width"] == "3px"                               # length → px
+        @test d["--masque-ring-halo-opacity"] == "0.5"
+        @test d["--masque-handle-fill"] == "#000"                              # CSS string passthrough
+        @test length(d) == 4                                                   # unset keys omitted
+        # Every key maps to its own --masque-* property.
+        props = [first(v) for v in values(Masque._OVERLAY_STYLE_KEYS)]
+        @test allunique(props) && all(startswith("--masque-"), props)
+        @test_throws "unknown key `hover_widht`" Masque.overlay_style_dict((; hover_widht = 3))
+        @test_throws "hover_width" Masque.overlay_style_dict((; hover_width = -1))
+        @test_throws "opacity from 0 to 1" Masque.overlay_style_dict((; cross_opacity = 2))
+        @test_throws ArgumentError Masque.overlay_style_dict((; hover_width = true))
+        @test_throws "NamedTuple" Masque.overlay_style_dict(Dict(:hover_width => 3))
+
+        tfig = Figure(size = (600, 400)); tax = Axis(tfig[1, 1])
+        scatter!(tax, [1.0, 2.0], [1.0, 2.0])
+        m = masque(tfig; overlaystyle = (; color = :blue, selected_width = 2.5)).manifest
+        @test m["overlayStyle"] == Dict("--masque-chrome" => "rgb(0,0,255)", "--masque-selected-width" => "2.5px")
+        @test !haskey(masque(tfig).manifest, "overlayStyle")                  # default ships nothing
+        @test_throws ArgumentError masque(tfig; overlaystyle = (; nope = 1))
+    end
+
     @testset "tooltip_spec on interactables" begin
         # Originally read the file's shared bare `ax`, which by execution order was actually
         # the Voronoiplot testset's leftover axis (each nested `@testset`'s `let` reassigns
