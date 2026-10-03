@@ -208,18 +208,51 @@ function PointInteractable(ax, p::Makie.Scatter; id = :scatter, payloads = nothi
     i = payloads === nothing ?
         PointInteractable(ax, pts; kw...) :
         PointInteractable(ax, pts; kw..., payloads)
+    p.markerspace[] === :data && return _shift_data_markers(ax, i, p.marker_offset[])
     return _with_offset(i, _marker_offset(p, length(i.points)))
 end
 
-# `marker_offset` moves each marker from its point by that many px (Makie converts it to a
-# `Vec3f`, one for every point or one per point). It is in markerspace units, so only a
-# `:pixel` markerspace scatter is moved here.
+# `marker_offset` moves each marker from its point (Makie converts it to a `Vec3f`, one for
+# every point or one per point). In `:pixel` markerspace it is px, kept as the circle's offset.
 function _marker_offset(p, n)
     p.markerspace[] === :pixel || return Makie.Vec2f(0, 0)
     mo = p.marker_offset[]
     mo isa Makie.VecTypes && return Makie.Vec2f(mo[1], mo[2])
+    return Makie.Vec2f[Makie.Vec2f(m[1], m[2]) for m in _marker_offset_vec(mo, n)]
+end
+# In `:data` markerspace the offset is in the axis's transformed units, added after the scale:
+# the marker is drawn at `f⁻¹(f(x) + offset)`. Payloads keep the plot's own values.
+function _shift_data_markers(ax, i::PointInteractable, mo)
+    offs = _marker_offset_vec(mo, length(i.points))
+    all(iszero, offs) && return i
+    tf = _transform_func(ax.scene)
+    finv = Makie.inverse_transform(tf)
+    if _no_inverse(finv)
+        _warn_no_inverse(i.id)
+        return i
+    end
+    pts = map(eachindex(i.points)) do k
+        x = i.points[k]
+        t = _apply_transform(tf, Makie.Point3d(x[1], x[2], x[3])) .+ offs[k]
+        d = _apply_transform(finv, Makie.Point3d(t...))
+        Point3f(d[1], d[2], ax isa Makie.Axis3 ? d[3] : x[3])
+    end
+    return PointInteractable(
+        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset,
+    )
+end
+function _marker_offset_vec(mo, n)
+    mo isa Makie.VecTypes && return fill(Makie.Vec3d(_pt3(mo)...), n)
     length(mo) == n || error("PointInteractable: $(length(mo)) marker offsets for $n points (Makie internals changed?)")
-    return Makie.Vec2f[Makie.Vec2f(m[1], m[2]) for m in mo]
+    return [Makie.Vec3d(_pt3(m)...) for m in mo]
+end
+# Makie returns `nothing`, or a tuple holding `nothing` for a per-axis transform, when a
+# transform has no inverse.
+_no_inverse(finv) = finv === nothing || (finv isa Tuple && any(isnothing, finv))
+function _warn_no_inverse(id)
+    @warn "masque: layer :$(id) stays at its unmoved positions; the axis transform has no " *
+        "inverse, so the drawn positions can't be mapped back to data" maxlog = 16
+    return nothing
 end
 _with_offset(i::PointInteractable, o) = PointInteractable(
     i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o,
@@ -884,7 +917,10 @@ function _placement(ax, p)
     moved || return nothing
     tf = _transform_func(ax.scene)
     finv = Makie.inverse_transform(tf)
-    finv === nothing && return nothing
+    if _no_inverse(finv)
+        _warn_no_inverse(Makie.plotkey(p))
+        return nothing
+    end
     rot = is3d ? any(off(r, c) for r in 1:3, c in 1:3 if r != c) : (off(1, 2) || off(2, 1))
     place = function (pt)
         x = _pt3(pt)
@@ -893,14 +929,33 @@ function _placement(ax, p)
         d = _apply_transform(finv, Makie.Point3d(m[1], m[2], m[3]))
         return Point3f(d[1], d[2], is3d ? d[3] : x[3])
     end
-    return (; place, rotated = rot)
+    # A marker sized in data units (`meshscatter`) grows with the model when `transform_marker`.
+    marker = hasproperty(p, :transform_marker) && p.transform_marker[] === true ?
+        abs.(Matrix(M)[1:3, 1:3]) : nothing
+    return (; place, rotated = rot, marker)
+end
+
+# A drawn (world) position back to the data point drawn there: `f⁻¹(inv(scene model) * w)`.
+# With no inverse (a custom transform) the world position is used as is.
+function _world_to_data(ax)
+    S = inv(Makie.transformationmatrix(ax.scene)[])
+    finv = Makie.inverse_transform(_transform_func(ax.scene))
+    return function (w)
+        m = S * Makie.Vec4d(w[1], w[2], length(w) >= 3 ? w[3] : 0, 1)
+        d = _no_inverse(finv) ? Makie.Point3d(m[1], m[2], m[3]) : _apply_transform(finv, Makie.Point3d(m[1], m[2], m[3]))
+        return ax isa Makie.Axis3 ? Point3f(d[1], d[2], d[3]) : Point2f(d[1], d[2])
+    end
 end
 
 _place(i::AbstractInteractable, f) = i
 _place(i::TextInteractable, f) = i   # string_boundingboxes already include the transformation
-_place(i::PointInteractable, f) = PointInteractable(
-    i.ax, map(f.place, i.points), i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset,
-)
+function _place(i::PointInteractable, f)
+    r3 = i.radius3d === nothing || f.marker === nothing ? i.radius3d :
+        [Makie.Vec3f((f.marker * Float64[r...])...) for r in i.radius3d]
+    return PointInteractable(
+        i.ax, map(f.place, i.points), i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset,
+    )
+end
 function _place(i::SegmentInteractable, f)
     res = i.resolve === nothing ? nothing : (ax -> map(f.place, i.resolve(ax)))
     paths = i.paths === nothing ? nothing : [map(f.place, path) for path in i.paths]

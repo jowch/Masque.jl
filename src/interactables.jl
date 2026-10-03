@@ -893,12 +893,15 @@ function hitlayers(i::TextInteractable, ctx)
         error("TextInteractable: $(length(boxes)) boxes for $(length(i.payloads)) payloads (Makie internals changed?)")
     o = _scene_viewport(i.ax).origin
     g = Real[]
-    # Boxes are in markerspace: scene px by default, data units for `markerspace = :data`.
+    # Boxes are in markerspace: scene px by default, and for `markerspace = :data` the drawn
+    # (world) position, `model * f(x)`, already past the axis scale `f`. Those corners map back
+    # to data before projecting, or a log axis would apply `f` twice.
     ondata = i.p.markerspace[] === :data
+    todata = ondata ? _world_to_data(i.ax) : nothing
     # Empty strings are not skipped: a zero-area box keeps box-count == payload-count.
     for b in boxes
         if ondata
-            q = (_proj(ctx, i.ax, (b.origin[1], b.origin[2])), _proj(ctx, i.ax, (b.origin[1] + b.widths[1], b.origin[2] + b.widths[2])))
+            q = (_proj(ctx, i.ax, todata(b.origin)), _proj(ctx, i.ax, todata(b.origin .+ b.widths)))
             x0, x1 = minmax(q[1][1], q[2][1]); y0, y1 = minmax(q[1][2], q[2][2])
             append!(g, (_q((x0 + x1) / 2), _q((y0 + y1) / 2), _q(x1 - x0), _q(y1 - y0)))
             continue

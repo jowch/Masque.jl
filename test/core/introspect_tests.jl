@@ -574,18 +574,52 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             img = Makie.colorbuffer(f; px_per_unit = c.scaling)
             @test all(q -> drawn_near(img, q...; tol = 2), got)
         end
-        @testset "text with markerspace = :data: the box is projected from data units" begin
-            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 6, 0, 6))
-            t = text!(a, 2, 3; text = "data", fontsize = 1, markerspace = :data)
+        # Center of the dark ink in an image region (grid lines and panels are light).
+        function ink_center(img; rows = axes(img, 1), cols = axes(img, 2))
+            dark = [(x, y) for y in rows, x in cols if Float64(Makie.red(img[y, x])) < 0.3 && Float64(Makie.blue(img[y, x])) < 0.3]
+            isempty(dark) && return (NaN, NaN)
+            return (sum(first, dark) / length(dark), sum(last, dark) / length(dark))
+        end
+        @testset "marker_offset in markerspace = :data moves by data units past the axis scale" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; yscale = log10, limits = (0, 6, 1, 1000))
+            p = scatter!(a, [2.0], [10.0]; markerspace = :data, marker = Rect, markersize = 0.3, color = :black, marker_offset = Vec2f(1, 1))
+            hidedecorations!(a); hidespines!(a)
+            _, _, c = ctx_for(f)
+            i = only(interactables(a, p; radius = 5))
+            @test i.payloads[1] == (; index = 1, x = 2.0, y = 10.0)
+            g = only(hitlayers(i, c)).geometry
+            want = Masque.data_to_image_px(c, a, (3.0, 100.0))   # one unit right, one decade up
+            @test isapprox(g[1], want[1]; atol = 1) && isapprox(g[2], want[2]; atol = 1)
+            img = Makie.colorbuffer(f; px_per_unit = c.scaling)
+            @test all(isapprox.(ink_center(img), (g[1], g[2]); atol = 4))
+        end
+        @testset "text with markerspace = :data sits on its glyphs on a log axis" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; yscale = log10, limits = (0, 6, 1, 1000))
+            t = text!(a, 2, 100; text = "data", fontsize = 0.5, markerspace = :data, align = (:center, :center))
+            hidedecorations!(a); hidespines!(a)
             _, _, c = ctx_for(f)
             g = only(hitlayers(built(a, t), c)).geometry
-            bb = only(Makie.string_boundingboxes(t))
-            lo = Masque.data_to_image_px(c, a, (bb.origin[1], bb.origin[2]))
-            hi = Masque.data_to_image_px(c, a, (bb.origin[1] + bb.widths[1], bb.origin[2] + bb.widths[2]))
-            @test isapprox(g[3], hi[1] - lo[1]; atol = 1) && isapprox(g[4], lo[2] - hi[2]; atol = 1)
-            @test g[3] > 50   # a 1-data-unit font on a 6-unit axis is large, not a few px
+            @test g[3] > 50   # half a decade on a three-decade axis is large, not a few px
             img = Makie.colorbuffer(f; px_per_unit = c.scaling)
-            @test drawn_near(img, g[1], g[2]; tol = round(Int, g[4] / 2))
+            ink = ink_center(img)
+            @test isapprox(ink[1], g[1]; atol = g[3] / 4) && isapprox(ink[2], g[2]; atol = g[4] / 4)
+        end
+        @testset "scale! grows a meshscatter's data-sized hit radius with the marker" begin
+            f = Figure(size = (500, 500)); a = Axis3(f[1, 1]; limits = (-4, 4, -4, 4, -4, 4))
+            ms = meshscatter!(a, [Point3f(1, 0, 0)]; markersize = 0.5)
+            scale!(ms, 2, 2, 2)
+            ref = meshscatter!(a, [Point3f(2, 0, 0)]; markersize = 1.0, visible = false)
+            _, _, c = ctx_for(f)
+            got, want = only(hitlayers(built(a, ms), c)).geometry, only(hitlayers(built(a, ref), c)).geometry
+            @test isapprox(got, want; atol = 1)
+        end
+        @testset "an axis transform with no inverse leaves the targets in place, with a warning" begin
+            f = Figure(); a = Axis(f[1, 1])
+            p = scatter!(a, [1.0, 2.0], [1.0, 2.0]); translate!(p, 1, 0, 0)
+            Makie.update_state_before_display!(f)
+            a.scene.transformation.transform_func[] = (x -> x, x -> x)
+            ps = @test_logs (:warn, r"no inverse") match_mode = :any built(a, p).points
+            @test ps == Point3f[(1, 1, 0), (2, 2, 0)]
         end
     end
 

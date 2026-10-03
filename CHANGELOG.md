@@ -74,10 +74,12 @@ All notable changes to this project are documented here. The format is based on
 - `masque(fig)` no longer fails when an `arrows3d!` gives one direction for every arrow
   (`arrows3d!(ax, points, Vec3f(1, 0, 1))`).
 - A plot moved by `translate!`, `scale!`, or `rotate!` now responds where it is drawn, and so
-  does a scatter drawn with `marker_offset` and a `text!` with `markerspace = :data`. Before,
-  their hover and click targets stayed at the unmoved positions. Tooltips still show the
-  plot's own data values. A rotated plot whose targets are rectangles (bars, a heatmap) is
-  skipped with a warning, since its rectangles are no longer axis-aligned.
+  does a scatter drawn with `marker_offset` (pixel or data markerspace) and a `text!` with
+  `markerspace = :data`, on linear and scaled axes alike. A `meshscatter!` enlarged by
+  `scale!` gets a target of the enlarged size. Before, these targets stayed at the unmoved
+  positions and sizes. Tooltips still show the plot's own data values. A rotated plot whose
+  targets are rectangles (bars, a heatmap) is skipped with a warning, since its rectangles are
+  no longer axis-aligned.
 - A plot drawn with `space = :relative`, `:pixel`, or `:clip` is now skipped with a warning, as
   such text already was. Before, its targets were placed as if its positions were data.
 
