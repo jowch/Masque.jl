@@ -390,6 +390,9 @@ struct PointInteractable <: AbstractInteractable
     tooltip::Union{Nothing, Markup, Bool}
     label::Union{Nothing, String}
     colors::Any
+    # A scatter's `marker_offset`: how far each marker is drawn from its point, in px (y up),
+    # one for every point or one per point. Moves the hit circle with the marker.
+    offset::Union{Makie.Vec2f, Vector{Makie.Vec2f}}
 end
 function PointInteractable(
         ax, points; id = :points,
@@ -411,7 +414,7 @@ function PointInteractable(
     # `nothing` looks the radius up (`_point_radius`, introspect.jl). A passed number wins,
     # including the `9` the MeshScatter constructor still forwards when it has no pixel radius.
     r = _check_radius(radius === nothing ? _point_radius(ax, pts) : radius, length(pts))
-    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors)
+    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0))
 end
 function _check_radius(r, n)
     r isa AbstractVector || return Float64(r)
@@ -442,7 +445,9 @@ function hitlayers(i::PointInteractable, ctx)
         else
             (i.radius isa Vector ? i.radius[k] : i.radius) * ctx.scaling
         end
-        append!(g, (_q(q[1]), _q(q[2]), _q(r)))
+        o = i.offset isa Vector ? i.offset[k] : i.offset
+        cx, cy = q[1] + o[1] * ctx.scaling, q[2] - o[2] * ctx.scaling   # image px are y-down
+        append!(g, (_q(cx), _q(cy), _q(r)))
     end
     return [HitLayer(i.id, :circles, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label, i.colors)]
 end
@@ -898,8 +903,19 @@ function hitlayers(i::TextInteractable, ctx)
         error("TextInteractable: $(length(boxes)) boxes for $(length(i.payloads)) payloads (Makie internals changed?)")
     o = _scene_viewport(i.ax).origin
     g = Real[]
+    # Boxes are in markerspace: scene px by default, and for `markerspace = :data` the drawn
+    # (world) position, `model * f(x)`, already past the axis scale `f`. Those corners map back
+    # to data before projecting, or a log axis would apply `f` twice.
+    ondata = i.p.markerspace[] === :data
+    todata = ondata ? _world_to_data(i.ax) : nothing
     # Empty strings are not skipped: a zero-area box keeps box-count == payload-count.
     for b in boxes
+        if ondata
+            q = (_proj(ctx, i.ax, todata(b.origin)), _proj(ctx, i.ax, todata(b.origin .+ b.widths)))
+            x0, x1 = minmax(q[1][1], q[2][1]); y0, y1 = minmax(q[1][2], q[2][2])
+            append!(g, (_q((x0 + x1) / 2), _q((y0 + y1) / 2), _q(x1 - x0), _q(y1 - y0)))
+            continue
+        end
         bx, by = Float64(b.origin[1]), Float64(b.origin[2])
         bw, bh = Float64(b.widths[1]), Float64(b.widths[2])
         # scene-local (y-up) → image px (y-down): same ×scaling + y-flip as the backend `project` closure.
