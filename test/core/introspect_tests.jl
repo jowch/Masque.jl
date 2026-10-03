@@ -521,6 +521,18 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test only(interactables(ac, sc; payloads = ["p", "q", "r"])).payloads == ["p", "q", "r"]
         m = masque(fc).manifest
         @test only(filter(l -> l["id"] == "scatter", m["layers"]))["payloads"][2].x == "b"
+        # the plot-object constructors fill their default payloads the same way
+        @test [p.x for p in PointInteractable(ad, sd).payloads] == ["2024-01-01", "2024-01-02", "2024-01-03"]
+        @test [p.x for p in PolygonInteractable(ac, vc).payloads] == ["a", "b"]
+        @test TextInteractable(ac, tc).payloads[1].x == "c"
+        @test PointInteractable(ac, sc; payloads = [(; x = 2.0) for _ in 1:3]).payloads[1].x == 2.0
+        fh = Figure(); ah = Axis(fh[1, 1])
+        sh = scatter!(ah, Dates.Time.(1:3), [1.0, 2.0, 3.0])
+        Makie.update_state_before_display!(fh)
+        @test [p.x for p in built(ah, sh).payloads] == ["01:00:00", "02:00:00", "03:00:00"]
+        # a number with no date or category behind it stays a number (here, past Int64 ms)
+        @test Masque._unconvert_payloads(ad, Any[(; x = 1.0e30)])[1].x == 1.0e30
+        @test Masque._unconvert_payloads(ac, Any[(; x = 7.0)])[1].x == 7.0
     end
 
     @testset "placement attributes move the hit target with the mark (#245)" begin

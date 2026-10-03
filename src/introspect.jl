@@ -326,6 +326,7 @@ function SegmentInteractable(ax, p::Makie.Arrows3D; id = :arrows3d, payloads = n
             end
                 for k in eachindex(starts)
         ]
+        payloads = _unconvert_payloads(ax, payloads)
     end
     return SegmentInteractable(ax, verts; mode = :pairs, id, payloads, tol, tooltip, label)
 end
@@ -487,7 +488,7 @@ end
 function PolygonInteractable(ax, p::Makie.Violin; id = :violin, payloads = nothing, tooltip = nothing, label = nothing)
     poly = _childof(p, Makie.Poly)
     rings = _conv(poly)[1]
-    pl = payloads === nothing ? _violin_payloads(p, rings) : payloads
+    pl = payloads === nothing ? _unconvert_payloads(ax, _violin_payloads(p, rings)) : payloads
     return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
 end
 
@@ -860,8 +861,7 @@ end
 
 # returns a Vector{AbstractInteractable} — usually one, two for composites (Stem, ScatterLines).
 # A non-data-space plot gives none (with a warning), the layers of a plot moved by its own
-# transformation are moved with it, and default payloads show categorical and date positions
-# as the user's values.
+# transformation are moved with it.
 function _construct(ax, p, id; kw...)
     if !(p isa Makie.Text || p isa Makie.Annotation) && _nondata_space(p)
         @warn "masque: skipping $(Makie.plotkey(p)) drawn in space = :$(p.space[]); only " *
@@ -870,18 +870,14 @@ function _construct(ax, p, id; kw...)
     end
     built = _construct_unplaced(ax, p, id; kw...)
     f = _placement(ax, p)
-    placed = f === nothing ? built : AbstractInteractable[i for i in (_place(i, f) for i in built) if i !== nothing]
-    haskey(kw, :payloads) && return placed
-    return AbstractInteractable[_with_payloads(i, _unconvert_payloads(ax, i)) for i in placed]
+    return f === nothing ? built : AbstractInteractable[i for i in (_place(i, f) for i in built) if i !== nothing]
 end
 
 # A positional default payload (`x`, `y`, `z`) holds Makie's converted number. On an axis
 # that converts that dimension, show what the user plotted instead: a category's label (as
 # the axis readout does), or a date/time. Both go out as strings, the form the tooltip
 # shows. Any other conversion, or a number that maps back to nothing, is left as is.
-function _unconvert_payloads(ax, i)
-    hasproperty(i, :payloads) || return nothing
-    pls = i.payloads
+function _unconvert_payloads(ax, pls)
     out = nothing
     for (k, d) in ((:x, :dim1_conversion), (:y, :dim2_conversion), (:z, :dim3_conversion))
         hasproperty(ax, d) || continue
@@ -896,7 +892,7 @@ function _unconvert_payloads(ax, i)
             sv === nothing || (out[j] = merge(out[j], NamedTuple{(k,)}((sv,))))
         end
     end
-    return out
+    return something(out, pls)
 end
 function _dim_value(c::Makie.CategoricalConversion, v)
     isfinite(v) && isinteger(v) || return nothing
@@ -922,12 +918,6 @@ function _dim_strings(vals)
         v === nothing ? nothing : dateonly && v isa D.DateTime ? string(D.Date(v)) : string(v)
             for v in vals
     ]
-end
-
-_with_payloads(i, ::Nothing) = i
-function _with_payloads(i, pl)
-    vals = [f === :payloads ? pl : getfield(i, f) for f in fieldnames(typeof(i))]
-    return typeof(i)(vals...)
 end
 
 function _construct_unplaced(ax, p, id; kw...)
