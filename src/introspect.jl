@@ -359,6 +359,7 @@ function SegmentInteractable(ax, p::Makie.Arrows3D; id = :arrows3d, payloads = n
             end
                 for k in eachindex(starts)
         ]
+        payloads = _unconvert_payloads(ax, payloads)
     end
     return SegmentInteractable(ax, verts; mode = :pairs, id, payloads, tol, tooltip, label)
 end
@@ -520,7 +521,7 @@ end
 function PolygonInteractable(ax, p::Makie.Violin; id = :violin, payloads = nothing, tooltip = nothing, label = nothing)
     poly = _childof(p, Makie.Poly)
     rings = _conv(poly)[1]
-    pl = payloads === nothing ? _violin_payloads(p, rings) : payloads
+    pl = payloads === nothing ? _unconvert_payloads(ax, _violin_payloads(p, rings)) : payloads
     return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
 end
 
@@ -946,6 +947,54 @@ _with_stroke(i::RectInteractable, sw) = RectInteractable(
 _with_stroke(i::PolygonInteractable, sw) = PolygonInteractable(
     i.ax, i.rings, i.id, i.payloads, i.tooltip, i.label, i.holes, sw,
 )
+
+# A positional default payload (`x`, `y`, `z`) holds Makie's converted number. On an axis
+# that converts that dimension, show what the user plotted instead: a category's label (as
+# the axis readout does), or a date/time. Both go out as strings, the form the tooltip
+# shows. Any other conversion, or a number that maps back to nothing, is left as is.
+function _unconvert_payloads(ax, pls)
+    out = nothing
+    for (k, d) in ((:x, :dim1_conversion), (:y, :dim2_conversion), (:z, :dim3_conversion))
+        hasproperty(ax, d) || continue
+        c = getproperty(ax, d)[]
+        (c isa Makie.CategoricalConversion || c isa Makie.DateTimeConversion) || continue
+        has(pl) = pl isa NamedTuple && haskey(pl, k) && pl[k] isa Real
+        any(has, pls) || continue
+        vals = Any[has(pl) ? _dim_value(c, pl[k]) : nothing for pl in pls]
+        strs = _dim_strings(vals)
+        out = something(out, Any[pl for pl in pls])
+        for (j, sv) in enumerate(strs)
+            sv === nothing || (out[j] = merge(out[j], NamedTuple{(k,)}((sv,))))
+        end
+    end
+    return something(out, pls)
+end
+function _dim_value(c::Makie.CategoricalConversion, v)
+    isfinite(v) && isinteger(v) || return nothing
+    j = findfirst(kv -> first(kv) == Int(v), c.int_to_category)
+    return j === nothing ? nothing : last(c.int_to_category[j])
+end
+function _dim_value(c::Makie.DateTimeConversion, v)
+    isfinite(v) || return nothing
+    try
+        return Makie.number_to_date(c.type[], v)
+    catch e
+        e isa Union{MethodError, InexactError, ArgumentError} || rethrow()
+        return nothing
+    end
+end
+# Dates plotted as `Date` convert to `DateTime`s at midnight; when every one is, show the
+# dates alone.
+function _dim_strings(vals)
+    D = Makie.Dates
+    dts = [v for v in vals if v isa D.DateTime]
+    dateonly = !isempty(dts) && all(t -> D.Time(t) == D.Time(0), dts)
+    return Any[
+        v === nothing ? nothing : dateonly && v isa D.DateTime ? string(D.Date(v)) : string(v)
+            for v in vals
+    ]
+end
+
 function _construct_unplaced(ax, p, id; kw...)
     p isa Makie.Scatter && return [PointInteractable(ax, p; id, kw...)]
     p isa Makie.MeshScatter && return [PointInteractable(ax, p; id, kw...)]

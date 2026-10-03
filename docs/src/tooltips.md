@@ -22,7 +22,10 @@ Main.masque_fallback("tooltips_template")
 
 Without `tooltip`, the tooltip is a small table of the payload's
 fields: your own fields when you pass `payloads`, and for a scatter
-without them, the point's `index`, `x`, and `y`.
+without them, the point's `index`, `x`, and `y`. On a categorical or
+date axis, `x` and `y` in the tooltip and in `pick` are text: the
+category's label, such as `"b"`, or the date or time you plotted, such
+as `"2024-01-02"`, `"2024-01-01T01:00:00"`, or `"01:00:00"`.
 
 Numbers show up to four significant figures, so `0.30000000000000004`
 reads `0.3` and `2.71828` reads `2.718`. Whole numbers show in full. To

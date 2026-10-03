@@ -400,12 +400,14 @@ struct PointInteractable <: AbstractInteractable
 end
 function PointInteractable(
         ax, points; id = :points,
-        payloads = [
-            length(p) >= 3 ?
-                (; index = k, x = Float64(p[1]), y = Float64(p[2]), z = Float64(p[3])) :
-                (; index = k, x = Float64(p[1]), y = Float64(p[2]))
-                for (k, p) in enumerate(points)
-        ],
+        payloads = _unconvert_payloads(
+            ax, Any[
+                length(p) >= 3 ?
+                    (; index = k, x = Float64(p[1]), y = Float64(p[2]), z = Float64(p[3])) :
+                    (; index = k, x = Float64(p[1]), y = Float64(p[2]))
+                    for (k, p) in enumerate(points)
+            ]
+        ),
         radius = nothing, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing
     )
     _check_tooltip(tooltip)
@@ -892,10 +894,12 @@ function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, too
     length(anchors) == length(strs) ||
         error("TextInteractable: $(length(anchors)) positions for $(length(strs)) strings (Makie internals changed?)")
     pl = if payloads === nothing
-        Any[
-            (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
-                for k in eachindex(strs)
-        ]
+        _unconvert_payloads(
+            ax, Any[
+                (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
+                    for k in eachindex(strs)
+            ]
+        )
     else
         _check_payloads(payloads, length(strs), "TextInteractable")
     end

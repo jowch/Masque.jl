@@ -504,6 +504,46 @@ end
         end
     end
 
+    @testset "categorical and date positions show the plotted values (#249)" begin
+        built(ax, p) = only(interactables(ax, p))
+        Dates = Makie.Dates   # not a test dependency of its own
+        fd = Figure(); ad = Axis(fd[1, 1])
+        sd = scatter!(ad, Dates.Date(2024, 1, 1) .+ Dates.Day.(0:2), [1.0, 2.0, 3.0])
+        ft = Figure(); at = Axis(ft[1, 1])
+        st = scatter!(at, Dates.DateTime(2024, 1, 1) .+ Dates.Hour.(0:2), [1.0, 2.0, 3.0])
+        fc = Figure(); ac = Axis(fc[1, 1])
+        sc = scatter!(ac, Makie.Categorical(["a", "b", "c"]), [1.0, 2.0, 3.0])
+        vc = violin!(ac, Makie.Categorical(repeat(["a", "b"], 10)), collect(1.0:20.0))
+        tc = text!(ac, Makie.Categorical(["c"]), [2.0]; text = ["note"])
+        foreach(Makie.update_state_before_display!, (fd, ft, fc))
+        @test [p.x for p in built(ad, sd).payloads] == ["2024-01-01", "2024-01-02", "2024-01-03"]
+        @test [p.x for p in built(at, st).payloads] == ["2024-01-01T00:00:00", "2024-01-01T01:00:00", "2024-01-01T02:00:00"]
+        @test built(ad, sd).payloads[1].y == 1.0   # an unconverted dimension stays a number
+        @test [p.x for p in built(ac, sc).payloads] == ["a", "b", "c"]
+        @test [p.x for p in built(ac, vc).payloads] == ["a", "b"]
+        @test built(ac, tc).payloads[1].x == "c"
+        # the hit geometry still comes from the converted positions
+        _, _, c = ctx_for(fc)
+        @test only(hitlayers(built(ac, sc), c)).geometry ==
+            only(hitlayers(PointInteractable(ac, sc), c)).geometry
+        # payloads you pass are yours, and the masque(fig) default carries the label too
+        @test only(interactables(ac, sc; payloads = ["p", "q", "r"])).payloads == ["p", "q", "r"]
+        m = masque(fc).manifest
+        @test only(filter(l -> l["id"] == "scatter", m["layers"]))["payloads"][2].x == "b"
+        # the plot-object constructors fill their default payloads the same way
+        @test [p.x for p in PointInteractable(ad, sd).payloads] == ["2024-01-01", "2024-01-02", "2024-01-03"]
+        @test [p.x for p in PolygonInteractable(ac, vc).payloads] == ["a", "b"]
+        @test TextInteractable(ac, tc).payloads[1].x == "c"
+        @test PointInteractable(ac, sc; payloads = [(; x = 2.0) for _ in 1:3]).payloads[1].x == 2.0
+        fh = Figure(); ah = Axis(fh[1, 1])
+        sh = scatter!(ah, Dates.Time.(1:3), [1.0, 2.0, 3.0])
+        Makie.update_state_before_display!(fh)
+        @test [p.x for p in built(ah, sh).payloads] == ["01:00:00", "02:00:00", "03:00:00"]
+        # a number with no date or category behind it stays a number (here, past Int64 ms)
+        @test Masque._unconvert_payloads(ad, Any[(; x = 1.0e30)])[1].x == 1.0e30
+        @test Masque._unconvert_payloads(ac, Any[(; x = 7.0)])[1].x == 7.0
+    end
+
     @testset "thick strokes are hoverable over their whole width (#246)" begin
         built(ax, p) = only(interactables(ax, p))
         f = Figure(size = (500, 350)); a = Axis(f[1, 1])
