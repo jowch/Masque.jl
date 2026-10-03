@@ -1,5 +1,5 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
-import { hitLayerByIndex } from "./selection"
+import { hitLayerByIndex, sameValue, selectionForValue } from "./selection"
 import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
@@ -290,7 +290,6 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const selection = manifest.selection
     const seedItems = selection === "elements" && (hydrated.length > 0 || manifest.hydrate === "items")
     const hostValue = seedItems ? { items: hydrated } : hydrated.length === 1 ? hydrated[0] : null
-    ;(host as unknown as { value: unknown }).value = hostValue
 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })
@@ -445,11 +444,37 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         cross_: cross,
         gesture_: channel,
         photoPaint_: (m) => paintPhoto(m),
+        setValue_: (v) => { restoring = false; bondValue = v },
     }
     const state = createOverlayState()
     state.selHits_ = selHits
     // A brush seed belongs to the box, not a click, so only a scalar seed can be clicked off.
     if (!seedItems && hydrated.length === 1) state.selSource_ = hydrated[0]
+
+    // `host.value` is the bond. Pluto writes it after mount: on a page reload it restores the
+    // kernel's value, which can be a click made since the `selected=` seed. Until a gesture of
+    // ours commits, a written value that differs from the current one redraws the selection,
+    // so the highlight shows what `@bind` holds (#272). After that our own commits are newer,
+    // so a late write of an older value must not undo a click. Pluto also re-writes an equal
+    // value whenever any bond in the notebook changes; that is a no-op here.
+    let bondValue: unknown = hostValue
+    let restoring = true
+    Object.defineProperty(host, "value", {
+        configurable: true,
+        enumerable: true,
+        get: () => bondValue,
+        set: (v: unknown) => {
+            if (restoring && !sameValue(v, bondValue)) {
+                const sel = selectionForValue(ctx.manifest_, v)
+                if (sel) {
+                    state.selHits_ = sel.hits
+                    state.selSource_ = sel.source
+                    renderSelection(ctx, state)
+                }
+            }
+            bondValue = v
+        },
+    })
 
     type GestureCanvas = HTMLCanvasElement & {
         masqueReplaceScene?: (scene: unknown, pxPerUnit?: number, width?: number, height?: number) => void
@@ -976,6 +1001,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         channel.dispose() // abandon anything in flight — a late response must not touch a dead DOM
         if (lastFrameUrl) URL.revokeObjectURL(lastFrameUrl)
         shadowHost.remove()
+        // A plain property again, so a dead overlay no longer redraws on a write.
+        Object.defineProperty(host, "value", { configurable: true, enumerable: true, writable: true, value: bondValue })
         host.masqueDead = true
         host.masqueDetach?.()
     }
