@@ -35,7 +35,8 @@ begin
     ys = [2.0, 1.5, 3.0, 2.2]
     zs = [0.8, 2.5, 1.2, 3.1]
     fig_xy = Figure(size = (420, 280))
-    scatter!(Axis(fig_xy[1, 1]; xlabel = "x", ylabel = "y", title = "xy"), xs, ys; markersize = 18)
+    ax_xy = Axis(fig_xy[1, 1]; xlabel = "x", ylabel = "y", title = "xy")
+    scatter!(ax_xy, xs, ys; markersize = 18)
     nothing
 end
 
@@ -44,13 +45,14 @@ end
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000011
 md"""
-The xz figure uses `pick`, so it is drawn again after each click, with the clicked sample passed as `selected`.
+This cell uses `pick` and passes the clicked index as `selected`, so the xz plot highlights the sample you clicked.
 """
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000004
 begin
     fig_xz = Figure(size = (420, 280))
-    scatter!(Axis(fig_xz[1, 1]; xlabel = "x", ylabel = "z", title = "xz"), xs, zs; markersize = 18)
+    ax_xz = Axis(fig_xz[1, 1]; xlabel = "x", ylabel = "z", title = "xz")
+    scatter!(ax_xz, xs, zs; markersize = 18)
     masque(fig_xz; selected = isnothing(pick) ? Int[] : [pick.index])
 end
 
@@ -60,7 +62,6 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 bond = "pick"
 show_code = true
 pluto_html = true
-chip = false
 
 cells = [
   "a1b2c3d4-00a1-4000-8000-000000000009",
