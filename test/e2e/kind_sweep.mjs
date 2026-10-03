@@ -1721,6 +1721,9 @@ try {
     // rather than removed, since it's harmless and a future payload shape could reintroduce a
     // field this would catch.
     let skipChangeWait = false;
+    // Whether `after` can't show this click (see below). Starts true on `skipChangeWait`, and the
+    // seed-clear path clears it once both of its round-trips have printed.
+    let staleAfter = false;
     if (already.test(before) || (spec.layerKind === "grid" && new RegExp(`index[=:]\\s*${clickIdx}\\b`).test(before))) {
       // layerElementCount throws for a kind with no indexable elements at all (e.g. a future
       // `:axis` spec, #113) — that isn't a driver bug, it's exactly the "nothing to click"
@@ -1743,8 +1746,11 @@ try {
         // assertions read that same stale text, so they can't tell "landed correctly" from
         // "missed entirely" here and are NOT pushed to `passed` on this path (see the comment
         // above the change-wait); only click-echo (further down) reads live client-side state
-        // with no kernel round-trip, so it is the one check this path actually carries.
+        // with no kernel round-trip, so it is the one check this path actually carries. The
+        // exception is when the first click clears the `selected=` seed: then both round-trips
+        // print, `after` is live, and the checks count (`staleAfter`).
         skipChangeWait = true;
+        staleAfter = true;
       } else {
         throw new Error(
           `${key}-click: layer "${spec.layerId}" (${layer.kind}, ${count} element${count === 1 ? "" : "s"}) has no ` +
@@ -1757,6 +1763,7 @@ try {
     const clickPt = hitPoint(layer, clickIdx);
     let after = before;
     if (skipChangeWait) {
+      // This holds unless the click clears the `selected=` seed (handled after the dispatch):
       // `after` is read with no settle and no retry: the bond round-trips browser -> kernel ->
       // reactive re-render, `dispatchAt` returns as soon as the synchronous DOM dispatch is done
       // (long before that round-trip lands), and even if it DID land in time the text would be
@@ -1775,12 +1782,17 @@ try {
       // The one element may be the `selected=` seed, which a click now clears (the toggle off).
       // Click once more so the checks below see it selected.
       if ((await inspect(key)).bond === null) {
-        await dispatchAt(key, clickPt.x, clickPt.y, "click");
-        // The clear and the reselect each round-trip; wait for the reselected event, not the
-        // `nothing` the clear printed.
-        for (let i = 0; i < 80 && /=nothing\s*$/.test(await textOf(`#out_${key}`)); i++) {
-          await new Promise((r) => setTimeout(r, 200));
+        // Let the clear's `nothing` print before reselecting. Until it lands, #out_${key} still
+        // shows the seed, so polling for "not nothing" right after the second click can stop on
+        // the stale seed and then read the `nothing` that arrives next.
+        const cleared = await waitChange(`#out_${key}`, before, `${key}-click (seed clear)`);
+        if (!/=nothing\s*$/.test(cleared)) {
+          throw new Error(`${key}-click: clearing the seed printed ${JSON.stringify(cleared).slice(0, 220)}, expected nothing`);
         }
+        await dispatchAt(key, clickPt.x, clickPt.y, "click");
+        await waitChange(`#out_${key}`, cleared, `${key}-click (reselect)`);
+        // Both the clear and the reselect printed, so `after` below is this click's own value.
+        staleAfter = false;
       }
       after = await textOf(`#out_${key}`);
     } else {
@@ -1809,7 +1821,7 @@ try {
     if (spec.layerId === "legend" && !/LegendEvent\(/.test(after)) {
       throw new Error(`${key}-click: expected LegendEvent: ${after.slice(0, 220)}`);
     }
-    if (!skipChangeWait) passed.push(`${key}/click-bind`);
+    if (!staleAfter) passed.push(`${key}/click-bind`);
 
     // Click-echo (#103/#107): the overlay pins the picked hit(s) in g.sel itself, with no bond
     // fed back through Julia — so this also proves the echo SURVIVES the reactive round-trip
@@ -1868,7 +1880,7 @@ try {
     // the hit-test (a grid cell continues `i = …`, a legend entry continues its 1-based index).
     // Belt-and-suspenders on top of the index regex above: this fails loud specifically on
     // "resolved to the wrong layer", not just "wrong index".
-    // On `skipChangeWait`, `after` is stale (see above) so this re-check is vacuous for THIS
+    // When `staleAfter` holds, `after` is stale (see above) so this re-check is vacuous for THIS
     // click — but the real regression test for `legend`-before-`:grid` layer precedence already
     // ran once per spec, unconditionally, before any click (`legend-precedence-order`/
     // `legend-precedence-pixel-contested`, pushed above using `spec.selectedIndex`), so the
@@ -1923,9 +1935,9 @@ try {
     if (spec.links) {
       // On a real click-wait, click-bind above already confirmed index==clickIdx; this confirms
       // the bond's payload actually carries label/targets (not just the index). On
-      // `skipChangeWait`, both `after` and these checks are stale/tautological for the same
-      // reason click-bind's are (see the comment above the change-wait) — pushed only when the
-      // change-wait actually ran, matching click-bind's own gating.
+      // `staleAfter`, both `after` and these checks are stale/tautological for the same
+      // reason click-bind's are (see the comment above the change-wait) — pushed only when
+      // `after` is live, matching click-bind's own gating.
       const clickTargets = (layer.links && layer.links[clickIdx]) || [];
       if (!clickTargets.length || !clickTargets.every((tid) => new RegExp(tid, "i").test(after))) {
         throw new Error(`${key}/links: click payload missing targets ${JSON.stringify(clickTargets)}: ${after.slice(0, 220)}`);
@@ -1943,7 +1955,7 @@ try {
       if (!new RegExp(expectTip, "i").test(after)) {
         throw new Error(`${key}/links: click payload missing label "${expectTip}": ${after.slice(0, 220)}`);
       }
-      if (!skipChangeWait) passed.push(`${key}/links-click-payload`);
+      if (!staleAfter) passed.push(`${key}/links-click-payload`);
     }
   }
 
