@@ -451,7 +451,7 @@ try {
   // edge (the caret then moves along the box). Before, it sat a fixed 14px into a box offset
   // 10px from the pointer, so it pointed beside the crosshair cursor.
   for (const [fx, fy, where] of [[0.15, 0.25, "open"], [0.8, 0.25, "right-edge"]]) {
-    const r = await page.evaluate(([fx, fy]) => {
+    const r = await page.evaluate(async ([fx, fy]) => {
       const span = document.querySelector("#coords_axis");
       const hosts = [...document.querySelectorAll(".ip-host")];
       const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -462,6 +462,9 @@ try {
         bubbles: true, composed: true, cancelable: true, clientX: x, clientY: y,
         pointerId: 1, pointerType: "mouse", isPrimary: true,
       }));
+      // A move inside the frame of the previous one is queued for the next animation frame
+      // (hover.ts's onMove), so read the tooltip after that frame has run.
+      await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
       const t = sr.querySelector(".masque-tip");
       const tipRect = t.getBoundingClientRect();
       const before = getComputedStyle(t, "::before");
