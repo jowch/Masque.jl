@@ -170,6 +170,11 @@ export interface OverlayState {
     // field untouched. Reset on remount falls out of createOverlayState() re-running, not a reset
     // this field needs of its own.
     selHits_: Hit[]
+    // The element whose click wrote `selHits_` (or the one `selected=` index hydrated it from),
+    // id-keyed so a manifest rebuild needs no re-keying. Clicking it again clears the selection
+    // and sends `null` — the toggle off. Null when nothing is selected or the selection holds
+    // several hydrated indices, which no single click owns.
+    selSource_: { layer: string; index: number } | null
     hiLeaveTimer_: ReturnType<typeof setTimeout> | null
     // g.link (legend-linked highlight): keyed by hitKey() of the SOURCE element (the hovered/
     // focused legend entry), not any one target hit — one source can fan out to many target
@@ -221,6 +226,7 @@ export function createOverlayState(): OverlayState {
         hiKey_: null,
         selKeys_: new Set(),
         selHits_: [],
+        selSource_: null,
         hiLeaveTimer_: null,
         linkKey_: null,
         linkLeaveTimer_: null,

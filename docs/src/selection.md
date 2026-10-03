@@ -1,7 +1,8 @@
 # Selection
 
 Clicking a mark selects it. The mark stays highlighted, and the `@bind`
-variable holds it until another click replaces it. You can also start
+variable holds it until another click replaces it. Click the mark again
+to clear the selection. You can also start
 with a mark selected, or keep a selection when the figure is rebuilt.
 
 The examples on this page use a scatter of cities, with each city's
@@ -18,7 +19,8 @@ cities = interactables(s; id = :cities, payloads = rows)
 mark's [`ElementEvent`](@ref). Clicking another mark replaces it,
 because one widget holds one selection. Clicking empty space changes
 nothing: the highlight stays and `pick` keeps its value, so a stray
-click does not lose your choice.
+click does not lose your choice. Clicking the selected mark again
+clears it: the highlight goes and `pick` is `nothing` again.
 
 To select several marks at once, drag a box over them instead: an
 [`ROIInteractable`](@ref) with `selects` returns every mark inside it,

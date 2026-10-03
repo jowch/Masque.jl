@@ -348,7 +348,15 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     // means this click isn't a selection gesture at all (e.g. an :axis hit) — leave the
     // selection untouched rather than clearing it.
     const next = selectionFor(hit, ctx.manifest_)
-    if (next !== null) { state.selHits_ = next; renderSelection(ctx, state) }
+    // A second click on the element that made the selection takes it back: the highlight clears
+    // and the bond returns to `null`, its value before any click.
+    const src = state.selSource_
+    const off = next !== null && src !== null && src.layer === hit.layer.id && src.index === hit.index
+    if (next !== null) {
+        state.selHits_ = off ? [] : next
+        state.selSource_ = off ? null : { layer: hit.layer.id, index: hit.index }
+        renderSelection(ctx, state)
+    }
     drawHover(ctx, state, hit)
     // Keep keyboard focus in sync with the mouse, but ONLY once keyboard nav is already
     // engaged (state.focusIdx_ !== null) — gating on that, not just "click landed on a
@@ -375,8 +383,11 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     // (`_bond_payload`), so uploading it here is dead weight the receiver discards (#109).
     // `resolvePayload` still resolves it for hover.ts's tooltip templates, which need it for
     // every kind including element ones — only the wire value skips it.
-    const value: { layer: string; index: number; payload?: unknown } = { layer: hit.layer.id, index: hit.index }
-    if (!SELECTED_KINDS.has(hit.layer.kind)) value.payload = resolvePayload(hit, ctx.manifest_, px, py)
+    let value: { layer: string; index: number; payload?: unknown } | null = null
+    if (!off) {
+        value = { layer: hit.layer.id, index: hit.index }
+        if (!SELECTED_KINDS.has(hit.layer.kind)) value.payload = resolvePayload(hit, ctx.manifest_, px, py)
+    }
     ;(ctx.host_ as unknown as { value: unknown }).value = value
     ctx.host_.dispatchEvent(new CustomEvent("input"))
 }
