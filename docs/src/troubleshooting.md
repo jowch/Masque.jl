@@ -26,6 +26,18 @@ saw, then gives the cause and the fix. For constructor signatures, see
 `masque`. Loading both is fine: `masque` without `backend=` then uses
 CairoMakie. For more information, see [Backends](@ref).
 
+### Tried a `backend=` that is not loaded
+
+**Error prefix:** `` masque: `backend = :webgl` needs `using WGLMakie` first `` /
+`masque: unknown backend`
+
+**Cause:** `backend=` names a backend whose package is not loaded, or a
+name other than `:cairo` and `:webgl`.
+
+**Fix:** add `using WGLMakie` (for `:webgl`) or `using CairoMakie` (for
+`:cairo`), or leave `backend=` out to use whichever is loaded. See
+[Choose a backend](@ref).
+
 ### Tried `tooltip = true`
 
 **Error prefix:** `tooltip = true is not meaningful`
@@ -48,6 +60,19 @@ message says `rows` instead of `entries`.
 
 **Fix:** give one entry per mark, or omit `payloads` on constructors
 that have a default.
+
+### Tried two interactables with the same id
+
+**Error prefix:** `masque: two interactables use the layer id`
+
+**Cause:** two interactables in one `masque` call have the same `id`,
+often because two constructors of the same kind both use their default
+id, such as two `PointInteractable(ax, pts)` with `id = :points`.
+
+**Fix:** pass a distinct `id` to one of them. An interactable whose id
+matches a layer that `masque(fig)` builds on its own replaces that
+layer instead of raising this error; see
+[Adding to what `masque(fig)` builds](@ref).
 
 ### Tried `mode` or `orientation` other than the two valid symbols
 
@@ -205,6 +230,38 @@ versions. To keep working until it is fixed, pin those packages to a
 version that worked.
 
 ## Not errors, but surprising
+
+### Upgrading code written for Masque 0.1
+
+Masque 0.2 renamed or reshaped a few calls. The old forms still work in
+0.2 and are removed in 0.3. Julia warns about them only when it runs
+with `--depwarn=yes`, as `Pkg.test` does, so a notebook shows no
+warning:
+
+| 0.1 | 0.2 |
+|---|---|
+| `auto_interactables(fig)` | `interactables(fig)` |
+| `RectInteractable(ax; grid = (xedges, yedges, values))` | `GridInteractable(ax, xedges, yedges, values)` |
+| `RectInteractable(ax, hm)` for a heatmap or image | `GridInteractable(ax, hm)` |
+| `RectInteractable(ax; rects = rects)` | `RectInteractable(ax, rects)` |
+| `RegionInteractable(ax; regions = regions, payloads)` | `RegionInteractable(ax, regions; payloads)` |
+| `masque(fig; backend = CairoBackend(; max_width))` | `masque(fig; backend = :cairo, max_width)` |
+| `masque(fig; backend = WebGLBackend(; px_per_unit, max_width))` | `masque(fig; backend = :webgl, px_per_unit, max_width)` |
+
+Four changes have no old form to fall back on:
+
+- `masque(fig, xs...)` now keeps the plots' own hover and click and
+  adds `xs` to them. Add `auto = false` to overlay only what you pass,
+  as in 0.1.
+- On a categorical or date axis, a mark's default `x` and `y` are now
+  the label or date as text, not a number.
+- A heatmap or image layer is a `GridInteractable`, so code that checks
+  `isa RectInteractable` for one needs the new type.
+- If you wrote your own backend, its `_ppu`, `context`, and
+  `make_widget` methods take `max_width` as a new last argument.
+
+The [changelog](https://github.com/jowch/Masque.jl/blob/main/CHANGELOG.md)
+has the details.
 
 ### Tried `CairoMakie.activate!(type = "svg")` and the widget is a PNG
 

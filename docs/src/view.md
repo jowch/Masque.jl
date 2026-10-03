@@ -53,6 +53,10 @@ differently; see [Pan and orbit preview](@ref).
 If the same axis has a threshold line or a brushing box, a plain drag
 moves the line or box, and Shift+drag pans.
 
+To pan from the keyboard, press Tab until the view has focus, then use
+the arrow keys, and `+` / `-` to zoom. See
+[Keyboard and screen readers](@ref).
+
 ## Orbit an `Axis3`
 
 On an `Axis3`, dragging turns the camera around the plot (azimuth and

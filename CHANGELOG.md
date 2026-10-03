@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-03
+
+Some calls written for 0.1 behave differently: each is marked **Breaking** below, and the
+categorical and date payloads under Fixed are a change too. The forms listed under Deprecated
+still work and are removed in 0.3.
+
 ### Changed
 - Clicking the selected mark or legend entry again clears the selection, and the `@bind`
   value goes back to `nothing`. Before, a selection could only be replaced by another click.
@@ -22,8 +28,8 @@ All notable changes to this project are documented here. The format is based on
 - **Breaking:** choose the backend by name, `masque(fig; backend = :cairo)` or
   `backend = :webgl`, and set `max_width` and `px_per_unit` as `masque` keywords, which both
   backends now accept: `px_per_unit = 3` also sharpens a CairoMakie PNG. The
-  `CairoBackend(; max_width)` and `WebGLBackend(; px_per_unit, max_width)` objects still work
-  with a deprecation warning and are removed in 0.3; when a call passes both a backend object
+  `CairoBackend(; max_width)` and `WebGLBackend(; px_per_unit, max_width)` objects still work,
+  are deprecated, and are removed in 0.3; when a call passes both a backend object
   and `masque`'s `max_width`, the keyword now wins. A third-party `AbstractBackend`'s `_ppu`,
   `context`, and `make_widget` methods take `max_width` as a new last argument.
 - `RectInteractable` and `RegionInteractable` take their shapes as the second argument, like
@@ -40,7 +46,8 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 - `masque(fig; overlaystyle = (; …))` sets the look of highlights, the selection, the
   crosshair, and ROI boxes for one widget: their color, outline widths, fill opacities, and
-  the ROI grips. Keys you leave out keep the built-in look. See the Overlay styling section of
+  the ROI grips. Keys you leave out keep the built-in look. Most keys are also `--masque-*` CSS
+  custom properties, which a page can set without Julia. See the Overlay styling section of
   the API page.
 - Threshold lines, ROI boxes, and pan and orbit views each get a Tab stop after the plot.
   Arrow keys move the line or the box, or pan or rotate the view; Alt with an arrow resizes an
@@ -161,6 +168,7 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jowch/Masque.jl/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/jowch/Masque.jl/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jowch/Masque.jl/releases/tag/v0.1.0

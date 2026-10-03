@@ -113,7 +113,9 @@ When you release it, it snaps onto that category, `level.value` is the
 category's position, and `level.category` is its label.
 
 If the axis also has a [`ViewInteractable`](@ref), a plain drag moves
-the threshold and Shift+drag pans.
+the threshold and Shift+drag pans. To move the line from the keyboard,
+press Tab until it has focus, then use the arrow keys; see
+[Keyboard and screen readers](@ref).
 
 When the cell that creates the figure runs again, for example because a
 slider it uses changed, the line goes back to `value` and `level` goes
