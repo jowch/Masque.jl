@@ -234,7 +234,8 @@ function Masque.context(b::WebGLBackend, fig, ppu, max_width)
         ids[leg] = id
         transforms[id] = Masque._legend_transform(id, leg, scaling, out_h)
     end
-    return InteractionContext(project, transforms, ids, out_w, out_h, scaling, display_scale)
+    # WGLMakie's sprite shader paints a marker's whole outline outside its edge.
+    return InteractionContext(project, transforms, ids, out_w, out_h, scaling, display_scale, 1.0)
 end
 
 # Path to the committed shim bundle (the WGLMakie bundle itself is sourced at runtime; see

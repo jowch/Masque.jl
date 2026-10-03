@@ -116,7 +116,7 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         "events" => [string(e) for e in L.events],
         "style" => style,
     )
-    if L.kind === :segments || L.kind === :polyline || L.kind === :lines
+    if L.kind in (:segments, :polyline, :lines, :rects, :polygons)
         t = hit_tol(i)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))
     end

@@ -504,6 +504,38 @@ end
         end
     end
 
+    @testset "thick strokes are hoverable over their whole width (#246)" begin
+        built(ax, p) = only(interactables(ax, p))
+        f = Figure(size = (500, 350)); a = Axis(f[1, 1])
+        thin = lines!(a, 1:3, 1:3)
+        thick = lines!(a, 1:3, 1:3; linewidth = 20)
+        segs = linesegments!(a, [1, 2, 3, 4], [1, 2, 1, 2]; linewidth = [4, 4, 30, 30])
+        hl = hlines!(a, [2.0]; linewidth = 16)
+        eb = errorbars!(a, [1.0], [1.0], [0.5]; whiskerwidth = 20, linewidth = 3)
+        s = scatter!(a, [1.0], [1.0]; markersize = 20, strokewidth = 8)
+        b = barplot!(a, [1, 2], [1, 2]; strokewidth = 8)
+        b0 = barplot!(a, [1, 2], [1, 2])
+        pl = poly!(a, Point2f[(0, 0), (1, 0), (1, 1)]; strokewidth = 10)
+        _, _, c = ctx_for(f)
+        @test built(a, thin).tol == 6          # thin lines keep the floor
+        @test built(a, thick).tol == 10        # half the linewidth
+        @test built(a, segs).tol == 15         # the widest of a per-segment vector
+        @test built(a, hl).tol == 8
+        @test built(a, eb).tol == 10           # the whiskers reach whiskerwidth / 2 from the bar end
+        @test only(interactables(a, thick; tol = 3)).tol == 3   # an explicit tol wins
+        @test built(a, s).radius ≈ 0.3525 * 20 && built(a, s).stroke == 8
+        # Cairo centers the outline on the marker edge, so half of it reaches past the marker
+        @test only(Masque.hitlayers(built(a, s), c)).geometry[3] == round(Int, (0.3525 * 20 + 4) * c.scaling)
+        @test only(interactables(a, s; radius = 5)).stroke == 0   # an explicit radius is the target
+        @test Masque.hit_tol(built(a, b)) == 4 && Masque.hit_tol(built(a, b0)) === nothing
+        @test Masque.hit_tol(built(a, pl)) == 5
+        # rects and polygons ship it as image px, like line layers
+        m = masque(f).manifest
+        tols = Dict(l["id"] => get(l, "tol", nothing) for l in m["layers"])
+        @test tols["bars"] == round(Int, 4 * m["scaling"]) && tols["bars_2"] === nothing
+        @test tols["poly"] == round(Int, 5 * m["scaling"])
+    end
+
     @testset "placement attributes move the hit target with the mark (#245)" begin
         built(ax, p) = only(interactables(ax, p))
         centers(L) = [(L.geometry[k], L.geometry[k + 1]) for k in 1:3:length(L.geometry)]
