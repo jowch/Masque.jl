@@ -104,7 +104,6 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 - *idea* — Tables.jl payloads beyond the DataFrames extension.
 
 ### Tooling
-- #176 — scheduled, advisory CI against Makie's development branch.
 - #177 — manifest-size delta on each PR.
 - *idea* — golden screenshots of the overlay chrome from the kind sweep.
 
