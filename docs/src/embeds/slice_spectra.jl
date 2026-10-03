@@ -25,7 +25,7 @@ Move the pointer across the plot. A vertical line follows it, a dot marks where 
 
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000010
 md"""
-Plot each spectrum with its own `lines!` call, and give each a one-word `label`, which names its row in the tooltip.
+Plot each spectrum with its own `lines!` call. A `label` that starts with a letter and holds only letters, digits, and underscores names that spectrum's row in the tooltip.
 """
 
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000002
@@ -47,7 +47,7 @@ end
 
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000011
 md"""
-Pass all three plots to one `SliceInteractable`, because `masque(fig)` does not add one on its own. The slice only shows values, so to keep a wavelength, add an `AxisInteractable` as well. `auto = false` keeps the lines from taking the click, and `covers = []` goes with it, because the slice then has no line highlights to replace.
+Pass all three plots to one `SliceInteractable`, because `masque(fig)` does not add one on its own. The slice only shows values, so to keep a wavelength, add an `AxisInteractable` as well. `auto = false` keeps the lines from taking the click. It also takes the lines out of the widget, so pass `covers = []` to the slice, or `masque` raises an error because the slice expects to replace their hover highlight.
 
 In your own notebook, a click saves the position in `at`. This page does not record clicks, so only the hover works here.
 """

@@ -1,8 +1,9 @@
 # Sample a series
 
-A slice reads every line on an axis at once. As you move the pointer,
-a vertical line follows it, a dot sits where it crosses each line, and
-the tooltip lists each line's value at that `x`. Use it to compare
+A slice reads several lines at once. As you move the pointer, a
+vertical line follows it, a dot sits where it crosses each line you
+gave the slice, and the tooltip lists each of those lines' values at
+that `x`. Use it to compare
 several series at the same position, such as spectra at one wavelength
 or traces at one time.
 
@@ -25,10 +26,11 @@ a [`SliceInteractable`](@ref) yourself:
 
 ```julia
 begin
+    xs = 0:0.1:10
     fig = Figure()
     ax = Axis(fig[1, 1])
-    a = lines!(ax, λ, control; label = "control")
-    b = lines!(ax, λ, treated; label = "treated")
+    a = lines!(ax, xs, sin.(xs); label = "sine")
+    b = lines!(ax, xs, cos.(xs); label = "cosine")
     probe = SliceInteractable(ax, [a, b])
     nothing
 end
@@ -38,9 +40,14 @@ end
 masque(fig, probe)
 ```
 
-Each line's `label` names its row in the tooltip, as long as the label
-is one word made of letters, digits, and underscores. Lines without such
-a label show up as `s1`, `s2`, and so on, in the order you passed them.
+Each line's `label` names its row in the tooltip when the label starts
+with a letter and holds only letters, digits, and underscores, such as
+`sine` or `run_2`. Any other label, such as `450nm` or `sample A`, or no
+label at all, shows up as `s1`, `s2`, and so on, in the order you passed
+the lines. Two lines with the same label show up as `sine` and `sine_2`.
+The label can't be `x` on a vertical slice, or `y` on a horizontal one,
+because that row already shows the position; `SliceInteractable` raises
+an error if it is.
 
 A slice is for reading values, so hovering does not change the `@bind`
 value. Each axis takes one slice, so to read several lines, pass them
@@ -55,7 +62,7 @@ your notebook gets their value:
 
 | To get | Use | You | Your notebook gets |
 |---|---|---|---|
-| Every line's value at the pointer | [`SliceInteractable`](@ref) | hover | nothing |
+| The value of each line you pass it, at the pointer | [`SliceInteractable`](@ref) | hover | nothing |
 | Which line you clicked | `masque(fig)` | click a line | that line ([Click marks](@ref)) |
 | The coordinates you clicked | [`AxisInteractable`](@ref) | click | `x` and `y` ([Read coordinates](@ref)) |
 | A cutoff | [`ThresholdInteractable`](@ref) | drag a line | its position ([Read coordinates](@ref)) |
@@ -79,18 +86,20 @@ saves the position:
 )
 ```
 
-`auto = false` keeps the lines from taking the click, so `at` always
-holds a position. Pass `covers = []` along with it, because the lines
-are no longer in the widget for the slice to stand in for. After a
-click, `at.x` is the `x` you clicked, and a later cell can read your
-data there:
+`auto = false` keeps the lines from taking the click, so a click on a
+line still saves a position rather than the line. It also takes the
+lines out of the widget, and a slice built from plots expects to
+replace their hover highlight, so `masque` raises an error unless you
+pass `covers = []` to the slice. `at` is `nothing` until the first
+click. After that, `at.x` is the `x` you clicked, and a later cell can
+read your data there:
 
 ```julia
 if isnothing(at)
-    "click a wavelength"
+    "click a position"
 else
-    i = argmin(abs.(λ .- at.x))
-    (; wavelength = λ[i], control = control[i], treated = treated[i])
+    i = argmin(abs.(xs .- at.x))
+    (; x = xs[i], sine = sin(xs[i]), cosine = cos(xs[i]))
 end
 ```
 
