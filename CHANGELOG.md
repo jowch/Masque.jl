@@ -60,6 +60,10 @@ All notable changes to this project are documented here. The format is based on
   (`scatter!(…; markersize = [10, 20, 30])`, or a GraphMakie `graphplot` with `node_size` or
   `ilabels`). Each point now gets a highlight and click target the size of its own marker.
   `PointInteractable`'s `radius` also takes one value per point.
+- A `band!` drawn with `direction = :y` now responds where it is drawn. Before, its hover and
+  click target was the band mirrored across the diagonal.
+- `masque(fig)` no longer fails when an `arrows3d!` gives one direction for every arrow
+  (`arrows3d!(ax, points, Vec3f(1, 0, 1))`).
 
 ## [0.1.1] - 2026-10-01
 
