@@ -13,6 +13,9 @@ ways, each more work and more control than the last:
 3. A subtype of [`AbstractInteractable`](@ref): also choose what a click
    returns, with an event type of your own.
 
+To make a plot type you defined with `@recipe` respond as one mark,
+see [Your own plot types](@ref).
+
 ## Regions over a figure
 
 Pass a list of shapes and one payload per shape. Hovering over a region

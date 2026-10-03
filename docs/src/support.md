@@ -106,8 +106,9 @@ visible part the table knows, under that part's layer id: `rainclouds!`
 gives `:violin`, `:scatter`, and `:boxplot`. A plot whose `space` is not
 `:data`, such as a `bracket!` label or a `scatter!` placed with
 `space = :relative`, is skipped with a warning that names its `space`.
-`surface!` is not made interactive. To make another plot
-type interactive yourself, see [Custom hits](@ref).
+`surface!` is not made interactive. To make a recipe of your own
+respond as one mark, see [Your own plot types](@ref), and to add hit
+shapes where nothing is drawn, see [Custom hits](@ref).
 
 Bars or cells turned with `rotate!` are skipped with a warning. To make
 rotated bars respond, draw them with `poly!`.
