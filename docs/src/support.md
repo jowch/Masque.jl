@@ -86,6 +86,7 @@ and the last two columns say which also work on `Axis3` and
 | `contourf!` | `:contourf` | `:polygons` | — | — |
 | `violin!` | `:violin` | `:polygons` | — | — |
 | `voronoiplot!` | `:voronoiplot` | `:polygons` | — | — |
+| `hexbin!` | `:hexbin` | `:polygons` | — | — |
 | `stem!` | `:stem` + `:stem_stems` | `:circles` + `:segments` | — | — |
 | `scatterlines!` | `:scatterlines` + `:scatterlines_line` | `:circles` + `:lines` | — | yes |
 | `boxplot!` | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
@@ -105,7 +106,7 @@ visible part the table knows, under that part's layer id: `rainclouds!`
 gives `:violin`, `:scatter`, and `:boxplot`. A plot whose `space` is not
 `:data`, such as a `bracket!` label or a `scatter!` placed with
 `space = :relative`, is skipped with a warning that names its `space`.
-`surface!` and `hexbin!` are not made interactive. To make another plot
+`surface!` is not made interactive. To make another plot
 type interactive yourself, see [Custom hits](@ref).
 
 Bars or cells turned with `rotate!` are skipped with a warning. To make

@@ -56,6 +56,9 @@ All notable changes to this project are documented here. The format is based on
   pointer, and a click returns them as `x` and `y` in the order the axis plots them (angle in
   radians first, unless `theta_as_x = false`). It works in a static export too. Thresholds,
   ROI boxes, slices, and pan views still raise an error on a `PolarAxis`.
+- `hexbin!` plots respond: each hexagon is one mark, and hovering shows its center and its
+  count (the summed weight when `weights` is given). `PolygonInteractable(ax, p)` builds the
+  layer, `:hexbin`, for one hexbin plot.
 
 ### Deprecated
 - `auto_interactables(fig)`: use `interactables(fig)`. It will be removed in 0.3.

@@ -222,6 +222,15 @@ HTML(
         "<span id=\"coords_band_y\" style=\"display:none\">$(JSON3.write(sweep.band_y.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-0000000000a0
+@bind ev_hexbin sweep.hexbin
+
+# ╔═╡ c1000000-0000-0000-0000-0000000000a1
+HTML(
+    "<span id=\"out_hexbin\">HEXBIN=$(repr(ev_hexbin))</span>" *
+        "<span id=\"coords_hexbin\" style=\"display:none\">$(JSON3.write(sweep.hexbin.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000076
 @bind ev_scatter_moved sweep.scatter_moved
 
@@ -403,6 +412,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000006d
 # ╠═c1000000-0000-0000-0000-00000000006a
 # ╠═c1000000-0000-0000-0000-00000000006b
+# ╠═c1000000-0000-0000-0000-0000000000a0
+# ╠═c1000000-0000-0000-0000-0000000000a1
 # ╠═c1000000-0000-0000-0000-000000000076
 # ╠═c1000000-0000-0000-0000-000000000077
 # ╠═c1000000-0000-0000-0000-000000000028

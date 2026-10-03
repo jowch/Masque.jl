@@ -491,6 +491,31 @@ function PolygonInteractable(ax, p::Makie.Violin; id = :violin, payloads = nothi
     return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
 end
 
+# `hexbin!` draws one data-space hexagon marker per bin at `hb.points`, which are already
+# through the axis transform (`positions_transformed`). The marker's unit vertices scaled by
+# `hb.markersize` are the drawn corners; mapping each corner back through the inverse
+# transform gives data points that project onto them, edges straight in pixels as drawn.
+const _HEX_UNIT = [Makie.Vec2d(cos(a), sin(a)) for a in range(pi / 6, 13pi / 6; length = 7)[1:6]]
+function PolygonInteractable(ax, p::Makie.Hexbin; id = :hexbin, payloads = nothing, tooltip = nothing, label = nothing)
+    tf = _transform_func(ax.scene)
+    finv = Makie.inverse_transform(tf)
+    _no_inverse(finv) && throw(
+        ArgumentError("masque: hexbin! on an axis scale with no inverse transform can't be placed in data space")
+    )
+    ms = p.markersize[]
+    s = ms isa Real ? Makie.Vec2d(ms, ms) : Makie.Vec2d(ms[1], ms[2])
+    back(t) = (d = _apply_transform(finv, Makie.Point2d(t[1], t[2])); Point2f(d[1], d[2]))
+    centers = p.points[]
+    rings = [[back(Makie.Point2d(c) .+ s .* u) for u in _HEX_UNIT] for c in centers]
+    pl = payloads === nothing ? Any[
+            let d = back(centers[k])
+                (; x = d[1], y = d[2], count = p.count_hex[][k])
+        end
+            for k in eachindex(centers)
+        ] : payloads
+    return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
+end
+
 # Cells come back in tessellation order, not input-site order, so there's no cheap
 # cell→generator mapping; default payload is (; index) only.
 function PolygonInteractable(ax, p::Makie.Voronoiplot; id = :voronoiplot, payloads = nothing, tooltip = nothing, label = nothing)
@@ -849,6 +874,7 @@ function _plotbase(p)
     p isa Makie.Contourf && return :contourf
     p isa Makie.Violin && return :violin
     p isa Makie.Voronoiplot && return :voronoiplot
+    p isa Makie.Hexbin && return :hexbin
     p isa Makie.Stem && return :stem
     p isa Makie.ScatterLines && return :scatterlines
     p isa Makie.Series && return :series
@@ -891,6 +917,7 @@ function _construct_unplaced(ax, p, id; kw...)
     p isa Makie.Contourf && return [PolygonInteractable(ax, p; id, kw...)]
     p isa Makie.Violin && return [PolygonInteractable(ax, p; id, kw...)]
     p isa Makie.Voronoiplot && return [PolygonInteractable(ax, p; id, kw...)]
+    p isa Makie.Hexbin && return [PolygonInteractable(ax, p; id, kw...)]
     p isa Makie.Stem && return _stem_parts(ax, p, id; kw...)
     p isa Makie.ScatterLines && return _scatterlines_parts(ax, p, id; kw...)
     p isa Makie.Series && return [SegmentInteractable(ax, p; id, kw...)]
@@ -1069,9 +1096,9 @@ function _skip_for_axis(ax, p)
     return false
 end
 
-# A known child of an unknown recipe that must not become its own layer. `hexbin!` draws one
-# data-space hexagon `Scatter` (`markerspace = :data`); `_marker_radius` throws unless
-# markerspace is `:pixel`, and a pixel radius would not be the hex. `bracket!` draws a
+# A known child of an unknown recipe that must not become its own layer. A data-space
+# `Scatter` (`markerspace = :data`, as `hexbin!` draws) can't be built: `_marker_radius`
+# throws unless markerspace is `:pixel`. `bracket!` draws a
 # pixel-space `Series`; `SegmentInteractable` would project those points as data. Non-data
 # `Text` is not refused here — `_text_interactables` warns and returns an empty vector.
 function _walk_refuses(p)
