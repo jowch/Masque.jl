@@ -1251,7 +1251,7 @@ describe("tooltips (mount/showTip)", () => {
             .dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
 
     it("a second hide before the first's flip-class cleanup fires replaces the pending timer, not stacks it", async () => {
-        // hideTip schedules a delayed removal of flip-x/flip-y (so a fast re-show doesn't visibly
+        // hideTip schedules a delayed removal of flip-y (so a fast re-show doesn't visibly
         // flash the caret back to its default side). Leaving twice in quick succession — e.g. the
         // pointer re-enters and leaves again before the first timer fires — must clear the stale
         // timer rather than let it fire later and race the second hide's own cleanup.
@@ -1267,7 +1267,6 @@ describe("tooltips (mount/showTip)", () => {
         // second leave before MOTION_MS elapses — must replace, not duplicate, the pending timer
         surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
         await new Promise((r) => setTimeout(r, 150))
-        expect(tip.classList.contains("flip-x")).toBe(false)
         expect(tip.classList.contains("flip-y")).toBe(false)
     })
 
@@ -1475,8 +1474,9 @@ describe("tooltips (mount/showTip)", () => {
             ({ left: 30, top: 20, width: 600, height: 400, right: 630, bottom: 420, x: 30, y: 20, toJSON() {} }) as DOMRect
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 110, clientY: 150, bubbles: true }))
         expect(tip.classList.contains("show")).toBe(true)
-        expect(tip.style.left).toBe(`${110 - 30 + 10}px`) // TIP_OFFSET = 10
-        expect(tip.style.top).toBe(`${150 - 20 + 10}px`)
+        expect(tip.style.left).toBe(`${110 - 30 - 14}px`) // CARET_INSET = 14
+        expect(tip.style.top).toBe(`${150 - 20 + 10}px`) // TIP_OFFSET = 10
+        expect(tip.style.getPropertyValue("--masque-caret-x")).toBe("14px") // the apex sits on the pointer
     })
 
     it("plain axis hover shows x=… y=… tooltip (no valueaxis)", () => {
@@ -2546,7 +2546,7 @@ describe("overlay visual polish", () => {
         expect(tip.style.top).toBe(top0)
     })
 
-    it("remeasures the tip after a zero first layout and shifts it inside the surface via the caret, not flip-x", async () => {
+    it("remeasures the tip after a zero first layout and shifts it inside the surface via the caret", async () => {
         const { host, script } = setup()
         // same-hit HTML: a circle near the 600×400 surface corner (image 1160,760 → client 580,380)
         mount(script, {
@@ -2559,7 +2559,6 @@ describe("overlay visual polish", () => {
         const surface = shadow.querySelector(".surface") as HTMLElement
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 580, clientY: 380, bubbles: true }))
         expect(tip.classList.contains("show")).toBe(true)
-        expect(tip.classList.contains("flip-x")).toBe(false) // never used by the anchored path
         Object.defineProperty(tip, "offsetWidth", { configurable: true, value: 220 })
         Object.defineProperty(tip, "offsetHeight", { configurable: true, value: 80 })
         Object.defineProperty(surface, "clientWidth", { configurable: true, value: 600 })
@@ -2569,8 +2568,7 @@ describe("overlay visual polish", () => {
         // anchor css (580,380), top css 370: box fits above (280 >= EDGE_GAP) so it stays above
         // the mark (flip-y set — its "caret points down" meaning, not the cursor-following sense)
         // but the 220px-wide box centred on x=580 would clip the 600px-wide surface's right edge,
-        // so it's shifted left and the caret moves to stay over the anchor instead of flip-x.
-        expect(tip.classList.contains("flip-x")).toBe(false)
+        // so it's shifted left and the caret moves to stay over the anchor.
         expect(tip.classList.contains("flip-y")).toBe(true)
         expect(tip.style.left).toBe("372px")
         expect(tip.style.top).toBe("280px")
@@ -2637,7 +2635,7 @@ describe("overlay visual polish", () => {
         expect(tip.innerHTML).toContain("x=")
     })
 
-    it("clamps the tip and flips the caret near the bottom-right edge", async () => {
+    it("clamps the tip near the bottom-right edge and keeps the caret on the pointer", async () => {
         const { host, script } = setup()
         // axis layer: hover anywhere inside the viewport so we can park the cursor at the edge
         mount(script, {
@@ -2656,20 +2654,16 @@ describe("overlay visual polish", () => {
         // client (580, 380) is inside the axis viewport and near the 600×400 surface corner
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 580, clientY: 380, bubbles: true }))
         expect(tip.classList.contains("show")).toBe(true)
-        expect(tip.classList.contains("flip-x")).toBe(true)
+        // Below the pointer would clip the bottom, so the box goes above it (caret underneath).
+        // The box clamps 8px inside the right edge, and the caret moves to stay on the pointer.
         expect(tip.classList.contains("flip-y")).toBe(true)
-        const left = parseFloat(tip.style.left)
-        const top = parseFloat(tip.style.top)
-        expect(left + 220).toBeLessThanOrEqual(600)
-        expect(top + 80).toBeLessThanOrEqual(400)
-        expect(left).toBeGreaterThanOrEqual(0)
-        expect(top).toBeGreaterThanOrEqual(0)
+        expect(tip.style.left).toBe("372px") // 600 - 220 - TIP_GAP
+        expect(tip.style.top).toBe("290px") // 380 - 80 - TIP_OFFSET
+        expect(tip.style.getPropertyValue("--masque-caret-x")).toBe("208px") // 580 - 372
         surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
         expect(tip.classList.contains("show")).toBe(false)
-        expect(tip.classList.contains("flip-x")).toBe(true)
         expect(tip.classList.contains("flip-y")).toBe(true)
         await new Promise((r) => setTimeout(r, 120))
-        expect(tip.classList.contains("flip-x")).toBe(false)
         expect(tip.classList.contains("flip-y")).toBe(false)
     })
 })
