@@ -525,6 +525,50 @@ function PolygonInteractable(ax, p::Makie.Violin; id = :violin, payloads = nothi
     return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
 end
 
+# `hexbin!` draws one data-space hexagon marker per bin at `hb.points`, which are already
+# through the axis transform (`positions_transformed`). Each corner is the center plus the
+# marker's unit vertex scaled by `hb.markersize`, an offset in transformed units. A corner
+# goes back through the inverse transform as `f⁻¹(center + offset)`, so it projects onto the
+# drawn corner with edges straight in pixels as drawn. `place` is `_placement`'s: the marker
+# keeps `transform_marker = false`, so a plot's `translate!`/`scale!`/`rotate!` moves the
+# center and leaves the offset alone, which `place(corner, offset)` does.
+const _HEX_UNIT = [Makie.Vec2d(cos(a), sin(a)) for a in range(pi / 6, 13pi / 6; length = 7)[1:6]]
+function _hex_rings(finv, p; place = nothing)
+    ms = p.markersize[]
+    s = ms isa Real ? Makie.Vec2d(ms, ms) : Makie.Vec2d(ms[1], ms[2])
+    offs = [s .* u for u in _HEX_UNIT]
+    corner(c, o) = _apply_transform(finv, Makie.Point2d(c[1] + o[1], c[2] + o[2]))
+    at(c, o) = place === nothing ? corner(c, o) : place(corner(c, o), Makie.Vec3d(o[1], o[2], 0))
+    return [[(q = at(c, o); Point2f(q[1], q[2])) for o in offs] for c in p.points[]]
+end
+function PolygonInteractable(ax, p::Makie.Hexbin; id = :hexbin, payloads = nothing, tooltip = nothing, label = nothing)
+    finv = Makie.inverse_transform(_transform_func(ax.scene))
+    if _no_inverse(finv)
+        @warn "masque: skipping hexbin; the axis transform has no inverse, so the hexagons " *
+            "can't be mapped back to data" maxlog = 16
+        return PolygonInteractable(ax, Vector{Point2f}[]; id, payloads = Any[], tooltip, label)
+    end
+    rings = _hex_rings(finv, p)
+    payloads === nothing || return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
+    # Unweighted counts are whole numbers; summed weights stay Float64.
+    counts = p.weights[] === nothing ? round.(Int, p.count_hex[]) : p.count_hex[]
+    # The centers are Float32; the shortest Float32 repr drops the widening noise (3.05, not
+    # 3.049999952316284).
+    clean(v) = parse(Float64, string(Float32(v)))
+    pl = Any[]
+    for (c, n) in zip(p.points[], counts)
+        d = _apply_transform(finv, Makie.Point2d(c[1], c[2]))
+        push!(pl, (; x = clean(d[1]), y = clean(d[2]), count = n))
+    end
+    return PolygonInteractable(ax, rings; id, payloads = _unconvert_payloads(ax, pl), tooltip, label)
+end
+# A moved hexbin: rebuild the corners so the model moves each center and not its offset.
+function _place_hexbin(i::PolygonInteractable, p, f)
+    isempty(i.rings) && return i
+    rings = _hex_rings(Makie.inverse_transform(_transform_func(i.ax.scene)), p; place = f.place)
+    return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol)
+end
+
 # Cells come back in tessellation order, not input-site order, so there's no cheap
 # cell→generator mapping; default payload is (; index) only.
 function PolygonInteractable(ax, p::Makie.Voronoiplot; id = :voronoiplot, payloads = nothing, tooltip = nothing, label = nothing)
@@ -883,6 +927,7 @@ function _plotbase(p)
     p isa Makie.Contourf && return :contourf
     p isa Makie.Violin && return :violin
     p isa Makie.Voronoiplot && return :voronoiplot
+    p isa Makie.Hexbin && return :hexbin
     p isa Makie.Stem && return :stem
     p isa Makie.ScatterLines && return :scatterlines
     p isa Makie.Series && return :series
@@ -904,7 +949,9 @@ function _construct(ax, p, id; kw...)
     end
     built = _construct_unplaced(ax, p, id; kw...)
     f = _placement(ax, p)
-    placed = f === nothing ? built : AbstractInteractable[i for i in (_place(i, f) for i in built) if i !== nothing]
+    placed = f === nothing ? built :
+        p isa Makie.Hexbin ? AbstractInteractable[_place_hexbin(i, p, f) for i in built] :
+        AbstractInteractable[i for i in (_place(i, f) for i in built) if i !== nothing]
     sw = _stroke_half(p)
     sw > 0 || return placed
     return AbstractInteractable[_with_stroke(i, sw) for i in placed]
@@ -983,6 +1030,7 @@ function _construct_unplaced(ax, p, id; kw...)
     p isa Makie.Contourf && return [PolygonInteractable(ax, p; id, kw...)]
     p isa Makie.Violin && return [PolygonInteractable(ax, p; id, kw...)]
     p isa Makie.Voronoiplot && return [PolygonInteractable(ax, p; id, kw...)]
+    p isa Makie.Hexbin && return [PolygonInteractable(ax, p; id, kw...)]
     p isa Makie.Stem && return _stem_parts(ax, p, id; kw...)
     p isa Makie.ScatterLines && return _scatterlines_parts(ax, p, id; kw...)
     p isa Makie.Series && return [SegmentInteractable(ax, p; id, kw...)]
@@ -1161,9 +1209,9 @@ function _skip_for_axis(ax, p)
     return false
 end
 
-# A known child of an unknown recipe that must not become its own layer. `hexbin!` draws one
-# data-space hexagon `Scatter` (`markerspace = :data`); `_marker_radius` throws unless
-# markerspace is `:pixel`, and a pixel radius would not be the hex. `bracket!` draws a
+# A known child of an unknown recipe that must not become its own layer. A data-space
+# `Scatter` (`markerspace = :data`, as `hexbin!` draws) can't be built: `_marker_radius`
+# throws unless markerspace is `:pixel`. `bracket!` draws a
 # pixel-space `Series`; `SegmentInteractable` would project those points as data. Non-data
 # `Text` is not refused here — `_text_interactables` warns and returns an empty vector.
 function _walk_refuses(p)
@@ -1348,7 +1396,7 @@ Other kinds are skipped with a warning. A recipe with its own
 that has a default (`arc!` is the `lines!` it draws), under that child's layer id. A child
 with `visible[] == false` is not a layer (`triplot!`'s ghost edges). A construct with no
 vertices does not take a layer id (`qqplot!` with `qqline = :none`). A data-space `Scatter`
-child is left alone (`hexbin!`), and so is a child whose `space` is not `:data` (`bracket!`).
+child is left alone, and so is a child whose `space` is not `:data` (`bracket!`).
 
 Layer ids are the plot kind (`:scatter`, `:lines`, …), suffixed `_2`, `_3`, … when a kind
 repeats across the figure. Passing an entry of this list to `masque` replaces the default with

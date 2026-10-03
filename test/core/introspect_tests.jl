@@ -1,6 +1,15 @@
 using Test, Masque, CairoMakie, Makie
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
+# An unknown recipe whose only child is a data-space Scatter, which the child walk refuses.
+# Types can't be defined inside a testset.
+Makie.@recipe DataDots (positions,) begin
+end
+function Makie.plot!(p::DataDots)
+    scatter!(p, p.positions; markerspace = :data, markersize = 0.2)
+    return p
+end
+
 @testset "Introspection" begin
     @testset "M2.1 plot-introspection constructors" begin
         # An introspected interactable must produce the SAME hitlayers as the explicit one a
@@ -368,9 +377,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @testset "skips unsupported plot types with a warning" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             scatter!(a, [1.0], [1.0])
-            # hexbin's only child is a data-space hex Scatter. The walk must not construct it.
-            hexbin!(a, rand(40), rand(40))
-            ints = @test_logs (:warn, r"plot type hexbin") interactables(f)
+            # DataDots' only child is a data-space Scatter. The walk must not construct it.
+            datadots!(a, Point2f[(0.5, 0.5), (1.5, 1.5)])
+            ints = @test_logs (:warn, r"plot type datadots") interactables(f)
             @test length(ints) == 1
             @test only(ints) isa PointInteractable
         end
@@ -386,8 +395,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
         @testset "no introspectable plots -> warn, render image only" begin
             f = Figure(size = (400, 300)); a = Axis(f[1, 1])
-            hexbin!(a, rand(40), rand(40))
-            w = @test_logs (:warn, r"plot type hexbin") match_mode = :any masque(f)
+            datadots!(a, Point2f[(0.5, 0.5), (1.5, 1.5)])
+            w = @test_logs (:warn, r"plot type datadots") match_mode = :any masque(f)
             @test isempty(w.manifest["layers"])
             @test !isempty(w.b64)                  # static image still produced
         end
@@ -1116,6 +1125,92 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test pi.payloads == Any[(; index = k) for k in 1:8]   # cell order ≠ site order → index only
         ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa PolygonInteractable
+    end
+
+    @testset "Hexbin extraction" begin
+        using Masque: PolygonInteractable, interactables
+        notwhite(c) = !(Float64(Makie.red(c)) > 0.95 && Float64(Makie.green(c)) > 0.95 && Float64(Makie.blue(c)) > 0.95)
+        shoelace(g) = abs(sum(g[i] * g[mod1(i + 3, length(g))] - g[mod1(i + 2, length(g))] * g[i + 1] for i in 1:2:length(g))) / 2
+        xs = [0.1, 0.12, 0.5, 0.52, 0.55, 0.9, 0.3, 0.7, 0.71, 0.2]
+        ys = [0.1, 0.11, 0.5, 0.48, 0.52, 0.9, 0.7, 0.2, 0.22, 0.8]
+        for xscale in (identity, log10)
+            fig = Figure(size = (500, 400)); ax = Axis(fig[1, 1]; xscale)
+            hidedecorations!(ax); hidespines!(ax)
+            hb = hexbin!(ax, xs .+ (xscale === log10 ? 1.0 : 0.0), ys; bins = 4, colormap = [:black, :red])
+            Makie.update_state_before_display!(fig)
+            pi = PolygonInteractable(ax, hb)
+            @test pi.id === :hexbin
+            n = length(hb.points[])
+            @test length(pi.rings) == n && all(length(r) == 6 for r in pi.rings)
+            @test [pl.count for pl in pi.payloads] == hb.count_hex[]
+            @test sum(pl.count for pl in pi.payloads) == length(xs)
+            @test all(pl.count isa Int && pl.x isa Float64 for pl in pi.payloads)
+            # no Float32 widening noise: each coordinate prints as its Float32 does
+            @test all(string(pl.x) == string(Float32(pl.x)) && string(pl.y) == string(Float32(pl.y)) for pl in pi.payloads)
+            # The rings cover exactly the drawn hexagons: their area matches the drawn pixels
+            # (decorations hidden, so every non-white pixel is a hexagon), and each centre is
+            # drawn. On a log axis the corners go back through the inverse transform.
+            _, _, c = ctx_for(fig)
+            L = only(hitlayers(pi, c))
+            img = Makie.colorbuffer(fig; px_per_unit = 2.0)
+            drawn = count(notwhite, img)
+            @test isapprox(sum(shoelace, L.geometry), drawn; rtol = 0.03)
+            for g in L.geometry
+                cx = sum(g[1:2:end]) / 6; cy = sum(g[2:2:end]) / 6
+                @test drawn_near(img, cx, cy; tol = 0)
+            end
+            # the centre payload is in data units
+            pl = pi.payloads[argmax(hb.count_hex[])]
+            @test pl.x > (xscale === log10 ? 1.0 : 0.0) && 0 < pl.y < 1
+        end
+
+        # weights sum into the count; threshold = 0 keeps the empty hexagons, each an element
+        fig = Figure(); ax = Axis(fig[1, 1])
+        hexbin!(ax, xs, ys; bins = 4, weights = fill(2.0, length(xs)), threshold = 0)
+        Makie.update_state_before_display!(fig)
+        ints = interactables(fig)
+        @test length(ints) == 1 && only(ints) isa PolygonInteractable && only(ints).id === :hexbin
+        cnt = [pl.count for pl in only(ints).payloads]
+        @test sum(cnt) == 2 * length(xs) && any(iszero, cnt)
+        # its hexagon Scatter is a descendant, not a second layer
+        @test only(masque(fig).manifest["layers"])["id"] == "hexbin"
+
+        # A moved hexbin: translate!/scale!/rotate! move each center, and the hexagon keeps
+        # its drawn size and orientation (its marker doesn't transform). Each moved ring is the
+        # unmoved ring's shape around a center that lands on drawn pixels. (Pixel area can't be
+        # compared here: moved centers no longer tile, so neighbours overlap. Geometry is whole
+        # pixels, hence the 1.5 px slack.)
+        function hexrings(move!)
+            fm = Figure(size = (500, 400)); am = Axis(fm[1, 1]; limits = (-1.5, 2.5, -1.5, 2.5))
+            hidedecorations!(am); hidespines!(am)
+            hm = hexbin!(am, xs, ys; bins = 4, colormap = [:black, :red])
+            move!(hm)
+            Makie.update_state_before_display!(fm)
+            _, _, cm = ctx_for(fm)
+            return only(hitlayers(only(interactables(am, hm)), cm)).geometry, Makie.colorbuffer(fm; px_per_unit = 2.0)
+        end
+        centred(g) = (c = (sum(g[1:2:end]) / 6, sum(g[2:2:end]) / 6); [g[k] - c[isodd(k) ? 1 : 2] for k in eachindex(g)])
+        g0, _ = hexrings(identity)
+        shape = centred(first(g0))
+        for move! in (h -> translate!(h, 0.3, 0.2, 0), h -> scale!(h, 1.4, 0.8, 1), h -> rotate!(h, π / 7))
+            gm, imgm = hexrings(move!)
+            @test gm != g0
+            @test all(g -> maximum(abs, centred(g) - shape) <= 1.5, gm)
+            @test all(g -> drawn_near(imgm, sum(g[1:2:end]) / 6, sum(g[2:2:end]) / 6; tol = 0), gm)
+        end
+
+        # an axis transform with no inverse: warn and skip the hexbin, not the whole figure
+        fn = Figure(); an = Axis(fn[1, 1])
+        hn = hexbin!(an, xs, ys; bins = 4)
+        Makie.update_state_before_display!(fn)
+        an.scene.transformation.transform_func[] = (x -> x, x -> x)
+        @test isempty(@test_logs((:warn, r"no inverse"), PolygonInteractable(an, hn)).rings)
+
+        # on a date axis the center shows as a date, like the other default payloads
+        fd = Figure(); ad = Axis(fd[1, 1])
+        hexbin!(ad, Makie.Dates.DateTime(2024, 1, 1) .+ Makie.Dates.Day.(1:20), collect(range(0, 1; length = 20)); bins = 3)
+        Makie.update_state_before_display!(fd)
+        @test all(pl.x isa String && startswith(pl.x, "2024-01") for pl in only(interactables(fd)).payloads)
     end
 
     @testset "Contourf extraction" begin
