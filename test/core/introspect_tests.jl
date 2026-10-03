@@ -1105,6 +1105,8 @@ end
             @test [pl.count for pl in pi.payloads] == hb.count_hex[]
             @test sum(pl.count for pl in pi.payloads) == length(xs)
             @test all(pl.count isa Int && pl.x isa Float64 for pl in pi.payloads)
+            # no Float32 widening noise: each coordinate prints as its Float32 does
+            @test all(string(pl.x) == string(Float32(pl.x)) && string(pl.y) == string(Float32(pl.y)) for pl in pi.payloads)
             # The rings cover exactly the drawn hexagons: their area matches the drawn pixels
             # (decorations hidden, so every non-white pixel is a hexagon), and each centre is
             # drawn. On a log axis the corners go back through the inverse transform.

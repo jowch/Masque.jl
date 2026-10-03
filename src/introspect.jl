@@ -543,10 +543,13 @@ function PolygonInteractable(ax, p::Makie.Hexbin; id = :hexbin, payloads = nothi
     payloads === nothing || return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
     # Unweighted counts are whole numbers; summed weights stay Float64.
     counts = p.weights[] === nothing ? round.(Int, p.count_hex[]) : p.count_hex[]
+    # The centers are Float32; the shortest Float32 repr drops the widening noise (3.05, not
+    # 3.049999952316284).
+    clean(v) = parse(Float64, string(Float32(v)))
     pl = Any[]
     for (c, n) in zip(centers, counts)
         d = back(c)
-        push!(pl, (; x = Float64(d[1]), y = Float64(d[2]), count = n))
+        push!(pl, (; x = clean(d[1]), y = clean(d[2]), count = n))
     end
     return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
 end
