@@ -13,6 +13,7 @@
 
 import Pkg
 import Test
+import TOML
 
 const MASQUE_ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 const TEST_DIR = joinpath(MASQUE_ROOT, "test")
@@ -42,8 +43,43 @@ catch
     "unknown commit"
 end
 
+# Decide refusals from the Project.toml files, not from the resolver's wording, which varies
+# across Pkg versions.
+project(dir) = TOML.parsefile(joinpath(dir, "Project.toml"))
+in_compat(v, spec) = v in Pkg.Types.semver_spec(spec)
+
+# Upstream packages whose version is outside Masque's own [compat] for them.
+function outside_pin(checkout)
+    compat = get(project(MASQUE_ROOT), "compat", Dict{String, Any}())
+    out = String[]
+    for p in UPSTREAM_PKGS
+        haskey(compat, p) || continue
+        v = VersionNumber(project(joinpath(checkout, p))["version"])
+        in_compat(v, compat[p]) || push!(out, "$p $v (Masque allows $(compat[p]))")
+    end
+    return out
+end
+
+# Upstream packages whose declared [compat] julia excludes the running Julia.
+function outside_julia(checkout)
+    out = String[]
+    for p in UPSTREAM_PKGS
+        spec = get(get(project(joinpath(checkout, p)), "compat", Dict{String, Any}()), "julia", nothing)
+        spec === nothing || in_compat(VERSION, spec) || push!(out, "$p (julia = \"$spec\")")
+    end
+    return out
+end
+
 function setup(checkout, env)
     commit = upstream_commit(checkout)
+    pin = outside_pin(checkout)
+    jl = outside_julia(checkout)
+    # Pkg.develop does not reject a path package whose own julia bound excludes this Julia, so
+    # say so here. If master still loads, the canaries below are a real result.
+    isempty(jl) || report(
+        "warning", "Makie master does not declare Julia $VERSION",
+        "MakieOrg/Makie.jl@$commit: " * join(jl, ", ") * ". Running the canaries anyway; `load` fails if it does not load."
+    )
     mkpath(env)
     Pkg.activate(env)
     specs = [Pkg.PackageSpec(; path = MASQUE_ROOT); [Pkg.PackageSpec(; path = joinpath(checkout, p)) for p in UPSTREAM_PKGS]]
@@ -52,22 +88,19 @@ function setup(checkout, env)
         Pkg.develop(specs)
     catch err
         msg = sprint(showerror, err)
-        if err isa Pkg.Resolve.ResolverError
-            if occursin("julia", lowercase(msg)) && occursin("restricted to versions", msg) &&
-                    !occursin("compatibility requirements with Masque", msg)
-                report(
-                    "error", "Makie master does not support Julia $VERSION",
-                    "Resolution refused at MakieOrg/Makie.jl@$commit because of Julia compat. " *
-                        "This is not an accessor shape break.\n$msg"
-                )
-            else
-                report(
-                    "error", "Makie master left Masque's compat pin",
-                    "Resolution refused at MakieOrg/Makie.jl@$commit: master's versions are outside " *
-                        "Masque's [compat] (one minor each). This is not an accessor shape break; the " *
-                        "CompatHelper pull request runs the canaries once a release widens the bound.\n$msg"
-                )
-            end
+        if !isempty(pin)
+            report(
+                "error", "Makie master left Masque's compat pin",
+                "Resolution refused at MakieOrg/Makie.jl@$commit: " * join(pin, ", ") * ". This is not " *
+                    "an accessor shape break; the CompatHelper pull request runs the canaries once a " *
+                    "release widens the bound.\n$msg"
+            )
+        elseif !isempty(jl)
+            report(
+                "error", "Makie master does not support Julia $VERSION",
+                "Resolution refused at MakieOrg/Makie.jl@$commit: " * join(jl, ", ") * ". This is not " *
+                    "an accessor shape break.\n$msg"
+            )
         else
             report("error", "Could not develop Makie master", "MakieOrg/Makie.jl@$commit: $msg")
         end
