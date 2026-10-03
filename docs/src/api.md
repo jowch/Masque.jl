@@ -109,6 +109,48 @@ dark values, the browser picks one by the system's color scheme:
 | `--masque-tip-maxwidth` | `320px` | CSS only |
 | `--masque-mark-border` | *(unset: plain 1px border)* | none; set from the mark's `colors` (see [Accent color](@ref)) |
 
+## Overlay styling
+
+Pass `overlaystyle` to `masque` to change how highlights, the
+selection, the crosshair, and ROI boxes look in that widget. Name only
+the parts you want to change; the rest keep the built-in look:
+
+```julia
+masque(fig; overlaystyle = (; color = :steelblue, hover_width = 2.5))
+```
+
+A per-layer `hoverstyle` stroke still wins on that layer. An unknown key
+raises an `ArgumentError` that lists the valid ones. Widths are in CSS
+pixels, and opacities run from 0 to 1. Colors take a CSS string or any
+Makie color.
+
+| Key | Default | Changes | Custom property |
+|---|---|---|---|
+| `color` | `#7a7a7a` on a light figure, `#c8c8c8` on a dark one | highlight, selection, ROI, and threshold stroke | `--masque-chrome` |
+| `dodge_fill` | `#141414` | how strongly a highlight brightens the mark; lighter is stronger | `--masque-hi-fill` |
+| `hover_width` | `1.5` | outline of the hovered mark | `--masque-hover-width` |
+| `selected_width` | `2` | outline of a selected point, bar, or shape; a selected line uses the ring below | `--masque-selected-width` |
+| `hover_fill_opacity` | `0.18` | fill of a hovered mark with a `hoverstyle` stroke | `--masque-hover-fill-opacity` |
+| `selected_fill_opacity` | `0.35` | fill of a selected mark with a `hoverstyle` stroke | `--masque-selected-fill-opacity` |
+| `ring_width` | `2` | ring around a selected line | `--masque-ring-width` |
+| `ring_halo_width` | `4` | soft band around that ring | `--masque-ring-halo-width` |
+| `ring_halo_opacity` | `0.25` | that band's opacity | `--masque-ring-halo-opacity` |
+| `roi_width` | `1` | ROI box outline | `--masque-roi-width` |
+| `handle_width` | `1` | ROI corner grip outline | `--masque-handle-width` |
+| `handle_fill` | `#ffffff` | ROI corner grip fill | `--masque-handle-fill` |
+| `cross_color` | `#b0b0b0` on a light figure, `#929292` on a dark one | crosshair line | `--masque-cross` |
+| `cross_width` | `1` | crosshair line | `--masque-cross-width` |
+| `cross_opacity` | `0.8` | crosshair line | `--masque-cross-opacity` |
+| `cross_halo_width` | `1.5` | figure-colored edge around the crosshair line | `--masque-cross-halo-width` |
+
+To change these without Julia, set the custom properties in a CSS rule
+on an element that contains the cell, as for tooltips. `color`,
+`dodge_fill`, and `cross_color` can only be set from Julia.
+
+One property has no key: `--masque-noblend-fill-opacity` (default `0.18`)
+is the highlight fill in a browser that cannot brighten the mark, and
+can be set only from CSS.
+
 ## Custom-hit interface
 
 For usage, see [Custom hits](@ref).

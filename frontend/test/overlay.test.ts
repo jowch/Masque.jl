@@ -249,13 +249,15 @@ describe("mount", () => {
         expect(cornerCenters).toEqual([{ x: 200, y: 200 }, { x: 600, y: 200 }, { x: 600, y: 600 }, { x: 200, y: 600 }])
         for (const h of handles) {
             expect(h.getAttribute("width")).toBe(String(2 * drawHalf))
-            expect(h.getAttribute("stroke-width")).toBe("1")
+            expect(h.getAttribute("stroke-width")).toBeNull() // the stylesheet's --masque-handle-width
+            expect(getComputedStyle(h).strokeWidth).toBe("1")
             expect(h.getAttribute("rx")).toBe(String(radius))
             expect(h.getAttribute("ry")).toBe(String(radius))
         }
         expect(rects[0].getAttribute("rx")).toBeNull()
         const box = rects[0] as SVGRectElement
-        expect(box.getAttribute("stroke-width")).toBe("1")
+        expect(box.getAttribute("stroke-width")).toBeNull() // the stylesheet's --masque-roi-width
+        expect(getComputedStyle(box).strokeWidth).toBe("1")
         expect(box.getAttribute("x")).toBe("200")
         let committed: { layer: string; index: number; payload: { xmin: number; xmax: number; ymin: number; ymax: number } } | null = null
         host.addEventListener("input", () => {
@@ -296,11 +298,12 @@ describe("mount", () => {
         mount(script, m)
         const rects = shadowOf(host).querySelectorAll("rect")
         const box = rects[0] as SVGRectElement
-        expect(box.getAttribute("stroke-width")).toBe("3")
+        expect(box.style.getPropertyValue("--masque-roi-width")).toBe("3")
+        expect(getComputedStyle(box).strokeWidth).toBe("3")
         expect(box.style.getPropertyValue("--masque-hi-stroke")).toBe("#123456")
         const grip = rects[1] as SVGRectElement
         expect(grip.classList.contains("masque-handle")).toBe(true)
-        expect(grip.getAttribute("stroke-width")).toBe("1")
+        expect(getComputedStyle(grip).strokeWidth).toBe("1")
         expect(grip.style.getPropertyValue("--masque-hi-stroke")).toBe("#123456")
     })
 
@@ -2261,7 +2264,8 @@ describe("overlay visual polish", () => {
         expect(edgeEl.classList.contains("masque-hover")).toBe(true)
         expect(edgeEl.classList.contains("masque-wash")).toBe(false)
         expect(edgeEl.getAttribute("stroke")).toBeNull() // colour comes from the stylesheet, not a presentation attribute
-        expect(edgeEl.getAttribute("stroke-width")).toBe("1.5")
+        expect(edgeEl.getAttribute("stroke-width")).toBeNull() // the stylesheet's --masque-hover-width
+        expect(getComputedStyle(edgeEl).strokeWidth).toBe("1.5")
         expect(edgeEl.getAttribute("stroke-opacity")).toBeNull() // fully opaque
         // The stroke lives in svg.masque-edge; that svg does not blend.
         expect(edgeEl.closest("svg")!.classList.contains("masque-edge")).toBe(true)
@@ -2283,7 +2287,7 @@ describe("overlay visual polish", () => {
         expect(el.classList.contains("masque-hi")).toBe(true)
         expect(el.classList.contains("masque-hover")).toBe(true)
         expect(el.getAttribute("fill")).toBeNull()
-        expect(el.getAttribute("stroke-width")).toBe("1.5")
+        expect(getComputedStyle(el).strokeWidth).toBe("1.5")
         expect(fillHiGroup(shadowOf(host)).children.length).toBe(0) // no fill shape for an open mark
     })
 
@@ -2334,7 +2338,8 @@ describe("overlay visual polish", () => {
         expect(edgeEl.classList.contains("masque-wash")).toBe(true)
         expect(edgeEl.getAttribute("fill")).toBeNull()
         expect(edgeEl.getAttribute("stroke")).toBeNull()
-        expect(edgeEl.getAttribute("stroke-width")).toBe("2")
+        expect(edgeEl.getAttribute("stroke-width")).toBeNull() // the stylesheet's --masque-selected-width
+        expect(getComputedStyle(edgeEl).strokeWidth).toBe("2")
         expect(edgeEl.getAttribute("stroke-opacity")).toBeNull()
         // outline sits ON the mark's own edge now, not a halo outside it (was r + 2)
         expect(edgeEl.getAttribute("r")).toBe("20")
@@ -2425,10 +2430,10 @@ describe("overlay visual polish", () => {
         expect(lines.every((ln) => ln.classList.contains("masque-hi"))).toBe(true)
         expect(lines.every((ln) => ln.getAttribute("fill") === null)).toBe(true)
         expect(lines.every((ln) => ln.getAttribute("stroke") === null)).toBe(true)
-        const widths = lines.map((ln) => ln.getAttribute("stroke-width")).sort()
+        const widths = lines.map((ln) => getComputedStyle(ln).strokeWidth).sort()
         expect(widths).toEqual(["2", "4"])
-        const outer = lines.find((ln) => ln.getAttribute("stroke-width") === "4")!
-        expect(outer.getAttribute("stroke-opacity")).toBe("0.25")
+        const outer = lines.find((ln) => getComputedStyle(ln).strokeWidth === "4")!
+        expect(Number(getComputedStyle(outer).strokeOpacity)).toBeCloseTo(0.25)
     })
 
     it("threshold line gets masque-hi with no explicit --masque-hi-stroke when style is missing", () => {
@@ -2489,7 +2494,7 @@ describe("overlay visual polish", () => {
         expect(css).toMatch(/svg\.masque-fill \{ mix-blend-mode: color-dodge/)
         expect(css).not.toMatch(/svg\.masque-edge \{ mix-blend-mode:/)
         expect(css).toMatch(/--masque-hi-c: var\(--masque-hi-stroke, var\(--masque-chrome\)\)/)
-        expect(css).toMatch(/@supports not \(mix-blend-mode: color-dodge\) \{\s*svg\.masque-fill \.masque-hi\.masque-fillshape \{ fill: var\(--masque-chrome\); fill-opacity: 0\.18; \}/)
+        expect(css).toMatch(/@supports not \(mix-blend-mode: color-dodge\) \{\s*svg\.masque-fill \.masque-hi\.masque-fillshape \{ fill: var\(--masque-chrome\); fill-opacity: var\(--masque-noblend-fill-opacity, 0\.18\); \}/)
     })
 
     it("does not rewrite tooltip HTML on same-hit mousemove", async () => {
@@ -4194,5 +4199,112 @@ describe("photographic pan / wheel zoom", () => {
         const line = shadow.querySelector("line") as SVGLineElement
         expect(line.classList.contains("masque-threshold-line")).toBe(true)
         expect(line.closest("g.masque-photo")).toBeTruthy()
+    })
+})
+
+describe("chrome metrics are custom properties (#180)", () => {
+    const shadowHostOf = (host: HTMLElement) => host.lastElementChild as HTMLElement
+    const surfaceHover = (shadow: ShadowRoot, x: number, y: number) =>
+        (shadow.querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, bubbles: true }))
+
+    it("a property on the shadow host changes that metric and leaves the rest at the recipe", () => {
+        const { host, script } = setup()
+        mount(script, { ...manifest, layers: [{ ...manifest.layers[0], selected: [0] }] })
+        const shadow = shadowOf(host)
+        shadowHostOf(host).style.setProperty("--masque-selected-width", "5")
+        const edge = edgeSelGroup(shadow).firstElementChild as SVGElement
+        expect(getComputedStyle(edge).strokeWidth).toBe("5")
+        const plain = { ...manifest, layers: [{ ...manifest.layers[0], selected: [0], style: { stroke: "#123456", width: 2 } }] }
+        const { host: host2, script: script2 } = setup()
+        mount(script2, plain)
+        shadowHostOf(host2).style.setProperty("--masque-selected-fill-opacity", "0.5")
+        const wash = plainSelGroup(shadowOf(host2)).firstElementChild as SVGElement
+        expect(Number(getComputedStyle(wash).fillOpacity)).toBeCloseTo(0.5)
+        // An unset property keeps the locked default.
+        expect(getComputedStyle(wash).strokeWidth).toBe("2")
+    })
+
+    it("hover width and fill opacity follow the host's properties", () => {
+        const { host, script } = setup()
+        mount(script, manifest)
+        const shadow = shadowOf(host)
+        shadowHostOf(host).style.setProperty("--masque-hover-width", "3")
+        surfaceHover(shadow, 300, 200)
+        const edge = edgeHiGroup(shadow).firstElementChild as SVGElement
+        expect(getComputedStyle(edge).strokeWidth).toBe("3")
+    })
+
+    it("ROI outline and grips read the host's properties, and a hoverstyle width still wins", () => {
+        const { host, script } = setup()
+        const m = roiManifest()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const sh = shadowHostOf(host)
+        sh.style.setProperty("--masque-roi-width", "2.5")
+        sh.style.setProperty("--masque-handle-width", "2")
+        sh.style.setProperty("--masque-handle-fill", "#000000")
+        const [box, grip] = [...shadow.querySelectorAll("rect")] as SVGRectElement[]
+        expect(getComputedStyle(box).strokeWidth).toBe("2.5")
+        expect(getComputedStyle(grip).strokeWidth).toBe("2")
+        expect(getComputedStyle(grip).fill).toBe("#000000")
+
+        const { host: host2, script: script2 } = setup()
+        const m2 = roiManifest()
+        m2.layers[0].style = { stroke: "#123456", width: 4 }
+        mount(script2, m2)
+        shadowHostOf(host2).style.setProperty("--masque-roi-width", "2.5")
+        const box2 = shadowOf(host2).querySelector("rect") as SVGRectElement
+        expect(getComputedStyle(box2).strokeWidth).toBe("4")
+    })
+
+    it("an explicit hoverstyle stroke's hover outline reads --masque-hover-width", () => {
+        const { host, script } = setup()
+        mount(script, { ...manifest, layers: [{ ...manifest.layers[0], style: { stroke: "#123456", width: 2 } }] })
+        const shadow = shadowOf(host)
+        surfaceHover(shadow, 300, 200)
+        const el = plainHiGroup(shadow).firstElementChild as SVGElement
+        expect(el.classList.contains("masque-w-hover")).toBe(true)
+        expect(getComputedStyle(el).strokeWidth).toBe("1.5")
+        shadowHostOf(host).style.setProperty("--masque-hover-width", "3")
+        expect(getComputedStyle(el).strokeWidth).toBe("3")
+    })
+
+    it("no stroke-width or stroke-opacity presentation attribute is left on highlight chrome", () => {
+        const { host, script } = setup()
+        mount(script, manifest)
+        const shadow = shadowOf(host)
+        surfaceHover(shadow, 300, 200)
+        for (const el of shadow.querySelectorAll(".masque-hi, .masque-handle")) {
+            expect(el.getAttribute("stroke-width")).toBeNull()
+            expect(el.getAttribute("stroke-opacity")).toBeNull()
+        }
+    })
+})
+
+describe("overlayStyle from Julia (#181)", () => {
+    it("writes each property on the shadow host, after the derived chrome colours", () => {
+        const { host, script } = setup()
+        mount(script, {
+            ...manifest,
+            overlayStyle: { "--masque-chrome": "rgb(0,0,255)", "--masque-hover-width": "3px" },
+        })
+        const sh = host.lastElementChild as HTMLElement
+        expect(sh.style.getPropertyValue("--masque-chrome")).toBe("rgb(0,0,255)") // wins over the derived grey
+        expect(sh.style.getPropertyValue("--masque-hover-width")).toBe("3px")
+        expect(sh.style.getPropertyValue("--masque-cross")).toBe("#b0b0b0") // unset keys keep the derivation
+        const shadow = shadowOf(host)
+        ;(shadow.querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+        const edge = edgeHiGroup(shadow).firstElementChild as SVGElement
+        expect(getComputedStyle(edge).strokeWidth).toBe("3px")
+    })
+
+    it("no overlayStyle leaves the host with only the derived colours", () => {
+        const { host, script } = setup()
+        mount(script, manifest)
+        const sh = host.lastElementChild as HTMLElement
+        expect(sh.style.getPropertyValue("--masque-chrome")).toBe("#7a7a7a")
+        expect(sh.style.getPropertyValue("--masque-hover-width")).toBe("")
     })
 })

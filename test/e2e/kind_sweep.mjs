@@ -315,7 +315,7 @@ try {
             const cs = getComputedStyle(ln);
             return {
               className: ln.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
-              width: ln.getAttribute("stroke-width"), opacity: ln.getAttribute("stroke-opacity"),
+              width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
               x1: ln.getAttribute("x1"), y1: ln.getAttribute("y1"),
               x2: ln.getAttribute("x2"), y2: ln.getAttribute("y2"),
             };
@@ -324,7 +324,7 @@ try {
             const cs = getComputedStyle(p);
             return {
               className: p.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
-              width: p.getAttribute("stroke-width"), opacity: p.getAttribute("stroke-opacity"),
+              width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
               d: p.getAttribute("d"),
             };
           }),
@@ -334,7 +334,7 @@ try {
       return {
         layer: layerName, kind: "closed", tag: el.tagName.toLowerCase(),
         className: el.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
-        width: el.getAttribute("stroke-width"),
+        width: String(parseFloat(cs.strokeWidth)),
         blend: layerName === "plain" ? null : getComputedStyle(svg).mixBlendMode,
         r: el.getAttribute("r"), cx: el.getAttribute("cx"), cy: el.getAttribute("cy"),
         x: el.getAttribute("x"), y: el.getAttribute("y"),
@@ -415,7 +415,7 @@ try {
       return {
         layer: layerName, tag: el.tagName.toLowerCase(), className: el.getAttribute("class"),
         fill: cs.fill, stroke: cs.stroke, fillOpacity: cs.fillOpacity,
-        width: el.getAttribute("stroke-width"), opacity: el.getAttribute("stroke-opacity"),
+        width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
         blend: layerName === "plain" ? null : getComputedStyle(svg).mixBlendMode,
         r: el.getAttribute("r"), cx: el.getAttribute("cx"), cy: el.getAttribute("cy"),
         x: el.getAttribute("x"), y: el.getAttribute("y"),
@@ -1427,7 +1427,7 @@ try {
                 const cs = getComputedStyle(ln);
                 return {
                   className: ln.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
-                  width: ln.getAttribute("stroke-width"), opacity: ln.getAttribute("stroke-opacity"),
+                  width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
                   x1: ln.getAttribute("x1"), y1: ln.getAttribute("y1"),
                   x2: ln.getAttribute("x2"), y2: ln.getAttribute("y2"),
                 };
@@ -1436,7 +1436,7 @@ try {
                 const cs = getComputedStyle(p);
                 return {
                   className: p.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
-                  width: p.getAttribute("stroke-width"), opacity: p.getAttribute("stroke-opacity"),
+                  width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
                   d: p.getAttribute("d"),
                 };
               }),
@@ -1446,7 +1446,7 @@ try {
           return {
             layer: layerName, kind: "closed", tag: el.tagName.toLowerCase(),
             className: el.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
-            width: el.getAttribute("stroke-width"),
+            width: String(parseFloat(cs.strokeWidth)),
             blend: layerName === "plain" ? null : getComputedStyle(svg).mixBlendMode,
             r: el.getAttribute("r"), cx: el.getAttribute("cx"), cy: el.getAttribute("cy"),
           };
