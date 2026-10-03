@@ -5,6 +5,7 @@
 //
 //   node keyboard_a11y.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
+import { shutdownOpenSession } from "./fresh_session.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -47,6 +48,7 @@ try {
   });
   page.on("console", (m) => consoleLog.push(`[${m.type()}] ${m.text()}`));
 
+  await shutdownOpenSession(base, notebook);
   await page.goto(`${base}/open?path=${encodeURIComponent(notebook)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
   const deadline = Date.now() + 1500000;
   let ready = false, tick = 0;
