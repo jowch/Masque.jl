@@ -1,0 +1,56 @@
+name: Upstream canary
+
+# Runs Masque's accessor canaries (test/makie_compat_tests.jl and test/wgl_compat_tests.jl)
+# against Makie master, so a change to an internal Masque reads shows up the night it lands
+# rather than when a release moves the compat bound. Advisory: it is not a required check and
+# never runs on pull requests, but a canary failure fails the run (no continue-on-error), so a
+# break is red in the Actions tab. CompatHelper covers released versions; this covers master.
+# Project.toml compat is not touched here, and GLMakie is never installed.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    name: Accessor canaries on Makie master
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      MAKIE_CHECKOUT: ${{ github.workspace }}/upstream/Makie.jl
+      CANARY_ENV: ${{ github.workspace }}/upstream/canary-env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out MakieOrg/Makie.jl master
+        uses: actions/checkout@v4
+        with:
+          repository: MakieOrg/Makie.jl
+          ref: master
+          path: upstream/Makie.jl
+          fetch-depth: 1
+      - name: Record upstream commit
+        run: echo "MAKIE_COMMIT=$(git -C "$MAKIE_CHECKOUT" rev-parse HEAD)" >> "$GITHUB_ENV"
+      - uses: julia-actions/setup-julia@v2
+        with:
+          # The package's lower bound. If master drops 1.10, `setup` or `load` says so.
+          version: '1.10'
+      - uses: julia-actions/cache@v2
+      # Resolution: Masque plus ComputePipeline, Makie, CairoMakie, and WGLMakie from the
+      # checkout. A refusal here means master left Masque's one-minor pin (or Julia 1.10), and
+      # is reported as that, not as a canary failure.
+      - name: Develop Makie master
+        run: julia test/upstream/canary.jl setup "$MAKIE_CHECKOUT" "$CANARY_ENV"
+      # Precompile and load, then log pkgversion of Makie, CairoMakie, WGLMakie and the commit.
+      - name: Load Makie master
+        id: load
+        run: julia --project="$CANARY_ENV" test/upstream/canary.jl load "$MAKIE_CHECKOUT"
+      - name: Makie accessor canary
+        run: julia --project="$CANARY_ENV" test/upstream/canary.jl makie
+      - name: WGL accessor canary
+        # Runs even when the Makie canary failed, so one run reports both.
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: julia --project="$CANARY_ENV" test/upstream/canary.jl wgl
