@@ -1175,6 +1175,37 @@ end
         # its hexagon Scatter is a descendant, not a second layer
         @test only(masque(fig).manifest["layers"])["id"] == "hexbin"
 
+        # A moved hexbin: translate!/scale!/rotate! move each center, and the hexagon keeps
+        # its drawn size and orientation (its marker doesn't transform). Each moved ring is the
+        # unmoved ring's shape around a center that lands on drawn pixels. (Pixel area can't be
+        # compared here: moved centers no longer tile, so neighbours overlap. Geometry is whole
+        # pixels, hence the 1.5 px slack.)
+        function hexrings(move!)
+            fm = Figure(size = (500, 400)); am = Axis(fm[1, 1]; limits = (-1.5, 2.5, -1.5, 2.5))
+            hidedecorations!(am); hidespines!(am)
+            hm = hexbin!(am, xs, ys; bins = 4, colormap = [:black, :red])
+            move!(hm)
+            Makie.update_state_before_display!(fm)
+            _, _, cm = ctx_for(fm)
+            return only(hitlayers(only(interactables(am, hm)), cm)).geometry, Makie.colorbuffer(fm; px_per_unit = 2.0)
+        end
+        centred(g) = (c = (sum(g[1:2:end]) / 6, sum(g[2:2:end]) / 6); [g[k] - c[isodd(k) ? 1 : 2] for k in eachindex(g)])
+        g0, _ = hexrings(identity)
+        shape = centred(first(g0))
+        for move! in (h -> translate!(h, 0.3, 0.2, 0), h -> scale!(h, 1.4, 0.8, 1), h -> rotate!(h, π / 7))
+            gm, imgm = hexrings(move!)
+            @test gm != g0
+            @test all(g -> maximum(abs, centred(g) - shape) <= 1.5, gm)
+            @test all(g -> drawn_near(imgm, sum(g[1:2:end]) / 6, sum(g[2:2:end]) / 6; tol = 0), gm)
+        end
+
+        # an axis transform with no inverse: warn and skip the hexbin, not the whole figure
+        fn = Figure(); an = Axis(fn[1, 1])
+        hn = hexbin!(an, xs, ys; bins = 4)
+        Makie.update_state_before_display!(fn)
+        an.scene.transformation.transform_func[] = (x -> x, x -> x)
+        @test isempty(@test_logs((:warn, r"no inverse"), PolygonInteractable(an, hn)).rings)
+
         # on a date axis the center shows as a date, like the other default payloads
         fd = Figure(); ad = Axis(fd[1, 1])
         hexbin!(ad, Makie.Dates.DateTime(2024, 1, 1) .+ Makie.Dates.Day.(1:20), collect(range(0, 1; length = 20)); bins = 3)
