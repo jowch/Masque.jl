@@ -305,6 +305,23 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test color_near(isredc, imga, mx, my; tol = 3)
         end
 
+        # one direction shared by every arrow (Makie broadcasts it) must not crash (#248)
+        fsh = Figure(; size = (600, 450))
+        axsh = Axis3(fsh[1, 1]; azimuth = 0.4, elevation = 0.5)
+        arrows3d!(axsh, apts, Makie.Vec3f(1, 0, 1); color = :red)
+        Makie.update_state_before_display!(fsh)
+        shi = only(@test_logs interactables(fsh))
+        @test length(shi.vertices) == 6
+        @test shi.payloads[3] == (; index = 3, x = 2.0, y = 4.0, z = 3.0, u = 1.0, v = 0.0, w = 1.0)
+        _, ppush, ctxsh = ctx_for(fsh)
+        imgsh = Makie.colorbuffer(fsh; px_per_unit = ppush)
+        Lsh = only(hitlayers(shi, ctxsh))
+        for k in 0:2
+            mx = (Lsh.geometry[4k + 1] + Lsh.geometry[4k + 3]) / 2
+            my = (Lsh.geometry[4k + 2] + Lsh.geometry[4k + 4]) / 2
+            @test color_near(isredc, imgsh, mx, my; tol = 3)
+        end
+
         # lengthscale ≠ 1: raw pos→pos+dir overshoots the drawn arrow; processed ends must hit
         fls = Figure(; size = (600, 450))
         axls = Axis3(fls[1, 1]; azimuth = 0.4, elevation = 0.5)

@@ -177,6 +177,24 @@ HTML(
         "<span id=\"coords_arrows3d\" style=\"display:none\">$(JSON3.write(sweep.arrows3d.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-00000000006c
+@bind ev_arrows3d_shared sweep.arrows3d_shared
+
+# ╔═╡ d1000000-0000-0000-0000-00000000006d
+HTML(
+    "<span id=\"out_arrows3d_shared\">ARROWS3D_SHARED=$(repr(ev_arrows3d_shared))</span>" *
+        "<span id=\"coords_arrows3d_shared\" style=\"display:none\">$(JSON3.write(sweep.arrows3d_shared.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000006a
+@bind ev_band_y sweep.band_y
+
+# ╔═╡ d1000000-0000-0000-0000-00000000006b
+HTML(
+    "<span id=\"out_band_y\">BAND_Y=$(repr(ev_band_y))</span>" *
+        "<span id=\"coords_band_y\" style=\"display:none\">$(JSON3.write(sweep.band_y.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000028
 @bind ev_hlines sweep.hlines
 
@@ -339,6 +357,10 @@ HTML(
 # ╟─d1000000-0000-0000-0000-000000000069
 # ╠═d1000000-0000-0000-0000-000000000026
 # ╠═d1000000-0000-0000-0000-000000000027
+# ╠═d1000000-0000-0000-0000-00000000006c
+# ╠═d1000000-0000-0000-0000-00000000006d
+# ╠═d1000000-0000-0000-0000-00000000006a
+# ╠═d1000000-0000-0000-0000-00000000006b
 # ╠═d1000000-0000-0000-0000-000000000028
 # ╠═d1000000-0000-0000-0000-000000000029
 # ╠═d1000000-0000-0000-0000-000000000030
