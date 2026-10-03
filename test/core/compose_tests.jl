@@ -25,7 +25,8 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
     @testset "no arguments: the defaults" begin
         f = Figure(); ax = Axis(f[1, 1])
         lines!(ax, xs, ys); scatter!(ax, xs, ys); scatter!(ax, xs, ys .+ 1)
-        @test ids(assemble(f)) == ids(interactables(f)) == [:lines, :scatter, :scatter_2]
+        # Ids follow drawing order; the list is topmost first.
+        @test ids(assemble(f)) == ids(interactables(f)) == [:scatter_2, :scatter, :lines]
     end
 
     @testset "an interactable with a new id is added after the defaults" begin
@@ -41,18 +42,18 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         lines!(ax, xs, ys); scatter!(ax, xs, ys); s2 = scatter!(ax, xs, ys .+ 1)
         tip = masque"y = {y}"
         out = assemble(f, interactables(s2; tooltip = tip))
-        @test ids(out) == [:lines, :scatter, :scatter_2]
-        @test out[3] isa PointInteractable && out[3].tooltip === tip
+        @test ids(out) == [:scatter_2, :scatter, :lines]
+        @test out[1] isa PointInteractable && out[1].tooltip === tip
         @test out[2].tooltip === nothing
         # The argument order does not move it: it keeps the default's position.
         out = assemble(f, ViewInteractable(ax), interactables(s2; tooltip = tip))
-        @test ids(out) == [:lines, :scatter, :scatter_2, :view]
+        @test ids(out) == [:scatter_2, :scatter, :lines, :view]
     end
 
     @testset "an explicit id renames the replacement" begin
         f = Figure(); ax = Axis(f[1, 1])
         lines!(ax, xs, ys); s = scatter!(ax, xs, ys)
-        @test ids(assemble(f, interactables(s; id = :picks))) == [:lines, :picks]
+        @test ids(assemble(f, interactables(s; id = :picks))) == [:picks, :lines]
     end
 
     @testset "a two-layer plot is replaced as a whole" begin
@@ -69,10 +70,10 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         f = Figure(); ax = Axis(f[1, 1])
         scatter!(ax, xs, ys); lines!(ax, xs, ys)
         out = assemble(f, PointInteractable(ax, collect(zip(xs, ys)); id = :scatter, payloads = ["a", "b", "c"]))
-        @test ids(out) == [:scatter, :lines]
-        @test out[1].payloads == ["a", "b", "c"]
+        @test ids(out) == [:lines, :scatter]
+        @test out[2].payloads == ["a", "b", "c"]
         # So an edited copy of the defaults is a valid call, as the old explicit form was.
-        @test ids(assemble(f, interactables(f), ViewInteractable(ax))) == [:scatter, :lines, :view]
+        @test ids(assemble(f, interactables(f), ViewInteractable(ax))) == [:lines, :scatter, :view]
     end
 
     @testset "two layers with one id are refused" begin
@@ -110,8 +111,8 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
     @testset "interactables(ax) is that axis's part of the defaults" begin
         f = Figure(); ax1 = Axis(f[1, 1]); ax2 = Axis(f[1, 2])
         scatter!(ax1, xs, ys); scatter!(ax2, xs, ys); lines!(ax2, xs, ys)
-        @test ids(interactables(ax2)) == [:scatter_2, :lines]
-        @test ids(assemble(f, interactables(ax2); auto = false)) == [:scatter_2, :lines]
+        @test ids(interactables(ax2)) == [:lines, :scatter_2]
+        @test ids(assemble(f, interactables(ax2); auto = false)) == [:lines, :scatter_2]
     end
 
     @testset "a recipe's own method" begin
@@ -119,11 +120,11 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         d = composedots!(ax, [Point2f(1, 1), Point2f(2, 2)])
         composedots!(ax, [Point2f(3, 3)])
         out = interactables(f)
-        @test ids(out) == [:composedots, :composedots_2]
-        @test out[1].payloads == ["dot 1", "dot 2"]
+        @test ids(out) == [:composedots_2, :composedots]
+        @test out[2].payloads == ["dot 1", "dot 2"]
         out = assemble(f, interactables(d; tooltip = false))
-        @test ids(out) == [:composedots, :composedots_2]
-        @test out[1].tooltip === false
+        @test ids(out) == [:composedots_2, :composedots]
+        @test out[2].tooltip === false
         # A fresh id is picked before the method runs, so each request builds once.
         COMPOSEDOTS_BUILDS[] = 0
         e = composedots!(ax, [Point2f(4, 4)])
@@ -178,7 +179,7 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         f = Figure(); ax = Axis(f[1, 1])
         lines!(ax, xs, ys); s = scatter!(ax, xs, ys)
         w = masque(f, interactables(s; payloads = ["a", "b", "c"]), ViewInteractable(ax))
-        @test [L["id"] for L in w.manifest["layers"]] == ["lines", "scatter", "view"]
+        @test [L["id"] for L in w.manifest["layers"]] == ["scatter", "lines", "view"]
         w = masque(f, ViewInteractable(ax); auto = false)
         @test [L["id"] for L in w.manifest["layers"]] == ["view"]
         # No defaults asked for, so an empty overlay is not a failed walk.
