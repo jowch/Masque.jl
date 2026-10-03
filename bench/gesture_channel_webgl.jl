@@ -14,7 +14,7 @@ Random.seed!(0)
 const _WGLExt = Base.get_extension(Masque, :MasqueWGLMakieExt)
 
 function bench_scene(name, fig, ints; input, trials = 20)
-    w = masque(fig, ints; backend = _WGLExt.WebGLBackend())
+    w = masque(fig, ints; backend = :webgl)
     @assert w.render_frame !== nothing "no ViewInteractable render_frame built for $name"
     w.render_frame(merge(input, Dict("settle" => false)))
     w.render_frame(merge(input, Dict("settle" => true)))

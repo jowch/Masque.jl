@@ -26,14 +26,13 @@ backend == "cairo" ? @eval(using CairoMakie) : @eval(using WGLMakie)
 
 include(joinpath(repo, "test", "parity_corpus.jl"))
 
-ext = Base.get_extension(Masque, backend == "cairo" ? :MasqueCairoMakieExt : :MasqueWGLMakieExt)
-bk = backend == "cairo" ? ext.CairoBackend() : ext.WebGLBackend()
+bk = Masque._resolve_backend(Symbol(backend))
 
 for (name, build) in _parity_corpus()
     fig, ints = build()
-    ppu = Masque._ppu(bk, fig)
+    ppu = Masque._ppu(bk, fig, 700)
     ppu == 2.0 || error("corpus figure `$name` must quotient ppu to 2.0, got $ppu — keep figures ≤ 700 px wide")
-    ctx = Masque.context(bk, fig, ppu)
+    ctx = Masque.context(bk, fig, ppu, 700)
     m = Masque.build_manifest(ints, ctx)
     path = joinpath(@__DIR__, "$name.$backend.json")
     open(io -> JSON3.pretty(io, m), path, "w")
