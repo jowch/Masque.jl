@@ -107,8 +107,6 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 ### Tooling
 - #176 — scheduled, advisory CI against Makie's development branch.
 - #177 — manifest-size delta on each PR.
-- #178 — reconcile the `:webgl` scene sizes in `perf-findings.md` with the bytes Pluto
-  packs; until then those rows are lower bounds.
 - *idea* — golden screenshots of the overlay chrome from the kind sweep.
 
 ## Not doing

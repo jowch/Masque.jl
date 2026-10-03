@@ -1,36 +1,17 @@
-# Same three scenes as bench/gesture_channel.jl, on `:webgl`. Wire bytes match
-# bench/webgl_payload_size.jl (binary length of concrete numeric arrays). JSON3 length
-# is an upper bound.
+# Same three scenes as bench/gesture_channel.jl, on `:webgl`. Scene and frame sizes are
+# Pluto's MsgPack (`packed_bytes`, bench/pluto_packed.jl), the same definition as
+# bench/webgl_payload_size.jl; the numeric-vector sum is printed next to it as a lower bound
+# (#178). JSON3 length is an upper bound.
 #
 # Run: julia --project="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}" bench/gesture_channel_webgl.jl
 
 using Masque, WGLMakie, Printf, Random
 import JSON3
 import Makie
+include(joinpath(@__DIR__, "pluto_packed.jl"))
 Random.seed!(0)
 
 const _WGLExt = Base.get_extension(Masque, :MasqueWGLMakieExt)
-
-function wire_bytes(x)
-    n = 0
-    if x isa AbstractDict
-        for v in values(x)
-            n += wire_bytes(v)
-        end
-    elseif x isa AbstractArray
-        T = eltype(x)
-        # A concrete bitstype vector is what MsgPack ships as a binary blob. An abstract
-        # eltype (Vector{Real} in a manifest) is a list of scalars, not a blob.
-        if isconcretetype(T) && isbitstype(T) && T <: Number
-            n += sizeof(T) * length(x)
-        else
-            for v in x
-                n += wire_bytes(v)
-            end
-        end
-    end
-    return n
-end
 
 function bench_scene(name, fig, ints; input, trials = 20)
     w = masque(fig, ints; backend = _WGLExt.WebGLBackend())
@@ -58,11 +39,12 @@ function bench_scene(name, fig, ints; input, trials = 20)
     r_gesture = w.render_frame(merge(input, Dict("settle" => false)))
     r_settle = w.render_frame(merge(input, Dict("settle" => true)))
     @printf(
-        "%-26s gesture(ppu=1) p50=%.1fms (n=%d)  settle(mount ppu) p50=%.1fms (n=%d)  scene-wire %.1fKB -> %.1fKB  frame-wire %.1fKB -> %.1fKB  scene-json %.1fKB\n",
+        "%-26s gesture(ppu=1) p50=%.1fms (n=%d)  settle(mount ppu) p50=%.1fms (n=%d)  scene-packed %.1fKB -> %.1fKB  frame-packed %.1fKB -> %.1fKB  scene-numeric %.1fKB  scene-json %.1fKB\n",
         name,
         p50(gesture_ms), trials, p50(settle_ms), trials,
-        wire_bytes(r_gesture["scene"]) / 1024, wire_bytes(r_settle["scene"]) / 1024,
-        wire_bytes(r_gesture) / 1024, wire_bytes(r_settle) / 1024,
+        packed_bytes(r_gesture["scene"]) / 1024, packed_bytes(r_settle["scene"]) / 1024,
+        packed_bytes(r_gesture) / 1024, packed_bytes(r_settle) / 1024,
+        numeric_bytes(r_gesture["scene"]) / 1024,
         length(JSON3.write(r_gesture["scene"])) / 1024,
     )
     return (; gesture_ms, settle_ms)

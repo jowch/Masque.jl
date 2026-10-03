@@ -21,6 +21,7 @@
 # docs/dev/architecture/02-backends.md). This bench covers the measurable payload/latency terms only.
 
 using Masque, WGLMakie, Printf, Random
+include(joinpath(@__DIR__, "pluto_packed.jl"))
 Random.seed!(0)   # mirror the Cairo subprocess seed so both sides build the SAME figures reproducibly
 # (matters at small N: an unseeded rand() shifts tick-label glyph content → the scene size drifts).
 
@@ -56,24 +57,10 @@ function buildfig(kind, n)
 end
 
 # --- WebGL side (live, this env) ---
-function wire_blob!(buf, x)
-    if x isa AbstractDict
-        for v in values(x)
-            wire_blob!(buf, v)
-        end
-    elseif x isa AbstractVector && eltype(x) <: Number
-        append!(buf, reinterpret(UInt8, Vector(x)))
-    elseif x isa AbstractVector
-        for v in x
-            wire_blob!(buf, v)
-        end
-    end
-    return buf
-end
 function webgl_measure(kind, n)
     ser() = (f = buildfig(kind, n); Makie.update_state_before_display!(f); _WGLExt.scene_payload(f))
     scene = ser()
-    scene_B = length(wire_blob!(UInt8[], scene))
+    scene_B = packed_bytes(scene)  # Pluto MsgPack, what the cell ships (#178)
     ser()  # warm
     ms = minimum(@elapsed(ser()) for _ in 1:3) * 1000
     return (scene_B, ms)
