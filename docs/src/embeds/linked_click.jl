@@ -21,12 +21,12 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000009
 md"""
-Hover over a point, and it highlights on its own panel only.
+Click a point in the xy plot, and the same sample is selected in the xz plot. Hover stays on the plot under the pointer.
 """
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000010
 md"""
-Create both scatter plots in one figure, the way you normally would, and one `masque` call covers both axes.
+Plot the same samples, in the same order, in two figures. The xy figure stores the click in `pick`.
 """
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000002
@@ -34,21 +34,27 @@ begin
     xs = [1.0, 2.0, 3.0, 4.0]
     ys = [2.0, 1.5, 3.0, 2.2]
     zs = [0.8, 2.5, 1.2, 3.1]
-    fig = Figure(size = (640, 280))
-    ax_xy = Axis(fig[1, 1]; xlabel = "x", ylabel = "y", title = "xy")
-    ax_xz = Axis(fig[1, 2]; xlabel = "x", ylabel = "z", title = "xz")
+    fig_xy = Figure(size = (420, 280))
+    ax_xy = Axis(fig_xy[1, 1]; xlabel = "x", ylabel = "y", title = "xy")
     scatter!(ax_xy, xs, ys; markersize = 18)
-    scatter!(ax_xz, xs, zs; markersize = 18)
     nothing
 end
 
+# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000003
+@bind pick masque(fig_xy)
+
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000011
 md"""
-In your own notebook, `@bind pick` saves a click in `pick`, but this page does not show that value.
+This cell uses `pick` and passes the clicked index as `selected`, so the xz plot highlights the sample you clicked.
 """
 
-# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000003
-@bind pick masque(fig)
+# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000004
+begin
+    fig_xz = Figure(size = (420, 280))
+    ax_xz = Axis(fig_xz[1, 1]; xlabel = "x", ylabel = "z", title = "xz")
+    scatter!(ax_xz, xs, zs; markersize = 18)
+    masque(fig_xz; selected = isnothing(pick) ? Int[] : [pick.index])
+end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
@@ -56,14 +62,14 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 bond = "pick"
 show_code = true
 pluto_html = true
-chip = false
 
 cells = [
   "a1b2c3d4-00a1-4000-8000-000000000009",
   "a1b2c3d4-00a1-4000-8000-000000000010",
   "a1b2c3d4-00a1-4000-8000-000000000002",
-  "a1b2c3d4-00a1-4000-8000-000000000011",
   "a1b2c3d4-00a1-4000-8000-000000000003",
+  "a1b2c3d4-00a1-4000-8000-000000000011",
+  "a1b2c3d4-00a1-4000-8000-000000000004",
 ]
 """
 
@@ -1715,8 +1721,9 @@ version = "4.1.0+0"
 # ╟─a1b2c3d4-00a1-4000-8000-000000000009
 # ╟─a1b2c3d4-00a1-4000-8000-000000000010
 # ╠═a1b2c3d4-00a1-4000-8000-000000000002
-# ╟─a1b2c3d4-00a1-4000-8000-000000000011
 # ╠═a1b2c3d4-00a1-4000-8000-000000000003
-# ╟═e1be0000-0000-4000-8000-000000000001
-# ╟═00000000-0000-0000-0000-000000000001
-# ╟═00000000-0000-0000-0000-000000000002
+# ╟─a1b2c3d4-00a1-4000-8000-000000000011
+# ╠═a1b2c3d4-00a1-4000-8000-000000000004
+# ╟─e1be0000-0000-4000-8000-000000000001
+# ╟─00000000-0000-0000-0000-000000000001
+# ╟─00000000-0000-0000-0000-000000000002
