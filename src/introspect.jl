@@ -15,10 +15,21 @@ function _marker_radius(p)
     )
     ms = p.markersize[]
     f = _marker_extent_factor(p.marker[])
+    # The marker's outline is centered on its edge, so half of `strokewidth` lies outside it.
+    sw = _stroke_half(p)
     # A per-point markersize gives a per-point radius, so a small marker does not take the
     # largest one's ring (graphplot's `node_size`, `scatter(…; markersize = [...])`).
-    _per_point(ms) || return _ms_extent(ms) * f / 2
-    return Float64[_ms_extent(m) * f / 2 for m in ms]
+    _per_point(ms) || return _ms_extent(ms) * f / 2 + sw
+    return Float64[_ms_extent(m) * f / 2 + sw for m in ms]
+end
+
+# Half the drawn outline width in px: `strokewidth / 2`, the largest of a per-element vector.
+function _stroke_half(p)
+    hasproperty(p, :strokewidth) || return 0.0
+    sw = p.strokewidth[]
+    sw isa Real && return max(0.0, Float64(sw)) / 2
+    sw isa AbstractVector{<:Real} && !isempty(sw) && return max(0.0, Float64(maximum(sw))) / 2
+    return 0.0
 end
 
 # One diameter for a markersize element: a number, or a `Vec2f` (width, height), which is what
@@ -234,15 +245,32 @@ function PointInteractable(ax, p::Makie.MeshScatter; id = :meshscatter, payloads
         PointInteractable(ax, pts; kw..., payloads)
 end
 
-SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
     SegmentInteractable(ax, _conv(p)[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
-SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
     SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol, tooltip, label)
 
 # The rendered edges live in the child LineSegments' converted (DATA space), including
 # mesh-triangulation diagonals a grid-edge reconstruction would miss.
-SegmentInteractable(ax, p::Makie.Wireframe; id = :wireframe, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+SegmentInteractable(ax, p::Makie.Wireframe; id = :wireframe, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
     SegmentInteractable(ax, _conv(_childof(p, Makie.LineSegments))[1]; mode = :pairs, id, payloads, tol, tooltip, label)
+
+# Default hit slack for a line-like plot, in px: at least 6, and wide enough to cover the
+# drawn stroke (`linewidth / 2` either side of the line; the largest of a per-element vector)
+# and `errorbars!`/`rangebars!` whiskers, which reach `whiskerwidth / 2` from each bar's end.
+function _line_tol(p)
+    w = 0.0
+    for a in (:linewidth, :whiskerwidth)
+        hasproperty(p, a) || continue
+        v = p[a][]
+        if v isa Real
+            w = max(w, Float64(v))
+        elseif v isa AbstractVector{<:Real} && !isempty(v)
+            w = max(w, Float64(maximum(v)))
+        end
+    end
+    return max(6.0, w / 2)
+end
 
 _bcast(v, k) = length(v) == 1 ? v[1] : v[k]
 
@@ -519,7 +547,7 @@ end
 
 # The parent `converted` is the raw input points; the rendered staircase (the actual click
 # target) lives in the child Lines as the pre-expanded step polyline.
-SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
     SegmentInteractable(ax, _converted(_childof(p, Makie.Lines))[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
 
 # Each child line (or a ScatterLines child's line, when markers are on) is one element.
@@ -539,7 +567,7 @@ function _series_payloads(children)
             for k in eachindex(children)
     ]
 end
-function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothing, tol = 6, tooltip = nothing, label = nothing)
+function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing)
     children = _child_plots(p)
     isempty(children) && error("Series introspection: no child lines (Makie internals changed?)")
     paths = [_conv(_series_line(c))[1] for c in children]
@@ -569,9 +597,9 @@ function _rangebar_pairs(p)
     end
     return vs
 end
-SegmentInteractable(ax, p::Makie.Errorbars; id = :errorbars, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+SegmentInteractable(ax, p::Makie.Errorbars; id = :errorbars, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
     SegmentInteractable(ax, _errorbar_pairs(p); mode = :pairs, id, payloads, tol, tooltip, label)
-SegmentInteractable(ax, p::Makie.Rangebars; id = :rangebars, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+SegmentInteractable(ax, p::Makie.Rangebars; id = :rangebars, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
     SegmentInteractable(ax, _rangebar_pairs(p); mode = :pairs, id, payloads, tol, tooltip, label)
 
 # `xmin`/`xmax` (HLines) and `ymin`/`ymax` (VLines) are fractions of the axis in relative
@@ -619,13 +647,13 @@ end
 
 _frac_to_data(finv, tlo, thi, frac) = Float64(_apply_transform(finv, tlo + (thi - tlo) * Float64(frac)))
 
-function SegmentInteractable(ax, p::Makie.HLines; id = :hlines, payloads = nothing, tol = 6, tooltip = nothing, label = nothing)
+function SegmentInteractable(ax, p::Makie.HLines; id = :hlines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing)
     vs = _span_pairs(ax, p, true)
     nseg = length(vs) ÷ 2
     pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
     return _segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, true); tooltip, label)
 end
-function SegmentInteractable(ax, p::Makie.VLines; id = :vlines, payloads = nothing, tol = 6, tooltip = nothing, label = nothing)
+function SegmentInteractable(ax, p::Makie.VLines; id = :vlines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing)
     vs = _span_pairs(ax, p, false)
     nseg = length(vs) ÷ 2
     pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
@@ -802,7 +830,21 @@ function _plotbase(p)
 end
 
 # returns a Vector{AbstractInteractable} — usually one, two for composites (Stem, ScatterLines).
+# A rect or polygon layer also responds over the plot's drawn outline.
 function _construct(ax, p, id; kw...)
+    built = _construct_shapes(ax, p, id; kw...)
+    sw = _stroke_half(p)
+    sw > 0 || return built
+    return AbstractInteractable[_with_stroke(i, sw) for i in built]
+end
+_with_stroke(i::AbstractInteractable, sw) = i
+_with_stroke(i::RectInteractable, sw) = RectInteractable(
+    i.ax, i.data, i.id, i.payloads, i.tooltip, i.clamp_to_viewport, i.resolve, i.label, sw,
+)
+_with_stroke(i::PolygonInteractable, sw) = PolygonInteractable(
+    i.ax, i.rings, i.id, i.payloads, i.tooltip, i.label, i.holes, sw,
+)
+function _construct_shapes(ax, p, id; kw...)
     p isa Makie.Scatter && return [PointInteractable(ax, p; id, kw...)]
     p isa Makie.MeshScatter && return [PointInteractable(ax, p; id, kw...)]
     (p isa Makie.Lines || p isa Makie.LineSegments || p isa Makie.Wireframe || p isa Makie.Arrows3D) &&

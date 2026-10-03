@@ -69,6 +69,10 @@ All notable changes to this project are documented here. The format is based on
   click target was the band mirrored across the diagonal.
 - `masque(fig)` no longer fails when an `arrows3d!` gives one direction for every arrow
   (`arrows3d!(ax, points, Vec3f(1, 0, 1))`).
+- Thick strokes respond over their whole width. A line's hover and click target now covers
+  its `linewidth` (it was a fixed 6 px either side), a scatter marker's covers its
+  `strokewidth`, bars and polygons respond over their drawn outline, and `errorbars!` and
+  `rangebars!` respond on their whiskers.
 
 ## [0.1.1] - 2026-10-01
 

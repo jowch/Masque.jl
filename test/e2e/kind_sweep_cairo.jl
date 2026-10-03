@@ -212,6 +212,15 @@ HTML(
         "<span id=\"coords_band_y\" style=\"display:none\">$(JSON3.write(sweep.band_y.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000074
+@bind ev_bar_stroke sweep.bar_stroke
+
+# ╔═╡ c1000000-0000-0000-0000-000000000075
+HTML(
+    "<span id=\"out_bar_stroke\">BAR_STROKE=$(repr(ev_bar_stroke))</span>" *
+        "<span id=\"coords_bar_stroke\" style=\"display:none\">$(JSON3.write(sweep.bar_stroke.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000028
 @bind ev_hlines sweep.hlines
 
@@ -382,6 +391,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000006d
 # ╠═c1000000-0000-0000-0000-00000000006a
 # ╠═c1000000-0000-0000-0000-00000000006b
+# ╠═c1000000-0000-0000-0000-000000000074
+# ╠═c1000000-0000-0000-0000-000000000075
 # ╠═c1000000-0000-0000-0000-000000000028
 # ╠═c1000000-0000-0000-0000-000000000029
 # ╠═c1000000-0000-0000-0000-000000000030

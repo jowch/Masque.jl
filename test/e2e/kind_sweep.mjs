@@ -1789,6 +1789,27 @@ try {
     if (spec.overlapsGrid && new RegExp(`:${spec.overlapsGrid},`).test(after)) {
       throw new Error(`${key}-click: bond resolved to grid layer "${spec.overlapsGrid}", not legend: ${after.slice(0, 220)}`);
     }
+    // A `:rects` layer with `tol` (bars with a drawn outline, #246) answers past each rect's
+    // edge: a hover `tol - 1` image px right of the last bar's edge, outside the rect itself,
+    // must still hit that bar and highlight the bar's own rect.
+    if (layer.kind === "rects" && layer.tol) {
+      const n = layer.geometry.length / 4 - 1;
+      const hp = hitPoint(layer, n);
+      const out = await dispatchAt(key, hp.x + hp.w / 2 + layer.tol - 1, hp.y, "pointermove");
+      const shape = out.hi.fill || out.hi.edge || out.hi.plain;
+      if (!out.show || !shape || Math.abs(Number(shape.w) - hp.w) > 1.2) {
+        throw new Error(`${key}/stroke-reach: hover ${layer.tol - 1} px outside bar ${n} gave ${JSON.stringify(out)}`);
+      }
+      const far = await dispatchAt(key, hp.x + hp.w / 2 + layer.tol + 3, hp.y, "pointermove");
+      if (far.show) throw new Error(`${key}/stroke-reach: hover past the reach still hit: ${far.text}`);
+      await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+      }, key);
+      passed.push(`${key}/stroke-reach`);
+    }
     console.error(`OK  ${key} — ${after.slice(0, 110)}`);
 
     if (spec.links) {

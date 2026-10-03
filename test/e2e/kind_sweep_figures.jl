@@ -143,6 +143,12 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
+        # Bars with a thick outline ship a `tol` reach on their `:rects` layer, #246.
+        "key" => "bar_stroke", "layerId" => "bars", "layerKind" => "rects",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "value", "hoverIndex" => 2, "hoverTip" => "value", "mode" => "element",
+    ),
+    Dict(
         "key" => "hlines", "layerId" => "hlines", "layerKind" => "segments",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "segment_index", "hoverIndex" => 1, "hoverTip" => "segment_index",
@@ -508,6 +514,14 @@ function build_kind_sweep()
         masque(fig)
     end
 
+    # Thick bar outlines respond too, #246: the layer carries a `tol` reach past each bar.
+    bar_stroke = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "bar-stroke")
+        barplot!(ax, 1:3, [2, 5, 3]; color = :lightgray, strokewidth = 8, strokecolor = :black)
+        masque(fig; selected = Dict(:bars => [2]))
+    end
+
     hlines = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "hlines", limits = (0, 5, 0, 5))
@@ -697,7 +711,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, bar_stroke, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
 end
