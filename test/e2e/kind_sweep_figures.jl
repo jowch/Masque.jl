@@ -162,6 +162,12 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 2, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
+        # The tooltip shows the plotted date, not Makie's epoch milliseconds, #249.
+        "key" => "scatter_dates", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "2024-01-02", "hoverIndex" => 2, "hoverTip" => "2024-01-03", "mode" => "element",
+    ),
+    Dict(
         "key" => "hlines", "layerId" => "hlines", "layerKind" => "segments",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "segment_index", "hoverIndex" => 1, "hoverTip" => "segment_index",
@@ -556,6 +562,14 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:scatter => [2]))
     end
 
+    # A date axis: default payloads carry the date as text, #249.
+    scatter_dates = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "scatter-dates")
+        scatter!(ax, Makie.Dates.Date(2024, 1, 1) .+ Makie.Dates.Day.(0:2), [1.0, 3.0, 2.0]; markersize = 22)
+        masque(fig; selected = Dict(:scatter => [2]))
+    end
+
     hlines = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "hlines", limits = (0, 5, 0, 5))
@@ -745,7 +759,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, scatter_moved, bar_stroke, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
 end

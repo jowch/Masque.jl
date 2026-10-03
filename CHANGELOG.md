@@ -93,6 +93,11 @@ All notable changes to this project are documented here. The format is based on
   its `linewidth` (it was a fixed 6 px either side), a scatter marker's covers its
   `strokewidth`, bars and polygons respond over their drawn outline, and `errorbars!` and
   `rangebars!` respond on their whiskers.
+- On a categorical or date axis, default tooltips and events show the value you plotted:
+  `x = "b"` for `Makie.Categorical(["a", "b", "c"])`, `x = "2024-01-02"` for dates. Before,
+  they showed Makie's internal number (`2.0`, or milliseconds since the epoch). On those axes
+  `x`, `y`, and `z` are now strings, so arithmetic such as `pick.x + 1` no longer works there;
+  pass `payloads` to keep numbers of your own.
 
 ## [0.1.1] - 2026-10-01
 
