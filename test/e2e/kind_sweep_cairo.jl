@@ -212,6 +212,15 @@ HTML(
         "<span id=\"coords_band_y\" style=\"display:none\">$(JSON3.write(sweep.band_y.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000074
+@bind ev_scatter_dates sweep.scatter_dates
+
+# ╔═╡ c1000000-0000-0000-0000-000000000075
+HTML(
+    "<span id=\"out_scatter_dates\">SCATTER_DATES=$(repr(ev_scatter_dates))</span>" *
+        "<span id=\"coords_scatter_dates\" style=\"display:none\">$(JSON3.write(sweep.scatter_dates.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000028
 @bind ev_hlines sweep.hlines
 
@@ -382,6 +391,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000006d
 # ╠═c1000000-0000-0000-0000-00000000006a
 # ╠═c1000000-0000-0000-0000-00000000006b
+# ╠═c1000000-0000-0000-0000-000000000074
+# ╠═c1000000-0000-0000-0000-000000000075
 # ╠═c1000000-0000-0000-0000-000000000028
 # ╠═c1000000-0000-0000-0000-000000000029
 # ╠═c1000000-0000-0000-0000-000000000030

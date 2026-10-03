@@ -69,6 +69,9 @@ All notable changes to this project are documented here. The format is based on
   click target was the band mirrored across the diagonal.
 - `masque(fig)` no longer fails when an `arrows3d!` gives one direction for every arrow
   (`arrows3d!(ax, points, Vec3f(1, 0, 1))`).
+- On a categorical or date axis, default tooltips and events show the value you plotted:
+  `x = "b"` for `Makie.Categorical(["a", "b", "c"])`, `x = "2024-01-02"` for dates. Before,
+  they showed Makie's internal number (`2.0`, or milliseconds since the epoch).
 
 ## [0.1.1] - 2026-10-01
 
