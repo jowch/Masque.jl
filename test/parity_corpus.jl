@@ -146,7 +146,7 @@ function _parity_corpus()
     )
 
     # 8. PolarAxis: discrete hits via shared projection (Makie.Polar in transform_func) +
-    # ispolar transform. Deterministic (θ, r) markers; continuous θ/r readout deferred.
+    # ispolar transform. Deterministic (θ, r) markers.
     push!(
         corpus, "polaraxis" => function ()
             fig = Figure(size = (600, 450))

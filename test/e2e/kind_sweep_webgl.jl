@@ -150,6 +150,16 @@ HTML(
         "<span id=\"coords_polar\" style=\"display:none\">$(JSON3.write(sweep.polar.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000074
+@bind ev_axis_polar sweep.axis_polar
+
+# ╔═╡ d1000000-0000-0000-0000-000000000075
+HTML(
+    "<span id=\"out_axis_polar\">AXIS_POLAR=$(repr(ev_axis_polar))</span>" *
+        "<span id=\"coords_axis_polar\" style=\"display:none\">$(JSON3.write(sweep.axis_polar.manifest["layers"]))</span>" *
+        "<span id=\"axes_axis_polar\" style=\"display:none\">$(JSON3.write(sweep.axis_polar.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000036
 @bind ev_scatter_dark sweep.scatter_dark
 
@@ -369,6 +379,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000067
 # ╠═d1000000-0000-0000-0000-000000000024
 # ╠═d1000000-0000-0000-0000-000000000025
+# ╠═d1000000-0000-0000-0000-000000000074
+# ╠═d1000000-0000-0000-0000-000000000075
 # ╠═d1000000-0000-0000-0000-000000000036
 # ╠═d1000000-0000-0000-0000-000000000037
 # ╠═d1000000-0000-0000-0000-000000000068

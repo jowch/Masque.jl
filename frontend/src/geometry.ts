@@ -1,6 +1,6 @@
 // All coordinates here are image pixels.
 import { contentPoint, isIdentity, type PhotoMatrix } from "./photo"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry } from "./types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
 const SEG_TOL = 8 // px slack for segments/polylines
@@ -160,7 +160,28 @@ export function invertAxis(t: AxisTransform, px: number, py: number): { x: numbe
     if (t.xreversed) fx = 1 - fx
     let fy = 1 - (py - vy) / vh
     if (t.yreversed) fy = 1 - fy
-    return { x: mapAxis(t.xlims, t.xscale, fx, t.xcats), y: mapAxis(t.ylims, t.yscale, fy, t.ycats) }
+    const x = mapAxis(t.xlims, t.xscale, fx, t.xcats), y = mapAxis(t.ylims, t.yscale, fy, t.ycats)
+    if (t.polar && typeof x === "number" && typeof y === "number") return cartesianToPolar(t.polar, x, y)
+    return { x, y }
+}
+
+const TAU = 2 * Math.PI
+
+// Makie's inverse of Polar, folded into the axis's branch instead of 0..2π (#170). The origin
+// reads θ as atan2(0, 0) = 0, folded like any other angle.
+function cartesianToPolar(p: PolarFrame, x: number, y: number): { x: number; y: number } {
+    const lo = p.branch[0]
+    const raw = p.direction * Math.atan2(y, x) - p.theta_0
+    const theta = lo + (((raw - lo) % TAU) + TAU) % TAU
+    const r = Math.hypot(x, y) + p.r0
+    return p.theta_as_x ? { x: theta, y: r } : { x: r, y: theta }
+}
+
+// Makie's Polar forward map, without clip_r: (θ, r) → the Cartesian point the lims are in.
+function polarToCartesian(p: PolarFrame, x: number, y: number): { x: number; y: number } {
+    const [theta, r] = p.theta_as_x ? [x, y] : [y, x]
+    const phi = p.direction * (theta + p.theta_0), rho = r - p.r0
+    return { x: rho * Math.cos(phi), y: rho * Math.sin(phi) }
 }
 
 function mapAxis(lims: [number, number], scale: string, f: number, cats?: string[] | null): number | string {
@@ -343,10 +364,11 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
 }
 
 // data → image px. Inverse of invertAxis on the same AxisTransform (no categoricals: a slice
-// rejects those at build time). Identity and log10/log round-trip; a log axis's straight
+// rejects those at build time; a polar axis goes through its Cartesian point first). Identity and log10/log round-trip; a log axis's straight
 // screen segment is not this curve, so a sampled dot can leave the stroke.
 export function projectAxis(t: AxisTransform, x: number, y: number): { x: number; y: number } {
     const [vx, vy, vw, vh] = t.viewport
+    if (t.polar) ({ x, y } = polarToCartesian(t.polar, x, y))
     let fx = unmapAxis(t.xlims, t.xscale, x)
     let fy = unmapAxis(t.ylims, t.yscale, y)
     if (t.xreversed) fx = 1 - fx

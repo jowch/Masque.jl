@@ -94,7 +94,16 @@ struct AxisTransform
     ycats     :: Union{Nothing, Vector{String}}
     valueaxis :: Union{Nothing, Symbol}            # nothing = 2-D {x,y} readout; :x/:y = 1-D colorbar readout
     is3d      :: Bool                              # Axis3: pixel→data inversion undefined; lims are placeholders
-    ispolar   :: Bool                              # PolarAxis: θ/r inversion not serialized; lims are placeholders
+    ispolar   :: Bool                              # PolarAxis: lims are the viewport's Cartesian window
+    polar     :: Union{Nothing, PolarFrame}        # PolarAxis: resolved Makie.Polar fields for the θ/r step
+end
+
+struct PolarFrame
+    theta_as_x :: Bool
+    direction  :: Int
+    theta_0    :: Float64
+    r0         :: Float64                          # target_r0
+    branch     :: Tuple{Float64,Float64}           # θ fold: thetacenter ± π on a sector, else 0..2π
 end
 ```
 
@@ -105,13 +114,27 @@ The `AxisTransform` is the *same information* expressed declaratively, so JS can
 for `AxisInteractable` and for live hover-coordinate readout (the drag/Tier-0 enabler).
 
 **Axis kinds.** `context()` builds a transform for every `Axis` (`:ax1`, `:ax2`, … in `fig.content`
-order), `Axis3`, and `PolarAxis`. `Axis3` (`is3d`) and `PolarAxis` (`ispolar`) carry a real
-viewport but placeholder lims: a pixel on a 3D axis is a ray, and the polar transform is not
-serialized to JS. The interactables that invert pixels (`AxisInteractable`, `ThresholdInteractable`,
-`ROIInteractable`, `SliceInteractable`, and `ViewInteractable` on polar) fail loud in `validate()`
-on those flags rather than read the placeholders; element hit-testing (points, segments, polys) works
-on all three because it only uses the forward projection. Serializing the polar transform so
-`AxisInteractable` gets a continuous θ/r readout is #170. Any other `Makie.AbstractAxis` (`LScene`
+order), `Axis3`, and `PolarAxis`. `Axis3` (`is3d`) carries a real
+viewport but placeholder lims, because a pixel on a 3D axis is a ray. The interactables that invert
+pixels (`AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, `SliceInteractable`) fail
+loud in `validate()` on it rather than read the placeholders.
+
+`PolarAxis` (`ispolar`, #170) inverts in two steps, the split Makie, Plotly, and Matplotlib all
+use. Its lims are the Cartesian window of the scene viewport (the corners unprojected the way
+`mouseposition` / `Makie.to_world` does, so `PolarAxis`'s letterbox and tick inset come with
+them), and `invertAxis` maps a pixel linearly onto that window. `PolarFrame` then takes the
+Cartesian point to `θ = mod(direction·atan2(y, x) − theta_0, branch)` and `r = hypot(x, y) + r0`,
+swapped when `theta_as_x` is false; `projectAxis` runs the forward map first. `clip_r` is not
+shipped because `hypot ≥ 0` makes it irrelevant to the inverse. The branch is `PolarAxis`'s own
+zoom-handler fold (`thetacenter ± π` from `target_thetalims` on a sector, else
+`inverse_transform(::Polar)`'s `0..2π`), so a point drawn at a negative angle on a sector around
+0 reads back negative. Only `AxisInteractable` consumes it: a threshold, ROI, and slice follow
+straight screen lines (constant r is a circle, constant θ a ray, a screen rectangle is no
+annular sector), and a polar view would write `target_rlims`/`target_thetalims`, so those and
+`ViewInteractable` still fail loud on `ispolar`. Element hit-testing (points, segments, polys)
+works on every axis kind because it only uses the forward projection.
+
+Any other `Makie.AbstractAxis` (`LScene`
 today) gets no transform, so both backends refuse the figure with the same `ArgumentError`
 (`_reject_unsupported_axes` in `src/backend.jl`, #172).
 

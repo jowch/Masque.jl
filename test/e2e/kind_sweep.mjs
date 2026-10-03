@@ -940,6 +940,52 @@ try {
       continue;
     }
 
+    if (spec.mode === "axis_polar") {
+      // AxisInteractable on a PolarAxis (#170): the pointer on a marker Julia projected reads
+      // that marker's (θ, r), and a pixel in the letterbox past the disc still reads a number.
+      const t = (await transformsOf(key))[layer.axis];
+      if (!t?.ispolar || !t.polar) throw new Error(`${key}: expected a polar transform, got ${JSON.stringify(t)}`);
+      const anchor = (await layersOf(spec.anchorKey)).find((l) => l.kind === "circles");
+      const pt = { x: anchor.geometry[3 * spec.anchorIndex], y: anchor.geometry[3 * spec.anchorIndex + 1] };
+      const read = (text) => {
+        const m = /x=(-?[\d.e+-]+), y=(-?[\d.e+-]+)/.exec(text ?? "");
+        return m ? { x: Number(m[1]), y: Number(m[2]) } : null;
+      };
+      const near = (v, want, tol) => v !== null && Math.abs(v - want) <= tol;
+      // The anchor is rounded to whole image px: 0.02 is a few px at r = 2 on this figure.
+      const hover = await dispatchAt(key, pt.x, pt.y, "pointermove");
+      const hv = read(hover?.text);
+      if (!hover?.show || !hv || !near(hv.x, spec.theta, 0.02) || !near(hv.y, spec.r, 0.02)) {
+        throw new Error(`${key}/hover: card should read θ≈${spec.theta}, r≈${spec.r}, got ${JSON.stringify(hover?.text)}`);
+      }
+      if (hover.cross) throw new Error(`${key}/hover: a readout with no slice draws no hairline`);
+      passed.push(`${key}/hover-reads-theta-r`);
+      const [vx, vy, , vh] = t.viewport;
+      const edge = read((await dispatchAt(key, vx + 2, vy + vh / 2, "pointermove"))?.text);
+      if (!edge || !near(edge.x, Math.PI, 0.1) || !(edge.y > spec.rmax)) {
+        throw new Error(`${key}/letterbox: left edge should read θ≈π past r=${spec.rmax}, got ${JSON.stringify(edge)}`);
+      }
+      passed.push(`${key}/letterbox-extrapolates`);
+      const re = /AxisEvent\(:axis,\s*x\s*=\s*(-?[\d.e+-]+),\s*y\s*=\s*(-?[\d.e+-]+)/;
+      const matches = (text) => {
+        const m = re.exec(text ?? "");
+        return !!m && near(Number(m[1]), spec.theta, 0.02) && near(Number(m[2]), spec.r, 0.02);
+      };
+      let after = null;
+      for (let attempt = 0; attempt < 3 && !matches(after); attempt++) {
+        await dispatchAt(key, pt.x, pt.y, "click");
+        for (let i = 0; i < 30; i++) {
+          after = await textOf(`#out_${key}`);
+          if (matches(after)) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+      if (!matches(after)) throw new Error(`${key}/click: expected AxisEvent at θ≈${spec.theta}, r≈${spec.r}, got ${JSON.stringify(after).slice(0, 200)}`);
+      passed.push(`${key}/click-theta-r`);
+      console.error(`OK  ${key}/click — ${after.slice(0, 100)}`);
+      continue;
+    }
+
     if (spec.mode === "axis") {
       const axisLayer = layers.find((l) => l.id === spec.layerId && l.kind === "axis");
       const cbLayer = layers.find((l) => l.id === spec.colorbarLayerId && l.kind === "axis");
