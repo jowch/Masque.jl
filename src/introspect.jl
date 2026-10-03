@@ -915,7 +915,7 @@ function _install_known!(d, ax, p)
         end
         return (built = false, warned = isempty(built) && _warned_empty(p))
     end
-    append!(d.ints, built)
+    push!(d.drawn, built)
     ids = Symbol[ii.id for ii in built]
     d.installed[p] = ids
     _register_plot!(d.plotmap, p, ids)
@@ -964,6 +964,7 @@ function _defaults(fig)
     _finalize!(fig)
     d = (
         ints = AbstractInteractable[],
+        drawn = Vector{Vector{AbstractInteractable}}(),
         seen = Dict{Symbol, Int}(),
         plotmap = IdDict{Any, Vector{Symbol}}(),
         installed = IdDict{Any, Vector{Symbol}}(),
@@ -982,6 +983,14 @@ function _defaults(fig)
             end
             _install_known!(d, ax, p)
         end
+        # Hit precedence is manifest order, first match wins. Makie draws a later plot over
+        # an earlier one, so the plot drawn last on an axis comes first: a `scatter!` after a
+        # `lines!` through the same points (a graph's nodes over its edges) wins the hover.
+        # The ids above are numbered in drawing order; a plot's own layers keep their order.
+        for built in Iterators.reverse(d.drawn)
+            append!(d.ints, built)
+        end
+        empty!(d.drawn)
     end
     # Colorbar blocks live in fig.content, not in an Axis's scene.
     nc = 0
@@ -1011,6 +1020,9 @@ The interactables `masque(fig)` builds by default: for every supported plot in e
 [`ColorbarInteractable`](@ref) per `Colorbar` and one [`LegendInteractable`](@ref) per
 `Legend`, linked to the layers of the plots each entry stands for. `interactables(ax)` is the
 part of that list on one axis, with the same ids.
+
+On each axis the plot drawn last comes first. Where marks overlap, the first in the list gets
+the pointer, so it is the mark drawn on top.
 
 On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D` are
 supported; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.

@@ -138,6 +138,16 @@ Layer ids are the plot kind (`:scatter`, `:lines`, `:cells`, `:bars`, `:poly`, â
 Wireframe/Arrows3D extract; on `PolarAxis` only Scatter/Lines/LineSegments/ScatterLines/Series.
 Other kinds on those axes are skipped with a warning.
 
+**Default order.** `interactables(fig)` lists each axis's plot layers in reverse drawing order
+(the plot created last on an axis first), then colorbars, then legends. `build_manifest` then
+stable-sorts legend layers first and `:view` layers last (`src/render.jl`), keeping this order
+for everything else. Manifest order is hit precedence, so the mark Makie draws on top wins the
+pointer: a graph's nodes over its edges, a
+`scatter!` over the `lines!` it marks. Ids are still numbered in drawing order (`:lines` before
+`:lines_2`), and a plot that builds several layers keeps their own order (a `stem!`'s points
+before its stems). Insertion order stands in for drawing order; a plot moved with
+`translate!` in z is not re-sorted.
+
 **Composing a call.** `masque(fig, xs...)` starts from `interactables(fig)` and applies each
 argument to it (`_assemble`, `src/compose.jl`). `interactables(plot; kwargs...)` is a request
 resolved once the figure is known: it rebuilds that plot's default layers with the kwargs, under

@@ -24,6 +24,9 @@ has a legend, its entries come first, and Page Down steps from the
 legend into the plot. Focusing a legend entry highlights the series it labels, as
 hovering over it does. See [Legend](@ref).
 
+On each axis, the keys visit the plot created last first, then the
+earlier ones.
+
 The focused mark gets the same highlight and tooltip as a hovered one.
 A legend entry shows no tooltip, on hover or on focus, unless you pass a
 template.

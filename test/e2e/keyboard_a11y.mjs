@@ -372,6 +372,11 @@ try {
   }
 
 
+  // Park the pointer off every plot first. The heatmap click above left it on the page, and once
+  // a widget scrolls into view under it, the browser's synthetic mousemove counts as a hover:
+  // a miss there hides the keyboard readout these checks wait for.
+  await page.mouse.move(0, 0);
+
   // #169: each drag layer is its own tab stop after the plot surface. Arrows there nudge the
   // line, the box, or the camera; the readout updates per keydown and the bond (a view: the
   // settle) goes out once, on keyup, even after a held key's repeats.

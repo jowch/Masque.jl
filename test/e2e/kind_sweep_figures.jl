@@ -467,7 +467,9 @@ function build_kind_sweep()
         ax = Axis(fig[1, 1]; title = "hlines", limits = (0, 5, 0, 5))
         scatter!(ax, [1.0, 4.0], [1.0, 4.0]; markersize = 8, color = :gray)
         hlines!(ax, [1.5, 3.5]; color = :gray, linewidth = 3)
-        vlines!(ax, [2.5]; color = :gray, linewidth = 3)
+        # Off the hlines' midpoints (x = 2.5), where the driver hovers and clicks: drawn on top,
+        # the vline would win the crossing.
+        vlines!(ax, [4.25]; color = :gray, linewidth = 3)
         masque(fig; selected = Dict(:hlines => [1]))
     end
 

@@ -30,25 +30,25 @@ cells. See [Linked views](@ref).
 
 ## Overlapping marks
 
-When two interactive plots overlap, the pointer reaches the plot that
-comes first in Masque's list, not the one drawn on top. Legend entries
-always come first and pan or orbit always comes last. In between, the
-plots keep the order you created them in. An interactable you pass to
-`masque` for one of those plots takes that plot's place, and any other
-comes after them. With `auto = false`, the order is the one you pass
-them in.
+When two interactive plots overlap, the pointer reaches the one drawn on
+top: on each axis, the plot you created last. Points drawn over a filled
+shape, or a graph's nodes over its edges, respond when you hover them,
+and the shape or edges respond everywhere else. Legend entries always
+come first and pan or orbit always comes last. An interactable you pass
+to `masque` for one of those plots takes that plot's place, and any
+other comes after them. With `auto = false`, the order is the one you
+pass them in.
 
-This matters most when you draw points over a filled shape. Here the
-polygon is created first, so with `masque(fig)` it covers the points:
-hovering a point shows the polygon's tooltip, and you cannot click the
-point.
+A shape drawn over points covers them. Here the polygon is created
+after the scatter, so with `masque(fig)` hovering a point shows the
+polygon's tooltip, and you cannot click the point.
 
 ```julia
 begin
     fig = Figure()
     ax = Axis(fig[1, 1])
-    p = poly!(ax, Point2f[(0, 0), (3, 0), (3, 3), (0, 3)])
     s = scatter!(ax, [1.0, 2.0], [1.0, 2.0]; markersize = 16)
+    p = poly!(ax, Point2f[(0, 0), (3, 0), (3, 3), (0, 3)]; color = (:gray, 0.3))
     nothing
 end
 ```
@@ -71,8 +71,8 @@ list are interactive, so include every plot you want to respond.
 
 The same order applies on an `Axis3`: distance from the camera does
 not decide which mark you reach. A mark on the far side of the scene
-can be reached through a nearer mark that comes later in the list, and
-a nearer mark can be blocked by a farther one that comes earlier.
+can be reached through a nearer mark created before it, and a nearer
+mark can be blocked by a farther one created after it.
 
 ## Rough edges today
 
