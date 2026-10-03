@@ -416,7 +416,7 @@ end
         "marks_bars", "marks_poly", "marks_polar", "legend_lines", "roi_table",
         "tooltips_template", "tooltips_dark", "grids_heatmap", "readouts_axis",
         "custom_regions", "linked_two_axis", "linked_legend_wash",
-        "marks_lines", "selection_start", "legend_fade",
+        "marks_lines", "selection_start", "legend_fade", "slice_spectra",
     ]
     for name in guides
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))
