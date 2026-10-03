@@ -250,6 +250,71 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test length(only(hitlayers(PolygonInteractable(a, multi), c)).payloads) == 2
         end
 
+        @testset "poly from shapes: one element per mesh Makie draws" begin
+            GB = Makie.GeometryBasics
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1])
+            tri(x) = Point2f[(x, 0), (x + 1, 0), (x + 1, 1)]
+            holed = GB.Polygon(Point2f[(0, 0), (4, 0), (4, 4), (0, 4)], [Point2f[(1, 1), (3, 1), (3, 3), (1, 3)]])
+            multi = GB.MultiPolygon([GB.Polygon(tri(0)), GB.Polygon(tri(2))])
+            cases = [
+                (Rect2f(0, 0, 2, 1), 1), ([Rect2f(0, 0, 1, 1), Rect2f(2, 0, 1, 2)], 2),
+                (Circle(Point2f(0, 0), 1.0f0), 1), ([Circle(Point2f(0, 0), 1.0f0), Circle(Point2f(3, 0), 0.5f0)], 2),
+                (GB.Polygon(tri(0)), 1), ([GB.Polygon(tri(0)), GB.Polygon(tri(2))], 2), (holed, 1),
+                # a lone MultiPolygon draws one mesh per polygon; a vector of them, one per entry
+                (multi, 2), ([multi, GB.MultiPolygon([GB.Polygon(tri(4))])], 2),
+            ]
+            plots = [poly!(a, g) for (g, _) in cases]
+            _, _, c = ctx_for(f)
+            for ((g, n), p) in zip(cases, plots)
+                @test length(only(hitlayers(PolygonInteractable(a, p), c)).payloads) == n
+            end
+            # a rect is its four corners
+            @test geom(PolygonInteractable(a, plots[1]), c) ==
+                geom(PolygonInteractable(a, [[(0.0, 0), (2, 0), (2, 1), (0, 1)]]), c)
+            # a circle is sampled on that circle
+            i_circ = PolygonInteractable(a, plots[4])
+            for (ring, ctr, r) in zip(i_circ.rings, ((0, 0), (3, 0)), (1.0, 0.5))
+                @test length(ring) >= 16
+                @test all(q -> isapprox(hypot(q[1] - ctr[1], q[2] - ctr[2]), r; atol = 1.0e-5), ring)
+            end
+            # a polygon keeps its interior as a hole
+            i_holed = PolygonInteractable(a, plots[7])
+            xy(ring) = Set((Float64(q[1]), Float64(q[2])) for q in ring)
+            @test xy(only(i_holed.rings)) == Set([(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0)])
+            @test xy(only(only(i_holed.holes))) == Set([(1.0, 1.0), (3.0, 1.0), (3.0, 3.0), (1.0, 3.0)])
+            # a vector-of-MultiPolygon entry keeps its second piece, as a further ring
+            i_multi = PolygonInteractable(a, plots[9])
+            @test length(i_multi.holes[1]) == 1 && isempty(i_multi.holes[2])
+            # every default builds, so masque(fig) no longer throws on these
+            @test masque(f) isa Masque.MasqueWidget
+        end
+
+        @testset "poly from a vector of meshes: one element, hit over its faces" begin
+            GB = Makie.GeometryBasics
+            # A fan around an interior vertex: the vertex buffer is not an outline.
+            pos = Point2f[(0, 0), (2, 0), (2, 2), (0, 2), (1, 1)]
+            fan = GB.Mesh(pos, [GB.GLTriangleFace(1, 2, 5), GB.GLTriangleFace(2, 3, 5), GB.GLTriangleFace(3, 4, 5), GB.GLTriangleFace(4, 1, 5)])
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1])
+            i = PolygonInteractable(a, poly!(a, [fan]))
+            @test length(i.rings) == 1
+            rings = vcat([i.rings[1]], i.holes[1])
+            @test length(rings) == 4
+            crosses(pt, ring) = (
+                n = length(ring); inside = false; j = n;
+                for k in 1:n
+                    (xk, yk), (xj, yj) = ring[k], ring[j]
+                    ((yk > pt[2]) != (yj > pt[2])) && pt[1] < (xj - xk) * (pt[2] - yk) / (yj - yk) + xk && (inside = !inside)
+                    j = k
+                end; inside
+            )
+            evenodd(pt) = isodd(count(r -> crosses(pt, r), rings))
+            # (0.2, 1) is inside the drawn quad but outside the vertex-order ring
+            @test evenodd((0.2, 1.0)) && evenodd((1.8, 1.0)) && evenodd((1.0, 0.2))
+            @test !evenodd((2.5, 1.0))
+            _, _, c = ctx_for(f)
+            @test length(only(hitlayers(i, c)).payloads) == 1
+        end
+
         @testset "introspected interactable flows through masque unchanged" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1])
             p = scatter!(a, [1.0, 2.0], [1.0, 2.0]; markersize = 18)

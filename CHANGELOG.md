@@ -60,6 +60,11 @@ All notable changes to this project are documented here. The format is based on
   (`scatter!(…; markersize = [10, 20, 30])`, or a GraphMakie `graphplot` with `node_size` or
   `ilabels`). Each point now gets a highlight and click target the size of its own marker.
   `PointInteractable`'s `radius` also takes one value per point.
+- `masque(fig)` no longer fails when `poly!` draws shapes instead of point rings: a `Rect2f`,
+  a `Circle`, a `Polygon`, a `MultiPolygon`, or a vector of them, and so `tricontourf!` works
+  too. Each entry of the vector is one hover and click target, the same element its `color`
+  colors, and a polygon's holes are not part of it. A single `MultiPolygon` is one target per
+  polygon, since Makie colors each one separately.
 - A `band!` drawn with `direction = :y` now responds where it is drawn. Before, its hover and
   click target was the band mirrored across the diagonal.
 - `masque(fig)` no longer fails when an `arrows3d!` gives one direction for every arrow
