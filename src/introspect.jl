@@ -504,15 +504,17 @@ function PolygonInteractable(ax, p::Makie.Hexbin; id = :hexbin, payloads = nothi
     )
     ms = p.markersize[]
     s = ms isa Real ? Makie.Vec2d(ms, ms) : Makie.Vec2d(ms[1], ms[2])
-    back(t) = (d = _apply_transform(finv, Makie.Point2d(t[1], t[2])); Point2f(d[1], d[2]))
+    back(t) = _apply_transform(finv, Makie.Point2d(t[1], t[2]))
     centers = p.points[]
-    rings = [[back(Makie.Point2d(c) .+ s .* u) for u in _HEX_UNIT] for c in centers]
-    pl = payloads === nothing ? Any[
-            let d = back(centers[k])
-                (; x = d[1], y = d[2], count = p.count_hex[][k])
-        end
-            for k in eachindex(centers)
-        ] : payloads
+    rings = [[Point2f(back(Makie.Point2d(c) .+ s .* u)) for u in _HEX_UNIT] for c in centers]
+    payloads === nothing || return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
+    # Unweighted counts are whole numbers; summed weights stay Float64.
+    counts = p.weights[] === nothing ? round.(Int, p.count_hex[]) : p.count_hex[]
+    pl = Any[]
+    for (c, n) in zip(centers, counts)
+        d = back(c)
+        push!(pl, (; x = Float64(d[1]), y = Float64(d[2]), count = n))
+    end
     return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
 end
 
