@@ -203,6 +203,7 @@ These are required visual-fidelity checks, not optional nice-to-haves. Drivers m
 | Remount fade / no pulse | `.masque-enter` on first insert (on each highlight shape itself — no wrapper); same hover node on mousemove; `.masque-leave` on clear | both |
 | Tooltip theme follows the figure | The overlay CSS keeps the no-relative-colour `prefers-color-scheme` fallback (`#1e1e1e`/`#e8e8e8` dark tokens); the tooltip on the light `scatter` is light and on the dark `scatter_dark` is dark; under `emulateMedia({colorScheme: "dark"})` the light figure's tooltip stays light (the OS setting does not override the figure). Dark **Makie** figure uses the flat `#c8c8c8` edge stroke (highlights do not follow OS). | `polish_verify.mjs` + `kind_sweep.mjs` (`scatter` + `scatter_dark`) |
 | Tooltip caret on the anchor | The caret apex sits on the hovered mark's anchor x (scatter element 0's centre), not the cursor | `polish_verify.mjs` (scatter) |
+| Readout caret on the pointer | A cursor-following tooltip's caret apex sits on the pointer x, in open space and where the box clamps at the right edge | `polish_verify.mjs` (axis) |
 | No fixed steel-teal `#3A6F7C`, no alert red `#ff3b30` | Highlight colour is the dodge fill / fixed-grey edge stroke, or (for an explicit `hoverstyle`) the verbatim stroke, never a fixed literal like the old teal, in overlay CSS, hover stroke, wash, or ring | both |
 
 `prefers-reduced-motion: reduce` stays instant (unit-tested). Live drivers use default
