@@ -309,6 +309,14 @@ kind_sweep_meta() = [
         # Both KDEs have support at x = 1. Don't pin the KDE height — only that both labels show.
         "probes" => [Dict("x" => 1.0, "contains" => ["wide", "narrow"])],
     ),
+    Dict(
+        # #271: a slice from plots with `auto = false` and no `covers`, as on the Slice across
+        # series page. Its default covers name lines not in the call and are dropped.
+        "key" => "slice_auto", "layerId" => "slice", "layerKind" => "slice",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "slice",
+        "probes" => [Dict("x" => 1.0, "y" => 2.0, "contains" => ["wide 1.000", "narrow 3.000"])],
+    ),
 ]
 
 function build_kind_sweep()
@@ -773,9 +781,18 @@ function build_kind_sweep()
         )
     end
 
+    slice_auto = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "slice auto = false", limits = (0, 4, 0, 4))
+        xs = [0.0, 1.0, 2.0, 3.0, 4.0]
+        wide = lines!(ax, xs, xs; label = "wide")
+        narrow = lines!(ax, xs, 4 .- xs; label = "narrow")
+        masque(fig, SliceInteractable(ax, [wide, narrow]), AxisInteractable(ax); auto = false)
+    end
+
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, hexbin, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
-        legend_overlap, legend_template, axis, slice_lines, slice_density,
+        legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto,
     )
 end

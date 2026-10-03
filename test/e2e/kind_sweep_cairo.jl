@@ -380,6 +380,16 @@ HTML(
         "<span id=\"axes_slice_density\" style=\"display:none\">$(JSON3.write(sweep.slice_density.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-0000000000b0
+@bind ev_slice_auto sweep.slice_auto
+
+# ╔═╡ c1000000-0000-0000-0000-0000000000b1
+HTML(
+    "<span id=\"out_slice_auto\">SLICE_AUTO=$(repr(ev_slice_auto))</span>" *
+        "<span id=\"coords_slice_auto\" style=\"display:none\">$(JSON3.write(sweep.slice_auto.manifest["layers"]))</span>" *
+        "<span id=\"axes_slice_auto\" style=\"display:none\">$(JSON3.write(sweep.slice_auto.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000040
 HTML(
     "<span id=\"kind_meta\" style=\"display:none\">$(JSON3.write(kind_sweep_meta()))</span>" *
@@ -464,4 +474,6 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000051
 # ╠═c1000000-0000-0000-0000-000000000052
 # ╠═c1000000-0000-0000-0000-000000000053
+# ╠═c1000000-0000-0000-0000-0000000000b0
+# ╠═c1000000-0000-0000-0000-0000000000b1
 # ╠═c1000000-0000-0000-0000-000000000040
