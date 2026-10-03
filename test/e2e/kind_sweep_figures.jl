@@ -151,6 +151,11 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
+        "key" => "scatter_moved", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "index", "hoverIndex" => 2, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
         "key" => "hlines", "layerId" => "hlines", "layerKind" => "segments",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "segment_index", "hoverIndex" => 1, "hoverTip" => "segment_index",
@@ -524,6 +529,16 @@ function build_kind_sweep()
         masque(fig)
     end
 
+    # A scatter moved by translate! and drawn with marker_offset, #245. The hit circles sit on
+    # the drawn markers, two data units right and one up plus 20 px each way, not at the data.
+    scatter_moved = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "scatter-moved", limits = (0, 8, 0, 6))
+        p = scatter!(ax, [1.0, 2.0, 3.0], [1.0, 3.0, 2.0]; markersize = 24, marker_offset = Makie.Vec2f(20, 20))
+        translate!(p, 2, 1, 0)
+        masque(fig; selected = Dict(:scatter => [2]))
+    end
+
     hlines = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "hlines", limits = (0, 5, 0, 5))
@@ -713,7 +728,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, scatter_moved, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density,
     )
 end
