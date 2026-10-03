@@ -129,7 +129,7 @@ Makie color.
 | `color` | `#7a7a7a` on a light figure, `#c8c8c8` on a dark one | highlight, selection, ROI, and threshold stroke | `--masque-chrome` |
 | `dodge_fill` | `#141414` | how strongly a highlight brightens the mark; lighter is stronger | `--masque-hi-fill` |
 | `hover_width` | `1.5` | outline of the hovered mark | `--masque-hover-width` |
-| `selected_width` | `2` | outline of a selected mark | `--masque-selected-width` |
+| `selected_width` | `2` | outline of a selected point, bar, or shape; a selected line uses the ring below | `--masque-selected-width` |
 | `hover_fill_opacity` | `0.18` | fill of a hovered mark with a `hoverstyle` stroke | `--masque-hover-fill-opacity` |
 | `selected_fill_opacity` | `0.35` | fill of a selected mark with a `hoverstyle` stroke | `--masque-selected-fill-opacity` |
 | `ring_width` | `2` | ring around a selected line | `--masque-ring-width` |
@@ -144,9 +144,12 @@ Makie color.
 | `cross_halo_width` | `1.5` | figure-colored edge around the crosshair line | `--masque-cross-halo-width` |
 
 To change these without Julia, set the custom properties in a CSS rule
-on an element that contains the cell, as for tooltips. The three colors
-that follow the figure's background, `color`, `dodge_fill`, and
-`cross_color`, can only be set from Julia.
+on an element that contains the cell, as for tooltips. `color`,
+`dodge_fill`, and `cross_color` can only be set from Julia.
+
+One property has no key: `--masque-noblend-fill-opacity` (default `0.18`)
+is the highlight fill in a browser that cannot brighten the mark, and
+can be set only from CSS.
 
 ## Custom-hit interface
 
