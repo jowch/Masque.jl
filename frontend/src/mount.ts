@@ -444,7 +444,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         cross_: cross,
         gesture_: channel,
         photoPaint_: (m) => paintPhoto(m),
-        setValue_: (v) => { restoring = false; bondValue = v },
+        // Through `host.value`, not into `bondValue`: a page may wrap the property after mount
+        // (the docs player does, to swap its snapshots) and must see every commit.
+        setValue_: (v) => {
+            committing = true
+            try {
+                (host as unknown as { value: unknown }).value = v
+            } finally {
+                committing = false
+            }
+        },
     }
     const state = createOverlayState()
     state.selHits_ = selHits
@@ -459,12 +468,19 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // value whenever any bond in the notebook changes; that is a no-op here.
     let bondValue: unknown = hostValue
     let restoring = true
-    Object.defineProperty(host, "value", {
+    let committing = false
+    const getBond = () => bondValue
+    // An accessor already on the host belongs to the page (the docs player's survives a
+    // remount, since ours is taken down on cleanup), so writes go through it untouched.
+    const theirs = Object.getOwnPropertyDescriptor(host, "value")?.set
+    if (theirs) theirs.call(host, hostValue)
+    else Object.defineProperty(host, "value", {
         configurable: true,
         enumerable: true,
-        get: () => bondValue,
+        get: getBond,
         set: (v: unknown) => {
-            if (restoring && !sameValue(v, bondValue)) {
+            if (committing) restoring = false
+            else if (restoring && !sameValue(v, bondValue)) {
                 const sel = selectionForValue(ctx.manifest_, v)
                 if (sel) {
                     state.selHits_ = sel.hits
@@ -1001,8 +1017,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         channel.dispose() // abandon anything in flight — a late response must not touch a dead DOM
         if (lastFrameUrl) URL.revokeObjectURL(lastFrameUrl)
         shadowHost.remove()
-        // A plain property again, so a dead overlay no longer redraws on a write.
-        Object.defineProperty(host, "value", { configurable: true, enumerable: true, writable: true, value: bondValue })
+        // A plain property again, so a dead overlay no longer redraws on a write. A page that
+        // wrapped it since keeps its own.
+        if (Object.getOwnPropertyDescriptor(host, "value")?.get === getBond)
+            Object.defineProperty(host, "value", { configurable: true, enumerable: true, writable: true, value: bondValue })
         host.masqueDead = true
         host.masqueDetach?.()
     }

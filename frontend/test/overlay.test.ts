@@ -1738,6 +1738,33 @@ describe("tooltips (mount/showTip)", () => {
             hostValue(host).value = { layer: "legend", index: 0 }
             expect(selectedCx(host)).toEqual(["900"])
         })
+
+        it("a page that wraps host.value after mount still sees every click", () => {
+            // The docs embed player redefines the property over ours to swap its snapshots.
+            const { host, script } = setup()
+            mount(script, three([0]))
+            const inner = Object.getOwnPropertyDescriptor(host, "value")!
+            const seen: unknown[] = []
+            Object.defineProperty(host, "value", { configurable: true, enumerable: true,
+                get: () => inner.get!.call(host),
+                set: (v: unknown) => { seen.push(v); inner.set!.call(host, v) } })
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 300, bubbles: true }))
+            expect(seen).toEqual([{ layer: "pts", index: 2 }])
+            expect(hostValue(host).value).toEqual(seen[0])
+        })
+
+        it("a page accessor already on the host at mount keeps receiving the bond", () => {
+            const { host, script } = setup()
+            let cur: unknown = "untouched"
+            Object.defineProperty(host, "value", { configurable: true, enumerable: true,
+                get: () => cur, set: (v: unknown) => { cur = v } })
+            mount(script, three([0]))
+            expect(cur).toEqual({ layer: "pts", index: 0 })
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 300, bubbles: true }))
+            expect(cur).toEqual({ layer: "pts", index: 2 })
+        })
     })
 
     it("a selects-ROI commit REPLACES the selected= hydration with its enclosure (hydration model)", () => {
