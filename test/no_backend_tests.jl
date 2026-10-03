@@ -18,6 +18,17 @@ using Test
     @test occursin("WGLMakie", err.msg)
 end
 
+@testset "backend = symbol with no backend extension loaded (#236)" begin
+    fig = Figure(; size = (300, 200))
+    scatter!(Axis(fig[1, 1]), 1:5, rand(5))
+    for (name, pkg) in ((:cairo, "CairoMakie"), (:webgl, "WGLMakie"))
+        err = (@test_throws ArgumentError masque(fig; backend = name)).value
+        @test occursin("using $pkg", err.msg)
+    end
+    err = (@test_throws ArgumentError masque(fig; backend = :gl)).value
+    @test occursin("unknown backend", err.msg) && occursin(":cairo, :webgl", err.msg)
+end
+
 # ---- cross-backend parity invariant: pure golden-data comparison, no Makie backend ----
 # The two committed goldens per corpus figure must agree structurally. This is the test
 # that catches a one-sided context() divergence (the Colorbar-misbind class) whatever its

@@ -45,7 +45,7 @@ end
 function make_widget(fig, ints)
     WEBGL || return masque(fig, ints)
     ext = Base.get_extension(Masque, :MasqueWGLMakieExt)
-    return masque(fig, ints; backend = ext.WebGLBackend())
+    return masque(fig, ints; backend = :webgl)
 end
 
 function html_ok(html)

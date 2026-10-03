@@ -17,8 +17,8 @@ else
         dir = joinpath(@__DIR__, "..", "fixtures", "parity")
         for (name, build) in _parity_corpus()
             fig, ints = build()
-            bk = _CairoExt.CairoBackend()
-            ctx = IP.context(bk, fig, IP._ppu(bk, fig))
+            bk = IP._resolve_backend(:cairo)
+            ctx = IP.context(bk, fig, IP._ppu(bk, fig, 700), 700)
             live = JSON3.read(JSON3.write(build_manifest(ints, ctx)))   # canonicalize via JSON round-trip
             golden = JSON3.read(read(joinpath(dir, "$name.cairo.json"), String))
             @test live == golden

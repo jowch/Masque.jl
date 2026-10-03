@@ -15,33 +15,28 @@ const Bonito = WGLMakie.Bonito
 export WebGLBackend
 
 """
-    WebGLBackend(; px_per_unit=2.0, max_width=700)
+    WebGLBackend
 
-Live, browser-GPU `Masque` backend (loaded when `WGLMakie` is `using`d): serializes `fig`'s scene
-and renders it in a WebGL `<canvas>` on the client GPU, with Masque's usual JS overlay layered on
-top — same `masque`/`@bind`/`InteractionEvent` contract as [`CairoBackend`](@ref), for animation,
-large/live data, and live 3D. Needs an explicit `backend=` if both `CairoMakie` and `WGLMakie`
-are loaded (`masque` otherwise defaults to Cairo).
+Live, browser-GPU `Masque` backend, chosen with `masque(fig; backend = :webgl)` once `WGLMakie`
+is loaded: serializes `fig`'s scene and renders it in a WebGL `<canvas>` on the client GPU, with
+Masque's usual JS overlay layered on top — same `masque`/`@bind`/`InteractionEvent` contract as
+the `:cairo` backend, for animation, large/live data, and live 3D. Needs `backend = :webgl` if
+both `CairoMakie` and `WGLMakie` are loaded (`masque` otherwise defaults to `:cairo`). Its
+density is `masque`'s `px_per_unit`, `2` by default; `WGLMakie.activate!` settings never apply
+to the widget.
 
-# Arguments
-- `px_per_unit` — the explicit device/surface scale (unlike `CairoBackend`, this is a fixed
-  knob, not derived from `max_width`). Default `2.0`.
-- `max_width` — the display width to target, in px (Pluto's column); mirrors
-  `CairoBackend`'s `max_width`. Default `700`.
-
-# Examples
-```julia
-using Masque, WGLMakie
-masque(fig; backend = WebGLBackend(; px_per_unit = 3.0))
-```
+`WebGLBackend(; px_per_unit, max_width)` is deprecated: use
+`masque(fig; backend = :webgl, px_per_unit, max_width)`. Removed in 0.3.
 """
 struct WebGLBackend <: AbstractBackend
-    px_per_unit::Float64
-    max_width::Int
+    WebGLBackend(::Masque._Builtin) = new()
 end
-WebGLBackend(; px_per_unit = 2.0, max_width = 700) = WebGLBackend(px_per_unit, max_width)
+function WebGLBackend(; px_per_unit = nothing, max_width = nothing)
+    return Masque._legacy_backend(WebGLBackend(Masque._Builtin()), :webgl, max_width, px_per_unit)
+end
+Masque._builtin_backend(::Val{:webgl}) = WebGLBackend(Masque._Builtin())
 
-Masque._ppu(b::WebGLBackend, _fig) = b.px_per_unit
+Masque._ppu(::WebGLBackend, _fig, _max_width) = 2.0
 
 # Every non-public WGLMakie/Bonito surface goes through one of these three (this extension is
 # the only place WGLMakie/Bonito are in scope); see test/webgl_ext_tests.jl's version-coupling guard.
@@ -200,11 +195,11 @@ end
 
 # Uses the same shared projection closure as CairoBackend, landing within 1-2px of where
 # WGLMakie draws the data.
-function Masque.context(b::WebGLBackend, fig, ppu)
+function Masque.context(b::WebGLBackend, fig, ppu, max_width)
     w, h = size(fig.scene)
     scaling = Float64(ppu)
     out_w, out_h = round(Int, w * scaling), round(Int, h * scaling)
-    display_scale = min(w, b.max_width) / out_w
+    display_scale = min(w, max_width) / out_w
 
     project = Masque._project_closure(scaling, out_h)
 
@@ -268,10 +263,10 @@ function Masque.with_owners(w::WebGLWidget, owners::Dict{String, Masque.LayerOwn
     )
 end
 
-Masque.make_widget(b::WebGLBackend, result::WebGLResult, manifest, display_css, fig, interactables, ppu) =
+Masque.make_widget(b::WebGLBackend, result::WebGLResult, manifest, display_css, fig, interactables, ppu, max_width) =
     WebGLWidget(
     result.scene, manifest, display_css, result.width, result.height, result.px_per_unit,
-    Masque._view_render_frame(b, fig, interactables, ppu),
+    Masque._view_render_frame(b, fig, interactables, ppu, max_width),
 )
 
 # `*_expr`/`*_js` are JS expressions yielding the data/text: published_to_js for Pluto, or
