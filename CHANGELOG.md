@@ -77,6 +77,8 @@ still work and are removed in 0.3.
   forms will be removed in 0.3.
 
 ### Fixed
+- The tooltip that follows the pointer (an axis or colorbar readout, a threshold, an ROI, a
+  view, a slice) now points at the pointer. Before, its arrow sat about 24 pixels to the side.
 - `masque(fig)` no longer fails when a scatter has one marker size per point
   (`scatter!(…; markersize = [10, 20, 30])`, or a GraphMakie `graphplot` with `node_size` or
   `ilabels`). Each point now gets a highlight and click target the size of its own marker.

@@ -11,6 +11,8 @@ import type { Hit, HitLayer, Manifest, SliceGeometry, ThresholdGeometry } from "
 
 const TIP_GAP = 8
 const TIP_OFFSET = 10
+// The caret's default distance from the box's left edge, mount.ts's --masque-caret-x fallback.
+const CARET_INSET = 14
 
 // Cursor classes are mutually exclusive and must never stick: every hover-path branch that can
 // set one goes through setCursorClass, which clears all of them first.
@@ -94,7 +96,7 @@ export function hideTip(ctx: OverlayCtx, state: OverlayState): void {
     const delay = prefersReducedMotion() ? 0 : MOTION_MS
     state.tipFlipTimer_ = setTimeout(() => {
         state.tipFlipTimer_ = null
-        if (!ctx.tip_.classList.contains("show")) ctx.tip_.classList.remove("flip-x", "flip-y")
+        if (!ctx.tip_.classList.contains("show")) ctx.tip_.classList.remove("flip-y")
     }, delay)
 }
 
@@ -104,6 +106,10 @@ export function tipOffset(ctx: OverlayCtx, e: MouseEvent): { x: number; y: numbe
     return { x: e.offsetX || e.clientX, y: e.offsetY || e.clientY }
 }
 
+// The cursor-following kinds (axis, threshold, ROI, view) and the slice readout: the box sits
+// below the pointer and its caret points at the pointer, the point the readout describes. Near
+// the right edge the box shifts left and the caret moves with the pointer, as placeAnchored does
+// on a side-clip; near the bottom the box goes above the pointer with the caret underneath.
 export function placeTip(ctx: OverlayCtx, state: OverlayState, ox: number, oy: number): void {
     if (!state.tipSized_) {
         state.tipW_ = ctx.tip_.offsetWidth; state.tipH_ = ctx.tip_.offsetHeight
@@ -114,20 +120,20 @@ export function placeTip(ctx: OverlayCtx, state: OverlayState, ox: number, oy: n
         state.surfaceSized_ = state.surfaceW_ > 0 && state.surfaceH_ > 0
     }
     const tw = state.tipW_, th = state.tipH_, hw = state.surfaceW_, hh = state.surfaceH_
-    ctx.tip_.classList.remove("flip-x", "flip-y")
-    ctx.tip_.style.removeProperty("--masque-caret-x") // only the anchored path (placeAnchored) uses this
+    ctx.tip_.classList.remove("flip-y")
     if (tw <= 0 || th <= 0 || hw <= 0 || hh <= 0) {
-        ctx.tip_.style.left = `${ox + TIP_OFFSET}px`
+        ctx.tip_.style.left = `${ox - CARET_INSET}px`
         ctx.tip_.style.top = `${oy + TIP_OFFSET}px`
+        ctx.tip_.style.setProperty("--masque-caret-x", `${CARET_INSET}px`)
         return
     }
-    let left = ox + TIP_OFFSET, top = oy + TIP_OFFSET
-    const flipX = left + tw > hw - TIP_GAP
+    let top = oy + TIP_OFFSET
     const flipY = top + th > hh - TIP_GAP
-    if (flipX) { left = ox - tw - TIP_OFFSET; ctx.tip_.classList.add("flip-x") }
     if (flipY) { top = oy - th - TIP_OFFSET; ctx.tip_.classList.add("flip-y") }
-    ctx.tip_.style.left = `${Math.max(TIP_GAP, Math.min(left, hw - tw - TIP_GAP))}px`
+    const left = Math.max(TIP_GAP, Math.min(ox - CARET_INSET, hw - tw - TIP_GAP))
+    ctx.tip_.style.left = `${left}px`
     ctx.tip_.style.top = `${Math.max(TIP_GAP, Math.min(top, hh - th - TIP_GAP))}px`
+    ctx.tip_.style.setProperty("--masque-caret-x", `${Math.max(6, Math.min(tw - 6, ox - left))}px`)
 }
 
 // Places the tooltip above (or, if that clips the surface's top, below) a mark's anchor point —
@@ -143,7 +149,6 @@ export function placeAnchored(ctx: OverlayCtx, state: OverlayState, anchor: Anch
         state.surfaceW_ = ctx.surface_.clientWidth; state.surfaceH_ = ctx.surface_.clientHeight
         state.surfaceSized_ = state.surfaceW_ > 0 && state.surfaceH_ > 0
     }
-    ctx.tip_.classList.remove("flip-x") // horizontal clipping is handled by shifting the caret, not this
     const tw = state.tipW_, th = state.tipH_, sw = state.surfaceW_, sh = state.surfaceH_
     if (tw <= 0 || th <= 0 || sw <= 0 || sh <= 0) {
         ctx.tip_.style.left = `${anchor.x}px`
