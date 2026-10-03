@@ -539,5 +539,16 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             my = (g[2k + 2] + g[2k + 4]) / 2
             @test red_near(img, mx, my; tol = 3)
         end
+        # after the camera turns (an orbit, then a remount), both layers follow the view
+        ax.azimuth[] = 1.1; ax.elevation[] = 0.2
+        _, ppub, ctxb = ctx_for(f)
+        imgb = Makie.colorbuffer(f; px_per_unit = ppub)
+        Lpb = only(hitlayers(pt, ctxb))
+        @test any(Lpb.geometry[i] != Lp.geometry[i] for i in 1:9)
+        for k in 0:2
+            @test red_near(imgb, Lpb.geometry[3k + 1], Lpb.geometry[3k + 2])
+        end
+        gb = only(only(hitlayers(ln, ctxb)).geometry)
+        @test red_near(imgb, (gb[1] + gb[3]) / 2, (gb[2] + gb[4]) / 2; tol = 3)
     end
 end
