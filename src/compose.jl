@@ -11,7 +11,9 @@ default. `id` names the first layer, and a plot that builds two layers (`stem!`,
 (`tooltip`, `payloads`, `label`, and any the plot's constructor takes) pass through to the
 constructor, so `interactables(ax, s; tooltip = masque"…")` is `PointInteractable(ax, s;
 tooltip = masque"…")` for a scatter. A two-layer plot takes `tooltip` and `label` on both
-layers and refuses `payloads`.
+layers and refuses `payloads`. Unlike the constructor, it also moves the layers to where the
+plot is drawn when `translate!`, `scale!`, or `rotate!` moved it, and returns no layers for a
+plot drawn outside data space (`space = :relative`, `:pixel`, `:clip`).
 
 This is also how a recipe gets layers of its own. Define a method for your plot type, and
 `masque(fig)` uses it instead of walking the plots your recipe draws:

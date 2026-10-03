@@ -205,10 +205,58 @@ function PointInteractable(ax, p::Makie.Scatter; id = :scatter, payloads = nothi
     pts = _conv(p)[1]
     r = radius === nothing ? _marker_radius(p) : radius
     kw = (; id, radius = r, colors, tooltip, label)
-    return payloads === nothing ?
+    i = payloads === nothing ?
         PointInteractable(ax, pts; kw...) :
         PointInteractable(ax, pts; kw..., payloads)
+    p.markerspace[] === :data && return _shift_data_markers(ax, i, p.marker_offset[])
+    return _with_offset(i, _marker_offset(p, length(i.points)))
 end
+
+# `marker_offset` moves each marker from its point (Makie converts it to a `Vec3f`, one for
+# every point or one per point). In `:pixel` markerspace it is px, kept as the circle's offset.
+function _marker_offset(p, n)
+    p.markerspace[] === :pixel || return Makie.Vec2f(0, 0)
+    mo = p.marker_offset[]
+    mo isa Makie.VecTypes && return Makie.Vec2f(mo[1], mo[2])
+    return Makie.Vec2f[Makie.Vec2f(m[1], m[2]) for m in _marker_offset_vec(mo, n)]
+end
+# In `:data` markerspace the offset is in the axis's transformed units, added after the scale:
+# the marker is drawn at `f⁻¹(f(x) + offset)`. Payloads keep the plot's own values.
+function _shift_data_markers(ax, i::PointInteractable, mo)
+    offs = _marker_offset_vec(mo, length(i.points))
+    all(iszero, offs) && return i
+    tf = _transform_func(ax.scene)
+    finv = Makie.inverse_transform(tf)
+    if _no_inverse(finv)
+        _warn_no_inverse(i.id)
+        return i
+    end
+    pts = map(eachindex(i.points)) do k
+        x = i.points[k]
+        t = _apply_transform(tf, Makie.Point3d(x[1], x[2], x[3])) .+ offs[k]
+        d = _apply_transform(finv, Makie.Point3d(t...))
+        Point3f(d[1], d[2], ax isa Makie.Axis3 ? d[3] : x[3])
+    end
+    return PointInteractable(
+        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset,
+    )
+end
+function _marker_offset_vec(mo, n)
+    mo isa Makie.VecTypes && return fill(Makie.Vec3d(_pt3(mo)...), n)
+    length(mo) == n || error("PointInteractable: $(length(mo)) marker offsets for $n points (Makie internals changed?)")
+    return [Makie.Vec3d(_pt3(m)...) for m in mo]
+end
+# Makie returns `nothing`, or a tuple holding `nothing` for a per-axis transform, when a
+# transform has no inverse.
+_no_inverse(finv) = finv === nothing || (finv isa Tuple && any(isnothing, finv))
+function _warn_no_inverse(id)
+    @warn "masque: layer :$(id) stays at its unmoved positions; the axis transform has no " *
+        "inverse, so the drawn positions can't be mapped back to data" maxlog = 16
+    return nothing
+end
+_with_offset(i::PointInteractable, o) = PointInteractable(
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o,
+)
 
 # markersize is DATA-space (no markerspace attribute), so pixel radius is camera/depth-dependent;
 # normalize to per-element Vec3f half-extents (radius3d) and let hitlayers project them. The
@@ -765,6 +813,15 @@ function _text_interactables(ax, p::Makie.Text, id; kw...)
     return AbstractInteractable[TextInteractable(ax, p; id, kw...)]
 end
 
+# A plot drawn in another space (`space = :relative`, `:pixel`, `:clip`) is placed relative
+# to the axis or the screen, not at its data coordinates, which is where Masque would put
+# its hit target. Text has its own check above, which also covers `annotation!`.
+function _nondata_space(p)
+    hasproperty(p, :space) || return false
+    sp = p.space[]
+    return sp isa Symbol && sp !== :data
+end
+
 # the layer-id base for a plot, or nothing if Masque can't introspect it
 function _plotbase(p)
     p isa Makie.Scatter && return :scatter
@@ -802,11 +859,20 @@ function _plotbase(p)
 end
 
 # returns a Vector{AbstractInteractable} — usually one, two for composites (Stem, ScatterLines).
-# Default payloads show categorical and date positions as the user's values.
+# A non-data-space plot gives none (with a warning), the layers of a plot moved by its own
+# transformation are moved with it, and default payloads show categorical and date positions
+# as the user's values.
 function _construct(ax, p, id; kw...)
-    built = _construct_raw(ax, p, id; kw...)
-    haskey(kw, :payloads) && return built
-    return AbstractInteractable[_with_payloads(i, _unconvert_payloads(ax, i)) for i in built]
+    if !(p isa Makie.Text || p isa Makie.Annotation) && _nondata_space(p)
+        @warn "masque: skipping $(Makie.plotkey(p)) drawn in space = :$(p.space[]); only " *
+            "data-space plots get hover and click targets" maxlog = 16
+        return AbstractInteractable[]
+    end
+    built = _construct_unplaced(ax, p, id; kw...)
+    f = _placement(ax, p)
+    placed = f === nothing ? built : AbstractInteractable[i for i in (_place(i, f) for i in built) if i !== nothing]
+    haskey(kw, :payloads) && return placed
+    return AbstractInteractable[_with_payloads(i, _unconvert_payloads(ax, i)) for i in placed]
 end
 
 # A positional default payload (`x`, `y`, `z`) holds Makie's converted number. On an axis
@@ -864,7 +930,7 @@ function _with_payloads(i, pl)
     return typeof(i)(vals...)
 end
 
-function _construct_raw(ax, p, id; kw...)
+function _construct_unplaced(ax, p, id; kw...)
     p isa Makie.Scatter && return [PointInteractable(ax, p; id, kw...)]
     p isa Makie.MeshScatter && return [PointInteractable(ax, p; id, kw...)]
     (p isa Makie.Lines || p isa Makie.LineSegments || p isa Makie.Wireframe || p isa Makie.Arrows3D) &&
@@ -891,6 +957,110 @@ function _construct_raw(ax, p, id; kw...)
     p isa Makie.Annotation && return _text_interactables(ax, _descendant(p, Makie.Text), id; kw...)
     # unreachable while _plotbase gates callers; loud if the two ever drift (kind added to one, not the other)
     return error("interactables: $(typeof(p).name.name) passed _plotbase but has no _construct branch")
+end
+
+# The plot's own transformation (`translate!`, `scale!`, `rotate!`) is applied after the axis
+# scale: Makie draws a point `x` at `model * f(x)`, with `f` the axis transform (`log10`, …).
+# Hit geometry is projected as data, so each point is replaced by the data point drawn in its
+# place, `f⁻¹(model * f(x))`. Payloads keep the plot's own values. On a 2D axis only x and y
+# move: a z translation is draw order, not position. `model` here is the plot's own part: an
+# `Axis3` scene has a model of its own (fitting the limits into its box), which every plot
+# inherits and the projection already applies. `nothing` when the plot is not moved.
+function _placement(ax, p)
+    hasproperty(p, :model) || return nothing
+    M = inv(Makie.transformationmatrix(ax.scene)[]) * Makie.transformationmatrix(p)[]
+    is3d = ax isa Makie.Axis3
+    off(r, c) = abs(M[r, c] - (r == c)) > 1.0e-6
+    moved = is3d ? any(off(r, c) for r in 1:4, c in 1:4) : any(off(r, c) for r in 1:2, c in 1:4)
+    moved || return nothing
+    tf = _transform_func(ax.scene)
+    finv = Makie.inverse_transform(tf)
+    if _no_inverse(finv)
+        _warn_no_inverse(Makie.plotkey(p))
+        return nothing
+    end
+    rot = is3d ? any(off(r, c) for r in 1:3, c in 1:3 if r != c) : (off(1, 2) || off(2, 1))
+    # `o` is a data-space `marker_offset`, already folded into the point as `f⁻¹(f(x) + o)` (see
+    # `_shift_data_markers`). Makie adds it after the model, so it is taken out before the model
+    # and added back after: the marker is drawn at `M * f(x) + o`.
+    place = function (pt, o = zero(Makie.Vec3d))
+        x = _pt3(pt)
+        t = _apply_transform(tf, Makie.Point3d(x[1], x[2], x[3])) .- o
+        m = M * Makie.Vec4d(t[1], t[2], t[3], 1)
+        d = _apply_transform(finv, Makie.Point3d(m[1] + o[1], m[2] + o[2], m[3] + o[3]))
+        return Point3f(d[1], d[2], is3d ? d[3] : x[3])
+    end
+    tm = hasproperty(p, :transform_marker) && p.transform_marker[] === true
+    # A marker sized in data units (`meshscatter`) grows with the model's scale when
+    # `transform_marker`; a rotation turns it but leaves its size alone.
+    marker = tm ? Makie.Vec3d((sqrt(sum(abs2, M[r, c] for r in 1:3)) for c in 1:3)...) : nothing
+    dataoffset = p isa Makie.Scatter && p.markerspace[] === :data && !tm ? p.marker_offset[] : nothing
+    return (; place, rotated = rot, marker, dataoffset)
+end
+
+# A drawn (world) position back to the data point drawn there: `f⁻¹(inv(scene model) * w)`.
+# With no inverse (a custom transform) the world position is used as is.
+function _world_to_data(ax)
+    S = inv(Makie.transformationmatrix(ax.scene)[])
+    finv = Makie.inverse_transform(_transform_func(ax.scene))
+    return function (w)
+        m = S * Makie.Vec4d(w[1], w[2], length(w) >= 3 ? w[3] : 0, 1)
+        d = _no_inverse(finv) ? Makie.Point3d(m[1], m[2], m[3]) : _apply_transform(finv, Makie.Point3d(m[1], m[2], m[3]))
+        return ax isa Makie.Axis3 ? Point3f(d[1], d[2], d[3]) : Point2f(d[1], d[2])
+    end
+end
+
+_place(i::AbstractInteractable, f) = i
+_place(i::TextInteractable, f) = i   # string_boundingboxes already include the transformation
+function _place(i::PointInteractable, f)
+    r3 = i.radius3d === nothing || f.marker === nothing ? i.radius3d :
+        [Makie.Vec3f((Makie.Vec3d(r...) .* f.marker)...) for r in i.radius3d]
+    pts = if f.dataoffset === nothing
+        map(f.place, i.points)
+    else
+        offs = _marker_offset_vec(f.dataoffset, length(i.points))
+        [f.place(i.points[k], offs[k]) for k in eachindex(i.points)]
+    end
+    return PointInteractable(
+        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset,
+    )
+end
+function _place(i::SegmentInteractable, f)
+    res = i.resolve === nothing ? nothing : (ax -> map(f.place, i.resolve(ax)))
+    paths = i.paths === nothing ? nothing : [map(f.place, path) for path in i.paths]
+    return SegmentInteractable(
+        i.ax, map(f.place, i.vertices), i.mode, i.id, i.payloads, i.tol, i.tooltip, res, i.label, i.unit, paths,
+    )
+end
+_place(i::PolygonInteractable, f) = PolygonInteractable(
+    i.ax, [map(f.place, ring) for ring in i.rings], i.id, i.payloads, i.tooltip, i.label,
+    [[map(f.place, h) for h in group] for group in i.holes],
+)
+# A rect or a grid cell stays axis-aligned only when the plot is not rotated.
+function _place_rect(f, r)
+    a = f.place((r[1] - r[3] / 2, r[2] - r[4] / 2))
+    b = f.place((r[1] + r[3] / 2, r[2] + r[4] / 2))
+    return ((a[1] + b[1]) / 2, (a[2] + b[2]) / 2, abs(b[1] - a[1]), abs(b[2] - a[2]))
+end
+function _place(i::RectInteractable, f)
+    _warn_rotated(i, f) && return nothing
+    res = i.resolve === nothing ? nothing : (ax -> [_place_rect(f, r) for r in i.resolve(ax)])
+    return RectInteractable(
+        i.ax, [_place_rect(f, r) for r in i.data], i.id, i.payloads, i.tooltip, i.clamp_to_viewport, res, i.label,
+    )
+end
+function _place(i::GridInteractable, f)
+    _warn_rotated(i, f) && return nothing
+    y0, x0 = i.yedges[1], i.xedges[1]
+    xe = Float64[f.place((x, y0))[1] for x in i.xedges]
+    ye = Float64[f.place((x0, y))[2] for y in i.yedges]
+    return GridInteractable(i.ax, xe, ye, i.values, i.id, i.tooltip, i.label)
+end
+function _warn_rotated(i, f)
+    f.rotated || return false
+    @warn "masque: skipping layer :$(i.id); its plot is rotated, and its rectangles would no " *
+        "longer be axis-aligned" maxlog = 16
+    return true
 end
 
 # Recursive `_child_plots` walk: registers `ids` for every descendant of `p` (a leaf plot's
@@ -981,15 +1151,15 @@ _nverts(::GridInteractable) = 1
 _nverts(i::TextInteractable) = length(i.payloads)
 _nverts(::AbstractInteractable) = 1
 
-# `_text_interactables` already warned. The parent walk must not add the generic
-# "unsupported plot type" warning on top of that (`bracket!`).
+# `_text_interactables` or `_construct` already warned about a non-data-space plot. The parent
+# walk must not add the generic "unsupported plot type" warning on top of that (`bracket!`).
 function _warned_empty(p)
     t = if p isa Makie.Text
         p
     elseif p isa Makie.Annotation
         _descendant_or_nothing(p, Makie.Text)
     else
-        nothing
+        return _nondata_space(p)
     end
     return t !== nothing && hasproperty(t, :space) && t.space[] !== :data
 end

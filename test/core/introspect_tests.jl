@@ -523,6 +523,156 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test only(filter(l -> l["id"] == "scatter", m["layers"]))["payloads"][2].x == "b"
     end
 
+    @testset "placement attributes move the hit target with the mark (#245)" begin
+        built(ax, p) = only(interactables(ax, p))
+        centers(L) = [(L.geometry[k], L.geometry[k + 1]) for k in 1:3:length(L.geometry)]
+
+        @testset "translate!: hit circles sit on the drawn markers, payloads keep the data" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 8, 0, 7))
+            p = scatter!(a, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]; markersize = 20)
+            translate!(p, 2, 1, 0)
+            _, _, c = ctx_for(f)
+            i = built(a, p)
+            moved = PointInteractable(a, [(3.0, 2.0), (4.0, 3.0), (5.0, 4.0)]; radius = i.radius)
+            @test only(hitlayers(i, c)).geometry == only(hitlayers(moved, c)).geometry
+            @test i.payloads[1] == (; index = 1, x = 1.0, y = 1.0)
+            img = Makie.colorbuffer(f; px_per_unit = c.scaling)
+            @test all(q -> drawn_near(img, q...; tol = 2), centers(only(hitlayers(i, c))))
+        end
+        @testset "translate! on a log axis moves in the axis's scale" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; yscale = log10, limits = (0, 4, 1, 1000))
+            p = scatter!(a, [1.0, 2.0], [1.0, 10.0]; markersize = 20)
+            translate!(p, 0, 1, 0)   # one decade up, drawn at y = 10 and 100
+            _, _, c = ctx_for(f)
+            moved = PointInteractable(a, [(1.0, 10.0), (2.0, 100.0)]; radius = 1)
+            got = centers(only(hitlayers(built(a, p), c)))
+            want = centers(only(hitlayers(moved, c)))
+            @test all(isapprox.(collect.(got), collect.(want); atol = 1))
+        end
+        @testset "a z translation is draw order, not position" begin
+            f = Figure(); a = Axis(f[1, 1])
+            p = scatter!(a, [1.0, 2.0], [1.0, 2.0]); translate!(p, 0, 0, 5)
+            _, _, c = ctx_for(f)
+            @test only(hitlayers(built(a, p), c)).geometry ==
+                only(hitlayers(PointInteractable(a, [(1.0, 1.0), (2.0, 2.0)]; radius = Masque._marker_radius(p)), c)).geometry
+        end
+        @testset "scale! and translate! on lines, bars, heatmap, poly, hlines" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 10, 0, 10))
+            l = lines!(a, [1.0, 2.0], [1.0, 2.0]); translate!(l, 1, 1, 0)
+            b = barplot!(a, [1, 2], [2, 3]); scale!(b, 2, 1, 1)
+            h = heatmap!(a, 1:2, 1:2, rand(2, 2)); translate!(h, 5, 5, 0)
+            pl = poly!(a, Point2f[(0, 0), (1, 0), (1, 1)]); translate!(pl, 3, 0, 0)
+            hl = hlines!(a, [4.0]); translate!(hl, 0, 1, 0)
+            _, _, c = ctx_for(f)
+            @test built(a, l).vertices == Point3f[(2, 2, 0), (3, 3, 0)]
+            r = built(a, b).data[1]
+            @test r[1] ≈ 2 && isapprox(r[3], 2 * 0.8; atol = 1.0e-5)   # center x doubled, width doubled
+            gi = built(a, h)
+            @test gi.xedges ≈ [5.5, 6.5, 7.5] && gi.yedges ≈ [5.5, 6.5, 7.5]
+            @test first.(built(a, pl).rings[1]) ≈ [3, 4, 4]
+            ys = only(hitlayers(built(a, hl), c)).geometry[2:2:end]
+            @test all(==(only(hitlayers(PointInteractable(a, [(1.0, 5.0)]; radius = 1), c)).geometry[2]), ys)
+        end
+        @testset "rotate!: points follow, axis-aligned rects are skipped with a warning" begin
+            f = Figure(); a = Axis(f[1, 1])
+            s = scatter!(a, [1.0], [0.0]); rotate!(s, π / 2)
+            b = barplot!(a, [1, 2], [2, 3]); rotate!(b, π / 2)
+            Makie.update_state_before_display!(f)
+            @test isapprox(built(a, s).points[1], Point3f(0, 1, 0); atol = 1.0e-5)
+            @test_logs (:warn, r"rotated") @test isempty(interactables(a, b))
+        end
+        @testset "space = :relative / :pixel plots are skipped with a warning" begin
+            f = Figure(); a = Axis(f[1, 1])
+            s = scatter!(a, [0.2, 0.5], [0.2, 0.5]; space = :relative)
+            l = lines!(a, [10.0, 50.0], [10.0, 50.0]; space = :pixel)
+            scatter!(a, 1:3, 1:3)
+            Makie.update_state_before_display!(f)
+            @test_logs (:warn, r"space = :relative") @test isempty(interactables(a, s))
+            @test_logs (:warn, r"space = :pixel") @test isempty(interactables(a, l))
+            ints = @test_logs (:warn, r"space = :relative") (:warn, r"space = :pixel") interactables(f)
+            @test [i.id for i in ints] == [:scatter]
+        end
+        @testset "marker_offset moves the hit circle by that many px" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 6, 0, 6))
+            p = scatter!(a, [2.0, 4.0], [2.0, 4.0]; markersize = 30, marker_offset = Vec2f(20, 20))
+            _, _, c = ctx_for(f)
+            base = PointInteractable(a, [(2.0, 2.0), (4.0, 4.0)]; radius = 1)
+            got, want = centers(only(hitlayers(built(a, p), c))), centers(only(hitlayers(base, c)))
+            @test all(isapprox.(collect.(got), [w .+ (20, -20) .* c.scaling for w in collect.(want)]; atol = 1))
+            img = Makie.colorbuffer(f; px_per_unit = c.scaling)
+            @test all(q -> drawn_near(img, q...; tol = 2), got)
+        end
+        # Center of the dark ink in an image region (grid lines and panels are light).
+        function ink_center(img; rows = axes(img, 1), cols = axes(img, 2))
+            dark = [(x, y) for y in rows, x in cols if Float64(Makie.red(img[y, x])) < 0.3 && Float64(Makie.blue(img[y, x])) < 0.3]
+            isempty(dark) && return (NaN, NaN)
+            return (sum(first, dark) / length(dark), sum(last, dark) / length(dark))
+        end
+        @testset "marker_offset in markerspace = :data moves by data units past the axis scale" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; yscale = log10, limits = (0, 6, 1, 1000))
+            p = scatter!(a, [2.0], [10.0]; markerspace = :data, marker = Rect, markersize = 0.3, color = :black, marker_offset = Vec2f(1, 1))
+            hidedecorations!(a); hidespines!(a)
+            _, _, c = ctx_for(f)
+            i = only(interactables(a, p; radius = 5))
+            @test i.payloads[1] == (; index = 1, x = 2.0, y = 10.0)
+            g = only(hitlayers(i, c)).geometry
+            want = Masque.data_to_image_px(c, a, (3.0, 100.0))   # one unit right, one decade up
+            @test isapprox(g[1], want[1]; atol = 1) && isapprox(g[2], want[2]; atol = 1)
+            img = Makie.colorbuffer(f; px_per_unit = c.scaling)
+            @test all(isapprox.(ink_center(img), (g[1], g[2]); atol = 4))
+        end
+        @testset "a data-space marker_offset is added after scale!, as Makie draws it" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 6, 0, 6))
+            p = scatter!(a, [1.0], [1.0]; markerspace = :data, marker = Rect, markersize = 0.3, color = :black, marker_offset = Vec2f(1, 0))
+            scale!(p, 2, 2, 1)
+            hidedecorations!(a); hidespines!(a)
+            _, _, c = ctx_for(f)
+            g = only(hitlayers(only(interactables(a, p; radius = 5)), c)).geometry
+            want = Masque.data_to_image_px(c, a, (3.0, 2.0))   # model first, then the offset
+            @test isapprox(g[1], want[1]; atol = 1) && isapprox(g[2], want[2]; atol = 1)
+            img = Makie.colorbuffer(f; px_per_unit = c.scaling)
+            @test all(isapprox.(ink_center(img), (g[1], g[2]); atol = 4))
+        end
+        @testset "text with markerspace = :data sits on its glyphs on a log axis" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; yscale = log10, limits = (0, 6, 1, 1000))
+            t = text!(a, 2, 100; text = "data", fontsize = 0.5, markerspace = :data, align = (:center, :center))
+            hidedecorations!(a); hidespines!(a)
+            _, _, c = ctx_for(f)
+            g = only(hitlayers(built(a, t), c)).geometry
+            @test g[3] > 50   # half a decade on a three-decade axis is large, not a few px
+            img = Makie.colorbuffer(f; px_per_unit = c.scaling)
+            ink = ink_center(img)
+            @test isapprox(ink[1], g[1]; atol = g[3] / 4) && isapprox(ink[2], g[2]; atol = g[4] / 4)
+        end
+        # Width in px of the dark ink in an image.
+        function ink_width(img)
+            cols = [x for y in axes(img, 1), x in axes(img, 2) if Float64(Makie.red(img[y, x])) < 0.5]
+            return isempty(cols) ? 0 : maximum(cols) - minimum(cols) + 1
+        end
+        @testset "a meshscatter's hit follows scale! in size, not rotate!" begin
+            for (move!, factor) in ((p -> scale!(p, 2, 2, 2), 2), (p -> rotate!(p, π / 4), 1))
+                f = Figure(size = (500, 500)); a = Axis(f[1, 1]; limits = (-3, 3, -3, 3), aspect = DataAspect())
+                ms = meshscatter!(a, [Point3f(0, 0, 0)]; markersize = 0.5, color = :black, shading = NoShading)
+                hidedecorations!(a); hidespines!(a)
+                move!(ms)
+                _, _, c = ctx_for(f)
+                i = built(a, ms)
+                @test i.radius3d[1] ≈ Vec3f(0.5factor, 0.5factor, 0.5factor)
+                r = only(hitlayers(i, c)).geometry[3]
+                img = Makie.colorbuffer(f; px_per_unit = c.scaling)
+                @test isapprox(2r, ink_width(img); rtol = 0.06)
+            end
+        end
+        @testset "an axis transform with no inverse leaves the targets in place, with a warning" begin
+            f = Figure(); a = Axis(f[1, 1])
+            p = scatter!(a, [1.0, 2.0], [1.0, 2.0]); translate!(p, 1, 0, 0)
+            Makie.update_state_before_display!(f)
+            a.scene.transformation.transform_func[] = (x -> x, x -> x)
+            ps = @test_logs (:warn, r"no inverse") match_mode = :any built(a, p).points
+            @test ps == Point3f[(1, 1, 0), (2, 2, 0)]
+        end
+    end
+
     @testset "M3 cheap-wins introspection" begin
         geom(int, c) = (L = only(hitlayers(int, c)); (L.kind, L.geometry, length(L.payloads)))
 

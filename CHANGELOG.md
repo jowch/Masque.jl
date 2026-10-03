@@ -80,6 +80,15 @@ All notable changes to this project are documented here. The format is based on
   click target was the band mirrored across the diagonal.
 - `masque(fig)` no longer fails when an `arrows3d!` gives one direction for every arrow
   (`arrows3d!(ax, points, Vec3f(1, 0, 1))`).
+- A plot moved by `translate!`, `scale!`, or `rotate!` now responds where it is drawn, and so
+  does a scatter drawn with `marker_offset` (pixel or data markerspace) and a `text!` with
+  `markerspace = :data`, on linear and scaled axes alike. A `meshscatter!` enlarged by
+  `scale!` gets a target of the enlarged size. Before, these targets stayed at the unmoved
+  positions and sizes. Tooltips still show the plot's own data values. A rotated plot whose
+  targets are rectangles (bars, a heatmap) is skipped with a warning, since its rectangles are
+  no longer axis-aligned.
+- A plot drawn with `space = :relative`, `:pixel`, or `:clip` is now skipped with a warning, as
+  such text already was. Before, its targets were placed as if its positions were data.
 - On a categorical or date axis, default tooltips and events show the value you plotted:
   `x = "b"` for `Makie.Categorical(["a", "b", "c"])`, `x = "2024-01-02"` for dates. Before,
   they showed Makie's internal number (`2.0`, or milliseconds since the epoch).
