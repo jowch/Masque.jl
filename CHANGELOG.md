@@ -11,6 +11,11 @@ All notable changes to this project are documented here. The format is based on
   (markers) and `:scatterlines_line` (line) layers it gives on a 2D `Axis`. Before, `masque`
   skipped it with a warning.
 
+### Fixed
+- After a page reload, the highlighted selection matches the value Pluto restored to the
+  `@bind` variable. Before, it showed the `selected=` element while the variable held your
+  last click, so the next click could clear the selection instead of making it (#272).
+
 ## [0.2.0] - 2026-10-03
 
 Some calls written for 0.1 behave differently: each is marked **Breaking** below, and the

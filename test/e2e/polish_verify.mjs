@@ -7,6 +7,7 @@
 //
 //   node polish_verify.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
+import { shutdownOpenSession } from "./fresh_session.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -64,6 +65,7 @@ try {
     if (WGL_CHURN_RE.test(text)) lastWglChurnAt = Date.now();
   });
 
+  await shutdownOpenSession(base, notebook);
   await page.goto(`${base}/open?path=${encodeURIComponent(notebook)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
   const deadline = Date.now() + 900000;
   let ready = false, tick = 0;
