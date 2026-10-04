@@ -223,6 +223,15 @@ HTML(
         "<span id=\"coords_scatterlines3d\" style=\"display:none\">$(JSON3.write(sweep.scatterlines3d.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-0000000000b5
+@bind ev_arrows2d sweep.arrows2d
+
+# ╔═╡ d1000000-0000-0000-0000-0000000000b6
+HTML(
+    "<span id=\"out_arrows2d\">ARROWS2D=$(repr(ev_arrows2d))</span>" *
+        "<span id=\"coords_arrows2d\" style=\"display:none\">$(JSON3.write(sweep.arrows2d.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-00000000006a
 @bind ev_band_y sweep.band_y
 
@@ -440,6 +449,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000006d
 # ╠═d1000000-0000-0000-0000-0000000000b3
 # ╠═d1000000-0000-0000-0000-0000000000b4
+# ╠═d1000000-0000-0000-0000-0000000000b5
+# ╠═d1000000-0000-0000-0000-0000000000b6
 # ╠═d1000000-0000-0000-0000-00000000006a
 # ╠═d1000000-0000-0000-0000-00000000006b
 # ╠═d1000000-0000-0000-0000-0000000000a0

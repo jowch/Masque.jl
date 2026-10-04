@@ -506,6 +506,7 @@ by the plot type):
 | `Makie.LineSegments` | `:segments` | `:pairs`, per segment | converted data |
 | `Makie.Wireframe` | `:wireframe` | `:pairs`, per edge | the child `LineSegments`' edges (incl. mesh-triangulation diagonals) |
 | `Makie.Arrows3D` | `:arrows3d` | `:pairs`, per shaft | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, z, u, v, w)` from `points`/`directions` |
+| `Makie.Arrows2D` | `:arrows2d` | `:pairs`, per arrow, tail to tip | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, u, v)` from `points`/`directions` |
 | `Makie.Errorbars` | `:errorbars` | `:pairs`, per bar | each bar's low→high endpoints |
 | `Makie.Rangebars` | `:rangebars` | `:pairs`, per bar | each bar's low→high endpoints |
 | `Makie.HLines` | `:hlines` | `:pairs`, per line | each line's rendered span (`xmin`/`xmax` fractions of the axis; default 0–1 is the full limits; re-resolved on limit changes) |

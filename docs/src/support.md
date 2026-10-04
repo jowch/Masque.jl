@@ -68,6 +68,7 @@ and the last two columns say which also work on `Axis3` and
 | `linesegments!` | `:segments` | `:segments` | yes | yes |
 | `wireframe!` | `:wireframe` | `:segments` | yes | — |
 | `arrows3d!` (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
+| `arrows2d!` (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
 | `heatmap!` / `image!` | `:cells` | `:grid` | — | — |
 | `barplot!` | `:bars` | `:rects` | — | — |
 | `poly!` | `:poly` | `:polygons` | — | — |
