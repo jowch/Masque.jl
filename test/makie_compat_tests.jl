@@ -123,6 +123,7 @@
         @test_throws DomainError Masque._apply_transform(log10, Makie.Point3(-1.0, 1.0, 0.0))   # pass-through preserved
         @test_throws r"^Masque: Makie internal `scaled_color`" Masque._scaled_color(nothing)
         @test_throws r"^Masque: Makie internal `scaled_colorrange`" Masque._scaled_colorrange(nothing)
+        @test_throws r"^Masque: Makie internal `DataShader canvas`" Masque._datashader_aggregate(nothing)
         @test_throws r"^Masque: Makie internal `raw_colormap`" Masque._raw_colormap(nothing)
     end
 
@@ -173,5 +174,16 @@
             error("USER CALLBACK BOOM")
         end
         @test_throws "USER CALLBACK BOOM" Masque._finalize!(fig2)
+    end
+
+    @testset "_datashader_aggregate reads a datashader's canvas (#276)" begin
+        fd = Figure(; size = (300, 200)); ad = Axis(fd[1, 1])
+        ds = datashader!(ad, Makie.Point2f[(0, 0), (1, 1), (1, 1), (2, 0.5)])
+        Masque._finalize!(fd)
+        img = only(Masque._child_plots(ds))
+        agg = Masque._datashader_aggregate(img)
+        @test agg isa AbstractMatrix{<:Real} && size(agg) == size(Masque._converted(img)[3])
+        @test sum(agg) == 4   # one count per point
+        @test Masque._datashader_aggregate(hm) === nothing   # not a datashader's image
     end
 end

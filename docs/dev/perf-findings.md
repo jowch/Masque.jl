@@ -64,7 +64,7 @@ manifest the MsgPack size.
 
 | Plot | PNG | manifest | note |
 |------|----:|---------:|------|
-| line, 10 pts | 51 KB | 0.5 KB | ~50 KB antialiasing and text floor for any plot |
+| line, 10 pts | 51 KB | 0.6 KB | ~50 KB antialiasing and text floor for any plot |
 | scatter, 100 | 35 KB | 4 KB | |
 | scatter, 1 000 | 188 KB | 38 KB | typical interactive plot |
 | scatter, 10 000 | 717 KB | 379 KB | manifest approaches PNG; both O(N) |
@@ -86,6 +86,12 @@ becomes a risk only at the extremes in "Stress".
   1.8 KB of `xy` in a 2.2 KB manifest, 1 000 vertices 17.6 KB in 18.0 KB (~18 B/vertex). The
   raster stays the empty-axis floor (9.8 KB). A view gesture rebuilds the manifest every frame,
   so a slice on a panned axis pays this again per camera move.
+- **Line samples** for the hover readout (`points`, section I, 2026-10-03, #262): a 2D line also
+  carries each sample as two Float32s (~10 B/sample), beside its integer-pixel geometry
+  (~6 B/vertex). That makes a line layer about 2.7× its geometry alone: 100 samples is 1.0 KB of
+  `points` in a 2.0 KB manifest, 1 000 is 9.8 KB in 15.8 KB, 10 000 is 98 KB in 156 KB. That stays
+  under a 10 000-point scatter's 379 KB. Date and category axes carry text instead, which is larger
+  per sample. Axis3 lines carry none.
 - **Not display width.** `px_per_unit` scales the PNG roughly with the square of the width but
   leaves the manifest alone: scatter-1000's PNG is 90 KB at 300 px and 188 KB at 700 px, its
   manifest 38 KB at both.

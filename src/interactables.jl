@@ -69,10 +69,15 @@ struct HitLayer
     label::Union{Nothing, String}
     colors::Any
     links::Union{Nothing, Vector{Vector{Symbol}}}
+    # :lines on a 2D axis: per element, the data samples `[x1, y1, x2, y2, …]` a hover readout
+    # snaps to, and the staircase `step` mode when the drawn path adds corners between them.
+    points::Union{Nothing, Vector}
+    step::Union{Nothing, Symbol}
 end
 HitLayer(id, kind, geometry, payloads, axis, events) = HitLayer(id, kind, geometry, payloads, axis, events, nothing, nothing, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label) = HitLayer(id, kind, geometry, payloads, axis, events, label, nothing, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors) = HitLayer(id, kind, geometry, payloads, axis, events, label, colors, nothing)
+HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links) = HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, nothing, nothing)
 
 """
     AbstractInteractable
@@ -174,6 +179,8 @@ _proj(ctx, ax, p) = data_to_image_px(ctx, ax, p)
 
 # Points widen to Point3f (z=0 for 2-coord input) so 2D and 3D geometry share one storage path.
 _pt3(p) = Point3f(p[1], p[2], length(p) >= 3 ? p[3] : 0)
+# Float64, for values shown as text: a date is milliseconds since year 1, past Float32's 7 digits.
+_pt3d(p) = Point3d(p[1], p[2], length(p) >= 3 ? p[3] : 0)
 
 # Round to Int (MsgPack encodes it far more compactly than Float32). `round(Int, NaN/Inf)`
 # throws, so non-finite values pass through as Float32 — NaN is the polyline gap sentinel
@@ -506,6 +513,7 @@ by the plot type):
 | `Makie.LineSegments` | `:segments` | `:pairs`, per segment | converted data |
 | `Makie.Wireframe` | `:wireframe` | `:pairs`, per edge | the child `LineSegments`' edges (incl. mesh-triangulation diagonals) |
 | `Makie.Arrows3D` | `:arrows3d` | `:pairs`, per shaft | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, z, u, v, w)` from `points`/`directions` |
+| `Makie.Arrows2D` | `:arrows2d` | `:pairs`, per arrow, tail to tip | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, u, v)` from `points`/`directions` |
 | `Makie.Errorbars` | `:errorbars` | `:pairs`, per bar | each bar's low→high endpoints |
 | `Makie.Rangebars` | `:rangebars` | `:pairs`, per bar | each bar's low→high endpoints |
 | `Makie.HLines` | `:hlines` | `:pairs`, per line | each line's rendered span (`xmin`/`xmax` fractions of the axis; default 0–1 is the full limits; re-resolved on limit changes) |
@@ -534,6 +542,10 @@ struct SegmentInteractable <: AbstractInteractable
     # means `vertices` is the single path.
     unit::Symbol
     paths::Union{Nothing, Vector{Vector{Point3f}}}
+    # The plot's own points per line, which a hover readout shows, with the staircase step mode
+    # when the drawn path adds a corner between samples. Placement (`translate!`, …) moves the
+    # drawn path, never these. `nothing` reads the samples from the path itself.
+    samples::Union{Nothing, Tuple{Union{Nothing, Symbol}, Vector{Vector{Point3d}}}}
 end
 function SegmentInteractable(
         ax, vertices; mode = :polyline, unit = :segment, id = :segments,
@@ -556,7 +568,7 @@ function SegmentInteractable(
     end
     return SegmentInteractable(
         ax, vs, mode, id, pl, Float64(tol), tooltip, nothing,
-        label === nothing ? nothing : String(label), unit, nothing,
+        label === nothing ? nothing : String(label), unit, nothing, nothing,
     )
 end
 # Internal-only: construct with a lazy `resolve(ax) -> vertices`. Called directly by the
@@ -569,7 +581,7 @@ function _segment_with_resolve(ax, vertices, mode, id, payloads, tol, resolve; t
     _check_tooltip(tooltip)
     return SegmentInteractable(
         ax, [_pt3(v) for v in vertices], mode, id, payloads, Float64(tol), tooltip, resolve,
-        label === nothing ? nothing : String(label), :segment, nothing,
+        label === nothing ? nothing : String(label), :segment, nothing, nothing,
     )
 end
 # One `:lines` layer whose elements are whole polylines (a `series!`, or any caller that
@@ -584,7 +596,7 @@ function _whole_lines(ax, paths, id, payloads, tol, label; tooltip = nothing)
     vs = n == 0 ? Point3f[] : ps[1]
     return SegmentInteractable(
         ax, vs, :polyline, id, pl, Float64(tol), tooltip, nothing,
-        label === nothing ? nothing : String(label), :line, ps,
+        label === nothing ? nothing : String(label), :line, ps, nothing,
     )
 end
 tooltip_spec(i::SegmentInteractable) = i.tooltip
@@ -596,6 +608,22 @@ function _flat_px(ctx, ax, vs)
     end
     return g
 end
+# One line's samples as `[x1, y1, x2, y2, …]`. On a categorical or date axis a coordinate is
+# shown as the label or date the user plotted, the same text a scatter's default payload holds.
+function _flat_data(ax, vs)
+    g = Float32[]
+    for v in vs
+        push!(g, v[1], v[2])
+    end
+    _converts_dim(ax) || return g
+    u = _unconvert_payloads(ax, Any[(; x = v[1], y = v[2]) for v in vs])
+    return Any[c for pl in u for c in (pl.x, pl.y)]
+end
+_converts_dim(ax) = any((:dim1_conversion, :dim2_conversion)) do d
+    hasproperty(ax, d) || return false
+    c = getproperty(ax, d)[]
+    return c isa Makie.CategoricalConversion || c isa Makie.DateTimeConversion
+end
 function hitlayers(i::SegmentInteractable, ctx)
     if i.unit === :line
         raw = if i.paths !== nothing
@@ -605,7 +633,16 @@ function hitlayers(i::SegmentInteractable, ctx)
             [vs]
         end
         geom = [_flat_px(ctx, i.ax, path) for path in raw]
-        return [HitLayer(i.id, :lines, geom, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
+        aid = axis_id(ctx, i.ax)
+        # The readout's samples. Axis3 has no 2D sample to show the cursor's position on a path.
+        points, step = if ctx.transforms[aid].is3d
+            nothing, nothing
+        elseif i.samples === nothing
+            [_flat_data(i.ax, path) for path in raw], nothing
+        else
+            [_flat_data(i.ax, path) for path in i.samples[2]], i.samples[1]
+        end
+        return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, step)]
     end
     vs = i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]
     kind = i.mode === :polyline ? :polyline : :segments

@@ -53,11 +53,14 @@ kind_sweep_meta() = [
         "key" => "lines", "layerId" => "lines", "layerKind" => "lines",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "curve", "hoverIndex" => 0, "hoverTip" => "curve", "mode" => "element",
+        # The hover readout at the third plotted point, (2.0, 0.4) (#262).
+        "readout" => Dict("vertex" => 2, "text" => ["x2", "y0.4"]),
     ),
     Dict(
         "key" => "series", "layerId" => "series", "layerKind" => "lines",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "series 1", "hoverIndex" => 1, "hoverTip" => "series 2", "mode" => "element",
+        "readout" => Dict("vertex" => 2, "text" => ["x3", "y1.5"]),
     ),
     Dict(
         "key" => "segments", "layerId" => "segments", "layerKind" => "segments",
@@ -150,6 +153,12 @@ kind_sweep_meta() = [
         "key" => "scatterlines3d", "layerId" => "scatterlines", "layerKind" => "circles",
         "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
+        # `arrows2d!` (#274): each arrow is one segment from tail to tip.
+        "key" => "arrows2d", "layerId" => "arrows2d", "layerKind" => "segments",
+        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "index", "hoverIndex" => 1, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
         # One band is one element, so nothing is baked selected and hover takes element 0.
@@ -561,6 +570,15 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:scatterlines => [2]))
     end
 
+    arrows2d = let
+        fig = Figure(size = (480, 320))
+        ax = Axis(fig[1, 1]; title = "arrows2d", limits = (0, 5, 0, 6))
+        apts = Makie.Point2f[(1, 1), (3, 2), (2, 4)]
+        adirs = Makie.Vec2f[(1.5, 0), (0, 2), (1.5, 1)]
+        arrows2d!(ax, apts, adirs; color = :gray)
+        masque(fig; selected = Dict(:arrows2d => [1]))
+    end
+
     # direction = :y draws the transpose of the band's converted points, #247. Values run
     # along x, so a hit ring left unflipped would sit across the axis from the drawn band.
     band_y = let
@@ -807,7 +825,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d, band_y, hexbin, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d, arrows2d, band_y, hexbin, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto,
     )
 end

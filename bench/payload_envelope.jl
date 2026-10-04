@@ -233,4 +233,21 @@ let
         )
     end
 end
+println("\n=== I. line readout samples — data-space Float32 x, y beside integer-px geometry ===")
+# A 2D `lines` layer ships each path's data samples (`points`) so the hover readout shows the
+# plotted value, not one inverted from rounded pixels (#262). Each sample is two Float32s
+# (5 B each on the wire); the drawn geometry is integer pixels (1-3 B per coordinate).
+let
+    for n in (100, 1_000, 10_000)
+        f = Figure(size = (600, 400)); ax = Axis(f[1, 1])
+        lines!(ax, 1:n, cumsum(randn(n)))
+        w = masque(f)
+        layer = only(filter(l -> l["kind"] == "lines", w.manifest["layers"]))
+        g_b, p_b = mp(layer["geometry"]), mp(layer["points"])
+        @printf(
+            "  %-40s  manifest=%7s KB   geometry=%7s KB   points=%7s KB  (×%.1f)\n",
+            "lines, $n pts", kb(mp(w.manifest)), kb(g_b), kb(p_b), (g_b + p_b) / g_b,
+        )
+    end
+end
 println()

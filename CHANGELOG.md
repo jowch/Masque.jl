@@ -10,6 +10,13 @@ All notable changes to this project are documented here. The format is based on
 - `scatterlines!` on an `Axis3` responds to hover and click, with the same `:scatterlines`
   (markers) and `:scatterlines_line` (line) layers it gives on a 2D `Axis`. Before, `masque`
   skipped it with a warning.
+- `arrows2d!` (and `arrows!` on a 2D `Axis`) responds to hover and click: each arrow is one
+  element of an `:arrows2d` layer, hit along the drawn arrow from tail to tip, with payload
+  `(; index, x, y, u, v)`. Before, `masque` made no layer for it.
+- Hovering a line from `lines!`, `stairs!`, `series!`, or `scatterlines!` shows `x` and `y`
+  of the plotted point nearest the pointer along the line, and a tooltip template can name
+  `x`, `y`, and `i`, that point's index. Clicks and the `@bind` value still pick the whole
+  line. Lines on an `Axis3` are unchanged (#262).
 
 ### Fixed
 - The 0.2 deprecations now show their warning in Pluto and the REPL. Before, Julia showed
@@ -25,6 +32,9 @@ All notable changes to this project are documented here. The format is based on
   no longer needs `covers = []` when `auto = false` leaves those plots out of the widget,
   where `masque` used to raise an error. A layer you name in `covers` yourself must still be
   in the call.
+- Hovering a `datashader!` pixel shows how many points fell in it. Before, with the default
+  `operation`, it showed the histogram-equalized colour value, a number near 1 such as
+  `0.99998`.
 - An `interactables` method for your own plot type no longer needs an `id` keyword:
   `Masque.interactables(ax, p::MyPlot)` works, and `masque` names the layers it returns after
   the plot. Before, `masque` said it had no default for the plot type. A caller's keyword the

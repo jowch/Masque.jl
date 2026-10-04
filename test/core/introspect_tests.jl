@@ -163,6 +163,19 @@ end
             @test_throws ArgumentError masque(f; selected = Dict(:lines => [2]))
             ev = Masque.APD.Bonds.transform_value(w, Dict("layer" => "lines", "index" => 0))
             @test ev isa ElementEvent && ev.index == 1 && ev.payload == (; index = 1)
+            # #262: each line ships its data samples for the hover readout; a gap stays a gap.
+            @test L.points == [Float32[0, 0, 1, 2, 2, 1, 3, 3]] && L.step === nothing
+            @test isequal(Lg.points, [Float32[0, 0, NaN, NaN, 2, 1]])
+            @test line["points"] == [Float32[0, 0, 1, 2, 2, 1, 3, 3]] && !haskey(line, "step")
+            # A template may name the readout's fields; any other unknown field still errors.
+            wt = masque(f, SegmentInteractable(a, pl; id = :tl, tooltip = masque"$(i): $(x), $(y)"))
+            @test haskey(only(filter(d -> d["id"] == "tl", wt.manifest["layers"])), "template")
+            @test_throws ArgumentError masque(f, SegmentInteractable(a, pl; id = :tl, tooltip = masque"$(z)"))
+            # Axis3 has no 2D readout, so it ships no samples.
+            f3 = Figure(size = (400, 300)); a3 = Axis3(f3[1, 1])
+            p3 = lines!(a3, [0.0, 1.0], [0.0, 1.0], [0.0, 1.0])
+            _, _, c3 = ctx_for(f3)
+            @test only(hitlayers(SegmentInteractable(a3, p3), c3)).points === nothing
         end
 
         @testset "heatmap/image -> GridInteractable, incl. EndPoints expansion" begin
@@ -572,10 +585,10 @@ end
                 )
                 px(k) = (c = center(k); img[round(Int, c[2]), round(Int, c[1])])
                 @test px(argmax(v)) != px(findfirst(iszero, v))
-                # With the default `operation`, the value is the histogram-equalized colour
-                # value, not the count (#276).
+                # With the default `operation` the value is still the count, not the
+                # histogram-equalized colour value (#276).
                 Ld, _ = layers(a -> datashader!(a, pts))
-                @test_broken sum(Ld[1]["geometry"]["values"]) == length(pts)
+                @test sum(Ld[1]["geometry"]["values"]) == length(pts)
             end
         end
 
@@ -638,6 +651,10 @@ end
         @test only(interactables(ac, sc; payloads = ["p", "q", "r"])).payloads == ["p", "q", "r"]
         m = masque(fc).manifest
         @test only(filter(l -> l["id"] == "scatter", m["layers"]))["payloads"][2].x == "b"
+        # A line's hover readout shows the same text (#262).
+        ld = lines!(ad, Dates.Date(2024, 1, 1) .+ Dates.Day.(0:2), [1.0, 2.0, 3.0])
+        _, _, cd = ctx_for(fd)
+        @test only(hitlayers(built(ad, ld), cd)).points == [Any["2024-01-01", 1.0f0, "2024-01-02", 2.0f0, "2024-01-03", 3.0f0]]
         # the plot-object constructors fill their default payloads the same way
         @test [p.x for p in PointInteractable(ad, sd).payloads] == ["2024-01-01", "2024-01-02", "2024-01-03"]
         @test [p.x for p in PolygonInteractable(ac, vc).payloads] == ["a", "b"]
@@ -699,6 +716,15 @@ end
             @test i.payloads[1] == (; index = 1, x = 1.0, y = 1.0)
             img = Makie.colorbuffer(f; px_per_unit = c.scaling)
             @test all(q -> drawn_near(img, q...; tol = 2), centers(only(hitlayers(i, c))))
+        end
+        @testset "translate!: a line's readout keeps the data (#262)" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 8, 0, 7))
+            p = lines!(a, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
+            translate!(p, 2, 1, 0)
+            _, _, c = ctx_for(f)
+            L = only(hitlayers(built(a, p), c))
+            @test L.points == [Float32[1, 1, 2, 2, 3, 3]]
+            @test L.geometry == only(hitlayers(SegmentInteractable(a, [(3, 2), (4, 3), (5, 4)]; unit = :line), c)).geometry
         end
         @testset "translate! on a log axis moves in the axis's scale" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1]; yscale = log10, limits = (0, 4, 1, 1000))
@@ -851,6 +877,18 @@ end
             img = Makie.colorbuffer(f; px_per_unit = 2.0)
             g = only(L.geometry)
             @test drawn_near(img, g[3], g[4])   # a corner of the staircase
+            # The readout snaps to the 4 input points, not the corners, so they ship with the step mode.
+            @test L.points == [Float32[0, 0, 1, 2, 2, 1, 3, 3]] && L.step === :pre
+            @test only(hitlayers(SegmentInteractable(a, stairs!(a, 0:2, [1, 2, 3]; step = :center)), c)).step === :center
+            # Every drawn vertex sits on the step of the sample the overlay maps it to
+            # (frontend/src/geometry.ts `lineReadout`): the next sample for `pre`, its own otherwise.
+            for mode in (:pre, :post, :center)
+                q = stairs!(a, [0.0, 1.0, 2.0, 3.0], [0.0, 2.0, 1.0, 3.0]; step = mode)
+                drawn = Masque._converted(Masque._childof(q, Makie.Lines))[1]
+                ys = only(only(hitlayers(SegmentInteractable(a, q), c)).points)[2:2:end]
+                sample(v) = (mode === :pre ? cld(v, 2) : fld(v, 2)) + 1
+                @test all(drawn[v + 1][2] == ys[sample(v)] for v in 0:(length(drawn) - 1))
+            end
         end
 
         @testset "errorbars/rangebars -> Segment(:pairs)" begin
@@ -1088,6 +1126,7 @@ end
             @test all(g -> length(g) == 8, L.geometry)   # 4 vertices × (x, y), not 3 segments each
             @test L.payloads[2].index == 2
             @test L.payloads[2].label == "series 2"
+            @test L.points[2] == Float32[1, 3.0, 2, 2.4, 3, 1.2, 4, 1.5]   # series 2's samples (x = 1:4)
             w = masque(f)
             ev = Masque.APD.Bonds.transform_value(w, Dict("layer" => "series", "index" => 1))
             @test ev isa ElementEvent && ev.index == 2 && ev.layer === :series
@@ -1152,6 +1191,76 @@ end
         ints = interactables(fig)
         @test length(ints) == 1 && ints[1] isa RectInteractable
         @test only(hitlayers(ints[1], c)).id === :crossbar
+    end
+
+    @testset "Arrows2D extraction: one segment per arrow, tail to tip (#274)" begin
+        using Masque: SegmentInteractable, interactables
+        isred(c) = Float64(Makie.red(c)) > 0.6 && Float64(Makie.green(c)) < 0.4 && Float64(Makie.blue(c)) < 0.4
+        function red_near(img, cx, cy; tol = 3)
+            ih, iw = size(img)
+            x, y = round(Int, cx), round(Int, cy)
+            for dy in -tol:tol, dx in -tol:tol
+                xx, yy = x + dx, y + dy
+                (1 <= xx <= iw && 1 <= yy <= ih) || continue
+                isred(img[yy, xx]) && return true
+            end
+            return false
+        end
+        # each end of every drawn segment, pulled `back` image px toward the other end, is on
+        # the drawn arrow: the start on the shaft, the end just inside the head's point
+        function on_arrows(L, img; back = 3)
+            g = L.geometry
+            all(0:(length(g) ÷ 4 - 1)) do k
+                x1, y1, x2, y2 = g[4k + 1], g[4k + 2], g[4k + 3], g[4k + 4]
+                len = hypot(x2 - x1, y2 - y1)
+                ux, uy = (x2 - x1) / len, (y2 - y1) / len
+                red_near(img, x1 + back * ux, y1 + back * uy) &&
+                    red_near(img, (x1 + x2) / 2, (y1 + y2) / 2) &&
+                    red_near(img, x2 - back * ux, y2 - back * uy)
+            end
+        end
+
+        pts = Point2f[(1, 1), (3, 2), (2, 4)]
+        dirs = Vec2f[(1, 0), (0, 1.5), (-1, -1)]
+        fig = Figure(size = (500, 400)); ax = Axis(fig[1, 1]; limits = (0, 5, 0, 6))
+        arrows2d!(ax, pts, dirs; color = :red)
+        Makie.update_state_before_display!(fig)
+        si = only(@test_logs interactables(fig))       # no logs: the pixel-space Poly isn't walked
+        @test si isa SegmentInteractable && si.id === :arrows2d
+        @test si.payloads[2] == (; index = 2, x = 3.0, y = 2.0, u = 0.0, v = 1.5)
+        @test si.tol == 7.0                            # half the default 14px head width
+        _, ppu, ctx = ctx_for(fig)
+        L = only(hitlayers(si, ctx))
+        @test L.kind === :segments && length(L.geometry) == 12
+        img = Makie.colorbuffer(fig; px_per_unit = ppu)
+        @test on_arrows(L, img)
+        # the segment runs from the plotted point to point + direction (align = :tail)
+        ref = only(hitlayers(SegmentInteractable(ax, [(1.0, 1.0), (2.0, 1.0)]; mode = :pairs), ctx))
+        @test L.geometry[1:4] ≈ ref.geometry
+
+        # align and lengthscale move the drawn arrow; the segment follows it, payloads keep
+        # the plotted values
+        fig2 = Figure(size = (500, 400)); ax2 = Axis(fig2[1, 1]; limits = (0, 5, 0, 6))
+        arrows2d!(ax2, pts, Vec2f(1, 1); align = :center, lengthscale = 1.5, color = :red)
+        Makie.update_state_before_display!(fig2)
+        si2 = only(@test_logs interactables(fig2))
+        @test si2.payloads[3] == (; index = 3, x = 2.0, y = 4.0, u = 1.0, v = 1.0)
+        _, ppu2, ctx2 = ctx_for(fig2)
+        L2 = only(hitlayers(si2, ctx2))
+        ref2 = only(hitlayers(SegmentInteractable(ax2, [(0.25, 0.25), (1.75, 1.75)]; mode = :pairs), ctx2))
+        @test L2.geometry[1:4] ≈ ref2.geometry
+        @test on_arrows(L2, Makie.colorbuffer(fig2; px_per_unit = ppu2))
+
+        # 2D arrows on Axis3 are skipped with a warning, not misplaced
+        f3 = Figure(); ax3 = Axis3(f3[1, 1])
+        arrows2d!(ax3, pts, dirs)
+        Makie.update_state_before_display!(f3)
+        @test isempty(@test_logs (:warn, r"arrows2d on Axis3") match_mode = :any interactables(f3))
+        # and on PolarAxis, through the same gate
+        fp = Figure(); axp = PolarAxis(fp[1, 1])
+        arrows2d!(axp, pts, dirs)
+        Makie.update_state_before_display!(fp)
+        @test isempty(@test_logs (:warn, r"arrows2d on PolarAxis") match_mode = :any interactables(fp))
     end
 
     @testset "Band extraction" begin
@@ -1615,6 +1724,16 @@ end
                 SegmentInteractable(c, ar; tooltip = tpl, label = "L"),
             )
             check(i, hctx)
+        end
+    end
+
+    @testset "datashader hover reads the count, whatever its operation (#276)" begin
+        pts = Point2f[(0, 0), (1, 1), (1, 1), (2, 0.5)]
+        for kw in ((;), (; operation = identity), (; local_operation = log1p))
+            f = Figure(; size = (500, 350)); a = Axis(f[1, 1])
+            datashader!(a, pts; kw...)
+            v = only(masque(f).manifest["layers"])["geometry"]["values"]
+            @test sort(unique(v)) == [0, 1, 2] && sum(v) == 4
         end
     end
 end

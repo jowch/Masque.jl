@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles,
-    anchorFor, computeAnchoredPlacement, photoClip,
+    anchorFor, computeAnchoredPlacement, photoClip, lineReadout,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
 import { begin as beginView, tip as viewTip, limitsTip } from "../src/drag/view"
@@ -937,5 +937,61 @@ describe("drag labels follow tooltip_sigdigits and keep trailing zeros", () => {
     })
     it("limitsTip formats each bound at the given digits", () => {
         expect(limitsTip({ xmin: 0.123456, xmax: 2, ymin: -3.5, ymax: 40 }, 2)).toBe("x:[0.12, 2.0] y:[-3.5, 40]")
+    })
+})
+
+// #262: a line hover reads out the nearest real sample, never an interpolated point.
+describe("lineReadout", () => {
+    const layer = (geometry: number[][], points: number[][], step?: HitLayer["step"]): HitLayer => ({
+        id: "l", kind: "lines", geometry, payloads: [{ index: 1 }], axis: "ax1", events: ["hover"], points, ...(step ? { step } : {}),
+    })
+
+    it("takes the nearer end of the edge under the cursor", () => {
+        const L = layer([[0, 100, 100, 100, 200, 100]], [[1, 5, 2, 6, 3, 7]])
+        expect(lineReadout(L, 0, 40, 95)).toEqual([0, 1, 5])
+        expect(lineReadout(L, 0, 60, 95)).toEqual([1, 2, 6])
+        expect(lineReadout(L, 0, 190, 105)).toEqual([2, 3, 7])
+    })
+
+    it("follows the path, so a curve that doubles back in x keeps the branch under the cursor", () => {
+        // Out along y = 0 to x = 100, then back along y = 50. A cursor near the upper branch at
+        // x = 10 reads the return trip's last sample, though the first sample is nearer in x.
+        const L = layer([[0, 0, 100, 0, 100, 50, 0, 50]], [[0, 0, 10, 0, 10, 5, 0, 5]])
+        expect(lineReadout(L, 0, 10, 48)).toEqual([3, 0, 5])
+    })
+
+    it("skips gaps and returns null without points", () => {
+        const L = layer([[0, 0, 100, 0, NaN, NaN, 200, 0, 300, 0]], [[0, 0, 1, 0, NaN, NaN, 2, 0, 3, 0]])
+        expect(lineReadout(L, 0, 290, 0)).toEqual([4, 3, 0])
+        expect(lineReadout({ ...L, points: undefined }, 0, 290, 0)).toBeNull()
+    })
+
+    // Makie's step points for samples (0,0), (1,1), (2,2), image px = 100·data with y down.
+    it("snaps a staircase to its samples, not its corners", () => {
+        const samples = [0, 0, 1, 1, 2, 2]
+        // pre: the riser comes first, so a plateau ends on its own sample.
+        const pre = layer([[0, 0, 0, -100, 100, -100, 100, -200, 200, -200]], [samples], "pre")
+        expect(lineReadout(pre, 0, 10, -100)).toEqual([1, 1, 1]) // plateau start: corner 1 → sample 1
+        expect(lineReadout(pre, 0, 0, -20)).toEqual([0, 0, 0])   // low on the first riser
+        // post: the plateau comes first, so it starts on its own sample.
+        const post = layer([[0, 0, 100, 0, 100, -100, 200, -100, 200, -200]], [samples], "post")
+        expect(lineReadout(post, 0, 90, 0)).toEqual([0, 0, 0])   // plateau end: corner 1 → sample 0
+        expect(lineReadout(post, 0, 100, -90)).toEqual([1, 1, 1]) // high on the riser
+        // center: the risers sit halfway between samples, and the ends are samples.
+        const center = layer([[0, 0, 50, 0, 50, -100, 150, -100, 150, -200, 200, -200]], [samples], "center")
+        expect(lineReadout(center, 0, 140, -100)).toEqual([1, 1, 1])
+        expect(lineReadout(center, 0, 190, -200)).toEqual([2, 2, 2])
+    })
+
+    it("returns null when the path has no edge or the samples run short", () => {
+        expect(lineReadout(layer([[50, 50]], [[1, 1]]), 0, 50, 50)).toBeNull()
+        expect(lineReadout(layer([[0, 0, 100, 0]], [[1, 1]]), 0, 95, 0)).toBeNull()
+        expect(lineReadout(layer([[0, 0, 100, 0]], [[1, 1, NaN, 2]]), 0, 95, 0)).toBeNull()
+    })
+
+    it("a hover hit carries the readout", () => {
+        const L = layer([[0, 100, 100, 100, 200, 100]], [[1, 5, 2, 6, 3, 7]])
+        expect(hitLayer(L, 95, 102)?.pt_).toEqual([1, 2, 6])
+        expect(hitLayer({ ...L, points: undefined }, 95, 102)?.pt_).toBeUndefined()
     })
 })
