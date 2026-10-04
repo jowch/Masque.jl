@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `scatterlines!` on an `Axis3` responds to hover and click, with the same `:scatterlines`
+  (markers) and `:scatterlines_line` (line) layers it gives on a 2D `Axis`. Before, `masque`
+  skipped it with a warning.
+
 ### Fixed
 - The 0.2 deprecations now show their warning in Pluto and the REPL. Before, Julia showed
   them only when it ran with `--depwarn=yes`, so a notebook still using `CairoBackend(…)`,
