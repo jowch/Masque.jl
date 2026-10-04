@@ -130,14 +130,9 @@ probe = SliceInteractable(ax; series = [(; id = :wide, x = xs, y = ys)])
 
 A marker or colorbar in the same widget keeps its own tooltip, and
 hovering a marker hides the slice's line. A slice replaces the hover
-highlight of the line layers it covers, and by default it covers each
-plot you passed it by that plot's layer id, such as `:lines`,
-`:stairs`, or `:band`, with `_2` added when a type repeats. Those ids
-are counted among the plots you passed to the slice, not among every
-plot on the axis. So if you slice only the second of two `lines!`
-plots, its id in the widget is `:lines_2` but the slice assumes
-`:lines`, and the line you sliced still shows its own hover highlight.
-To fix that, pass the layer yourself with `covers = [:lines_2]`.
+highlight of the plots you passed it, whatever their ids in the widget.
+For a slice built from series, or to cover different layers, list them in
+`covers`, such as `covers = [:lines_2]`.
 
 A slice needs a 2D `Axis`; see [Supported plots and axes](@ref) for
 which axes and scales.

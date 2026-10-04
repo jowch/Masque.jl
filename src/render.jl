@@ -162,14 +162,14 @@ function _selection_spec(interactables, layers)
     return (mode = kind === :grid ? "grid" : "elements", target = target)
 end
 
-# A slice from plots covers those plots' default layers unless told otherwise. With `auto =
-# false` those layers are not in the call, and there is nothing to cover: drop them. Covers the
-# caller named stay, so `_validate_slices` still reports a missing one.
+# A slice from plots covers the layers `_assemble` found for them unless told otherwise. Keep
+# the coverable ones in this call. Covers the caller named stay, so `_validate_slices` still
+# reports a missing or uncoverable one.
 function _drop_absent_default_covers!(built)
-    ids = Set(d["id"] for (_, _, d) in built)
+    kinds = Dict(d["id"] => d["kind"] for (_, _, d) in built)
     for (i, _, d) in built
-        i isa SliceInteractable && i.covers_default || continue
-        filter!(in(ids), d["geometry"]["covers"])
+        i isa SliceInteractable && !isempty(i.cover_plots) || continue
+        filter!(c -> get(kinds, c, nothing) in ("lines", "polygons"), d["geometry"]["covers"])
     end
     return nothing
 end

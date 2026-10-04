@@ -152,7 +152,7 @@ end
         @test_throws ArgumentError build_manifest([missing], ctx)
     end
 
-    @testset "default covers skip layers not in the call (#271)" begin
+    @testset "default covers follow the plots, skip layers not in the call (#271)" begin
         fl = Figure(); axl = Axis(fl[1, 1])
         a = lines!(axl, [0.0, 1.0, 2.0], [0.0, 1.0, 0.0])
         b = lines!(axl, [0.0, 1.0, 2.0], [1.0, 0.0, 1.0])
@@ -164,6 +164,14 @@ end
         w = masque(fl, SliceInteractable(axl, [a, b]))
         sl = only(filter(L -> L["kind"] == "slice", w.manifest["layers"]))
         @test sl["geometry"]["covers"] == ["lines", "lines_2"]
+        # Covers follow the plot, not its place in the vector: the second line alone is :lines_2.
+        w = masque(fl, SliceInteractable(axl, b))
+        sl = only(filter(L -> L["kind"] == "slice", w.manifest["layers"]))
+        @test sl["geometry"]["covers"] == ["lines_2"]
+        # A line passed as `interactables(plot)` under its own id is covered under that id.
+        w = masque(fl, interactables(b; id = :trend), SliceInteractable(axl, b); auto = false)
+        sl = only(filter(L -> L["kind"] == "slice", w.manifest["layers"]))
+        @test sl["geometry"]["covers"] == ["trend"]
         # Covers the caller names are checked as before.
         err = (@test_throws ArgumentError masque(fl, SliceInteractable(axl, [a, b]; covers = [:lines]); auto = false)).value
         @test occursin("not a layer in this masque() call", err.msg)
@@ -192,7 +200,7 @@ end
         Makie.update_state_before_display!(f)
         lines_slice = SliceInteractable(axp, [wide, narrow])
         @test lines_slice.orientation === :vertical
-        @test lines_slice.covers == [:lines, :lines_2]
+        @test lines_slice.covers == Symbol[] && lines_slice.cover_plots == [wide, narrow]
         @test [s.id for s in lines_slice.series] == [:wide, :narrow]
         @test lines_slice.series[1].y == [0.0, 1.0, 0.0]
         band_slice = SliceInteractable(axp, b; covers = ())
@@ -248,7 +256,7 @@ end
             Makie.update_state_before_display!(f)
             s = SliceInteractable(ax, p)
             @test s.orientation === :vertical
-            @test s.covers == [:stairs]
+            @test s.cover_plots == [p]
             xy = _packed(only(s.series), :vertical)
             if step === :pre
                 # (0,0),(0,2),(1,2),(1,1),(2,1),(2,3),(3,3) — constant between risers

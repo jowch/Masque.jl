@@ -1705,9 +1705,9 @@ committed. Produces one `:slice` [`HitLayer`](@ref), which is not a hit target.
   a `:polygons` or `:lines` layer (`ArgumentError` otherwise). While the pointer is over one
   of them the cursor stays `crosshair`, the polygon or line highlight is skipped, and the
   tooltip is the sample. Default `()` on the series constructor. On the plot constructor,
-  `nothing` (the default) names that plot's auto-extract layer id (`:density`, `:lines`,
-  `:series`, `:stairs`, `:band`, with `_2`, `_3`, … when a vector repeats a kind), and skips
-  any of those that are not in the `masque` call, as with `auto = false`.
+  `nothing` (the default) covers the `:lines` and `:polygons` layers that the passed plots
+  became in the `masque` call, whatever ids they have. A plot with no layer in the call (as
+  with `auto = false`) covers nothing.
 - `tooltip` — what the card says while this slice is the thing under the pointer (a covered
   layer, or empty axis interior inside at least one series). `nothing` is the auto table of the
   live sample (the probe coordinate plus one field per series id), `masque"…"` is a template
@@ -1743,12 +1743,12 @@ struct SliceInteractable <: AbstractInteractable
     covers::Vector{Symbol}
     tooltip::Union{Nothing, Markup, Bool}
     crosshair::Bool
-    # `covers` came from the plot constructor's default, not the caller: a covered layer
-    # missing from the `masque` call (`auto = false`) is dropped rather than an error.
-    covers_default::Bool
+    # The plots the plot constructor's default covers. `masque` looks up the layers they
+    # became and sets `covers` to those; empty when the caller passed `covers` or series.
+    cover_plots::Vector{Any}
 end
 SliceInteractable(ax, orientation, series, id, covers, tooltip, crosshair) =
-    SliceInteractable(ax, orientation, series, id, covers, tooltip, crosshair, false)
+    SliceInteractable(ax, orientation, series, id, covers, tooltip, crosshair, Any[])
 
 function _slice_covers(covers)
     covers isa Symbol && return Symbol[covers]
