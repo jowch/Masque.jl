@@ -30,6 +30,11 @@ using HypertextLiteral: HypertextLiteral, @htl
 import AbstractPlutoDingetjes
 const APD = AbstractPlutoDingetjes
 
+# Every deprecation warns through here. Plain `Base.depwarn` logs only under `--depwarn=yes`,
+# which `Pkg.test` sets and Pluto and the REPL do not, so a notebook user would never see it.
+# `force = true` logs it anyway, once per call site; `--depwarn=error` still throws.
+_deprecate(msg, funcsym) = Base.depwarn(msg, funcsym; force = true)
+
 """
     AbstractBackend
 
