@@ -123,6 +123,7 @@
         @test_throws DomainError Masque._apply_transform(log10, Makie.Point3(-1.0, 1.0, 0.0))   # pass-through preserved
         @test_throws r"^Masque: Makie internal `scaled_color`" Masque._scaled_color(nothing)
         @test_throws r"^Masque: Makie internal `scaled_colorrange`" Masque._scaled_colorrange(nothing)
+        @test_throws r"^Masque: Makie internal `DataShader canvas`" Masque._datashader_aggregate(nothing)
         @test_throws r"^Masque: Makie internal `raw_colormap`" Masque._raw_colormap(nothing)
     end
 
