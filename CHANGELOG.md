@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `scatterlines!` on an `Axis3` responds to hover and click, with the same `:scatterlines`
+  (markers) and `:scatterlines_line` (line) layers it gives on a 2D `Axis`. Before, `masque`
+  skipped it with a warning.
 - `arrows2d!` (and `arrows!` on a 2D `Axis`) responds to hover and click: each arrow is one
   element of an `:arrows2d` layer, hit along the drawn arrow from tail to tip, with payload
   `(; index, x, y, u, v)`. Before, `masque` made no layer for it.
@@ -19,6 +22,11 @@ All notable changes to this project are documented here. The format is based on
 - After a page reload, the highlighted selection matches the value Pluto restored to the
   `@bind` variable. Before, it showed the `selected=` element while the variable held your
   last click, so the next click could clear the selection instead of making it (#272).
+- An `interactables` method for your own plot type no longer needs an `id` keyword:
+  `Masque.interactables(ax, p::MyPlot)` works, and `masque` names the layers it returns after
+  the plot. Before, `masque` said it had no default for the plot type. A caller's keyword the
+  method does not take, as in `interactables(p; tooltip = …)`, now fails with an error that
+  names the plot type and says to add `; kwargs...`, not a bare `MethodError`.
 
 ## [0.2.0] - 2026-10-03
 

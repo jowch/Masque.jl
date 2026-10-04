@@ -74,6 +74,17 @@ matches a layer that `masque(fig)` builds on its own replaces that
 layer instead of raising this error; see
 [Adding to what `masque(fig)` builds](@ref).
 
+### Passed a keyword your plot type's `interactables` method does not take
+
+**Error prefix:** `masque: the interactables method for`
+
+**Cause:** a call such as `interactables(d; tooltip = …)` passes its
+keywords to the method you defined for your plot type, and a method
+written as `Masque.interactables(ax, p::MyPlot)` takes none of them.
+
+**Fix:** add `; kwargs...` to the method's signature and pass
+`kwargs...` on to the constructors; see [Writing the method](@ref).
+
 ### Tried `mode` or `orientation` other than the two valid symbols
 
 **Error prefix:** `mode must be :polyline or :pairs` /

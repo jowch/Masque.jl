@@ -1206,11 +1206,11 @@ function _skip_for_axis(ax, p)
     if ax isa Makie.Axis3 && !(
             p isa Union{
                 Makie.Scatter, Makie.Lines, Makie.LineSegments,
-                Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D,
+                Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D, Makie.ScatterLines,
             }
         )
         @warn "masque: skipping $(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/" *
-            "LineSegments/MeshScatter/Wireframe/Arrows3D have 3D-valid extraction today; " *
+            "LineSegments/MeshScatter/Wireframe/Arrows3D/ScatterLines have 3D-valid extraction today; " *
             "other kinds are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
         return true
     end
@@ -1290,7 +1290,7 @@ function _install_known!(d, ax, p)
     n = get(d.seen, base, 0) + 1
     d.seen[base] = n
     id = n == 1 ? base : Symbol(base, :_, n)
-    built = interactables(ax, p; id)
+    built = _plot_interactables(ax, p; id)
     if isempty(built) || all(i -> _nverts(i) == 0, built)
         if n == 1
             delete!(d.seen, base)
@@ -1408,8 +1408,8 @@ part of that list on one axis, with the same ids.
 On each axis the plot drawn last comes first. Where marks overlap, the first in the list gets
 the pointer, so it is the mark drawn on top.
 
-On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D` are
-supported; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
+On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D`/
+`ScatterLines` are supported; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
 Other kinds are skipped with a warning. A recipe with its own
 `Masque.interactables(ax, p::MyPlot)` method uses it. Any other recipe contributes each child
 that has a default (`arc!` is the `lines!` it draws), under that child's layer id. A child
