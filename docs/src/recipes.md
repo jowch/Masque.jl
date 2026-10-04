@@ -44,14 +44,14 @@ values. To make each row one mark that reports
 its values, add this method:
 
 ```julia
-function Masque.interactables(ax, p::Dumbbell; id = :dumbbell, payloads = nothing, kwargs...)
+function Masque.interactables(ax, p::Dumbbell; payloads = nothing, kwargs...)
     before, after = p.before[], p.after[]
     rows = [
         (; row = k, before = before[k], after = after[k], change = after[k] - before[k])
             for k in eachindex(before)
     ]
     bars = p.plots[1]
-    return interactables(ax, bars; id, payloads = something(payloads, rows), kwargs...)
+    return interactables(ax, bars; payloads = something(payloads, rows), kwargs...)
 end
 ```
 
@@ -78,10 +78,9 @@ the axis the plot is drawn in and the plot itself. The method returns a
 vector of interactables, built with the same constructors you would use
 in a `masque` call; see [Constructors](@ref).
 
-Give the first layer the `id` you receive. `masque` picks it from your
-plot function's name, so the first `dumbbell!` is `:dumbbell`, the
-second is `:dumbbell_2`, and `pick.layer` and `selected=` use these
-names.
+`masque` names the layer after your plot function, so the first
+`dumbbell!` is `:dumbbell`, the second is `:dumbbell_2`, and
+`pick.layer` and `selected=` use these names.
 
 Pass `kwargs...` on to the constructors. A caller who wants a different
 tooltip or payloads for one plot passes them with the plot:
@@ -91,9 +90,10 @@ d = dumbbell!(ax, before, after)
 @bind pick masque(fig, interactables(d; tooltip = masque"change $(change)"))
 ```
 
-Those keywords reach your method, and without `kwargs...` in its
-signature this call fails with a `MethodError`. The method above also takes `payloads`
-by name, so a caller's payloads replace the rows it builds.
+Those keywords reach your method, so without `kwargs...` in its
+signature this call fails with an error that names your plot type. The
+method above also takes `payloads` by name, so a caller's payloads
+replace the rows it builds.
 
 ## Hit size from the drawn plot
 
@@ -108,29 +108,29 @@ not draw as a plot of its own. Then you give the hit size yourself, as
 `radius` for points and `tol` for lines:
 
 ```julia
-function Masque.interactables(ax, p::Dumbbell; id = :dumbbell, kwargs...)
+function Masque.interactables(ax, p::Dumbbell; kwargs...)
     before, after = p.before[], p.after[]
     pairs = [Point2f(x, k) for k in eachindex(before) for x in (before[k], after[k])]
-    return [SegmentInteractable(ax, pairs; mode = :pairs, tol = 6, id, kwargs...)]
+    return [SegmentInteractable(ax, pairs; mode = :pairs, tol = 6, kwargs...)]
 end
 ```
 
 ## Several layers
 
 To make two parts of your plot respond separately, return a layer for
-each, and name every layer after the first from `id`, such as
-`Symbol(id, :_dots)`. A name that ends in a number, like
-`Symbol(id, :_2)`, clashes with the second plot of your type.
+each, and give every layer after the first a short name with `id`.
+`masque` puts your plot's name in front of it, so the layers below are
+`:dumbbell`, `:dumbbell_ends`, and `:dumbbell_bars`.
 
 Where two of your layers overlap, the pointer reaches the one that
 comes first in the vector, so put the part drawn on top first. This
 version makes each dot its own mark, ahead of the bar under it:
 
 ```julia
-function Masque.interactables(ax, p::Dumbbell; id = :dumbbell, kwargs...)
-    starts = interactables(ax, p.plots[2]; id, kwargs...)
-    ends = interactables(ax, p.plots[3]; id = Symbol(id, :_ends), kwargs...)
-    bars = interactables(ax, p.plots[1]; id = Symbol(id, :_bars), kwargs...)
+function Masque.interactables(ax, p::Dumbbell; kwargs...)
+    starts = interactables(ax, p.plots[2]; kwargs...)
+    ends = interactables(ax, p.plots[3]; id = :ends, kwargs...)
+    bars = interactables(ax, p.plots[1]; id = :bars, kwargs...)
     return vcat(starts, ends, bars)
 end
 ```
@@ -160,7 +160,7 @@ module MyPlotsMasqueExt
 
 using MyPlots, Masque
 
-function Masque.interactables(ax, p::MyPlots.Dumbbell; id = :dumbbell, payloads = nothing, kwargs...)
+function Masque.interactables(ax, p::MyPlots.Dumbbell; payloads = nothing, kwargs...)
     # as above
 end
 

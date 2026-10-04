@@ -1193,6 +1193,76 @@ end
         @test only(hitlayers(ints[1], c)).id === :crossbar
     end
 
+    @testset "Arrows2D extraction: one segment per arrow, tail to tip (#274)" begin
+        using Masque: SegmentInteractable, interactables
+        isred(c) = Float64(Makie.red(c)) > 0.6 && Float64(Makie.green(c)) < 0.4 && Float64(Makie.blue(c)) < 0.4
+        function red_near(img, cx, cy; tol = 3)
+            ih, iw = size(img)
+            x, y = round(Int, cx), round(Int, cy)
+            for dy in -tol:tol, dx in -tol:tol
+                xx, yy = x + dx, y + dy
+                (1 <= xx <= iw && 1 <= yy <= ih) || continue
+                isred(img[yy, xx]) && return true
+            end
+            return false
+        end
+        # each end of every drawn segment, pulled `back` image px toward the other end, is on
+        # the drawn arrow: the start on the shaft, the end just inside the head's point
+        function on_arrows(L, img; back = 3)
+            g = L.geometry
+            all(0:(length(g) ÷ 4 - 1)) do k
+                x1, y1, x2, y2 = g[4k + 1], g[4k + 2], g[4k + 3], g[4k + 4]
+                len = hypot(x2 - x1, y2 - y1)
+                ux, uy = (x2 - x1) / len, (y2 - y1) / len
+                red_near(img, x1 + back * ux, y1 + back * uy) &&
+                    red_near(img, (x1 + x2) / 2, (y1 + y2) / 2) &&
+                    red_near(img, x2 - back * ux, y2 - back * uy)
+            end
+        end
+
+        pts = Point2f[(1, 1), (3, 2), (2, 4)]
+        dirs = Vec2f[(1, 0), (0, 1.5), (-1, -1)]
+        fig = Figure(size = (500, 400)); ax = Axis(fig[1, 1]; limits = (0, 5, 0, 6))
+        arrows2d!(ax, pts, dirs; color = :red)
+        Makie.update_state_before_display!(fig)
+        si = only(@test_logs interactables(fig))       # no logs: the pixel-space Poly isn't walked
+        @test si isa SegmentInteractable && si.id === :arrows2d
+        @test si.payloads[2] == (; index = 2, x = 3.0, y = 2.0, u = 0.0, v = 1.5)
+        @test si.tol == 7.0                            # half the default 14px head width
+        _, ppu, ctx = ctx_for(fig)
+        L = only(hitlayers(si, ctx))
+        @test L.kind === :segments && length(L.geometry) == 12
+        img = Makie.colorbuffer(fig; px_per_unit = ppu)
+        @test on_arrows(L, img)
+        # the segment runs from the plotted point to point + direction (align = :tail)
+        ref = only(hitlayers(SegmentInteractable(ax, [(1.0, 1.0), (2.0, 1.0)]; mode = :pairs), ctx))
+        @test L.geometry[1:4] ≈ ref.geometry
+
+        # align and lengthscale move the drawn arrow; the segment follows it, payloads keep
+        # the plotted values
+        fig2 = Figure(size = (500, 400)); ax2 = Axis(fig2[1, 1]; limits = (0, 5, 0, 6))
+        arrows2d!(ax2, pts, Vec2f(1, 1); align = :center, lengthscale = 1.5, color = :red)
+        Makie.update_state_before_display!(fig2)
+        si2 = only(@test_logs interactables(fig2))
+        @test si2.payloads[3] == (; index = 3, x = 2.0, y = 4.0, u = 1.0, v = 1.0)
+        _, ppu2, ctx2 = ctx_for(fig2)
+        L2 = only(hitlayers(si2, ctx2))
+        ref2 = only(hitlayers(SegmentInteractable(ax2, [(0.25, 0.25), (1.75, 1.75)]; mode = :pairs), ctx2))
+        @test L2.geometry[1:4] ≈ ref2.geometry
+        @test on_arrows(L2, Makie.colorbuffer(fig2; px_per_unit = ppu2))
+
+        # 2D arrows on Axis3 are skipped with a warning, not misplaced
+        f3 = Figure(); ax3 = Axis3(f3[1, 1])
+        arrows2d!(ax3, pts, dirs)
+        Makie.update_state_before_display!(f3)
+        @test isempty(@test_logs (:warn, r"arrows2d on Axis3") match_mode = :any interactables(f3))
+        # and on PolarAxis, through the same gate
+        fp = Figure(); axp = PolarAxis(fp[1, 1])
+        arrows2d!(axp, pts, dirs)
+        Makie.update_state_before_display!(fp)
+        @test isempty(@test_logs (:warn, r"arrows2d on PolarAxis") match_mode = :any interactables(fp))
+    end
+
     @testset "Band extraction" begin
         using Masque: PolygonInteractable, interactables
         fig = Figure(); ax = Axis(fig[1, 1])

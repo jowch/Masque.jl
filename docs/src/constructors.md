@@ -92,6 +92,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Series` | `SegmentInteractable` | `index`; `label` when the series has one | `:series` |
 | `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | `segment_index` | `:segments`, `:errorbars`, … |
 | `Arrows3D` | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
+| `Arrows2D` | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |
 | `BarPlot` | `RectInteractable` | `low`, `high`, `value` | `:bars` |
 | `Hist` | `RectInteractable` | `value`, `low`, `high` | `:hist` |
 | `Waterfall` | `RectInteractable` | `low`, `high`, `value` | `:waterfall` |

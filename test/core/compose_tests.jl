@@ -15,6 +15,28 @@ function Masque.interactables(ax, p::ComposeDots; id = :composedots, kwargs...)
     return AbstractInteractable[PointInteractable(ax, p.positions[]; id, payloads = ["dot $k" for k in eachindex(p.positions[])], kwargs...)]
 end
 
+# #270: the natural first attempt at a recipe's method, with no keywords; one with two layers,
+# the second a brush aimed at the first; one that takes `id` but no other keyword; and one
+# whose body raises a MethodError of its own.
+Makie.@recipe NoKwDots (positions,) begin
+end
+Makie.plot!(p::NoKwDots) = (scatter!(p, p.positions); p)
+Masque.interactables(ax, p::NoKwDots) = AbstractInteractable[PointInteractable(ax, p.positions[])]
+Makie.@recipe BrushedDots (positions,) begin
+end
+Makie.plot!(p::BrushedDots) = (scatter!(p, p.positions); p)
+Masque.interactables(ax, p::BrushedDots) = AbstractInteractable[
+    PointInteractable(ax, p.positions[]), ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0), selects = :points),
+]
+Makie.@recipe IdOnlyDots (positions,) begin
+end
+Makie.plot!(p::IdOnlyDots) = (scatter!(p, p.positions); p)
+Masque.interactables(ax, p::IdOnlyDots; id) = AbstractInteractable[PointInteractable(ax, p.positions[]; id)]
+Makie.@recipe BrokenDots (positions,) begin
+end
+Makie.plot!(p::BrokenDots) = (scatter!(p, p.positions); p)
+Masque.interactables(ax, p::BrokenDots; id, kwargs...) = AbstractInteractable[PointInteractable(ax, p.positions[], "not a keyword")]
+
 ids(xs) = [i.id for i in xs]
 assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
 
@@ -187,5 +209,37 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test isempty(w.manifest["layers"])
         w = masque(f; selected = Dict(:scatter => [2]))
         @test only(filter(L -> L["id"] == "scatter", w.manifest["layers"]))["selected"] == [1]
+    end
+
+    @testset "a recipe method need not take `id` (#270)" begin
+        pts = Point2f[(1, 1), (2, 4)]
+        # Without keywords: `masque` names the layer after the plot, numbering the second.
+        f = Figure(); ax = Axis(f[1, 1])
+        nokwdots!(ax, pts); nokwdots!(ax, pts)
+        @test ids(assemble(f)) == [:nokwdots_2, :nokwdots]   # the plot drawn last comes first
+        @test [L["id"] for L in masque(f).manifest["layers"]] == ["nokwdots_2", "nokwdots"]
+        # The other layers add their own name, and a brush follows its target's new name.
+        f = Figure(); ax = Axis(f[1, 1])
+        brusheddots!(ax, pts)
+        built = assemble(f)
+        @test ids(built) == [:brusheddots, :brusheddots_roi]
+        @test Masque.selects(built[2]) === :brusheddots
+        # `id` through `interactables(plot; id)` names it too.
+        f = Figure(); ax = Axis(f[1, 1])
+        p = nokwdots!(ax, pts)
+        @test ids(assemble(f, interactables(p; id = :mine))) == [:mine]
+        # A caller's keyword the method does not take is named, with the fix.
+        err = (@test_throws ArgumentError assemble(f, interactables(p; tooltip = false))).value
+        @test occursin("NoKwDots", err.msg) && occursin("`tooltip`", err.msg) &&
+            occursin("; kwargs...", err.msg)
+        f = Figure(); ax = Axis(f[1, 1])
+        p = idonlydots!(ax, pts)
+        @test ids(assemble(f)) == [:idonlydots]
+        err = (@test_throws ArgumentError assemble(f, interactables(p; tooltip = false))).value
+        @test occursin("IdOnlyDots", err.msg) && occursin("`tooltip`", err.msg) && !occursin("`id`", err.msg)
+        # A MethodError from inside the method's own body is the user's, and passes through.
+        f = Figure(); ax = Axis(f[1, 1])
+        brokendots!(ax, pts)
+        @test_throws MethodError masque(f)
     end
 end
