@@ -59,14 +59,14 @@ This method makes each row one mark. It passes the recipe's bars, `p.plots[1]`, 
 """
 
 # ╔═╡ c5d1e7a0-0001-4000-8000-000000000003
-function Masque.interactables(ax, p::Dumbbell; id = :dumbbell, payloads = nothing, kwargs...)
+function Masque.interactables(ax, p::Dumbbell; payloads = nothing, kwargs...)
     before, after = p.before[], p.after[]
     rows = [
         (; row = k, before = before[k], after = after[k], change = after[k] - before[k])
             for k in eachindex(before)
     ]
     bars = p.plots[1]
-    return interactables(ax, bars; id, payloads = something(payloads, rows), kwargs...)
+    return interactables(ax, bars; payloads = something(payloads, rows), kwargs...)
 end
 
 # ╔═╡ c5d1e7a0-0001-4000-8000-000000000004

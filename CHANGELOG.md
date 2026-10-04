@@ -14,6 +14,11 @@ All notable changes to this project are documented here. The format is based on
 - After a page reload, the highlighted selection matches the value Pluto restored to the
   `@bind` variable. Before, it showed the `selected=` element while the variable held your
   last click, so the next click could clear the selection instead of making it (#272).
+- An `interactables` method for your own plot type no longer needs an `id` keyword:
+  `Masque.interactables(ax, p::MyPlot)` works, and `masque` names the layers it returns after
+  the plot. Before, `masque` said it had no default for the plot type. A caller's keyword the
+  method does not take, as in `interactables(p; tooltip = …)`, now fails with an error that
+  names the plot type and says to add `; kwargs...`, not a bare `MethodError`.
 
 ## [0.2.0] - 2026-10-03
 

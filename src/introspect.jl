@@ -1271,7 +1271,7 @@ function _install_known!(d, ax, p)
     n = get(d.seen, base, 0) + 1
     d.seen[base] = n
     id = n == 1 ? base : Symbol(base, :_, n)
-    built = interactables(ax, p; id)
+    built = _plot_interactables(ax, p; id)
     if isempty(built) || all(i -> _nverts(i) == 0, built)
         if n == 1
             delete!(d.seen, base)
