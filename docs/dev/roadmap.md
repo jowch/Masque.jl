@@ -59,7 +59,7 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
   selection.
 - *idea* — links across layers and across figures; across widgets this needs a registry.
 - *idea* — range select on a colorbar; lasso select beside the box ROI.
-- *idea* — nearest-mark snapping within a radius; selection kept across a reload.
+- *idea* — nearest-mark snapping within a radius.
 - *idea* — a 2D profile probe on a heatmap cell; a delta readout between two parked probes.
 
 ### Gestures and animation

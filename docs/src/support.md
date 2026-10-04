@@ -97,7 +97,8 @@ and the last two columns say which also work on `Axis3` and
 | `Legend` (block) | `:legend` | `:rects` | yes | yes |
 
 Each `lines!` and `stairs!` plot is one element for its whole line, and
-`series!` has one element per series. Only the body of a `boxplot!`
+`series!` has one element per series. On a 2D `Axis`, hovering a line
+shows the point you plotted nearest the pointer. Only the body of a `boxplot!`
 responds, not its whiskers or outliers, and an `annotation!` responds
 on its text. In a `contourf!` plot, hovering inside a hole of a filled
 level reaches nothing unless another level is drawn there.
@@ -105,7 +106,8 @@ level reaches nothing unless another level is drawn there.
 A recipe not in the table, such as `rainclouds!`, still gets each
 visible part the table knows, under that part's layer id: `rainclouds!`
 gives `:violin`, `:scatter`, and `:boxplot`, and `tricontourf!` gives
-`:poly`. A plot whose `space` is not
+`:poly`. A `datashader!` of points gives `:cells`, and hovering a pixel
+shows how many points fell in it. A plot whose `space` is not
 `:data`, such as a `bracket!` label or a `scatter!` placed with
 `space = :relative`, is skipped with a warning that names its `space`.
 `surface!` is not made interactive. To make a recipe of your own

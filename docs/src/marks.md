@@ -72,8 +72,9 @@ hexagons are polygons too. A filled contour also reports the `low` and
 ## Lines
 
 A `lines!` call is one mark. Clicking anywhere along it selects the
-whole line, since a line plot is read as one series. To read the value
-at a particular `x` instead, use a [`SliceInteractable`](@ref).
+whole line, since a line plot is read as one series. Hovering it shows
+the point you plotted nearest the pointer (see [Tooltips](@ref)). To
+read every line at the same `x`, use a [`SliceInteractable`](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">

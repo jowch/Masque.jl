@@ -6,13 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-04
+
 ### Added
 - `scatterlines!` on an `Axis3` responds to hover and click, with the same `:scatterlines`
   (markers) and `:scatterlines_line` (line) layers it gives on a 2D `Axis`. Before, `masque`
-  skipped it with a warning.
+  skipped it with a warning (#273).
 - `arrows2d!` (and `arrows!` on a 2D `Axis`) responds to hover and click: each arrow is one
   element of an `:arrows2d` layer, hit along the drawn arrow from tail to tip, with payload
-  `(; index, x, y, u, v)`. Before, `masque` made no layer for it.
+  `(; index, x, y, u, v)`. Before, `masque` made no layer for it (#274).
 - Hovering a line from `lines!`, `stairs!`, `series!`, or `scatterlines!` shows `x` and `y`
   of the plotted point nearest the pointer along the line, and a tooltip template can name
   `x`, `y`, and `i`, that point's index. Clicks and the `@bind` value still pick the whole
@@ -22,7 +24,7 @@ All notable changes to this project are documented here. The format is based on
 - The 0.2 deprecations now show their warning in Pluto and the REPL. Before, Julia showed
   them only when it ran with `--depwarn=yes`, so a notebook still using `CairoBackend(…)`,
   `auto_interactables`, or a keyword form of `RectInteractable` or `RegionInteractable` got
-  no warning before 0.3 removes them.
+  no warning before 0.3 removes them (#269).
 - After a page reload, the highlighted selection matches the value Pluto restored to the
   `@bind` variable. Before, it showed the `selected=` element while the variable held your
   last click, so the next click could clear the selection instead of making it (#272).
@@ -31,15 +33,16 @@ All notable changes to this project are documented here. The format is based on
   `lines!` plots took over the first one's hover and left the sliced one's in place. It also
   no longer needs `covers = []` when `auto = false` leaves those plots out of the widget,
   where `masque` used to raise an error. A layer you name in `covers` yourself must still be
-  in the call.
+  in the call (#271).
 - Hovering a `datashader!` pixel shows how many points fell in it. Before, with the default
   `operation`, it showed the histogram-equalized colour value, a number near 1 such as
-  `0.99998`.
+  `0.99998` (#276).
 - An `interactables` method for your own plot type no longer needs an `id` keyword:
   `Masque.interactables(ax, p::MyPlot)` works, and `masque` names the layers it returns after
   the plot. Before, `masque` said it had no default for the plot type. A caller's keyword the
   method does not take, as in `interactables(p; tooltip = …)`, now fails with an error that
-  names the plot type and says to add `; kwargs...`, not a bare `MethodError`.
+  names the plot type and says to add `; kwargs...`, not a bare `MethodError`
+  (#270).
 
 ## [0.2.0] - 2026-10-03
 
@@ -203,7 +206,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/jowch/Masque.jl/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jowch/Masque.jl/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/jowch/Masque.jl/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jowch/Masque.jl/releases/tag/v0.1.0
