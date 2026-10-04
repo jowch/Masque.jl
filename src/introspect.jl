@@ -380,7 +380,7 @@ function GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells,
     return GridInteractable(ax, _edges(xr, ncols), _edges(yr, nrows), vals; id, tooltip, label)
 end
 function RectInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; kwargs...)
-    Base.depwarn(
+    _deprecate(
         "`RectInteractable(ax, p)` for a heatmap or image is deprecated; use `GridInteractable(ax, p)`. " *
             "Removed in 0.3.",
         :RectInteractable,
@@ -1426,7 +1426,7 @@ end
 Deprecated: use [`interactables(fig)`](@ref interactables). Removed in 0.3.
 """
 function auto_interactables(fig)
-    Base.depwarn("`auto_interactables(fig)` is deprecated, use `interactables(fig)`", :auto_interactables)
+    _deprecate("`auto_interactables(fig)` is deprecated; use `interactables(fig)`. Removed in 0.3.", :auto_interactables)
     return interactables(fig)
 end
 

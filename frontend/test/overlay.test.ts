@@ -1630,6 +1630,143 @@ describe("tooltips (mount/showTip)", () => {
         expect(() => mount(script, bad)).toThrow(/selected|out of range|index/i)
     })
 
+    // #272: on a reload Pluto writes the kernel's bond value into host.value after mount. The
+    // highlight follows that value, not the `selected=` seed.
+    describe("restored bond value", () => {
+        const three = (selected?: number[]): Manifest => ({
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{
+                id: "pts", kind: "circles", geometry: [300, 200, 20, 600, 400, 20, 900, 600, 20],
+                payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["click", "hover"],
+                ...(selected ? { selected } : {}),
+            }],
+        })
+        const hostValue = (host: HTMLElement) => host as unknown as { value: unknown }
+        const selectedCx = (host: HTMLElement) =>
+            [...edgeSelGroup(shadowOf(host)).querySelectorAll("circle")].map((c) => c.getAttribute("cx"))
+
+        it("redraws the selection from a restored click, without sending it back", () => {
+            const { host, script } = setup()
+            mount(script, three([0]))
+            expect(selectedCx(host)).toEqual(["300"])
+            let fired = false
+            host.addEventListener("input", () => { fired = true })
+            hostValue(host).value = { layer: "pts", index: 2 }
+            expect(selectedCx(host)).toEqual(["900"])
+            expect(hostValue(host).value).toEqual({ layer: "pts", index: 2 })
+            expect(fired).toBe(false)
+        })
+
+        it("a click on the restored element clears it, as a click on a clicked element does", () => {
+            const { host, script } = setup()
+            mount(script, three([0]))
+            hostValue(host).value = { layer: "pts", index: 2 }
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 300, bubbles: true }))
+            expect(hostValue(host).value).toBeNull()
+            expect(selectedCx(host)).toEqual([])
+        })
+
+        it("a restored null clears the seed", () => {
+            const { host, script } = setup()
+            mount(script, three([0]))
+            hostValue(host).value = null
+            expect(selectedCx(host)).toEqual([])
+        })
+
+        it("an equal value is a no-op, so the seed's drawing is kept", () => {
+            const { host, script } = setup()
+            mount(script, three([0]))
+            const before = edgeSelGroup(shadowOf(host)).firstElementChild
+            hostValue(host).value = { layer: "pts", index: 0 }
+            expect(edgeSelGroup(shadowOf(host)).firstElementChild).toBe(before)
+        })
+
+        it("after a click, a late write of an older value leaves the click's highlight", () => {
+            const { host, script } = setup()
+            mount(script, three([0]))
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true })) // clears 0
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true })) // selects 0
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 150, clientY: 100, bubbles: false }))
+            hostValue(host).value = { layer: "pts", index: 2 }
+            expect(selectedCx(host)).toEqual(["300"])
+        })
+
+        it("an unknown layer, a bad index, or a non-selection value leaves the selection", () => {
+            const { host, script } = setup()
+            mount(script, three([0]))
+            hostValue(host).value = { layer: "nope", index: 0 }
+            hostValue(host).value = { layer: "pts", index: 7 }
+            hostValue(host).value = { layer: "pts", index: 1.5 }
+            hostValue(host).value = 3
+            expect(selectedCx(host)).toEqual(["300"])
+        })
+
+        it("restores a brushed {items} selection", () => {
+            const { host, script } = setup()
+            const m = three()
+            m.layers[0].events = ["hover"]
+            m.layers.push({ id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                selects: "pts", geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } })
+            m.selection = "elements"
+            m.selectionTarget = "pts"
+            mount(script, m)
+            expect(hostValue(host).value).toBeNull()
+            hostValue(host).value = { items: [{ layer: "pts", index: 1 }, { layer: "pts", index: 2 }] }
+            expect(selectedCx(host)).toEqual(["600", "900"])
+        })
+
+        it("restores a clicked grid cell", () => {
+            const { host, script } = setup()
+            mount(script, {
+                width: 1200, height: 800, scaling: 2, transforms: {},
+                layers: [{ id: "heat", kind: "grid", axis: "ax1", events: ["click", "hover"], payloads: [],
+                    geometry: { xedges: [0, 100, 200], yedges: [0, 100, 200], ncols: 2, nrows: 2, values: [1, 2, 3, 4] } }],
+            })
+            hostValue(host).value = { layer: "heat", index: 3, payload: { i: 1, j: 1, value: 4 } }
+            const rect = fillSelGroup(shadowOf(host)).querySelector("rect")!
+            expect([rect.getAttribute("x"), rect.getAttribute("y"), rect.getAttribute("width")]).toEqual(["100", "100", "100"])
+        })
+
+        it("restores a legend click as its linked marks", () => {
+            const { host, script } = setup()
+            const m = three()
+            m.layers.push({ id: "legend", kind: "rects", geometry: [1000, 50, 20, 20], payloads: [{ label: "a" }],
+                axis: "ax1", events: ["click", "hover"], links: [["pts:3"]] }) // 1-based pin
+            mount(script, m)
+            hostValue(host).value = { layer: "legend", index: 0 }
+            expect(selectedCx(host)).toEqual(["900"])
+        })
+
+        it("a page that wraps host.value after mount still sees every click", () => {
+            // The docs embed player redefines the property over ours to swap its snapshots.
+            const { host, script } = setup()
+            mount(script, three([0]))
+            const inner = Object.getOwnPropertyDescriptor(host, "value")!
+            const seen: unknown[] = []
+            Object.defineProperty(host, "value", { configurable: true, enumerable: true,
+                get: () => inner.get!.call(host),
+                set: (v: unknown) => { seen.push(v); inner.set!.call(host, v) } })
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 300, bubbles: true }))
+            expect(seen).toEqual([{ layer: "pts", index: 2 }])
+            expect(hostValue(host).value).toEqual(seen[0])
+        })
+
+        it("a page accessor already on the host at mount keeps receiving the bond", () => {
+            const { host, script } = setup()
+            let cur: unknown = "untouched"
+            Object.defineProperty(host, "value", { configurable: true, enumerable: true,
+                get: () => cur, set: (v: unknown) => { cur = v } })
+            mount(script, three([0]))
+            expect(cur).toEqual({ layer: "pts", index: 0 })
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 300, bubbles: true }))
+            expect(cur).toEqual({ layer: "pts", index: 2 })
+        })
+    })
+
     it("a selects-ROI commit REPLACES the selected= hydration with its enclosure (hydration model)", () => {
         // selected= is pure hydration (an initial value): a selects-ROI move/release sets the
         // whole selection, it doesn't add to it.

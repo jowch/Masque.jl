@@ -5,6 +5,7 @@
 //
 //   node keyboard_a11y.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
+import { shutdownOpenSession } from "./fresh_session.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -47,6 +48,7 @@ try {
   });
   page.on("console", (m) => consoleLog.push(`[${m.type()}] ${m.text()}`));
 
+  await shutdownOpenSession(base, notebook);
   await page.goto(`${base}/open?path=${encodeURIComponent(notebook)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
   const deadline = Date.now() + 1500000;
   let ready = false, tick = 0;
@@ -202,14 +204,6 @@ try {
     let after = before;
     for (let i = 0; i < 40 && after === before; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
     if (after === before) throw new Error(`${key}: Enter never updated #out_${key} (wire index ${target}, was ${beforeWire})`);
-    // Enter on the element the overlay already shows selected clears it. After a page reload
-    // the overlay shows the `selected=` seed while Pluto restores the kernel's last value, so
-    // the target can be that element: a second Enter selects it.
-    if (/=nothing\s*$/.test(after)) {
-      const cleared = after;
-      await page.keyboard.press("Enter");
-      for (let i = 0; i < 40 && after === cleared; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
-    }
     const idRe = new RegExp(`:${layer.id}|${layer.id}`, "i");
     if (!idRe.test(after)) throw new Error(`${key}: Enter bond value missing layer id: ${after.slice(0, 200)}`);
     if (!new RegExp(`:${layer.id},\\s*${target + 1}\\b`).test(after)) {
