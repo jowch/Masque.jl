@@ -152,6 +152,9 @@ export interface OverlayCtx {
     gesture_: GestureChannel
     // Paints the photographic matrix onto the base and the overlay groups. Mount owns the DOM.
     photoPaint_: (m: PhotoMatrix) => void
+    // Writes the bond value from a gesture. `host_.value` itself is an accessor (mount.ts):
+    // a write through it is Pluto restoring the kernel's value, which redraws the selection.
+    setValue_: (v: unknown) => void
 }
 
 export interface OverlayState {
