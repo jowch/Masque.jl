@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
-import { esc, renderTemplate, renderAutoTable, fmtNum } from "../src/template"
+import { esc, renderTemplate, renderAutoTable, fmtNum, withReadout } from "../src/template"
+import type { AxisTransform, Hit, HitLayer } from "../src/types"
 
 // d3-format's own specs never throw once parsed (a bad spec throws at parse time, already
 // covered above) — so exercising applySpec's *second* try/catch (the formatter call itself
@@ -129,5 +130,20 @@ describe("rounding in the tooltip renderers", () => {
         const segs = [{ f: "x" }, " | ", { f: "x", spec: ".6f" }]
         expect(renderTemplate(segs, { x: 0.1 + 0.2 })).toBe("0.3 | 0.300000")
         expect(renderTemplate([{ f: "x" }], { x: Math.PI }, 2)).toBe("3.1")
+    })
+})
+
+describe("withReadout", () => {
+    const layer = { id: "l", kind: "lines", geometry: [], payloads: [], axis: "ax1", events: ["hover"] } as HitLayer
+    const t = { xcats: ["a", "b"] } as unknown as AxisTransform
+    it("names a category position by its label, and keeps a position past the labels as a number", () => {
+        const hit = (x: number): Hit => ({ layer, index: 0, pt_: [0, x, 1] })
+        expect(withReadout({ label: "s" }, hit(2), t, false)).toEqual({ label: "s", x: "b", y: 1 })
+        expect(withReadout({ label: "s" }, hit(3), t, false)).toEqual({ label: "s", x: 3, y: 1 })
+    })
+    it("adds the 1-based index for a template only, and leaves a scalar payload alone", () => {
+        const hit: Hit = { layer, index: 0, pt_: [4, 1, 2] }
+        expect(withReadout({}, hit, undefined, true)).toEqual({ i: 5, x: 1, y: 2 })
+        expect(withReadout("text", hit, undefined, true)).toBe("text")
     })
 })

@@ -983,6 +983,12 @@ describe("lineReadout", () => {
         expect(lineReadout(center, 0, 190, -200)).toEqual([2, 2, 2])
     })
 
+    it("returns null when the path has no edge or the samples run short", () => {
+        expect(lineReadout(layer([[50, 50]], [[1, 1]]), 0, 50, 50)).toBeNull()
+        expect(lineReadout(layer([[0, 0, 100, 0]], [[1, 1]]), 0, 95, 0)).toBeNull()
+        expect(lineReadout(layer([[0, 0, 100, 0]], [[1, 1, NaN, 2]]), 0, 95, 0)).toBeNull()
+    })
+
     it("a hover hit carries the readout", () => {
         const L = layer([[0, 100, 100, 100, 200, 100]], [[1, 5, 2, 6, 3, 7]])
         expect(hitLayer(L, 95, 102)?.pt_).toEqual([1, 2, 6])
