@@ -26,6 +26,9 @@ All notable changes to this project are documented here. The format is based on
 - After a page reload, the highlighted selection matches the value Pluto restored to the
   `@bind` variable. Before, it showed the `selected=` element while the variable held your
   last click, so the next click could clear the selection instead of making it (#272).
+- Hovering a `datashader!` pixel shows how many points fell in it. Before, with the default
+  `operation`, it showed the histogram-equalized colour value, a number near 1 such as
+  `0.99998`.
 - An `interactables` method for your own plot type no longer needs an `id` keyword:
   `Masque.interactables(ax, p::MyPlot)` works, and `masque` names the layers it returns after
   the plot. Before, `masque` said it had no default for the plot type. A caller's keyword the

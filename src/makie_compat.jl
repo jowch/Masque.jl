@@ -30,6 +30,22 @@ function _converted(p)
     end
 end
 
+# Wraps `p.parent.canvas[]` for the image a `datashader!` of points draws: the canvas holds the
+# aggregate before `operation` maps it to colour. Makie's own DataInspector reads the same
+# buffer. `nothing` for any other image, and for the categorical form, whose images each draw
+# a canvas of their own.
+function _datashader_aggregate(img)
+    try
+        parent = img.parent
+        parent isa Makie.DataShader{<:Tuple{<:AbstractVector{<:Makie.Point}}} || return nothing
+        c = parent.canvas[]
+        return copy(reshape(c.pixelbuffer, c.resolution))
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("DataShader canvas", "`canvas[]` with `pixelbuffer` and `resolution`")
+    end
+end
+
 # Wraps `.plots`, a plot/Scene's child-plot list; no public child-plot API exists.
 function _child_plots(p)
     plots = try

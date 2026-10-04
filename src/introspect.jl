@@ -391,6 +391,12 @@ _edges(e, n) = length(e) == n + 1 ? collect(Float64, e) :
     collect(range(Float64(e[1]), Float64(e[end]); length = n + 1))
 function GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells, tooltip = nothing, label = nothing)
     xr, yr, vals = _conv(p)
+    # A `datashader!` image holds the colour-mapped aggregate (histogram-equalized by
+    # default); hover reads the aggregate itself, the count for the default `AggCount`.
+    if p isa Makie.Image
+        counts = _datashader_aggregate(p)
+        counts === nothing || size(counts) != size(vals) || (vals = counts)
+    end
     ncols, nrows = size(vals)
     return GridInteractable(ax, _edges(xr, ncols), _edges(yr, nrows), vals; id, tooltip, label)
 end
