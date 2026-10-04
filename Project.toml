@@ -1,6 +1,6 @@
 name = "Masque"
 uuid = "82b01fb5-7eeb-4559-83ea-8d75f85d4328"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Jonathan Chen <jwhc@ucla.edu>"]
 
 [deps]

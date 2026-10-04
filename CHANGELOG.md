@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-04
+
 ### Added
 - `scatterlines!` on an `Axis3` responds to hover and click, with the same `:scatterlines`
   (markers) and `:scatterlines_line` (line) layers it gives on a 2D `Axis`. Before, `masque`
@@ -203,7 +205,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/jowch/Masque.jl/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jowch/Masque.jl/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/jowch/Masque.jl/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jowch/Masque.jl/releases/tag/v0.1.0
