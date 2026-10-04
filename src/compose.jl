@@ -295,6 +295,10 @@ function _assemble(fig, xs; auto::Bool)
     end
     for k in eachindex(out)
         i = out[k]
+        if i isa SliceInteractable && !isempty(i.cover_plots)
+            covers = unique!(Symbol[id for p in i.cover_plots for id in get(plotmap, p, Symbol[])])
+            out[k] = SliceInteractable(i.ax, i.orientation, i.series, i.id, covers, i.tooltip, i.crosshair, i.cover_plots)
+        end
         i isa LegendInteractable && i.lenient || continue
         out[k] = _legend_interactable(i.leg; id = i.id, events = i.evs, tooltip = i.tooltip, plotmap)
     end

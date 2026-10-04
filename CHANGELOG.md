@@ -26,6 +26,12 @@ All notable changes to this project are documented here. The format is based on
 - After a page reload, the highlighted selection matches the value Pluto restored to the
   `@bind` variable. Before, it showed the `selected=` element while the variable held your
   last click, so the next click could clear the selection instead of making it (#272).
+- A slice built from plots replaces the hover of exactly those plots. Before, it guessed
+  their layer ids by counting the plots passed to it, so slicing only the second of two
+  `lines!` plots took over the first one's hover and left the sliced one's in place. It also
+  no longer needs `covers = []` when `auto = false` leaves those plots out of the widget,
+  where `masque` used to raise an error. A layer you name in `covers` yourself must still be
+  in the call.
 - Hovering a `datashader!` pixel shows how many points fell in it. Before, with the default
   `operation`, it showed the histogram-equalized colour value, a number near 1 such as
   `0.99998`.

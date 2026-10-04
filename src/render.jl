@@ -166,6 +166,18 @@ function _selection_spec(interactables, layers)
     return (mode = kind === :grid ? "grid" : "elements", target = target)
 end
 
+# A slice from plots covers the layers `_assemble` found for them unless told otherwise. Keep
+# the coverable ones in this call. Covers the caller named stay, so `_validate_slices` still
+# reports a missing or uncoverable one.
+function _drop_absent_default_covers!(built)
+    kinds = Dict(d["id"] => d["kind"] for (_, _, d) in built)
+    for (i, _, d) in built
+        i isa SliceInteractable && !isempty(i.cover_plots) || continue
+        filter!(c -> get(kinds, c, nothing) in ("lines", "polygons"), d["geometry"]["covers"])
+    end
+    return nothing
+end
+
 # One slice per axis. Each `covers` id must be a `:polygons` or `:lines` layer in this call.
 function _validate_slices(layers)
     by_id = Dict(l["id"] => l for l in layers)
@@ -361,6 +373,7 @@ function build_manifest(
     layers = Any[d for (_, _, d) in built]
     layer_owners = Any[i for (i, _, _) in built]
     _validate_selectors(interactables, layers)
+    _drop_absent_default_covers!(built)
     _validate_slices(layers)
     _validate_links(layer_owners, layers)
     spec = _selection_spec(interactables, layers)
