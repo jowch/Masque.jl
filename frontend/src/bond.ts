@@ -250,7 +250,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     applyDrag(ctx, state, d, e)
     const { layout, content } = pointerSpace(ctx, state, e)
     if (d.kind === "threshold") {
-        (ctx.host_ as unknown as { value: unknown }).value = thresholdDrag.end(d, content)
+        ctx.setValue_(thresholdDrag.end(d, content))
         ctx.host_.dispatchEvent(new CustomEvent("input"))
     } else if (d.kind === "view") {
         // §12.3: a view gesture commits nothing — no bond write, no "input" event.
@@ -267,7 +267,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
         }
         state.photoAnchor_ = null
     } else {
-        (ctx.host_ as unknown as { value: unknown }).value = roiDrag.end(ctx, state, d)
+        ctx.setValue_(roiDrag.end(ctx, state, d))
         ctx.host_.dispatchEvent(new CustomEvent("input"))
     }
     hideTip(ctx, state); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
@@ -388,7 +388,7 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
         value = { layer: hit.layer.id, index: hit.index }
         if (!SELECTED_KINDS.has(hit.layer.kind)) value.payload = resolvePayload(hit, ctx.manifest_, px, py)
     }
-    ;(ctx.host_ as unknown as { value: unknown }).value = value
+    ctx.setValue_(value)
     ctx.host_.dispatchEvent(new CustomEvent("input"))
 }
 

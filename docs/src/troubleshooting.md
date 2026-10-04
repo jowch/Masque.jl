@@ -234,9 +234,8 @@ version that worked.
 ### Upgrading code written for Masque 0.1
 
 Masque 0.2 renamed or reshaped a few calls. The old forms still work in
-0.2 and are removed in 0.3. Julia warns about them only when it runs
-with `--depwarn=yes`, as `Pkg.test` does, so a notebook shows no
-warning:
+0.2 and are removed in 0.3. Each one shows a warning in the cell's log
+that names its replacement:
 
 | 0.1 | 0.2 |
 |---|---|
