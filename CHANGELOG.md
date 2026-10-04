@@ -11,6 +11,9 @@ All notable changes to this project are documented here. The format is based on
   them only when it ran with `--depwarn=yes`, so a notebook still using `CairoBackend(…)`,
   `auto_interactables`, or a keyword form of `RectInteractable` or `RegionInteractable` got
   no warning before 0.3 removes them.
+- After a page reload, the highlighted selection matches the value Pluto restored to the
+  `@bind` variable. Before, it showed the `selected=` element while the variable held your
+  last click, so the next click could clear the selection instead of making it (#272).
 
 ## [0.2.0] - 2026-10-03
 
