@@ -47,7 +47,7 @@ end
 
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000011
 md"""
-Pass all three plots to one `SliceInteractable`, because `masque(fig)` does not add one on its own. The slice only shows values, so to keep a wavelength, add an `AxisInteractable` as well. `auto = false` keeps the lines from taking the click. It also takes the lines out of the widget, so pass `covers = []` to the slice, or `masque` raises an error because the slice expects to replace their hover highlight.
+Pass all three plots to one `SliceInteractable`, because `masque(fig)` does not add one on its own. The slice only shows values, so to keep a wavelength, add an `AxisInteractable` as well. `auto = false` keeps the lines from taking the click, so a click saves a wavelength rather than a line.
 
 In your own notebook, a click saves the position in `at`. This page does not record clicks, so only the hover works here.
 """
@@ -55,7 +55,7 @@ In your own notebook, a click saves the position in `at`. This page does not rec
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000003
 @bind at masque(
     fig,
-    SliceInteractable(ax, [a, b, c]; covers = []),
+    SliceInteractable(ax, [a, b, c]),
     AxisInteractable(ax);
     auto = false,
 )
