@@ -340,7 +340,9 @@ SegmentInteractable(ax, p::Makie.Arrows2D; id = :arrows2d, payloads = nothing, t
     _arrow_segments(ax, p, Makie.Point2f, "Arrows2D"; id, payloads, tol, tooltip, label)
 
 # Hit slack wide enough to cover the drawn head and shaft: half the widest part, at least 6px.
-# The widths are pixels only while `markerspace = :pixel` (the default).
+# The widths are pixels only while `markerspace = :pixel` (the default); in any other space
+# they are not screen sizes, so the slack stays at the 6px line default. Makie draws each
+# width as one number for every arrow, so there is no per-arrow vector to read.
 function _arrow2d_tol(p)
     p.markerspace[] === :pixel || return 6.0
     w = max(Float64(p.tipwidth[]), Float64(p.shaftwidth[]))

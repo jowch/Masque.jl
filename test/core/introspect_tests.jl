@@ -1217,6 +1217,11 @@ end
         arrows2d!(ax3, pts, dirs)
         Makie.update_state_before_display!(f3)
         @test isempty(@test_logs (:warn, r"arrows2d on Axis3") match_mode = :any interactables(f3))
+        # and on PolarAxis, through the same gate
+        fp = Figure(); axp = PolarAxis(fp[1, 1])
+        arrows2d!(axp, pts, dirs)
+        Makie.update_state_before_display!(fp)
+        @test isempty(@test_logs (:warn, r"arrows2d on PolarAxis") match_mode = :any interactables(fp))
     end
 
     @testset "Band extraction" begin
