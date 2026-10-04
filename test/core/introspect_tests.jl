@@ -163,6 +163,19 @@ end
             @test_throws ArgumentError masque(f; selected = Dict(:lines => [2]))
             ev = Masque.APD.Bonds.transform_value(w, Dict("layer" => "lines", "index" => 0))
             @test ev isa ElementEvent && ev.index == 1 && ev.payload == (; index = 1)
+            # #262: each line ships its data samples for the hover readout; a gap stays a gap.
+            @test L.points == [Float32[0, 0, 1, 2, 2, 1, 3, 3]] && L.step === nothing
+            @test isequal(Lg.points, [Float32[0, 0, NaN, NaN, 2, 1]])
+            @test line["points"] == [Float32[0, 0, 1, 2, 2, 1, 3, 3]] && !haskey(line, "step")
+            # A template may name the readout's fields; any other unknown field still errors.
+            wt = masque(f, SegmentInteractable(a, pl; id = :tl, tooltip = masque"$(i): $(x), $(y)"))
+            @test haskey(only(filter(d -> d["id"] == "tl", wt.manifest["layers"])), "template")
+            @test_throws ArgumentError masque(f, SegmentInteractable(a, pl; id = :tl, tooltip = masque"$(z)"))
+            # Axis3 has no 2D readout, so it ships no samples.
+            f3 = Figure(size = (400, 300)); a3 = Axis3(f3[1, 1])
+            p3 = lines!(a3, [0.0, 1.0], [0.0, 1.0], [0.0, 1.0])
+            _, _, c3 = ctx_for(f3)
+            @test only(hitlayers(SegmentInteractable(a3, p3), c3)).points === nothing
         end
 
         @testset "heatmap/image -> GridInteractable, incl. EndPoints expansion" begin
@@ -638,6 +651,10 @@ end
         @test only(interactables(ac, sc; payloads = ["p", "q", "r"])).payloads == ["p", "q", "r"]
         m = masque(fc).manifest
         @test only(filter(l -> l["id"] == "scatter", m["layers"]))["payloads"][2].x == "b"
+        # A line's hover readout shows the same text (#262).
+        ld = lines!(ad, Dates.Date(2024, 1, 1) .+ Dates.Day.(0:2), [1.0, 2.0, 3.0])
+        _, _, cd = ctx_for(fd)
+        @test only(hitlayers(built(ad, ld), cd)).points == [Any["2024-01-01", 1.0f0, "2024-01-02", 2.0f0, "2024-01-03", 3.0f0]]
         # the plot-object constructors fill their default payloads the same way
         @test [p.x for p in PointInteractable(ad, sd).payloads] == ["2024-01-01", "2024-01-02", "2024-01-03"]
         @test [p.x for p in PolygonInteractable(ac, vc).payloads] == ["a", "b"]
@@ -699,6 +716,15 @@ end
             @test i.payloads[1] == (; index = 1, x = 1.0, y = 1.0)
             img = Makie.colorbuffer(f; px_per_unit = c.scaling)
             @test all(q -> drawn_near(img, q...; tol = 2), centers(only(hitlayers(i, c))))
+        end
+        @testset "translate!: a line's readout keeps the data (#262)" begin
+            f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 8, 0, 7))
+            p = lines!(a, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
+            translate!(p, 2, 1, 0)
+            _, _, c = ctx_for(f)
+            L = only(hitlayers(built(a, p), c))
+            @test L.points == [Float32[1, 1, 2, 2, 3, 3]]
+            @test L.geometry == only(hitlayers(SegmentInteractable(a, [(3, 2), (4, 3), (5, 4)]; unit = :line), c)).geometry
         end
         @testset "translate! on a log axis moves in the axis's scale" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1]; yscale = log10, limits = (0, 4, 1, 1000))
@@ -851,6 +877,18 @@ end
             img = Makie.colorbuffer(f; px_per_unit = 2.0)
             g = only(L.geometry)
             @test drawn_near(img, g[3], g[4])   # a corner of the staircase
+            # The readout snaps to the 4 input points, not the corners, so they ship with the step mode.
+            @test L.points == [Float32[0, 0, 1, 2, 2, 1, 3, 3]] && L.step === :pre
+            @test only(hitlayers(SegmentInteractable(a, stairs!(a, 0:2, [1, 2, 3]; step = :center)), c)).step === :center
+            # Every drawn vertex sits on the step of the sample the overlay maps it to
+            # (frontend/src/geometry.ts `lineReadout`): the next sample for `pre`, its own otherwise.
+            for mode in (:pre, :post, :center)
+                q = stairs!(a, [0.0, 1.0, 2.0, 3.0], [0.0, 2.0, 1.0, 3.0]; step = mode)
+                drawn = Masque._converted(Masque._childof(q, Makie.Lines))[1]
+                ys = only(only(hitlayers(SegmentInteractable(a, q), c)).points)[2:2:end]
+                sample(v) = (mode === :pre ? cld(v, 2) : fld(v, 2)) + 1
+                @test all(drawn[v + 1][2] == ys[sample(v)] for v in 0:(length(drawn) - 1))
+            end
         end
 
         @testset "errorbars/rangebars -> Segment(:pairs)" begin
@@ -1088,6 +1126,7 @@ end
             @test all(g -> length(g) == 8, L.geometry)   # 4 vertices × (x, y), not 3 segments each
             @test L.payloads[2].index == 2
             @test L.payloads[2].label == "series 2"
+            @test L.points[2] == Float32[1, 3.0, 2, 2.4, 3, 1.2, 4, 1.5]   # series 2's samples (x = 1:4)
             w = masque(f)
             ev = Masque.APD.Bonds.transform_value(w, Dict("layer" => "series", "index" => 1))
             @test ev isa ElementEvent && ev.index == 2 && ev.layer === :series

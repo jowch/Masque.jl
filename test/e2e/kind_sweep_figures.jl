@@ -53,11 +53,14 @@ kind_sweep_meta() = [
         "key" => "lines", "layerId" => "lines", "layerKind" => "lines",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "curve", "hoverIndex" => 0, "hoverTip" => "curve", "mode" => "element",
+        # The hover readout at the third plotted point, (2.0, 0.4) (#262).
+        "readout" => Dict("vertex" => 2, "text" => ["x2", "y0.4"]),
     ),
     Dict(
         "key" => "series", "layerId" => "series", "layerKind" => "lines",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "series 1", "hoverIndex" => 1, "hoverTip" => "series 2", "mode" => "element",
+        "readout" => Dict("vertex" => 2, "text" => ["x3", "y1.5"]),
     ),
     Dict(
         "key" => "segments", "layerId" => "segments", "layerKind" => "segments",

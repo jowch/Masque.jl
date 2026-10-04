@@ -2849,6 +2849,56 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         expect(tip.innerHTML).toBe("(2,1) = 12")
     })
 
+    // #262: hovering a line reads out its nearest sample next to the line's own payload.
+    describe("line readout", () => {
+        const lineManifest = (extra: Partial<HitLayer> = {}, xcats?: string[]): Manifest => ({
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false, ...(xcats ? { xcats } : {}) } },
+            layers: [{ id: "lines", kind: "lines", axis: "ax1", events: ["click", "hover"], payloads: [{ index: 1 }],
+                geometry: [[100, 400, 300, 400, 500, 400]], points: [[1, 2.5, 2, 3.25, 3, 4]], ...extra }],
+        })
+        const hoverAt = (host: HTMLElement, x: number, y: number) => {
+            const shadow = shadowOf(host)
+            ;(shadow.querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new PointerEvent("pointermove", { clientX: x / 2, clientY: y / 2, bubbles: true }))
+            return shadow.querySelector(".masque-tip") as HTMLElement
+        }
+
+        it("the default tooltip adds x and y of the nearest sample", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest())
+            const tip = hoverAt(host, 280, 402)
+            expect(tip.textContent).toBe("index1x2y3.25")
+        })
+
+        it("a template can name i, x and y", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest({ template: ["#", { f: "i" }, " at ", { f: "x" }, ", ", { f: "y" }] }))
+            expect(hoverAt(host, 480, 398).innerHTML).toBe("#3 at 3, 4")
+        })
+
+        it("a categorical x shows the category label", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest({}, ["a", "b", "c"]))
+            expect(hoverAt(host, 120, 400).textContent).toBe("index1xay2.5")
+        })
+
+        it("no points, no readout: the tooltip is the payload alone", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest({ points: undefined }))
+            expect(hoverAt(host, 280, 402).textContent).toBe("index1")
+        })
+
+        it("the bond value stays the whole line", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest())
+            ;(shadowOf(host).querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new MouseEvent("click", { clientX: 140, clientY: 200, bubbles: true }))
+            expect((host as unknown as { value: unknown }).value).toEqual({ layer: "lines", index: 0 })
+        })
+    })
+
     it("a grid template sees the Julia 1-based cell, the same as pick.i/pick.j and the default tooltip", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
