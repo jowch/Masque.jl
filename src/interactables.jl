@@ -699,14 +699,14 @@ function RectInteractable(
         )
     )
     if grid !== nothing
-        Base.depwarn(
+        _deprecate(
             "`RectInteractable(ax; grid = (xedges, yedges, values))` is deprecated; use " *
                 "`GridInteractable(ax, xedges, yedges, values)`. Removed in 0.3.",
             :RectInteractable,
         )
         return GridInteractable(ax, grid...; id, tooltip, label)
     end
-    Base.depwarn(
+    _deprecate(
         "`RectInteractable(ax; rects = …)` is deprecated; use `RectInteractable(ax, rects)`. Removed in 0.3.",
         :RectInteractable,
     )
@@ -1641,7 +1641,7 @@ function RegionInteractable(
 end
 # Deprecated keyword form, removed in 0.3.
 function RegionInteractable(ax; regions, kwargs...)
-    Base.depwarn(
+    _deprecate(
         "`RegionInteractable(ax; regions = …)` is deprecated; use `RegionInteractable(ax, regions)`. Removed in 0.3.",
         :RegionInteractable,
     )
