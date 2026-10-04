@@ -93,6 +93,14 @@ A point inside an element still wins over another element's outline. `:circles` 
 centers the outline on the marker's edge, and all of it on WebGL, which paints it outside).
 `:circles` and the other kinds' manifests are untouched by this field.
 
+`points` (optional, `:lines` on a 2D axis only) is one flat `[x1, y1, x2, y2, …]` per element:
+the line's own data samples, which the hover readout snaps to ([§10](10-tooltips.md)). The
+geometry is rounded to image pixels and a stairs path adds corners between samples, so the
+samples cannot be recovered from it. Numbers ship as Float32. On a date or categorical axis a
+coordinate ships as the text a scatter's default payload holds. `step` (`"pre"`, `"post"` or
+`"center"`, from a `stairs` plot) says which sample each drawn corner belongs to. Placement
+(`translate!`, …) moves the path but not the samples.
+
 `label` (optional, per-layer, `String`) is a screen-reader announcement prefix for the
 keyboard-navigation overlay ([§11](11-keyboard.md)) — e.g. `"Scatter"` in "Scatter, element 3 of 10: …". Set via
 the `label` keyword on `PointInteractable`/`SegmentInteractable`/`RectInteractable`/

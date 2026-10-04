@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- Hovering a line from `lines!`, `stairs!`, `series!`, or `scatterlines!` shows `x` and `y`
+  of the plotted point nearest the pointer along the line, and a tooltip template can name
+  `x`, `y`, and `i`, that point's index. Clicks and the `@bind` value still pick the whole
+  line. Lines on an `Axis3` are unchanged (#262).
+
 ### Fixed
 - After a page reload, the highlighted selection matches the value Pluto restored to the
   `@bind` variable. Before, it showed the `selected=` element while the variable held your

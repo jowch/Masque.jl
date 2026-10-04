@@ -23,7 +23,7 @@ scatter!(ax, [1, 2, 3], [1, 4, 9])
 """
 module Masque
 
-using Makie: Makie, Point2f, Point3f, RGBAf
+using Makie: Makie, Point2f, Point3f, Point3d, RGBAf
 using FileIO
 using Base64: base64encode
 using HypertextLiteral: HypertextLiteral, @htl

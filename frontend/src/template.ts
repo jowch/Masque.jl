@@ -1,6 +1,6 @@
 // Template literal markup is author-trusted; every interpolated data value is HTML-escaped.
 import { format } from "d3-format"
-import type { Hit, TemplateSegment } from "./types"
+import type { AxisTransform, Hit, TemplateSegment } from "./types"
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }
 export const esc = (v: unknown): string => String(v).replace(/[&<>"']/g, (c) => ESC[c])
@@ -25,6 +25,19 @@ export function fmtNum(v: unknown, digits: number = DEFAULT_SIGDIGITS): string {
     if (typeof v !== "number" || !Number.isFinite(v) || Number.isInteger(v)) return String(v)
     if (Math.abs(v) >= 10 ** digits) return String(Math.round(v))
     return String(Number(v.toPrecision(digits)))
+}
+
+// A line hover's readout merged into its payload: `x` and `y` of the nearest sample, and for a
+// template also `i`, its 1-based index. The default table leaves `i` out, next to the line's own
+// `index` it reads as a second index. Julia sends a categorical or date coordinate as its text;
+// a number on an axis with categories still shows the label Makie puts at that position. A
+// non-object payload has nowhere to put fields and is shown as it is.
+export function withReadout(payload: unknown, hit: Hit, t: AxisTransform | undefined, template: boolean): unknown {
+    if (!hit.pt_ || (payload != null && typeof payload !== "object")) return payload
+    const [s, x, y] = hit.pt_
+    const cat = (v: number | string, cats?: string[] | null) => (typeof v === "number" && cats?.length ? cats[Math.round(v) - 1] ?? v : v)
+    const xy = { x: cat(x, t?.xcats), y: cat(y, t?.ycats) }
+    return template ? { ...(payload as object), i: s + 1, ...xy } : { ...(payload as object), ...xy }
 }
 
 // Missing fields (undefined) emit nothing.
@@ -80,7 +93,7 @@ export function stripToPlain(html: string): string {
 // Plain-text tooltip content for one hit — the announcement body in keyboard.ts's live region.
 // `:axis`/`:grid` hits never reach here (keyboard.ts's focus list excludes those kinds), so
 // unlike hover.ts's tipHtmlForHit this needs no manifest/px/py for continuous-axis inversion.
-export function plainTextForHit(hit: Hit, digits: number = DEFAULT_SIGDIGITS): string {
+export function plainTextForHit(hit: Hit, digits: number = DEFAULT_SIGDIGITS, t?: AxisTransform): string {
     const layer = hit.layer
     if (layer.tooltip === false) {
         // A legend entry has no visual card by default — the label is already in the row —
@@ -96,6 +109,6 @@ export function plainTextForHit(hit: Hit, digits: number = DEFAULT_SIGDIGITS): s
         return ""
     }
     const payload = layer.payloads[hit.index]
-    if (layer.template) return stripToPlain(renderTemplate(layer.template, payload, digits))
-    return renderAutoTablePlain(payload, digits)
+    if (layer.template) return stripToPlain(renderTemplate(layer.template, withReadout(payload, hit, t, true), digits))
+    return renderAutoTablePlain(withReadout(payload, hit, t, false), digits)
 }

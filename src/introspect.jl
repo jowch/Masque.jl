@@ -298,8 +298,11 @@ function PointInteractable(ax, p::Makie.MeshScatter; id = :meshscatter, payloads
         PointInteractable(ax, pts; kw..., payloads)
 end
 
-SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
-    SegmentInteractable(ax, _conv(p)[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
+function SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing)
+    data = _conv(p)[1]
+    i = SegmentInteractable(ax, data; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
+    return _with_samples(i, nothing, [[_pt3d(v) for v in data]])
+end
 SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
     SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol, tooltip, label)
 
@@ -645,8 +648,15 @@ end
 
 # The parent `converted` is the raw input points; the rendered staircase (the actual click
 # target) lives in the child Lines as the pre-expanded step polyline.
-SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
-    SegmentInteractable(ax, _converted(_childof(p, Makie.Lines))[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
+# The hover readout snaps to the input points, not the corners, so they ride along with the
+# step mode.
+function SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing)
+    i = SegmentInteractable(ax, _converted(_childof(p, Makie.Lines))[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
+    return _with_samples(i, p.step[], [[_pt3d(v) for v in _converted(p)[1]]])
+end
+_with_samples(i::SegmentInteractable, step, paths) = SegmentInteractable(
+    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, (step, paths),
+)
 
 # Each child line (or a ScatterLines child's line, when markers are on) is one element.
 # BezierPath curves aren't sampled here — a child that isn't Lines/ScatterLines fails loud.
@@ -670,7 +680,8 @@ function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothi
     isempty(children) && error("Series introspection: no child lines (Makie internals changed?)")
     paths = [_conv(_series_line(c))[1] for c in children]
     pl = payloads === nothing ? _series_payloads(children) : payloads
-    return _whole_lines(ax, paths, id, pl, tol, label; tooltip)
+    i = _whole_lines(ax, paths, id, pl, tol, label; tooltip)
+    return _with_samples(i, nothing, [[_pt3d(v) for v in path] for path in paths])
 end
 
 # Errorbars `converted` is Vec4 (x, y, low, high) with low/high RELATIVE offsets; Rangebars is
@@ -1111,7 +1122,7 @@ function _place(i::SegmentInteractable, f)
     res = i.resolve === nothing ? nothing : (ax -> map(f.place, i.resolve(ax)))
     paths = i.paths === nothing ? nothing : [map(f.place, path) for path in i.paths]
     return SegmentInteractable(
-        i.ax, map(f.place, i.vertices), i.mode, i.id, i.payloads, i.tol, i.tooltip, res, i.label, i.unit, paths,
+        i.ax, map(f.place, i.vertices), i.mode, i.id, i.payloads, i.tol, i.tooltip, res, i.label, i.unit, paths, i.samples,
     )
 end
 _place(i::PolygonInteractable, f) = PolygonInteractable(

@@ -611,3 +611,26 @@ describe("surface focus indicator", () => {
         expect(surface.classList.contains("kbd-ring")).toBe(false)
     })
 })
+
+// #262: keyboard focus has no cursor, so a line reads out the sample nearest its arc-length midpoint.
+describe("keyboard line readout", () => {
+    it("announces and shows the sample nearest the middle of the path", async () => {
+        vi.useFakeTimers()
+        try {
+            const m: Manifest = {
+                width: 1200, height: 800, scaling: 2, transforms: {},
+                layers: [{ id: "lines", kind: "lines", axis: "ax1", events: ["click", "hover"], payloads: [{ index: 1 }],
+                    geometry: [[0, 400, 100, 400, 500, 400, 600, 400]], points: [[0, 1, 1, 2, 5, 3, 6, 4]] }],
+            }
+            const { surface, shadow } = setup(m)
+            surface.focus()
+            down(surface, "ArrowRight")
+            // Midpoint x = 300 lies on the 100 → 500 edge, equally far from both ends: the first wins.
+            expect((shadow.querySelector(".masque-tip") as HTMLElement).textContent).toBe("index1x1y2")
+            vi.advanceTimersByTime(200)
+            expect((shadow.querySelector('[aria-live="polite"]') as HTMLElement).textContent).toContain("index 1, x 1, y 2")
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+})

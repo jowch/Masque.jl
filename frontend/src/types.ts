@@ -135,6 +135,12 @@ export interface HitLayer {
     // shared palette + one 0-based palette index per element (colormapped/categorical data).
     // Absent → no accent (unresolvable or not attempted for this plot kind).
     colors?: string | { palette: string[]; index: number[] }
+    // :lines on a 2D axis: per element, the data samples [x0, y0, x1, y1, …] that a hover
+    // readout snaps to. Vertex k of the drawn path is sample k, except for a staircase (`step`),
+    // whose drawn path adds a corner between samples. A coordinate on a categorical or date axis
+    // is its label or date text. Absent → no readout (Axis3, or a layer built by hand).
+    points?: (number | string)[][]
+    step?: "pre" | "post" | "center"
     // Bond value shape: selects-ROI mouse-up ships { items: [...] }; single-click / bounds-ROI
     // ships { layer, index, payload } directly.
 }
@@ -168,6 +174,7 @@ export interface Hit {
     index: number // -1 for axis (continuous)
     geom_?: unknown[] // shape descriptor for highlight drawing
     grid_?: [number, number, number?] // [i, j, value]; value absent only when neither values nor sample was sent
+    pt_?: [number, number | string, number | string] // :lines readout: [0-based sample index, x, y] nearest the cursor
     axis_?: string // transform id, for continuous inversion
     roiPart_?: { corner?: number; edge?: "n" | "s" | "w" | "e"; move?: boolean } // which sub-part of an :roi a drag grabbed
 }

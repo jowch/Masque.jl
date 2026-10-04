@@ -27,16 +27,39 @@ function finitePair(x: number, y: number): boolean {
 }
 
 // Nearest point on a polyline (flat [x,y,…], NaN/Inf = gap). null when the path has no finite edge.
-export function closestPointOnPath(px: number, py: number, verts: number[]): { x: number; y: number; dist: number } | null {
-    let best: { x: number; y: number; dist: number } | null = null
+// `edge` is the index of the edge it lies on, from vertex `edge` to vertex `edge + 1`.
+export function closestPointOnPath(px: number, py: number, verts: number[]): { x: number; y: number; dist: number; edge: number } | null {
+    let best: { x: number; y: number; dist: number; edge: number } | null = null
     for (let i = 0; i < verts.length / 2 - 1; i++) {
         const x0 = verts[2 * i], y0 = verts[2 * i + 1], x1 = verts[2 * i + 2], y1 = verts[2 * i + 3]
         if (!finitePair(x0, y0) || !finitePair(x1, y1)) continue
         const p = closestPointOnSegment(px, py, x0, y0, x1, y1)
         const dist = Math.hypot(px - p.x, py - p.y)
-        if (!best || dist < best.dist) best = { x: p.x, y: p.y, dist }
+        if (!best || dist < best.dist) best = { x: p.x, y: p.y, dist, edge: i }
     }
     return best
+}
+
+// The data sample a hover on line `index` of a :lines layer reads out, at image px (px, py):
+// the nearest point on the drawn path, then whichever end of its edge is closer on screen.
+// Following the path, not the x axis, keeps a curve that doubles back on the branch under the
+// cursor. A staircase's corners are not samples: Makie draws sample k at vertex 2k, and a
+// corner belongs to the step it sits on (the next sample for `pre`, its own for `post` and
+// `center`). Returns [0-based sample, x, y] in data space, or null without `points`.
+export function lineReadout(layer: HitLayer, index: number, px: number, py: number): [number, number | string, number | string] | null {
+    const pts = layer.points?.[index]
+    const verts = (layer.geometry as number[][] | null)?.[index]
+    if (!pts || !verts) return null
+    const on = closestPointOnPath(px, py, verts)
+    if (!on) return null
+    const a = on.edge, b = a + 1
+    const da = Math.hypot(verts[2 * a] - on.x, verts[2 * a + 1] - on.y)
+    const db = Math.hypot(verts[2 * b] - on.x, verts[2 * b + 1] - on.y)
+    const k = db < da ? b : a
+    const s = layer.step === undefined ? k : layer.step === "pre" ? Math.ceil(k / 2) : Math.floor(k / 2)
+    const x = pts[2 * s], y = pts[2 * s + 1]
+    const shown = (v: number | string | undefined) => typeof v === "string" || Number.isFinite(v)
+    return x !== undefined && y !== undefined && shown(x) && shown(y) ? [s, x, y] : null
 }
 
 // Keyboard focus has no cursor: sit at the arc-length midpoint, the same idea as a segment's midpoint.
@@ -299,7 +322,10 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
                 const hit = closestPointOnPath(px, py, paths[k])
                 if (hit && hit.dist < bd) { bd = hit.dist; best = k }
             }
-            if (bd <= tol && best >= 0) return { index: best, geom_: ["path", paths[best]] }
+            if (bd <= tol && best >= 0) {
+                const pt = lineReadout(layer, best, px, py)
+                return pt ? { index: best, geom_: ["path", paths[best]], pt_: pt } : { index: best, geom_: ["path", paths[best]] }
+            }
             return null
         }
         case "segments": {
