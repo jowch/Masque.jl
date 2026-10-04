@@ -11,6 +11,11 @@ All notable changes to this project are documented here. The format is based on
   element of an `:arrows2d` layer, hit along the drawn arrow from tail to tip, with payload
   `(; index, x, y, u, v)`. Before, `masque` made no layer for it.
 
+### Fixed
+- After a page reload, the highlighted selection matches the value Pluto restored to the
+  `@bind` variable. Before, it showed the `selected=` element while the variable held your
+  last click, so the next click could clear the selection instead of making it (#272).
+
 ## [0.2.0] - 2026-10-03
 
 Some calls written for 0.1 behave differently: each is marked **Breaking** below, and the
