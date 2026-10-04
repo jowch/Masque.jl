@@ -27,6 +27,12 @@ date axis, `x` and `y` in the tooltip and in `pick` are text: the
 category's label, such as `"b"`, or the date or time you plotted, such
 as `"2024-01-02"`, `"2024-01-01T01:00:00"`, or `"01:00:00"`.
 
+Hovering a line from `lines!`, `stairs!`, `series!`, or `scatterlines!`
+adds `x` and `y` of the point you plotted nearest the pointer along the
+line. In a template you can also use `i`, that point's position in the
+line's data, so `$(i)` is `3` over `xs[3], ys[3]`. A click still picks
+the whole line. A line on an `Axis3` shows only its payload.
+
 Numbers show up to four significant figures, so `0.30000000000000004`
 reads `0.3` and `2.71828` reads `2.718`. Whole numbers show in full. To
 show more or fewer figures, pass `tooltip_sigdigits` to `masque`:

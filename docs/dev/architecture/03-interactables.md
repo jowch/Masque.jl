@@ -93,6 +93,14 @@ A point inside an element still wins over another element's outline. `:circles` 
 centers the outline on the marker's edge, and all of it on WebGL, which paints it outside).
 `:circles` and the other kinds' manifests are untouched by this field.
 
+`points` (optional, `:lines` on a 2D axis only) is one flat `[x1, y1, x2, y2, …]` per element:
+the line's own data samples, which the hover readout snaps to ([§10](10-tooltips.md)). The
+geometry is rounded to image pixels and a stairs path adds corners between samples, so the
+samples cannot be recovered from it. Numbers ship as Float32. On a date or categorical axis a
+coordinate ships as the text a scatter's default payload holds. `step` (`"pre"`, `"post"` or
+`"center"`, from a `stairs` plot) says which sample each drawn corner belongs to. Placement
+(`translate!`, …) moves the path but not the samples.
+
 `label` (optional, per-layer, `String`) is a screen-reader announcement prefix for the
 keyboard-navigation overlay ([§11](11-keyboard.md)) — e.g. `"Scatter"` in "Scatter, element 3 of 10: …". Set via
 the `label` keyword on `PointInteractable`/`SegmentInteractable`/`RectInteractable`/
@@ -126,7 +134,7 @@ this table is `docs/src/support.md`.
 | Type | kind(s) | Makie surfaces | payload |
 |---|---|---|---|
 | `PointInteractable` | `:circles` | Scatter, MeshScatter (3-D), Stem·pts, ScatterLines·pts | `(; index, x, y)`, plus `z` when the point has three coordinates (Scatter on `Axis3`, MeshScatter) |
-| `SegmentInteractable` | `:polyline` \| `:lines` \| `:segments` | Lines, Stairs, Series, ScatterLines·line (`:lines`, one element per path); an explicit `mode=:polyline` vertex list stays `:polyline` (per edge); LineSegments, Errorbars, Rangebars, HLines, VLines, Stem·stems, Wireframe, Arrows3D (`:pairs` → `:segments`) | `:lines` `(; index)` (a series adds `label` when Makie set one); `:polyline` / `:segments` `(; segment_index)`; Arrows3D `(; index, x, y, z, u, v, w)` |
+| `SegmentInteractable` | `:polyline` \| `:lines` \| `:segments` | Lines, Stairs, Series, ScatterLines·line (`:lines`, one element per path); an explicit `mode=:polyline` vertex list stays `:polyline` (per edge); LineSegments, Errorbars, Rangebars, HLines, VLines, Stem·stems, Wireframe, Arrows3D, Arrows2D (`:pairs` → `:segments`) | `:lines` `(; index)` (a series adds `label` when Makie set one); `:polyline` / `:segments` `(; segment_index)`; Arrows3D `(; index, x, y, z, u, v, w)`; Arrows2D `(; index, x, y, u, v)` |
 | `RectInteractable` | `:rects` | BarPlot, Hist, Waterfall, CrossBar, HSpan, VSpan, Spy, BoxPlot (un-notched) | BarPlot/Waterfall `(; low, high, value)`; Hist `(; value, low, high)`; CrossBar `(; midpoint, low, high)`; HSpan/VSpan `(; low, high)`; BoxPlot `(; q1, median, q3)`; Spy `(; index)` |
 | `GridInteractable` | `:grid` | Heatmap, Image | none: the client resolves `(; i, j, value)`, and a click commits a `GridCellEvent` |
 | `PolygonInteractable` | `:polygons` | Poly, Band, Density, Contourf, Violin, Voronoiplot, BoxPlot (notched) | Band/Density/Voronoiplot `(; index)`; Contourf `(; low, high)`; Violin `(; x)` |
@@ -142,7 +150,7 @@ this table is `docs/src/support.md`.
 Layer ids are the plot kind (`:scatter`, `:lines`, `:cells`, `:bars`, `:poly`, …, `:colorbar`,
 `:legend`), suffixed `_2`, `_3`, … when a kind repeats; a composite's second layer takes a suffix
 (`:stem_stems`, `:scatterlines_line`). On `Axis3` only Scatter/Lines/LineSegments/MeshScatter/
-Wireframe/Arrows3D extract; on `PolarAxis` only Scatter/Lines/LineSegments/ScatterLines/Series.
+Wireframe/Arrows3D/ScatterLines extract; on `PolarAxis` only Scatter/Lines/LineSegments/ScatterLines/Series.
 Other kinds on those axes are skipped with a warning.
 
 **Default order.** `interactables(fig)` lists each axis's plot layers in reverse drawing order

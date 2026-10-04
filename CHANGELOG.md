@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `scatterlines!` on an `Axis3` responds to hover and click, with the same `:scatterlines`
+  (markers) and `:scatterlines_line` (line) layers it gives on a 2D `Axis`. Before, `masque`
+  skipped it with a warning.
+- `arrows2d!` (and `arrows!` on a 2D `Axis`) responds to hover and click: each arrow is one
+  element of an `:arrows2d` layer, hit along the drawn arrow from tail to tip, with payload
+  `(; index, x, y, u, v)`. Before, `masque` made no layer for it.
+- Hovering a line from `lines!`, `stairs!`, `series!`, or `scatterlines!` shows `x` and `y`
+  of the plotted point nearest the pointer along the line, and a tooltip template can name
+  `x`, `y`, and `i`, that point's index. Clicks and the `@bind` value still pick the whole
+  line. Lines on an `Axis3` are unchanged (#262).
+
 ### Fixed
 - The 0.2 deprecations now show their warning in Pluto and the REPL. Before, Julia showed
   them only when it ran with `--depwarn=yes`, so a notebook still using `CairoBackend(…)`,

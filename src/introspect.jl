@@ -298,8 +298,11 @@ function PointInteractable(ax, p::Makie.MeshScatter; id = :meshscatter, payloads
         PointInteractable(ax, pts; kw..., payloads)
 end
 
-SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
-    SegmentInteractable(ax, _conv(p)[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
+function SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing)
+    data = _conv(p)[1]
+    i = SegmentInteractable(ax, data; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
+    return _with_samples(i, nothing, [[_pt3d(v) for v in data]])
+end
 SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
     SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol, tooltip, label)
 
@@ -330,39 +333,57 @@ _bcast(v, k) = length(v) == 1 ? v[1] : v[k]
 # Raw pos→pos+dir is wrong: arrows3d autoscales and renders via MeshScatter children in a
 # normalized, anisotropically-scaled space. Read the processed startpoints/endpoints instead
 # (already post-align/lengthscale/normalize, in DATA coords).
-function SegmentInteractable(ax, p::Makie.Arrows3D; id = :arrows3d, payloads = nothing, tol = 6, tooltip = nothing, label = nothing)
+SegmentInteractable(ax, p::Makie.Arrows3D; id = :arrows3d, payloads = nothing, tol = 6, tooltip = nothing, label = nothing) =
+    _arrow_segments(ax, p, Makie.Point3f, "Arrows3D"; id, payloads, tol, tooltip, label)
+
+# `arrows2d!` draws each arrow as a `Poly` in pixel space, which the child walk skips. The
+# drawn arrow (tail, shaft and head together) is scaled to span exactly startpoint→endpoint
+# on screen, so the data-space start→end segment lies along it with its end on the tip.
+SegmentInteractable(ax, p::Makie.Arrows2D; id = :arrows2d, payloads = nothing, tol = _arrow2d_tol(p), tooltip = nothing, label = nothing) =
+    _arrow_segments(ax, p, Makie.Point2f, "Arrows2D"; id, payloads, tol, tooltip, label)
+
+# Hit slack wide enough to cover the drawn head and shaft: half the widest part, at least 6px.
+# The widths are pixels only while `markerspace = :pixel` (the default); in any other space
+# they are not screen sizes, so the slack stays at the 6px line default. Makie draws each
+# width as one number for every arrow, so there is no per-arrow vector to read.
+function _arrow2d_tol(p)
+    p.markerspace[] === :pixel || return 6.0
+    w = max(Float64(p.tipwidth[]), Float64(p.shaftwidth[]))
+    p.taillength[] > 0 && (w = max(w, Float64(p.tailwidth[])))
+    return max(6.0, w / 2)
+end
+
+function _arrow_segments(ax, p, P, name; id, payloads, tol, tooltip, label)
     starts, ends_ = p.startpoints[], p.endpoints[]
     length(starts) == length(ends_) || error(
-        "Arrows3D introspection: startpoints/endpoints length mismatch ($(length(starts)) vs $(length(ends_)))"
+        "$name introspection: startpoints/endpoints length mismatch ($(length(starts)) vs $(length(ends_)))"
     )
-    verts = Makie.Point3f[]
+    verts = P[]
     sizehint!(verts, 2 * length(starts))
     for (a, b) in zip(starts, ends_)
-        push!(verts, Makie.Point3f(a...), Makie.Point3f(b...))
+        push!(verts, P(a[1:length(P)]...), P(b[1:length(P)]...))
     end
     if payloads === nothing
         # Makie broadcasts a single point or direction over every arrow, so either can have
         # length 1 while startpoints has one entry per arrow.
         pts, dirs = p.points[], p.directions[]
-        for (name, v) in (("points", pts), ("directions", dirs))
+        for (vname, v) in (("points", pts), ("directions", dirs))
             length(v) in (1, length(starts)) || error(
-                "Arrows3D introspection: $name/startpoints length mismatch ($(length(v)) vs $(length(starts)))"
+                "$name introspection: $vname/startpoints length mismatch ($(length(v)) vs $(length(starts)))"
             )
         end
-        payloads = [
-            let pt = _bcast(pts, k), d = _bcast(dirs, k)
-                (;
-                    index = k,
-                    x = Float64(pt[1]), y = Float64(pt[2]), z = Float64(pt[3]),
-                    u = Float64(d[1]), v = Float64(d[2]), w = Float64(d[3]),
-                )
-            end
-                for k in eachindex(starts)
-        ]
+        payloads = [_arrow_payload(P, k, _bcast(pts, k), _bcast(dirs, k)) for k in eachindex(starts)]
         payloads = _unconvert_payloads(ax, payloads)
     end
     return SegmentInteractable(ax, verts; mode = :pairs, id, payloads, tol, tooltip, label)
 end
+_arrow_payload(::Type{Makie.Point3f}, k, pt, d) = (;
+    index = k,
+    x = Float64(pt[1]), y = Float64(pt[2]), z = Float64(pt[3]),
+    u = Float64(d[1]), v = Float64(d[2]), w = Float64(d[3]),
+)
+_arrow_payload(::Type{Makie.Point2f}, k, pt, d) =
+    (; index = k, x = Float64(pt[1]), y = Float64(pt[2]), u = Float64(d[1]), v = Float64(d[2]))
 
 # Makie converts cell centers to an edge vector (length n+1); the coordinate-free form gives
 # `EndPoints` (length 2), expanded here to n+1 uniform edges.
@@ -651,8 +672,15 @@ end
 
 # The parent `converted` is the raw input points; the rendered staircase (the actual click
 # target) lives in the child Lines as the pre-expanded step polyline.
-SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing) =
-    SegmentInteractable(ax, _converted(_childof(p, Makie.Lines))[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
+# The hover readout snaps to the input points, not the corners, so they ride along with the
+# step mode.
+function SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = nothing)
+    i = SegmentInteractable(ax, _converted(_childof(p, Makie.Lines))[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
+    return _with_samples(i, p.step[], [[_pt3d(v) for v in _converted(p)[1]]])
+end
+_with_samples(i::SegmentInteractable, step, paths) = SegmentInteractable(
+    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, (step, paths),
+)
 
 # Each child line (or a ScatterLines child's line, when markers are on) is one element.
 # BezierPath curves aren't sampled here — a child that isn't Lines/ScatterLines fails loud.
@@ -676,7 +704,8 @@ function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothi
     isempty(children) && error("Series introspection: no child lines (Makie internals changed?)")
     paths = [_conv(_series_line(c))[1] for c in children]
     pl = payloads === nothing ? _series_payloads(children) : payloads
-    return _whole_lines(ax, paths, id, pl, tol, label; tooltip)
+    i = _whole_lines(ax, paths, id, pl, tol, label; tooltip)
+    return _with_samples(i, nothing, [[_pt3d(v) for v in path] for path in paths])
 end
 
 # Errorbars `converted` is Vec4 (x, y, low, high) with low/high RELATIVE offsets; Rangebars is
@@ -914,6 +943,7 @@ function _plotbase(p)
     p isa Makie.LineSegments && return :segments
     p isa Makie.Wireframe && return :wireframe
     p isa Makie.Arrows3D && return :arrows3d
+    p isa Makie.Arrows2D && return :arrows2d
     (p isa Makie.Heatmap || p isa Makie.Image) && return :cells
     p isa Makie.BarPlot && return :bars
     p isa Makie.Poly && return :poly
@@ -1020,7 +1050,7 @@ end
 function _construct_unplaced(ax, p, id; kw...)
     p isa Makie.Scatter && return [PointInteractable(ax, p; id, kw...)]
     p isa Makie.MeshScatter && return [PointInteractable(ax, p; id, kw...)]
-    (p isa Makie.Lines || p isa Makie.LineSegments || p isa Makie.Wireframe || p isa Makie.Arrows3D) &&
+    (p isa Makie.Lines || p isa Makie.LineSegments || p isa Makie.Wireframe || p isa Makie.Arrows3D || p isa Makie.Arrows2D) &&
         return [SegmentInteractable(ax, p; id, kw...)]
     (
         p isa Makie.Stairs || p isa Makie.Errorbars || p isa Makie.Rangebars ||
@@ -1117,7 +1147,7 @@ function _place(i::SegmentInteractable, f)
     res = i.resolve === nothing ? nothing : (ax -> map(f.place, i.resolve(ax)))
     paths = i.paths === nothing ? nothing : [map(f.place, path) for path in i.paths]
     return SegmentInteractable(
-        i.ax, map(f.place, i.vertices), i.mode, i.id, i.payloads, i.tol, i.tooltip, res, i.label, i.unit, paths,
+        i.ax, map(f.place, i.vertices), i.mode, i.id, i.payloads, i.tol, i.tooltip, res, i.label, i.unit, paths, i.samples,
     )
 end
 _place(i::PolygonInteractable, f) = PolygonInteractable(
@@ -1193,11 +1223,11 @@ function _skip_for_axis(ax, p)
     if ax isa Makie.Axis3 && !(
             p isa Union{
                 Makie.Scatter, Makie.Lines, Makie.LineSegments,
-                Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D,
+                Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D, Makie.ScatterLines,
             }
         )
         @warn "masque: skipping $(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/" *
-            "LineSegments/MeshScatter/Wireframe/Arrows3D have 3D-valid extraction today; " *
+            "LineSegments/MeshScatter/Wireframe/Arrows3D/ScatterLines have 3D-valid extraction today; " *
             "other kinds are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
         return true
     end
@@ -1395,8 +1425,8 @@ part of that list on one axis, with the same ids.
 On each axis the plot drawn last comes first. Where marks overlap, the first in the list gets
 the pointer, so it is the mark drawn on top.
 
-On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D` are
-supported; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
+On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D`/
+`ScatterLines` are supported; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
 Other kinds are skipped with a warning. A recipe with its own
 `Masque.interactables(ax, p::MyPlot)` method uses it. Any other recipe contributes each child
 that has a default (`arc!` is the `lines!` it draws), under that child's layer id. A child

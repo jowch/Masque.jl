@@ -1454,6 +1454,31 @@ try {
     if (spec.selected && afterLeave.sel < 1) throw new Error(`${key}: g.sel dropped on unhover`);
     if (spec.selected) passed.push(`${key}/selected-survives-unhover`);
 
+    // #262: a hover just past a plotted point reads out that point, not one between samples.
+    if (spec.readout) {
+      const verts = layer.geometry[hoverIndex];
+      const k = spec.readout.vertex;
+      const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
+      const want = spec.readout.text.map(norm);
+      let t = null;
+      for (let a = 0; a < 8; a++) {
+        t = await dispatchAt(key, verts[2 * k] + 2, verts[2 * k + 1], "pointermove");
+        if (t?.show && want.every((w) => norm(t.text).includes(w))) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (!(t?.show && want.every((w) => norm(t.text).includes(w)))) {
+        throw new Error(`${key}: readout at vertex ${k} wanted ${JSON.stringify(spec.readout.text)}, tooltip ${JSON.stringify(t?.text)}`);
+      }
+      await page.evaluate((k2) => {
+        const span = document.querySelector(`#coords_${k2}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+      }, key);
+      passed.push(`${key}/readout`);
+    }
+
     // A legend entry's linked highlight (HitLayer.links) draws the SELECTED recipe for every
     // element of the target layer(s) into g.link — distinct from g.sel/g.hi. Generic: skipped
     // for every spec except the one(s) that carry a "links" meta key. Runs BEFORE the click

@@ -1,6 +1,6 @@
 import { anchorFor, computeAnchoredPlacement, hitTestAt, photoClip, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layoutSpaceLayer } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
-import { renderTemplate, renderAutoTable, esc, fmtNum } from "./template"
+import { renderTemplate, renderAutoTable, esc, fmtNum, withReadout } from "./template"
 import { drawHover, clearHover, drawLink, clearLink, markColorFor } from "./highlight"
 import { hideCross, syncCross } from "./cross"
 import { linkedHits } from "./selection"
@@ -180,7 +180,7 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
         // tooltip below, shows the Julia 1-based cell that pick.i/pick.j report.
         return renderTemplate(
             layer.template,
-            hit.grid_ ? { ...(payload as object), i: hit.grid_[0] + 1, j: hit.grid_[1] + 1 } : payload,
+            hit.grid_ ? { ...(payload as object), i: hit.grid_[0] + 1, j: hit.grid_[1] + 1 } : withReadout(payload, hit, ctx.manifest_.transforms[layer.axis], true),
             ctx.tipDigits_,
         )
     } else if (hit.grid_) {
@@ -192,7 +192,7 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
         const d = ctx.tipDigits_
         return "value" in v ? esc(fmt(v.value, d)) : `x=${esc(fmt(v.x, d))}, y=${esc(fmt(v.y, d))}`
     }
-    return renderAutoTable(hit.layer.payloads[hit.index], ctx.tipDigits_)
+    return renderAutoTable(withReadout(hit.layer.payloads[hit.index], hit, ctx.manifest_.transforms[layer.axis], false), ctx.tipDigits_)
 }
 
 export function applyTipHtml(ctx: OverlayCtx, state: OverlayState, html: string, hit: Hit | null): void {

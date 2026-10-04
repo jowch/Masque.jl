@@ -9,7 +9,7 @@ import { showTipAt, hideTip, updateLinkForHit, layoutAnchor } from "./hover"
 import { commitClick } from "./bond"
 import { plainTextForHit } from "./template"
 import { cssAnchor } from "./state"
-import { anchorFor } from "./geometry"
+import { anchorFor, lineReadout } from "./geometry"
 import type { OverlayCtx, OverlayState } from "./state"
 import type { FocusRef, Hit, HitLayer, Manifest } from "./types"
 
@@ -86,6 +86,12 @@ export function focusTo(ctx: OverlayCtx, state: OverlayState, i: number | null):
     state.focusIdx_ = clamped
     const ref = ctx.focusable_[clamped]
     const hit = hitFor(ref)
+    // No cursor: read out the sample nearest the path's arc-length midpoint, where the tooltip sits.
+    if (hit.layer.kind === "lines") {
+        const mid = anchorFor(hit, null)
+        const pt = lineReadout(hit.layer, hit.index, mid.x, mid.y)
+        if (pt) hit.pt_ = pt
+    }
     state.focusHit_ = hit
     ctx.surface_.classList.add("kbd-ring")
     drawHover(ctx, state, hit)
@@ -97,7 +103,7 @@ export function focusTo(ctx: OverlayCtx, state: OverlayState, i: number | null):
     const html = showTipAt(ctx, state, hit, anchor.x, anchor.y, css)
     state.focusTipHtml_ = html
     state.focusTipCss_ = html === null ? null : css
-    scheduleAnnounce(ctx, state, announceText(ref, plainTextForHit(hit, ctx.tipDigits_)))
+    scheduleAnnounce(ctx, state, announceText(ref, plainTextForHit(hit, ctx.tipDigits_, ctx.manifest_.transforms[hit.layer.axis])))
 }
 
 // First index of each distinct layer run in `list` (list is manifest-order, so a layer's
