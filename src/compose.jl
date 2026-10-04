@@ -19,13 +19,14 @@ This is also how a recipe gets layers of its own. Define a method for your plot 
 `masque(fig)` uses it instead of walking the plots your recipe draws:
 
 ```julia
-function Masque.interactables(ax, p::MyPlot; id = :myplot, kwargs...)
-    return [PointInteractable(ax, p.positions[]; id, kwargs...)]
+function Masque.interactables(ax, p::MyPlot; kwargs...)
+    return [PointInteractable(ax, p.positions[]; kwargs...)]
 end
 ```
 
-Use `id` for the first layer and derive any others from it, so two `myplot!` calls in one
-figure take `:myplot` and `:myplot_2` without colliding.
+`masque` names the layers the method returns: the first takes the plot's name, `:myplot` and
+then `:myplot_2` for a second `myplot!`, and each other layer adds its own name to it
+(`:myplot_bars`). A method that takes `id` by name names its layers itself instead.
 """
 function interactables(ax, p::Makie.AbstractPlot; id = nothing, kwargs...)
     base = _plotbase(p)
@@ -33,35 +34,58 @@ function interactables(ax, p::Makie.AbstractPlot; id = nothing, kwargs...)
         ArgumentError(
             "interactables: Masque has no default for $(Makie.plotkey(p)). `masque(fig)` builds a " *
                 "recipe's layers from the plots it draws; to give it its own, define " *
-                "`Masque.interactables(ax, p::YourPlotType; id, kwargs...)`",
+                "`Masque.interactables(ax, p::YourPlotType; kwargs...)`",
         ),
     )
     return _construct(ax, p, something(id, base); kwargs...)
 end
 
-# `interactables(ax, p; kwargs...)` as `masque` calls it. A recipe's own method written
-# without keywords (`Masque.interactables(ax, p::MyPlot)`) is never reached with keywords:
-# Julia sends the call to the built-in method, which reports no default for the plot. One
-# that lacks a keyword the caller passed raises a bare `MethodError`. Read the keywords the
-# method declares and name the fix instead. A `MethodError` raised inside the method's body is
-# not this case and passes through.
-function _plot_interactables(ax, p; kwargs...)
-    if _has_custom(ax, p)
-        declared = Base.kwarg_decl(which(interactables, Tuple{typeof(ax), typeof(p)}))
-        slurps = any(k -> endswith(string(k), "..."), declared)
-        rejected = [k for k in keys(kwargs) if !slurps && k ∉ declared]
-        isempty(rejected) && return interactables(ax, p; kwargs...)
+# `interactables(ax, p; id, kwargs...)` as `masque` calls it. A recipe's own method need not
+# take `id`: when it doesn't, `masque` calls it without one and names the layers it returns,
+# the first `id` and the rest `id` plus their own name (`:dumbbell`, `:dumbbell_scatter`).
+# Other keywords come from the caller, and a method that lacks one would otherwise raise a
+# bare `MethodError`, or, written without keywords, be passed over for the built-in method,
+# which reports no default for the plot. Read the keywords the method declares and name the
+# fix instead. A `MethodError` raised inside the method's body is not this case and passes
+# through.
+function _plot_interactables(ax, p; id, kwargs...)
+    _has_custom(ax, p) || return interactables(ax, p; id, kwargs...)
+    declared = Base.kwarg_decl(which(interactables, Tuple{typeof(ax), typeof(p)}))
+    slurps = any(k -> endswith(string(k), "..."), declared)
+    takes(k) = slurps || k in declared
+    rejected = [k for k in keys(kwargs) if !takes(k)]
+    if !isempty(rejected)
         T = Makie.plotsym(typeof(p))   # the name `@recipe` gave the type, `MyPlot`
         kws = (length(rejected) == 1 ? "keyword " : "keywords ") * join(("`$k`" for k in rejected), ", ")
         throw(
             ArgumentError(
-                "masque: the interactables method for $T does not take the $kws, which `masque` " *
-                    "passes it. Add `; id, kwargs...` to its signature, " *
-                    "`Masque.interactables(ax, p::$T; id, kwargs...)`, and give the first layer it builds that id",
+                "masque: the interactables method for $T does not take the $kws, passed with " *
+                    "`interactables(plot; …)`. Add `; kwargs...` to its signature, " *
+                    "`Masque.interactables(ax, p::$T; kwargs...)`, and pass them on to the layers it builds",
             ),
         )
     end
-    return interactables(ax, p; kwargs...)
+    :id in declared && return interactables(ax, p; id, kwargs...)
+    return _name_layers(interactables(ax, p; kwargs...), id)
+end
+
+# The layers of a recipe method that took no `id`, named after `id`: the first takes it, the
+# rest add their own name to it. A layer that points at another of them by id (a slice's
+# `covers`, a selector's `selects`) follows the rename.
+function _name_layers(built, id::Symbol)
+    names = Dict{Symbol, Symbol}()
+    for l in built
+        own = _layer_id(l)
+        own === nothing || haskey(names, own) || (names[own] = isempty(names) ? id : Symbol(id, :_, own))
+    end
+    rename(f, v) = f === :id ? names[v] :
+        f === :selects && v isa Symbol ? get(names, v, v) :
+        f === :covers ? Symbol[get(names, c, c) for c in v] : v
+    return AbstractInteractable[
+        _layer_id(l) === nothing ? l :
+            typeof(l)(ntuple(i -> rename(fieldname(typeof(l), i), getfield(l, i)), fieldcount(typeof(l)))...)
+            for l in built
+    ]
 end
 
 # `interactables(plot)` before `masque` has found its axis and its default id.
