@@ -172,6 +172,13 @@ end
         w = masque(fl, interactables(b; id = :trend), SliceInteractable(axl, b); auto = false)
         sl = only(filter(L -> L["kind"] == "slice", w.manifest["layers"]))
         @test sl["geometry"]["covers"] == ["trend"]
+        # A Series slice reads every row and covers the series layer.
+        fs = Figure(); axs = Axis(fs[1, 1])
+        sp = series!(axs, [0.0, 1.0, 2.0], [0.0 1.0 0.0; 1.0 2.0 1.0]; labels = ["a", "b"])
+        w = masque(fs, SliceInteractable(axs, sp))
+        sl = only(filter(L -> L["kind"] == "slice", w.manifest["layers"]))
+        @test sl["geometry"]["covers"] == ["series"]
+        @test length(sl["geometry"]["series"]) == 2
         # Covers the caller names are checked as before.
         err = (@test_throws ArgumentError masque(fl, SliceInteractable(axl, [a, b]; covers = [:lines]); auto = false)).value
         @test occursin("not a layer in this masque() call", err.msg)
