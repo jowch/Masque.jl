@@ -880,6 +880,15 @@ end
             # The readout snaps to the 4 input points, not the corners, so they ship with the step mode.
             @test L.points == [Float32[0, 0, 1, 2, 2, 1, 3, 3]] && L.step === :pre
             @test only(hitlayers(SegmentInteractable(a, stairs!(a, 0:2, [1, 2, 3]; step = :center)), c)).step === :center
+            # Every drawn vertex sits on the step of the sample the overlay maps it to
+            # (frontend/src/geometry.ts `lineReadout`): the next sample for `pre`, its own otherwise.
+            for mode in (:pre, :post, :center)
+                q = stairs!(a, [0.0, 1.0, 2.0, 3.0], [0.0, 2.0, 1.0, 3.0]; step = mode)
+                drawn = Masque._converted(Masque._childof(q, Makie.Lines))[1]
+                ys = only(only(hitlayers(SegmentInteractable(a, q), c)).points)[2:2:end]
+                sample(v) = (mode === :pre ? cld(v, 2) : fld(v, 2)) + 1
+                @test all(drawn[v + 1][2] == ys[sample(v)] for v in 0:(length(drawn) - 1))
+            end
         end
 
         @testset "errorbars/rangebars -> Segment(:pairs)" begin

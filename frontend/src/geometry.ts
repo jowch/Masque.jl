@@ -55,7 +55,7 @@ export function lineReadout(layer: HitLayer, index: number, px: number, py: numb
     const a = on.edge, b = a + 1
     const da = Math.hypot(verts[2 * a] - on.x, verts[2 * a + 1] - on.y)
     const db = Math.hypot(verts[2 * b] - on.x, verts[2 * b + 1] - on.y)
-    const k = db < da ? b : a
+    const k = db < da ? b : a // a tie keeps the earlier vertex
     const s = layer.step === undefined ? k : layer.step === "pre" ? Math.ceil(k / 2) : Math.floor(k / 2)
     const x = pts[2 * s], y = pts[2 * s + 1]
     const shown = (v: number | string | undefined) => typeof v === "string" || Number.isFinite(v)
