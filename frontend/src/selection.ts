@@ -52,18 +52,36 @@ export function computeSelection(
             xmin: Math.min(ax, bx), xmax: Math.max(ax, bx),
             ymin: Math.min(ay, by), ymax: Math.max(ay, by),
         }
-        const rx0 = gg.xedges[i0], rx1 = gg.xedges[i1 + 1], ry0 = gg.yedges[j0], ry1 = gg.yedges[j1 + 1]
-        // "rectfill", not "rect": this block sits beside the continuous ROI outline the user is
-        // actually dragging, so it must not draw its own stroke on top of/next to that outline
-        // (a stroked rect here reads as two overlapping boxes with parallel edges after release —
-        // see highlight.ts's makeHiElement). An element-indexed :rects selection (selects on a
-        // rects-kind target, or `selected=`) keeps its stroke; only this cell-block union rect
-        // — which exists only because a grid target isn't itself element-selectable — is fill-only.
-        const hits: Hit[] = [{ layer: target, index: 0,
-            geom_: ["rectfill", (rx0 + rx1) / 2, (ry0 + ry1) / 2, Math.abs(rx1 - rx0), Math.abs(ry1 - ry0)] }]
-        return { items: [{ layer: target.id, index: 0, payload }], hits }
+        return { items: [{ layer: target.id, index: 0, payload }], hits: [gridBlockHit(target, i0, i1, j0, j1)] }
     }
     return { items: [], hits: [] } // unsupported target kind
+}
+
+// The highlight for a brushed block of grid cells, inclusive cell indices.
+// "rectfill", not "rect": this block sits beside the continuous ROI outline the user is
+// actually dragging, so it must not draw its own stroke on top of/next to that outline
+// (a stroked rect here reads as two overlapping boxes with parallel edges after release —
+// see highlight.ts's makeHiElement). An element-indexed :rects selection (selects on a
+// rects-kind target, or `selected=`) keeps its stroke; only this cell-block union rect
+// — which exists only because a grid target isn't itself element-selectable — is fill-only.
+function gridBlockHit(target: HitLayer, i0: number, i1: number, j0: number, j1: number): Hit {
+    const gg = target.geometry as GridGeometry
+    const rx0 = gg.xedges[i0], rx1 = gg.xedges[i1 + 1], ry0 = gg.yedges[j0], ry1 = gg.yedges[j1 + 1]
+    return { layer: target, index: 0,
+        geom_: ["rectfill", (rx0 + rx1) / 2, (ry0 + ry1) / 2, Math.abs(rx1 - rx0), Math.abs(ry1 - ry0)] }
+}
+
+// One clicked grid cell by its row-major index, drawn as geometry.ts's hitLayer draws a
+// clicked cell. A sub-pixel grid's click highlights the sample pixel under the cursor, which
+// a bare index no longer knows, so that cell is drawn at least one sample pixel wide.
+function gridCellHit(layer: HitLayer, index: number): Hit | null {
+    const gg = layer.geometry as GridGeometry
+    if (!Number.isInteger(index) || index < 0 || index >= gg.ncols * gg.nrows) return null
+    const i = index % gg.ncols, j = Math.floor(index / gg.ncols)
+    const x0 = gg.xedges[i], x1 = gg.xedges[i + 1], y0 = gg.yedges[j], y1 = gg.yedges[j + 1]
+    const min = gg.sample ? gg.sample_px ?? 0 : 0
+    return { layer, index, grid_: [i, j, gg.values?.[index]],
+        geom_: ["rect", (x0 + x1) / 2, (y0 + y1) / 2, Math.max(Math.abs(x1 - x0), min), Math.max(Math.abs(y1 - y0), min)] }
 }
 
 // Kinds that can be drawn as a persistent pre-highlight (mirrors Julia `_SELECTED_KINDS`).
@@ -189,4 +207,60 @@ export function linkedHits(manifest: Manifest, layer: HitLayer, index: number): 
     const hits: Hit[] = []
     for (const id of ids) hits.push(...resolveLinkedTarget(manifest, id))
     return hits
+}
+
+// What a restored bond value selects: the hits to highlight, and the element a second click
+// on would clear. `null` leaves the selection as it is, the same as a click that is not a
+// selection gesture (an axis click, a threshold or ROI value). An entry that no longer
+// matches the manifest is dropped, the way a frame's re-key in mount.ts drops it.
+export type SelSource = { layer: string; index: number }
+export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]; source: SelSource | null } | null {
+    if (v === null || v === undefined) return { hits: [], source: null }
+    if (typeof v !== "object") return null
+    const o = v as { layer?: unknown; index?: unknown; items?: unknown }
+    if (Array.isArray(o.items)) {
+        const hits: Hit[] = []
+        for (const item of o.items) {
+            const it = item as { layer?: unknown; index?: unknown; payload?: unknown }
+            const layer = manifest.layers.find((l) => l.id === it?.layer)
+            if (!layer || typeof it.index !== "number") continue
+            const p = it.payload as { i0?: unknown; i1?: unknown; j0?: unknown; j1?: unknown } | undefined
+            if (layer.kind === "grid" && p && [p.i0, p.i1, p.j0, p.j1].every(Number.isInteger)) {
+                const gg = layer.geometry as GridGeometry
+                const [i0, i1, j0, j1] = [p.i0, p.i1, p.j0, p.j1] as number[]
+                if (i0 >= 0 && j0 >= 0 && i0 <= i1 && j0 <= j1 && i1 < gg.ncols && j1 < gg.nrows) hits.push(gridBlockHit(layer, i0, i1, j0, j1))
+                continue
+            }
+            const hit = elementHit(layer, it.index)
+            if (hit) hits.push(hit)
+        }
+        return { hits, source: null }
+    }
+    const layer = manifest.layers.find((l) => l.id === o.layer)
+    if (!layer || typeof o.index !== "number") return null
+    const hit = elementHit(layer, o.index)
+    const hits = hit ? selectionFor(hit, manifest) : null
+    return hits === null ? null : { hits, source: { layer: layer.id, index: o.index } }
+}
+
+function elementHit(layer: HitLayer, index: number): Hit | null {
+    if (!Number.isInteger(index)) return null
+    if (layer.kind === "grid") return gridCellHit(layer, index)
+    if (!SELECTED_KINDS.has(layer.kind)) return null
+    try {
+        return { layer, ...hitLayerByIndex(layer, index) }
+    } catch {
+        return null
+    }
+}
+
+// Structural equality for bond values, which are JSON-shaped: Pluto hands back an equal copy,
+// never the object we wrote.
+export function sameValue(a: unknown, b: unknown): boolean {
+    if (a === b) return true
+    if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false
+    if (Array.isArray(a) !== Array.isArray(b)) return false
+    const ka = Object.keys(a), kb = Object.keys(b)
+    if (ka.length !== kb.length) return false
+    return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && sameValue((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
 }

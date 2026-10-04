@@ -164,7 +164,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             place()
             showReadout(text)
             pending = () => {
-                (ctx.host_ as unknown as { value: unknown }).value = thresholdDrag.end(d, { x: h ? mid : d.tg_.pos, y: h ? d.tg_.pos : mid })
+                ctx.setValue_(thresholdDrag.end(d, { x: h ? mid : d.tg_.pos, y: h ? d.tg_.pos : mid }))
                 ctx.host_.dispatchEvent(new CustomEvent("input"))
                 el.setAttribute("aria-valuetext", thresholdValue(l, ctx))
                 place()
@@ -212,7 +212,7 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             place()
             showReadout(text)
             pending = () => {
-                (ctx.host_ as unknown as { value: unknown }).value = roiDrag.end(ctx, state, d)
+                ctx.setValue_(roiDrag.end(ctx, state, d))
                 ctx.host_.dispatchEvent(new CustomEvent("input"))
             }
             return true

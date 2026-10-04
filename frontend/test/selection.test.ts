@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { layerNElements, selectionFor, linkedHits } from "../src/selection"
+import { layerNElements, selectionFor, linkedHits, selectionForValue, sameValue } from "../src/selection"
 import type { Hit, HitLayer, Manifest } from "../src/types"
 
 // layerNElements' other kind branches (circles/rects/polygons/segments/polyline) are exercised
@@ -100,5 +100,44 @@ describe("linkedHits", () => {
         expect(hits).toHaveLength(1)
         expect(hits[0].layer).toBe(namedPin)
         expect(hits[0].index).toBe(0)
+    })
+})
+
+// A value Pluto restores into host.value (#272), mapped back to what it highlights.
+describe("selectionForValue", () => {
+    const m: Manifest = {
+        width: 400, height: 400, scaling: 2, transforms: {},
+        layers: [
+            { id: "pts", kind: "circles", geometry: [10, 10, 5, 50, 50, 5], payloads: [{}, {}], axis: "ax1", events: ["click"] },
+            { id: "heat", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+                geometry: { xedges: [0, 100, 200, 300], yedges: [0, 100, 200], ncols: 3, nrows: 2 } },
+        ],
+    }
+
+    it("maps a brushed grid block to one block highlight and skips what no longer fits", () => {
+        const sel = selectionForValue(m, { items: [
+            { layer: "heat", index: 0, payload: { i0: 1, i1: 2, j0: 0, j1: 1 } },
+            { layer: "heat", index: 0, payload: { i0: 2, i1: 3, j0: 0, j1: 0 } }, // past the last column
+            { layer: "gone", index: 0 },
+            { layer: "pts", index: "1" },
+            { layer: "pts", index: 1 },
+        ] })!
+        expect(sel.source).toBeNull()
+        expect(sel.hits.map((h) => [h.layer.id, h.geom_])).toEqual([
+            ["heat", ["rectfill", 200, 100, 200, 200]],
+            ["pts", ["circle", 50, 50, 5]],
+        ])
+    })
+
+    it("clears on null or undefined and leaves the selection on other scalars", () => {
+        expect(selectionForValue(m, undefined)).toEqual({ hits: [], source: null })
+        expect(selectionForValue(m, "pts")).toBeNull()
+    })
+
+    it("sameValue compares structurally", () => {
+        expect(sameValue({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] })).toBe(true)
+        expect(sameValue({ a: 1 }, { a: 1, b: 2 })).toBe(false)
+        expect(sameValue([1], { 0: 1 })).toBe(false)
+        expect(sameValue(null, {})).toBe(false)
     })
 })

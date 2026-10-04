@@ -465,7 +465,7 @@ function _legacy_backend(backend, name, max_width, px_per_unit)
     kws = String[]
     max_width === nothing || push!(kws, "max_width = $max_width")
     px_per_unit === nothing || push!(kws, "px_per_unit = $px_per_unit")
-    Base.depwarn(
+    _deprecate(
         "`$(nameof(typeof(backend)))(…)` is deprecated; use `masque(fig; " *
             join(["backend = :$name"; kws], ", ") * ")`. Removed in 0.3.",
         nameof(typeof(backend)),
