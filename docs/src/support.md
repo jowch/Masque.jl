@@ -88,7 +88,7 @@ and the last two columns say which also work on `Axis3` and
 | `voronoiplot!` | `:voronoiplot` | `:polygons` | — | — |
 | `hexbin!` | `:hexbin` | `:polygons` | — | — |
 | `stem!` | `:stem` + `:stem_stems` | `:circles` + `:segments` | — | — |
-| `scatterlines!` | `:scatterlines` + `:scatterlines_line` | `:circles` + `:lines` | — | yes |
+| `scatterlines!` | `:scatterlines` + `:scatterlines_line` | `:circles` + `:lines` | yes | yes |
 | `boxplot!` | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
 | `text!` | `:text` | `:rects` | — | — |
 | `annotation!` | `:annotation` | `:rects` | — | — |

@@ -145,6 +145,13 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 1, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
+        # `scatterlines!` on Axis3 (#273): the markers are the `:scatterlines` layer, drawn
+        # over the `:scatterlines_line` layer, so a hover on a marker takes the marker.
+        "key" => "scatterlines3d", "layerId" => "scatterlines", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
         # One band is one element, so nothing is baked selected and hover takes element 0.
         "key" => "band_y", "layerId" => "band", "layerKind" => "polygons",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
@@ -546,6 +553,14 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:arrows3d => [1]))
     end
 
+    scatterlines3d = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "scatterlines3d")
+        spts = Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3)]
+        scatterlines!(ax, spts; color = :gray, markersize = 14)
+        masque(fig; selected = Dict(:scatterlines => [2]))
+    end
+
     # direction = :y draws the transpose of the band's converted points, #247. Values run
     # along x, so a hit ring left unflipped would sit across the axis from the drawn band.
     band_y = let
@@ -792,7 +807,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, band_y, hexbin, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d, band_y, hexbin, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto,
     )
 end
