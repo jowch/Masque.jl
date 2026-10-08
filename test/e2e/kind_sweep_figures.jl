@@ -155,6 +155,67 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
+        # Plain `scatter!` on Axis3 (#301): the marks project through the 3D camera.
+        "key" => "scatter3d", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
+        # `lines!` on Axis3: one element, so nothing is baked selected and hover takes it.
+        "key" => "lines3d", "layerId" => "lines", "layerKind" => "lines",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
+        # `meshscatter!` on Axis3: each sphere's hit circle comes from its data-space size.
+        "key" => "meshscatter3d", "layerId" => "meshscatter", "layerKind" => "circles",
+        "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
+        # `wireframe!` on Axis3: each drawn edge is one segment element. Makie outlines every
+        # quad, so an interior edge is drawn (and shipped) twice; elements 0 and 3 are the first
+        # quad's two outer edges, which appear once.
+        "key" => "wireframe3d", "layerId" => "wireframe", "layerKind" => "segments",
+        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 3,
+        "tip" => "index", "hoverIndex" => 3, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
+        # Two plots overlapping on screen on Axis3: the scatter, drawn after the meshscatter,
+        # answers where both claim the pixel ("topmost wins", #242). Its marker also sits in
+        # front of the sphere, so the plot that answers is the one both backends show.
+        # `overlapsLayer` names the plot underneath, which must sort after the answering layer
+        # and claim the hovered pixel too.
+        "key" => "overlap3d", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "front", "hoverIndex" => 0, "hoverTip" => "front", "mode" => "element",
+        "overlapsLayer" => "meshscatter",
+    ),
+    Dict(
+        # `text!` (#301): each string is one element, hit on its drawn box.
+        "key" => "text", "layerId" => "text", "layerKind" => "rects",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "beta", "hoverIndex" => 0, "hoverTip" => "alpha", "mode" => "element",
+    ),
+    Dict(
+        # `datashader!`: a grid whose hover reads the aggregate count.
+        "key" => "datashader", "layerId" => "cells", "layerKind" => "grid",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "element",
+    ),
+    Dict(
+        # `violin!`: each violin is one polygon element.
+        "key" => "violin", "layerId" => "violin", "layerKind" => "polygons",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "x 1", "hoverIndex" => 1, "hoverTip" => "x 2", "mode" => "element",
+    ),
+    Dict(
+        # `stairs!`: one stepped line is one element; hover reads out the nearest step (#262).
+        "key" => "stairs", "layerId" => "stairs", "layerKind" => "lines",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+    ),
+    Dict(
         # `arrows2d!` (#274): each arrow is one segment from tail to tip.
         "key" => "arrows2d", "layerId" => "arrows2d", "layerKind" => "segments",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
@@ -577,6 +638,91 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:scatterlines => [2]))
     end
 
+    scatter3d = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "scatter3d")
+        scatter!(ax, Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3)]; color = :gray, markersize = 20)
+        masque(fig; selected = Dict(:scatter => [2]))
+    end
+
+    lines3d = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "lines3d")
+        lines!(ax, Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3), (4, 4, 2)]; color = :gray, linewidth = 4)
+        masque(fig)
+    end
+
+    meshscatter3d = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "meshscatter3d")
+        meshscatter!(ax, Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3)]; color = :gray, markersize = 0.3)
+        masque(fig; selected = Dict(:meshscatter => [2]))
+    end
+
+    # A coarse surface's edges, so each edge is long enough to hover on its own.
+    wireframe3d = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "wireframe3d")
+        xs = [0.0, 2.0, 4.0]
+        ys = [0.0, 2.0, 4.0]
+        wireframe!(ax, xs, ys, [x + y / 2 for x in xs, y in ys]; color = :gray, linewidth = 3)
+        masque(fig; selected = Dict(:wireframe => [1]))
+    end
+
+    # A small scatter marker in front of a large sphere, drawn after it (#242, #301).
+    overlap3d = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(
+            fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "overlap3d",
+            limits = (0, 4, 0, 4, 0, 4),
+        )
+        ms = meshscatter!(ax, Makie.Point3f[(2, 2, 2)]; color = :lightgray, markersize = 0.8)
+        # The marker sits between the sphere's centre and the camera, so it draws in front of
+        # the sphere on WebGL too, where the depth test decides what shows.
+        el, az = 0.5, 0.4
+        toward = Makie.Vec3f(cos(el) * cos(az), cos(el) * sin(az), sin(el))
+        sc = scatter!(ax, [Makie.Point3f(2, 2, 2) + 1.2f0 * toward]; color = :black, markersize = 16)
+        masque(
+            fig,
+            interactables(ms; payloads = [(; label = "back")]),
+            interactables(sc; payloads = [(; label = "front")]),
+        )
+    end
+
+    text = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "text", limits = (0, 4, 0, 3))
+        text!(ax, [1.0, 2.0, 3.0], [1.0, 2.0, 1.0]; text = ["alpha", "beta", "gamma"], fontsize = 22, align = (:center, :center))
+        masque(fig; selected = Dict(:text => [2]))
+    end
+
+    # A fixed point cloud in four clumps, so the aggregate doesn't change between runs.
+    datashader = let
+        rng = MersenneTwister(3)
+        pts = [Point2f(cx + 0.3randn(rng), cy + 0.3randn(rng)) for (cx, cy) in ((1, 1), (3, 1), (1, 3), (3, 3)) for _ in 1:400]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "datashader")
+        datashader!(ax, pts; async = false)
+        masque(fig)
+    end
+
+    violin = let
+        rng = MersenneTwister(2)
+        xs = repeat([1, 2]; inner = 200)
+        ys = vcat(randn(rng, 200), randn(rng, 200) .* 0.6 .+ 1)
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "violin")
+        violin!(ax, xs, ys; color = (:steelblue, 0.6))
+        masque(fig; selected = Dict(:violin => [1]))
+    end
+
+    stairs = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "stairs", limits = (0, 5, 0, 4))
+        stairs!(ax, [1.0, 2.0, 3.0, 4.0], [1.0, 3.0, 2.0, 2.5]; color = :gray, linewidth = 4)
+        masque(fig)
+    end
+
     arrows2d = let
         fig = Figure(size = (480, 320))
         ax = Axis(fig[1, 1]; title = "arrows2d", limits = (0, 5, 0, 6))
@@ -844,7 +990,8 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto,
     )
 end
