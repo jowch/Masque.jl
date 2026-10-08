@@ -2957,6 +2957,32 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             expect(hover(host).innerHTML).toBe("2 12")
         })
 
+        it("without shipped values, a payload shows alone", () => {
+            const noValues = (payloads: unknown[]): Manifest => {
+                const m = cellManifest(payloads)
+                delete (m.layers[0].geometry as { values?: number[] }).values
+                return m
+            }
+            const a = setup()
+            mount(a.script, noValues(["p", "q", "r", "s"]))
+            expect(hover(a.host).innerHTML).toBe("q")
+            const b = setup()
+            mount(b.script, noValues(labels))
+            expect(hover(b.host).textContent).toBe("rowbcolx")
+        })
+
+        it("a template names a bare payload as payload, and a null payload falls back to the default", () => {
+            const a = setup()
+            mount(a.script, cellManifest(["p", "q", "r", "s"], { template: [{ f: "payload" }, ": ", { f: "value" }] }))
+            expect(hover(a.host).innerHTML).toBe("q: 12")
+            const b = setup()
+            mount(b.script, cellManifest([null, null, null, null], { template: [{ f: "i" }, ",", { f: "j" }] }))
+            expect(hover(b.host).innerHTML).toBe("2,1")
+            const c = setup()
+            mount(c.script, cellManifest([null, null, null, null]))
+            expect(hover(c.host).innerHTML).toBe("(2,1) = 12")
+        })
+
         it("a click uploads the cell, not its payload (Julia looks it up)", () => {
             const { host, script } = setup()
             mount(script, cellManifest(labels))
