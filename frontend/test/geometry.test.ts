@@ -428,6 +428,31 @@ describe("hitLayer + hitTest", () => {
         expect(hitTest(m, 100, 100, "hover")?.layer.id).toBe("pts")
         expect(hitTest(m, 100, 100, "click")).toBeNull() // not a click layer
     })
+    it("two axis readouts each answer their own panel (#287)", () => {
+        const tf = (viewport: number[]) => ({ viewport }) as unknown as AxisTransform
+        const axis = (id: string, ax: string): HitLayer =>
+            ({ id, kind: "axis", axis: ax, events: ["click", "hover"], payloads: [], geometry: null })
+        const m = {
+            width: 400, height: 200, scaling: 1,
+            transforms: { a1: tf([10, 10, 170, 180]), a2: tf([210, 10, 170, 180]), cb: tf([385, 10, 10, 180]) },
+            layers: [
+                axis("axis", "a1"), axis("axis_2", "a2"),
+                { id: "cb", kind: "axis", bond: "colorbar", axis: "cb", events: ["hover"], payloads: [], geometry: [385, 10, 10, 180] },
+            ],
+        } as unknown as Manifest
+        expect(hitTest(m, 50, 100, "click")?.layer.id).toBe("axis")
+        expect(hitTest(m, 300, 100, "click")?.layer.id).toBe("axis_2")
+        expect(hitTestAt(m, 300, 100, { s: 1, tx: 0, ty: 0 }, "hover")?.layer.id).toBe("axis_2")
+        // Outside every axis the first readout still answers, as a single one does.
+        expect(hitTest(m, 195, 100, "click")?.layer.id).toBe("axis")
+        expect(hitTest(m, 390, 100, "hover")?.layer.id).toBe("axis")
+        // A readout that doesn't listen for the event doesn't take the panel.
+        const hoverOnly = { ...m, layers: [axis("axis", "a1"), { ...axis("axis_2", "a2"), events: ["hover"] }] }
+        expect(hitTest(hoverOnly, 300, 100, "click")?.layer.id).toBe("axis")
+        // A readout whose axis has no transform claims no panel.
+        const orphan = { ...m, layers: [axis("axis", "a1"), axis("axis_2", "gone")] }
+        expect(hitTest(orphan, 300, 100, "click")?.layer.id).toBe("axis")
+    })
     it("hitTestAt unmaps data layers and keeps legend, colorbar, and view in layout pixels", () => {
         const photo = { s: 2, tx: -100, ty: -50 }
         const m: Manifest = {

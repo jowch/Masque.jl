@@ -598,10 +598,27 @@ export function layoutSpaceLayer(layer: HitLayer): boolean {
     return layer.kind === "view" || screenFixedLayer(layer)
 }
 
+// An `AxisInteractable` (an `:axis` layer with no bbox) reads anywhere on the image, so the
+// first of two on different panels would answer every pixel. Outside its own axis it yields
+// to another one whose axis is under the pointer; a pixel outside every axis still reads.
+function yieldsToOtherAxis(manifest: Manifest, layer: HitLayer, x: number, y: number, event: string): boolean {
+    if (layer.kind !== "axis" || Array.isArray(layer.geometry)) return false
+    const inside = (id: string): boolean => {
+        const t = manifest.transforms[id]
+        if (!t) return false
+        const [vx, vy, vw, vh] = t.viewport
+        return x >= vx && x <= vx + vw && y >= vy && y <= vy + vh
+    }
+    if (inside(layer.axis)) return false
+    return manifest.layers.some((l) => l !== layer && l.kind === "axis" && !Array.isArray(l.geometry) &&
+        l.axis !== layer.axis && l.events.includes(event) && inside(l.axis))
+}
+
 // first layer (in manifest order) with a hit for the given event; null if none
 export function hitTest(manifest: Manifest, px: number, py: number, event: string): Hit | null {
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
+        if (yieldsToOtherAxis(manifest, layer, px, py, event)) continue
         const h = hitLayer(layer, px, py)
         if (h) return { layer, ...h }
     }
@@ -644,6 +661,7 @@ export function hitTestAt(
         if (!layer.events.includes(event)) continue
         const layoutSpace = layoutSpaceLayer(layer)
         if (!layoutSpace && outside) continue
+        if (yieldsToOtherAxis(manifest, layer, x, y, event)) continue
         const p = layoutSpace ? { x, y } : content
         const h = hitLayer(layer, p.x, p.y)
         if (h) return { layer, ...h }
