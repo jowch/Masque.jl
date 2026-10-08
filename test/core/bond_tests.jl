@@ -90,6 +90,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test propertynames(ev) == (:layer, :i, :j, :value, :row, :col, :payload)
         @test sprint(show, ev) == "GridCellEvent(:$(L["id"]), i = 2, j = 2, value = 22.0, payload = (row = \"r2\", col = \"c2\"))"
         @test_throws ArgumentError ev.nope
+        # A cell outside the grid is an error, not a wrong payload.
+        @test_throws ArgumentError tv(w, Dict("layer" => L["id"], "index" => 0, "payload" => Dict("i" => 5, "j" => 0)))
+        @test_throws ArgumentError AxisEvent(:axis, 1.0, 2.0).row   # no payload to forward to
 
         # A matrix the same shape as the values gives the same layout.
         m = GridInteractable(ax, hm; payloads = [rows[i] * cols[j] for i in 1:2, j in 1:3])
