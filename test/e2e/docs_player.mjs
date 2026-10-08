@@ -6,8 +6,8 @@
 // or if an overlay click does not update that readout. Then, with jsDelivr blocked, the
 // iframe must give way to its text twin (docs/player_fallback.jl): the `details` after it
 // opens with the notebook's code, and the search index carries that code. The Backends
-// page's two `@example` widgets, shown without Pluto, must hover to a tooltip, and show
-// their figure with scripts off.
+// page's two `@example` widgets, shown without Pluto, must hover to a tooltip, mount when
+// their script runs from `<head>`, and show their figure with scripts off.
 //
 //   node docs_player.mjs <docs/build>
 
@@ -465,7 +465,7 @@ try {
     // The manifest is inlined into the mount call; read the scatter's first point from it.
     const pt = await host.evaluate((h) => {
       const src = h.querySelector("script").textContent;
-      const m = src.match(/mount\(currentScript, (.*), new Promise/s);
+      const m = src.match(/mount\(img, (.*), new Promise/s);
       const man = JSON.parse(m[1]);
       const layer = man.layers.find((l) => l.id === "scatter");
       const r = h.querySelector("img").getBoundingClientRect();
@@ -487,6 +487,26 @@ try {
     const errs = consoleLog.slice(before).filter((l) => l.startsWith("pageerror:") || (l.startsWith("error:") && !(l.includes("Failed to load resource") && l.includes("404"))));
     if (errs.length) throw new Error(`@example widgets logged errors: ${errs.join(" | ")}`);
     console.log(`E2E OK [docs @example] — 2 widgets mounted without Pluto, hover tooltip ${JSON.stringify(tip)}`);
+
+    // The classic Jupyter Notebook inserts output HTML inertly and runs each script from
+    // `<head>` (jQuery's globalEval). The widget must still find its own host and mount.
+    const headMounted = await page.evaluate(async () => {
+      const src = document.querySelector(".ip-host");
+      const html = src.outerHTML.split(src.id).join("masque-headcopy");
+      const box = document.createElement("div");
+      document.body.appendChild(box);
+      box.innerHTML = html;
+      for (const old of box.querySelectorAll("script")) {
+        const s = document.createElement("script");
+        s.text = old.textContent;
+        document.head.appendChild(s).remove();
+      }
+      await new Promise((r) => requestAnimationFrame(r));
+      const host = document.getElementById("masque-headcopy");
+      return [...host.querySelectorAll("*")].some((el) => el.shadowRoot?.querySelector(".surface"));
+    });
+    if (!headMounted) throw new Error("@example widget: a script run from <head> did not mount its host");
+    console.log("E2E OK [docs @example] — a script run from <head>, as in the classic Jupyter Notebook, mounts its host");
 
     // With scripts off, the same page shows each widget's plain figure.
     const noJs = await browser.newContext({ javaScriptEnabled: false });

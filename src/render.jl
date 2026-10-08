@@ -1035,18 +1035,27 @@ _js_literal(io::IO, x) = _js_literal(io, string(x))
 # (#298). Clicks still highlight, but nothing reads the bond and no frame comes back for a
 # pan. The block gives each widget's `const`s their own scope, so two widgets on one plain
 # page don't collide. A display that blocks inline scripts shows the plain `<img>`.
+# The script finds its host by id, not `currentScript.parentElement`: the classic Jupyter
+# Notebook runs output scripts from `<head>`. `mount` takes the host's child, so the `<img>`
+# stands in for the script. Ids come from a counter and the clock, not `rand`, so showing a
+# widget leaves the user's random stream alone.
+const _STANDALONE_IDS = Threads.Atomic{Int}(0)
+_standalone_id() = string("masque-", string(hash((time_ns(), Threads.atomic_add!(_STANDALONE_IDS, 1))); base = 36))
+
 function _standalone_html(w::MasqueWidget)
     boot = HypertextLiteral.JavaScript(_OVERLAY_JS[])
     manifest = HypertextLiteral.JavaScript(sprint(_js_literal, w.manifest))
+    id = _standalone_id()
     return @htl(
         """
-        <div class="ip-host" style="position:relative; display:inline-block; width:100%; max-width:$(w.display_css)px;">
+        <div class="ip-host" id="$(id)" style="position:relative; display:inline-block; width:100%; max-width:$(w.display_css)px;">
           <img src="data:image/png;base64,$(w.b64)" style="display:block; width:100%; height:auto;" draggable="false">
           <script>
             {
-              const currentScript = document.currentScript;
               $(boot)
-              if (currentScript) window.Masque.mount(currentScript, $(manifest), new Promise(() => {}), null);
+              const host = document.getElementById($(id));
+              const img = host && host.querySelector("img");
+              if (img) window.Masque.mount(img, $(manifest), new Promise(() => {}), null);
             }
           </script>
         </div>

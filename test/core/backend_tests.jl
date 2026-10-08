@@ -353,13 +353,17 @@ end
     html = sprint(show, MIME"text/html"(), w)
     @test occursin("<img src=\"data:image/png;base64,$(w.b64)\"", html)
     @test occursin("max-width:$(w.display_css)px", html)
-    @test occursin("window.Masque.mount(currentScript, ", html)
+    @test occursin("window.Masque.mount(img, ", html)
+    # The script finds its own host by id, so it mounts even when it runs from `<head>`.
+    id = match(r"<div class=\"ip-host\" id=\"([^\"]+)\"", html).captures[1]
+    @test occursin("document.getElementById(\"$(id)\")", html)
+    @test id != match(r"id=\"([^\"]+)\"", sprint(show, MIME"text/html"(), w)).captures[1]
     @test !occursin("published_to_js", html) && !occursin("getPublishedObject", html)
     # The overlay script sits in a block, so two widgets on one page don't redeclare `const`s.
     script = match(r"<script>(.*?)</script>"s, html).captures[1]
     @test startswith(strip(script), "{") && endswith(strip(script), "}")
     # The inlined manifest reads back as the widget's own manifest.
-    lit = match(r"mount\(currentScript, (.*), new Promise"s, html).captures[1]
+    lit = match(r"mount\(img, (.*), new Promise"s, html).captures[1]
     @test JSON3.read(lit; allow_inf = true)["layers"][1]["id"] == w.manifest["layers"][1]["id"]
     @test length(JSON3.read(lit; allow_inf = true)["layers"]) == length(w.manifest["layers"])
     # A display that publishes to JS still gets the Pluto widget.
