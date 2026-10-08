@@ -99,6 +99,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test m.payloads == Any["r1c1", "r2c1", "r1c2", "r2c2", "r1c3", "r2c3"]
         @test_throws ArgumentError GridInteractable(ax, hm; payloads = ones(3, 2))
         @test_throws ArgumentError GridInteractable(ax, hm; payloads = ["a", "b"])
+        # The positional form from before payloads still builds, with none.
+        @test isempty(GridInteractable(ax, m.xedges, m.yedges, m.values, :c, nothing, nothing).payloads)
         # A template field that is neither a payload field nor i/j/value still fails the build.
         bad = GridInteractable(ax, hm; payloads = (i, j) -> (; row = i), tooltip = masque"$(nope)")
         @test_throws ArgumentError masque(fig, bad)

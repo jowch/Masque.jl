@@ -827,9 +827,9 @@ GridInteractable(ax, xedges, yedges, vals)
 p = heatmap!(ax, X, Y, Z)
 GridInteractable(ax, p)
 
-rows = ["r\$i" for i in 1:4]; cols = ["c\$j" for j in 1:3]
-GridInteractable(ax, xedges, yedges, vals; payloads = (i, j) -> (; row = rows[i], col = cols[j]),
-    tooltip = masque"(\$(row), \$(col)) = \$(value)")
+xs = ["a", "b", "c", "d"]; ys = ["p", "q", "r"]  # i runs along x, j along y
+GridInteractable(ax, xedges, yedges, vals; payloads = (i, j) -> (; x = xs[i], y = ys[j]),
+    tooltip = masque"(\$(x), \$(y)) = \$(value)")
 ```
 """
 struct GridInteractable <: AbstractInteractable
@@ -838,6 +838,9 @@ struct GridInteractable <: AbstractInteractable
     # Row-major like the shipped `values` (cell `(i, j)` at `(j-1)*ncols + i`); empty for none.
     payloads::Vector{Any}
 end
+# The 7-field form from before `payloads` existed: a grid with no payloads.
+GridInteractable(ax, xedges, yedges, values, id, tooltip, label) =
+    GridInteractable(ax, xedges, yedges, values, id, tooltip, label, Any[])
 # One payload per cell, row-major. `payloads` is a `(ncols, nrows)` matrix or `(i, j) -> payload`.
 function _grid_payloads(payloads, ncols, nrows)
     payloads === nothing && return Any[]

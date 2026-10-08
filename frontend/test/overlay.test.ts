@@ -2992,6 +2992,25 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         })
     })
 
+    it("a sampled grid's tooltip reads the source cell's payload", () => {
+        // Same sample as below: image (15, 10) is source cell i=2, j=0, row-major payload index 2.
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{ id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: ["a", "b", "c"],
+                geometry: {
+                    xedges: [0, 10, 20, 30], yedges: [0, 20], ncols: 3, nrows: 1,
+                    sample: [7, 8], sncols: 2, snrows: 1,
+                    sample_origin: [0, 0], sample_span: [30, 20], sample_px: 15,
+                } }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        ;(shadow.querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 5, bubbles: true }))
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("c = 8")
+    })
+
     it("grid sample hover shows the pixel-center value, and a NaN sample shows nothing", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
