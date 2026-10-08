@@ -43,8 +43,16 @@ s = scatter!(ax, xs, ys)
 ```
 
 An interactable whose `id` matches a default layer's id also replaces
-that layer, and two layers with the same id raise an error. To overlay
-only what you pass, add `auto = false`:
+that layer. Two of one kind on their default id are numbered the way
+plots are, in the order you pass them, so a pan on each of two axes is
+`:view` and `:view_2`:
+
+```julia
+@bind pick masque(fig, ViewInteractable(ax1), ViewInteractable(ax2))
+```
+
+Two layers with an id you chose, such as two `id = :pan`, raise an
+error. To overlay only what you pass, add `auto = false`:
 
 ```julia
 @bind pick masque(fig, PointInteractable(ax, s); auto = false)
