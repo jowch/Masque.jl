@@ -972,24 +972,90 @@ function _request_frame_js(io, render_frame)
     return link === nothing ? HypertextLiteral.JavaScript("null") : link
 end
 
-# Outside Pluto (Documenter, VS Code, a plain HTML export, `sprint` in a test) there is no
-# `published_to_js`, and no `currentScript`/`invalidation` for the overlay. Show the figure
-# without the overlay rather than throwing (#288). The context key is what `published_to_js`
-# itself asserts on, so any display where the live widget worked before still gets it.
+# Outside Pluto (Documenter, VS Code, IJulia, a plain HTML page, `sprint` in a test) there is
+# no `published_to_js`, and no `currentScript`/`invalidation` for the overlay. The context key
+# is what `published_to_js` itself asserts on, so any display where the Pluto widget worked
+# before still gets it.
 _hosts_overlay(io) = APD.is_supported_by_display(io, APD.Display.published_to_js) ||
     get(io, :pluto_published_to_js, nothing) !== nothing
 
-# The same host box and `<img>` as the live widget, with no script.
-_static_html(w::MasqueWidget) = @htl(
-    """
-    <div class="ip-host" style="position:relative; display:inline-block; width:100%; max-width:$(w.display_css)px;">
-      <img src="data:image/png;base64,$(w.b64)" style="display:block; width:100%; height:auto;" draggable="false">
-    </div>
-    """
-)
+# The manifest written into the page as a JS literal, where Pluto would publish it. JS, not
+# JSON: NaN is the polyline gap sentinel and JSON has no spelling for it. Every `<` is escaped
+# so a tooltip containing `</script>` can't end the script element.
+_js_literal(io::IO, ::Union{Nothing, Missing}) = print(io, "null")
+_js_literal(io::IO, x::Bool) = print(io, x ? "true" : "false")
+_js_literal(io::IO, x::Integer) = print(io, x)
+function _js_literal(io::IO, x::AbstractFloat)
+    isnan(x) && return print(io, "NaN")
+    isinf(x) && return print(io, x > 0 ? "Infinity" : "-Infinity")
+    # Float32's shortest form ("0.1f0") keeps the payload as small as Pluto's; `f` → `e`
+    # makes it a JS number.
+    x isa Union{Float16, Float32} && return print(io, replace(string(Float32(x)), 'f' => 'e'))
+    return print(io, Float64(x))
+end
+_js_literal(io::IO, x::Symbol) = _js_literal(io, String(x))
+function _js_literal(io::IO, s::AbstractString)
+    print(io, '"')
+    for c in s
+        if c == '"'
+            print(io, "\\\"")
+        elseif c == '\\'
+            print(io, "\\\\")
+        elseif !isvalid(c)
+            print(io, "\\ufffd")
+        elseif c == '<' || c < ' ' || c == '\u2028' || c == '\u2029'
+            print(io, "\\u", string(UInt32(c); base = 16, pad = 4))
+        else
+            print(io, c)
+        end
+    end
+    return print(io, '"')
+end
+function _js_literal(io::IO, xs::Union{AbstractArray, Tuple})
+    print(io, '[')
+    for (i, x) in enumerate(xs)
+        i > 1 && print(io, ',')
+        _js_literal(io, x)
+    end
+    return print(io, ']')
+end
+function _js_literal(io::IO, d::Union{AbstractDict, NamedTuple})
+    print(io, '{')
+    for (i, (k, v)) in enumerate(pairs(d))
+        i > 1 && print(io, ',')
+        _js_literal(io, string(k))
+        print(io, ':')
+        _js_literal(io, v)
+    end
+    return print(io, '}')
+end
+_js_literal(io::IO, x) = _js_literal(io, string(x))
+
+# Outside Pluto: hover, highlights and tooltips run in the browser with the manifest inlined
+# (#298). Clicks still highlight, but nothing reads the bond and no frame comes back for a
+# pan. The block gives each widget's `const`s their own scope, so two widgets on one plain
+# page don't collide. A display that blocks inline scripts shows the plain `<img>`.
+function _standalone_html(w::MasqueWidget)
+    boot = HypertextLiteral.JavaScript(_OVERLAY_JS[])
+    manifest = HypertextLiteral.JavaScript(sprint(_js_literal, w.manifest))
+    return @htl(
+        """
+        <div class="ip-host" style="position:relative; display:inline-block; width:100%; max-width:$(w.display_css)px;">
+          <img src="data:image/png;base64,$(w.b64)" style="display:block; width:100%; height:auto;" draggable="false">
+          <script>
+            {
+              const currentScript = document.currentScript;
+              $(boot)
+              if (currentScript) window.Masque.mount(currentScript, $(manifest), new Promise(() => {}), null);
+            }
+          </script>
+        </div>
+        """
+    )
+end
 
 function Base.show(io::IO, m::MIME"text/html", w::MasqueWidget)
-    _hosts_overlay(io) || return show(io, m, _static_html(w))
+    _hosts_overlay(io) || return show(io, m, _standalone_html(w))
     # Inject unconditionally: wrapping the esbuild IIFE in `if (!window.Masque) {…}` makes it
     # install `{}` instead of `{mount}` (a JS block-scope/strict-mode quirk).
     boot = HypertextLiteral.JavaScript(_OVERLAY_JS[])

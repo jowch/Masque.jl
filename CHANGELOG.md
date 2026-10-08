@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A CairoMakie widget shown outside Pluto (Documenter, IJulia, VS Code's notebooks, or
+  `show(io, MIME"text/html"(), w)` in a script) keeps its tooltips and highlights, with
+  nothing to turn on. Clicks highlight a mark but set no `@bind` value, and dragging the view
+  needs Pluto. A display that blocks scripts still shows the plain figure (#298).
+
 ### Fixed
 - Two interactables of the same kind in one `masque` call no longer clash over their
   default id. Two `ViewInteractable(ax)` on two axes become `:view` and `:view_2`, the way
