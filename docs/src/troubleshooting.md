@@ -65,9 +65,9 @@ that have a default.
 
 **Error prefix:** `masque: two interactables use the layer id`
 
-**Cause:** two interactables in one `masque` call have the same `id`,
-often because two constructors of the same kind both use their default
-id, such as two `PointInteractable(ax, pts)` with `id = :points`.
+**Cause:** two interactables in one `masque` call have the same `id`
+that you chose, such as two `ViewInteractable(ax; id = :pan)`. Two left
+on their default id are numbered instead (`:view`, `:view_2`).
 
 **Fix:** pass a distinct `id` to one of them. An interactable whose id
 matches a layer that `masque(fig)` builds on its own replaces that
