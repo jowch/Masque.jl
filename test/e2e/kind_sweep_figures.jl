@@ -174,8 +174,8 @@ kind_sweep_meta() = [
     ),
     Dict(
         # `wireframe!` on Axis3: each drawn edge is one segment element. Makie outlines every
-        # quad, so an interior edge is drawn (and shipped) twice; elements 0 and 3 are the first
-        # quad's two outer edges, which appear once.
+        # quad, so an interior edge is drawn (and shipped) twice, #316; elements 0 and 3 are the
+        # first quad's two outer edges, which appear once. A fix for #316 may renumber them.
         "key" => "wireframe3d", "layerId" => "wireframe", "layerKind" => "segments",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 3,
         "tip" => "index", "hoverIndex" => 3, "hoverTip" => "index", "mode" => "element",
@@ -198,10 +198,11 @@ kind_sweep_meta() = [
         "tip" => "beta", "hoverIndex" => 0, "hoverTip" => "alpha", "mode" => "element",
     ),
     Dict(
-        # `datashader!`: a grid whose hover reads the aggregate count.
+        # `datashader!`: a grid whose hover reads the aggregate count, not the colour-mapped
+        # value. Cell (99, 45) is the fullest cell, three points under `AggSerial`.
         "key" => "datashader", "layerId" => "cells", "layerKind" => "grid",
-        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
-        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "element",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 19062, "clickIndex" => 19062,
+        "tip" => "(99,45) = 3", "hoverIndex" => 19062, "hoverTip" => "(99,45) = 3", "mode" => "element",
     ),
     Dict(
         # `violin!`: each violin is one polygon element.
@@ -703,7 +704,8 @@ function build_kind_sweep()
         pts = [Point2f(cx + 0.3randn(rng), cy + 0.3randn(rng)) for (cx, cy) in ((1, 1), (3, 1), (1, 3), (3, 3)) for _ in 1:400]
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "datashader")
-        datashader!(ax, pts; async = false)
+        # Serial aggregation: the threaded one can count a point twice (Makie PR #5750).
+        datashader!(ax, pts; async = false, method = Makie.AggSerial())
         masque(fig)
     end
 

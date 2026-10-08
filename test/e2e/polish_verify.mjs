@@ -503,6 +503,59 @@ try {
       }
     }
     passed.push(`${key}/highlight`);
+
+    // The checks above compare the overlay with the manifest it was drawn from, so they pass
+    // even when the manifest is off the drawn mark. On Cairo, read the rendered PNG at the
+    // hit geometry instead (same canvas readback as flush-radius above): every tested mark's
+    // centre (an edge's midpoint) must be drawn, and `overlap3d`'s must be the black front
+    // marker, not the grey sphere behind it. A sphere's hit circle comes from its data-space
+    // size, an axis-aligned approximation that can fall short of the drawn outline, so it is
+    // checked as a band: drawn 3 px inside `r`, background by 1.25·r. Measured on this figure,
+    // the outline sits 3-4 px past `r`.
+    if (backend === "cairo") {
+      const n = circles ? g.length / 3 : g.length / 4;
+      const probes = [];
+      for (let i = 0; i < n; i++) {
+        if (!circles && i !== sel && i !== hov) continue;
+        if (circles) {
+          const [cx, cy, r] = [g[3 * i], g[3 * i + 1], g[3 * i + 2]];
+          probes.push({ x: cx, y: cy, want: key === "overlap3d" ? "dark" : "mark", what: `${i}/centre` });
+          if (key === "meshscatter3d") {
+            for (const [dx, dy, dir] of [[1, 0, "+x"], [-1, 0, "-x"], [0, 1, "+y"], [0, -1, "-y"]]) {
+              probes.push({ x: cx + dx * (r - 3), y: cy + dy * (r - 3), want: "mark", what: `${i}/inside${dir}` });
+              probes.push({ x: cx + dx * 1.25 * r, y: cy + dy * 1.25 * r, want: "bg", what: `${i}/outside${dir}` });
+            }
+          }
+        } else {
+          probes.push({ x: (g[4 * i] + g[4 * i + 2]) / 2, y: (g[4 * i + 1] + g[4 * i + 3]) / 2, want: "mark", what: `${i}/mid` });
+        }
+      }
+      const px = await page.evaluate(([k, ps]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        const img = host.querySelector("img");
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        return ps.map((p) => {
+          const d = ctx.getImageData(Math.round(p.x), Math.round(p.y), 1, 1).data;
+          return { r: d[0], g: d[1], b: d[2] };
+        });
+      }, [key, probes]);
+      // Axis3 gridlines are light grey (~233), so they count as background here.
+      const isBg = (p) => p.r > 225 && p.g > 225 && p.b > 225;
+      probes.forEach((p, i) => {
+        const c = px[i];
+        const ok = p.want === "bg" ? isBg(c) : p.want === "dark" ? Math.max(c.r, c.g, c.b) < 60 : !isBg(c);
+        if (!ok) throw new Error(`${key}/on-drawn-mark: ${p.what} at (${p.x.toFixed(1)}, ${p.y.toFixed(1)}) wanted ${p.want}, read ${JSON.stringify(c)}`);
+      });
+      passed.push(`${key}/on-drawn-mark`);
+    } else {
+      passed.push(`${key}/on-drawn-mark-skipped-webgl`);
+    }
   }
 
   // The axis readout's cursor-following tooltip: the caret apex sits on the pointer, both in
