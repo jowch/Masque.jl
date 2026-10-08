@@ -206,7 +206,7 @@ function _assemble(fig, xs; auto::Bool)
     given = _flatten_args!(AbstractInteractable[], collect(Any, xs))
     if auto
         _reject_unsupported_axes(fig)
-        d = _defaults(fig)
+        d = _defaults(fig; replaced = Base.IdSet{Any}(g.plot for g in given if g isa _PlotRequest))
         defaults, plotmap, installed = d.ints, d.plotmap, d.installed
     else
         _finalize!(fig)

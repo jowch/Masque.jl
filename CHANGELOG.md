@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- A `scatter!` sized in data units (`markerspace = :data`) no longer stops `masque(fig)`
+  from showing the figure. Each marker responds over its drawn shape (a square marker over
+  its square, a circle over its circle). Passing `radius` to `interactables(plot; …)` still gives circles of that
+  many pixels. More generally, a plot `masque(fig)` can't make interactive is now skipped
+  with a warning instead of failing the whole widget (#291).
+
 ## [0.2.1] - 2026-10-04
 
 ### Added
