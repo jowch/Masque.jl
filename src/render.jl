@@ -972,7 +972,24 @@ function _request_frame_js(io, render_frame)
     return link === nothing ? HypertextLiteral.JavaScript("null") : link
 end
 
+# Outside Pluto (Documenter, VS Code, a plain HTML export, `sprint` in a test) there is no
+# `published_to_js`, and no `currentScript`/`invalidation` for the overlay. Show the figure
+# without the overlay rather than throwing (#288). The context key is what `published_to_js`
+# itself asserts on, so any display where the live widget worked before still gets it.
+_hosts_overlay(io) = APD.is_supported_by_display(io, APD.Display.published_to_js) ||
+    get(io, :pluto_published_to_js, nothing) !== nothing
+
+# The same host box and `<img>` as the live widget, with no script.
+_static_html(w::MasqueWidget) = @htl(
+    """
+    <div class="ip-host" style="position:relative; display:inline-block; width:100%; max-width:$(w.display_css)px;">
+      <img src="data:image/png;base64,$(w.b64)" style="display:block; width:100%; height:auto;" draggable="false">
+    </div>
+    """
+)
+
 function Base.show(io::IO, m::MIME"text/html", w::MasqueWidget)
+    _hosts_overlay(io) || return show(io, m, _static_html(w))
     # Inject unconditionally: wrapping the esbuild IIFE in `if (!window.Masque) {…}` makes it
     # install `{}` instead of `{mount}` (a JS block-scope/strict-mode quirk).
     boot = HypertextLiteral.JavaScript(_OVERLAY_JS[])

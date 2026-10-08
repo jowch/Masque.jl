@@ -324,7 +324,20 @@ const _SHIM_TEXT = Ref{String}("")
 _bundle_text() = (isempty(_BUNDLE_TEXT[]) && (_BUNDLE_TEXT[] = read(_wgl_bundle_path(), String)); _BUNDLE_TEXT[])
 _shim_text() = (isempty(_SHIM_TEXT[]) && (_SHIM_TEXT[] = read(SHIM_JS, String)); _SHIM_TEXT[])
 
+# Outside Pluto there is nothing to draw the scene with and no PNG to fall back on, so show a
+# box the figure's size that says so, rather than throwing (#288).
+_static_html(w::WebGLWidget) = @htl(
+    """
+    <div class="ip-host" style="position:relative; display:inline-block; width:100%; max-width:$(w.display_css)px;">
+      <div class="masque-webgl-static" style="aspect-ratio:$(w.width) / $(w.height); display:flex; align-items:center; justify-content:center; border:1px dashed #999; color:#666; font:14px sans-serif; text-align:center; padding:1em; box-sizing:border-box;">
+        This WebGL figure is drawn only in Pluto.
+      </div>
+    </div>
+    """
+)
+
 function Base.show(io::IO, m::MIME"text/html", w::WebGLWidget)
+    Masque._hosts_overlay(io) || return show(io, m, _static_html(w))
     # published_to_js ids are content-addressed, so this one cached bundle string (_bundle_text)
     # always gets the same id and crosses the wire once per notebook, not once per widget.
     pub = APD.Display.published_to_js
