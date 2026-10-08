@@ -455,11 +455,12 @@ end
             bints = @test_logs (:warn, r"non-data-space text") interactables(fb)
             @test isempty(bints)
 
-            # A top-level data-space scatter still fails in PointInteractable. The refusal
-            # applies to children discovered under an unknown parent, not to this plot.
+            # A top-level data-space scatter is built, as its markers' outlines (#291). The
+            # refusal applies to children discovered under an unknown parent, not to this plot.
             fd = Figure(size = (400, 300)); ad = Axis(fd[1, 1])
             scatter!(ad, [1.0, 2.0], [1.0, 2.0]; markersize = 0.3, markerspace = :data)
-            @test_throws ErrorException interactables(fd)
+            dints = @test_logs interactables(fd)
+            @test only(dints) isa PolygonInteractable && only(dints).id === :scatter
 
             # Default `triplot!` draws the triangles and also ghost edges, the convex hull,
             # constrained edges, and a point scatter, all with `visible[] == false`. Those
@@ -839,6 +840,40 @@ end
             @test isapprox(g[1], want[1]; atol = 1) && isapprox(g[2], want[2]; atol = 1)
             img = Makie.colorbuffer(f; px_per_unit = c.scaling)
             @test all(isapprox.(ink_center(img), (g[1], g[2]); atol = 4))
+        end
+        # #291: a data-space marker is an area; its polygon covers the ink Makie draws.
+        function ink_box(img)
+            dark = [(x, y) for y in axes(img, 1), x in axes(img, 2) if Float64(Makie.red(img[y, x])) < 0.3 && Float64(Makie.blue(img[y, x])) < 0.3]
+            return (extrema(first, dark)..., extrema(last, dark)...)
+        end
+        @testset "markerspace = :data: $(marker) $(kw) hits its drawn outline" for (marker, kw) in (
+                (:rect, (;)), (:circle, (;)), (Rect, (;)), (Circle, (;)), (:utriangle, (;)),
+                (:rect, (; rotation = pi / 6)), (:rect, (; yscale = log10)), (Rect, (; marker_offset = Vec2f(0.5, 0))),
+            )
+            ys = get(kw, :yscale, identity)
+            f = Figure(size = (500, 400))
+            a = Axis(f[1, 1]; yscale = ys, limits = ys === identity ? (0, 6, 0, 6) : (0, 6, 1, 1000))
+            skw = Base.structdiff(kw, NamedTuple{(:yscale,)})
+            p = scatter!(a, [3.0], [ys === identity ? 3.0 : 30.0]; marker, markersize = 2, markerspace = :data, color = :black, skw...)
+            hidedecorations!(a); hidespines!(a)
+            _, _, c = ctx_for(f)
+            i = only(interactables(a, p))
+            @test i isa PolygonInteractable && i.id === :scatter
+            @test i.payloads == [(; index = 1, x = 3.0, y = ys === identity ? 3.0 : 30.0)]
+            ring = only(only(hitlayers(i, c)).geometry)
+            got = (extrema(ring[1:2:end])..., extrema(ring[2:2:end])...)
+            @test all(isapprox.(got, ink_box(Makie.colorbuffer(f; px_per_unit = c.scaling)); atol = 3))
+            # `radius` still asks for pixel circles.
+            @test only(interactables(a, p; radius = 5)) isa PointInteractable
+        end
+        @testset "markerspace = :data: per-point sizes, and scale! moves centers, not outlines" begin
+            f = Figure(size = (500, 400)); a = Axis(f[1, 1]; limits = (0, 6, 0, 6))
+            p = scatter!(a, [1.0, 2.0], [1.0, 1.0]; marker = Rect, markersize = [0.5, 1.0], markerspace = :data)
+            r = only(interactables(a, p)).rings
+            @test extrema(q -> q[1], r[1]) == (0.75f0, 1.25f0) && extrema(q -> q[1], r[2]) == (1.5f0, 2.5f0)
+            scale!(p, 2, 2, 1)
+            r = only(interactables(a, p)).rings
+            @test extrema(q -> q[1], r[1]) == (1.75f0, 2.25f0) && extrema(q -> q[2], r[2]) == (1.5f0, 2.5f0)
         end
         @testset "text with markerspace = :data sits on its glyphs on a log axis" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1]; yscale = log10, limits = (0, 6, 1, 1000))

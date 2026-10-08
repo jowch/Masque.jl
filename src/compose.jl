@@ -193,6 +193,56 @@ function _claimed(id, taken)
     end
 end
 
+# The ids constructors give when the caller passes none. A list rather than a flag on each
+# interactable, so an explicit `id = :view` counts too: it is the same name.
+# `test/compose_tests.jl` checks it against every constructor's default.
+const _BUILTIN_IDS = Set{Symbol}(
+    [
+        :arrows2d, :arrows3d, :axis, :band, :bars, :boxplot, :cells, :colorbar, :contourf,
+        :crossbar, :density, :errorbars, :hexbin, :hist, :hlines, :hspan, :legend, :lines,
+        :meshscatter, :points, :poly, :polygons, :rangebars, :rects, :region, :roi, :scatter,
+        :segments, :series, :slice, :spy, :stairs, :text, :threshold, :view, :violin, :vlines,
+        :voronoiplot, :vspan, :waterfall, :wireframe,
+    ]
+)
+
+# Number arguments that share a built-in id, in argument order: two `ViewInteractable(ax)`
+# become `:view` and `:view_2`, as two scatters' defaults do. Any other id stays put and
+# counts as taken, as do the ids an `interactables(plot)` argument rebuilds, so a built-in
+# id that meets one moves instead. A numbered id that names a default replaces it, so
+# `ColorbarInteractable(cb1)`, `ColorbarInteractable(cb2)` replace `:colorbar` and
+# `:colorbar_2`. Only calls that raised a duplicate-id error before see a new id.
+function _number_builtin_ids(given, installed)
+    used = Set{Symbol}()
+    for g in given
+        if g isa _PlotRequest
+            union!(used, get(installed, g.plot, Symbol[]))
+        else
+            id = _layer_id(g)
+            id === nothing || id in _BUILTIN_IDS || push!(used, id)
+        end
+    end
+    out = AbstractInteractable[]
+    for g in given
+        id = g isa _PlotRequest ? nothing : _layer_id(g)
+        if id === nothing || !(id in _BUILTIN_IDS)
+            push!(out, g)
+            continue
+        end
+        n = 1
+        while (n == 1 ? id : Symbol(id, :_, n)) in used
+            n += 1
+        end
+        new = n == 1 ? id : Symbol(id, :_, n)
+        push!(used, new)
+        push!(out, new === id ? g : _with_id(g, new))
+    end
+    return out
+end
+
+# `i` with its `id` field set to `id`, through the all-fields constructor.
+_with_id(i::T, id) where {T} = T((f === :id ? id : getfield(i, f) for f in fieldnames(T))...)
+
 """
     _assemble(fig, xs; auto) -> Vector{AbstractInteractable}
 
@@ -208,7 +258,7 @@ function _assemble_all(fig, xs; auto::Bool)
     given = _flatten_args!(AbstractInteractable[], collect(Any, xs))
     if auto
         _reject_unsupported_axes(fig)
-        d = _defaults(fig)
+        d = _defaults(fig; replaced = Base.IdSet{Any}(g.plot for g in given if g isa _PlotRequest))
         defaults, plotmap, installed = d.ints, d.plotmap, d.installed
     else
         _finalize!(fig)
@@ -216,6 +266,7 @@ function _assemble_all(fig, xs; auto::Bool)
         plotmap = IdDict{Any, Vector{Symbol}}()
         installed = IdDict{Any, Vector{Symbol}}()
     end
+    given = _number_builtin_ids(given, installed)
     default_ids = Set{Symbol}(id for id in map(_layer_id, defaults) if id !== nothing)
 
     # One group per argument; `replaces` maps a default's id to the group that takes its place.

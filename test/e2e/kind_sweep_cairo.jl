@@ -249,6 +249,15 @@ HTML(
         "<span id=\"coords_hexbin\" style=\"display:none\">$(JSON3.write(sweep.hexbin.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-0000000000e1
+@bind ev_scatter_data sweep.scatter_data
+
+# ╔═╡ c1000000-0000-0000-0000-0000000000e2
+HTML(
+    "<span id=\"out_scatter_data\">SCATTER_DATA=$(repr(ev_scatter_data))</span>" *
+        "<span id=\"coords_scatter_data\" style=\"display:none\">$(JSON3.write(sweep.scatter_data.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000076
 @bind ev_scatter_moved sweep.scatter_moved
 
@@ -464,6 +473,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000006b
 # ╠═c1000000-0000-0000-0000-0000000000a0
 # ╠═c1000000-0000-0000-0000-0000000000a1
+# ╠═c1000000-0000-0000-0000-0000000000e1
+# ╠═c1000000-0000-0000-0000-0000000000e2
 # ╠═c1000000-0000-0000-0000-000000000076
 # ╠═c1000000-0000-0000-0000-000000000077
 # ╠═c1000000-0000-0000-0000-000000000078

@@ -101,7 +101,12 @@ Each `lines!` and `stairs!` plot is one element for its whole line, and
 shows the point you plotted nearest the pointer. Only the body of a `boxplot!`
 responds, not its whiskers or outliers, and an `annotation!` responds
 on its text. In a `contourf!` plot, hovering inside a hole of a filled
-level reaches nothing unless another level is drawn there.
+level reaches nothing unless another level is drawn there. A `scatter!`
+sized in data units (`markerspace = :data`) responds over each marker's
+drawn shape: a square over its square, a circle over its circle. To
+cover heatmap cells exactly, draw `marker = Rect` with `markersize = 1`;
+the `:rect` symbol draws a smaller square. Its layer has kind `:polygons`; pass `radius` to
+`interactables(plot; …)` to hit circles of that many pixels instead.
 
 A recipe not in the table, such as `rainclouds!`, still gets each
 visible part the table knows, under that part's layer id: `rainclouds!`
@@ -110,7 +115,9 @@ gives `:violin`, `:scatter`, and `:boxplot`, and `tricontourf!` gives
 shows how many points fell in it. A plot whose `space` is not
 `:data`, such as a `bracket!` label or a `scatter!` placed with
 `space = :relative`, is skipped with a warning that names its `space`.
-`surface!` is not made interactive. To make a recipe of your own
+`surface!` is not made interactive. If Masque can't make one plot
+interactive, it skips that plot with a warning and the rest of the
+figure still responds. To make a recipe of your own
 respond as one mark, see [Your own plot types](@ref), and to add hit
 shapes where nothing is drawn, see [Custom hits](@ref).
 

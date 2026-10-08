@@ -98,10 +98,90 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test ids(assemble(f, interactables(f), ViewInteractable(ax))) == [:lines, :scatter, :view]
     end
 
-    @testset "two layers with one id are refused" begin
+    @testset "two layers with one id you chose are refused" begin
         f = Figure(); ax = Axis(f[1, 1])
         scatter!(ax, xs, ys)
-        @test_throws ArgumentError assemble(f, ViewInteractable(ax), ViewInteractable(ax))
+        @test_throws ArgumentError assemble(f, ViewInteractable(ax; id = :pan), ViewInteractable(ax; id = :pan))
+    end
+
+    @testset "a repeated built-in id is numbered (#287)" begin
+        f = Figure(); ax1 = Axis(f[1, 1]); ax2 = Axis(f[1, 2])
+        scatter!(ax1, xs, ys); scatter!(ax2, xs, ys)
+        out = assemble(f, ViewInteractable(ax1), ViewInteractable(ax2))
+        @test ids(out) == [:scatter, :scatter_2, :view, :view_2]
+        @test out[3].ax === ax1 && out[4].ax === ax2
+        @test ids(assemble(f, AxisInteractable(ax1), AxisInteractable(ax2), AxisInteractable(ax1); auto = false)) ==
+            [:axis, :axis_2, :axis_3]
+        # Every kind with a fixed default, and the rest of each interactable is kept.
+        t = assemble(
+            f, ThresholdInteractable(ax1; value = 1.0), ThresholdInteractable(ax2; value = 2.0, orientation = :vertical),
+            ROIInteractable(ax1; bounds = (0, 1, 0, 1)), ROIInteractable(ax2; bounds = (0, 2, 0, 2), selects = :scatter);
+            auto = false,
+        )
+        @test ids(t) == [:threshold, :threshold_2, :roi, :roi_2]
+        @test t[2].value == 2.0 && t[2].orientation === :vertical && t[2].ax === ax2
+        @test t[4].bounds == (0.0, 2.0, 0.0, 2.0) && t[4].selects === :scatter
+        pts = collect(zip(xs, ys))
+        @test ids(assemble(f, PointInteractable(ax1, pts), PointInteractable(ax2, pts; payloads = ["a", "b", "c"]); auto = false)) ==
+            [:points, :points_2]
+        # `id = :view` is the built-in name, so it is numbered like the default. An id you
+        # chose keeps its name, so a built-in id that meets it moves.
+        @test ids(assemble(f, ViewInteractable(ax1), ViewInteractable(ax2; id = :view); auto = false)) == [:view, :view_2]
+        @test ids(assemble(f, ViewInteractable(ax1), ViewInteractable(ax2), ViewInteractable(ax2; id = :view_2); auto = false)) ==
+            [:view, :view_3, :view_2]
+        # A lone built-in id is not moved by a chosen id that extends it.
+        @test ids(assemble(f, ViewInteractable(ax1), AxisInteractable(ax1; id = :view_readout); auto = false)) ==
+            [:view, :view_readout]
+    end
+
+    @testset "numbered built-in ids replace the defaults they name (#287)" begin
+        f = Figure()
+        _, hm1 = heatmap(f[1, 1], rand(3, 3)); cb1 = Colorbar(f[1, 2], hm1)
+        _, hm2 = heatmap(f[2, 1], rand(3, 3)); cb2 = Colorbar(f[2, 2], hm2)
+        out = assemble(f, ColorbarInteractable(cb1), ColorbarInteractable(cb2))
+        @test ids(out) == [:cells, :cells_2, :colorbar, :colorbar_2]
+        @test out[3].cb === cb1 && out[4].cb === cb2
+        lf = Figure(); lax = Axis(lf[1, 1])
+        lines!(lax, xs, ys; label = "a")
+        l1 = axislegend(lax); l2 = Legend(lf[1, 2], lax)
+        lout = assemble(lf, LegendInteractable(l1), LegendInteractable(l2))
+        @test ids(lout) == [:lines, :legend, :legend_2]
+        @test lout[2].leg === l1 && lout[3].leg === l2
+        @test lout[3].targets == [[:lines]]
+    end
+
+    @testset "every constructor's default id is a built-in id (#287)" begin
+        # Read each constructor's `id = :name` default from the source, so a new constructor
+        # can't leave its default out of `_BUILTIN_IDS`.
+        found = Set{Symbol}()
+        walk(x) = nothing
+        function walk(ex::Expr)
+            if ex.head === :kw && ex.args[1] === :id && ex.args[2] isa QuoteNode
+                push!(found, ex.args[2].value)
+            end
+            foreach(walk, ex.args)
+            return nothing
+        end
+        function defs(ex)
+            ex isa Expr || return
+            if ex.head in (:function, :(=)) && ex.args[1] isa Expr
+                sig = ex.args[1]
+                while sig isa Expr && sig.head === :where
+                    sig = sig.args[1]
+                end
+                if sig isa Expr && sig.head === :call
+                    name = sig.args[1]
+                    name isa Symbol && occursin(r"interactable"i, string(name)) && walk(sig)
+                end
+            end
+            foreach(defs, ex.args)
+            return
+        end
+        for file in ("interactables.jl", "introspect.jl")
+            defs(Meta.parseall(read(joinpath(pkgdir(Masque), "src", file), String)))
+        end
+        @test :view in found && :scatter in found && :points in found
+        @test found == Masque._BUILTIN_IDS
     end
 
     @testset "auto = false keeps only the arguments" begin
@@ -209,6 +289,34 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test isempty(w.manifest["layers"])
         w = masque(f; selected = Dict(:scatter => [2]))
         @test only(filter(L -> L["id"] == "scatter", w.manifest["layers"]))["selected"] == [1]
+    end
+
+    @testset "a scatter sized in data units doesn't stop the widget (#291)" begin
+        # The reporter's figure: a near-transparent square over each heatmap cell.
+        f = Figure(); ax = Axis(f[1, 1]; aspect = DataAspect())
+        heatmap!(ax, 1:10, 1:10, rand(10, 10))
+        sc = scatter!(
+            ax, vec([Point2f(i, j) for i in 1:10, j in 1:10]);
+            marker = Rect, markersize = 1, markerspace = :data, color = (:white, 0.01),
+        )
+        w = @test_logs masque(f, interactables(sc; payloads = [(i = k,) for k in 1:100], tooltip = masque"cell $(i)"))
+        L = only(filter(L -> L["id"] == "scatter", w.manifest["layers"]))
+        @test L["kind"] == "polygons" && length(L["payloads"]) == 100
+        @test [L["id"] for L in w.manifest["layers"]] == ["scatter", "cells"]
+        # `radius` still gives pixel circles, with defaults on or off.
+        @test only(filter(L -> L["id"] == "scatter", masque(f, interactables(sc; radius = 5)).manifest["layers"]))["kind"] == "circles"
+        @test only(masque(f, interactables(sc; radius = 5); auto = false).manifest["layers"])["kind"] == "circles"
+
+        # A plot Masque can't build is skipped with a warning, and the rest still responds.
+        # An Axis3 scatter in data units has no pixel radius to derive.
+        f = Figure(); ax = Axis3(f[1, 1])
+        sc = scatter!(ax, [1.0, 2.0], [1.0, 2.0], [1.0, 2.0]; markerspace = :data, markersize = 0.3)
+        lines!(ax, [1.0, 2.0], [2.0, 1.0], [1.0, 1.0])
+        built = @test_logs (:warn, r"skipping scatter;") match_mode = :any assemble(f)
+        @test ids(built) == [:lines]
+        # Replaced by the caller: no warning, and the replacement is built.
+        built = @test_logs assemble(f, interactables(sc; radius = 5))
+        @test sort(ids(built)) == [:lines, :scatter]
     end
 
     @testset "a recipe method need not take `id` (#270)" begin
