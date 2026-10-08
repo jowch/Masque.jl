@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- `masque` warns once per call about the plots it skips, listing each kind, with a count when
+  one repeats. Before, it warned once per skipped plot, so two `Axis3` panels with `text!`
+  gave two identical warnings per call (#289).
+
 ## [0.2.1] - 2026-10-04
 
 ### Added

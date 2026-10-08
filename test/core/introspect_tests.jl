@@ -776,8 +776,28 @@ end
             Makie.update_state_before_display!(f)
             @test_logs (:warn, r"space = :relative") @test isempty(interactables(a, s))
             @test_logs (:warn, r"space = :pixel") @test isempty(interactables(a, l))
-            ints = @test_logs (:warn, r"space = :relative") (:warn, r"space = :pixel") interactables(f)
+            # One call gives one warning, which lists both.
+            ints = @test_logs (:warn, r"skipping 2 plots.*space = :relative.*space = :pixel"s) interactables(f)
             @test [i.id for i in ints] == [:scatter]
+        end
+        @testset "skipped plots warn once per call, a repeat counted (#289)" begin
+            f = Figure()
+            for k in 1:2
+                a = Axis3(f[1, k])
+                scatter!(a, [1.0], [1.0], [1.0])
+                text!(a, Point3f(1, 1, 1); text = "residue $k")
+            end
+            Makie.update_state_before_display!(f)
+            once = r"^masque: skipping 2 plots.*\n  - text on Axis3 .* \(2 times\)$"s
+            # Exactly one warning per call, and again on the next call (a re-run cell).
+            @test_logs (:warn, once) masque(f)
+            w = @test_logs (:warn, once) masque(f)
+            @test [L["id"] for L in w.manifest["layers"]] == ["scatter", "scatter_2"]
+            @test_logs (:warn, once) interactables(f)
+            # A single skipped plot keeps the one-line form.
+            g = Figure(); b = Axis3(g[1, 1]); text!(b, Point3f(1, 1, 1); text = "x")
+            Makie.update_state_before_display!(g)
+            @test_logs (:warn, r"^masque: skipping text on Axis3 — only") (:warn, r"no introspectable") masque(g)
         end
         @testset "marker_offset moves the hit circle by that many px" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 6, 0, 6))
