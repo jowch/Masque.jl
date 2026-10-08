@@ -173,6 +173,13 @@ kind_sweep_meta() = [
         "tip" => "count", "hoverIndex" => 1, "hoverTip" => "count", "mode" => "element",
     ),
     Dict(
+        # A scatter sized in data units (#291): each square marker is one polygon element
+        # covering its heatmap cell, on top of the heatmap's `:cells`.
+        "key" => "scatter_data", "layerId" => "scatter", "layerKind" => "polygons",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "x", "hoverIndex" => 1, "hoverTip" => "x", "mode" => "element",
+    ),
+    Dict(
         # Bars with a thick outline ship a `tol` reach on their `:rects` layer, #246.
         "key" => "bar_stroke", "layerId" => "bars", "layerKind" => "rects",
         "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
@@ -598,6 +605,18 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:hexbin => [1]))
     end
 
+    # Square markers sized in data units over a heatmap's cells, #291.
+    scatter_data = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "scatter markerspace = :data")
+        heatmap!(ax, 1:4, 1:3, reshape(collect(1.0:12.0), 4, 3); colormap = :grays)
+        scatter!(
+            ax, vec([Point2f(i, j) for i in 1:4, j in 1:3]);
+            marker = Rect, markersize = 0.8, markerspace = :data, color = (:orange, 0.6),
+        )
+        masque(fig; selected = Dict(:scatter => [1]))
+    end
+
     # Thick bar outlines respond too, #246: the layer carries a `tol` reach past each bar.
     bar_stroke = let
         fig = Figure(size = (480, 260))
@@ -825,7 +844,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d, arrows2d, band_y, hexbin, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto,
     )
 end
