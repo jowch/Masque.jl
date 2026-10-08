@@ -2,15 +2,23 @@
 # Lazily warm what a task needs, instead of paying for it at every session start.
 # Idempotent: re-running `julia` on a warm machine takes ~10 s (npm ci always reinstalls).
 #
-#   scripts/cloud-warm.sh [julia] [frontend] [e2e]     (no args = julia)
+#   scripts/cloud-warm.sh [julia] [julia-fetch] [frontend] [e2e]     (no args = julia)
 #
 #   julia     Shared dev env at $MASQUE_DEV_ENV: Masque (dev'd from this checkout)
 #             + every [deps]/[extras] package in Project.toml + Pluto 0.20, precompiled
-#             (~7 min cold). One env serves both the unit tests
-#             (`julia --project="$MASQUE_DEV_ENV" test/runtests.jl`) and the kind-sweep
+#             (~11 min cold, ~8.5 after the setup script's julia-fetch). One env serves both the
+#             unit tests (`julia --project="$MASQUE_DEV_ENV" test/runtests.jl`) and the kind-sweep
 #             notebooks, which read MASQUE_DEV_ENV. Unlike CI's kind-sweep step (CairoMakie,
 #             WGLMakie, JSON3 only), every dep is a direct dep here, because the test files
 #             `using` [extras] and indirect deps (Makie, FileIO, …) that `using` can't see.
+#   julia-fetch  The same env resolved and downloaded, not precompiled (~2.5 min). The cloud
+#             environment's setup script runs it, because the cloud snapshots the setup's
+#             files for later sessions only when the whole script ends within ~5 min, and
+#             precompiling takes longer. Its lines, after installing Julia, the registry, Runic:
+#               git clone -q --depth 1 https://github.com/jowch/Masque.jl /tmp/masque-setup &&
+#                   bash /tmp/masque-setup/scripts/cloud-warm.sh julia-fetch || true
+#               rm -rf /tmp/masque-setup
+#             The env then points at the deleted clone until a session runs `julia`.
 #   frontend  `npm ci` in frontend/.
 #   e2e       `npm install` + the Chromium build matching test/e2e's pinned Playwright
 #             (already preinstalled on the cloud image: no download, see CLAUDE.md).
@@ -26,12 +34,14 @@ DEV_ENV="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}"
 for target in "$@"; do
     echo "== cloud-warm: $target"
     case "$target" in
-        julia)
+        julia | julia-fetch)
             mkdir -p "$DEV_ENV"
             # JULIA_NOSYSIMAGE=1: a sysimage wrapper (e.g. the Cursor image) would preload
-            # CairoMakie + Masque; a no-op for stock julia. REPO goes in via ARGS, not
+            # CairoMakie + Masque; a no-op for stock julia. JULIA_PKG_PRECOMPILE_AUTO=0: precompile
+            # once, after the last add; per-add precompiles built Makie twice, since adding Pluto
+            # downgrades HTTP and Bonito under it (~6 min lost). REPO goes in via ARGS, not
             # string interpolation, so any checkout path is safe.
-            JULIA_NOSYSIMAGE=1 julia --project="$DEV_ENV" -e '
+            JULIA_NOSYSIMAGE=1 JULIA_PKG_PRECOMPILE_AUTO=0 julia --project="$DEV_ENV" -e '
                 using Pkg, TOML
                 repo = ARGS[1]
                 Pkg.develop(path = repo)
@@ -42,9 +52,9 @@ for target in "$@"; do
                 # Pluto pinned to the 0.20 series test/e2e/serve.jl installs, so that server
                 # reuses this precompile cache whenever it resolves the same versions.
                 Pkg.add(Pkg.PackageSpec(name = "Pluto", version = "0.20"))
-                Pkg.precompile()
-            ' "$REPO"
-            echo "julia env ready: $DEV_ENV"
+                ARGS[2] == "julia" && Pkg.precompile()
+            ' "$REPO" "$target"
+            echo "$target env ready: $DEV_ENV"
             ;;
         frontend)
             (cd "$REPO/frontend" && npm ci)
@@ -75,7 +85,7 @@ for target in "$@"; do
             (cd "$REPO/test/e2e" && npx playwright install --with-deps chromium)
             ;;
         *)
-            echo "unknown target: $target (expected julia, frontend, e2e)" >&2
+            echo "unknown target: $target (expected julia, julia-fetch, frontend, e2e)" >&2
             exit 2
             ;;
     esac
