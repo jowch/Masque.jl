@@ -50,8 +50,9 @@ p = heatmap!(ax, 1:3, 1:3, contacts)
 Hovering a cell reads `(F17, I24) = 0.31`. A click puts the cell's
 payload in `pick`, so `pick.row` and `pick.col` read it directly, as
 `pick.i` and `pick.j` do. Every cell's payload is sent with the figure,
-so on a grid of hundreds of thousands of cells, keep the data in Julia
-instead and look it up with `pick`, as in `names[pick.i]`.
+so on a grid of tens of thousands of cells the notebook gets slow to
+load. There, keep the data in Julia and look it up with `pick`, as in
+`names[pick.i]`.
 
 ## Make a grid from edges and values
 

@@ -101,10 +101,10 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws ArgumentError masque(fig, bad)
 
         # Without payloads, a cell is unchanged: no payload, no forwarding.
-        plain = tv(masque(fig), Dict("layer" => "heatmap", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
+        plain = tv(masque(fig), Dict("layer" => "cells", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
         @test plain.payload === nothing
         @test propertynames(plain) == (:layer, :i, :j, :value)
-        @test sprint(show, plain) == "GridCellEvent(:heatmap, i = 1, j = 1, value = 11.0)"
+        @test sprint(show, plain) == "GridCellEvent(:cells, i = 1, j = 1, value = 11.0)"
         @test_throws ArgumentError plain.row
         @test GridCellEvent(:cells, 1, 2, 3.0) == GridCellEvent(:cells, 1, 2, 3.0, nothing)
     end
