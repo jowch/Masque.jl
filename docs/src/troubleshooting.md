@@ -286,6 +286,17 @@ return a `Figure`, and write the SVG file with
 figure, return `masque(fig)`. For more information, see
 [Makie's settings don't change the widget](@ref makie-settings).
 
+### Tried showing a widget outside Pluto and hover does nothing
+
+**Cause:** tooltips, highlights, and clicks need Pluto. In Documenter,
+VS Code, or any other HTML display, a CairoMakie widget shows the plain
+figure. A WGLMakie widget has no image to show there, so it shows an
+empty box saying it is drawn only in Pluto.
+
+**Fix:** open the notebook in Pluto for the interactive figure. To put
+the figure in a document, return `fig` itself, or write it with
+`save("figure.png", fig)`.
+
 ### Tried feeding this widget's bond into the same call's `selected=`
 
 **Pluto says:** cyclic references.

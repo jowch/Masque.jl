@@ -362,7 +362,9 @@ per-element vector of markers) falls back to `markersize / 2` as a conservative 
 marker's outline is added where it is drawn: half of `strokewidth` on CairoMakie, which
 centers the outline on the marker's edge, and all of it on WebGL, which paints it outside. This
 requires `markerspace = :pixel` (the default); pass `radius=` explicitly for any other
-markerspace, or it errors. The points constructor above takes the same radius when exactly one
+markerspace, or it errors. `interactables(ax, p)` and `masque(fig)` build a `markerspace =
+:data` scatter as a [`PolygonInteractable`](@ref) instead, one polygon per marker's drawn
+shape, unless `radius` is passed. The points constructor above takes the same radius when exactly one
 `Scatter` on `ax` has the same positions (including a `scatterlines!`/`stem!` child scatter);
 it does not resolve `colors`. The overlay adds its own hit-test slack on top, so the smaller
 radius doesn't make small markers harder to click. The scatter constructor also resolves

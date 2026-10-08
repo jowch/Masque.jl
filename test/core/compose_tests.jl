@@ -291,6 +291,34 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test only(filter(L -> L["id"] == "scatter", w.manifest["layers"]))["selected"] == [1]
     end
 
+    @testset "a scatter sized in data units doesn't stop the widget (#291)" begin
+        # The reporter's figure: a near-transparent square over each heatmap cell.
+        f = Figure(); ax = Axis(f[1, 1]; aspect = DataAspect())
+        heatmap!(ax, 1:10, 1:10, rand(10, 10))
+        sc = scatter!(
+            ax, vec([Point2f(i, j) for i in 1:10, j in 1:10]);
+            marker = Rect, markersize = 1, markerspace = :data, color = (:white, 0.01),
+        )
+        w = @test_logs masque(f, interactables(sc; payloads = [(i = k,) for k in 1:100], tooltip = masque"cell $(i)"))
+        L = only(filter(L -> L["id"] == "scatter", w.manifest["layers"]))
+        @test L["kind"] == "polygons" && length(L["payloads"]) == 100
+        @test [L["id"] for L in w.manifest["layers"]] == ["scatter", "cells"]
+        # `radius` still gives pixel circles, with defaults on or off.
+        @test only(filter(L -> L["id"] == "scatter", masque(f, interactables(sc; radius = 5)).manifest["layers"]))["kind"] == "circles"
+        @test only(masque(f, interactables(sc; radius = 5); auto = false).manifest["layers"])["kind"] == "circles"
+
+        # A plot Masque can't build is skipped with a warning, and the rest still responds.
+        # An Axis3 scatter in data units has no pixel radius to derive.
+        f = Figure(); ax = Axis3(f[1, 1])
+        sc = scatter!(ax, [1.0, 2.0], [1.0, 2.0], [1.0, 2.0]; markerspace = :data, markersize = 0.3)
+        lines!(ax, [1.0, 2.0], [2.0, 1.0], [1.0, 1.0])
+        built = @test_logs (:warn, r"skipping scatter;") match_mode = :any assemble(f)
+        @test ids(built) == [:lines]
+        # Replaced by the caller: no warning, and the replacement is built.
+        built = @test_logs assemble(f, interactables(sc; radius = 5))
+        @test sort(ids(built)) == [:lines, :scatter]
+    end
+
     @testset "a recipe method need not take `id` (#270)" begin
         pts = Point2f[(1, 1), (2, 4)]
         # Without keywords: `masque` names the layer after the plot, numbering the second.
