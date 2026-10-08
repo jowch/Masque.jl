@@ -117,10 +117,10 @@ reader's GPU draws without Julia. For what stops working, see
 
 ## [Outside Pluto](@id outside-pluto)
 
-A CairoMakie widget keeps its tooltips and highlights wherever it shows
-as HTML: Documenter, IJulia, VS Code's notebooks, or a page you write
-with `show(io, MIME"text/html"(), w)`. Hover the two plots below; this
-page built them with Documenter, without Pluto.
+A CairoMakie widget keeps its tooltips and highlights outside Pluto, in
+Documenter or in an HTML page you write with
+`show(io, MIME"text/html"(), w)`. Hover the two plots below; this page
+built them with Documenter, without Pluto.
 
 ```@example outside-pluto
 using CairoMakie, Masque
@@ -138,8 +138,9 @@ lines!(ax2, 0:0.1:6, sin.(0:0.1:6))
 masque(fig2)
 ```
 
-Each widget adds about 130 KB to the page, and Documenter stops a
-build when a page passes 200 KB, so list a page with two or more
+Each widget adds about 80 KB of script to the page, plus its image.
+Documenter warns about a page past 100 KB, which one widget already
+reaches, and stops the build at 200 KB, so list a page with two or more
 widgets in `size_threshold_ignore`:
 
 ```julia

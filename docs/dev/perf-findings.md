@@ -74,6 +74,24 @@ manifest the MsgPack size.
 A realistic single interactive plot is **50–400 KB total**. Editor lag is not expected there; it
 becomes a risk only at the extremes in "Stress".
 
+### Outside Pluto
+
+Outside Pluto (#298), `show` writes one self-contained block per widget: the 81,883-byte
+`assets/overlay.js`, the PNG as base64 (4/3 of the decoded size), and the manifest as a JS
+literal. Nothing is shared between widgets on a page, so the script is the fixed ~82 KB per
+widget. Measured with `sizeof(sprint(show, MIME"text/html"(), masque(fig)))` on CairoMakie
+0.15, Julia 1.13, default figure size unless noted (2026-10-08, PR #311):
+
+| Plot | block | PNG (base64) | manifest |
+|------|------:|-----:|---------:|
+| scatter, 4 pts, 400×260 (the Backends page example) | 97 KB | 14 KB | 0.7 KB |
+| line, 10 pts | 155 KB | 72 KB | 0.8 KB |
+| scatter, 100 | 152 KB | 62 KB | 7.5 KB |
+| scatter, 1 000 | 499 KB | 346 KB | 71 KB |
+
+Documenter warns at 100 KiB per page and fails at 200 KiB, so one widget already warns and
+two fail a default build.
+
 ### What scales the manifest
 
 - **Element count**, linearly: ~38 B/element (three integer-pixel coordinates at 1–3 B each,

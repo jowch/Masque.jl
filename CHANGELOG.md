@@ -7,10 +7,16 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- A CairoMakie widget shown outside Pluto (Documenter, IJulia, VS Code's notebooks, or
-  `show(io, MIME"text/html"(), w)` in a script) keeps its tooltips and highlights, with
-  nothing to turn on. Clicks highlight a mark but set no `@bind` value, and dragging the view
-  needs Pluto. A display that blocks scripts still shows the plain figure (#298).
+- A CairoMakie widget shown outside Pluto, in Documenter or in an HTML page written with
+  `show(io, MIME"text/html"(), w)`, keeps its tooltips and highlights, with nothing to turn
+  on. Clicks highlight a mark but set no `@bind` value, and dragging the view needs Pluto. A
+  display that blocks scripts still shows the plain figure (#298).
+
+  Each widget now carries about 80 KB of script on top of its image, so a Documenter page
+  with two or more widgets passes Documenter's 200 KB page limit and `makedocs` stops with
+  an error, where on 0.2.2 it built. List that page in `size_threshold_ignore`, as
+  [Outside Pluto](https://jowch.github.io/Masque.jl/stable/backends/#outside-pluto) shows,
+  or show `fig` itself for the plain image.
 
 ### Fixed
 - Two interactables of the same kind in one `masque` call no longer clash over their
