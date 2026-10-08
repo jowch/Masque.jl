@@ -34,8 +34,9 @@ hover and click:
 ```
 
 To change one plot, such as giving it a tooltip template, `payloads`,
-or a different layer name (`label`), pass `interactables(plot; ...)` with the keywords you
-want. It replaces that plot's layer and keeps its id:
+or a different layer name (`label`), pass `interactables(plot; ...)`
+with the keywords you want. It replaces that plot's layer and keeps
+its id:
 
 ```julia
 s = scatter!(ax, xs, ys)

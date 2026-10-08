@@ -80,7 +80,9 @@ scatter!(ax, [1.0, 2.0, 3.0], [4.0, 1.0, 3.0]; label = "wild type")
 
 Moving to the first point might announce "wild type, element 1 of 3: x
 1.0, y 4.0". A plot with no `label` gets no name, and the announcement
-starts at the position: "element 1 of 3: x 1.0, y 4.0".
+starts at the position: "element 1 of 3: x 1.0, y 4.0". A label written
+in LaTeX or rich text names nothing either, since a screen reader would
+read out its markup; give that layer a plain-text name as shown below.
 
 To name a layer something else, or to name one whose plot has no
 `label`, pass the plot to [`interactables`](@ref) with a `label`, here

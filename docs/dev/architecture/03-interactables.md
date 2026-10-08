@@ -101,12 +101,14 @@ coordinate ships as the text a scatter's default payload holds. `step` (`"pre"`,
 `"center"`, from a `stairs` plot) says which sample each drawn corner belongs to. Placement
 (`translate!`, …) moves the path but not the samples.
 
-`label` (optional, per-layer, `String`) is a screen-reader announcement prefix for the
-keyboard-navigation overlay ([§11](11-keyboard.md)) — e.g. `"Scatter"` in "Scatter, element 3 of 10: …". Set via
-the `label` keyword on `PointInteractable`/`SegmentInteractable`/`RectInteractable`/
-`PolygonInteractable` (the kinds keyboard nav visits); absent by default, and
-omitted from the manifest entirely when unset (same idiom as `selects`/`tol` above) — see
-`perf-findings.md` for the measured per-layer wire cost.
+`label` (optional, per-layer, `String`) is the layer's name, which keyboard navigation
+announces before the position ([§11](11-keyboard.md)): "wild type, element 3 of 10: …".
+Positional constructors default it to `nothing`. A constructor that takes a plot, and
+`_construct` for every plot `masque(fig)` builds, default it to the plot's own Makie `label`
+when that label is non-empty plain text (`_plot_label`); empty, LaTeX and rich-text labels
+give `nothing`. An explicit `label`, including `nothing`, wins. It is omitted from the
+manifest entirely when unset (same idiom as `selects`/`tol` above) — see `perf-findings.md`
+for the measured per-layer wire cost.
 
 This is a **closed set of seven data geometry kinds**
 (`:circles/:polyline/:lines/:segments/:rects/:grid/:polygons`)

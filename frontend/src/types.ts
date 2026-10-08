@@ -130,7 +130,7 @@ export interface HitLayer {
     // Julia guarantees every referenced layer exists and has a kind in SELECTED_KINDS, and
     // that a `:k` pin is in range.
     links?: string[][]
-    label?: string     // screen-reader announcement prefix, e.g. "Scatter, element 3 of 10: …"; absent → no prefix
+    label?: string     // the layer's name (by default the plot's Makie label), announced before the position; absent → no name
     // Per-element tooltip accent colour: one CSS colour string (uniform across the layer), or a
     // shared palette + one 0-based palette index per element (colormapped/categorical data).
     // Absent → no accent (unresolvable or not attempted for this plot kind).
