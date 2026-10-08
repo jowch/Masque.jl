@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Two interactables of the same kind in one `masque` call no longer clash over their
+  default id. Two `ViewInteractable(ax)` on two axes become `:view` and `:view_2`, the way
+  two scatters become `:scatter` and `:scatter_2`; the same holds for `AxisInteractable`,
+  `ColorbarInteractable`, `LegendInteractable`, `ThresholdInteractable`, `ROIInteractable`,
+  and every other constructor's default. Before, `masque` raised "two interactables use the
+  layer id". Ids you choose are unchanged, and two that match still raise. With two
+  `AxisInteractable`s, each panel now reads its own coordinates; before, the first one
+  answered over both panels (#287).
+
 ## [0.2.1] - 2026-10-04
 
 ### Added
