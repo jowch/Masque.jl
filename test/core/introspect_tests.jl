@@ -788,7 +788,7 @@ end
                 text!(a, Point3f(1, 1, 1); text = "residue $k")
             end
             Makie.update_state_before_display!(f)
-            once = r"^masque: skipping 2 plots.*\n  - text on Axis3 .* \(2 times\)$"s
+            once = r"^masque: skipping 2 plots[^\n]*\n  - 2 × text on Axis3 — [^\n]*$"
             # Exactly one warning per call, and again on the next call (a re-run cell).
             @test_logs (:warn, once) masque(f)
             w = @test_logs (:warn, once) masque(f)

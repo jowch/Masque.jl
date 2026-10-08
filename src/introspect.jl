@@ -1255,7 +1255,7 @@ function _warn_skips(notes)
         haskey(counts, n) || push!(order, n)
         counts[n] = get(counts, n, 0) + 1
     end
-    times(n) = counts[n] == 1 ? n : "$(n) ($(counts[n]) times)"
+    times(n) = counts[n] == 1 ? n : "$(counts[n]) × $(n)"
     if length(notes) == 1
         @warn "masque: skipping $(only(notes))"
     else
