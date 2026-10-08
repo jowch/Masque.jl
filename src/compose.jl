@@ -277,9 +277,11 @@ The interactables one `masque(fig, xs...)` call overlays. With `auto`, start fro
 figure's defaults. An argument replaces the default with its id, and `interactables(plot)`
 replaces every default its plot built; a replacement takes the place of the first default
 it replaces. Everything else is added after the defaults, in argument order. Legends with no
-explicit `targets` are linked again, to the layers of this call.
+explicit `targets` are linked again, to the layers of this call. Plots it skips are warned
+on once, together, at the end.
 """
-function _assemble(fig, xs; auto::Bool)
+_assemble(fig, xs; auto::Bool) = _collecting_skips(() -> _assemble_all(fig, xs; auto))
+function _assemble_all(fig, xs; auto::Bool)
     given = AbstractInteractable[_resolve_slice_axis(fig, g) for g in _flatten_args!(AbstractInteractable[], collect(Any, xs))]
     if auto
         _reject_unsupported_axes(fig)
