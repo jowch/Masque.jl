@@ -39,8 +39,9 @@ for target in "$@"; do
             # JULIA_NOSYSIMAGE=1: a sysimage wrapper (e.g. the Cursor image) would preload
             # CairoMakie + Masque; a no-op for stock julia. JULIA_PKG_PRECOMPILE_AUTO=0: precompile
             # once, after the last add; per-add precompiles built Makie twice, since adding Pluto
-            # downgrades HTTP and Bonito under it (~6 min lost). REPO goes in via ARGS, not
-            # string interpolation, so any checkout path is safe.
+            # downgrades HTTP and Bonito under it (~6 min lost). That downgrade also means the
+            # WebGL tests here run on Bonito 4, while CI's Pkg.test() (no Pluto) gets Bonito 5.
+            # REPO goes in via ARGS, not string interpolation, so any checkout path is safe.
             JULIA_NOSYSIMAGE=1 JULIA_PKG_PRECOMPILE_AUTO=0 julia --project="$DEV_ENV" -e '
                 using Pkg, TOML
                 repo = ARGS[1]
