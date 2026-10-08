@@ -572,8 +572,10 @@ end
 function PolygonInteractable(ax, p::Makie.Hexbin; id = :hexbin, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     finv = Makie.inverse_transform(_transform_func(ax.scene))
     if _no_inverse(finv)
-        @warn "masque: skipping hexbin; the axis transform has no inverse, so the hexagons " *
-            "can't be mapped back to data" maxlog = 16
+        _skip_note(
+            "hexbin; the axis transform has no inverse, so the hexagons can't be " *
+                "mapped back to data"
+        )
         return PolygonInteractable(ax, Vector{Point2f}[]; id, payloads = Any[], tooltip, label)
     end
     rings = _hex_rings(finv, p)
@@ -651,8 +653,10 @@ function _data_marker_polygons(ax, p; id = :scatter, payloads = nothing, tooltip
     tf = _transform_func(ax.scene)
     finv = Makie.inverse_transform(tf)
     if _no_inverse(finv)
-        @warn "masque: skipping $(Makie.plotkey(p)) drawn in markerspace = :data; the axis " *
-            "transform has no inverse, so its markers can't be mapped back to data" maxlog = 16
+        _skip_note(
+            "$(Makie.plotkey(p)) drawn in markerspace = :data; the axis transform has no " *
+                "inverse, so its markers can't be mapped back to data"
+        )
         return PolygonInteractable(ax, Vector{Point2f}[]; id, payloads = Any[], tooltip, label)
     end
     rings = _data_marker_rings(tf, finv, p)
@@ -1008,7 +1012,7 @@ end
 # but specifically, not via the generic "unsupported plot type" path.
 function _text_interactables(ax, p::Makie.Text, id; kw...)
     if p.space[] !== :data
-        @warn "masque: skipping non-data-space text (space=$(p.space[]))" maxlog = 16
+        _skip_note("non-data-space text (space=$(p.space[]))")
         return AbstractInteractable[]
     end
     return AbstractInteractable[TextInteractable(ax, p; id, kw...)]
@@ -1070,8 +1074,10 @@ function _construct(ax, p, id; kw...)
     # layers are built from its children (`stem!`, `annotation!`), which carry no label.
     haskey(kw, :label) || (kw = (; kw..., label = _plot_label(p)))
     if !(p isa Makie.Text || p isa Makie.Annotation) && _nondata_space(p)
-        @warn "masque: skipping $(Makie.plotkey(p)) drawn in space = :$(p.space[]); only " *
-            "data-space plots get hover and click targets" maxlog = 16
+        _skip_note(
+            "$(Makie.plotkey(p)) drawn in space = :$(p.space[]); only data-space " *
+                "plots get hover and click targets"
+        )
         return AbstractInteractable[]
     end
     built = _construct_unplaced(ax, p, id; kw...)
@@ -1275,8 +1281,10 @@ function _place(i::GridInteractable, f)
 end
 function _warn_rotated(i, f)
     f.rotated || return false
-    @warn "masque: skipping layer :$(i.id); its plot is rotated, and its rectangles would no " *
-        "longer be axis-aligned" maxlog = 16
+    _skip_note(
+        "layer :$(i.id); its plot is rotated, and its rectangles would no longer " *
+            "be axis-aligned"
+    )
     return true
 end
 
@@ -1315,6 +1323,50 @@ function _register_plot!(plotmap, p, ids; overwrite = false)
     return nothing
 end
 
+# A skipped plot is noted, not warned on the spot. Inside one `masque` or `interactables`
+# call the notes are gathered and warned once at the end, a repeated note counted rather than
+# repeated: two Axis3 panels with `text!` give one line, not one warning per panel. Outside
+# such a call (an explicit constructor) the note is warned at once.
+const _SKIPS = :masque_skipped_plots
+
+function _skip_note(note::AbstractString)
+    notes = get(task_local_storage(), _SKIPS, nothing)
+    if notes === nothing
+        @warn "masque: skipping $(note)"
+    else
+        push!(notes, note)
+    end
+    return nothing
+end
+
+# Run `f` with skip notes gathered, then warn once. A nested call joins the outer one.
+function _collecting_skips(f)
+    haskey(task_local_storage(), _SKIPS) && return f()
+    notes = String[]
+    r = task_local_storage(f, _SKIPS, notes)
+    _warn_skips(notes)
+    return r
+end
+
+function _warn_skips(notes)
+    isempty(notes) && return nothing
+    counts = Dict{String, Int}()
+    order = String[]
+    for n in notes
+        haskey(counts, n) || push!(order, n)
+        counts[n] = get(counts, n, 0) + 1
+    end
+    times(n) = counts[n] == 1 ? n : "$(counts[n]) × $(n)"
+    if length(notes) == 1
+        @warn "masque: skipping $(only(notes))"
+    else
+        lines = join(("  - " * times(n) for n in order), "\n")
+        @warn "masque: skipping $(length(notes)) plots, which get no hover or click " *
+            "targets:\n$(lines)"
+    end
+    return nothing
+end
+
 # Other 2D recipes extract pixel-separable geometry that a 3D perspective projection
 # silently misaligns, and separable-edge / axis-aligned rect recipes assume Cartesian pixel
 # geometry (polar maps those into arcs and wedges). Skip loudly rather than construct.
@@ -1325,9 +1377,11 @@ function _skip_for_axis(ax, p)
                 Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D, Makie.ScatterLines,
             }
         )
-        @warn "masque: skipping $(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/" *
-            "LineSegments/MeshScatter/Wireframe/Arrows3D/ScatterLines have 3D-valid extraction today; " *
-            "other kinds are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
+        _skip_note(
+            "$(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/LineSegments/MeshScatter/" *
+                "Wireframe/Arrows3D/ScatterLines have 3D-valid extraction today; other kinds " *
+                "are roadmap scope (docs/dev/roadmap.md)"
+        )
         return true
     end
     if ax isa Makie.PolarAxis && !(
@@ -1336,9 +1390,11 @@ function _skip_for_axis(ax, p)
                 Makie.ScatterLines, Makie.Series,
             }
         )
-        @warn "masque: skipping $(Makie.plotkey(p)) on PolarAxis — only Scatter/Lines/" *
-            "LineSegments/ScatterLines/Series have polar-valid extraction today; grid and rect " *
-            "recipes are roadmap scope (docs/dev/roadmap.md)" maxlog = 16
+        _skip_note(
+            "$(Makie.plotkey(p)) on PolarAxis — only Scatter/Lines/LineSegments/ScatterLines/" *
+                "Series have polar-valid extraction today; grid and rect recipes are roadmap " *
+                "scope (docs/dev/roadmap.md)"
+        )
         return true
     end
     return false
@@ -1491,7 +1547,7 @@ function _defaults(fig; replaced = Base.IdSet{Any}())
                 # A child already warned (non-data text, or an axis skip). A second warning
                 # that names the parent only repeats that, which `bracket!` used to do.
                 if !r.built && !r.warned
-                    @warn "masque: skipping unsupported plot type $(Makie.plotkey(p)) (no introspection recipe)" maxlog = 16
+                    _skip_note("unsupported plot type $(Makie.plotkey(p)) (no introspection recipe)")
                 end
                 continue
             end
@@ -1540,8 +1596,8 @@ the pointer, so it is the mark drawn on top.
 
 On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D`/
 `ScatterLines` are supported; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
-Other kinds are skipped with a warning. A recipe with its own
-`Masque.interactables(ax, p::MyPlot)` method uses it. Any other recipe contributes each child
+Other kinds are skipped, and one call warns once, listing the skipped plots together. A
+recipe with its own `Masque.interactables(ax, p::MyPlot)` method uses it. Any other recipe contributes each child
 that has a default (`arc!` is the `lines!` it draws), under that child's layer id. A child
 with `visible[] == false` is not a layer (`triplot!`'s ghost edges). A construct with no
 vertices does not take a layer id (`qqplot!` with `qqline = :none`). A data-space `Scatter`
@@ -1555,7 +1611,7 @@ Each interactable inherits its constructor's default per-element payloads, so th
 path on a very large plot allocates one payload per element; construct with a lean `payloads=`
 yourself for huge data.
 """
-interactables(fig::Makie.Figure) = _defaults(fig).ints
+interactables(fig::Makie.Figure) = _collecting_skips(() -> _defaults(fig).ints)
 function interactables(ax::_SUPPORTED_AXES)
     fig = ax.parent
     fig isa Makie.Figure ||
