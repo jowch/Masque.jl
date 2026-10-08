@@ -346,3 +346,19 @@ end
     @test length(cbs2) == 2
     @test Set(c.id for c in cbs2) == Set([:colorbar, :colorbar_2])
 end
+
+@testset "outside Pluto, show gives the static image (#288)" begin
+    (; fig, ax, pts) = default_fixture()
+    w = masque(fig, [PointInteractable(ax, pts)]; auto = false)
+    html = sprint(show, MIME"text/html"(), w)
+    @test occursin("<img src=\"data:image/png;base64,$(w.b64)\"", html)
+    @test !occursin("<script", html)
+    @test occursin("max-width:$(w.display_css)px", html)
+    # A display that publishes to JS still gets the live widget.
+    buf = IOBuffer()
+    io = IOContext(buf, :pluto_published_to_js => (io, x) -> print(io, "null"))
+    show(io, MIME"text/html"(), w)
+    live = String(take!(buf))
+    @test occursin("window.Masque.mount", live)
+    @test occursin("<img src=\"data:image/png;base64,$(w.b64)\"", live)
+end
