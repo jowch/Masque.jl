@@ -7,7 +7,7 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Fixed
-- Showing a `masque` widget outside Pluto (Documenter, VS Code, an HTML export, or
+- Showing a `masque` widget outside Pluto (Documenter, VS Code, or
   `show(io, MIME"text/html"(), w)` in a script) gives the plain figure without hover or
   click, instead of throwing an `AssertionError`. A `backend = :webgl` widget, which has no
   image to fall back on, shows a box of the figure's size saying it is drawn only in Pluto.
