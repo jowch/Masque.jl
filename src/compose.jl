@@ -151,12 +151,18 @@ function _plot_axis(fig, p; who = "interactables($(Makie.plotkey(p)))")
     )
 end
 
-# Where `ax` sits in the figure's layout, `fig[1, 2]`, for an error message.
+# Where `ax` sits in the figure's layout, `fig[1, 2]` or `fig[1, 2][1, 1]` in a nested grid,
+# for an error message.
 function _axis_place(ax)
-    gc = ax.layoutobservables.gridcontent[]
-    gc === nothing && return "an $(nameof(typeof(ax))) outside the layout"
     r(x) = first(x) == last(x) ? string(first(x)) : string(first(x), ":", last(x))
-    return "fig[$(r(gc.span.rows)), $(r(gc.span.cols))]"
+    place = ""
+    block = ax
+    while (gc = block.layoutobservables.gridcontent[]) !== nothing
+        place = "[$(r(gc.span.rows)), $(r(gc.span.cols))]" * place
+        block = gc.parent
+    end
+    isempty(place) && return "an $(nameof(typeof(ax))) outside the layout"
+    return "fig" * place
 end
 
 # A slice built from plots alone, on the axis that draws them.

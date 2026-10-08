@@ -1494,8 +1494,7 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 `:threshold` [`HitLayer`](@ref).
 
 # Arguments
-- `ax` — a `Makie.Axis`. The plot constructor can leave it out: `masque` then uses the axis
-  that draws the plots, and raises `ArgumentError` if they are on different axes.
+- `ax` — a `Makie.Axis`.
 - `orientation` — `:horizontal` (constant-y line, dragged vertically) or `:vertical`
   (constant-x line, dragged horizontally). Any other value raises `ArgumentError`. Default
   `:horizontal`.
@@ -1563,8 +1562,7 @@ corners invert to data-space bounds via
 compatible layer, reporting the contained elements. Produces one `:roi` [`HitLayer`](@ref).
 
 # Arguments
-- `ax` — a `Makie.Axis`. The plot constructor can leave it out: `masque` then uses the axis
-  that draws the plots, and raises `ArgumentError` if they are on different axes.
+- `ax` — a `Makie.Axis`.
 - `bounds` — initial `(xmin, xmax, ymin, ymax)` in data space. Requires `xmin < xmax` and
   `ymin < ymax` (`ArgumentError` otherwise); length must be 4 (`ArgumentError` otherwise).
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:roi`.

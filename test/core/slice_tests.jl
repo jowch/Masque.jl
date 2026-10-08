@@ -208,6 +208,12 @@ end
         free = lines!(Axis(f; width = 100, height = 100), [0.0, 1.0], [0.0, 1.0])
         err = (@test_throws ArgumentError masque(f, SliceInteractable([a, free]))).value
         @test occursin("fig[1, 2]", err.msg) && occursin("an Axis outside the layout", err.msg)
+        # Axes in nested grids are named by their full path, so two panels never read the same.
+        fn = Figure()
+        n1 = lines!(Axis(fn[1, 1][1, 1]), [0.0, 1.0], [0.0, 1.0])
+        n2 = lines!(Axis(fn[1, 2][1, 1]), [0.0, 1.0], [0.0, 1.0])
+        err = (@test_throws ArgumentError masque(fn, SliceInteractable([n1, n2]))).value
+        @test occursin("fig[1, 1][1, 1]", err.msg) && occursin("fig[1, 2][1, 1]", err.msg)
         # A plot from another figure is not drawn here.
         g = Figure(); stray = lines!(Axis(g[1, 1]), [0.0, 1.0], [0.0, 1.0])
         err = (@test_throws ArgumentError masque(f, SliceInteractable(stray))).value
