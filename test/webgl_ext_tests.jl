@@ -390,6 +390,18 @@ end
     @test occursin("window.Masque.mount", html)
 end
 
+@testset "webgl show outside Pluto gives a sized placeholder (#288)" begin
+    fig = Figure(; size = (300, 200))
+    ax = Axis(fig[1, 1])
+    scatter!(ax, 1:3, 1:3)
+    w = masque(fig; backend = :webgl)
+    html = sprint(show, MIME"text/html"(), w)
+    @test occursin("masque-webgl-static", html)
+    @test occursin("aspect-ratio:$(w.width) / $(w.height)", html)
+    @test !occursin("<script", html)
+    @test !occursin("<canvas", html)
+end
+
 @testset "webgl show kicks the view warmup before it runs" begin
     fig = Figure(; size = (300, 200))
     ax = Axis3(fig[1, 1])
