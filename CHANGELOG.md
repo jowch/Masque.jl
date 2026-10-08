@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `SliceInteractable([a, b])` builds a slice from plots without naming the axis; `masque`
+  puts it on the axis that draws them, and plots on different axes raise an error naming
+  both. `SliceInteractable(ax, [a, b])` still works (#306).
+
 ### Fixed
 - Two interactables of the same kind in one `masque` call no longer clash over their
   default id. Two `ViewInteractable(ax)` on two axes become `:view` and `:view_2`, the way

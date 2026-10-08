@@ -184,6 +184,37 @@ end
         @test occursin("not a layer in this masque() call", err.msg)
     end
 
+    @testset "plot constructor without the axis (#306)" begin
+        f = Figure(); ax1 = Axis(f[1, 1]); ax2 = Axis(f[1, 2])
+        a = lines!(ax2, [0.0, 1.0, 2.0], [0.0, 1.0, 0.0]; label = "a")
+        b = lines!(ax2, [0.0, 1.0, 2.0], [1.0, 0.0, 1.0]; label = "b")
+        c = lines!(ax1, [0.0, 1.0, 2.0], [2.0, 2.0, 2.0])
+        slice_of(w) = only(filter(L -> L["kind"] == "slice", w.manifest["layers"]))
+        # The slice lands on the plots' axis, the second panel, with the same layer as the
+        # axis-taking form.
+        with_ax = slice_of(masque(f, SliceInteractable(ax2, [a, b])))
+        without = slice_of(masque(f, SliceInteractable([a, b])))
+        @test without == with_ax
+        @test without["geometry"]["covers"] == ["lines_2", "lines_3"]
+        # One plot, and keywords carry over.
+        one = slice_of(masque(f, SliceInteractable(b; id = :probe, crosshair = false, covers = ())))
+        @test one["id"] == "probe" && one["axis"] == with_ax["axis"]
+        @test one["geometry"]["covers"] == String[]
+        @test one == slice_of(masque(f, SliceInteractable(ax2, b; id = :probe, crosshair = false, covers = ())))
+        # Plots on two axes name both.
+        err = (@test_throws ArgumentError masque(f, SliceInteractable([a, c]))).value
+        @test occursin("different axes", err.msg) && occursin("fig[1, 1]", err.msg) && occursin("fig[1, 2]", err.msg)
+        # A plot from another figure is not drawn here.
+        g = Figure(); stray = lines!(Axis(g[1, 1]), [0.0, 1.0], [0.0, 1.0])
+        err = (@test_throws ArgumentError masque(f, SliceInteractable(stray))).value
+        @test occursin("SliceInteractable", err.msg) && occursin("not drawn", err.msg)
+        # Outside `masque` there is no axis yet, and `build_manifest` says where to find one.
+        _, _, ctxf = ctx_for(f)
+        msg = validate(SliceInteractable([a, b]), ctxf)
+        @test msg isa String && occursin("masque(fig", msg)
+        @test_throws ArgumentError SliceInteractable(Any[])
+    end
+
     @testset "scale, categorical" begin
         fs = Figure(); axs = Axis(fs[1, 1]; yscale = sqrt); scatter!(axs, [1.0, 2.0], [1.0, 2.0])
         _, _, ctxs = ctx_for(fs)

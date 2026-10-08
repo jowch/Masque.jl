@@ -1494,7 +1494,8 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 `:threshold` [`HitLayer`](@ref).
 
 # Arguments
-- `ax` — a `Makie.Axis`.
+- `ax` — a `Makie.Axis`. The plot constructor can leave it out: `masque` then uses the axis
+  that draws the plots, and raises `ArgumentError` if they are on different axes.
 - `orientation` — `:horizontal` (constant-y line, dragged vertically) or `:vertical`
   (constant-x line, dragged horizontally). Any other value raises `ArgumentError`. Default
   `:horizontal`.
@@ -1562,7 +1563,8 @@ corners invert to data-space bounds via
 compatible layer, reporting the contained elements. Produces one `:roi` [`HitLayer`](@ref).
 
 # Arguments
-- `ax` — a `Makie.Axis`.
+- `ax` — a `Makie.Axis`. The plot constructor can leave it out: `masque` then uses the axis
+  that draws the plots, and raises `ArgumentError` if they are on different axes.
 - `bounds` — initial `(xmin, xmax, ymin, ymax)` in data space. Requires `xmin < xmax` and
   `ymin < ymax` (`ArgumentError` otherwise); length must be 4 (`ArgumentError` otherwise).
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:roi`.
@@ -1718,6 +1720,7 @@ end
     SliceInteractable(ax; series, orientation=:vertical, crosshair=true, id=:slice, covers=(), tooltip=nothing)
     SliceInteractable(ax, plot; orientation=nothing, crosshair=true, id=:slice, covers=nothing, tooltip=nothing)
     SliceInteractable(ax, plots; orientation=nothing, crosshair=true, id=:slice, covers=nothing, tooltip=nothing)
+    SliceInteractable(plots; orientation=nothing, crosshair=true, id=:slice, covers=nothing, tooltip=nothing)
 
 Sample one or more 1-D series at the cursor and show that sample in the tooltip. `masque(fig)`
 does not add a slice, and a plot without one draws no hairline. This interactable draws one
@@ -1726,7 +1729,8 @@ hair — vertical or horizontal, matching `orientation` — and a filled dot per
 committed. Produces one `:slice` [`HitLayer`](@ref), which is not a hit target.
 
 # Arguments
-- `ax` — a `Makie.Axis`.
+- `ax` — a `Makie.Axis`. The plot constructor can leave it out: `masque` then uses the axis
+  that draws the plots, and raises `ArgumentError` if they are on different axes.
 - `series` — a vector of `(; x, y)`, each `x` and `y` an equal-length vector of reals. Optional
   `id` (default `:s1`, `:s2`, …), `label`, and `color`. For `:vertical`, `x` is strictly
   increasing; for `:horizontal`, `y` is. A non-finite probe coordinate starts a new run, and
@@ -1771,7 +1775,7 @@ SliceInteractable(ax; series = [(; id = :wide, x = xs, y = ys), (; id = :narrow,
 
 d1 = density!(ax, randn(200))
 d2 = density!(ax, randn(200) .+ 2)
-SliceInteractable(ax, [d1, d2])
+SliceInteractable([d1, d2])
 ```
 """
 struct SliceInteractable <: AbstractInteractable
@@ -1883,6 +1887,8 @@ events(::SliceInteractable) = (:hover,)
 tooltip_spec(i::SliceInteractable) = i.tooltip
 
 function validate(i::SliceInteractable, ctx::InteractionContext)
+    i.ax isa _AxisOf && return "SliceInteractable(plots) finds its axis in `masque(fig, …)`; " *
+        "call `SliceInteractable(ax, plots)` to build it yourself"
     i.ax isa Makie.Legend && return "SliceInteractable: ax is a Legend, not an Axis — a legend has no data-space series to sample."
     t = ctx.transforms[axis_id(ctx, i.ax)]
     t.is3d && return "SliceInteractable: sampling inverts a pixel to a data coordinate via the axis " *

@@ -31,7 +31,7 @@ begin
     ax = Axis(fig[1, 1])
     a = lines!(ax, xs, sin.(xs); label = "sine")
     b = lines!(ax, xs, cos.(xs); label = "cosine")
-    probe = SliceInteractable(ax, [a, b])
+    probe = SliceInteractable([a, b])
     nothing
 end
 ```
@@ -48,6 +48,9 @@ the lines. Two lines with the same label show up as `sine` and `sine_2`.
 The label can't be `x` on a vertical slice, or `y` on a horizontal one,
 because that row already shows the position; `SliceInteractable` raises
 an error if it is.
+
+The slice goes on the axis that draws the lines, so pass lines from one
+axis only.
 
 A slice is for reading values, so hovering does not change the `@bind`
 value. Each axis takes one slice, so to read several lines, pass them
@@ -80,7 +83,7 @@ saves the position:
 ```julia
 @bind at masque(
     fig,
-    SliceInteractable(ax, [a, b]),
+    SliceInteractable([a, b]),
     AxisInteractable(ax);
     auto = false,
 )

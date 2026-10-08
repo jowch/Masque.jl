@@ -137,18 +137,48 @@ function _has_custom_for(A, p)
     return m.sig != Tuple{typeof(interactables), Any, Makie.AbstractPlot}
 end
 
-# The block whose scene draws `p`, among the axes Masque supports.
-function _plot_axis(fig, p)
+# The block whose scene draws `p`, among the axes Masque supports. `who` names the caller in
+# the error.
+function _plot_axis(fig, p; who = "interactables($(Makie.plotkey(p)))")
     s = Makie.parent_scene(p)
     for c in fig.content
         c isa _SUPPORTED_AXES && c.scene === s && return c
     end
     throw(
         ArgumentError(
-            "interactables($(Makie.plotkey(p))): the plot is not drawn in an Axis, Axis3, or PolarAxis of this figure",
+            "$who: the plot is not drawn in an Axis, Axis3, or PolarAxis of this figure",
         ),
     )
 end
+
+# Where `ax` sits in the figure's layout, `fig[1, 2]`, for an error message.
+function _axis_place(ax)
+    try
+        sp = ax.layoutobservables.gridcontent[].span
+        r(x) = first(x) == last(x) ? string(first(x)) : string(first(x), ":", last(x))
+        return "fig[$(r(sp.rows)), $(r(sp.cols))]"
+    catch
+        return string(nameof(typeof(ax)))
+    end
+end
+
+# A slice built from plots alone, on the axis that draws them.
+function _resolve_slice_axis(fig, i::SliceInteractable)
+    i.ax isa _AxisOf || return i
+    axes = Any[]
+    for p in i.ax.plots
+        a = _plot_axis(fig, p; who = "SliceInteractable($(Makie.plotkey(p)))")
+        any(b -> b === a, axes) || push!(axes, a)
+    end
+    length(axes) == 1 || throw(
+        ArgumentError(
+            "SliceInteractable: the plots are on different axes ($(join(map(_axis_place, axes), ", "))); " *
+                "a slice samples one axis, so pass plots from one of them",
+        ),
+    )
+    return SliceInteractable(only(axes), i.orientation, i.series, i.id, i.covers, i.tooltip, i.crosshair, i.cover_plots)
+end
+_resolve_slice_axis(fig, i) = i
 
 _layer_id(i) = hasproperty(i, :id) ? i.id : nothing
 
@@ -253,7 +283,7 @@ it replaces. Everything else is added after the defaults, in argument order. Leg
 explicit `targets` are linked again, to the layers of this call.
 """
 function _assemble(fig, xs; auto::Bool)
-    given = _flatten_args!(AbstractInteractable[], collect(Any, xs))
+    given = AbstractInteractable[_resolve_slice_axis(fig, g) for g in _flatten_args!(AbstractInteractable[], collect(Any, xs))]
     if auto
         _reject_unsupported_axes(fig)
         d = _defaults(fig; replaced = Base.IdSet{Any}(g.plot for g in given if g isa _PlotRequest))
