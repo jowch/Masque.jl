@@ -120,7 +120,7 @@ the default with the same id.
 # Examples
 ```julia
 s = scatter!(ax, xs, ys)
-masque(fig, interactables(s; tooltip = masque"x = $(x)"))   # defaults, with this tooltip
+masque(fig, interactables(s; tooltip = masque"x = \$(x)"))   # defaults, with this tooltip
 ```
 """
 function interactables(p::Makie.AbstractPlot; kwargs...)
