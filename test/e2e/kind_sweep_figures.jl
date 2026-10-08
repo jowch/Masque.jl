@@ -659,13 +659,14 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:meshscatter => [2]))
     end
 
-    # A coarse surface's edges, so each edge is long enough to hover on its own.
+    # A coarse pyramid's edges, so each edge is long enough to hover on its own. A plane would
+    # be seen almost edge-on from this camera and squash the edges together.
     wireframe3d = let
         fig = Figure(size = (480, 320))
         ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "wireframe3d")
         xs = [0.0, 2.0, 4.0]
         ys = [0.0, 2.0, 4.0]
-        wireframe!(ax, xs, ys, [x + y / 2 for x in xs, y in ys]; color = :gray, linewidth = 3)
+        wireframe!(ax, xs, ys, [1.0 2.0 1.0; 2.0 4.0 2.0; 1.0 2.0 1.0]; color = :gray, linewidth = 3)
         masque(fig; selected = Dict(:wireframe => [1]))
     end
 
