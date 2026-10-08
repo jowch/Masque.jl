@@ -11,7 +11,8 @@ _conv(p) = _converted(p)
 function _marker_radius(p)
     p.markerspace[] === :pixel || error(
         "PointInteractable: scatter has markerspace=$(repr(p.markerspace[])); radius can only be " *
-            "derived from markersize for :pixel markers (the default). Pass radius=… explicitly."
+            "derived from markersize for :pixel markers (the default). Pass radius=… explicitly, or " *
+            "use `interactables(ax, scatter)` to hit each marker's drawn outline."
     )
     ms = p.markersize[]
     f = _marker_extent_factor(p.marker[])
@@ -596,6 +597,83 @@ function _place_hexbin(i::PolygonInteractable, p, f)
     return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol)
 end
 
+# A scatter sized in data units (`markerspace = :data`) draws each marker as an area,
+# `markersize` wide in the axis's transformed units, so a pixel radius can't describe it.
+# Each marker becomes a polygon built as hexbin's hexagons are: a corner is the drawn center
+# `f(x) + marker_offset` plus the marker's rotated outline offset, mapped back through the
+# inverse transform. The outline is the marker's bounding box, or the ellipse inside it for
+# a round marker. On `Axis3` the markers face the camera, so this stays 2D (and polar).
+_data_markers(ax, p) = p isa Makie.Scatter && p.markerspace[] === :data && !(ax isa Makie.Axis3)
+
+const _BOX_UNIT = [Makie.Vec2d(-0.5, -0.5), Makie.Vec2d(0.5, -0.5), Makie.Vec2d(0.5, 0.5), Makie.Vec2d(-0.5, 0.5)]
+const _ROUND_UNIT = [Makie.Vec2d(cos(a), sin(a)) ./ 2 for a in range(0, 2pi; length = 33)[1:32]]
+# The outline of one marker in markersize units. A `BezierPath` (every symbol marker) is
+# drawn at its own bounding box; a `Circle`/`Rect` geometry, a glyph or an image fills the
+# whole `markersize` square, as `_marker_radius` assumes.
+function _data_marker_outline(marker)
+    m = marker isa Symbol ? get(Makie.default_marker_map(), marker, nothing) : marker
+    is_round = marker === :circle || m isa _GB.Circle || m === _GB.Circle
+    lo, w = if m isa Makie.BezierPath
+        bb = Makie.bbox(m)
+        Makie.Vec2d(minimum(bb)...), Makie.Vec2d(Makie.widths(bb)...)
+    else
+        Makie.Vec2d(-0.5, -0.5), Makie.Vec2d(1, 1)
+    end
+    return [lo .+ (u .+ 0.5) .* w for u in (is_round ? _ROUND_UNIT : _BOX_UNIT)]
+end
+_data_marker_size(m::Real) = Makie.Vec2d(m, m)
+_data_marker_size(m) = Makie.Vec2d(m[1], m[2])
+_data_marker_rotation(r) = r isa Makie.Billboard ? nothing : Makie.to_rotation(r)
+function _data_marker_rings(tf, finv, p; place = nothing)
+    pts = _conv(p)[1]
+    n = length(pts)
+    ms, mk, rot = p.markersize[], p.marker[], p.rotation[]
+    mos = _marker_offset_vec(p.marker_offset[], n)
+    perm = mk isa AbstractVector && !(mk isa Makie.BezierPath)
+    perr = rot isa AbstractVector && !(rot isa Makie.VecTypes)
+    shared = perm ? nothing : _data_marker_outline(mk)
+    return map(1:n) do k
+        x = _pt3(pts[k])
+        c = _apply_transform(tf, Makie.Point3d(x[1], x[2], x[3]))
+        s = _data_marker_size(_per_point(ms) ? ms[k] : ms)
+        q = _data_marker_rotation(perr ? rot[k] : rot)
+        map(perm ? _data_marker_outline(mk[k]) : shared) do u
+            v = Makie.Vec3d(s[1] * u[1], s[2] * u[2], 0)
+            o = (q === nothing ? v : Makie.Vec3d(q * v)) .+ mos[k]
+            d = _apply_transform(finv, Makie.Point3d(c[1] + o[1], c[2] + o[2], c[3]))
+            place === nothing && return Point2f(d[1], d[2])
+            e = place(d, o)
+            return Point2f(e[1], e[2])
+        end
+    end
+end
+function _data_marker_polygons(ax, p; id = :scatter, payloads = nothing, tooltip = nothing, label = nothing)
+    tf = _transform_func(ax.scene)
+    finv = Makie.inverse_transform(tf)
+    if _no_inverse(finv)
+        @warn "masque: skipping $(Makie.plotkey(p)) drawn in markerspace = :data; the axis " *
+            "transform has no inverse, so its markers can't be mapped back to data" maxlog = 16
+        return PolygonInteractable(ax, Vector{Point2f}[]; id, payloads = Any[], tooltip, label)
+    end
+    rings = _data_marker_rings(tf, finv, p)
+    if payloads === nothing
+        payloads = _unconvert_payloads(
+            ax, Any[(; index = k, x = Float64(x[1]), y = Float64(x[2])) for (k, x) in enumerate(_conv(p)[1])],
+        )
+    end
+    return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
+end
+# Moved: rebuild the corners so the model moves each center and not its outline.
+function _place_data_markers(i::PolygonInteractable, p, f)
+    isempty(i.rings) && return i
+    tf = _transform_func(i.ax.scene)
+    # `transform_marker` lets the model scale and turn the outline too.
+    tm = p.transform_marker[] === true
+    place = tm ? ((pt, _) -> f.place(pt)) : f.place
+    rings = _data_marker_rings(tf, Makie.inverse_transform(tf), p; place)
+    return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol)
+end
+
 # Cells come back in tessellation order, not input-site order, so there's no cheap
 # cell→generator mapping; default payload is (; index) only.
 function PolygonInteractable(ax, p::Makie.Voronoiplot; id = :voronoiplot, payloads = nothing, tooltip = nothing, label = nothing)
@@ -987,6 +1065,8 @@ function _construct(ax, p, id; kw...)
     f = _placement(ax, p)
     placed = f === nothing ? built :
         p isa Makie.Hexbin ? AbstractInteractable[_place_hexbin(i, p, f) for i in built] :
+        p isa Makie.Scatter && only(built) isa PolygonInteractable ?
+        AbstractInteractable[_place_data_markers(only(built), p, f)] :
         AbstractInteractable[i for i in (_place(i, f) for i in built) if i !== nothing]
     sw = _stroke_half(p)
     sw > 0 || return placed
@@ -1048,7 +1128,7 @@ function _dim_strings(vals)
 end
 
 function _construct_unplaced(ax, p, id; kw...)
-    p isa Makie.Scatter && return [PointInteractable(ax, p; id, kw...)]
+    p isa Makie.Scatter && return [_scatter_interactable(ax, p; id, kw...)]
     p isa Makie.MeshScatter && return [PointInteractable(ax, p; id, kw...)]
     (p isa Makie.Lines || p isa Makie.LineSegments || p isa Makie.Wireframe || p isa Makie.Arrows3D || p isa Makie.Arrows2D) &&
         return [SegmentInteractable(ax, p; id, kw...)]
@@ -1075,6 +1155,12 @@ function _construct_unplaced(ax, p, id; kw...)
     p isa Makie.Annotation && return _text_interactables(ax, _descendant(p, Makie.Text), id; kw...)
     # unreachable while _plotbase gates callers; loud if the two ever drift (kind added to one, not the other)
     return error("interactables: $(typeof(p).name.name) passed _plotbase but has no _construct branch")
+end
+
+# A data-space scatter hits each marker's outline, unless a `radius` asks for circles.
+function _scatter_interactable(ax, p; radius = nothing, kw...)
+    radius === nothing && _data_markers(ax, p) && return _data_marker_polygons(ax, p; kw...)
+    return PointInteractable(ax, p; radius, kw...)
 end
 
 # The plot's own transformation (`translate!`, `scale!`, `rotate!`) is applied after the axis
@@ -1246,8 +1332,8 @@ function _skip_for_axis(ax, p)
 end
 
 # A known child of an unknown recipe that must not become its own layer. A data-space
-# `Scatter` (`markerspace = :data`, as `hexbin!` draws) can't be built: `_marker_radius`
-# throws unless markerspace is `:pixel`. `bracket!` draws a
+# `Scatter` (`markerspace = :data`) is how a recipe draws areas, as `hexbin!` does, not
+# marks of its own. `bracket!` draws a
 # pixel-space `Series`; `SegmentInteractable` would project those points as data. Non-data
 # `Text` is not refused here — `_text_interactables` warns and returns an empty vector.
 function _walk_refuses(p)
@@ -1307,14 +1393,27 @@ function _install_known!(d, ax, p)
     n = get(d.seen, base, 0) + 1
     d.seen[base] = n
     id = n == 1 ? base : Symbol(base, :_, n)
-    built = _plot_interactables(ax, p; id)
+    # One plot Masque can't build must not stop the whole widget: warn and skip it. A plot
+    # the caller replaces with `interactables(plot; …)` skips quietly; its replacement is
+    # built on its own. An error in a recipe's own `interactables` method is its author's
+    # bug, and passes through.
+    failed = false
+    built = try
+        _plot_interactables(ax, p; id)
+    catch e
+        (e isa InterruptException || _has_custom(ax, p)) && rethrow()
+        failed = true
+        p in d.replaced || @warn "masque: skipping $(Makie.plotkey(p)); its hover and click targets " *
+            "could not be built. Pass `interactables(plot; …)` to build it another way." exception = (e, catch_backtrace()) maxlog = 16
+        AbstractInteractable[]
+    end
     if isempty(built) || all(i -> _nverts(i) == 0, built)
         if n == 1
             delete!(d.seen, base)
         else
             d.seen[base] = n - 1
         end
-        return (built = false, warned = isempty(built) && _warned_empty(p))
+        return (built = false, warned = failed || isempty(built) && _warned_empty(p))
     end
     push!(d.drawn, built)
     ids = Symbol[ii.id for ii in built]
@@ -1360,10 +1459,11 @@ end
 # Every default of `fig`. `plotmap` is plot -> layer ids for the legend links, descendants
 # included. `installed` holds only the plots built directly, so a replacement can find the
 # layers its plot's default took.
-function _defaults(fig)
+function _defaults(fig; replaced = Base.IdSet{Any}())
     # Introspection reads post-layout axis state (e.g. `ax.finallimits[]`).
     _finalize!(fig)
     d = (
+        replaced,
         ints = AbstractInteractable[],
         drawn = Vector{Vector{AbstractInteractable}}(),
         seen = Dict{Symbol, Int}(),
