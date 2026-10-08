@@ -98,15 +98,23 @@ text and the bond payload → it gets a live check on every backend × the kinds
   driver for any new kind, recipe, or interaction.
 
 ## Cloud sessions (claude.ai/code)
-- The container is **not cached**: every session starts from the environment's setup script,
-  which only installs Julia (on PATH; the latest release, like CI's `'1'` job — 1.13 today),
-  the General registry, and Runic. Nothing Makie is compiled, so question-only
-  sessions stay cheap.
+- **The setup script's output is snapshotted.** The environment's setup script installs Julia
+  (on PATH; the latest release, like CI's `'1'` job — 1.13 today), the General registry and
+  Runic, then runs `scripts/cloud-warm.sh julia-fetch` (lines at the top of that script), which
+  resolves and downloads the `$MASQUE_DEV_ENV` env without precompiling it. The cloud keeps a
+  filesystem snapshot of the result and starts later sessions from it, but only when the whole
+  script ends within ~5 min; past that nothing is cached and every session reruns the script.
+  So precompiling stays out of setup: it takes ~8.5 min, nearly all of it the serial
+  Makie → WGLMakie chain, so a time-boxed partial precompile saves almost nothing. The
+  snapshot is rebuilt when the script changes and about weekly. Project threads clone two
+  repos, so repo `.claude/settings.json` hooks don't run there.
 - **Warm lazily, and early.** On a task that will run Julia, start
   `scripts/cloud-warm.sh julia > /tmp/masque-warm.log 2>&1 &` *first*, then read code while it
-  compiles (~7 min cold). Add `frontend` before the frontend gate and `e2e` before live
-  verification. Don't run Julia tests or Pluto until the warm-up log says `done` — competing
-  for the 4 cores slows both.
+  precompiles (~8.5 min from the snapshot, ~11 min with nothing fetched). It also points the
+  env at this checkout: the snapshot's env points at the deleted setup clone, so tests fail
+  until it has run. Add `frontend` before the frontend gate and `e2e` before live verification.
+  Don't run Julia tests or Pluto until the warm-up log says `done` — competing for the 4 cores
+  slows both.
 - **Playwright is pinned to the image's Chromium.** The image preinstalls one Chromium build in
   `$PLAYWRIGHT_BROWSERS_PATH` (`/opt/pw-browsers`), and `test/e2e/package.json` pins the
   Playwright release whose build matches it (1.56.1 ↔ build 1194), so `cloud-warm.sh e2e`
