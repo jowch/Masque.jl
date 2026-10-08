@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A plot's layer is named after the plot's own `label`, the text its legend entry shows, so
+  `scatter!(ax, xs, ys; label = "wild type")` announces "wild type, element 3 of 10: …" to
+  screen readers. Passing `label` to `interactables(plot; …)` or a constructor still names the
+  layer, and `label = nothing` leaves the name out. A plot with no `label` announces what it
+  did before (#304).
+
 ### Fixed
 - Two interactables of the same kind in one `masque` call no longer clash over their
   default id. Two `ViewInteractable(ax)` on two axes become `:view` and `:view_2`, the way
