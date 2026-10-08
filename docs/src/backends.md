@@ -138,6 +138,14 @@ lines!(ax2, 0:0.1:6, sin.(0:0.1:6))
 masque(fig2)
 ```
 
+Each widget adds about 130 KB to the page, and Documenter stops a
+build when a page passes 200 KB, so list a page with two or more
+widgets in `size_threshold_ignore`:
+
+```julia
+makedocs(; format = Documenter.HTML(; size_threshold_ignore = ["plots.md"]), ...)
+```
+
 A click highlights a mark there too, but nothing reads the choice: the
 `@bind` value and dragging the view with a [`ViewInteractable`](@ref)
 need a running Pluto notebook. A display that doesn't run the page's

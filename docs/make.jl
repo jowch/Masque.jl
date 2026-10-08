@@ -38,6 +38,8 @@ makedocs(;
         edit_link = "main",
         collapselevel = 2,
         assets = ["assets/masque-embed.css", "assets/masque-embed.js"],
+        # Each `@example` widget on this page carries the overlay script and its PNG.
+        size_threshold_ignore = ["backends.md"],
     ),
     pages = [
         "Home" => "index.md",
