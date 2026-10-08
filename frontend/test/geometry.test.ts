@@ -449,6 +449,9 @@ describe("hitLayer + hitTest", () => {
         // A readout that doesn't listen for the event doesn't take the panel.
         const hoverOnly = { ...m, layers: [axis("axis", "a1"), { ...axis("axis_2", "a2"), events: ["hover"] }] }
         expect(hitTest(hoverOnly, 300, 100, "click")?.layer.id).toBe("axis")
+        // A readout whose axis has no transform claims no panel.
+        const orphan = { ...m, layers: [axis("axis", "a1"), axis("axis_2", "gone")] }
+        expect(hitTest(orphan, 300, 100, "click")?.layer.id).toBe("axis")
     })
     it("hitTestAt unmaps data layers and keeps legend, colorbar, and view in layout pixels", () => {
         const photo = { s: 2, tx: -100, ty: -50 }
