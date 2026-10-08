@@ -12,7 +12,9 @@ All notable changes to this project are documented here. The format is based on
   two scatters become `:scatter` and `:scatter_2`; the same holds for `AxisInteractable`,
   `ColorbarInteractable`, `LegendInteractable`, `ThresholdInteractable`, `ROIInteractable`,
   and every other constructor's default. Before, `masque` raised "two interactables use the
-  layer id". Ids you choose are unchanged, and two that match still raise (#287).
+  layer id". Ids you choose are unchanged, and two that match still raise. With two
+  `AxisInteractable`s, each panel now reads its own coordinates; before, the first one
+  answered over both panels (#287).
 
 ## [0.2.1] - 2026-10-04
 

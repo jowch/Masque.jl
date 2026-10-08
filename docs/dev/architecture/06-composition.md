@@ -29,8 +29,11 @@ them cleanly:
 **Named tensions (accepted, not bugs):**
 1. `AxisInteractable` returns no region geometry — it rides the `:axis` channel as an unbounded
    catch-all. `ColorbarInteractable` also uses `:axis` but ships a bbox so the hit region is
-   bounded to the colorbar's pixel extent. Worth the shared channel: both collapse into the
-   `AxisTransform` already shipped, with no new JS primitive.
+   bounded to the colorbar's pixel extent. With several `AxisInteractable`s on different
+   panels, one outside its own axis yields to the one whose axis is under the pointer
+   (`yieldsToOtherAxis` in `geometry.ts`); outside every axis the first still answers. Worth
+   the shared channel: both collapse into the `AxisTransform` already shipped, with no new JS
+   primitive.
 2. No general z-order/`Consume` model for overlapping custom regions — JS is first-match-wins in
    manifest order. `build_manifest` now imposes one fixed precedence on that order (not a general
    layering model): `LegendInteractable` layers sort first (a legend drawn over plot geometry must
