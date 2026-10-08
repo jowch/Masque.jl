@@ -82,7 +82,7 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 
 ### Output, hosts, and payload
 - *idea* — SVG output for sparse plots, after a spike on primitive count.
-- #298 — a `show` fallback that mounts outside Pluto; then a static `save_html(widget)`
+- *idea* — a `show` fallback that mounts outside Pluto; then a static `save_html(widget)`
   inspector and inspection-only IJulia and Quarto.
 - *idea* — GLMakie rendering to PNG behind `AbstractBackend`.
 - *idea* — `:webgl` in-place data patching on a canvas that is still alive.
