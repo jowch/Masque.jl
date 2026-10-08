@@ -76,21 +76,23 @@ becomes a risk only at the extremes in "Stress".
 
 ### Outside Pluto
 
-Outside Pluto (#298), `show` writes one self-contained block per widget: the 81,883-byte
-`assets/overlay.js`, the PNG as base64 (4/3 of the decoded size), and the manifest as a JS
-literal. Nothing is shared between widgets on a page, so the script is the fixed ~82 KB per
-widget. Measured with `sizeof(sprint(show, MIME"text/html"(), masque(fig)))` on CairoMakie
-0.15, Julia 1.13, default figure size unless noted (2026-10-08, PR #311):
+Outside Pluto (#298), `show` writes one block per widget: the PNG as base64 (4/3 of the
+decoded size), the manifest as a JS literal, and about 1.1 KB of loader. A registered
+install's loader fetches the 81,883-byte `assets/overlay.js` from jsDelivr once per page
+(#311); a git checkout inlines it in every block instead. Measured with
+`sizeof(sprint(show, MIME"text/html"(), masque(fig)))` on CairoMakie 0.15, Julia 1.13,
+default figure size unless noted (2026-10-08, PR #311):
 
-| Plot | block | PNG (base64) | manifest |
-|------|------:|-----:|---------:|
-| scatter, 4 pts, 400×260 (the Backends page example) | 97 KB | 14 KB | 0.7 KB |
-| line, 10 pts | 155 KB | 72 KB | 0.8 KB |
-| scatter, 100 | 152 KB | 62 KB | 7.5 KB |
-| scatter, 1 000 | 499 KB | 346 KB | 71 KB |
+| Plot | block, registered | block, checkout | PNG (base64) | manifest |
+|------|------:|------:|-----:|---------:|
+| scatter, 4 pts, 400×260 (the Backends page example) | 16 KB | 97 KB | 14 KB | 0.7 KB |
+| line, 10 pts | 84 KB | 165 KB | 82 KB | 0.8 KB |
+| scatter, 100 | 71 KB | 152 KB | 62 KB | 7.5 KB |
+| scatter, 1 000 | 423 KB | 504 KB | 351 KB | 71 KB |
 
-Documenter warns at 100 KiB per page and fails at 200 KiB, so one widget already warns and
-two fail a default build.
+Documenter warns at 100 KiB per page and fails at 200 KiB. With a registered install the
+PNG sets the budget: two default-size widgets warn, three fail. From a checkout (this
+repo's own docs build) one widget already warns and two fail.
 
 ### What scales the manifest
 

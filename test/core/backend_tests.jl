@@ -353,7 +353,10 @@ end
     html = sprint(show, MIME"text/html"(), w)
     @test occursin("<img src=\"data:image/png;base64,$(w.b64)\"", html)
     @test occursin("max-width:$(w.display_css)px", html)
-    @test occursin("window.Masque.mount(img, ", html)
+    @test occursin("Masque.mount(img, ", html)
+    # A git checkout (this test run) inlines the bundle in each widget.
+    @test Masque._OVERLAY_CDN[] === nothing
+    @test occursin(Masque._OVERLAY_JS[], html)
     # The script finds its own host by id, so it mounts even when it runs from `<head>`.
     id = match(r"<div class=\"ip-host\" id=\"([^\"]+)\"", html).captures[1]
     @test occursin("document.getElementById(\"$(id)\")", html)
@@ -373,6 +376,49 @@ end
     live = String(take!(buf))
     @test occursin("window.Masque.mount(currentScript, manifest, invalidation, requestFrame)", live)
     @test occursin("<img src=\"data:image/png;base64,$(w.b64)\"", live)
+end
+
+@testset "a registered install loads the overlay script once per page (#311)" begin
+    js = Masque._OVERLAY_JS[]
+    depot = mktempdir()
+    pkg = joinpath(depot, "packages", "Masque", "AbCd1")
+    mkpath(pkg)
+    pushfirst!(DEPOT_PATH, depot)
+    cdn = try
+        Masque._overlay_cdn(pkg, v"0.2.2", js)
+    finally
+        popfirst!(DEPOT_PATH)
+    end
+    @test cdn.url == "https://cdn.jsdelivr.net/gh/jowch/Masque.jl@v0.2.2/assets/overlay.js"
+    @test cdn.integrity == "sha384-" * Masque.base64encode(Masque.sha384(js))
+    # A git checkout, a folder outside every depot, or no version inlines instead.
+    @test Masque._overlay_cdn(pkgdir(Masque), v"0.2.2", js) === nothing
+    @test Masque._overlay_cdn(mktempdir(), v"0.2.2", js) === nothing
+
+    (; fig, ax, pts) = default_fixture()
+    w = masque(fig, [PointInteractable(ax, pts)]; auto = false)
+    old = Masque._OVERLAY_CDN[]
+    Masque._OVERLAY_CDN[] = cdn
+    html = try
+        sprint(show, MIME"text/html"(), w)
+    finally
+        Masque._OVERLAY_CDN[] = old
+    end
+    @test occursin(cdn.url, html) && occursin(cdn.integrity, html)
+    @test !occursin(js, html)
+    @test sizeof(html) < sizeof(w.b64) + 8_000
+    @test occursin("Masque.mount(img, ", html)
+    lit = match(r"mount\(img, (.*), new Promise"s, html).captures[1]
+    @test length(JSON3.read(lit; allow_inf = true)["layers"]) == length(w.manifest["layers"])
+    # The Pluto widget still inlines the bundle.
+    buf = IOBuffer()
+    Masque._OVERLAY_CDN[] = cdn
+    try
+        show(IOContext(buf, :pluto_published_to_js => (io, x) -> print(io, "null")), MIME"text/html"(), w)
+    finally
+        Masque._OVERLAY_CDN[] = old
+    end
+    @test occursin(js, String(take!(buf)))
 end
 
 @testset "the inlined manifest is a JS literal (#298)" begin

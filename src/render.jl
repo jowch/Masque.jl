@@ -1042,8 +1042,33 @@ _js_literal(io::IO, x) = _js_literal(io, string(x))
 const _STANDALONE_IDS = Threads.Atomic{Int}(0)
 _standalone_id() = string("masque-", string(hash((time_ns(), Threads.atomic_add!(_STANDALONE_IDS, 1))); base = 36))
 
+# A registered install loads the bundle once per page from jsDelivr (`_OVERLAY_CDN`, #311):
+# widgets share one load through `window.__masqueLoads`, keyed by URL so two versions on a
+# page don't mix. If the load fails or the hash doesn't match, the widget stays a plain
+# figure. A git checkout inlines the bundle in each widget.
+function _standalone_boot(cdn::NamedTuple)
+    return HypertextLiteral.JavaScript(
+        """
+        const loads = window.__masqueLoads || (window.__masqueLoads = {});
+        const url = $(sprint(_js_literal, cdn.url));
+        const load = loads[url] || (loads[url] = new Promise((ok, fail) => {
+          const s = document.createElement("script");
+          s.src = url;
+          s.integrity = $(sprint(_js_literal, cdn.integrity));
+          s.crossOrigin = "anonymous";
+          s.onload = () => ok(window.Masque);
+          s.onerror = fail;
+          document.head.appendChild(s);
+        }));
+        """
+    )
+end
+_standalone_boot(::Nothing) = HypertextLiteral.JavaScript(
+    _OVERLAY_JS[] * "\nconst load = Promise.resolve(window.Masque);\n"
+)
+
 function _standalone_html(w::MasqueWidget)
-    boot = HypertextLiteral.JavaScript(_OVERLAY_JS[])
+    boot = _standalone_boot(_OVERLAY_CDN[])
     manifest = HypertextLiteral.JavaScript(sprint(_js_literal, w.manifest))
     id = _standalone_id()
     return @htl(
@@ -1053,9 +1078,11 @@ function _standalone_html(w::MasqueWidget)
           <script>
             {
               $(boot)
-              const host = document.getElementById($(id));
-              const img = host && host.querySelector("img");
-              if (img) window.Masque.mount(img, $(manifest), new Promise(() => {}), null);
+              load.then((Masque) => {
+                const host = document.getElementById($(id));
+                const img = host && host.querySelector("img");
+                if (img) Masque.mount(img, $(manifest), new Promise(() => {}), null);
+              }, () => console.warn("Masque: the overlay script didn't load, so this figure has no hover."));
             }
           </script>
         </div>

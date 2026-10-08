@@ -138,10 +138,12 @@ lines!(ax2, 0:0.1:6, sin.(0:0.1:6))
 masque(fig2)
 ```
 
-Each widget adds about 80 KB of script to the page, plus its image.
-Documenter warns about a page past 100 KB, which one widget already
-reaches, and stops the build at 200 KB, so list a page with two or more
-widgets in `size_threshold_ignore`:
+The page loads Masque's script once from jsDelivr, the version that
+matches your installed Masque, so hover needs an internet connection;
+offline, the page shows the plain figures. Each widget adds its image
+to the page. Documenter warns about a page past 100 KB and stops the
+build at 200 KB, so a page with several large figures goes in
+`size_threshold_ignore`:
 
 ```julia
 makedocs(; format = Documenter.HTML(; size_threshold_ignore = ["plots.md"]), ...)

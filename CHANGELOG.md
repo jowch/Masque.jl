@@ -12,11 +12,10 @@ All notable changes to this project are documented here. The format is based on
   on. Clicks highlight a mark but set no `@bind` value, and dragging the view needs Pluto. A
   display that blocks scripts still shows the plain figure (#298).
 
-  Each widget carries about 80 KB of script on top of its image, so a Documenter page with
-  two or more widgets passes Documenter's 200 KB page limit and `makedocs` stops with an
-  error. List that page in `size_threshold_ignore`, as
-  [Outside Pluto](https://jowch.github.io/Masque.jl/stable/backends/#outside-pluto) shows,
-  or show `fig` itself for the plain image.
+  The page loads the overlay script once from jsDelivr, pinned to the installed Masque
+  release and checked against its hash, so each widget adds little beyond its image. Read
+  offline, the page shows the plain figures. A Masque checked out with `Pkg.develop` writes
+  the script into each widget instead, about 80 KB apiece (#298).
 
 ### Fixed
 - `masque` warns once per call about the plots it skips, listing each kind, with a count when
