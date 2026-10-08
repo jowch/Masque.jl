@@ -153,13 +153,10 @@ end
 
 # Where `ax` sits in the figure's layout, `fig[1, 2]`, for an error message.
 function _axis_place(ax)
-    try
-        sp = ax.layoutobservables.gridcontent[].span
-        r(x) = first(x) == last(x) ? string(first(x)) : string(first(x), ":", last(x))
-        return "fig[$(r(sp.rows)), $(r(sp.cols))]"
-    catch
-        return string(nameof(typeof(ax)))
-    end
+    gc = ax.layoutobservables.gridcontent[]
+    gc === nothing && return "an $(nameof(typeof(ax))) outside the layout"
+    r(x) = first(x) == last(x) ? string(first(x)) : string(first(x), ":", last(x))
+    return "fig[$(r(gc.span.rows)), $(r(gc.span.cols))]"
 end
 
 # A slice built from plots alone, on the axis that draws them.

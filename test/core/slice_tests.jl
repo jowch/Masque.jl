@@ -204,13 +204,19 @@ end
         # Plots on two axes name both.
         err = (@test_throws ArgumentError masque(f, SliceInteractable([a, c]))).value
         @test occursin("different axes", err.msg) && occursin("fig[1, 1]", err.msg) && occursin("fig[1, 2]", err.msg)
+        # An axis placed outside the layout has no grid position to name.
+        free = lines!(Axis(f; width = 100, height = 100), [0.0, 1.0], [0.0, 1.0])
+        err = (@test_throws ArgumentError masque(f, SliceInteractable([a, free]))).value
+        @test occursin("fig[1, 2]", err.msg) && occursin("an Axis outside the layout", err.msg)
         # A plot from another figure is not drawn here.
         g = Figure(); stray = lines!(Axis(g[1, 1]), [0.0, 1.0], [0.0, 1.0])
         err = (@test_throws ArgumentError masque(f, SliceInteractable(stray))).value
         @test occursin("SliceInteractable", err.msg) && occursin("not drawn", err.msg)
         # Outside `masque` there is no axis yet, and `build_manifest` says where to find one.
         _, _, ctxf = ctx_for(f)
-        msg = validate(SliceInteractable([a, b]), ctxf)
+        pending = SliceInteractable([a, b])
+        @test sprint(show, pending.ax) == "(the plots' axis)"
+        msg = validate(pending, ctxf)
         @test msg isa String && occursin("masque(fig", msg)
         @test_throws ArgumentError SliceInteractable(Any[])
     end
