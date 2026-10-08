@@ -612,14 +612,14 @@ const _ROUND_UNIT = [Makie.Vec2d(cos(a), sin(a)) ./ 2 for a in range(0, 2pi; len
 # whole `markersize` square, as `_marker_radius` assumes.
 function _data_marker_outline(marker)
     m = marker isa Symbol ? get(Makie.default_marker_map(), marker, nothing) : marker
-    round = marker === :circle || m isa _GB.Circle || m === _GB.Circle
+    is_round = marker === :circle || m isa _GB.Circle || m === _GB.Circle
     lo, w = if m isa Makie.BezierPath
         bb = Makie.bbox(m)
         Makie.Vec2d(minimum(bb)...), Makie.Vec2d(Makie.widths(bb)...)
     else
         Makie.Vec2d(-0.5, -0.5), Makie.Vec2d(1, 1)
     end
-    return [lo .+ (u .+ 0.5) .* w for u in (round ? _ROUND_UNIT : _BOX_UNIT)]
+    return [lo .+ (u .+ 0.5) .* w for u in (is_round ? _ROUND_UNIT : _BOX_UNIT)]
 end
 _data_marker_size(m::Real) = Makie.Vec2d(m, m)
 _data_marker_size(m) = Makie.Vec2d(m[1], m[2])
