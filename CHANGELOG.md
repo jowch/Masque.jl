@@ -12,9 +12,9 @@ All notable changes to this project are documented here. The format is based on
   on. Clicks highlight a mark but set no `@bind` value, and dragging the view needs Pluto. A
   display that blocks scripts still shows the plain figure (#298).
 
-  Each widget now carries about 80 KB of script on top of its image, so a Documenter page
-  with two or more widgets passes Documenter's 200 KB page limit and `makedocs` stops with
-  an error, where on 0.2.2 it built. List that page in `size_threshold_ignore`, as
+  Each widget carries about 80 KB of script on top of its image, so a Documenter page with
+  two or more widgets passes Documenter's 200 KB page limit and `makedocs` stops with an
+  error. List that page in `size_threshold_ignore`, as
   [Outside Pluto](https://jowch.github.io/Masque.jl/stable/backends/#outside-pluto) shows,
   or show `fig` itself for the plain image.
 
@@ -35,11 +35,9 @@ All notable changes to this project are documented here. The format is based on
   its square, a circle over its circle). Passing `radius` to `interactables(plot; …)` still gives circles of that
   many pixels. More generally, a plot `masque(fig)` can't make interactive is now skipped
   with a warning instead of failing the whole widget (#291).
-- Showing a `masque` widget outside Pluto (Documenter, VS Code, or
-  `show(io, MIME"text/html"(), w)` in a script) gives the plain figure without hover or
-  click, instead of throwing an `AssertionError`. A `backend = :webgl` widget, which has no
-  image to fall back on, shows a box of the figure's size saying it is drawn only in Pluto.
-  Widgets in Pluto are unchanged (#288).
+- Showing a `masque` widget outside Pluto no longer throws an `AssertionError`. A
+  `backend = :webgl` widget, which has no image to fall back on, shows a box of the figure's
+  size saying it is drawn only in Pluto. Widgets in Pluto are unchanged (#288).
 
 ## [0.2.1] - 2026-10-04
 
