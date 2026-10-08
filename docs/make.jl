@@ -34,7 +34,7 @@ makedocs(;
     sitename = "Masque.jl",
     format = Documenter.HTML(;
         prettyurls = PRETTY_URLS,
-        canonical = "https://jowch.github.io/Masque.jl",
+        canonical = "https://jowch.github.io/Masque.jl/stable/",
         edit_link = "main",
         collapselevel = 2,
         assets = ["assets/masque-embed.css", "assets/masque-embed.js"],
