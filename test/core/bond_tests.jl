@@ -68,6 +68,47 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test !occursin("-1", sprint(show, ax))
     end
 
+    @testset "grid cell payloads (#290)" begin
+        fig = Figure(); ax = Axis(fig[1, 1])
+        z = [11.0 21.0 31.0; 12.0 22.0 32.0]   # 2 columns (x) × 3 rows (y)
+        hm = heatmap!(ax, 1:2, 1:3, z)
+        rows = ["r1", "r2"]; cols = ["c1", "c2", "c3"]
+        tv = Masque.APD.Bonds.transform_value
+        tip = masque"($(row), $(col)) = $(value) at $(i),$(j)"
+        w = masque(fig, interactables(hm; payloads = (i, j) -> (; row = rows[i], col = cols[j]), tooltip = tip))
+        L = only(l for l in w.manifest["layers"] if l["kind"] == "grid")
+        # Row-major like `values`: cell (i, j) at (j - 1) * ncols + i.
+        @test [p.row * p.col for p in L["payloads"]] == ["r1c1", "r2c1", "r1c2", "r2c2", "r1c3", "r2c3"]
+        js = Dict("layer" => L["id"], "index" => 3, "payload" => Dict("i" => 1, "j" => 1, "value" => 22.0))
+        for widget in (w, Masque.MasqueWidget("", w.manifest, 100))   # by interactable, and by stamp
+            ev = tv(widget, js)
+            @test ev isa GridCellEvent && ev.i == 2 && ev.j == 2 && ev.value == 22.0
+            @test ev.row == "r2" && ev.col == "c2" && ev.payload == (; row = "r2", col = "c2")
+            @test z[ev] == 22.0
+        end
+        ev = tv(w, js)
+        @test propertynames(ev) == (:layer, :i, :j, :value, :row, :col, :payload)
+        @test sprint(show, ev) == "GridCellEvent(:$(L["id"]), i = 2, j = 2, value = 22.0, payload = (row = \"r2\", col = \"c2\"))"
+        @test_throws ArgumentError ev.nope
+
+        # A matrix the same shape as the values gives the same layout.
+        m = GridInteractable(ax, hm; payloads = [rows[i] * cols[j] for i in 1:2, j in 1:3])
+        @test m.payloads == Any["r1c1", "r2c1", "r1c2", "r2c2", "r1c3", "r2c3"]
+        @test_throws ArgumentError GridInteractable(ax, hm; payloads = ones(3, 2))
+        @test_throws ArgumentError GridInteractable(ax, hm; payloads = ["a", "b"])
+        # A template field that is neither a payload field nor i/j/value still fails the build.
+        bad = GridInteractable(ax, hm; payloads = (i, j) -> (; row = i), tooltip = masque"$(nope)")
+        @test_throws ArgumentError masque(fig, bad)
+
+        # Without payloads, a cell is unchanged: no payload, no forwarding.
+        plain = tv(masque(fig), Dict("layer" => "heatmap", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
+        @test plain.payload === nothing
+        @test propertynames(plain) == (:layer, :i, :j, :value)
+        @test sprint(show, plain) == "GridCellEvent(:heatmap, i = 1, j = 1, value = 11.0)"
+        @test_throws ArgumentError plain.row
+        @test GridCellEvent(:cells, 1, 2, 3.0) == GridCellEvent(:cells, 1, 2, 3.0, nothing)
+    end
+
     @testset "legend click is a LegendEvent" begin
         fig = Figure(); ax = Axis(fig[1, 1])
         lines!(ax, 1:3; label = "trend")

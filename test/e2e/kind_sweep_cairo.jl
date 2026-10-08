@@ -113,6 +113,15 @@ HTML(
         "<span id=\"coords_image_rgb\" style=\"display:none\">$(JSON3.write(sweep.image_rgb.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-0000000000e3
+@bind ev_heatmap_labels sweep.heatmap_labels
+
+# ╔═╡ c1000000-0000-0000-0000-0000000000e4
+HTML(
+    "<span id=\"out_heatmap_labels\">HEATMAP_LABELS=$(repr(ev_heatmap_labels))</span>" *
+        "<span id=\"coords_heatmap_labels\" style=\"display:none\">$(JSON3.write(sweep.heatmap_labels.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000020
 @bind ev_barplot sweep.barplot
 
@@ -443,6 +452,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000019
 # ╠═c1000000-0000-0000-0000-000000000060
 # ╠═c1000000-0000-0000-0000-000000000061
+# ╠═c1000000-0000-0000-0000-0000000000e3
+# ╟─c1000000-0000-0000-0000-0000000000e4
 # ╠═c1000000-0000-0000-0000-000000000020
 # ╠═c1000000-0000-0000-0000-000000000021
 # ╠═c1000000-0000-0000-0000-000000000022

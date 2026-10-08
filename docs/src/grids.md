@@ -31,9 +31,27 @@ first index in the matrix you plotted and `pick.j` its second, so
 index along x and the second along y. `pick.value` is the cell's value,
 and the clicked cell stays highlighted.
 
-A grid does not take `payloads`, so a cell always reports just its
-`i`, `j`, and `value`. To use other per-cell data, keep it in Julia and
-look it up with `pick`.
+## Label cells
+
+To show your own data for each cell, such as row and column names on a
+contact map or correlation matrix, pass `payloads`: a function of the
+cell's `i` and `j`, or a matrix the same size as the one you plotted.
+The tooltip then lists the payload's fields and the cell's value, and a
+template can use them next to `i`, `j`, and `value`:
+
+```julia
+names = ["F17", "I24", "K31"]
+p = heatmap!(ax, 1:3, 1:3, contacts)
+@bind pick masque(fig, interactables(p;
+    payloads = (i, j) -> (; row = names[i], col = names[j]),
+    tooltip = masque"($(row), $(col)) = $(value)"))
+```
+
+Hovering a cell reads `(F17, I24) = 0.31`. A click puts the cell's
+payload in `pick`, so `pick.row` and `pick.col` read it directly, as
+`pick.i` and `pick.j` do. Every cell's payload is sent with the figure,
+so on a grid of hundreds of thousands of cells, keep the data in Julia
+instead and look it up with `pick`, as in `names[pick.i]`.
 
 ## Make a grid from edges and values
 

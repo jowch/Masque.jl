@@ -1,33 +1,43 @@
 """
-    GridCellEvent(layer, i, j, value)
+    GridCellEvent(layer, i, j, value, payload = nothing)
 
 One heatmap or image cell. `i` and `j` are the cell's first and second index in the matrix
 you plotted; Makie draws the first index along x and the second along y. `A[cell]` is
 `A[cell.i, cell.j]`. `value` is the shipped cell value,
-or `nothing` when values were not sent.
+or `nothing` when values were not sent. `payload` is the cell's entry from the grid's
+`payloads`, or `nothing` when it has none; its fields read through, so `cell.row` is
+`cell.payload.row`.
 """
 struct GridCellEvent <: InteractionEvent
     layer::Symbol
     i::Int
     j::Int
     value::Any
+    payload::Any
 end
+GridCellEvent(layer, i, j, value) = GridCellEvent(layer, i, j, value, nothing)
 
 Base.to_indices(A, inds, I::Tuple{GridCellEvent, Vararg{Any}}) =
     to_indices(A, inds, (I[1].i, I[1].j, Base.tail(I)...))
 
 function transform_bond(::Type{GridCellEvent}, i, layer::HitLayer, index, js_payload)
-    return _grid_cell_event(layer.id, js_payload)
+    return _grid_cell_event(layer.id, js_payload, layer.payloads, layer.geometry)
 end
 
-function _grid_cell_event(id::Symbol, js_payload)
+# `payloads` is row-major over the cells, like the shipped `values`; empty when the grid has none.
+function _grid_cell_event(id::Symbol, js_payload, payloads = Any[], geometry = nothing)
     js_payload isa AbstractDict || throw(
         ArgumentError("bond: layer :$id grid cell payload must be a dict, got $(typeof(js_payload))"),
     )
     i = Int(_js_req(js_payload, "i", id)) + 1
     j = Int(_js_req(js_payload, "j", id)) + 1
     value = haskey(js_payload, "value") ? js_payload["value"] : nothing
-    return GridCellEvent(id, i, j, value)
+    isempty(payloads) && return GridCellEvent(id, i, j, value, nothing)
+    ncols = Int(geometry["ncols"])
+    nrows = Int(geometry["nrows"])
+    (1 <= i <= ncols && 1 <= j <= nrows) ||
+        throw(ArgumentError("bond: layer :$id cell ($i, $j) is outside the $ncols×$nrows grid"))
+    return GridCellEvent(id, i, j, value, payloads[(j - 1) * ncols + i])
 end
 
 """
