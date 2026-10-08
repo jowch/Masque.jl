@@ -1233,7 +1233,7 @@ function _skip_note(note::AbstractString)
     if notes === nothing
         @warn "masque: skipping $(note)"
     else
-        push!(notes, String(note))
+        push!(notes, note)
     end
     return nothing
 end
@@ -1481,8 +1481,8 @@ the pointer, so it is the mark drawn on top.
 
 On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D`/
 `ScatterLines` are supported; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
-Other kinds are skipped with a warning. A recipe with its own
-`Masque.interactables(ax, p::MyPlot)` method uses it. Any other recipe contributes each child
+Other kinds are skipped, and one call warns once, listing the skipped plots together. A
+recipe with its own `Masque.interactables(ax, p::MyPlot)` method uses it. Any other recipe contributes each child
 that has a default (`arc!` is the `lines!` it draws), under that child's layer id. A child
 with `visible[] == false` is not a layer (`triplot!`'s ghost edges). A construct with no
 vertices does not take a layer id (`qqplot!` with `qqline = :none`). A data-space `Scatter`
