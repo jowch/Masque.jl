@@ -294,8 +294,8 @@ WGLMakie widget shows an empty box saying it is drawn only in Pluto.
 
 **Fix:** show a CairoMakie widget in a display that runs scripts, such
 as Documenter or an HTML page you write with `show`, or open the
-notebook in Pluto. For
-what works outside Pluto, see [Outside Pluto](@ref outside-pluto).
+notebook in Pluto. For what works outside Pluto, see
+[Outside Pluto](@ref outside-pluto).
 
 ### Tried feeding this widget's bond into the same call's `selected=`
 
