@@ -1782,3 +1782,15 @@ end
 function SliceInteractable(ax, p; orientation = nothing, crosshair = true, id = :slice, covers = nothing, tooltip = nothing)
     return SliceInteractable(ax, [p]; orientation, crosshair, id, covers, tooltip)
 end
+
+# The axis of a slice built from plots alone. `masque` finds it once it has the figure, as it
+# does for `interactables(plot)`, since a plot does not know which block draws it.
+# It keeps its own copy of the plots: `cover_plots` is empty when the caller passes `covers`.
+struct _AxisOf
+    plots::Vector{Any}
+end
+Base.show(io::IO, ::_AxisOf) = print(io, "(the plots' axis)")
+
+# The plot constructor without the axis, documented on `SliceInteractable`.
+SliceInteractable(plots::AbstractVector; kwargs...) = SliceInteractable(_AxisOf(collect(Any, plots)), plots; kwargs...)
+SliceInteractable(p::Makie.AbstractPlot; kwargs...) = SliceInteractable([p]; kwargs...)

@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `SliceInteractable([a, b])` builds a slice from plots without naming the axis; `masque`
+  puts it on the axis that draws them, and plots on different axes raise an error naming
+  both. `SliceInteractable(ax, [a, b])` still works (#306).
 - A heatmap or image takes `payloads`, one per cell: a function `(i, j) -> payload` or a
   matrix the same size as the plotted one, passed to `interactables(p; payloads)` or
   `GridInteractable`. The tooltip lists the payload's fields and the cell's value, a
