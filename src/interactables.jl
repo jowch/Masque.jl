@@ -786,8 +786,8 @@ end
 
 # ============================ GridInteractable =============================
 """
-    GridInteractable(ax, xedges, yedges, values; id=:cells, tooltip=nothing, label=nothing)
-    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, tooltip=nothing, label=nothing)
+    GridInteractable(ax, xedges, yedges, values; id=:cells, payloads=nothing, tooltip=nothing, label=nothing)
+    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, payloads=nothing, tooltip=nothing, label=nothing)
 
 A binned grid, such as a heatmap or image. Produces one `:grid` [`HitLayer`](@ref). A click
 commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value.
@@ -798,8 +798,14 @@ commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value.
 - `values` — an `(ncols, nrows)` `Matrix` of per-cell values. Shape mismatch raises
   `ArgumentError`.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:cells`.
-- `tooltip` — `nothing` for the auto table of `i`, `j` and `value` (default), `masque"..."` for
-  a template, or `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
+- `payloads` — optional data for each cell: a matrix the same shape as `values`, or a function
+  `(i, j) -> payload` called once per cell. A click's [`GridCellEvent`](@ref) carries the
+  cell's payload, and its fields read through (`ev.row`). Every payload ships with the widget,
+  so a large grid with payloads makes a large page. Default `nothing`.
+- `tooltip` — `nothing` for the default (default): `(i,j) = value`, or with `payloads` a table
+  of the payload's fields and `value`. `masque"..."` is a template that can use `i`, `j`,
+  `value` and the payload's fields; `false` suppresses it. `tooltip = true` is rejected
+  (`ArgumentError`).
 - `label` — an optional screen-reader announcement prefix (see [`PointInteractable`](@ref)).
   It is stored and shipped, but has no effect yet: a grid is not keyboard-navigable.
 
@@ -820,13 +826,36 @@ GridInteractable(ax, xedges, yedges, vals)
 
 p = heatmap!(ax, X, Y, Z)
 GridInteractable(ax, p)
+
+xs = ["a", "b", "c", "d"]; ys = ["p", "q", "r"]  # i runs along x, j along y
+GridInteractable(ax, xedges, yedges, vals; payloads = (i, j) -> (; x = xs[i], y = ys[j]),
+    tooltip = masque"(\$(x), \$(y)) = \$(value)")
 ```
 """
 struct GridInteractable <: AbstractInteractable
     ax; xedges::Vector{Float64}; yedges::Vector{Float64}; values::AbstractMatrix
     id::Symbol; tooltip::Union{Nothing, Markup, Bool}; label::Union{Nothing, String}
+    # Row-major like the shipped `values` (cell `(i, j)` at `(j-1)*ncols + i`); empty for none.
+    payloads::Vector{Any}
 end
-function GridInteractable(ax, xedges, yedges, values; id = :cells, tooltip = nothing, label = nothing)
+# The 7-field form from before `payloads` existed: a grid with no payloads.
+GridInteractable(ax, xedges, yedges, values, id, tooltip, label) =
+    GridInteractable(ax, xedges, yedges, values, id, tooltip, label, Any[])
+# One payload per cell, row-major. `payloads` is a `(ncols, nrows)` matrix or `(i, j) -> payload`.
+function _grid_payloads(payloads, ncols, nrows)
+    payloads === nothing && return Any[]
+    payloads isa Function && return Any[payloads(c, r) for r in 1:nrows for c in 1:ncols]
+    payloads isa AbstractMatrix && size(payloads) == (ncols, nrows) &&
+        return Any[payloads[c, r] for r in 1:nrows for c in 1:ncols]
+    throw(
+        ArgumentError(
+            "GridInteractable: `payloads` must be a matrix the same shape as `values` " *
+                "$((ncols, nrows)) or a function `(i, j) -> payload`, got " *
+                "$(payloads isa AbstractArray ? "an array of size $(size(payloads))" : typeof(payloads))",
+        ),
+    )
+end
+function GridInteractable(ax, xedges, yedges, values; id = :cells, payloads = nothing, tooltip = nothing, label = nothing)
     _check_tooltip(tooltip)
     xe = collect(Float64, xedges); ye = collect(Float64, yedges)
     # geometry.ts's findBin binary-searches these edges assuming strict monotonicity (asc or
@@ -843,7 +872,10 @@ function GridInteractable(ax, xedges, yedges, values; id = :cells, tooltip = not
                 "= $(expected), got $(values isa AbstractMatrix ? size(values) : typeof(values))",
         ),
     )
-    return GridInteractable(ax, xe, ye, values, id, tooltip, label === nothing ? nothing : String(label))
+    return GridInteractable(
+        ax, xe, ye, values, id, tooltip, label === nothing ? nothing : String(label),
+        _grid_payloads(payloads, expected...),
+    )
 end
 tooltip_spec(i::GridInteractable) = i.tooltip
 function hitlayers(i::GridInteractable, ctx)
@@ -888,7 +920,7 @@ function hitlayers(i::GridInteractable, ctx)
             geom["sample_px"] = sampled.sample_px
         end
     end
-    return [HitLayer(i.id, :grid, geom, Any[], axis_id(ctx, i.ax), events(i), i.label)]
+    return [HitLayer(i.id, :grid, geom, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
 end
 
 # ============================ TextInteractable =============================

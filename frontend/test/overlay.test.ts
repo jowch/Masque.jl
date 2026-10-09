@@ -2917,6 +2917,100 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         expect(tip.innerHTML).toBe("cell 2,1 = 12")
     })
 
+    // #290: per-cell payloads, row-major like values.
+    describe("grid cell payloads", () => {
+        const cellManifest = (payloads: unknown[], extra: Partial<HitLayer> = {}): Manifest => ({
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{ id: "hm", kind: "grid", axis: "ax1", events: ["click", "hover"], payloads,
+                geometry: { xedges: [0, 10, 20], yedges: [0, 10, 20], ncols: 2, nrows: 2, values: [11, 12, 21, 22] }, ...extra }],
+        })
+        // Image (15, 5): wire cell i=1, j=0, row-major index 1.
+        const hover = (host: HTMLElement) => {
+            const shadow = shadowOf(host)
+            ;(shadow.querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 2.5, bubbles: true }))
+            return shadow.querySelector(".masque-tip") as HTMLElement
+        }
+        const labels = [{ row: "a", col: "x" }, { row: "b", col: "x" }, { row: "a", col: "y" }, { row: "b", col: "y" }]
+
+        it("the default tooltip is the cell's payload fields and its value", () => {
+            const { host, script } = setup()
+            mount(script, cellManifest(labels))
+            expect(hover(host).textContent).toBe("rowbcolxvalue12")
+        })
+
+        it("a bare label payload reads 'label = value'", () => {
+            const { host, script } = setup()
+            mount(script, cellManifest(["p", "q", "r", "s"]))
+            expect(hover(host).innerHTML).toBe("q = 12")
+        })
+
+        it("a template sees the payload fields next to i, j and value", () => {
+            const { host, script } = setup()
+            mount(script, cellManifest(labels, { template: ["(", { f: "row" }, ", ", { f: "col" }, ") = ", { f: "value" }, " at ", { f: "i" }] }))
+            expect(hover(host).innerHTML).toBe("(b, x) = 12 at 2")
+        })
+
+        it("the cell's i, j and value win over a payload field of the same name", () => {
+            const { host, script } = setup()
+            mount(script, cellManifest([{ i: 99 }, { i: 99, value: "no" }, {}, {}], { template: [{ f: "i" }, " ", { f: "value" }] }))
+            expect(hover(host).innerHTML).toBe("2 12")
+        })
+
+        it("without shipped values, a payload shows alone", () => {
+            const noValues = (payloads: unknown[]): Manifest => {
+                const m = cellManifest(payloads)
+                delete (m.layers[0].geometry as { values?: number[] }).values
+                return m
+            }
+            const a = setup()
+            mount(a.script, noValues(["p", "q", "r", "s"]))
+            expect(hover(a.host).innerHTML).toBe("q")
+            const b = setup()
+            mount(b.script, noValues(labels))
+            expect(hover(b.host).textContent).toBe("rowbcolx")
+        })
+
+        it("a template names a bare payload as payload, and a null payload falls back to the default", () => {
+            const a = setup()
+            mount(a.script, cellManifest(["p", "q", "r", "s"], { template: [{ f: "payload" }, ": ", { f: "value" }] }))
+            expect(hover(a.host).innerHTML).toBe("q: 12")
+            const b = setup()
+            mount(b.script, cellManifest([null, null, null, null], { template: [{ f: "i" }, ",", { f: "j" }] }))
+            expect(hover(b.host).innerHTML).toBe("2,1")
+            const c = setup()
+            mount(c.script, cellManifest([null, null, null, null]))
+            expect(hover(c.host).innerHTML).toBe("(2,1) = 12")
+        })
+
+        it("a click uploads the cell, not its payload (Julia looks it up)", () => {
+            const { host, script } = setup()
+            mount(script, cellManifest(labels))
+            ;(shadowOf(host).querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new MouseEvent("click", { clientX: 7.5, clientY: 2.5, bubbles: true }))
+            expect((host as unknown as { value: unknown }).value).toEqual({ layer: "hm", index: 1, payload: { i: 1, j: 0, value: 12 } })
+        })
+    })
+
+    it("a sampled grid's tooltip reads the source cell's payload", () => {
+        // Same sample as below: image (15, 10) is source cell i=2, j=0, row-major payload index 2.
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{ id: "hm", kind: "grid", axis: "ax1", events: ["hover"], payloads: ["a", "b", "c"],
+                geometry: {
+                    xedges: [0, 10, 20, 30], yedges: [0, 20], ncols: 3, nrows: 1,
+                    sample: [7, 8], sncols: 2, snrows: 1,
+                    sample_origin: [0, 0], sample_span: [30, 20], sample_px: 15,
+                } }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        ;(shadow.querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 7.5, clientY: 5, bubbles: true }))
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("c = 8")
+    })
+
     it("grid sample hover shows the pixel-center value, and a NaN sample shows nothing", () => {
         const m: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},

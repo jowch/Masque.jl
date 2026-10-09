@@ -107,7 +107,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `CrossBar` | `RectInteractable` | `midpoint`, `low`, `high` | `:crossbar` |
 | `HSpan` / `VSpan` | `RectInteractable` | `low`, `high` | `:hspan` / `:vspan` |
 | `Spy` | `RectInteractable` | `index` | `:spy` |
-| `Heatmap` / `Image` | `GridInteractable` | `i`, `j`, `value` (takes no `payloads`) | `:cells` |
+| `Heatmap` / `Image` | `GridInteractable` | `i`, `j`, `value`, plus the cell's own `payloads` | `:cells` |
 | `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
 | `Contourf` | `PolygonInteractable` | `low`, `high` | `:contourf` |
 | `Violin` | `PolygonInteractable` | `x` | `:violin` |

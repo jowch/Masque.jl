@@ -132,6 +132,14 @@ bake it; hover/click or drag only.
 | Polar (`PolarAxis` scatter) | `:circles` | wash, flush drawn `r` | tip, click `@bind`, persist |
 | Scatter (dark figure) | `:circles` | wash, flush drawn `r` on dark axes | tip, click `@bind`, persist, flat `#c8c8c8` edge stroke + dodge fill brightens the marker's interior (screenshot) on the dark figure too, still readable |
 | Arrows3D | `:segments` | ring | tip, click `@bind`, persist |
+| Axis3 scatter / meshscatter | `:circles` | wash, `r` from the projected mark | tip, click `@bind`, persist, hover highlight on the projected mark |
+| Axis3 lines | `:lines` | none (one element) | tip, click `@bind` |
+| Axis3 wireframe | `:segments` (one per edge) | ring | tip, click `@bind`, persist, ring on the edge |
+| Axis3 overlapping pair | `:circles` over `:circles` | none | the plot drawn last answers where both claim the pixel (its layer sorts first), highlight takes its circle |
+| Text | `:rects` | wash | tip, click `@bind`, persist |
+| Datashader | `:grid` | **unsupported** | cell tip, click `@bind` |
+| Violin | `:polygons` | wash | tip, click `@bind`, persist |
+| Stairs | `:lines` | none (one element) | tip, click `@bind` |
 | HLines / VLines | `:segments` | ring | tip, click `@bind`, persist |
 | Threshold | `:threshold` | none | drag commit → `@bind` |
 | Threshold (categorical y) | `:threshold` | none | release commits the nearest category's 1-based position and its label (`value`, `category`, #192), and the line snaps onto that category (#199) |

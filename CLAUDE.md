@@ -78,12 +78,13 @@ text and the bond payload → it gets a live check on every backend × the kinds
   about payload shape (unit tests never call `show`). **Agents run**
   `docs/dev/live-interaction-checklist.md` via **both** `test/e2e/kind_sweep.mjs` **and**
   `test/e2e/polish_verify.mjs` (Cairo **and** WGL) across scatter, lines/segments,
-  heatmap/image, barplot, poly, polar, dark-figure scatter, arrows3d, hlines/vlines,
-  threshold, ROI, view-pan, and axis/colorbar. Interaction without visual is unfinished; visual
-  chrome without the kind sweep is unfinished. The overlay recipes (highlight
-  layers and colours, fades, tooltip placement and theme, ROI chrome) are **locked**: the full
-  spec is the "Visual language (settled)" section of `docs/dev/live-interaction-checklist.md`.
-  Cite it; do not reopen it.
+  heatmap/image, barplot, poly, polar, dark-figure scatter, arrows3d, the Axis3 kinds
+  (scatter, lines, meshscatter, wireframe, an overlapping pair), text, datashader, violin,
+  stairs, hlines/vlines, threshold, ROI, view-pan, and axis/colorbar. Interaction without
+  visual is unfinished; visual chrome without the kind sweep is unfinished. The overlay
+  recipes (highlight layers and colours, fades, tooltip placement and theme, ROI chrome) are
+  **locked**: the full spec is the "Visual language (settled)" section of
+  `docs/dev/live-interaction-checklist.md`. Cite it; do not reopen it.
 - **Skip only** pure-internal refactors with zero observable delta (and say so). When unsure,
   it's user-facing — verify all backends × the kinds the change can touch, interaction
   **and** visual.
