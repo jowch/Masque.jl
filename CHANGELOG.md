@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-09
+
 ### Added
 - A CairoMakie widget shown outside Pluto, in Documenter or in an HTML page written with
   `show(io, MIME"text/html"(), w)`, keeps its tooltips and highlights, with nothing to turn
@@ -253,7 +255,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/jowch/Masque.jl/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/jowch/Masque.jl/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jowch/Masque.jl/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/jowch/Masque.jl/compare/v0.1.0...v0.1.1
