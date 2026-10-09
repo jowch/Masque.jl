@@ -616,6 +616,8 @@ function build_kind_sweep()
     end
 
     # overlaystyle (#181): the selected and hovered outlines take the given colour and widths.
+    # tooltipstyle (#305): the tooltip card takes the given background, text colour and radius,
+    # with no caret.
     # Not in kind_sweep_meta(), whose generic checks assert the default recipe; polish_verify.mjs
     # checks this one.
     scatter_styled = let
@@ -632,6 +634,7 @@ function build_kind_sweep()
             selected = Dict(:scatter_styled => [2]),
             auto = false,
             overlaystyle = (; color = "rgb(0, 102, 204)", hover_width = 3, selected_width = 4),
+            tooltipstyle = (; bg = "rgb(20, 30, 60)", color = "rgb(240, 240, 200)", radius = 9, caret = false),
         )
     end
 

@@ -210,6 +210,7 @@ try {
     return {
       show: t?.classList.contains("show"), text: t?.innerText ?? "",
       bg: cs?.backgroundColor, color: cs?.color,
+      radius: cs?.borderTopLeftRadius, caret: t ? getComputedStyle(t, "::before").display : null,
       hi: { fill: capture(svgFill, "fill"), edge: capture(svgEdge, "edge"), plain: capture(svgPlain, "plain") },
       sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel"),
     };
@@ -447,6 +448,14 @@ try {
     throw new Error(`scatter_styled: hover ${JSON.stringify(sTip?.hi)} (want edge ${STYLED} at width 3, plus the fill)`);
   }
   passed.push("overlaystyle");
+
+  // tooltipstyle (#305): the same figure sets the card's background, text colour and radius,
+  // and hides the caret.
+  if (!sTip.show || sTip.bg !== "rgb(20, 30, 60)" || sTip.color !== "rgb(240, 240, 200)"
+      || sTip.radius !== "9px" || sTip.caret !== "none") {
+    throw new Error(`scatter_styled: tooltip ${JSON.stringify({ show: sTip.show, bg: sTip.bg, color: sTip.color, radius: sTip.radius, caret: sTip.caret })} (want bg rgb(20, 30, 60), color rgb(240, 240, 200), radius 9px, no caret)`);
+  }
+  passed.push("tooltipstyle");
 
   // Axis3 kinds (#301): the baked selection and a hover on another mark sit on the projected
   // mark. `overlap3d` hovers the front marker of a pair: the highlight must take the marker's

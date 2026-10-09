@@ -49,14 +49,40 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test any(s -> s == Dict("f" => "pop", "spec" => ","), seg)
     end
 
-    @testset "tooltip_* style kwargs" begin
-        @test isempty(Masque.tip_style_dict())                                  # nothing set → empty
-        d = Masque.tip_style_dict(; tooltip_bg = :red, tooltip_font_size = 13, tooltip_caret = false)
+    @testset "tooltipstyle" begin
+        @test isempty(Masque.tip_style_dict(nothing))                           # unset → empty
+        @test isempty(Masque.tip_style_dict((;)))
+        @test isempty(Masque.tip_style_dict((; caret = true)))                  # built-in look
+        d = Masque.tip_style_dict((; bg = :red, font_size = 13, radius = 6, font = "serif", caret = false))
         @test d["--masque-tip-bg"] == "rgb(255,0,0)"                            # Makie color → CSS
         @test d["--masque-tip-font-size"] == "13px"
+        @test d["--masque-tip-radius"] == "6px"
+        @test d["--masque-tip-font"] == "serif"
         @test d["--masque-tip-caret"] == "none"
-        @test Masque.tip_style_dict(; tooltip_bg = "#abc")["--masque-tip-bg"] == "#abc"  # CSS string passthrough
-        @test !haskey(Masque.tip_style_dict(; tooltip_bg = :red), "--masque-tip-color")  # unset omitted
+        @test Masque.tip_style_dict((; bg = "#abc"))["--masque-tip-bg"] == "#abc"  # CSS string passthrough
+        @test !haskey(Masque.tip_style_dict((; bg = :red)), "--masque-tip-color")  # unset omitted
+        @test_throws "unknown key `backround`" Masque.tip_style_dict((; backround = :red))
+        @test_throws "Valid keys: bg, color, accent, font, font_size, radius, caret" Masque.tip_style_dict((; x = 1))
+        @test_throws "`radius` must be a size" Masque.tip_style_dict((; radius = -1))
+        @test_throws "`caret` must be" Masque.tip_style_dict((; caret = :no))
+        @test_throws "must be a NamedTuple" Masque.tip_style_dict(Dict(:bg => :red))
+    end
+
+    @testset "deprecated tooltip_* keywords" begin
+        flat(; kw...) = merge(
+            (; bg = nothing, color = nothing, accent = nothing, font = nothing, font_size = nothing, radius = nothing, caret = nothing),
+            (; kw...),
+        )
+        # The warning logs once per call site, so later calls run with it silenced.
+        quiet(f) = Base.CoreLogging.with_logger(f, Base.CoreLogging.NullLogger())
+        @test Masque._merge_tooltip_kwargs(nothing, flat()) === nothing           # none given → no warning
+        @test Masque._merge_tooltip_kwargs((; bg = :red), flat()) == (; bg = :red)
+        m = @test_deprecated r"`tooltip_bg = …`, `tooltip_caret = …` is deprecated; use `tooltipstyle = \(; bg = …, caret = …\)`. Removed in 0.4" Masque._merge_tooltip_kwargs(
+            nothing, flat(; bg = :red, caret = false),
+        )
+        @test m == (; bg = :red, caret = false)
+        @test quiet(() -> Masque._merge_tooltip_kwargs((; color = :blue), flat(; radius = 3))) == (; color = :blue, radius = 3)
+        @test_throws "both set" quiet(() -> Masque._merge_tooltip_kwargs((; bg = :blue), flat(; bg = :red)))
     end
 
     @testset "overlaystyle" begin
@@ -107,7 +133,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         _, _, tctx = ctx_for(tfig)
         pts2 = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
         pi = PointInteractable(tax, pts2; tooltip = masque"x=$(x), y=$(y)")
-        man = build_manifest([pi], tctx; tip_style = Masque.tip_style_dict(; tooltip_bg = :red))
+        man = build_manifest([pi], tctx; tip_style = Masque.tip_style_dict((; bg = :red)))
         L = man["layers"][1]
         @test haskey(L, "template")
         @test !haskey(L, "tooltips")                       # old per-element array removed
@@ -126,6 +152,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             tfig, PointInteractable(tax, pts2); tooltip_sigdigits = 2, auto = false
         ).manifest["tipDigits"] == 2
         @test masque(tfig; tooltip_sigdigits = 7).manifest["tipDigits"] == 7     # zero-config path too
+        tstyle = masque(tfig; tooltipstyle = (; bg = :red, caret = false)).manifest["tipStyle"]
+        @test tstyle == Dict("--masque-tip-bg" => "rgb(255,0,0)", "--masque-tip-caret" => "none")
+        old = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
+            masque(tfig; tooltip_bg = :red, tooltip_caret = false).manifest["tipStyle"]
+        end
+        @test old == tstyle                                                       # deprecated form, same result
         for bad in (0, 18, 2.5, "3", nothing, true)
             @test_throws ArgumentError masque(
                 tfig, PointInteractable(tax, pts2); tooltip_sigdigits = bad, auto = false
