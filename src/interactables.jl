@@ -532,7 +532,7 @@ by the plot type):
 | `Makie.Stairs` | `:stairs` | one `:lines` element, the whole staircase | the child `Lines`' pre-expanded step polyline |
 | `Makie.Series` | `:series` | one `:lines` layer, one element per series | each child line (or a `ScatterLines` child's line) |
 | `Makie.LineSegments` | `:segments` | `:pairs`, per segment | converted data |
-| `Makie.Wireframe` | `:wireframe` | `:pairs`, per edge | the child `LineSegments`' edges (incl. mesh-triangulation diagonals) |
+| `Makie.Wireframe` | `:wireframe` | `:pairs`, per drawn edge, each once, in drawing order (see below) | the child `LineSegments`' edges (incl. mesh-triangulation diagonals), an edge shared by two faces kept at its first copy |
 | `Makie.Arrows3D` | `:arrows3d` | `:pairs`, per shaft | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, z, u, v, w)` from `points`/`directions` |
 | `Makie.Arrows2D` | `:arrows2d` | `:pairs`, per arrow, tail to tip | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, u, v)` from `points`/`directions` |
 | `Makie.Errorbars` | `:errorbars` | `:pairs`, per bar | each bar's low→high endpoints |
@@ -542,6 +542,11 @@ by the plot type):
 
 A `series!` element's default payload is `(; index, label)` when the child plot's label is a
 non-empty string (Makie's own default is `"series k"`), otherwise `(; index)`.
+
+A `wireframe!`'s edges come in Makie's drawing order (face by face), with an edge two faces
+share kept where it first appears. Edge `k`'s endpoints are
+`SegmentInteractable(ax, w).vertices[2k-1:2k]`, and half the length of `vertices` is the edge
+count a `payloads` vector must match.
 
 # Examples
 ```julia

@@ -46,6 +46,14 @@ All notable changes to this project are documented here. The format is based on
   would overwrite the other's value. That includes several boxes that select from the same
   layer, which the Brush a region page used to allow; the last box released replaced the
   others' selection anyway. Pass each to its own `masque` call (#309).
+- **Breaking:** a `wireframe!` layer has one element per drawn edge. Makie outlines every
+  face, so an edge shared by two faces used to ship twice, and its second copy could never
+  be hovered or clicked. Edges keep Makie's drawing order, with a shared edge kept where it
+  first appears, so every edge after the first shared one moves to a lower index. Edge `k`
+  is `SegmentInteractable(ax, w).vertices[2k-1:2k]`, and half that vector's length is the
+  edge count. A `payloads` vector of the old length, or a `selected` index past the new
+  count, raises an `ArgumentError`. An in-range `selected` index, or a saved `pick.index`,
+  silently points at a different edge, so check those by hand (#316).
 
 ### Deprecated
 - The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,

@@ -378,7 +378,11 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         wints = interactables(fw)
         wi = only(wints)
         @test wi isa SegmentInteractable && wi.mode === :pairs
-        @test iseven(length(wi.vertices)) && length(wi.vertices) >= 80   # grid edges + triangulation diagonals
+        # a 5×5 grid draws 2·5·4 = 40 edges; Makie outlines each of the 16 quads (64 segments),
+        # and the edges two quads share ship once (#316)
+        @test length(wi.vertices) == 2 * 40
+        wedges = Set(Set((wi.vertices[k], wi.vertices[k + 1])) for k in 1:2:length(wi.vertices))
+        @test length(wedges) == 40
         _, ppuw, ctxw = ctx_for(fw)
         imgw = Makie.colorbuffer(fw; px_per_unit = ppuw)
         Lw = only(hitlayers(wi, ctxw))
