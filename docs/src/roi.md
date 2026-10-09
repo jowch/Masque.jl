@@ -19,14 +19,14 @@ Main.masque_fallback("roi_table")
 
 ## Pick the points inside a box
 
-An [`ROIInteractable`](@ref) adds the box, and `selects` names the layer
-whose points it collects. Give the scatter an `id` with
-[`interactables`](@ref) so the box can refer to it, and pass both to the
+An [`ROIInteractable`](@ref) adds the box, and `selects` names the plot
+whose points it collects. To give each point its row of data, pass the
+scatter to [`interactables`](@ref) with `payloads`, and pass both to the
 same `masque` call:
 
 ```julia
-pts = interactables(s; id = :pts, payloads = samples)
-roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = :pts)
+pts = interactables(s; payloads = samples)
+roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = s)
 ```
 
 ```julia
@@ -49,7 +49,7 @@ If your rows are a `DataFrame`, pass it as `payloads`, with one row per
 point in the order you plotted them:
 
 ```julia
-pts = interactables(s; id = :pts, payloads = df)
+pts = interactables(s; payloads = df)
 ```
 
 Then `df[picks, :]` is the rows inside the box. To show an empty table
@@ -65,7 +65,7 @@ widget, still shows its tooltip, but clicking it does not change
 
 ## Brush heatmap cells
 
-Name a heatmap or image layer in `selects` instead, and the box returns
+Name a heatmap or image in `selects` instead, and the box returns
 one [`GridWindowEvent`](@ref) for the block of cells it covers.
 [Brush a block of cells](@ref) shows how to read it.
 
@@ -92,10 +92,13 @@ that arrow points to, and Alt+Shift with an arrow shrinks it. See
 
 ## Where it works
 
-`selects` can name a layer of points, or a heatmap or image, and that
-layer must be in the same `masque` call. A widget takes one box, and
-no threshold or colorbar you pass alongside it, since each owns the
-widget's value. The box needs a 2D `Axis`; see
+`selects` can name a plot of points, such as a scatter, or a heatmap or
+image. A plot that draws both lines and points, such as `scatterlines`,
+gives the box its points. `selects` also takes a layer id, such as the
+`id` you gave [`interactables`](@ref), and that layer must be in the
+same `masque` call. A widget takes one box, and no threshold or
+colorbar you pass alongside it, since each owns the widget's value. The
+box needs a 2D `Axis`; see
 [Supported plots and axes](@ref) for which axes and scales.
 
 For larger examples, [Box-select scatter](@ref) summarizes two groups

@@ -156,11 +156,20 @@ hit_tol(::AbstractInteractable) = nothing
 Supertype for interactables that highlight elements on another layer — today just
 [`ROIInteractable`](@ref)'s `selects` mode, brushing a `:circles`/`:grid` layer. Subtypes
 additionally implement these non-exported functions (extend as `Masque.selects(::MyType) = …`):
-- `Masque.selects(i) -> Union{Nothing,Symbol}` — the target layer id, or `nothing`.
+- `Masque.selects(i) -> Union{Nothing,Symbol}` — the target layer id, or `nothing`. The
+  built-in [`ROIInteractable`](@ref) may also hold a plot here until `masque` resolves it to
+  that plot's layer id.
 - `Masque.compatible_kinds(i) -> Tuple` — the target `HitLayer.kind`s this selector accepts;
   `masque` raises `ArgumentError` at build time if `selects` names a layer of an unlisted kind.
 """
 abstract type AbstractSelector <: AbstractInteractable end
+
+# A plot named as a selector's `selects`, with the layer ids `masque` built for it in this
+# call. `build_manifest` picks the one whose kind the selector brushes.
+struct _PlotTarget
+    plot::Makie.AbstractPlot
+    ids::Vector{Symbol}
+end
 
 # Only AbstractSelectors override these.
 selects(::AbstractInteractable) = nothing
@@ -1718,9 +1727,11 @@ compatible layer, reporting the contained elements. Produces one `:roi` [`HitLay
 - `bounds` — initial `(xmin, xmax, ymin, ymax)` in data space. Requires `xmin < xmax` and
   `ymin < ymax` (`ArgumentError` otherwise); length must be 4 (`ArgumentError` otherwise).
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:roi`.
-- `selects` — the `id` of a `:circles` or `:grid` layer to brush: on mouse-up, elements whose
+- `selects` — the layer to brush: a `:circles` or `:grid` layer's `id`, or the plot itself
+  (`selects = sc`), whatever id that plot's layer ends up with. On mouse-up, elements whose
   geometry falls inside the ROI are reported. `masque` raises `ArgumentError` at build time if
-  `selects` names a layer absent from the same call, or one of an unsupported kind.
+  `selects` names a layer absent from the same call, one of an unsupported kind, or a plot
+  with no point or grid layer in the call.
 
 Payload on commit (no `selects`): a [`BoundsEvent`](@ref). With `selects` set, the bond is a
 `Vector{ElementEvent}` for a `:circles` target (one per contained element), or one
@@ -1740,12 +1751,17 @@ need numeric limits), or either scale isn't client-invertible (supported: `ident
 ```julia
 ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0))
 
-# brush a scatter layer named :scatter
+# brush the points of a scatter plot `sc`
+ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0), selects = sc)
+
+# brush a layer by its id
 ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0), selects = :scatter)
 ```
 """
 struct ROIInteractable <: AbstractSelector
-    ax; bounds::NTuple{4, Float64}; id::Symbol; selects::Union{Nothing, Symbol}   # (xmin,xmax,ymin,ymax) data space
+    # bounds: (xmin,xmax,ymin,ymax) data space. A plot `selects` becomes a `_PlotTarget` in
+    # `_assemble`, then the one compatible layer id in `build_manifest`.
+    ax; bounds::NTuple{4, Float64}; id::Symbol; selects::Union{Nothing, Symbol, Makie.AbstractPlot, _PlotTarget}
 end
 function ROIInteractable(ax; bounds, id = :roi, selects = nothing)
     xmin, xmax, ymin, ymax = _roi_bounds(bounds)

@@ -26,7 +26,7 @@ Drag the box over some stations, and the last cell lists the ones inside.
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
 md"""
-Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Passing the scatter to `interactables` with the station rows as `payloads` puts each station's name and group in its tooltip. `ROIInteractable` adds a box that collects the points inside it.
+Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Passing the scatter to `interactables` with the station rows as `payloads` puts each station's name and group in its tooltip. `ROIInteractable` adds a box, and `selects = s` makes it collect the scatter's points inside it.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -50,8 +50,8 @@ begin
     north, mid, south, east = "#4363d8", "#f58231", "#3cb44b", "#911eb4"
     colors = [north, north, north, mid, mid, mid, south, south, south, east]
     s = scatter!(ax, xs, ys; color = colors, markersize = 18)
-    pts = interactables(s; id = :pts, payloads = samples)
-    roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = :pts)
+    pts = interactables(s; payloads = samples)
+    roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = s)
     nothing
 end
 

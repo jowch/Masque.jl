@@ -17,7 +17,7 @@ Main.masque_fallback("grids_heatmap")
 
 `masque(fig)` makes every `heatmap!` and `image!` interactive. Each
 grid gets a layer id, `:cells` for the first and `:cells_2` for the
-second, which a `selects` box names and `pick.layer` reports. To give a
+second, which `pick.layer` reports. To give a
 grid a name of your own, for example when a figure has two grids, pass
 the plot to [`interactables`](@ref) with an `id`:
 
@@ -85,20 +85,20 @@ image's layer id, such as `id = :cells`, so it takes the image's place.
 ## Brush a block of cells
 
 To select a block of cells by dragging a box over them, pass an
-[`ROIInteractable`](@ref) to `masque`, with `selects` naming the grid's
-layer id:
+[`ROIInteractable`](@ref) to `masque`, with `selects` naming the heatmap
+or image you plotted:
 
 ```julia
-box = ROIInteractable(ax; bounds = (1.0, 3.0, 1.0, 2.0), selects = :cells)
+box = ROIInteractable(ax; bounds = (1.0, 3.0, 1.0, 2.0), selects = p)
 @bind win masque(fig, box)
 ```
 
 `win` is a [`GridWindowEvent`](@ref) for the block of cells under the
 box. It starts with the block under `bounds`, and each release replaces
-it with the block under the box then. `win.i1:win.i2` is the range of the matrix's
-first index, drawn along x, and `win.j1:win.j2` the range of its second
-index, drawn along y, so `z[win]` is `z[win.i1:win.i2, win.j1:win.j2]`,
-that block of the matrix.
+it with the block under the box then. `win.i1:win.i2` is the range of
+the matrix's first index, drawn along x, and `win.j1:win.j2` the range
+of its second index, drawn along y, so `z[win]` is
+`z[win.i1:win.i2, win.j1:win.j2]`, that block of the matrix.
 
 A box that misses the grid still gives a `GridWindowEvent`, with empty
 ranges (`win.i1:win.i2` is `1:0`), so `z[win]` is an empty matrix
