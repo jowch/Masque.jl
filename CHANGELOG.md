@@ -113,6 +113,10 @@ All notable changes to this project are documented here. The format is based on
 - A `meshscatter!` sphere on `Axis3` responds to hover and clicks out to its drawn edge, and
   its highlight sits on its outline. Before, its hit circle could fall well inside the
   sphere, so pointing near the edge missed it (#317).
+- A box with `selects` on a heatmap or image no longer takes an extra row or column when
+  its edge sits exactly on a cell edge. With cell edges at 0, 1, 2, 3, a box from 1 to 2
+  selects only the cell between them, where it used to take the cells on either side too.
+  This changes the cells a release and the starting value return for such boxes (#337).
 
 ## [0.2.2] - 2026-10-09
 

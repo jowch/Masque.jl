@@ -86,14 +86,25 @@ function _contained_cells(box, g)
 end
 
 # `cellRange` in selection.ts: the 0-based, inclusive cells a pixel span `[lo, hi]` overlaps
-# on monotonic `edges`, or `nothing`. `_find_bin` is geometry.ts's `findBin`.
+# on monotonic `edges`, or `nothing`. `_find_bin` is geometry.ts's `findBin`. An end cell the
+# span only grazes, by `_EDGE_SLACK` px or less and not all of it, is left out (#337): the cell
+# edges are whole pixels, so a box edge on a data cell edge lands up to half a pixel past it.
+const _EDGE_SLACK = 0.5
 function _cell_range(edges, lo, hi)
     e1 = Float64(first(edges)); en = Float64(last(edges))
     clo = max(lo, min(e1, en)); chi = min(hi, max(e1, en))
     chi < clo && return nothing
     a = _find_bin(edges, clo); b = _find_bin(edges, chi)
     (a < 0 || b < 0) && return nothing
-    return (min(a, b), max(a, b))
+    i0, i1 = minmax(a, b)
+    function grazes(k)
+        c0, c1 = minmax(Float64(edges[k + 1]), Float64(edges[k + 2]))
+        overlap = min(chi, c1) - max(clo, c0)
+        return overlap <= _EDGE_SLACK && overlap < c1 - c0
+    end
+    i0 < i1 && grazes(i0) && (i0 += 1)
+    i0 < i1 && grazes(i1) && (i1 -= 1)
+    return (i0, i1)
 end
 
 """

@@ -9,14 +9,28 @@ import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, SurfaceGeome
 export type SelectionItem = { layer: string; index: number; payload?: unknown }
 export type SelectionResult = { items: SelectionItem[]; hits: Hit[] }
 
+// How far into a neighbouring cell a box edge may reach before that cell counts (#337). The
+// manifest's cell edges are whole pixels, so a box edge placed on a data cell edge lands up to
+// half a pixel either side of it.
+export const EDGE_SLACK = 0.5
+
 // [lo,hi] pixel span over an edge array → inclusive cell-index range clamped to the grid, or null if no overlap.
+// An end cell the span only grazes (by EDGE_SLACK or less, and not all of it) is left out.
 export function cellRange(edges: number[], lo: number, hi: number): [number, number] | null {
     const gmin = Math.min(edges[0], edges[edges.length - 1]), gmax = Math.max(edges[0], edges[edges.length - 1])
     const clo = Math.max(lo, gmin), chi = Math.min(hi, gmax)
     if (chi < clo) return null
     const a = findBin(edges, clo), b = findBin(edges, chi)
     if (a < 0 || b < 0) return null
-    return [Math.min(a, b), Math.max(a, b)]
+    let i0 = Math.min(a, b), i1 = Math.max(a, b)
+    const grazes = (k: number) => {
+        const e0 = Math.min(edges[k], edges[k + 1]), e1 = Math.max(edges[k], edges[k + 1])
+        const overlap = Math.min(chi, e1) - Math.max(clo, e0)
+        return overlap <= EDGE_SLACK && overlap < e1 - e0
+    }
+    if (i0 < i1 && grazes(i0)) i0++
+    if (i0 < i1 && grazes(i1)) i1--
+    return [i0, i1]
 }
 
 // Box pixel-rect → contained items + highlight hits, dispatched by target kind.

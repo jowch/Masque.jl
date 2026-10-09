@@ -334,9 +334,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         start = IP.APD.Bonds.initial_value(w)
         @test start isa GridWindowEvent && start.layer === :img
         @test (start.xmin, start.xmax, start.ymin, start.ymax) == (1.0, 3.0, 1.0, 2.0)
-        # Columns 2:3 exactly. The rows take 1:3: the cell edges are whole pixels, and the box's
-        # data edges land a fraction of a pixel past them into rows 1 and 3, as a release does.
-        @test (start.i1, start.i2, start.j1, start.j2) == (2, 3, 1, 3)
+        # Columns 2:3 and row 2 exactly (#337): the box's data edges sit on cell edges and land a
+        # fraction of a pixel past the whole-pixel edges into the neighbours, which doesn't count.
+        @test (start.i1, start.i2, start.j1, start.j2) == (2, 3, 2, 2)
         @test start == tv(w, w.manifest["initial"])
 
         # A cell envelope can still reach Julia from a stale bundle or a hand-set bond. It fails
