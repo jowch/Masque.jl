@@ -87,10 +87,12 @@ function gridCellHit(layer: HitLayer, index: number): Hit | null {
 
 // A selected surface point, re-keyed onto a new frame's layer. An in-drag frame ships no
 // surface geometry, so the point stays selected with nothing to draw until the release frame
-// brings its geometry back (the highlight hides during the drag, by design).
-export function surfaceSelection(layer: HitLayer, index: number): Hit {
+// brings its geometry back (the highlight hides during the drag, by design). A point the layer
+// can't draw otherwise (out of range, not drawn) is not selected.
+export function surfaceSelection(layer: HitLayer, index: number): Hit | null {
+    if ((layer.geometry as { suspended?: boolean }).suspended) return Number.isInteger(index) && index >= 0 ? { layer, index } : null
     const h = surfacePointHit(layer, index)
-    return h ? { layer, ...h } : { layer, index }
+    return h ? { layer, ...h } : null
 }
 
 // Kinds that can be drawn as a persistent pre-highlight (mirrors Julia `_SELECTED_KINDS`).

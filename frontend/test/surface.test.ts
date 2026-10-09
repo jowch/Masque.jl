@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest"
 import { anchorFor, hitLayer, resolvePayload } from "../src/geometry"
-import { selectionFor, surfaceSelection } from "../src/selection"
+import { selectionFor, selectionForValue, surfaceSelection } from "../src/selection"
+import { tipHtmlForHit } from "../src/hover"
+import type { OverlayCtx } from "../src/state"
 import { dualCell, surfaceFields } from "../src/surface"
 import type { HitLayer, Manifest, SurfaceGeometry } from "../src/types"
 
@@ -106,6 +108,40 @@ describe(":surface highlight and tooltip", () => {
         const suspended = layer({ suspended: true } as SurfaceGeometry)
         const kept = surfaceSelection(suspended, 4)
         expect(kept).toEqual({ layer: suspended, index: 4 }) // nothing to draw, still selected
-        expect(surfaceSelection(L, 4).geom_?.[0]).toBe("poly")
+        expect(surfaceSelection(L, 4)?.geom_?.[0]).toBe("poly")
+        expect(surfaceSelection(L, 99)).toBeNull()
+    })
+})
+
+describe(":surface tooltip and restored selection", () => {
+    const ctx = (L: HitLayer) => ({ manifest_: { layers: [L] }, tipDigits_: 4 }) as unknown as OverlayCtx
+
+    it("shows the point's fields, with a payload's own fields winning a clash", () => {
+        const L = layer(flat(), Array.from({ length: 9 }, (_, k) => ({ name: `p${k}`, z: -1 })))
+        const h = { layer: L, ...hitLayer(L, 19, 19)! }
+        const html = tipHtmlForHit(ctx(L), h, 19, 19)!
+        expect(html).toContain("p8")
+        expect(html).toContain("-1") // the payload's z, not the point's 8
+        expect(html).not.toMatch(/>8</)
+    })
+
+    it("fills a template from the same fields", () => {
+        const L = { ...layer(flat()), template: ["z=", { f: "z" }] } as unknown as HitLayer
+        const h = { layer: L, ...hitLayer(L, 19, 19)! }
+        expect(tipHtmlForHit(ctx(L), h, 19, 19)).toContain("z=8")
+    })
+
+    it("draws nothing for a layer with its tooltip turned off", () => {
+        const L = { ...layer(flat()), tooltip: false } as HitLayer
+        expect(tipHtmlForHit(ctx(L), { layer: L, ...hitLayer(L, 19, 19)! }, 19, 19)).toBeNull()
+    })
+
+    it("maps a restored bond value back to the point's cell", () => {
+        const L = layer(flat())
+        const m = { width: 40, height: 40, scaling: 1, transforms: {}, layers: [L] } as unknown as Manifest
+        const sel = selectionForValue(m, { layer: "surface", index: 4, payload: { i: 2, j: 3, value: 4 } })!
+        expect(sel.hits).toHaveLength(1)
+        expect(sel.hits[0].geom_?.[0]).toBe("poly")
+        expect(selectionForValue(m, { layer: "surface", index: 99 })).toBeNull() // like any other kind
     })
 })

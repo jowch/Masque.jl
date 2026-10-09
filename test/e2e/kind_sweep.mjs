@@ -2005,17 +2005,26 @@ try {
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
         return host?.dataset.masqueGestureFrame ?? null;
       }, key);
-      const pointer = (type, ix, iy) => page.evaluate(([k, t, x, y]) => {
+      // In view first, as the view case does: an off-screen :webgl canvas can lose its context.
+      // The base's box is read once, before the drag: on :webgl a frame can swap the canvas
+      // while the drag is under way.
+      const box = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        return { left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+      }, key);
+      const pointer = (type, ix, iy) => page.evaluate(([k, t, cx, cy]) => {
         const span = document.querySelector(`#coords_${k}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-        const b = host.querySelector("img, canvas").getBoundingClientRect();
-        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
         sr.querySelector(".surface").dispatchEvent(new PointerEvent(t, {
           bubbles: true, composed: true, cancelable: true, shiftKey: true, buttons: t === "pointerup" ? 0 : 1,
-          clientX: b.left + x * s, clientY: b.top + y * s, pointerId: 1, pointerType: "mouse", isPrimary: true,
+          clientX: cx, clientY: cy, pointerId: 1, pointerType: "mouse", isPrimary: true,
         }));
-      }, [key, type, ix, iy]);
+      }, [key, type, box.left + ix * box.s, box.top + iy * box.s]);
       const tries = backend === "webgl" ? 50 : 25, delayMs = backend === "webgl" ? 300 : 200;
       const stamp0 = await readStamp();
       const n0 = stamp0 ? JSON.parse(stamp0).n : 0;

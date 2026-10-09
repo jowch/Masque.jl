@@ -663,7 +663,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             const layer = newManifest.layers.find((l) => l.id === h.layer.id)
             if (!layer) continue
             if (layer.kind === "surface") {
-                nextSel.push(surfaceSelection(layer, h.index))
+                const kept = surfaceSelection(layer, h.index)
+                if (kept) nextSel.push(kept)
                 continue
             }
             try {
