@@ -440,8 +440,23 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         end
         @test err isa ArgumentError && occursin("`lines` plot", err.msg) && occursin("lines", err.msg)
 
-        # `build_manifest` on its own takes layer ids only.
+        # Two layers the box could brush: the error names both and asks for an id.
         _, _, ctx = ctx_for(fig)
+        two = Masque._PlotTarget(s1, [:a, :b])
+        err = try
+            Masque.build_manifest(
+                [
+                    PointInteractable(ax, [(1.0, 1.0)]; id = :a), PointInteractable(ax, [(2.0, 2.0)]; id = :b),
+                    ROIInteractable(ax, bounds, :roi, two),
+                ], ctx,
+            )
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("`:a`, `:b`", err.msg) && occursin("selects = :a", err.msg)
+
+        # `build_manifest` on its own takes layer ids only.
         @test_throws ArgumentError Masque.build_manifest(
             [PointInteractable(ax, [(1.0, 1.0)]; id = :scatter), ROIInteractable(ax; bounds, selects = s1)], ctx,
         )

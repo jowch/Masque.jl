@@ -156,7 +156,9 @@ hit_tol(::AbstractInteractable) = nothing
 Supertype for interactables that highlight elements on another layer — today just
 [`ROIInteractable`](@ref)'s `selects` mode, brushing a `:circles`/`:grid` layer. Subtypes
 additionally implement these non-exported functions (extend as `Masque.selects(::MyType) = …`):
-- `Masque.selects(i) -> Union{Nothing,Symbol}` — the target layer id, or `nothing`.
+- `Masque.selects(i) -> Union{Nothing,Symbol}` — the target layer id, or `nothing`. The
+  built-in [`ROIInteractable`](@ref) may also hold a plot here until `masque` resolves it to
+  that plot's layer id.
 - `Masque.compatible_kinds(i) -> Tuple` — the target `HitLayer.kind`s this selector accepts;
   `masque` raises `ArgumentError` at build time if `selects` names a layer of an unlisted kind.
 """

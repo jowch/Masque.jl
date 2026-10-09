@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 - An ROI's `selects` takes the plot it brushes, as in `ROIInteractable(ax; bounds, selects = sc)`,
-  so a figure with two scatters no longer needs to know which became `:scatter_2`. A plot that
+  so you no longer need to know which scatter became `:scatter_2`. A plot that
   draws both lines and points, such as `scatterlines`, gives the box its points. A layer id
   still works (#302).
 
