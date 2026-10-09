@@ -3533,6 +3533,26 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
         expect((host as unknown as { value: unknown }).value).toBeNull()
     })
 
+    it("an owned bond seeds the owner's initial envelope; selected= elsewhere is highlight only", () => {
+        const { host, script } = setup()
+        const owned: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            bondOwner: "threshold",
+            initial: { layer: "threshold", index: 0, payload: 0.5 },
+            layers: [{
+                id: "pts", kind: "circles", geometry: [300, 200, 20, 600, 400, 20],
+                payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["hover"],
+                selected: [1],
+            }],
+        }
+        mount(script, owned)
+        expect((host as unknown as { value: unknown }).value).toEqual({ layer: "threshold", index: 0, payload: 0.5 })
+        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
+        const { host: host2, script: script2 } = setup()
+        mount(script2, { ...owned, initial: undefined, bondOwner: "colorbar" })
+        expect((host2 as unknown as { value: unknown }).value).toBeNull()
+    })
+
     it("hydration across two scalar layers is highlight-only", () => {
         const { host, script } = setup()
         const twoLayer: Manifest = {

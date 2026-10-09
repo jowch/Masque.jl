@@ -63,12 +63,9 @@ else
 end
 ```
 
-Only the box sets `picks`: hovering a point still shows its tooltip,
-but clicking it does not change `picks`. The exception is an
-[`AxisInteractable`](@ref) in the same widget: it takes clicks anywhere
-on its axis, so a click there replaces `picks` with an
-[`AxisEvent`](@ref). To keep `picks` a vector, put the axis readout in a
-separate `masque` call.
+Only the box sets `picks`: hovering a point, or anything else in the
+widget, still shows its tooltip, but clicking it does not change
+`picks`. To click marks as well, put them in a separate `masque` call.
 
 ## Brush heatmap cells
 
@@ -79,7 +76,8 @@ one [`GridWindowEvent`](@ref) for the block of cells it covers.
 ## Read the box itself
 
 Leave out `selects` and the value is the box: a [`BoundsEvent`](@ref)
-with `xmin`, `xmax`, `ymin`, and `ymax`. Use this when the region is
+with `xmin`, `xmax`, `ymin`, and `ymax`. It starts at `bounds`, so
+`box.xmin` works before the first drag. Use this when the region is
 what you want, such as a time window, a crop, or a range to fit over.
 
 To start one widget's box where another's was released, pass that
@@ -99,8 +97,9 @@ that arrow points to, and Alt+Shift with an arrow shrinks it. See
 ## Where it works
 
 `selects` can name a layer of points, or a heatmap or image, and that
-layer must be in the same `masque` call. All the boxes in one widget
-must name the same layer. The box needs a 2D `Axis`; see
+layer must be in the same `masque` call. A widget takes one box, and
+no threshold or colorbar you pass alongside it, since each owns the
+widget's value. The box needs a 2D `Axis`; see
 [Supported plots and axes](@ref) for which axes and scales.
 
 For larger examples, [Box-select scatter](@ref) summarizes two groups

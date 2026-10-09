@@ -170,6 +170,10 @@ export interface Manifest {
     // "items" forces an empty {items: []} seed (an explicit empty brush). Absent + no selected
     // indices leaves host.value null.
     hydrate?: "items"
+    // Set when a threshold, an ROI, or a colorbar the caller passed owns the bond: the only
+    // layer that commits. `initial` is the envelope the bond starts at (absent: `null`).
+    bondOwner?: string
+    initial?: { layer: string; index: number; payload: unknown }
 }
 
 // `layer`/`index` are excluded from the trailing-underscore mangle convention (see
