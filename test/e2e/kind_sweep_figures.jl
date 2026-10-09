@@ -214,6 +214,19 @@ kind_sweep_meta() = [
         "orbitSuspends" => true,
     ),
     Dict(
+        # `text!` on Axis3 (#292): "front" sits between "back" and the camera, so their boxes
+        # overlap, and front is listed first. WebGL depth-tests text, so front is on top and
+        # answers; Cairo paints labels in list order, so back is on top and answers.
+        # `byBackend` entries replace the spec's own on that backend.
+        "key" => "text3d", "layerId" => "text", "layerKind" => "rects",
+        "selected" => "wash", "circle" => false, "selectedIndex" => 2, "clickIndex" => 0,
+        "tip" => "front", "hoverIndex" => 0, "hoverTip" => "front", "mode" => "element",
+        "overlapsElement" => 1,
+        "byBackend" => Dict(
+            "cairo" => Dict("clickIndex" => 1, "tip" => "back", "hoverIndex" => 1, "hoverTip" => "back", "overlapsElement" => 0),
+        ),
+    ),
+    Dict(
         # `text!` (#301): each string is one element, hit on its drawn box.
         "key" => "text", "layerId" => "text", "layerKind" => "rects",
         "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
@@ -802,6 +815,23 @@ function build_kind_sweep()
         )
     end
 
+    # Two labels on one line of sight, the front one listed first, and one on its own (#292).
+    text3d = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(
+            fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "text3d",
+            limits = (0, 4, 0, 4, 0, 4),
+        )
+        el, az = 0.5, 0.4
+        toward = Makie.Vec3f(cos(el) * cos(az), cos(el) * sin(az), sin(el))
+        back = Makie.Point3f(2, 2, 2)
+        text!(
+            ax, [back + 1.2f0 * toward, back, Makie.Point3f(0.5, 3.5, 0.5)];
+            text = ["front", "back", "solo"], fontsize = 22, align = (:center, :center),
+        )
+        masque(fig; selected = Dict(:text => [3]))
+    end
+
     text = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "text", limits = (0, 4, 0, 3))
@@ -1153,7 +1183,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

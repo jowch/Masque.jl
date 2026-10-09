@@ -175,7 +175,8 @@ export function hitLayerByIndex(layer: HitLayer, index: number): Omit<Hit, "laye
 // buildFocusable and hitsForLayer below, so neither draws/announces/highlights a segment the
 // mouse can never reach.
 // Element k is not on screen: a :polyline edge touching a NaN gap, or, once a zoomed Axis3
-// clips it (#321), a :segments pair, :circles centre, or whole :lines path with no finite spot.
+// clips it (#321), a :segments pair, :circles centre, or whole :lines path with no finite spot,
+// or a :rects box (a text label whose anchor an Axis3 clips).
 export function isGapElement(layer: HitLayer, k: number): boolean {
     switch (layer.kind) {
         case "polyline": {
@@ -188,6 +189,8 @@ export function isGapElement(layer: HitLayer, k: number): boolean {
         }
         case "circles":
             return Number.isNaN((layer.geometry as number[])[3 * k])
+        case "rects":
+            return Number.isNaN((layer.geometry as number[])[4 * k])
         case "lines":
             return !((layer.geometry as number[][])[k] ?? []).some((v) => Number.isFinite(v))
         default:

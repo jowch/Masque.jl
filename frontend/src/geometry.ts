@@ -285,11 +285,15 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
         case "rects": {
             // `tol` reaches past each rect's edge, over its drawn outline (absent → none).
             // Inside wins over any rect's reach, so touching bars split at their edge; between
-            // rects, the nearest outline wins.
+            // rects, the nearest outline wins. `order`, when present, is the front-to-back
+            // order to test them in (text on an Axis3); a rect not in it is not drawn.
             const a = g as number[]
             const tol = layer.tol ?? 0
+            const order = layer.order
+            const n = order ? order.length : a.length / 4
             let near = -1, nd = tol * tol
-            for (let k = 0; k < a.length / 4; k++) {
+            for (let m = 0; m < n; m++) {
+                const k = order ? order[m] : m
                 const cx = a[4 * k], cy = a[4 * k + 1], w = a[4 * k + 2], h = a[4 * k + 3]
                 const dx = Math.max(Math.abs(px - cx) - w / 2, 0), dy = Math.max(Math.abs(py - cy) - h / 2, 0)
                 if (dx === 0 && dy === 0) return { index: k, geom_: ["rect", cx, cy, w, h] }

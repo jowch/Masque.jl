@@ -285,6 +285,15 @@ HTML(
         "<span id=\"coords_surface3d\" style=\"display:none\">$(JSON3.write(sweep.surface3d.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000125
+@bind ev_text3d sweep.text3d
+
+# ╔═╡ c1000000-0000-0000-0000-000000000126
+HTML(
+    "<span id=\"out_text3d\">TEXT3D=$(repr(ev_text3d))</span>" *
+        "<span id=\"coords_text3d\" style=\"display:none\">$(JSON3.write(sweep.text3d.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-00000000010b
 @bind ev_text sweep.text
 
@@ -627,6 +636,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-00000000010a
 # ╠═c1000000-0000-0000-0000-000000000123
 # ╠═c1000000-0000-0000-0000-000000000124
+# ╠═c1000000-0000-0000-0000-000000000125
+# ╠═c1000000-0000-0000-0000-000000000126
 # ╠═c1000000-0000-0000-0000-00000000010b
 # ╠═c1000000-0000-0000-0000-00000000010c
 # ╠═c1000000-0000-0000-0000-00000000010d

@@ -285,6 +285,18 @@ end
     @test r == round(Int, (0.3525 * 20 + 8) * ctx.scaling)
 end
 
+@testset "text on Axis3: the nearest label answers on WebGL (#292)" begin
+    fig = Figure(; size = (600, 450))
+    ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, limits = (0, 2, 0, 2, 0, 2))
+    anchors = [Point3f(0.2, 0.2, 0.2), Point3f(1.8, 1.8, 1.8), Point3f(1.0, 1.0, 1.0)]
+    t = text!(ax, anchors; text = ["a", "b", "c"])
+    bk = Masque._resolve_backend(:webgl)
+    ctx = Masque.context(bk, fig, Masque._ppu(bk, fig, 700), 700)
+    @test ctx.depth_test
+    _, _, depth = Masque._project_depth(ctx, ax, anchors)
+    @test only(Masque.hitlayers(TextInteractable(ax, t), ctx)).order == sortperm(depth) .- 1
+end
+
 @testset "masque(fig) with both backends loaded defaults to Cairo" begin
     using CairoMakie
     cairo_ext = Base.get_extension(Masque, :MasqueCairoMakieExt)

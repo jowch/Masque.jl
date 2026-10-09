@@ -168,6 +168,10 @@ export interface HitLayer {
     // is its label or date text. Absent → no readout (Axis3, or a layer built by hand).
     points?: (number | string)[][]
     step?: "pre" | "post" | "center"
+    // :rects: 0-based element indices, front to back, to hit-test in (text on an Axis3, where
+    // the label nearest the camera wins an overlap). An element left out is not drawn.
+    // Absent → index order.
+    order?: number[]
     // Bond value shape: selects-ROI mouse-up ships { items: [...] }; single-click / bounds-ROI
     // ships { layer, index, payload } directly.
 }
