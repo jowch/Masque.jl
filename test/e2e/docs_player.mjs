@@ -5,7 +5,9 @@
 // Fails if the overlay never mounts, if host.value does not key a snapshot,
 // or if an overlay click does not update that readout. Then, with jsDelivr blocked, the
 // iframe must give way to its text twin (docs/player_fallback.jl): the `details` after it
-// opens with the notebook's code, and the search index carries that code.
+// opens with the notebook's code, and the search index carries that code. The Backends
+// page's two `@example` widgets, shown without Pluto, must hover to a tooltip, mount when
+// their script runs from `<head>`, and show their figure with scripts off.
 //
 //   node docs_player.mjs <docs/build>
 
@@ -442,6 +444,78 @@ try {
     await dragChecks(bs, "gallery_boxselect", moves, (items) => `a dragged box enclosing ${items.length} points`);
     bs.done();
     console.log(`E2E OK [docs player] — box-select: ${moves.length} pointer drags each swapped to their own recording`);
+  }
+
+  // A widget shown by a Documenter `@example` block, with no Pluto (#298): two on one page,
+  // so a second widget's script must not collide with the first's. Hovering a point with the
+  // real pointer shows its tooltip, and the page logs no errors.
+  {
+    const p = existsSync(join(root, "backends", "index.html")) ? "/backends/" : "/backends.html";
+    const before = consoleLog.length;
+    await page.goto(`http://127.0.0.1:${server.address().port}${p}`, { waitUntil: "load" });
+    await page.waitForFunction(() => {
+      const hosts = [...document.querySelectorAll(".ip-host")];
+      return hosts.length === 2 && hosts.every((h) => [...h.querySelectorAll("*")].some((el) => el.shadowRoot?.querySelector(".surface")));
+    }, null, { timeout: 20000 }).catch(async () => {
+      const n = await page.evaluate(() => document.querySelectorAll(".ip-host").length);
+      throw new Error(`@example widgets: expected 2 mounted overlays, found ${n} hosts | ${consoleLog.slice(before).join(" | ")}`);
+    });
+    const host = page.locator(".ip-host").first();
+    await host.scrollIntoViewIfNeeded();
+    // The manifest is inlined into the mount call; read the scatter's first point from it.
+    const pt = await host.evaluate((h) => {
+      const src = h.querySelector("script").textContent;
+      const m = src.match(/mount\(img, (.*), new Promise/s);
+      const man = JSON.parse(m[1]);
+      const layer = man.layers.find((l) => l.id === "scatter");
+      const r = h.querySelector("img").getBoundingClientRect();
+      const s = r.width / man.width;
+      return { x: r.x + layer.geometry[0] * s, y: r.y + layer.geometry[1] * s };
+    });
+    let tip = "";
+    for (let a = 0; a < 10 && !tip; a++) {
+      await page.mouse.move(pt.x + 30, pt.y + 30);
+      await page.mouse.move(pt.x, pt.y);
+      await sleep(150);
+      tip = await host.evaluate((h) => {
+        let sr = null; h.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const t = sr && sr.querySelector(".masque-tip");
+        return t && getComputedStyle(t).display !== "none" && t.offsetParent !== null ? t.innerText.trim() : "";
+      });
+    }
+    if (!tip) throw new Error("@example widget: hovering the first point showed no tooltip");
+    const errs = consoleLog.slice(before).filter((l) => l.startsWith("pageerror:") || (l.startsWith("error:") && !(l.includes("Failed to load resource") && l.includes("404"))));
+    if (errs.length) throw new Error(`@example widgets logged errors: ${errs.join(" | ")}`);
+    console.log(`E2E OK [docs @example] — 2 widgets mounted without Pluto, hover tooltip ${JSON.stringify(tip)}`);
+
+    // The classic Jupyter Notebook inserts output HTML inertly and runs each script from
+    // `<head>` (jQuery's globalEval). The widget must still find its own host and mount.
+    const headMounted = await page.evaluate(async () => {
+      const src = document.querySelector(".ip-host");
+      const html = src.outerHTML.split(src.id).join("masque-headcopy");
+      const box = document.createElement("div");
+      document.body.appendChild(box);
+      box.innerHTML = html;
+      for (const old of box.querySelectorAll("script")) {
+        const s = document.createElement("script");
+        s.text = old.textContent;
+        document.head.appendChild(s).remove();
+      }
+      await new Promise((r) => requestAnimationFrame(r));
+      const host = document.getElementById("masque-headcopy");
+      return [...host.querySelectorAll("*")].some((el) => el.shadowRoot?.querySelector(".surface"));
+    });
+    if (!headMounted) throw new Error("@example widget: a script run from <head> did not mount its host");
+    console.log("E2E OK [docs @example] — a script run from <head>, as in the classic Jupyter Notebook, mounts its host");
+
+    // With scripts off, the same page shows each widget's plain figure.
+    const noJs = await browser.newContext({ javaScriptEnabled: false });
+    const page3 = await noJs.newPage();
+    await page3.goto(`http://127.0.0.1:${server.address().port}${p}`, { waitUntil: "load" });
+    const widths = await page3.evaluate(() => [...document.querySelectorAll(".ip-host img")].map((i) => i.naturalWidth));
+    await noJs.close();
+    if (widths.length !== 2 || !widths.every((w) => w > 0)) throw new Error(`@example widgets with scripts off: image widths ${JSON.stringify(widths)}`);
+    console.log("E2E OK [docs @example] — with scripts off, both widgets show their figure");
   }
 
   // Pluto's frontend unreachable: the iframe never draws a cell, so the page hides it and
