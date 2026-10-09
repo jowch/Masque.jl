@@ -30,6 +30,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         d = PointInteractable(ax, pts; payloads = [Dict(:name => "a"), Dict("name" => "b", "x" => 0)]).payloads
         @test d[1] == Dict{Symbol, Any}(:name => "a", :x => 1.0, :y => 2.0)
         @test d[2] == Dict{String, Any}("name" => "b", "x" => 0, "y" => 4.0)
+        # The payload's own dict type is kept (an `OrderedDict` keeps its order).
+        @test PointInteractable(ax, pts[1:1]; payloads = [IdDict{Symbol, Any}(:name => "a")]).payloads[1] isa IdDict{Symbol, Any}
         # Mixed keys: nothing to merge onto safely, so it replaces.
         mixed = Dict{Any, Any}(:a => 1, "b" => 2)
         @test PointInteractable(ax, pts[1:1]; payloads = [mixed]).payloads[1] === mixed

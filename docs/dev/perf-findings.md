@@ -171,13 +171,15 @@ A `:view` layer is one viewport bbox plus a mode and two angles, the same order 
 
 Shipping a tooltip string per element would grow the manifest by the sum of those strings:
 1 000 elements × 200 B is +196 KB (73 → 269 KB), and 50 000 × 200 B is a **13.17 MB** manifest
-that takes ~1.5–2.2 s to render (STRESS D). Both benches build the scatter twice (`masque(fig)`'s
-own layer plus the passed one), so half the elements carry the payload. Since #308 (2026-10-09)
-a key-value payload is merged onto the point's own `x` and `y`, which adds ~21 B per element:
-section B's rows each grew by 21.5 KB per 1 000 points (51.6 → 73.1 KB at length 0) and STRESS D
-by 1.04 MB (12.13 → 13.17 MB), measured against `main` at `0e764bb` on the same machine. So per-element strings are not shipped. A layer with
+that takes ~1.5–2.2 s to render (STRESS D). So per-element strings are not shipped. A layer with
 a tooltip carries a `template` (a small segment array evaluated on hover) and the manifest one
 `tipStyle` dict, both O(1) per layer; the default envelope above is unchanged by them.
+
+Both benches build the scatter twice (`masque(fig)`'s own layer plus the passed one), so half the
+elements carry the payload. Since #308 (2026-10-09) a key-value payload is merged onto the
+point's own `x` and `y`, which adds ~21 B per element: section B's rows each grew by 21.5 KB per
+1 000 points (51.6 → 73.1 KB at length 0) and STRESS D by 1.04 MB (12.13 → 13.17 MB), measured
+against `main` at `0e764bb` on the same machine.
 
 ### Render latency
 

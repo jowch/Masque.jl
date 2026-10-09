@@ -274,7 +274,7 @@ function _merge_payload(d::NamedTuple, p::AbstractDict)
     K = keytype(p)
     key = K === Symbol ? identity : K === String ? string : nothing
     key === nothing && return p
-    out = Dict{K, Any}(p)
+    out = merge!(empty(p, K, Any), p)   # keeps an `OrderedDict`'s type and order
     for (k, v) in pairs(_default_fields(d))
         get!(out, key(k), v)
     end
@@ -351,8 +351,9 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
   `(; index, x, y, z)` for 3-coordinate points — `index` is 1-based. A named-tuple, row, or
   `Dict` payload is merged onto the default: `(; name = "a")` gives `(; name, x, y)`, and a
   field the payload names itself (its own `x`) wins. `index` isn't added, since the event
-  carries it as `ev.index`. Any other payload (a bare string) replaces the default. Every
-  plot-object constructor merges the same way onto its own default payload.
+  carries it as `ev.index`. A `Dict` merges when it is keyed by `Symbol` or `String`; any other
+  payload (a bare string) replaces the default. Every plot-object constructor merges the same
+  way onto its own default payload.
 - `radius` — highlight and click-target radius in px (scaled to the rendered image's DPI): a
   number for every point, or a vector with one per point. Default `nothing`: use the drawn
   radius of the one `Scatter` on `ax` with these positions (see below), per point when its
