@@ -51,7 +51,7 @@ function armPan(ctx: OverlayCtx, state: OverlayState, e: PointerEvent, viewId: s
 
 // An Axis3 pan's limits are where the next zoom or pan starts (#321).
 function rememberSlide(state: OverlayState, d: Extract<Drag, { kind: "view" }>, input: Record<string, unknown>): void {
-    if (d.slide_ && Array.isArray(input.limits)) viewDrag.rememberView3(state, d.id_, d.g_, input.limits as Limits3)
+    if (d.base_ && Array.isArray(input.limits)) viewDrag.rememberView3(state, d.id_, d.base_, input.limits as Limits3)
 }
 
 function viewNeedsSettle(d: Extract<Drag, { kind: "view" }>): boolean {
@@ -190,7 +190,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         if (viewLayer) {
             const g = viewLayer.geometry as ViewGeometry
             // On an Axis3, Shift+drag pans the limits instead of orbiting (#321).
-            const base = g.mode === "orbit" ? viewDrag.view3Base(state, viewLayer.id, g) ?? undefined : undefined
+            const base = g.mode === "orbit" && g.limits ? viewDrag.view3Base(state, viewLayer.id, g.limits) : undefined
             state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], layout.x, layout.y, e.pointerId, true, base)
             if (g.mode === "pan") armPan(ctx, state, e, viewLayer.id)
             hideCross(ctx, state)

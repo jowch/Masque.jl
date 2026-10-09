@@ -29,22 +29,21 @@ export function limits3Tip(l: Limits3, digits: number): string {
     return `x:[${fmt(l[0], digits)}, ${fmt(l[1], digits)}] y:[${fmt(l[2], digits)}, ${fmt(l[3], digits)}] z:[${fmt(l[4], digits)}, ${fmt(l[5], digits)}]`
 }
 
-// The Axis3 limits the next zoom or pan starts from: the last ones asked for, or the frame's own.
-export function view3Base(state: OverlayState, id: string, g: ViewGeometry): Limits3 | null {
-    return state.view3_.get(id)?.limits ?? g.limits ?? null
+// The Axis3 limits the next zoom or pan starts from: the last ones asked for, else `shown`, the
+// limits of the frame on screen. A frame's limits can trail the requests still in flight.
+export function view3Base(state: OverlayState, id: string, shown: Limits3): Limits3 {
+    return state.view3_.get(id)?.limits ?? shown
 }
 
-export function rememberView3(state: OverlayState, id: string, g: ViewGeometry, limits: Limits3): void {
-    const home = state.view3_.get(id)?.home ?? g.limits ?? limits
-    state.view3_.set(id, { limits, home })
+// The first remembered limits' `shown` frame is the home the zoom is bounded around.
+export function rememberView3(state: OverlayState, id: string, shown: Limits3, limits: Limits3): void {
+    state.view3_.set(id, { limits, home: state.view3_.get(id)?.home ?? shown })
 }
 
-// One Axis3 zoom step from the remembered limits; null when the frame carries no limits.
-export function zoom3(state: OverlayState, id: string, g: ViewGeometry, k: number): Limits3 | null {
-    const base = view3Base(state, id, g)
-    if (!base) return null
-    const next = zoomLimits3(base, k, state.view3_.get(id)?.home ?? g.limits)
-    rememberView3(state, id, g, next)
+// One Axis3 zoom step from the remembered limits.
+export function zoom3(state: OverlayState, id: string, shown: Limits3, k: number): Limits3 {
+    const next = zoomLimits3(view3Base(state, id, shown), k, state.view3_.get(id)?.home ?? shown)
+    rememberView3(state, id, shown, next)
     return next
 }
 

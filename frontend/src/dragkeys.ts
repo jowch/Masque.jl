@@ -235,16 +235,15 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
             if (g.mode === "orbit") {
                 // Axis3 zoom and Shift+arrow pan move the limits (#321), from the last ones asked for.
                 if (zoom !== 0 || e.shiftKey) {
-                    if (!g.limits) return true // consume so the page stays put
-                    let lim: Limits3 | null
+                    const shown = g.limits
+                    if (!shown) return true // consume so the page stays put
+                    let lim: Limits3
                     if (zoom !== 0) {
-                        lim = viewDrag.zoom3(state, id, g, wheelScale(-zoom * ZOOM_NOTCH, 0))
+                        lim = viewDrag.zoom3(state, id, shown, wheelScale(-zoom * ZOOM_NOTCH, 0))
                     } else {
-                        const base = viewDrag.view3Base(state, id, g)
-                        lim = base ? panLimits3(g, base, -dx * VIEW_STEP * g.w, -dy * VIEW_STEP * g.h) : null
-                        if (lim) viewDrag.rememberView3(state, id, g, lim)
+                        lim = panLimits3(g, viewDrag.view3Base(state, id, shown), -dx * VIEW_STEP * g.w, -dy * VIEW_STEP * g.h)
+                        viewDrag.rememberView3(state, id, shown, lim)
                     }
-                    if (!lim) return true
                     const input = { id, limits: lim, settle: false }
                     state.keyView_ = true
                     ctx.gesture_.request(input)

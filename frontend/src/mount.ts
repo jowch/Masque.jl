@@ -16,7 +16,7 @@ import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, MOTION_MS } from "./state"
 import type { HiGroups, OverlayCtx } from "./state"
-import type { Hit, Manifest, ViewGeometry } from "./types"
+import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
 import { matrixLimits } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
@@ -928,7 +928,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
         let id = ""
         let axis = ""
-        let orbit: ViewGeometry | null = null
+        let limits3: Limits3 | null = null // an Axis3 view's limits, on screen now
         for (const layer of ctx.manifest_.layers) {
             if (layer.kind !== "view" || !layer.events.includes("drag")) continue
             const g = layer.geometry as ViewGeometry
@@ -936,7 +936,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             if (g.mode === "orbit") {
                 if (!g.limits) continue
                 id = layer.id
-                orbit = g
+                limits3 = g.limits
                 break
             }
             if (!ctx.manifest_.transforms[layer.axis]) continue
@@ -946,11 +946,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         if (!id) return
         e.preventDefault()
-        if (orbit) {
+        if (limits3) {
+            const shown = limits3
             // Axis3 (#321): no photograph to scale. Each notch asks for limits scaled about
             // their center; the idle timer settles the last ones at full resolution.
-            const lim = viewDrag.zoom3(state, id, orbit, wheelScale(e.deltaY, e.deltaMode))
-            if (!lim) return
+            const lim = viewDrag.zoom3(state, id, shown, wheelScale(e.deltaY, e.deltaMode))
             ctx.gesture_.request({ id, limits: lim, settle: false })
             setTipText(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_))
             setTipVisible(ctx, true)
@@ -958,12 +958,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             placeTip(ctx, state, tp.x, tp.y)
             if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
             const wheelId = id
-            const g3 = orbit
             state.wheelTimer_ = setTimeout(() => {
                 state.wheelTimer_ = null
                 hideTip(ctx, state)
-                const settled = viewDrag.view3Base(state, wheelId, g3)
-                if (settled) ctx.gesture_.settle({ id: wheelId, limits: settled, settle: true })
+                ctx.gesture_.settle({ id: wheelId, limits: viewDrag.view3Base(state, wheelId, shown), settle: true })
             }, WHEEL_IDLE_MS)
             return
         }

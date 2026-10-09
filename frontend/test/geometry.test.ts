@@ -692,6 +692,9 @@ describe("view pan / orbit math", () => {
         expect(p[0]).toBeCloseTo(2)
         expect(p[1]).toBeCloseTo(7)
         expect(panLimits3({ ...g, panx: undefined }, g.limits, 100, 0)).toEqual(g.limits)
+        // A basis measured at flat limits does not rescale.
+        const flat = { ...g, limits: [0, 10, 0, 10, 5, 5] as [number, number, number, number, number, number] }
+        expect(panLimits3(flat, g.limits, 0, 50)[4]).toBeCloseTo(1)
         // A non-finite basis step leaves that axis where it was.
         expect(panLimits3({ ...g, pany: [0, 0, NaN] }, g.limits, 0, 50)).toEqual(g.limits)
     })
