@@ -692,6 +692,8 @@ describe("view pan / orbit math", () => {
         expect(p[0]).toBeCloseTo(2)
         expect(p[1]).toBeCloseTo(7)
         expect(panLimits3({ ...g, panx: undefined }, g.limits, 100, 0)).toEqual(g.limits)
+        // A non-finite basis step leaves that axis where it was.
+        expect(panLimits3({ ...g, pany: [0, 0, NaN] }, g.limits, 0, 50)).toEqual(g.limits)
     })
     it("orbitAngles defaults azimuth/elevation to 0 when the geometry omits them", () => {
         const g = { x: 0, y: 0, w: 1000, h: 500, mode: "orbit" as const }

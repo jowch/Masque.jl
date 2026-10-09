@@ -3977,6 +3977,54 @@ describe("photographic pan / wheel zoom", () => {
         }
     })
 
+    it("an Axis3 frame stamps its limits; a cancelled Shift+drag settles the panned limits", async () => {
+        vi.useFakeTimers()
+        try {
+            const m = viewManifest("orbit")
+            const g0 = { x: 0, y: 0, w: 1200, h: 800, mode: "orbit" as const, azimuth: 0.4, elevation: 0.5,
+                limits: [0, 10, 0, 10, 0, 10] as [number, number, number, number, number, number],
+                panx: [0.01, 0, 0] as [number, number, number], pany: [0, 0, -0.01] as [number, number, number] }
+            m.layers[0].geometry = g0
+            const landed: Manifest = { ...m, layers: [{ ...m.layers[0], geometry: { ...g0, limits: [2, 8, 2, 8, 2, 8] } }] }
+            // A WebGL base applies a frame without waiting on an image load.
+            const host = document.createElement("div")
+            const canvas = document.createElement("canvas") as HTMLCanvasElement & { masqueReplaceScene?: () => void }
+            canvas.getBoundingClientRect = () =>
+                ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+            canvas.masqueReplaceScene = vi.fn()
+            const script = document.createElement("script")
+            host.append(canvas, script)
+            document.body.append(host)
+            const requestFrame = vi.fn(async (_input: Record<string, unknown>) =>
+                ({ scene: { tag: "z" }, pxPerUnit: 1, width: 400, height: 300, manifest: landed }))
+            mount(script, m, undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            wheelAt(surface, -120)
+            await vi.advanceTimersByTimeAsync(200)
+            const stamp = JSON.parse(host.dataset.masqueGestureFrame!)
+            expect(stamp.limits).toEqual([2, 8, 2, 8, 2, 8])
+            expect(stamp.azimuth).toBe(0.4)
+
+            requestFrame.mockClear()
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 100, bubbles: true, shiftKey: true }))
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 150, clientY: 100, bubbles: true, shiftKey: true }))
+            surface.dispatchEvent(new PointerEvent("pointercancel", { clientX: 150, clientY: 100, bubbles: true }))
+            await vi.advanceTimersByTimeAsync(10)
+            const last = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]
+            expect(last).toMatchObject({ id: "view", settle: true })
+            expect(Array.isArray(last.limits)).toBe(true)
+            // The next notch starts from the cancelled pan's limits, not the landed frame's.
+            requestFrame.mockClear()
+            wheelAt(surface, 120)
+            await vi.advanceTimersByTimeAsync(200)
+            const next = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0].limits as number[]
+            const panned = last.limits as number[]
+            expect((next[0] + next[1]) / 2).toBeCloseTo((panned[0] + panned[1]) / 2)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it("a second notch inside 150ms settles once", async () => {
         vi.useFakeTimers()
         try {
