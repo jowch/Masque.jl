@@ -59,13 +59,14 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test d["--masque-tip-radius"] == "6px"
         @test d["--masque-tip-font"] == "serif"
         @test d["--masque-tip-caret"] == "none"
-        @test Masque.tip_style_dict((; bg = "#abc"))["--masque-tip-bg"] == "#abc"  # CSS string passthrough
+        @test Masque.tip_style_dict((; bg = "#abc"))["--masque-tip-bg"] == "rgb(170,187,204)"  # string → checked CSS
         @test !haskey(Masque.tip_style_dict((; bg = :red)), "--masque-tip-color")  # unset omitted
         @test_throws "unknown key `backround`" Masque.tip_style_dict((; backround = :red))
         @test_throws "Valid keys: bg, color, accent, font, font_size, radius, caret" Masque.tip_style_dict((; x = 1))
         @test_throws "`radius` must be a size" Masque.tip_style_dict((; radius = -1))
         @test_throws "`caret` must be" Masque.tip_style_dict((; caret = :no))
-        @test_throws "`bg` must be a CSS string or a Makie color" Masque.tip_style_dict((; bg = 5))
+        @test_throws "`bg` must be a color name, a hex code" Masque.tip_style_dict((; bg = 5))
+        @test_throws "`accent` must be a color name, a hex code" Masque.tip_style_dict((; accent = "steelbleu"))
         @test_throws "`color` must be" Masque.tip_style_dict((; color = :notacolour))
         @test_throws "must be a NamedTuple" Masque.tip_style_dict(Dict(:bg => :red))
     end
@@ -94,7 +95,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test d["--masque-chrome"] == "rgb(255,0,0)"                           # Makie color → CSS
         @test d["--masque-hover-width"] == "3px"                               # length → px
         @test d["--masque-ring-halo-opacity"] == "0.5"
-        @test d["--masque-handle-fill"] == "#000"                              # CSS string passthrough
+        @test d["--masque-handle-fill"] == "rgb(0,0,0)"                        # string → checked CSS
         @test length(d) == 4                                                   # unset keys omitted
         # Every key maps to its own --masque-* property.
         props = [first(v) for v in values(Masque._OVERLAY_STYLE_KEYS)]
@@ -104,6 +105,25 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws "opacity from 0 to 1" Masque.overlay_style_dict((; cross_opacity = 2))
         @test_throws ArgumentError Masque.overlay_style_dict((; hover_width = true))
         @test_throws "NamedTuple" Masque.overlay_style_dict(Dict(:hover_width => 3))
+
+        # A colour string must parse (#342): a typo raises instead of the browser dropping it.
+        color_of(v) = Masque.overlay_style_dict((; color = v))["--masque-chrome"]
+        @test color_of("steelblue") == "rgb(70,130,180)"
+        @test color_of("#ff000080") == "rgba(255,0,0,0.502)"
+        @test color_of("rgb(0, 128, 255)") == "rgb(0,128,255)"
+        @test color_of("hsl(120, 100%, 25%)") == "rgb(0,128,0)"
+        @test color_of("transparent") == "rgba(0,0,0,0.0)"
+        @test color_of("0xff0000") == "rgb(255,0,0)"          # Colors.jl-only forms are sent as CSS
+        @test color_of("var(--my-accent)") == "var(--my-accent)"   # the one CSS-only form let through
+        @test color_of(" var(--a, #fff) ") == "var(--a, #fff)"
+        @test_throws "overlaystyle: `color` must be a color name, a hex code" color_of("steelbleu")
+        @test_throws "got \"steelbleu\"" color_of("steelbleu")
+        @test_throws "`cross_color` must be" Masque.overlay_style_dict((; cross_color = "currentColor"))
+        @test_throws "`dodge_fill` must be" Masque.overlay_style_dict((; dodge_fill = "oklch(0.7 0.1 200)"))
+        @test_throws "`handle_fill` must be" Masque.overlay_style_dict((; handle_fill = :notacolour))
+        @test_throws "`color` must be" color_of("")
+        @test_throws "got 2" color_of(2)                          # a number isn't a grey level
+        @test_throws "got 0.5" color_of(0.5)
 
         tfig = Figure(size = (600, 400)); tax = Axis(tfig[1, 1])
         scatter!(tax, [1.0, 2.0], [1.0, 2.0])
