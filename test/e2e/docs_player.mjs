@@ -380,8 +380,14 @@ try {
 
   // Grab the resting box and drag it by each offset with the real pointer; each release
   // must key a recording. `describe` names what the release committed, for messages.
+  // What the lookup keys on (points, or a grid window), not the raw value: two boxes pressed
+  // against the same edge commit different bounds but the same window.
+  const itemsKey = (items) => items.map((it) => `${it.layer}:${it.index}` + (it.payload ? `@${it.payload.i0}-${it.payload.i1}/${it.payload.j0}-${it.payload.j1}` : "")).join(",");
   const dragChecks = async (pl, embed, moves, describe) => {
-    let prevKey = "";
+    // A selecting box starts at what it holds (#330), so the page already shows that value: a
+    // release with the same points leaves it as it is.
+    let prevKey = await pl.frame.evaluate(() => document.querySelector(".ip-host").value?.items ?? null)
+      .then((items) => (items ? itemsKey(items) : ""));
     const boxCentre = () => pl.frame.evaluate(() => {
       const host = document.querySelector(".ip-host");
       let sr = null; host.querySelectorAll("*").forEach((n) => { if (n.shadowRoot) sr = n.shadowRoot; });
@@ -417,9 +423,7 @@ try {
       const items = await pl.frame.evaluate(() => { const v = document.querySelector(".ip-host").value; return v && v.items ? v.items : null; });
       if (items === null) throw new Error(`${embed}: a drag did not commit an items value`);
       const what = describe(items);
-      // Compare what the lookup keys on (points, or a grid window), not the raw value: two
-      // boxes pressed against the same edge commit different bounds but the same window.
-      const v = items.map((it) => `${it.layer}:${it.index}` + (it.payload ? `@${it.payload.i0}-${it.payload.i1}/${it.payload.j0}-${it.payload.j1}` : "")).join(",");
+      const v = itemsKey(items);
       // The same release as the last drag leaves the page as it was; a miss still fails.
       if (v !== prevKey) await pl.swapped(before, what);
       else await sleep(500);

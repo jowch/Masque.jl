@@ -65,7 +65,7 @@ This cell responds when you release the box.
 """
 
 # ╔═╡ a1410008-0001-4000-8000-000000000004
-if isnothing(region) || isempty(R[region])
+if isempty(R[region])
     "Drag the box over the image."
 else
     q(A) = round(median(A[region]); digits = 3)
