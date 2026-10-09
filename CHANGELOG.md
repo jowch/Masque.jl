@@ -14,6 +14,11 @@ All notable changes to this project are documented here. The format is based on
   screen pixels, and a `wireframe!` over the same grid is left as decoration. While you
   orbit, the surface's highlight hides and comes back on release. `SurfaceInteractable`
   builds one by hand (#259).
+- `text!` on an `Axis3` responds to hover and click, so a label can be picked like the point
+  it names. Where labels overlap, the one drawn on top answers: the nearest with
+  `backend = :webgl`, and the one listed last with CairoMakie, which draws labels in order. A
+  label outside the axis limits isn't drawn and doesn't respond. Its default payload adds the
+  anchor's `z` (#292).
 - `masque(fig; tooltipstyle = (; bg = :black, color = :white, radius = 6))` sets the tooltip
   card's look in one keyword, like `overlaystyle` does for the overlay. Its keys are `bg`,
   `color`, `accent`, `font`, `font_size`, `radius`, and `caret`; an unknown key, or a value
@@ -60,9 +65,8 @@ All notable changes to this project are documented here. The format is based on
   threshold at a `ThresholdEvent` at `value`, and a box without `selects` at a `BoundsEvent`
   at `bounds`. `level.value` works from the first run, and code that falls back with
   `isnothing(level) ? 0.5 : level.value` still gets the same number. Code that tests
-  `isnothing(level)` to mean "not dragged yet" no longer sees `nothing`. A selecting box
-  and a colorbar still start at `nothing`, since they have no value before the first release
-  or click (#309).
+  `isnothing(level)` to mean "not dragged yet" no longer sees `nothing`. A colorbar still
+  starts at `nothing`, since it has no value before the first click (#309).
 - **Breaking:** two of these controls in one widget raise an error naming both, since each
   would overwrite the other's value. That includes several boxes that select from the same
   layer, which the Brush a region page used to allow; the last box released replaced the
@@ -75,6 +79,13 @@ All notable changes to this project are documented here. The format is based on
   edge count. A `payloads` vector of the old length, or a `selected` index past the new
   count, raises an `ArgumentError`. An in-range `selected` index, or a saved `pick.index`,
   silently points at a different edge, so check those by hand (#316).
+- **Breaking:** a box with `selects` starts at what its `bounds` contain, highlighted, instead
+  of `nothing`: a `Vector{ElementEvent}` of the points inside, or a `GridWindowEvent` for the
+  cells under it. Code that checks `isnothing(picks) || isempty(picks)` still
+  runs, but on the first run it now shows the points inside `bounds` instead of its empty case.
+  Code that tests `isnothing(picks)` to mean "not released yet" no longer sees `nothing`.
+  `selected=` on the target still sets the starting value instead, and `selected=` on another
+  layer now only highlights there, where it used to replace the box's value (#330).
 
 ### Deprecated
 - The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,

@@ -772,19 +772,19 @@ end
             for k in 1:2
                 a = Axis3(f[1, k])
                 scatter!(a, [1.0], [1.0], [1.0])
-                text!(a, Point3f(1, 1, 1); text = "residue $k")
+                heatmap!(a, [1.0 2.0; 3.0 4.0])
             end
             Makie.update_state_before_display!(f)
-            once = r"^masque: skipping 2 plots[^\n]*\n  - 2 × text on Axis3 — [^\n]*$"
+            once = r"^masque: skipping 2 plots[^\n]*\n  - 2 × heatmap on Axis3 — [^\n]*$"
             # Exactly one warning per call, and again on the next call (a re-run cell).
             @test_logs (:warn, once) masque(f)
             w = @test_logs (:warn, once) masque(f)
             @test [L["id"] for L in w.manifest["layers"]] == ["scatter", "scatter_2"]
             @test_logs (:warn, once) interactables(f)
             # A single skipped plot keeps the one-line form.
-            g = Figure(); b = Axis3(g[1, 1]); text!(b, Point3f(1, 1, 1); text = "x")
+            g = Figure(); b = Axis3(g[1, 1]); heatmap!(b, [1.0 2.0; 3.0 4.0])
             Makie.update_state_before_display!(g)
-            @test_logs (:warn, r"^masque: skipping text on Axis3 — only") (:warn, r"no introspectable") masque(g)
+            @test_logs (:warn, r"^masque: skipping heatmap on Axis3 — only") (:warn, r"no introspectable") masque(g)
         end
         @testset "marker_offset moves the hit circle by that many px" begin
             f = Figure(size = (500, 350)); a = Axis(f[1, 1]; limits = (0, 6, 0, 6))

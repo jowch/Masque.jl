@@ -34,9 +34,10 @@ owns_bond(::ROIInteractable) = true
 owns_bond(i::ColorbarInteractable) = !i.auto
 
 # The wire envelope an owner's bond starts at, as the browser would send it on release, or
-# `nothing` when the owner has no value before its first commit.
-initial_envelope(::AbstractInteractable, ctx) = nothing
-function initial_envelope(i::ThresholdInteractable, ctx)
+# `nothing` when the owner has no value before its first commit. `layers` are the manifest's
+# layer dicts, whose image-px geometry a selecting box tests its target against.
+initial_envelope(::AbstractInteractable, ctx, layers) = nothing
+function initial_envelope(i::ThresholdInteractable, ctx, layers)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     cats = i.orientation === :horizontal ? t.ycats : t.xcats
     k = cats === nothing || !isinteger(i.value) ? 0 : Int(i.value)
@@ -44,11 +45,55 @@ function initial_envelope(i::ThresholdInteractable, ctx)
     payload = 1 <= k <= length(something(cats, ())) ? cats[k] : i.value
     return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
 end
-function initial_envelope(i::ROIInteractable, ctx)
-    i.selects === nothing || return nothing
+function initial_envelope(i::ROIInteractable, ctx, layers)
     xmin, xmax, ymin, ymax = i.bounds
-    payload = Dict{String, Any}("xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax)
-    return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
+    if i.selects === nothing
+        payload = Dict{String, Any}("xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax)
+        return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
+    end
+    # A box over marks starts from its target's `selected` (`_seed_contained!`), not here.
+    target = only(l for l in layers if l["id"] == string(i.selects))
+    target["kind"] == "grid" || return nothing
+    box = only(l for l in layers if l["id"] == string(i.id))["geometry"]
+    cells = _contained_cells(box, target["geometry"])
+    cells === nothing && return Dict{String, Any}("items" => Dict{String, Any}[])
+    ci, cj = cells
+    # The data bounds the box was given, where the browser inverts its pixel corners.
+    payload = Dict{String, Any}(
+        "i0" => ci[1], "i1" => ci[2], "j0" => cj[1], "j1" => cj[2],
+        "xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax,
+    )
+    return Dict{String, Any}("items" => [Dict{String, Any}("layer" => target["id"], "index" => 0, "payload" => payload)])
+end
+
+# What a box at image-px `box` holds: the 0-based indices of the circles whose centres it
+# contains, or the grid cells it overlaps (`nothing` if none). The same comparisons as
+# `computeSelection` in frontend/src/selection.ts, on the same manifest numbers, so the starting
+# value and a release at the starting bounds agree.
+_box_span(box) = (Float64(box["x"]), Float64(box["x"]) + Float64(box["w"]), Float64(box["y"]), Float64(box["y"]) + Float64(box["h"]))
+function _contained_indices(box, a)
+    xlo, xhi, ylo, yhi = _box_span(box)
+    return Int[
+        k for k in 0:(length(a) ÷ 3 - 1)
+            if xlo <= Float64(a[3k + 1]) <= xhi && ylo <= Float64(a[3k + 2]) <= yhi
+    ]
+end
+function _contained_cells(box, g)
+    xlo, xhi, ylo, yhi = _box_span(box)
+    ci = _cell_range(g["xedges"], xlo, xhi)
+    cj = _cell_range(g["yedges"], ylo, yhi)
+    return ci === nothing || cj === nothing ? nothing : (ci, cj)
+end
+
+# `cellRange` in selection.ts: the 0-based, inclusive cells a pixel span `[lo, hi]` overlaps
+# on monotonic `edges`, or `nothing`. `_find_bin` is geometry.ts's `findBin`.
+function _cell_range(edges, lo, hi)
+    e1 = Float64(first(edges)); en = Float64(last(edges))
+    clo = max(lo, min(e1, en)); chi = min(hi, max(e1, en))
+    chi < clo && return nothing
+    a = _find_bin(edges, clo); b = _find_bin(edges, chi)
+    (a < 0 || b < 0) && return nothing
+    return (min(a, b), max(a, b))
 end
 
 """
@@ -445,8 +490,8 @@ end
     mount_envelope(manifest) -> Union{Nothing, Dict}
 
 The wire envelope `mount.ts` seeds into `host.value` at mount, so Julia `initial_value` and the
-browser agree. A `selects` elements call seeds `{items}` (possibly empty when `hydrate` is set).
-Otherwise a widget whose bond has an owner seeds the owner's `initial` envelope (absent means
+browser agree. A `selects` elements call seeds `{items}` from its target's `selected` indices
+(possibly none); `selected` on any other layer only highlights. Otherwise a widget whose bond has an owner seeds the owner's `initial` envelope (absent means
 `nothing`), and its hydrated indices are highlight-only. A single hydrated index on a scalar
 layer seeds `{layer, index}`. Multiple indices on a scalar layer are highlight-only (`nothing`).
 """
@@ -459,9 +504,9 @@ function mount_envelope(manifest::AbstractDict)
             push!(hydrated, Dict{String, Any}("layer" => d["id"], "index" => Int(idx)))
         end
     end
-    sel = get(manifest, "selection", nothing)
-    if sel == "elements" && (!isempty(hydrated) || get(manifest, "hydrate", nothing) == "items")
-        return Dict{String, Any}("items" => hydrated)
+    if get(manifest, "selection", nothing) == "elements"
+        target = manifest["selectionTarget"]
+        return Dict{String, Any}("items" => filter(h -> h["layer"] == target, hydrated))
     end
     haskey(manifest, "bondOwner") && return get(manifest, "initial", nothing)
     length(hydrated) == 1 && return only(hydrated)

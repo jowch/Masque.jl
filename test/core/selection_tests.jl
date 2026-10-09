@@ -242,7 +242,6 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test [e.payload for e in two] == ["p1", "p8"]
         empty = iv(Int[])
         @test empty isa Vector{ElementEvent} && isempty(empty)
-        @test masque(fig, [pi, roi]; selected = Int[], auto = false).manifest["hydrate"] == "items"
     end
 
     @testset "transform_value reconstructs the payload from the manifest, not the wire" begin
@@ -331,7 +330,14 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test w.manifest["selection"] == "grid" && w.manifest["selectionTarget"] == "img"
         img = only(filter(l -> l["id"] == "img", w.manifest["layers"]))
         @test img["events"] == ["hover"]
-        @test IP.APD.Bonds.initial_value(w) === nothing
+        # The bond starts at the cells the starting bounds overlap, as a release there would (#330).
+        start = IP.APD.Bonds.initial_value(w)
+        @test start isa GridWindowEvent && start.layer === :img
+        @test (start.xmin, start.xmax, start.ymin, start.ymax) == (1.0, 3.0, 1.0, 2.0)
+        # Columns 2:3 exactly. The rows take 1:3: the cell edges are whole pixels, and the box's
+        # data edges land a fraction of a pixel past them into rows 1 and 3, as a release does.
+        @test (start.i1, start.i2, start.j1, start.j2) == (2, 3, 1, 3)
+        @test start == tv(w, w.manifest["initial"])
 
         # A cell envelope can still reach Julia from a stale bundle or a hand-set bond. It fails
         # with a message that names the box, not `GridCellEvent has no field i1` downstream.
@@ -370,7 +376,10 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         ev_of(id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))["events"]
         @test ev_of("pts") == ["hover"]
         @test ev_of("other") == ["hover"]
-        @test w.manifest["bondOwner"] == "box" && !haskey(w.manifest, "initial")
+        @test w.manifest["bondOwner"] == "box"
+        # The bond starts at the points inside the starting bounds (#330).
+        start = IP.APD.Bonds.initial_value(w)
+        @test start isa Vector{ElementEvent} && [e.payload for e in start] == ["b", "c"]
 
         err = try
             tv(w, Dict("layer" => "pts", "index" => 1))
@@ -385,6 +394,41 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test got isa Vector{ElementEvent} && [e.payload for e in got] == ["b", "c"]
         seeded = IP.APD.Bonds.initial_value(masque(pfig, [pi, roi]; selected = 2, auto = false))
         @test seeded isa Vector{ElementEvent} && only(seeded).payload == "b"
+    end
+    @testset "a selecting box starts at the marks inside its starting bounds (#330)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (8.0, 8.0)]
+        scatter!(ax, first.(pts), last.(pts))
+        pi = PointInteractable(ax, pts; id = :pts, payloads = ["a", "b", "c", "d"])
+        iv = IP.APD.Bonds.initial_value
+        box(b) = ROIInteractable(ax; bounds = b, selects = :pts, id = :box)
+
+        # The start ships as the target's `selected` indices, one array, not a list of items.
+        w = masque(fig, [pi, box((1.5, 3.5, 1.5, 3.5))]; auto = false)
+        @test only(filter(l -> l["id"] == "pts", w.manifest["layers"]))["selected"] == [1, 2]
+        @test !haskey(w.manifest, "initial")
+        env = IP.mount_envelope(w.manifest)
+        @test env == Dict("items" => [Dict("layer" => "pts", "index" => 1), Dict("layer" => "pts", "index" => 2)])
+        @test [e.payload for e in iv(w)] == ["b", "c"]
+        # The same value a release of the untouched box would send.
+        @test iv(w) == IP.APD.Bonds.transform_value(w, env)
+
+        # A box over no marks starts empty, not at `nothing`.
+        @test iv(masque(fig, [pi, box((4.0, 6.0, 4.0, 6.0))]; auto = false)) == ElementEvent[]
+
+        # A box covering everything starts at every mark, in layer order.
+        @test [e.index for e in iv(masque(fig, [pi, box((0.5, 9.0, 0.5, 9.0))]; auto = false))] == 1:4
+
+        # `selected=` on the target still wins, including an explicit empty brush.
+        b = box((1.5, 3.5, 1.5, 3.5))
+        @test [e.payload for e in iv(masque(fig, [pi, b]; selected = 4, auto = false))] == ["d"]
+        @test iv(masque(fig, [pi, b]; selected = Int[], auto = false)) == ElementEvent[]
+
+        # `selected=` on another layer only highlights: the box still starts at its own marks.
+        other = PointInteractable(ax, [(9.0, 1.0)]; id = :other)
+        wo = masque(fig, [pi, other, b]; selected = Dict(:other => [1]), auto = false)
+        @test only(filter(l -> l["id"] == "other", wo.manifest["layers"]))["selected"] == [0]
+        @test [(e.layer, e.payload) for e in iv(wo)] == [(:pts, "b"), (:pts, "c")]
     end
 
     @testset "selects takes a plot (#302)" begin

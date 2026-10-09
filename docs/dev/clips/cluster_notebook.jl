@@ -64,7 +64,7 @@ end
 # ╔═╡ a1420001-0001-4000-8000-000000000004
 begin
     edges = range(minimum(zs), maximum(zs); length = 21)
-    inside = isnothing(picks) ? Float64[] : zs[picks]
+    inside = zs[picks]
     cmp = Figure(size = (560, 260))
     cax = Axis(
         cmp[1, 1]; xlabel = "z", ylabel = "samples",

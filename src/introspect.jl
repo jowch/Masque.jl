@@ -1391,12 +1391,12 @@ function _skip_for_axis(ax, p)
             p isa Union{
                 Makie.Scatter, Makie.Lines, Makie.LineSegments,
                 Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D, Makie.ScatterLines,
-                Makie.Surface,
+                Makie.Surface, Makie.Text,
             }
         )
         _skip_note(
             "$(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/LineSegments/MeshScatter/" *
-                "Wireframe/Arrows3D/ScatterLines/Surface have 3D-valid extraction today; other kinds " *
+                "Wireframe/Arrows3D/ScatterLines/Surface/Text have 3D-valid extraction today; other kinds " *
                 "are roadmap scope (docs/dev/roadmap.md)"
         )
         return true
@@ -1647,7 +1647,7 @@ On each axis the plot drawn last comes first. Where marks overlap, the first in 
 the pointer, so it is the mark drawn on top.
 
 On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D`/
-`ScatterLines`/`Surface` are supported, and a `Wireframe` drawn on the same grid as a `Surface`
+`ScatterLines`/`Surface`/`Text` are supported, and a `Wireframe` drawn on the same grid as a `Surface`
 there is decoration, with no layer of its own; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
 Other kinds are skipped, and one call warns once, listing the skipped plots together. A
 recipe with its own `Masque.interactables(ax, p::MyPlot)` method uses it. Any other recipe contributes each child

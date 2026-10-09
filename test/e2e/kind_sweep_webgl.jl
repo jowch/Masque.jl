@@ -286,6 +286,15 @@ HTML(
         "<span id=\"coords_surface3d\" style=\"display:none\">$(JSON3.write(sweep.surface3d.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000125
+@bind ev_text3d sweep.text3d
+
+# ╔═╡ d1000000-0000-0000-0000-000000000126
+HTML(
+    "<span id=\"out_text3d\">TEXT3D=$(repr(ev_text3d))</span>" *
+        "<span id=\"coords_text3d\" style=\"display:none\">$(JSON3.write(sweep.text3d.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-00000000010b
 @bind ev_text sweep.text
 
@@ -448,6 +457,15 @@ HTML(
 HTML(
     "<span id=\"out_roi\">ROI=$(repr(ev_roi))</span>" *
         "<span id=\"coords_roi\" style=\"display:none\">$(JSON3.write(sweep.roi.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-0000000000c0
+@bind ev_roi_grid sweep.roi_grid
+
+# ╔═╡ d1000000-0000-0000-0000-0000000000c1
+HTML(
+    "<span id=\"out_roi_grid\">ROI_GRID=$(repr(ev_roi_grid))</span>" *
+        "<span id=\"coords_roi_grid\" style=\"display:none\">$(JSON3.write(sweep.roi_grid.manifest["layers"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000034
@@ -619,6 +637,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000010a
 # ╠═d1000000-0000-0000-0000-000000000123
 # ╠═d1000000-0000-0000-0000-000000000124
+# ╠═d1000000-0000-0000-0000-000000000125
+# ╠═d1000000-0000-0000-0000-000000000126
 # ╠═d1000000-0000-0000-0000-00000000010b
 # ╠═d1000000-0000-0000-0000-00000000010c
 # ╠═d1000000-0000-0000-0000-00000000010d
@@ -655,6 +675,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000065
 # ╠═d1000000-0000-0000-0000-000000000032
 # ╠═d1000000-0000-0000-0000-000000000033
+# ╠═d1000000-0000-0000-0000-0000000000c0
+# ╠═d1000000-0000-0000-0000-0000000000c1
 # ╠═d1000000-0000-0000-0000-000000000034
 # ╠═d1000000-0000-0000-0000-000000000035
 # ╠═d1000000-0000-0000-0000-000000000115

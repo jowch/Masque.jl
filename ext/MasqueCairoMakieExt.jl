@@ -70,7 +70,8 @@ function Masque.context(b::CairoBackend, fig, ppu, max_width)
         transforms[id] = Masque._legend_transform(id, leg, scaling, out_h)
     end
     # CairoMakie centers a marker's outline on its edge.
-    return InteractionContext(project, transforms, ids, out_w, out_h, scaling, display_scale, 0.5)
+    # It also paints text in list order with no depth test, so the last label is on top.
+    return InteractionContext(project, transforms, ids, out_w, out_h, scaling, display_scale, 0.5, false)
 end
 
 Masque.make_widget(b::CairoBackend, result::RenderResult, manifest, display_css, fig, interactables, ppu, max_width) =

@@ -76,7 +76,8 @@ the mark without changing the variable.
 ## What the `@bind` value holds
 
 A `masque` widget's `@bind` value starts as `nothing`, or at the
-starting position of a threshold or a box without `selects`. After a
+starting position of a threshold or a box. A box with `selects` starts
+at the marks inside it. After a
 click or release it is an *event*, a small struct whose fields you read
 directly. A clicked mark's event has the payload's fields, such as
 `pick.city`, along with `pick.layer`, the interactable you clicked, and
