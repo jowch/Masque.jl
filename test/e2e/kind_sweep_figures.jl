@@ -214,13 +214,17 @@ kind_sweep_meta() = [
         "orbitSuspends" => true,
     ),
     Dict(
-        # `text!` on Axis3 (#292): "front" sits between "back" and the camera, so its box
-        # overlaps back's; the nearer label must answer there although back has the lower index.
-        # Front is also drawn after back, so it is on top on Cairo as well as on WebGL.
+        # `text!` on Axis3 (#292): "front" sits between "back" and the camera, so their boxes
+        # overlap, and front is listed first. WebGL depth-tests text, so front is on top and
+        # answers; Cairo paints labels in list order, so back is on top and answers.
+        # `byBackend` entries replace the spec's own on that backend.
         "key" => "text3d", "layerId" => "text", "layerKind" => "rects",
-        "selected" => "wash", "circle" => false, "selectedIndex" => 2, "clickIndex" => 1,
-        "tip" => "front", "hoverIndex" => 1, "hoverTip" => "front", "mode" => "element",
-        "overlapsElement" => 0,
+        "selected" => "wash", "circle" => false, "selectedIndex" => 2, "clickIndex" => 0,
+        "tip" => "front", "hoverIndex" => 0, "hoverTip" => "front", "mode" => "element",
+        "overlapsElement" => 1,
+        "byBackend" => Dict(
+            "cairo" => Dict("clickIndex" => 1, "tip" => "back", "hoverIndex" => 1, "hoverTip" => "back", "overlapsElement" => 0),
+        ),
     ),
     Dict(
         # `text!` (#301): each string is one element, hit on its drawn box.
@@ -811,7 +815,7 @@ function build_kind_sweep()
         )
     end
 
-    # Two labels on one line of sight, the front one drawn last, and one on its own (#292).
+    # Two labels on one line of sight, the front one listed first, and one on its own (#292).
     text3d = let
         fig = Figure(size = (480, 320))
         ax = Axis3(
@@ -822,8 +826,8 @@ function build_kind_sweep()
         toward = Makie.Vec3f(cos(el) * cos(az), cos(el) * sin(az), sin(el))
         back = Makie.Point3f(2, 2, 2)
         text!(
-            ax, [back, back + 1.2f0 * toward, Makie.Point3f(0.5, 3.5, 0.5)];
-            text = ["back", "front", "solo"], fontsize = 22, align = (:center, :center),
+            ax, [back + 1.2f0 * toward, back, Makie.Point3f(0.5, 3.5, 0.5)];
+            text = ["front", "back", "solo"], fontsize = 22, align = (:center, :center),
         )
         masque(fig; selected = Dict(:text => [3]))
     end

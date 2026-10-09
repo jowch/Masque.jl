@@ -277,7 +277,9 @@ try {
   const usedDevEnv = await page.evaluate(() => document.querySelector("#kind_env")?.textContent?.trim());
   console.error(`MASQUE_DEV_ENV propagated to notebook worker: ${usedDevEnv === "true" ? "yes" : usedDevEnv === "false" ? "no (portable path taken)" : "unknown (#kind_env missing)"}`);
 
-  const meta = await page.evaluate(() => JSON.parse(document.querySelector("#kind_meta").textContent));
+  // A spec's `byBackend[backend]` entries replace its own on this backend.
+  const meta = (await page.evaluate(() => JSON.parse(document.querySelector("#kind_meta").textContent)))
+    .map(({ byBackend, ...s }) => ({ ...s, ...(byBackend?.[backend] ?? {}) }));
   const pageBackend = await page.evaluate(() => document.querySelector("#kind_backend")?.textContent?.trim());
   if (pageBackend && pageBackend !== backend) {
     throw new Error(`notebook backend ${pageBackend} != requested ${backend}`);
@@ -651,9 +653,9 @@ try {
       passed.push(`${key}/overlap-pixel-contested`);
     }
 
-    // Two elements of one layer claim the hovered pixel (#292, text on Axis3): the nearer one,
-    // with the higher index, must come first in the layer's front-to-back `order`, so the
-    // generic hover/click checks below prove it answers rather than the lower index.
+    // Two elements of one layer claim the hovered pixel (#292, text on Axis3): the one drawn on
+    // top must come first in the layer's `order`, so the generic hover/click checks below prove
+    // it answers.
     if (spec.overlapsElement !== undefined) {
       const order = layer.order;
       if (!Array.isArray(order)) throw new Error(`${key}: layer "${layer.id}" ships no order`);
@@ -661,7 +663,6 @@ try {
       if (front < 0 || behind < 0 || !(front < behind)) {
         throw new Error(`${key}: order ${JSON.stringify(order)} doesn't put ${spec.hoverIndex} before ${spec.overlapsElement}`);
       }
-      if (!(spec.overlapsElement < spec.hoverIndex)) throw new Error(`${key}: overlapsElement must have the lower index`);
       const hp = hitPoint(layer, spec.hoverIndex), b = hitPoint(layer, spec.overlapsElement);
       if (!(Math.abs(hp.x - b.x) < b.w / 2 && Math.abs(hp.y - b.y) < b.h / 2)) {
         throw new Error(`${key}: hover pixel ${JSON.stringify(hp)} is not inside element ${spec.overlapsElement}'s box ${JSON.stringify(b)}`);

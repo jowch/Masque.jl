@@ -63,7 +63,9 @@ data→image-px closure (so projection is not hard-wired to Makie). `transforms`
 serialized to JS; `ids` maps an axis object to its transform id. `marker_stroke` is the share
 of a scatter marker's `strokewidth` drawn outside the marker: `0.5` when the backend centers
 the outline on the marker's edge (CairoMakie, the default), `1.0` when it paints the whole
-outline outside (WGLMakie).
+outline outside (WGLMakie). `depth_test` says whether the backend hides one 3D text label behind
+a nearer one (WGLMakie) or paints labels in list order, the last on top (CairoMakie, the
+default).
 """
 struct InteractionContext
     project::Function                       # (ax, point) -> Point2f, image px
@@ -74,9 +76,10 @@ struct InteractionContext
     scaling::Float64
     display_scale::Float64                  # CSS px per image px on screen (image is rendered above display res)
     marker_stroke::Float64
+    depth_test::Bool
 end
-InteractionContext(project, transforms, ids, width, height, scaling, display_scale) =
-    InteractionContext(project, transforms, ids, width, height, scaling, display_scale, 0.5)
+InteractionContext(project, transforms, ids, width, height, scaling, display_scale, marker_stroke = 0.5) =
+    InteractionContext(project, transforms, ids, width, height, scaling, display_scale, marker_stroke, false)
 
 """
     data_to_image_px(ctx::InteractionContext, ax, p) -> Point2f

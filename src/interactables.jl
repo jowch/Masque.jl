@@ -1254,7 +1254,7 @@ one. Produces one `:rects` [`HitLayer`](@ref), one box per string.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:text`.
 - `payloads` — one entry per string; `ArgumentError` if the length doesn't match. Default:
   `(; text, index, x, y)` — `text` is the string, `index` 1-based, `(x, y)` its data-space
-  anchor (`(x, y, z)` on an `Axis3`). A key-value payload is merged onto the default, as for
+  anchor (`(x, y, z)` for a 3D position). A key-value payload is merged onto the default, as for
   [`PointInteractable`](@ref).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
@@ -1266,9 +1266,10 @@ projected data coordinates — a rotated label gets its expanded axis-aligned bo
 read lazily in `hitlayers`, not at construction, so a `TextInteractable` can be built before
 the figure is finalized.
 
-On an `Axis3`, where labels can overlap, the label whose anchor is nearest the camera wins
-the overlap, and a label whose anchor is outside the axis limits is not drawn, so it is not
-hit either.
+On an `Axis3`, where labels can overlap, the label drawn on top wins the overlap: with
+`backend = :webgl` the one whose anchor is nearest the camera, and with CairoMakie, which
+paints labels in order, the one listed last. A label whose anchor is outside the axis limits is
+not drawn, so it is not hit either.
 
 # Examples
 ```julia
@@ -1288,7 +1289,7 @@ function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, too
         error("TextInteractable: $(length(anchors)) positions for $(length(strs)) strings (Makie internals changed?)")
     defaults = _unconvert_payloads(
         ax, Any[
-            ax isa Makie.Axis3 ?
+            length(anchors[k]) >= 3 ?
                 (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]), z = Float64(anchors[k][3])) :
                 (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
                 for k in eachindex(strs)
@@ -1341,8 +1342,10 @@ function hitlayers(i::TextInteractable, ctx)
     ]
 end
 
-# Labels on an Axis3, front to back by their anchor's clip-space depth, as 0-based indices. A
-# label whose anchor is not drawn (outside the axis limits, or not finite) is left out.
+# The drawn labels on an Axis3, top one first, as 0-based indices: by their anchor's clip-space
+# depth where the backend depth-tests text (WebGL), else last-listed first, since CairoMakie
+# paints them in list order. A label whose anchor is not drawn (outside the axis limits, or not
+# finite) is left out.
 function _text_order(ctx, ax, anchors)
     pts = Point3f[Point3f(a[1], a[2], length(a) >= 3 ? a[3] : 0) for a in anchors]
     px, py, depth = _project_depth(ctx, ax, pts)
@@ -1351,7 +1354,7 @@ function _text_order(ctx, ax, anchors)
         k for k in eachindex(pts) if all(isfinite, pts[k]) && (box === nothing || _in_clipbox(box, pts[k])) &&
             isfinite(px[k]) && isfinite(py[k]) && isfinite(depth[k])
     ]
-    return ks[sortperm(depth[ks])] .- 1
+    return (ctx.depth_test ? ks[sortperm(depth[ks])] : reverse(ks)) .- 1
 end
 
 # ============================ PolygonInteractable ==========================

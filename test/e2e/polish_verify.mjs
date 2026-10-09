@@ -579,15 +579,17 @@ try {
     }
   }
 
-  // Text on Axis3 (#292): where "front" overlaps "back", the hover answers with front, the
-  // label nearer the camera, and draws the closed-mark recipe on front's box.
+  // Text on Axis3 (#292): where "front" (listed first) overlaps "back", the hover answers with
+  // the label drawn on top, and draws the closed-mark recipe on its box: front on WebGL, which
+  // depth-tests text, and back on Cairo, which paints labels in list order.
   {
     const key = "text3d";
     const m = await inspect(key);
     pin(m, key);
     const layer = (await layersOf(key)).find((l) => l.id === "text");
     if (!layer || layer.kind !== "rects") throw new Error(`${key}: no :rects text layer`);
-    const g = layer.geometry, hov = 1;
+    const g = layer.geometry, hov = backend === "cairo" ? 1 : 0;
+    const [top, under] = hov === 1 ? ["back", "front"] : ["front", "back"];
     let t = null;
     for (let a = 0; a < 8; a++) {
       t = await hoverAt(key, g[4 * hov], g[4 * hov + 1]);
@@ -596,7 +598,7 @@ try {
     }
     if (!t?.show) throw new Error(`${key}: no tooltip on hover ${JSON.stringify(t)}`);
     assertHoverRecipe(t.hi, key, true, false);
-    if (!/front/.test(t.text) || /back/.test(t.text)) throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not the front label`);
+    if (!t.text.includes(top) || t.text.includes(under)) throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not the ${top} label`);
     passed.push(`${key}/highlight`);
   }
 

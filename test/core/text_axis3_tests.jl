@@ -35,18 +35,49 @@ boxof(g, k) = Tuple(Float64.(g[(4k - 3):(4k)]))
         end
     end
 
-    @testset "overlapping labels: the one nearest the camera is first" begin
+    @testset "overlapping labels: the one drawn on top is first" begin
         fig = Figure(; size = (600, 450))
         ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, limits = (0, 2, 0, 2, 0, 2))
         anchors = [Point3f(0.2, 0.2, 0.2), Point3f(1.8, 1.8, 1.8), Point3f(1.0, 1.0, 1.0)]
         t = text!(ax, anchors; text = ["a", "b", "c"], fontsize = 18)
         _, _, ctx = ctx_for(fig)
-        L = only(hitlayers(TextInteractable(ax, t), ctx))
+        # CairoMakie paints labels in list order, so the last one listed is on top.
+        @test !ctx.depth_test
+        @test only(hitlayers(TextInteractable(ax, t), ctx)).order == [2, 1, 0]
+        # A backend that depth-tests text puts the nearest first.
+        wctx = InteractionContext(
+            ctx.project, ctx.transforms, ctx.ids, ctx.width, ctx.height, ctx.scaling, ctx.display_scale, 1.0, true,
+        )
+        L = only(hitlayers(TextInteractable(ax, t), wctx))
         _, _, depth = Masque._project_depth(ctx, ax, anchors)
         @test L.order == sortperm(depth) .- 1
-        @test issorted(depth[L.order .+ 1])
-        # This camera looks from +x, so the label at the low corner is the farthest.
-        @test last(L.order) == 0
+        @test L.order != [2, 1, 0]
+    end
+
+    @testset "Cairo: the label listed last covers a nearer one listed first" begin
+        # "near" (blue) sits between "far" (red) and the camera. Cairo paints them in list order,
+        # so far shows more red in the overlap when it is listed last than when it is listed
+        # first, though it is farther, and the order puts the last listed first either way.
+        el, az = 0.5, 0.4
+        function overlap_red(listed)
+            fig = Figure(; size = (600, 450))
+            ax = Axis3(fig[1, 1]; azimuth = az, elevation = el, limits = (0, 4, 0, 4, 0, 4))
+            far = Point3f(2, 2, 2)
+            pos = Dict(:far => far, :near => far + 1.2f0 * Vec3f(cos(el) * cos(az), cos(el) * sin(az), sin(el)))
+            col = Dict(:far => :red, :near => :blue)
+            t = text!(
+                ax, [pos[k] for k in listed]; text = fill("MMMM", 2), color = [col[k] for k in listed],
+                fontsize = 40, align = (:center, :center),
+            )
+            _, ppu, ctx = ctx_for(fig)
+            L = only(hitlayers(TextInteractable(ax, t), ctx))
+            @test L.order == [1, 0]
+            img = Makie.colorbuffer(fig; px_per_unit = ppu)
+            b1, b2 = boxof(L.geometry, 1), boxof(L.geometry, 2)
+            return count(p -> inbox(p, b1; pad = 0) && inbox(p, b2; pad = 0), redpx(img))
+        end
+        # About 5300 red pixels against 3500 with this camera.
+        @test overlap_red([:near, :far]) > 1.25 * overlap_red([:far, :near])
     end
 
     @testset "a label outside the axis limits is not drawn and not hit" begin
@@ -91,6 +122,17 @@ boxof(g, k) = Tuple(Float64.(g[(4k - 3):(4k)]))
         L = only(filter(L -> L["id"] == "text", w.manifest["layers"]))
         @test L["kind"] == "rects" && sort(L["order"]) == [0, 1]
         @test L["payloads"][1] == (; text = "p", index = 1, x = 1.0, y = 1.0, z = 1.0)
+    end
+
+    @testset "2D positions on an Axis3" begin
+        fig = Figure(; size = (500, 400))
+        ax = Axis3(fig[1, 1]; limits = (0, 3, 0, 3, -1, 1))
+        t = text!(ax, [1.0, 2.0], [1.0, 2.0]; text = ["a", "b"])
+        ti = TextInteractable(ax, t)
+        @test ti.payloads[2] == (; text = "b", index = 2, x = 2.0, y = 2.0)
+        w = @test_logs masque(fig)
+        L = only(w.manifest["layers"])
+        @test L["kind"] == "rects" && sort(L["order"]) == [0, 1]
     end
 
     @testset "text on a 2D Axis ships no order" begin
