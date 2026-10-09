@@ -680,8 +680,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // relying on the bond (which §12.3 leaves untouched for a view gesture).
         const viewLayer = newManifest.layers.find((l) => l.id === input.id)
         const geom = viewLayer?.geometry as ViewGeometry | undefined
+        // An Axis3 frame's limits decode as a typed array, which JSON writes as an object.
         const camera: Record<string, number | number[]> = "azimuth" in input || "limits" in input
-            ? { azimuth: geom?.azimuth ?? NaN, elevation: geom?.elevation ?? NaN, ...(geom?.limits ? { limits: geom.limits } : {}) }
+            ? { azimuth: geom?.azimuth ?? NaN, elevation: geom?.elevation ?? NaN, ...(geom?.limits ? { limits: Array.from(geom.limits) } : {}) }
             : (() => {
                 const t = viewLayer ? newManifest.transforms[viewLayer.axis] : undefined
                 return { xmin: t?.xlims[0] ?? NaN, xmax: t?.xlims[1] ?? NaN, ymin: t?.ylims[0] ?? NaN, ymax: t?.ylims[1] ?? NaN }
