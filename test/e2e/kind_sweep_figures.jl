@@ -356,12 +356,13 @@ kind_sweep_meta() = [
     Dict(
         # A box over a heatmap starts at the cell block inside its bounds, drawn as one fill-only
         # block (#330). Cell 0 sits outside the box, so the no-click check never presses on it.
+        # The bounds sit exactly on cell edges, which must not pull in the neighbours (#337).
         "key" => "roi_grid", "layerId" => "roi", "layerKind" => "roi",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "owner",
         "owner" => Dict(
             "layer" => "cells", "startsSelected" => true,
-            "initial" => "^ROI_GRID=(Masque\\.)?GridWindowEvent\\(:cells, i1 = 3, i2 = 4, j1 = 2, j2 = 3, xmin = 2\\.6, xmax = 4\\.4, ymin = 1\\.6, ymax = 3\\.4\\)\$",
+            "initial" => "^ROI_GRID=(Masque\\.)?GridWindowEvent\\(:cells, i1 = 3, i2 = 4, j1 = 2, j2 = 3, xmin = 2\\.5, xmax = 4\\.5, ymin = 1\\.5, ymax = 3\\.5\\)\$",
         ),
     ),
     Dict(
@@ -1013,7 +1014,7 @@ function build_kind_sweep()
         masque(
             fig,
             interactables(hm; id = :cells),
-            ROIInteractable(ax; bounds = (2.6, 4.4, 1.6, 3.4), selects = :cells, id = :roi),
+            ROIInteractable(ax; bounds = (2.5, 4.5, 1.5, 3.5), selects = :cells, id = :roi),
         )
     end
 
