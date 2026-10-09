@@ -353,9 +353,10 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
   (a `Char`, an image, a per-element vector of markers) keeps the `markersize / 2` bound.
 - `radius3d` — per-point data-space half-extents (`Vector{Makie.Vec3f}`), for markers whose
   on-screen size is camera/depth-dependent (e.g. `meshscatter`). When set, overrides `radius`
-  with an axis-aligned pixel-radius approximation projected per point — it can underestimate
-  the true silhouette (worst case ~29%, at adversarial azimuth/elevation). Must have one entry
-  per point (`ArgumentError` otherwise).
+  with the radius of each point's projected outline: the longest semi-axis of the ellipsoid
+  with these half-extents, as drawn. With Axis3's `perspectiveness` above 0 it can fall a
+  few percent short (about 6% at `perspectiveness = 1`). Must have one entry per point
+  (`ArgumentError` otherwise).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`; not meaningful).
 - `label` — the layer's name, which screen readers announce when the keyboard moves to an
@@ -411,9 +412,8 @@ struct PointInteractable <: AbstractInteractable
     ax; points::Vector{Point3f}; id::Symbol; payloads::Vector{Any}
     # px, one for every point or one per point
     radius::Union{Float64, Vector{Float64}}
-    # Data-space half-extents (meshscatter markers are data-sized); overrides `radius` via an
-    # axis-aligned pixel-radius approximation that can underestimate the true silhouette
-    # (worst case ~29%, at adversarial azimuth/elevation).
+    # Data-space half-extents (meshscatter markers are data-sized); overrides `radius` with
+    # the radius of the projected outline (`_px_radius3d`).
     radius3d::Union{Nothing, Vector{Makie.Vec3f}}
     tooltip::Union{Nothing, Markup, Bool}
     label::Union{Nothing, String}
@@ -457,18 +457,32 @@ function _check_radius(r, n)
     return Vector{Float64}(r)
 end
 tooltip_spec(i::PointInteractable) = i.tooltip
-# Max projected displacement over the ±axis half-extents; non-finite offsets are skipped.
-function _px_radius3d(ctx, ax, p, e, q, box = _clipbox(ax))
-    m = 0.0
-    for d in (
-            (e[1], 0, 0), (-e[1], 0, 0), (0, e[2], 0),
-            (0, -e[2], 0), (0, 0, e[3]), (0, 0, -e[3]),
-        )
-        q2 = _proj(ctx, ax, (p[1] + d[1], p[2] + d[2], p[3] + d[3]), box)
-        r = hypot(q2[1] - q[1], q2[2] - q[2])
-        isfinite(r) && (m = max(m, r))
+# Outline radius of the ellipsoid with data-space semi-axes `e` around `p` (projected to `q`).
+# Projecting `p ± eᵢ` gives the screen images `cᵢ` of its three semi-axes; the drawn outline is
+# then the ellipse `M·(unit ball)` with `M = [c₁ c₂ c₃]`, whose longest semi-axis is `M`'s
+# largest singular value (exact for Axis3's default orthographic camera). The largest single
+# `|cᵢ|` falls short whenever the outline's long direction isn't along a data axis. Under
+# perspective the near half of an axis projects longer than the far half, which the average in
+# `cᵢ` hides, so the radius is never less than the longest single half. The edge points skip
+# the Axis3 clip box: `hitlayers` already hides a sphere whose centre is clipped, and one whose
+# edge crosses the limits keeps its full radius. A semi-axis whose projection isn't finite is
+# left out.
+function _px_radius3d(ctx, ax, p, e, q)
+    all(isfinite, q) || return 0.0   # a clipped sphere, skipped by the hit layer anyway
+    a = b = d = 0.0   # M·Mᵀ = [a b; b d]
+    half = 0.0
+    for i in 1:3
+        o = ntuple(j -> j == i ? Float64(e[i]) : 0.0, 3)
+        hi = data_to_image_px(ctx, ax, (p[1] + o[1], p[2] + o[2], p[3] + o[3]))
+        lo = data_to_image_px(ctx, ax, (p[1] - o[1], p[2] - o[2], p[3] - o[3]))
+        cx, cy = (hi[1] - lo[1]) / 2, (hi[2] - lo[2]) / 2
+        isfinite(cx) && isfinite(cy) || continue
+        a += cx^2
+        b += cx * cy
+        d += cy^2
+        half = max(half, hypot(hi[1] - q[1], hi[2] - q[2]), hypot(q[1] - lo[1], q[2] - lo[2]))
     end
-    return m
+    return max(half, sqrt((a + d) / 2 + hypot((a - d) / 2, b)))
 end
 function hitlayers(i::PointInteractable, ctx)
     g = Real[]
@@ -476,7 +490,7 @@ function hitlayers(i::PointInteractable, ctx)
     for (k, p) in enumerate(i.points)
         q = _proj(ctx, i.ax, p, box)
         r = if i.radius3d !== nothing
-            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q, box)
+            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q)
         else
             ((i.radius isa Vector ? i.radius[k] : i.radius) + i.stroke * ctx.marker_stroke) * ctx.scaling
         end

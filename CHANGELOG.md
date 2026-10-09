@@ -62,6 +62,11 @@ All notable changes to this project are documented here. The format is based on
   `tooltipstyle`'s, so one such as `tooltip_font_size = "12"` raises an `ArgumentError`, and
   passing a key both ways is an error. `tooltip_sigdigits` stays (#305).
 
+### Fixed
+- A `meshscatter!` sphere on `Axis3` responds to hover and clicks out to its drawn edge, and
+  its highlight sits on its outline. Before, its hit circle could fall well inside the
+  sphere, so pointing near the edge missed it (#317).
+
 ## [0.2.2] - 2026-10-09
 
 ### Added
