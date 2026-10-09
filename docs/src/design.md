@@ -12,8 +12,8 @@ mark in Julia, click it. See [How interactions work](@ref).
 
 A click selects one mark and replaces the previous selection. To select
 several marks at once, drag a box over them with an
-[`ROIInteractable`](@ref). The box is a rectangle, and every box in one
-widget selects from the same layer: a set of points, or a heatmap or
+[`ROIInteractable`](@ref). The box is a rectangle, and a widget takes
+one box, which selects from one layer: a set of points, or a heatmap or
 image.
 
 Your figure stays as you created it. Highlights are drawn on top of the

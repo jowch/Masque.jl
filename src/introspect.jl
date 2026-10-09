@@ -1586,7 +1586,7 @@ function _defaults(fig; replaced = Base.IdSet{Any}())
         c isa Makie.Colorbar || continue
         nc += 1
         id = nc == 1 ? :colorbar : Symbol(:colorbar_, nc)
-        push!(d.ints, ColorbarInteractable(c; id))
+        push!(d.ints, ColorbarInteractable(c, id, true))
     end
     # Likewise Legend blocks, linked through the plotmap built above.
     nl = 0

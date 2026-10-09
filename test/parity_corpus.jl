@@ -59,22 +59,22 @@ function _parity_corpus()
         end
     )
 
-    # 3. drag/readout family: Threshold + ROI + Axis readout (axis-transform channel)
-    push!(
-        corpus, "dragreadout" => function ()
-            fig = Figure(size = (600, 400))
-            ax = Axis(fig[1, 1])
-            scatter!(ax, [1.0, 2.0, 3.0], [1.0, 4.0, 9.0])
-            Makie.update_state_before_display!(fig)
-            return (
-                fig, [
-                    ThresholdInteractable(ax; orientation = :horizontal, value = 4.0),
-                    ROIInteractable(ax; bounds = (1.5, 2.5, 2.0, 6.0)),
-                    AxisInteractable(ax),
-                ],
-            )
-        end
-    )
+    # 3. drag/readout family: Threshold or ROI + Axis readout (axis-transform channel). One
+    # widget takes one bond owner (#309), so the threshold and the box are separate entries.
+    for (name, owner) in (
+            "dragreadout" => ax -> ThresholdInteractable(ax; orientation = :horizontal, value = 4.0),
+            "roireadout" => ax -> ROIInteractable(ax; bounds = (1.5, 2.5, 2.0, 6.0)),
+        )
+        push!(
+            corpus, name => function ()
+                fig = Figure(size = (600, 400))
+                ax = Axis(fig[1, 1])
+                scatter!(ax, [1.0, 2.0, 3.0], [1.0, 4.0, 9.0])
+                Makie.update_state_before_display!(fig)
+                return (fig, [owner(ax), AxisInteractable(ax)])
+            end
+        )
+    end
 
     # 4. grouped custom regions: one interactable fanning out to several layer kinds
     push!(

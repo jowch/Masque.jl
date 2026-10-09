@@ -210,6 +210,7 @@ try {
     return {
       show: t?.classList.contains("show"), text: t?.innerText ?? "",
       bg: cs?.backgroundColor, color: cs?.color,
+      radius: cs?.borderTopLeftRadius, caret: t ? getComputedStyle(t, "::before").display : null,
       hi: { fill: capture(svgFill, "fill"), edge: capture(svgEdge, "edge"), plain: capture(svgPlain, "plain") },
       sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel"),
     };
@@ -448,6 +449,14 @@ try {
   }
   passed.push("overlaystyle");
 
+  // tooltipstyle (#305): the same figure sets the card's background, text colour and radius,
+  // and hides the caret.
+  if (!sTip.show || sTip.bg !== "rgb(20, 30, 60)" || sTip.color !== "rgb(240, 240, 200)"
+      || sTip.radius !== "9px" || sTip.caret !== "none") {
+    throw new Error(`scatter_styled: tooltip ${JSON.stringify({ show: sTip.show, bg: sTip.bg, color: sTip.color, radius: sTip.radius, caret: sTip.caret })} (want bg rgb(20, 30, 60), color rgb(240, 240, 200), radius 9px, no caret)`);
+  }
+  passed.push("tooltipstyle");
+
   // Axis3 kinds (#301): the baked selection and a hover on another mark sit on the projected
   // mark. `overlap3d` hovers the front marker of a pair: the highlight must take the marker's
   // circle, not the sphere's behind it.
@@ -556,6 +565,41 @@ try {
     } else {
       passed.push(`${key}/on-drawn-mark-skipped-webgl`);
     }
+  }
+
+  // Axis3 wheel zoom (#321): the limits readout is the same tooltip card as a hover, in the
+  // figure's theme, shown while the wheel turns and gone once the zoom settles. Zooming back
+  // out leaves the view as the other drivers found it.
+  {
+    const lightTip = await hoverAt("scatter", hx, hy);
+    const view3 = (await layersOf("view3d")).find((l) => l.id === "view").geometry;
+    const wheel3 = (deltaY) => page.evaluate(async ([k, ix, iy, dy]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const hosts = [...document.querySelectorAll(".ip-host")];
+      const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center", inline: "nearest" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy,
+      }));
+      await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+      const t = sr.querySelector(".masque-tip");
+      const cs = getComputedStyle(t);
+      const during = { show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color };
+      await new Promise((res) => setTimeout(res, 600));   // past the wheel's idle settle
+      return { during, after: t.classList.contains("show") };
+    }, ["view3d", view3.x + view3.w / 2, view3.y + view3.h / 2, deltaY]);
+    const r = await wheel3(-300);
+    if (!r.during.show) throw new Error("view3d/zoom-readout: no limits readout while the wheel turns");
+    if (!/x:\[/.test(r.during.text) || !/z:\[/.test(r.during.text)) throw new Error(`view3d/zoom-readout: readout does not show the x and z limits: ${JSON.stringify(r.during.text)}`);
+    if (r.during.bg !== lightTip.bg || r.during.color !== lightTip.color) {
+      throw new Error(`view3d/zoom-readout: readout theme ${r.during.bg}/${r.during.color} differs from the hover tooltip's ${lightTip.bg}/${lightTip.color}`);
+    }
+    if (r.after) throw new Error("view3d/zoom-readout: the readout is still showing after the zoom settled");
+    await wheel3(300);
+    passed.push("view3d/zoom-readout");
   }
 
   // The axis readout's cursor-following tooltip: the caret apex sits on the pointer, both in

@@ -16,20 +16,87 @@ function _check_sigdigits(n)
     throw(ArgumentError("tooltip_sigdigits must be an integer from 1 to 17, got $(repr(n))"))
 end
 
-function tip_style_dict(;
-        tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
-        tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing,
-        tooltip_caret = true,
-    )
+# `tooltipstyle` key => (custom property, value kind).
+const _TOOLTIP_STYLE_KEYS = (
+    bg = ("--masque-tip-bg", :color),
+    color = ("--masque-tip-color", :color),
+    accent = ("--masque-tip-accent", :color),
+    font = ("--masque-tip-font", :font),
+    font_size = ("--masque-tip-font-size", :length),
+    radius = ("--masque-tip-radius", :length),
+    caret = ("--masque-tip-caret", :caret),
+)
+
+function _tooltip_style_value(k, kind, v)
+    if kind === :color
+        # `to_color` reads a bare number as a grey level, which gives no valid CSS colour.
+        css = v isa Real ? nothing : try
+                _css_color(v)
+        catch
+                nothing
+        end
+        css === nothing &&
+            throw(ArgumentError("tooltipstyle: `$k` must be a CSS string or a Makie color, got $(repr(v))"))
+        return css
+    end
+    if kind === :font
+        v isa AbstractString || v isa Symbol ||
+            throw(ArgumentError("tooltipstyle: `font` must be a CSS font-family string, got $(repr(v))"))
+        return String(v)
+    end
+    if kind === :caret
+        v isa Bool || throw(ArgumentError("tooltipstyle: `caret` must be `true` or `false`, got $(repr(v))"))
+        return v ? "block" : "none"
+    end
+    v isa Real && !(v isa Bool) && isfinite(v) && v >= 0 ||
+        throw(ArgumentError("tooltipstyle: `$k` must be a size in px, a number ≥ 0, got $(repr(v))"))
+    return "$(v)px"
+end
+
+# Only set keys are emitted; unset ones keep the tooltip's built-in look. `caret = true` is
+# the built-in look, so it emits nothing either.
+function tip_style_dict(style)
     d = Dict{String, String}()
-    tooltip_bg === nothing || (d["--masque-tip-bg"] = _css_color(tooltip_bg))
-    tooltip_color === nothing || (d["--masque-tip-color"] = _css_color(tooltip_color))
-    tooltip_accent === nothing || (d["--masque-tip-accent"] = _css_color(tooltip_accent))
-    tooltip_font === nothing || (d["--masque-tip-font"] = String(tooltip_font))
-    tooltip_font_size === nothing || (d["--masque-tip-font-size"] = "$(tooltip_font_size)px")
-    tooltip_radius === nothing || (d["--masque-tip-radius"] = "$(tooltip_radius)px")
-    tooltip_caret === false && (d["--masque-tip-caret"] = "none")
+    style === nothing && return d
+    style isa NamedTuple || throw(
+        ArgumentError("tooltipstyle must be a NamedTuple such as `(; bg = :black)`, got $(repr(style))"),
+    )
+    for (k, v) in pairs(style)
+        haskey(_TOOLTIP_STYLE_KEYS, k) || throw(
+            ArgumentError(
+                "tooltipstyle: unknown key `$k`. Valid keys: " *
+                    join(string.(keys(_TOOLTIP_STYLE_KEYS)), ", "),
+            ),
+        )
+        v === nothing && continue
+        prop, kind = _TOOLTIP_STYLE_KEYS[k]
+        val = _tooltip_style_value(k, kind, v)
+        kind === :caret && val == "block" && continue
+        d[prop] = val
+    end
     return d
+end
+
+# The 0.2 flat `tooltip_*` keywords, deprecated in 0.3 and removed in 0.4: fold the ones
+# given into `tooltipstyle`, warning once with the replacement. A key given both ways is an
+# error rather than a silent pick.
+function _merge_tooltip_kwargs(tooltipstyle, flat::NamedTuple)
+    given = NamedTuple{Tuple(k for k in keys(flat) if flat[k] !== nothing)}(flat)
+    isempty(given) && return tooltipstyle
+    old = join(("`tooltip_$k = …`" for k in keys(given)), ", ")
+    new = join(("$k = …" for k in keys(given)), ", ")
+    _deprecate(
+        "$old $(length(given) > 1 ? "are" : "is") deprecated; use `tooltipstyle = (; $new)`. Removed in 0.4.",
+        :masque,
+    )
+    tooltipstyle === nothing && return given
+    tooltipstyle isa NamedTuple || return tooltipstyle   # tip_style_dict raises the error
+    for k in keys(given)
+        haskey(tooltipstyle, k) && throw(
+            ArgumentError("masque: `tooltip_$k` and `tooltipstyle.$k` both set; pass only `tooltipstyle`"),
+        )
+    end
+    return merge(tooltipstyle, given)
 end
 
 # `overlaystyle` key => (custom property, value kind). The colour keys override the light/dark
@@ -147,22 +214,69 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     return d
 end
 
-# One `selects` target for the widget. Several selectors must name that same layer.
-function _selection_spec(interactables, layers)
-    targets = Symbol[]
+# An ROI whose `selects` is a plot brushes the one layer of that plot it can brush: a
+# scatterlines plot has a `:lines` and a `:circles` layer, and the box takes the points.
+function _resolve_plot_targets(interactables, pairs)
+    kinds = Dict(L.id => L.kind for (_, L) in pairs)
+    swap = IdDict{Any, Any}()
     for i in interactables
-        s = selects(i)
-        s === nothing && continue
-        push!(targets, s)
+        i isa ROIInteractable || continue
+        t = i.selects
+        t isa Makie.AbstractPlot && throw(
+            ArgumentError(
+                "ROIInteractable: `selects` is a plot, which `masque(fig, …)` resolves to its layer; " *
+                    "build_manifest needs a layer id",
+            ),
+        )
+        t isa _PlotTarget || continue
+        ok = filter(id -> get(kinds, id, nothing) in compatible_kinds(i), t.ids)
+        plot = Makie.plotkey(t.plot)
+        if isempty(ok)
+            found = join(("`:$id` ($(get(kinds, id, "none")))" for id in t.ids), ", ")
+            throw(
+                ArgumentError(
+                    "ROIInteractable: `selects` is a `$plot` plot whose layers ($found) are none of " *
+                        "$(compatible_kinds(i)); the box brushes points or grid cells",
+                ),
+            )
+        end
+        length(ok) == 1 || throw(
+            ArgumentError(
+                "ROIInteractable: `selects` is a `$plot` plot with several layers the box could brush " *
+                    "($(join(("`:$id`" for id in ok), ", "))); pass the one you want by id, as `selects = :$(first(ok))`",
+            ),
+        )
+        swap[i] = ROIInteractable(i.ax, i.bounds, i.id, only(ok))
     end
-    isempty(targets) && return nothing
-    uniq = unique(targets)
-    length(uniq) == 1 || throw(
+    isempty(swap) && return interactables, pairs
+    return Any[get(swap, i, i) for i in interactables], Tuple{Any, HitLayer}[(get(swap, i, i), L) for (i, L) in pairs]
+end
+
+# The interactable that owns the widget's bond and its first layer's id, or `nothing`. Two owners
+# would each overwrite the other's value, and the bond could not start at both initial states.
+function _bond_owner(built)
+    owners = Tuple{Any, Symbol}[]
+    for (i, L, _) in built
+        owns_bond(i) && !any(o -> o[1] === i, owners) && push!(owners, (i, L.id))
+    end
+    isempty(owners) && return nothing
+    length(owners) == 1 && return only(owners)
+    names = join([":" * string(id) for (_, id) in owners], ", ", " and ")
+    throw(
         ArgumentError(
-            "masque: multiple selectors must share one target; got $(join(string.(uniq), ", "))",
+            "masque: $names each own the `@bind` value, and a widget has one. A threshold, an ROI " *
+                "box, or a colorbar you pass takes every click in its widget; pass the others " *
+                "to separate masque() calls",
         ),
     )
-    target = only(uniq)
+end
+
+# The widget's `selects` target, or `nothing`. A selector owns the bond, so `_bond_owner` has
+# already rejected a second one and `only` holds.
+function _selection_spec(interactables, layers)
+    targets = Symbol[s for s in map(selects, interactables) if s !== nothing]
+    isempty(targets) && return nothing
+    target = only(targets)
     kinds = Dict(Symbol(l["id"]) => Symbol(l["kind"]) for l in layers)
     kind = kinds[target]
     return (mode = kind === :grid ? "grid" : "elements", target = target)
@@ -364,26 +478,31 @@ function build_manifest(
         selected = nothing, tip_style = nothing, tip_digits = _DEFAULT_SIGDIGITS, background = nothing,
         overlay_style = nothing, owners_out = nothing,
     )
-    built = Tuple{Any, HitLayer, Dict{String, Any}}[]
+    pairs = Tuple{Any, HitLayer}[]
     for i in interactables
         msg = validate(i, ctx)
         msg === nothing || throw(ArgumentError(msg))
         for L in hitlayers(i, ctx)
-            push!(built, (i, L, _layer_dict(i, L, ctx)))
+            push!(pairs, (i, L))
         end
     end
+    interactables, pairs = _resolve_plot_targets(interactables, pairs)
+    built = Tuple{Any, HitLayer, Dict{String, Any}}[(i, L, _layer_dict(i, L, ctx)) for (i, L) in pairs]
     layers = Any[d for (_, _, d) in built]
     layer_owners = Any[i for (i, _, _) in built]
     _validate_selectors(interactables, layers)
     _drop_absent_default_covers!(built)
     _validate_slices(layers)
     _validate_links(layer_owners, layers)
+    owner = _bond_owner(built)
     spec = _selection_spec(interactables, layers)
-    # The box owns its target's bond: a click would replace the brushed selection while the box
-    # stays drawn over it. The target keeps hover (tooltip); the overlay hit-tests clicks by `events`.
-    if spec !== nothing
-        target = only(filter(l -> l["id"] == string(spec.target), layers))
-        filter!(!=("click"), target["events"])
+    # The owner is the only layer that commits: a click elsewhere would replace the threshold's
+    # value or the brushed selection while the control stays drawn at its own. Every other layer
+    # keeps hover (tooltip); the overlay hit-tests clicks by `events`.
+    if owner !== nothing
+        for (i, _, d) in built
+            i === owner[1] || filter!(!=("click"), d["events"])
+        end
     end
     layer_ids = Symbol[L.id for (_, L, _) in built]
     seedable = Symbol[L.id for (_, L, _) in built if L.kind in _SELECTED_KINDS]
@@ -421,6 +540,11 @@ function build_manifest(
         "layers" => layers,
         "transforms" => Dict(string(id) => _transform_dict(t) for (id, t) in ctx.transforms),
     )
+    if owner !== nothing
+        m["bondOwner"] = string(owner[2])
+        env = initial_envelope(owner[1], ctx)
+        env === nothing || (m["initial"] = env)
+    end
     if spec !== nothing
         m["selection"] = spec.mode
         m["selectionTarget"] = string(spec.target)
@@ -569,8 +693,14 @@ Two layers with the same id raise `ArgumentError`. Legends link to the layers of
 The bond is `nothing` until the first commit, unless `selected=` restored one. A click is one
 [`InteractionEvent`](@ref). A `selects` [`ROIInteractable`](@ref) aimed at points commits a
 `Vector{ElementEvent}` (an empty box is `ElementEvent[]`); aimed at a grid, one
-[`GridWindowEvent`](@ref). The box owns that bond: its target layer shows tooltips but commits no
-clicks. Clicks on other layers stay single events.
+[`GridWindowEvent`](@ref).
+
+A [`ThresholdInteractable`](@ref), an [`ROIInteractable`](@ref), or a
+[`ColorbarInteractable`](@ref) you pass owns the bond: every other layer shows tooltips but
+commits no clicks, and `selected=` on those layers only highlights. A threshold's bond starts
+as a [`ThresholdEvent`](@ref) at its `value`, and a box without `selects` as a
+[`BoundsEvent`](@ref) at its `bounds`. One widget takes one owner; two raise `ArgumentError`.
+The colorbars `masque(fig)` adds by itself own nothing.
 
 # Keywords
 - `auto` — start from the figure's defaults. Default `true`.
@@ -598,10 +728,11 @@ clicks. Clicks on other layers stay single events.
   Readouts and drag labels keep their trailing zeros (`2.500`), so they don't change width as
   the pointer moves. A template field with a spec, such as `\$(x:.2f)`, ignores it, and the
   `@bind` value is never rounded.
-- `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`, `tooltip_font_size`,
-  `tooltip_radius`, `tooltip_caret` — tooltip card styling; each defaults to the built-in
-  style. See the Tooltips page for the full system, including the `--masque-tip-*` CSS
-  escape hatch.
+- `tooltipstyle` — the look of the tooltip card, as a `NamedTuple`:
+  `tooltipstyle = (; bg = :black, color = :white, radius = 6)`. Keys: `bg`, `color`, `accent`,
+  `font`, `font_size`, `radius`, `caret`. Each key you leave out keeps the built-in look. See
+  [Tooltip styling](@ref). The 0.2 keywords `tooltip_bg`, `tooltip_color`, … still work with
+  a deprecation warning and are removed in 0.4.
 - `overlaystyle` — the look of highlights, the selection, the crosshair, and ROI boxes, as a
   `NamedTuple`: `overlaystyle = (; color = :steelblue, hover_width = 2)`. Each key you leave
   out keeps the built-in look. See [Overlay styling](@ref) for the keys.
@@ -627,11 +758,19 @@ end
 function _masque(
         fig, interactables::AbstractVector; backend::Union{Nothing, Symbol, AbstractBackend} = nothing,
         max_width = nothing, px_per_unit = nothing, selected = nothing,
+        tooltipstyle = nothing, tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing,
         tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
-        tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing, tooltip_caret = true,
-        tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing,
+        tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing, tooltip_caret = nothing,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
+    tooltipstyle = _merge_tooltip_kwargs(
+        tooltipstyle,
+        (;
+            bg = tooltip_bg, color = tooltip_color, accent = tooltip_accent, font = tooltip_font,
+            font_size = tooltip_font_size, radius = tooltip_radius, caret = tooltip_caret,
+        ),
+    )
+    tip_style = tip_style_dict(tooltipstyle)
     overlay_style = overlay_style_dict(overlaystyle)
     backend, max_width, px_per_unit = _backend_settings(backend, max_width, px_per_unit)
     bg0 = fig.scene.backgroundcolor[]
@@ -644,9 +783,6 @@ function _masque(
             ArgumentError("masque: `px_per_unit = $ppu` makes the picture less than 1 pixel wide"),
         )
         ctx = context(backend, fig, ppu, max_width)
-        tip_style = tip_style_dict(;
-            tooltip_bg, tooltip_color, tooltip_accent, tooltip_font, tooltip_font_size, tooltip_radius, tooltip_caret,
-        )
         owners_out = Ref(Dict{String, LayerOwner}())
         manifest = build_manifest(
             interactables, ctx; selected, tip_style, tip_digits,
@@ -867,9 +1003,17 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
     ax === nothing && throw(
         ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
     )
-    if haskey(input, "azimuth")
-        ax.azimuth[] = Float64(input["azimuth"])
-        ax.elevation[] = Float64(input["elevation"])
+    if haskey(input, "azimuth") || haskey(input, "limits")
+        if haskey(input, "azimuth")
+            ax.azimuth[] = Float64(input["azimuth"])
+            ax.elevation[] = Float64(input["elevation"])
+        end
+        if haskey(input, "limits")
+            l = Float64.(input["limits"])
+            length(l) == 6 && all(isfinite, l) && l[2] > l[1] && l[4] > l[3] && l[6] > l[5] ||
+                throw(ArgumentError("Masque gesture channel: Axis3 limits must be 6 finite, increasing pairs"))
+            ax.limits[] = (l[1], l[2], l[3], l[4], l[5], l[6])
+        end
     else
         ax.limits[] = (
             Float64(input["xmin"]), Float64(input["xmax"]),
@@ -911,16 +1055,23 @@ function _warm_view_render_frame!(frame, view_axes; stop = () -> false)
         if hasproperty(ax, :azimuth) && hasproperty(ax, :elevation)
             az0 = Float64(ax.azimuth[])
             el0 = Float64(ax.elevation[])
+            lim0 = ax.limits[]
+            fl = _finallimits(ax)
+            lo = Float64.(Tuple(fl.origin)); w = Float64.(Tuple(fl.widths))
+            zoomed = Float64[lo[1] + w[1] / 8, lo[1] + 7w[1] / 8, lo[2] + w[2] / 8, lo[2] + 7w[2] / 8, lo[3] + w[3] / 8, lo[3] + 7w[3] / 8]
             try
                 !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.05, "elevation" => el0, "settle" => false))
                 !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0 + 0.05, "settle" => false))
                 !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.8, "elevation" => el0 - 0.2, "settle" => false))
+                !stop() && frame(Dict{String, Any}("id" => sid, "limits" => zoomed, "settle" => false))
+                ax.limits[] == lim0 || (ax.limits[] = lim0)
                 !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0, "settle" => true))
             finally
                 if ax.azimuth[] != az0 || ax.elevation[] != el0
                     ax.azimuth[] = az0
                     ax.elevation[] = el0
                 end
+                ax.limits[] == lim0 || (ax.limits[] = lim0)
             end
         else
             lim0 = ax.limits[]

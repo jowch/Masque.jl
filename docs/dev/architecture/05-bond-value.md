@@ -4,19 +4,31 @@
 `Vector{ElementEvent}`. The type matches the interactables in that call. A
 [`PointInteractable`](@ref) is always an [`ElementEvent`](@ref). A vector appears only when
 the same call contains an [`ROIInteractable`](@ref) whose `selects` aims at those points. A
-`selects` ROI over a grid returns one [`GridWindowEvent`](@ref). Either way the box owns that
-bond: `build_manifest` ships the target layer hover-only (no `"click"` in its `events`), so it
-takes no clicks and shows no `pointer` cursor, and `bond_from_js` refuses a single-element
-envelope for that layer. The target is transparent to clicks, not a click sink: a click on it
-falls through `hitTest` to the next layer with `"click"`, and an `AxisInteractable` (no bbox)
-catches everything on its axis, so there the click commits an `AxisEvent`, the same as a click on
-empty space. The alternatives were a one-element commit (a one-cell
-window, or a one-point vector, which is what points did before) and moving the box to the
-clicked mark. Both were rejected: the first leaves the box drawn over its old region while the
-value names a different mark, and the second builds further on one value per widget. Compound
-binds (a value keyed by layer) are deferred; a hover-only target is easy to make clickable again
-if they land. Axis, colorbar, threshold, and bounds-only ROI stay their own
-types even inside a widget that also selects. A view pan or orbit commits nothing.
+`selects` ROI over a grid returns one [`GridWindowEvent`](@ref). A view pan or orbit commits
+nothing.
+
+A threshold, any ROI, or a colorbar the caller passed owns the bond (#309; `owns_bond`).
+`build_manifest` ships every other layer hover-only (no `"click"` in its `events`), so they take
+no clicks and show no `pointer` cursor, and stamps `bondOwner` with the owner's layer id. The
+other layers are transparent to clicks, not click sinks: a click on them falls through `hitTest`
+and finds nothing that commits. For a `selects` box, `bond_from_js` also refuses a
+single-element envelope for its target. The colorbars `masque(fig)` adds by itself
+(`ColorbarInteractable.auto`) own nothing, or any figure with a colorbar would take no clicks.
+Two owners in one call raise `ArgumentError` naming both: each would overwrite the other, and the
+bond could not start at both initial states.
+
+The owner sets the bond's starting value. A threshold starts at a `ThresholdEvent` at `value`
+(with its category's label when `value` is a category's position) and a bounds-only ROI at a
+`BoundsEvent` at `bounds`: `build_manifest` writes that wire envelope as `initial`, the same shape
+a release sends. A colorbar and a `selects` ROI have no value before their first commit, so they
+start at `nothing` (a `selects` ROI still hydrates from `selected=`). With an owner, `selected=`
+on another layer only highlights.
+
+The alternatives for a `selects` target were a one-element commit (a one-cell window, or a
+one-point vector, which is what points did before) and moving the box to the clicked mark. Both
+were rejected: the first leaves the box drawn over its old region while the value names a
+different mark, and the second builds further on one value per widget. Compound binds (a value
+keyed by layer) are deferred; a hover-only layer is easy to make clickable again if they land.
 
 | Commit | Type | Fields the cell reads |
 |---|---|---|
@@ -37,8 +49,8 @@ otherwise rebuilds the event from the layer's `bond` stamp. The stamp is one of
 `"element"`, `"legend"`, `"gridcell"`, `"axis"`, `"colorbar"`, `"threshold"`, `"bounds"`,
 `"none"`. Owners are not serialized.
 
-The wire stays 0-based. `mount.ts` writes an envelope (`null`, `{items}`, or
-`{layer, index}` with no payload for an element). Pluto overwrites `initial_value` with
+The wire stays 0-based. `mount.ts` writes an envelope (`null`, `{items}`, the owner's
+`initial`, or `{layer, index}` with no payload for an element). Pluto overwrites `initial_value` with
 `transform_value` of that same envelope. Subtract 1 only when writing the manifest; add 1
 when reading the wire. Grid window keys on the wire are `i0,i1,j0,j1` (0-based inclusive);
 Julia stores `i1,i2,j1,j2`. An element or legend row is looked up as `payloads[index]` with

@@ -275,6 +275,28 @@ kind_sweep_meta() = [
         "key" => "threshold", "layerId" => "threshold", "layerKind" => "threshold",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        # The line owns the bond (#309): the scatter beside it keeps its tooltip, takes no
+        # click, and the bond starts as the line's value.
+        "owner" => Dict("layer" => "scatter", "initial" => "ThresholdEvent"),
+    ),
+    Dict(
+        # A colorbar the caller passed owns the bond (#309): the heatmap keeps its tooltip, takes
+        # no click, and the bond stays `nothing` until the colorbar is clicked.
+        "key" => "colorbar_owner", "layerId" => "colorbar", "layerKind" => "axis",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "owner",
+        "owner" => Dict("layer" => "cells", "initial" => "^COLORBAR_OWNER=nothing\$"),
+    ),
+    Dict(
+        # A box without `selects` owns the bond and starts at its `bounds` (#309). The scatter's
+        # first point sits outside the box, so the no-click check never presses on the box.
+        "key" => "roi_bounds", "layerId" => "roi", "layerKind" => "roi",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "owner",
+        "owner" => Dict(
+            "layer" => "scatter",
+            "initial" => "^ROI_BOUNDS=BoundsEvent\\(:roi, xmin = 3\\.0, xmax = 6\\.0, ymin = 3\\.0, ymax = 6\\.0\\)\$",
+        ),
     ),
     Dict(
         # A threshold on a categorical y axis. Release commits the nearest category's position
@@ -300,6 +322,15 @@ kind_sweep_meta() = [
         "key" => "view", "layerId" => "view", "layerKind" => "view",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+    ),
+    Dict(
+        # Axis3 view (#321): drag orbits, the wheel zooms the limits about their center, and
+        # Shift+drag pans them. After the zoom the corner points sit outside the limits and stop
+        # hitting; the middle one still hits, and so does the part of a line that crosses them.
+        "key" => "view3d", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        "inside" => 2, "outside" => 0,
     ),
     Dict(
         "key" => "legend", "layerId" => "legend", "layerKind" => "rects",
@@ -615,6 +646,8 @@ function build_kind_sweep()
     end
 
     # overlaystyle (#181): the selected and hovered outlines take the given colour and widths.
+    # tooltipstyle (#305): the tooltip card takes the given background, text colour and radius,
+    # with no caret.
     # Not in kind_sweep_meta(), whose generic checks assert the default recipe; polish_verify.mjs
     # checks this one.
     scatter_styled = let
@@ -631,6 +664,7 @@ function build_kind_sweep()
             selected = Dict(:scatter_styled => [2]),
             auto = false,
             overlaystyle = (; color = "rgb(0, 102, 204)", hover_width = 3, selected_width = 4),
+            tooltipstyle = (; bg = "rgb(20, 30, 60)", color = "rgb(240, 240, 200)", radius = 9, caret = false),
         )
     end
 
@@ -848,10 +882,23 @@ function build_kind_sweep()
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "threshold", limits = (0, 10, 0, 10))
         scatter!(ax, [2.0, 8.0], [2.0, 8.0]; markersize = 10, color = :gray)
-        masque(
-            fig, ThresholdInteractable(ax; orientation = :horizontal, value = 4.0, id = :threshold);
-            auto = false,
-        )
+        masque(fig, ThresholdInteractable(ax; orientation = :horizontal, value = 4.0, id = :threshold))
+    end
+
+    roi_bounds = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "roi bounds", limits = (0, 10, 0, 10))
+        scatter!(ax, [1.0, 8.0], [1.0, 8.0]; markersize = 14, color = :gray)
+        masque(fig, ROIInteractable(ax; bounds = (3.0, 6.0, 3.0, 6.0), id = :roi))
+    end
+
+    colorbar_owner = let
+        z = [Float64(i + 3j) for i in 1:4, j in 1:3]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "colorbar owner")
+        hm = heatmap!(ax, 1:4, 1:3, z)
+        cb = Colorbar(fig[1, 2], hm)
+        masque(fig, ColorbarInteractable(cb))
     end
 
     threshold_cat = let
@@ -890,6 +937,17 @@ function build_kind_sweep()
         ax = Axis(fig[1, 1]; title = "view-pan", limits = (0, 8, 0, 8))
         sc = scatter!(ax, first.(pts), last.(pts); markersize = 14, color = :gray)
         masque(fig, interactables(sc; id = :pts), ViewInteractable(ax; id = :view))
+    end
+
+    view3d = let
+        pts = Makie.Point3f[(0, 0, 0), (4, 4, 4), (2, 2, 2)]
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "view3d")
+        sc = scatter!(ax, pts; markersize = 14, color = :gray)
+        # Runs through the zoomed limits with both ends outside them: the part inside is still
+        # drawn, so it must still hover.
+        ln = lines!(ax, [0, 2.6, 4], [2.8, 2.8, 2.8], [2, 2, 2]; color = :steelblue)
+        masque(fig, interactables(sc; id = :pts), interactables(ln; id = :line), ViewInteractable(ax; id = :view))
     end
 
     legend = let
@@ -955,8 +1013,8 @@ function build_kind_sweep()
         )
     end
 
-    # AxisInteractable (whole-axis catch-all readout) + ColorbarInteractable (bounded-bbox
-    # readout) sharing one widget/bond with a real, pre-existing selection (`:pts`) alongside
+    # AxisInteractable (whole-axis catch-all readout) + the automatic ColorbarInteractable
+    # (bounded-bbox readout; one the caller passed would own the bond, #309) sharing one widget/bond with a real, pre-existing selection (`:pts`) alongside
     # them — the fixture #113 asks for: an axis or colorbar click must leave that selection
     # untouched (the #107 round-1 regression), and the two `:axis`-kind layers exercise the
     # catch-all vs. bounded branches of geometry.ts's hit test respectively. `sc`'s continuous
@@ -967,24 +1025,22 @@ function build_kind_sweep()
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "axis", limits = (0, 4, 0, 3))
         sc = scatter!(ax, first.(pts), last.(pts); color = [1.0, 2.0, 3.0], colormap = :viridis, markersize = 22)
-        cb = Colorbar(fig[1, 2], sc)
+        Colorbar(fig[1, 2], sc)
         masque(
             fig,
             [
-                PointInteractable(
-                    ax, sc; id = :pts,
+                interactables(
+                    sc; id = :pts,
                     payloads = [(; label = "alpha"), (; label = "beta"), (; label = "gamma")],
                 ),
-                ColorbarInteractable(cb; id = :colorbar),
-                # Sorted LAST: an `AxisInteractable`'s hit test has no bounding check at all — a
-                # true whole-image catch-all (geometry.ts's "axis" case with `geometry ===
-                # nothing`). Placed before `:pts`/`:colorbar` in `build_manifest`'s stable layer
-                # order, it would win every click meant for the scatter marks or the colorbar
-                # (the layer-ordering hazard #113 calls out).
+                # Sorted LAST, after the automatic `:colorbar`: an `AxisInteractable`'s hit test
+                # has no bounding check at all — a true whole-image catch-all (geometry.ts's
+                # "axis" case with `geometry === nothing`). Placed before `:pts`/`:colorbar` in
+                # `build_manifest`'s stable layer order, it would win every click meant for the
+                # scatter marks or the colorbar (the layer-ordering hazard #113 calls out).
                 AxisInteractable(ax; id = :axis),
             ];
             selected = Dict(:pts => [2]),
-            auto = false,
         )
     end
 
@@ -1041,7 +1097,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, view, view3d, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
