@@ -1793,7 +1793,8 @@ committed. Produces one `:slice` [`HitLayer`](@ref), which is not a hit target.
   that riser starts. `Density` and `Band` contribute the band's upper curve as drawn. A `Band`
   with `direction = :y` flips its converted edge (Makie swaps only the mesh). A `Density` with
   `direction = :y` already stores `Point2(offset + density, x)` and is `:horizontal`; it is not
-  flipped again. A vector becomes one slice; mixed orientations raise `ArgumentError` unless
+  flipped again. A NaN in either coordinate of a plot's point is a gap in the slice, as in the
+  drawn line. A vector becomes one slice; mixed orientations raise `ArgumentError` unless
   `orientation` is passed.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` or a `PolarAxis`, if

@@ -272,6 +272,13 @@ end
         @test hs.orientation === :horizontal
         @test hs.series[1].y == hy
         @test hs.series[1].x == 4 .- hy
+        # A NaN in one coordinate is a gap in the drawn line, not an error.
+        gappy = lines!(axp, [0.0, 1.0, 2.0, 3.0, 4.0], [0.0, 1.0, NaN, 3.0, 4.0])
+        gs = SliceInteractable(axp, gappy; covers = ())
+        @test isequal(gs.series[1].x, [0.0, 1.0, NaN, 3.0, 4.0])
+        @test isequal(gs.series[1].y, [0.0, 1.0, NaN, 3.0, 4.0])
+        missing_x = lines!(axp, [0.0, 1.0, NaN, 3.0, 4.0], [0.0, 1.0, 2.0, 3.0, 4.0])
+        @test isnan(SliceInteractable(axp, missing_x; covers = ()).series[1].y[3])
         back = lines!(axp, [0.0, 1.0, 0.5], [0.0, 1.0, 0.5])
         @test_throws ArgumentError SliceInteractable(axp, back)
         sc = scatter!(axp, [1.0], [1.0])

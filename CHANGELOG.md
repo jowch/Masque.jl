@@ -33,6 +33,9 @@ All notable changes to this project are documented here. The format is based on
   before (#304).
 
 ### Fixed
+- A slice built from a `lines!` plot (or `stairs`, `series`, `band`, `density`) whose data
+  has a NaN in one coordinate, such as a missing `y` value, now samples around the gap the
+  way the line is drawn. Before, it raised "series 1 has a non-finite coordinate" (#319).
 - `masque` warns once per call about the plots it skips, listing each kind, with a count when
   one repeats. Before, it warned once per skipped plot, so two `Axis3` panels with `text!`
   gave two identical warnings per call (#289).

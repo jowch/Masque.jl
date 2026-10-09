@@ -1637,12 +1637,17 @@ end
 # swapped again. A strictly decreasing probe is stored left-to-right; a non-monotonic one fails
 # in the constructor.
 
+# Makie breaks a line where either coordinate is NaN, so the gap is NaN in both: the series
+# constructor rejects a point that is finite on one side only.
 function _slice_xy(pts)
     xs = Float64[]
     ys = Float64[]
     for p in pts
-        push!(xs, Float64(p[1]))
-        push!(ys, Float64(p[2]))
+        x = Float64(p[1])
+        y = Float64(p[2])
+        isfinite(x) && isfinite(y) || (x = y = NaN)
+        push!(xs, x)
+        push!(ys, y)
     end
     return xs, ys
 end
