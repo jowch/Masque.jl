@@ -101,12 +101,14 @@ coordinate ships as the text a scatter's default payload holds. `step` (`"pre"`,
 `"center"`, from a `stairs` plot) says which sample each drawn corner belongs to. Placement
 (`translate!`, …) moves the path but not the samples.
 
-`label` (optional, per-layer, `String`) is a screen-reader announcement prefix for the
-keyboard-navigation overlay ([§11](11-keyboard.md)) — e.g. `"Scatter"` in "Scatter, element 3 of 10: …". Set via
-the `label` keyword on `PointInteractable`/`SegmentInteractable`/`RectInteractable`/
-`PolygonInteractable` (the kinds keyboard nav visits); absent by default, and
-omitted from the manifest entirely when unset (same idiom as `selects`/`tol` above) — see
-`perf-findings.md` for the measured per-layer wire cost.
+`label` (optional, per-layer, `String`) is the layer's name, which keyboard navigation
+announces before the position ([§11](11-keyboard.md)): "wild type, element 3 of 10: …".
+Positional constructors default it to `nothing`. A constructor that takes a plot, and
+`_construct` for every plot `masque(fig)` builds, default it to the plot's own Makie `label`
+when that label is non-empty plain text (`_plot_label`); empty, LaTeX and rich-text labels
+give `nothing`. An explicit `label`, including `nothing`, wins. It is omitted from the
+manifest entirely when unset (same idiom as `selects`/`tol` above) — see `perf-findings.md`
+for the measured per-layer wire cost.
 
 This is a **closed set of seven data geometry kinds**
 (`:circles/:polyline/:lines/:segments/:rects/:grid/:polygons`)
@@ -136,7 +138,7 @@ this table is `docs/src/support.md`.
 | `PointInteractable` | `:circles` | Scatter, MeshScatter (3-D), Stem·pts, ScatterLines·pts | `(; index, x, y)`, plus `z` when the point has three coordinates (Scatter on `Axis3`, MeshScatter) |
 | `SegmentInteractable` | `:polyline` \| `:lines` \| `:segments` | Lines, Stairs, Series, ScatterLines·line (`:lines`, one element per path); an explicit `mode=:polyline` vertex list stays `:polyline` (per edge); LineSegments, Errorbars, Rangebars, HLines, VLines, Stem·stems, Wireframe, Arrows3D, Arrows2D (`:pairs` → `:segments`) | `:lines` `(; index)` (a series adds `label` when Makie set one); `:polyline` / `:segments` `(; segment_index)`; Arrows3D `(; index, x, y, z, u, v, w)`; Arrows2D `(; index, x, y, u, v)` |
 | `RectInteractable` | `:rects` | BarPlot, Hist, Waterfall, CrossBar, HSpan, VSpan, Spy, BoxPlot (un-notched) | BarPlot/Waterfall `(; low, high, value)`; Hist `(; value, low, high)`; CrossBar `(; midpoint, low, high)`; HSpan/VSpan `(; low, high)`; BoxPlot `(; q1, median, q3)`; Spy `(; index)` |
-| `GridInteractable` | `:grid` | Heatmap, Image | none: the client resolves `(; i, j, value)`, and a click commits a `GridCellEvent` |
+| `GridInteractable` | `:grid` | Heatmap, Image | optional, one per cell, row-major like `values[]` (#290); the client resolves `(; i, j, value)`, and a click commits a `GridCellEvent` carrying that cell's payload |
 | `PolygonInteractable` | `:polygons` | Poly, Band, Density, Contourf, Violin, Voronoiplot, BoxPlot (notched) | Band/Density/Voronoiplot `(; index)`; Contourf `(; low, high)`; Violin `(; x)` |
 | `AxisInteractable` | `:axis` (unbounded) | the Axis area itself (linear + log) — declared | `(; x, y)` inverted client-side |
 | `ColorbarInteractable` | `:axis` (bounded bbox) | Colorbar — auto-extracted from `fig.content` | `(; value)` inverted client-side via `AxisTransform.valueaxis` |

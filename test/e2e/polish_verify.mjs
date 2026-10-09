@@ -448,6 +448,116 @@ try {
   }
   passed.push("overlaystyle");
 
+  // Axis3 kinds (#301): the baked selection and a hover on another mark sit on the projected
+  // mark. `overlap3d` hovers the front marker of a pair: the highlight must take the marker's
+  // circle, not the sphere's behind it.
+  for (const [key, layerId, sel, hov] of [
+    ["scatter3d", "scatter", 1, 0],
+    ["meshscatter3d", "meshscatter", 1, 0],
+    ["wireframe3d", "wireframe", 0, 3],
+    ["overlap3d", "scatter", null, 0],
+  ]) {
+    const m = await inspect(key);
+    pin(m, key);
+    const layer = (await layersOf(key)).find((l) => l.id === layerId);
+    if (!layer) throw new Error(`${key}: no layer ${layerId}`);
+    const g = layer.geometry;
+    const circles = layer.kind === "circles";
+    if (sel !== null) {
+      if (circles) {
+        const w = {
+          fill: m.kids.find((k) => k.layer === "fill" && k.kind === "closed"),
+          edge: m.kids.find((k) => k.layer === "edge" && k.kind === "closed"),
+          plain: m.kids.find((k) => k.layer === "plain" && k.kind === "closed"),
+        };
+        assertWash(w, key, false);
+        for (const shape of [w.fill, w.edge].filter(Boolean)) {
+          assertCircleR(shape.r, g[3 * sel + 2], `${key}/selected-${shape.layer}`);
+          if (Math.abs(Number(shape.cx) - g[3 * sel]) > 0.6 || Math.abs(Number(shape.cy) - g[3 * sel + 1]) > 0.6) {
+            throw new Error(`${key}: selected wash off the mark (${shape.cx},${shape.cy}) vs (${g[3 * sel]},${g[3 * sel + 1]})`);
+          }
+        }
+      } else {
+        const r = m.kids.find((k) => k.kind === "ring");
+        assertRing(r, key, false);
+        const ln = r.lines[0];
+        if (Math.abs(Number(ln.x1) - g[4 * sel]) > 1.2 || Math.abs(Number(ln.y1) - g[4 * sel + 1]) > 1.2) {
+          throw new Error(`${key}: ring off the edge ${JSON.stringify(ln)} vs ${g.slice(4 * sel, 4 * sel + 4)}`);
+        }
+      }
+    }
+    const [hx3, hy3] = circles
+      ? [g[3 * hov], g[3 * hov + 1]]
+      : [(g[4 * hov] + g[4 * hov + 2]) / 2, (g[4 * hov + 1] + g[4 * hov + 3]) / 2];
+    let t3 = null;
+    for (let a = 0; a < 8; a++) {
+      t3 = await hoverAt(key, hx3, hy3);
+      if (t3.show && (t3.hi.fill || t3.hi.edge)) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (!t3?.show) throw new Error(`${key}: no tooltip on hover ${JSON.stringify(t3)}`);
+    assertHoverRecipe(t3.hi, key, circles, false);
+    if (circles) {
+      for (const shape of [t3.hi.fill, t3.hi.edge].filter(Boolean)) {
+        assertCircleR(shape.r, g[3 * hov + 2], `${key}/hover-${shape.layer}`);
+      }
+    }
+    passed.push(`${key}/highlight`);
+
+    // The checks above compare the overlay with the manifest it was drawn from, so they pass
+    // even when the manifest is off the drawn mark. On Cairo, read the rendered PNG at the
+    // hit geometry instead (same canvas readback as flush-radius above): every tested mark's
+    // centre (an edge's midpoint) must be drawn, and `overlap3d`'s must be the black front
+    // marker, not the grey sphere behind it. A sphere's hit circle comes from its data-space
+    // size, an axis-aligned approximation that can fall short of the drawn outline, so it is
+    // checked as a band: drawn 3 px inside `r`, background by 1.25·r. Measured on this figure,
+    // the outline sits 3-4 px past `r`.
+    if (backend === "cairo") {
+      const n = circles ? g.length / 3 : g.length / 4;
+      const probes = [];
+      for (let i = 0; i < n; i++) {
+        if (!circles && i !== sel && i !== hov) continue;
+        if (circles) {
+          const [cx, cy, r] = [g[3 * i], g[3 * i + 1], g[3 * i + 2]];
+          probes.push({ x: cx, y: cy, want: key === "overlap3d" ? "dark" : "mark", what: `${i}/centre` });
+          if (key === "meshscatter3d") {
+            for (const [dx, dy, dir] of [[1, 0, "+x"], [-1, 0, "-x"], [0, 1, "+y"], [0, -1, "-y"]]) {
+              probes.push({ x: cx + dx * (r - 3), y: cy + dy * (r - 3), want: "mark", what: `${i}/inside${dir}` });
+              probes.push({ x: cx + dx * 1.25 * r, y: cy + dy * 1.25 * r, want: "bg", what: `${i}/outside${dir}` });
+            }
+          }
+        } else {
+          probes.push({ x: (g[4 * i] + g[4 * i + 2]) / 2, y: (g[4 * i + 1] + g[4 * i + 3]) / 2, want: "mark", what: `${i}/mid` });
+        }
+      }
+      const px = await page.evaluate(([k, ps]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        const img = host.querySelector("img");
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        return ps.map((p) => {
+          const d = ctx.getImageData(Math.round(p.x), Math.round(p.y), 1, 1).data;
+          return { r: d[0], g: d[1], b: d[2] };
+        });
+      }, [key, probes]);
+      // Axis3 gridlines are light grey (~233), so they count as background here.
+      const isBg = (p) => p.r > 225 && p.g > 225 && p.b > 225;
+      probes.forEach((p, i) => {
+        const c = px[i];
+        const ok = p.want === "bg" ? isBg(c) : p.want === "dark" ? Math.max(c.r, c.g, c.b) < 60 : !isBg(c);
+        if (!ok) throw new Error(`${key}/on-drawn-mark: ${p.what} at (${p.x.toFixed(1)}, ${p.y.toFixed(1)}) wanted ${p.want}, read ${JSON.stringify(c)}`);
+      });
+      passed.push(`${key}/on-drawn-mark`);
+    } else {
+      passed.push(`${key}/on-drawn-mark-skipped-webgl`);
+    }
+  }
+
   // The axis readout's cursor-following tooltip: the caret apex sits on the pointer, both in
   // open space and where the box clamps at the right edge (the caret then moves along the box).
   // The bottom flip (.flip-y) leaves this horizontal apex unchanged; overlay.test.ts pins it. Before, it sat a fixed 14px into a box offset

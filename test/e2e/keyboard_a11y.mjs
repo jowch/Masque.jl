@@ -301,6 +301,24 @@ try {
     if (afterEsc.count === 0) throw new Error(`${key}: Escape cleared g.link instantly (no remount fade)`);
     if (!afterEsc.leaving) throw new Error(`${key}: Escape did not apply masque-leave to g.link`);
     passed.push("legend/keyboard-escape-fades-link");
+
+    // #304: a plot's Makie `label` names its layer, and the live region announces that name
+    // before the position. Every plot here has one, so End's mark (the last focusable layer's
+    // last element) starts with its plot's label.
+    const named = Object.fromEntries(layers.filter((l) => FOCUSABLE.has(l.kind)).map((l) => [l.id, l.label]));
+    if (named.lines !== "quad" || named.lines_2 !== "lin" || named.scatter !== "pts") {
+      throw new Error(`${key}: plot layers not named after their Makie labels: ${JSON.stringify(named)}`);
+    }
+    const last = layers.filter((l) => FOCUSABLE.has(l.kind) && l.id !== "legend").at(-1);
+    await surface.focus();
+    await page.keyboard.press("End");
+    const prefix = new RegExp(`^${last.label}, element \\d+ of \\d+`);
+    const atEnd = await waitForLiveRegion(key, prefix);
+    if (!prefix.test(atEnd.liveText)) {
+      throw new Error(`${key}: live region does not start with the layer name: ${JSON.stringify(atEnd.liveText)}`);
+    }
+    passed.push("legend/plot-label-names-layer");
+    await page.keyboard.press("Escape");
   }
 
   // :grid (heatmap) must never enter the focus list — arrowing must draw nothing.

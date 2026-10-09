@@ -630,6 +630,24 @@ try {
       passed.push(`${key}/legend-precedence-pixel-contested`);
     }
 
+    // Two plots claim the hovered pixel (#301): the one drawn last must sort first, so the
+    // generic hover/click checks below prove it answers. The pixel has to sit inside one of the
+    // plot underneath's circles, or the pair doesn't overlap and those checks prove nothing.
+    if (spec.overlapsLayer) {
+      const under = layers.find((l) => l.id === spec.overlapsLayer);
+      if (!under) throw new Error(`${key}: no layer "${spec.overlapsLayer}" in manifest`);
+      if (!(layers.indexOf(layer) < layers.indexOf(under))) {
+        throw new Error(`${key}: layer "${layer.id}" does not sort before "${under.id}"`);
+      }
+      if (under.kind !== "circles") throw new Error(`${key}: overlapsLayer must be a circles layer, got ${under.kind}`);
+      const hp = hitPoint(layer, spec.hoverIndex);
+      const contested = Array.from({ length: under.geometry.length / 3 }, (_, i) => hitPoint(under, i))
+        .some((c) => Math.hypot(hp.x - c.x, hp.y - c.y) < c.r);
+      if (!contested) throw new Error(`${key}: hover pixel ${JSON.stringify(hp)} is not inside any "${under.id}" circle`);
+      passed.push(`${key}/overlap-order`);
+      passed.push(`${key}/overlap-pixel-contested`);
+    }
+
     // mount.ts used to force host.value = null unconditionally, so the real Pluto bond settled
     // on `nothing` at mount even with selected= baked in. Read #out_${key} (repr(ev) off the
     // actual bond) before any click/drag on this widget to catch that directly.
@@ -1847,6 +1865,12 @@ try {
     }
     if (spec.layerId === "legend" && !/LegendEvent\(/.test(after)) {
       throw new Error(`${key}-click: expected LegendEvent: ${after.slice(0, 220)}`);
+    }
+    // A grid with per-cell payloads (#290): the bond carries the clicked cell's own payload.
+    if (spec.bindPayloadField) {
+      const want = `${spec.bindPayloadField} = ${JSON.stringify(layer.payloads[clickIdx][spec.bindPayloadField])}`;
+      if (!after.includes(want)) throw new Error(`${key}-click: expected ${want} in ${after.slice(0, 220)}`);
+      if (!staleAfter) passed.push(`${key}/click-payload`);
     }
     if (!staleAfter) passed.push(`${key}/click-bind`);
 

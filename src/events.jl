@@ -9,8 +9,8 @@ Abstract type of every `masque` `@bind` value that is not `nothing`. Concrete su
 the fields of that commit: an element pick, a legend entry, a grid cell or window, an axis or
 colorbar click, a threshold, or ROI bounds. A `selects` ROI over points yields a
 `Vector{ElementEvent}` instead of one event. Field names on the struct win over a payload key
-of the same name; on an [`ElementEvent`](@ref) or [`LegendEvent`](@ref), other names forward
-to the payload. See [`bondtype`](@ref) and [`transform_bond`](@ref).
+of the same name; on an [`ElementEvent`](@ref), a [`LegendEvent`](@ref), or a
+[`GridCellEvent`](@ref) with a payload, other names forward to the payload. See [`bondtype`](@ref) and [`transform_bond`](@ref).
 """
 abstract type InteractionEvent end
 
@@ -26,11 +26,16 @@ include("events/grid.jl")
 include("events/readout.jl")
 include("events/bounds.jl")
 
+# Events whose payload fields read through as properties. A grid cell forwards only when its
+# grid has `payloads`.
+_forwards(ev::Union{ElementEvent, LegendEvent}) = true
+_forwards(ev::GridCellEvent) = getfield(ev, :payload) !== nothing
+_forwards(ev) = false
+
 function Base.getproperty(ev::InteractionEvent, name::Symbol)
     name === :layer && return getfield(ev, :layer)
     hasfield(typeof(ev), name) && return getfield(ev, name)
-    ev isa Union{ElementEvent, LegendEvent} ||
-        throw(ArgumentError("$(typeof(ev)) has no field $name"))
+    _forwards(ev) || throw(ArgumentError("$(typeof(ev)) has no field $name"))
     pl = getfield(ev, :payload)
     hasproperty(pl, name) && return getproperty(pl, name)
     if pl isa AbstractDict
@@ -62,7 +67,8 @@ end
 
 function Base.propertynames(ev::InteractionEvent)
     fs = fieldnames(typeof(ev))
-    ev isa Union{ElementEvent, LegendEvent} || return fs
+    ev isa GridCellEvent && !_forwards(ev) && return filter(!=(:payload), fs)
+    _forwards(ev) || return fs
     pl = getfield(ev, :payload)
     data = _payload_names(pl)
     out = Symbol[]
@@ -99,6 +105,7 @@ function Base.show(io::IO, ev::InteractionEvent)
             f === :layer && continue
             # A category label is only set on a categorical axis; omit the unset one.
             f in (:xcat, :ycat, :category) && getfield(ev, f) === nothing && continue
+            f === :payload && getfield(ev, f) === nothing && continue
             print(io, ", ", f, " = ")
             show(io, getfield(ev, f))
         end

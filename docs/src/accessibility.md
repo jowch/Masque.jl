@@ -69,31 +69,24 @@ pointer.
 
 ## What gets announced
 
-When you move to a mark, a screen reader announces an optional layer
-name, the mark's position in its layer, and the text its tooltip shows.
-For example:
+When you move to a mark, a screen reader announces the layer's name,
+the mark's position in its layer, and the text its tooltip shows. A
+plot's layer takes its name from the plot's own `label`, the one its
+legend entry shows:
 
 ```julia
-PointInteractable(
-    ax, [(1.0, 4.0), (2.0, 1.0), (3.0, 3.0)];
-    label = "Scatter",
-    payloads = [(x = 1.0, y = 4.0), (x = 2.0, y = 1.0), (x = 3.0, y = 3.0)],
-)
+scatter!(ax, [1.0, 2.0, 3.0], [4.0, 1.0, 3.0]; label = "wild type")
 ```
 
-Moving to the first point might announce "Scatter, element 1 of 3: x
-1.0, y 4.0". Without `label`, the announcement starts at the position:
-"element 1 of 3: x 1.0, y 4.0".
+Moving to the first point might announce "wild type, element 1 of 3: x
+1.0, y 4.0". A plot with no `label` gets no name, and the announcement
+starts at the position: "element 1 of 3: x 1.0, y 4.0". A label written
+in LaTeX or rich text names nothing either, since a screen reader would
+read out its markup; give that layer a plain-text name as shown below.
 
-`label` names the whole layer, so you set it once per interactable. The
-constructors that take positions accept it:
-[`PointInteractable`](@ref), [`SegmentInteractable`](@ref),
-[`RectInteractable`](@ref), and
-[`PolygonInteractable`](@ref).
-
-`masque(fig)` on its own sets no labels. To name the layers it builds
-for your plots, pass each plot to [`interactables`](@ref) with a
-`label`, here for a scatter `s` and a barplot `b`:
+To name a layer something else, or to name one whose plot has no
+`label`, pass the plot to [`interactables`](@ref) with a `label`, here
+for a scatter `s` and a barplot `b`:
 
 ```julia
 masque(
@@ -103,9 +96,13 @@ masque(
 )
 ```
 
-A payload field called `label`, as in `(city = "Tokyo", label =
-"capital")`, is different: it belongs to one mark and shows in that
-mark's tooltip.
+`label = nothing` leaves the name out. The constructors that take
+positions accept `label` too: [`PointInteractable`](@ref),
+[`SegmentInteractable`](@ref), [`RectInteractable`](@ref), and
+[`PolygonInteractable`](@ref).
+
+The `label` field that `series!` puts in each line's payload is
+different: it names that one line, and shows in its tooltip.
 
 ## [Limitations](@id accessibility-limitations)
 

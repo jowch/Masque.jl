@@ -114,6 +114,15 @@ HTML(
         "<span id=\"coords_image_rgb\" style=\"display:none\">$(JSON3.write(sweep.image_rgb.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-0000000000e3
+@bind ev_heatmap_labels sweep.heatmap_labels
+
+# ╔═╡ d1000000-0000-0000-0000-0000000000e4
+HTML(
+    "<span id=\"out_heatmap_labels\">HEATMAP_LABELS=$(repr(ev_heatmap_labels))</span>" *
+        "<span id=\"coords_heatmap_labels\" style=\"display:none\">$(JSON3.write(sweep.heatmap_labels.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000020
 @bind ev_barplot sweep.barplot
 
@@ -221,6 +230,87 @@ HTML(
 HTML(
     "<span id=\"out_scatterlines3d\">SCATTERLINES3D=$(repr(ev_scatterlines3d))</span>" *
         "<span id=\"coords_scatterlines3d\" style=\"display:none\">$(JSON3.write(sweep.scatterlines3d.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000101
+@bind ev_scatter3d sweep.scatter3d
+
+# ╔═╡ d1000000-0000-0000-0000-000000000102
+HTML(
+    "<span id=\"out_scatter3d\">SCATTER3D=$(repr(ev_scatter3d))</span>" *
+        "<span id=\"coords_scatter3d\" style=\"display:none\">$(JSON3.write(sweep.scatter3d.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000103
+@bind ev_lines3d sweep.lines3d
+
+# ╔═╡ d1000000-0000-0000-0000-000000000104
+HTML(
+    "<span id=\"out_lines3d\">LINES3D=$(repr(ev_lines3d))</span>" *
+        "<span id=\"coords_lines3d\" style=\"display:none\">$(JSON3.write(sweep.lines3d.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000105
+@bind ev_meshscatter3d sweep.meshscatter3d
+
+# ╔═╡ d1000000-0000-0000-0000-000000000106
+HTML(
+    "<span id=\"out_meshscatter3d\">MESHSCATTER3D=$(repr(ev_meshscatter3d))</span>" *
+        "<span id=\"coords_meshscatter3d\" style=\"display:none\">$(JSON3.write(sweep.meshscatter3d.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000107
+@bind ev_wireframe3d sweep.wireframe3d
+
+# ╔═╡ d1000000-0000-0000-0000-000000000108
+HTML(
+    "<span id=\"out_wireframe3d\">WIREFRAME3D=$(repr(ev_wireframe3d))</span>" *
+        "<span id=\"coords_wireframe3d\" style=\"display:none\">$(JSON3.write(sweep.wireframe3d.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000109
+@bind ev_overlap3d sweep.overlap3d
+
+# ╔═╡ d1000000-0000-0000-0000-00000000010a
+HTML(
+    "<span id=\"out_overlap3d\">OVERLAP3D=$(repr(ev_overlap3d))</span>" *
+        "<span id=\"coords_overlap3d\" style=\"display:none\">$(JSON3.write(sweep.overlap3d.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000010b
+@bind ev_text sweep.text
+
+# ╔═╡ d1000000-0000-0000-0000-00000000010c
+HTML(
+    "<span id=\"out_text\">TEXT=$(repr(ev_text))</span>" *
+        "<span id=\"coords_text\" style=\"display:none\">$(JSON3.write(sweep.text.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000010d
+@bind ev_datashader sweep.datashader
+
+# ╔═╡ d1000000-0000-0000-0000-00000000010e
+HTML(
+    "<span id=\"out_datashader\">DATASHADER=$(repr(ev_datashader))</span>" *
+        "<span id=\"coords_datashader\" style=\"display:none\">$(JSON3.write(sweep.datashader.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000010f
+@bind ev_violin sweep.violin
+
+# ╔═╡ d1000000-0000-0000-0000-000000000110
+HTML(
+    "<span id=\"out_violin\">VIOLIN=$(repr(ev_violin))</span>" *
+        "<span id=\"coords_violin\" style=\"display:none\">$(JSON3.write(sweep.violin.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000111
+@bind ev_stairs sweep.stairs
+
+# ╔═╡ d1000000-0000-0000-0000-000000000112
+HTML(
+    "<span id=\"out_stairs\">STAIRS=$(repr(ev_stairs))</span>" *
+        "<span id=\"coords_stairs\" style=\"display:none\">$(JSON3.write(sweep.stairs.manifest["layers"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-0000000000b5
@@ -444,6 +534,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000019
 # ╠═d1000000-0000-0000-0000-000000000060
 # ╠═d1000000-0000-0000-0000-000000000061
+# ╠═d1000000-0000-0000-0000-0000000000e3
+# ╟─d1000000-0000-0000-0000-0000000000e4
 # ╠═d1000000-0000-0000-0000-000000000020
 # ╠═d1000000-0000-0000-0000-000000000021
 # ╠═d1000000-0000-0000-0000-000000000022
@@ -468,6 +560,24 @@ HTML(
 # ╠═d1000000-0000-0000-0000-00000000006d
 # ╠═d1000000-0000-0000-0000-0000000000b3
 # ╠═d1000000-0000-0000-0000-0000000000b4
+# ╠═d1000000-0000-0000-0000-000000000101
+# ╠═d1000000-0000-0000-0000-000000000102
+# ╠═d1000000-0000-0000-0000-000000000103
+# ╠═d1000000-0000-0000-0000-000000000104
+# ╠═d1000000-0000-0000-0000-000000000105
+# ╠═d1000000-0000-0000-0000-000000000106
+# ╠═d1000000-0000-0000-0000-000000000107
+# ╠═d1000000-0000-0000-0000-000000000108
+# ╠═d1000000-0000-0000-0000-000000000109
+# ╠═d1000000-0000-0000-0000-00000000010a
+# ╠═d1000000-0000-0000-0000-00000000010b
+# ╠═d1000000-0000-0000-0000-00000000010c
+# ╠═d1000000-0000-0000-0000-00000000010d
+# ╠═d1000000-0000-0000-0000-00000000010e
+# ╠═d1000000-0000-0000-0000-00000000010f
+# ╠═d1000000-0000-0000-0000-000000000110
+# ╠═d1000000-0000-0000-0000-000000000111
+# ╠═d1000000-0000-0000-0000-000000000112
 # ╠═d1000000-0000-0000-0000-0000000000b5
 # ╠═d1000000-0000-0000-0000-0000000000b6
 # ╠═d1000000-0000-0000-0000-00000000006a

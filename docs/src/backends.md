@@ -114,3 +114,45 @@ A static HTML export keeps its tooltips and highlights on both
 backends: it contains the PNG, or on WGLMakie the scene, which the
 reader's GPU draws without Julia. For what stops working, see
 [Static exports and this site](@ref).
+
+## [Outside Pluto](@id outside-pluto)
+
+A CairoMakie widget keeps its tooltips and highlights outside Pluto, in
+Documenter or in an HTML page you write with
+`show(io, MIME"text/html"(), w)`. Hover the two plots below; this page
+built them with Documenter, without Pluto.
+
+```@example outside-pluto
+using CairoMakie, Masque
+
+fig = Figure(size = (400, 260))
+ax = Axis(fig[1, 1])
+scatter!(ax, [1, 2, 3, 4], [1, 4, 9, 16]; markersize = 16)
+masque(fig)
+```
+
+```@example outside-pluto
+fig2 = Figure(size = (400, 260))
+ax2 = Axis(fig2[1, 1])
+lines!(ax2, 0:0.1:6, sin.(0:0.1:6))
+masque(fig2)
+```
+
+The page loads Masque's script once from jsDelivr, the version that
+matches your installed Masque, so hover needs an internet connection;
+offline, the page shows the plain figures. Each widget adds its image
+to the page. Documenter warns about a page past 100 KB and stops the
+build at 200 KB, so a page with several large figures goes in
+`size_threshold_ignore`:
+
+```julia
+makedocs(; format = Documenter.HTML(; size_threshold_ignore = ["plots.md"]), ...)
+```
+
+A click highlights a mark there too, but nothing reads the choice: the
+`@bind` value and dragging the view with a [`ViewInteractable`](@ref)
+need a running Pluto notebook. A display that doesn't run the page's
+scripts shows the plain figure, and a WGLMakie widget, which has no
+image to fall back on, shows a box of the figure's size saying it is
+drawn only in Pluto. To put a WGLMakie figure in a document, use
+`backend = :cairo` there.
