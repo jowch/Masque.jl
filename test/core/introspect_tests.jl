@@ -1782,6 +1782,30 @@ end
         end
     end
 
+    @testset "wireframe ships each drawn edge once (#316)" begin
+        P = Point3f
+        # reversed and repeated copies drop; first occurrences keep their order
+        v = [P(0, 0, 0), P(1, 0, 0), P(1, 0, 0), P(1, 1, 0), P(1, 0, 0), P(0, 0, 0), P(1, 1, 0), P(1, 0, 0)]
+        @test Masque._unique_edges(v) == v[1:4]
+        nan = P(NaN, 0, 0)
+        @test isequal(Masque._unique_edges([nan, P(0, 0, 0), P(0, 0, 0), nan]), [nan, P(0, 0, 0)])
+        @test isempty(Masque._unique_edges(P[]))
+
+        # a 3×3 grid: 4 quads outline 16 segments for 12 drawn edges
+        f = Figure()
+        a = Axis3(f[1, 1])
+        w = wireframe!(a, [0.0, 2.0, 4.0], [0.0, 2.0, 4.0], [1.0 2.0 1.0; 2.0 4.0 2.0; 1.0 2.0 1.0])
+        i = SegmentInteractable(a, w)
+        @test length(i.vertices) == 2 * 12
+        @test i.vertices[1:8] == Masque._conv(Masque._childof(w, Makie.LineSegments))[1][1:8]   # first quad keeps 0-3
+
+        # a cube mesh: 12 triangles outline 36 segments for 18 drawn edges (12 sides + 6 diagonals)
+        g = Figure()
+        b = Axis3(g[1, 1])
+        wm = wireframe!(b, Makie.normal_mesh(Rect3f(0, 0, 0, 1, 1, 1)))
+        @test length(SegmentInteractable(b, wm).vertices) == 2 * 18
+    end
+
     @testset "datashader hover reads the count, whatever its operation (#276)" begin
         pts = Point2f[(0, 0), (1, 1), (1, 1), (2, 0.5)]
         for kw in ((;), (; operation = identity), (; local_operation = log1p))

@@ -513,7 +513,7 @@ by the plot type):
 | `Makie.Stairs` | `:stairs` | one `:lines` element, the whole staircase | the child `Lines`' pre-expanded step polyline |
 | `Makie.Series` | `:series` | one `:lines` layer, one element per series | each child line (or a `ScatterLines` child's line) |
 | `Makie.LineSegments` | `:segments` | `:pairs`, per segment | converted data |
-| `Makie.Wireframe` | `:wireframe` | `:pairs`, per edge | the child `LineSegments`' edges (incl. mesh-triangulation diagonals) |
+| `Makie.Wireframe` | `:wireframe` | `:pairs`, per drawn edge, each once | the child `LineSegments`' edges (incl. mesh-triangulation diagonals), an edge shared by two faces kept once |
 | `Makie.Arrows3D` | `:arrows3d` | `:pairs`, per shaft | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, z, u, v, w)` from `points`/`directions` |
 | `Makie.Arrows2D` | `:arrows2d` | `:pairs`, per arrow, tail to tip | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, u, v)` from `points`/`directions` |
 | `Makie.Errorbars` | `:errorbars` | `:pairs`, per bar | each bar's low→high endpoints |

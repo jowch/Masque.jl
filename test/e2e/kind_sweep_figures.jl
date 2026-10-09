@@ -181,9 +181,8 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
-        # `wireframe!` on Axis3: each drawn edge is one segment element. Makie outlines every
-        # quad, so an interior edge is drawn (and shipped) twice, #316; elements 0 and 3 are the
-        # first quad's two outer edges, which appear once. A fix for #316 may renumber them.
+        # `wireframe!` on Axis3: each drawn edge is one segment element, an edge two quads
+        # share shipped once (#316). Elements 0 and 3 are the first quad's two outer edges.
         "key" => "wireframe3d", "layerId" => "wireframe", "layerKind" => "segments",
         "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 3,
         "tip" => "index", "hoverIndex" => 3, "hoverTip" => "index", "mode" => "element",

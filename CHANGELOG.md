@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** a `wireframe!` layer has one element per drawn edge. Makie outlines every
+  face, so an edge shared by two faces used to ship twice, and its second copy could never
+  be hovered or clicked. The edges after the first repeat now have lower indices, so a
+  saved `pick.index`, a `selected` index or a `payloads` vector for a wireframe needs
+  updating; `payloads` takes one entry per drawn edge (#316).
+
 ## [0.2.2] - 2026-10-09
 
 ### Added

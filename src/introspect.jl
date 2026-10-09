@@ -308,9 +308,27 @@ SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothin
     SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol, tooltip, label)
 
 # The rendered edges live in the child LineSegments' converted (DATA space), including
-# mesh-triangulation diagonals a grid-edge reconstruction would miss.
+# mesh-triangulation diagonals a grid-edge reconstruction would miss. Makie outlines every
+# quad (or triangle), so an edge two faces share is drawn twice; `_unique_edges` keeps one
+# copy so each drawn edge is one element (#316).
 SegmentInteractable(ax, p::Makie.Wireframe; id = :wireframe, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p)) =
-    SegmentInteractable(ax, _conv(_childof(p, Makie.LineSegments))[1]; mode = :pairs, id, payloads, tol, tooltip, label)
+    SegmentInteractable(ax, _unique_edges(_conv(_childof(p, Makie.LineSegments))[1]); mode = :pairs, id, payloads, tol, tooltip, label)
+
+# Drop repeated `:pairs` edges, in either direction, keeping each edge's first occurrence and
+# its order. Endpoints compare with `isequal`, so a NaN gap edge still matches its own copy.
+function _unique_edges(v::AbstractVector)
+    T = eltype(v)
+    seen = Set{Tuple{T, T}}()
+    out = similar(v, 0)
+    for k in 1:2:(length(v) - 1)
+        a, b = v[k], v[k + 1]
+        key = isless(Tuple(b), Tuple(a)) ? (b, a) : (a, b)
+        key in seen && continue
+        push!(seen, key)
+        push!(out, a, b)
+    end
+    return out
+end
 
 # Default hit slack for a line-like plot, in px: at least 6, and wide enough to cover the
 # drawn stroke (`linewidth / 2` either side of the line; the largest of a per-element vector)
