@@ -1,0 +1,128 @@
+{
+    "height": 800,
+    "layers": [
+        {
+            "kind": "circles",
+            "id": "pts",
+            "geometry": [
+                116,
+                691,
+                6,
+                450,
+                482,
+                6,
+                784,
+                272,
+                6,
+                1118,
+                63,
+                6,
+                617,
+                272,
+                6,
+                617,
+                377,
+                6
+            ],
+            "selected": [
+                5
+            ],
+            "payloads": [
+                {
+                    "index": 1,
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "index": 2,
+                    "x": 2,
+                    "y": 2
+                },
+                {
+                    "index": 3,
+                    "x": 3,
+                    "y": 3
+                },
+                {
+                    "index": 4,
+                    "x": 4,
+                    "y": 4
+                },
+                {
+                    "index": 5,
+                    "x": 2.5,
+                    "y": 3
+                },
+                {
+                    "index": 6,
+                    "x": 2.5,
+                    "y": 2.5
+                }
+            ],
+            "colors": "rgb(0,114,178)",
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "bond": "element",
+            "events": [
+                "hover"
+            ]
+        },
+        {
+            "selects": "pts",
+            "kind": "roi",
+            "id": "roi",
+            "geometry": {
+                "w": 333.9394,
+                "handle": 16,
+                "h": 209.09091,
+                "y": 272.45453,
+                "x": 450.03033
+            },
+            "payloads": [
+            ],
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "bond": "none",
+            "events": [
+                "drag"
+            ]
+        }
+    ],
+    "bondOwner": "roi",
+    "selectionTarget": "pts",
+    "transforms": {
+        "ax1": {
+            "xscale": "identity",
+            "ylims": [
+                0.8499999977648258,
+                4.150000002235174
+            ],
+            "xlims": [
+                0.8499999977648258,
+                4.150000002235174
+            ],
+            "valueaxis": null,
+            "polar": null,
+            "is3d": false,
+            "xreversed": false,
+            "ycats": null,
+            "xcats": null,
+            "yreversed": false,
+            "yscale": "identity",
+            "viewport": [
+                66,
+                32,
+                1102,
+                690
+            ],
+            "ispolar": false
+        }
+    },
+    "width": 1200,
+    "scaling": 2,
+    "selection": "elements"
+}

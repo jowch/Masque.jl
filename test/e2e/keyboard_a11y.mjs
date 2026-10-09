@@ -519,7 +519,16 @@ try {
       const s3 = await dragState(key, id);
       if (Math.abs(s3.rect[3] - s.rect[3]) > 0.5) throw new Error(`${key}: Alt+Shift+ArrowDown did not shrink back: ${JSON.stringify(s3.rect)}`);
       if (s3.inputs !== n0 + 3) throw new Error(`${key}: expected three bond writes, got ${s3.inputs - n0}`);
-      await waitFor(async () => { const t = await textOf(`#out_${key}`); return { ok: t !== before, t }; }, `${key} bond`);
+      // The bond starts at the points the box holds (#330), and a few pixels of nudging keep the
+      // same points, so the value can be unchanged here. Page the box down until a point leaves
+      // it: that release has to reach the kernel.
+      let t = before;
+      for (let i = 0; i < 6 && t === before; i++) {
+        await page.keyboard.press("PageDown");
+        t = await waitFor(async () => { const v = await textOf(`#out_${key}`); return { ok: v !== before, t: v }; }, `${key} bond`, 10)
+          .then((v) => v.t, () => before);
+      }
+      if (t === before) throw new Error(`${key}: the bond never changed from ${JSON.stringify(before)} after paging the box down`);
       passed.push(`${key}/arrow-move+alt-resize+single-bind`);
       await page.keyboard.press("Escape");
     }

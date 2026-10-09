@@ -739,11 +739,16 @@ try {
       const hov = await dispatchAt(key, op.x, op.y, "pointermove");
       if (!hov.show || !hov.text) throw new Error(`${key}: hovering :${other.id} showed no tooltip ${JSON.stringify(hov)}`);
       passed.push(`${key}/owner-other-hover`);
+      // A selecting box starts with the marks inside its bounds highlighted, as after a release (#330).
+      if (spec.owner.startsSelected) {
+        if (!(hov.sel > 0)) throw new Error(`${key}: no starting selection drawn at mount (${hov.sel})`);
+        passed.push(`${key}/owner-start-highlight`);
+      }
       const clicked = await dispatchAt(key, op.x, op.y, "click");
       await new Promise((r) => setTimeout(r, 1500));
       const afterClick = await textOf(`#out_${key}`);
       if (afterClick !== mountBond) throw new Error(`${key}: clicking :${other.id} changed the bond ${JSON.stringify(mountBond)} -> ${JSON.stringify(afterClick)}`);
-      if (clicked.sel !== 0) throw new Error(`${key}: clicking :${other.id} drew a selection (${clicked.sel})`);
+      if (clicked.sel !== hov.sel) throw new Error(`${key}: clicking :${other.id} changed the selection (${hov.sel} -> ${clicked.sel})`);
       passed.push(`${key}/owner-other-no-click`);
       await dispatchAt(key, 1, 1, "pointermove");
       console.error(`OK  ${key}/owner — starts ${mountBond.slice(0, 80)}, :${other.id} hover-only`);

@@ -458,6 +458,15 @@ HTML(
         "<span id=\"coords_roi\" style=\"display:none\">$(JSON3.write(sweep.roi.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-0000000000c0
+@bind ev_roi_grid sweep.roi_grid
+
+# ╔═╡ c1000000-0000-0000-0000-0000000000c1
+HTML(
+    "<span id=\"out_roi_grid\">ROI_GRID=$(repr(ev_roi_grid))</span>" *
+        "<span id=\"coords_roi_grid\" style=\"display:none\">$(JSON3.write(sweep.roi_grid.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000034
 @bind ev_view sweep.view
 
@@ -665,6 +674,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000065
 # ╠═c1000000-0000-0000-0000-000000000032
 # ╠═c1000000-0000-0000-0000-000000000033
+# ╠═c1000000-0000-0000-0000-0000000000c0
+# ╠═c1000000-0000-0000-0000-0000000000c1
 # ╠═c1000000-0000-0000-0000-000000000034
 # ╠═c1000000-0000-0000-0000-000000000035
 # ╠═c1000000-0000-0000-0000-000000000115

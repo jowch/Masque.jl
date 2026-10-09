@@ -63,9 +63,8 @@ All notable changes to this project are documented here. The format is based on
   threshold at a `ThresholdEvent` at `value`, and a box without `selects` at a `BoundsEvent`
   at `bounds`. `level.value` works from the first run, and code that falls back with
   `isnothing(level) ? 0.5 : level.value` still gets the same number. Code that tests
-  `isnothing(level)` to mean "not dragged yet" no longer sees `nothing`. A selecting box
-  and a colorbar still start at `nothing`, since they have no value before the first release
-  or click (#309).
+  `isnothing(level)` to mean "not dragged yet" no longer sees `nothing`. A colorbar still
+  starts at `nothing`, since it has no value before the first click (#309).
 - **Breaking:** two of these controls in one widget raise an error naming both, since each
   would overwrite the other's value. That includes several boxes that select from the same
   layer, which the Brush a region page used to allow; the last box released replaced the
@@ -78,6 +77,13 @@ All notable changes to this project are documented here. The format is based on
   edge count. A `payloads` vector of the old length, or a `selected` index past the new
   count, raises an `ArgumentError`. An in-range `selected` index, or a saved `pick.index`,
   silently points at a different edge, so check those by hand (#316).
+- **Breaking:** a box with `selects` starts at what its `bounds` contain, highlighted, instead
+  of `nothing`: a `Vector{ElementEvent}` of the points inside, or a `GridWindowEvent` for the
+  cells under it. Code that checks `isnothing(picks) || isempty(picks)` still
+  runs, but on the first run it now shows the points inside `bounds` instead of its empty case.
+  Code that tests `isnothing(picks)` to mean "not released yet" no longer sees `nothing`.
+  `selected=` on the target still sets the starting value instead, and `selected=` on another
+  layer now only highlights there, where it used to replace the box's value (#330).
 
 ### Deprecated
 - The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,

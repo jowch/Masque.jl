@@ -1,0 +1,133 @@
+{
+    "height": 800,
+    "layers": [
+        {
+            "kind": "grid",
+            "id": "img",
+            "geometry": {
+                "yedges": [
+                    722,
+                    584,
+                    446,
+                    308,
+                    170,
+                    32
+                ],
+                "ncols": 4,
+                "values": [
+                    4,
+                    5,
+                    6,
+                    7,
+                    7,
+                    8,
+                    9,
+                    10,
+                    10,
+                    11,
+                    12,
+                    13,
+                    13,
+                    14,
+                    15,
+                    16,
+                    16,
+                    17,
+                    18,
+                    19
+                ],
+                "xedges": [
+                    66,
+                    342,
+                    617,
+                    892,
+                    1168
+                ],
+                "nrows": 5
+            },
+            "payloads": [
+            ],
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "bond": "gridcell",
+            "events": [
+                "hover"
+            ]
+        },
+        {
+            "selects": "img",
+            "kind": "roi",
+            "id": "roi",
+            "geometry": {
+                "w": 606.1,
+                "handle": 16,
+                "h": 759,
+                "y": -451,
+                "x": -71.75
+            },
+            "payloads": [
+            ],
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "bond": "none",
+            "events": [
+                "drag"
+            ]
+        }
+    ],
+    "initial": {
+        "items": [
+            {
+                "payload": {
+                    "xmin": 0,
+                    "xmax": 2.2,
+                    "ymin": 3.5,
+                    "i0": 0,
+                    "ymax": 9,
+                    "i1": 1,
+                    "j0": 2,
+                    "j1": 4
+                },
+                "layer": "img",
+                "index": 0
+            }
+        ]
+    },
+    "bondOwner": "roi",
+    "selectionTarget": "img",
+    "transforms": {
+        "ax1": {
+            "xscale": "identity",
+            "ylims": [
+                0.5,
+                5.5
+            ],
+            "xlims": [
+                0.5,
+                4.5
+            ],
+            "valueaxis": null,
+            "polar": null,
+            "is3d": false,
+            "xreversed": false,
+            "ycats": null,
+            "xcats": null,
+            "yreversed": false,
+            "yscale": "identity",
+            "viewport": [
+                66,
+                32,
+                1102,
+                690
+            ],
+            "ispolar": false
+        }
+    },
+    "width": 1200,
+    "scaling": 2,
+    "selection": "grid"
+}

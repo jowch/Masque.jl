@@ -2010,8 +2010,9 @@ Payload on commit (no `selects`): a [`BoundsEvent`](@ref). With `selects` set, t
 [`GridWindowEvent`](@ref) for a `:grid` target — see [`InteractionEvent`](@ref). The box owns
 the bond: every other layer in that widget, the target included, keeps its hover tooltip but
 takes no clicks. Without `selects`, the bond starts as a `BoundsEvent` at `bounds`; with it, the
-bond starts as `nothing` (or as `selected=` seeds it) until the first release. `bounds=` accepts
-a `BoundsEvent` or a `(xmin, xmax, ymin, ymax)` tuple.
+bond starts at what `bounds` contains, highlighted, as a release there would set it, unless
+`selected=` on the target seeds it. `bounds=` accepts a `BoundsEvent` or a
+`(xmin, xmax, ymin, ymax)` tuple.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data point), a `PolarAxis` (a screen rectangle is not an annular sector), a categorical axis (bounds

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest"
-import { layerNElements, selectionFor, linkedHits, selectionForValue, sameValue } from "../src/selection"
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { computeSelection, layerNElements, selectionFor, linkedHits, selectionForValue, sameValue } from "../src/selection"
 import type { Hit, HitLayer, Manifest } from "../src/types"
 
 // layerNElements' other kind branches (circles/rects/polygons/segments/polyline) are exercised
@@ -152,4 +155,35 @@ describe("selectionForValue", () => {
         expect(sameValue([1], { 0: 1 })).toBe(false)
         expect(sameValue(null, {})).toBe(false)
     })
+})
+
+// A selecting box's bond starts at what Julia computes its starting bounds contain (#330).
+// These goldens are Julia manifests (test/parity_corpus.jl); a release of the untouched box
+// runs computeSelection, so the two must agree or the value would change on a no-op drag.
+describe("a selecting box's starting value matches computeSelection (Julia parity)", () => {
+    const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "test", "fixtures", "parity")
+    for (const name of ["roiselect", "roigrid", "roiedge", "roigridover"]) {
+        for (const backend of ["cairo", "webgl"]) {
+            it(`${name}.${backend}`, () => {
+                const m = JSON.parse(readFileSync(join(dir, `${name}.${backend}.json`), "utf8")) as Manifest
+                const roi = m.layers.find((l) => l.kind === "roi") as HitLayer
+                const target = m.layers.find((l) => l.id === roi.selects) as HitLayer
+                const box = roi.geometry as { x: number; y: number; w: number; h: number }
+                const got = computeSelection(box, target, m.transforms[target.axis]).items
+                // Marks start as the target's `selected`; a grid's cell block ships in `initial`.
+                const want: { layer: string; index: number; payload?: Record<string, number> }[] = target.kind === "grid"
+                    ? (m.initial as { items: { layer: string; index: number; payload: Record<string, number> }[] }).items
+                    : (target.selected ?? []).map((index) => ({ layer: target.id, index }))
+                expect(got.length).toBeGreaterThan(0)
+                expect(got.map(({ layer, index }) => ({ layer, index }))).toEqual(want.map(({ layer, index }) => ({ layer, index })))
+                for (let k = 0; k < got.length; k++) {
+                    const p = got[k].payload as Record<string, number> | undefined, q = want[k].payload
+                    if (!p || !q) { expect(p).toEqual(q); continue }
+                    for (const c of ["i0", "i1", "j0", "j1"]) expect(p[c]).toBe(q[c])
+                    // Julia sends the bounds it was given; the browser inverts the box's corners.
+                    for (const c of ["xmin", "xmax", "ymin", "ymax"]) expect(p[c]).toBeCloseTo(q[c], 4)
+                }
+            })
+        }
+    }
 })

@@ -36,10 +36,11 @@ roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = s)
 `bounds` is where the box starts, as `(xmin, xmax, ymin, ymax)` in data
 coordinates.
 
-When you release the box, the points inside it stay highlighted, and
-`picks` lists them: one [`ElementEvent`](@ref) per point, holding that
-point's payload fields, such as `name` and `group`. A box with no points
-inside gives an empty list.
+`picks` lists the points inside the box: one [`ElementEvent`](@ref)
+per point, holding that point's payload fields, such as `name` and
+`group`. It starts with the points inside `bounds`, highlighted, and
+each release replaces it with the points inside the box then. A box
+with no points inside gives an empty list.
 
 Use `picks` to index your data: `samples[picks]` is the rows of
 `samples` inside the box.
@@ -52,15 +53,10 @@ pts = interactables(s; payloads = df)
 ```
 
 Then `df[picks, :]` is the rows inside the box. To show an empty table
-with the same columns before the first release or when the box is empty,
-use `df[1:0, :]`:
+with the same columns when the box is empty, use `df[1:0, :]`:
 
 ```julia
-if isnothing(picks) || isempty(picks)
-    df[1:0, :]
-else
-    df[picks, :]
-end
+isempty(picks) ? df[1:0, :] : df[picks, :]
 ```
 
 Only the box sets `picks`: hovering a point, or anything else in the

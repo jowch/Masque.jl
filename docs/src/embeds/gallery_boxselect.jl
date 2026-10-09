@@ -62,7 +62,7 @@ This cell responds when you release the box.
 """
 
 # ╔═╡ a1410007-0001-4000-8000-000000000004
-if isnothing(picks) || isempty(picks)
+if isempty(picks)
     "Adjust the box to select points."
 else
     n = length(picks)
