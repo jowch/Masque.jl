@@ -3,7 +3,7 @@
 // tooltip reuse the existing hover/highlight machinery (drawHi, showTipAt) so there is exactly
 // one visual language for "this element is what you're on" whether you got there by mouse or
 // keyboard — see hover.ts's restoreFocus for how the two stay in sync on a pointer miss.
-import { hitLayerByIndex, isGapSegment, layerNElements } from "./selection"
+import { hitLayerByIndex, isGapElement, layerNElements } from "./selection"
 import { drawHover, clearHover, clearLink } from "./highlight"
 import { showTipAt, hideTip, updateLinkForHit, layoutAnchor } from "./hover"
 import { commitClick } from "./bond"
@@ -34,7 +34,7 @@ export function buildFocusable(manifest: Manifest): FocusRef[] {
         const n = layerNElements(layer)
         const indices: number[] = []
         for (let i = 0; i < n; i++) {
-            if (layer.kind === "polyline" && isGapSegment(layer, i)) continue
+            if (isGapElement(layer, i)) continue
             indices.push(i)
         }
         indices.forEach((index, k) => out.push({ layer_: layer, index_: index, ordinal_: k + 1, layerTotal_: indices.length }))
@@ -50,7 +50,7 @@ function hitFor(ref: FocusRef): Hit {
 // layer), not the flat cross-layer focus-list index — the number a user labels a Scatter
 // `label` against is its own element count, not how many other layers happen to precede it.
 // Uses ref.ordinal_/layerTotal_ (computed once in buildFocusable), not layerNElements(layer) —
-// they differ once a :polyline has any NaN-gap segments skipped from the focus list.
+// they differ once any element not on screen (selection.ts's isGapElement) is skipped.
 function announceText(ref: FocusRef, plain: string): string {
     const prefix = ref.layer_.label ? `${ref.layer_.label}, ` : ""
     const pos = `element ${ref.ordinal_} of ${ref.layerTotal_}`

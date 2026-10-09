@@ -93,6 +93,18 @@ describe("linkedHits", () => {
         expect(hits.map((h) => h.index)).toEqual([0, 1, 2])
     })
 
+    it("a linked element a zoomed Axis3 clipped off screen highlights nothing (#321)", () => {
+        const edges: HitLayer = {
+            id: "edges", kind: "segments", axis: "ax1", events: ["hover"],
+            geometry: [NaN, NaN, NaN, NaN, 0, 0, 10, 10], payloads: [{}, {}],
+        }
+        const link: HitLayer = { ...legend, links: [["edges:1"], ["edges:2"], ["edges"]] }
+        const m: Manifest = { width: 100, height: 100, scaling: 1, layers: [edges, link], transforms: {} }
+        expect(linkedHits(m, link, 0)).toEqual([])
+        expect(linkedHits(m, link, 1).map((h) => h.index)).toEqual([1])
+        expect(linkedHits(m, link, 2).map((h) => h.index)).toEqual([1])
+    })
+
     it("an exact layer id containing a colon is not parsed as an element pin", () => {
         const pinLegend: HitLayer = { ...legend, links: [["series:2"]] }
         const m: Manifest = { width: 100, height: 100, scaling: 1, layers: [namedPin, pinLegend], transforms: {} }

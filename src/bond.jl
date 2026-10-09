@@ -17,12 +17,38 @@ end
     bondtype(interactable) -> Type
 
 The type of one commit from this interactable. Default [`ElementEvent`](@ref). When the same
-widget carries a `selects` ROI aimed at this interactable's layer, that layer commits no clicks
-at all: the box owns the bond. That is a property of the call, not of the layer's `bondtype`.
+widget carries a threshold, an ROI, or a colorbar the caller passed, this interactable's layer
+commits no clicks at all: that control owns the bond. That is a property of the call, not of the
+layer's `bondtype`.
 """
 bondtype(::AbstractInteractable) = ElementEvent
 bondtype(::ViewInteractable) = Nothing
 bondtype(::GridInteractable) = GridCellEvent
+
+# Whether this interactable owns its widget's bond. An owner is the only layer that commits:
+# every other layer keeps hover and takes no clicks. A widget has at most one.
+owns_bond(i::AbstractInteractable) = selects(i) !== nothing
+owns_bond(::ThresholdInteractable) = true
+owns_bond(::ROIInteractable) = true
+owns_bond(i::ColorbarInteractable) = !i.auto
+
+# The wire envelope an owner's bond starts at, as the browser would send it on release, or
+# `nothing` when the owner has no value before its first commit.
+initial_envelope(::AbstractInteractable, ctx) = nothing
+function initial_envelope(i::ThresholdInteractable, ctx)
+    t = ctx.transforms[axis_id(ctx, i.ax)]
+    cats = i.orientation === :horizontal ? t.ycats : t.xcats
+    k = cats === nothing || !isinteger(i.value) ? 0 : Int(i.value)
+    # On a categorical dimension the browser sends the category's label, as a release does.
+    payload = 1 <= k <= length(something(cats, ())) ? cats[k] : i.value
+    return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
+end
+function initial_envelope(i::ROIInteractable, ctx)
+    i.selects === nothing || return nothing
+    xmin, xmax, ymin, ymax = i.bounds
+    payload = Dict{String, Any}("xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax)
+    return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
+end
 
 """
     transform_bond(interactable, layer, index, js_payload) -> InteractionEvent
@@ -419,8 +445,9 @@ end
 
 The wire envelope `mount.ts` seeds into `host.value` at mount, so Julia `initial_value` and the
 browser agree. A `selects` elements call seeds `{items}` (possibly empty when `hydrate` is set).
-A single hydrated index on a scalar layer seeds `{layer, index}`. Multiple indices on a scalar
-layer are highlight-only (`nothing`).
+Otherwise a widget whose bond has an owner seeds the owner's `initial` envelope (absent means
+`nothing`), and its hydrated indices are highlight-only. A single hydrated index on a scalar
+layer seeds `{layer, index}`. Multiple indices on a scalar layer are highlight-only (`nothing`).
 """
 function mount_envelope(manifest::AbstractDict)
     hydrated = Dict{String, Any}[]
@@ -435,6 +462,7 @@ function mount_envelope(manifest::AbstractDict)
     if sel == "elements" && (!isempty(hydrated) || get(manifest, "hydrate", nothing) == "items")
         return Dict{String, Any}("items" => hydrated)
     end
+    haskey(manifest, "bondOwner") && return get(manifest, "initial", nothing)
     length(hydrated) == 1 && return only(hydrated)
     return nothing
 end
