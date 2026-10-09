@@ -1,4 +1,4 @@
-import { invertAxis, matrixLimits, projectAxis } from "./geometry"
+import { invertAxis, matrixLimits, panLimits3, projectAxis } from "./geometry"
 import { hideTip, placeTip, setMarkAccent, setTipText, setTipVisible } from "./hover"
 import { scheduleAnnounce } from "./keyboard"
 import { settleCurrentPan } from "./bond"
@@ -8,7 +8,7 @@ import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
 import { mapPoint, unmapPoint, wheelScale, zoomAt } from "./photo"
-import type { HitLayer, ThresholdGeometry, ViewGeometry } from "./types"
+import type { HitLayer, Limits3, ThresholdGeometry, ViewGeometry } from "./types"
 
 // Keyboard path for the three drag kinds (#169). Each drag layer gets its own tab stop after
 // the plot surface, so arrows on the surface keep walking marks (keyboard.ts) and arrows here
@@ -35,7 +35,7 @@ const HINTS = {
     roi: "Use arrow keys to move the box, Page Up or Page Down for a larger step. " +
         "Alt with an arrow grows that side; Alt and Shift with an arrow shrinks it.",
     pan: "Use arrow keys to pan, plus or minus to zoom.",
-    orbit: "Use arrow keys to rotate the view.",
+    orbit: "Use arrow keys to rotate the view, Shift with an arrow to pan, plus or minus to zoom.",
 }
 
 function layerById(ctx: OverlayCtx, id: string): HitLayer | undefined {
@@ -233,7 +233,25 @@ export function buildDragStops(ctx: OverlayCtx, state: OverlayState, shadow: Sha
                 default: return false
             }
             if (g.mode === "orbit") {
-                if (zoom !== 0) return true // wheel zoom is pan-only; consume so the page stays put
+                // Axis3 zoom and Shift+arrow pan move the limits (#321), from the last ones asked for.
+                if (zoom !== 0 || e.shiftKey) {
+                    if (!g.limits) return true // consume so the page stays put
+                    let lim: Limits3 | null
+                    if (zoom !== 0) {
+                        lim = viewDrag.zoom3(state, id, g, wheelScale(-zoom * ZOOM_NOTCH, 0))
+                    } else {
+                        const base = viewDrag.view3Base(state, id, g)
+                        lim = base ? panLimits3(g, base, -dx * VIEW_STEP * g.w, -dy * VIEW_STEP * g.h) : null
+                        if (lim) viewDrag.rememberView3(state, id, g, lim)
+                    }
+                    if (!lim) return true
+                    const input = { id, limits: lim, settle: false }
+                    state.keyView_ = true
+                    ctx.gesture_.request(input)
+                    showReadout(viewDrag.limits3Tip(lim, ctx.tipDigits_))
+                    pending = () => { state.keyView_ = false; ctx.gesture_.settle({ ...input, settle: true }) }
+                    return true
+                }
                 const cam = orbitCam ?? { azimuth: g.azimuth ?? 0, elevation: g.elevation ?? 0 }
                 // One press is a mouse drag of a tenth of the viewport, from the last camera.
                 const o = viewDrag.begin(id, { ...g, ...cam }, t, 0, 0, -1) as Extract<Drag, { kind: "view" }>

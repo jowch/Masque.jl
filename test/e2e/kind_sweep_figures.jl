@@ -303,6 +303,15 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
     ),
     Dict(
+        # Axis3 view (#321): drag orbits, the wheel zooms the limits about their center, and
+        # Shift+drag pans them. After the zoom the corner points sit outside the limits and stop
+        # hitting; the middle one still hits.
+        "key" => "view3d", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        "inside" => 2, "outside" => 0,
+    ),
+    Dict(
         "key" => "legend", "layerId" => "legend", "layerKind" => "rects",
         "selected" => nothing, "halo" => false, "selectedIndex" => 2, "clickIndex" => 2,
         "tip" => "pts", "mode" => "element",
@@ -882,6 +891,14 @@ function build_kind_sweep()
         masque(fig, interactables(sc; id = :pts), ViewInteractable(ax; id = :view))
     end
 
+    view3d = let
+        pts = Makie.Point3f[(0, 0, 0), (4, 4, 4), (2, 2, 2)]
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "view3d")
+        sc = scatter!(ax, pts; markersize = 14, color = :gray)
+        masque(fig, interactables(sc; id = :pts), ViewInteractable(ax; id = :view))
+    end
+
     legend = let
         xs = collect(0.0:0.5:3.0)
         fig = Figure(size = (480, 320))
@@ -1022,7 +1039,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, view3d, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto,
     )
 end

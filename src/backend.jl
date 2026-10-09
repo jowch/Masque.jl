@@ -139,8 +139,19 @@ end
 # interactables.jl passes non-finite coordinates through unchanged. Points widen to
 # Point3 so this same closure also projects 3D scenes (Axis3's transform_func is
 # `identity`; `Makie.project` applies the 3D camera itself).
+#
+# An `Axis3` clips its plots to its limits (Makie's clip planes, `ax.clip = true`), so a point
+# outside them, as after a zoom (#321), is not drawn. It projects to NaN, the "not on screen"
+# sentinel every hit layer already skips, rather than onto a spot where nothing is visible.
 function _project_closure(scaling, out_h)
+    clipbox = IdDict{Any, Any}()
     return function (ax, p)
+        if ax isa Makie.Axis3
+            box = get!(() -> _axis3_clipbox(ax), clipbox, ax)
+            if box !== nothing && !_in_clipbox(box, p)
+                return Point2f(NaN32, NaN32)
+            end
+        end
         tp = try
             _apply_transform(
                 _transform_func(ax.scene),
@@ -154,6 +165,26 @@ function _project_closure(scaling, out_h)
         o = _scene_viewport(ax).origin
         return Point2f((q[1] + o[1]) * scaling, out_h - (q[2] + o[2]) * scaling)  # flip to image coords
     end
+end
+
+# `(lo, hi)` of an Axis3's limits, widened by Makie's own clip-plane nudge, or `nothing` when
+# the axis does not clip.
+function _axis3_clipbox(ax)
+    hasproperty(ax, :clip) && ax.clip[] === true || return nothing
+    fl = _finallimits(ax)
+    lo = Float64.(Tuple(fl.origin)); w = Float64.(Tuple(fl.widths))
+    tol = 1.0e-5 .* abs.(w)
+    return (lo .- tol, lo .+ w .+ tol)
+end
+function _in_clipbox((lo, hi), p)
+    z = length(p) >= 3 ? p[3] : 0.0
+    for (v, a, b) in zip((p[1], p[2], z), lo, hi)
+        v isa Real || continue
+        x = Float64(v)
+        isnan(x) && continue
+        (a <= x <= b) || return false
+    end
+    return true
 end
 
 _scalesym(f) = f === identity ? :identity : Symbol(nameof(f))

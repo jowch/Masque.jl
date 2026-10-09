@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
-    hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles,
+    hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
     anchorFor, computeAnchoredPlacement, photoClip, lineReadout,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
@@ -669,6 +669,29 @@ describe("view pan / orbit math", () => {
         const clamped = orbitAngles(g, 0, 0, 0, 1e6)
         expect(clamped.elevation).toBeLessThan(Math.PI / 2)
         expect(clamped.elevation).toBeGreaterThan(-Math.PI / 2)
+    })
+    it("zoomLimits3 scales Axis3 limits about their center and stays within 64x of home", () => {
+        const l: [number, number, number, number, number, number] = [0, 10, -1, 1, 100, 200]
+        const z = zoomLimits3(l, 2)
+        expect(z).toEqual([2.5, 7.5, -0.5, 0.5, 125, 175])
+        expect(zoomLimits3(z, 0.5)).toEqual(l)
+        const deep = zoomLimits3(l, 1e6, l)
+        expect(deep[1] - deep[0]).toBeCloseTo(10 / 64)
+        expect(zoomLimits3(l, 0)).toEqual(l)
+    })
+    it("panLimits3 moves the limits against the drag, scaled by any zoom since the basis", () => {
+        const g = {
+            x: 0, y: 0, w: 1000, h: 500, mode: "orbit" as const,
+            limits: [0, 10, 0, 10, 0, 10] as [number, number, number, number, number, number],
+            panx: [0.01, 0, 0] as [number, number, number], pany: [0, 0, -0.02] as [number, number, number],
+        }
+        // 100 px right shows data 1 unit further left; 50 px down shows z 1 unit higher.
+        expect(panLimits3(g, g.limits, 100, 50)).toEqual([-1, 9, 0, 10, 1, 11])
+        // Zoomed 2x in x: the same drag covers half the data.
+        const p = panLimits3(g, [2.5, 7.5, 0, 10, 0, 10], 100, 0)
+        expect(p[0]).toBeCloseTo(2)
+        expect(p[1]).toBeCloseTo(7)
+        expect(panLimits3({ ...g, panx: undefined }, g.limits, 100, 0)).toEqual(g.limits)
     })
     it("orbitAngles defaults azimuth/elevation to 0 when the geometry omits them", () => {
         const g = { x: 0, y: 0, w: 1000, h: 500, mode: "orbit" as const }

@@ -1424,7 +1424,8 @@ end
 """
     ViewInteractable(ax; id=:view)
 
-Drag-to-pan (2D `Axis`) or drag-to-orbit (`Axis3`). Produces one `:view` [`HitLayer`](@ref)
+Drag-to-pan and wheel zoom (2D `Axis`), or drag-to-orbit, wheel zoom and Shift+drag pan
+(`Axis3`). Produces one `:view` [`HitLayer`](@ref)
 covering `ax`'s whole viewport; it sorts after Tier-0 `:threshold`/`:roi` layers so an ordinary
 drag on those wins without a modifier — **Shift+drag** forces the view gesture even over a
 `ThresholdInteractable`/`ROIInteractable` hit.
@@ -1436,8 +1437,11 @@ drag on those wins without a modifier — **Shift+drag** forces the view gesture
 **Commits nothing.** A camera is operational state, not an analysis value a notebook reads
 (docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a
 `:view` [`InteractionEvent`](@ref). Drag frames stream over a `with_js_link` gesture channel
-instead, on both backends: Julia mutates `ax.limits[]` (pan) or `ax.azimuth[]`/`ax.elevation[]`
-(orbit) and ships a hit manifest for every frame the camera moves. `:cairo` ships that frame as
+instead, on both backends: Julia mutates `ax.limits[]` (pan, zoom) or `ax.azimuth[]`/`ax.elevation[]`
+(orbit) and ships a hit manifest for every frame the camera moves. On an `Axis3`, zoom (wheel,
+`+`/`-`) scales the limits about their center and pan (Shift+drag, Shift+arrows) shifts them
+in the screen plane, as Makie's own `Axis3` zoom and translation do; the box keeps its size and
+marks outside the new limits are clipped, so they no longer hover or click. `:cairo` ships that frame as
 a PNG; `:webgl` ships a freshly serialized scene applied to the canvas already on the page.
 In-drag frames render at `px_per_unit = 1`; the release frame renders at the widget's own
 resolution. Because nothing commits, `ax`'s camera stays wherever the gesture left it until the
@@ -1514,8 +1518,45 @@ function hitlayers(i::ViewInteractable, ctx)
         # (§12.3): a view gesture reports no InteractionEvent at all.
         geom["azimuth"] = Float64(i.ax.azimuth[])
         geom["elevation"] = Float64(i.ax.elevation[])
+        # Zoom and pan (#321) move the limits, as Makie's own Axis3 scroll zoom and translation
+        # do: JS scales them about their center, or shifts them by `panx`/`pany` per image px.
+        fl = _finallimits(i.ax)
+        lo = Float64.(Tuple(fl.origin)); w = Float64.(Tuple(fl.widths))
+        geom["limits"] = Float64[lo[1], lo[1] + w[1], lo[2], lo[2] + w[2], lo[3], lo[3] + w[3]]
+        panx, pany = _axis3_pan_basis(ctx, i.ax, lo, w)
+        geom["panx"] = panx
+        geom["pany"] = pany
     end
     return [HitLayer(i.id, :view, geom, Any[], axis_id(ctx, i.ax), events(i))]
+end
+
+# The data displacement, in the plane facing the camera through the limits' center, that moves
+# the picture by one image px right (`panx`) or down (`pany`). Makie's `Axis3` translation drags
+# in that same plane. Measured from the projection itself: J maps data to image px, the model
+# matrix S maps data to world, and the shortest world step for a screen step is J_w⁺ with
+# J_w = J S⁻¹. With the default orthographic camera that step lies in the screen plane exactly.
+function _axis3_pan_basis(ctx, ax, lo, w)
+    c = lo .+ w ./ 2
+    J = zeros(2, 3)
+    for k in 1:3
+        h = w[k] / 4
+        a = _proj(ctx, ax, ntuple(j -> j == k ? c[j] + h : c[j], 3))
+        b = _proj(ctx, ax, ntuple(j -> j == k ? c[j] - h : c[j], 3))
+        J[1, k] = (a[1] - b[1]) / 2h
+        J[2, k] = (a[2] - b[2]) / 2h
+    end
+    m = ax.scene.transformation.model[]
+    s = (m[1, 1], m[2, 2], m[3, 3])
+    Jw = J ./ [s[1] s[2] s[3]]
+    G = Jw * transpose(Jw)
+    d = G[1, 1] * G[2, 2] - G[1, 2] * G[2, 1]
+    zero3 = Float64[0, 0, 0]
+    (isfinite(d) && abs(d) > 0) || return zero3, zero3
+    Ginv = [G[2, 2] -G[1, 2]; -G[2, 1] G[1, 1]] ./ d
+    P = transpose(Jw) * Ginv                       # world per image px, 3×2
+    D = P ./ [s[1], s[2], s[3]]                    # data per image px
+    all(isfinite, D) || return zero3, zero3
+    return Float64.(D[:, 1]), Float64.(D[:, 2])
 end
 
 # ============================ ThresholdInteractable ========================

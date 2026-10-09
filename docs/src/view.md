@@ -96,9 +96,15 @@ end
 @bind pick masque(fig, orbit)
 ```
 
+Scroll to zoom in or out around the middle of the axis box, and
+Shift+drag to pan. The box keeps its size while the data grows or slides
+inside it, and marks that leave the box are hidden and no longer respond
+to hover or clicks. From the keyboard, `+` / `-` zoom and Shift with an
+arrow key pans.
+
 ## When the figure is rebuilt
 
-Dragging changes the axis itself: its limits, or its azimuth and
+Dragging changes the axis itself: its limits, and its azimuth and
 elevation on an `Axis3`. So if only the cell with `masque` runs again,
 the plot stays at the view you dragged to.
 
@@ -123,7 +129,7 @@ begin
 end
 ```
 
-For an `Axis3`, set `azimuth` and `elevation` the same way.
+For an `Axis3`, set `azimuth`, `elevation`, and `limits` the same way.
 
 ## Where it works
 

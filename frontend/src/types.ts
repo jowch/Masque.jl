@@ -72,7 +72,15 @@ export interface ViewGeometry {
     fill?: string
     azimuth?: number    // radians; orbit only (current Axis3 camera)
     elevation?: number  // radians; orbit only
+    // orbit only (#321): the Axis3 limits [xmin, xmax, ymin, ymax, zmin, zmax] this frame
+    // drew, and the data step that moves the picture one image px right (`panx`) or down
+    // (`pany`) at those limits.
+    limits?: Limits3
+    panx?: [number, number, number]
+    pany?: [number, number, number]
 }
+
+export type Limits3 = [number, number, number, number, number, number]
 
 export interface AxisTransform {
     xlims: [number, number]

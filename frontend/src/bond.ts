@@ -9,7 +9,7 @@ import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
 import { contentPoint, panTo, unmapPoint } from "./photo"
-import type { AxisTransform, Hit, ThresholdGeometry, ViewGeometry } from "./types"
+import type { AxisTransform, Hit, Limits3, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
 // (observed live in Chromium for a synthetic/non-primary pointerId — real touch/pen input can
@@ -49,6 +49,11 @@ function armPan(ctx: OverlayCtx, state: OverlayState, e: PointerEvent, viewId: s
     state.photoAnchor_ = unmapPoint(state.photo_, layout)
 }
 
+// An Axis3 pan's limits are where the next zoom or pan starts (#321).
+function rememberSlide(state: OverlayState, d: Extract<Drag, { kind: "view" }>, input: Record<string, unknown>): void {
+    if (d.slide_ && Array.isArray(input.limits)) viewDrag.rememberView3(state, d.id_, d.g_, input.limits as Limits3)
+}
+
 function viewNeedsSettle(d: Extract<Drag, { kind: "view" }>): boolean {
     return d.lastInput_ !== undefined || d.settleOwed_ === true
 }
@@ -78,6 +83,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
                 const input = viewDrag.requestInput(d, layout, false)
                 ctx.gesture_.request(input)
                 d.lastInput_ = input
+                rememberSlide(state, d, input)
             }
         } else {
             // Layout point. The base is not photographically transformed, so this is not
@@ -183,7 +189,9 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         })
         if (viewLayer) {
             const g = viewLayer.geometry as ViewGeometry
-            state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], layout.x, layout.y, e.pointerId)
+            // On an Axis3, Shift+drag pans the limits instead of orbiting (#321).
+            const base = g.mode === "orbit" ? viewDrag.view3Base(state, viewLayer.id, g) ?? undefined : undefined
+            state.drag_ = viewDrag.begin(viewLayer.id, g, ctx.manifest_.transforms[viewLayer.axis], layout.x, layout.y, e.pointerId, true, base)
             if (g.mode === "pan") armPan(ctx, state, e, viewLayer.id)
             hideCross(ctx, state)
             ctx.surface_.classList.add("grabbing")
@@ -263,7 +271,9 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
         if (d.g_.mode === "pan") {
             if (viewNeedsSettle(d)) settleCurrentPan(ctx, state, d)
         } else if (d.lastInput_ !== undefined) {
-            ctx.gesture_.settle(viewDrag.requestInput(d, layout, true))
+            const input = viewDrag.requestInput(d, layout, true)
+            ctx.gesture_.settle(input)
+            rememberSlide(state, d, input)
         }
         state.photoAnchor_ = null
     } else {
@@ -312,7 +322,9 @@ export function onCancel(ctx: OverlayCtx, state: OverlayState, e: PointerEvent):
             settleCurrentPan(ctx, state, d)
         } else if (d.lastInput_ !== undefined) {
             const p = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
-            ctx.gesture_.settle(viewDrag.requestInput(d, p, true))
+            const input = viewDrag.requestInput(d, p, true)
+            ctx.gesture_.settle(input)
+            rememberSlide(state, d, input)
         }
     }
     if (d.kind === "view") state.photoAnchor_ = null
