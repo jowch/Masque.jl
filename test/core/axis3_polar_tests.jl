@@ -397,6 +397,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # (centre x = 1, radius 0.3).
         r_at(xlo) = (limits!(axo, xlo, xlo + 4.1, 0, 5, 0, 5); only(hitlayers(only(interactables(fo)), last(ctx_for(fo)))).geometry[3])
         @test abs(r_at(0.9) - r_at(0.5)) <= 1
+        @test r_at(1.4) == 0   # centre outside the limits: hidden, so no radius
 
         # Wireframe: rendered edges from the child LineSegments (data space), :pairs mode
         fw = Figure(; size = (600, 450))
