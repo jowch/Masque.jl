@@ -15,8 +15,9 @@ All notable changes to this project are documented here. The format is based on
 ### Deprecated
 - The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,
   `tooltip_font_size`, `tooltip_radius`, and `tooltip_caret` still work, with a warning naming
-  the `tooltipstyle` form, and are removed in 0.4. Passing a key both ways is an error.
-  `tooltip_sigdigits` stays (#305).
+  the `tooltipstyle` form, and are removed in 0.4. Their values are now checked like
+  `tooltipstyle`'s, so one such as `tooltip_font_size = "12"` raises an `ArgumentError`, and
+  passing a key both ways is an error. `tooltip_sigdigits` stays (#305).
 
 ## [0.2.2] - 2026-10-09
 

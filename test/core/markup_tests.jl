@@ -65,6 +65,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws "Valid keys: bg, color, accent, font, font_size, radius, caret" Masque.tip_style_dict((; x = 1))
         @test_throws "`radius` must be a size" Masque.tip_style_dict((; radius = -1))
         @test_throws "`caret` must be" Masque.tip_style_dict((; caret = :no))
+        @test_throws "`bg` must be a CSS string or a Makie color" Masque.tip_style_dict((; bg = 5))
+        @test_throws "`color` must be" Masque.tip_style_dict((; color = :notacolour))
         @test_throws "must be a NamedTuple" Masque.tip_style_dict(Dict(:bg => :red))
     end
 
@@ -77,7 +79,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         quiet(f) = Base.CoreLogging.with_logger(f, Base.CoreLogging.NullLogger())
         @test Masque._merge_tooltip_kwargs(nothing, flat()) === nothing           # none given → no warning
         @test Masque._merge_tooltip_kwargs((; bg = :red), flat()) == (; bg = :red)
-        m = @test_deprecated r"`tooltip_bg = …`, `tooltip_caret = …` is deprecated; use `tooltipstyle = \(; bg = …, caret = …\)`. Removed in 0.4" Masque._merge_tooltip_kwargs(
+        m = @test_deprecated r"`tooltip_bg = …`, `tooltip_caret = …` are deprecated; use `tooltipstyle = \(; bg = …, caret = …\)`. Removed in 0.4" Masque._merge_tooltip_kwargs(
             nothing, flat(; bg = :red, caret = false),
         )
         @test m == (; bg = :red, caret = false)

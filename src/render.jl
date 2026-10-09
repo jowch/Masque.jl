@@ -28,7 +28,17 @@ const _TOOLTIP_STYLE_KEYS = (
 )
 
 function _tooltip_style_value(k, kind, v)
-    kind === :color && return _css_color(v)
+    if kind === :color
+        # `to_color` reads a bare number as a grey level, which gives no valid CSS colour.
+        css = v isa Real ? nothing : try
+                _css_color(v)
+        catch
+                nothing
+        end
+        css === nothing &&
+            throw(ArgumentError("tooltipstyle: `$k` must be a CSS string or a Makie color, got $(repr(v))"))
+        return css
+    end
     if kind === :font
         v isa AbstractString || v isa Symbol ||
             throw(ArgumentError("tooltipstyle: `font` must be a CSS font-family string, got $(repr(v))"))
@@ -76,7 +86,8 @@ function _merge_tooltip_kwargs(tooltipstyle, flat::NamedTuple)
     old = join(("`tooltip_$k = …`" for k in keys(given)), ", ")
     new = join(("$k = …" for k in keys(given)), ", ")
     _deprecate(
-        "$old is deprecated; use `tooltipstyle = (; $new)`. Removed in 0.4.", :masque,
+        "$old $(length(given) > 1 ? "are" : "is") deprecated; use `tooltipstyle = (; $new)`. Removed in 0.4.",
+        :masque,
     )
     tooltipstyle === nothing && return given
     tooltipstyle isa NamedTuple || return tooltipstyle   # tip_style_dict raises the error
