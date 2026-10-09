@@ -7,6 +7,7 @@
 
 using Masque, CairoMakie, Printf, Random
 Random.seed!(0)
+include(joinpath(@__DIR__, "mpsize.jl"))   # mp(x): the MsgPack size of a manifest
 
 function bench_scene(name, fig, ints; azimuth_input, trials = 20)
     w = masque(fig, ints)
@@ -35,12 +36,15 @@ function bench_scene(name, fig, ints; azimuth_input, trials = 20)
     r_settle = w.render_frame(merge(azimuth_input, Dict("settle" => true)))
     png_gesture_kb = length(r_gesture["png"]) / 1024
     png_settle_kb = length(r_settle["png"]) / 1024
+    # A surface layer ships no geometry in-drag (#259), so the two manifests differ.
+    man_gesture_kb = mp(r_gesture["manifest"]) / 1024
+    man_settle_kb = mp(r_settle["manifest"]) / 1024
 
     @printf(
-        "%-22s gesture(ppu=1) p50=%.1fms (n=%d)  settle(mount ppu) p50=%.1fms (n=%d)  png %.1fKB -> %.1fKB\n",
-        name, p50(gesture_ms), trials, p50(settle_ms), trials, png_gesture_kb, png_settle_kb,
+        "%-22s gesture(ppu=1) p50=%.1fms (n=%d)  settle(mount ppu) p50=%.1fms (n=%d)  png %.1fKB -> %.1fKB  manifest %.1fKB -> %.1fKB\n",
+        name, p50(gesture_ms), trials, p50(settle_ms), trials, png_gesture_kb, png_settle_kb, man_gesture_kb, man_settle_kb,
     )
-    return (; gesture_ms, settle_ms, png_gesture_kb, png_settle_kb)
+    return (; gesture_ms, settle_ms, png_gesture_kb, png_settle_kb, man_gesture_kb, man_settle_kb)
 end
 
 println("Gesture channel (#102) — shipped `Masque._view_render_frame`, best-of-$(20) per phase, warmup discarded")
@@ -59,7 +63,8 @@ let
     bench_scene("light (helix+12pts)", fig, ints; azimuth_input = Dict("id" => "view", "azimuth" => 0.5, "elevation" => 0.4))
 end
 
-# Heavy scene — same shape as issue #102's spike (+ 80×80 surface!).
+# Heavy scene — same shape as issue #102's spike (+ 80×80 surface!). Since #259 the surface
+# is a default `:surface` layer too: left out of in-drag manifests, rebuilt on settle.
 let
     fig = Figure(size = (480, 360))
     ax = Axis3(fig[1, 1])

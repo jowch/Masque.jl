@@ -1,5 +1,6 @@
 // All coordinates here are image pixels.
 import { contentPoint, isIdentity, type PhotoMatrix } from "./photo"
+import { hitSurface, surfaceVertex } from "./surface"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
@@ -371,6 +372,8 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
                     Math.abs(gg.xedges[i + 1] - gg.xedges[i]), Math.abs(gg.yedges[j + 1] - gg.yedges[j])],
             }
         }
+        case "surface":
+            return hitSurface(layer, px, py)
         case "threshold": {
             const tg = g as ThresholdGeometry
             const [lo, hi] = tg.span
@@ -734,6 +737,16 @@ export function anchorFor(hit: Hit, cursor: { x: number; y: number } | null): An
         const on = cursor ? closestPointOnPath(cursor.x, cursor.y, verts) : null
         const p = on ?? pointHalfwayAlong(verts)
         return { x: p.x, y: p.y, top: p.y }
+    }
+    if (g[0] === "poly" && hit.layer.kind === "surface") {
+        // Above the point itself, clear of its dual cell.
+        const v = surfaceVertex(hit.layer, hit.index)
+        if (v) {
+            const ring = g[1] as number[]
+            let top = v[1]
+            for (let k = 1; k < ring.length; k += 2) top = Math.min(top, ring[k])
+            return { x: v[0], y: v[1], top }
+        }
     }
     if (g[0] === "poly") {
         // Centroid of the exterior. A ring group's centroid can sit in a hole; that is outside

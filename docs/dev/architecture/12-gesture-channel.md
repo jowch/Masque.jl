@@ -124,6 +124,12 @@ The trigger is a change to the projection, not a change to the picture:
 A gesture that moves the camera and ships a frame without a matching manifest, or that lets JS
 derive geometry from a JS-owned camera, does not conform, whatever its performance.
 
+A layer may be *suspended* in an in-drag frame: shipped with no geometry, so it has no hit area
+and draws nothing, and restored by the release frame. A suspended layer is not stale, so it
+conforms. The `:surface` layer does this (#259, `_suspended_surface` in `src/render.jl`): at the
+thinning cap it outweighs the in-drag picture several times over, and no one hovers mid-drag. A
+selected surface point stays selected and its highlight returns on release.
+
 The 3D orbit preview (#87) rests on this clause: without per-frame re-projection an orbit would
 leave the overlay at a stale azimuth/elevation. JS maps pointer delta to angles
 (`orbitAngles`, `frontend/src/geometry.ts`) and sends them; Julia owns the projection.

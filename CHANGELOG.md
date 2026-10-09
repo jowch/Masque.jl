@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A `surface!` on an `Axis3` responds to hover and click. Hovering shows the data point
+  under the pointer, its `i`, `j`, `x`, `y`, and `z`, and `value` when `color` is a separate
+  matrix, always from the side of the surface you can see. A click binds a `GridCellEvent`,
+  so `z[pick]` reads the point. A very fine grid is thinned to about one point every four
+  screen pixels, and a `wireframe!` over the same grid is left as decoration. While you
+  orbit, the surface's highlight hides and comes back on release. `SurfaceInteractable`
+  builds one by hand (#259).
+
 ## [0.2.2] - 2026-10-09
 
 ### Added

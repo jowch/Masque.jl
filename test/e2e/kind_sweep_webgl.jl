@@ -277,6 +277,15 @@ HTML(
         "<span id=\"coords_overlap3d\" style=\"display:none\">$(JSON3.write(sweep.overlap3d.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000120
+@bind ev_surface3d sweep.surface3d
+
+# ╔═╡ d1000000-0000-0000-0000-000000000121
+HTML(
+    "<span id=\"out_surface3d\">SURFACE3D=$(repr(ev_surface3d))</span>" *
+        "<span id=\"coords_surface3d\" style=\"display:none\">$(JSON3.write(sweep.surface3d.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-00000000010b
 @bind ev_text sweep.text
 
@@ -581,6 +590,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000108
 # ╠═d1000000-0000-0000-0000-000000000109
 # ╠═d1000000-0000-0000-0000-00000000010a
+# ╠═d1000000-0000-0000-0000-000000000120
+# ╠═d1000000-0000-0000-0000-000000000121
 # ╠═d1000000-0000-0000-0000-00000000010b
 # ╠═d1000000-0000-0000-0000-00000000010c
 # ╠═d1000000-0000-0000-0000-00000000010d

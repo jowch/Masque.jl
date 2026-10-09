@@ -9,10 +9,17 @@ bites first is manifest **payload size**, not hit-test CPU ([§8](08-scaling.md)
 higher-leverage lever is wire encoding ([§9](09-wire-encoding.md)). Spatial acceleration
 (bucketing/quadtree) waits until a profile shows the JS hit test itself is the bottleneck.
 
-**Occlusion policy (document-and-accept, backend-symmetric).** Every projected vertex is hittable,
-including far-side points on solid 3D objects; first-match-wins resolves overlaps exactly as in 2D.
-The upgrade path is a build-time CPU painter's cull in Julia (NDC depth), symmetric by
-construction. GPU-pick occlusion is a non-goal: hit geometry stays Julia-projected on both
+**Occlusion policy (backend-symmetric).** Within a `:surface` layer, quads are tried front to
+back; between layers, first match wins. Julia sorts a surface's quads by the average clip-space
+depth of their corners, the order CairoMakie paints them in, so on `:cairo` the answer and the
+picture agree by construction and on `:webgl` they differ only where two faces of close average
+depth overlap (#259). Every other layer keeps every projected vertex hittable, including
+far-side points on solid 3D objects, and between layers the plot drawn last wins (#242), which
+is what CairoMakie draws. On `:webgl`, which depth-tests every pixel, a mark hidden behind a
+surface still answers hover and beats the surface in front of it; accepted, since a
+backend-dependent rule is ruled out (`roadmap.md`). A painter's cull (dropping hidden quads) is
+not built: the depth order already resolves every overlap, and a cull would only save bytes at
+the price of a raster pass per orbit frame. GPU-pick occlusion is a non-goal: hit geometry stays Julia-projected on both
 backends. The `:webgl` scene JSON zeros non-finite floats in GPU buffers (`_json_float` in
 `ext/MasqueWGLMakieExt.jl`, since `JSON3` rejects `NaN`), for transport only; hit geometry keeps
 them as `Float32`, so a `NaN` gap survives ([§9](09-wire-encoding.md)).
@@ -33,4 +40,7 @@ gated on `ispolar` ([§2](02-backends.md)).
 **Figure hygiene.** `masque` forces an opaque background for the render and restores it; it makes
 no other change to the user's figure.
 
-**BoxPlot whiskers and outliers are decorative**; only the box body is a hit target.
+**BoxPlot whiskers and outliers are decorative**; only the box body is a hit target. Likewise a
+`wireframe!` of the same grid as a `surface!` on the same `Axis3` (`==` on the converted
+arguments): its edges sit a few pixels apart over the whole surface and would answer nearly every
+hover with an edge, hidden side included. An explicit `SegmentInteractable(ax, wf)` still builds it.

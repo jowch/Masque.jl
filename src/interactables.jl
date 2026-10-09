@@ -8,7 +8,7 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 # Fields
 - `id::Symbol` — the layer id; becomes `InteractionEvent.layer` on a hit.
 - `kind::Symbol` — one of `:circles`, `:polyline`, `:lines`, `:segments`, `:rects`, `:grid`,
-  `:polygons`, `:axis`, `:threshold`, `:roi`, `:view`, `:slice`. `geometry`'s layout depends on it:
+  `:surface`, `:polygons`, `:axis`, `:threshold`, `:roi`, `:view`, `:slice`. `geometry`'s layout depends on it:
   - `:circles` — flat `Real[]`, `(cx, cy, r)` per element (image px)
   - `:rects` — flat `Real[]`, `(cx, cy, w, h)` per element (image px)
   - `:polyline` / `:segments` — flat `Real[]`, `(x, y)` per vertex — one connected path hit
@@ -24,6 +24,12 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
     `"values"` (the source matrix, when a cell is at least one screen pixel) or `"sample"`
     (one source value per screen pixel of the axis viewport, when cells are smaller). A
     sub-pixel matrix that is not real-valued ships neither.
+  - `:surface` — a `Dict` for a projected vertex grid of `"ni"` × `"nj"` shipped points:
+    `"i"`/`"j"` (0-based source index of each shipped row/column), `"xy"` (image px,
+    interleaved, row-major over `(ni, nj)`; `NaN` is a point not drawn), `"order"` (0-based quad
+    indices, front to back; quad `a + b·(ni-1)` has corners `(a, b)` to `(a+1, b+1)`), the data
+    `"x"`/`"y"` (length `ni`/`nj`, or one per point), `"z"`, and optionally `"value"`.
+    Payloads, when present, are one per shipped point, row-major like `xy`
   - `:axis` — `nothing` (whole-axis readout, `AxisInteractable`) or flat `Real[x, y, w, h]`
     (the colorbar's pixel bbox, `ColorbarInteractable`); not element-indexed
   - `:threshold` / `:roi` / `:view` — a small `Dict` (orientation/position, drag bbox +
@@ -59,7 +65,7 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 """
 struct HitLayer
     id::Symbol
-    kind::Symbol          # :circles|:polyline|:lines|:segments|:rects|:grid|:polygons|:axis|:threshold|:roi|:view|:slice
+    kind::Symbol          # :circles|:polyline|:lines|:segments|:rects|:grid|:surface|:polygons|:axis|:threshold|:roi|:view|:slice
     geometry::Any
     payloads::Vector{Any}
     axis::Symbol
@@ -172,6 +178,10 @@ const _JS_INVERTIBLE = (:identity, :log10, :log)  # scales geometry.ts `invert` 
 # Below this on-screen cell size a cursor can't land on one source cell, so the manifest
 # carries one source value per screen pixel of the axis viewport instead of the full matrix.
 const GRID_VALUES_MIN_SCREEN_PX = 1.0
+
+# A surface ships at most one point per this many CSS px of its axis's longer side, along each
+# grid direction (`SurfaceInteractable`). Measured in docs/dev/perf-findings.md (Section J).
+const SURFACE_MIN_SCREEN_PX = 4
 
 _proj(ctx, ax, p) = data_to_image_px(ctx, ax, p)
 
@@ -922,6 +932,186 @@ function hitlayers(i::GridInteractable, ctx)
         end
     end
     return [HitLayer(i.id, :grid, geom, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
+end
+
+# ============================ SurfaceInteractable ==========================
+"""
+    SurfaceInteractable(ax, x, y, z; id=:surface, value=nothing, payloads=nothing, tooltip=nothing, label=nothing)
+    SurfaceInteractable(ax, p::Makie.Surface; id=:surface, payloads=nothing, tooltip=nothing, label=<p's label>)
+
+A 3D surface on an `Axis3`. Produces one `:surface` [`HitLayer`](@ref). The pointer lands in one
+of the surface's drawn quads and answers with the data point at the quad's corner nearest the
+pointer, on the side of the surface you can see. A click commits a [`GridCellEvent`](@ref) with
+the point's `(i, j)` and `value = z[i, j]`, so `z[pick]` (or any matrix of `z`'s shape) reads it.
+
+# Arguments
+- `x`, `y` — the grid, as in `surface!`: vectors of length `size(z, 1)` and `size(z, 2)`, or
+  matrices the shape of `z`.
+- `z` — the heights, a real matrix. A point with a non-finite corner in all its quads is not
+  drawn and cannot be hovered.
+- `value` — optional: a real matrix the shape of `z` that colours the surface (`surface!`'s
+  `color`). The tooltip then shows it as `value`.
+- `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:surface`.
+- `payloads` — optional data for each point: a matrix the shape of `z`, or a function
+  `(i, j) -> payload`. Its fields join the point's own (`i`, `j`, `x`, `y`, `z`, `value`) in the
+  tooltip and win where a name is shared; the click's `GridCellEvent` carries it and its fields
+  read through. Default `nothing`.
+- `tooltip` — `nothing` for the default table of `i`, `j`, `x`, `y`, `z` (and `value`),
+  `masque"..."` for a template over those fields, or `false` to suppress. `tooltip = true` is
+  rejected (`ArgumentError`).
+- `label` — the layer's name (see [`PointInteractable`](@ref)). A surface is not
+  keyboard-navigable, so it has no effect yet.
+
+A dense grid is thinned: along each grid direction, at most one point ships for every 4 screen
+pixels of the axis's longer side, with the last row and column always kept.
+A point that is not shipped cannot be hovered; at that density it is smaller than a pixel. The
+stride depends on the axis size only, so it stays the same as the view turns.
+
+Quads with a corner outside the axis limits are not hit, as CairoMakie does not draw them.
+Between this layer and another plot on the same axis, the plot drawn last still wins.
+
+# Examples
+```julia
+xs = range(-2, 2; length = 40); ys = xs
+zs = [exp(-(x^2 + y^2)) for x in xs, y in ys]
+p = surface!(ax, xs, ys, zs)
+SurfaceInteractable(ax, p)
+SurfaceInteractable(ax, xs, ys, zs; tooltip = masque"z = \$(z)")
+```
+"""
+struct SurfaceInteractable <: AbstractInteractable
+    ax
+    # Where each point is drawn, data space, after the plot's own transformation.
+    pos::Matrix{Point3f}
+    # The data each point reports: x, y vectors (length size(z, 1) / size(z, 2)) or matrices.
+    x::Union{Vector{Float32}, Matrix{Float32}}
+    y::Union{Vector{Float32}, Matrix{Float32}}
+    z::Matrix{Float32}
+    value::Union{Nothing, Matrix{Float32}}
+    id::Symbol
+    payloads::Union{Nothing, Matrix{Any}}
+    tooltip::Union{Nothing, Markup, Bool}
+    label::Union{Nothing, String}
+end
+
+# A real matrix, or `nothing` for anything else (a colour matrix, a symbol, one number).
+_surface_matrix(v, sz) = v isa AbstractMatrix{<:Union{Real, Missing}} && size(v) == sz ?
+    Float32[_sample_value(a) for a in v] : nothing
+
+function _surface_axis(v, n, d, sz, name)
+    v isa AbstractVector && length(v) == n && return Float32[_sample_value(a) for a in v]
+    v isa AbstractMatrix && size(v) == sz && return Float32[_sample_value(a) for a in v]
+    throw(
+        ArgumentError(
+            "SurfaceInteractable: `$name` must be a vector of length size(z, $d) = $n or a matrix " *
+                "of size $sz, got $(v isa AbstractArray ? "an array of size $(size(v))" : typeof(v))",
+        ),
+    )
+end
+
+_surface_at(v::AbstractVector, a, b, d) = v[d == 1 ? a : b]
+_surface_at(v::AbstractMatrix, a, b, d) = v[a, b]
+
+function SurfaceInteractable(
+        ax, x, y, z; id = :surface, value = nothing, payloads = nothing, tooltip = nothing, label = nothing,
+    )
+    _check_tooltip(tooltip)
+    z isa AbstractMatrix{<:Union{Real, Missing}} ||
+        throw(ArgumentError("SurfaceInteractable: `z` must be a real matrix, got $(typeof(z))"))
+    sz = size(z)
+    xs = _surface_axis(x, sz[1], 1, sz, "x")
+    ys = _surface_axis(y, sz[2], 2, sz, "y")
+    zs = Float32[_sample_value(a) for a in z]
+    vs = value === nothing ? nothing : _surface_matrix(value, sz)
+    value === nothing || vs !== nothing || throw(
+        ArgumentError("SurfaceInteractable: `value` must be a real matrix of size $sz, got $(typeof(value))"),
+    )
+    pos = Point3f[Point3f(_surface_at(xs, a, b, 1), _surface_at(ys, a, b, 2), zs[a, b]) for a in 1:sz[1], b in 1:sz[2]]
+    pl = payloads === nothing ? nothing :
+        payloads isa Function ? Any[payloads(a, b) for a in 1:sz[1], b in 1:sz[2]] :
+        payloads isa AbstractMatrix && size(payloads) == sz ? Matrix{Any}(payloads) :
+        throw(
+            ArgumentError(
+                "SurfaceInteractable: `payloads` must be a matrix the same shape as `z` $sz or a " *
+                "function `(i, j) -> payload`, got " *
+                "$(payloads isa AbstractArray ? "an array of size $(size(payloads))" : typeof(payloads))",
+            ),
+        )
+    return SurfaceInteractable(ax, pos, xs, ys, zs, vs, id, pl, tooltip, label === nothing ? nothing : String(label))
+end
+tooltip_spec(i::SurfaceInteractable) = i.tooltip
+validate(i::SurfaceInteractable, ctx::InteractionContext) =
+    ctx.transforms[axis_id(ctx, i.ax)].is3d ? nothing :
+    "SurfaceInteractable :$(i.id): a surface is hit-tested on an `Axis3` only (a 2D `Axis` is roadmap scope)"
+
+# Shipped source indices along one grid direction of `n` points, at most about `cap` of them:
+# every `s`-th, and always the last, so the surface's edge answers.
+function _surface_stride(n, cap)
+    s = cld(n, max(cap, 1))
+    s <= 1 && return collect(1:n)
+    I = collect(1:s:n)
+    last(I) == n || push!(I, n)
+    return I
+end
+
+# Data limits of an `Axis3`, widened by a hair so a point on the box (the default limits put
+# the data's own extrema there) is not cut by rounding.
+function _surface_inside(ax)
+    lim = _finallimits(ax)
+    lo, w = lim.origin, lim.widths
+    tol = 1.0e-5 .* max.(abs.(w), 1.0e-12)
+    return p -> all(lo[d] - tol[d] <= p[d] <= lo[d] + w[d] + tol[d] for d in 1:3)
+end
+
+function hitlayers(i::SurfaceInteractable, ctx)
+    ni0, nj0 = size(i.z)
+    vp = ctx.transforms[axis_id(ctx, i.ax)].viewport
+    cap = floor(Int, max(vp[3], vp[4]) * ctx.display_scale / SURFACE_MIN_SCREEN_PX)
+    I, J = _surface_stride(ni0, cap), _surface_stride(nj0, cap)
+    ni, nj = length(I), length(J)
+    # Shipped points are row-major over (ni, nj): point (a, b) is entry a + (b - 1) * ni.
+    pts = Point3f[i.pos[a, b] for b in J for a in I]
+    px, py, depth = _project_depth(ctx, i.ax, pts)
+    inside = _surface_inside(i.ax)
+    ok = [all(isfinite, p) && inside(p) && isfinite(px[k]) && isfinite(py[k]) for (k, p) in enumerate(pts)]
+    xy = Real[]
+    sizehint!(xy, 2 * length(pts))
+    for k in eachindex(pts)
+        ok[k] ? append!(xy, (_q(px[k]), _q(py[k]))) : append!(xy, (NaN32, NaN32))
+    end
+    order, d = _surface_order(ok, depth, ni, nj)
+    geom = Dict{String, Any}(
+        "ni" => ni, "nj" => nj, "i" => I .- 1, "j" => J .- 1, "xy" => xy, "order" => order,
+        "x" => i.x isa Vector ? i.x[I] : Float32[i.x[a, b] for b in J for a in I],
+        "y" => i.y isa Vector ? i.y[J] : Float32[i.y[a, b] for b in J for a in I],
+        "z" => Float32[i.z[a, b] for b in J for a in I],
+    )
+    i.value === nothing || (geom["value"] = Float32[i.value[a, b] for b in J for a in I])
+    pl = i.payloads === nothing ? Any[] : Any[i.payloads[a, b] for b in J for a in I]
+    return [HitLayer(i.id, :surface, geom, pl, axis_id(ctx, i.ax), events(i), i.label)]
+end
+
+"""
+    _surface_order(ok, depth, ni, nj) -> (order, depth)
+
+Quads of an `ni × nj` vertex grid, front to back by the average clip-space depth of their
+corners (smaller is nearer): the order CairoMakie paints a surface's faces in, reversed. Quad
+`q` (0-based) has corners `(a, b)`, `(a+1, b)`, `(a, b+1)`, `(a+1, b+1)` with `q = a + b·(ni-1)`
+(0-based `a`, `b`). A quad with a corner that is not drawn (`ok` false) is left out. Returns
+the 0-based quad indices and their depths, in that order. Any layer of quads or faces drawn
+by depth can reuse it.
+"""
+function _surface_order(ok, depth, ni, nj)
+    qs = Int[]; qd = Float64[]
+    for b in 1:(nj - 1), a in 1:(ni - 1)
+        c1 = a + (b - 1) * ni
+        c = (c1, c1 + 1, c1 + ni, c1 + ni + 1)
+        all(k -> ok[k], c) || continue
+        push!(qs, (a - 1) + (b - 1) * (ni - 1))
+        push!(qd, (depth[c[1]] + depth[c[2]] + depth[c[3]] + depth[c[4]]) / 4)
+    end
+    p = sortperm(qd)
+    return qs[p], qd[p]
 end
 
 # ============================ TextInteractable =============================

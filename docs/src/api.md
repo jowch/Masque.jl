@@ -30,6 +30,7 @@ PointInteractable
 SegmentInteractable
 RectInteractable
 GridInteractable
+SurfaceInteractable
 PolygonInteractable
 AxisInteractable
 ColorbarInteractable

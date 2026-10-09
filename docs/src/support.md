@@ -55,9 +55,9 @@ reaches.
 ## Recipes masque(fig) extracts
 
 `masque(fig)` makes these plots interactive and skips any other plot
-with a warning that names it. Every recipe here works on a 2D `Axis`,
-and the last two columns say which also work on `Axis3` and
-`PolarAxis`. Constructor signatures and default fields are in
+with a warning that names it. Every recipe here except `surface!` works
+on a 2D `Axis`, and the last two columns say which also work on `Axis3`
+and `PolarAxis`. Constructor signatures and default fields are in
 [Constructors](@ref) and [Plot-object defaults](@ref).
 
 | Recipe | Layer `id` | Kind | Axis3 | PolarAxis |
@@ -70,6 +70,7 @@ and the last two columns say which also work on `Axis3` and
 | `arrows3d!` (`Arrows3D`) | `:arrows3d` | `:segments` | yes | — |
 | `arrows2d!` (`Arrows2D`) | `:arrows2d` | `:segments` | — | — |
 | `heatmap!` / `image!` | `:cells` | `:grid` | — | — |
+| `surface!` | `:surface` | `:surface` | only | — |
 | `barplot!` | `:bars` | `:rects` | — | — |
 | `poly!` | `:poly` | `:polygons` | — | — |
 | `stairs!` | `:stairs` | `:lines` | — | — |
@@ -115,7 +116,10 @@ gives `:violin`, `:scatter`, and `:boxplot`, and `tricontourf!` gives
 shows how many points fell in it. A plot whose `space` is not
 `:data`, such as a `bracket!` label or a `scatter!` placed with
 `space = :relative`, is skipped with a warning that names its `space`.
-`surface!` is not made interactive. If Masque can't make one plot
+A `surface!` responds on an `Axis3` only: hovering it shows the data point under the pointer
+on the side you can see, and a `wireframe!` drawn over the same grid is left as decoration so
+the surface answers. A `surface!` on a 2D `Axis` is skipped with a warning; to inspect a grid
+there, draw it with `heatmap!`. If Masque can't make one plot
 interactive, it skips that plot with a warning and the rest of the
 figure still responds. To make a recipe of your own
 respond as one mark, see [Your own plot types](@ref), and to add hit

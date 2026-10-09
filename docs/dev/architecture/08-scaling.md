@@ -61,3 +61,17 @@ the viewport is not a whole number of pixels. A pan rebuilds the sample for the 
 it does not make the sample finer. *Implemented:* `src/interactables.jl` (`_grid_sample`) and
 `frontend/src/geometry.ts` (`hitGridSample`). The size is in `perf-findings.md`.
 
+**A dense surface is thinned to a fixed stride (#259).** A `:surface` layer ships projected
+points, about 14 B each for a vector grid (24 for a matrix grid), so a fine grid outgrows the
+envelope, and its cells are smaller than a pixel anyway. Along each grid direction the layer
+ships at most `N = floor(L / SURFACE_MIN_SCREEN_PX)` points, with `L` the `Axis3` viewport's
+longer side in screen pixels and `SURFACE_MIN_SCREEN_PX = 4`: every `ceil(n / N)`-th row and
+column, plus the last. One cap from the longer side, not one per direction, because rows and
+columns stop mapping to screen x and y once the box turns. The stride ignores the camera, so the
+same points ship on every orbit frame and a selected point never drops out mid-orbit. Unlike the
+heatmap's sample, a thinned surface skips points: a point between shipped ones cannot be hovered,
+which is accepted because it is under a screen pixel. An in-drag orbit frame leaves the surface's
+geometry out entirely and the release frame ships it ([§12](12-gesture-channel.md)). *Implemented:*
+`src/interactables.jl` (`SurfaceInteractable`, `_surface_stride`). The sizes are in
+`perf-findings.md`.
+
