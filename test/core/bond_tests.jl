@@ -40,6 +40,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             fig = Figure(); ax = Axis(fig[1, 1])
             pts = PointInteractable(ax, [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]; id = :cities, payloads = df)
             @test pts.payloads[1].city == "Tokyo"
+            @test pts.payloads[1] == (; city = "Tokyo", pop = 37, x = 1.0, y = 1.0)   # merged (#308)
             @test length(pts.payloads) == 3
             pick = ElementEvent(:cities, 1, pts.payloads[1])
             @test pick.city == "Tokyo"

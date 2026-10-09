@@ -1,5 +1,5 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
-import { hitLayerByIndex, sameValue, selectionForValue } from "./selection"
+import { hitLayerByIndex, sameValue, selectionForValue, surfaceSelection } from "./selection"
 import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
@@ -675,6 +675,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         for (const h of state.selHits_) {
             const layer = newManifest.layers.find((l) => l.id === h.layer.id)
             if (!layer) continue
+            if (layer.kind === "surface") {
+                const kept = surfaceSelection(layer, h.index)
+                if (kept) nextSel.push(kept)
+                continue
+            }
             try {
                 nextSel.push({ layer, ...hitLayerByIndex(layer, h.index) })
             } catch {

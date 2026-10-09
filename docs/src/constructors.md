@@ -8,7 +8,8 @@ Most constructors take the axis first and `id` as a keyword: the
 `Symbol` an event reports as `pick.layer`. Constructors for marks also
 take `payloads` (a vector or a `DataFrame`, one entry per mark) and
 `tooltip` (a `masque"..."` template, or `false`). Without `payloads`,
-each mark reports its `index` and coordinates.
+each mark reports its `index` and coordinates, and `payloads` adds your
+fields to those coordinates.
 
 ## What `masque(fig)` builds
 
@@ -71,6 +72,7 @@ its own, define a method of [`interactables`](@ref) for its type; see
 | [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, unit=:segment, tol=6, id=:segments)` | [`ElementEvent`](@ref): `segment_index`, or `index` with `unit = :line` | [Click marks](@ref) |
 | [`RectInteractable`](@ref) | `(ax, rects; clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot)` | [`ElementEvent`](@ref): `index`; bars give `low`, `high`, `value` | [Click marks](@ref) |
 | [`GridInteractable`](@ref) | `(ax, xedges, yedges, values; id=:cells)` or `(ax, p::Union{Heatmap,Image})` | [`GridCellEvent`](@ref): `i`, `j`, `value` | [Inspect a grid](@ref) |
+| [`SurfaceInteractable`](@ref) | `(ax, x, y, z; value, id=:surface)` or `(ax, p::Surface)` | [`GridCellEvent`](@ref): `i`, `j`, `value` (the point's `z`) | [Supported plots and axes](@ref) |
 | [`PolygonInteractable`](@ref) | `(ax, rings; holes=nothing, id=:polygons)` or `(ax, p::Poly)` | [`ElementEvent`](@ref): `index` | [Click marks](@ref) |
 | [`TextInteractable`](@ref) | `(ax, p::Text; id=:text)` | [`ElementEvent`](@ref): `text`, `index`, `x`, `y` | [Click marks](@ref) |
 
@@ -109,6 +111,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `HSpan` / `VSpan` | `RectInteractable` | `low`, `high` | `:hspan` / `:vspan` |
 | `Spy` | `RectInteractable` | `index` | `:spy` |
 | `Heatmap` / `Image` | `GridInteractable` | `i`, `j`, `value`, plus the cell's own `payloads` | `:cells` |
+| `Surface` | `SurfaceInteractable` | `i`, `j`, `x`, `y`, `z`; `value` when `color` is a separate matrix | `:surface` |
 | `Poly` / `Band` / `Density` / `Voronoiplot` | `PolygonInteractable` | `index` | `:poly`, `:band`, … |
 | `Contourf` | `PolygonInteractable` | `low`, `high` | `:contourf` |
 | `Violin` | `PolygonInteractable` | `x` | `:violin` |

@@ -16,20 +16,87 @@ function _check_sigdigits(n)
     throw(ArgumentError("tooltip_sigdigits must be an integer from 1 to 17, got $(repr(n))"))
 end
 
-function tip_style_dict(;
-        tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
-        tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing,
-        tooltip_caret = true,
-    )
+# `tooltipstyle` key => (custom property, value kind).
+const _TOOLTIP_STYLE_KEYS = (
+    bg = ("--masque-tip-bg", :color),
+    color = ("--masque-tip-color", :color),
+    accent = ("--masque-tip-accent", :color),
+    font = ("--masque-tip-font", :font),
+    font_size = ("--masque-tip-font-size", :length),
+    radius = ("--masque-tip-radius", :length),
+    caret = ("--masque-tip-caret", :caret),
+)
+
+function _tooltip_style_value(k, kind, v)
+    if kind === :color
+        # `to_color` reads a bare number as a grey level, which gives no valid CSS colour.
+        css = v isa Real ? nothing : try
+                _css_color(v)
+        catch
+                nothing
+        end
+        css === nothing &&
+            throw(ArgumentError("tooltipstyle: `$k` must be a CSS string or a Makie color, got $(repr(v))"))
+        return css
+    end
+    if kind === :font
+        v isa AbstractString || v isa Symbol ||
+            throw(ArgumentError("tooltipstyle: `font` must be a CSS font-family string, got $(repr(v))"))
+        return String(v)
+    end
+    if kind === :caret
+        v isa Bool || throw(ArgumentError("tooltipstyle: `caret` must be `true` or `false`, got $(repr(v))"))
+        return v ? "block" : "none"
+    end
+    v isa Real && !(v isa Bool) && isfinite(v) && v >= 0 ||
+        throw(ArgumentError("tooltipstyle: `$k` must be a size in px, a number ≥ 0, got $(repr(v))"))
+    return "$(v)px"
+end
+
+# Only set keys are emitted; unset ones keep the tooltip's built-in look. `caret = true` is
+# the built-in look, so it emits nothing either.
+function tip_style_dict(style)
     d = Dict{String, String}()
-    tooltip_bg === nothing || (d["--masque-tip-bg"] = _css_color(tooltip_bg))
-    tooltip_color === nothing || (d["--masque-tip-color"] = _css_color(tooltip_color))
-    tooltip_accent === nothing || (d["--masque-tip-accent"] = _css_color(tooltip_accent))
-    tooltip_font === nothing || (d["--masque-tip-font"] = String(tooltip_font))
-    tooltip_font_size === nothing || (d["--masque-tip-font-size"] = "$(tooltip_font_size)px")
-    tooltip_radius === nothing || (d["--masque-tip-radius"] = "$(tooltip_radius)px")
-    tooltip_caret === false && (d["--masque-tip-caret"] = "none")
+    style === nothing && return d
+    style isa NamedTuple || throw(
+        ArgumentError("tooltipstyle must be a NamedTuple such as `(; bg = :black)`, got $(repr(style))"),
+    )
+    for (k, v) in pairs(style)
+        haskey(_TOOLTIP_STYLE_KEYS, k) || throw(
+            ArgumentError(
+                "tooltipstyle: unknown key `$k`. Valid keys: " *
+                    join(string.(keys(_TOOLTIP_STYLE_KEYS)), ", "),
+            ),
+        )
+        v === nothing && continue
+        prop, kind = _TOOLTIP_STYLE_KEYS[k]
+        val = _tooltip_style_value(k, kind, v)
+        kind === :caret && val == "block" && continue
+        d[prop] = val
+    end
     return d
+end
+
+# The 0.2 flat `tooltip_*` keywords, deprecated in 0.3 and removed in 0.4: fold the ones
+# given into `tooltipstyle`, warning once with the replacement. A key given both ways is an
+# error rather than a silent pick.
+function _merge_tooltip_kwargs(tooltipstyle, flat::NamedTuple)
+    given = NamedTuple{Tuple(k for k in keys(flat) if flat[k] !== nothing)}(flat)
+    isempty(given) && return tooltipstyle
+    old = join(("`tooltip_$k = …`" for k in keys(given)), ", ")
+    new = join(("$k = …" for k in keys(given)), ", ")
+    _deprecate(
+        "$old $(length(given) > 1 ? "are" : "is") deprecated; use `tooltipstyle = (; $new)`. Removed in 0.4.",
+        :masque,
+    )
+    tooltipstyle === nothing && return given
+    tooltipstyle isa NamedTuple || return tooltipstyle   # tip_style_dict raises the error
+    for k in keys(given)
+        haskey(tooltipstyle, k) && throw(
+            ArgumentError("masque: `tooltip_$k` and `tooltipstyle.$k` both set; pass only `tooltipstyle`"),
+        )
+    end
+    return merge(tooltipstyle, given)
 end
 
 # `overlaystyle` key => (custom property, value kind). The colour keys override the light/dark
@@ -139,6 +206,16 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         L.points === nothing || isempty(ks) || union!(ks, (:x, :y, :i))
         # A grid cell's template also sees the cell's `i`, `j`, and `value`.
         L.kind === :grid && !isempty(ks) && union!(ks, (:i, :j, :value))
+        # A surface point always has its own fields, so its template is checked against them
+        # plus a named tuple's fields, or `payload` for a bare value. Any other payload (a
+        # `Dict`, a `DataFrame` row) spreads fields Julia can't list here, so, as for every
+        # other kind, the check is skipped.
+        if L.kind === :surface && !haskey(L.geometry, "suspended")
+            union!(ks, (:i, :j, :x, :y, :z))
+            haskey(L.geometry, "value") && push!(ks, :value)
+            any(pl -> pl isa Union{Number, AbstractString, Symbol}, L.payloads) && push!(ks, :payload)
+            all(pl -> pl === nothing || pl isa Union{NamedTuple, Number, AbstractString, Symbol}, L.payloads) || empty!(ks)
+        end
         isempty(ks) || check_fields(spec, ks)      # build-time field check (skip if no NamedTuple payloads)
         d["template"] = markup_segments(spec)
     elseif spec === false
@@ -422,13 +499,14 @@ the published manifest.
 function build_manifest(
         interactables, ctx::InteractionContext;
         selected = nothing, tip_style = nothing, tip_digits = _DEFAULT_SIGDIGITS, background = nothing,
-        overlay_style = nothing, owners_out = nothing,
+        overlay_style = nothing, owners_out = nothing, suspend_surfaces = false,
     )
     pairs = Tuple{Any, HitLayer}[]
     for i in interactables
         msg = validate(i, ctx)
         msg === nothing || throw(ArgumentError(msg))
-        for L in hitlayers(i, ctx)
+        Ls = suspend_surfaces && i isa SurfaceInteractable ? [_suspended_surface(i, ctx)] : hitlayers(i, ctx)
+        for L in Ls
             push!(pairs, (i, L))
         end
     end
@@ -674,10 +752,11 @@ itself own nothing.
   Readouts and drag labels keep their trailing zeros (`2.500`), so they don't change width as
   the pointer moves. A template field with a spec, such as `\$(x:.2f)`, ignores it, and the
   `@bind` value is never rounded.
-- `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`, `tooltip_font_size`,
-  `tooltip_radius`, `tooltip_caret` — tooltip card styling; each defaults to the built-in
-  style. See the Tooltips page for the full system, including the `--masque-tip-*` CSS
-  escape hatch.
+- `tooltipstyle` — the look of the tooltip card, as a `NamedTuple`:
+  `tooltipstyle = (; bg = :black, color = :white, radius = 6)`. Keys: `bg`, `color`, `accent`,
+  `font`, `font_size`, `radius`, `caret`. Each key you leave out keeps the built-in look. See
+  [Tooltip styling](@ref). The 0.2 keywords `tooltip_bg`, `tooltip_color`, … still work with
+  a deprecation warning and are removed in 0.4.
 - `overlaystyle` — the look of highlights, the selection, the crosshair, and ROI boxes, as a
   `NamedTuple`: `overlaystyle = (; color = :steelblue, hover_width = 2)`. Each key you leave
   out keeps the built-in look. See [Overlay styling](@ref) for the keys.
@@ -703,11 +782,19 @@ end
 function _masque(
         fig, interactables::AbstractVector; backend::Union{Nothing, Symbol, AbstractBackend} = nothing,
         max_width = nothing, px_per_unit = nothing, selected = nothing,
+        tooltipstyle = nothing, tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing,
         tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
-        tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing, tooltip_caret = true,
-        tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing,
+        tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing, tooltip_caret = nothing,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
+    tooltipstyle = _merge_tooltip_kwargs(
+        tooltipstyle,
+        (;
+            bg = tooltip_bg, color = tooltip_color, accent = tooltip_accent, font = tooltip_font,
+            font_size = tooltip_font_size, radius = tooltip_radius, caret = tooltip_caret,
+        ),
+    )
+    tip_style = tip_style_dict(tooltipstyle)
     overlay_style = overlay_style_dict(overlaystyle)
     backend, max_width, px_per_unit = _backend_settings(backend, max_width, px_per_unit)
     bg0 = fig.scene.backgroundcolor[]
@@ -720,9 +807,6 @@ function _masque(
             ArgumentError("masque: `px_per_unit = $ppu` makes the picture less than 1 pixel wide"),
         )
         ctx = context(backend, fig, ppu, max_width)
-        tip_style = tip_style_dict(;
-            tooltip_bg, tooltip_color, tooltip_accent, tooltip_font, tooltip_font_size, tooltip_radius, tooltip_caret,
-        )
         owners_out = Ref(Dict{String, LayerOwner}())
         manifest = build_manifest(
             interactables, ctx; selected, tip_style, tip_digits,
@@ -974,7 +1058,7 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
         fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
         _finalize!(fig)
         ctx = context(backend, fig, ppu, max_width)
-        manifest = build_manifest(interactables, ctx)
+        manifest = build_manifest(interactables, ctx; suspend_surfaces = get(input, "settle", false) !== true)
         result = render(backend, fig, render_ppu)
         frame = _gesture_frame(result)
         frame["manifest"] = manifest
@@ -983,6 +1067,15 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
         fig.scene.backgroundcolor[] = bg0
     end
 end
+
+# An in-drag frame (any view drag in the figure: an orbit, or a pan of a 2D axis beside the
+# surface) leaves out every surface layer's geometry: at the thinning cap a surface
+# outweighs the in-drag picture several times over (perf-findings.md, Section J), and
+# no one hovers mid-drag. The layer is not built at all, so the drag doesn't pay for its
+# projection either. It stays, with no hit area and no highlight, until the release frame
+# ships it again. §12.5 forbids a stale overlay, not a suspended one.
+_suspended_surface(i::SurfaceInteractable, ctx) =
+    HitLayer(i.id, :surface, Dict{String, Any}("suspended" => true), Any[], axis_id(ctx, i.ax), events(i), i.label)
 
 # A real call is what compiles this path (camera write, `ppu=1` render, JS payload). The
 # frames are discarded. `show` schedules it after the mount HTML is written. Tiny nudges plus

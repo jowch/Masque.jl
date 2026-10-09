@@ -11,7 +11,7 @@ load Pluto (see `CLAUDE.md`; `scripts/cloud-warm.sh julia` builds the env with a
 
 ```sh
 ENV_DIR="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}"
-julia --project="$ENV_DIR" bench/payload_envelope.jl        # :cairo envelope (sections A–H)
+julia --project="$ENV_DIR" bench/payload_envelope.jl        # :cairo envelope (sections A–J)
 julia --project="$ENV_DIR" bench/stress.jl                  # :cairo 10× extremes (STRESS A–E)
 julia --project="$ENV_DIR" bench/gesture_channel.jl         # :cairo gesture frames
 julia --project="$ENV_DIR" bench/gesture_channel_webgl.jl   # :webgl gesture frames
@@ -143,6 +143,27 @@ Section G, text labels (2026-07-01). A label is a 4-int `:rects` box (~8 B) plus
 | scatter + 5 short labels | 5 | 0.8 KB | 51 |
 | text only, 100 labels of ~4 chars | 100 | 4.9 KB | 47 |
 
+Section J, surface on Axis3 (2026-10-09 at `0e764bb` plus #259, Julia 1.13.1). A `:surface`
+layer ships each shipped point's integer-px `xy` and Float32 `z`, one quad index per quad in
+depth order, and the source row and column indices. A matrix grid adds per-point `x` and `y`; a
+separate colour matrix adds `value`. A grid larger than one point per `SURFACE_MIN_SCREEN_PX` (4)
+of the axis's longer side is thinned to that stride; at 600×450 the cap is 126×126. Build is the
+layer's own `hitlayers` call (projection, quantize, depth sort), best of 5, paid by the mount and
+by every orbit settle frame.
+
+| Surface (600×450 figure) | shipped | vector grid | matrix grid | with `value` | build |
+|---|---:|---:|---:|---:|---:|
+| 50×50 | 50×50 | 34.7 KB | 58.6 KB | 46.9 KB | ~2 ms |
+| 100×100 | 100×100 | 137.5 KB | 234.2 KB | 186.3 KB | ~8 ms |
+| 200×200 | 101×101 | 140.4 KB | 239.0 KB | 190.2 KB | 8–15 ms |
+| 500×500 | 126×126 | 218.3 KB | 372.1 KB | 295.9 KB | 13–19 ms |
+| 1000×1000 | 126×126 | 218.4 KB | 372.2 KB | 295.9 KB | 13–14 ms |
+
+~14 B/point for a vector grid, ~24 B for a matrix grid, ~19 B with `value`. Thinning holds every
+surface inside the 50–400 KB envelope at this size; a 700-px-wide axis reaches the 168×168 cap
+(387 KB vector, 661 KB matrix, measured for the design in #259). In-drag frames leave the layer
+out (see "`:cairo` gesture frames").
+
 Bars, spans, and text are low-N by nature (tens to hundreds of elements), so their per-element
 payloads never move the envelope. A high-cell `voronoiplot!` (1 000 cells) would reach
 scatter-scale manifests, a few hundred KB.
@@ -170,10 +191,16 @@ A `:view` layer is one viewport bbox plus a mode and two angles, the same order 
 ### Tooltips
 
 Shipping a tooltip string per element would grow the manifest by the sum of those strings:
-1 000 elements × 200 B is +196 KB (14 → 210 KB), and 50 000 × 200 B is a **10.24 MB** manifest
-that takes 1.25–1.34 s to render (STRESS D). So per-element strings are not shipped. A layer with
+1 000 elements × 200 B is +196 KB (73 → 269 KB), and 50 000 × 200 B is a **13.17 MB** manifest
+that takes ~1.5–2.2 s to render (STRESS D). So per-element strings are not shipped. A layer with
 a tooltip carries a `template` (a small segment array evaluated on hover) and the manifest one
 `tipStyle` dict, both O(1) per layer; the default envelope above is unchanged by them.
+
+Both benches build the scatter twice (`masque(fig)`'s own layer plus the passed one), so half the
+elements carry the payload. Since #308 (2026-10-09) a key-value payload is merged onto the
+point's own `x` and `y`, which adds ~21 B per element: section B's rows each grew by 21.5 KB per
+1 000 points (51.6 → 73.1 KB at length 0) and STRESS D by 1.04 MB (12.13 → 13.17 MB), measured
+against `main` at `0e764bb` on the same machine.
 
 ### Render latency
 
@@ -229,7 +256,7 @@ for the heatmap sample sizes). Render times are a range across repeated runs on 
 | heatmap 300×300 (cells visible) | 388 KB | 442 KB | 33–84 ms |
 | heatmap 500×500 (cells sub-pixel) | 1 009 KB | 906 KB | 47–206 ms |
 | heatmap 1000×1000 (cells sub-pixel) | 2.26 MB | **896 KB** | 97–227 ms |
-| scatter 50 000 + 200 B payload/element | 47 KB | **10.24 MB** | 1 248–1 340 ms |
+| scatter 50 000 + 200 B payload/element | 47 KB | **13.17 MB** | 1 491–2 153 ms (2026-10-09, #308) |
 
 - **The PNG is not monotonic in N.** Past saturation a dense scatter compresses to a near-solid
   mass (200 000 points → 71 KB) while the manifest grows linearly to 7.7 MB.
@@ -413,14 +440,22 @@ Every trial remounted the widget twice (#83).
 Julia side only; #102's spike put websocket transfer and browser decode and paint at a ~31–34 ms
 floor on top. Ranges are two runs.
 
-| scene | in-drag (`ppu=1`) p50 | settle (mount `ppu`) p50 | PNG in-drag → settle |
-|---|---:|---:|---:|
-| `Axis3` helix + 12 markers, orbit | 11.1–11.3 ms | 24.2–25.5 ms | 56.5 KB → 139.2 KB |
-| the same + an 80×80 `surface!`, orbit | 80.8–87.4 ms | 124.7–125.5 ms | 63.0 KB → 161.8 KB |
-| `Axis`, 6-point scatter, 2-D pan | 4.1–5.3 ms | 13.2–13.4 ms | 9.0 KB → 19.1 KB |
+| scene | in-drag (`ppu=1`) p50 | settle (mount `ppu`) p50 | PNG in-drag → settle | manifest in-drag → settle |
+|---|---:|---:|---:|---:|
+| `Axis3` helix + 12 markers, orbit | 11.1–11.3 ms | 24.2–25.5 ms | 56.5 KB → 139.2 KB | 3.3 KB → 3.3 KB |
+| the same + an 80×80 `surface!`, orbit | 80.8–87.4 ms | 124.7–125.5 ms | 63.0 KB → 161.8 KB | 3.4 KB → 91.1 KB |
+| `Axis`, 6-point scatter, 2-D pan | 4.1–5.3 ms | 13.2–13.4 ms | 9.0 KB → 19.1 KB | 1.1 KB → 1.1 KB |
 
 Dropping to `ppu=1` during the drag roughly halves the heavy scene's cost: the render, not the
 manifest rebuild, is what it pays for.
+
+The manifest column is from 2026-10-09 at `0e764bb` plus #259, Julia 1.13.1. Since #259 the
+heavy scene's surface is a default `:surface` layer: in-drag frames ship it suspended (no
+geometry, and it is not built), and the settle frame ships its 88 KB. The timings above predate
+it. Re-timed on the cloud box, which runs this bench about 1.5× slower and noisier than the
+columns above, an interleaved A/B of the heavy scene with and without the surface layer (30
+frames each, same process) gave in-drag 112.8 vs 113.1 ms and settle 162.7 vs 172.2 ms: the
+layer costs the settle frame its build (~10 ms) and the drag nothing.
 
 ### `:webgl` gesture frames
 

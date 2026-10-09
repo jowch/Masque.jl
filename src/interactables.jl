@@ -8,7 +8,7 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 # Fields
 - `id::Symbol` — the layer id; becomes `InteractionEvent.layer` on a hit.
 - `kind::Symbol` — one of `:circles`, `:polyline`, `:lines`, `:segments`, `:rects`, `:grid`,
-  `:polygons`, `:axis`, `:threshold`, `:roi`, `:view`, `:slice`. `geometry`'s layout depends on it:
+  `:surface`, `:polygons`, `:axis`, `:threshold`, `:roi`, `:view`, `:slice`. `geometry`'s layout depends on it:
   - `:circles` — flat `Real[]`, `(cx, cy, r)` per element (image px)
   - `:rects` — flat `Real[]`, `(cx, cy, w, h)` per element (image px)
   - `:polyline` / `:segments` — flat `Real[]`, `(x, y)` per vertex — one connected path hit
@@ -24,6 +24,12 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
     `"values"` (the source matrix, when a cell is at least one screen pixel) or `"sample"`
     (one source value per screen pixel of the axis viewport, when cells are smaller). A
     sub-pixel matrix that is not real-valued ships neither.
+  - `:surface` — a `Dict` for a projected vertex grid of `"ni"` × `"nj"` shipped points:
+    `"i"`/`"j"` (0-based source index of each shipped row/column), `"xy"` (image px,
+    interleaved, row-major over `(ni, nj)`; `NaN` is a point not drawn), `"order"` (0-based quad
+    indices, front to back; quad `a + b·(ni-1)` has corners `(a, b)` to `(a+1, b+1)`), the data
+    `"x"`/`"y"` (length `ni`/`nj`, or one per point), `"z"`, and optionally `"value"`.
+    Payloads, when present, are one per shipped point, row-major like `xy`
   - `:axis` — `nothing` (whole-axis readout, `AxisInteractable`) or flat `Real[x, y, w, h]`
     (the colorbar's pixel bbox, `ColorbarInteractable`); not element-indexed
   - `:threshold` / `:roi` / `:view` — a small `Dict` (orientation/position, drag bbox +
@@ -59,7 +65,7 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 """
 struct HitLayer
     id::Symbol
-    kind::Symbol          # :circles|:polyline|:lines|:segments|:rects|:grid|:polygons|:axis|:threshold|:roi|:view|:slice
+    kind::Symbol          # :circles|:polyline|:lines|:segments|:rects|:grid|:surface|:polygons|:axis|:threshold|:roi|:view|:slice
     geometry::Any
     payloads::Vector{Any}
     axis::Symbol
@@ -182,6 +188,10 @@ const _JS_INVERTIBLE = (:identity, :log10, :log)  # scales geometry.ts `invert` 
 # carries one source value per screen pixel of the axis viewport instead of the full matrix.
 const GRID_VALUES_MIN_SCREEN_PX = 1.0
 
+# A surface ships at most one point per this many CSS px of its axis's longer side, along each
+# grid direction (`SurfaceInteractable`). Measured in docs/dev/perf-findings.md (Section J).
+const SURFACE_MIN_SCREEN_PX = 4
+
 # An `Axis3` clips its plots to its limits (Makie's clip planes, `ax.clip = true`), so a point
 # outside them, as after a zoom (#321), is not drawn. Built-in hit geometry gets NaN there, the
 # "not on screen" sentinel every hit layer already skips, rather than a spot where nothing is
@@ -276,6 +286,29 @@ function expand_payloads(payloads, n, who)
 end
 _check_payloads(payloads, n, what) = expand_payloads(payloads, n, what)
 
+# A user's payload is merged onto the mark's own default payload: `(; name = "a")` on a
+# scatter point gives `(; name, x, y)`, and the user's fields win a clash. `index` (and a
+# segment's `segment_index`) is left out, since the event carries it as `ev.index`. A payload
+# that isn't key-value (a bare string) replaces the default, as there is nothing to merge.
+function _merge_payloads(defaults, payloads, who)
+    payloads === nothing && return defaults
+    pl = expand_payloads(payloads, length(defaults), who)
+    return Any[_merge_payload(d, p) for (d, p) in zip(defaults, pl)]
+end
+_default_fields(d::NamedTuple) = Base.structdiff(d, NamedTuple{(:index, :segment_index)})
+_merge_payload(d, p) = p
+_merge_payload(d::NamedTuple, p::NamedTuple) = merge(p, Base.structdiff(_default_fields(d), p))
+function _merge_payload(d::NamedTuple, p::AbstractDict)
+    K = keytype(p)
+    key = K === Symbol ? identity : K === String ? string : nothing
+    key === nothing && return p
+    out = merge!(empty(p, K, Any), p)   # keeps an `OrderedDict`'s type and order
+    for (k, v) in pairs(_default_fields(d))
+        get!(out, key(k), v)
+    end
+    return out
+end
+
 # Checked at construction (not manifest build time) so the error points at the caller's own call.
 _check_tooltip(tooltip) =
     tooltip === true && throw(
@@ -343,7 +376,12 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit.
 - `payloads` — one entry per point (`ArgumentError` if the length doesn't match `points`), or a
   `DataFrame` with one row per point once DataFrames is loaded. Default: `(; index, x, y)`, or
-  `(; index, x, y, z)` for 3-coordinate points — `index` is 1-based.
+  `(; index, x, y, z)` for 3-coordinate points — `index` is 1-based. A named-tuple, row, or
+  `Dict` payload is merged onto the default: `(; name = "a")` gives `(; name, x, y)`, and a
+  field the payload names itself (its own `x`) wins. `index` isn't added, since the event
+  carries it as `ev.index`. A `Dict` merges when it is keyed by `Symbol` or `String`; any other
+  payload (a bare string) replaces the default. Every plot-object constructor merges the same
+  way onto its own default payload.
 - `radius` — highlight and click-target radius in px (scaled to the rendered image's DPI): a
   number for every point, or a vector with one per point. Default `nothing`: use the drawn
   radius of the one `Scatter` on `ax` with these positions (see below), per point when its
@@ -353,9 +391,10 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
   (a `Char`, an image, a per-element vector of markers) keeps the `markersize / 2` bound.
 - `radius3d` — per-point data-space half-extents (`Vector{Makie.Vec3f}`), for markers whose
   on-screen size is camera/depth-dependent (e.g. `meshscatter`). When set, overrides `radius`
-  with an axis-aligned pixel-radius approximation projected per point — it can underestimate
-  the true silhouette (worst case ~29%, at adversarial azimuth/elevation). Must have one entry
-  per point (`ArgumentError` otherwise).
+  with the radius of each point's projected outline: the longest semi-axis of the ellipsoid
+  with these half-extents, as drawn. With Axis3's `perspectiveness` above 0 it can fall a
+  few percent short (about 6% at `perspectiveness = 1`). Must have one entry per point
+  (`ArgumentError` otherwise).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`; not meaningful).
 - `label` — the layer's name, which screen readers announce when the keyboard moves to an
@@ -411,9 +450,8 @@ struct PointInteractable <: AbstractInteractable
     ax; points::Vector{Point3f}; id::Symbol; payloads::Vector{Any}
     # px, one for every point or one per point
     radius::Union{Float64, Vector{Float64}}
-    # Data-space half-extents (meshscatter markers are data-sized); overrides `radius` via an
-    # axis-aligned pixel-radius approximation that can underestimate the true silhouette
-    # (worst case ~29%, at adversarial azimuth/elevation).
+    # Data-space half-extents (meshscatter markers are data-sized); overrides `radius` with
+    # the radius of the projected outline (`_px_radius3d`).
     radius3d::Union{Nothing, Vector{Makie.Vec3f}}
     tooltip::Union{Nothing, Markup, Bool}
     label::Union{Nothing, String}
@@ -426,20 +464,20 @@ struct PointInteractable <: AbstractInteractable
     stroke::Float64
 end
 function PointInteractable(
-        ax, points; id = :points,
-        payloads = _unconvert_payloads(
-            ax, Any[
-                length(p) >= 3 ?
-                    (; index = k, x = Float64(p[1]), y = Float64(p[2]), z = Float64(p[3])) :
-                    (; index = k, x = Float64(p[1]), y = Float64(p[2]))
-                    for (k, p) in enumerate(points)
-            ]
-        ),
+        ax, points; id = :points, payloads = nothing,
         radius = nothing, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing
     )
     _check_tooltip(tooltip)
     pts = [_pt3(p) for p in points]
-    pl = expand_payloads(payloads, length(pts), "PointInteractable")
+    defaults = _unconvert_payloads(
+        ax, Any[
+            length(p) >= 3 ?
+                (; index = k, x = Float64(p[1]), y = Float64(p[2]), z = Float64(p[3])) :
+                (; index = k, x = Float64(p[1]), y = Float64(p[2]))
+                for (k, p) in enumerate(points)
+        ]
+    )
+    pl = _merge_payloads(defaults, payloads, "PointInteractable")
     r3 = radius3d === nothing ? nothing : Vector{Makie.Vec3f}(radius3d)
     r3 === nothing || length(r3) == length(pts) ||
         throw(ArgumentError("radius3d must have one entry per point (got $(length(r3)) for $(length(pts)))"))
@@ -457,18 +495,32 @@ function _check_radius(r, n)
     return Vector{Float64}(r)
 end
 tooltip_spec(i::PointInteractable) = i.tooltip
-# Max projected displacement over the ±axis half-extents; non-finite offsets are skipped.
-function _px_radius3d(ctx, ax, p, e, q, box = _clipbox(ax))
-    m = 0.0
-    for d in (
-            (e[1], 0, 0), (-e[1], 0, 0), (0, e[2], 0),
-            (0, -e[2], 0), (0, 0, e[3]), (0, 0, -e[3]),
-        )
-        q2 = _proj(ctx, ax, (p[1] + d[1], p[2] + d[2], p[3] + d[3]), box)
-        r = hypot(q2[1] - q[1], q2[2] - q[2])
-        isfinite(r) && (m = max(m, r))
+# Outline radius of the ellipsoid with data-space semi-axes `e` around `p` (projected to `q`).
+# Projecting `p ± eᵢ` gives the screen images `cᵢ` of its three semi-axes; the drawn outline is
+# then the ellipse `M·(unit ball)` with `M = [c₁ c₂ c₃]`, whose longest semi-axis is `M`'s
+# largest singular value (exact for Axis3's default orthographic camera). The largest single
+# `|cᵢ|` falls short whenever the outline's long direction isn't along a data axis. Under
+# perspective the near half of an axis projects longer than the far half, which the average in
+# `cᵢ` hides, so the radius is never less than the longest single half. The edge points skip
+# the Axis3 clip box: `hitlayers` already hides a sphere whose centre is clipped, and one whose
+# edge crosses the limits keeps its full radius. A semi-axis whose projection isn't finite is
+# left out.
+function _px_radius3d(ctx, ax, p, e, q)
+    all(isfinite, q) || return 0.0   # a clipped sphere, skipped by the hit layer anyway
+    a = b = d = 0.0   # M·Mᵀ = [a b; b d]
+    half = 0.0
+    for i in 1:3
+        o = ntuple(j -> j == i ? Float64(e[i]) : 0.0, 3)
+        hi = data_to_image_px(ctx, ax, (p[1] + o[1], p[2] + o[2], p[3] + o[3]))
+        lo = data_to_image_px(ctx, ax, (p[1] - o[1], p[2] - o[2], p[3] - o[3]))
+        cx, cy = (hi[1] - lo[1]) / 2, (hi[2] - lo[2]) / 2
+        isfinite(cx) && isfinite(cy) || continue
+        a += cx^2
+        b += cx * cy
+        d += cy^2
+        half = max(half, hypot(hi[1] - q[1], hi[2] - q[2]), hypot(q[1] - lo[1], q[2] - lo[2]))
     end
-    return m
+    return max(half, sqrt((a + d) / 2 + hypot((a - d) / 2, b)))
 end
 function hitlayers(i::PointInteractable, ctx)
     g = Real[]
@@ -476,7 +528,7 @@ function hitlayers(i::PointInteractable, ctx)
     for (k, p) in enumerate(i.points)
         q = _proj(ctx, i.ax, p, box)
         r = if i.radius3d !== nothing
-            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q, box)
+            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q)
         else
             ((i.radius isa Vector ? i.radius[k] : i.radius) + i.stroke * ctx.marker_stroke) * ctx.scaling
         end
@@ -532,7 +584,7 @@ by the plot type):
 | `Makie.Stairs` | `:stairs` | one `:lines` element, the whole staircase | the child `Lines`' pre-expanded step polyline |
 | `Makie.Series` | `:series` | one `:lines` layer, one element per series | each child line (or a `ScatterLines` child's line) |
 | `Makie.LineSegments` | `:segments` | `:pairs`, per segment | converted data |
-| `Makie.Wireframe` | `:wireframe` | `:pairs`, per edge | the child `LineSegments`' edges (incl. mesh-triangulation diagonals) |
+| `Makie.Wireframe` | `:wireframe` | `:pairs`, per drawn edge, each once, in drawing order (see below) | the child `LineSegments`' edges (incl. mesh-triangulation diagonals), an edge shared by two faces kept at its first copy |
 | `Makie.Arrows3D` | `:arrows3d` | `:pairs`, per shaft | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, z, u, v, w)` from `points`/`directions` |
 | `Makie.Arrows2D` | `:arrows2d` | `:pairs`, per arrow, tail to tip | processed `startpoints`/`endpoints` (post-align/lengthscale); default payload `(; index, x, y, u, v)` from `points`/`directions` |
 | `Makie.Errorbars` | `:errorbars` | `:pairs`, per bar | each bar's low→high endpoints |
@@ -542,6 +594,11 @@ by the plot type):
 
 A `series!` element's default payload is `(; index, label)` when the child plot's label is a
 non-empty string (Makie's own default is `"series k"`), otherwise `(; index)`.
+
+A `wireframe!`'s edges come in Makie's drawing order (face by face), with an edge two faces
+share kept where it first appears. Edge `k`'s endpoints are
+`SegmentInteractable(ax, w).vertices[2k-1:2k]`, and half the length of `vertices` is the edge
+count a `payloads` vector must match.
 
 # Examples
 ```julia
@@ -754,7 +811,8 @@ Axis-aligned rectangles from an explicit list (bars, boxes). Produces one `:rect
 are removed in 0.3.
 
 # From a plot object
-`RectInteractable(ax, p)` builds `rects` and default payloads from `p`:
+`RectInteractable(ax, p)` builds `rects` and default payloads from `p`. A key-value `payloads`
+entry is merged onto that default, as for [`PointInteractable`](@ref):
 
 | `p` | default `id` | notes |
 |---|---|---|
@@ -999,6 +1057,180 @@ function hitlayers(i::GridInteractable, ctx)
     return [HitLayer(i.id, :grid, geom, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
 end
 
+# ============================ SurfaceInteractable ==========================
+"""
+    SurfaceInteractable(ax, x, y, z; id=:surface, value=nothing, payloads=nothing, tooltip=nothing, label=nothing)
+    SurfaceInteractable(ax, p::Makie.Surface; id=:surface, payloads=nothing, tooltip=nothing, label=<p's label>)
+
+A 3D surface on an `Axis3`. Produces one `:surface` [`HitLayer`](@ref). The pointer lands in one
+of the surface's drawn quads and answers with the data point at the quad's corner nearest the
+pointer, on the side of the surface you can see. A click commits a [`GridCellEvent`](@ref) with
+the point's `(i, j)` and `value = z[i, j]`, so `z[pick]` (or any matrix of `z`'s shape) reads it.
+
+# Arguments
+- `x`, `y` — the grid, as in `surface!`: vectors of length `size(z, 1)` and `size(z, 2)`, or
+  matrices the shape of `z`.
+- `z` — the heights, a real matrix. A point with a non-finite corner in all its quads is not
+  drawn and cannot be hovered.
+- `value` — optional: a real matrix the shape of `z` that colours the surface (`surface!`'s
+  `color`). The tooltip then shows it as `value`.
+- `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:surface`.
+- `payloads` — optional data for each point: a matrix the shape of `z`, or a function
+  `(i, j) -> payload`. Its fields join the point's own (`i`, `j`, `x`, `y`, `z`, `value`) in the
+  tooltip and win where a name is shared; the click's `GridCellEvent` carries it and its fields
+  read through. Default `nothing`.
+- `tooltip` — `nothing` for the default table of `i`, `j`, `x`, `y`, `z` (and `value`),
+  `masque"..."` for a template over those fields, or `false` to suppress. `tooltip = true` is
+  rejected (`ArgumentError`).
+- `label` — the layer's name (see [`PointInteractable`](@ref)). A surface is not
+  keyboard-navigable, so it has no effect yet.
+
+A dense grid is thinned: along each grid direction, at most one point ships for every 4 screen
+pixels of the axis's longer side, with the last row and column always kept.
+A point that is not shipped cannot be hovered; at that density it is smaller than a pixel. The
+stride depends on the axis size only, so it stays the same as the view turns.
+
+Quads with a corner outside the axis limits are not hit, as CairoMakie does not draw them.
+Between this layer and another plot on the same axis, the plot drawn last still wins.
+
+# Examples
+```julia
+xs = range(-2, 2; length = 40); ys = xs
+zs = [exp(-(x^2 + y^2)) for x in xs, y in ys]
+p = surface!(ax, xs, ys, zs)
+SurfaceInteractable(ax, p)
+SurfaceInteractable(ax, xs, ys, zs; tooltip = masque"z = \$(z)")
+```
+"""
+struct SurfaceInteractable <: AbstractInteractable
+    ax
+    # Where each point is drawn, data space, after the plot's own transformation.
+    pos::Matrix{Point3f}
+    # The data each point reports: x, y vectors (length size(z, 1) / size(z, 2)) or matrices.
+    x::Union{Vector{Float32}, Matrix{Float32}}
+    y::Union{Vector{Float32}, Matrix{Float32}}
+    z::Matrix{Float32}
+    value::Union{Nothing, Matrix{Float32}}
+    id::Symbol
+    payloads::Union{Nothing, Matrix{Any}, Function}   # a function is called at shipped points only
+    tooltip::Union{Nothing, Markup, Bool}
+    label::Union{Nothing, String}
+end
+
+# A real matrix, or `nothing` for anything else (a colour matrix, a symbol, one number).
+_surface_matrix(v, sz) = v isa AbstractMatrix{<:Union{Real, Missing}} && size(v) == sz ?
+    Float32[_sample_value(a) for a in v] : nothing
+
+function _surface_axis(v, n, d, sz, name)
+    v isa AbstractVector && length(v) == n && return Float32[_sample_value(a) for a in v]
+    v isa AbstractMatrix && size(v) == sz && return Float32[_sample_value(a) for a in v]
+    throw(
+        ArgumentError(
+            "SurfaceInteractable: `$name` must be a vector of length size(z, $d) = $n or a matrix " *
+                "of size $sz, got $(v isa AbstractArray ? "an array of size $(size(v))" : typeof(v))",
+        ),
+    )
+end
+
+_surface_at(v::AbstractVector, a, b, d) = v[d == 1 ? a : b]
+_surface_at(v::AbstractMatrix, a, b, d) = v[a, b]
+
+function SurfaceInteractable(
+        ax, x, y, z; id = :surface, value = nothing, payloads = nothing, tooltip = nothing, label = nothing,
+    )
+    _check_tooltip(tooltip)
+    z isa AbstractMatrix{<:Union{Real, Missing}} ||
+        throw(ArgumentError("SurfaceInteractable: `z` must be a real matrix, got $(typeof(z))"))
+    sz = size(z)
+    xs = _surface_axis(x, sz[1], 1, sz, "x")
+    ys = _surface_axis(y, sz[2], 2, sz, "y")
+    zs = Float32[_sample_value(a) for a in z]
+    vs = value === nothing ? nothing : _surface_matrix(value, sz)
+    value === nothing || vs !== nothing || throw(
+        ArgumentError("SurfaceInteractable: `value` must be a real matrix of size $sz, got $(typeof(value))"),
+    )
+    pos = Point3f[Point3f(_surface_at(xs, a, b, 1), _surface_at(ys, a, b, 2), zs[a, b]) for a in 1:sz[1], b in 1:sz[2]]
+    pl = payloads === nothing ? nothing :
+        payloads isa Function ? payloads :
+        payloads isa AbstractMatrix && size(payloads) == sz ? Matrix{Any}(payloads) :
+        throw(
+            ArgumentError(
+                "SurfaceInteractable: `payloads` must be a matrix the same shape as `z` $sz or a " *
+                "function `(i, j) -> payload`, got " *
+                "$(payloads isa AbstractArray ? "an array of size $(size(payloads))" : typeof(payloads))",
+            ),
+        )
+    return SurfaceInteractable(ax, pos, xs, ys, zs, vs, id, pl, tooltip, label === nothing ? nothing : String(label))
+end
+tooltip_spec(i::SurfaceInteractable) = i.tooltip
+validate(i::SurfaceInteractable, ctx::InteractionContext) =
+    ctx.transforms[axis_id(ctx, i.ax)].is3d ? nothing :
+    "SurfaceInteractable :$(i.id): a surface is hit-tested on an `Axis3` only (a 2D `Axis` is roadmap scope)"
+
+# Shipped source indices along one grid direction of `n` points, at most about `cap` of them:
+# every `s`-th, and always the last, so the surface's edge answers. The stride is a whole
+# number, so a grid just past the cap ships about half as many points as one just under it
+# (126 ships whole under a cap of 126; 130 ships 66), and both stay under the cap.
+function _surface_stride(n, cap)
+    s = cld(n, max(cap, 1))
+    s <= 1 && return collect(1:n)
+    I = collect(1:s:n)
+    last(I) == n || push!(I, n)
+    return I
+end
+
+function hitlayers(i::SurfaceInteractable, ctx)
+    ni0, nj0 = size(i.z)
+    vp = ctx.transforms[axis_id(ctx, i.ax)].viewport
+    cap = floor(Int, max(vp[3], vp[4]) * ctx.display_scale / SURFACE_MIN_SCREEN_PX)
+    I, J = _surface_stride(ni0, cap), _surface_stride(nj0, cap)
+    ni, nj = length(I), length(J)
+    # Shipped points are row-major over (ni, nj): point (a, b) is entry a + (b - 1) * ni.
+    pts = Point3f[i.pos[a, b] for b in J for a in I]
+    px, py, depth = _project_depth(ctx, i.ax, pts)
+    box = _clipbox(i.ax)
+    ok = [all(isfinite, p) && (box === nothing || _in_clipbox(box, p)) && isfinite(px[k]) && isfinite(py[k]) for (k, p) in enumerate(pts)]
+    xy = Real[]
+    sizehint!(xy, 2 * length(pts))
+    for k in eachindex(pts)
+        ok[k] ? append!(xy, (_q(px[k]), _q(py[k]))) : append!(xy, (NaN32, NaN32))
+    end
+    order, d = _surface_order(ok, depth, ni, nj)
+    geom = Dict{String, Any}(
+        "ni" => ni, "nj" => nj, "i" => I .- 1, "j" => J .- 1, "xy" => xy, "order" => order,
+        "x" => i.x isa Vector ? i.x[I] : Float32[i.x[a, b] for b in J for a in I],
+        "y" => i.y isa Vector ? i.y[J] : Float32[i.y[a, b] for b in J for a in I],
+        "z" => Float32[i.z[a, b] for b in J for a in I],
+    )
+    i.value === nothing || (geom["value"] = Float32[i.value[a, b] for b in J for a in I])
+    pl = i.payloads === nothing ? Any[] :
+        i.payloads isa Function ? Any[i.payloads(a, b) for b in J for a in I] : Any[i.payloads[a, b] for b in J for a in I]
+    return [HitLayer(i.id, :surface, geom, pl, axis_id(ctx, i.ax), events(i), i.label)]
+end
+
+"""
+    _surface_order(ok, depth, ni, nj) -> (order, depth)
+
+Quads of an `ni × nj` vertex grid, front to back by the average clip-space depth of their
+corners (smaller is nearer): the order CairoMakie paints a surface's faces in, reversed. Quad
+`q` (0-based) has corners `(a, b)`, `(a+1, b)`, `(a, b+1)`, `(a+1, b+1)` with `q = a + b·(ni-1)`
+(0-based `a`, `b`). A quad with a corner that is not drawn (`ok` false) is left out. Returns
+the 0-based quad indices and their depths, in that order. Any layer of quads or faces drawn
+by depth can reuse it.
+"""
+function _surface_order(ok, depth, ni, nj)
+    qs = Int[]; qd = Float64[]
+    for b in 1:(nj - 1), a in 1:(ni - 1)
+        c1 = a + (b - 1) * ni
+        c = (c1, c1 + 1, c1 + ni, c1 + ni + 1)
+        all(k -> ok[k], c) || continue
+        push!(qs, (a - 1) + (b - 1) * (ni - 1))
+        push!(qd, (depth[c[1]] + depth[c[2]] + depth[c[3]] + depth[c[4]]) / 4)
+    end
+    p = sortperm(qd)
+    return qs[p], qd[p]
+end
+
 # ============================ TextInteractable =============================
 """
     TextInteractable(ax, p::Makie.Text; id=:text, payloads=nothing, tooltip=nothing, label=nothing)
@@ -1013,7 +1245,7 @@ one. Produces one `:rects` [`HitLayer`](@ref), one box per string.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:text`.
 - `payloads` — one entry per string; `ArgumentError` if the length doesn't match. Default:
   `(; text, index, x, y)` — `text` is the string, `index` 1-based, `(x, y)` its data-space
-  anchor.
+  anchor. A key-value payload is merged onto the default, as for [`PointInteractable`](@ref).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
 - `label` — the layer's name, which screen readers announce (see [`PointInteractable`](@ref)).
@@ -1040,16 +1272,13 @@ function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, too
     anchors = p.positions[]
     length(anchors) == length(strs) ||
         error("TextInteractable: $(length(anchors)) positions for $(length(strs)) strings (Makie internals changed?)")
-    pl = if payloads === nothing
-        _unconvert_payloads(
-            ax, Any[
-                (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
-                    for k in eachindex(strs)
-            ]
-        )
-    else
-        _check_payloads(payloads, length(strs), "TextInteractable")
-    end
+    defaults = _unconvert_payloads(
+        ax, Any[
+            (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
+                for k in eachindex(strs)
+        ]
+    )
+    pl = _merge_payloads(defaults, payloads, "TextInteractable")
     return TextInteractable(ax, p, id, pl, tooltip, label === nothing ? nothing : String(label))
 end
 tooltip_spec(i::TextInteractable) = i.tooltip
@@ -1106,7 +1335,8 @@ Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLa
   Default `nothing`; from a plot object, the plot's own Makie `label`.
 
 # From a plot object
-`PolygonInteractable(ax, p)` builds `rings` and default payloads from `p`:
+`PolygonInteractable(ax, p)` builds `rings` and default payloads from `p`. A key-value
+`payloads` entry is merged onto that default, as for [`PointInteractable`](@ref):
 
 | `p` | default `id` | rings from | notes |
 |---|---|---|---|

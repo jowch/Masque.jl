@@ -249,21 +249,23 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         pts = DEFAULT_PTS
         scatter!(bax, first.(pts), last.(pts))
         payloads = [(; name = "a"), (; name = "b"), (; name = "c")]
+        # What the widget holds: each payload merged onto its point's x and y (#308).
+        stored = PointInteractable(bax, pts; payloads).payloads
         w = masque(bfig, PointInteractable(bax, pts; id = :scatter, payloads = payloads); auto = false)
         tv = IP.APD.Bonds.transform_value
 
         # element kind: the identical object comes back, not a JSON-shaped copy of it — a
-        # NamedTuple stays a NamedTuple, and it's the very object passed in `payloads=`.
+        # NamedTuple stays a NamedTuple, and it's the payload the widget holds.
         ev = tv(w, Dict("layer" => "scatter", "index" => 1, "payload" => Dict("wrong" => "value")))
         @test ev isa ElementEvent
         @test ev.index == 2
         @test ev.payload isa NamedTuple
-        @test ev.payload === payloads[2]
+        @test ev.payload === stored[2]
         @test ev.name == "b"
 
         # the browser's own reported payload is ignored outright for an element kind
         ev0 = tv(w, Dict("layer" => "scatter", "index" => 0, "payload" => "anything at all"))
-        @test ev0.index == 1 && ev0.payload === payloads[1]
+        @test ev0.index == 1 && ev0.payload === stored[1]
 
         # an axis click is an AxisEvent, not a payload NamedTuple
         w2 = masque(
@@ -290,8 +292,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             )
         )
         @test multi isa Vector{ElementEvent}
-        @test multi[1].payload === payloads[1] && multi[1].index == 1
-        @test multi[2].payload === payloads[3] && multi[2].index == 3
+        @test multi[1].payload === stored[1] && multi[1].index == 1
+        @test multi[2].payload === stored[3] && multi[2].index == 3
 
         # out-of-range index: reconstruction fails loud rather than passing the bad index through
         @test_throws ArgumentError tv(w, Dict("layer" => "scatter", "index" => 99, "payload" => nothing))
@@ -303,7 +305,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             auto = false,
         )
         iv = IP.APD.Bonds.initial_value(wsel)
-        @test iv isa ElementEvent && iv.payload === payloads[2] && iv.index == 2
+        @test iv isa ElementEvent && iv.payload === stored[2] && iv.index == 2
         ev_same = tv(wsel, Dict("layer" => "scatter", "index" => 1, "payload" => nothing))
         @test ev_same.payload === iv.payload
         @test ev_same == iv

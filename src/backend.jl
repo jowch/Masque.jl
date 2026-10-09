@@ -156,6 +156,34 @@ function _project_closure(scaling, out_h)
     end
 end
 
+# `_project_closure` for many points of one 3D axis at once, plus each point's clip-space
+# depth (smaller is nearer the camera). One matrix product per point instead of a closure
+# call, for layers that ship thousands of vertices (a surface). Same transform, same pixel
+# arithmetic; `ctx.height` is the `out_h` the closure was built with.
+function _project_depth(ctx::InteractionContext, ax, pts::AbstractVector)
+    tf = _transform_func(ax.scene)
+    M = _data_to_clip(ax.scene)
+    vp = _scene_viewport(ax)
+    o, w = vp.origin, vp.widths
+    s, out_h = ctx.scaling, ctx.height
+    n = length(pts)
+    xs = Vector{Float64}(undef, n); ys = similar(xs); ds = similar(xs)
+    for k in 1:n
+        p = pts[k]
+        tp = try
+            _apply_transform(tf, Makie.Point3(Float64(p[1]), Float64(p[2]), Float64(p[3])))
+        catch e
+            e isa DomainError || rethrow()
+            Makie.Point3(NaN, NaN, NaN)
+        end
+        c = M * Makie.Vec4d(tp[1], tp[2], tp[3], 1)
+        nx, ny = c[1] / c[4], c[2] / c[4]
+        xs[k] = ((nx + 1) / 2 * w[1] + o[1]) * s
+        ys[k] = out_h - ((ny + 1) / 2 * w[2] + o[2]) * s
+        ds[k] = c[3] / c[4]
+    end
+    return xs, ys, ds
+end
 # `(lo, hi)` of an Axis3's limits, widened by Makie's own clip-plane nudge, or `nothing` when
 # the axis does not clip.
 function _axis3_clipbox(ax)

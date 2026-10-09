@@ -4,6 +4,7 @@ import { renderTemplate, renderAutoTable, esc, fmtNum, withReadout } from "./tem
 import { drawHover, clearHover, drawLink, clearLink, markColorFor } from "./highlight"
 import { hideCross, syncCross } from "./cross"
 import { linkedHits } from "./selection"
+import { surfaceFields } from "./surface"
 import { fmt, cssAnchor, hitKey, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
 import { contentPoint, isIdentity, mapPoint, type PhotoMatrix } from "./photo"
 import type { OverlayCtx, OverlayState } from "./state"
@@ -181,6 +182,11 @@ function cellObject(hit: Hit): object {
 export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): string | null {
     const layer = hit.layer
     if (layer.tooltip === false) return null
+    if (layer.kind === "surface") {
+        // The point's own fields, then its payload's, which win a name clash (#308).
+        const fields = { ...surfaceFields(layer, hit.index), ...cellObject(hit) }
+        return layer.template ? renderTemplate(layer.template, fields, ctx.tipDigits_) : renderAutoTable(fields, ctx.tipDigits_)
+    }
     if (layer.template) {
         const payload = resolvePayload(hit, ctx.manifest_, x, y)
         // Wire i/j are 0-based (the @bind payload keeps them so); a template, like the default

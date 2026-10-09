@@ -217,9 +217,7 @@ function PointInteractable(ax, p::Makie.Scatter; id = :scatter, payloads = nothi
     pts = _conv(p)[1]
     r = radius === nothing ? _marker_radius(p) : radius
     kw = (; id, radius = r, colors, tooltip, label)
-    i = payloads === nothing ?
-        PointInteractable(ax, pts; kw...) :
-        PointInteractable(ax, pts; kw..., payloads)
+    i = PointInteractable(ax, pts; kw..., payloads)
     # An explicit radius is the whole target; otherwise the outline adds to the marker.
     i = _with_marker_stroke(i, radius === nothing ? _stroke_width(p) : 0.0)
     p.markerspace[] === :data && return _shift_data_markers(ax, i, p.marker_offset[])
@@ -276,9 +274,9 @@ _with_marker_stroke(i::PointInteractable, s) = PointInteractable(
 )
 
 # markersize is DATA-space (no markerspace attribute), so pixel radius is camera/depth-dependent;
-# normalize to per-element Vec3f half-extents (radius3d) and let hitlayers project them. The
-# axis-aligned half-extent approximation can underestimate the true silhouette (worst case ~29%,
-# at adversarial azimuth/elevation); pass radius=/radius3d= explicitly if it's too coarse.
+# normalize to per-element Vec3f half-extents (radius3d) and let hitlayers project the outline.
+# Makie's default marker is a unit sphere, so these are its semi-axes; a custom `marker` or a
+# `rotation` isn't read, so pass radius=/radius3d= explicitly for those.
 function _meshscatter_extents(ms, n)
     ms isa Makie.VecTypes{3} && return fill(Makie.Vec3f(ms...), n)
     ms isa Real && return fill(Makie.Vec3f(ms, ms, ms), n)
@@ -294,9 +292,7 @@ function PointInteractable(ax, p::Makie.MeshScatter; id = :meshscatter, payloads
     pts = _conv(p)[1]
     r3 = radius !== nothing || radius3d !== nothing ? radius3d : _meshscatter_extents(p.markersize[], length(pts))
     kw = (; id, radius = something(radius, 9), radius3d = r3, tooltip, label)
-    return payloads === nothing ?
-        PointInteractable(ax, pts; kw...) :
-        PointInteractable(ax, pts; kw..., payloads)
+    return PointInteractable(ax, pts; kw..., payloads)
 end
 
 function SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
@@ -308,9 +304,27 @@ SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothin
     SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol, tooltip, label)
 
 # The rendered edges live in the child LineSegments' converted (DATA space), including
-# mesh-triangulation diagonals a grid-edge reconstruction would miss.
+# mesh-triangulation diagonals a grid-edge reconstruction would miss. Makie outlines every
+# quad (or triangle), so an edge two faces share is drawn twice; `_unique_edges` keeps one
+# copy so each drawn edge is one element (#316).
 SegmentInteractable(ax, p::Makie.Wireframe; id = :wireframe, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p)) =
-    SegmentInteractable(ax, _conv(_childof(p, Makie.LineSegments))[1]; mode = :pairs, id, payloads, tol, tooltip, label)
+    SegmentInteractable(ax, _unique_edges(_conv(_childof(p, Makie.LineSegments))[1]); mode = :pairs, id, payloads, tol, tooltip, label)
+
+# Drop repeated `:pairs` edges, in either direction, keeping each edge's first occurrence and
+# its order. Endpoints compare with `isequal`, so a NaN gap edge still matches its own copy.
+function _unique_edges(v::AbstractVector)
+    T = eltype(v)
+    seen = Set{Tuple{T, T}}()
+    out = similar(v, 0)
+    for k in 1:2:(length(v) - 1)
+        a, b = v[k], v[k + 1]
+        key = isless(Tuple(b), Tuple(a)) ? (b, a) : (a, b)
+        key in seen && continue
+        push!(seen, key)
+        push!(out, a, b)
+    end
+    return out
+end
 
 # Default hit slack for a line-like plot, in px: at least 6, and wide enough to cover the
 # drawn stroke (`linewidth / 2` either side of the line; the largest of a per-element vector)
@@ -364,19 +378,17 @@ function _arrow_segments(ax, p, P, name; id, payloads, tol, tooltip, label)
     for (a, b) in zip(starts, ends_)
         push!(verts, P(a[1:length(P)]...), P(b[1:length(P)]...))
     end
-    if payloads === nothing
-        # Makie broadcasts a single point or direction over every arrow, so either can have
-        # length 1 while startpoints has one entry per arrow.
-        pts, dirs = p.points[], p.directions[]
-        for (vname, v) in (("points", pts), ("directions", dirs))
-            length(v) in (1, length(starts)) || error(
-                "$name introspection: $vname/startpoints length mismatch ($(length(v)) vs $(length(starts)))"
-            )
-        end
-        payloads = [_arrow_payload(P, k, _bcast(pts, k), _bcast(dirs, k)) for k in eachindex(starts)]
-        payloads = _unconvert_payloads(ax, payloads)
+    # Makie broadcasts a single point or direction over every arrow, so either can have
+    # length 1 while startpoints has one entry per arrow.
+    pts, dirs = p.points[], p.directions[]
+    for (vname, v) in (("points", pts), ("directions", dirs))
+        length(v) in (1, length(starts)) || error(
+            "$name introspection: $vname/startpoints length mismatch ($(length(v)) vs $(length(starts)))"
+        )
     end
-    return SegmentInteractable(ax, verts; mode = :pairs, id, payloads, tol, tooltip, label)
+    defaults = _unconvert_payloads(ax, Any[_arrow_payload(P, k, _bcast(pts, k), _bcast(dirs, k)) for k in eachindex(starts)])
+    pl = _merge_payloads(defaults, payloads, "SegmentInteractable")
+    return SegmentInteractable(ax, verts; mode = :pairs, id, payloads = pl, tol, tooltip, label)
 end
 _arrow_payload(::Type{Makie.Point3f}, k, pt, d) = (;
     index = k,
@@ -401,6 +413,14 @@ function GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells,
     ncols, nrows = size(vals)
     return GridInteractable(ax, _edges(xr, ncols), _edges(yr, nrows), vals; id, payloads, tooltip, label)
 end
+# A surface's converted `x`/`y` are vectors or matrices (a range or an interval converts to a
+# vector). `color` colours it by a separate matrix when it is one of `z`'s shape.
+function SurfaceInteractable(ax, p::Makie.Surface; id = :surface, payloads = nothing, tooltip = nothing, label = _plot_label(p))
+    x, y, z = _converted(p)
+    value = _surface_matrix(p.color[], size(z))
+    return SurfaceInteractable(ax, x, y, z; id, value, payloads, tooltip, label)
+end
+
 function RectInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; kwargs...)
     _deprecate(
         "`RectInteractable(ax, p)` for a heatmap or image is deprecated; use `GridInteractable(ax, p)`. " *
@@ -437,7 +457,7 @@ function _bar_payloads(rects, direction)
 end
 function RectInteractable(ax, p::Makie.BarPlot; id = :bars, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     rs = _bar_rects(p)
-    pl = payloads === nothing ? _bar_payloads(rs, p.direction[]) : payloads
+    pl = _merge_payloads(_bar_payloads(rs, p.direction[]), payloads, "RectInteractable")
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
@@ -530,7 +550,7 @@ function PolygonInteractable(ax, p::Makie.Contourf; id = :contourf, payloads = n
     polys = _conv(poly)[1]
     rings = [piece.exterior for piece in polys]
     holes = [piece.interiors for piece in polys]
-    pl = payloads === nothing ? _contourf_payloads(p, poly) : payloads
+    pl = _merge_payloads(_contourf_payloads(p, poly), payloads, "PolygonInteractable")
     return PolygonInteractable(ax, rings; id, payloads = pl, holes, tooltip, label)
 end
 
@@ -549,7 +569,7 @@ end
 function PolygonInteractable(ax, p::Makie.Violin; id = :violin, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     poly = _childof(p, Makie.Poly)
     rings = _conv(poly)[1]
-    pl = payloads === nothing ? _unconvert_payloads(ax, _violin_payloads(p, rings)) : payloads
+    pl = _merge_payloads(_unconvert_payloads(ax, _violin_payloads(p, rings)), payloads, "PolygonInteractable")
     return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
 end
 
@@ -579,7 +599,6 @@ function PolygonInteractable(ax, p::Makie.Hexbin; id = :hexbin, payloads = nothi
         return PolygonInteractable(ax, Vector{Point2f}[]; id, payloads = Any[], tooltip, label)
     end
     rings = _hex_rings(finv, p)
-    payloads === nothing || return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
     # Unweighted counts are whole numbers; summed weights stay Float64.
     counts = p.weights[] === nothing ? round.(Int, p.count_hex[]) : p.count_hex[]
     # The centers are Float32; the shortest Float32 repr drops the widening noise (3.05, not
@@ -590,7 +609,8 @@ function PolygonInteractable(ax, p::Makie.Hexbin; id = :hexbin, payloads = nothi
         d = _apply_transform(finv, Makie.Point2d(c[1], c[2]))
         push!(pl, (; x = clean(d[1]), y = clean(d[2]), count = n))
     end
-    return PolygonInteractable(ax, rings; id, payloads = _unconvert_payloads(ax, pl), tooltip, label)
+    pl = _merge_payloads(_unconvert_payloads(ax, pl), payloads, "PolygonInteractable")
+    return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
 end
 # A moved hexbin: rebuild the corners so the model moves each center and not its offset.
 function _place_hexbin(i::PolygonInteractable, p, f)
@@ -660,12 +680,11 @@ function _data_marker_polygons(ax, p; id = :scatter, payloads = nothing, tooltip
         return PolygonInteractable(ax, Vector{Point2f}[]; id, payloads = Any[], tooltip, label)
     end
     rings = _data_marker_rings(tf, finv, p)
-    if payloads === nothing
-        payloads = _unconvert_payloads(
-            ax, Any[(; index = k, x = Float64(x[1]), y = Float64(x[2])) for (k, x) in enumerate(_conv(p)[1])],
-        )
-    end
-    return PolygonInteractable(ax, rings; id, payloads, tooltip, label)
+    defaults = _unconvert_payloads(
+        ax, Any[(; index = k, x = Float64(x[1]), y = Float64(x[2])) for (k, x) in enumerate(_conv(p)[1])],
+    )
+    pl = _merge_payloads(defaults, payloads, "PolygonInteractable")
+    return PolygonInteractable(ax, rings; id, payloads = pl, tooltip, label)
 end
 # Moved: rebuild the corners so the model moves each center and not its outline.
 function _place_data_markers(i::PolygonInteractable, p, f)
@@ -722,7 +741,8 @@ function _boxplot_interactable(ax, p; id = :boxplot, payloads = nothing, kw...)
     node = _boxplot_stats_node(p)
     boxpoly = _childof(node, Makie.Poly)
     geom = _conv(boxpoly)[1]
-    pl = payloads === nothing ? _boxplot_payloads(_conv(node)) : payloads
+    who = eltype(geom) <: _GB.HyperRectangle ? "RectInteractable" : "PolygonInteractable"
+    pl = _merge_payloads(_boxplot_payloads(_conv(node)), payloads, who)
     if eltype(geom) <: _GB.HyperRectangle
         rects = [(r.origin[1] + r.widths[1] / 2, r.origin[2] + r.widths[2] / 2, r.widths[1], r.widths[2]) for r in geom]
         return RectInteractable(ax, rects; id, payloads = pl, kw...)
@@ -795,7 +815,7 @@ function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothi
     children = _child_plots(p)
     isempty(children) && error("Series introspection: no child lines (Makie internals changed?)")
     paths = [_conv(_series_line(c))[1] for c in children]
-    pl = payloads === nothing ? _series_payloads(children) : payloads
+    pl = _merge_payloads(_series_payloads(children), payloads, "SegmentInteractable")
     i = _whole_lines(ax, paths, id, pl, tol, label; tooltip)
     return _with_samples(i, nothing, [[_pt3d(v) for v in path] for path in paths])
 end
@@ -926,13 +946,13 @@ end
 function RectInteractable(ax, p::Makie.Hist; id = :hist, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     bar = _childof(p, Makie.BarPlot)
     rs = _bar_rects(bar)
-    pl = payloads === nothing ? _hist_payloads(rs, bar.direction[]) : payloads
+    pl = _merge_payloads(_hist_payloads(rs, bar.direction[]), payloads, "RectInteractable")
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 function RectInteractable(ax, p::Makie.Waterfall; id = :waterfall, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     bar = _childof(p, Makie.BarPlot)
     rs = _bar_rects(bar)
-    pl = payloads === nothing ? _waterfall_payloads(p, rs) : payloads
+    pl = _merge_payloads(_waterfall_payloads(p, rs), payloads, "RectInteractable")
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
@@ -961,12 +981,12 @@ function _span_rects(ax, p, full::Symbol)
 end
 function RectInteractable(ax, p::Makie.HSpan; id = :hspan, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     rs = _span_rects(ax, p, :x)
-    pl = payloads === nothing ? _span_payloads(p) : _check_payloads(payloads, length(rs), "RectInteractable")
+    pl = _merge_payloads(_span_payloads(p), payloads, "RectInteractable")
     return _rect_with_resolve(ax, rs, id, pl, true, _ax -> _span_rects(_ax, p, :x); tooltip, label)
 end
 function RectInteractable(ax, p::Makie.VSpan; id = :vspan, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     rs = _span_rects(ax, p, :y)
-    pl = payloads === nothing ? _span_payloads(p) : _check_payloads(payloads, length(rs), "RectInteractable")
+    pl = _merge_payloads(_span_payloads(p), payloads, "RectInteractable")
     return _rect_with_resolve(ax, rs, id, pl, true, _ax -> _span_rects(_ax, p, :y); tooltip, label)
 end
 
@@ -976,7 +996,7 @@ function _crossbar_payloads(p)
 end
 function RectInteractable(ax, p::Makie.CrossBar; id = :crossbar, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     rs = _bar_rects(p)
-    pl = payloads === nothing ? _crossbar_payloads(p) : payloads
+    pl = _merge_payloads(_crossbar_payloads(p), payloads, "RectInteractable")
     return RectInteractable(ax, rs; id, payloads = pl, tooltip, label)
 end
 
@@ -1034,6 +1054,7 @@ function _plotbase(p)
     p isa Makie.Lines && return :lines
     p isa Makie.LineSegments && return :segments
     p isa Makie.Wireframe && return :wireframe
+    p isa Makie.Surface && return :surface
     p isa Makie.Arrows3D && return :arrows3d
     p isa Makie.Arrows2D && return :arrows2d
     (p isa Makie.Heatmap || p isa Makie.Image) && return :cells
@@ -1156,6 +1177,7 @@ function _construct_unplaced(ax, p, id; kw...)
             p isa Makie.HLines || p isa Makie.VLines
     ) && return [SegmentInteractable(ax, p; id, kw...)]
     (p isa Makie.Heatmap || p isa Makie.Image) && return [GridInteractable(ax, p; id, kw...)]
+    p isa Makie.Surface && return [SurfaceInteractable(ax, p; id, kw...)]
     (p isa Makie.BarPlot || p isa Makie.Spy) && return [RectInteractable(ax, p; id, kw...)]
     (p isa Makie.Hist || p isa Makie.Waterfall || p isa Makie.CrossBar) && return [RectInteractable(ax, p; id, kw...)]
     (p isa Makie.HSpan || p isa Makie.VSpan) && return [RectInteractable(ax, p; id, kw...)]
@@ -1279,6 +1301,9 @@ function _place(i::GridInteractable, f)
     ye = Float64[f.place((x0, y))[2] for y in i.yedges]
     return GridInteractable(i.ax, xe, ye, i.values, i.id, i.tooltip, i.label, i.payloads)
 end
+_place(i::SurfaceInteractable, f) = SurfaceInteractable(
+    i.ax, map(f.place, i.pos), i.x, i.y, i.z, i.value, i.id, i.payloads, i.tooltip, i.label,
+)
 function _warn_rotated(i, f)
     f.rotated || return false
     _skip_note(
@@ -1375,13 +1400,18 @@ function _skip_for_axis(ax, p)
             p isa Union{
                 Makie.Scatter, Makie.Lines, Makie.LineSegments,
                 Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D, Makie.ScatterLines,
+                Makie.Surface,
             }
         )
         _skip_note(
             "$(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/LineSegments/MeshScatter/" *
-                "Wireframe/Arrows3D/ScatterLines have 3D-valid extraction today; other kinds " *
+                "Wireframe/Arrows3D/ScatterLines/Surface have 3D-valid extraction today; other kinds " *
                 "are roadmap scope (docs/dev/roadmap.md)"
         )
+        return true
+    end
+    if ax isa Makie.Axis && p isa Makie.Surface
+        _skip_note("surface on a 2D Axis — surfaces get hover and click targets on Axis3 only")
         return true
     end
     if ax isa Makie.PolarAxis && !(
@@ -1421,6 +1451,7 @@ _nverts(i::SegmentInteractable) = i.paths === nothing ? length(i.vertices) : sum
 _nverts(i::PolygonInteractable) = sum(length, i.rings; init = 0)
 _nverts(i::RectInteractable) = length(i.data)
 _nverts(::GridInteractable) = 1
+_nverts(i::SurfaceInteractable) = length(i.z)
 _nverts(i::TextInteractable) = length(i.payloads)
 _nverts(::AbstractInteractable) = 1
 
@@ -1525,6 +1556,34 @@ function _walk_unknown!(d, ax, parent)
     return (built = built_any, warned = warned_any)
 end
 
+# A `wireframe!` of the grid a `surface!` on the same `Axis3` draws is decoration: its edges
+# sit a few pixels apart over the whole surface, so as a layer it would answer nearly every
+# hover with an edge instead of a data point, hidden side included (`BoxPlot`'s whiskers are
+# the precedent). An explicit `SegmentInteractable(ax, wf)` still builds it.
+function _surface_grids(ax)
+    ax isa Makie.Axis3 || return ()
+    return [_grid3(_converted(p)) for p in _child_plots(ax.scene) if p isa Makie.Surface]
+end
+function _decorates_surface(p, grids)
+    p isa Makie.Wireframe && !isempty(grids) || return false
+    g = _grid3(_converted(p))
+    # `isequal`, not `==`: a NaN hole is in both grids, and NaN != NaN.
+    return g !== nothing && any(h -> isequal(h, g), grids)
+end
+# A grid's `(x, y, z)` as three Float32 matrices of `z`'s shape: Makie converts a surface's
+# `x`/`y` to ranges and a wireframe's to matrices, and keeps `z`'s own eltype.
+function _grid3(args)
+    length(args) == 3 || return nothing
+    x, y, z = args
+    z isa AbstractMatrix || return nothing
+    m(v, d) = v isa AbstractMatrix ? (size(v) == size(z) ? Float32.(v) : nothing) :
+        v isa AbstractVector && length(v) == size(z, d) ?
+        Float32[d == 1 ? v[a] : v[b] for a in axes(z, 1), b in axes(z, 2)] : nothing
+    X, Y = m(x, 1), m(y, 2)
+    (X === nothing || Y === nothing) && return nothing
+    return (X, Y, Float32.(z))
+end
+
 # Every default of `fig`. `plotmap` is plot -> layer ids for the legend links, descendants
 # included. `installed` holds only the plots built directly, so a replacement can find the
 # layers its plot's default took.
@@ -1541,7 +1600,9 @@ function _defaults(fig; replaced = Base.IdSet{Any}())
     )
     for ax in fig.content
         ax isa _SUPPORTED_AXES || continue
+        grids = _surface_grids(ax)
         for p in _child_plots(ax.scene)
+            _decorates_surface(p, grids) && continue
             if !_known(ax, p)
                 r = _walk_unknown!(d, ax, p)
                 # A child already warned (non-data text, or an axis skip). A second warning
@@ -1595,7 +1656,8 @@ On each axis the plot drawn last comes first. Where marks overlap, the first in 
 the pointer, so it is the mark drawn on top.
 
 On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D`/
-`ScatterLines` are supported; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
+`ScatterLines`/`Surface` are supported, and a `Wireframe` drawn on the same grid as a `Surface`
+there is decoration, with no layer of its own; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
 Other kinds are skipped, and one call warns once, listing the skipped plots together. A
 recipe with its own `Masque.interactables(ax, p::MyPlot)` method uses it. Any other recipe contributes each child
 that has a default (`arc!` is the `lines!` it draws), under that child's layer id. A child

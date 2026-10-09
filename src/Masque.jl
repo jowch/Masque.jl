@@ -90,7 +90,8 @@ export AbstractBackend
 export AbstractInteractable, AbstractSelector, HitLayer, InteractionContext, AxisTransform
 export PointInteractable, SegmentInteractable, RectInteractable, GridInteractable, PolygonInteractable,
     AxisInteractable, ColorbarInteractable, LegendInteractable, RegionInteractable, FunctionInteractable,
-    ThresholdInteractable, ROIInteractable, TextInteractable, ViewInteractable, SliceInteractable
+    ThresholdInteractable, ROIInteractable, TextInteractable, ViewInteractable, SliceInteractable,
+    SurfaceInteractable
 export masque, interactables, auto_interactables, data_to_image_px, hitlayers, bondtype, transform_bond
 export InteractionEvent, ElementEvent, LegendEvent, GridCellEvent, GridWindowEvent,
     AxisEvent, ThresholdEvent, ColorbarEvent, BoundsEvent
