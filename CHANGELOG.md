@@ -9,9 +9,12 @@ All notable changes to this project are documented here. The format is based on
 ### Changed
 - **Breaking:** a `wireframe!` layer has one element per drawn edge. Makie outlines every
   face, so an edge shared by two faces used to ship twice, and its second copy could never
-  be hovered or clicked. The edges after the first repeat now have lower indices, so a
-  saved `pick.index`, a `selected` index or a `payloads` vector for a wireframe needs
-  updating; `payloads` takes one entry per drawn edge (#316).
+  be hovered or clicked. Edges keep Makie's drawing order, with a shared edge kept where it
+  first appears, so every edge after the first shared one moves to a lower index. Edge `k`
+  is `SegmentInteractable(ax, w).vertices[2k-1:2k]`, and half that vector's length is the
+  edge count. A `payloads` vector of the old length, or a `selected` index past the new
+  count, raises an `ArgumentError`. An in-range `selected` index, or a saved `pick.index`,
+  silently points at a different edge, so check those by hand (#316).
 
 ## [0.2.2] - 2026-10-09
 
