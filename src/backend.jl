@@ -156,6 +156,48 @@ function _project_closure(scaling, out_h)
     end
 end
 
+# `(lo, hi)` of an Axis3's limits, widened by Makie's own clip-plane nudge, or `nothing` when
+# the axis does not clip.
+function _axis3_clipbox(ax)
+    hasproperty(ax, :clip) && ax.clip[] === true || return nothing
+    fl = _finallimits(ax)
+    lo = Float64.(Tuple(fl.origin)); w = Float64.(Tuple(fl.widths))
+    tol = 1.0e-5 .* abs.(w)
+    return (lo .- tol, lo .+ w .+ tol)
+end
+function _in_clipbox((lo, hi), p)
+    z = length(p) >= 3 ? p[3] : 0.0
+    for (v, a, b) in zip((p[1], p[2], z), lo, hi)
+        v isa Real || continue
+        x = Float64(v)
+        isnan(x) && continue
+        (a <= x <= b) || return false
+    end
+    return true
+end
+# The part of the data-space segment `a → b` inside the box, as `(t0, t1)` along it, or
+# `nothing` when none of it is (Liang–Barsky against the six faces).
+function _clip_segment((lo, hi), a, b)
+    t0, t1 = 0.0, 1.0
+    for k in 1:3
+        d = Float64(b[k]) - Float64(a[k])
+        for (p, q) in ((-d, Float64(a[k]) - lo[k]), (d, hi[k] - Float64(a[k])))
+            if p == 0
+                q < 0 && return nothing
+            elseif p < 0
+                r = q / p
+                r > t1 && return nothing
+                t0 = max(t0, r)
+            else
+                r = q / p
+                r < t0 && return nothing
+                t1 = min(t1, r)
+            end
+        end
+    end
+    return (t0, t1)
+end
+
 _scalesym(f) = f === identity ? :identity : Symbol(nameof(f))
 
 # ordered category labels for a categorical dim conversion, else nothing

@@ -173,7 +173,16 @@ const _JS_INVERTIBLE = (:identity, :log10, :log)  # scales geometry.ts `invert` 
 # carries one source value per screen pixel of the axis viewport instead of the full matrix.
 const GRID_VALUES_MIN_SCREEN_PX = 1.0
 
-_proj(ctx, ax, p) = data_to_image_px(ctx, ax, p)
+# An `Axis3` clips its plots to its limits (Makie's clip planes, `ax.clip = true`), so a point
+# outside them, as after a zoom (#321), is not drawn. Built-in hit geometry gets NaN there, the
+# "not on screen" sentinel every hit layer already skips, rather than a spot where nothing is
+# visible. `data_to_image_px` itself still projects any point. Callers projecting many points
+# look the box up once with `_clipbox` and pass it in.
+_clipbox(ax) = ax isa Makie.Axis3 ? _axis3_clipbox(ax) : nothing
+function _proj(ctx, ax, p, box = _clipbox(ax))
+    box === nothing || _in_clipbox(box, p) || return Point2f(NaN32, NaN32)
+    return data_to_image_px(ctx, ax, p)
+end
 
 # Points widen to Point3f (z=0 for 2-coord input) so 2D and 3D geometry share one storage path.
 _pt3(p) = Point3f(p[1], p[2], length(p) >= 3 ? p[3] : 0)
@@ -440,13 +449,13 @@ function _check_radius(r, n)
 end
 tooltip_spec(i::PointInteractable) = i.tooltip
 # Max projected displacement over the ±axis half-extents; non-finite offsets are skipped.
-function _px_radius3d(ctx, ax, p, e, q)
+function _px_radius3d(ctx, ax, p, e, q, box = _clipbox(ax))
     m = 0.0
     for d in (
             (e[1], 0, 0), (-e[1], 0, 0), (0, e[2], 0),
             (0, -e[2], 0), (0, 0, e[3]), (0, 0, -e[3]),
         )
-        q2 = _proj(ctx, ax, (p[1] + d[1], p[2] + d[2], p[3] + d[3]))
+        q2 = _proj(ctx, ax, (p[1] + d[1], p[2] + d[2], p[3] + d[3]), box)
         r = hypot(q2[1] - q[1], q2[2] - q[2])
         isfinite(r) && (m = max(m, r))
     end
@@ -454,10 +463,11 @@ function _px_radius3d(ctx, ax, p, e, q)
 end
 function hitlayers(i::PointInteractable, ctx)
     g = Real[]
+    box = _clipbox(i.ax)
     for (k, p) in enumerate(i.points)
-        q = _proj(ctx, i.ax, p)
+        q = _proj(ctx, i.ax, p, box)
         r = if i.radius3d !== nothing
-            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q)
+            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q, box)
         else
             ((i.radius isa Vector ? i.radius[k] : i.radius) + i.stroke * ctx.marker_stroke) * ctx.scaling
         end
@@ -603,11 +613,60 @@ function _whole_lines(ax, paths, id, payloads, tol, label; tooltip = nothing)
 end
 tooltip_spec(i::SegmentInteractable) = i.tooltip
 hit_tol(i::SegmentInteractable) = i.tol
-function _flat_px(ctx, ax, vs)
+function _flat_px(ctx, ax, vs, box = _clipbox(ax))
     g = Real[]
     for v in vs
-        q = _proj(ctx, ax, v); append!(g, (_q(q[1]), _q(q[2])))
+        q = _proj(ctx, ax, v, box); append!(g, (_q(q[1]), _q(q[2])))
     end
+    return g
+end
+# Lines on a zoomed `Axis3`: Makie's clip planes cut a line where it leaves the limits, so the
+# part still drawn keeps a hit. Each edge is clipped to the box in data space and the clipped
+# ends are projected; only what lies wholly outside becomes a gap.
+_all_finite(v) = all(x -> x isa Real && isfinite(x), (v[1], v[2], length(v) >= 3 ? v[3] : 0.0))
+_needs_clip(box, vs) = box !== nothing && !all(v -> _in_clipbox(box, v), vs)
+function _edge_px(ctx, ax, box, a, b)
+    (_all_finite(a) && _all_finite(b)) || return nothing
+    t = _clip_segment(box, _pt3(a), _pt3(b))
+    t === nothing && return nothing
+    at(s) = data_to_image_px(ctx, ax, Tuple(Float64.(_pt3(a)) .+ s .* (Float64.(_pt3(b)) .- Float64.(_pt3(a)))))
+    return t, at(t[1]), at(t[2])
+end
+_push_px!(g, q) = append!(g, (_q(q[1]), _q(q[2])))
+# One connected path (`:lines`): runs of visible edges, NaN-separated.
+function _clipped_path_px(ctx, ax, vs, box)
+    _needs_clip(box, vs) || return _flat_px(ctx, ax, vs, box)
+    g = Real[]
+    open = false   # g ends on the previous edge's far end, so the next edge continues from it
+    for k in 1:(length(vs) - 1)
+        e = _edge_px(ctx, ax, box, vs[k], vs[k + 1])
+        if e === nothing
+            open = false
+            continue
+        end
+        (t0, t1), a, b = e
+        if !(open && t0 == 0)
+            isempty(g) || isnan(g[end]) || append!(g, (NaN32, NaN32))
+            _push_px!(g, a)
+        end
+        _push_px!(g, b)
+        open = t1 == 1
+    end
+    return g
+end
+# Vertex pairs (`:segments`), one pair per edge kept in place so element k stays edge k.
+function _clipped_pairs_px(ctx, ax, vs, box)
+    _needs_clip(box, vs) || return _flat_px(ctx, ax, vs, box)
+    g = Real[]
+    for k in 1:2:(length(vs) - 1)
+        e = _edge_px(ctx, ax, box, vs[k], vs[k + 1])
+        if e === nothing
+            append!(g, (NaN32, NaN32, NaN32, NaN32))
+        else
+            _push_px!(g, e[2]); _push_px!(g, e[3])
+        end
+    end
+    isodd(length(vs)) && append!(g, _flat_px(ctx, ax, vs[end:end], box))
     return g
 end
 # One line's samples as `[x1, y1, x2, y2, …]`. On a categorical or date axis a coordinate is
@@ -634,7 +693,8 @@ function hitlayers(i::SegmentInteractable, ctx)
             vs = i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]
             [vs]
         end
-        geom = [_flat_px(ctx, i.ax, path) for path in raw]
+        box = _clipbox(i.ax)
+        geom = [_clipped_path_px(ctx, i.ax, path, box) for path in raw]
         aid = axis_id(ctx, i.ax)
         # The readout's samples. Axis3 has no 2D sample to show the cursor's position on a path.
         points, step = if ctx.transforms[aid].is3d
@@ -647,8 +707,14 @@ function hitlayers(i::SegmentInteractable, ctx)
         return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, step)]
     end
     vs = i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]
-    kind = i.mode === :polyline ? :polyline : :segments
-    return [HitLayer(i.id, kind, _flat_px(ctx, i.ax, vs), i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
+    box = _clipbox(i.ax)
+    aid = axis_id(ctx, i.ax)
+    i.mode === :polyline || return [HitLayer(i.id, :segments, _clipped_pairs_px(ctx, i.ax, vs, box), i.payloads, aid, events(i), i.label)]
+    _needs_clip(box, vs) || return [HitLayer(i.id, :polyline, _flat_px(ctx, i.ax, vs, box), i.payloads, aid, events(i), i.label)]
+    # A clipped edge's ends no longer meet its neighbours', so a path cut by the limits ships as
+    # one pair per edge: element k is still edge k.
+    pairs = [vs[k + j] for k in 1:(length(vs) - 1) for j in 0:1]
+    return [HitLayer(i.id, :segments, _clipped_pairs_px(ctx, i.ax, pairs, box), i.payloads, aid, events(i), i.label)]
 end
 
 # ============================ RectInteractable =============================
@@ -1081,10 +1147,10 @@ function PolygonInteractable(ax, rings; id = :polygons, payloads = nothing, tool
 end
 tooltip_spec(i::PolygonInteractable) = i.tooltip
 hit_tol(i::PolygonInteractable) = i.tol > 0 ? i.tol : nothing
-function _project_ring(ctx, ax, ring)
+function _project_ring(ctx, ax, ring, box = _clipbox(ax))
     flat = Real[]
     for p in ring
-        q = _proj(ctx, ax, p)
+        q = _proj(ctx, ax, p, box)
         append!(flat, (_q(q[1]), _q(q[2])))
     end
     return flat
@@ -1424,7 +1490,8 @@ end
 """
     ViewInteractable(ax; id=:view)
 
-Drag-to-pan (2D `Axis`) or drag-to-orbit (`Axis3`). Produces one `:view` [`HitLayer`](@ref)
+Drag-to-pan and wheel zoom (2D `Axis`), or drag-to-orbit, wheel zoom and Shift+drag pan
+(`Axis3`). Produces one `:view` [`HitLayer`](@ref)
 covering `ax`'s whole viewport; it sorts after Tier-0 `:threshold`/`:roi` layers so an ordinary
 drag on those wins without a modifier — **Shift+drag** forces the view gesture even over a
 `ThresholdInteractable`/`ROIInteractable` hit.
@@ -1436,8 +1503,11 @@ drag on those wins without a modifier — **Shift+drag** forces the view gesture
 **Commits nothing.** A camera is operational state, not an analysis value a notebook reads
 (docs/dev/architecture/12-gesture-channel.md §12.3) — the bond `masque` returns never carries a
 `:view` [`InteractionEvent`](@ref). Drag frames stream over a `with_js_link` gesture channel
-instead, on both backends: Julia mutates `ax.limits[]` (pan) or `ax.azimuth[]`/`ax.elevation[]`
-(orbit) and ships a hit manifest for every frame the camera moves. `:cairo` ships that frame as
+instead, on both backends: Julia mutates `ax.limits[]` (pan, zoom) or `ax.azimuth[]`/`ax.elevation[]`
+(orbit) and ships a hit manifest for every frame the camera moves. On an `Axis3`, zoom (wheel,
+`+`/`-`) scales the limits about their center and pan (Shift+drag, Shift+arrows) shifts them
+in the screen plane, as Makie's own `Axis3` zoom and translation do; the box keeps its size and
+marks outside the new limits are clipped, so they no longer hover or click. `:cairo` ships that frame as
 a PNG; `:webgl` ships a freshly serialized scene applied to the canvas already on the page.
 In-drag frames render at `px_per_unit = 1`; the release frame renders at the widget's own
 resolution. Because nothing commits, `ax`'s camera stays wherever the gesture left it until the
@@ -1514,8 +1584,45 @@ function hitlayers(i::ViewInteractable, ctx)
         # (§12.3): a view gesture reports no InteractionEvent at all.
         geom["azimuth"] = Float64(i.ax.azimuth[])
         geom["elevation"] = Float64(i.ax.elevation[])
+        # Zoom and pan (#321) move the limits, as Makie's own Axis3 scroll zoom and translation
+        # do: JS scales them about their center, or shifts them by `panx`/`pany` per image px.
+        fl = _finallimits(i.ax)
+        lo = Float64.(Tuple(fl.origin)); w = Float64.(Tuple(fl.widths))
+        geom["limits"] = Float64[lo[1], lo[1] + w[1], lo[2], lo[2] + w[2], lo[3], lo[3] + w[3]]
+        panx, pany = _axis3_pan_basis(ctx, i.ax, lo, w)
+        geom["panx"] = panx
+        geom["pany"] = pany
     end
     return [HitLayer(i.id, :view, geom, Any[], axis_id(ctx, i.ax), events(i))]
+end
+
+# The data displacement, in the plane facing the camera through the limits' center, that moves
+# the picture by one image px right (`panx`) or down (`pany`). Makie's `Axis3` translation drags
+# in that same plane. Measured from the projection itself: J maps data to image px, the model
+# matrix S maps data to world, and the shortest world step for a screen step is J_w⁺ with
+# J_w = J S⁻¹. With the default orthographic camera that step lies in the screen plane exactly.
+function _axis3_pan_basis(ctx, ax, lo, w)
+    c = lo .+ w ./ 2
+    J = zeros(2, 3)
+    for k in 1:3
+        h = w[k] / 4
+        a = _proj(ctx, ax, ntuple(j -> j == k ? c[j] + h : c[j], 3))
+        b = _proj(ctx, ax, ntuple(j -> j == k ? c[j] - h : c[j], 3))
+        J[1, k] = (a[1] - b[1]) / 2h
+        J[2, k] = (a[2] - b[2]) / 2h
+    end
+    m = ax.scene.transformation.model[]
+    s = (m[1, 1], m[2, 2], m[3, 3])
+    Jw = J ./ [s[1] s[2] s[3]]
+    G = Jw * transpose(Jw)
+    d = G[1, 1] * G[2, 2] - G[1, 2] * G[2, 1]
+    zero3 = Float64[0, 0, 0]
+    (isfinite(d) && abs(d) > 0) || return zero3, zero3
+    Ginv = [G[2, 2] -G[1, 2]; -G[2, 1] G[1, 1]] ./ d
+    P = transpose(Jw) * Ginv                       # world per image px, 3×2
+    D = P ./ [s[1], s[2], s[3]]                    # data per image px
+    all(isfinite, D) || return zero3, zero3
+    return Float64.(D[:, 1]), Float64.(D[:, 2])
 end
 
 # ============================ ThresholdInteractable ========================

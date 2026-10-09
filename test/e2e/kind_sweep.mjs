@@ -699,6 +699,91 @@ try {
       );
     }
 
+    if (key === "view3d") {
+      // Axis3 zoom and pan (#321). The wheel scales the limits about their center, so the
+      // middle point stays put on screen and the corner leaves the limits: it is clipped from
+      // the picture and must stop hitting. Shift+drag then pans the limits; a plain drag orbits.
+      const stamp3 = async () => {
+        const raw = await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          return host?.dataset.masqueGestureFrame ?? "";
+        }, key);
+        return raw ? JSON.parse(raw) : null;
+      };
+      const waitStamp = async (after, what, ok) => {
+        const tries = backend === "webgl" ? 50 : 25;
+        const delayMs = backend === "webgl" ? 300 : 200;
+        for (let i = 0; i < tries; i++) {
+          await new Promise((r) => setTimeout(r, delayMs));
+          const st = await stamp3();
+          if (st && st.n > (after?.n ?? 0) && st.settle === true && ok(st)) return st;
+        }
+        throw new Error(`${key}-${what}: no settled gesture frame with the expected camera (last ${JSON.stringify(await stamp3())})`);
+      };
+      const pts3 = layers.find((l) => l.id === "pts");
+      if (!pts3) throw new Error(`${key}: no pts layer`);
+      const inP = hitPoint(pts3, spec.inside), outP = hitPoint(pts3, spec.outside);
+      const line3 = layers.find((l) => l.id === "line");
+      if (!line3) throw new Error(`${key}: no line layer`);
+      const lineP = { x: line3.geometry[0][2], y: line3.geometry[0][3] };   // the vertex inside the zoom
+      await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1)?.scrollIntoView({ block: "center", inline: "nearest" });
+      }, key);
+      for (const [p, what] of [[inP, "inside"], [outP, "outside"], [lineP, "line"]]) {
+        const r = await dispatchAt(key, p.x, p.y, "pointermove");
+        if (!r.show) throw new Error(`${key}: the ${what} point should hover before the zoom`);
+      }
+      const before = await textOf(`#out_${key}`);
+      const g = layer.geometry;
+      const lim0 = g.limits;
+      if (!Array.isArray(lim0) || lim0.length !== 6) throw new Error(`${key}: view geometry has no Axis3 limits: ${JSON.stringify(g)}`);
+      const s0 = await stamp3();
+      const prevented = await page.evaluate(([k, ix, iy]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: -600 });
+        sr.querySelector(".surface").dispatchEvent(ev);
+        return ev.defaultPrevented;
+      }, [key, g.x + g.w / 2, g.y + g.h / 2]);
+      if (!prevented) throw new Error(`${key}-wheel: the wheel was not taken by the Axis3 view`);
+      const w = (l, i) => l[2 * i + 1] - l[2 * i];
+      const zs = await waitStamp(s0, "wheel", (st) => Array.isArray(st.limits) && [0, 1, 2].every((i) => w(st.limits, i) < 0.75 * w(lim0, i)));
+      passed.push(`${key}/wheel-zoom`);
+      const rOut = await dispatchAt(key, outP.x, outP.y, "pointermove");
+      if (rOut.show) throw new Error(`${key}: the corner point is outside the zoomed limits but still hovers (${rOut.text})`);
+      const rIn = await dispatchAt(key, inP.x, inP.y, "pointermove");
+      if (!rIn.show) throw new Error(`${key}: the middle point should still hover after a center zoom`);
+      // The data is symmetric about the middle point, so the limits' center projects there and a
+      // center zoom by k moves every visible point k times farther from it on screen. The line's
+      // ends are now outside the limits; its middle vertex is inside and must still hover.
+      const k = w(lim0, 0) / w(zs.limits, 0);
+      const lineZ = { x: inP.x + k * (lineP.x - inP.x), y: inP.y + k * (lineP.y - inP.y) };
+      const rLine = await dispatchAt(key, lineZ.x, lineZ.y, "pointermove");
+      if (!rLine.show) throw new Error(`${key}: the line still drawn inside the zoomed limits should hover at ${JSON.stringify(lineZ)}`);
+      passed.push(`${key}/zoom-clips-hits`);
+      await drag(key, inP.x, inP.y, inP.x + 80, inP.y, true);
+      const ps = await waitStamp(zs, "shift-drag", (st) => Array.isArray(st.limits) &&
+        st.limits.some((v, i) => Math.abs(v - zs.limits[i]) > 1e-3 * w(zs.limits, Math.floor(i / 2))) &&
+        [0, 1, 2].every((i) => Math.abs(w(st.limits, i) - w(zs.limits, i)) < 1e-6 * Math.abs(w(zs.limits, i)) + 1e-9) &&
+        Math.abs(st.azimuth - zs.azimuth) < 1e-9);
+      passed.push(`${key}/shift-drag-pan`);
+      await drag(key, inP.x, inP.y, inP.x + 80, inP.y, false);
+      await waitStamp(ps, "orbit", (st) => Math.abs(st.azimuth - ps.azimuth) > 0.05);
+      passed.push(`${key}/drag-orbit`);
+      const after = await textOf(`#out_${key}`);
+      if (after !== before) throw new Error(`${key}: a view gesture must not commit (${before} -> ${after})`);
+      console.error(`OK  ${key} — wheel zoom ${JSON.stringify(zs.limits)}, clipped corner, pan, orbit`);
+      continue;
+    }
+
     if (spec.mode === "drag" && spec.layerKind === "view") {
       // #102/§12.3: a view gesture commits nothing anymore — the OLD assertion here waited for
       // #out_view's bond text to change and would now fail for the right reason (nothing ever
