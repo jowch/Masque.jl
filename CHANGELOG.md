@@ -6,14 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [0.2.2] - 2026-10-09
-
 ### Added
 - A `ViewInteractable` on an `Axis3` zooms as well as orbits: scroll, or press `+` / `-`,
   to zoom around the middle of the axis box, and Shift+drag, or Shift with an arrow key, to
   pan. As in Makie, the box keeps its size and the limits change, so marks outside the new
   limits are hidden and stop responding to hover and clicks. A line that crosses the edge
   of the box still responds along the part that is drawn (#321).
+
+## [0.2.2] - 2026-10-09
+
+### Added
 - A CairoMakie widget shown outside Pluto, in Documenter or in an HTML page written with
   `show(io, MIME"text/html"(), w)`, keeps its tooltips and highlights, with nothing to turn
   on. Clicks highlight a mark but set no `@bind` value, and dragging the view needs Pluto. A
