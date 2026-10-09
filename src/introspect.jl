@@ -421,15 +421,6 @@ function SurfaceInteractable(ax, p::Makie.Surface; id = :surface, payloads = not
     return SurfaceInteractable(ax, x, y, z; id, value, payloads, tooltip, label)
 end
 
-function RectInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; kwargs...)
-    _deprecate(
-        "`RectInteractable(ax, p)` for a heatmap or image is deprecated; use `GridInteractable(ax, p)`. " *
-            "Removed in 0.3.",
-        :RectInteractable,
-    )
-    return GridInteractable(ax, p; kwargs...)
-end
-
 # The child Poly carries the final laid-out rectangles (dodge/stack/automatic-width applied);
 # read those instead of replaying Makie's bar solver.
 function _bar_rects(p)
@@ -1679,16 +1670,6 @@ function interactables(ax::_SUPPORTED_AXES)
     fig isa Makie.Figure ||
         throw(ArgumentError("interactables(ax): this axis is not in a Figure"))
     return filter(i -> hasproperty(i, :ax) && i.ax === ax, interactables(fig))
-end
-
-"""
-    auto_interactables(fig) -> Vector{AbstractInteractable}
-
-Deprecated: use [`interactables(fig)`](@ref interactables). Removed in 0.3.
-"""
-function auto_interactables(fig)
-    _deprecate("`auto_interactables(fig)` is deprecated; use `interactables(fig)`. Removed in 0.3.", :auto_interactables)
-    return interactables(fig)
 end
 
 # --- SliceInteractable from a plot -----------------------------------------------------------

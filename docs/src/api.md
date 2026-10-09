@@ -9,7 +9,6 @@ examples, start with [Getting started](@ref).
 Masque
 masque
 interactables
-auto_interactables
 InteractionEvent
 ElementEvent
 LegendEvent

@@ -18,17 +18,9 @@ This is the default backend `masque` picks when `CairoMakie` is loaded. Its dens
 
 The widget owns its DPI, format, and background; the figure's plots and size are kept.
 `CairoMakie.activate!` settings apply to a bare `Figure` and to `save`, never to the widget.
-
-`CairoBackend(; max_width)` is deprecated: use `masque(fig; backend = :cairo, max_width)`.
-Removed in 0.3.
 """
-struct CairoBackend <: AbstractBackend
-    CairoBackend(::Masque._Builtin) = new()
-end
-function CairoBackend(; max_width = nothing)
-    return Masque._legacy_backend(CairoBackend(Masque._Builtin()), :cairo, max_width, nothing)
-end
-Masque._builtin_backend(::Val{:cairo}) = CairoBackend(Masque._Builtin())
+struct CairoBackend <: AbstractBackend end
+Masque._builtin_backend(::Val{:cairo}) = CairoBackend()
 
 function Masque._ppu(::CairoBackend, fig, max_width)
     sw = size(fig.scene)[1]
