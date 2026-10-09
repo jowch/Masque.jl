@@ -146,4 +146,10 @@ describe("withReadout", () => {
         expect(withReadout({}, hit, undefined, true)).toEqual({ i: 5, x: 1, y: 2 })
         expect(withReadout("text", hit, undefined, true)).toBe("text")
     })
+    it("lets the payload's own fields win a clash, as every mark's defaults do", () => {
+        const hit: Hit = { layer, index: 0, pt_: [4, 1, 2] }
+        const out = withReadout({ x: "mine", name: "s" }, hit, undefined, true)
+        expect(out).toEqual({ x: "mine", name: "s", i: 5, y: 2 })
+        expect(Object.keys(out as object)).toEqual(["x", "name", "i", "y"])
+    })
 })

@@ -30,14 +30,20 @@ export function fmtNum(v: unknown, digits: number = DEFAULT_SIGDIGITS): string {
 // A line hover's readout merged into its payload: `x` and `y` of the nearest sample, and for a
 // template also `i`, its 1-based index. The default table leaves `i` out, next to the line's own
 // `index` it reads as a second index. Julia sends a categorical or date coordinate as its text;
-// a number on an axis with categories still shows the label Makie puts at that position. A
-// non-object payload has nowhere to put fields and is shown as it is.
+// a number on an axis with categories still shows the label Makie puts at that position. As
+// with every mark's default fields, the payload's own fields win a clash. A non-object payload
+// has nowhere to put fields and is shown as it is.
 export function withReadout(payload: unknown, hit: Hit, t: AxisTransform | undefined, template: boolean): unknown {
     if (!hit.pt_ || (payload != null && typeof payload !== "object")) return payload
     const [s, x, y] = hit.pt_
     const cat = (v: number | string, cats?: string[] | null) => (typeof v === "number" && cats?.length ? cats[Math.round(v) - 1] ?? v : v)
-    const xy = { x: cat(x, t?.xcats), y: cat(y, t?.ycats) }
-    return template ? { ...(payload as object), i: s + 1, ...xy } : { ...(payload as object), ...xy }
+    const own = (payload ?? {}) as Record<string, unknown>
+    const readout: Record<string, unknown> = template ? { i: s + 1 } : {}
+    readout.x = cat(x, t?.xcats)
+    readout.y = cat(y, t?.ycats)
+    const out: Record<string, unknown> = { ...own }
+    for (const [k, v] of Object.entries(readout)) if (!(k in own)) out[k] = v
+    return out
 }
 
 // Missing fields (undefined) emit nothing.
