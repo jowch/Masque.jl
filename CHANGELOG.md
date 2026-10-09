@@ -17,7 +17,8 @@ All notable changes to this project are documented here. The format is based on
   The page loads the overlay script once from jsDelivr, pinned to the installed Masque
   release and checked against its hash, so each widget adds little beyond its image. Read
   offline, the page shows the plain figures. A Masque checked out with `Pkg.develop` writes
-  the script into each widget instead, about 80 KB apiece (#298).
+  the script into each widget instead, about 80 KB apiece. An install from a branch or URL
+  shows the plain figures; use `Pkg.develop` to try unreleased changes outside Pluto (#298).
 - `SliceInteractable([a, b])` builds a slice from plots without naming the axis; `masque`
   puts it on the axis that draws them, and plots on different axes raise an error naming
   both. `SliceInteractable(ax, [a, b])` still works (#306).
