@@ -122,6 +122,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws "`dodge_fill` must be" Masque.overlay_style_dict((; dodge_fill = "oklch(0.7 0.1 200)"))
         @test_throws "`handle_fill` must be" Masque.overlay_style_dict((; handle_fill = :notacolour))
         @test_throws "`color` must be" color_of("")
+        @test_throws "got 2" color_of(2)                          # a number isn't a grey level
+        @test_throws "got 0.5" color_of(0.5)
 
         tfig = Figure(size = (600, 400)); tax = Axis(tfig[1, 1])
         scatter!(tax, [1.0, 2.0], [1.0, 2.0])

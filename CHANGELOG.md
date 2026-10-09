@@ -91,7 +91,8 @@ All notable changes to this project are documented here. The format is based on
   the browser. Names, hex codes, and `rgb(…)` and `hsl(…)` strings work as before, and
   `"var(--name)"` still follows a CSS custom property. Other CSS-only forms, such as
   `currentColor`, `color-mix(…)`, or `oklch(…)`, now raise; pass a Makie color or wrap the
-  value in a custom property your page sets (#342).
+  value in a custom property your page sets. An `overlaystyle` colour given as a bare number,
+  which used to be read as a grey level, raises too, as it already did in `tooltipstyle` (#342).
 
 ### Deprecated
 - The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,

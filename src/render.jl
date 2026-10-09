@@ -24,7 +24,10 @@ const _STYLE_COLOR_FORMS =
 # colour, so a typo raises rather than reaching the browser, which drops it without a word.
 # It is sent as `rgb(…)`, since Colors.jl also reads forms CSS doesn't (`0xff0000`, X11 names
 # such as `gray50`). A `var(--…)` reference is the one CSS-only form let through unchecked.
+# A bare number is refused: `to_color` reads it as a grey level, where a Makie `color` number
+# means a colormap value, and past 1 it gives no valid CSS colour at all.
 function _style_color(v)
+    v isa Real && return nothing
     v isa AbstractString && occursin(r"^\s*var\(.*\)\s*$"s, v) && return String(strip(v))
     try
         return _css_color(v isa AbstractString ? Makie.to_color(v) : v)
@@ -47,8 +50,7 @@ const _TOOLTIP_STYLE_KEYS = (
 
 function _tooltip_style_value(k, kind, v)
     if kind === :color
-        # `to_color` reads a bare number as a grey level, which gives no valid CSS colour.
-        css = v isa Real ? nothing : _style_color(v)
+        css = _style_color(v)
         css === nothing && throw(ArgumentError("tooltipstyle: `$k` must be $(_STYLE_COLOR_FORMS), got $(repr(v))"))
         return css
     end
