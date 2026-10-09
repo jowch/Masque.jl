@@ -40,7 +40,7 @@ its id:
 
 ```julia
 s = scatter!(ax, xs, ys)
-@bind pick masque(fig, interactables(s; tooltip = masque"{name}", payloads = df))
+@bind pick masque(fig, interactables(s; tooltip = masque"$(name)", payloads = df))
 ```
 
 An interactable whose `id` matches a default layer's id also replaces
