@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { computeSelection, layerNElements, selectionFor, linkedHits, selectionForValue, sameValue } from "../src/selection"
+import { cellRange, computeSelection, layerNElements, selectionFor, linkedHits, selectionForValue, sameValue } from "../src/selection"
 import type { Hit, HitLayer, Manifest } from "../src/types"
 
 // layerNElements' other kind branches (circles/rects/polygons/segments/polyline) are exercised
@@ -16,6 +16,32 @@ describe("layerNElements", () => {
             geometry: { xedges: [0, 1, 2], yedges: [0, 1, 2, 3], ncols: 2, nrows: 3 },
         }
         expect(layerNElements(layer)).toBe(6)
+    })
+})
+
+// The cell edges are whole pixels and a box keeps its fractional corners, so a box placed on data
+// cell edges reaches up to half a pixel into the neighbouring cells. That sliver is not overlap (#337).
+describe("cellRange", () => {
+    const asc = [100, 200, 300, 400], desc = [400, 300, 200, 100]
+    it("leaves out an end cell the span only grazes by half a pixel or less", () => {
+        expect(cellRange(asc, 199.6, 300.4)).toEqual([1, 1])
+        expect(cellRange(asc, 199.5, 300.5)).toEqual([1, 1])
+        expect(cellRange(desc, 199.6, 300.4)).toEqual([1, 1])
+    })
+    it("keeps an end cell the span reaches into by more than half a pixel", () => {
+        expect(cellRange(asc, 199.4, 300.6)).toEqual([0, 2])
+        expect(cellRange(desc, 199.4, 300.6)).toEqual([0, 2])
+    })
+    it("keeps a sliver-wide span on one edge to one cell, never none", () => {
+        expect(cellRange(asc, 199.8, 200.2)).toEqual([1, 1])
+        expect(cellRange(asc, 150, 150.1)).toEqual([0, 0])
+    })
+    it("keeps an end cell narrower than the slack when the span covers all of it", () => {
+        expect(cellRange([0, 0.4, 10, 20], 0, 15)).toEqual([0, 2])
+    })
+    it("clamps an overhanging span to the grid and returns null off it", () => {
+        expect(cellRange(asc, 50, 250)).toEqual([0, 1])
+        expect(cellRange(asc, 450, 500)).toBeNull()
     })
 })
 

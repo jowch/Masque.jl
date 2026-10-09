@@ -334,9 +334,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         start = IP.APD.Bonds.initial_value(w)
         @test start isa GridWindowEvent && start.layer === :img
         @test (start.xmin, start.xmax, start.ymin, start.ymax) == (1.0, 3.0, 1.0, 2.0)
-        # Columns 2:3 exactly. The rows take 1:3: the cell edges are whole pixels, and the box's
-        # data edges land a fraction of a pixel past them into rows 1 and 3, as a release does.
-        @test (start.i1, start.i2, start.j1, start.j2) == (2, 3, 1, 3)
+        # Columns 2:3 and row 2 exactly (#337): the box's data edges sit on cell edges and land a
+        # fraction of a pixel past the whole-pixel edges into the neighbours, which doesn't count.
+        @test (start.i1, start.i2, start.j1, start.j2) == (2, 3, 2, 2)
         @test start == tv(w, w.manifest["initial"])
 
         # A cell envelope can still reach Julia from a stale bundle or a hand-set bond. It fails
@@ -355,6 +355,22 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         win = tv(w, Dict("items" => [Dict("layer" => "img", "index" => 0, "payload" => payload)]))
         @test win isa GridWindowEvent && (win.i1, win.i2, win.j1, win.j2) == (2, 3, 2, 2)
         @test vals[win] == vals[2:3, 2:2]
+    end
+
+    @testset "_cell_range leaves out an end cell the box only grazes (#337)" begin
+        # The same cases as `cellRange` in frontend/test/selection.test.ts, 0-based cells.
+        cr = Masque._cell_range
+        asc = [100.0, 200.0, 300.0, 400.0]; desc = reverse(asc)
+        @test cr(asc, 199.6, 300.4) == (1, 1)
+        @test cr(asc, 199.5, 300.5) == (1, 1)
+        @test cr(desc, 199.6, 300.4) == (1, 1)
+        @test cr(asc, 199.4, 300.6) == (0, 2)
+        @test cr(desc, 199.4, 300.6) == (0, 2)
+        @test cr(asc, 199.8, 200.2) == (1, 1)
+        @test cr(asc, 150.0, 150.1) == (0, 0)
+        @test cr([0.0, 0.4, 10.0, 20.0], 0.0, 15.0) == (0, 2)
+        @test cr(asc, 50.0, 250.0) == (0, 1)
+        @test cr(asc, 450.0, 500.0) === nothing
     end
 
     @testset "a selects box owns its point target's bond; a point click commits nothing" begin
