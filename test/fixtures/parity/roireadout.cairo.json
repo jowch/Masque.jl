@@ -2,15 +2,14 @@
     "height": 800,
     "layers": [
         {
-            "kind": "threshold",
-            "id": "threshold",
+            "kind": "roi",
+            "id": "roi",
             "geometry": {
-                "pos": 455.40915,
-                "orientation": "h",
-                "span": [
-                    88,
-                    1168
-                ]
+                "w": 490.90915,
+                "handle": 16,
+                "h": 313.63632,
+                "y": 298.59097,
+                "x": 382.54544
             },
             "payloads": [
             ],
@@ -18,7 +17,7 @@
             "style": {
                 "width": 2
             },
-            "bond": "threshold",
+            "bond": "bounds",
             "events": [
                 "drag"
             ]
@@ -40,11 +39,16 @@
         }
     ],
     "initial": {
-        "payload": 4,
-        "layer": "threshold",
+        "payload": {
+            "xmin": 1.5,
+            "xmax": 2.5,
+            "ymin": 2,
+            "ymax": 6
+        },
+        "layer": "roi",
         "index": 0
     },
-    "bondOwner": "threshold",
+    "bondOwner": "roi",
     "transforms": {
         "ax1": {
             "xscale": "identity",

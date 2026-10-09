@@ -147,6 +147,25 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     return d
 end
 
+# The interactable that owns the widget's bond and its first layer's id, or `nothing`. Two owners
+# would each overwrite the other's value, and the bond could not start at both initial states.
+function _bond_owner(built)
+    owners = Tuple{Any, Symbol}[]
+    for (i, L, _) in built
+        owns_bond(i) && !any(o -> o[1] === i, owners) && push!(owners, (i, L.id))
+    end
+    isempty(owners) && return nothing
+    length(owners) == 1 && return only(owners)
+    names = join([":" * string(id) for (_, id) in owners], ", ", " and ")
+    throw(
+        ArgumentError(
+            "masque: $names each own the `@bind` value, and a widget has one. A threshold, an ROI " *
+                "box, or a colorbar you pass takes every click in its widget; pass the others " *
+                "to separate masque() calls",
+        ),
+    )
+end
+
 # One `selects` target for the widget. Several selectors must name that same layer.
 function _selection_spec(interactables, layers)
     targets = Symbol[]
@@ -378,12 +397,15 @@ function build_manifest(
     _drop_absent_default_covers!(built)
     _validate_slices(layers)
     _validate_links(layer_owners, layers)
+    owner = _bond_owner(built)
     spec = _selection_spec(interactables, layers)
-    # The box owns its target's bond: a click would replace the brushed selection while the box
-    # stays drawn over it. The target keeps hover (tooltip); the overlay hit-tests clicks by `events`.
-    if spec !== nothing
-        target = only(filter(l -> l["id"] == string(spec.target), layers))
-        filter!(!=("click"), target["events"])
+    # The owner is the only layer that commits: a click elsewhere would replace the threshold's
+    # value or the brushed selection while the control stays drawn at its own. Every other layer
+    # keeps hover (tooltip); the overlay hit-tests clicks by `events`.
+    if owner !== nothing
+        for (i, _, d) in built
+            i === owner[1] || filter!(!=("click"), d["events"])
+        end
     end
     layer_ids = Symbol[L.id for (_, L, _) in built]
     seedable = Symbol[L.id for (_, L, _) in built if L.kind in _SELECTED_KINDS]
@@ -421,6 +443,11 @@ function build_manifest(
         "layers" => layers,
         "transforms" => Dict(string(id) => _transform_dict(t) for (id, t) in ctx.transforms),
     )
+    if owner !== nothing
+        m["bondOwner"] = string(owner[2])
+        env = initial_envelope(owner[1], ctx)
+        env === nothing || (m["initial"] = env)
+    end
     if spec !== nothing
         m["selection"] = spec.mode
         m["selectionTarget"] = string(spec.target)
@@ -569,8 +596,14 @@ Two layers with the same id raise `ArgumentError`. Legends link to the layers of
 The bond is `nothing` until the first commit, unless `selected=` restored one. A click is one
 [`InteractionEvent`](@ref). A `selects` [`ROIInteractable`](@ref) aimed at points commits a
 `Vector{ElementEvent}` (an empty box is `ElementEvent[]`); aimed at a grid, one
-[`GridWindowEvent`](@ref). The box owns that bond: its target layer shows tooltips but commits no
-clicks. Clicks on other layers stay single events.
+[`GridWindowEvent`](@ref).
+
+A [`ThresholdInteractable`](@ref), an [`ROIInteractable`](@ref), or a
+[`ColorbarInteractable`](@ref) you pass owns the bond: every other layer shows tooltips but
+commits no clicks, and `selected=` on those layers only highlights. A threshold's bond starts
+as a [`ThresholdEvent`](@ref) at its `value`, and a box without `selects` as a
+[`BoundsEvent`](@ref) at its `bounds`. One widget takes one owner; two raise `ArgumentError`.
+The colorbars `masque(fig)` adds by itself own nothing.
 
 # Keywords
 - `auto` — start from the figure's defaults. Default `true`.

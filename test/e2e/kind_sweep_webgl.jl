@@ -404,6 +404,15 @@ HTML(
         "<span id=\"axes_threshold_cat\" style=\"display:none\">$(JSON3.write(sweep.threshold_cat.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000115
+@bind ev_colorbar_owner sweep.colorbar_owner
+
+# ╔═╡ d1000000-0000-0000-0000-000000000116
+HTML(
+    "<span id=\"out_colorbar_owner\">COLORBAR_OWNER=$(repr(ev_colorbar_owner))</span>" *
+        "<span id=\"coords_colorbar_owner\" style=\"display:none\">$(JSON3.write(sweep.colorbar_owner.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000064
 @bind ev_axis_cat sweep.axis_cat
 
@@ -609,6 +618,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000031
 # ╠═d1000000-0000-0000-0000-000000000062
 # ╠═d1000000-0000-0000-0000-000000000063
+# ╠═d1000000-0000-0000-0000-000000000115
+# ╟─d1000000-0000-0000-0000-000000000116
 # ╠═d1000000-0000-0000-0000-000000000064
 # ╠═d1000000-0000-0000-0000-000000000065
 # ╠═d1000000-0000-0000-0000-000000000032

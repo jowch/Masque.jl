@@ -699,6 +699,35 @@ try {
       );
     }
 
+    // A threshold, a box, or a colorbar the caller passed owns the bond (#309). The bond starts
+    // at the owner's value (`spec.owner.initial`, a regex on #out), and another layer of the
+    // same widget shows its tooltip but takes no click: the overlay drops its "click" event,
+    // and a real click on it leaves the bond as it was.
+    if (spec.owner) {
+      if (!new RegExp(spec.owner.initial).test(mountBond)) {
+        throw new Error(`${key}: mount bond ${JSON.stringify(mountBond)}, want /${spec.owner.initial}/`);
+      }
+      passed.push(`${key}/owner-initial-bond`);
+      const other = layers.find((l) => l.id === spec.owner.layer);
+      if (!other) throw new Error(`${key}: no layer "${spec.owner.layer}" in ${layers.map((l) => l.id)}`);
+      if (other.events.includes("click") || !other.events.includes("hover")) {
+        throw new Error(`${key}: :${other.id} events ${JSON.stringify(other.events)}, want hover without click`);
+      }
+      const op = hitPoint(other, 0);
+      const hov = await dispatchAt(key, op.x, op.y, "pointermove");
+      if (!hov.show || !hov.text) throw new Error(`${key}: hovering :${other.id} showed no tooltip ${JSON.stringify(hov)}`);
+      passed.push(`${key}/owner-other-hover`);
+      const clicked = await dispatchAt(key, op.x, op.y, "click");
+      await new Promise((r) => setTimeout(r, 1500));
+      const afterClick = await textOf(`#out_${key}`);
+      if (afterClick !== mountBond) throw new Error(`${key}: clicking :${other.id} changed the bond ${JSON.stringify(mountBond)} -> ${JSON.stringify(afterClick)}`);
+      if (clicked.sel !== 0) throw new Error(`${key}: clicking :${other.id} drew a selection (${clicked.sel})`);
+      passed.push(`${key}/owner-other-no-click`);
+      await dispatchAt(key, 1, 1, "pointermove");
+      console.error(`OK  ${key}/owner — starts ${mountBond.slice(0, 80)}, :${other.id} hover-only`);
+    }
+    if (spec.mode === "owner") continue;
+
     if (spec.mode === "drag" && spec.layerKind === "view") {
       // #102/§12.3: a view gesture commits nothing anymore — the OLD assertion here waited for
       // #out_view's bond text to change and would now fail for the right reason (nothing ever

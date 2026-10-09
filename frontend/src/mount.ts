@@ -271,9 +271,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     // The @bind target is the host element. Seed the same envelope Julia's `mount_envelope`
     // builds, or Pluto's mount-time read overwrites `initial_value`. A selects-elements widget
-    // seeds `{items}` (including an explicit empty brush). One hydrated index on a scalar layer
-    // seeds `{layer, index}`. Several indices on a scalar layer are a highlight only (`null`):
-    // that interaction holds one event, so a set is not a value it can carry.
+    // seeds `{items}` (including an explicit empty brush). Otherwise a widget whose bond has an
+    // owner seeds that owner's `initial` envelope, and hydrated indices are a highlight only. One
+    // hydrated index on a scalar layer seeds `{layer, index}`. Several indices on a scalar layer
+    // are a highlight only (`null`): that interaction holds one event, so a set is not a value
+    // it can carry.
     //
     // No `payload` key: `selected=` only ever hydrates a SELECTED_KINDS layer (hitLayerByIndex
     // throws otherwise), and Julia reconstructs an element hit from its own manifest rather than
@@ -289,7 +291,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     const selection = manifest.selection
     const seedItems = selection === "elements" && (hydrated.length > 0 || manifest.hydrate === "items")
-    const hostValue = seedItems ? { items: hydrated } : hydrated.length === 1 ? hydrated[0] : null
+    const owned = manifest.bondOwner !== undefined
+    const hostValue = seedItems ? { items: hydrated }
+        : owned ? (manifest.initial ?? null)
+        : hydrated.length === 1 ? hydrated[0] : null
 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })
@@ -458,7 +463,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const state = createOverlayState()
     state.selHits_ = selHits
     // A brush seed belongs to the box, not a click, so only a scalar seed can be clicked off.
-    if (!seedItems && hydrated.length === 1) state.selSource_ = hydrated[0]
+    if (!seedItems && !owned && hydrated.length === 1) state.selSource_ = hydrated[0]
 
     // `host.value` is the bond. Pluto writes it after mount: on a page reload it restores the
     // kernel's value, which can be a click made since the `selected=` seed. Until a gesture of

@@ -1166,6 +1166,10 @@ like [`AxisInteractable`](@ref) but scoped to the colorbar and 1-D. Produces one
 
 Payload on hit (client-side): `(; value)`.
 
+A colorbar you pass to `masque` owns the bond: every other layer in that widget keeps its hover
+tooltip but takes no clicks, so the bond only ever holds a [`ColorbarEvent`](@ref). It starts
+as `nothing`. The colorbars `masque(fig)` adds on its own do not own the bond.
+
 `masque` raises `ArgumentError` at build time if the colorbar's value-axis scale isn't
 client-invertible (supported: `identity`, `log10`, `log`).
 
@@ -1178,8 +1182,12 @@ ColorbarInteractable(cb)
 struct ColorbarInteractable <: AbstractInteractable
     cb
     id::Symbol
+    # `masque` added it for a figure's colorbar, rather than the caller passing it. Only one
+    # the caller passed owns the bond: otherwise any figure with a colorbar would take no clicks.
+    auto::Bool
 end
-ColorbarInteractable(cb; id = :colorbar) = ColorbarInteractable(cb, id)
+ColorbarInteractable(cb, id::Symbol) = ColorbarInteractable(cb, id, false)
+ColorbarInteractable(cb; id = :colorbar) = ColorbarInteractable(cb, id, false)
 function validate(i::ColorbarInteractable, ctx::InteractionContext)
     t = ctx.transforms[axis_id(ctx, i.cb)]
     va = t.valueaxis
@@ -1537,6 +1545,10 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 
 Payload on commit (client-side): the scalar data coordinate.
 
+The line owns the bond: every other layer in that widget keeps its hover tooltip but takes no
+clicks, and the bond starts as a [`ThresholdEvent`](@ref) at `value` (with its `category` on a
+categorical axis, when `value` is a category's position).
+
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data value — inversion is undefined), a `PolarAxis` (a straight line is neither a constant r nor
 a constant θ), or
@@ -1606,10 +1618,10 @@ compatible layer, reporting the contained elements. Produces one `:roi` [`HitLay
 Payload on commit (no `selects`): a [`BoundsEvent`](@ref). With `selects` set, the bond is a
 `Vector{ElementEvent}` for a `:circles` target (one per contained element), or one
 [`GridWindowEvent`](@ref) for a `:grid` target — see [`InteractionEvent`](@ref). The box owns
-that bond: the target layer keeps its hover tooltip but takes no clicks. A click on it passes
-through to any clickable layer underneath (an [`AxisInteractable`](@ref) catches clicks anywhere
-on its axis); with none there, the value stays the brush. `bounds=` accepts a `BoundsEvent` or a `(xmin, xmax, ymin, ymax)`
-tuple.
+the bond: every other layer in that widget, the target included, keeps its hover tooltip but
+takes no clicks. Without `selects`, the bond starts as a `BoundsEvent` at `bounds`; with it, the
+bond starts as `nothing` (or as `selected=` seeds it) until the first release. `bounds=` accepts
+a `BoundsEvent` or a `(xmin, xmax, ymin, ymax)` tuple.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data point), a `PolarAxis` (a screen rectangle is not an annular sector), a categorical axis (bounds

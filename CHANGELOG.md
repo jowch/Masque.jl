@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** a `ThresholdInteractable`, an `ROIInteractable`, or a `ColorbarInteractable`
+  you pass to `masque` owns the `@bind` value. Every other layer in that widget keeps its
+  hover and tooltip but no longer takes clicks, so `masque(fig, cutoff)` keeps hover on the
+  points and the value only ever holds the threshold. Before, a click on a point replaced
+  the threshold's value, which is why the docs passed `auto = false`. Code that relied on
+  clicking marks in the same widget as one of these controls needs a second `masque` call
+  for the marks. The colorbars `masque(fig)` adds by itself still leave the other layers
+  clickable. A selecting box already worked this way for the layer it selects (#309).
+- **Breaking:** the value starts at the control's starting position instead of `nothing`: a
+  threshold at a `ThresholdEvent` at `value`, and a box without `selects` at a `BoundsEvent`
+  at `bounds`. `level.value` works from the first run, and code that falls back with
+  `isnothing(level) ? 0.5 : level.value` still gets the same number. Code that tests
+  `isnothing(level)` to mean "not dragged yet" no longer sees `nothing`. A selecting box
+  and a colorbar still start at `nothing`, since they have no value before the first release
+  or click (#309).
+- **Breaking:** two of these controls in one widget raise an error naming both, since each
+  would overwrite the other's value. Pass each to its own `masque` call (#309).
+
 ## [0.2.2] - 2026-10-09
 
 ### Added
