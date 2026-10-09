@@ -147,6 +147,44 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     return d
 end
 
+# An ROI whose `selects` is a plot brushes the one layer of that plot it can brush: a
+# scatterlines plot has a `:lines` and a `:circles` layer, and the box takes the points.
+function _resolve_plot_targets(interactables, pairs)
+    kinds = Dict(L.id => L.kind for (_, L) in pairs)
+    swap = IdDict{Any, Any}()
+    for i in interactables
+        i isa ROIInteractable || continue
+        t = i.selects
+        t isa Makie.AbstractPlot && throw(
+            ArgumentError(
+                "ROIInteractable: `selects` is a plot, which `masque(fig, …)` resolves to its layer; " *
+                    "build_manifest needs a layer id",
+            ),
+        )
+        t isa _PlotTarget || continue
+        ok = filter(id -> get(kinds, id, nothing) in compatible_kinds(i), t.ids)
+        plot = Makie.plotkey(t.plot)
+        if isempty(ok)
+            found = join(("`:$id` ($(get(kinds, id, "none")))" for id in t.ids), ", ")
+            throw(
+                ArgumentError(
+                    "ROIInteractable: `selects` is a `$plot` plot whose layers ($found) are none of " *
+                        "$(compatible_kinds(i)); the box brushes points or grid cells",
+                ),
+            )
+        end
+        length(ok) == 1 || throw(
+            ArgumentError(
+                "ROIInteractable: `selects` is a `$plot` plot with several layers the box could brush " *
+                    "($(join(("`:$id`" for id in ok), ", "))); pass the one you want by id, as `selects = :$(first(ok))`",
+            ),
+        )
+        swap[i] = ROIInteractable(i.ax, i.bounds, i.id, only(ok))
+    end
+    isempty(swap) && return interactables, pairs
+    return Any[get(swap, i, i) for i in interactables], Tuple{Any, HitLayer}[(get(swap, i, i), L) for (i, L) in pairs]
+end
+
 # One `selects` target for the widget. Several selectors must name that same layer.
 function _selection_spec(interactables, layers)
     targets = Symbol[]
@@ -364,14 +402,16 @@ function build_manifest(
         selected = nothing, tip_style = nothing, tip_digits = _DEFAULT_SIGDIGITS, background = nothing,
         overlay_style = nothing, owners_out = nothing,
     )
-    built = Tuple{Any, HitLayer, Dict{String, Any}}[]
+    pairs = Tuple{Any, HitLayer}[]
     for i in interactables
         msg = validate(i, ctx)
         msg === nothing || throw(ArgumentError(msg))
         for L in hitlayers(i, ctx)
-            push!(built, (i, L, _layer_dict(i, L, ctx)))
+            push!(pairs, (i, L))
         end
     end
+    interactables, pairs = _resolve_plot_targets(interactables, pairs)
+    built = Tuple{Any, HitLayer, Dict{String, Any}}[(i, L, _layer_dict(i, L, ctx)) for (i, L) in pairs]
     layers = Any[d for (_, _, d) in built]
     layer_owners = Any[i for (i, _, _) in built]
     _validate_selectors(interactables, layers)

@@ -384,4 +384,66 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         seeded = IP.APD.Bonds.initial_value(masque(pfig, [pi, roi]; selected = 2, auto = false))
         @test seeded isa Vector{ElementEvent} && only(seeded).payload == "b"
     end
+
+    @testset "selects takes a plot (#302)" begin
+        layer(w, id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))
+        bounds = (0.0, 4.0, 0.0, 4.0)
+
+        # Two scatters: the box finds the second one's numbered layer without the caller naming it.
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        s1 = scatter!(ax, [1.0, 2.0], [1.0, 2.0])
+        s2 = scatter!(ax, [1.5, 3.0], [2.5, 3.0])
+        w = masque(fig, ROIInteractable(ax; bounds, selects = s2))
+        @test w.manifest["selectionTarget"] == "scatter_2"
+        @test layer(w, "roi")["selects"] == "scatter_2"
+        # Same widget as naming the id, so the browser sees nothing new.
+        @test w.manifest == masque(fig, ROIInteractable(ax; bounds, selects = :scatter_2)).manifest
+        w1 = masque(fig, ROIInteractable(ax; bounds, selects = s1))
+        @test w1.manifest["selectionTarget"] == "scatter"
+
+        # The plot's own id, set through `interactables`, is the one the box takes.
+        w = masque(fig, interactables(s2; id = :pts), ROIInteractable(ax; bounds, selects = s2))
+        @test w.manifest["selectionTarget"] == "pts"
+
+        # Without `auto`, the plot needs its own interactables in the call.
+        err = try
+            masque(fig, ROIInteractable(ax; bounds, selects = s2); auto = false)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("auto = false", err.msg)
+        w = masque(fig, interactables(s2), ROIInteractable(ax; bounds, selects = s2); auto = false)
+        @test w.manifest["selectionTarget"] == "scatter"
+
+        # A composite brushes the layer of a compatible kind: scatterlines' points, not its line.
+        cfig = Figure(size = (400, 300)); cax = Axis(cfig[1, 1])
+        sl = scatterlines!(cax, [1.0, 2.0, 3.0], [1.0, 3.0, 2.0])
+        w = masque(cfig, ROIInteractable(cax; bounds, selects = sl))
+        @test layer(w, w.manifest["selectionTarget"])["kind"] == "circles"
+
+        # A heatmap gives a grid brush.
+        hfig = Figure(size = (400, 300)); hax = Axis(hfig[1, 1])
+        hm = heatmap!(hax, 0 .. 4.0, 0 .. 3.0, [Float64(i + j) for i in 1:4, j in 1:3])
+        w = masque(hfig, ROIInteractable(hax; bounds, selects = hm))
+        @test w.manifest["selection"] == "grid"
+        @test layer(w, w.manifest["selectionTarget"])["kind"] == "grid"
+
+        # A plot with no brushable layer names the kinds it found.
+        lfig = Figure(size = (400, 300)); lax = Axis(lfig[1, 1])
+        ln = lines!(lax, 1:4, 1:4)
+        err = try
+            masque(lfig, ROIInteractable(lax; bounds, selects = ln))
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("`lines` plot", err.msg) && occursin("lines", err.msg)
+
+        # `build_manifest` on its own takes layer ids only.
+        _, _, ctx = ctx_for(fig)
+        @test_throws ArgumentError Masque.build_manifest(
+            [PointInteractable(ax, [(1.0, 1.0)]; id = :scatter), ROIInteractable(ax; bounds, selects = s1)], ctx,
+        )
+    end
 end
