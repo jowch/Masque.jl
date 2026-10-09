@@ -248,7 +248,7 @@ const _BUILTIN_IDS = Set{Symbol}(
         :arrows2d, :arrows3d, :axis, :band, :bars, :boxplot, :cells, :colorbar, :contourf,
         :crossbar, :density, :errorbars, :hexbin, :hist, :hlines, :hspan, :legend, :lines,
         :meshscatter, :points, :poly, :polygons, :rangebars, :rects, :region, :roi, :scatter,
-        :segments, :series, :slice, :spy, :stairs, :text, :threshold, :view, :violin, :vlines,
+        :segments, :series, :slice, :spy, :stairs, :surface, :text, :threshold, :view, :violin, :vlines,
         :voronoiplot, :vspan, :waterfall, :wireframe,
     ]
 )

@@ -154,6 +154,20 @@ function _project_px(scene, pt)
     return q
 end
 
+# Wraps `Makie.space_to_clip(camera, :data)` times the scene's model: the one matrix
+# `Makie.project` applies to a (transformed) data point before the perspective divide. Read
+# once per layer so a dense 3D layer projects in one pass (`_project_depth`, backend.jl).
+function _data_to_clip(scene)
+    M = try
+        Makie.space_to_clip(scene.camera, :data) * scene.transformation.model[]
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("space_to_clip", "`Makie.space_to_clip(camera, :data)` and `scene.transformation.model[]` to be 4×4 matrices")
+    end
+    size(M) == (4, 4) || return _makie_compat_error("space_to_clip", "a 4×4 data-to-clip matrix")
+    return Makie.Mat4d(M)
+end
+
 # Wraps `Makie.update_state_before_display!`, the finalize step Makie runs at display/save time.
 # Runs user observable callbacks, so it uses the DOWNSTREAM union: a real error from user code
 # must propagate as-is, not get re-headlined as a Makie compat break.

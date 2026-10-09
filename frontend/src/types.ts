@@ -6,6 +6,7 @@ export type Kind =
     | "segments"  // geometry: [x0,y0,x1,y1, …]  disjoint pairs
     | "rects"     // geometry: [cx,cy,w,h, …]
     | "grid"      // geometry: GridGeometry  (compact; edges not N rects)
+    | "surface"   // geometry: SurfaceGeometry — a projected vertex grid, quads tried in `order`
     | "polygons"  // geometry: (number[] | number[][])[]  one ring, or [exterior, ...holes]; even-odd per element
     | "axis"      // geometry: null  — continuous, rides the axis transform
     | "threshold" // geometry: ThresholdGeometry — a draggable h/v line; value computed via AxisTransform on drag
@@ -29,6 +30,24 @@ export interface GridGeometry {
     sample_origin?: [number, number] // image px, top-left of sample (0, 0)
     sample_span?: [number, number]   // image px width, height of the sampled viewport
     sample_px?: number                // image px per sample; the last bin may be shorter
+}
+
+// A 3D surface's shipped points (a strided subset of the source grid on a dense surface).
+// Point (a, b) is entry k = a + b*ni of every per-point array. Quad q = a + b*(ni-1) has
+// corners (a, b), (a+1, b), (a, b+1), (a+1, b+1). `suspended` alone (no arrays) is an in-drag
+// frame that left the geometry out: no hit area and no highlight until the release frame.
+export interface SurfaceGeometry {
+    suspended?: true
+    ni: number
+    nj: number
+    i: number[]     // 0-based source row of each shipped row: length ni
+    j: number[]     // 0-based source column of each shipped column: length nj
+    xy: number[]    // image px, interleaved per point; NaN = a point not drawn
+    order: number[] // quads front to back; quads with a corner not drawn are left out
+    x: number[]     // data x: length ni (a vector grid) or ni*nj (a matrix grid)
+    y: number[]     // data y: length nj or ni*nj
+    z: number[]     // ni*nj
+    value?: number[] // ni*nj, the colour matrix when it is separate from z
 }
 
 export interface ThresholdGeometry {
@@ -120,8 +139,8 @@ export interface HitLayer {
     id: string
     kind: Kind
     // A polygon element is a flat ring (number[]) or, when it has holes, a ring group (number[][]).
-    geometry: number[] | Array<number[] | number[][]> | GridGeometry | ThresholdGeometry | ROIGeometry | ViewGeometry | SliceGeometry | null
-    payloads: unknown[] // one per element; a :grid layer's are per cell, row-major like values (empty for none)
+    geometry: number[] | Array<number[] | number[][]> | GridGeometry | SurfaceGeometry | ThresholdGeometry | ROIGeometry | ViewGeometry | SliceGeometry | null
+    payloads: unknown[] // one per element; a :grid layer's are per cell, row-major like values; a :surface layer's per shipped point (empty for none)
     axis: string
     events: string[] // "click" | "hover" | "drag"
     style?: LayerStyle
@@ -185,7 +204,7 @@ export interface Hit {
     layer: HitLayer
     index: number // -1 for axis (continuous)
     geom_?: unknown[] // shape descriptor for highlight drawing
-    grid_?: [number, number, number?] // [i, j, value]; value absent only when neither values nor sample was sent
+    grid_?: [number, number, number?] // [i, j, value]; value absent only when neither values nor sample was sent. A :surface point: [source i, source j, z]
     pt_?: [number, number | string, number | string] // :lines readout: [0-based sample index, x, y] nearest the cursor
     axis_?: string // transform id, for continuous inversion
     roiPart_?: { corner?: number; edge?: "n" | "s" | "w" | "e"; move?: boolean } // which sub-part of an :roi a drag grabbed

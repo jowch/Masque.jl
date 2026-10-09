@@ -1,10 +1,10 @@
 """
     GridCellEvent(layer, i, j, value, payload = nothing)
 
-One heatmap or image cell. `i` and `j` are the cell's first and second index in the matrix
-you plotted; Makie draws the first index along x and the second along y. `A[cell]` is
-`A[cell.i, cell.j]`. `value` is the shipped cell value,
-or `nothing` when values were not sent. `payload` is the cell's entry from the grid's
+One heatmap or image cell, or one point of a 3D surface. `i` and `j` are the cell's first
+and second index in the matrix you plotted; Makie draws the first index along x and the second
+along y. `A[cell]` is `A[cell.i, cell.j]`. `value` is the shipped cell value (a surface
+point's `z`), or `nothing` when values were not sent. `payload` is the cell's entry from the grid's
 `payloads`, or `nothing` when it has none; its fields read through, so `cell.row` is
 `cell.payload.row`.
 """
@@ -25,6 +25,7 @@ function transform_bond(::Type{GridCellEvent}, i, layer::HitLayer, index, js_pay
 end
 
 # `payloads` is row-major over the cells, like the shipped `values`; empty when the grid has none.
+# A surface's are row-major over its shipped points, found by their source indices.
 function _grid_cell_event(id::Symbol, js_payload, payloads = Any[], geometry = nothing)
     js_payload isa AbstractDict || throw(
         ArgumentError("bond: layer :$id grid cell payload must be a dict, got $(typeof(js_payload))"),
@@ -33,6 +34,7 @@ function _grid_cell_event(id::Symbol, js_payload, payloads = Any[], geometry = n
     j = Int(_js_req(js_payload, "j", id)) + 1
     value = haskey(js_payload, "value") ? js_payload["value"] : nothing
     isempty(payloads) && return GridCellEvent(id, i, j, value, nothing)
+    haskey(geometry, "ni") && return GridCellEvent(id, i, j, value, _surface_payload(id, i, j, payloads, geometry))
     ncols = Int(geometry["ncols"])
     nrows = Int(geometry["nrows"])
     (1 <= i <= ncols && 1 <= j <= nrows) ||
@@ -74,4 +76,12 @@ function _grid_window_event(id::Symbol, js_payload)
         Float64(_js_req(js_payload, "ymin", id)),
         Float64(_js_req(js_payload, "ymax", id)),
     )
+end
+
+function _surface_payload(id, i, j, payloads, geometry)
+    a = findfirst(==(i - 1), geometry["i"])
+    b = findfirst(==(j - 1), geometry["j"])
+    (a === nothing || b === nothing) &&
+        throw(ArgumentError("bond: layer :$id point ($i, $j) is not a shipped point of the surface"))
+    return payloads[a + (b - 1) * Int(geometry["ni"])]
 end

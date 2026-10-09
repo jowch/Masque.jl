@@ -58,7 +58,7 @@ data to resolve a hit to an element index and its payload.
 ```julia
 struct HitLayer
     id       :: Symbol            # stable key for this layer (links to events/style)
-    kind     :: Symbol            # :circles | :polyline | :lines | :segments | :rects | :grid | :polygons | :axis
+    kind     :: Symbol            # :circles | :polyline | :lines | :segments | :rects | :grid | :surface | :polygons | :axis
                                   #   | :threshold | :roi | :view | :slice
     geometry :: Any               # compact, image-px; layout keyed by `kind` (see below)
     payloads :: Vector{Any}       # element index -> JSON-serializable payload (the linkage key)
@@ -80,6 +80,7 @@ Geometry layout by `kind` (all coords image-px, top-left origin):
 | `:segments` | `Float32[x0,y0,x1,y1, …]` | nearest of disjoint pairs | pair index |
 | `:rects` | `Float32[cx,cy,w,h, …]` | point-in-rect, else the nearest rect within `tol` of its edge | quad index |
 | `:grid` | `(xedges, yedges, ncols, nrows)` plus `values[]` **or** `sample` (screen pixels; [§8](08-scaling.md)) | source bin, or the screen pixel then the cell at its center | `j*ncols+i` |
+| `:surface` | a projected vertex grid: `ni`, `nj`, source `i`/`j` per shipped row/column, `xy` (image px, row-major, NaN = not drawn), `order` (quads front to back), data `x`/`y`/`z`[/`value`] arrays | quads in `order`, point-in-quad as two triangles; the first hit answers with its corner nearest the pointer | `b*ni+a`, the shipped point |
 | `:polygons` | one flat ring per element, or a list of rings when that element has holes (exterior, then each hole) | even-odd across that element's rings, else the nearest element within `tol` of a ring | element index |
 | `:axis` | `nothing` (unbounded, `AxisInteractable`) or `Real[x,y,w,h]` bbox (bounded, `ColorbarInteractable`) | absent geometry = always-hit; bbox present = point-in-bbox; invert pixel via `AxisTransform` | `-1` (continuous); `valueaxis ≠ nothing` → 1-D `(; value)` |
 
@@ -139,6 +140,7 @@ this table is `docs/src/support.md`.
 | `SegmentInteractable` | `:polyline` \| `:lines` \| `:segments` | Lines, Stairs, Series, ScatterLines·line (`:lines`, one element per path); an explicit `mode=:polyline` vertex list stays `:polyline` (per edge); LineSegments, Errorbars, Rangebars, HLines, VLines, Stem·stems, Wireframe, Arrows3D, Arrows2D (`:pairs` → `:segments`) | `:lines` `(; index)` (a series adds `label` when Makie set one); `:polyline` / `:segments` `(; segment_index)`; Arrows3D `(; index, x, y, z, u, v, w)`; Arrows2D `(; index, x, y, u, v)` |
 | `RectInteractable` | `:rects` | BarPlot, Hist, Waterfall, CrossBar, HSpan, VSpan, Spy, BoxPlot (un-notched) | BarPlot/Waterfall `(; low, high, value)`; Hist `(; value, low, high)`; CrossBar `(; midpoint, low, high)`; HSpan/VSpan `(; low, high)`; BoxPlot `(; q1, median, q3)`; Spy `(; index)` |
 | `GridInteractable` | `:grid` | Heatmap, Image | optional, one per cell, row-major like `values[]` (#290); the client resolves `(; i, j, value)`, and a click commits a `GridCellEvent` carrying that cell's payload |
+| `SurfaceInteractable` | `:surface` | Surface on `Axis3` (a `Wireframe` of the same grid is decoration, [§7](07-scope.md)) | no per-point payload objects: the client builds `(; i, j, x, y, z[, value])` from the geometry's arrays, merges optional per-point `payloads` on top (payload wins), and a click commits a `GridCellEvent` with `value = z[i, j]` (#259) |
 | `PolygonInteractable` | `:polygons` | Poly, Band, Density, Contourf, Violin, Voronoiplot, BoxPlot (notched) | Band/Density/Voronoiplot `(; index)`; Contourf `(; low, high)`; Violin `(; x)` |
 | `AxisInteractable` | `:axis` (unbounded) | the Axis area itself (linear + log) — declared | `(; x, y)` inverted client-side |
 | `ColorbarInteractable` | `:axis` (bounded bbox) | Colorbar — auto-extracted from `fig.content` | `(; value)` inverted client-side via `AxisTransform.valueaxis` |

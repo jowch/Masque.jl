@@ -1,5 +1,6 @@
 import { findBin, invertAxis, polygonRings } from "./geometry"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest } from "./types"
+import { surfacePointHit } from "./surface"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, SurfaceGeometry } from "./types"
 
 // Bond item shape emitted per contained element in a selects-ROI { items: SelectionItem[] }.
 // `payload` is present only for a computed (non-element) target — a `:grid` cell range, since
@@ -84,6 +85,16 @@ function gridCellHit(layer: HitLayer, index: number): Hit | null {
         geom_: ["rect", (x0 + x1) / 2, (y0 + y1) / 2, Math.max(Math.abs(x1 - x0), min), Math.max(Math.abs(y1 - y0), min)] }
 }
 
+// A selected surface point, re-keyed onto a new frame's layer. An in-drag frame ships no
+// surface geometry, so the point stays selected with nothing to draw until the release frame
+// brings its geometry back (the highlight hides during the drag, by design). A point the layer
+// can't draw otherwise (out of range, not drawn) is not selected.
+export function surfaceSelection(layer: HitLayer, index: number): Hit | null {
+    if ((layer.geometry as { suspended?: boolean }).suspended) return Number.isInteger(index) && index >= 0 ? { layer, index } : null
+    const h = surfacePointHit(layer, index)
+    return h ? { layer, ...h } : null
+}
+
 // Kinds that can be drawn as a persistent pre-highlight (mirrors Julia `_SELECTED_KINDS`).
 // Open kinds (segments / polyline) use the selected-ring recipe; closed kinds use the wash.
 export const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines"])
@@ -97,7 +108,7 @@ export const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments
 // `state.selHits_` untouched rather than clearing it.
 export function selectionFor(hit: Hit, manifest: Manifest): Hit[] | null {
     if (hit.layer.links && hit.layer.links.length) return linkedHits(manifest, hit.layer, hit.index)
-    if (SELECTED_KINDS.has(hit.layer.kind) || hit.layer.kind === "grid") return [hit]
+    if (SELECTED_KINDS.has(hit.layer.kind) || hit.layer.kind === "grid" || hit.layer.kind === "surface") return [hit]
     return null
 }
 
@@ -254,14 +265,28 @@ export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]
     }
     const layer = manifest.layers.find((l) => l.id === o.layer)
     if (!layer || typeof o.index !== "number") return null
-    const hit = elementHit(layer, o.index)
+    const index = layer.kind === "surface" ? surfaceIndexOf(layer, (o as { payload?: unknown }).payload) : o.index
+    if (index === null) return null
+    const hit = elementHit(layer, index)
     const hits = hit ? selectionFor(hit, manifest) : null
-    return hits === null ? null : { hits, source: { layer: layer.id, index: o.index } }
+    return hits === null ? null : { hits, source: { layer: layer.id, index } }
+}
+
+// A surface value's shipped-point index, found from its source (i, j) rather than its stored
+// index: the stride, and so every index, changes with the axis size between runs. A point the
+// new stride doesn't ship is not selected.
+function surfaceIndexOf(layer: HitLayer, payload: unknown): number | null {
+    const g = layer.geometry as SurfaceGeometry
+    const p = payload as { i?: unknown; j?: unknown } | undefined
+    if (g.suspended || !g.i || !p || !Number.isInteger(p.i) || !Number.isInteger(p.j)) return null
+    const a = g.i.indexOf(p.i as number), b = g.j.indexOf(p.j as number)
+    return a < 0 || b < 0 ? null : a + b * g.ni
 }
 
 function elementHit(layer: HitLayer, index: number): Hit | null {
     if (!Number.isInteger(index)) return null
     if (layer.kind === "grid") return gridCellHit(layer, index)
+    if (layer.kind === "surface") return surfaceSelection(layer, index)
     if (!SELECTED_KINDS.has(layer.kind)) return null
     try {
         return { layer, ...hitLayerByIndex(layer, index) }

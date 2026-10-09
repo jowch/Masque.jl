@@ -413,6 +413,14 @@ function GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells,
     ncols, nrows = size(vals)
     return GridInteractable(ax, _edges(xr, ncols), _edges(yr, nrows), vals; id, payloads, tooltip, label)
 end
+# A surface's converted `x`/`y` are vectors or matrices (a range or an interval converts to a
+# vector). `color` colours it by a separate matrix when it is one of `z`'s shape.
+function SurfaceInteractable(ax, p::Makie.Surface; id = :surface, payloads = nothing, tooltip = nothing, label = _plot_label(p))
+    x, y, z = _converted(p)
+    value = _surface_matrix(p.color[], size(z))
+    return SurfaceInteractable(ax, x, y, z; id, value, payloads, tooltip, label)
+end
+
 function RectInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; kwargs...)
     _deprecate(
         "`RectInteractable(ax, p)` for a heatmap or image is deprecated; use `GridInteractable(ax, p)`. " *
@@ -1046,6 +1054,7 @@ function _plotbase(p)
     p isa Makie.Lines && return :lines
     p isa Makie.LineSegments && return :segments
     p isa Makie.Wireframe && return :wireframe
+    p isa Makie.Surface && return :surface
     p isa Makie.Arrows3D && return :arrows3d
     p isa Makie.Arrows2D && return :arrows2d
     (p isa Makie.Heatmap || p isa Makie.Image) && return :cells
@@ -1168,6 +1177,7 @@ function _construct_unplaced(ax, p, id; kw...)
             p isa Makie.HLines || p isa Makie.VLines
     ) && return [SegmentInteractable(ax, p; id, kw...)]
     (p isa Makie.Heatmap || p isa Makie.Image) && return [GridInteractable(ax, p; id, kw...)]
+    p isa Makie.Surface && return [SurfaceInteractable(ax, p; id, kw...)]
     (p isa Makie.BarPlot || p isa Makie.Spy) && return [RectInteractable(ax, p; id, kw...)]
     (p isa Makie.Hist || p isa Makie.Waterfall || p isa Makie.CrossBar) && return [RectInteractable(ax, p; id, kw...)]
     (p isa Makie.HSpan || p isa Makie.VSpan) && return [RectInteractable(ax, p; id, kw...)]
@@ -1291,6 +1301,9 @@ function _place(i::GridInteractable, f)
     ye = Float64[f.place((x0, y))[2] for y in i.yedges]
     return GridInteractable(i.ax, xe, ye, i.values, i.id, i.tooltip, i.label, i.payloads)
 end
+_place(i::SurfaceInteractable, f) = SurfaceInteractable(
+    i.ax, map(f.place, i.pos), i.x, i.y, i.z, i.value, i.id, i.payloads, i.tooltip, i.label,
+)
 function _warn_rotated(i, f)
     f.rotated || return false
     _skip_note(
@@ -1387,13 +1400,18 @@ function _skip_for_axis(ax, p)
             p isa Union{
                 Makie.Scatter, Makie.Lines, Makie.LineSegments,
                 Makie.MeshScatter, Makie.Wireframe, Makie.Arrows3D, Makie.ScatterLines,
+                Makie.Surface,
             }
         )
         _skip_note(
             "$(Makie.plotkey(p)) on Axis3 — only Scatter/Lines/LineSegments/MeshScatter/" *
-                "Wireframe/Arrows3D/ScatterLines have 3D-valid extraction today; other kinds " *
+                "Wireframe/Arrows3D/ScatterLines/Surface have 3D-valid extraction today; other kinds " *
                 "are roadmap scope (docs/dev/roadmap.md)"
         )
+        return true
+    end
+    if ax isa Makie.Axis && p isa Makie.Surface
+        _skip_note("surface on a 2D Axis — surfaces get hover and click targets on Axis3 only")
         return true
     end
     if ax isa Makie.PolarAxis && !(
@@ -1433,6 +1451,7 @@ _nverts(i::SegmentInteractable) = i.paths === nothing ? length(i.vertices) : sum
 _nverts(i::PolygonInteractable) = sum(length, i.rings; init = 0)
 _nverts(i::RectInteractable) = length(i.data)
 _nverts(::GridInteractable) = 1
+_nverts(i::SurfaceInteractable) = length(i.z)
 _nverts(i::TextInteractable) = length(i.payloads)
 _nverts(::AbstractInteractable) = 1
 
@@ -1537,6 +1556,34 @@ function _walk_unknown!(d, ax, parent)
     return (built = built_any, warned = warned_any)
 end
 
+# A `wireframe!` of the grid a `surface!` on the same `Axis3` draws is decoration: its edges
+# sit a few pixels apart over the whole surface, so as a layer it would answer nearly every
+# hover with an edge instead of a data point, hidden side included (`BoxPlot`'s whiskers are
+# the precedent). An explicit `SegmentInteractable(ax, wf)` still builds it.
+function _surface_grids(ax)
+    ax isa Makie.Axis3 || return ()
+    return [_grid3(_converted(p)) for p in _child_plots(ax.scene) if p isa Makie.Surface]
+end
+function _decorates_surface(p, grids)
+    p isa Makie.Wireframe && !isempty(grids) || return false
+    g = _grid3(_converted(p))
+    # `isequal`, not `==`: a NaN hole is in both grids, and NaN != NaN.
+    return g !== nothing && any(h -> isequal(h, g), grids)
+end
+# A grid's `(x, y, z)` as three Float32 matrices of `z`'s shape: Makie converts a surface's
+# `x`/`y` to ranges and a wireframe's to matrices, and keeps `z`'s own eltype.
+function _grid3(args)
+    length(args) == 3 || return nothing
+    x, y, z = args
+    z isa AbstractMatrix || return nothing
+    m(v, d) = v isa AbstractMatrix ? (size(v) == size(z) ? Float32.(v) : nothing) :
+        v isa AbstractVector && length(v) == size(z, d) ?
+        Float32[d == 1 ? v[a] : v[b] for a in axes(z, 1), b in axes(z, 2)] : nothing
+    X, Y = m(x, 1), m(y, 2)
+    (X === nothing || Y === nothing) && return nothing
+    return (X, Y, Float32.(z))
+end
+
 # Every default of `fig`. `plotmap` is plot -> layer ids for the legend links, descendants
 # included. `installed` holds only the plots built directly, so a replacement can find the
 # layers its plot's default took.
@@ -1553,7 +1600,9 @@ function _defaults(fig; replaced = Base.IdSet{Any}())
     )
     for ax in fig.content
         ax isa _SUPPORTED_AXES || continue
+        grids = _surface_grids(ax)
         for p in _child_plots(ax.scene)
+            _decorates_surface(p, grids) && continue
             if !_known(ax, p)
                 r = _walk_unknown!(d, ax, p)
                 # A child already warned (non-data text, or an axis skip). A second warning
@@ -1607,7 +1656,8 @@ On each axis the plot drawn last comes first. Where marks overlap, the first in 
 the pointer, so it is the mark drawn on top.
 
 On `Axis3`, only `Scatter`/`Lines`/`LineSegments`/`MeshScatter`/`Wireframe`/`Arrows3D`/
-`ScatterLines` are supported; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
+`ScatterLines`/`Surface` are supported, and a `Wireframe` drawn on the same grid as a `Surface`
+there is decoration, with no layer of its own; on `PolarAxis`, only `Scatter`/`Lines`/`LineSegments`/`ScatterLines`/`Series`.
 Other kinds are skipped, and one call warns once, listing the skipped plots together. A
 recipe with its own `Masque.interactables(ax, p::MyPlot)` method uses it. Any other recipe contributes each child
 that has a default (`arc!` is the `lines!` it draws), under that child's layer id. A child

@@ -8,6 +8,7 @@
 //   node polish_verify.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
 import { shutdownOpenSession } from "./fresh_session.mjs";
+import { surfacePoint } from "./kind_sweep_point.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -147,7 +148,7 @@ try {
         layer: layerName, kind: "closed", tag: el.tagName.toLowerCase(),
         className: el.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
         width: String(parseFloat(cs.strokeWidth)), r: el.getAttribute("r"),
-        cx: el.getAttribute("cx"), cy: el.getAttribute("cy"),
+        cx: el.getAttribute("cx"), cy: el.getAttribute("cy"), points: el.getAttribute("points"),
         blend: layerName === "plain" ? null : getComputedStyle(svg).mixBlendMode,
       };
     });
@@ -199,10 +200,10 @@ try {
       if (!el) return null;
       const cs = getComputedStyle(el);
       return {
-        layer: layerName, className: el.getAttribute("class"),
+        layer: layerName, className: el.getAttribute("class"), tag: el.tagName.toLowerCase(),
         fill: cs.fill, stroke: cs.stroke, fillOpacity: cs.fillOpacity,
         width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
-        r: el.getAttribute("r"), enter: el.classList.contains("masque-enter"),
+        r: el.getAttribute("r"), enter: el.classList.contains("masque-enter"), points: el.getAttribute("points"),
         blend: layerName === "plain" ? null : getComputedStyle(svg).mixBlendMode,
       };
     };
@@ -571,6 +572,90 @@ try {
       });
       for (const grp of reachGroups) {
         if (!grp.idx.some((k) => !isBg(px[k]))) throw new Error(`${key}/on-drawn-mark: ${grp.what}: the sphere is drawn 3 px inside r in no direction`);
+      }
+      passed.push(`${key}/on-drawn-mark`);
+    } else {
+      passed.push(`${key}/on-drawn-mark-skipped-webgl`);
+    }
+  }
+
+  // A surface point (#259) is highlighted as its dual cell: a closed polygon through the midpoints
+  // of its grid edges and the centres of its quads, so the polygon surrounds the point. The hover
+  // and the selection use the closed-mark recipe; the tooltip sits over the point. On Cairo the
+  // point itself must be on the drawn surface.
+  {
+    const key = "surface3d";
+    const m = await inspect(key);
+    pin(m, key);
+    const layer = (await layersOf(key)).find((l) => l.id === "surface");
+    if (!layer || layer.kind !== "surface") throw new Error(`${key}: no :surface layer`);
+    const g = layer.geometry;
+    const pt = (k) => { const p = surfacePoint(g, k); return [p.x, p.y]; };
+    const surrounds = (points, [x, y]) => {
+      const v = (points || "").trim().split(/[\s,]+/).map(Number);
+      if (v.length < 6 || v.some((n) => !Number.isFinite(n))) return false;
+      const xs = v.filter((_, i) => i % 2 === 0), ys = v.filter((_, i) => i % 2 === 1);
+      return Math.min(...xs) < x && x < Math.max(...xs) && Math.min(...ys) < y && y < Math.max(...ys);
+    };
+    const hov = 12, sel = 13;
+    let t = null;
+    for (let a = 0; a < 8; a++) {
+      t = await hoverAt(key, ...pt(hov));
+      if (t.show && t.hi.fill && t.hi.edge) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (!t?.show) throw new Error(`${key}: no tooltip on hover ${JSON.stringify(t)}`);
+    assertHoverRecipe(t.hi, key, true, false);
+    for (const shape of [t.hi.fill, t.hi.edge]) {
+      if (shape.tag !== "polygon" || !surrounds(shape.points, pt(hov))) {
+        throw new Error(`${key}: hover ${shape.layer} is not a cell around the point ${pt(hov)}: ${shape.tag} ${shape.points}`);
+      }
+    }
+    if (!/i\s*3\s*j\s*3/.test(t.text.replace(/\s+/g, " "))) throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not point (3, 3)`);
+    passed.push(`${key}/highlight`);
+
+    // Select point `sel` (kind_sweep may already have), check the wash, and leave it as found.
+    const clickAt = (x, y) => page.evaluate(([k, ix, iy]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const o = { bubbles: true, composed: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, pointerId: 1, pointerType: "mouse", isPrimary: true };
+      const surface = sr.querySelector(".surface");
+      surface.dispatchEvent(new PointerEvent("pointermove", o));
+      surface.dispatchEvent(new PointerEvent("pointerdown", o));
+      surface.dispatchEvent(new PointerEvent("pointerup", o));
+      surface.dispatchEvent(new MouseEvent("click", o));
+    }, [key, x, y]);
+    const wasSelected = (await inspect(key)).sel > 0;
+    if (!wasSelected) await clickAt(...pt(sel));
+    const ms = await inspect(key);
+    const w = {
+      fill: ms.kids.find((k) => k.layer === "fill" && k.kind === "closed"),
+      edge: ms.kids.find((k) => k.layer === "edge" && k.kind === "closed"),
+      plain: ms.kids.find((k) => k.layer === "plain" && k.kind === "closed"),
+    };
+    assertWash(w, key, false);
+    if (!wasSelected) {
+      if (!surrounds(w.edge?.points, pt(sel))) throw new Error(`${key}: selected cell ${w.edge?.points} is not around ${pt(sel)}`);
+      await clickAt(...pt(sel)); // deselect again
+    }
+    passed.push(`${key}/selected`);
+
+    if (backend === "cairo") {
+      const px = await page.evaluate(([k, ps]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        const img = host.querySelector("img");
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        return ps.map(([x, y]) => [...ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data.slice(0, 3)]);
+      }, [key, [pt(hov), pt(sel)]]);
+      for (const [i, c] of px.entries()) {
+        if (c.every((v) => v > 225)) throw new Error(`${key}/on-drawn-mark: point ${[hov, sel][i]} reads background ${c}`);
       }
       passed.push(`${key}/on-drawn-mark`);
     } else {

@@ -206,6 +206,16 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         L.points === nothing || isempty(ks) || union!(ks, (:x, :y, :i))
         # A grid cell's template also sees the cell's `i`, `j`, and `value`.
         L.kind === :grid && !isempty(ks) && union!(ks, (:i, :j, :value))
+        # A surface point always has its own fields, so its template is checked against them
+        # plus a named tuple's fields, or `payload` for a bare value. Any other payload (a
+        # `Dict`, a `DataFrame` row) spreads fields Julia can't list here, so, as for every
+        # other kind, the check is skipped.
+        if L.kind === :surface && !haskey(L.geometry, "suspended")
+            union!(ks, (:i, :j, :x, :y, :z))
+            haskey(L.geometry, "value") && push!(ks, :value)
+            any(pl -> pl isa Union{Number, AbstractString, Symbol}, L.payloads) && push!(ks, :payload)
+            all(pl -> pl === nothing || pl isa Union{NamedTuple, Number, AbstractString, Symbol}, L.payloads) || empty!(ks)
+        end
         isempty(ks) || check_fields(spec, ks)      # build-time field check (skip if no NamedTuple payloads)
         d["template"] = markup_segments(spec)
     elseif spec === false
@@ -476,13 +486,14 @@ the published manifest.
 function build_manifest(
         interactables, ctx::InteractionContext;
         selected = nothing, tip_style = nothing, tip_digits = _DEFAULT_SIGDIGITS, background = nothing,
-        overlay_style = nothing, owners_out = nothing,
+        overlay_style = nothing, owners_out = nothing, suspend_surfaces = false,
     )
     pairs = Tuple{Any, HitLayer}[]
     for i in interactables
         msg = validate(i, ctx)
         msg === nothing || throw(ArgumentError(msg))
-        for L in hitlayers(i, ctx)
+        Ls = suspend_surfaces && i isa SurfaceInteractable ? [_suspended_surface(i, ctx)] : hitlayers(i, ctx)
+        for L in Ls
             push!(pairs, (i, L))
         end
     end
@@ -1034,7 +1045,7 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
         fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
         _finalize!(fig)
         ctx = context(backend, fig, ppu, max_width)
-        manifest = build_manifest(interactables, ctx)
+        manifest = build_manifest(interactables, ctx; suspend_surfaces = get(input, "settle", false) !== true)
         result = render(backend, fig, render_ppu)
         frame = _gesture_frame(result)
         frame["manifest"] = manifest
@@ -1043,6 +1054,15 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
         fig.scene.backgroundcolor[] = bg0
     end
 end
+
+# An in-drag frame (any view drag in the figure: an orbit, or a pan of a 2D axis beside the
+# surface) leaves out every surface layer's geometry: at the thinning cap a surface
+# outweighs the in-drag picture several times over (perf-findings.md, Section J), and
+# no one hovers mid-drag. The layer is not built at all, so the drag doesn't pay for its
+# projection either. It stays, with no hit area and no highlight, until the release frame
+# ships it again. §12.5 forbids a stale overlay, not a suspended one.
+_suspended_surface(i::SurfaceInteractable, ctx) =
+    HitLayer(i.id, :surface, Dict{String, Any}("suspended" => true), Any[], axis_id(ctx, i.ax), events(i), i.label)
 
 # A real call is what compiles this path (camera write, `ppu=1` render, JS payload). The
 # frames are discarded. `show` schedules it after the mount HTML is written. Tiny nudges plus

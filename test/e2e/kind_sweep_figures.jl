@@ -201,6 +201,19 @@ kind_sweep_meta() = [
         "overlapsLayer" => "meshscatter",
     ),
     Dict(
+        # `surface!` on Axis3 (#259): the pointer lands in a quad and answers with its nearest
+        # point, highlighted as the point's dual cell. Point k is (a, b) = (k % 5, k ÷ 5) of the
+        # 5×5 grid; 12 is the centre (the peak), 13 is (4, 3) in Julia's 1-based indices, on the
+        # side facing the camera. Points on the far rim are seen edge-on, so their quads are too
+        # thin to click reliably from a synthetic event. The widget carries
+        # a ViewInteractable too: `orbitSuspends` checks that an in-drag frame hides the selected
+        # point's highlight and the release frame brings it back.
+        "key" => "surface3d", "layerId" => "surface", "layerKind" => "surface",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 13,
+        "tip" => "i4j3", "hoverIndex" => 12, "hoverTip" => "i3j3", "mode" => "element",
+        "orbitSuspends" => true,
+    ),
+    Dict(
         # `text!` (#301): each string is one element, hit on its drawn box.
         "key" => "text", "layerId" => "text", "layerKind" => "rects",
         "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
@@ -739,6 +752,18 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:wireframe => [1]))
     end
 
+    # A coarse dome, so each point's cell is large enough to hover on its own (#259). The `wireframe!` over the same grid is decoration: it must not
+    # take the hover from the surface.
+    surface3d = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "surface3d")
+        xs = [0.0, 1.0, 2.0, 3.0, 4.0]
+        zs = [4.0 - ((x - 2)^2 + (y - 2)^2) / 2 for x in xs, y in xs]
+        surface!(ax, xs, xs, zs; colormap = [:steelblue, :lightblue], shading = NoShading)
+        wireframe!(ax, xs, xs, zs; color = :black, linewidth = 0.5)
+        masque(fig, ViewInteractable(ax))
+    end
+
     # A small scatter marker in front of a large sphere, drawn after it (#242, #301).
     overlap3d = let
         fig = Figure(size = (480, 320))
@@ -1099,7 +1124,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, view, view3d, legend, series_legend,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, view, view3d, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

@@ -7,6 +7,7 @@
 //   node kind_sweep.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
 import { shutdownOpenSession } from "./fresh_session.mjs";
+import { surfacePoint } from "./kind_sweep_point.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PNG } from "pngjs";
@@ -24,7 +25,7 @@ const TINT_CHECK_KEYS = new Set(["scatter", "scatter_dark", "barplot", "heatmap"
 
 // Mirrors selection.ts's selectionFor: these kinds (plus :grid) pin the clicked hit itself; a
 // legend layer (has `links`) pins its linked target(s) instead.
-const SELF_PIN_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines", "grid"]);
+const SELF_PIN_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines", "grid", "surface"]);
 
 const [base, notebook, backend, artifactDirArg] = process.argv.slice(2);
 if (!base || !notebook || !backend) {
@@ -50,6 +51,7 @@ function layerElementCount(l) {
   if (l.kind === "lines") return g.length;
   if (l.kind === "polygons") return g.length;
   if (l.kind === "grid") return g.ncols * g.nrows;
+  if (l.kind === "surface") return g.ni * g.nj;
   throw new Error(`layerElementCount: unhandled kind ${l.kind}`);
 }
 
@@ -136,6 +138,7 @@ function hitPoint(layer, index) {
       y: (g.yedges[j] + g.yedges[j + 1]) / 2,
     };
   }
+  if (k === "surface") return surfacePoint(g, index);
   if (k === "threshold") {
     const [s0, s1] = g.span;
     return g.orientation === "h"
@@ -1993,7 +1996,14 @@ try {
     }
     const idRe = new RegExp(`:${spec.layerId}|${spec.layerId}`, "i");
     if (!idRe.test(after)) throw new Error(`${key}-click: no layer in ${JSON.stringify(after).slice(0, 220)}`);
-    if (spec.layerKind !== "grid") {
+    if (spec.layerKind === "surface") {
+      // A surface point binds as a GridCellEvent of its source (i, j) and its z (#259).
+      const g = layer.geometry, a = clickIdx % g.ni, b = Math.floor(clickIdx / g.ni);
+      const m = new RegExp(`:${spec.layerId},\\s*i = (\\d+), j = (\\d+), value = (-?[\\d.eE+-]+)`).exec(after);
+      if (!m || Number(m[1]) !== g.i[a] + 1 || Number(m[2]) !== g.j[b] + 1 || Math.abs(Number(m[3]) - g.z[clickIdx]) > 1e-4) {
+        throw new Error(`${key}-click: expected GridCellEvent i=${g.i[a] + 1}, j=${g.j[b] + 1}, value≈${g.z[clickIdx]}: ${after.slice(0, 220)}`);
+      }
+    } else if (spec.layerKind !== "grid") {
       if (!new RegExp(`:${spec.layerId},\\s*${juliaIdx()}\\b`).test(after)) {
         throw new Error(`${key}-click: expected Julia index ${juliaIdx()}: ${after.slice(0, 220)}`);
       }
@@ -2116,6 +2126,78 @@ try {
       }, key);
       passed.push(`${key}/marker-stroke`);
     }
+    // #259: an in-drag orbit frame ships no surface geometry, so the selected point's highlight
+    // hides while the pointer is down, and the release frame brings it back on the new view.
+    // The click above left the point selected. Shift forces the view gesture over the surface.
+    if (spec.orbitSuspends) {
+      const sel0 = (await inspect(key)).sel;
+      if (sel0 < 1) throw new Error(`${key}/orbit-suspend: no selected point before the orbit (g.sel=${sel0})`);
+      const readStamp = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        return host?.dataset.masqueGestureFrame ?? null;
+      }, key);
+      // In view first, as the view case does: an off-screen :webgl canvas can lose its context.
+      // The base's box is read once, before the drag: on :webgl a frame can swap the canvas
+      // while the drag is under way.
+      const box = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        return { left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+      }, key);
+      const pointer = (type, ix, iy) => page.evaluate(([k, t, cx, cy]) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        sr.querySelector(".surface").dispatchEvent(new PointerEvent(t, {
+          bubbles: true, composed: true, cancelable: true, shiftKey: true, buttons: t === "pointerup" ? 0 : 1,
+          clientX: cx, clientY: cy, pointerId: 1, pointerType: "mouse", isPrimary: true,
+        }));
+      }, [key, type, box.left + ix * box.s, box.top + iy * box.s]);
+      const tries = backend === "webgl" ? 50 : 25, delayMs = backend === "webgl" ? 300 : 200;
+      const stamp0 = await readStamp();
+      const n0 = stamp0 ? JSON.parse(stamp0).n : 0;
+      await pointer("pointerdown", clickPt.x, clickPt.y);
+      let mid = null;
+      for (let step = 1; step <= tries && !mid; step++) {
+        await pointer("pointermove", clickPt.x + 4 * step, clickPt.y);
+        await new Promise((r) => setTimeout(r, delayMs));
+        const st = await readStamp();
+        const parsed = st ? JSON.parse(st) : null;
+        if (parsed && parsed.n > n0 && parsed.settle === false) mid = parsed;
+      }
+      if (!mid) {
+        await pointer("pointerup", clickPt.x, clickPt.y);
+        throw new Error(`${key}/orbit-suspend: no in-drag frame landed`);
+      }
+      const during = await inspect(key);
+      if (during.sel !== 0) {
+        await pointer("pointerup", clickPt.x, clickPt.y);
+        throw new Error(`${key}/orbit-suspend: the selected point still draws ${during.sel} shape(s) mid-drag`);
+      }
+      passed.push(`${key}/orbit-suspend`);
+      await pointer("pointerup", clickPt.x + 4 * tries, clickPt.y);
+      let settled = null;
+      for (let i = 0; i < tries && !settled; i++) {
+        await new Promise((r) => setTimeout(r, delayMs));
+        const st = await readStamp();
+        const parsed = st ? JSON.parse(st) : null;
+        if (parsed && parsed.n > mid.n && parsed.settle === true) settled = parsed;
+      }
+      if (!settled) throw new Error(`${key}/orbit-suspend: the release frame never landed`);
+      let back = await inspect(key);
+      for (let i = 0; i < 10 && back.sel !== sel0; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        back = await inspect(key);
+      }
+      if (back.sel !== sel0) throw new Error(`${key}/orbit-restore: g.sel=${back.sel} after release, expected ${sel0}`);
+      if (/=\s*nothing$/.test(await textOf(`#out_${key}`))) throw new Error(`${key}/orbit-restore: the orbit cleared the bond`);
+      passed.push(`${key}/orbit-restore`);
+    }
+
     console.error(`OK  ${key} — ${after.slice(0, 110)}`);
 
     if (spec.links) {

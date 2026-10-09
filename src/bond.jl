@@ -24,6 +24,7 @@ layer's `bondtype`.
 bondtype(::AbstractInteractable) = ElementEvent
 bondtype(::ViewInteractable) = Nothing
 bondtype(::GridInteractable) = GridCellEvent
+bondtype(::SurfaceInteractable) = GridCellEvent
 
 # Whether this interactable owns its widget's bond. An owner is the only layer that commits:
 # every other layer keeps hover and takes no clicks. A widget has at most one.
@@ -67,7 +68,7 @@ function transform_bond(::Type{Nothing}, i, layer::HitLayer, index, js_payload)
     throw(ArgumentError("bond: layer :$(layer.id) commits nothing"))
 end
 
-function transform_bond(i::GridInteractable, layer::HitLayer, index, js_payload)
+function transform_bond(i::Union{GridInteractable, SurfaceInteractable}, layer::HitLayer, index, js_payload)
     return _grid_cell_event(i.id, js_payload, layer.payloads, layer.geometry)
 end
 function transform_bond(i::ViewInteractable, layer::HitLayer, index, js_payload)
@@ -75,7 +76,7 @@ function transform_bond(i::ViewInteractable, layer::HitLayer, index, js_payload)
 end
 function transform_bond(i::FunctionInteractable, layer::HitLayer, index, js_payload)
     k = layer.kind
-    k === :grid && return _grid_cell_event(layer.id, js_payload, layer.payloads, layer.geometry)
+    k in (:grid, :surface) && return _grid_cell_event(layer.id, js_payload, layer.payloads, layer.geometry)
     k === :axis && return _axis_event(layer.id, js_payload)
     k === :threshold && return _threshold_event(layer.id, js_payload)
     k === :roi && return _bounds_event(layer.id, js_payload)
@@ -89,7 +90,7 @@ end
 
 # Wire kind → bond stamp when the interactable is a FunctionInteractable (or stamp is missing).
 function kind_bond_stamp(kind::Symbol)
-    kind === :grid && return "gridcell"
+    kind in (:grid, :surface) && return "gridcell"
     kind === :axis && return "axis"
     kind === :threshold && return "threshold"
     kind === :roi && return "bounds"
@@ -107,7 +108,7 @@ function bond_stamp(i::AbstractInteractable, L::HitLayer)
     if i isa ROIInteractable
         return i.selects === nothing ? "bounds" : "none"
     end
-    i isa GridInteractable && return "gridcell"
+    i isa Union{GridInteractable, SurfaceInteractable} && return "gridcell"
     i isa SliceInteractable && return "none"
     i isa FunctionInteractable && return kind_bond_stamp(L.kind)
     L.kind === :view && return "none"
