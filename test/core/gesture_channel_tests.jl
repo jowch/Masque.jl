@@ -100,7 +100,7 @@ end
 
         # `panx`/`pany` move the picture one image px right/down: check against the projection.
         bk = Masque._resolve_backend(:cairo)
-        ctx = Masque.context(bk, fig, w.px_per_unit, 700)
+        ctx = Masque.context(bk, fig, Masque._ppu(bk, fig, 700), 700)
         c = Point3d((lim[1] + lim[2]) / 2, (lim[3] + lim[4]) / 2, (lim[5] + lim[6]) / 2)
         q0 = data_to_image_px(ctx, ax, c)
         qx = data_to_image_px(ctx, ax, c .+ 20 .* Point3d(g["panx"]...))
@@ -120,7 +120,7 @@ end
         m = resp["manifest"]
         @test only(l for l in m["layers"] if l["kind"] == "view")["geometry"]["limits"] ≈ zl atol = 1.0e-6
         circ = only(l for l in m["layers"] if l["kind"] == "circles")["geometry"]
-        @test all(isnan, circ[1:6])
+        @test all(isnan, circ[[1, 2, 4, 5]])   # centres; the pixel radius stays
         @test all(isfinite, circ[7:9])
 
         # An orbit after a zoom keeps the zoomed limits.
