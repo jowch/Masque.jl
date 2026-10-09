@@ -508,6 +508,17 @@ HTML(
         "<span id=\"axes_slice_auto\" style=\"display:none\">$(JSON3.write(sweep.slice_auto.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000113
+@bind ev_slice_gap sweep.slice_gap
+
+# ╔═╡ d1000000-0000-0000-0000-000000000114
+HTML(
+    "<span id=\"out_slice_gap\">SLICE_GAP=$(repr(ev_slice_gap))</span>" *
+        # The gap is NaN, which JSON can't spell; the driver reads it as null.
+        "<span id=\"coords_slice_gap\" style=\"display:none\">$(replace(JSON3.write(sweep.slice_gap.manifest["layers"]; allow_inf = true), "NaN" => "null"))</span>" *
+        "<span id=\"axes_slice_gap\" style=\"display:none\">$(JSON3.write(sweep.slice_gap.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000040
 HTML(
     "<span id=\"kind_meta\" style=\"display:none\">$(JSON3.write(kind_sweep_meta()))</span>" *
@@ -620,4 +631,6 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000053
 # ╠═d1000000-0000-0000-0000-0000000000b0
 # ╠═d1000000-0000-0000-0000-0000000000b1
+# ╠═d1000000-0000-0000-0000-000000000113
+# ╠═d1000000-0000-0000-0000-000000000114
 # ╠═d1000000-0000-0000-0000-000000000040
