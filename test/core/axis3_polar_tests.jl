@@ -391,6 +391,13 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             @test abs(drawn - r) <= 2
         end
 
+        # A sphere whose centre is inside the limits but whose edge crosses them keeps its full
+        # radius: the clip box hides the sphere only when its centre is outside.
+        # Two x windows of the same width give the same scale; only the second cuts sphere 1
+        # (centre x = 1, radius 0.3).
+        r_at(xlo) = (limits!(axo, xlo, xlo + 4.1, 0, 5, 0, 5); only(hitlayers(only(interactables(fo)), last(ctx_for(fo)))).geometry[3])
+        @test abs(r_at(0.9) - r_at(0.5)) <= 1
+
         # Wireframe: rendered edges from the child LineSegments (data space), :pairs mode
         fw = Figure(; size = (600, 450))
         axw = Axis3(fw[1, 1]; azimuth = 0.4, elevation = 0.5)
@@ -401,7 +408,11 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         wints = interactables(fw)
         wi = only(wints)
         @test wi isa SegmentInteractable && wi.mode === :pairs
-        @test iseven(length(wi.vertices)) && length(wi.vertices) >= 80   # grid edges + triangulation diagonals
+        # a 5×5 grid draws 2·5·4 = 40 edges; Makie outlines each of the 16 quads (64 segments),
+        # and the edges two quads share ship once (#316)
+        @test length(wi.vertices) == 2 * 40
+        wedges = Set(Set((wi.vertices[k], wi.vertices[k + 1])) for k in 1:2:length(wi.vertices))
+        @test length(wedges) == 40
         _, ppuw, ctxw = ctx_for(fw)
         imgw = Makie.colorbuffer(fw; px_per_unit = ppuw)
         Lw = only(hitlayers(wi, ctxw))

@@ -88,6 +88,20 @@ function _name_layers(built, id::Symbol)
     ]
 end
 
+# A plot named as an ROI's `selects`, with the layers it became in this call. A series
+# child's `id:k` entry names one element, not a layer, so only real layer ids count.
+function _plot_target(p, plotmap, layer_ids)
+    ids = Symbol[id for id in get(plotmap, p, Symbol[]) if id in layer_ids]
+    isempty(ids) && throw(
+        ArgumentError(
+            "ROIInteractable: `selects` is a `$(Makie.plotkey(p))` plot with no layer in this masque() call. " *
+                "With `auto = false`, pass `interactables(plot)` to the same call; otherwise check that " *
+                "the plot is in this figure",
+        ),
+    )
+    return _PlotTarget(p, ids)
+end
+
 # `interactables(plot)` before `masque` has found its axis and its default id.
 struct _PlotRequest <: AbstractInteractable
     plot::Makie.AbstractPlot
@@ -381,6 +395,9 @@ function _assemble_all(fig, xs; auto::Bool)
     end
     for k in eachindex(out)
         i = out[k]
+        if i isa ROIInteractable && i.selects isa Makie.AbstractPlot
+            out[k] = ROIInteractable(i.ax, i.bounds, i.id, _plot_target(i.selects, plotmap, seen))
+        end
         if i isa SliceInteractable && !isempty(i.cover_plots)
             covers = unique!(Symbol[id for p in i.cover_plots for id in get(plotmap, p, Symbol[])])
             out[k] = SliceInteractable(i.ax, i.orientation, i.series, i.id, covers, i.tooltip, i.crosshair, i.cover_plots)

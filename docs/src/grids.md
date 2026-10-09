@@ -17,7 +17,7 @@ Main.masque_fallback("grids_heatmap")
 
 `masque(fig)` makes every `heatmap!` and `image!` interactive. Each
 grid gets a layer id, `:cells` for the first and `:cells_2` for the
-second, which a `selects` box names and `pick.layer` reports. To give a
+second, which `pick.layer` reports. To give a
 grid a name of your own, for example when a figure has two grids, pass
 the plot to [`interactables`](@ref) with an `id`:
 
@@ -85,11 +85,11 @@ image's layer id, such as `id = :cells`, so it takes the image's place.
 ## Brush a block of cells
 
 To select a block of cells by dragging a box over them, pass an
-[`ROIInteractable`](@ref) to `masque`, with `selects` naming the grid's
-layer id:
+[`ROIInteractable`](@ref) to `masque`, with `selects` naming the heatmap
+or image you plotted:
 
 ```julia
-box = ROIInteractable(ax; bounds = (1.0, 3.0, 1.0, 2.0), selects = :cells)
+box = ROIInteractable(ax; bounds = (1.0, 3.0, 1.0, 2.0), selects = p)
 @bind win masque(fig, box)
 ```
 

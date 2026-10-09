@@ -163,19 +163,35 @@ export function hitLayerByIndex(layer: HitLayer, index: number): Omit<Hit, "laye
 // always carries through both coordinates of the same vertex). Shared by keyboard.ts's
 // buildFocusable and hitsForLayer below, so neither draws/announces/highlights a segment the
 // mouse can never reach.
-export function isGapSegment(layer: HitLayer, k: number): boolean {
-    const a = layer.geometry as number[]
-    return Number.isNaN(a[2 * k]) || Number.isNaN(a[2 * k + 2])
+// Element k is not on screen: a :polyline edge touching a NaN gap, or, once a zoomed Axis3
+// clips it (#321), a :segments pair, :circles centre, or whole :lines path with no finite spot.
+export function isGapElement(layer: HitLayer, k: number): boolean {
+    switch (layer.kind) {
+        case "polyline": {
+            const a = layer.geometry as number[]
+            return Number.isNaN(a[2 * k]) || Number.isNaN(a[2 * k + 2])
+        }
+        case "segments": {
+            const a = layer.geometry as number[]
+            return Number.isNaN(a[4 * k]) || Number.isNaN(a[4 * k + 2])
+        }
+        case "circles":
+            return Number.isNaN((layer.geometry as number[])[3 * k])
+        case "lines":
+            return !((layer.geometry as number[][])[k] ?? []).some((v) => Number.isFinite(v))
+        default:
+            return false
+    }
 }
 
 // Every element of a layer as a Hit, for the "highlight the whole target layer" case (a legend
 // entry's `links`) — same building blocks (layerNElements + hitLayerByIndex) mount.ts uses for
-// `selected=`. A :polyline's NaN-gap segments are skipped, same as buildFocusable.
+// `selected=`. Elements not on screen (isGapElement) are skipped, same as buildFocusable.
 export function hitsForLayer(layer: HitLayer): Hit[] {
     const n = layerNElements(layer)
     const hits: Hit[] = []
     for (let i = 0; i < n; i++) {
-        if (layer.kind === "polyline" && isGapSegment(layer, i)) continue
+        if (isGapElement(layer, i)) continue
         hits.push({ layer, ...hitLayerByIndex(layer, i) })
     }
     return hits
@@ -197,7 +213,7 @@ function resolveLinkedTarget(manifest: Manifest, spec: string): Hit[] {
     const i = Number(m[2]) - 1
     const n = layerNElements(target)
     if (i < 0 || i >= n) return []
-    if (target.kind === "polyline" && isGapSegment(target, i)) return []
+    if (isGapElement(target, i)) return []
     return [{ layer: target, ...hitLayerByIndex(target, i) }]
 }
 
