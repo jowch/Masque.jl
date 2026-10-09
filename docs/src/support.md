@@ -92,7 +92,7 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `stem!` | `:stem` + `:stem_stems` | `:circles` + `:segments` | — | — |
 | `scatterlines!` | `:scatterlines` + `:scatterlines_line` | `:circles` + `:lines` | yes | yes |
 | `boxplot!` | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
-| `text!` | `:text` | `:rects` | — | — |
+| `text!` | `:text` | `:rects` | yes | — |
 | `annotation!` | `:annotation` | `:rects` | — | — |
 | `Colorbar` (block) | `:colorbar` | `:axis` | yes | yes |
 | `Legend` (block) | `:legend` | `:rects` | yes | yes |
@@ -120,7 +120,9 @@ A `surface!` responds on an `Axis3` only: hovering it shows the
 data point under the pointer on the side you can see, and a
 `wireframe!` drawn over the same grid is left as decoration so the
 surface answers. A `surface!` on a 2D `Axis` is skipped with a
-warning; to inspect a grid there, draw it with `heatmap!`. If Masque can't make one plot
+warning; to inspect a grid there, draw it with `heatmap!`. On an
+`Axis3`, where `text!` labels can overlap, the label nearest you
+answers. If Masque can't make one plot
 interactive, it skips that plot with a warning and the rest of the
 figure still responds. To make a recipe of your own
 respond as one mark, see [Your own plot types](@ref), and to add hit

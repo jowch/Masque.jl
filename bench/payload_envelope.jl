@@ -202,6 +202,18 @@ let
     text!(ax, xs, ys; text = ["L$(k)" for k in 1:n], fontsize = 10)
     text_row("text-only, $n labels", masque(f))
 end
+let
+    # The same 100 labels on an Axis3 (#292): each adds `z` to its payload and one index to the
+    # layer's front-to-back `order`.
+    n = 100
+    f = Figure(size = (900, 700)); ax = Axis3(f[1, 1])
+    xs, ys, zs = rand(n) .* 10, rand(n) .* 10, rand(n) .* 10
+    text!(ax, xs, ys, zs; text = ["L$(k)" for k in 1:n], fontsize = 10)
+    w = masque(f)
+    text_row("text-only on Axis3, $n labels", w)
+    o = only(filter(l -> l["id"] == "text", w.manifest["layers"]))["order"]
+    @printf("  %-40s  order=%dB\n", "", mp(o))
+end
 
 println("\n=== H. slice series — data-space Float64 xy (not integer px) ===")
 # SliceInteractable ships the probe series as Float64, not the quantized Int geometry every

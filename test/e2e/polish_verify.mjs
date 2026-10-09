@@ -579,6 +579,27 @@ try {
     }
   }
 
+  // Text on Axis3 (#292): where "front" overlaps "back", the hover answers with front, the
+  // label nearer the camera, and draws the closed-mark recipe on front's box.
+  {
+    const key = "text3d";
+    const m = await inspect(key);
+    pin(m, key);
+    const layer = (await layersOf(key)).find((l) => l.id === "text");
+    if (!layer || layer.kind !== "rects") throw new Error(`${key}: no :rects text layer`);
+    const g = layer.geometry, hov = 1;
+    let t = null;
+    for (let a = 0; a < 8; a++) {
+      t = await hoverAt(key, g[4 * hov], g[4 * hov + 1]);
+      if (t.show && t.hi.fill && t.hi.edge) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (!t?.show) throw new Error(`${key}: no tooltip on hover ${JSON.stringify(t)}`);
+    assertHoverRecipe(t.hi, key, true, false);
+    if (!/front/.test(t.text) || /back/.test(t.text)) throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not the front label`);
+    passed.push(`${key}/highlight`);
+  }
+
   // A surface point (#259) is highlighted as its dual cell: a closed polygon through the midpoints
   // of its grid edges and the centres of its quads, so the polygon surrounds the point. The hover
   // and the selection use the closed-mark recipe; the tooltip sits over the point. On Cairo the

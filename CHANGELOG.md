@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format is based on
   screen pixels, and a `wireframe!` over the same grid is left as decoration. While you
   orbit, the surface's highlight hides and comes back on release. `SurfaceInteractable`
   builds one by hand (#259).
+- `text!` on an `Axis3` responds to hover and click, so a label can be picked like the point
+  it names. Where labels overlap, the one nearest you answers. A label outside the axis
+  limits isn't drawn and doesn't respond. Its default payload adds the anchor's `z` (#292).
 - `masque(fig; tooltipstyle = (; bg = :black, color = :white, radius = 6))` sets the tooltip
   card's look in one keyword, like `overlaystyle` does for the overlay. Its keys are `bg`,
   `color`, `accent`, `font`, `font_size`, `radius`, and `caret`; an unknown key, or a value

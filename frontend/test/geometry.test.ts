@@ -251,6 +251,17 @@ describe("hitLayer + hitTest", () => {
         expect(hitLayer(rects, 122, 100)).toMatchObject({ index: 1 })   // inside bar 1, in bar 0's reach
         expect(hitLayer(rects, 100, 113)?.geom_).toEqual(["rect", 100, 100, 40, 20])   // highlight is the bar itself
     })
+    it("rects with order: the first in order wins an overlap, and one left out never hits", () => {
+        // three overlapping labels; 2 is nearest the camera, 0 is not drawn
+        const rects: HitLayer = {
+            id: "text", kind: "rects", geometry: [100, 100, 40, 20, 110, 100, 40, 20, 120, 100, 40, 20], order: [2, 1],
+            payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["click"],
+        }
+        expect(hitLayer(rects, 115, 100)).toMatchObject({ index: 2 })   // inside all three
+        expect(hitLayer(rects, 95, 100)).toMatchObject({ index: 1 })    // inside 0 and 1
+        expect(hitLayer(rects, 82, 100)).toBeNull()                     // inside 0 only
+        expect(hitLayer({ ...rects, order: undefined }, 115, 100)).toMatchObject({ index: 0 })
+    })
     it("polygons with tol: the outline reach responds, inside a neighbour still wins", () => {
         const polys: HitLayer = {
             id: "polys", kind: "polygons", axis: "ax1", events: ["click"], payloads: [{ i: 0 }, { i: 1 }], tol: 4,

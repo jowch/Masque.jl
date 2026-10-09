@@ -651,6 +651,25 @@ try {
       passed.push(`${key}/overlap-pixel-contested`);
     }
 
+    // Two elements of one layer claim the hovered pixel (#292, text on Axis3): the nearer one,
+    // with the higher index, must come first in the layer's front-to-back `order`, so the
+    // generic hover/click checks below prove it answers rather than the lower index.
+    if (spec.overlapsElement !== undefined) {
+      const order = layer.order;
+      if (!Array.isArray(order)) throw new Error(`${key}: layer "${layer.id}" ships no order`);
+      const front = order.indexOf(spec.hoverIndex), behind = order.indexOf(spec.overlapsElement);
+      if (front < 0 || behind < 0 || !(front < behind)) {
+        throw new Error(`${key}: order ${JSON.stringify(order)} doesn't put ${spec.hoverIndex} before ${spec.overlapsElement}`);
+      }
+      if (!(spec.overlapsElement < spec.hoverIndex)) throw new Error(`${key}: overlapsElement must have the lower index`);
+      const hp = hitPoint(layer, spec.hoverIndex), b = hitPoint(layer, spec.overlapsElement);
+      if (!(Math.abs(hp.x - b.x) < b.w / 2 && Math.abs(hp.y - b.y) < b.h / 2)) {
+        throw new Error(`${key}: hover pixel ${JSON.stringify(hp)} is not inside element ${spec.overlapsElement}'s box ${JSON.stringify(b)}`);
+      }
+      passed.push(`${key}/overlap-order`);
+      passed.push(`${key}/overlap-pixel-contested`);
+    }
+
     // mount.ts used to force host.value = null unconditionally, so the real Pluto bond settled
     // on `nothing` at mount even with selected= baked in. Read #out_${key} (repr(ev) off the
     // actual bond) before any click/drag on this widget to catch that directly.

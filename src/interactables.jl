@@ -62,6 +62,10 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
   otherwise, for explicitly-given targets — the auto-extracted path drops an unsupported target
   with a `@warn` instead of failing the whole build). An `id:k` pin whose `k` is out of range
   is the same kind of error as an unknown layer.
+- `order` — `:rects` only, optional: the 0-based element indices front to back, which the
+  overlay hit-tests in, so the nearest of overlapping boxes wins. An element left out is not
+  drawn and never hit. `nothing` (default) tests in index order. Built by
+  [`TextInteractable`](@ref) on an `Axis3`.
 """
 struct HitLayer
     id::Symbol
@@ -77,7 +81,12 @@ struct HitLayer
     # snaps to, and the staircase `step` mode when the drawn path adds corners between them.
     points::Union{Nothing, Vector}
     step::Union{Nothing, Symbol}
+    # :rects: 0-based element indices, front to back, that the overlay hit-tests in; an
+    # element left out is not drawn. `nothing` is index order.
+    order::Union{Nothing, Vector{Int}}
 end
+HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step) =
+    HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events) = HitLayer(id, kind, geometry, payloads, axis, events, nothing, nothing, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label) = HitLayer(id, kind, geometry, payloads, axis, events, label, nothing, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors) = HitLayer(id, kind, geometry, payloads, axis, events, label, colors, nothing)
@@ -1245,7 +1254,8 @@ one. Produces one `:rects` [`HitLayer`](@ref), one box per string.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:text`.
 - `payloads` — one entry per string; `ArgumentError` if the length doesn't match. Default:
   `(; text, index, x, y)` — `text` is the string, `index` 1-based, `(x, y)` its data-space
-  anchor. A key-value payload is merged onto the default, as for [`PointInteractable`](@ref).
+  anchor (`(x, y, z)` on an `Axis3`). A key-value payload is merged onto the default, as for
+  [`PointInteractable`](@ref).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
 - `label` — the layer's name, which screen readers announce (see [`PointInteractable`](@ref)).
@@ -1255,6 +1265,10 @@ Geometry is each string's axis-aligned bounding box (`Makie.string_boundingboxes
 projected data coordinates — a rotated label gets its expanded axis-aligned box. Boxes are
 read lazily in `hitlayers`, not at construction, so a `TextInteractable` can be built before
 the figure is finalized.
+
+On an `Axis3`, where labels can overlap, the label whose anchor is nearest the camera wins
+the overlap, and a label whose anchor is outside the axis limits is not drawn, so it is not
+hit either.
 
 # Examples
 ```julia
@@ -1274,7 +1288,9 @@ function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, too
         error("TextInteractable: $(length(anchors)) positions for $(length(strs)) strings (Makie internals changed?)")
     defaults = _unconvert_payloads(
         ax, Any[
-            (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
+            ax isa Makie.Axis3 ?
+                (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]), z = Float64(anchors[k][3])) :
+                (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
                 for k in eachindex(strs)
         ]
     )
@@ -1293,11 +1309,20 @@ function hitlayers(i::TextInteractable, ctx)
     # to data before projecting, or a log axis would apply `f` twice.
     ondata = i.p.markerspace[] === :data
     todata = ondata ? _world_to_data(i.ax) : nothing
+    order = i.ax isa Makie.Axis3 ? _text_order(ctx, i.ax, i.p.positions[]) : nothing
+    drawn = order === nothing ? nothing : Set(order)
     # Empty strings are not skipped: a zero-area box keeps box-count == payload-count.
-    for b in boxes
+    for (k, b) in enumerate(boxes)
+        if drawn !== nothing && (k - 1) ∉ drawn
+            append!(g, (NaN32, NaN32, NaN32, NaN32))
+            continue
+        end
         if ondata
-            q = (_proj(ctx, i.ax, todata(b.origin)), _proj(ctx, i.ax, todata(b.origin .+ b.widths)))
-            x0, x1 = minmax(q[1][1], q[2][1]); y0, y1 = minmax(q[1][2], q[2][2])
+            # On an Axis3 the box is 3D (a label on a plane in the scene): its 2D box is that of
+            # all eight projected corners. The anchor alone decides clipping, as Makie draws it.
+            cs = i.ax isa Makie.Axis3 ? Makie.corners(b) : (b.origin, b.origin .+ b.widths)
+            q = [_proj(ctx, i.ax, todata(c), nothing) for c in cs]
+            x0, x1 = extrema(p[1] for p in q); y0, y1 = extrema(p[2] for p in q)
             append!(g, (_q((x0 + x1) / 2), _q((y0 + y1) / 2), _q(x1 - x0), _q(y1 - y0)))
             continue
         end
@@ -1309,7 +1334,24 @@ function hitlayers(i::TextInteractable, ctx)
         w = bw * ctx.scaling; h = bh * ctx.scaling
         append!(g, (_q(x_left + w / 2), _q(y_top + h / 2), _q(w), _q(h)))   # :rects list = (cx, cy, w, h)
     end
-    return [HitLayer(i.id, :rects, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label)]
+    return [
+        HitLayer(
+            i.id, :rects, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label, nothing, nothing, nothing, nothing, order,
+        ),
+    ]
+end
+
+# Labels on an Axis3, front to back by their anchor's clip-space depth, as 0-based indices. A
+# label whose anchor is not drawn (outside the axis limits, or not finite) is left out.
+function _text_order(ctx, ax, anchors)
+    pts = Point3f[Point3f(a[1], a[2], length(a) >= 3 ? a[3] : 0) for a in anchors]
+    px, py, depth = _project_depth(ctx, ax, pts)
+    box = _clipbox(ax)
+    ks = [
+        k for k in eachindex(pts) if all(isfinite, pts[k]) && (box === nothing || _in_clipbox(box, pts[k])) &&
+            isfinite(px[k]) && isfinite(py[k]) && isfinite(depth[k])
+    ]
+    return ks[sortperm(depth[ks])] .- 1
 end
 
 # ============================ PolygonInteractable ==========================
