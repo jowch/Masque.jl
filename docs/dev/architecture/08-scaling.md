@@ -62,7 +62,7 @@ it does not make the sample finer. *Implemented:* `src/interactables.jl` (`_grid
 `frontend/src/geometry.ts` (`hitGridSample`). The size is in `perf-findings.md`.
 
 **A dense surface is thinned to a fixed stride (#259).** A `:surface` layer ships projected
-points, about 14 B each for a vector grid (24 for a matrix grid), so a fine grid outgrows the
+points, so a fine grid outgrows the
 envelope, and its cells are smaller than a pixel anyway. Along each grid direction the layer
 ships at most `N = floor(L / SURFACE_MIN_SCREEN_PX)` points, with `L` the `Axis3` viewport's
 longer side in screen pixels and `SURFACE_MIN_SCREEN_PX = 4`: every `ceil(n / N)`-th row and

@@ -141,7 +141,15 @@ describe(":surface tooltip and restored selection", () => {
         const m = { width: 40, height: 40, scaling: 1, transforms: {}, layers: [L] } as unknown as Manifest
         const sel = selectionForValue(m, { layer: "surface", index: 4, payload: { i: 2, j: 3, value: 4 } })!
         expect(sel.hits).toHaveLength(1)
+        expect(sel.hits[0].index).toBe(4) // source (2, 3) is shipped point (1, 1)
         expect(sel.hits[0].geom_?.[0]).toBe("poly")
-        expect(selectionForValue(m, { layer: "surface", index: 99 })).toBeNull() // like any other kind
+        expect(sel.source).toEqual({ layer: "surface", index: 4 })
+        // Saved under another stride: the stored index is stale, the source (i, j) is not.
+        const moved = selectionForValue(m, { layer: "surface", index: 1, payload: { i: 4, j: 6, value: 8 } })!
+        expect(moved.hits[0].index).toBe(8)
+        expect(moved.source).toEqual({ layer: "surface", index: 8 })
+        // A source point this stride doesn't ship, or no (i, j) at all, selects nothing.
+        expect(selectionForValue(m, { layer: "surface", index: 4, payload: { i: 1, j: 3 } })).toBeNull()
+        expect(selectionForValue(m, { layer: "surface", index: 4 })).toBeNull()
     })
 })

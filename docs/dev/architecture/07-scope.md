@@ -12,7 +12,7 @@ higher-leverage lever is wire encoding ([§9](09-wire-encoding.md)). Spatial acc
 **Occlusion policy (backend-symmetric).** Within a `:surface` layer, quads are tried front to
 back; between layers, first match wins. Julia sorts a surface's quads by the average clip-space
 depth of their corners, the order CairoMakie paints them in, so on `:cairo` the answer and the
-picture agree by construction and on `:webgl` they differ only where two faces of close average
+picture agree to within a cell and on `:webgl` they differ only where two faces of close average
 depth overlap (#259). Every other layer keeps every projected vertex hittable, including
 far-side points on solid 3D objects, and between layers the plot drawn last wins (#242), which
 is what CairoMakie draws. On `:webgl`, which depth-tests every pixel, a mark hidden behind a

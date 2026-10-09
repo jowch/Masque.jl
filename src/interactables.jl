@@ -989,7 +989,7 @@ struct SurfaceInteractable <: AbstractInteractable
     z::Matrix{Float32}
     value::Union{Nothing, Matrix{Float32}}
     id::Symbol
-    payloads::Union{Nothing, Matrix{Any}}
+    payloads::Union{Nothing, Matrix{Any}, Function}   # a function is called at shipped points only
     tooltip::Union{Nothing, Markup, Bool}
     label::Union{Nothing, String}
 end
@@ -1028,7 +1028,7 @@ function SurfaceInteractable(
     )
     pos = Point3f[Point3f(_surface_at(xs, a, b, 1), _surface_at(ys, a, b, 2), zs[a, b]) for a in 1:sz[1], b in 1:sz[2]]
     pl = payloads === nothing ? nothing :
-        payloads isa Function ? Any[payloads(a, b) for a in 1:sz[1], b in 1:sz[2]] :
+        payloads isa Function ? payloads :
         payloads isa AbstractMatrix && size(payloads) == sz ? Matrix{Any}(payloads) :
         throw(
             ArgumentError(
@@ -1045,7 +1045,9 @@ validate(i::SurfaceInteractable, ctx::InteractionContext) =
     "SurfaceInteractable :$(i.id): a surface is hit-tested on an `Axis3` only (a 2D `Axis` is roadmap scope)"
 
 # Shipped source indices along one grid direction of `n` points, at most about `cap` of them:
-# every `s`-th, and always the last, so the surface's edge answers.
+# every `s`-th, and always the last, so the surface's edge answers. The stride is a whole
+# number, so a grid just past the cap ships about half as many points as one just under it
+# (126 ships whole under a cap of 126; 130 ships 66), and both stay under the cap.
 function _surface_stride(n, cap)
     s = cld(n, max(cap, 1))
     s <= 1 && return collect(1:n)
@@ -1087,7 +1089,8 @@ function hitlayers(i::SurfaceInteractable, ctx)
         "z" => Float32[i.z[a, b] for b in J for a in I],
     )
     i.value === nothing || (geom["value"] = Float32[i.value[a, b] for b in J for a in I])
-    pl = i.payloads === nothing ? Any[] : Any[i.payloads[a, b] for b in J for a in I]
+    pl = i.payloads === nothing ? Any[] :
+        i.payloads isa Function ? Any[i.payloads(a, b) for b in J for a in I] : Any[i.payloads[a, b] for b in J for a in I]
     return [HitLayer(i.id, :surface, geom, pl, axis_id(ctx, i.ax), events(i), i.label)]
 end
 

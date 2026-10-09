@@ -183,6 +183,33 @@ bump(n; lo = -3, hi = 3) = (xs = range(lo, hi; length = n); (xs, xs, [exp(-(a^2 
         )
         d = build_manifest([SurfaceInteractable(ax, xs, ys, zs; tooltip = masque"$(x), $(z)")], ctx_for(fig)[3])
         @test haskey(only(d["layers"]), "template")
+        # A payload of another shape (a Dict) can't be checked here, so its fields aren't refused.
+        si = SurfaceInteractable(ax, xs, ys, zs; payloads = (i, j) -> Dict("name" => "p$(i)$(j)"), tooltip = masque"$(name)")
+        @test haskey(only(build_manifest([si], ctx_for(fig)[3])["layers"]), "template")
+
+        # A wireframe over a surface with NaN holes is still decoration.
+        zn = copy(zs); zn[3, 3] = NaN
+        f4 = Figure(); a4 = Axis3(f4[1, 1])
+        surface!(a4, xs, ys, zn)
+        wireframe!(a4, xs, ys, zn)
+        ints4 = interactables(f4)
+        @test count(i -> i isa SurfaceInteractable, ints4) == 1
+        @test count(i -> i isa SegmentInteractable, ints4) == 0
+    end
+
+    @testset "payload function runs at shipped points only" begin
+        n = 1000
+        xs = range(0, 1; length = n)
+        zs = [a * b for a in xs, b in xs]
+        fig = Figure(; size = (600, 450))
+        ax = Axis3(fig[1, 1])
+        surface!(ax, xs, xs, zs)
+        _, _, ctx = ctx_for(fig)
+        calls = Ref(0)
+        si = SurfaceInteractable(ax, xs, xs, zs; payloads = (i, j) -> (calls[] += 1; (; s = i + j)))
+        L = only(hitlayers(si, ctx))
+        @test calls[] == L.geometry["ni"] * L.geometry["nj"] < n^2
+        @test L.payloads[1] == (; s = 2)
     end
 
     @testset "drag frames leave the surface out; the release frame ships it" begin

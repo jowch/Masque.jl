@@ -139,11 +139,15 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         L.points === nothing || isempty(ks) || union!(ks, (:x, :y, :i))
         # A grid cell's template also sees the cell's `i`, `j`, and `value`.
         L.kind === :grid && !isempty(ks) && union!(ks, (:i, :j, :value))
-        # A surface point always has its own fields, so its template is always checked.
+        # A surface point always has its own fields, so its template is checked against them
+        # plus a named tuple's fields, or `payload` for a bare value. Any other payload (a
+        # `Dict`, a `DataFrame` row) spreads fields Julia can't list here, so, as for every
+        # other kind, the check is skipped.
         if L.kind === :surface && !haskey(L.geometry, "suspended")
             union!(ks, (:i, :j, :x, :y, :z))
             haskey(L.geometry, "value") && push!(ks, :value)
-            any(pl -> !(pl isa NamedTuple), L.payloads) && push!(ks, :payload)
+            any(pl -> pl isa Union{Number, AbstractString, Symbol}, L.payloads) && push!(ks, :payload)
+            all(pl -> pl === nothing || pl isa Union{NamedTuple, Number, AbstractString, Symbol}, L.payloads) || empty!(ks)
         end
         isempty(ks) || check_fields(spec, ks)      # build-time field check (skip if no NamedTuple payloads)
         d["template"] = markup_segments(spec)
@@ -907,7 +911,8 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
     end
 end
 
-# An in-drag frame leaves out every surface layer's geometry: at the thinning cap a surface
+# An in-drag frame (any view drag in the figure: an orbit, or a pan of a 2D axis beside the
+# surface) leaves out every surface layer's geometry: at the thinning cap a surface
 # outweighs the in-drag picture several times over (perf-findings.md, Section J), and
 # no one hovers mid-drag. The layer is not built at all, so the drag doesn't pay for its
 # projection either. It stays, with no hit area and no highlight, until the release frame

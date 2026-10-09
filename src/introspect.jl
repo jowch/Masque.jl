@@ -1555,7 +1555,8 @@ end
 function _decorates_surface(p, grids)
     p isa Makie.Wireframe && !isempty(grids) || return false
     g = _grid3(_converted(p))
-    return g !== nothing && any(==(g), grids)
+    # `isequal`, not `==`: a NaN hole is in both grids, and NaN != NaN.
+    return g !== nothing && any(h -> isequal(h, g), grids)
 end
 # A grid's `(x, y, z)` as three Float32 matrices of `z`'s shape: Makie converts a surface's
 # `x`/`y` to ranges and a wireframe's to matrices, and keeps `z`'s own eltype.

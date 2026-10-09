@@ -1,6 +1,6 @@
 import { findBin, invertAxis, polygonRings } from "./geometry"
 import { surfacePointHit } from "./surface"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest } from "./types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, SurfaceGeometry } from "./types"
 
 // Bond item shape emitted per contained element in a selects-ROI { items: SelectionItem[] }.
 // `payload` is present only for a computed (non-element) target — a `:grid` cell range, since
@@ -249,9 +249,22 @@ export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]
     }
     const layer = manifest.layers.find((l) => l.id === o.layer)
     if (!layer || typeof o.index !== "number") return null
-    const hit = elementHit(layer, o.index)
+    const index = layer.kind === "surface" ? surfaceIndexOf(layer, (o as { payload?: unknown }).payload) : o.index
+    if (index === null) return null
+    const hit = elementHit(layer, index)
     const hits = hit ? selectionFor(hit, manifest) : null
-    return hits === null ? null : { hits, source: { layer: layer.id, index: o.index } }
+    return hits === null ? null : { hits, source: { layer: layer.id, index } }
+}
+
+// A surface value's shipped-point index, found from its source (i, j) rather than its stored
+// index: the stride, and so every index, changes with the axis size between runs. A point the
+// new stride doesn't ship is not selected.
+function surfaceIndexOf(layer: HitLayer, payload: unknown): number | null {
+    const g = layer.geometry as SurfaceGeometry
+    const p = payload as { i?: unknown; j?: unknown } | undefined
+    if (g.suspended || !g.i || !p || !Number.isInteger(p.i) || !Number.isInteger(p.j)) return null
+    const a = g.i.indexOf(p.i as number), b = g.j.indexOf(p.j as number)
+    return a < 0 || b < 0 ? null : a + b * g.ni
 }
 
 function elementHit(layer: HitLayer, index: number): Hit | null {
