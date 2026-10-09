@@ -157,7 +157,8 @@ export interface OverlayCtx {
     photoPaint_: (m: PhotoMatrix) => void
     // Writes the bond value from a gesture. `host_.value` itself is an accessor (mount.ts):
     // a write through it is Pluto restoring the kernel's value, which redraws the selection.
-    setValue_: (v: unknown) => void
+    // `slot` names the committing layer; a keyed bond writes the value into that slot only.
+    setValue_: (v: unknown, slot: string) => void
 }
 
 export interface OverlayState {
@@ -181,6 +182,9 @@ export interface OverlayState {
     // and sends `null` — the toggle off. Null when nothing is selected or the selection holds
     // several hydrated indices, which no single click owns.
     selSource_: { layer: string; index: number } | null
+    // A keyed bond's selection, per slot: `selHits_` is the union of these, so a click on one
+    // layer leaves a box's brushed marks highlighted. `null` on a single bond.
+    slots_: Map<string, { hits_: Hit[]; source_: { layer: string; index: number } | null }> | null
     hiLeaveTimer_: ReturnType<typeof setTimeout> | null
     // g.link (legend-linked highlight): keyed by hitKey() of the SOURCE element (the hovered/
     // focused legend entry), not any one target hit — one source can fan out to many target
@@ -236,6 +240,7 @@ export function createOverlayState(): OverlayState {
         selKeys_: new Set(),
         selHits_: [],
         selSource_: null,
+        slots_: null,
         hiLeaveTimer_: null,
         linkKey_: null,
         linkLeaveTimer_: null,

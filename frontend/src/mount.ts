@@ -1,5 +1,5 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
-import { hitLayerByIndex, sameValue, selectionForValue } from "./selection"
+import { hitLayerByIndex, sameValue, selectionForValue, slotOf } from "./selection"
 import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
@@ -293,7 +293,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const selection = manifest.selection
     const seedItems = selection === "elements" && (hydrated.length > 0 || manifest.hydrate === "items")
     const owned = manifest.bondOwner !== undefined
-    const hostValue = seedItems ? { items: hydrated }
+    const keyed = manifest.keyed !== undefined
+    const hostValue = keyed ? { keyed: manifest.initial ?? {} }
+        : seedItems ? { items: hydrated }
         : owned ? (manifest.initial ?? null)
         : hydrated.length === 1 ? hydrated[0] : null
 
@@ -452,10 +454,14 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         photoPaint_: (m) => paintPhoto(m),
         // Through `host.value`, not into `bondValue`: a page may wrap the property after mount
         // (the docs player does, to swap its snapshots) and must see every commit.
-        setValue_: (v) => {
+        setValue_: (v, slot) => {
+            const slots = ctx.manifest_.keyed
+            if (slots && !slots.includes(slot)) return
+            const live = host as unknown as { value: unknown }
+            const cur = (live.value as { keyed?: Record<string, unknown> } | null)?.keyed ?? {}
             committing = true
             try {
-                (host as unknown as { value: unknown }).value = v
+                live.value = slots ? { keyed: { ...cur, [slot]: v } } : v
             } finally {
                 committing = false
             }
@@ -464,7 +470,19 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const state = createOverlayState()
     state.selHits_ = selHits
     // A brush seed belongs to the box, not a click, so only a scalar seed can be clicked off.
-    if (!seedItems && !owned && hydrated.length === 1) state.selSource_ = hydrated[0]
+    if (!seedItems && !owned && !keyed && hydrated.length === 1) state.selSource_ = hydrated[0]
+    if (keyed) {
+        // Each slot starts with the hydrated marks of its own layer (a box's are its target's).
+        state.slots_ = new Map()
+        const init = (manifest.initial ?? {}) as Record<string, unknown>
+        for (const slot of manifest.keyed ?? []) {
+            const hits = selHits.filter((h) => slotOf(manifest, h.layer.id) === slot)
+            const env = init[slot] as { layer?: unknown; index?: unknown } | null | undefined
+            const source = env && typeof env.layer === "string" && typeof env.index === "number" && hits.length === 1
+                ? { layer: env.layer, index: env.index } : null
+            state.slots_.set(slot, { hits_: hits, source_: source })
+        }
+    }
 
     // `host.value` is the bond. Pluto writes it after mount: on a page reload it restores the
     // kernel's value, which can be a click made since the `selected=` seed. Until a gesture of
@@ -487,7 +505,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         set: (v: unknown) => {
             if (committing) restoring = false
             else if (restoring && !sameValue(v, bondValue)) {
-                const sel = selectionForValue(ctx.manifest_, v)
+                const keyedV = (v as { keyed?: Record<string, unknown> } | null)?.keyed
+                if (state.slots_ && keyedV) {
+                    for (const [slot, sv] of Object.entries(keyedV)) {
+                        const s = selectionForValue(ctx.manifest_, sv)
+                        if (s && state.slots_.has(slot)) state.slots_.set(slot, { hits_: s.hits, source_: s.source })
+                    }
+                    state.selHits_ = [...state.slots_.values()].flatMap((s) => s.hits_)
+                    renderSelection(ctx, state)
+                }
+                const sel = state.slots_ ? null : selectionForValue(ctx.manifest_, v)
                 if (sel) {
                     state.selHits_ = sel.hits
                     state.selSource_ = sel.source
@@ -664,17 +691,21 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // reading it here would resurrect that and silently drop every click since (#102
         // tripwire #3, the #107 regression shape). `selKeys_` is already id-keyed and gets
         // rebuilt by `renderSelection` itself, so only `selHits_` needs re-keying here.
-        const nextSel: Hit[] = []
-        for (const h of state.selHits_) {
-            const layer = newManifest.layers.find((l) => l.id === h.layer.id)
-            if (!layer) continue
-            try {
-                nextSel.push({ layer, ...hitLayerByIndex(layer, h.index) })
-            } catch {
-                /* index no longer valid against the new geometry — drop rather than throw mid-gesture */
+        const rekey = (hits: Hit[]): Hit[] => {
+            const out: Hit[] = []
+            for (const h of hits) {
+                const layer = newManifest.layers.find((l) => l.id === h.layer.id)
+                if (!layer) continue
+                try {
+                    out.push({ layer, ...hitLayerByIndex(layer, h.index) })
+                } catch {
+                    /* index no longer valid against the new geometry — drop rather than throw mid-gesture */
+                }
             }
+            return out
         }
-        state.selHits_ = nextSel
+        if (state.slots_) for (const s of state.slots_.values()) s.hits_ = rekey(s.hits_)
+        state.selHits_ = rekey(state.selHits_)
         renderSelection(ctx, state)
         adoptPhoto(input)
         dragStops?.sync_()

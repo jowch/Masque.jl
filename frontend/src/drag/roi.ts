@@ -1,6 +1,6 @@
 import { invertAxis } from "../geometry"
 import { computeSelection } from "../selection"
-import { SVG_NS, DEFAULT_STYLE, renderSelection } from "../highlight"
+import { SVG_NS, DEFAULT_STYLE, setSelection } from "../highlight"
 import { clampX, clampY, fmt } from "../state"
 import type { Drag, OverlayCtx, OverlayState, ROIBox } from "../state"
 import type { HitLayer, Manifest, ROIGeometry } from "../types"
@@ -131,9 +131,7 @@ export function move(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { ki
     setROI(box)
     if (d.target_) {
         const sel = computeSelection(box.g_, d.target_, ctx.manifest_.transforms[d.target_.axis])
-        state.selHits_ = sel.hits
-        state.selSource_ = null // the box owns this selection, not a click
-        renderSelection(ctx, state)
+        setSelection(ctx, state, d.id_, sel.hits, null) // the box owns this selection, not a click
         return `${sel.items.length} selected`
     }
     const b = roiBounds(box)
@@ -148,9 +146,7 @@ export function end(
 ): { items: unknown[] } | { layer: string; index: number; payload: unknown } {
     if (d.target_) {
         const sel = computeSelection(d.box_.g_, d.target_, ctx.manifest_.transforms[d.target_.axis])
-        state.selHits_ = sel.hits
-        state.selSource_ = null // the box owns this selection, not a click
-        renderSelection(ctx, state)
+        setSelection(ctx, state, d.id_, sel.hits, null) // the box owns this selection, not a click
         return { items: sel.items }
     }
     return { layer: d.id_, index: 0, payload: roiBounds(d.box_) }

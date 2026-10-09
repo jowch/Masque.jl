@@ -543,6 +543,77 @@ describe("mount", () => {
         expect(selChildren(shadow).map((el) => el.outerHTML)).toEqual(sel)
     })
 
+    it("a keyed bond keeps a slot per layer: a click and a brush don't replace each other", () => {
+        const m: Manifest = { ...boxSelectManifest(), keyed: ["dots", "roi"], initial: { dots: null, roi: null } }
+        // a clickable layer outside the box: image (1000,200) -> client (500,100)
+        m.layers.unshift({ id: "dots", kind: "circles", geometry: [1000, 200, 10], payloads: [{ d: 0 }],
+            axis: "ax1", events: ["click", "hover"] })
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const value = () => (host as unknown as { value: unknown }).value
+        expect(value()).toEqual({ keyed: { dots: null, roi: null } })
+        // release the box without moving: it brushes pts 0 and 1
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 200, clientY: 200, bubbles: true }))
+        const brush = { items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }] }
+        expect(value()).toEqual({ keyed: { dots: null, roi: brush } })
+        const brushed = selChildren(shadow).length
+        expect(brushed).toBeGreaterThan(0)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 500, clientY: 100, bubbles: true }))
+        expect(value()).toEqual({ keyed: { dots: { layer: "dots", index: 0 }, roi: brush } })
+        expect(selChildren(shadow).length).toBeGreaterThan(brushed)
+        // a second click on the same dot takes back that slot only
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 500, clientY: 100, bubbles: true }))
+        expect(value()).toEqual({ keyed: { dots: null, roi: brush } })
+        expect(selChildren(shadow).length).toBe(brushed)
+    })
+
+    it("a keyed bond seeds a box's slot with its target's hydrated marks", () => {
+        const m: Manifest = { ...boxSelectManifest(), keyed: ["dots", "roi"],
+            initial: { dots: null, roi: { items: [{ layer: "pts", index: 0 }] } } }
+        m.layers.unshift({ id: "dots", kind: "circles", geometry: [1000, 200, 10], payloads: [{ d: 0 }],
+            axis: "ax1", events: ["click", "hover"] })
+        m.layers.find((l) => l.id === "pts")!.selected = [0]
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const seeded = selChildren(shadow).length
+        expect(seeded).toBeGreaterThan(0)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 500, clientY: 100, bubbles: true }))
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 500, clientY: 100, bubbles: true }))
+        // the dot came and went; the box's seeded mark stayed
+        expect(selChildren(shadow).length).toBe(seeded)
+        expect((host as unknown as { value: unknown }).value).toEqual({
+            keyed: { dots: null, roi: { items: [{ layer: "pts", index: 0 }] } },
+        })
+    })
+
+    it("a keyed bond restores every slot's highlight from a value Pluto writes", () => {
+        const m: Manifest = { ...boxSelectManifest(), keyed: ["dots", "roi"], initial: { dots: null, roi: null } }
+        m.layers.unshift({ id: "dots", kind: "circles", geometry: [1000, 200, 10], payloads: [{ d: 0 }],
+            axis: "ax1", events: ["click", "hover"] })
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        ;(host as unknown as { value: unknown }).value = {
+            keyed: { dots: { layer: "dots", index: 0 }, roi: { items: [{ layer: "pts", index: 2 }] } },
+        }
+        const restored = selChildren(shadow).length
+        expect(restored).toBeGreaterThan(0)
+        // the restored dot is that slot's source, so clicking it clears the dot and keeps pts[2]
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 500, clientY: 100, bubbles: true }))
+        expect((host as unknown as { value: unknown }).value).toEqual({
+            keyed: { dots: null, roi: { items: [{ layer: "pts", index: 2 }] } },
+        })
+        expect(selChildren(shadow).length).toBeLessThan(restored)
+        expect(selChildren(shadow).length).toBeGreaterThan(0)
+    })
+
     it("a click after a selects brush selects again, not clears: the brush owns the selection", () => {
         const m = boxSelectManifest()
         // a legend entry at image [1080,1120]x[90,110], outside the box: client (550,50)

@@ -225,6 +225,12 @@ export function linkedHits(manifest: Manifest, layer: HitLayer, index: number): 
     return hits
 }
 
+// The keyed-bond slot a layer's selection belongs to: a `selects` box's target belongs to the box.
+export function slotOf(manifest: Manifest, layerId: string): string {
+    const box = manifest.layers.find((l) => l.kind === "roi" && l.selects === layerId)
+    return box ? box.id : layerId
+}
+
 // What a restored bond value selects: the hits to highlight, and the element a second click
 // on would clear. `null` leaves the selection as it is, the same as a click that is not a
 // selection gesture (an axis click, a threshold or ROI value). An entry that no longer

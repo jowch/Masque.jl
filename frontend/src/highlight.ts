@@ -329,6 +329,24 @@ export function drawSelection(state: OverlayState, selGroups: HiGroups, hits: Hi
     if (state.hiKey_ !== null && next.has(state.hiKey_)) clearHiImmediate(state, hiGroups)
 }
 
+// Set the selection a gesture made, then draw it. On a keyed bond only `slot`'s share changes.
+export function setSelection(ctx: OverlayCtx, state: OverlayState, slot: string, hits: Hit[], source: { layer: string; index: number } | null): void {
+    if (state.slots_) {
+        state.slots_.set(slot, { hits_: hits, source_: source })
+        state.selHits_ = [...state.slots_.values()].flatMap((s) => s.hits_)
+        state.selSource_ = null
+    } else {
+        state.selHits_ = hits
+        state.selSource_ = source
+    }
+    renderSelection(ctx, state)
+}
+
+// The element whose click made `slot`'s selection (a second click on it clears it).
+export function selSourceFor(state: OverlayState, slot: string): { layer: string; index: number } | null {
+    return state.slots_ ? state.slots_.get(slot)?.source_ ?? null : state.selSource_
+}
+
 // The single funnel to g.sel — every writer of state.selHits_ calls this after assigning it.
 // Screen-fixed hits (a legend entry) land outside the photograph clip. Linked data marks stay in.
 export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {

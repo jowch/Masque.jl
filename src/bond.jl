@@ -450,6 +450,8 @@ Otherwise a widget whose bond has an owner seeds the owner's `initial` envelope 
 layer seeds `{layer, index}`. Multiple indices on a scalar layer are highlight-only (`nothing`).
 """
 function mount_envelope(manifest::AbstractDict)
+    # A keyed bond seeds each slot on its own (`_keyed_manifest!`).
+    haskey(manifest, "keyed") && return Dict{String, Any}("keyed" => manifest["initial"])
     hydrated = Dict{String, Any}[]
     for d in get(manifest, "layers", Any[])
         idxs = get(d, "selected", nothing)
@@ -475,6 +477,7 @@ layer id strings to [`LayerOwner`](@ref) (empty for hand-built test manifests; t
 `bond` stamp is enough for built-ins).
 """
 function bond_from_js(manifest::AbstractDict, owners, js)
+    haskey(manifest, "keyed") && return keyed_value(manifest, owners, js)
     js === nothing && return nothing
     haskey(js, "items") && return selection_value(manifest, owners, js["items"])
     target = get(manifest, "selectionTarget", nothing)
@@ -487,6 +490,28 @@ function bond_from_js(manifest::AbstractDict, owners, js)
         )
     end
     return _one_event(manifest, owners, js)
+end
+
+# A keyed bond is a `NamedTuple` with one field per committing layer, in argument order. Each
+# field holds what that layer would commit alone, or `nothing` before its first commit. A slot
+# the browser leaves out keeps `nothing`, so a stale envelope from before a rebuild still reads.
+function keyed_value(manifest::AbstractDict, owners, js)
+    keys = Symbol.(manifest["keyed"])
+    slots = js === nothing ? Dict{String, Any}() : get(js, "keyed", nothing)
+    slots isa AbstractDict || throw(ArgumentError("bond: a keyed widget expects a {keyed} envelope"))
+    for k in Base.keys(slots)
+        Symbol(k) in keys || throw(ArgumentError("bond: :$k is not a slot of this keyed widget"))
+    end
+    vals = map(keys) do k
+        env = get(slots, string(k), nothing)
+        env === nothing && return nothing
+        haskey(env, "items") && return selection_value(manifest, owners, env["items"])
+        String(env["layer"]) == string(k) || throw(
+            ArgumentError("bond: slot :$k carries a commit from layer :$(env["layer"])"),
+        )
+        return _one_event(manifest, owners, env)
+    end
+    return NamedTuple{Tuple(keys)}(Tuple(vals))
 end
 
 function bond_from_js(w, js)

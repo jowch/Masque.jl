@@ -1,5 +1,5 @@
 import { hitTestAt, layoutSpaceLayer, matrixLimits, photoClip, resolvePayload } from "./geometry"
-import { drawHover, renderSelection } from "./highlight"
+import { drawHover, selSourceFor, setSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { hideCross } from "./cross"
 import { selectionFor, SELECTED_KINDS } from "./selection"
@@ -258,7 +258,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     applyDrag(ctx, state, d, e)
     const { layout, content } = pointerSpace(ctx, state, e)
     if (d.kind === "threshold") {
-        ctx.setValue_(thresholdDrag.end(d, content))
+        ctx.setValue_(thresholdDrag.end(d, content), d.id_)
         ctx.host_.dispatchEvent(new CustomEvent("input"))
     } else if (d.kind === "view") {
         // §12.3: a view gesture commits nothing — no bond write, no "input" event.
@@ -277,7 +277,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
         }
         state.photoAnchor_ = null
     } else {
-        ctx.setValue_(roiDrag.end(ctx, state, d))
+        ctx.setValue_(roiDrag.end(ctx, state, d), d.id_)
         ctx.host_.dispatchEvent(new CustomEvent("input"))
     }
     hideTip(ctx, state); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
@@ -362,13 +362,10 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     const next = selectionFor(hit, ctx.manifest_)
     // A second click on the element that made the selection takes it back: the highlight clears
     // and the bond returns to `null`, its value before any click.
-    const src = state.selSource_
+    const slot = hit.layer.id
+    const src = selSourceFor(state, slot)
     const off = next !== null && src !== null && src.layer === hit.layer.id && src.index === hit.index
-    if (next !== null) {
-        state.selHits_ = off ? [] : next
-        state.selSource_ = off ? null : { layer: hit.layer.id, index: hit.index }
-        renderSelection(ctx, state)
-    }
+    if (next !== null) setSelection(ctx, state, slot, off ? [] : next, off ? null : { layer: hit.layer.id, index: hit.index })
     drawHover(ctx, state, hit)
     // Keep keyboard focus in sync with the mouse, but ONLY once keyboard nav is already
     // engaged (state.focusIdx_ !== null) — gating on that, not just "click landed on a
@@ -400,7 +397,7 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
         value = { layer: hit.layer.id, index: hit.index }
         if (!SELECTED_KINDS.has(hit.layer.kind)) value.payload = resolvePayload(hit, ctx.manifest_, px, py)
     }
-    ctx.setValue_(value)
+    ctx.setValue_(value, slot)
     ctx.host_.dispatchEvent(new CustomEvent("input"))
 }
 

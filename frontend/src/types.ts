@@ -173,7 +173,10 @@ export interface Manifest {
     // Set when a threshold, an ROI, or a colorbar the caller passed owns the bond: the only
     // layer that commits. `initial` is the envelope the bond starts at (absent: `null`).
     bondOwner?: string
-    initial?: { layer: string; index: number; payload: unknown }
+    // A keyed bond (`keyed = true`): one slot per committing layer, by layer id, in argument
+    // order. `initial` then maps each slot to its starting envelope (`null` for no value yet).
+    keyed?: string[]
+    initial?: { layer: string; index: number; payload: unknown } | Record<string, unknown>
 }
 
 // `layer`/`index` are excluded from the trailing-underscore mangle convention (see

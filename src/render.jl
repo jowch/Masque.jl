@@ -166,6 +166,56 @@ function _bond_owner(built)
     )
 end
 
+# A keyed bond still has one `selection` / `selectionTarget` pair on the manifest, so it takes
+# one `selects` box. Lifting that means keying those two fields by box.
+function _check_one_selector(interactables)
+    n = count(i -> selects(i) !== nothing, interactables)
+    n <= 1 || throw(
+        ArgumentError("masque: a keyed bond takes one `selects` box for now; this call has $n"),
+    )
+    return nothing
+end
+
+# Whether a layer gets a slot in a keyed bond: it commits a click, or it is a threshold or box.
+function _commits(i, L::HitLayer, d)
+    (i isa ThresholdInteractable || i isa ROIInteractable) && return true
+    L.kind in (:threshold, :roi) && return true
+    return "click" in d["events"] && d["bond"] != "none"
+end
+
+# Stamp a keyed bond: `keyed` lists the slots in argument order, and `initial` holds each slot's
+# starting wire envelope (`nothing` for a slot with no value yet). A slot starts where it would
+# start alone: a threshold at `value`, a plain box at `bounds`, a selecting box at its seeded
+# items, and a layer at its one seeded index.
+function _keyed_manifest!(m, built, spec, selected, ctx)
+    keys = String[]
+    initial = Dict{String, Any}()
+    for (i, L, d) in built
+        _commits(i, L, d) || continue
+        id = string(L.id)
+        id in keys && continue
+        push!(keys, id)
+        env = initial_envelope(i, ctx)
+        if env === nothing && spec !== nothing && selects(i) === spec.target && spec.mode == "elements"
+            target = only(l for l in m["layers"] if l["id"] == string(spec.target))
+            idxs = get(target, "selected", nothing)
+            if idxs !== nothing || explicit_empty_seed(selected)
+                env = Dict{String, Any}(
+                    "items" => [Dict{String, Any}("layer" => target["id"], "index" => k) for k in something(idxs, Int[])],
+                )
+            end
+        elseif env === nothing
+            idxs = get(d, "selected", nothing)
+            idxs !== nothing && length(idxs) == 1 &&
+                (env = Dict{String, Any}("layer" => id, "index" => only(idxs)))
+        end
+        initial[id] = env
+    end
+    m["keyed"] = keys
+    m["initial"] = initial
+    return m
+end
+
 # The widget's `selects` target, or `nothing`. A selector owns the bond, so `_bond_owner` has
 # already rejected a second one and `only` holds.
 function _selection_spec(interactables, layers)
@@ -371,7 +421,7 @@ the published manifest.
 function build_manifest(
         interactables, ctx::InteractionContext;
         selected = nothing, tip_style = nothing, tip_digits = _DEFAULT_SIGDIGITS, background = nothing,
-        overlay_style = nothing, owners_out = nothing,
+        overlay_style = nothing, owners_out = nothing, keyed::Bool = false,
     )
     built = Tuple{Any, HitLayer, Dict{String, Any}}[]
     for i in interactables
@@ -387,8 +437,16 @@ function build_manifest(
     _drop_absent_default_covers!(built)
     _validate_slices(layers)
     _validate_links(layer_owners, layers)
-    owner = _bond_owner(built)
+    owner = keyed ? nothing : _bond_owner(built)
+    keyed && _check_one_selector(interactables)
     spec = _selection_spec(interactables, layers)
+    # A keyed bond gives each committing layer its own slot, so only a `selects` box's target
+    # loses its clicks: the box holds that layer's selection.
+    if keyed && spec !== nothing
+        for (_, L, d) in built
+            L.id === spec.target && filter!(!=("click"), d["events"])
+        end
+    end
     # The owner is the only layer that commits: a click elsewhere would replace the threshold's
     # value or the brushed selection while the control stays drawn at its own. Every other layer
     # keeps hover (tooltip); the overlay hit-tests clicks by `events`.
@@ -433,6 +491,7 @@ function build_manifest(
         "layers" => layers,
         "transforms" => Dict(string(id) => _transform_dict(t) for (id, t) in ctx.transforms),
     )
+    keyed && _keyed_manifest!(m, built, spec, selected, ctx)
     if owner !== nothing
         m["bondOwner"] = string(owner[2])
         env = initial_envelope(owner[1], ctx)
@@ -652,7 +711,7 @@ function _masque(
         max_width = nothing, px_per_unit = nothing, selected = nothing,
         tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
         tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing, tooltip_caret = true,
-        tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing,
+        tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing, keyed::Bool = false,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
     overlay_style = overlay_style_dict(overlaystyle)
@@ -673,7 +732,7 @@ function _masque(
         owners_out = Ref(Dict{String, LayerOwner}())
         manifest = build_manifest(
             interactables, ctx; selected, tip_style, tip_digits,
-            background = fig.scene.backgroundcolor[], overlay_style, owners_out,
+            background = fig.scene.backgroundcolor[], overlay_style, owners_out, keyed,
         )
         result = render(backend, fig, ppu)
         display_css = round(Int, min(size(fig.scene)[1], max_width))

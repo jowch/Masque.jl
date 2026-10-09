@@ -444,4 +444,62 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test iv(masque(cfig, ThresholdInteractable(cax; value = 2.5); auto = false)) ==
             ThresholdEvent(:threshold, 2.5, nothing)
     end
+    @testset "keyed = true gives each committing layer its own slot (spike)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        pts = [(2.0, 2.0), (4.0, 4.0), (8.0, 8.0)]
+        pi = PointInteractable(ax, pts; id = :pts, payloads = ["a", "b", "c"])
+        dots = PointInteractable(ax, [(9.0, 1.0)]; id = :dots)
+        th = ThresholdInteractable(ax; value = 4.0, id = :cutoff)
+        box = ROIInteractable(ax; bounds = (1.0, 5.0, 1.0, 5.0), selects = :pts, id = :box)
+        tv = IP.APD.Bonds.transform_value
+        iv = IP.APD.Bonds.initial_value
+        ev_of(w, id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))["events"]
+
+        # Two controls and a clickable layer: no owner error, and every slot starts where it
+        # would start alone.
+        w = masque(fig, [pi, dots, th, box]; auto = false, keyed = true)
+        @test w.manifest["keyed"] == ["dots", "cutoff", "box"]
+        @test !haskey(w.manifest, "bondOwner")
+        @test "click" in ev_of(w, "dots")
+        @test ev_of(w, "pts") == ["hover"]    # the box holds its target's selection
+        v0 = iv(w)
+        @test v0 isa NamedTuple{(:dots, :cutoff, :box)}
+        @test v0.dots === nothing && v0.box === nothing
+        @test v0.cutoff == ThresholdEvent(:cutoff, 4.0, nothing)
+
+        # A commit fills its own slot; the browser sends every slot it holds.
+        got = tv(
+            w, Dict(
+                "keyed" => Dict(
+                    "dots" => Dict("layer" => "dots", "index" => 0),
+                    "cutoff" => Dict("layer" => "cutoff", "index" => 0, "payload" => 6.5),
+                    "box" => Dict("items" => [Dict("layer" => "pts", "index" => 0), Dict("layer" => "pts", "index" => 1)]),
+                ),
+            ),
+        )
+        @test got.dots isa ElementEvent && got.dots.layer === :dots
+        @test got.cutoff == ThresholdEvent(:cutoff, 6.5, nothing)
+        @test [e.payload for e in got.box] == ["a", "b"]
+
+        # Two thresholds are fine keyed; a slot that isn't in the widget, or a commit filed under
+        # another layer's slot, is refused.
+        w2 = masque(fig, th, ThresholdInteractable(ax; value = 6.0, id = :t2); keyed = true)
+        @test (iv(w2).cutoff.value, iv(w2).t2.value) == (4.0, 6.0)
+        @test_throws ArgumentError tv(w2, Dict("keyed" => Dict("ghost" => nothing)))
+        @test_throws ArgumentError tv(
+            w2, Dict("keyed" => Dict("t2" => Dict("layer" => "cutoff", "index" => 0, "payload" => 1.0))),
+        )
+
+        # `selected=` seeds a layer's slot (one index) and a box's slot (its target's marks).
+        ws = masque(fig, [pi, dots, box]; auto = false, keyed = true, selected = Dict(:dots => 1, :pts => [2]))
+        @test iv(ws).dots isa ElementEvent && iv(ws).dots.index == 1
+        @test only(iv(ws).box).payload == "b"
+
+        # A keyed bond takes one selecting box for now.
+        box2 = ROIInteractable(ax; bounds = (6.0, 9.0, 6.0, 9.0), selects = :dots, id = :box2)
+        @test_throws ArgumentError masque(fig, [pi, dots, box, box2]; auto = false, keyed = true)
+
+        # Off by default: the single-owner rule from #309 stands.
+        @test_throws ArgumentError masque(fig, th, ThresholdInteractable(ax; value = 6.0, id = :t2))
+    end
 end
