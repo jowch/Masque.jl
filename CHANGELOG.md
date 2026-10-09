@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-09
+
 ### Added
 - A `ViewInteractable` on an `Axis3` zooms as well as orbits: scroll, or press `+` / `-`,
   to zoom around the middle of the axis box, and Shift+drag, or Shift with an arrow key, to
@@ -20,7 +22,8 @@ All notable changes to this project are documented here. The format is based on
   The page loads the overlay script once from jsDelivr, pinned to the installed Masque
   release and checked against its hash, so each widget adds little beyond its image. Read
   offline, the page shows the plain figures. A Masque checked out with `Pkg.develop` writes
-  the script into each widget instead, about 80 KB apiece (#298).
+  the script into each widget instead, about 80 KB apiece. An install from a branch or URL
+  shows the plain figures; use `Pkg.develop` to try unreleased changes outside Pluto (#298).
 - `SliceInteractable([a, b])` builds a slice from plots without naming the axis; `masque`
   puts it on the axis that draws them, and plots on different axes raise an error naming
   both. `SliceInteractable(ax, [a, b])` still works (#306).
@@ -60,6 +63,9 @@ All notable changes to this project are documented here. The format is based on
 - Showing a `masque` widget outside Pluto no longer throws an `AssertionError`. A
   `backend = :webgl` widget, which has no image to fall back on, shows a box of the figure's
   size saying it is drawn only in Pluto. Widgets in Pluto are unchanged (#288).
+- Two tooltip examples, in the `interactables` docstring and on the constructors page, wrote a
+  template field as `{x}`, which a tooltip shows as literal text. They now write `$(x)`.
+  Thanks to Jah-yee (#303).
 
 ## [0.2.1] - 2026-10-04
 
@@ -261,7 +267,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/jowch/Masque.jl/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/jowch/Masque.jl/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jowch/Masque.jl/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/jowch/Masque.jl/compare/v0.1.0...v0.1.1
