@@ -199,10 +199,10 @@ kind_sweep_meta() = [
     ),
     Dict(
         # `datashader!`: a grid whose hover reads the aggregate count, not the colour-mapped
-        # value. Cell (99, 45) is the fullest cell, three points under `AggSerial`.
+        # value. Cell (55, 23) holds the twenty stacked points; every other cell holds at most two.
         "key" => "datashader", "layerId" => "cells", "layerKind" => "grid",
-        "selected" => nothing, "circle" => false, "selectedIndex" => 19062, "clickIndex" => 19062,
-        "tip" => "(99,45) = 3", "hoverIndex" => 19062, "hoverTip" => "(99,45) = 3", "mode" => "element",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 2430, "clickIndex" => 2430,
+        "tip" => "(55,23) = 20", "hoverIndex" => 2430, "hoverTip" => "(55,23) = 20", "mode" => "element",
     ),
     Dict(
         # `violin!`: each violin is one polygon element.
@@ -698,21 +698,27 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:text => [2]))
     end
 
-    # A fixed point cloud in four clumps, so the aggregate doesn't change between runs.
+    # Four clumps laid out on a golden-angle spiral (no RNG: `randn` streams differ between
+    # Julia versions, and CI's sweep runs 1.10), plus twenty copies of one point, so exactly one
+    # cell holds twenty points and every other cell fewer.
     datashader = let
-        rng = MersenneTwister(3)
-        pts = [Point2f(cx + 0.3randn(rng), cy + 0.3randn(rng)) for (cx, cy) in ((1, 1), (3, 1), (1, 3), (3, 3)) for _ in 1:400]
+        spiral(cx, cy) = [Point2f(cx + 0.6sqrt(k / 400) * cos(2.39996k), cy + 0.6sqrt(k / 400) * sin(2.39996k)) for k in 1:400]
+        pts = vcat((spiral(cx, cy) for (cx, cy) in ((1, 1), (3, 1), (1, 3), (3, 3)))..., fill(Point2f(2, 2), 20))
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "datashader")
         # Serial aggregation: the threaded one can count a point twice (Makie PR #5750).
-        datashader!(ax, pts; async = false, method = Makie.AggSerial())
+        # 4-px bins: the driver's no-pulse nudge moves the pointer 1 CSS px, which would leave a
+        # default 1-px bin and hover its neighbour.
+        datashader!(ax, pts; async = false, method = Makie.AggSerial(), binsize = 4)
         masque(fig)
     end
 
     violin = let
-        rng = MersenneTwister(2)
+        # Evenly spaced logistic quantiles (close to normal), not `randn`, so the shapes match
+        # across Julia versions.
+        q = [log(p / (1 - p)) / 1.7 for p in range(0.0025, 0.9975; length = 200)]
         xs = repeat([1, 2]; inner = 200)
-        ys = vcat(randn(rng, 200), randn(rng, 200) .* 0.6 .+ 1)
+        ys = vcat(q, q .* 0.6 .+ 1)
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "violin")
         violin!(ax, xs, ys; color = (:steelblue, 0.6))
