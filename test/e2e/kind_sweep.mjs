@@ -984,6 +984,9 @@ try {
         for (const s of probe.contains) {
           if (!tip.text.includes(s)) throw new Error(`${key}: tooltip ${JSON.stringify(tip?.text)} missing ${JSON.stringify(s)}`);
         }
+        for (const s of probe.excludes ?? []) {
+          if (tip.text.includes(s)) throw new Error(`${key}: tooltip ${JSON.stringify(tip.text)} should not show ${JSON.stringify(s)}`);
+        }
       }
       passed.push(`${key}/slice`);
       console.error(`OK  ${key}/slice`);

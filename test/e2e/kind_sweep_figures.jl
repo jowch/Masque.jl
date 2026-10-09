@@ -419,6 +419,17 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "slice",
         "probes" => [Dict("x" => 1.0, "y" => 2.0, "contains" => ["wide 1.000", "narrow 3.000"])],
     ),
+    Dict(
+        # #319: a missing y value (NaN in one coordinate) is a gap in the slice, as in the
+        # drawn line. x = 2 falls in the gap, so only the unbroken line reads out.
+        "key" => "slice_gap", "layerId" => "slice", "layerKind" => "slice",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "slice",
+        "probes" => [
+            Dict("x" => 1.0, "y" => 2.0, "contains" => ["gappy 1.000", "whole 3.000"]),
+            Dict("x" => 2.0, "y" => 2.0, "contains" => ["whole 2.000"], "excludes" => ["gappy"]),
+        ],
+    ),
 ]
 
 function build_kind_sweep()
@@ -1036,10 +1047,19 @@ function build_kind_sweep()
         masque(fig, SliceInteractable(ax, [wide, narrow]), AxisInteractable(ax); auto = false)
     end
 
+    slice_gap = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "slice gap", limits = (0, 4, 0, 4))
+        xs = [0.0, 1.0, 2.0, 3.0, 4.0]
+        gappy = lines!(ax, xs, [0.0, 1.0, NaN, 3.0, 4.0]; label = "gappy")
+        whole = lines!(ax, xs, 4 .- xs; label = "whole")
+        masque(fig, SliceInteractable(ax, [gappy, whole]), AxisInteractable(ax); auto = false)
+    end
+
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, view3d, legend, series_legend,
-        legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto,
+        legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

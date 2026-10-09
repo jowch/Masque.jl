@@ -432,10 +432,10 @@ HTML(
         "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>",
 )
 
-# ╔═╡ d1000000-0000-0000-0000-000000000113
+# ╔═╡ d1000000-0000-0000-0000-000000000115
 @bind ev_view3d sweep.view3d
 
-# ╔═╡ d1000000-0000-0000-0000-000000000114
+# ╔═╡ d1000000-0000-0000-0000-000000000116
 HTML(
     "<span id=\"out_view3d\">VIEW3D=$(repr(ev_view3d))</span>" *
         "<span id=\"coords_view3d\" style=\"display:none\">$(JSON3.write(sweep.view3d.manifest["layers"]))</span>",
@@ -515,6 +515,17 @@ HTML(
     "<span id=\"out_slice_auto\">SLICE_AUTO=$(repr(ev_slice_auto))</span>" *
         "<span id=\"coords_slice_auto\" style=\"display:none\">$(JSON3.write(sweep.slice_auto.manifest["layers"]))</span>" *
         "<span id=\"axes_slice_auto\" style=\"display:none\">$(JSON3.write(sweep.slice_auto.manifest["transforms"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000113
+@bind ev_slice_gap sweep.slice_gap
+
+# ╔═╡ d1000000-0000-0000-0000-000000000114
+HTML(
+    "<span id=\"out_slice_gap\">SLICE_GAP=$(repr(ev_slice_gap))</span>" *
+        # The gap is NaN, which JSON can't spell; the driver reads it as null.
+        "<span id=\"coords_slice_gap\" style=\"display:none\">$(replace(JSON3.write(sweep.slice_gap.manifest["layers"]; allow_inf = true), "NaN" => "null"))</span>" *
+        "<span id=\"axes_slice_gap\" style=\"display:none\">$(JSON3.write(sweep.slice_gap.manifest["transforms"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000040
@@ -613,8 +624,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000033
 # ╠═d1000000-0000-0000-0000-000000000034
 # ╠═d1000000-0000-0000-0000-000000000035
-# ╠═d1000000-0000-0000-0000-000000000113
-# ╠═d1000000-0000-0000-0000-000000000114
+# ╠═d1000000-0000-0000-0000-000000000115
+# ╠═d1000000-0000-0000-0000-000000000116
 # ╠═d1000000-0000-0000-0000-000000000038
 # ╠═d1000000-0000-0000-0000-000000000039
 # ╠═d1000000-0000-0000-0000-000000000047
@@ -631,4 +642,6 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000053
 # ╠═d1000000-0000-0000-0000-0000000000b0
 # ╠═d1000000-0000-0000-0000-0000000000b1
+# ╠═d1000000-0000-0000-0000-000000000113
+# ╠═d1000000-0000-0000-0000-000000000114
 # ╠═d1000000-0000-0000-0000-000000000040
