@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- An ROI's `selects` takes the plot it brushes, as in `ROIInteractable(ax; bounds, selects = sc)`,
+  so you no longer need to know which scatter became `:scatter_2`. A plot that
+  draws both lines and points, such as `scatterlines`, gives the box its points. A layer id
+  still works (#302).
 - A `ViewInteractable` on an `Axis3` zooms as well as orbits: scroll, or press `+` / `-`,
   to zoom around the middle of the axis box, and Shift+drag, or Shift with an arrow key, to
   pan. As in Makie, the box keeps its size and the limits change, so marks outside the new
