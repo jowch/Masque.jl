@@ -276,10 +276,10 @@ HTML(
         "<span id=\"coords_overlap3d\" style=\"display:none\">$(JSON3.write(sweep.overlap3d.manifest["layers"]))</span>",
 )
 
-# ╔═╡ c1000000-0000-0000-0000-000000000120
+# ╔═╡ c1000000-0000-0000-0000-000000000123
 @bind ev_surface3d sweep.surface3d
 
-# ╔═╡ c1000000-0000-0000-0000-000000000121
+# ╔═╡ c1000000-0000-0000-0000-000000000124
 HTML(
     "<span id=\"out_surface3d\">SURFACE3D=$(repr(ev_surface3d))</span>" *
         "<span id=\"coords_surface3d\" style=\"display:none\">$(JSON3.write(sweep.surface3d.manifest["layers"]))</span>",
@@ -412,6 +412,24 @@ HTML(
         "<span id=\"axes_threshold_cat\" style=\"display:none\">$(JSON3.write(sweep.threshold_cat.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000119
+@bind ev_colorbar_owner sweep.colorbar_owner
+
+# ╔═╡ c1000000-0000-0000-0000-000000000120
+HTML(
+    "<span id=\"out_colorbar_owner\">COLORBAR_OWNER=$(repr(ev_colorbar_owner))</span>" *
+        "<span id=\"coords_colorbar_owner\" style=\"display:none\">$(JSON3.write(sweep.colorbar_owner.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000121
+@bind ev_roi_bounds sweep.roi_bounds
+
+# ╔═╡ c1000000-0000-0000-0000-000000000122
+HTML(
+    "<span id=\"out_roi_bounds\">ROI_BOUNDS=$(repr(ev_roi_bounds))</span>" *
+        "<span id=\"coords_roi_bounds\" style=\"display:none\">$(JSON3.write(sweep.roi_bounds.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000064
 @bind ev_axis_cat sweep.axis_cat
 
@@ -438,6 +456,15 @@ HTML(
 HTML(
     "<span id=\"out_view\">VIEW=$(repr(ev_view))</span>" *
         "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000115
+@bind ev_view3d sweep.view3d
+
+# ╔═╡ c1000000-0000-0000-0000-000000000116
+HTML(
+    "<span id=\"out_view3d\">VIEW3D=$(repr(ev_view3d))</span>" *
+        "<span id=\"coords_view3d\" style=\"display:none\">$(JSON3.write(sweep.view3d.manifest["layers"]))</span>",
 )
 
 # ╔═╡ c1000000-0000-0000-0000-000000000038
@@ -589,8 +616,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000108
 # ╠═c1000000-0000-0000-0000-000000000109
 # ╠═c1000000-0000-0000-0000-00000000010a
-# ╠═c1000000-0000-0000-0000-000000000120
-# ╠═c1000000-0000-0000-0000-000000000121
+# ╠═c1000000-0000-0000-0000-000000000123
+# ╠═c1000000-0000-0000-0000-000000000124
 # ╠═c1000000-0000-0000-0000-00000000010b
 # ╠═c1000000-0000-0000-0000-00000000010c
 # ╠═c1000000-0000-0000-0000-00000000010d
@@ -619,12 +646,18 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000031
 # ╠═c1000000-0000-0000-0000-000000000062
 # ╠═c1000000-0000-0000-0000-000000000063
+# ╠═c1000000-0000-0000-0000-000000000119
+# ╟─c1000000-0000-0000-0000-000000000120
+# ╠═c1000000-0000-0000-0000-000000000121
+# ╟─c1000000-0000-0000-0000-000000000122
 # ╠═c1000000-0000-0000-0000-000000000064
 # ╠═c1000000-0000-0000-0000-000000000065
 # ╠═c1000000-0000-0000-0000-000000000032
 # ╠═c1000000-0000-0000-0000-000000000033
 # ╠═c1000000-0000-0000-0000-000000000034
 # ╠═c1000000-0000-0000-0000-000000000035
+# ╠═c1000000-0000-0000-0000-000000000115
+# ╠═c1000000-0000-0000-0000-000000000116
 # ╠═c1000000-0000-0000-0000-000000000038
 # ╠═c1000000-0000-0000-0000-000000000039
 # ╠═c1000000-0000-0000-0000-000000000047

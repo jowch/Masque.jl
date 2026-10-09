@@ -88,6 +88,87 @@ end
         @test view_layer["geometry"]["elevation"] ≈ 0.2 atol = 1.0e-9
     end
 
+    @testset "3D zoom and pan move the limits (#321)" begin
+        fig = Figure(size = (400, 400))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5)
+        pts = Makie.Point3f[(0, 0, 0), (1, 1, 1), (0.5, 0.5, 0.5)]
+        scatter!(ax, pts)
+        w = masque(fig, [ViewInteractable(ax), PointInteractable(ax, pts)]; auto = false)
+        g = only(l for l in w.manifest["layers"] if l["kind"] == "view")["geometry"]
+        lim = g["limits"]
+        @test length(lim) == 6 && lim[1] < 0 && lim[2] > 1 && lim[5] < 0 && lim[6] > 1
+
+        # `panx`/`pany` move the picture one image px right/down: check against the projection.
+        bk = Masque._resolve_backend(:cairo)
+        ctx = Masque.context(bk, fig, Masque._ppu(bk, fig, 700), 700)
+        c = Point3d((lim[1] + lim[2]) / 2, (lim[3] + lim[4]) / 2, (lim[5] + lim[6]) / 2)
+        q0 = data_to_image_px(ctx, ax, c)
+        qx = data_to_image_px(ctx, ax, c .+ 20 .* Point3d(g["panx"]...))
+        qy = data_to_image_px(ctx, ax, c .+ 20 .* Point3d(g["pany"]...))
+        @test qx[1] - q0[1] ≈ 20 atol = 0.5
+        @test qx[2] - q0[2] ≈ 0 atol = 0.5
+        @test qy[1] - q0[1] ≈ 0 atol = 0.5
+        @test qy[2] - q0[2] ≈ 20 atol = 0.5
+
+        # Zoom: limits around the middle point. The corners fall outside and stop hitting.
+        zl = Float64[0.4, 0.6, 0.4, 0.6, 0.4, 0.6]
+        resp = w.render_frame(Dict("id" => "view", "limits" => zl, "settle" => true))
+        fl = ax.finallimits[]
+        @test collect(minimum(fl)) ≈ [0.4, 0.4, 0.4] atol = 1.0e-6
+        @test collect(maximum(fl)) ≈ [0.6, 0.6, 0.6] atol = 1.0e-6
+        @test ax.azimuth[] ≈ 0.4 atol = 1.0e-9
+        m = resp["manifest"]
+        @test only(l for l in m["layers"] if l["kind"] == "view")["geometry"]["limits"] ≈ zl atol = 1.0e-6
+        circ = only(l for l in m["layers"] if l["kind"] == "circles")["geometry"]
+        @test all(isnan, circ[[1, 2, 4, 5]])   # centres; the pixel radius stays
+        @test all(isfinite, circ[7:9])
+
+        # An orbit after a zoom keeps the zoomed limits.
+        w.render_frame(Dict("id" => "view", "azimuth" => 0.9, "elevation" => 0.3, "settle" => false))
+        @test collect(maximum(ax.finallimits[])) ≈ [0.6, 0.6, 0.6] atol = 1.0e-6
+        @test_throws ArgumentError w.render_frame(Dict("id" => "view", "limits" => [1.0, 0.0, 0, 1, 0, 1]))
+    end
+
+    @testset "a line crossing the zoomed limits keeps its drawn part (#321)" begin
+        box = ((0.4, 0.4, 0.4), (0.6, 0.6, 0.6))
+        @test all(Masque._clip_segment(box, (0, 0, 0), (1, 1, 1)) .≈ (0.4, 0.6))
+        @test Masque._clip_segment(box, (0, 0, 0), (0.1, 0.1, 0.1)) === nothing
+        @test Masque._clip_segment(box, (0.5, 0, 0.5), (0.5, 1, 0.5)) == (0.4, 0.6)   # parallel to two faces
+        @test Masque._clip_segment(box, (0.7, 0, 0.5), (0.7, 1, 0.5)) === nothing
+
+        fig = Figure(size = (400, 400))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5)
+        lines!(ax, [0, 0.5, 1], [0, 0.5, 1], [0, 0.5, 1])
+        path = [(0, 0, 0), (0.5, 0.5, 0.5), (1, 1, 1)]
+        w = masque(
+            fig, [
+                ViewInteractable(ax),
+                SegmentInteractable(ax, path; id = :edges),
+                SegmentInteractable(ax, [(0, 0, 0), (0.1, 0.1, 0.1), (0, 0, 0), (1, 1, 1)]; mode = :pairs, id = :pairs),
+            ]
+        )
+        lay(m, id) = only(l for l in m["layers"] if l["id"] == id)
+        @test lay(w.manifest, "edges")["kind"] == "polyline"   # nothing cut yet
+        m = w.render_frame(Dict("id" => "view", "limits" => [0.4, 0.6, 0.4, 0.6, 0.4, 0.6], "settle" => true))["manifest"]
+        bk = Masque._resolve_backend(:cairo)
+        ctx = Masque.context(bk, fig, Masque._ppu(bk, fig, 700), 700)
+        px(p) = collect(data_to_image_px(ctx, ax, p))
+        a, mid, b = px((0.4, 0.4, 0.4)), px((0.5, 0.5, 0.5)), px((0.6, 0.6, 0.6))
+
+        # The plotted line: one run from where it enters the box to where it leaves.
+        g = only(lay(m, "lines")["geometry"])
+        @test length(g) == 6 && all(isfinite, g)
+        @test g ≈ vcat(a, mid, b) atol = 1
+        # A per-edge path ships one pair per edge, so element k is still edge k.
+        e = lay(m, "edges")
+        @test e["kind"] == "segments"
+        @test e["geometry"] ≈ vcat(a, mid, mid, b) atol = 1
+        # A pair wholly outside is a gap; the crossing one keeps its inside part.
+        q = lay(m, "pairs")["geometry"]
+        @test all(isnan, q[1:4])
+        @test q[5:8] ≈ vcat(a, b) atol = 1
+    end
+
     @testset "unknown layer id fails loud" begin
         (; fig, ax, pts) = default_fixture()
         w = masque(fig, [ViewInteractable(ax; id = :view), PointInteractable(ax, pts)]; auto = false)
@@ -98,7 +179,7 @@ end
         fig3 = Figure(size = (400, 400))
         ax3 = Axis3(fig3[1, 1])
         scatter!(ax3, Makie.Point3f[(1, 2, 3), (4, 5, 6)])
-        az0, el0 = ax3.azimuth[], ax3.elevation[]
+        az0, el0, lim0 = ax3.azimuth[], ax3.elevation[], ax3.limits[]
         w3 = masque(fig3, [ViewInteractable(ax3)]; auto = false)
         @test w3.render_frame isa Function
         @test !Masque._view_warmup_finished(w3.render_frame)
@@ -119,6 +200,7 @@ end
         @test Masque._view_warmup_finished(w3.render_frame)
         @test ax3.azimuth[] ≈ az0 atol = 1.0e-12
         @test ax3.elevation[] ≈ el0 atol = 1.0e-12
+        @test ax3.limits[] == lim0   # the warmup's zoom frame is put back too
 
         fig2 = Figure(size = (600, 400))
         ax2 = Axis(fig2[1, 1])

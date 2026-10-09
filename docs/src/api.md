@@ -55,29 +55,31 @@ For usage, see [Tooltips](@ref).
 
 ## Tooltip styling
 
-Pass any of these to `masque` to set that part of the tooltip's style
-for the whole widget. A property you set stays the same on light and
-dark figures:
+Pass `tooltipstyle` to `masque` to change how the tooltip card looks in
+that widget. Name only the parts you want to change; the rest keep the
+built-in look. A part you set stays the same on light and dark figures:
 
 ```julia
-masque(fig, xs...;
-    tooltip_bg        = nothing,   # background: CSS string or Makie color
-    tooltip_color     = nothing,   # text color: CSS string or Makie color
-    tooltip_accent    = nothing,   # accent (emphasis, links)
-    tooltip_font      = nothing,   # font-family: String
-    tooltip_font_size = nothing,   # Real, in px
-    tooltip_radius    = nothing,   # Real, in px
-    tooltip_caret     = true,      # Bool: draw the caret pointing at the mark
-    tooltip_sigdigits = 4,         # Int, 1 to 17: significant figures for numbers
-)
+masque(fig; tooltipstyle = (; bg = "#1a1a2e", color = :white, radius = 6))
 ```
 
-`nothing`, the default for every keyword except `tooltip_caret` and
-`tooltip_sigdigits`, keeps the built-in style. `tooltip_sigdigits` sets
-how many significant figures a tooltip number shows: in the default
-tooltip, a heatmap cell, and a template field with no format spec,
-trailing zeros are dropped; axis, colorbar, and slice readouts and drag
-labels keep them, so they don't change width as you move. See
+An unknown key raises an `ArgumentError` that lists the valid ones.
+
+| Key | Value | Changes |
+|---|---|---|
+| `bg` | CSS string or Makie color | background |
+| `color` | CSS string or Makie color | text color |
+| `accent` | CSS string or Makie color | field names in the default table |
+| `font` | `String`, a CSS font-family | font |
+| `font_size` | number, in px | text size |
+| `radius` | number, in px | corner radius |
+| `caret` | `Bool` | `false` hides the caret pointing at the mark |
+
+`tooltip_sigdigits`, a separate keyword, sets how many significant
+figures a tooltip number shows, from 1 to 17 (default 4). In the
+default tooltip, a heatmap cell, and a template field with no format
+spec, trailing zeros are dropped; axis, colorbar, and slice readouts
+and drag labels keep them, so they don't change width as you move. See
 [Tooltips](@ref).
 
 To style tooltips without Julia, set the `--masque-tip-*` CSS custom
@@ -95,16 +97,16 @@ gets a dark tooltip. Older browsers without CSS relative-color syntax
 use the fixed values shown instead, and where a row lists light and
 dark values, the browser picks one by the system's color scheme:
 
-| Custom property | Default (light / dark) | Julia keyword |
+| Custom property | Default (light / dark) | `tooltipstyle` key |
 |---|---|---|
-| `--masque-tip-bg` | follows the figure; older browsers `#ffffff` / `#1e1e1e` | `tooltip_bg` |
-| `--masque-tip-color` | follows the figure; older browsers `#1a1a1a` / `#e8e8e8` | `tooltip_color` |
+| `--masque-tip-bg` | follows the figure; older browsers `#ffffff` / `#1e1e1e` | `tooltipstyle.bg` |
+| `--masque-tip-color` | follows the figure; older browsers `#1a1a1a` / `#e8e8e8` | `tooltipstyle.color` |
 | `--masque-tip-border` | follows the figure; older browsers `rgba(0,0,0,0.1)` / `rgba(255,255,255,0.15)` | CSS only |
-| `--masque-tip-accent` | `#6b7280` | `tooltip_accent` |
-| `--masque-tip-font` | `system-ui, -apple-system, sans-serif` | `tooltip_font` |
-| `--masque-tip-font-size` | `11px` | `tooltip_font_size` |
-| `--masque-tip-radius` | `4px` | `tooltip_radius` |
-| `--masque-tip-caret` | `block` (the caret's `display`) | `tooltip_caret` (`false` → `none`) |
+| `--masque-tip-accent` | `#6b7280` | `tooltipstyle.accent` |
+| `--masque-tip-font` | `system-ui, -apple-system, sans-serif` | `tooltipstyle.font` |
+| `--masque-tip-font-size` | `11px` | `tooltipstyle.font_size` |
+| `--masque-tip-radius` | `4px` | `tooltipstyle.radius` |
+| `--masque-tip-caret` | `block` (the caret's `display`) | `tooltipstyle.caret` (`false` → `none`) |
 | `--masque-tip-padding` | `8px 12px` | CSS only |
 | `--masque-tip-shadow` | `0 2px 4px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)` / `0 2px 4px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3)` | CSS only |
 | `--masque-tip-maxwidth` | `320px` | CSS only |

@@ -8,7 +8,8 @@ Most constructors take the axis first and `id` as a keyword: the
 `Symbol` an event reports as `pick.layer`. Constructors for marks also
 take `payloads` (a vector or a `DataFrame`, one entry per mark) and
 `tooltip` (a `masque"..."` template, or `false`). Without `payloads`,
-each mark reports its `index` and coordinates.
+each mark reports its `index` and coordinates, and `payloads` adds your
+fields to those coordinates.
 
 ## What `masque(fig)` builds
 

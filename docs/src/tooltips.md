@@ -21,8 +21,9 @@ Main.masque_fallback("tooltips_template")
 ## The default tooltip
 
 Without `tooltip`, the tooltip is a small table of the payload's
-fields: your own fields when you pass `payloads`, and for a scatter
-without them, the point's `index`, `x`, and `y`. On a categorical or
+fields: for a scatter, the point's `index`, `x`, and `y`, and when you
+pass `payloads`, your fields followed by `x` and `y` (see
+[Concepts](@ref) for how the two combine). On a categorical or
 date axis, `x` and `y` in the tooltip and in `pick` are text: the
 category's label, such as `"b"`, or the date or time you plotted, such
 as `"2024-01-02"`, `"2024-01-01T01:00:00"`, or `"01:00:00"`.
@@ -89,8 +90,8 @@ a `TemplateValidationError` when its cell runs.
 A template that names a field the payload does not have raises an
 `ArgumentError` when `masque` runs, and the message lists the payload's
 fields and suggests the closest match. This check needs named-tuple
-payloads: with a `DataFrame` or `Dict`, a misspelled field shows up as a
-blank in the tooltip, so hover once after you write the template.
+payloads: with a `DataFrame` or `Dict`, a misspelled field can show up as
+a blank in the tooltip, so hover once after you write the template.
 
 ## HTML in payload values
 
@@ -150,7 +151,7 @@ color. The color comes from:
 Without a known color, the border is a plain 1px line.
 
 To change the tooltip's background, text color, font, or corner radius
-for a whole widget, pass the `tooltip_*` keywords to `masque`, or set the
+for a whole widget, pass `tooltipstyle` to `masque`, or set the
 `--masque-tip-*` CSS properties on the page. See [Tooltip styling](@ref).
 To change the color and width of highlights and the selection, pass
 `overlaystyle`; see [Overlay styling](@ref).

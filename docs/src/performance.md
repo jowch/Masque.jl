@@ -42,7 +42,9 @@ each gesture changes, see [How interactions work](@ref).
 
 Every payload field is sent with every mark, so keep payloads to the
 fields you show. Keep the data you need later in Julia, and look it up
-with `pick.index` or an id field.
+with `pick.index` or an id field. A named-tuple payload also carries the
+mark's own data, such as a point's `x` and `y`; a bare value, such as an
+id, is sent as it is with nothing added.
 
 A `masque"..."` template is sent once per layer, while a formatted
 string in each payload is sent once per mark, so use a template instead.

@@ -39,7 +39,16 @@ cities = interactables(s; payloads = rows)   # rows[i] belongs to point i
 
 The tooltip shows the payload, and a click returns it to Julia as
 `pick.city`, `pick.pop`, and so on. Without `payloads`, each mark gets
-an `index` and its coordinates, such as `x` and `y` for a scatter point.
+an `index` and its own data, such as `x` and `y` for a scatter point or
+`low`, `high`, and `value` for a bar.
+
+Your payloads are added to the mark's own data, so `(; city = "Lyon")`
+on a scatter point gives `city`, `x`, and `y`, and `pick.index` still
+says which point it is. A field you name yourself, such as your own
+`x`, takes the place of the mark's. To show only some fields in the
+tooltip, pass a template that names them; see [Tooltips](@ref). A
+payload that isn't a named tuple, `DataFrame` row, or `Dict`, such as a
+bare string, is shown as it is.
 
 ## Tooltips are templates
 
@@ -66,8 +75,9 @@ the mark without changing the variable.
 
 ## What the `@bind` value holds
 
-A `masque` widget's `@bind` value starts as `nothing`, and after a click
-or release it is an *event*, a small struct whose fields you read
+A `masque` widget's `@bind` value starts as `nothing`, or at the
+starting position of a threshold or a box without `selects`. After a
+click or release it is an *event*, a small struct whose fields you read
 directly. A clicked mark's event has the payload's fields, such as
 `pick.city`, along with `pick.layer`, the interactable you clicked, and
 `pick.index`, the mark's position in your data. The event indexes your
@@ -87,7 +97,9 @@ Clicking the selected mark again sets the value back to `nothing`.
 | Release a threshold line | [`ThresholdEvent`](@ref) | `pick.value` |
 
 A widget with several interactables holds the most recent event, so to
-tell them apart, check `pick.layer` or the event's type. Clicking another
+tell them apart, check `pick.layer` or the event's type. A threshold, a
+box, or a colorbar you pass is the exception: it owns the value, and
+the rest of the widget shows tooltips but takes no clicks. Clicking another
 mark replaces the event, clicking the selected mark again clears it to
 `nothing`, and clicking empty space keeps it. To start
 with marks selected, see [Selection](@ref).

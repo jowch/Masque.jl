@@ -9,13 +9,14 @@ import type { DragStops } from "./dragkeys"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import { limitsTip } from "./drag/view"
+import * as viewDrag from "./drag/view"
 import { createGestureChannel } from "./gesture"
 import { DEFAULT_SIGDIGITS } from "./template"
 import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, MOTION_MS } from "./state"
 import type { HiGroups, OverlayCtx } from "./state"
-import type { Hit, Manifest, ViewGeometry } from "./types"
+import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
 import { matrixLimits } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
@@ -271,9 +272,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     // The @bind target is the host element. Seed the same envelope Julia's `mount_envelope`
     // builds, or Pluto's mount-time read overwrites `initial_value`. A selects-elements widget
-    // seeds `{items}` (including an explicit empty brush). One hydrated index on a scalar layer
-    // seeds `{layer, index}`. Several indices on a scalar layer are a highlight only (`null`):
-    // that interaction holds one event, so a set is not a value it can carry.
+    // seeds `{items}` (including an explicit empty brush). Otherwise a widget whose bond has an
+    // owner seeds that owner's `initial` envelope, and hydrated indices are a highlight only. One
+    // hydrated index on a scalar layer seeds `{layer, index}`. Several indices on a scalar layer
+    // are a highlight only (`null`): that interaction holds one event, so a set is not a value
+    // it can carry.
     //
     // No `payload` key: `selected=` only ever hydrates a SELECTED_KINDS layer (hitLayerByIndex
     // throws otherwise), and Julia reconstructs an element hit from its own manifest rather than
@@ -289,7 +292,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     const selection = manifest.selection
     const seedItems = selection === "elements" && (hydrated.length > 0 || manifest.hydrate === "items")
-    const hostValue = seedItems ? { items: hydrated } : hydrated.length === 1 ? hydrated[0] : null
+    const owned = manifest.bondOwner !== undefined
+    const hostValue = seedItems ? { items: hydrated }
+        : owned ? (manifest.initial ?? null)
+        : hydrated.length === 1 ? hydrated[0] : null
 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })
@@ -458,7 +464,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const state = createOverlayState()
     state.selHits_ = selHits
     // A brush seed belongs to the box, not a click, so only a scalar seed can be clicked off.
-    if (!seedItems && hydrated.length === 1) state.selSource_ = hydrated[0]
+    if (!seedItems && !owned && hydrated.length === 1) state.selSource_ = hydrated[0]
 
     // `host.value` is the bond. Pluto writes it after mount: on a page reload it restores the
     // kernel's value, which can be a click made since the `selected=` seed. Until a gesture of
@@ -683,9 +689,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // landed" from "a frame was requested," and read the exact camera it landed at, without
         // relying on the bond (which §12.3 leaves untouched for a view gesture).
         const viewLayer = newManifest.layers.find((l) => l.id === input.id)
-        const geom = viewLayer?.geometry as { azimuth?: number; elevation?: number } | undefined
-        const camera: Record<string, number> = "azimuth" in input
-            ? { azimuth: geom?.azimuth ?? NaN, elevation: geom?.elevation ?? NaN }
+        const geom = viewLayer?.geometry as ViewGeometry | undefined
+        // An Axis3 frame's limits decode as a typed array, which JSON writes as an object.
+        const camera: Record<string, number | number[]> = "azimuth" in input || "limits" in input
+            ? { azimuth: geom?.azimuth ?? NaN, elevation: geom?.elevation ?? NaN, ...(geom?.limits ? { limits: Array.from(geom.limits) } : {}) }
             : (() => {
                 const t = viewLayer ? newManifest.transforms[viewLayer.axis] : undefined
                 return { xmin: t?.xlims[0] ?? NaN, xmax: t?.xlims[1] ?? NaN, ymin: t?.ylims[0] ?? NaN, ymax: t?.ylims[1] ?? NaN }
@@ -932,11 +939,17 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
         let id = ""
         let axis = ""
+        let limits3: Limits3 | null = null // an Axis3 view's limits, on screen now
         for (const layer of ctx.manifest_.layers) {
             if (layer.kind !== "view" || !layer.events.includes("drag")) continue
             const g = layer.geometry as ViewGeometry
-            if (g.mode !== "pan") continue
             if (layout.x < g.x || layout.x > g.x + g.w || layout.y < g.y || layout.y > g.y + g.h) continue
+            if (g.mode === "orbit") {
+                if (!g.limits) continue
+                id = layer.id
+                limits3 = g.limits
+                break
+            }
             if (!ctx.manifest_.transforms[layer.axis]) continue
             id = layer.id
             axis = layer.axis
@@ -944,6 +957,25 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
         if (!id) return
         e.preventDefault()
+        if (limits3) {
+            const shown = limits3
+            // Axis3 (#321): no photograph to scale. Each notch asks for limits scaled about
+            // their center; the idle timer settles the last ones at full resolution.
+            const lim = viewDrag.zoom3(state, id, shown, wheelScale(e.deltaY, e.deltaMode))
+            ctx.gesture_.request({ id, limits: lim, settle: false })
+            setTipText(ctx, state, viewDrag.limits3Tip(lim, ctx.tipDigits_))
+            setTipVisible(ctx, true)
+            const tp = tipOffset(ctx, e)
+            placeTip(ctx, state, tp.x, tp.y)
+            if (state.wheelTimer_ !== null) clearTimeout(state.wheelTimer_)
+            const wheelId = id
+            state.wheelTimer_ = setTimeout(() => {
+                state.wheelTimer_ = null
+                hideTip(ctx, state)
+                ctx.gesture_.settle({ id: wheelId, limits: viewDrag.view3Base(state, wheelId, shown), settle: true })
+            }, WHEEL_IDLE_MS)
+            return
+        }
         state.photoViewId_ = id
         const local = unmapPoint(state.photo_, layout)
         const next = zoomAt(state.photo_, local, wheelScale(e.deltaY, e.deltaMode))

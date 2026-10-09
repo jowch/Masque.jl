@@ -2,7 +2,7 @@ import type { Anchor } from "./geometry"
 import type { CrossEls } from "./cross"
 import type { GestureChannel } from "./gesture"
 import { IDENTITY, type PhotoMatrix } from "./photo"
-import type { AxisTransform, FocusRef, Hit, HitLayer, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
+import type { AxisTransform, FocusRef, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 // A value that changes as the pointer moves (an axis readout, a slice sample, a drag label):
 // fixed significant figures, trailing zeros kept, so the label does not change width with
@@ -107,6 +107,9 @@ export type Drag =
     }
     | {
         kind: "view"; id_: string; g_: ViewGeometry; t_: AxisTransform; x0_: number; y0_: number; pointerId_: number
+        // Axis3 Shift+drag (#321): pan the limits instead of orbiting, starting from `base_`.
+        slide_?: boolean
+        base_?: Limits3
         // The last gesture-channel request payload actually sent for this drag — `undefined`
         // until the first one past VIEW_MIN_PX. bond.ts's terminal handlers
         // (onUp/onCancel/onLostCapture) settle when this is set, not from the release point's
@@ -220,6 +223,9 @@ export interface OverlayState {
     // A keyboard pan or orbit (dragkeys.ts) is between its first keydown and its keyup settle.
     // A frame that lands meanwhile keeps the readout, as it does for a pointer pan or a wheel.
     keyView_: boolean
+    // Axis3 limits per view id (#321): the last ones a zoom or pan asked for, which a frame's
+    // geometry can trail, and the ones on screen at the first zoom or pan, which bound the zoom.
+    view3_: Map<string, { limits: Limits3; home: Limits3 }>
 }
 
 export function createOverlayState(): OverlayState {
@@ -257,6 +263,7 @@ export function createOverlayState(): OverlayState {
         photoViewId_: null,
         wheelTimer_: null,
         keyView_: false,
+        view3_: new Map(),
     }
 }
 

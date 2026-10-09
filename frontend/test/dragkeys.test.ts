@@ -272,6 +272,32 @@ describe("drag-layer tab stops", () => {
         expect(inputs).toHaveLength(0)
     })
 
+    it("view orbit with limits: + zooms the Axis3 limits, Shift+arrows pan them from the last request", async () => {
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]) }))
+        const m = viewManifest("orbit")
+        Object.assign(m.layers[0].geometry as object, { limits: [0, 10, 0, 10, 0, 10], panx: [0.01, 0, 0], pany: [0, 0, -0.01] })
+        const { shadow, inputs } = setup(m, requestFrame)
+        const stop = stopOf(shadow, "view")
+        stop.focus()
+        expect(press(stop, "+").defaultPrevented).toBe(true)
+        await new Promise((r) => setTimeout(r, 0))
+        const zoomed = requestFrame.mock.calls[0][0].limits as number[]
+        expect(zoomed[0] + zoomed[1]).toBeCloseTo(10)
+        expect(zoomed[1] - zoomed[0]).toBeLessThan(10)
+        release(stop, "+")
+        await new Promise((r) => setTimeout(r, 10))
+        expect(requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]).toMatchObject({ settle: true, limits: zoomed })
+        // Right shows data further right, as on a 2D axis: 120 px at the zoomed scale.
+        press(stop, "ArrowRight", { shiftKey: true })
+        await new Promise((r) => setTimeout(r, 0))
+        const panned = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0]
+        expect(panned.azimuth).toBeUndefined()
+        const w = zoomed[1] - zoomed[0]
+        expect((panned.limits as number[])[0]).toBeCloseTo(zoomed[0] + 1.2 * w / 10)
+        expect((panned.limits as number[])[2]).toBeCloseTo(zoomed[2])
+        expect(inputs).toHaveLength(0)
+    })
+
     it("threshold: PageDown, a reversed axis's Home/End, and keys that mean nothing to a line", () => {
         const m = thresholdManifest("h")
         m.transforms.ax1 = { ...ax1, yreversed: true }

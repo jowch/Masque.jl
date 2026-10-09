@@ -199,7 +199,7 @@ end
 
     ev = APD.Bonds.transform_value(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "wrong"))
     @test ev isa Masque.ElementEvent && ev.index == 2
-    @test ev.payload === payloads[2]
+    @test ev.payload === pt.payloads[2]   # the label merged onto the point's x and y (#308)
     # both backends call Masque.bond_from_js — not a second copy of the transform
     @test ev == Masque.bond_from_js(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "ignored"))
 
@@ -362,6 +362,13 @@ end
     view_layer = only(l for l in orb["manifest"]["layers"] if l["kind"] == "view")
     @test view_layer["geometry"]["azimuth"] ≈ 0.7 atol = 1.0e-9
     @test haskey(orb, "scene") && !haskey(orb, "png")
+    # Zoom (#321): the limits frame re-serializes the scene at the new limits.
+    zoom = w3.render_frame(Dict("id" => "view", "limits" => [2.0, 3.0, 3.0, 4.0, 4.0, 5.0], "settle" => true))
+    @test collect(maximum(ax3.finallimits[])) ≈ [3.0, 4.0, 5.0] atol = 1.0e-6
+    @test haskey(zoom, "scene")
+    zg = only(l for l in zoom["manifest"]["layers"] if l["kind"] == "view")["geometry"]
+    @test zg["limits"] ≈ [2.0, 3.0, 3.0, 4.0, 4.0, 5.0] atol = 1.0e-6
+    @test zg["azimuth"] ≈ 0.7 atol = 1.0e-9
 
     fig0 = Figure(; size = (200, 150))
     ax0 = Axis(fig0[1, 1])

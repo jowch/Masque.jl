@@ -74,6 +74,17 @@ matches a layer that `masque(fig)` builds on its own replaces that
 layer instead of raising this error; see
 [Adding to what `masque(fig)` builds](@ref).
 
+### Tried two thresholds, boxes, or colorbars in one widget
+
+**Error prefix:** ``masque: :threshold and :roi each own the `@bind` value``
+
+**Cause:** a [`ThresholdInteractable`](@ref), an [`ROIInteractable`](@ref),
+or a [`ColorbarInteractable`](@ref) you pass sets the widget's value,
+and the rest of the widget takes no clicks. A widget has one value, so
+it takes one of them.
+
+**Fix:** pass each to its own `masque` call on the same figure.
+
 ### Passed a keyword your plot type's `interactables` method does not take
 
 **Error prefix:** `masque: the interactables method for`
@@ -273,6 +284,20 @@ Four changes have no old form to fall back on:
 The [changelog](https://github.com/jowch/Masque.jl/blob/main/CHANGELOG.md)
 has the details.
 
+### Upgrading code written for Masque 0.2
+
+Masque 0.3 groups the tooltip style keywords into one `tooltipstyle`
+keyword, the way `overlaystyle` groups the overlay's. The old keywords
+still work in 0.3, show a warning in the cell's log that names the
+replacement, and are removed in 0.4:
+
+| 0.2 | 0.3 |
+|---|---|
+| `masque(fig; tooltip_bg = :black, tooltip_color = :white)` | `masque(fig; tooltipstyle = (; bg = :black, color = :white))` |
+| `tooltip_accent`, `tooltip_font`, `tooltip_font_size`, `tooltip_radius`, `tooltip_caret` | the `tooltipstyle` keys `accent`, `font`, `font_size`, `radius`, `caret` |
+
+`tooltip_sigdigits` stays a keyword of its own. See [Tooltip styling](@ref).
+
 ### Tried `CairoMakie.activate!(type = "svg")` and the widget is a PNG
 
 **Cause:** `type = "svg"` chooses how a bare `Figure` displays, but
@@ -338,6 +363,9 @@ Check, in order:
    error, so its marks do not respond, as with a
    [heatmap or bar plot on a `PolarAxis`](@ref polar-skipped-plots).
    [Recipes masque(fig) extracts](@ref) lists the supported plots.
+4. Does the widget have a threshold, a box, or a colorbar you passed?
+   That control owns the value, so the other marks show tooltips but
+   do not take clicks. Put the marks in a separate `masque` call.
 
 ### Tried a tooltip and saw `[object Object]`
 

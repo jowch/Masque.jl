@@ -14,6 +14,79 @@ All notable changes to this project are documented here. The format is based on
   screen pixels, and a `wireframe!` over the same grid is left as decoration. While you
   orbit, the surface's highlight hides and comes back on release. `SurfaceInteractable`
   builds one by hand (#259).
+- `masque(fig; tooltipstyle = (; bg = :black, color = :white, radius = 6))` sets the tooltip
+  card's look in one keyword, like `overlaystyle` does for the overlay. Its keys are `bg`,
+  `color`, `accent`, `font`, `font_size`, `radius`, and `caret`; an unknown key, or a value
+  of the wrong kind, raises an `ArgumentError` (#305).
+- An ROI's `selects` takes the plot it brushes, as in `ROIInteractable(ax; bounds, selects = sc)`,
+  so you no longer need to know which scatter became `:scatter_2`. A plot that
+  draws both lines and points, such as `scatterlines`, gives the box its points. A layer id
+  still works (#302).
+- A `ViewInteractable` on an `Axis3` zooms as well as orbits: scroll, or press `+` / `-`,
+  to zoom around the middle of the axis box, and Shift+drag, or Shift with an arrow key, to
+  pan. As in Makie, the box keeps its size and the limits change, so marks outside the new
+  limits are hidden and stop responding to hover and clicks. A line that crosses the edge
+  of the box still responds along the part that is drawn (#321).
+
+### Changed
+- **Breaking:** `payloads` add to a mark's own data instead of replacing it. A scatter
+  point given `(; name = "a")` now has `name`, `x`, and `y` in its tooltip and `@bind`
+  value, so labelling points no longer means copying the coordinates into each payload. The
+  same goes for every mark with its own data, such as a bar's `low`, `high`, and `value`,
+  and for `DataFrame` rows and `Dict`s. A field the payload names itself wins, and `index`
+  is not added, since `pick.index` already holds it. A payload that isn't key-value, such
+  as a bare string, still replaces the default (#308).
+
+  Two things change in existing notebooks. A default tooltip that showed only your fields
+  now also shows the mark's, such as `x` and `y`; to show only yours, pass a `tooltip`
+  template that names them. And a payload that passes its own `x` (or `y`) for something
+  other than the plotted coordinate, such as a category name, now sits next to the mark's
+  other coordinate, and on a line it takes the place of the `x` the hover reads out from
+  the nearest point. Rename that field if you want both.
+- **Breaking:** a `ThresholdInteractable`, an `ROIInteractable`, or a `ColorbarInteractable`
+  you pass to `masque` owns the `@bind` value. Every other layer in that widget keeps its
+  hover and tooltip but no longer takes clicks, so `masque(fig, cutoff)` keeps hover on the
+  points and the value only ever holds the threshold. Before, a click on a point replaced
+  the threshold's value, which is why the docs passed `auto = false`. Code that relied on
+  clicking marks in the same widget as one of these controls needs a second `masque` call
+  for the marks. The colorbars `masque(fig)` adds by itself still leave the other layers
+  clickable. This changes widgets with a selecting box too: the box's target already took
+  no clicks, but the other layers kept theirs, and an `AxisInteractable` click replaced the
+  selection with an `AxisEvent`. Those layers now only show tooltips (#309).
+- **Breaking:** in a widget with one of these controls, `selected=` on another layer only
+  highlights its marks. Before, `masque(fig, cutoff; selected = Dict(:scatter => [1]))`
+  started the value as that point's `ElementEvent`; now it starts at the threshold (#309).
+- **Breaking:** the value starts at the control's starting position instead of `nothing`: a
+  threshold at a `ThresholdEvent` at `value`, and a box without `selects` at a `BoundsEvent`
+  at `bounds`. `level.value` works from the first run, and code that falls back with
+  `isnothing(level) ? 0.5 : level.value` still gets the same number. Code that tests
+  `isnothing(level)` to mean "not dragged yet" no longer sees `nothing`. A selecting box
+  and a colorbar still start at `nothing`, since they have no value before the first release
+  or click (#309).
+- **Breaking:** two of these controls in one widget raise an error naming both, since each
+  would overwrite the other's value. That includes several boxes that select from the same
+  layer, which the Brush a region page used to allow; the last box released replaced the
+  others' selection anyway. Pass each to its own `masque` call (#309).
+- **Breaking:** a `wireframe!` layer has one element per drawn edge. Makie outlines every
+  face, so an edge shared by two faces used to ship twice, and its second copy could never
+  be hovered or clicked. Edges keep Makie's drawing order, with a shared edge kept where it
+  first appears, so every edge after the first shared one moves to a lower index. Edge `k`
+  is `SegmentInteractable(ax, w).vertices[2k-1:2k]`, and half that vector's length is the
+  edge count. A `payloads` vector of the old length, or a `selected` index past the new
+  count, raises an `ArgumentError`. An in-range `selected` index, or a saved `pick.index`,
+  silently points at a different edge, so check those by hand (#316).
+
+### Deprecated
+- The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,
+  `tooltip_font_size`, `tooltip_radius`, and `tooltip_caret` still work, with a warning naming
+  the `tooltipstyle` form, and are removed in 0.4. Their values are now checked like
+  `tooltipstyle`'s, so one such as `tooltip_font_size = "12"` raises an `ArgumentError`, and
+  passing a key both ways is an error. `tooltip_sigdigits` stays (#305).
+
+### Fixed
+- A `meshscatter!` sphere on `Axis3` responds to hover and clicks out to its drawn edge, and
+  its highlight sits on its outline. Before, its hit circle could fall well inside the
+  sphere, so pointing near the edge missed it (#317).
 
 ## [0.2.2] - 2026-10-09
 
