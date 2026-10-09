@@ -390,7 +390,7 @@ _arrow_payload(::Type{Makie.Point2f}, k, pt, d) =
 # `EndPoints` (length 2), expanded here to n+1 uniform edges.
 _edges(e, n) = length(e) == n + 1 ? collect(Float64, e) :
     collect(range(Float64(e[1]), Float64(e[end]); length = n + 1))
-function GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells, tooltip = nothing, label = _plot_label(p))
+function GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     xr, yr, vals = _conv(p)
     # A `datashader!` image holds the colour-mapped aggregate (histogram-equalized by
     # default); hover reads the aggregate itself, the count for the default `AggCount`.
@@ -399,7 +399,7 @@ function GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells,
         counts === nothing || size(counts) != size(vals) || (vals = counts)
     end
     ncols, nrows = size(vals)
-    return GridInteractable(ax, _edges(xr, ncols), _edges(yr, nrows), vals; id, tooltip, label)
+    return GridInteractable(ax, _edges(xr, ncols), _edges(yr, nrows), vals; id, payloads, tooltip, label)
 end
 function RectInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; kwargs...)
     _deprecate(
@@ -1277,7 +1277,7 @@ function _place(i::GridInteractable, f)
     y0, x0 = i.yedges[1], i.xedges[1]
     xe = Float64[f.place((x, y0))[1] for x in i.xedges]
     ye = Float64[f.place((x0, y))[2] for y in i.yedges]
-    return GridInteractable(i.ax, xe, ye, i.values, i.id, i.tooltip, i.label)
+    return GridInteractable(i.ax, xe, ye, i.values, i.id, i.tooltip, i.label, i.payloads)
 end
 function _warn_rotated(i, f)
     f.rotated || return false
@@ -1795,3 +1795,15 @@ end
 function SliceInteractable(ax, p; orientation = nothing, crosshair = true, id = :slice, covers = nothing, tooltip = nothing)
     return SliceInteractable(ax, [p]; orientation, crosshair, id, covers, tooltip)
 end
+
+# The axis of a slice built from plots alone. `masque` finds it once it has the figure, as it
+# does for `interactables(plot)`, since a plot does not know which block draws it.
+# It keeps its own copy of the plots: `cover_plots` is empty when the caller passes `covers`.
+struct _AxisOf
+    plots::Vector{Any}
+end
+Base.show(io::IO, ::_AxisOf) = print(io, "(the plots' axis)")
+
+# The plot constructor without the axis, documented on `SliceInteractable`.
+SliceInteractable(plots::AbstractVector; kwargs...) = SliceInteractable(_AxisOf(collect(Any, plots)), plots; kwargs...)
+SliceInteractable(p::Makie.AbstractPlot; kwargs...) = SliceInteractable([p]; kwargs...)

@@ -113,7 +113,7 @@ export interface HitLayer {
     kind: Kind
     // A polygon element is a flat ring (number[]) or, when it has holes, a ring group (number[][]).
     geometry: number[] | Array<number[] | number[][]> | GridGeometry | ThresholdGeometry | ROIGeometry | ViewGeometry | SliceGeometry | null
-    payloads: unknown[]
+    payloads: unknown[] // one per element; a :grid layer's are per cell, row-major like values (empty for none)
     axis: string
     events: string[] // "click" | "hover" | "drag"
     style?: LayerStyle
