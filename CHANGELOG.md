@@ -84,8 +84,9 @@ All notable changes to this project are documented here. The format is based on
   passing a key both ways is an error. `tooltip_sigdigits` stays (#305).
 
 ### Removed
-- **Breaking:** the forms deprecated in 0.2 are gone, and calling one now raises a
-  `MethodError` (#299):
+- **Breaking:** the forms deprecated in 0.2 are gone. Calling one now raises a
+  `MethodError` ("no method matching …"), or an `UndefVarError` for `auto_interactables`
+  (#299):
 
   | Removed | Use instead |
   |---|---|

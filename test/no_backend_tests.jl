@@ -92,7 +92,8 @@ end
 
 # #269: Pluto and the REPL run with `--depwarn=no`, which hides a plain `Base.depwarn`. Run a
 # deprecated form in a child process with that flag and check the warning still shows, once
-# per call site.
+# per call site. The `tooltip_*` keywords are its only deprecation since 0.3; when they go in
+# 0.4, point this at the next deprecation or drop it.
 @testset "deprecations warn without --depwarn=yes (#269)" begin
     code = """
     using Masque, Test
