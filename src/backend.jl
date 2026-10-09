@@ -175,6 +175,28 @@ function _in_clipbox((lo, hi), p)
     end
     return true
 end
+# The part of the data-space segment `a → b` inside the box, as `(t0, t1)` along it, or
+# `nothing` when none of it is (Liang–Barsky against the six faces).
+function _clip_segment((lo, hi), a, b)
+    t0, t1 = 0.0, 1.0
+    for k in 1:3
+        d = Float64(b[k]) - Float64(a[k])
+        for (p, q) in ((-d, Float64(a[k]) - lo[k]), (d, hi[k] - Float64(a[k])))
+            if p == 0
+                q < 0 && return nothing
+            elseif p < 0
+                r = q / p
+                r > t1 && return nothing
+                t0 = max(t0, r)
+            else
+                r = q / p
+                r < t0 && return nothing
+                t1 = min(t1, r)
+            end
+        end
+    end
+    return (t0, t1)
+end
 
 _scalesym(f) = f === identity ? :identity : Symbol(nameof(f))
 

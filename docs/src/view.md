@@ -99,7 +99,10 @@ end
 Scroll to zoom in or out around the middle of the axis box, and
 Shift+drag to pan. The box keeps its size while the data grows or slides
 inside it, and marks that leave the box are hidden and no longer respond
-to hover or clicks. From the keyboard, `+` / `-` zoom and Shift with an
+to hover or clicks. A line that crosses the edge of the box still
+responds along the part you can see. A sphere from `meshscatter` stops
+responding once its center leaves the box, even if part of it is still
+showing. From the keyboard, `+` / `-` zoom and Shift with an
 arrow key pans.
 
 ## When the figure is rebuilt

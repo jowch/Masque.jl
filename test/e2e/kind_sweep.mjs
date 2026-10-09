@@ -725,12 +725,15 @@ try {
       const pts3 = layers.find((l) => l.id === "pts");
       if (!pts3) throw new Error(`${key}: no pts layer`);
       const inP = hitPoint(pts3, spec.inside), outP = hitPoint(pts3, spec.outside);
+      const line3 = layers.find((l) => l.id === "line");
+      if (!line3) throw new Error(`${key}: no line layer`);
+      const lineP = { x: line3.geometry[0][2], y: line3.geometry[0][3] };   // the vertex inside the zoom
       await page.evaluate((k) => {
         const span = document.querySelector(`#coords_${k}`);
         const hosts = [...document.querySelectorAll(".ip-host")];
         hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1)?.scrollIntoView({ block: "center", inline: "nearest" });
       }, key);
-      for (const [p, what] of [[inP, "inside"], [outP, "outside"]]) {
+      for (const [p, what] of [[inP, "inside"], [outP, "outside"], [lineP, "line"]]) {
         const r = await dispatchAt(key, p.x, p.y, "pointermove");
         if (!r.show) throw new Error(`${key}: the ${what} point should hover before the zoom`);
       }
@@ -758,6 +761,13 @@ try {
       if (rOut.show) throw new Error(`${key}: the corner point is outside the zoomed limits but still hovers (${rOut.text})`);
       const rIn = await dispatchAt(key, inP.x, inP.y, "pointermove");
       if (!rIn.show) throw new Error(`${key}: the middle point should still hover after a center zoom`);
+      // The data is symmetric about the middle point, so the limits' center projects there and a
+      // center zoom by k moves every visible point k times farther from it on screen. The line's
+      // ends are now outside the limits; its middle vertex is inside and must still hover.
+      const k = w(lim0, 0) / w(zs.limits, 0);
+      const lineZ = { x: inP.x + k * (lineP.x - inP.x), y: inP.y + k * (lineP.y - inP.y) };
+      const rLine = await dispatchAt(key, lineZ.x, lineZ.y, "pointermove");
+      if (!rLine.show) throw new Error(`${key}: the line still drawn inside the zoomed limits should hover at ${JSON.stringify(lineZ)}`);
       passed.push(`${key}/zoom-clips-hits`);
       await drag(key, inP.x, inP.y, inP.x + 80, inP.y, true);
       const ps = await waitStamp(zs, "shift-drag", (st) => Array.isArray(st.limits) &&

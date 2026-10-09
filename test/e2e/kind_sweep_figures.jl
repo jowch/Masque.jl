@@ -305,7 +305,7 @@ kind_sweep_meta() = [
     Dict(
         # Axis3 view (#321): drag orbits, the wheel zooms the limits about their center, and
         # Shift+drag pans them. After the zoom the corner points sit outside the limits and stop
-        # hitting; the middle one still hits.
+        # hitting; the middle one still hits, and so does the part of a line that crosses them.
         "key" => "view3d", "layerId" => "view", "layerKind" => "view",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
@@ -907,7 +907,10 @@ function build_kind_sweep()
         fig = Figure(size = (480, 320))
         ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "view3d")
         sc = scatter!(ax, pts; markersize = 14, color = :gray)
-        masque(fig, interactables(sc; id = :pts), ViewInteractable(ax; id = :view))
+        # Runs through the zoomed limits with both ends outside them: the part inside is still
+        # drawn, so it must still hover.
+        ln = lines!(ax, [0, 2.6, 4], [2.8, 2.8, 2.8], [2, 2, 2]; color = :steelblue)
+        masque(fig, interactables(sc; id = :pts), interactables(ln; id = :line), ViewInteractable(ax; id = :view))
     end
 
     legend = let

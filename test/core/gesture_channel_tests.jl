@@ -129,6 +129,46 @@ end
         @test_throws ArgumentError w.render_frame(Dict("id" => "view", "limits" => [1.0, 0.0, 0, 1, 0, 1]))
     end
 
+    @testset "a line crossing the zoomed limits keeps its drawn part (#321)" begin
+        box = ((0.4, 0.4, 0.4), (0.6, 0.6, 0.6))
+        @test all(Masque._clip_segment(box, (0, 0, 0), (1, 1, 1)) .≈ (0.4, 0.6))
+        @test Masque._clip_segment(box, (0, 0, 0), (0.1, 0.1, 0.1)) === nothing
+        @test Masque._clip_segment(box, (0.5, 0, 0.5), (0.5, 1, 0.5)) == (0.4, 0.6)   # parallel to two faces
+        @test Masque._clip_segment(box, (0.7, 0, 0.5), (0.7, 1, 0.5)) === nothing
+
+        fig = Figure(size = (400, 400))
+        ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5)
+        lines!(ax, [0, 0.5, 1], [0, 0.5, 1], [0, 0.5, 1])
+        path = [(0, 0, 0), (0.5, 0.5, 0.5), (1, 1, 1)]
+        w = masque(
+            fig, [
+                ViewInteractable(ax),
+                SegmentInteractable(ax, path; id = :edges),
+                SegmentInteractable(ax, [(0, 0, 0), (0.1, 0.1, 0.1), (0, 0, 0), (1, 1, 1)]; mode = :pairs, id = :pairs),
+            ]
+        )
+        lay(m, id) = only(l for l in m["layers"] if l["id"] == id)
+        @test lay(w.manifest, "edges")["kind"] == "polyline"   # nothing cut yet
+        m = w.render_frame(Dict("id" => "view", "limits" => [0.4, 0.6, 0.4, 0.6, 0.4, 0.6], "settle" => true))["manifest"]
+        bk = Masque._resolve_backend(:cairo)
+        ctx = Masque.context(bk, fig, Masque._ppu(bk, fig, 700), 700)
+        px(p) = collect(data_to_image_px(ctx, ax, p))
+        a, mid, b = px((0.4, 0.4, 0.4)), px((0.5, 0.5, 0.5)), px((0.6, 0.6, 0.6))
+
+        # The plotted line: one run from where it enters the box to where it leaves.
+        g = only(lay(m, "lines")["geometry"])
+        @test length(g) == 6 && all(isfinite, g)
+        @test g ≈ vcat(a, mid, b) atol = 1
+        # A per-edge path ships one pair per edge, so element k is still edge k.
+        e = lay(m, "edges")
+        @test e["kind"] == "segments"
+        @test e["geometry"] ≈ vcat(a, mid, mid, b) atol = 1
+        # A pair wholly outside is a gap; the crossing one keeps its inside part.
+        q = lay(m, "pairs")["geometry"]
+        @test all(isnan, q[1:4])
+        @test q[5:8] ≈ vcat(a, b) atol = 1
+    end
+
     @testset "unknown layer id fails loud" begin
         (; fig, ax, pts) = default_fixture()
         w = masque(fig, [ViewInteractable(ax; id = :view), PointInteractable(ax, pts)]; auto = false)

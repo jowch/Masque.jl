@@ -224,7 +224,7 @@ export interface OverlayState {
     // A frame that lands meanwhile keeps the readout, as it does for a pointer pan or a wheel.
     keyView_: boolean
     // Axis3 limits per view id (#321): the last ones a zoom or pan asked for, which a frame's
-    // geometry can trail, and the ones the widget mounted with, which bound the zoom.
+    // geometry can trail, and the ones on screen at the first zoom or pan, which bound the zoom.
     view3_: Map<string, { limits: Limits3; home: Limits3 }>
 }
 
