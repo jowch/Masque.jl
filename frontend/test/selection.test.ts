@@ -162,7 +162,7 @@ describe("selectionForValue", () => {
 // runs computeSelection, so the two must agree or the value would change on a no-op drag.
 describe("a selecting box's starting value matches computeSelection (Julia parity)", () => {
     const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "test", "fixtures", "parity")
-    for (const name of ["roiselect", "roigrid"]) {
+    for (const name of ["roiselect", "roigrid", "roiedge", "roigridover"]) {
         for (const backend of ["cairo", "webgl"]) {
             it(`${name}.${backend}`, () => {
                 const m = JSON.parse(readFileSync(join(dir, `${name}.${backend}.json`), "utf8")) as Manifest
@@ -170,7 +170,10 @@ describe("a selecting box's starting value matches computeSelection (Julia parit
                 const target = m.layers.find((l) => l.id === roi.selects) as HitLayer
                 const box = roi.geometry as { x: number; y: number; w: number; h: number }
                 const got = computeSelection(box, target, m.transforms[target.axis]).items
-                const want = (m.initial as { items: { layer: string; index: number; payload?: Record<string, number> }[] }).items
+                // Marks start as the target's `selected`; a grid's cell block ships in `initial`.
+                const want: { layer: string; index: number; payload?: Record<string, number> }[] = target.kind === "grid"
+                    ? (m.initial as { items: { layer: string; index: number; payload: Record<string, number> }[] }).items
+                    : (target.selected ?? []).map((index) => ({ layer: target.id, index }))
                 expect(got.length).toBeGreaterThan(0)
                 expect(got.map(({ layer, index }) => ({ layer, index }))).toEqual(want.map(({ layer, index }) => ({ layer, index })))
                 for (let k = 0; k < got.length; k++) {

@@ -327,6 +327,17 @@ kind_sweep_meta() = [
         ),
     ),
     Dict(
+        # A box over a heatmap starts at the cell block inside its bounds, drawn as one fill-only
+        # block (#330). Cell 0 sits outside the box, so the no-click check never presses on it.
+        "key" => "roi_grid", "layerId" => "roi", "layerKind" => "roi",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "owner",
+        "owner" => Dict(
+            "layer" => "cells", "startsSelected" => true,
+            "initial" => "^ROI_GRID=(Masque\\.)?GridWindowEvent\\(:cells, i1 = 3, i2 = 4, j1 = 2, j2 = 3, xmin = 2\\.6, xmax = 4\\.4, ymin = 1\\.6, ymax = 3\\.4\\)\$",
+        ),
+    ),
+    Dict(
         "key" => "view", "layerId" => "view", "layerKind" => "view",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
@@ -936,6 +947,17 @@ function build_kind_sweep()
         )
     end
 
+    roi_grid = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "roi over a heatmap")
+        hm = heatmap!(ax, 1:6, 1:4, [Float64(i + 6j) for i in 1:6, j in 1:4])
+        masque(
+            fig,
+            interactables(hm; id = :cells),
+            ROIInteractable(ax; bounds = (2.6, 4.4, 1.6, 3.4), selects = :cells, id = :roi),
+        )
+    end
+
     view = let
         pts = [(1.0, 1.0), (7.0, 1.0), (1.0, 7.0), (7.0, 7.0)]
         fig = Figure(size = (480, 260))
@@ -1102,7 +1124,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, view, view3d, legend, series_legend,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

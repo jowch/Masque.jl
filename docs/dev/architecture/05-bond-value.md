@@ -20,16 +20,22 @@ bond could not start at both initial states.
 The owner sets the bond's starting value. A threshold starts at a `ThresholdEvent` at `value`
 (with its category's label when `value` is a category's position) and a bounds-only ROI at a
 `BoundsEvent` at `bounds`: `build_manifest` writes that wire envelope as `initial`, the same shape
-a release sends. A `selects` ROI starts at what its starting box holds (#330): `initial` is the
-`{items}` envelope a release of the untouched box would send, which `_contained_items` computes
+a release sends. A `selects` ROI starts at what its starting box holds (#330), the value a release of the
+untouched box would send. Over marks, `build_manifest` writes the indices of the marks inside
+as the target's `selected` (one integer array, the same field `selected=` fills), so
+`mount_envelope` and `mount.ts` seed and highlight them as they would a `selected=` start.
+Over a grid, `initial` is the one-item `{items}` envelope holding the overlapped cell block,
+which `mount.ts` highlights at mount. `_contained_indices` and `_contained_cells` compute both
 from the manifest's own image-px numbers (circle centres, grid edges) with the comparisons
-`computeSelection` makes, and `mount.ts` highlights it at mount. Julia rather than the browser
-computes it because `initial_value` must equal what the browser seeds. The `roiselect` and
-`roigrid` parity goldens pin the two together: `selection.test.ts` runs `computeSelection` on
-them and compares with `initial`. A grid item carries the box's `bounds` as given, where a
-release inverts the box's pixel corners, so those four numbers can differ in the last bits.
-`selected=` on the target still wins, as before. A colorbar has no value before its first
-click, so it starts at `nothing`. With an owner, `selected=` on another layer only highlights.
+`computeSelection` makes. Julia rather than the browser computes them because `initial_value`
+must equal what the browser seeds. The `roiselect`, `roigrid`, `roiedge` and `roigridover`
+parity goldens pin the two together: `selection.test.ts` runs `computeSelection` on them and
+compares. A grid item carries the box's `bounds` as given, where a release inverts the box's
+pixel corners, so those four numbers can differ in the last bits. `selected=` on the target
+still wins, and an explicit empty one starts the box empty. A colorbar has no value before its
+first click, so it starts at `nothing`. With an owner, `selected=` on another layer only
+highlights; for a box over marks that holds because the bond is built from the target's
+indices alone.
 
 The alternatives for a `selects` target were a one-element commit (a one-cell window, or a
 one-point vector, which is what points did before) and moving the box to the clicked mark. Both
@@ -68,8 +74,7 @@ the 1-based index. The browser payload for those kinds is ignored.
 `AbstractDict` keyed by layer id. `selected = 1` and `selected = [1]` are the same seed.
 On a scalar point layer that seed is one `ElementEvent`; several indices highlight those
 marks and leave the bond `nothing`. On a `selects` point call the same seeds are a vector,
-and an explicit empty vector hydrates `ElementEvent[]` (`hydrate = "items"`). `nothing` is
-not rewritten to `[]`. Indices are checked `1 <= idx <= n`; `0` errors, naming `1:n`. The
+and an explicit empty vector hydrates `ElementEvent[]`. Indices are checked `1 <= idx <= n`; `0` errors, naming `1:n`. The
 manifest stores the 0-based index the overlay already paints.
 
 Hover never sets the bond. Only a commit round-trips.

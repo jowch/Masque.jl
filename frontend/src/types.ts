@@ -167,14 +167,11 @@ export interface Manifest {
     // element hits; "grid" commits one window. selectionTarget is that layer's id.
     selection?: "elements" | "grid"
     selectionTarget?: string
-    // "items" forces an empty {items: []} seed (an explicit empty brush). Absent + no selected
-    // indices leaves host.value null.
-    hydrate?: "items"
     // Set when a threshold, an ROI, or a colorbar the caller passed owns the bond: the only
     // layer that commits. `initial` is the envelope the bond starts at (absent: `null`): a
-    // selecting box's is the `{items}` its starting bounds contain.
+    // box over a grid's is the `{items}` holding the cells its starting bounds contain.
     bondOwner?: string
-    initial?: { layer: string; index: number; payload: unknown } | { items: { layer: string; index: number; payload?: unknown }[] }
+    initial?: { layer: string; index: number; payload: unknown } | { items: { layer: string; index: number; payload: unknown }[] }
 }
 
 // `layer`/`index` are excluded from the trailing-underscore mangle convention (see

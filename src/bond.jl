@@ -50,40 +50,38 @@ function initial_envelope(i::ROIInteractable, ctx, layers)
         payload = Dict{String, Any}("xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax)
         return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
     end
-    box = only(l for l in layers if l["id"] == string(i.id))["geometry"]
+    # A box over marks starts from its target's `selected` (`_seed_contained!`), not here.
     target = only(l for l in layers if l["id"] == string(i.selects))
-    return Dict{String, Any}("items" => _contained_items(box, target, i.bounds))
+    target["kind"] == "grid" || return nothing
+    box = only(l for l in layers if l["id"] == string(i.id))["geometry"]
+    cells = _contained_cells(box, target["geometry"])
+    cells === nothing && return Dict{String, Any}("items" => Dict{String, Any}[])
+    ci, cj = cells
+    # The data bounds the box was given, where the browser inverts its pixel corners.
+    payload = Dict{String, Any}(
+        "i0" => ci[1], "i1" => ci[2], "j0" => cj[1], "j1" => cj[2],
+        "xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax,
+    )
+    return Dict{String, Any}("items" => [Dict{String, Any}("layer" => target["id"], "index" => 0, "payload" => payload)])
 end
 
-# What a box at image-px `box` holds of `target`, as the `{items}` a release of that box sends.
-# The same comparisons as `computeSelection` in frontend/src/selection.ts, on the same
-# manifest numbers, so the starting value and a release at the starting bounds agree.
-function _contained_items(box, target, bounds)
-    xlo = Float64(box["x"]); xhi = xlo + Float64(box["w"])
-    ylo = Float64(box["y"]); yhi = ylo + Float64(box["h"])
-    id = target["id"]
-    items = Dict{String, Any}[]
-    if target["kind"] == "circles"
-        a = target["geometry"]
-        for k in 0:(length(a) ÷ 3 - 1)
-            cx = Float64(a[3k + 1]); cy = Float64(a[3k + 2])
-            xlo <= cx <= xhi && ylo <= cy <= yhi &&
-                push!(items, Dict{String, Any}("layer" => id, "index" => k))
-        end
-    elseif target["kind"] == "grid"
-        g = target["geometry"]
-        ci = _cell_range(g["xedges"], xlo, xhi)
-        cj = _cell_range(g["yedges"], ylo, yhi)
-        (ci === nothing || cj === nothing) && return items
-        # The data bounds the box was given, where the browser inverts its pixel corners.
-        xmin, xmax, ymin, ymax = bounds
-        payload = Dict{String, Any}(
-            "i0" => ci[1], "i1" => ci[2], "j0" => cj[1], "j1" => cj[2],
-            "xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax,
-        )
-        push!(items, Dict{String, Any}("layer" => id, "index" => 0, "payload" => payload))
-    end
-    return items
+# What a box at image-px `box` holds: the 0-based indices of the circles whose centres it
+# contains, or the grid cells it overlaps (`nothing` if none). The same comparisons as
+# `computeSelection` in frontend/src/selection.ts, on the same manifest numbers, so the starting
+# value and a release at the starting bounds agree.
+_box_span(box) = (Float64(box["x"]), Float64(box["x"]) + Float64(box["w"]), Float64(box["y"]), Float64(box["y"]) + Float64(box["h"]))
+function _contained_indices(box, a)
+    xlo, xhi, ylo, yhi = _box_span(box)
+    return Int[
+        k for k in 0:(length(a) ÷ 3 - 1)
+            if xlo <= Float64(a[3k + 1]) <= xhi && ylo <= Float64(a[3k + 2]) <= yhi
+    ]
+end
+function _contained_cells(box, g)
+    xlo, xhi, ylo, yhi = _box_span(box)
+    ci = _cell_range(g["xedges"], xlo, xhi)
+    cj = _cell_range(g["yedges"], ylo, yhi)
+    return ci === nothing || cj === nothing ? nothing : (ci, cj)
 end
 
 # `cellRange` in selection.ts: the 0-based, inclusive cells a pixel span `[lo, hi]` overlaps
@@ -491,8 +489,8 @@ end
     mount_envelope(manifest) -> Union{Nothing, Dict}
 
 The wire envelope `mount.ts` seeds into `host.value` at mount, so Julia `initial_value` and the
-browser agree. A `selects` elements call seeds `{items}` (possibly empty when `hydrate` is set).
-Otherwise a widget whose bond has an owner seeds the owner's `initial` envelope (absent means
+browser agree. A `selects` elements call seeds `{items}` from its target's `selected` indices
+(possibly none); `selected` on any other layer only highlights. Otherwise a widget whose bond has an owner seeds the owner's `initial` envelope (absent means
 `nothing`), and its hydrated indices are highlight-only. A single hydrated index on a scalar
 layer seeds `{layer, index}`. Multiple indices on a scalar layer are highlight-only (`nothing`).
 """
@@ -505,9 +503,9 @@ function mount_envelope(manifest::AbstractDict)
             push!(hydrated, Dict{String, Any}("layer" => d["id"], "index" => Int(idx)))
         end
     end
-    sel = get(manifest, "selection", nothing)
-    if sel == "elements" && (!isempty(hydrated) || get(manifest, "hydrate", nothing) == "items")
-        return Dict{String, Any}("items" => hydrated)
+    if get(manifest, "selection", nothing) == "elements"
+        target = manifest["selectionTarget"]
+        return Dict{String, Any}("items" => filter(h -> h["layer"] == target, hydrated))
     end
     haskey(manifest, "bondOwner") && return get(manifest, "initial", nothing)
     length(hydrated) == 1 && return only(hydrated)

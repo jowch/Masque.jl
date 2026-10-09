@@ -1711,8 +1711,9 @@ describe("tooltips (mount/showTip)", () => {
                 selects: "pts", geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } })
             m.selection = "elements"
             m.selectionTarget = "pts"
+            m.bondOwner = "roi"
             mount(script, m)
-            expect(hostValue(host).value).toBeNull()
+            expect(hostValue(host).value).toEqual({ items: [] })
             hostValue(host).value = { items: [{ layer: "pts", index: 1 }, { layer: "pts", index: 2 }] }
             expect(selectedCx(host)).toEqual(["600", "900"])
         })
@@ -3517,7 +3518,7 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
         const { host: host2, script: script2 } = setup()
         const empty: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
-            selection: "elements", selectionTarget: "pts", hydrate: "items",
+            selection: "elements", selectionTarget: "pts",
             layers: [{
                 id: "pts", kind: "circles", geometry: [300, 200, 20],
                 payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"],
@@ -3553,23 +3554,45 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
         expect((host2 as unknown as { value: unknown }).value).toBeNull()
     })
 
-    it("a selecting box seeds and highlights the items its starting bounds hold; selected= wins", () => {
+    it("a box over marks seeds {items} from its target's selected; selected= on another layer only highlights", () => {
         const { host, script } = setup()
+        // Julia stamps the marks inside the box's starting bounds as the target's `selected`.
         const boxed: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
             selection: "elements", selectionTarget: "pts", bondOwner: "box",
-            initial: { items: [{ layer: "pts", index: 1 }] },
-            layers: [{
-                id: "pts", kind: "circles", geometry: [300, 200, 20, 600, 400, 20],
-                payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["hover"],
-            }],
+            layers: [
+                { id: "pts", kind: "circles", geometry: [300, 200, 20, 600, 400, 20],
+                    payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["hover"], selected: [1] },
+                { id: "other", kind: "circles", geometry: [900, 600, 20],
+                    payloads: [{ i: 0 }], axis: "ax1", events: ["hover"], selected: [0] },
+            ],
         }
         mount(script, boxed)
         expect((host as unknown as { value: unknown }).value).toEqual({ items: [{ layer: "pts", index: 1 }] })
-        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
-        const { host: host2, script: script2 } = setup()
-        mount(script2, { ...boxed, layers: [{ ...boxed.layers[0], selected: [0] }] })
-        expect((host2 as unknown as { value: unknown }).value).toEqual({ items: [{ layer: "pts", index: 0 }] })
+        expect([...new Set(selChildren(shadowOf(host)).map((el) => el.getAttribute("cx")))].sort()).toEqual(["600", "900"])
+    })
+
+    it("a box over a grid seeds and draws the cell block its starting bounds hold", () => {
+        const { host, script } = setup()
+        const payload = { i0: 0, i1: 1, j0: 0, j1: 1, xmin: 1, xmax: 3, ymin: 50, ymax: 87.5 }
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            selection: "grid", selectionTarget: "img", bondOwner: "roi",
+            initial: { items: [{ layer: "img", index: 0, payload }] },
+            layers: [
+                { id: "img", kind: "grid", axis: "ax1", events: ["hover"], payloads: [],
+                    geometry: { xedges: [0, 200, 400, 600], yedges: [0, 200, 400, 600], ncols: 3, nrows: 3 } },
+                { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                    selects: "img", geometry: { x: 100, y: 100, w: 300, h: 300, handle: 16 } },
+            ],
+        })
+        expect((host as unknown as { value: unknown }).value).toEqual({ items: [{ layer: "img", index: 0, payload }] })
+        // Cells 0..1 × 0..1 span image [0,400]², drawn as one fill-only rectfill.
+        const el = fillSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        expect(el.tagName.toLowerCase()).toBe("rect")
+        expect([el.getAttribute("x"), el.getAttribute("y"), el.getAttribute("width"), el.getAttribute("height")])
+            .toEqual(["0", "0", "400", "400"])
+        expect(edgeSelGroup(shadowOf(host)).children.length).toBe(0)
     })
 
     it("hydration across two scalar layers is highlight-only", () => {

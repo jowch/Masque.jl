@@ -164,7 +164,11 @@ function _parity_corpus()
 
     # 9. selecting boxes (#330): the bond starts at what the starting bounds contain, which
     # Julia computes from the manifest's image-px geometry. frontend/test/selection.test.ts
-    # runs `computeSelection` on these goldens and checks it agrees with `initial`.
+    # runs `computeSelection` on these goldens and checks it agrees with the target's
+    # `selected` (marks) or `initial` (a grid). `roiedge` puts marks on the box's data bounds,
+    # which their whole-pixel centres leave a fraction of a pixel outside the Float32 box on
+    # both sides, and `roigridover` hangs the box off the grid: where the inclusive and clamped
+    # comparisons would drift first.
     push!(
         corpus, "roiselect" => function ()
             fig = Figure(size = (600, 400))
@@ -189,6 +193,34 @@ function _parity_corpus()
                 fig, [
                     GridInteractable(ax, hm; id = :img),
                     ROIInteractable(ax; bounds = (1.6, 3.2, 1.6, 2.4), selects = :img),
+                ],
+            )
+        end
+    )
+    push!(
+        corpus, "roiedge" => function ()
+            fig = Figure(size = (600, 400))
+            ax = Axis(fig[1, 1])
+            sc = scatter!(ax, [1.0, 2.0, 3.0, 4.0, 2.5, 2.5], [1.0, 2.0, 3.0, 4.0, 3.0, 2.5])
+            Makie.update_state_before_display!(fig)
+            return (
+                fig, [
+                    PointInteractable(ax, sc; id = :pts),
+                    ROIInteractable(ax; bounds = (2.0, 3.0, 2.0, 3.0), selects = :pts),
+                ],
+            )
+        end
+    )
+    push!(
+        corpus, "roigridover" => function ()
+            fig = Figure(size = (600, 400))
+            ax = Axis(fig[1, 1])
+            hm = heatmap!(ax, 1:4, 1:5, [Float64(i + 3j) for i in 1:4, j in 1:5])
+            Makie.update_state_before_display!(fig)
+            return (
+                fig, [
+                    GridInteractable(ax, hm; id = :img),
+                    ROIInteractable(ax; bounds = (0.0, 2.2, 3.5, 9.0), selects = :img),
                 ],
             )
         end

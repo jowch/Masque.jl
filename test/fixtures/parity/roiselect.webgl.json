@@ -18,6 +18,10 @@
                 63,
                 6
             ],
+            "selected": [
+                1,
+                2
+            ],
             "payloads": [
                 {
                     "index": 1,
@@ -73,18 +77,6 @@
             ]
         }
     ],
-    "initial": {
-        "items": [
-            {
-                "layer": "pts",
-                "index": 1
-            },
-            {
-                "layer": "pts",
-                "index": 2
-            }
-        ]
-    },
     "bondOwner": "roi",
     "selectionTarget": "pts",
     "transforms": {

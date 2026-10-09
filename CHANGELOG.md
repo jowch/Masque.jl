@@ -43,10 +43,11 @@ All notable changes to this project are documented here. The format is based on
   others' selection anyway. Pass each to its own `masque` call (#309).
 - **Breaking:** a box with `selects` starts at what its `bounds` contain, highlighted, instead
   of `nothing`: a `Vector{ElementEvent}` of the points inside, or a `GridWindowEvent` for the
-  cells under it. `picks` works from the first run, and code that checks
-  `isnothing(picks) || isempty(picks)` still behaves the same. Code that tests
-  `isnothing(picks)` to mean "not released yet" no longer sees `nothing`. `selected=` on the
-  target still sets the starting value instead (#330).
+  cells under it. Code that checks `isnothing(picks) || isempty(picks)` still
+  runs, but on the first run it now shows the points inside `bounds` instead of its empty case.
+  Code that tests `isnothing(picks)` to mean "not released yet" no longer sees `nothing`.
+  `selected=` on the target still sets the starting value instead, and `selected=` on another
+  layer now only highlights there, where it used to replace the box's value (#330).
 
 ## [0.2.2] - 2026-10-09
 

@@ -215,6 +215,19 @@ function _selection_spec(interactables, layers)
     return (mode = kind === :grid ? "grid" : "elements", target = target)
 end
 
+# A box over marks with no `selected=` for its target starts at the marks inside `bounds`:
+# stamp them as the target's `selected`, so they ship as one index array and both
+# `mount_envelope` and `mount.ts` seed and highlight them as they would a `selected=` start.
+_seed_contained!(owner, layers) = nothing
+function _seed_contained!(owner::ROIInteractable, layers)
+    target = only(l for l in layers if l["id"] == string(owner.selects))
+    target["kind"] == "circles" || return nothing
+    box = only(l for l in layers if l["id"] == string(owner.id))["geometry"]
+    idxs = _contained_indices(box, target["geometry"])
+    isempty(idxs) || (target["selected"] = idxs)
+    return nothing
+end
+
 # A slice from plots covers the layers `_assemble` found for them unless told otherwise. Keep
 # the coverable ones in this call. Covers the caller named stay, so `_validate_slices` still
 # reports a missing or uncoverable one.
@@ -455,6 +468,8 @@ function build_manifest(
         end
         d["bond"] = bond_stamp(i, L)
     end
+    spec === nothing || haskey(norm, spec.target) || explicit_empty_seed(selected) ||
+        _seed_contained!(owner[1], layers)
     # Precedence for the frontend's first-match-in-manifest-order `hitTest` (geometry.ts):
     # `LegendInteractable` layers sort FIRST (a legend drawn over plot geometry must win the
     # pixels under it, or it's unhoverable), `:view` layers sort LAST (catch-all viewport hits
@@ -481,9 +496,6 @@ function build_manifest(
     if spec !== nothing
         m["selection"] = spec.mode
         m["selectionTarget"] = string(spec.target)
-        if spec.mode == "elements" && explicit_empty_seed(selected)
-            m["hydrate"] = "items"
-        end
     end
     (tip_style === nothing || isempty(tip_style)) || (m["tipStyle"] = tip_style)
     (overlay_style === nothing || isempty(overlay_style)) || (m["overlayStyle"] = overlay_style)

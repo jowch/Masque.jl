@@ -272,9 +272,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     // The @bind target is the host element. Seed the same envelope Julia's `mount_envelope`
     // builds, or Pluto's mount-time read overwrites `initial_value`. A selects-elements widget
-    // seeds `{items}` (including an explicit empty brush). Otherwise a widget whose bond has an
-    // owner seeds that owner's `initial` envelope (a selecting box's holds the marks inside its
-    // starting bounds), and hydrated indices are a highlight only. One
+    // seeds `{items}` from its target's indices (Julia stamps the marks inside the box's
+    // starting bounds there when `selected=` names none); indices on other layers only
+    // highlight. Otherwise a widget whose bond has an owner seeds that owner's `initial`
+    // envelope (a box over a grid holds the cells inside its starting bounds), and hydrated
+    // indices are a highlight only. One
     // hydrated index on a scalar layer seeds `{layer, index}`. Several indices on a scalar layer
     // are a highlight only (`null`): that interaction holds one event, so a set is not a value
     // it can carry.
@@ -292,9 +294,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }
     }
     const selection = manifest.selection
-    const seedItems = selection === "elements" && (hydrated.length > 0 || manifest.hydrate === "items")
+    const seedItems = selection === "elements"
     const owned = manifest.bondOwner !== undefined
-    const hostValue = seedItems ? { items: hydrated }
+    const hostValue = seedItems ? { items: hydrated.filter((h) => h.layer === manifest.selectionTarget) }
         : owned ? (manifest.initial ?? null)
         : hydrated.length === 1 ? hydrated[0] : null
 
@@ -463,9 +465,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         },
     }
     const state = createOverlayState()
-    // A selecting box's starting value is the marks inside its starting bounds, which Julia
-    // computed into `initial`. Highlight them as a release would, unless `selected=` seeded
-    // the brush instead.
+    // A box over a grid starts at the cells inside its starting bounds, which Julia computed
+    // into `initial`. Highlight them as a release would. (A box over marks already highlights
+    // its start through the target's `selected`.)
     const startHits = owned && !seedItems ? (selectionForValue(manifest, hostValue)?.hits ?? []) : []
     state.selHits_ = [...selHits, ...startHits]
     // A brush seed belongs to the box, not a click, so only a scalar seed can be clicked off.
