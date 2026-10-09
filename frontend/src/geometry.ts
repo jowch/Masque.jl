@@ -1,6 +1,6 @@
 // All coordinates here are image pixels.
 import { contentPoint, isIdentity, type PhotoMatrix } from "./photo"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry } from "./types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3 } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
 const SEG_TOL = 8 // px slack for segments/polylines
@@ -571,6 +571,42 @@ export function matrixLimits(
     if (ymin > ymax) { const s = ymin; ymin = ymax; ymax = s }
     if (!(xmax > xmin) || !(ymax > ymin) || !Number.isFinite(xmin + xmax + ymin + ymax)) return null
     return { xmin, xmax, ymin, ymax }
+}
+
+// Axis3 zoom (#321): scale the limits about their center by 1/k, as Makie's own Axis3 scroll
+// zoom does with `zoommode = :center`. k > 1 zooms in. `home` bounds the total zoom both ways.
+const ZOOM3_MAX = 64
+export function zoomLimits3(l: Limits3, k: number, home?: Limits3): Limits3 {
+    const out = [...l] as Limits3
+    if (!(k > 0) || !Number.isFinite(k)) return out
+    for (let i = 0; i < 3; i++) {
+        const c = (l[2 * i] + l[2 * i + 1]) / 2
+        let h = (l[2 * i + 1] - l[2 * i]) / 2 / k
+        if (home) {
+            const hh = (home[2 * i + 1] - home[2 * i]) / 2
+            h = Math.min(hh * ZOOM3_MAX, Math.max(hh / ZOOM3_MAX, h))
+        }
+        out[2 * i] = c - h
+        out[2 * i + 1] = c + h
+    }
+    return out
+}
+
+// Axis3 pan (#321): shift `base` so the data follows a (dx, dy) image-px drag. `panx`/`pany` were
+// measured at `g.limits`; a zoom since then scales each data axis's step with its width.
+export function panLimits3(g: ViewGeometry, base: Limits3, dx: number, dy: number): Limits3 {
+    const out = [...base] as Limits3
+    const ref = g.limits, px = g.panx, py = g.pany
+    if (!ref || !px || !py) return out
+    for (let i = 0; i < 3; i++) {
+        const rw = ref[2 * i + 1] - ref[2 * i]
+        const k = rw > 0 ? (base[2 * i + 1] - base[2 * i]) / rw : 1
+        const d = -(px[i] * dx + py[i] * dy) * k
+        if (!Number.isFinite(d)) continue
+        out[2 * i] += d
+        out[2 * i + 1] += d
+    }
+    return out
 }
 
 /** Axis3 orbit: pixel Δ → azimuth/elevation (radians). Elevation clamped away from ±π/2. */

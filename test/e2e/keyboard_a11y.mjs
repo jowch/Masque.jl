@@ -569,6 +569,43 @@ try {
       passed.push(`${key}/arrow-pan+zoom+settle-no-bind`);
       await page.keyboard.press("Escape");
     }
+
+    // Axis3 view (#321): + zooms the limits about their center, Shift+arrow pans them, and
+    // a plain arrow still orbits. The bond never moves.
+    {
+      const key = "view3d", id = "view";
+      let s = await tabToStop(key, id);
+      const n0 = s.inputs, before = await textOf(`#out_${key}`);
+      const settleAfter = (n, what) => waitFor(async () => {
+        const d = await dragState(key, id);
+        return { ok: d.frame && d.frame.n > n && d.frame.settle && Array.isArray(d.frame.limits), f: d.frame };
+      }, what);
+      const w = (l, i) => l[2 * i + 1] - l[2 * i];
+      await page.keyboard.press("+");
+      const zoomed = await settleAfter(s.frame?.n ?? 0, `${key} zoom frame`);
+      await page.keyboard.press("+");
+      const zoomed2 = await settleAfter(zoomed.f.n, `${key} second zoom frame`);
+      if (!(w(zoomed2.f.limits, 0) < w(zoomed.f.limits, 0))) {
+        throw new Error(`${key}: + did not zoom in from the last limits: ${JSON.stringify(zoomed.f)} -> ${JSON.stringify(zoomed2.f)}`);
+      }
+      await page.keyboard.press("Shift+ArrowRight");
+      const panned = await settleAfter(zoomed2.f.n, `${key} pan frame`);
+      const moved = panned.f.limits.some((v, i) => Math.abs(v - zoomed2.f.limits[i]) > 1e-3 * w(zoomed2.f.limits, Math.floor(i / 2)));
+      if (!moved || Math.abs(w(panned.f.limits, 0) - w(zoomed2.f.limits, 0)) > 1e-6) {
+        throw new Error(`${key}: Shift+ArrowRight did not pan: ${JSON.stringify(zoomed2.f)} -> ${JSON.stringify(panned.f)}`);
+      }
+      await page.keyboard.press("ArrowRight");
+      const orbit = await settleAfter(panned.f.n, `${key} orbit frame`);
+      if (!(Math.abs(orbit.f.azimuth - panned.f.azimuth) > 0.05)) throw new Error(`${key}: ArrowRight did not orbit: ${JSON.stringify(orbit.f)}`);
+      s = await dragState(key, id);
+      if (s.inputs !== n0) throw new Error(`${key}: a view nudge wrote the bond`);
+      if ((await textOf(`#out_${key}`)) !== before) throw new Error(`${key}: a view nudge changed #out_${key}`);
+      // Put the camera back for the drivers that run after this one.
+      for (const k of ["ArrowLeft", "Shift+ArrowLeft", "-", "-"]) await page.keyboard.press(k);
+      await page.waitForTimeout(1500);
+      passed.push(`${key}/zoom+shift-pan+orbit-no-bind`);
+      await page.keyboard.press("Escape");
+    }
   }
 
   if (unexpected.length) throw new Error(`page errors: ${unexpected.join(" | ")}`);

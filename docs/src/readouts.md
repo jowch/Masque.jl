@@ -47,9 +47,9 @@ of an ordinary axis.
 Hover over a colorbar to see the value its color stands for, and click
 it to set `pick` to a [`ColorbarEvent`](@ref) with `pick.value`.
 `masque(fig)` adds a [`ColorbarInteractable`](@ref) for every
-`Colorbar` in the figure. To get the colorbar without the heatmap's
-cells in the same widget, create one yourself and pass it with
-`auto = false`, which leaves out everything else `masque` would add:
+`Colorbar` in the figure, and the heatmap's cells take clicks too. To
+have `pick` hold only the colorbar's value, create the
+`ColorbarInteractable` yourself and pass it to `masque`:
 
 ```julia
 begin
@@ -64,8 +64,12 @@ end
 ```
 
 ```julia
-@bind pick masque(fig, cbint; auto = false)
+@bind pick masque(fig, cbint)
 ```
+
+A colorbar you pass owns `pick`: the cells still show their tooltips,
+but clicking them does not change `pick`. `pick` is `nothing` until
+the first click on the colorbar.
 
 A later cell could use `pick.value` as a contour level or a threshold
 for the heatmap.
@@ -90,22 +94,17 @@ end
 ```
 
 ```julia
-@bind level masque(fig, cutoff; auto = false)
+@bind level masque(fig, cutoff)
 ```
 
-`auto = false` keeps the points from responding to clicks, so `level`
-only ever holds the line's position.
-
-The line follows your drag, and when you release it, `level` becomes a
-[`ThresholdEvent`](@ref) whose `level.value` is the line's new position
-in data coordinates. Before the first drag `level` is `nothing`, so fall
-back to the starting value:
+The line owns `level`: the points still show their tooltips, but
+clicking them does not change `level`, so it only ever holds the line's
+position. `level` is a [`ThresholdEvent`](@ref), and `level.value` is
+the line's position in data coordinates. It starts at `value`, and
+changes when you release the line after a drag:
 
 ```julia
-begin
-    t = isnothing(level) ? 0.5 : level.value
-    "$(count(>(t), ys)) of $(length(ys)) points above $(round(t; digits = 2))"
-end
+"$(count(>(level.value), ys)) of $(length(ys)) points above $(round(level.value; digits = 2))"
 ```
 
 On a categorical axis, the line shows the category while you drag.
@@ -118,9 +117,8 @@ press Tab until it has focus, then use the arrow keys; see
 [Keyboard and screen readers](@ref).
 
 When the cell that creates the figure runs again, for example because a
-slider it uses changed, the line goes back to `value` and `level` goes
-back to `nothing`. The cell above then falls back to the starting
-value, so its count still matches the line. To keep a cutoff you like,
+slider it uses changed, the line and `level` both go back to `value`.
+To keep a cutoff you like,
 write its number as `value` in the figure code. Writing
 `value = level.value` there does not work, for the same reason as
 `selected = pick`; see [Selection](@ref).
@@ -129,5 +127,9 @@ write its number as `value` in the figure code. Writing
 
 The axis readout and the threshold need a 2D `Axis`; see
 [Supported plots and axes](@ref) for which axes and scales.
+
+One widget takes one threshold, colorbar you pass, or box from
+[Brush a region](@ref), since each owns the widget's value. To use two,
+pass each to its own `masque` call.
 
 To drag a box instead of a line, see [Brush a region](@ref).

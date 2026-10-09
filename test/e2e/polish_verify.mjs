@@ -210,6 +210,7 @@ try {
     return {
       show: t?.classList.contains("show"), text: t?.innerText ?? "",
       bg: cs?.backgroundColor, color: cs?.color,
+      radius: cs?.borderTopLeftRadius, caret: t ? getComputedStyle(t, "::before").display : null,
       hi: { fill: capture(svgFill, "fill"), edge: capture(svgEdge, "edge"), plain: capture(svgPlain, "plain") },
       sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel"),
     };
@@ -448,6 +449,14 @@ try {
   }
   passed.push("overlaystyle");
 
+  // tooltipstyle (#305): the same figure sets the card's background, text colour and radius,
+  // and hides the caret.
+  if (!sTip.show || sTip.bg !== "rgb(20, 30, 60)" || sTip.color !== "rgb(240, 240, 200)"
+      || sTip.radius !== "9px" || sTip.caret !== "none") {
+    throw new Error(`scatter_styled: tooltip ${JSON.stringify({ show: sTip.show, bg: sTip.bg, color: sTip.color, radius: sTip.radius, caret: sTip.caret })} (want bg rgb(20, 30, 60), color rgb(240, 240, 200), radius 9px, no caret)`);
+  }
+  passed.push("tooltipstyle");
+
   // Axis3 kinds (#301): the baked selection and a hover on another mark sit on the projected
   // mark. `overlap3d` hovers the front marker of a pair: the highlight must take the marker's
   // circle, not the sphere's behind it.
@@ -508,23 +517,27 @@ try {
     // even when the manifest is off the drawn mark. On Cairo, read the rendered PNG at the
     // hit geometry instead (same canvas readback as flush-radius above): every tested mark's
     // centre (an edge's midpoint) must be drawn, and `overlap3d`'s must be the black front
-    // marker, not the grey sphere behind it. A sphere's hit circle comes from its data-space
-    // size, an axis-aligned approximation that can fall short of the drawn outline, so it is
-    // checked as a band: drawn 3 px inside `r`, background by 1.25·r. Measured on this figure,
-    // the outline sits 3-4 px past `r`.
+    // marker, not the grey sphere behind it. Axis3 stretches each axis differently, so a sphere
+    // draws as an ellipse and its hit circle is the ellipse's long radius: no sphere 3 px past `r`
+    // in any of 16 directions, and the sphere drawn 3 px inside `r` in at least one.
     if (backend === "cairo") {
       const n = circles ? g.length / 3 : g.length / 4;
       const probes = [];
+      const reachGroups = [];
       for (let i = 0; i < n; i++) {
         if (!circles && i !== sel && i !== hov) continue;
         if (circles) {
           const [cx, cy, r] = [g[3 * i], g[3 * i + 1], g[3 * i + 2]];
           probes.push({ x: cx, y: cy, want: key === "overlap3d" ? "dark" : "mark", what: `${i}/centre` });
           if (key === "meshscatter3d") {
-            for (const [dx, dy, dir] of [[1, 0, "+x"], [-1, 0, "-x"], [0, 1, "+y"], [0, -1, "-y"]]) {
-              probes.push({ x: cx + dx * (r - 3), y: cy + dy * (r - 3), want: "mark", what: `${i}/inside${dir}` });
-              probes.push({ x: cx + dx * 1.25 * r, y: cy + dy * 1.25 * r, want: "bg", what: `${i}/outside${dir}` });
+            const reach = [];
+            for (let a = 0; a < 16; a++) {
+              const [dx, dy] = [Math.cos((a * Math.PI) / 8), Math.sin((a * Math.PI) / 8)];
+              probes.push({ x: cx + dx * (r + 3), y: cy + dy * (r + 3), want: "off", what: `${i}/outside@${a * 22.5}°` });
+              reach.push(probes.length);
+              probes.push({ x: cx + dx * (r - 3), y: cy + dy * (r - 3), want: "any", what: `${i}/inside@${a * 22.5}°` });
             }
+            reachGroups.push({ what: `${i}/reaches-r`, idx: reach });
           }
         } else {
           probes.push({ x: (g[4 * i] + g[4 * i + 2]) / 2, y: (g[4 * i + 1] + g[4 * i + 3]) / 2, want: "mark", what: `${i}/mid` });
@@ -549,13 +562,55 @@ try {
       const isBg = (p) => p.r > 225 && p.g > 225 && p.b > 225;
       probes.forEach((p, i) => {
         const c = px[i];
-        const ok = p.want === "bg" ? isBg(c) : p.want === "dark" ? Math.max(c.r, c.g, c.b) < 60 : !isBg(c);
+        // "off" the grey sphere: anything outside its shading (57-138 on this figure), such as
+        // background, gridlines, or the Axis3 frame's black lines that pass beside it.
+        const v = Math.max(c.r, c.g, c.b);
+        const ok = p.want === "any" ||
+          (p.want === "bg" ? isBg(c) : p.want === "off" ? v < 40 || v > 190 : p.want === "dark" ? v < 60 : !isBg(c));
         if (!ok) throw new Error(`${key}/on-drawn-mark: ${p.what} at (${p.x.toFixed(1)}, ${p.y.toFixed(1)}) wanted ${p.want}, read ${JSON.stringify(c)}`);
       });
+      for (const grp of reachGroups) {
+        if (!grp.idx.some((k) => !isBg(px[k]))) throw new Error(`${key}/on-drawn-mark: ${grp.what}: the sphere is drawn 3 px inside r in no direction`);
+      }
       passed.push(`${key}/on-drawn-mark`);
     } else {
       passed.push(`${key}/on-drawn-mark-skipped-webgl`);
     }
+  }
+
+  // Axis3 wheel zoom (#321): the limits readout is the same tooltip card as a hover, in the
+  // figure's theme, shown while the wheel turns and gone once the zoom settles. Zooming back
+  // out leaves the view as the other drivers found it.
+  {
+    const lightTip = await hoverAt("scatter", hx, hy);
+    const view3 = (await layersOf("view3d")).find((l) => l.id === "view").geometry;
+    const wheel3 = (deltaY) => page.evaluate(async ([k, ix, iy, dy]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const hosts = [...document.querySelectorAll(".ip-host")];
+      const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center", inline: "nearest" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy,
+      }));
+      await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+      const t = sr.querySelector(".masque-tip");
+      const cs = getComputedStyle(t);
+      const during = { show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color };
+      await new Promise((res) => setTimeout(res, 600));   // past the wheel's idle settle
+      return { during, after: t.classList.contains("show") };
+    }, ["view3d", view3.x + view3.w / 2, view3.y + view3.h / 2, deltaY]);
+    const r = await wheel3(-300);
+    if (!r.during.show) throw new Error("view3d/zoom-readout: no limits readout while the wheel turns");
+    if (!/x:\[/.test(r.during.text) || !/z:\[/.test(r.during.text)) throw new Error(`view3d/zoom-readout: readout does not show the x and z limits: ${JSON.stringify(r.during.text)}`);
+    if (r.during.bg !== lightTip.bg || r.during.color !== lightTip.color) {
+      throw new Error(`view3d/zoom-readout: readout theme ${r.during.bg}/${r.during.color} differs from the hover tooltip's ${lightTip.bg}/${lightTip.color}`);
+    }
+    if (r.after) throw new Error("view3d/zoom-readout: the readout is still showing after the zoom settled");
+    await wheel3(300);
+    passed.push("view3d/zoom-readout");
   }
 
   // The axis readout's cursor-following tooltip: the caret apex sits on the pointer, both in
