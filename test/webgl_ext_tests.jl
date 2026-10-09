@@ -199,7 +199,7 @@ end
 
     ev = APD.Bonds.transform_value(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "wrong"))
     @test ev isa Masque.ElementEvent && ev.index == 2
-    @test ev.payload === payloads[2]
+    @test ev.payload === pt.payloads[2]   # the label merged onto the point's x and y (#308)
     # both backends call Masque.bond_from_js — not a second copy of the transform
     @test ev == Masque.bond_from_js(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "ignored"))
 

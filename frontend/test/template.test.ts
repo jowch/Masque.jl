@@ -151,5 +151,6 @@ describe("withReadout", () => {
         const out = withReadout({ x: "mine", name: "s" }, hit, undefined, true)
         expect(out).toEqual({ x: "mine", name: "s", i: 5, y: 2 })
         expect(Object.keys(out as object)).toEqual(["x", "name", "i", "y"])
+        expect(withReadout(null, hit, undefined, false)).toEqual({ x: 1, y: 2 })
     })
 })
