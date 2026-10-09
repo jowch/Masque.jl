@@ -65,13 +65,11 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`picks` starts as `nothing`. After a release, `picks` lists the stations inside the box, or is empty if there are none. `samples[picks]` is their rows, and this cell shows them as a table.
+`picks` lists the stations inside the box, or is empty if there are none. It starts with the ones inside the starting box and changes when you release it. `samples[picks]` is their rows, and this cell shows them as a table.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if isnothing(picks)
-    md"*Drag the box over some stations, then release.*"
-elseif isempty(picks)
+if isempty(picks)
     md"*No stations in the box.*"
 else
     rows = samples[picks]
