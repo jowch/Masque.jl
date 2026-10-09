@@ -25,6 +25,12 @@ All notable changes to this project are documented here. The format is based on
   template can use those fields next to `i`, `j`, and `value`, and a click's
   `GridCellEvent` carries the payload, so `pick.row` reads it. Before, a grid took no
   payloads, and labelling cells meant one `RectInteractable` per cell (#290).
+- A plot's layer is named after the plot's own `label`, the text its legend entry shows, so
+  `scatter!(ax, xs, ys; label = "wild type")` announces "wild type, element 3 of 10: …" to
+  screen readers. Passing `label` to `interactables(plot; …)` or a constructor still names the
+  layer, and `label = nothing` leaves the name out. A plot with no `label`, or one written in
+  LaTeX or rich text (whose markup a screen reader would read out), announces what it did
+  before (#304).
 
 ### Fixed
 - `masque` warns once per call about the plots it skips, listing each kind, with a count when

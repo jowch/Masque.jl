@@ -37,11 +37,9 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
 - `axis::Symbol` — the id of this layer's [`AxisTransform`](@ref) in
   `InteractionContext.transforms` (see `axis_id`).
 - `events::Tuple` — the pointer events this layer responds to (`:click`, `:hover`, `:drag`).
-- `label::Union{Nothing,String}` — an optional announcement prefix for screen readers (e.g.
-  `"Scatter"`), used by the keyboard-navigation overlay ("Scatter, element 3 of 10: …"). Not to
-  be confused with a `label` *payload* key (e.g. `(; label = "a")` in the examples below) —
-  that's per-element tooltip data; this is one string per layer. `nothing` (default) omits it
-  from the manifest.
+- `label::Union{Nothing,String}` — the layer's name, which the keyboard-navigation overlay
+  announces ("wild type, element 3 of 10: …"). One string per layer, unlike a `label` field in
+  a payload, which belongs to one element. `nothing` (default) omits it from the manifest.
 - `colors` — an optional tooltip accent colour for this layer's elements: a single CSS colour
   string (uniform across the layer), or `(; palette, index)` with `palette::Vector{String}` (CSS
   colours) and one 1-based `index` per element into it (colormapped/categorical data).
@@ -342,10 +340,12 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
   per point (`ArgumentError` otherwise).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`; not meaningful).
-- `label` — an optional screen-reader announcement prefix for this layer (e.g. `"Scatter"`),
-  used by the overlay's keyboard navigation ("Scatter, element 3 of 10: …"). Default `nothing`
-  (no prefix). Not the same thing as a `label` *payload* key (see the `PointInteractable`
-  examples elsewhere in this file) — that's per-element tooltip data.
+- `label` — the layer's name, which screen readers announce when the keyboard moves to an
+  element ("wild type, element 3 of 10: …"). Default `nothing` (no name); from a plot object,
+  the plot's own Makie `label` when it is set to plain text, so `scatter!(…; label = "wild
+  type")` names its layer. Pass `label = nothing` to leave it out. A `label` field in a
+  payload, as `series!` gives each line, is different: it belongs to one element and shows in
+  its tooltip.
 - `colors` — an optional tooltip accent colour: one CSS colour string for every point, a
   `Vector` of CSS colour strings (one per point), or `(; palette, index)` with one 1-based
   `index` per point into `palette`. Default `nothing` (no accent). Not derived automatically
@@ -500,8 +500,8 @@ Lines / polylines or disjoint segment pairs. Produces one `:polyline`, `:lines`,
   also take `whiskerwidth / 2`, so their whiskers respond).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
-- `label` — an optional screen-reader announcement prefix for this layer (see
-  [`PointInteractable`](@ref)). Default `nothing`.
+- `label` — the layer's name, which screen readers announce (see [`PointInteractable`](@ref)).
+  Default `nothing`; from a plot object, the plot's own Makie `label`.
 
 # From a plot object
 `SegmentInteractable(ax, p)` reads vertices from `p` (no `mode`/`unit` keyword — those are fixed
@@ -670,8 +670,8 @@ Axis-aligned rectangles from an explicit list (bars, boxes). Produces one `:rect
   so integer quantization never expands past the edge) before shipping geometry. Used
   internally by the `HSpan`/`VSpan` introspection methods below; rarely needed directly.
   Default `false`.
-- `label` — an optional screen-reader announcement prefix for this layer (see
-  [`PointInteractable`](@ref)). Default `nothing`.
+- `label` — the layer's name, which screen readers announce (see [`PointInteractable`](@ref)).
+  Default `nothing`; from a plot object, the plot's own Makie `label`.
 
 `RectInteractable(ax; rects = …)` is deprecated in favor of `RectInteractable(ax, rects)`.
 `RectInteractable(ax; grid = (xedges, yedges, values))` and `RectInteractable(ax, p)` for a
@@ -806,8 +806,9 @@ commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value.
   of the payload's fields and `value`. `masque"..."` is a template that can use `i`, `j`,
   `value` and the payload's fields; `false` suppresses it. `tooltip = true` is rejected
   (`ArgumentError`).
-- `label` — an optional screen-reader announcement prefix (see [`PointInteractable`](@ref)).
-  It is stored and shipped, but has no effect yet: a grid is not keyboard-navigable.
+- `label` — the layer's name (see [`PointInteractable`](@ref)); from a plot object, the plot's
+  own Makie `label`. It is stored and shipped, but has no effect yet: a grid is not
+  keyboard-navigable.
 
 When a cell is at least one screen pixel, the manifest carries `values` (row-major). Below
 that it carries `sample`: one source value per screen pixel of the axis viewport, the cell
@@ -940,8 +941,8 @@ one. Produces one `:rects` [`HitLayer`](@ref), one box per string.
   anchor.
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
-- `label` — an optional screen-reader announcement prefix for this layer (see
-  [`PointInteractable`](@ref)).
+- `label` — the layer's name, which screen readers announce (see [`PointInteractable`](@ref)).
+  Default: the text plot's own Makie `label`, or `nothing`.
 
 Geometry is each string's axis-aligned bounding box (`Makie.string_boundingboxes`), not
 projected data coordinates — a rotated label gets its expanded axis-aligned box. Boxes are
@@ -958,7 +959,7 @@ struct TextInteractable <: AbstractInteractable
     ax; p; id::Symbol; payloads::Vector{Any}; tooltip::Union{Nothing, Markup, Bool}   # p::Makie.Text
     label::Union{Nothing, String}
 end
-function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, tooltip = nothing, label = nothing)
+function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, tooltip = nothing, label = _plot_label(p))
     _check_tooltip(tooltip)
     strs = p.text[]
     anchors = p.positions[]
@@ -1026,8 +1027,8 @@ Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLa
   `(; index)`, 1-based.
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
-- `label` — an optional screen-reader announcement prefix for this layer (see
-  [`PointInteractable`](@ref)). Default `nothing`.
+- `label` — the layer's name, which screen readers announce (see [`PointInteractable`](@ref)).
+  Default `nothing`; from a plot object, the plot's own Makie `label`.
 
 # From a plot object
 `PolygonInteractable(ax, p)` builds `rings` and default payloads from `p`:
