@@ -928,7 +928,11 @@ end
 
 function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu, max_width)
     view_axes = Dict{Symbol, Any}(i.id => i.ax for i in interactables if i isa ViewInteractable)
-    isempty(view_axes) && return nothing
+    has_live = any(i -> i isa ThresholdInteractable && i.live !== nothing, interactables)
+    isempty(view_axes) && !has_live && return nothing
+    # A live control's frames rebuild the manifest from these, so the line is drawn where the
+    # drag left it. Copied: the widget's own list stays as the author built it.
+    interactables = collect(AbstractInteractable, interactables)
     state = _ViewWarmup(
         input -> _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, max_width),
         view_axes, nothing, nothing, false, false, false,
@@ -943,8 +947,20 @@ function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu, m
     return frame
 end
 
+# Spike: a live threshold's frame. Run the author's callback with the dragged value, move the
+# line there in the manifest, then render the figure as a view frame does.
+function _apply_live_frame(input, k, backend, fig, interactables, ppu, max_width)
+    i = interactables[k]::ThresholdInteractable
+    v = _threshold_value(input["value"])
+    i.live(v)
+    interactables[k] = ThresholdInteractable(i.ax, i.orientation, v, i.id, i.live)
+    return _render_gesture_frame(input, backend, fig, interactables, ppu, max_width)
+end
+
 function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, max_width)
     id = Symbol(input["id"])
+    k = findfirst(i -> i isa ThresholdInteractable && i.id === id && i.live !== nothing, interactables)
+    k === nothing || return _apply_live_frame(input, k, backend, fig, interactables, ppu, max_width)
     ax = get(view_axes, id, nothing)
     ax === nothing && throw(
         ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
@@ -966,6 +982,10 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
             Float64(input["ymin"]), Float64(input["ymax"]),
         )
     end
+    return _render_gesture_frame(input, backend, fig, interactables, ppu, max_width)
+end
+
+function _render_gesture_frame(input, backend, fig, interactables, ppu, max_width)
     # Frame resolution drops to 1x for every in-drag frame and restores to the mount ppu on
     # release ("settle", the frontend's terminal request) — the MANIFEST always stays in the
     # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never

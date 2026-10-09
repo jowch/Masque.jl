@@ -163,6 +163,31 @@ describe("mount", () => {
         expect(committed!.payload).toBeCloseTo(25)
     })
 
+    it("a live threshold streams in-drag values and settles on release (spike)", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [{ id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { orientation: "h", pos: 400, span: [0, 1200], live: true } }],
+        }
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({}))
+        const { host, script } = setup()
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 300, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 300, bubbles: true }))
+        await flushFrame(); await flushFrame()
+        const inputs = requestFrame.mock.calls.map((c) => c[0])
+        expect(inputs.length).toBeGreaterThan(0)
+        const last = inputs[inputs.length - 1]
+        expect(last).toMatchObject({ id: "thr", settle: true })
+        expect(last.value as number).toBeCloseTo(25)
+        // the release still commits through @bind
+        expect((host as unknown as { value: { payload: number } }).value.payload).toBeCloseTo(25)
+    })
+
     it("re-grab works at the moved threshold position (hit-test tracks the drawn line)", () => {
         // Same class of bug as the ROI re-grab test: the drag moved the drawn line but hit-testing
         // read the manifest's original `pos`, so a second drag only grabbed the line where it

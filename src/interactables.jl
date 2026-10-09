@@ -1649,6 +1649,9 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 - `value` — the line's initial data-space position (a y-value for `:horizontal`, x-value for
   `:vertical`). Required, no default.
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:threshold`.
+- `live` — spike: a function called with each in-drag value, `live(v)`. It updates the figure
+  (an `Observable`, a plot attribute), and the widget redraws over the gesture channel while
+  the line moves, as a pan does. Needs a running kernel. Default `nothing`.
 
 Payload on commit (client-side): the scalar data coordinate.
 
@@ -1669,11 +1672,12 @@ ThresholdInteractable(ax; orientation = :horizontal, value = 5.0)
 """
 struct ThresholdInteractable <: AbstractInteractable
     ax; orientation::Symbol; value::Float64; id::Symbol
+    live::Union{Nothing, Function}
 end
-function ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold)
+function ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold, live = nothing)
     orientation in (:horizontal, :vertical) ||
         throw(ArgumentError("ThresholdInteractable: orientation must be :horizontal or :vertical, got $(orientation)"))
-    return ThresholdInteractable(ax, orientation, _threshold_value(value), id)
+    return ThresholdInteractable(ax, orientation, _threshold_value(value), id, live)
 end
 events(::ThresholdInteractable) = (:drag,)
 function validate(i::ThresholdInteractable, ctx::InteractionContext)
@@ -1698,7 +1702,8 @@ function hitlayers(i::ThresholdInteractable, ctx)
         pos = _proj(ctx, i.ax, (i.value, t.ylims[1]))[1]   # constant data-x → its pixel-x
         span = Float32[vy, vy + vh]; orient = "v"
     end
-    geom = Dict("orientation" => orient, "pos" => Float32(pos), "span" => span)
+    geom = Dict{String, Any}("orientation" => orient, "pos" => Float32(pos), "span" => span)
+    i.live === nothing || (geom["live"] = true)
     return [HitLayer(i.id, :threshold, geom, Any[], axis_id(ctx, i.ax), events(i))]
 end
 

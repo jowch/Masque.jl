@@ -17,6 +17,28 @@ end
         @test w.render_frame === nothing
     end
 
+    @testset "a live threshold redraws over the channel (spike)" begin
+        fig = Figure(size = (600, 400))
+        ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        level = Observable(5.0)
+        hlines!(ax, level)
+        seen = Float64[]
+        th = ThresholdInteractable(ax; value = 5.0, live = v -> (push!(seen, v); level[] = v))
+        @test masque(fig, ThresholdInteractable(ax; value = 5.0)).render_frame === nothing
+        w = masque(fig, th)
+        @test w.render_frame isa Function
+        @test only(filter(l -> l["kind"] == "threshold", w.manifest["layers"]))["geometry"]["live"] == true
+        pos(m) = only(filter(l -> l["kind"] == "threshold", m["layers"]))["geometry"]["pos"]
+        resp = w.render_frame(Dict("id" => "threshold", "value" => 8.0, "settle" => false))
+        @test seen == [8.0] && level[] == 8.0
+        @test !isempty(resp["png"])
+        # the new manifest draws the line where the drag left it, and the owner rule still holds
+        @test pos(resp["manifest"]) < pos(w.manifest)
+        @test resp["manifest"]["bondOwner"] == "threshold"
+        # the widget's own manifest is untouched
+        @test pos(w.manifest) == pos(masque(fig, ThresholdInteractable(ax; value = 5.0)).manifest)
+    end
+
     @testset "2D pan: frame + manifest travel together, ppu drops during the gesture" begin
         fig = Figure(size = (600, 400))
         ax = Axis(fig[1, 1])

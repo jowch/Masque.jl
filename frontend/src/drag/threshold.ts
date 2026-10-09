@@ -47,6 +47,12 @@ function place(d: Extract<Drag, { kind: "threshold" }>, pos: number): void {
     setLine(d.line_, d.tg_, pos)
 }
 
+// The data value under the dragged line, as a release would send it.
+export function valueAt(d: Extract<Drag, { kind: "threshold" }>, p: { x: number; y: number }): unknown {
+    const v = invertAxis(d.t_, clampX(d.t_, p.x), clampY(d.t_, p.y))
+    return d.tg_.orientation === "h" ? v.y : v.x
+}
+
 export function move(d: Extract<Drag, { kind: "threshold" }>, p: { x: number; y: number }, digits: number): string {
     place(d, d.tg_.orientation === "h" ? clampY(d.t_, p.y) : clampX(d.t_, p.x))
     const v = invertAxis(d.t_, clampX(d.t_, p.x), clampY(d.t_, p.y))

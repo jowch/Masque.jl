@@ -76,6 +76,8 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
     let text: string
     if (d.kind === "threshold") {
         text = thresholdDrag.move(d, content, ctx.tipDigits_)
+        // Spike: a live line streams its value; Julia runs the author's callback and redraws.
+        if (d.tg_.live) ctx.gesture_.request({ id: d.id_, value: thresholdDrag.valueAt(d, content), settle: false })
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {
             text = viewDrag.tip(d, layout, ctx.tipDigits_)
@@ -258,7 +260,9 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     applyDrag(ctx, state, d, e)
     const { layout, content } = pointerSpace(ctx, state, e)
     if (d.kind === "threshold") {
-        ctx.setValue_(thresholdDrag.end(d, content), d.id_)
+        const committed = thresholdDrag.end(d, content)
+        if (d.tg_.live) void ctx.gesture_.settle({ id: d.id_, value: committed.payload, settle: true })
+        ctx.setValue_(committed, d.id_)
         ctx.host_.dispatchEvent(new CustomEvent("input"))
     } else if (d.kind === "view") {
         // §12.3: a view gesture commits nothing — no bond write, no "input" event.

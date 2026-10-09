@@ -35,6 +35,7 @@ export interface ThresholdGeometry {
     orientation: "h" | "v"
     pos: number            // image-px coordinate of the line (y if "h", x if "v")
     span: [number, number] // image-px extent along the axis viewport
+    live?: true            // spike: in-drag values go over the gesture channel and the figure redraws
 }
 
 export interface ROIGeometry {
