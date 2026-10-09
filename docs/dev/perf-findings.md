@@ -70,6 +70,8 @@ manifest the MsgPack size.
 | scatter, 10 000 | 717 KB | 379 KB | manifest approaches PNG; both O(N) |
 | heatmap, 50×50 | 30 KB | 13 KB | |
 | heatmap, 200×200 | 190 KB | 197 KB | edges are compact; `values[]` is O(cells) |
+| heatmap, 50×50, cell labels | 30 KB | 54 KB | `payloads = (i, j) -> (; row, col)` (2026-10-08, #290) |
+| heatmap, 200×200, cell labels | 190 KB | 897 KB | ~18 B/cell of payload on top of `values[]` |
 
 A realistic single interactive plot is **50–400 KB total**. Editor lag is not expected there; it
 becomes a risk only at the extremes in "Stress".
@@ -102,6 +104,11 @@ repo's own docs build) one widget already warns and two fail.
 - **A heatmap's value matrix** (`:grid` `values[]`, O(cells)) while each cell is at least one
   screen pixel: 200×200 is 197 KB. Below one pixel per cell the manifest carries one value per
   screen pixel of the axis viewport instead ("Stress"). Tooltip templates add nothing per cell.
+- **Per-cell grid payloads** (`payloads`, #290, 2026-10-08): one payload per cell, shipped on both
+  the `values[]` and the sub-pixel branch, since hover needs the cell's own entry. A short
+  `(; row, col)` label pair is ~18 B/cell, so a labelled 200×200 heatmap is 897 KB against 197 KB
+  unlabelled; that is O(cells), where row and column label vectors would be O(rows + columns).
+  A grid without `payloads` ships the same bytes as before.
 - **Slice series**, which stay Float64 (section H, one series, no other layers): 100 vertices is
   1.8 KB of `xy` in a 2.2 KB manifest, 1 000 vertices 17.6 KB in 18.0 KB (~18 B/vertex). The
   raster stays the empty-axis floor (9.8 KB). A view gesture rebuilds the manifest every frame,

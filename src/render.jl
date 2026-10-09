@@ -137,6 +137,8 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         ks = L.kind === :slice ? _slice_template_keys(L) : _payload_keys(L.payloads)
         # A line's hover readout adds the nearest sample's `x`, `y`, and 1-based index `i`.
         L.points === nothing || isempty(ks) || union!(ks, (:x, :y, :i))
+        # A grid cell's template also sees the cell's `i`, `j`, and `value`.
+        L.kind === :grid && !isempty(ks) && union!(ks, (:i, :j, :value))
         isempty(ks) || check_fields(spec, ks)      # build-time field check (skip if no NamedTuple payloads)
         d["template"] = markup_segments(spec)
     elseif spec === false

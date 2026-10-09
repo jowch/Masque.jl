@@ -22,7 +22,7 @@ types even inside a widget that also selects. A view pan or orbit commits nothin
 |---|---|---|
 | point, bar, polygon, segment, list of rects | `ElementEvent` | `layer`, `index` (1-based); other names forward to the row |
 | legend entry | `LegendEvent` | `label`, `group`, `targets`; `index` is the entry, not a table row |
-| heatmap / image cell | `GridCellEvent` | `i`, `j` (1-based); `A[cell]` is `A[cell.i, cell.j]`; `value` is `nothing` when it was not shipped |
+| heatmap / image cell | `GridCellEvent` | `i`, `j` (1-based); `A[cell]` is `A[cell.i, cell.j]`; `value` is `nothing` when it was not shipped; `payload` is the cell's `payloads` entry (Julia looks it up from `(i, j)`, the browser never uploads it), and its fields forward as on `ElementEvent` |
 | grid brush | `GridWindowEvent` | `i1:i2`, `j1:j2` (1-based inclusive); `A[win]` is that window; a miss is an empty range |
 | axis click | `AxisEvent` | `x`, `y`; `xcat`, `ycat` on a categorical dimension, else `nothing` |
 | colorbar click | `ColorbarEvent` | `value` |

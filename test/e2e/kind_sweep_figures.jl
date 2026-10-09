@@ -86,6 +86,14 @@ kind_sweep_meta() = [
         "tip" => "1,1", "hoverIndex" => 0, "hoverTip" => "1,1", "mode" => "element",
     ),
     Dict(
+        # Per-cell payloads (#290): the template reads each cell's row and column labels, and
+        # the click's `GridCellEvent` carries that cell's payload (`bindPayloadField`).
+        "key" => "heatmap_labels", "layerId" => "cells", "layerKind" => "grid",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "(r1,c1)=4", "hoverIndex" => 5, "hoverTip" => "(r2,c2)=8", "mode" => "element",
+        "bindPayloadField" => "row",
+    ),
+    Dict(
         "key" => "barplot", "layerId" => "bars", "layerKind" => "rects",
         "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
         "tip" => "value", "hoverIndex" => 0, "hoverTip" => "value",
@@ -480,6 +488,20 @@ function build_kind_sweep()
         ax = Axis(fig[1, 1]; title = "image_rgb")
         image!(ax, (0.5, 4.5), (0.5, 3.5), z)
         masque(fig)
+    end
+
+    heatmap_labels = let
+        z = [Float64(i + 3j) for i in 1:4, j in 1:3]
+        rows = ["r$i" for i in 1:4]; cols = ["c$j" for j in 1:3]
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "heatmap_labels")
+        hm = heatmap!(ax, 1:4, 1:3, z)
+        masque(
+            fig, interactables(
+                hm; payloads = (i, j) -> (; row = rows[i], col = cols[j]),
+                tooltip = masque"($(row), $(col)) = $(value)",
+            ),
+        )
     end
 
     barplot = let
@@ -998,7 +1020,7 @@ function build_kind_sweep()
     end
 
     return (;
-        scatter, lines, series, segments, heatmap, image, image_rgb, barplot, poly, poly_shapes, regions,
+        scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto,

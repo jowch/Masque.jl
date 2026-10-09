@@ -16,6 +16,15 @@ All notable changes to this project are documented here. The format is based on
   release and checked against its hash, so each widget adds little beyond its image. Read
   offline, the page shows the plain figures. A Masque checked out with `Pkg.develop` writes
   the script into each widget instead, about 80 KB apiece (#298).
+- `SliceInteractable([a, b])` builds a slice from plots without naming the axis; `masque`
+  puts it on the axis that draws them, and plots on different axes raise an error naming
+  both. `SliceInteractable(ax, [a, b])` still works (#306).
+- A heatmap or image takes `payloads`, one per cell: a function `(i, j) -> payload` or a
+  matrix the same size as the plotted one, passed to `interactables(p; payloads)` or
+  `GridInteractable`. The tooltip lists the payload's fields and the cell's value, a
+  template can use those fields next to `i`, `j`, and `value`, and a click's
+  `GridCellEvent` carries the payload, so `pick.row` reads it. Before, a grid took no
+  payloads, and labelling cells meant one `RectInteractable` per cell (#290).
 
 ### Fixed
 - `masque` warns once per call about the plots it skips, listing each kind, with a count when

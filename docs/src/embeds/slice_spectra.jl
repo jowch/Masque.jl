@@ -55,7 +55,7 @@ In your own notebook, a click saves the position in `at`. This page does not rec
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000003
 @bind at masque(
     fig,
-    SliceInteractable(ax, [a, b, c]),
+    SliceInteractable([a, b, c]),
     AxisInteractable(ax);
     auto = false,
 )
