@@ -357,6 +357,22 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test vals[win] == vals[2:3, 2:2]
     end
 
+    @testset "_cell_range leaves out an end cell the box only grazes (#337)" begin
+        # The same cases as `cellRange` in frontend/test/selection.test.ts, 0-based cells.
+        cr = Masque._cell_range
+        asc = [100.0, 200.0, 300.0, 400.0]; desc = reverse(asc)
+        @test cr(asc, 199.6, 300.4) == (1, 1)
+        @test cr(asc, 199.5, 300.5) == (1, 1)
+        @test cr(desc, 199.6, 300.4) == (1, 1)
+        @test cr(asc, 199.4, 300.6) == (0, 2)
+        @test cr(desc, 199.4, 300.6) == (0, 2)
+        @test cr(asc, 199.8, 200.2) == (1, 1)
+        @test cr(asc, 150.0, 150.1) == (0, 0)
+        @test cr([0.0, 0.4, 10.0, 20.0], 0.0, 15.0) == (0, 2)
+        @test cr(asc, 50.0, 250.0) == (0, 1)
+        @test cr(asc, 450.0, 500.0) === nothing
+    end
+
     @testset "a selects box owns its point target's bond; a point click commits nothing" begin
         pfig = Figure(size = (400, 300)); pax = Axis(pfig[1, 1])
         pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0)]
