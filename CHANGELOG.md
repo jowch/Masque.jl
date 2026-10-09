@@ -58,6 +58,9 @@ All notable changes to this project are documented here. The format is based on
 - Showing a `masque` widget outside Pluto no longer throws an `AssertionError`. A
   `backend = :webgl` widget, which has no image to fall back on, shows a box of the figure's
   size saying it is drawn only in Pluto. Widgets in Pluto are unchanged (#288).
+- Two tooltip examples, in the `masque` docstring and on the constructors page, wrote a
+  template field as `{x}`, which a tooltip shows as literal text. They now write `$(x)`.
+  Thanks to Jah-yee (#303).
 
 ## [0.2.1] - 2026-10-04
 
