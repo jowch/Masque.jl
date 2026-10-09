@@ -7,6 +7,7 @@
 //   node kind_sweep.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
 import { shutdownOpenSession } from "./fresh_session.mjs";
+import { surfacePoint } from "./kind_sweep_point.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PNG } from "pngjs";
@@ -137,10 +138,7 @@ function hitPoint(layer, index) {
       y: (g.yedges[j] + g.yedges[j + 1]) / 2,
     };
   }
-  if (k === "surface") {
-    // The shipped point itself: the nearest corner of whichever quad is under it.
-    return { x: g.xy[2 * index], y: g.xy[2 * index + 1] };
-  }
+  if (k === "surface") return surfacePoint(g, index);
   if (k === "threshold") {
     const [s0, s1] = g.span;
     return g.orientation === "h"

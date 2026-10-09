@@ -8,6 +8,7 @@
 //   node polish_verify.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
 import { shutdownOpenSession } from "./fresh_session.mjs";
+import { surfacePoint } from "./kind_sweep_point.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -569,14 +570,14 @@ try {
     const layer = (await layersOf(key)).find((l) => l.id === "surface");
     if (!layer || layer.kind !== "surface") throw new Error(`${key}: no :surface layer`);
     const g = layer.geometry;
-    const pt = (k) => [g.xy[2 * k], g.xy[2 * k + 1]];
+    const pt = (k) => { const p = surfacePoint(g, k); return [p.x, p.y]; };
     const surrounds = (points, [x, y]) => {
       const v = (points || "").trim().split(/[\s,]+/).map(Number);
       if (v.length < 6 || v.some((n) => !Number.isFinite(n))) return false;
       const xs = v.filter((_, i) => i % 2 === 0), ys = v.filter((_, i) => i % 2 === 1);
       return Math.min(...xs) < x && x < Math.max(...xs) && Math.min(...ys) < y && y < Math.max(...ys);
     };
-    const hov = 12, sel = 6;
+    const hov = 12, sel = 13;
     let t = null;
     for (let a = 0; a < 8; a++) {
       t = await hoverAt(key, ...pt(hov));

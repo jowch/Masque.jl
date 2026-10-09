@@ -202,12 +202,14 @@ kind_sweep_meta() = [
     Dict(
         # `surface!` on Axis3 (#259): the pointer lands in a quad and answers with its nearest
         # point, highlighted as the point's dual cell. Point k is (a, b) = (k % 5, k ÷ 5) of the
-        # 5×5 grid; 12 is the centre, 6 is (2, 2) in Julia's 1-based indices. The widget carries
+        # 5×5 grid; 12 is the centre (the peak), 13 is (4, 3) in Julia's 1-based indices, on the
+        # side facing the camera. Points on the far rim are seen edge-on, so their quads are too
+        # thin to click reliably from a synthetic event. The widget carries
         # a ViewInteractable too: `orbitSuspends` checks that an in-drag frame hides the selected
         # point's highlight and the release frame brings it back.
         "key" => "surface3d", "layerId" => "surface", "layerKind" => "surface",
-        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 6,
-        "tip" => "i2j2", "hoverIndex" => 12, "hoverTip" => "i3j3", "mode" => "element",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 13,
+        "tip" => "i4j3", "hoverIndex" => 12, "hoverTip" => "i3j3", "mode" => "element",
         "orbitSuspends" => true,
     ),
     Dict(
@@ -715,8 +717,7 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:wireframe => [1]))
     end
 
-    # A coarse dome, so each point's cell is large enough to hover on its own and every point
-    # faces this camera (#259). The `wireframe!` over the same grid is decoration: it must not
+    # A coarse dome, so each point's cell is large enough to hover on its own (#259). The `wireframe!` over the same grid is decoration: it must not
     # take the hover from the surface.
     surface3d = let
         fig = Figure(size = (480, 320))
