@@ -288,14 +288,15 @@ figure, return `masque(fig)`. For more information, see
 
 ### Tried showing a widget outside Pluto and hover does nothing
 
-**Cause:** tooltips, highlights, and clicks need Pluto. In Documenter,
-VS Code, or any other HTML display, a CairoMakie widget shows the plain
-figure. A WGLMakie widget has no image to show there, so it shows an
-empty box saying it is drawn only in Pluto.
+**Cause:** the display doesn't run the page's scripts, the page can't
+reach jsDelivr to load Masque's script, or the widget uses WGLMakie. A
+CairoMakie widget then shows the plain figure, and a WGLMakie widget
+shows an empty box saying it is drawn only in Pluto.
 
-**Fix:** open the notebook in Pluto for the interactive figure. To put
-the figure in a document, return `fig` itself, or write it with
-`save("figure.png", fig)`.
+**Fix:** show a CairoMakie widget in a display that runs scripts, such
+as Documenter or an HTML page you write with `show`, and read the page
+with an internet connection, or open the notebook in Pluto. For what works outside Pluto, see
+[Outside Pluto](@ref outside-pluto).
 
 ### Tried feeding this widget's bond into the same call's `selected=`
 

@@ -50,3 +50,9 @@ jobs:
       - name: Playwright docs player
         working-directory: test/e2e
         run: node docs_player.mjs "$GITHUB_WORKSPACE/docs/build"
+      # A registered install loads the overlay script from jsDelivr; the driver serves this
+      # checkout's bundle at that URL (#311).
+      - name: Playwright overlay script from jsDelivr
+        run: |
+          julia --color=yes --project=docs test/e2e/standalone_cdn.jl "$RUNNER_TEMP/cdn"
+          cd test/e2e && node standalone_cdn.mjs "$RUNNER_TEMP/cdn"

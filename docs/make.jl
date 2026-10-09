@@ -38,6 +38,9 @@ makedocs(;
         edit_link = "main",
         collapselevel = 2,
         assets = ["assets/masque-embed.css", "assets/masque-embed.js"],
+        # The docs build from a checkout, so each `@example` widget on this page carries the
+        # overlay script as well as its PNG (docs/dev/perf-findings.md, "Outside Pluto").
+        size_threshold_ignore = ["backends.md"],
     ),
     pages = [
         "Home" => "index.md",
