@@ -11,6 +11,41 @@ All notable changes to this project are documented here. The format is based on
   card's look in one keyword, like `overlaystyle` does for the overlay. Its keys are `bg`,
   `color`, `accent`, `font`, `font_size`, `radius`, and `caret`; an unknown key, or a value
   of the wrong kind, raises an `ArgumentError` (#305).
+- An ROI's `selects` takes the plot it brushes, as in `ROIInteractable(ax; bounds, selects = sc)`,
+  so you no longer need to know which scatter became `:scatter_2`. A plot that
+  draws both lines and points, such as `scatterlines`, gives the box its points. A layer id
+  still works (#302).
+- A `ViewInteractable` on an `Axis3` zooms as well as orbits: scroll, or press `+` / `-`,
+  to zoom around the middle of the axis box, and Shift+drag, or Shift with an arrow key, to
+  pan. As in Makie, the box keeps its size and the limits change, so marks outside the new
+  limits are hidden and stop responding to hover and clicks. A line that crosses the edge
+  of the box still responds along the part that is drawn (#321).
+
+### Changed
+- **Breaking:** a `ThresholdInteractable`, an `ROIInteractable`, or a `ColorbarInteractable`
+  you pass to `masque` owns the `@bind` value. Every other layer in that widget keeps its
+  hover and tooltip but no longer takes clicks, so `masque(fig, cutoff)` keeps hover on the
+  points and the value only ever holds the threshold. Before, a click on a point replaced
+  the threshold's value, which is why the docs passed `auto = false`. Code that relied on
+  clicking marks in the same widget as one of these controls needs a second `masque` call
+  for the marks. The colorbars `masque(fig)` adds by itself still leave the other layers
+  clickable. This changes widgets with a selecting box too: the box's target already took
+  no clicks, but the other layers kept theirs, and an `AxisInteractable` click replaced the
+  selection with an `AxisEvent`. Those layers now only show tooltips (#309).
+- **Breaking:** in a widget with one of these controls, `selected=` on another layer only
+  highlights its marks. Before, `masque(fig, cutoff; selected = Dict(:scatter => [1]))`
+  started the value as that point's `ElementEvent`; now it starts at the threshold (#309).
+- **Breaking:** the value starts at the control's starting position instead of `nothing`: a
+  threshold at a `ThresholdEvent` at `value`, and a box without `selects` at a `BoundsEvent`
+  at `bounds`. `level.value` works from the first run, and code that falls back with
+  `isnothing(level) ? 0.5 : level.value` still gets the same number. Code that tests
+  `isnothing(level)` to mean "not dragged yet" no longer sees `nothing`. A selecting box
+  and a colorbar still start at `nothing`, since they have no value before the first release
+  or click (#309).
+- **Breaking:** two of these controls in one widget raise an error naming both, since each
+  would overwrite the other's value. That includes several boxes that select from the same
+  layer, which the Brush a region page used to allow; the last box released replaced the
+  others' selection anyway. Pass each to its own `masque` call (#309).
 
 ### Deprecated
 - The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,

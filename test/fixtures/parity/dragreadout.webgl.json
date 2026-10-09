@@ -24,27 +24,6 @@
             ]
         },
         {
-            "kind": "roi",
-            "id": "roi",
-            "geometry": {
-                "w": 490.90915,
-                "handle": 16,
-                "h": 313.63632,
-                "y": 298.59097,
-                "x": 382.54544
-            },
-            "payloads": [
-            ],
-            "axis": "ax1",
-            "style": {
-                "width": 2
-            },
-            "bond": "bounds",
-            "events": [
-                "drag"
-            ]
-        },
-        {
             "kind": "axis",
             "id": "axis",
             "geometry": null,
@@ -56,11 +35,16 @@
             },
             "bond": "axis",
             "events": [
-                "click",
                 "hover"
             ]
         }
     ],
+    "initial": {
+        "payload": 4,
+        "layer": "threshold",
+        "index": 0
+    },
+    "bondOwner": "threshold",
     "transforms": {
         "ax1": {
             "xscale": "identity",

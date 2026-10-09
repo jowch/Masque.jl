@@ -363,12 +363,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test "click" in only(alone.manifest["layers"])["events"]
         @test tv(alone, Dict("layer" => "pts", "index" => 1)) isa ElementEvent
 
-        # With the box, the target is hover-only; another point layer in the call keeps its clicks.
+        # With the box, the target is hover-only, and so is every other layer in the call (#309).
         w = masque(pfig, [pi, other, roi]; auto = false)
         ev_of(id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))["events"]
         @test ev_of("pts") == ["hover"]
-        @test ev_of("other") == ["click", "hover"]
-        @test tv(w, Dict("layer" => "other", "index" => 0)) isa ElementEvent
+        @test ev_of("other") == ["hover"]
+        @test w.manifest["bondOwner"] == "box" && !haskey(w.manifest, "initial")
 
         err = try
             tv(w, Dict("layer" => "pts", "index" => 1))
@@ -383,5 +383,143 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test got isa Vector{ElementEvent} && [e.payload for e in got] == ["b", "c"]
         seeded = IP.APD.Bonds.initial_value(masque(pfig, [pi, roi]; selected = 2, auto = false))
         @test seeded isa Vector{ElementEvent} && only(seeded).payload == "b"
+    end
+
+    @testset "selects takes a plot (#302)" begin
+        layer(w, id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))
+        bounds = (0.0, 4.0, 0.0, 4.0)
+
+        # Two scatters: the box finds the second one's numbered layer without the caller naming it.
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        s1 = scatter!(ax, [1.0, 2.0], [1.0, 2.0])
+        s2 = scatter!(ax, [1.5, 3.0], [2.5, 3.0])
+        w = masque(fig, ROIInteractable(ax; bounds, selects = s2))
+        @test w.manifest["selectionTarget"] == "scatter_2"
+        @test layer(w, "roi")["selects"] == "scatter_2"
+        # Same widget as naming the id, so the browser sees nothing new.
+        @test w.manifest == masque(fig, ROIInteractable(ax; bounds, selects = :scatter_2)).manifest
+        w1 = masque(fig, ROIInteractable(ax; bounds, selects = s1))
+        @test w1.manifest["selectionTarget"] == "scatter"
+
+        # The plot's own id, set through `interactables`, is the one the box takes.
+        w = masque(fig, interactables(s2; id = :pts), ROIInteractable(ax; bounds, selects = s2))
+        @test w.manifest["selectionTarget"] == "pts"
+
+        # Without `auto`, the plot needs its own interactables in the call.
+        err = try
+            masque(fig, ROIInteractable(ax; bounds, selects = s2); auto = false)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("auto = false", err.msg)
+        w = masque(fig, interactables(s2), ROIInteractable(ax; bounds, selects = s2); auto = false)
+        @test w.manifest["selectionTarget"] == "scatter"
+
+        # A composite brushes the layer of a compatible kind: scatterlines' points, not its line.
+        cfig = Figure(size = (400, 300)); cax = Axis(cfig[1, 1])
+        sl = scatterlines!(cax, [1.0, 2.0, 3.0], [1.0, 3.0, 2.0])
+        w = masque(cfig, ROIInteractable(cax; bounds, selects = sl))
+        @test layer(w, w.manifest["selectionTarget"])["kind"] == "circles"
+
+        # A heatmap gives a grid brush.
+        hfig = Figure(size = (400, 300)); hax = Axis(hfig[1, 1])
+        hm = heatmap!(hax, 0 .. 4.0, 0 .. 3.0, [Float64(i + j) for i in 1:4, j in 1:3])
+        w = masque(hfig, ROIInteractable(hax; bounds, selects = hm))
+        @test w.manifest["selection"] == "grid"
+        @test layer(w, w.manifest["selectionTarget"])["kind"] == "grid"
+
+        # A plot with no brushable layer names the kinds it found.
+        lfig = Figure(size = (400, 300)); lax = Axis(lfig[1, 1])
+        ln = lines!(lax, 1:4, 1:4)
+        err = try
+            masque(lfig, ROIInteractable(lax; bounds, selects = ln))
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("`lines` plot", err.msg) && occursin("lines", err.msg)
+
+        # Two layers the box could brush: the error names both and asks for an id.
+        _, _, ctx = ctx_for(fig)
+        two = Masque._PlotTarget(s1, [:a, :b])
+        err = try
+            Masque.build_manifest(
+                [
+                    PointInteractable(ax, [(1.0, 1.0)]; id = :a), PointInteractable(ax, [(2.0, 2.0)]; id = :b),
+                    ROIInteractable(ax, bounds, :roi, two),
+                ], ctx,
+            )
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("`:a`, `:b`", err.msg) && occursin("selects = :a", err.msg)
+
+        # `build_manifest` on its own takes layer ids only.
+        @test_throws ArgumentError Masque.build_manifest(
+            [PointInteractable(ax, [(1.0, 1.0)]; id = :scatter), ROIInteractable(ax; bounds, selects = s1)], ctx,
+        )
+    end
+
+    @testset "a threshold, an ROI, or a passed colorbar owns the bond (#309)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        sc = scatter!(ax, [2.0, 8.0], [2.0, 8.0]; color = [1.0, 2.0])
+        cb = Colorbar(fig[1, 2], sc)
+        tv = IP.APD.Bonds.transform_value
+        iv = IP.APD.Bonds.initial_value
+        ev_of(w, id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))["events"]
+
+        # Without an owner, the automatic layers take clicks and the bond starts as `nothing`.
+        plain = masque(fig)
+        @test "click" in ev_of(plain, "scatter") && "click" in ev_of(plain, "colorbar")
+        @test !haskey(plain.manifest, "bondOwner") && iv(plain) === nothing
+
+        # A threshold keeps hover on everything else, takes their clicks, and starts at `value`.
+        th = ThresholdInteractable(ax; value = 4.0)
+        w = masque(fig, th)
+        @test ev_of(w, "scatter") == ["hover"] && ev_of(w, "colorbar") == ["hover"]
+        @test ev_of(w, "threshold") == ["drag"]
+        @test w.manifest["bondOwner"] == "threshold"
+        @test iv(w) == ThresholdEvent(:threshold, 4.0, nothing)
+        @test tv(w, Dict("layer" => "threshold", "index" => 0, "payload" => 6.5)) == ThresholdEvent(:threshold, 6.5, nothing)
+
+        # A bounds ROI starts at its `bounds`.
+        roi = ROIInteractable(ax; bounds = (1.0, 3.0, 2.0, 5.0))
+        wr = masque(fig, roi)
+        @test ev_of(wr, "scatter") == ["hover"]
+        @test iv(wr) == BoundsEvent(:roi, 1.0, 3.0, 2.0, 5.0)
+
+        # A colorbar you pass owns the bond, with no value before the first click; one `masque`
+        # adds by itself does not.
+        wc = masque(fig, ColorbarInteractable(cb))
+        @test ev_of(wc, "scatter") == ["hover"] && "click" in ev_of(wc, "colorbar")
+        @test wc.manifest["bondOwner"] == "colorbar" && iv(wc) === nothing
+        @test !Masque.owns_bond(only(filter(i -> i isa ColorbarInteractable, interactables(fig))))
+
+        # `selected=` on another layer highlights it but leaves the bond at the owner's start.
+        ws = masque(fig, th; selected = Dict(:scatter => [1]))
+        @test only(filter(l -> l["id"] == "scatter", ws.manifest["layers"]))["selected"] == [0]
+        @test iv(ws) == ThresholdEvent(:threshold, 4.0, nothing)
+
+        # Two owners name both.
+        err = try
+            masque(fig, th, roi)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin(":threshold and :roi", err.msg)
+        @test_throws ArgumentError masque(fig, th, ThresholdInteractable(ax; value = 6.0, id = :t2))
+        @test_throws ArgumentError masque(fig, th, ColorbarInteractable(cb))
+
+        # On a categorical axis, a `value` at a category's position starts with its label.
+        cfig = Figure(size = (400, 300))
+        cax = Axis(cfig[1, 1]; dim2_conversion = Makie.CategoricalConversion())
+        scatter!(cax, [1.0, 2.0, 3.0], ["a", "b", "c"])
+        @test iv(masque(cfig, ThresholdInteractable(cax; value = 2.0); auto = false)) ==
+            ThresholdEvent(:threshold, 2.0, "b")
+        @test iv(masque(cfig, ThresholdInteractable(cax; value = 2.5); auto = false)) ==
+            ThresholdEvent(:threshold, 2.5, nothing)
     end
 end

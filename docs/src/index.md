@@ -22,7 +22,8 @@ Click a mark to send it to your notebook. See [Click marks](@ref) and
 
 ![Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera](assets/home/orbit.gif)
 
-Drag a 2D axis to pan, or an `Axis3` to orbit. See [Pan and orbit](@ref).
+Drag a 2D axis to pan, or an `Axis3` to orbit, and scroll to zoom
+either. See [Pan and orbit](@ref).
 
 ## Highlight from the legend
 

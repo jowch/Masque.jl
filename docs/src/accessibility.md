@@ -61,10 +61,12 @@ cells that use it update when you release the key, not at every step.
 | Pan view | Arrow keys | Pan by a tenth of the axis |
 | | + / − | Zoom in / out around the middle of the axis |
 | Orbit view | Arrow keys | Rotate the camera |
+| | Shift + arrow key | Pan by a tenth of the axis |
+| | + / − | Zoom in / out around the middle of the axis |
 | Any | Escape | Leave the stop |
 
 On a categorical axis, a threshold line moves one category at a time.
-Panning and rotating never change the `@bind` value, as with the
+Panning, zooming, and rotating never change the `@bind` value, as with the
 pointer.
 
 ## What gets announced

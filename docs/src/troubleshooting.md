@@ -74,6 +74,17 @@ matches a layer that `masque(fig)` builds on its own replaces that
 layer instead of raising this error; see
 [Adding to what `masque(fig)` builds](@ref).
 
+### Tried two thresholds, boxes, or colorbars in one widget
+
+**Error prefix:** ``masque: :threshold and :roi each own the `@bind` value``
+
+**Cause:** a [`ThresholdInteractable`](@ref), an [`ROIInteractable`](@ref),
+or a [`ColorbarInteractable`](@ref) you pass sets the widget's value,
+and the rest of the widget takes no clicks. A widget has one value, so
+it takes one of them.
+
+**Fix:** pass each to its own `masque` call on the same figure.
+
 ### Passed a keyword your plot type's `interactables` method does not take
 
 **Error prefix:** `masque: the interactables method for`
@@ -352,6 +363,9 @@ Check, in order:
    error, so its marks do not respond, as with a
    [heatmap or bar plot on a `PolarAxis`](@ref polar-skipped-plots).
    [Recipes masque(fig) extracts](@ref) lists the supported plots.
+4. Does the widget have a threshold, a box, or a colorbar you passed?
+   That control owns the value, so the other marks show tooltips but
+   do not take clicks. Put the marks in a separate `masque` call.
 
 ### Tried a tooltip and saw `[object Object]`
 
