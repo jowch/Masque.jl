@@ -1866,6 +1866,12 @@ try {
     if (spec.layerId === "legend" && !/LegendEvent\(/.test(after)) {
       throw new Error(`${key}-click: expected LegendEvent: ${after.slice(0, 220)}`);
     }
+    // A grid with per-cell payloads (#290): the bond carries the clicked cell's own payload.
+    if (spec.bindPayloadField) {
+      const want = `${spec.bindPayloadField} = ${JSON.stringify(layer.payloads[clickIdx][spec.bindPayloadField])}`;
+      if (!after.includes(want)) throw new Error(`${key}-click: expected ${want} in ${after.slice(0, 220)}`);
+      if (!staleAfter) passed.push(`${key}/click-payload`);
+    }
     if (!staleAfter) passed.push(`${key}/click-bind`);
 
     // Click-echo (#103/#107): the overlay pins the picked hit(s) in g.sel itself, with no bond

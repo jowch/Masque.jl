@@ -171,6 +171,13 @@ export function placeAnchored(ctx: OverlayCtx, state: OverlayState, anchor: Anch
 // The html-selection branching shared by pointer hover (showTip, below) and keyboard focus
 // (keyboard.ts's focusTo) — factored out so keyboard.ts can build the same content without a
 // MouseEvent to derive an offset from.
+// A grid cell's payload as fields to spread: an object as is, a bare value as `payload`.
+function cellObject(hit: Hit): object {
+    const cell = hit.layer.payloads[hit.index]
+    if (cell === undefined || cell === null) return {}
+    return typeof cell === "object" ? cell as object : { payload: cell }
+}
+
 export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): string | null {
     const layer = hit.layer
     if (layer.tooltip === false) return null
@@ -178,12 +185,25 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
         const payload = resolvePayload(hit, ctx.manifest_, x, y)
         // Wire i/j are 0-based (the @bind payload keeps them so); a template, like the default
         // tooltip below, shows the Julia 1-based cell that pick.i/pick.j report.
+        // A cell's own payload fields come first, so i/j/value win a name clash as they do on
+        // the Julia GridCellEvent.
         return renderTemplate(
             layer.template,
-            hit.grid_ ? { ...(payload as object), i: hit.grid_[0] + 1, j: hit.grid_[1] + 1 } : withReadout(payload, hit, ctx.manifest_.transforms[layer.axis], true),
+            hit.grid_ ? { ...cellObject(hit), ...(payload as object), i: hit.grid_[0] + 1, j: hit.grid_[1] + 1 } : withReadout(payload, hit, ctx.manifest_.transforms[layer.axis], true),
             ctx.tipDigits_,
         )
     } else if (hit.grid_) {
+        // With per-cell payloads, the table of the payload's fields and the cell value.
+        const cell = hit.layer.payloads[hit.index]
+        if (cell !== undefined && cell !== null) {
+            const v = hit.grid_[2]
+            if (typeof cell !== "object") {
+                // A bare label reads like the default: `F17 = 0.31`.
+                const label = esc(fmtNum(cell, ctx.tipDigits_))
+                return v === undefined ? label : `${label} = ${esc(fmtNum(v, ctx.tipDigits_))}`
+            }
+            return renderAutoTable(v === undefined ? cell : { ...cell, value: v }, ctx.tipDigits_)
+        }
         // Wire i/j are 0-based; the tooltip shows the Julia 1-based cell.
         const i = hit.grid_[0] + 1, j = hit.grid_[1] + 1
         return hit.grid_[2] === undefined ? `(${i},${j})` : `(${i},${j}) = ${esc(fmtNum(hit.grid_[2], ctx.tipDigits_))}`

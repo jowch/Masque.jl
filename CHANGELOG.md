@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A heatmap or image takes `payloads`, one per cell: a function `(i, j) -> payload` or a
+  matrix the same size as the plotted one, passed to `interactables(p; payloads)` or
+  `GridInteractable`. The tooltip lists the payload's fields and the cell's value, a
+  template can use those fields next to `i`, `j`, and `value`, and a click's
+  `GridCellEvent` carries the payload, so `pick.row` reads it. Before, a grid took no
+  payloads, and labelling cells meant one `RectInteractable` per cell (#290).
+
 ### Fixed
 - `masque` warns once per call about the plots it skips, listing each kind, with a count when
   one repeats. Before, it warned once per skipped plot, so two `Axis3` panels with `text!`

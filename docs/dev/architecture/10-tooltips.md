@@ -61,9 +61,12 @@ payload keys. A field present in the template but absent from the payload is a b
 `ArgumentError`, with a "did you mean?" suggestion (Levenshtein edit distance ≤ 2). This check
 only runs when the layer's payloads are `NamedTuple`s (the default for the built-in
 interactables); for `Dict`-valued or heterogeneous payloads, it's skipped and a missing
-`$(field)` renders empty at hover instead. `:grid` (heatmap/image) layers carry no per-element
-payload; a template there resolves the synthesised fields `$(i)`, `$(j)`, and `$(value)`, which
-are likewise not field-validated at build. `$(i)` and `$(j)` are the Julia 1-based cell, the same
+`$(field)` renders empty at hover instead. A `:grid` (heatmap/image) template resolves the
+synthesised fields `$(i)`, `$(j)`, and `$(value)`. Without `payloads` they are not
+field-validated at build; with per-cell `payloads` (#290), the check runs over the payload keys
+plus those three, and the three win a name clash, as the struct fields of `GridCellEvent` do.
+The default grid tooltip with payloads is the auto table of the cell's payload fields then
+`value` (a bare non-object payload reads `label = value`). `$(i)` and `$(j)` are the Julia 1-based cell, the same
 numbers as the default `(i,j)` tooltip and `GridCellEvent`; the overlay adds 1 to the 0-based
 wire indices for the tooltip only, and the `@bind` payload keeps the wire indices.
 
