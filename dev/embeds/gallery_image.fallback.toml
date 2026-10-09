@@ -1,4 +1,4 @@
 image = "gallery_image.png"
 
 [outputs]
-a1410008-0001-4000-8000-000000000004 = "Drag the box over the image."
+a1410008-0001-4000-8000-000000000004 = "16 pixels: median R 0.417, G 0.321, B 0.762"
