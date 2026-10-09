@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A `ViewInteractable` on an `Axis3` zooms as well as orbits: scroll, or press `+` / `-`,
+  to zoom around the middle of the axis box, and Shift+drag, or Shift with an arrow key, to
+  pan. As in Makie, the box keeps its size and the limits change, so marks outside the new
+  limits are hidden and stop responding to hover and clicks. A line that crosses the edge
+  of the box still responds along the part that is drawn (#321).
+
 ### Changed
 - **Breaking:** a `ThresholdInteractable`, an `ROIInteractable`, or a `ColorbarInteractable`
   you pass to `masque` owns the `@bind` value. Every other layer in that widget keeps its

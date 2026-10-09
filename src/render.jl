@@ -890,9 +890,17 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
     ax === nothing && throw(
         ArgumentError("Masque gesture channel: no ViewInteractable with id :$(id) on this widget"),
     )
-    if haskey(input, "azimuth")
-        ax.azimuth[] = Float64(input["azimuth"])
-        ax.elevation[] = Float64(input["elevation"])
+    if haskey(input, "azimuth") || haskey(input, "limits")
+        if haskey(input, "azimuth")
+            ax.azimuth[] = Float64(input["azimuth"])
+            ax.elevation[] = Float64(input["elevation"])
+        end
+        if haskey(input, "limits")
+            l = Float64.(input["limits"])
+            length(l) == 6 && all(isfinite, l) && l[2] > l[1] && l[4] > l[3] && l[6] > l[5] ||
+                throw(ArgumentError("Masque gesture channel: Axis3 limits must be 6 finite, increasing pairs"))
+            ax.limits[] = (l[1], l[2], l[3], l[4], l[5], l[6])
+        end
     else
         ax.limits[] = (
             Float64(input["xmin"]), Float64(input["xmax"]),
@@ -934,16 +942,23 @@ function _warm_view_render_frame!(frame, view_axes; stop = () -> false)
         if hasproperty(ax, :azimuth) && hasproperty(ax, :elevation)
             az0 = Float64(ax.azimuth[])
             el0 = Float64(ax.elevation[])
+            lim0 = ax.limits[]
+            fl = _finallimits(ax)
+            lo = Float64.(Tuple(fl.origin)); w = Float64.(Tuple(fl.widths))
+            zoomed = Float64[lo[1] + w[1] / 8, lo[1] + 7w[1] / 8, lo[2] + w[2] / 8, lo[2] + 7w[2] / 8, lo[3] + w[3] / 8, lo[3] + 7w[3] / 8]
             try
                 !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.05, "elevation" => el0, "settle" => false))
                 !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0 + 0.05, "settle" => false))
                 !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0 + 0.8, "elevation" => el0 - 0.2, "settle" => false))
+                !stop() && frame(Dict{String, Any}("id" => sid, "limits" => zoomed, "settle" => false))
+                ax.limits[] == lim0 || (ax.limits[] = lim0)
                 !stop() && frame(Dict{String, Any}("id" => sid, "azimuth" => az0, "elevation" => el0, "settle" => true))
             finally
                 if ax.azimuth[] != az0 || ax.elevation[] != el0
                     ax.azimuth[] = az0
                     ax.elevation[] = el0
                 end
+                ax.limits[] == lim0 || (ax.limits[] = lim0)
             end
         else
             lim0 = ax.limits[]
