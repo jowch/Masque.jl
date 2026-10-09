@@ -86,6 +86,12 @@ All notable changes to this project are documented here. The format is based on
   Code that tests `isnothing(picks)` to mean "not released yet" no longer sees `nothing`.
   `selected=` on the target still sets the starting value instead, and `selected=` on another
   layer now only highlights there, where it used to replace the box's value (#330).
+- **Breaking:** a color string in `overlaystyle` or `tooltipstyle` must be a color, so a
+  typo such as `color = "steelbleu"` raises an `ArgumentError` instead of being dropped by
+  the browser. Names, hex codes, and `rgb(…)` and `hsl(…)` strings work as before, and
+  `"var(--name)"` still follows a CSS custom property. Other CSS-only forms, such as
+  `currentColor`, `color-mix(…)`, or `oklch(…)`, now raise; pass a Makie color or wrap the
+  value in a custom property your page sets (#342).
 
 ### Deprecated
 - The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,

@@ -62,13 +62,17 @@ built-in look. A part you set stays the same on light and dark figures:
 masque(fig; tooltipstyle = (; bg = "#1a1a2e", color = :white, radius = 6))
 ```
 
-An unknown key raises an `ArgumentError` that lists the valid ones.
+An unknown key raises an `ArgumentError` that lists the valid ones. A
+color is any Makie color, or a string: a name such as `"steelblue"`, a
+hex code, or an `rgb(…)` or `hsl(…)` string. A string that isn't a color,
+such as a typo, raises an `ArgumentError`. To follow a CSS custom
+property your page sets, pass `"var(--name)"`.
 
 | Key | Value | Changes |
 |---|---|---|
-| `bg` | CSS string or Makie color | background |
-| `color` | CSS string or Makie color | text color |
-| `accent` | CSS string or Makie color | field names in the default table |
+| `bg` | color | background |
+| `color` | color | text color |
+| `accent` | color | field names in the default table |
 | `font` | `String`, a CSS font-family | font |
 | `font_size` | number, in px | text size |
 | `radius` | number, in px | corner radius |
@@ -123,8 +127,8 @@ masque(fig; overlaystyle = (; color = :steelblue, hover_width = 2.5))
 
 A per-layer `hoverstyle` stroke still wins on that layer. An unknown key
 raises an `ArgumentError` that lists the valid ones. Widths are in CSS
-pixels, and opacities run from 0 to 1. Colors take a CSS string or any
-Makie color.
+pixels, and opacities run from 0 to 1. Colors take the same forms as in
+[Tooltip styling](@ref).
 
 | Key | Default | Changes | Custom property |
 |---|---|---|---|
