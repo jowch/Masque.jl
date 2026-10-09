@@ -317,12 +317,13 @@ kind_sweep_meta() = [
     Dict(
         # A selecting box owns the bond and starts at the points inside its bounds, (3, 3) and
         # (5, 5), highlighted (#330). The first point sits outside, so the no-click check never
-        # presses on the box. The regex stays loose: a warm re-run (#114) mounts at the last drag.
+        # presses on the box. Each driver opens a fresh session, so the bond is the start's.
         "key" => "roi", "layerId" => "roi", "layerKind" => "roi",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
         "owner" => Dict(
-            "layer" => "pts", "initial" => "^ROI=ElementEvent\\[ElementEvent\\(:pts, \\d+,", "startsSelected" => true,
+            "layer" => "pts", "startsSelected" => true,
+            "initial" => "^ROI=(Masque\\.)?ElementEvent\\[ElementEvent\\(:pts, 2, [^\\]]*, ElementEvent\\(:pts, 3, [^\\]]*\\]\$",
         ),
     ),
     Dict(
