@@ -8,6 +8,10 @@ ignore:
   - "frontend/test/**" # vitest specs (frontend/)
   - "test/**"          # Julia test suite (repo root) — a different tree, not a duplicate of the line above
 
+# No PR comment: the codecov/project and codecov/patch status checks carry the result,
+# and a comment (re-edited on every push) emails everyone watching the PR.
+comment: false
+
 coverage:
   status:
     project:

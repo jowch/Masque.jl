@@ -16,6 +16,27 @@ function _check_sigdigits(n)
     throw(ArgumentError("tooltip_sigdigits must be an integer from 1 to 17, got $(repr(n))"))
 end
 
+# What a style colour key takes, for its error message.
+const _STYLE_COLOR_FORMS =
+    "a color name, a hex code, an `rgb(…)` or `hsl(…)` string, a `var(--…)` reference, or a Makie color"
+
+# A style keyword's colour as CSS, or `nothing` if `v` isn't one. A string must parse as a
+# colour, so a typo raises rather than reaching the browser, which drops it without a word.
+# It is sent as `rgb(…)`, since Colors.jl also reads forms CSS doesn't (`0xff0000`, X11 names
+# such as `gray50`). A `var(--…)` reference is the one CSS-only form let through unchecked.
+# A bare number is refused: `to_color` reads it as a grey level, where a Makie `color` number
+# means a colormap value, and past 1 it gives no valid CSS colour at all.
+function _style_color(v)
+    v isa Real && return nothing
+    v isa AbstractString && occursin(r"^\s*var\(.*\)\s*$"s, v) && return String(strip(v))
+    try
+        return _css_color(v isa AbstractString ? Makie.to_color(v) : v)
+    catch e
+        e isa InterruptException && rethrow()
+        return nothing
+    end
+end
+
 # `tooltipstyle` key => (custom property, value kind).
 const _TOOLTIP_STYLE_KEYS = (
     bg = ("--masque-tip-bg", :color),
@@ -29,14 +50,8 @@ const _TOOLTIP_STYLE_KEYS = (
 
 function _tooltip_style_value(k, kind, v)
     if kind === :color
-        # `to_color` reads a bare number as a grey level, which gives no valid CSS colour.
-        css = v isa Real ? nothing : try
-                _css_color(v)
-        catch
-                nothing
-        end
-        css === nothing &&
-            throw(ArgumentError("tooltipstyle: `$k` must be a CSS string or a Makie color, got $(repr(v))"))
+        css = _style_color(v)
+        css === nothing && throw(ArgumentError("tooltipstyle: `$k` must be $(_STYLE_COLOR_FORMS), got $(repr(v))"))
         return css
     end
     if kind === :font
@@ -121,7 +136,11 @@ const _OVERLAY_STYLE_KEYS = (
 )
 
 function _overlay_style_value(k, kind, v)
-    kind === :color && return _css_color(v)
+    if kind === :color
+        css = _style_color(v)
+        css === nothing && throw(ArgumentError("overlaystyle: `$k` must be $(_STYLE_COLOR_FORMS), got $(repr(v))"))
+        return css
+    end
     ok = v isa Real && !(v isa Bool) && isfinite(v) && v >= 0 && (kind === :length || v <= 1)
     ok || throw(
         ArgumentError(
