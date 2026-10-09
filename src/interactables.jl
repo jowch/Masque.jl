@@ -173,7 +173,17 @@ const _JS_INVERTIBLE = (:identity, :log10, :log)  # scales geometry.ts `invert` 
 # carries one source value per screen pixel of the axis viewport instead of the full matrix.
 const GRID_VALUES_MIN_SCREEN_PX = 1.0
 
-_proj(ctx, ax, p) = data_to_image_px(ctx, ax, p)
+# An `Axis3` clips its plots to its limits (Makie's clip planes, `ax.clip = true`), so a point
+# outside them, as after a zoom (#321), is not drawn. Built-in hit geometry gets NaN there, the
+# "not on screen" sentinel every hit layer already skips, rather than a spot where nothing is
+# visible. `data_to_image_px` itself still projects any point.
+function _proj(ctx, ax, p)
+    if ax isa Makie.Axis3
+        box = _axis3_clipbox(ax)
+        box === nothing || _in_clipbox(box, p) || return Point2f(NaN32, NaN32)
+    end
+    return data_to_image_px(ctx, ax, p)
+end
 
 # Points widen to Point3f (z=0 for 2-coord input) so 2D and 3D geometry share one storage path.
 _pt3(p) = Point3f(p[1], p[2], length(p) >= 3 ? p[3] : 0)

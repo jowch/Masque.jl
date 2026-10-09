@@ -139,19 +139,8 @@ end
 # interactables.jl passes non-finite coordinates through unchanged. Points widen to
 # Point3 so this same closure also projects 3D scenes (Axis3's transform_func is
 # `identity`; `Makie.project` applies the 3D camera itself).
-#
-# An `Axis3` clips its plots to its limits (Makie's clip planes, `ax.clip = true`), so a point
-# outside them, as after a zoom (#321), is not drawn. It projects to NaN, the "not on screen"
-# sentinel every hit layer already skips, rather than onto a spot where nothing is visible.
 function _project_closure(scaling, out_h)
-    clipbox = IdDict{Any, Any}()
     return function (ax, p)
-        if ax isa Makie.Axis3
-            box = get!(() -> _axis3_clipbox(ax), clipbox, ax)
-            if box !== nothing && !_in_clipbox(box, p)
-                return Point2f(NaN32, NaN32)
-            end
-        end
         tp = try
             _apply_transform(
                 _transform_func(ax.scene),
