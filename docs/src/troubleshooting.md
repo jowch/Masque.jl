@@ -284,6 +284,20 @@ Four changes have no old form to fall back on:
 The [changelog](https://github.com/jowch/Masque.jl/blob/main/CHANGELOG.md)
 has the details.
 
+### Upgrading code written for Masque 0.2
+
+Masque 0.3 groups the tooltip style keywords into one `tooltipstyle`
+keyword, the way `overlaystyle` groups the overlay's. The old keywords
+still work in 0.3, show a warning in the cell's log that names the
+replacement, and are removed in 0.4:
+
+| 0.2 | 0.3 |
+|---|---|
+| `masque(fig; tooltip_bg = :black, tooltip_color = :white)` | `masque(fig; tooltipstyle = (; bg = :black, color = :white))` |
+| `tooltip_accent`, `tooltip_font`, `tooltip_font_size`, `tooltip_radius`, `tooltip_caret` | the `tooltipstyle` keys `accent`, `font`, `font_size`, `radius`, `caret` |
+
+`tooltip_sigdigits` stays a keyword of its own. See [Tooltip styling](@ref).
+
 ### Tried `CairoMakie.activate!(type = "svg")` and the widget is a PNG
 
 **Cause:** `type = "svg"` chooses how a bare `Figure` displays, but

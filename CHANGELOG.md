@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `masque(fig; tooltipstyle = (; bg = :black, color = :white, radius = 6))` sets the tooltip
+  card's look in one keyword, like `overlaystyle` does for the overlay. Its keys are `bg`,
+  `color`, `accent`, `font`, `font_size`, `radius`, and `caret`; an unknown key, or a value
+  of the wrong kind, raises an `ArgumentError` (#305).
 - An ROI's `selects` takes the plot it brushes, as in `ROIInteractable(ax; bounds, selects = sc)`,
   so you no longer need to know which scatter became `:scatter_2`. A plot that
   draws both lines and points, such as `scatterlines`, gives the box its points. A layer id
@@ -42,6 +46,13 @@ All notable changes to this project are documented here. The format is based on
   would overwrite the other's value. That includes several boxes that select from the same
   layer, which the Brush a region page used to allow; the last box released replaced the
   others' selection anyway. Pass each to its own `masque` call (#309).
+
+### Deprecated
+- The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,
+  `tooltip_font_size`, `tooltip_radius`, and `tooltip_caret` still work, with a warning naming
+  the `tooltipstyle` form, and are removed in 0.4. Their values are now checked like
+  `tooltipstyle`'s, so one such as `tooltip_font_size = "12"` raises an `ArgumentError`, and
+  passing a key both ways is an error. `tooltip_sigdigits` stays (#305).
 
 ## [0.2.2] - 2026-10-09
 

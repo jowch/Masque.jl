@@ -150,7 +150,7 @@ color. The color comes from:
 Without a known color, the border is a plain 1px line.
 
 To change the tooltip's background, text color, font, or corner radius
-for a whole widget, pass the `tooltip_*` keywords to `masque`, or set the
+for a whole widget, pass `tooltipstyle` to `masque`, or set the
 `--masque-tip-*` CSS properties on the page. See [Tooltip styling](@ref).
 To change the color and width of highlights and the selection, pass
 `overlaystyle`; see [Overlay styling](@ref).
