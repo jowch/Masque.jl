@@ -170,8 +170,12 @@ A `:view` layer is one viewport bbox plus a mode and two angles, the same order 
 ### Tooltips
 
 Shipping a tooltip string per element would grow the manifest by the sum of those strings:
-1 000 elements × 200 B is +196 KB (14 → 210 KB), and 50 000 × 200 B is a **10.24 MB** manifest
-that takes 1.25–1.34 s to render (STRESS D). So per-element strings are not shipped. A layer with
+1 000 elements × 200 B is +196 KB (73 → 269 KB), and 50 000 × 200 B is a **13.17 MB** manifest
+that takes ~1.5–2.2 s to render (STRESS D). Both benches build the scatter twice (`masque(fig)`'s
+own layer plus the passed one), so half the elements carry the payload. Since #308 (2026-10-09)
+a key-value payload is merged onto the point's own `x` and `y`, which adds ~21 B per element:
+section B's rows each grew by 21.5 KB per 1 000 points (51.6 → 73.1 KB at length 0) and STRESS D
+by 1.04 MB (12.13 → 13.17 MB), measured against `main` at `0e764bb` on the same machine. So per-element strings are not shipped. A layer with
 a tooltip carries a `template` (a small segment array evaluated on hover) and the manifest one
 `tipStyle` dict, both O(1) per layer; the default envelope above is unchanged by them.
 
@@ -229,7 +233,7 @@ for the heatmap sample sizes). Render times are a range across repeated runs on 
 | heatmap 300×300 (cells visible) | 388 KB | 442 KB | 33–84 ms |
 | heatmap 500×500 (cells sub-pixel) | 1 009 KB | 906 KB | 47–206 ms |
 | heatmap 1000×1000 (cells sub-pixel) | 2.26 MB | **896 KB** | 97–227 ms |
-| scatter 50 000 + 200 B payload/element | 47 KB | **10.24 MB** | 1 248–1 340 ms |
+| scatter 50 000 + 200 B payload/element | 47 KB | **13.17 MB** | 1 491–2 153 ms (2026-10-09, #308) |
 
 - **The PNG is not monotonic in N.** Past saturation a dense scatter compresses to a near-solid
   mass (200 000 points → 71 KB) while the manifest grows linearly to 7.7 MB.
