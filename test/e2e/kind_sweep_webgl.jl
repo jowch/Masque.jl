@@ -413,6 +413,15 @@ HTML(
         "<span id=\"coords_colorbar_owner\" style=\"display:none\">$(JSON3.write(sweep.colorbar_owner.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000117
+@bind ev_roi_bounds sweep.roi_bounds
+
+# ╔═╡ d1000000-0000-0000-0000-000000000118
+HTML(
+    "<span id=\"out_roi_bounds\">ROI_BOUNDS=$(repr(ev_roi_bounds))</span>" *
+        "<span id=\"coords_roi_bounds\" style=\"display:none\">$(JSON3.write(sweep.roi_bounds.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000064
 @bind ev_axis_cat sweep.axis_cat
 
@@ -620,6 +629,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000063
 # ╠═d1000000-0000-0000-0000-000000000115
 # ╟─d1000000-0000-0000-0000-000000000116
+# ╠═d1000000-0000-0000-0000-000000000117
+# ╟─d1000000-0000-0000-0000-000000000118
 # ╠═d1000000-0000-0000-0000-000000000064
 # ╠═d1000000-0000-0000-0000-000000000065
 # ╠═d1000000-0000-0000-0000-000000000032

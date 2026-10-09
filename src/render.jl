@@ -166,22 +166,12 @@ function _bond_owner(built)
     )
 end
 
-# One `selects` target for the widget. Several selectors must name that same layer.
+# The widget's `selects` target, or `nothing`. A selector owns the bond, so `_bond_owner` has
+# already rejected a second one and `only` holds.
 function _selection_spec(interactables, layers)
-    targets = Symbol[]
-    for i in interactables
-        s = selects(i)
-        s === nothing && continue
-        push!(targets, s)
-    end
+    targets = Symbol[s for s in map(selects, interactables) if s !== nothing]
     isempty(targets) && return nothing
-    uniq = unique(targets)
-    length(uniq) == 1 || throw(
-        ArgumentError(
-            "masque: multiple selectors must share one target; got $(join(string.(uniq), ", "))",
-        ),
-    )
-    target = only(uniq)
+    target = only(targets)
     kinds = Dict(Symbol(l["id"]) => Symbol(l["kind"]) for l in layers)
     kind = kinds[target]
     return (mode = kind === :grid ? "grid" : "elements", target = target)

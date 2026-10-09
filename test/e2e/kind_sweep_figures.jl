@@ -289,6 +289,17 @@ kind_sweep_meta() = [
         "owner" => Dict("layer" => "cells", "initial" => "^COLORBAR_OWNER=nothing\$"),
     ),
     Dict(
+        # A box without `selects` owns the bond and starts at its `bounds` (#309). The scatter's
+        # first point sits outside the box, so the no-click check never presses on the box.
+        "key" => "roi_bounds", "layerId" => "roi", "layerKind" => "roi",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "owner",
+        "owner" => Dict(
+            "layer" => "scatter",
+            "initial" => "^ROI_BOUNDS=BoundsEvent\\(:roi, xmin = 3\\.0, xmax = 6\\.0, ymin = 3\\.0, ymax = 6\\.0\\)\$",
+        ),
+    ),
+    Dict(
         # A threshold on a categorical y axis. Release commits the nearest category's position
         # and label (#192), and the line snaps onto that category (#199).
         "key" => "threshold_cat", "layerId" => "threshold", "layerKind" => "threshold",
@@ -863,6 +874,13 @@ function build_kind_sweep()
         masque(fig, ThresholdInteractable(ax; orientation = :horizontal, value = 4.0, id = :threshold))
     end
 
+    roi_bounds = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "roi bounds", limits = (0, 10, 0, 10))
+        scatter!(ax, [1.0, 8.0], [1.0, 8.0]; markersize = 14, color = :gray)
+        masque(fig, ROIInteractable(ax; bounds = (3.0, 6.0, 3.0, 6.0), id = :roi))
+    end
+
     colorbar_owner = let
         z = [Float64(i + 3j) for i in 1:4, j in 1:3]
         fig = Figure(size = (480, 260))
@@ -1057,7 +1075,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, threshold_cat, axis_cat, roi, view, legend, series_legend,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, overlap3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, view, legend, series_legend,
         legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
