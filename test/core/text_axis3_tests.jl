@@ -43,6 +43,8 @@ boxof(g, k) = Tuple(Float64.(g[(4k - 3):(4k)]))
         _, _, ctx = ctx_for(fig)
         # CairoMakie paints labels in list order, so the last one listed is on top.
         @test !ctx.depth_test
+        # A context built without `depth_test` (an older call) assumes the same.
+        @test !InteractionContext(ctx.project, ctx.transforms, ctx.ids, ctx.width, ctx.height, ctx.scaling, ctx.display_scale).depth_test
         @test only(hitlayers(TextInteractable(ax, t), ctx)).order == [2, 1, 0]
         # A backend that depth-tests text puts the nearest first.
         wctx = InteractionContext(
