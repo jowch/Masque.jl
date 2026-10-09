@@ -336,8 +336,9 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
 - `radius3d` — per-point data-space half-extents (`Vector{Makie.Vec3f}`), for markers whose
   on-screen size is camera/depth-dependent (e.g. `meshscatter`). When set, overrides `radius`
   with the radius of each point's projected outline: the longest semi-axis of the ellipsoid
-  with these half-extents, as drawn. Must have one entry per point (`ArgumentError`
-  otherwise).
+  with these half-extents, as drawn. With Axis3's `perspectiveness` above 0 it can fall a
+  few percent short (about 6% at `perspectiveness = 1`). Must have one entry per point
+  (`ArgumentError` otherwise).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`; not meaningful).
 - `label` — the layer's name, which screen readers announce when the keyboard moves to an
@@ -438,14 +439,17 @@ function _check_radius(r, n)
     return Vector{Float64}(r)
 end
 tooltip_spec(i::PointInteractable) = i.tooltip
-# Outline radius of the ellipsoid with data-space semi-axes `e` around `p`. Projecting `p ± eᵢ`
-# gives the screen images `cᵢ` of its three semi-axes; the drawn outline is then the ellipse
-# `M·(unit ball)` with `M = [c₁ c₂ c₃]`, whose longest semi-axis is `M`'s largest singular value
-# (exact for Axis3's default orthographic camera). The largest single `|cᵢ|`, the old estimate,
-# falls short whenever the outline's long direction isn't along a data axis. A semi-axis whose
+# Outline radius of the ellipsoid with data-space semi-axes `e` around `p` (projected to `q`).
+# Projecting `p ± eᵢ` gives the screen images `cᵢ` of its three semi-axes; the drawn outline is
+# then the ellipse `M·(unit ball)` with `M = [c₁ c₂ c₃]`, whose longest semi-axis is `M`'s
+# largest singular value (exact for Axis3's default orthographic camera). The largest single
+# `|cᵢ|` falls short whenever the outline's long direction isn't along a data axis. Under
+# perspective the near half of an axis projects longer than the far half, which the average in
+# `cᵢ` hides, so the radius is never less than the longest single half. A semi-axis whose
 # projection isn't finite is left out.
-function _px_radius3d(ctx, ax, p, e)
+function _px_radius3d(ctx, ax, p, e, q)
     a = b = d = 0.0   # M·Mᵀ = [a b; b d]
+    half = 0.0
     for i in 1:3
         o = ntuple(j -> j == i ? Float64(e[i]) : 0.0, 3)
         hi = _proj(ctx, ax, (p[1] + o[1], p[2] + o[2], p[3] + o[3]))
@@ -455,15 +459,16 @@ function _px_radius3d(ctx, ax, p, e)
         a += cx^2
         b += cx * cy
         d += cy^2
+        half = max(half, hypot(hi[1] - q[1], hi[2] - q[2]), hypot(q[1] - lo[1], q[2] - lo[2]))
     end
-    return sqrt((a + d) / 2 + hypot((a - d) / 2, b))
+    return max(half, sqrt((a + d) / 2 + hypot((a - d) / 2, b)))
 end
 function hitlayers(i::PointInteractable, ctx)
     g = Real[]
     for (k, p) in enumerate(i.points)
         q = _proj(ctx, i.ax, p)
         r = if i.radius3d !== nothing
-            _px_radius3d(ctx, i.ax, p, i.radius3d[k])
+            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q)
         else
             ((i.radius isa Vector ? i.radius[k] : i.radius) + i.stroke * ctx.marker_stroke) * ctx.scaling
         end
