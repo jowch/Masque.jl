@@ -1500,6 +1500,24 @@ try {
       passed.push(`${key}/readout`);
     }
 
+    // #308: a payload is merged onto the mark's own fields, so the default table shows both.
+    if (spec.hoverFields) {
+      const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
+      const want = spec.hoverFields.map(norm);
+      const p = hitPoint(layer, hoverIndex);
+      let t = null;
+      for (let a = 0; a < 8; a++) {
+        t = await dispatchAt(key, p.x, p.y, "pointermove");
+        if (t?.show && want.every((w) => norm(t.text).includes(w))) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (!(t?.show && want.every((w) => norm(t.text).includes(w)))) {
+        throw new Error(`${key}: hover table wanted ${JSON.stringify(spec.hoverFields)}, tooltip ${JSON.stringify(t?.text)}`);
+      }
+      await dispatchAt(key, p.x, p.y, "pointerleave");
+      passed.push(`${key}/payload-merge`);
+    }
+
     // A legend entry's linked highlight (HitLayer.links) draws the SELECTED recipe for every
     // element of the target layer(s) into g.link — distinct from g.sel/g.hi. Generic: skipped
     // for every spec except the one(s) that carry a "links" meta key. Runs BEFORE the click

@@ -48,6 +48,8 @@ kind_sweep_meta() = [
         "key" => "scatter", "layerId" => "scatter", "layerKind" => "circles",
         "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
         "tip" => "beta", "hoverIndex" => 0, "hoverTip" => "alpha", "mode" => "element",
+        # The payload `(; label)` merges onto the point's own x and y (#308).
+        "hoverFields" => ["labelalpha", "x1", "y1"],
     ),
     Dict(
         "key" => "lines", "layerId" => "lines", "layerKind" => "lines",

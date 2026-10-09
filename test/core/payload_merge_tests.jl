@@ -40,36 +40,36 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     @testset "plot objects" begin
         fig = Figure(); ax = Axis(fig[1, 1])
         s = scatter!(ax, [1.0, 2.0], [3.0, 4.0])
-        i = only(interactables(s; payloads = [(; name = "a"), (; name = "b")]))
+        i = only(interactables(ax, s; payloads = [(; name = "a"), (; name = "b")]))
         @test i.payloads[2] === (; name = "b", x = 2.0, y = 4.0)
 
         b = barplot!(ax, [1, 2], [5.0, 7.0])
-        i = only(interactables(b; payloads = [(; name = "a"), (; name = "b")]))
+        i = only(interactables(ax, b; payloads = [(; name = "a"), (; name = "b")]))
         @test i.payloads[2] === (; name = "b", low = 0.0, high = 7.0, value = 7.0)
 
         t = text!(ax, [Point2f(1, 2)]; text = ["hi"])
-        i = only(interactables(t; payloads = [(; name = "a")]))
+        i = only(interactables(ax, t; payloads = [(; name = "a")]))
         @test i.payloads[1] === (; name = "a", text = "hi", x = 1.0, y = 2.0)
 
         a = arrows2d!(ax, [Point2f(0, 0)], [Vec2f(1, 2)])
-        i = only(interactables(a; payloads = [(; name = "a")]))
+        i = only(interactables(ax, a; payloads = [(; name = "a")]))
         @test i.payloads[1] === (; name = "a", x = 0.0, y = 0.0, u = 1.0, v = 2.0)
 
         sr = series!(ax, [1.0 2.0; 3.0 4.0]; labels = ["one", "two"])
-        i = only(interactables(sr; payloads = [(; name = "a"), (; name = "b")]))
+        i = only(interactables(ax, sr; payloads = [(; name = "a"), (; name = "b")]))
         @test i.payloads[1] === (; name = "a", label = "one")
 
         # A line's default is only its index, so there's nothing to add.
         l = lines!(ax, [1.0, 2.0], [1.0, 2.0])
-        @test only(interactables(l; payloads = [(; name = "a")])).payloads[1] === (; name = "a")
+        @test only(interactables(ax, l; payloads = [(; name = "a")])).payloads[1] === (; name = "a")
 
-        @test_throws ArgumentError interactables(b; payloads = [(; name = "a")])
+        @test_throws ArgumentError interactables(ax, b; payloads = [(; name = "a")])
     end
 
     @testset "categorical x is merged as its label" begin
         fig = Figure(); ax = Axis(fig[1, 1])
-        s = scatter!(ax, ["a", "b"], [1.0, 2.0])
-        i = only(interactables(s; payloads = [(; name = "p"), (; name = "q")]))
+        s = scatter!(ax, Makie.Categorical(["a", "b"]), [1.0, 2.0])
+        i = only(interactables(ax, s; payloads = [(; name = "p"), (; name = "q")]))
         @test i.payloads[2] === (; name = "q", x = "b", y = 2.0)
     end
 
