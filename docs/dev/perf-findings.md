@@ -142,6 +142,10 @@ Section G, text labels (2026-07-01). A label is a 4-int `:rects` box (~8 B) plus
 |------|-------:|---------:|---------:|
 | scatter + 5 short labels | 5 | 0.8 KB | 51 |
 | text only, 100 labels of ~4 chars | 100 | 4.9 KB | 47 |
+| the same 100 labels on an `Axis3` | 100 | 6.1 KB | 59 |
+
+On an `Axis3` (2026-10-09, #292, Julia 1.13.1) each label's payload adds its anchor's `z` (~11 B)
+and the layer adds a front-to-back `order`, one small integer per drawn label (~1 B each).
 
 Section J, surface on Axis3 (2026-10-09 at `0e764bb` plus #259, Julia 1.13.1). A `:surface`
 layer ships each shipped point's integer-px `xy` and Float32 `z`, one quad index per quad in
