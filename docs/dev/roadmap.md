@@ -44,7 +44,6 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 **breaking**. The PR that closes an issue deletes its line here.
 
 ### Overlay and chrome
-- #179 — wide mode: widen the Pluto cell from inside the widget.
 - *idea* — pin a tooltip so its numbers can be read or copied.
 - *idea* — high-contrast mode (`prefers-contrast`).
 - *idea* — touch: long-press tooltip, one-finger pan, pinch zoom.
@@ -96,7 +95,6 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 - *idea* — Tables.jl payloads beyond the DataFrames extension.
 
 ### Tooling
-- #177 — manifest-size delta on each PR.
 - *idea* — golden screenshots of the overlay chrome from the kind sweep.
 
 ## Not doing
@@ -120,3 +118,9 @@ Kept so these are not proposed again without new evidence.
   ([§12.5](architecture/12-gesture-channel.md#125-backend-obligations-mechanism-independent)).
 - **#167** — an outline-only highlight for large marks: the dodge fill is a mild brightening,
   not a flash, and `overlaystyle`'s `dodge_fill` (#181) sets its strength.
+- **#177** — a manifest-size delta check on each PR: a second cold Makie precompile per PR and
+  a tolerance to tune, for a payload the committed benches already track. Revisit if the
+  payload regresses in practice.
+- **#179** — wide mode, widening the Pluto cell from inside the widget: it depends on Pluto's
+  private DOM and CSS, so it breaks silently when Pluto changes. Reopen if someone needs
+  `max_width > 700`.
