@@ -329,7 +329,11 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test w.manifest["selection"] == "grid" && w.manifest["selectionTarget"] == "img"
         img = only(filter(l -> l["id"] == "img", w.manifest["layers"]))
         @test img["events"] == ["hover"]
-        @test IP.APD.Bonds.initial_value(w) === nothing
+        # The bond starts at the cells the starting bounds overlap, as a release there would (#330).
+        start = IP.APD.Bonds.initial_value(w)
+        @test start isa GridWindowEvent && start.layer === :img
+        @test (start.xmin, start.xmax, start.ymin, start.ymax) == (1.0, 3.0, 1.0, 2.0)
+        @test 1 <= start.i1 <= 2 && start.i2 == 3 && 1 <= start.j1 <= 2 && start.j2 >= 2
 
         # A cell envelope can still reach Julia from a stale bundle or a hand-set bond. It fails
         # with a message that names the box, not `GridCellEvent has no field i1` downstream.
@@ -368,7 +372,10 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         ev_of(id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))["events"]
         @test ev_of("pts") == ["hover"]
         @test ev_of("other") == ["hover"]
-        @test w.manifest["bondOwner"] == "box" && !haskey(w.manifest, "initial")
+        @test w.manifest["bondOwner"] == "box"
+        # The bond starts at the points inside the starting bounds (#330).
+        start = IP.APD.Bonds.initial_value(w)
+        @test start isa Vector{ElementEvent} && [e.payload for e in start] == ["b", "c"]
 
         err = try
             tv(w, Dict("layer" => "pts", "index" => 1))
@@ -384,6 +391,35 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         seeded = IP.APD.Bonds.initial_value(masque(pfig, [pi, roi]; selected = 2, auto = false))
         @test seeded isa Vector{ElementEvent} && only(seeded).payload == "b"
     end
+    @testset "a selecting box starts at the marks inside its starting bounds (#330)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (8.0, 8.0)]
+        scatter!(ax, first.(pts), last.(pts))
+        pi = PointInteractable(ax, pts; id = :pts, payloads = ["a", "b", "c", "d"])
+        iv = IP.APD.Bonds.initial_value
+        box(b) = ROIInteractable(ax; bounds = b, selects = :pts, id = :box)
+
+        w = masque(fig, [pi, box((1.5, 3.5, 1.5, 3.5))]; auto = false)
+        @test w.manifest["initial"] == Dict(
+            "items" => [Dict("layer" => "pts", "index" => 1), Dict("layer" => "pts", "index" => 2)],
+        )
+        @test IP.mount_envelope(w.manifest) == w.manifest["initial"]
+        @test [e.payload for e in iv(w)] == ["b", "c"]
+        # The same value a release of the untouched box would send.
+        @test iv(w) == IP.APD.Bonds.transform_value(w, w.manifest["initial"])
+
+        # A box over no marks starts empty, not at `nothing`.
+        @test iv(masque(fig, [pi, box((4.0, 6.0, 4.0, 6.0))]; auto = false)) == ElementEvent[]
+
+        # A box covering everything starts at every mark, in layer order.
+        @test [e.index for e in iv(masque(fig, [pi, box((0.5, 9.0, 0.5, 9.0))]; auto = false))] == 1:4
+
+        # `selected=` on the target still wins, including an explicit empty brush.
+        b = box((1.5, 3.5, 1.5, 3.5))
+        @test [e.payload for e in iv(masque(fig, [pi, b]; selected = 4, auto = false))] == ["d"]
+        @test iv(masque(fig, [pi, b]; selected = Int[], auto = false)) == ElementEvent[]
+    end
+
     @testset "a threshold, an ROI, or a passed colorbar owns the bond (#309)" begin
         fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
         sc = scatter!(ax, [2.0, 8.0], [2.0, 8.0]; color = [1.0, 2.0])

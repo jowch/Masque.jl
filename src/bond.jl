@@ -33,9 +33,10 @@ owns_bond(::ROIInteractable) = true
 owns_bond(i::ColorbarInteractable) = !i.auto
 
 # The wire envelope an owner's bond starts at, as the browser would send it on release, or
-# `nothing` when the owner has no value before its first commit.
-initial_envelope(::AbstractInteractable, ctx) = nothing
-function initial_envelope(i::ThresholdInteractable, ctx)
+# `nothing` when the owner has no value before its first commit. `layers` are the manifest's
+# layer dicts, whose image-px geometry a selecting box tests its target against.
+initial_envelope(::AbstractInteractable, ctx, layers) = nothing
+function initial_envelope(i::ThresholdInteractable, ctx, layers)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     cats = i.orientation === :horizontal ? t.ycats : t.xcats
     k = cats === nothing || !isinteger(i.value) ? 0 : Int(i.value)
@@ -43,11 +44,57 @@ function initial_envelope(i::ThresholdInteractable, ctx)
     payload = 1 <= k <= length(something(cats, ())) ? cats[k] : i.value
     return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
 end
-function initial_envelope(i::ROIInteractable, ctx)
-    i.selects === nothing || return nothing
+function initial_envelope(i::ROIInteractable, ctx, layers)
     xmin, xmax, ymin, ymax = i.bounds
-    payload = Dict{String, Any}("xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax)
-    return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
+    if i.selects === nothing
+        payload = Dict{String, Any}("xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax)
+        return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
+    end
+    box = only(l for l in layers if l["id"] == string(i.id))["geometry"]
+    target = only(l for l in layers if l["id"] == string(i.selects))
+    return Dict{String, Any}("items" => _contained_items(box, target, i.bounds))
+end
+
+# What a box at image-px `box` holds of `target`, as the `{items}` a release of that box sends.
+# The same comparisons as `computeSelection` in frontend/src/selection.ts, on the same
+# manifest numbers, so the starting value and a release at the starting bounds agree.
+function _contained_items(box, target, bounds)
+    xlo = Float64(box["x"]); xhi = xlo + Float64(box["w"])
+    ylo = Float64(box["y"]); yhi = ylo + Float64(box["h"])
+    id = target["id"]
+    items = Dict{String, Any}[]
+    if target["kind"] == "circles"
+        a = target["geometry"]
+        for k in 0:(length(a) ÷ 3 - 1)
+            cx = Float64(a[3k + 1]); cy = Float64(a[3k + 2])
+            xlo <= cx <= xhi && ylo <= cy <= yhi &&
+                push!(items, Dict{String, Any}("layer" => id, "index" => k))
+        end
+    elseif target["kind"] == "grid"
+        g = target["geometry"]
+        ci = _cell_range(g["xedges"], xlo, xhi)
+        cj = _cell_range(g["yedges"], ylo, yhi)
+        (ci === nothing || cj === nothing) && return items
+        # The data bounds the box was given, where the browser inverts its pixel corners.
+        xmin, xmax, ymin, ymax = bounds
+        payload = Dict{String, Any}(
+            "i0" => ci[1], "i1" => ci[2], "j0" => cj[1], "j1" => cj[2],
+            "xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax,
+        )
+        push!(items, Dict{String, Any}("layer" => id, "index" => 0, "payload" => payload))
+    end
+    return items
+end
+
+# `cellRange` in selection.ts: the 0-based, inclusive cells a pixel span `[lo, hi]` overlaps
+# on monotonic `edges`, or `nothing`. `_find_bin` is geometry.ts's `findBin`.
+function _cell_range(edges, lo, hi)
+    e1 = Float64(first(edges)); en = Float64(last(edges))
+    clo = max(lo, min(e1, en)); chi = min(hi, max(e1, en))
+    chi < clo && return nothing
+    a = _find_bin(edges, clo); b = _find_bin(edges, chi)
+    (a < 0 || b < 0) && return nothing
+    return (min(a, b), max(a, b))
 end
 
 """

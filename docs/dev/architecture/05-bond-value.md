@@ -20,9 +20,16 @@ bond could not start at both initial states.
 The owner sets the bond's starting value. A threshold starts at a `ThresholdEvent` at `value`
 (with its category's label when `value` is a category's position) and a bounds-only ROI at a
 `BoundsEvent` at `bounds`: `build_manifest` writes that wire envelope as `initial`, the same shape
-a release sends. A colorbar and a `selects` ROI have no value before their first commit, so they
-start at `nothing` (a `selects` ROI still hydrates from `selected=`). With an owner, `selected=`
-on another layer only highlights.
+a release sends. A `selects` ROI starts at what its starting box holds (#330): `initial` is the
+`{items}` envelope a release of the untouched box would send, which `_contained_items` computes
+from the manifest's own image-px numbers (circle centres, grid edges) with the comparisons
+`computeSelection` makes, and `mount.ts` highlights it at mount. Julia rather than the browser
+computes it because `initial_value` must equal what the browser seeds. The `roiselect` and
+`roigrid` parity goldens pin the two together: `selection.test.ts` runs `computeSelection` on
+them and compares with `initial`. A grid item carries the box's `bounds` as given, where a
+release inverts the box's pixel corners, so those four numbers can differ in the last bits.
+`selected=` on the target still wins, as before. A colorbar has no value before its first
+click, so it starts at `nothing`. With an owner, `selected=` on another layer only highlights.
 
 The alternatives for a `selects` target were a one-element commit (a one-cell window, or a
 one-point vector, which is what points did before) and moving the box to the clicked mark. Both

@@ -162,5 +162,37 @@ function _parity_corpus()
         end
     )
 
+    # 9. selecting boxes (#330): the bond starts at what the starting bounds contain, which
+    # Julia computes from the manifest's image-px geometry. frontend/test/selection.test.ts
+    # runs `computeSelection` on these goldens and checks it agrees with `initial`.
+    push!(
+        corpus, "roiselect" => function ()
+            fig = Figure(size = (600, 400))
+            ax = Axis(fig[1, 1])
+            sc = scatter!(ax, [1.0, 2.0, 2.4, 3.0], [1.0, 4.0, 5.5, 9.0])
+            Makie.update_state_before_display!(fig)
+            return (
+                fig, [
+                    PointInteractable(ax, sc; id = :pts),
+                    ROIInteractable(ax; bounds = (1.5, 2.5, 2.0, 6.0), selects = :pts),
+                ],
+            )
+        end
+    )
+    push!(
+        corpus, "roigrid" => function ()
+            fig = Figure(size = (600, 400))
+            ax = Axis(fig[1, 1])
+            hm = heatmap!(ax, 1:4, 1:5, [Float64(i + 3j) for i in 1:4, j in 1:5])
+            Makie.update_state_before_display!(fig)
+            return (
+                fig, [
+                    GridInteractable(ax, hm; id = :img),
+                    ROIInteractable(ax; bounds = (1.6, 3.2, 1.6, 2.4), selects = :img),
+                ],
+            )
+        end
+    )
+
     return corpus
 end

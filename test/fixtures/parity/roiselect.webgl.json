@@ -1,0 +1,121 @@
+{
+    "height": 800,
+    "layers": [
+        {
+            "kind": "circles",
+            "id": "pts",
+            "geometry": [
+                137,
+                691,
+                6,
+                628,
+                455,
+                6,
+                824,
+                338,
+                6,
+                1119,
+                63,
+                6
+            ],
+            "payloads": [
+                {
+                    "index": 1,
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "index": 2,
+                    "x": 2,
+                    "y": 4
+                },
+                {
+                    "index": 3,
+                    "x": 2.4,
+                    "y": 5.5
+                },
+                {
+                    "index": 4,
+                    "x": 3,
+                    "y": 9
+                }
+            ],
+            "colors": "rgb(0,114,178)",
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "bond": "element",
+            "events": [
+                "hover"
+            ]
+        },
+        {
+            "selects": "pts",
+            "kind": "roi",
+            "id": "roi",
+            "geometry": {
+                "w": 490.90915,
+                "handle": 16,
+                "h": 313.63632,
+                "y": 298.59097,
+                "x": 382.54544
+            },
+            "payloads": [
+            ],
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "bond": "none",
+            "events": [
+                "drag"
+            ]
+        }
+    ],
+    "initial": {
+        "items": [
+            {
+                "layer": "pts",
+                "index": 1
+            },
+            {
+                "layer": "pts",
+                "index": 2
+            }
+        ]
+    },
+    "bondOwner": "roi",
+    "selectionTarget": "pts",
+    "transforms": {
+        "ax1": {
+            "xscale": "identity",
+            "ylims": [
+                0.5999999940395355,
+                9.400000005960464
+            ],
+            "xlims": [
+                0.8999999985098839,
+                3.100000001490116
+            ],
+            "valueaxis": null,
+            "polar": null,
+            "is3d": false,
+            "xreversed": false,
+            "ycats": null,
+            "xcats": null,
+            "yreversed": false,
+            "yscale": "identity",
+            "viewport": [
+                88,
+                32,
+                1080,
+                690
+            ],
+            "ispolar": false
+        }
+    },
+    "width": 1200,
+    "scaling": 2,
+    "selection": "elements"
+}

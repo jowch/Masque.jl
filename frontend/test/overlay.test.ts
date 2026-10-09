@@ -3553,6 +3553,25 @@ describe("host.value seeded at mount from selected= (bond hydration, not just g.
         expect((host2 as unknown as { value: unknown }).value).toBeNull()
     })
 
+    it("a selecting box seeds and highlights the items its starting bounds hold; selected= wins", () => {
+        const { host, script } = setup()
+        const boxed: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            selection: "elements", selectionTarget: "pts", bondOwner: "box",
+            initial: { items: [{ layer: "pts", index: 1 }] },
+            layers: [{
+                id: "pts", kind: "circles", geometry: [300, 200, 20, 600, 400, 20],
+                payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["hover"],
+            }],
+        }
+        mount(script, boxed)
+        expect((host as unknown as { value: unknown }).value).toEqual({ items: [{ layer: "pts", index: 1 }] })
+        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
+        const { host: host2, script: script2 } = setup()
+        mount(script2, { ...boxed, layers: [{ ...boxed.layers[0], selected: [0] }] })
+        expect((host2 as unknown as { value: unknown }).value).toEqual({ items: [{ layer: "pts", index: 0 }] })
+    })
+
     it("hydration across two scalar layers is highlight-only", () => {
         const { host, script } = setup()
         const twoLayer: Manifest = {

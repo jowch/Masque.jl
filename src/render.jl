@@ -435,7 +435,7 @@ function build_manifest(
     )
     if owner !== nothing
         m["bondOwner"] = string(owner[2])
-        env = initial_envelope(owner[1], ctx)
+        env = initial_envelope(owner[1], ctx, layers)
         env === nothing || (m["initial"] = env)
     end
     if spec !== nothing
@@ -583,17 +583,18 @@ them, or `interactables(plot; …)` for one plot.
 Two layers with the same id raise `ArgumentError`. Legends link to the layers of this call.
 `auto = false` drops the defaults, so only the arguments are overlaid.
 
-The bond is `nothing` until the first commit, unless `selected=` restored one. A click is one
-[`InteractionEvent`](@ref). A `selects` [`ROIInteractable`](@ref) aimed at points commits a
-`Vector{ElementEvent}` (an empty box is `ElementEvent[]`); aimed at a grid, one
-[`GridWindowEvent`](@ref).
+The bond is `nothing` until the first commit, unless `selected=` restored one or an owner
+(below) sets its start. A click is one [`InteractionEvent`](@ref). A `selects`
+[`ROIInteractable`](@ref) aimed at points commits a `Vector{ElementEvent}` (an empty box is
+`ElementEvent[]`); aimed at a grid, one [`GridWindowEvent`](@ref).
 
 A [`ThresholdInteractable`](@ref), an [`ROIInteractable`](@ref), or a
 [`ColorbarInteractable`](@ref) you pass owns the bond: every other layer shows tooltips but
 commits no clicks, and `selected=` on those layers only highlights. A threshold's bond starts
-as a [`ThresholdEvent`](@ref) at its `value`, and a box without `selects` as a
-[`BoundsEvent`](@ref) at its `bounds`. One widget takes one owner; two raise `ArgumentError`.
-The colorbars `masque(fig)` adds by itself own nothing.
+as a [`ThresholdEvent`](@ref) at its `value`, a box without `selects` as a
+[`BoundsEvent`](@ref) at its `bounds`, and a box with `selects` at what its `bounds` contain.
+One widget takes one owner; two raise `ArgumentError`. The colorbars `masque(fig)` adds by
+itself own nothing.
 
 # Keywords
 - `auto` — start from the figure's defaults. Default `true`.

@@ -31,13 +31,18 @@ All notable changes to this project are documented here. The format is based on
   threshold at a `ThresholdEvent` at `value`, and a box without `selects` at a `BoundsEvent`
   at `bounds`. `level.value` works from the first run, and code that falls back with
   `isnothing(level) ? 0.5 : level.value` still gets the same number. Code that tests
-  `isnothing(level)` to mean "not dragged yet" no longer sees `nothing`. A selecting box
-  and a colorbar still start at `nothing`, since they have no value before the first release
-  or click (#309).
+  `isnothing(level)` to mean "not dragged yet" no longer sees `nothing`. A colorbar still
+  starts at `nothing`, since it has no value before the first click (#309).
 - **Breaking:** two of these controls in one widget raise an error naming both, since each
   would overwrite the other's value. That includes several boxes that select from the same
   layer, which the Brush a region page used to allow; the last box released replaced the
   others' selection anyway. Pass each to its own `masque` call (#309).
+- **Breaking:** a box with `selects` starts at what its `bounds` contain, highlighted, instead
+  of `nothing`: a `Vector{ElementEvent}` of the points inside, or a `GridWindowEvent` for the
+  cells under it. `picks` works from the first run, and code that checks
+  `isnothing(picks) || isempty(picks)` still behaves the same. Code that tests
+  `isnothing(picks)` to mean "not released yet" no longer sees `nothing`. `selected=` on the
+  target still sets the starting value instead (#330).
 
 ## [0.2.2] - 2026-10-09
 

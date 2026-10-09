@@ -315,9 +315,15 @@ kind_sweep_meta() = [
         "category" => "b", "position" => 2,
     ),
     Dict(
+        # A selecting box owns the bond and starts at the points inside its bounds, (3, 3) and
+        # (5, 5), highlighted (#330). The first point sits outside, so the no-click check never
+        # presses on the box. The regex stays loose: a warm re-run (#114) mounts at the last drag.
         "key" => "roi", "layerId" => "roi", "layerKind" => "roi",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        "owner" => Dict(
+            "layer" => "pts", "initial" => "^ROI=ElementEvent\\[ElementEvent\\(:pts, \\d+,", "startsSelected" => true,
+        ),
     ),
     Dict(
         "key" => "view", "layerId" => "view", "layerKind" => "view",
