@@ -57,9 +57,9 @@ full list.
 
 ## Show your own data
 
-The default tooltip shows coordinates. To show your own fields instead,
-pass the scatter to [`interactables`](@ref) with one `payloads`
-entry per point. Replace the figure cell with this one:
+The default tooltip shows coordinates. To add your own fields, pass the
+scatter to [`interactables`](@ref) with one `payloads` entry per point.
+Replace the figure cell with this one:
 
 ```julia
 begin
@@ -68,12 +68,7 @@ begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1])
     s = scatter!(ax, xs, ys; markersize = 16)
-    points = [
-        (name = "one", x = 1.0, y = 2.0),
-        (name = "two", x = 2.0, y = 1.0),
-        (name = "three", x = 3.0, y = 4.0),
-        (name = "four", x = 4.0, y = 3.0),
-    ]
+    points = [(name = "one",), (name = "two",), (name = "three",), (name = "four",)]
     pts = interactables(s; payloads = points)
     nothing
 end
@@ -86,7 +81,8 @@ and pass `pts` to `masque` in the `@bind` cell:
 ```
 
 Hovering a point now shows its `name`, `x`, and `y`, and clicking it
-sets `pick.name`.
+sets `pick.name`. Your fields are added to the point's own `x` and
+`y`, so you don't copy the coordinates into each entry.
 
 The notebook below does the same with three points, recorded from a real
 notebook (see [Static exports and this site](@ref)).

@@ -22,6 +22,20 @@ All notable changes to this project are documented here. The format is based on
   of the box still responds along the part that is drawn (#321).
 
 ### Changed
+- **Breaking:** `payloads` add to a mark's own data instead of replacing it. A scatter
+  point given `(; name = "a")` now has `name`, `x`, and `y` in its tooltip and `@bind`
+  value, so labelling points no longer means copying the coordinates into each payload. The
+  same goes for every mark with its own data, such as a bar's `low`, `high`, and `value`,
+  and for `DataFrame` rows and `Dict`s. A field the payload names itself wins, and `index`
+  is not added, since `pick.index` already holds it. A payload that isn't key-value, such
+  as a bare string, still replaces the default (#308).
+
+  Two things change in existing notebooks. A default tooltip that showed only your fields
+  now also shows the mark's, such as `x` and `y`; to show only yours, pass a `tooltip`
+  template that names them. And a payload that passes its own `x` (or `y`) for something
+  other than the plotted coordinate, such as a category name, now sits next to the mark's
+  other coordinate, and on a line it takes the place of the `x` the hover reads out from
+  the nearest point. Rename that field if you want both.
 - **Breaking:** a `ThresholdInteractable`, an `ROIInteractable`, or a `ColorbarInteractable`
   you pass to `masque` owns the `@bind` value. Every other layer in that widget keeps its
   hover and tooltip but no longer takes clicks, so `masque(fig, cutoff)` keeps hover on the

@@ -276,6 +276,29 @@ function expand_payloads(payloads, n, who)
 end
 _check_payloads(payloads, n, what) = expand_payloads(payloads, n, what)
 
+# A user's payload is merged onto the mark's own default payload: `(; name = "a")` on a
+# scatter point gives `(; name, x, y)`, and the user's fields win a clash. `index` (and a
+# segment's `segment_index`) is left out, since the event carries it as `ev.index`. A payload
+# that isn't key-value (a bare string) replaces the default, as there is nothing to merge.
+function _merge_payloads(defaults, payloads, who)
+    payloads === nothing && return defaults
+    pl = expand_payloads(payloads, length(defaults), who)
+    return Any[_merge_payload(d, p) for (d, p) in zip(defaults, pl)]
+end
+_default_fields(d::NamedTuple) = Base.structdiff(d, NamedTuple{(:index, :segment_index)})
+_merge_payload(d, p) = p
+_merge_payload(d::NamedTuple, p::NamedTuple) = merge(p, Base.structdiff(_default_fields(d), p))
+function _merge_payload(d::NamedTuple, p::AbstractDict)
+    K = keytype(p)
+    key = K === Symbol ? identity : K === String ? string : nothing
+    key === nothing && return p
+    out = merge!(empty(p, K, Any), p)   # keeps an `OrderedDict`'s type and order
+    for (k, v) in pairs(_default_fields(d))
+        get!(out, key(k), v)
+    end
+    return out
+end
+
 # Checked at construction (not manifest build time) so the error points at the caller's own call.
 _check_tooltip(tooltip) =
     tooltip === true && throw(
@@ -343,7 +366,12 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit.
 - `payloads` — one entry per point (`ArgumentError` if the length doesn't match `points`), or a
   `DataFrame` with one row per point once DataFrames is loaded. Default: `(; index, x, y)`, or
-  `(; index, x, y, z)` for 3-coordinate points — `index` is 1-based.
+  `(; index, x, y, z)` for 3-coordinate points — `index` is 1-based. A named-tuple, row, or
+  `Dict` payload is merged onto the default: `(; name = "a")` gives `(; name, x, y)`, and a
+  field the payload names itself (its own `x`) wins. `index` isn't added, since the event
+  carries it as `ev.index`. A `Dict` merges when it is keyed by `Symbol` or `String`; any other
+  payload (a bare string) replaces the default. Every plot-object constructor merges the same
+  way onto its own default payload.
 - `radius` — highlight and click-target radius in px (scaled to the rendered image's DPI): a
   number for every point, or a vector with one per point. Default `nothing`: use the drawn
   radius of the one `Scatter` on `ax` with these positions (see below), per point when its
@@ -426,20 +454,20 @@ struct PointInteractable <: AbstractInteractable
     stroke::Float64
 end
 function PointInteractable(
-        ax, points; id = :points,
-        payloads = _unconvert_payloads(
-            ax, Any[
-                length(p) >= 3 ?
-                    (; index = k, x = Float64(p[1]), y = Float64(p[2]), z = Float64(p[3])) :
-                    (; index = k, x = Float64(p[1]), y = Float64(p[2]))
-                    for (k, p) in enumerate(points)
-            ]
-        ),
+        ax, points; id = :points, payloads = nothing,
         radius = nothing, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing
     )
     _check_tooltip(tooltip)
     pts = [_pt3(p) for p in points]
-    pl = expand_payloads(payloads, length(pts), "PointInteractable")
+    defaults = _unconvert_payloads(
+        ax, Any[
+            length(p) >= 3 ?
+                (; index = k, x = Float64(p[1]), y = Float64(p[2]), z = Float64(p[3])) :
+                (; index = k, x = Float64(p[1]), y = Float64(p[2]))
+                for (k, p) in enumerate(points)
+        ]
+    )
+    pl = _merge_payloads(defaults, payloads, "PointInteractable")
     r3 = radius3d === nothing ? nothing : Vector{Makie.Vec3f}(radius3d)
     r3 === nothing || length(r3) == length(pts) ||
         throw(ArgumentError("radius3d must have one entry per point (got $(length(r3)) for $(length(pts)))"))
@@ -773,7 +801,8 @@ Axis-aligned rectangles from an explicit list (bars, boxes). Produces one `:rect
 are removed in 0.3.
 
 # From a plot object
-`RectInteractable(ax, p)` builds `rects` and default payloads from `p`:
+`RectInteractable(ax, p)` builds `rects` and default payloads from `p`. A key-value `payloads`
+entry is merged onto that default, as for [`PointInteractable`](@ref):
 
 | `p` | default `id` | notes |
 |---|---|---|
@@ -1032,7 +1061,7 @@ one. Produces one `:rects` [`HitLayer`](@ref), one box per string.
 - `id` — the layer id; becomes `InteractionEvent.layer` on a hit. Default `:text`.
 - `payloads` — one entry per string; `ArgumentError` if the length doesn't match. Default:
   `(; text, index, x, y)` — `text` is the string, `index` 1-based, `(x, y)` its data-space
-  anchor.
+  anchor. A key-value payload is merged onto the default, as for [`PointInteractable`](@ref).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`).
 - `label` — the layer's name, which screen readers announce (see [`PointInteractable`](@ref)).
@@ -1059,16 +1088,13 @@ function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, too
     anchors = p.positions[]
     length(anchors) == length(strs) ||
         error("TextInteractable: $(length(anchors)) positions for $(length(strs)) strings (Makie internals changed?)")
-    pl = if payloads === nothing
-        _unconvert_payloads(
-            ax, Any[
-                (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
-                    for k in eachindex(strs)
-            ]
-        )
-    else
-        _check_payloads(payloads, length(strs), "TextInteractable")
-    end
+    defaults = _unconvert_payloads(
+        ax, Any[
+            (; text = string(strs[k]), index = k, x = Float64(anchors[k][1]), y = Float64(anchors[k][2]))
+                for k in eachindex(strs)
+        ]
+    )
+    pl = _merge_payloads(defaults, payloads, "TextInteractable")
     return TextInteractable(ax, p, id, pl, tooltip, label === nothing ? nothing : String(label))
 end
 tooltip_spec(i::TextInteractable) = i.tooltip
@@ -1125,7 +1151,8 @@ Arbitrary filled polygons, hit-tested even-odd. Produces one `:polygons` [`HitLa
   Default `nothing`; from a plot object, the plot's own Makie `label`.
 
 # From a plot object
-`PolygonInteractable(ax, p)` builds `rings` and default payloads from `p`:
+`PolygonInteractable(ax, p)` builds `rings` and default payloads from `p`. A key-value
+`payloads` entry is merged onto that default, as for [`PointInteractable`](@ref):
 
 | `p` | default `id` | rings from | notes |
 |---|---|---|---|

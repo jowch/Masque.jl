@@ -26,19 +26,15 @@ Hover over a point to see its name, then click it, and the last cell names the p
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000010
 md"""
-Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Pass the scatter to `interactables` with one `payloads` entry per point, and the tooltip shows each point's fields.
+Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Pass the scatter to `interactables` with one `payloads` entry per point, and the tooltip shows each point's name next to its `x` and `y`.
 """
 
 # ╔═╡ b0e1e001-0001-4000-8000-000000000002
 begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    points = [
-        (name = "one", x = 1.0, y = 1.0),
-        (name = "two", x = 2.0, y = 4.0),
-        (name = "three", x = 3.0, y = 9.0),
-    ]
-    s = scatter!(ax, [p.x for p in points], [p.y for p in points]; markersize = 18)
+    s = scatter!(ax, [1.0, 2.0, 3.0], [1.0, 4.0, 9.0]; markersize = 18)
+    points = [(name = "one",), (name = "two",), (name = "three",)]
     pts = interactables(s; payloads = points)
     nothing
 end

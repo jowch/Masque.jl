@@ -39,7 +39,16 @@ cities = interactables(s; payloads = rows)   # rows[i] belongs to point i
 
 The tooltip shows the payload, and a click returns it to Julia as
 `pick.city`, `pick.pop`, and so on. Without `payloads`, each mark gets
-an `index` and its coordinates, such as `x` and `y` for a scatter point.
+an `index` and its own data, such as `x` and `y` for a scatter point or
+`low`, `high`, and `value` for a bar.
+
+Your payloads are added to the mark's own data, so `(; city = "Lyon")`
+on a scatter point gives `city`, `x`, and `y`, and `pick.index` still
+says which point it is. A field you name yourself, such as your own
+`x`, takes the place of the mark's. To show only some fields in the
+tooltip, pass a template that names them; see [Tooltips](@ref). A
+payload that isn't a named tuple, `DataFrame` row, or `Dict`, such as a
+bare string, is shown as it is.
 
 ## Tooltips are templates
 
