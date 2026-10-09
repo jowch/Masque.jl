@@ -189,9 +189,9 @@ export interface Hit {
 
 // One entry in keyboard.ts's flat, manifest-order nav list — element-indexed kinds only
 // (circles/rects/polygons/segments/polyline/lines; grid/axis/threshold/roi/view excluded, see
-// keyboard.ts's FOCUSABLE_KINDS for why). A polyline's NaN-gap "segments" (Julia's gap
-// sentinel — see geometry.ts's hitLayer, which the mouse path already skips) never get a
-// FocusRef at all. `index_` is the raw hitLayerByIndex/geometry index (used to resolve the
+// keyboard.ts's FOCUSABLE_KINDS for why). An element not on screen (selection.ts's
+// isGapElement: a polyline's NaN-gap "segments", Julia's gap sentinel that geometry.ts's
+// hitLayer already skips, or a mark a zoomed Axis3 clipped) never gets a FocusRef at all. `index_` is the raw hitLayerByIndex/geometry index (used to resolve the
 // Hit); `ordinal_`/`layerTotal_` are the 1-based position/count among this layer's FOCUSABLE
 // elements only, announced to the user ("element `ordinal_` of `layerTotal_`") — not the same
 // as `index_`/layerNElements(layer) once a layer has any skipped gaps. FocusRef never crosses

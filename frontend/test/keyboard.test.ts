@@ -501,6 +501,37 @@ describe("keyboard navigation", () => {
         expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "l", index: 3 })
     })
 
+    it("skips segments, circles and lines a zoomed Axis3 clipped off screen (#321)", async () => {
+        vi.useFakeTimers()
+        try {
+            const manifest: Manifest = {
+                width: 1200, height: 800, scaling: 2, transforms: {},
+                layers: [
+                    { id: "seg", kind: "segments", geometry: [NaN, NaN, NaN, NaN, 0, 0, 100, 100], payloads: [{ s: 0 }, { s: 1 }], axis: "ax1", events: ["click", "hover"], label: "Edges" },
+                    { id: "pts", kind: "circles", geometry: [NaN, NaN, 5, 300, 300, 5], payloads: [{ p: 0 }, { p: 1 }], axis: "ax1", events: ["click", "hover"] },
+                    { id: "ln", kind: "lines", geometry: [[], [0, 400, 50, 400]], payloads: [{ l: 0 }, { l: 1 }], axis: "ax1", events: ["click", "hover"] },
+                ],
+            }
+            const { surface, shadow, host } = setup(manifest)
+            const value = () => (host as unknown as { value: { layer: string; index: number } }).value
+            surface.focus()
+            down(surface, "ArrowRight") // the clipped pair 0 is skipped
+            vi.advanceTimersByTime(200)
+            const live = shadow.querySelector('[aria-live="polite"]') as HTMLElement
+            expect(live.textContent).toBe("Edges, element 1 of 1: s 1")
+            down(surface, "Enter")
+            expect(value()).toMatchObject({ layer: "seg", index: 1 })
+            down(surface, "ArrowRight") // circle 0 has a NaN centre
+            down(surface, "Enter")
+            expect(value()).toMatchObject({ layer: "pts", index: 1 })
+            down(surface, "ArrowRight") // path 0 has no vertex left
+            down(surface, "Enter")
+            expect(value()).toMatchObject({ layer: "ln", index: 1 })
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
     it(":lines is one focus stop for the whole path, NaN gap included", () => {
         const manifest: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
