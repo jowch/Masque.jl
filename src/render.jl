@@ -602,31 +602,6 @@ const _BUILTIN_BACKENDS = (
 )
 function _builtin_backend end
 
-# The token the built-in backend structs' constructors take, so their public keyword
-# constructors (deprecated in 0.2.0) are the only ones a user reaches.
-struct _Builtin end
-
-# A built-in backend object built with the deprecated keyword constructors
-# (`CairoBackend(; max_width)`, `WebGLBackend(; px_per_unit, max_width)`). `masque` reads the
-# settings it carries when its own keywords are not given. Removed in 0.3 with the constructors.
-struct _LegacyBackend <: AbstractBackend
-    backend::AbstractBackend
-    max_width::Union{Nothing, Int}
-    px_per_unit::Union{Nothing, Float64}
-end
-
-function _legacy_backend(backend, name, max_width, px_per_unit)
-    kws = String[]
-    max_width === nothing || push!(kws, "max_width = $max_width")
-    px_per_unit === nothing || push!(kws, "px_per_unit = $px_per_unit")
-    _deprecate(
-        "`$(nameof(typeof(backend)))(…)` is deprecated; use `masque(fig; " *
-            join(["backend = :$name"; kws], ", ") * ")`. Removed in 0.3.",
-        nameof(typeof(backend)),
-    )
-    return _LegacyBackend(backend, max_width, px_per_unit)
-end
-
 # Backend choice follows which package extension is loaded, never sniffed from Makie's global
 # `current_backend()` state. `explicit` is the caller's `backend=`.
 function _resolve_backend(explicit)
@@ -669,18 +644,10 @@ _check_px_per_unit(p::Real) = isfinite(p) && p > 0 ? Float64(p) :
     throw(ArgumentError("masque: `px_per_unit` must be a positive number or `nothing`, got $p"))
 _check_px_per_unit(p) = throw(ArgumentError("masque: `px_per_unit` must be a positive number or `nothing`, got $(repr(p))"))
 
-# The backend that renders, and the `max_width` / `px_per_unit` it renders with. `masque`'s own
-# keywords win over the settings a deprecated backend object carries.
+# The backend that renders, and the `max_width` / `px_per_unit` it renders with.
 function _backend_settings(backend, max_width, px_per_unit)
     b = _resolve_backend(backend)
-    legacy_w, legacy_ppu = nothing, nothing
-    if b isa _LegacyBackend
-        legacy_w, legacy_ppu = b.max_width, b.px_per_unit
-        b = b.backend
-    end
-    w = _check_max_width(something(max_width, legacy_w, 700))
-    ppu = _check_px_per_unit(something(px_per_unit, legacy_ppu, Some(nothing)))
-    return b, w, ppu
+    return b, _check_max_width(something(max_width, 700)), _check_px_per_unit(px_per_unit)
 end
 
 """

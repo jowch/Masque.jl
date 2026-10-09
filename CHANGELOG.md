@@ -83,6 +83,20 @@ All notable changes to this project are documented here. The format is based on
   `tooltipstyle`'s, so one such as `tooltip_font_size = "12"` raises an `ArgumentError`, and
   passing a key both ways is an error. `tooltip_sigdigits` stays (#305).
 
+### Removed
+- **Breaking:** the forms deprecated in 0.2 are gone, and calling one now raises a
+  `MethodError` (#299):
+
+  | Removed | Use instead |
+  |---|---|
+  | `CairoBackend(; max_width)` | `masque(fig; backend = :cairo, max_width)` |
+  | `WebGLBackend(; px_per_unit, max_width)` | `masque(fig; backend = :webgl, px_per_unit, max_width)` |
+  | `auto_interactables(fig)` and its export | `interactables(fig)` |
+  | `RectInteractable(ax, p)` for a heatmap or image | `GridInteractable(ax, p)` |
+  | `RectInteractable(ax; grid = …)` | `GridInteractable(ax, xedges, yedges, values)` |
+  | `RectInteractable(ax; rects = …)` | `RectInteractable(ax, rects)` |
+  | `RegionInteractable(ax; regions = …)` | `RegionInteractable(ax, regions)` |
+
 ### Fixed
 - A `meshscatter!` sphere on `Axis3` responds to hover and clicks out to its drawn edge, and
   its highlight sits on its outline. Before, its hit circle could fall well inside the

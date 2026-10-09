@@ -805,11 +805,6 @@ Axis-aligned rectangles from an explicit list (bars, boxes). Produces one `:rect
 - `label` — the layer's name, which screen readers announce (see [`PointInteractable`](@ref)).
   Default `nothing`; from a plot object, the plot's own Makie `label`.
 
-`RectInteractable(ax; rects = …)` is deprecated in favor of `RectInteractable(ax, rects)`.
-`RectInteractable(ax; grid = (xedges, yedges, values))` and `RectInteractable(ax, p)` for a
-`Heatmap` or `Image` are deprecated too: they return a [`GridInteractable`](@ref). All three
-are removed in 0.3.
-
 # From a plot object
 `RectInteractable(ax, p)` builds `rects` and default payloads from `p`. A key-value `payloads`
 entry is merged onto that default, as for [`PointInteractable`](@ref):
@@ -854,34 +849,6 @@ function RectInteractable(
     rs = [(Float64(r[1]), Float64(r[2]), Float64(r[3]), Float64(r[4])) for r in rects]
     pl = payloads === nothing ? Any[(; index = k) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "RectInteractable")
     return RectInteractable(ax, rs, id, pl, tooltip, clamp_to_viewport, nothing, lbl)
-end
-# Deprecated keyword forms: `rects =` (positional since 0.2.0) and `grid =` (now
-# GridInteractable). Both removed in 0.3.
-function RectInteractable(
-        ax; rects = nothing, grid = nothing, id = :rects, payloads = nothing,
-        tooltip = nothing, clamp_to_viewport = false, label = nothing
-    )
-    rects === nothing && grid === nothing &&
-        throw(ArgumentError("RectInteractable: pass the rects positionally, `RectInteractable(ax, rects)`"))
-    rects === nothing || grid === nothing || throw(
-        ArgumentError(
-            "RectInteractable: pass either `rects` or `grid`, not both. For a grid, use " *
-                "`GridInteractable(ax, xedges, yedges, values)`"
-        )
-    )
-    if grid !== nothing
-        _deprecate(
-            "`RectInteractable(ax; grid = (xedges, yedges, values))` is deprecated; use " *
-                "`GridInteractable(ax, xedges, yedges, values)`. Removed in 0.3.",
-            :RectInteractable,
-        )
-        return GridInteractable(ax, grid...; id, tooltip, label)
-    end
-    _deprecate(
-        "`RectInteractable(ax; rects = …)` is deprecated; use `RectInteractable(ax, rects)`. Removed in 0.3.",
-        :RectInteractable,
-    )
-    return RectInteractable(ax, collect(rects); id, payloads, tooltip, clamp_to_viewport, label)
 end
 # Internal-only: construct a RectInteractable with a lazy `resolve(ax) -> rects`.
 function _rect_with_resolve(ax, rects, id, payloads, clamp_to_viewport, resolve; tooltip = nothing, label = nothing)
@@ -2052,9 +2019,6 @@ present), so a single call can mix shapes freely.
   (`ArgumentError`).
 - `events` — the pointer events all generated layers respond to. Default `(:click, :hover)`.
 
-`RegionInteractable(ax; regions = …, payloads = …)` is deprecated in favor of
-`RegionInteractable(ax, regions; payloads = …)` and is removed in 0.3.
-
 # Examples
 ```julia
 RegionInteractable(
@@ -2074,14 +2038,6 @@ function RegionInteractable(
     pl = payloads === nothing ? Any[(; index = k) for k in 1:length(regions)] :
         expand_payloads(payloads, length(regions), "RegionInteractable")
     return RegionInteractable(ax, collect(regions), pl, id, tooltip, events)
-end
-# Deprecated keyword form, removed in 0.3.
-function RegionInteractable(ax; regions, kwargs...)
-    _deprecate(
-        "`RegionInteractable(ax; regions = …)` is deprecated; use `RegionInteractable(ax, regions)`. Removed in 0.3.",
-        :RegionInteractable,
-    )
-    return RegionInteractable(ax, collect(regions); kwargs...)
 end
 events(i::RegionInteractable) = i.evs
 tooltip_spec(i::RegionInteractable) = i.tooltip

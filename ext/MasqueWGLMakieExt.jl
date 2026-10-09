@@ -24,17 +24,9 @@ the `:cairo` backend, for animation, large/live data, and live 3D. Needs `backen
 both `CairoMakie` and `WGLMakie` are loaded (`masque` otherwise defaults to `:cairo`). Its
 density is `masque`'s `px_per_unit`, `2` by default; `WGLMakie.activate!` settings never apply
 to the widget.
-
-`WebGLBackend(; px_per_unit, max_width)` is deprecated: use
-`masque(fig; backend = :webgl, px_per_unit, max_width)`. Removed in 0.3.
 """
-struct WebGLBackend <: AbstractBackend
-    WebGLBackend(::Masque._Builtin) = new()
-end
-function WebGLBackend(; px_per_unit = nothing, max_width = nothing)
-    return Masque._legacy_backend(WebGLBackend(Masque._Builtin()), :webgl, max_width, px_per_unit)
-end
-Masque._builtin_backend(::Val{:webgl}) = WebGLBackend(Masque._Builtin())
+struct WebGLBackend <: AbstractBackend end
+Masque._builtin_backend(::Val{:webgl}) = WebGLBackend()
 
 Masque._ppu(::WebGLBackend, _fig, _max_width) = 2.0
 

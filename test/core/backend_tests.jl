@@ -43,17 +43,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test w.display_css == 301 && w.manifest["scaling"] == 2 * 301 / 600
     end
 
-    @testset "deprecated CairoBackend(; max_width) forwards (#236)" begin
-        f = Figure(size = (600, 400)); scatter!(Axis(f[1, 1]), 1:3, 1:3)
-        b = @test_deprecated _CairoExt.CairoBackend(; max_width = 300)
-        @test b isa AbstractBackend
-        w = masque(f; backend = b)
-        @test w.display_css == 300 && w.manifest["scaling"] == 1.0
-        # masque's own keyword wins over the object's
-        w = masque(f; backend = b, max_width = 500)
-        @test w.display_css == 500
-        b0 = @test_deprecated _CairoExt.CairoBackend()
-        @test masque(f; backend = b0).display_css == 600
+    @testset "CairoBackend(; max_width) is removed (#299)" begin
+        @test_throws MethodError _CairoExt.CairoBackend(; max_width = 300)
     end
 
     @testset "context / transforms" begin

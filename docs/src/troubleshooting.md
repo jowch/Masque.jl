@@ -255,11 +255,11 @@ version that worked.
 
 ### Upgrading code written for Masque 0.1
 
-Masque 0.2 renamed or reshaped a few calls. The old forms still work in
-0.2 and are removed in 0.3. Each one shows a warning in the cell's log
-that names its replacement:
+Masque 0.2 renamed or reshaped a few calls. 0.2 still ran the old forms
+with a warning; 0.3 removed them, so each one now fails with a
+`MethodError` ("no method matching …"). Use the new form instead:
 
-| 0.1 | 0.2 |
+| Removed in 0.3 | Use instead |
 |---|---|
 | `auto_interactables(fig)` | `interactables(fig)` |
 | `RectInteractable(ax; grid = (xedges, yedges, values))` | `GridInteractable(ax, xedges, yedges, values)` |

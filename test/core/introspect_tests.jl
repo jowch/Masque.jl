@@ -198,29 +198,15 @@ end
             @test only(interactables(f1)) isa GridInteractable
         end
 
-        @testset "deprecated grid forms of RectInteractable return a GridInteractable" begin
+        @testset "the 0.1 grid and keyword geometry forms are removed (#299)" begin
             z = [Float64((i + j) % 5) for i in 1:4, j in 1:3]
             f = Figure(size = (500, 350)); a = Axis(f[1, 1]); p = heatmap!(a, 1:4, 1:3, z)
-            _, _, c = ctx_for(f)
-            g = @test_deprecated RectInteractable(a; grid = (0.5:1:4.5, 0.5:1:3.5, z))
-            @test g isa GridInteractable && g.id === :rects
-            @test geom(g, c) == geom(GridInteractable(a, 0.5:1:4.5, 0.5:1:3.5, z), c)
-            g = @test_deprecated RectInteractable(a, p; tooltip = false)
-            @test g isa GridInteractable && g.id === :cells && g.tooltip === false
-            @test Masque.bondtype(g) === Masque.GridCellEvent
-        end
-
-        @testset "keyword geometry forms of Rect and Region are deprecated" begin
-            f = Figure(size = (500, 350)); a = Axis(f[1, 1]); _, _, c = ctx_for(f)
+            @test_throws MethodError RectInteractable(a; grid = (0.5:1:4.5, 0.5:1:3.5, z))
+            @test_throws MethodError RectInteractable(a, p)
             rs = [(1.0, 1.0, 0.5, 0.5), (2.0, 2.0, 0.5, 0.5)]
-            r = @test_deprecated RectInteractable(a; rects = rs, id = :boxes, payloads = ["p", "q"])
-            new = RectInteractable(a, rs; id = :boxes, payloads = ["p", "q"])
-            @test r.id === :boxes && r.payloads == new.payloads && geom(r, c) == geom(new, c)
+            @test_throws MethodError RectInteractable(a; rects = rs)
             regs = [(:circle, (1.0, 1.0), 10), (:rect, (2.0, 4.0), 1.0, 2.0)]
-            g = @test_deprecated RegionInteractable(a; regions = regs, payloads = ["a", "b"], id = :reg)
-            gnew = RegionInteractable(a, regs; payloads = ["a", "b"], id = :reg)
-            @test g.id === :reg && g.payloads == gnew.payloads &&
-                [L.geometry for L in hitlayers(g, c)] == [L.geometry for L in hitlayers(gnew, c)]
+            @test_throws MethodError RegionInteractable(a; regions = regs)
             # the positional form's payloads default to (; index), like the other element kinds
             @test RegionInteractable(a, regs).payloads == [(; index = 1), (; index = 2)]
         end

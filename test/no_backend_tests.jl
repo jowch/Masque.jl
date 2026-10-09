@@ -96,16 +96,15 @@ end
 @testset "deprecations warn without --depwarn=yes (#269)" begin
     code = """
     using Masque, Test
-    regs = [(:circle, 0.0, 0.0, 1.0)]
-    @noinline site() = RegionInteractable(nothing; regions = regs)
-    @test_logs (:warn, r"`RegionInteractable\\(ax, regions\\)`. Removed in 0.3") (site(); site(); site())
+    @noinline site() = Masque._merge_tooltip_kwargs(nothing, (; bg = :red))
+    @test_logs (:warn, r"`tooltipstyle = \\(; bg = …\\)`. Removed in 0.4") (site(); site(); site())
     """
     julia(flag, code) = `$(Base.julia_cmd()) $flag --startup-file=no --project=$(Base.active_project()) -e $code`
     @test success(pipeline(julia("--depwarn=no", code); stdout, stderr))
     # `--depwarn=error` still turns the warning into an error.
     code = """
     using Masque, Test
-    @test_throws ErrorException RegionInteractable(nothing; regions = [(:circle, 0.0, 0.0, 1.0)])
+    @test_throws ErrorException Masque._merge_tooltip_kwargs(nothing, (; bg = :red))
     """
     @test success(pipeline(julia("--depwarn=error", code); stdout, stderr))
     # Every deprecation goes through `_deprecate`, which forces the warning.

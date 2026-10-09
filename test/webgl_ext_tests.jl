@@ -268,11 +268,7 @@ end
     w = masque(fig; px_per_unit = 3)
     @test w.px_per_unit == 3.0 && w.manifest["scaling"] == 3.0 && w.manifest["width"] == 1800
 
-    b = @test_deprecated _WGLExt.WebGLBackend(; px_per_unit = 3.0, max_width = 300)
-    w = masque(fig; backend = b)
-    @test w.px_per_unit == 3.0 && w.display_css == 300
-    w = masque(fig; backend = b, px_per_unit = 1.5, max_width = 500)   # masque's keywords win
-    @test w.px_per_unit == 1.5 && w.display_css == 500
+    @test_throws MethodError _WGLExt.WebGLBackend(; px_per_unit = 3.0, max_width = 300)   # removed in 0.3 (#299)
 end
 
 @testset "a scatter's outline lies outside the marker on WebGL (#246)" begin
