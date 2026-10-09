@@ -346,7 +346,10 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
     first(states).key == "null" || error("first player state must be idle in $(basename(path))")
     snapshots, extra = snapshot_table([st.key => Dict("cells" => st.payloads) for st in states])
     check_budget(path, length(states), length(snapshots["snaps"]), extra)
-    set_bond!(session, nb, bond, nothing)
+    # Back to the widget's starting value by re-running its cell, not to `nothing`: a selecting
+    # box starts at the points inside it (#330), so its notebook need not handle `nothing`.
+    delete!(nb.bonds, bond)
+    Pluto.update_save_run!(session, nb, [widget]; run_async = false, save = false)
     assert_no_errors(nb, path)
     # Ship no stored bond value: Pluto would restore `nothing` over the value a `selected=`
     # widget seeds at mount. The player swaps in that value's snapshot when it arms.
