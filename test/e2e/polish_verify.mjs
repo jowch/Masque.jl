@@ -508,10 +508,9 @@ try {
     // even when the manifest is off the drawn mark. On Cairo, read the rendered PNG at the
     // hit geometry instead (same canvas readback as flush-radius above): every tested mark's
     // centre (an edge's midpoint) must be drawn, and `overlap3d`'s must be the black front
-    // marker, not the grey sphere behind it. A sphere's hit circle comes from its data-space
-    // size, an axis-aligned approximation that can fall short of the drawn outline, so it is
-    // checked as a band: drawn 3 px inside `r`, background by 1.25·r. Measured on this figure,
-    // the outline sits 3-4 px past `r`.
+    // marker, not the grey sphere behind it. A sphere's hit circle is its projected outline,
+    // so it gets the same ±3 px flush check as 2D scatter: drawn 3 px inside `r`, background
+    // 3 px outside it.
     if (backend === "cairo") {
       const n = circles ? g.length / 3 : g.length / 4;
       const probes = [];
@@ -523,7 +522,7 @@ try {
           if (key === "meshscatter3d") {
             for (const [dx, dy, dir] of [[1, 0, "+x"], [-1, 0, "-x"], [0, 1, "+y"], [0, -1, "-y"]]) {
               probes.push({ x: cx + dx * (r - 3), y: cy + dy * (r - 3), want: "mark", what: `${i}/inside${dir}` });
-              probes.push({ x: cx + dx * 1.25 * r, y: cy + dy * 1.25 * r, want: "bg", what: `${i}/outside${dir}` });
+              probes.push({ x: cx + dx * (r + 3), y: cy + dy * (r + 3), want: "bg", what: `${i}/outside${dir}` });
             }
           }
         } else {

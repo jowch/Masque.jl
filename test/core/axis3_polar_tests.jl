@@ -368,6 +368,29 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # radius3d validation fails loud on length mismatch
         @test_throws ArgumentError PointInteractable(axm, mpts; radius3d = [Makie.Vec3f(1, 1, 1)])
 
+        # The hit circle reaches the drawn outline (#317). Axis3 stretches each data axis by a
+        # different amount, so a sphere draws as an ellipse whose long direction lies along no
+        # single data axis; the old per-axis estimate fell ~9 px short here. The drawn extent
+        # is the farthest pixel the sphere changes, read by rendering with and without it.
+        fo = Figure(; size = (600, 450))
+        axo = Axis3(fo[1, 1]; azimuth = 0.4, elevation = 0.5)
+        mso = meshscatter!(axo, Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3)]; markersize = 0.3, color = :gray)
+        _, ppuo, ctxo = ctx_for(fo)
+        Lo3 = only(hitlayers(only(interactables(fo)), ctxo))
+        with_sphere = copy(Makie.colorbuffer(fo; px_per_unit = ppuo))   # the buffer is reused
+        mso.visible[] = false
+        without = Makie.colorbuffer(fo; px_per_unit = ppuo)
+        chan(c) = (Float64(Makie.red(c)), Float64(Makie.green(c)), Float64(Makie.blue(c)))
+        for k in 0:2
+            cx, cy, r = Lo3.geometry[3k + 1], Lo3.geometry[3k + 2], Lo3.geometry[3k + 3]
+            drawn = 0.0
+            for y in round(Int, cy - 1.3r):round(Int, cy + 1.3r), x in round(Int, cx - 1.3r):round(Int, cx + 1.3r)
+                sum(abs.(chan(with_sphere[y, x]) .- chan(without[y, x]))) > 0.3 || continue
+                drawn = max(drawn, hypot(x - 0.5 - cx, y - 0.5 - cy))
+            end
+            @test abs(drawn - r) <= 2
+        end
+
         # Wireframe: rendered edges from the child LineSegments (data space), :pairs mode
         fw = Figure(; size = (600, 450))
         axw = Axis3(fw[1, 1]; azimuth = 0.4, elevation = 0.5)

@@ -335,9 +335,9 @@ Scatter-style points, hit-tested as circles. Produces one `:circles` [`HitLayer`
   (a `Char`, an image, a per-element vector of markers) keeps the `markersize / 2` bound.
 - `radius3d` — per-point data-space half-extents (`Vector{Makie.Vec3f}`), for markers whose
   on-screen size is camera/depth-dependent (e.g. `meshscatter`). When set, overrides `radius`
-  with an axis-aligned pixel-radius approximation projected per point — it can underestimate
-  the true silhouette (worst case ~29%, at adversarial azimuth/elevation). Must have one entry
-  per point (`ArgumentError` otherwise).
+  with the radius of each point's projected outline: the longest semi-axis of the ellipsoid
+  with these half-extents, as drawn. Must have one entry per point (`ArgumentError`
+  otherwise).
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress. `tooltip = true` is rejected (`ArgumentError`; not meaningful).
 - `label` — the layer's name, which screen readers announce when the keyboard moves to an
@@ -393,9 +393,8 @@ struct PointInteractable <: AbstractInteractable
     ax; points::Vector{Point3f}; id::Symbol; payloads::Vector{Any}
     # px, one for every point or one per point
     radius::Union{Float64, Vector{Float64}}
-    # Data-space half-extents (meshscatter markers are data-sized); overrides `radius` via an
-    # axis-aligned pixel-radius approximation that can underestimate the true silhouette
-    # (worst case ~29%, at adversarial azimuth/elevation).
+    # Data-space half-extents (meshscatter markers are data-sized); overrides `radius` with
+    # the radius of the projected outline (`_px_radius3d`).
     radius3d::Union{Nothing, Vector{Makie.Vec3f}}
     tooltip::Union{Nothing, Markup, Bool}
     label::Union{Nothing, String}
@@ -439,25 +438,32 @@ function _check_radius(r, n)
     return Vector{Float64}(r)
 end
 tooltip_spec(i::PointInteractable) = i.tooltip
-# Max projected displacement over the ±axis half-extents; non-finite offsets are skipped.
-function _px_radius3d(ctx, ax, p, e, q)
-    m = 0.0
-    for d in (
-            (e[1], 0, 0), (-e[1], 0, 0), (0, e[2], 0),
-            (0, -e[2], 0), (0, 0, e[3]), (0, 0, -e[3]),
-        )
-        q2 = _proj(ctx, ax, (p[1] + d[1], p[2] + d[2], p[3] + d[3]))
-        r = hypot(q2[1] - q[1], q2[2] - q[2])
-        isfinite(r) && (m = max(m, r))
+# Outline radius of the ellipsoid with data-space semi-axes `e` around `p`. Projecting `p ± eᵢ`
+# gives the screen images `cᵢ` of its three semi-axes; the drawn outline is then the ellipse
+# `M·(unit ball)` with `M = [c₁ c₂ c₃]`, whose longest semi-axis is `M`'s largest singular value
+# (exact for Axis3's default orthographic camera). The largest single `|cᵢ|`, the old estimate,
+# falls short whenever the outline's long direction isn't along a data axis. A semi-axis whose
+# projection isn't finite is left out.
+function _px_radius3d(ctx, ax, p, e)
+    a = b = d = 0.0   # M·Mᵀ = [a b; b d]
+    for i in 1:3
+        o = ntuple(j -> j == i ? Float64(e[i]) : 0.0, 3)
+        hi = _proj(ctx, ax, (p[1] + o[1], p[2] + o[2], p[3] + o[3]))
+        lo = _proj(ctx, ax, (p[1] - o[1], p[2] - o[2], p[3] - o[3]))
+        cx, cy = (hi[1] - lo[1]) / 2, (hi[2] - lo[2]) / 2
+        isfinite(cx) && isfinite(cy) || continue
+        a += cx^2
+        b += cx * cy
+        d += cy^2
     end
-    return m
+    return sqrt((a + d) / 2 + hypot((a - d) / 2, b))
 end
 function hitlayers(i::PointInteractable, ctx)
     g = Real[]
     for (k, p) in enumerate(i.points)
         q = _proj(ctx, i.ax, p)
         r = if i.radius3d !== nothing
-            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q)
+            _px_radius3d(ctx, i.ax, p, i.radius3d[k])
         else
             ((i.radius isa Vector ? i.radius[k] : i.radius) + i.stroke * ctx.marker_stroke) * ctx.scaling
         end

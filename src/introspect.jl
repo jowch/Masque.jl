@@ -276,9 +276,9 @@ _with_marker_stroke(i::PointInteractable, s) = PointInteractable(
 )
 
 # markersize is DATA-space (no markerspace attribute), so pixel radius is camera/depth-dependent;
-# normalize to per-element Vec3f half-extents (radius3d) and let hitlayers project them. The
-# axis-aligned half-extent approximation can underestimate the true silhouette (worst case ~29%,
-# at adversarial azimuth/elevation); pass radius=/radius3d= explicitly if it's too coarse.
+# normalize to per-element Vec3f half-extents (radius3d) and let hitlayers project the outline.
+# Makie's default marker is a unit sphere, so these are its semi-axes; a custom `marker` or a
+# `rotation` isn't read, so pass radius=/radius3d= explicitly for those.
 function _meshscatter_extents(ms, n)
     ms isa Makie.VecTypes{3} && return fill(Makie.Vec3f(ms...), n)
     ms isa Real && return fill(Makie.Vec3f(ms, ms, ms), n)
