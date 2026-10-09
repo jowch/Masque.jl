@@ -66,6 +66,13 @@ for d in (50, 200)
     heatmap!(ax, 1:d, 1:d, rand(d, d))
     row("heatmap, $(d)×$(d)", masque(f))
 end
+# Per-cell payloads (#290): one short (row, col) label pair per cell, on top of `values[]`.
+for d in (50, 200)
+    f = Figure(size = (600, 400)); ax = Axis(f[1, 1])
+    hm = heatmap!(ax, 1:d, 1:d, rand(d, d))
+    w = masque(f, interactables(hm; payloads = (i, j) -> (; row = "r$i", col = "c$j")))
+    row("heatmap, $(d)×$(d), cell labels", w)
+end
 
 println("\n=== B. manifest vs payload richness (scatter, N=1000) — bounds M2.3 tooltips ===")
 let

@@ -42,14 +42,14 @@ function transform_bond(::Type{Nothing}, i, layer::HitLayer, index, js_payload)
 end
 
 function transform_bond(i::GridInteractable, layer::HitLayer, index, js_payload)
-    return _grid_cell_event(i.id, js_payload)
+    return _grid_cell_event(i.id, js_payload, layer.payloads, layer.geometry)
 end
 function transform_bond(i::ViewInteractable, layer::HitLayer, index, js_payload)
     throw(ArgumentError("bond: layer :$(i.id) is a view gesture and commits nothing"))
 end
 function transform_bond(i::FunctionInteractable, layer::HitLayer, index, js_payload)
     k = layer.kind
-    k === :grid && return _grid_cell_event(layer.id, js_payload)
+    k === :grid && return _grid_cell_event(layer.id, js_payload, layer.payloads, layer.geometry)
     k === :axis && return _axis_event(layer.id, js_payload)
     k === :threshold && return _threshold_event(layer.id, js_payload)
     k === :roi && return _bounds_event(layer.id, js_payload)
@@ -113,7 +113,7 @@ function event_from_stamp(d::AbstractDict, index, js_payload)
     end
     bond == "element" && return _element_event(id, index, d["payloads"])
     bond == "legend" && return _legend_event(id, index, d["payloads"])
-    bond == "gridcell" && return _grid_cell_event(id, js_payload)
+    bond == "gridcell" && return _grid_cell_event(id, js_payload, get(d, "payloads", Any[]), get(d, "geometry", nothing))
     bond == "axis" && return _axis_event(id, js_payload)
     bond == "colorbar" && return _colorbar_event(id, js_payload)
     bond == "threshold" && return _threshold_event(id, js_payload)

@@ -70,9 +70,31 @@ manifest the MsgPack size.
 | scatter, 10 000 | 717 KB | 379 KB | manifest approaches PNG; both O(N) |
 | heatmap, 50×50 | 30 KB | 13 KB | |
 | heatmap, 200×200 | 190 KB | 197 KB | edges are compact; `values[]` is O(cells) |
+| heatmap, 50×50, cell labels | 30 KB | 54 KB | `payloads = (i, j) -> (; row, col)` (2026-10-08, #290) |
+| heatmap, 200×200, cell labels | 190 KB | 897 KB | ~18 B/cell of payload on top of `values[]` |
 
 A realistic single interactive plot is **50–400 KB total**. Editor lag is not expected there; it
 becomes a risk only at the extremes in "Stress".
+
+### Outside Pluto
+
+Outside Pluto (#298), `show` writes one block per widget: the PNG as base64 (4/3 of the
+decoded size), the manifest as a JS literal, and about 1.1 KB of loader. A registered
+install's loader fetches the 81,883-byte `assets/overlay.js` from jsDelivr once per page
+(#311); a git checkout inlines it in every block instead. Measured with
+`sizeof(sprint(show, MIME"text/html"(), masque(fig)))` on CairoMakie 0.15, Julia 1.13,
+default figure size unless noted (2026-10-08, PR #311):
+
+| Plot | block, registered | block, checkout | PNG (base64) | manifest |
+|------|------:|------:|-----:|---------:|
+| scatter, 4 pts, 400×260 (the Backends page example) | 16 KB | 97 KB | 14 KB | 0.7 KB |
+| line, 10 pts | 84 KB | 165 KB | 82 KB | 0.8 KB |
+| scatter, 100 | 71 KB | 152 KB | 62 KB | 7.5 KB |
+| scatter, 1 000 | 423 KB | 504 KB | 351 KB | 71 KB |
+
+Documenter warns at 100 KiB per page and fails at 200 KiB. With a registered install the
+PNG sets the budget: two default-size widgets warn, three fail. From a checkout (this
+repo's own docs build) one widget already warns and two fail.
 
 ### What scales the manifest
 
@@ -82,6 +104,11 @@ becomes a risk only at the extremes in "Stress".
 - **A heatmap's value matrix** (`:grid` `values[]`, O(cells)) while each cell is at least one
   screen pixel: 200×200 is 197 KB. Below one pixel per cell the manifest carries one value per
   screen pixel of the axis viewport instead ("Stress"). Tooltip templates add nothing per cell.
+- **Per-cell grid payloads** (`payloads`, #290, 2026-10-08): one payload per cell, shipped on both
+  the `values[]` and the sub-pixel branch, since hover needs the cell's own entry. A short
+  `(; row, col)` label pair is ~18 B/cell, so a labelled 200×200 heatmap is 897 KB against 197 KB
+  unlabelled; that is O(cells), where row and column label vectors would be O(rows + columns).
+  A grid without `payloads` ships the same bytes as before.
 - **Slice series**, which stay Float64 (section H, one series, no other layers): 100 vertices is
   1.8 KB of `xy` in a 2.2 KB manifest, 1 000 vertices 17.6 KB in 18.0 KB (~18 B/vertex). The
   raster stays the empty-axis floor (9.8 KB). A view gesture rebuilds the manifest every frame,

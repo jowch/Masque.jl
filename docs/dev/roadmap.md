@@ -82,8 +82,8 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 
 ### Output, hosts, and payload
 - *idea* — SVG output for sparse plots, after a spike on primitive count.
-- *idea* — a `show` fallback that mounts outside Pluto; then a static `save_html(widget)`
-  inspector and inspection-only IJulia and Quarto.
+- *idea* — a static `save_html(widget)` inspector, and inspection-only IJulia and Quarto,
+  on top of the CairoMakie `show` that already mounts outside Pluto (#298; WebGL is #300).
 - *idea* — GLMakie rendering to PNG behind `AbstractBackend`.
 - *idea* — `:webgl` in-place data patching on a canvas that is still alive.
 - *idea* — level-of-detail hit layers for high-N plots: a decimated layer, with exact

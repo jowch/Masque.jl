@@ -1,4 +1,4 @@
-using Test, Masque, CairoMakie, Makie
+using Test, Masque, CairoMakie, Makie, JSON3
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
 @testset "Backend" begin
@@ -347,18 +347,93 @@ end
     @test Set(c.id for c in cbs2) == Set([:colorbar, :colorbar_2])
 end
 
-@testset "outside Pluto, show gives the static image (#288)" begin
+@testset "outside Pluto, show inlines the manifest for hover (#288, #298)" begin
     (; fig, ax, pts) = default_fixture()
     w = masque(fig, [PointInteractable(ax, pts)]; auto = false)
     html = sprint(show, MIME"text/html"(), w)
     @test occursin("<img src=\"data:image/png;base64,$(w.b64)\"", html)
-    @test !occursin("<script", html)
     @test occursin("max-width:$(w.display_css)px", html)
-    # A display that publishes to JS still gets the live widget.
+    @test occursin("Masque.mount(img, ", html)
+    # A git checkout (this test run) inlines the bundle in each widget.
+    @test Masque._OVERLAY_CDN[] === nothing
+    @test occursin(Masque._OVERLAY_JS[], html)
+    # The script finds its own host by id, so it mounts even when it runs from `<head>`.
+    id = match(r"<div class=\"ip-host\" id=\"([^\"]+)\"", html).captures[1]
+    @test occursin("document.getElementById(\"$(id)\")", html)
+    @test id != match(r"id=\"([^\"]+)\"", sprint(show, MIME"text/html"(), w)).captures[1]
+    @test !occursin("published_to_js", html) && !occursin("getPublishedObject", html)
+    # The overlay script sits in a block, so two widgets on one page don't redeclare `const`s.
+    script = match(r"<script>(.*?)</script>"s, html).captures[1]
+    @test startswith(strip(script), "{") && endswith(strip(script), "}")
+    # The inlined manifest reads back as the widget's own manifest.
+    lit = match(r"mount\(img, (.*), new Promise"s, html).captures[1]
+    @test JSON3.read(lit; allow_inf = true)["layers"][1]["id"] == w.manifest["layers"][1]["id"]
+    @test length(JSON3.read(lit; allow_inf = true)["layers"]) == length(w.manifest["layers"])
+    # A display that publishes to JS still gets the Pluto widget.
     buf = IOBuffer()
     io = IOContext(buf, :pluto_published_to_js => (io, x) -> print(io, "null"))
     show(io, MIME"text/html"(), w)
     live = String(take!(buf))
-    @test occursin("window.Masque.mount", live)
+    @test occursin("window.Masque.mount(currentScript, manifest, invalidation, requestFrame)", live)
     @test occursin("<img src=\"data:image/png;base64,$(w.b64)\"", live)
+end
+
+@testset "a registered install loads the overlay script once per page (#311)" begin
+    js = Masque._OVERLAY_JS[]
+    depot = mktempdir()
+    pkg = joinpath(depot, "packages", "Masque", "AbCd1")
+    mkpath(pkg)
+    pushfirst!(DEPOT_PATH, depot)
+    cdn = try
+        Masque._overlay_cdn(pkg, v"0.2.2", js)
+    finally
+        popfirst!(DEPOT_PATH)
+    end
+    @test cdn.url == "https://cdn.jsdelivr.net/gh/jowch/Masque.jl@v0.2.2/assets/overlay.js"
+    @test cdn.integrity == "sha384-" * Masque.base64encode(Masque.sha384(js))
+    # A git checkout, a folder outside every depot, or no version inlines instead.
+    @test Masque._overlay_cdn(pkgdir(Masque), v"0.2.2", js) === nothing
+    @test Masque._overlay_cdn(mktempdir(), v"0.2.2", js) === nothing
+
+    (; fig, ax, pts) = default_fixture()
+    w = masque(fig, [PointInteractable(ax, pts)]; auto = false)
+    old = Masque._OVERLAY_CDN[]
+    Masque._OVERLAY_CDN[] = cdn
+    html = try
+        sprint(show, MIME"text/html"(), w)
+    finally
+        Masque._OVERLAY_CDN[] = old
+    end
+    @test occursin(cdn.url, html) && occursin(cdn.integrity, html)
+    @test !occursin(js, html)
+    @test sizeof(html) < sizeof(w.b64) + 8_000
+    @test occursin("Masque.mount(img, ", html)
+    lit = match(r"mount\(img, (.*), new Promise"s, html).captures[1]
+    @test length(JSON3.read(lit; allow_inf = true)["layers"]) == length(w.manifest["layers"])
+    # The Pluto widget still inlines the bundle.
+    buf = IOBuffer()
+    Masque._OVERLAY_CDN[] = cdn
+    try
+        show(IOContext(buf, :pluto_published_to_js => (io, x) -> print(io, "null")), MIME"text/html"(), w)
+    finally
+        Masque._OVERLAY_CDN[] = old
+    end
+    @test occursin(js, String(take!(buf)))
+end
+
+@testset "the inlined manifest is a JS literal (#298)" begin
+    lit(x) = sprint(Masque._js_literal, x)
+    @test lit(nothing) == "null"
+    @test lit([true, false]) == "[true,false]"
+    # Julia versions print Float32 as `0.1` or `0.1f0`; either way it is a JS number.
+    @test replace(lit(Float32[0.1, 1.0e-5, NaN, Inf, -Inf]), "e0," => ",") == "[0.1,1.0e-5,NaN,Infinity,-Infinity]"
+    @test lit(1.5) == "1.5" && lit(3) == "3" && lit(:a) == "\"a\""
+    @test lit((a = 1, b = (2, 3))) == "{\"a\":1,\"b\":[2,3]}"
+    @test lit(Dict("k" => "v")) == "{\"k\":\"v\"}"
+    # A `</script>` in a tooltip can't end the script element, and quotes and line
+    # separators stay inside the string.
+    s = lit("</script> \"q\" \\ \n \u2028")
+    @test !occursin('<', s)
+    @test s == "\"\\u003c/script> \\\"q\\\" \\\\ \\u000a \\u2028\""
+    @test JSON3.read(s) == "</script> \"q\" \\ \n \u2028"
 end

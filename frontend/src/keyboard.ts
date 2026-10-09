@@ -18,8 +18,8 @@ import type { FocusRef, Hit, HitLayer, Manifest } from "./types"
 const ANNOUNCE_DEBOUNCE_MS = 150
 
 // :grid is excluded even though it's element-indexed: hitLayerByIndex (selection.ts) throws for
-// it (grid isn't in SELECTED_KINDS — no pre-highlight geometry helper), its payloads[] is empty
-// (values are resolved client-side from a (i,j) lookup, not positional), and ncols*nrows is
+// it (grid isn't in SELECTED_KINDS — no pre-highlight geometry helper), its value comes from an
+// (i,j) lookup rather than payloads[] (empty unless the grid has per-cell payloads), and ncols*nrows is
 // unbounded (a 1000x1000 heatmap is not something you arrow through one cell at a time).
 // :axis/:threshold/:roi/:view are continuous or drag-only, not element-indexed at all.
 const FOCUSABLE_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines"])

@@ -78,12 +78,13 @@ text and the bond payload → it gets a live check on every backend × the kinds
   about payload shape (unit tests never call `show`). **Agents run**
   `docs/dev/live-interaction-checklist.md` via **both** `test/e2e/kind_sweep.mjs` **and**
   `test/e2e/polish_verify.mjs` (Cairo **and** WGL) across scatter, lines/segments,
-  heatmap/image, barplot, poly, polar, dark-figure scatter, arrows3d, hlines/vlines,
-  threshold, ROI, view-pan, and axis/colorbar. Interaction without visual is unfinished; visual
-  chrome without the kind sweep is unfinished. The overlay recipes (highlight
-  layers and colours, fades, tooltip placement and theme, ROI chrome) are **locked**: the full
-  spec is the "Visual language (settled)" section of `docs/dev/live-interaction-checklist.md`.
-  Cite it; do not reopen it.
+  heatmap/image, barplot, poly, polar, dark-figure scatter, arrows3d, the Axis3 kinds
+  (scatter, lines, meshscatter, wireframe, an overlapping pair), text, datashader, violin,
+  stairs, hlines/vlines, threshold, ROI, view-pan, and axis/colorbar. Interaction without
+  visual is unfinished; visual chrome without the kind sweep is unfinished. The overlay
+  recipes (highlight layers and colours, fades, tooltip placement and theme, ROI chrome) are
+  **locked**: the full spec is the "Visual language (settled)" section of
+  `docs/dev/live-interaction-checklist.md`. Cite it; do not reopen it.
 - **Skip only** pure-internal refactors with zero observable delta (and say so). When unsure,
   it's user-facing — verify all backends × the kinds the change can touch, interaction
   **and** visual.
@@ -97,15 +98,23 @@ text and the bond payload → it gets a live check on every backend × the kinds
   driver for any new kind, recipe, or interaction.
 
 ## Cloud sessions (claude.ai/code)
-- The container is **not cached**: every session starts from the environment's setup script,
-  which only installs Julia (on PATH; the latest release, like CI's `'1'` job — 1.13 today),
-  the General registry, and Runic. Nothing Makie is compiled, so question-only
-  sessions stay cheap.
+- **The setup script's output is snapshotted.** The environment's setup script installs Julia
+  (on PATH; the latest release, like CI's `'1'` job — 1.13 today), the General registry and
+  Runic, then runs `scripts/cloud-warm.sh julia-fetch` (lines at the top of that script), which
+  resolves and downloads the `$MASQUE_DEV_ENV` env without precompiling it. The cloud keeps a
+  filesystem snapshot of the result and starts later sessions from it, but only when the whole
+  script ends within ~5 min; past that nothing is cached and every session reruns the script.
+  So precompiling stays out of setup: it takes ~8.5 min, nearly all of it the serial
+  Makie → WGLMakie chain, so a time-boxed partial precompile saves almost nothing. The
+  snapshot is rebuilt when the script changes and about weekly. Project threads clone two
+  repos, so repo `.claude/settings.json` hooks don't run there.
 - **Warm lazily, and early.** On a task that will run Julia, start
   `scripts/cloud-warm.sh julia > /tmp/masque-warm.log 2>&1 &` *first*, then read code while it
-  compiles (~7 min cold). Add `frontend` before the frontend gate and `e2e` before live
-  verification. Don't run Julia tests or Pluto until the warm-up log says `done` — competing
-  for the 4 cores slows both.
+  precompiles (~8.5 min from the snapshot, ~11 min with nothing fetched). It also points the
+  env at this checkout: the snapshot's env points at the deleted setup clone, so tests fail
+  until it has run. Add `frontend` before the frontend gate and `e2e` before live verification.
+  Don't run Julia tests or Pluto until the warm-up log says `done` — competing for the 4 cores
+  slows both.
 - **Playwright is pinned to the image's Chromium.** The image preinstalls one Chromium build in
   `$PLAYWRIGHT_BROWSERS_PATH` (`/opt/pw-browsers`), and `test/e2e/package.json` pins the
   Playwright release whose build matches it (1.56.1 ↔ build 1194), so `cloud-warm.sh e2e`

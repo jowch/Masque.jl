@@ -6,7 +6,36 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A CairoMakie widget shown outside Pluto, in Documenter or in an HTML page written with
+  `show(io, MIME"text/html"(), w)`, keeps its tooltips and highlights, with nothing to turn
+  on. Clicks highlight a mark but set no `@bind` value, and dragging the view needs Pluto. A
+  display that blocks scripts still shows the plain figure (#298).
+
+  The page loads the overlay script once from jsDelivr, pinned to the installed Masque
+  release and checked against its hash, so each widget adds little beyond its image. Read
+  offline, the page shows the plain figures. A Masque checked out with `Pkg.develop` writes
+  the script into each widget instead, about 80 KB apiece (#298).
+- `SliceInteractable([a, b])` builds a slice from plots without naming the axis; `masque`
+  puts it on the axis that draws them, and plots on different axes raise an error naming
+  both. `SliceInteractable(ax, [a, b])` still works (#306).
+- A heatmap or image takes `payloads`, one per cell: a function `(i, j) -> payload` or a
+  matrix the same size as the plotted one, passed to `interactables(p; payloads)` or
+  `GridInteractable`. The tooltip lists the payload's fields and the cell's value, a
+  template can use those fields next to `i`, `j`, and `value`, and a click's
+  `GridCellEvent` carries the payload, so `pick.row` reads it. Before, a grid took no
+  payloads, and labelling cells meant one `RectInteractable` per cell (#290).
+- A plot's layer is named after the plot's own `label`, the text its legend entry shows, so
+  `scatter!(ax, xs, ys; label = "wild type")` announces "wild type, element 3 of 10: …" to
+  screen readers. Passing `label` to `interactables(plot; …)` or a constructor still names the
+  layer, and `label = nothing` leaves the name out. A plot with no `label`, or one written in
+  LaTeX or rich text (whose markup a screen reader would read out), announces what it did
+  before (#304).
+
 ### Fixed
+- `masque` warns once per call about the plots it skips, listing each kind, with a count when
+  one repeats. Before, it warned once per skipped plot, so two `Axis3` panels with `text!`
+  gave two identical warnings per call (#289).
 - Two interactables of the same kind in one `masque` call no longer clash over their
   default id. Two `ViewInteractable(ax)` on two axes become `:view` and `:view_2`, the way
   two scatters become `:scatter` and `:scatter_2`; the same holds for `AxisInteractable`,
@@ -20,11 +49,9 @@ All notable changes to this project are documented here. The format is based on
   its square, a circle over its circle). Passing `radius` to `interactables(plot; …)` still gives circles of that
   many pixels. More generally, a plot `masque(fig)` can't make interactive is now skipped
   with a warning instead of failing the whole widget (#291).
-- Showing a `masque` widget outside Pluto (Documenter, VS Code, or
-  `show(io, MIME"text/html"(), w)` in a script) gives the plain figure without hover or
-  click, instead of throwing an `AssertionError`. A `backend = :webgl` widget, which has no
-  image to fall back on, shows a box of the figure's size saying it is drawn only in Pluto.
-  Widgets in Pluto are unchanged (#288).
+- Showing a `masque` widget outside Pluto no longer throws an `AssertionError`. A
+  `backend = :webgl` widget, which has no image to fall back on, shows a box of the figure's
+  size saying it is drawn only in Pluto. Widgets in Pluto are unchanged (#288).
 
 ## [0.2.1] - 2026-10-04
 

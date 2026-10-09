@@ -26,6 +26,7 @@ module Masque
 using Makie: Makie, Point2f, Point3f, Point3d, RGBAf
 using FileIO
 using Base64: base64encode
+using SHA: sha384
 using HypertextLiteral: HypertextLiteral, @htl
 import AbstractPlutoDingetjes
 const APD = AbstractPlutoDingetjes
@@ -51,9 +52,28 @@ abstract type AbstractBackend end
 
 # The committed overlay bundle, read once at module load (see docs/dev/frontend-delivery.md).
 const _OVERLAY_JS = Ref{String}("")
+# Where a page outside Pluto loads that bundle from: `(url, integrity)`, or `nothing` to
+# inline it in every widget.
+const _OVERLAY_CDN = Ref{Union{Nothing, NamedTuple{(:url, :integrity), Tuple{String, String}}}}(nothing)
 function __init__()
-    _OVERLAY_JS[] = read(joinpath(@__DIR__, "..", "assets", "overlay.js"), String)
+    dir = normpath(joinpath(@__DIR__, ".."))
+    _OVERLAY_JS[] = read(joinpath(dir, "assets", "overlay.js"), String)
+    _OVERLAY_CDN[] = _overlay_cdn(dir, pkgversion(@__MODULE__), _OVERLAY_JS[])
     return nothing
+end
+
+# A registered install is the tree of its release tag, so its bundle is byte-identical to the
+# one jsDelivr serves for that tag, and a page can load it once instead of inlining 80 KB per
+# widget (#311). The browser checks it against this copy's hash. A git checkout may carry an
+# unreleased bundle, so it inlines its own.
+function _overlay_cdn(dir, version, js)
+    (version === nothing || isdir(joinpath(dir, ".git"))) && return nothing
+    in_depot = any(DEPOT_PATH) do depot
+        startswith(dir, normpath(joinpath(depot, "packages")) * Base.Filesystem.path_separator)
+    end
+    in_depot || return nothing
+    url = "https://cdn.jsdelivr.net/gh/jowch/Masque.jl@v$(version)/assets/overlay.js"
+    return (; url, integrity = "sha384-" * base64encode(sha384(js)))
 end
 
 include("makie_compat.jl")
