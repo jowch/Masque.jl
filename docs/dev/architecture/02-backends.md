@@ -27,9 +27,8 @@ when that is `nothing`, from `_ppu(backend, fig, max_width)`, and passes the sam
 and `render`, so the manifest's geometry and the artifact agree on one pixel grid. `max_width` and
 `px_per_unit` are `masque` keywords, never backend fields (#236): the roadmap rules out
 per-backend settings, so every setting reaches every backend through these signatures. The
-built-in backend structs are fieldless; `CairoBackend(; max_width)` / `WebGLBackend(; …)`
-survive in 0.2.x only as deprecated constructors returning a `_LegacyBackend` wrapper whose
-settings `masque`'s own keywords override (removed in 0.3).
+built-in backend structs are fieldless; the 0.2 keyword constructors (`CairoBackend(; max_width)`,
+`WebGLBackend(; …)`) were removed in 0.3.
 
 **Two co-equal backends**, each a weak-dep extension:
 

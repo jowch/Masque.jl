@@ -271,10 +271,8 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test interactables(v) == [v]
     end
 
-    @testset "auto_interactables is a deprecated alias" begin
-        f = Figure(); ax = Axis(f[1, 1])
-        scatter!(ax, xs, ys)
-        @test ids(@test_deprecated auto_interactables(f)) == [:scatter]
+    @testset "auto_interactables is removed (#299)" begin
+        @test !isdefined(Masque, :auto_interactables)
     end
 
     @testset "masque builds the assembled set" begin
