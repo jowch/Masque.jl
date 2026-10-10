@@ -102,7 +102,7 @@ All notable changes to this project are documented here. The format is based on
   A threshold's field starts at a `ThresholdEvent` at its `value`, and a box's at a
   `BoundsEvent` at its `bounds`, so `sel.cutoff.value` works from the first run. Before, a
   threshold's or a box's value was `nothing` until the first drag, so a check such as
-  `isnothing(level)` is now never true:
+  `isnothing(level)` is now never true (#309):
 
   ```julia
   @bind level masque(fig, thr; bind = thr)
@@ -189,7 +189,7 @@ All notable changes to this project are documented here. The format is based on
 ### Removed
 - **Breaking:** the forms deprecated in 0.2 are gone. Calling one now raises a
   `MethodError` ("no method matching …"), or an `UndefVarError` for `auto_interactables`,
-  and the error message names the form to use instead (#299):
+  and the error message names the form to use instead (#299, #348):
 
   | Removed | Use instead |
   |---|---|
