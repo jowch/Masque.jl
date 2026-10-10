@@ -594,9 +594,21 @@ function with_owners end   # backends that own a distinct widget type extend thi
 
 # `selected=` as 0-based indices per field. A key must be a field that holds picks: a control
 # starts at its own value, and a layer outside the bind value takes no picks.
+# `bind = st` makes the value the plot's parts, `sel.stems`, so `selected = (stems = [2],)`
+# names a part the way the value does: it is read under the plot's name.
+function _under_bare_head(binding, fields, selected)
+    binding.bare && (selected isa NamedTuple || selected isa AbstractDict) || return selected
+    heads = unique(_head.(fields))
+    length(heads) == 1 && !(only(heads) in fields) || return selected
+    h = only(heads)
+    any(k -> Symbol(k) === h || startswith(string(k), "$h."), keys(selected)) && return selected
+    return NamedTuple{(h,)}((selected,))
+end
+
 function _field_seeds(built, fields, roles, binding, selected)
     seeds = Dict{Symbol, Vector{Int}}()
     selected === nothing && return seeds
+    selected = _under_bare_head(binding, fields, selected)
     layer_ids = Symbol[L.id for (_, L, _) in built]
     by_id = Dict(L.id => L for (_, L, _) in built)
     seedable = Symbol[f for f in fields if roles[f] in (:pick, :brush) && by_id[f].kind in _SELECTED_KINDS]

@@ -74,9 +74,9 @@ box or a threshold line starts where its `bounds` or `value` puts it,
 so to start one somewhere else, set those instead; see
 [Read the box itself](@ref) and [Drag a threshold](@ref).
 
-A [`RegionInteractable`](@ref) makes one layer per shape, so name those
-layers in `selected=`: `:cells_c`, `:cells_r`, and `:cells_p` for the
-id `:cells`. See [Custom hits](@ref).
+A [`RegionInteractable`](@ref) with several kinds of shape makes one
+part per kind, so name the part in `selected=`, as in
+`selected = (cells = (circles = [1],),)` for the id `:cells`. See [Custom hits](@ref).
 
 ## Keep a selection when the figure rebuilds
 

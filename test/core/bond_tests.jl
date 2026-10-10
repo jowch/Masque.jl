@@ -376,8 +376,10 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test masque(fig; bind = (fit = sl, spikes = st)).manifest["fields"] == ["fit.points", "fit.line", "spikes.points", "spikes.stems"]
         @test masque(fig, (spikes = interactables(st),); bind = (:spikes,)).manifest["fields"] == ["spikes.points", "spikes.stems"]
         @test masque(fig, (spikes = interactables(st),); bind = (Symbol("spikes.stems"),)).manifest["fields"] == ["spikes.stems"]
-        # One recipe in `bind` gives its parts, bare.
+        # One recipe in `bind` gives its parts, bare, and `selected=` names them the same way.
         @test iv(masque(fig; bind = st)) === (points = nothing, stems = nothing)
+        @test iv(masque(fig; bind = st, selected = (stems = [2],))).stems.index == 2
+        @test iv(masque(fig; bind = st, selected = (stem = (stems = [2],),))).stems.index == 2
         # selected= nests the same way, and a recipe's name alone is not enough.
         ws = masque(fig; bind = (fit = sl, spikes = st), selected = (spikes = (stems = [2],),))
         @test iv(ws).spikes.stems.index == 2 && iv(ws).spikes.points === nothing
