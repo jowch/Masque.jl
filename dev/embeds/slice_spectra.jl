@@ -42,12 +42,13 @@ begin
     b = lines!(ax, λ, treated; label = "treated")
     c = lines!(ax, λ, washed; label = "washed")
     axislegend(ax; position = :rt)
+    readout = AxisInteractable(ax)
     nothing
 end
 
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000011
 md"""
-Pass all three plots to one `SliceInteractable`, because `masque(fig)` does not add one on its own. The slice only shows values, so to keep a wavelength, add an `AxisInteractable` as well. `auto = false` keeps the lines from taking the click, so a click saves a wavelength rather than a line.
+Pass all three plots to one `SliceInteractable`, because `masque(fig)` does not add one on its own. The slice only shows values, so to keep a wavelength, add an `AxisInteractable` as well, and `bind = readout` makes `at` its value. `auto = false` leaves out what `masque(fig)` would add for the lines and the legend, so only the slice and the readout respond to the pointer.
 
 In your own notebook, a click saves the position in `at`. This page does not record clicks, so only the hover works here.
 """
@@ -56,8 +57,9 @@ In your own notebook, a click saves the position in `at`. This page does not rec
 @bind at masque(
     fig,
     SliceInteractable([a, b, c]),
-    AxisInteractable(ax);
+    readout;
     auto = false,
+    bind = readout,
 )
 
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000012

@@ -50,11 +50,11 @@ end
 
 # ╔═╡ a1410007-0001-4000-8000-000000000011
 md"""
-`@bind picks` stores the points inside the box when you release it.
+`bind = s` makes `picks` the scatter's value, which the box fills, and `@bind picks` stores the points inside the box when you release it.
 """
 
 # ╔═╡ a1410007-0001-4000-8000-000000000003
-@bind picks masque(fig, pts, roi)
+@bind picks masque(fig, pts, roi; bind = s)
 
 # ╔═╡ a1410007-0001-4000-8000-000000000012
 md"""

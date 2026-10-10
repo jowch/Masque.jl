@@ -43,11 +43,11 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000103
 md"""
-`selected = 1` starts the widget with the first city selected, so `pick` already holds its event.
+`selected = 1` starts the widget with the first city selected, so `sel.cities` already holds its event. The `id` you gave the scatter names that field.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000104
-@bind pick masque(fig, cities; selected = 1)
+@bind sel masque(fig, cities; selected = 1)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
 md"""
@@ -55,12 +55,12 @@ This cell shows the selected city from the start, and responds when you click an
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000106
-isnothing(pick) ? "click a city" : "$(pick.city) selected"
+isnothing(sel.cities) ? "click a city" : "$(sel.cities.city) selected"
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
-bond = "pick"
+bond = "sel"
 show_code = true
 pluto_html = true
 

@@ -60,7 +60,7 @@ end
         scatter!(ax, xs, ys; color = (cls.color, α), label = cls.name, markersize = 11)
     end
     axislegend(ax)
-    masque(fig)
+    masque(fig; bind = :legend)
 end
 
 # ╔═╡ c0e10002-0001-4000-8000-000000000004
