@@ -1842,6 +1842,33 @@ describe("tooltips (mount/showTip)", () => {
         expect(sel.children.length).toBe(2)  // points 0 and 1 only — index 2 is gone
     })
 
+    it("a selects-ROI whose target `bind` left out neither fills nor highlights it", () => {
+        // At mount and after a release alike: the box commits its bounds alone.
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "pts", kind: "circles", geometry: [300, 300, 10, 500, 500, 10, 900, 700, 10],
+                    payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["hover"], brush: "elements" },
+                { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                    selects: "pts", geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } },
+            ],
+            fields: ["roi"],
+            initial: { roi: null },
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const sel = edgeSelGroup(shadow)
+        expect(sel.children.length).toBe(0)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+        expect(sel.children.length).toBe(0)
+        expect(Object.keys((host as unknown as { value: object }).value)).toEqual(["roi"])
+    })
+
     // #102/§12.3: a view gesture commits nothing — the drag readout still lives entirely in
     // the browser (Tier 0), but nothing writes host.value or fires "input" for it anymore. This
     // used to be "drag-to-pan commits new limits on mouse-up (commit-on-release)"; changing what

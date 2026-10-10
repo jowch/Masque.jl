@@ -659,7 +659,9 @@ a slice has no field.
   `NamedTuple` also names them, so `bind = (left = sc1, right = sc2)` gives `sel.left` and
   `sel.right`, and their events' `layer` is `:left` and `:right`. One plot, interactable or
   name instead of a tuple makes the value that one field's own value: `bind = thr` gives a
-  `ThresholdEvent`, and `bind = sc` an `ElementEvent` or `nothing`. A plot or interactable not
+  `ThresholdEvent`, and `bind = sc` an `ElementEvent` or `nothing`. An object that builds
+  several layers, such as a `scatterlines!` plot or a `RegionInteractable` of several shape
+  kinds, still gives one field per layer in a `NamedTuple`. A plot or interactable not
   otherwise passed is added. Every other layer keeps hover and takes no clicks. An object
   named two different ways, by `id`, a `NamedTuple` argument or `bind`, raises
   `ArgumentError`.
@@ -667,7 +669,8 @@ a slice has no field.
   when one field takes picks. Also accepts the event itself, a vector of events, or a `Dict`
   keyed by field. A pick holds one element, so several indices for one field raise
   `ArgumentError`, except on the target of a box with `selects`, where they replace what the
-  box starts at and `[]` starts it empty. Works on
+  box starts at, and an empty one keyed to the target, as in `selected = (pts = Int[],)`,
+  starts it empty (a bare `Int[]` sets nothing). Works on
   `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines`; any other kind, an
   out-of-range index (`0` included), a control, or a layer that is not a field raises
   `ArgumentError`. This is only needed to carry a pick through a rebuild — and it must come

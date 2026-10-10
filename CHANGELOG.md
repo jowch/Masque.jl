@@ -73,8 +73,16 @@ All notable changes to this project are documented here. The format is based on
   of `bind` keep their hover and tooltip and take no clicks.
 
   A threshold's field starts at a `ThresholdEvent` at its `value`, and a box's at a
-  `BoundsEvent` at its `bounds`, so `sel.cutoff.value` works from the first run. A pick
-  starts at `nothing`, or at the element `selected=` names.
+  `BoundsEvent` at its `bounds`, so `sel.cutoff.value` works from the first run. Before, a
+  threshold's or a box's value was `nothing` until the first drag, so a check such as
+  `isnothing(level)` is now never true:
+
+  ```julia
+  @bind level masque(fig, thr; bind = thr)
+  level           # before: nothing until the first drag; now: ThresholdEvent at thr's value
+  ```
+
+  A pick starts at `nothing`, or at the element `selected=` names.
 - **Breaking:** a box with `selects` adds two fields: its own `BoundsEvent`, which used to be
   left out, and its target's, holding what the box contains. The target's field starts at
   what the box's starting `bounds` contain, highlighted: a `Vector{ElementEvent}` of the
@@ -83,13 +91,15 @@ All notable changes to this project are documented here. The format is based on
   widget keep theirs. Several boxes may now share a figure (#330, #335).
 - **Breaking:** a `lines!` plot, the line of a `scatterlines!`, a `stairs!` and a `series!`
   show their tooltip on hover but take no clicks, since neither the whole line nor a point
-  on it is the obvious pick. Bind one to make it clickable, as in `bind = (fit = ln,)`, or
+  on it is the obvious pick. Before, a click selected the whole line. Bind one to make it clickable, as in `bind = (fit = ln,)`, or
   pass `interactables(ln)` (#335).
 - **Breaking:** `selected=` names fields: `selected = (scatter = 3,)`, or `selected = 3` when
   the widget has one plot that takes picks. A field holds one pick, so several indices for
   one plot raise an `ArgumentError`, where they used to highlight without setting the value.
   So does `selected=` for a control, which starts at its own value, or for a plot left out
-  of `bind`. Several indices still work on the target of a box with `selects` (#335).
+  of `bind`. Several indices still work on the target of a box with `selects`. To start that
+  target empty, name it, as in `selected = (scatter = Int[],)`; a bare `selected = Int[]`,
+  which used to start it empty, now sets nothing, so the box starts at what it contains (#335).
 - **Breaking:** a `wireframe!` layer has one element per drawn edge. Makie outlines every
   face, so an edge shared by two faces used to ship twice, and its second copy could never
   be hovered or clicked. Edges keep Makie's drawing order, with a shared edge kept where it

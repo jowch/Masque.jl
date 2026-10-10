@@ -310,4 +310,65 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws ArgumentError masque(fig, ViewInteractable(ax; id = :pan); bind = :pan)
         @test_throws ArgumentError masque(fig; bind = (s1, :scatter))
     end
+
+    @testset "a name keeps the id it names, even a constructor's default (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        s1 = scatter!(ax, [1.0, 2.0], [1.0, 2.0])
+        s2 = scatter!(ax, [5.0, 6.0], [5.0, 6.0])
+        iv = Masque.APD.Bonds.initial_value
+        t1 = ThresholdInteractable(ax; value = 1.0)
+        t2 = ThresholdInteractable(ax; value = 2.0, orientation = :vertical)
+        # The unnamed threshold moves off the default id; the named one keeps it.
+        w = masque(fig, t1; bind = (threshold = t2,))
+        @test w.manifest["fields"] == ["threshold"]
+        @test iv(w).threshold.value == 2.0
+        v = iv(masque(fig, t1, (threshold = t2,); bind = (:threshold, :threshold_2)))
+        @test v.threshold.value == 2.0 && v.threshold_2.value == 1.0
+        r1 = ROIInteractable(ax; bounds = (1.0, 2.0, 1.0, 2.0))
+        r2 = ROIInteractable(ax; bounds = (3.0, 4.0, 3.0, 4.0))
+        @test iv(masque(fig, r1; bind = (roi = r2,))).roi.xmin == 3.0
+        # A plot's default id is taken by the plot: naming another plot that says so.
+        err = try
+            masque(fig; bind = (scatter = s2,)); nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("the name :scatter is already the id", err.msg)
+    end
+
+    @testset "bind and selected= errors name the fields (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        s1 = scatter!(ax, [1.0, 2.0], [1.0, 2.0])
+        s2 = scatter!(ax, [5.0, 6.0], [5.0, 6.0])
+        msg(f) = try
+            f(); ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("isn't in bind (fields: :left)", msg(() -> masque(fig; bind = (left = s1,), selected = (right = [1],))))
+        @test occursin("as a tuple", msg(() -> masque(fig; bind = [s1, s2])))
+        # One object that builds several layers keeps a field per layer.
+        reg = RegionInteractable(ax, [(:circle, (1.0, 1.0), 0.5), (:rect, (5.0, 5.0), 1.0, 1.0)]; id = :cells)
+        v = Masque.APD.Bonds.initial_value(masque(fig, reg; bind = reg))
+        @test v isa NamedTuple && length(v) == 2
+    end
+
+    @testset "bind and a box with selects (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        pts = scatter!(ax, [1.0, 5.0, 9.0], [1.0, 5.0, 9.0])
+        iv = Masque.APD.Bonds.initial_value
+        box = ROIInteractable(ax; bounds = (4.0, 6.0, 4.0, 6.0), selects = pts)
+        # The box alone: its bounds, and its target is not a field.
+        wb = masque(fig, box; bind = box)
+        @test wb.manifest["fields"] == ["roi"] && !haskey(wb.manifest["initial"], "scatter")
+        @test iv(wb) isa BoundsEvent
+        # The target alone: what the box holds.
+        wt = masque(fig, box; bind = pts)
+        @test wt.manifest["fields"] == ["scatter"]
+        @test [e.index for e in iv(wt)] == [2]
+        # A box named only in `bind` is added to the call.
+        wa = masque(fig; bind = (box, pts))
+        @test wa.manifest["fields"] == ["roi", "scatter"]
+        @test iv(wa).roi.xmin == 4.0 && [e.index for e in iv(wa).scatter] == [2]
+    end
 end

@@ -56,28 +56,6 @@ function _item_key(it)
     return string(k, "@", Int(p["i0"]), "-", Int(p["i1"]), "/", Int(p["j0"]), "-", Int(p["j1"]))
 end
 
-"""
-    value_key(table, v)
-
-The key of a whole bind value, `{field => envelope}`: the [`snapshot_key`](@ref) of the one
-field that differs from the widget's starting value, `"null"` when none does, and the keys
-joined with `+` when several do (a player records one field at a time, so that misses).
-`table` carries the starting value (`initial`) and the fields that count (`keyed`): every
-field but the bounds of a `selects` box, a position no recording can match. Must stay in
-lockstep with `keyOf` in `PLAYER_LOOKUP_JS`.
-"""
-function value_key(table::AbstractDict, v)
-    v === nothing && return "null"
-    init = get(table, "initial", Dict{String, Any}())
-    parts = String[]
-    for f in get(table, "keyed", String[])
-        cur = get(v, f, nothing)
-        isequal(jsonable(cur), jsonable(get(init, f, nothing))) && continue
-        push!(parts, cur === nothing ? "null@" * f : snapshot_key(cur))
-    end
-    return isempty(parts) ? "null" : join(parts, "+")
-end
-
 # The starting value and the fields a player keys on, from the widget's manifest.
 function player_keying(manifest::AbstractDict)
     boxes = Set(string(l["id"]) for l in manifest["layers"] if get(l, "selects", nothing) !== nothing)
@@ -358,6 +336,15 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
             push!(seen, k)
             push!(out, (; key = k, value = whole(string(L["id"]), v)))
         end
+    end
+    # A pick `selected=` seeds can be clicked off: record that field cleared.
+    for L in manifest["layers"]
+        f = string(L["id"])
+        haskey(L, "brush") || string(get(L, "bond", "none")) in _CONTINUOUS_BONDS && continue
+        get(init, f, nothing) === nothing && continue
+        k = "null@" * f
+        push!(seen, k)
+        push!(out, (; key = k, value = whole(f, nothing)))
     end
     clicks = copy(seen)
     for row in get(player, "states", Any[])

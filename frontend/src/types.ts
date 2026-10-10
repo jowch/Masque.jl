@@ -172,8 +172,8 @@ export interface HitLayer {
     // the label nearest the camera wins an overlap). An element left out is not drawn.
     // Absent → index order.
     order?: number[]
-    // Bond value shape: selects-ROI mouse-up ships { items: [...] }; single-click / bounds-ROI
-    // ships { layer, index, payload } directly.
+    // A field's envelope: a `selects` target's field holds { items: [...] }; a click or a
+    // box's bounds hold { layer, index, payload }.
 }
 
 export interface Manifest {
@@ -189,6 +189,9 @@ export interface Manifest {
     // The layer ids whose commits make the `@bind` value, one field each. Every other layer
     // takes no clicks. The browser sends `{field: envelope}` for all of them on every commit.
     fields?: string[]
+    // True when `bind` named one object of one field: Julia unwraps that field's value. The
+    // browser ignores it and sends `{field: envelope}` either way.
+    bare?: boolean
     // Every field's starting envelope (`null`: nothing picked yet). Only the mount manifest
     // carries it; a frame's manifest leaves it out.
     initial?: Record<string, unknown>

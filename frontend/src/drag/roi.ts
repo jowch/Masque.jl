@@ -88,9 +88,12 @@ export function buildROIBoxes(manifest: Manifest, svg: SVGElement, base: HTMLEle
         }
         // box.g_ aliases the manifest ROIGeometry so drag mutations stay visible to hitLayer,
         // which reads layer.geometry directly. `target_` is resolved once here, not per mousedown;
-        // undefined when this ROI has no `selects` (bounds-only). draw_ is the painted square;
-        // the hit half-size stays on the geometry (`handle`), which geometry.ts reads directly.
-        const target = layer.selects ? (manifest.layers.find((l) => l.id === layer.selects) as HitLayer | undefined) : undefined
+        // undefined when this ROI has no `selects` (bounds-only), or when `bind` left the target
+        // out of the value: then the box neither fills nor highlights it, at mount or on a drag.
+        // draw_ is the painted square; the hit half-size stays on the geometry (`handle`), which
+        // geometry.ts reads directly.
+        const bound = layer.selects !== undefined && (!manifest.fields || manifest.fields.includes(layer.selects))
+        const target = bound ? (manifest.layers.find((l) => l.id === layer.selects) as HitLayer | undefined) : undefined
         const box: ROIBox = {
             rect_: rect, handles_: handles, g_: rg, draw_: draw,
             t_: manifest.transforms[layer.axis], target_: target,

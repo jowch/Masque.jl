@@ -650,9 +650,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideTip(ctx, state)
 
         // Re-key the LIVE selection against the new layer objects — do NOT re-derive it from
-        // the new manifest's own `selected=` field, which is only the mount-time hydration seed;
-        // reading it here would resurrect that and silently drop every click since (#102
-        // tripwire #3, the #107 regression shape). `selKeys_` is already id-keyed and gets
+        // the mount manifest's `initial`, which is only the starting value (a frame's manifest
+        // leaves it out); reading it here would resurrect that and silently drop every click
+        // since (#102 tripwire #3, the #107 regression shape). `selKeys_` is already id-keyed and gets
         // rebuilt by `renderSelection` itself, so only `sel_` needs re-keying here.
         for (const [f, sel] of state.sel_) {
             const nextSel: Hit[] = []

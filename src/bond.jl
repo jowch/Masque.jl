@@ -550,6 +550,14 @@ function _field_seeds(built, fields, roles, binding, selected)
     layer_ids = Symbol[L.id for (_, L, _) in built]
     by_id = Dict(L.id => L for (_, L, _) in built)
     seedable = Symbol[f for f in fields if roles[f] in (:pick, :brush) && by_id[f].kind in _SELECTED_KINDS]
+    # A key `bind` left out names a field, so it gets the field list, not the layer list.
+    if binding.refs !== nothing && (selected isa NamedTuple || selected isa AbstractDict)
+        for k in keys(selected)
+            Symbol(k) in fields || throw(
+                ArgumentError("selected= names :$(k), which isn't in bind (fields: $(_field_list(fields)))"),
+            )
+        end
+    end
     for (id, idxs) in normalize_selected(layer_ids, seedable, selected)
         id in layer_ids || throw(
             ArgumentError(

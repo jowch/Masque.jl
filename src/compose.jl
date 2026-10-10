@@ -259,20 +259,24 @@ const _BUILTIN_IDS = Set{Symbol}(
 # id that meets one moves instead. A numbered id that names a default replaces it, so
 # `ColorbarInteractable(cb1)`, `ColorbarInteractable(cb2)` replace `:colorbar` and
 # `:colorbar_2`. Only calls that raised a duplicate-id error before see a new id.
-function _number_builtin_ids(given, installed; final_ids = IdDict{Any, Symbol}())
+function _number_builtin_ids(
+        given, installed; final_ids = IdDict{Any, Symbol}(), fixed = falses(length(given)),
+    )
+    # A default id the caller gave as a name (`fixed`) is kept; only constructor defaults move.
+    keeps(k, id) = !(id in _BUILTIN_IDS) || fixed[k]
     used = Set{Symbol}()
-    for g in given
+    for (k, g) in enumerate(given)
         if g isa _PlotRequest
             union!(used, get(installed, g.plot, Symbol[]))
         else
             id = _layer_id(g)
-            id === nothing || id in _BUILTIN_IDS || push!(used, id)
+            id === nothing || keeps(k, id) && push!(used, id)
         end
     end
     out = AbstractInteractable[]
-    for g in given
+    for (k, g) in enumerate(given)
         id = g isa _PlotRequest ? nothing : _layer_id(g)
-        if id === nothing || !(id in _BUILTIN_IDS)
+        if id === nothing || keeps(k, id)
             id === nothing || (final_ids[g] = id)
             push!(out, g)
             continue
@@ -303,8 +307,11 @@ explicit `targets` are linked again, to the layers of this call. Plots it skips 
 on once, together, at the end.
 """
 _assemble(fig, xs; auto::Bool) = _collecting_skips(() -> _assemble_all(fig, xs; auto).ints)
-function _assemble_all(fig, xs; auto::Bool)
-    given = AbstractInteractable[_resolve_slice_axis(fig, g) for g in _flatten_args!(AbstractInteractable[], collect(Any, xs))]
+# `named` holds the objects of `xs` the caller named, and `names` those names (see `_bind_call`).
+function _assemble_all(fig, xs; auto::Bool, named = Base.IdSet{Any}(), names = Set{Symbol}())
+    flat = _flatten_args!(AbstractInteractable[], collect(Any, xs))
+    fixed = BitVector([g in named for g in flat])
+    given = AbstractInteractable[_resolve_slice_axis(fig, g) for g in flat]
     if auto
         _reject_unsupported_axes(fig)
         d = _defaults(fig; replaced = Base.IdSet{Any}(g.plot for g in given if g isa _PlotRequest))
@@ -316,7 +323,7 @@ function _assemble_all(fig, xs; auto::Bool)
         installed = IdDict{Any, Vector{Symbol}}()
     end
     final_ids = IdDict{Any, Symbol}()
-    given = _number_builtin_ids(given, installed; final_ids)
+    given = _number_builtin_ids(given, installed; final_ids, fixed)
     default_ids = Set{Symbol}(id for id in map(_layer_id, defaults) if id !== nothing)
 
     # One group per argument; `replaces` maps a default's id to the group that takes its place.
@@ -384,7 +391,9 @@ function _assemble_all(fig, xs; auto::Bool)
         id === nothing && continue
         id in seen && throw(
             ArgumentError(
-                "masque: two interactables use the layer id :$id; pass a distinct `id` to one of them",
+                id in names ?
+                    "masque: the name :$id is already the id of another layer in this call; pick another name" :
+                    "masque: two interactables use the layer id :$id; pass a distinct `id` to one of them",
             ),
         )
         push!(seen, id)

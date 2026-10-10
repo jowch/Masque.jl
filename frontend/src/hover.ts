@@ -374,7 +374,7 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     const covered = hitIsCovered(sliceLayer, hit)
     // An uncovered discrete mark keeps its own tooltip and turns the slice hair off, clickable or not.
     const mark = !!hit && PRESS_KINDS.has(hit.layer.kind) && !covered
-    // `pointer` only where a click commits: a `selects` target is hover-only (the box owns the bond).
+    // `pointer` only where a click commits: a `selects` target is hover-only (its field holds the box's marks).
     const press = mark && hit.layer.events.includes("click")
     const viewGrab = !hit && dragHit?.layer.kind === "view"
     const inSupport = !!sampled && sampled.samples.length > 0

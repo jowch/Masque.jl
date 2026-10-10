@@ -109,6 +109,8 @@ function _bind_call(fig, xs, bind; auto::Bool)
             Pair{Union{Nothing, Symbol}, Any}[k => v for (k, v) in pairs(bind)]
         elseif bind isa Tuple
             Pair{Union{Nothing, Symbol}, Any}[nothing => v for v in bind]
+        elseif bind isa AbstractVector && length(bind) != 1
+            throw(ArgumentError("bind: list several objects as a tuple, `bind = (a, b)`, not a vector"))
         else
             bare = true
             Pair{Union{Nothing, Symbol}, Any}[nothing => bind]
@@ -144,13 +146,16 @@ function _bind_call(fig, xs, bind; auto::Bool)
 
     renamed = IdDict{Any, Any}()
     named = AbstractInteractable[]
+    fixed = Base.IdSet{Any}()
     for a in args
         n = get(names, _named_key(a), nothing)
         b = n === nothing ? a : _apply_name(a, n)
+        n === nothing || push!(fixed, b)
         renamed[_named_key(a)] = b
         push!(named, b)
     end
-    built = _collecting_skips(() -> _assemble_all(fig, named; auto))
+    given_names = Set{Symbol}(values(names))
+    built = _collecting_skips(() -> _assemble_all(fig, named; auto, named = fixed, names = given_names))
     resolved = if refs === nothing
         nothing
     else

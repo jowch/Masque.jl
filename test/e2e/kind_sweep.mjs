@@ -1416,7 +1416,7 @@ try {
       // or `:colorbar` rather than `:pts` (#114 — whichever this block clicked last, last time it
       // ran against this same server), so bond text alone can't confirm `:pts` is what's
       // currently selected. What item 1 actually needs is a VISUAL fact — `g.sel` reflects
-      // `manifest["layers"]["selected"]`, which `masque()` bakes fresh into the mount HTML every
+      // `manifest["initial"]`, which `masque()` bakes fresh into the mount HTML every
       // time, independent of bond history — not a bond-text fact, so it holds cold or warm.
       const beforeClicks = await inspect(key);
       if (beforeClicks.sel < 1) throw new Error(`${key}: expected a baked :pts selection before any click, got g.sel=${beforeClicks.sel}`);
