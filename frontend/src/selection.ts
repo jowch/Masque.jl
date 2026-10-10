@@ -2,6 +2,8 @@ import { findBin, invertAxis, polygonRings, samplePoint, SEG_TOL } from "./geome
 import { surfacePointHit } from "./surface"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, SurfaceGeometry } from "./types"
 import type { FieldPick } from "./state"
+import { decodeMask, maskHit } from "./gridmask"
+import type { GridMask } from "./gridmask"
 
 // Bond item shape emitted per contained element in a selects-ROI { items: SelectionItem[] }.
 // `payload` is present only for a computed (non-element) target — a `:grid` cell range, since
@@ -271,7 +273,15 @@ export function linkedHits(manifest: Manifest, layer: HitLayer, index: number): 
 // selection gesture (an axis click, a threshold or ROI value). An entry that no longer
 // matches the manifest is dropped, the way a frame's re-key in mount.ts drops it.
 export type SelSource = { layer: string; index: number; sample?: number }
-export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]; source: SelSource | null; items?: FieldPick[] } | null {
+export function selectionForValue(manifest: Manifest, v: unknown, field?: string): { hits: Hit[]; source: SelSource | null; items?: FieldPick[]; mask?: GridMask } | null {
+    // A `many` grid's value is its mask, which names no layer: the field says which.
+    const grid = field === undefined ? undefined : manifest.layers.find((l) => l.id === field && l.many && l.kind === "grid")
+    if (grid) {
+        const mask = decodeMask(grid, v)
+        if (!mask) return null
+        const hit = maskHit(grid, mask)
+        return { hits: hit ? [hit] : [], source: null, mask }
+    }
     if (v === null || v === undefined) return { hits: [], source: null }
     if (typeof v !== "object") return null
     const o = v as { layer?: unknown; index?: unknown; items?: unknown }

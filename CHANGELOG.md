@@ -41,6 +41,14 @@ All notable changes to this project are documented here. The format is based on
   image and surface cells don't take it yet. `selected = (scatter = [1, 3],)` starts with
   several marks selected. A colorbar's pick is one value, so `select = :many` on one raises an
   `ArgumentError` (#335).
+- A heatmap or image built with `interactables(hm; select = :many)`, or
+  `GridInteractable(ax, hm; select = :many)`, lets a reader select any set of cells: its
+  `@bind` field is a `GridSelection`, a `BitMatrix` of the selected cells the size of the
+  plotted matrix, empty to start. `img[sel.region]` gives the selected values,
+  `findall(sel.region)` the cells, and `sel.region.mask` the matrix. A click selects one cell,
+  Cmd-click on a Mac or Ctrl-click elsewhere adds a cell or takes it out, and a click on empty
+  plot space or Escape clears it. The selected cells are drawn as one highlighted area with
+  an outline around its edge (#335).
 
 ### Changed
 - **Breaking:** `payloads` add to a mark's own data instead of replacing it. A scatter

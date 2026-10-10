@@ -535,6 +535,10 @@ end
 # A `select = :many` field: every pick it holds, in the order they were made.
 function _many_value(manifest, owners, d, env)
     id = Symbol(d["id"])
+    if d["bond"] == "gridcell"
+        g = d["geometry"]
+        return _grid_selection(id, env, Int(g["ncols"]), Int(g["nrows"]))
+    end
     env === nothing || (env isa AbstractDict && haskey(env, "items")) || throw(
         ArgumentError("bond: field :$id holds several picks, `{items: [...]}`; got $(repr(env))"),
     )
@@ -651,6 +655,7 @@ function _under_bare_head(binding, fields, selected)
     return NamedTuple{(h,)}((selected,))
 end
 
+_is_grid(built, id) = any(((_, L, _),) -> L.id === id && L.kind === :grid, built)
 _is_many(built, id) = any(((_, L, d),) -> L.id === id && get(d, "many", false) === true, built)
 
 function _field_seeds(built, fields, roles, binding, selected)
@@ -704,8 +709,8 @@ end
 
 Every field's starting wire envelope, the value the browser sends until the first commit:
 `nothing` for a pick `selected=` does not seed, `{layer, index}` for one it does (with `sample`
-for a point on a line), `{items: [...]}` for a `select = :many` field, a control's
-start, and the elements a box's starting bounds hold for its target.
+for a point on a line), `{items: [...]}` for a `select = :many` field (`{runs: []}` on a
+grid), a control's start, and the elements a box's starting bounds hold for its target.
 """
 function _initial_value(built, fields, roles, binding, selected, ctx, layers)
     seeds = _field_seeds(built, fields, roles, binding, selected)
@@ -717,6 +722,8 @@ function _initial_value(built, fields, roles, binding, selected, ctx, layers)
             initial_envelope(by_id[f], ctx, layers)
         elseif roles[f] === :brush
             _brush_start(f, built, get(seeds, f, nothing), layers)
+        elseif _is_many(built, f) && _is_grid(built, f)
+            Dict{String, Any}("runs" => Int[])
         elseif _is_many(built, f)
             pts = _picks_points(by_layer[f])
             Dict{String, Any}(

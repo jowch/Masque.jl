@@ -24,7 +24,7 @@ module Masque
 
 using Makie: Makie, Point2f, Point3f, Point3d, RGBAf
 using FileIO
-using Base64: base64encode
+using Base64: base64decode, base64encode
 using SHA: sha384
 using HypertextLiteral: HypertextLiteral, @htl
 import AbstractPlutoDingetjes
@@ -95,7 +95,7 @@ export PointInteractable, SegmentInteractable, RectInteractable, GridInteractabl
     ThresholdInteractable, ROIInteractable, TextInteractable, ViewInteractable, SliceInteractable,
     SurfaceInteractable
 export masque, interactables, data_to_image_px, hitlayers, bondtype, transform_bond
-export InteractionEvent, ElementEvent, LegendEvent, GridCellEvent, GridWindowEvent,
+export InteractionEvent, ElementEvent, LegendEvent, GridCellEvent, GridWindowEvent, GridSelection,
     AxisEvent, ThresholdEvent, ColorbarEvent, BoundsEvent
 export Markup, @masque_str
 

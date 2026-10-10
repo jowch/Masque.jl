@@ -34,6 +34,23 @@ first index in the matrix you plotted and `pick.j` its second, so
 index along x and the second along y. `pick.value` is the cell's value,
 and the clicked cell stays highlighted.
 
+## Select several cells
+
+A heatmap or image built with `select = :many` lets the reader pick any
+set of cells, and its field holds every selected cell at once:
+
+```julia
+hm = heatmap!(ax, img)
+@bind sel masque(fig, (region = interactables(hm; select = :many),))
+```
+
+`sel.region` is a [`GridSelection`](@ref), empty to start. A click
+selects one cell, and a Cmd-click (on a Mac) or Ctrl-click (elsewhere)
+adds a cell or takes it out. `img[sel.region]` gives the values of the
+selected cells, `findall(sel.region)` their positions in `img`, and
+`sel.region.mask` a matrix the size of `img` that is `true` where a cell
+is selected, so a selection of any shape is one value to index with.
+
 ## Label cells
 
 To show your own data for each cell, such as the names along each side

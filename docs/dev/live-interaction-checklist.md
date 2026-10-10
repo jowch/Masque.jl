@@ -33,7 +33,7 @@ still fire for that hit, only the highlight is skipped. Per geometry: a closed m
 (circle/rect/polygon) draws BOTH shapes, identical geometry; an open seg (a line has no
 interior) draws the edge shape only, no fill shape; a `selects`-ROI's grid cell-block union rect
 (`"rectfill"` geom tag) draws the fill shape only, since the ROI box itself is already the
-rect's outline. A picked point on a bound line draws the selected-seg ring around a circle at
+rect's outline. A `select = :many` grid's held cells (`"mask"` geom tag, one hit per field) draw ONE fill shape over every held cell (a path of row-run rects, so touching cells paint as one area) and an edge shape on the selection's OUTLINE only, 2px wash with square caps, so the block reads as one region, not a lattice; hovering a held cell draws no highlight, like any selected mark. A picked point on a bound line draws the selected-seg ring around a circle at
 that data point, radius the line's hit slack (`tol`); the line itself is not ringed, and
 hovering it still draws its hover outline. The third svg, `svg.masque-plain` (unblended), holds ROI/threshold, the
 selected-seg ring (inner 2px + outer 4px @ 0.25, chrome grey), and hover/selected highlights
@@ -128,6 +128,7 @@ bake it; hover/click or drag only.
 | Lines | `:lines` | ring (one `<path>` through the whole polyline) | tip, click `@bind` (one element; Julia index `1`), persist, ring recipe, hover on that same selected path draws no highlight |
 | Series | `:lines` | ring on series 1 | tip per series, click the second series (`@bind` Julia index `2`), hover stroke traces that whole path (edge-only, no fill shape) |
 | LineSegments | `:segments` | ring | tip, click `@bind`, persist, hover edge-only (no fill shape) |
+| Heatmap / Image (`select = :many`) | `:grid` | mask: one fill over the held cells, 2px outline edge only | click picks one cell, Ctrl-click toggles, `@bind` is a `GridSelection`, outline traces the held block, hover on a held cell draws nothing |
 | Heatmap / Image | `:grid` | **unsupported** | cell tip `(i,j)=value`, click `@bind`, dodge fill brightens the cell's interior (screenshot, on a bright-enough cell; grid hover is a closed "rect" geom_) |
 | BarPlot | `:rects` | wash | tip, click `@bind`, persist, dodge fill brightens the bar's interior (screenshot) |
 | Poly | `:polygons` | wash | tip, click `@bind`, persist, dodge fill brightens the polygon's interior (screenshot) |

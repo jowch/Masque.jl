@@ -1,5 +1,6 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, selectionForValue, surfaceSelection } from "./selection"
+import { emptyMask, maskHit } from "./gridmask"
 import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
@@ -458,8 +459,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // over marks or cells holds at its starting bounds.
     const restoreSelection = (v: Record<string, unknown>) => {
         for (const f of fields) {
-            const sel = selectionForValue(ctx.manifest_, v[f] ?? null)
-            if (sel) state.sel_.set(f, sel.items ? { hits_: sel.hits, source_: null, items_: sel.items } : { hits_: sel.hits, source_: sel.source })
+            const sel = selectionForValue(ctx.manifest_, v[f] ?? null, f)
+            if (sel) state.sel_.set(f, sel.mask ? { hits_: sel.hits, source_: null, mask_: sel.mask } : sel.items ? { hits_: sel.hits, source_: null, items_: sel.items } : { hits_: sel.hits, source_: sel.source })
         }
     }
     restoreSelection(hostValue)
@@ -659,6 +660,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // since (#102 tripwire #3, the #107 regression shape). `selKeys_` is already id-keyed and gets
         // rebuilt by `renderSelection` itself, so only `sel_` needs re-keying here.
         for (const [f, sel] of state.sel_) {
+            if (sel.mask_) {
+                // A grid's mask outlines against the new frame's cell edges. A frame comes from a
+                // view gesture, which never touches the bond (§12.3) and never changes the cell
+                // count; a grid whose size did change draws nothing, and its next click replaces
+                // the value (gridMaskOf starts that click from an empty mask).
+                const layer = newManifest.layers.find((l) => l.id === f && l.kind === "grid")
+                const hit = layer && sel.mask_.length === emptyMask(layer).length ? maskHit(layer, sel.mask_) : null
+                state.sel_.set(f, { ...sel, hits_: hit ? [hit] : [] })
+                continue
+            }
             const nextSel: Hit[] = []
             for (const h of sel.hits_) {
                 const layer = newManifest.layers.find((l) => l.id === h.layer.id)

@@ -1,15 +1,17 @@
-import { hitTestAt, layoutSpaceLayer, lineReadout, matrixLimits, photoClip, resolvePayload } from "./geometry"
+import { findBin, hitTestAt, layoutSpaceLayer, lineReadout, matrixLimits, photoClip, resolvePayload } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { hideCross } from "./cross"
-import { linePointHit, manyHits, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
+import { cellRange, linePointHit, manyHits, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
+import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
+import type { GridMask, MaskEnvelope } from "./gridmask"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
-import type { Drag, FieldPick, OverlayCtx, OverlayState } from "./state"
+import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
 import { contentPoint, panTo, unmapPoint } from "./photo"
-import type { AxisTransform, Hit, Limits3, ThresholdGeometry, ViewGeometry } from "./types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
 // (observed live in Chromium for a synthetic/non-primary pointerId — real touch/pen input can
@@ -431,6 +433,7 @@ function lineSample(hit: Hit, px: number, py: number): number | undefined {
 }
 
 function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number, toggle: boolean): void {
+    if (hit.layer.kind === "grid") { commitGridClick(ctx, state, hit, toggle); return }
     const field = hit.layer.id
     const items = state.sel_.get(field)?.items_ ?? []
     const element = SELECTED_KINDS.has(hit.layer.kind)
@@ -450,6 +453,81 @@ function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: num
     ctx.commit_({ [field]: { items: next } })
 }
 
+// The same gestures on a `many` grid, cell by cell: a plain click makes the cell the only one
+// selected (or clears the field when it already is), Cmd/Ctrl-click flips it.
+function commitGridClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, toggle: boolean): void {
+    const mask = gridMaskOf(state, hit.layer)
+    const held = mask[hit.index] === 1
+    if (toggle) {
+        mask[hit.index] = held ? 0 : 1
+    } else {
+        const only = held && maskCount(mask) === 1
+        mask.fill(0)
+        if (!only) mask[hit.index] = 1
+    }
+    setGridMask(ctx, state, hit.layer, mask)
+    drawHover(ctx, state, hit)
+}
+
+// A copy of the grid field's mask, to edit and hand to setGridMask.
+function gridMaskOf(state: OverlayState, layer: HitLayer): GridMask {
+    const cur = state.sel_.get(layer.id)?.mask_
+    return cur && cur.length === emptyMask(layer).length ? cur.slice() : emptyMask(layer)
+}
+
+function setGridMask(ctx: OverlayCtx, state: OverlayState, layer: HitLayer, mask: GridMask): void {
+    ctx.commit_({ [layer.id]: showGridMask(ctx, state, layer, mask) })
+}
+
+// Holds and draws `mask` as the grid field's selection, and returns its envelope.
+function showGridMask(ctx: OverlayCtx, state: OverlayState, layer: HitLayer, mask: GridMask): MaskEnvelope {
+    const hit = maskHit(layer, mask)
+    state.sel_.set(layer.id, { hits_: hit ? [hit] : [], source_: null, mask_: mask })
+    renderSelection(ctx, state)
+    return encodeMask(layer, mask)
+}
+
+// A marquee over a `many` grid, `box` in the layer's image px (as computeSelection takes it).
+// `mode` is the marquee's, decided once at the press for every field: "replace" takes the cells
+// the box overlaps, "add" adds them, "subtract" (Cmd/Ctrl from a held pick, as in Finder) takes
+// them out. `before` is the field's selection at the press. Each call starts again from
+// `before` and never reads the live mask, so the marquee calls it on every move to preview and
+// once more on release; cancel restores `before` itself. A box that misses the grid replaces
+// with nothing. Redraws the selection and returns the field's new envelope; the caller commits
+// it with the release's other fields, so one release sends one value.
+export function applyGridMarquee(
+    ctx: OverlayCtx, state: OverlayState, layer: HitLayer,
+    box: { x: number; y: number; w: number; h: number }, mode: "replace" | "add" | "subtract", before: FieldSelection | undefined,
+): MaskEnvelope {
+    const base = before?.mask_
+    const from = base && base.length === emptyMask(layer).length ? base.slice() : emptyMask(layer)
+    return showGridMask(ctx, state, layer, gridMarqueeMask(layer, from, box, mode))
+}
+
+// applyGridMarquee's new mask, written into `mask` (the gesture's base) and returned.
+export function gridMarqueeMask(
+    layer: HitLayer, mask: GridMask, box: { x: number; y: number; w: number; h: number }, mode: "replace" | "add" | "subtract",
+): GridMask {
+    const gg = layer.geometry as GridGeometry
+    if (mode === "replace") mask.fill(0)
+    const ci = cellRange(gg.xedges, box.x, box.x + box.w), cj = cellRange(gg.yedges, box.y, box.y + box.h)
+    if (ci && cj) setBlock(mask, gg.ncols, ci[0], ci[1], cj[0], cj[1], mode !== "subtract")
+    return mask
+}
+
+// Whether the field holds the cell under image px `pt`: a Cmd/Ctrl marquee pressed there
+// subtracts.
+export function gridCellHeld(state: OverlayState, layer: HitLayer, pt: { x: number; y: number }): boolean {
+    const k = gridCellAt(layer.geometry as GridGeometry, pt.x, pt.y)
+    return k !== null && state.sel_.get(layer.id)?.mask_?.[k] === 1
+}
+
+// The row-major index of the cell under image px (x, y), or null off the grid.
+function gridCellAt(gg: GridGeometry, x: number, y: number): number | null {
+    const i = findBin(gg.xedges, x), j = findBin(gg.yedges, y)
+    return i < 0 || j < 0 ? null : j * gg.ncols + i
+}
+
 // Clears the picks of every click field on `axes` (every axis when it is null), leaving the
 // controls and a box's target alone. A field that already holds nothing sends nothing.
 export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] | null): void {
@@ -458,8 +536,16 @@ export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] 
     for (const layer of ctx.manifest_.layers) {
         if (layer.brush || !layer.events.includes("click") || !(layer.id in cur)) continue
         if (axes !== null && !axes.includes(layer.axis)) continue
-        const v = cur[layer.id] as { items?: unknown[] } | null
-        if (v === null || v === undefined || (layer.many && !v.items?.length)) continue
+        const v = cur[layer.id] as { items?: unknown[]; runs?: unknown[]; bits?: string } | null
+        if (v === null || v === undefined) continue
+        if (layer.many && layer.kind === "grid") {
+            const mask = state.sel_.get(layer.id)?.mask_
+            if (!mask || maskCount(mask) === 0) continue
+            state.sel_.set(layer.id, { hits_: [], source_: null, mask_: emptyMask(layer) })
+            updates[layer.id] = { runs: [] }
+            continue
+        }
+        if (layer.many && !v.items?.length) continue
         state.sel_.set(layer.id, layer.many ? { hits_: [], source_: null, items_: [] } : { hits_: [], source_: null })
         updates[layer.id] = layer.many ? { items: [] } : null
     }
