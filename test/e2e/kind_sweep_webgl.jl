@@ -595,6 +595,16 @@ HTML(
         "<span id=\"coords_composite\" style=\"display:none\">$(JSON3.write(sweep.composite.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000129
+@bind ev_many sweep.many
+
+# ╔═╡ d1000000-0000-0000-0000-000000000130
+HTML(
+    "<span id=\"out_many\">MANY=$(sweep_field("many", ev_many))</span>" *
+        "<span id=\"bond_many\" style=\"display:none\">$(repr(ev_many))</span>" *
+        "<span id=\"coords_many\" style=\"display:none\">$(JSON3.write(sweep.many.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000050
 @bind ev_slice_lines sweep.slice_lines
 
@@ -760,6 +770,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000044
 # ╠═d1000000-0000-0000-0000-000000000127
 # ╠═d1000000-0000-0000-0000-000000000128
+# ╠═d1000000-0000-0000-0000-000000000129
+# ╠═d1000000-0000-0000-0000-000000000130
 # ╠═d1000000-0000-0000-0000-000000000050
 # ╠═d1000000-0000-0000-0000-000000000051
 # ╠═d1000000-0000-0000-0000-000000000052

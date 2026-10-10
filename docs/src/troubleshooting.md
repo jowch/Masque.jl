@@ -97,8 +97,9 @@ symbol: `bind = (:a,)`.
 start at.
 
 **Fix:** pass one index per plot, as in `selected = (scatter = 1,)`.
-To start with several marks selected, use a box with `selects`, whose
-plot's field holds a list; see [Selection](@ref).
+To start with several marks selected, pass the plot with
+`select = :many`, as in `interactables(sc; select = :many)`, so its
+field holds a list; see [Select several marks](@ref).
 
 ### Tried `selected=` on a line, a control, or a plot left out of `bind`
 
@@ -420,8 +421,9 @@ Check, in order:
 
 1. Does any cell use the variable? With `@bind pick masque(...)` and no
    cell that uses `pick`, a click changes nothing you can see.
-2. Did you click empty space? A click that misses every mark does
-   nothing, and it does not clear the selection.
+2. Did you click empty space? A click that misses every mark clears
+   the selection of the plots in that axis, and does nothing when none
+   of them holds a pick.
 3. Is the mark you clicked interactive? `masque(fig)` skips an
    unsupported plot type with a warning in the notebook log, not an
    error, so its marks do not respond, as with a

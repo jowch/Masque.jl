@@ -33,8 +33,10 @@ about the same as one that just fills the plot (see
 Hovering does not run Julia, so it stays fast however large the data
 is. A click on a mark or a release takes as long as the cells that use
 the `@bind` value take, including creating a new figure if one depends
-on the click. A click on empty space, and the end of a pan or orbit,
-leave the value unchanged, so those cells do not run. Panning and orbiting render the figure again in Julia for
+on the click. A click on empty space clears the picks there, so it
+costs the same as a click on a mark when something was selected and
+nothing when nothing was. The end of a pan or orbit leaves the value
+unchanged, so those cells do not run. Panning and orbiting render the figure again in Julia for
 each frame while you drag, so they cost one render per frame. For what
 each gesture changes, see [How interactions work](@ref).
 

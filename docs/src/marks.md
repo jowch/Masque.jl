@@ -80,8 +80,8 @@ hexagons are polygons too. A filled contour also reports the `low` and
 ## Lines
 
 Hovering a line shows the point you plotted nearest the pointer (see
-[Tooltips](@ref)), but a click on it changes nothing, since you might
-mean the whole line or one point on it. To make a line clickable, name
+[Tooltips](@ref)), but a click on it changes nothing, not even the
+other picks, since you might mean the whole line or one point on it. To make a line clickable, name
 it in `bind`. A click then selects the whole line, since a line plot is
 read as one series. To read every line at the same `x`, use a
 [`SliceInteractable`](@ref) instead.

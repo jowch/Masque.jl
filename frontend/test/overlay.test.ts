@@ -5076,3 +5076,192 @@ describe("overlayStyle from Julia (#181)", () => {
         expect(sh.style.getPropertyValue("--masque-hover-width")).toBe("")
     })
 })
+
+describe("select = :many and clearing picks (#335)", () => {
+    // Two points on one axis, a `many` field; a second plot with a one-pick field.
+    const many = (): Manifest => ({
+        width: 1200, height: 800, scaling: 2,
+        transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+        fields: ["pts", "one"],
+        initial: { pts: { items: [] }, one: null },
+        layers: [
+            { id: "pts", kind: "circles", geometry: [200, 200, 20, 600, 400, 20], payloads: [{}, {}], axis: "ax1", events: ["click", "hover"], many: true },
+            { id: "one", kind: "circles", geometry: [1000, 600, 20], payloads: [{}], axis: "ax1", events: ["click", "hover"] },
+        ],
+    })
+    const click = (s: HTMLElement, x: number, y: number, mod: MouseEventInit = {}) =>
+        s.dispatchEvent(new MouseEvent("click", { clientX: x, clientY: y, bubbles: true, ...mod }))
+    const val = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+
+    it("a plain click replaces the picks, Ctrl-click adds and removes one", () => {
+        const { host, script } = setup()
+        mount(script, many())
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        click(surface, 100, 100)
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
+        click(surface, 300, 200, { ctrlKey: true })
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }] })
+        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
+        click(surface, 100, 100, { ctrlKey: true })
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }] })
+        click(surface, 100, 100)
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
+        // A plain click on the only pick takes it back.
+        click(surface, 100, 100)
+        expect(val(host).pts).toEqual({ items: [] })
+    })
+
+    it("a click on an empty part of the plot clears its picks; a miss with none sends nothing", () => {
+        const { host, script } = setup()
+        mount(script, many())
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        let n = 0
+        host.addEventListener("input", () => { n++ })
+        click(surface, 400, 50) // empty, nothing held
+        expect(n).toBe(0)
+        click(surface, 100, 100)
+        click(surface, 500, 300)
+        expect(val(host)).toEqual({ pts: { items: [{ layer: "pts", index: 0 }] }, one: { layer: "one", index: 0 } })
+        n = 0
+        click(surface, 400, 50)
+        expect(n).toBe(1)
+        expect(val(host)).toEqual({ pts: { items: [] }, one: null })
+        expect(selChildren(shadowOf(host)).length).toBe(0)
+    })
+
+    it("Escape clears every pick", () => {
+        const { host, script } = setup()
+        mount(script, many())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        click(surface, 100, 100)
+        click(surface, 500, 300)
+        surface.focus()
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+        expect(val(host)).toEqual({ pts: { items: [] }, one: null })
+    })
+
+    it("Ctrl+Enter on a focused mark adds it, as Ctrl-click does", () => {
+        const { host, script } = setup()
+        const m = many()
+        m.layers = [m.layers[0]]; m.fields = ["pts"]; m.initial = { pts: { items: [] } }
+        mount(script, m)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.focus()
+        const key = (k: string, mod: KeyboardEventInit = {}) =>
+            surface.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...mod }))
+        key("Home"); key("Enter")
+        key("ArrowRight"); key("Enter", { ctrlKey: true })
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }] })
+        key("Enter")
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }] })
+    })
+
+    it("a click on a hover-only mark, or a Cmd/Ctrl-click that misses, keeps the picks", () => {
+        const { host, script } = setup()
+        const m = many()
+        m.layers.push({ id: "line", kind: "circles", geometry: [1000, 200, 20], payloads: [{}], axis: "ax1", events: ["hover"] })
+        mount(script, m)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        click(surface, 100, 100)
+        click(surface, 500, 100) // the hover-only mark
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
+        click(surface, 400, 50, { ctrlKey: true }) // a modified miss
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
+        click(surface, 400, 50)
+        expect(val(host).pts).toEqual({ items: [] })
+    })
+
+    it("an empty click clears every axis under it, and none inside a legend's box", () => {
+        const { host, script } = setup()
+        const m = many()
+        const full = m.transforms.ax1
+        // A twin axis over the same plot area, and a legend box in its top-right corner.
+        m.transforms.ax2 = { ...full }
+        m.transforms.leg = { ...full, viewport: [800, 0, 400, 200] }
+        m.layers[1].axis = "ax2"
+        m.layers.push({ id: "legend", kind: "rects", axis: "leg", events: ["click", "hover"], bond: "legend",
+            geometry: [1100, 100, 40, 20], payloads: [{}] })
+        m.fields = ["pts", "one", "legend"]; m.initial = { pts: { items: [] }, one: null, legend: null }
+        mount(script, m)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        click(surface, 100, 100); click(surface, 500, 300); click(surface, 550, 50)
+        expect(val(host)).toEqual({ pts: { items: [{ layer: "pts", index: 0 }] }, one: { layer: "one", index: 0 }, legend: { layer: "legend", index: 0 } })
+        click(surface, 425, 25) // legend padding
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
+        expect(val(host).one).toEqual({ layer: "one", index: 0 })
+        click(surface, 200, 350) // plot area: both twins clear, the legend keeps its pick
+        expect(val(host)).toEqual({ pts: { items: [] }, one: null, legend: { layer: "legend", index: 0 } })
+    })
+
+    it("Escape and an empty click leave a threshold and a box's target alone", () => {
+        const { host, script } = setup()
+        const m = many()
+        m.layers.push({ id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { orientation: "h", pos: 790, span: [0, 1200] } })
+        m.fields = ["pts", "one", "thr"]
+        m.initial = { pts: { items: [] }, one: null, thr: { layer: "thr", index: 0, payload: 1.25 } }
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        click(surface, 100, 100)
+        click(surface, 400, 50)
+        expect(val(host).thr).toEqual({ layer: "thr", index: 0, payload: 1.25 })
+        click(surface, 100, 100)
+        surface.focus()
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+        expect(val(host)).toEqual({ pts: { items: [] }, one: null, thr: { layer: "thr", index: 0, payload: 1.25 } })
+    })
+
+    it("a mouse click on a many plot moves the keyboard focus to that mark", () => {
+        const { host, script } = setup()
+        const m = many()
+        m.layers = [m.layers[0]]; m.fields = ["pts"]; m.initial = { pts: { items: [] } }
+        mount(script, m)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.focus()
+        const key = (k: string) => surface.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }))
+        key("Home") // focus on pts[0]
+        click(surface, 300, 200) // the mouse picks pts[1]
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }] })
+        key("Enter") // on the focused mark, now pts[1]: the only pick, so it clears
+        expect(val(host).pts).toEqual({ items: [] })
+    })
+
+    it("a restored pick that names no element is dropped", () => {
+        const { host, script } = setup()
+        const m = many()
+        m.initial = { pts: { items: [{ layer: "pts", index: 5 }, { layer: "pts", index: 1 }] }, one: null }
+        mount(script, m)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        click(surface, 100, 100, { ctrlKey: true })
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }, { layer: "pts", index: 0 }] })
+    })
+
+    it("a legend with select = :many toggles its entries", () => {
+        const { host, script } = setup()
+        const m = many()
+        m.layers = [{ id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"], bond: "legend", many: true,
+            geometry: [1100, 100, 40, 20, 1100, 200, 40, 20], payloads: [{}, {}] }]
+        m.fields = ["legend"]; m.initial = { legend: { items: [] } }
+        mount(script, m)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        click(surface, 550, 50)
+        click(surface, 550, 100, { ctrlKey: true })
+        expect(val(host).legend).toEqual({ items: [{ layer: "legend", index: 0 }, { layer: "legend", index: 1 }] })
+        click(surface, 550, 50, { ctrlKey: true })
+        expect(val(host).legend).toEqual({ items: [{ layer: "legend", index: 1 }] })
+    })
+
+    it("a restored value draws every pick and Ctrl-click builds on it", () => {
+        const { host, script } = setup()
+        const m = many()
+        m.initial = { pts: { items: [{ layer: "pts", index: 1 }] }, one: null }
+        mount(script, m)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
+        click(surface, 100, 100, { ctrlKey: true })
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }, { layer: "pts", index: 0 }] })
+    })
+})

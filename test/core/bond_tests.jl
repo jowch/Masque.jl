@@ -412,4 +412,87 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test wa.manifest["fields"] == ["roi", "scatter"]
         @test iv(wa).roi.xmin == 4.0 && [e.index for e in iv(wa).scatter] == [2]
     end
+
+    @testset "select = :many holds a vector of picks (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        sc = scatter!(ax, [1.0, 5.0, 9.0], [1.0, 5.0, 9.0]; label = "pts")
+        iv = Masque.APD.Bonds.initial_value
+        tv = Masque.APD.Bonds.transform_value
+        w = masque(fig, interactables(sc; select = :many))
+        L = only(l for l in w.manifest["layers"] if l["id"] == "scatter")
+        @test L["many"] === true
+        @test w.manifest["initial"]["scatter"] == Dict("items" => Any[])
+        @test iv(w) == (scatter = ElementEvent[],)
+        v = tv(w, Dict("scatter" => Dict("items" => [Dict("layer" => "scatter", "index" => 2), Dict("layer" => "scatter", "index" => 0)])))
+        @test [e.index for e in v.scatter] == [3, 1]
+        @test v.scatter isa Vector{ElementEvent}
+        # selected= takes several indices for a `many` field, and one still works.
+        @test [e.index for e in iv(masque(fig, interactables(sc; select = :many); selected = (scatter = [1, 3],))).scatter] == [1, 3]
+        @test [e.index for e in iv(masque(fig, interactables(sc; select = :many); selected = (scatter = 2,))).scatter] == [2]
+        # A one-pick field still refuses several, and names the fix.
+        err = try
+            masque(fig; selected = (scatter = [1, 2],)); nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("select = :many", err.msg)
+        # Constructors take it too, and a recipe's every part follows `interactables(plot; select)`.
+        pts = PointInteractable(ax, [(1.0, 1.0), (2.0, 2.0)]; select = :many, id = :mine)
+        @test Masque.select_mode(pts) === :many
+        @test iv(masque(fig, pts; bind = pts)) == ElementEvent[]
+        st = stem!(ax, [5.0], [5.0])
+        @test iv(masque(fig; bind = interactables(st; select = :many))) == (points = ElementEvent[], stems = ElementEvent[])
+        # A legend and an axis hold vectors of their own events.
+        axislegend(ax)
+        wl = masque(fig, LegendInteractable(fig.content[end]; select = :many); bind = (:legend,))
+        @test iv(wl) == (legend = LegendEvent[],)
+        @test tv(wl, Dict("legend" => Dict("items" => [Dict("layer" => "legend", "index" => 0)]))).legend[1].index == 1
+        wa = masque(fig, AxisInteractable(ax; select = :many); bind = (:axis,))
+        @test iv(wa) == (axis = AxisEvent[],)
+        va = tv(wa, Dict("axis" => Dict("items" => [Dict("layer" => "axis", "index" => 0, "payload" => Dict("x" => 2.0, "y" => 3.0))])))
+        @test only(va.axis).x == 2.0
+        # Bad values name the problem.
+        @test_throws "select must be :one or :many" PointInteractable(ax, [(1.0, 1.0)]; select = :all)
+        @test_throws "a colorbar pick is one value; select = :many isn't supported" interactables(
+            Colorbar(fig[1, 2], heatmap!(Axis(fig[2, 1]), rand(2, 2))); select = :many,
+        )
+        @test_throws ArgumentError tv(w, Dict("scatter" => Dict("layer" => "scatter", "index" => 0)))
+        # A pick named twice is held once.
+        @test [e.index for e in iv(masque(fig, interactables(sc; select = :many); selected = (scatter = [1, 1, 3],))).scatter] == [1, 3]
+        # `select` on an interactables(plot) request carries through to the built layers.
+        @test iv(masque(fig, interactables(only(interactables(sc)); select = :many))).scatter == ElementEvent[]
+        # The positional constructors from before `select` still build a one-pick interactable.
+        leg = fig.content[findfirst(c -> c isa Legend, fig.content)]
+        for i in (
+                pts, TextInteractable(ax, text!(ax, [(1.0, 1.0)]; text = ["a"])),
+                PolygonInteractable(ax, [[(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)]]), AxisInteractable(ax),
+                LegendInteractable(leg), RegionInteractable(ax, [(:rect, (1.0, 1.0), 1.0, 1.0)]),
+            )
+            T = typeof(i)
+            old = T((getfield(i, f) for f in fieldnames(T)[1:(end - 1)])...)
+            @test Masque.select_mode(old) === :one
+        end
+        # Cells don't take several picks yet, and say so.
+        hm = heatmap!(Axis(fig[3, 1]), [1 2; 3 4])
+        @test_throws "heatmap, image and surface cells don't take several picks yet" masque(fig, interactables(hm; select = :many))
+    end
+
+    @testset "select = :many on a recipe's parts and a box's target (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        iv = Masque.APD.Bonds.initial_value
+        tv = Masque.APD.Bonds.transform_value
+        st = stem!(ax, [2.0, 5.0], [3.0, 6.0])
+        w = masque(fig, interactables(st; select = :many); bind = (stem = st,))
+        @test all(get(l, "many", false) for l in w.manifest["layers"] if startswith(l["id"], "stem."))
+        v = tv(w, Dict("stem.points" => Dict("items" => [Dict("layer" => "stem.points", "index" => 1)]), "stem.stems" => Dict("items" => [])))
+        @test only(v.stem.points).index == 2 && only(v.stem.points).part == (:points,)
+        @test v.stem.stems == ElementEvent[]
+        # A box's target stays a brush: no `many` flag, and its value is what the box holds.
+        pts = scatter!(ax, [1.0, 5.0, 9.0], [1.0, 5.0, 9.0])
+        box = ROIInteractable(ax; bounds = (4.0, 6.0, 4.0, 6.0), selects = pts)
+        wb = masque(fig, interactables(pts; select = :many), box; bind = (box, pts))
+        L = only(l for l in wb.manifest["layers"] if l["id"] == "scatter")
+        @test !haskey(L, "many") && haskey(L, "brush")
+        @test [e.index for e in iv(wb).scatter] == [2]
+    end
 end

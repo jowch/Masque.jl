@@ -148,6 +148,7 @@ export interface HitLayer {
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
     brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds
+    many?: true // a `select = :many` field: it holds { items: [...] }, and Cmd/Ctrl-click toggles one in or out
     // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | none
     bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "none"
     selects?: string   // id of the target layer this ROI selects; absent → bounds-ROI (no multi-select)
@@ -172,8 +173,8 @@ export interface HitLayer {
     // the label nearest the camera wins an overlap). An element left out is not drawn.
     // Absent → index order.
     order?: number[]
-    // A field's envelope: a `selects` target's field holds { items: [...] }; a click or a
-    // box's bounds hold { layer, index, payload }.
+    // A field's envelope: a `selects` target's or a `many` field holds { items: [...] }; a
+    // click or a box's bounds hold { layer, index, payload }.
 }
 
 export interface Manifest {
