@@ -141,6 +141,7 @@ All notable changes to this project are documented here. The format is based on
   event also holds `x` and `y`, and `line`, which line of a `series!` it is on. Code that
   read `pick.index` as which line reads `pick.line` now. `selected = (fit = [3],)` on a bound
   line starts at its third point; on a `series!` the starting point can't be given by index.
+  From the keyboard, Shift + ← / → moves along a focused line's points and Enter picks one.
   A line on an `Axis3` has no points to pick, so its click still picks the whole line (#335).
 
 ### Deprecated

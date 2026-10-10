@@ -355,7 +355,8 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
 // resolution, same "input" event.
 export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number): void {
     // A line picks the data point nearest the click, the one hover reads out. A click with no
-    // sample to name (the nearest one is off screen) commits nothing.
+    // sample to name (the nearest one is off screen) commits nothing, and returns before
+    // drawHover: the pointer is already over the line, so its hover outline is already drawn.
     let sample: number | undefined
     let point: Hit | null = null
     if (picksPoints(hit.layer)) {

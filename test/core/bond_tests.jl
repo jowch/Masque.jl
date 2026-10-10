@@ -371,6 +371,16 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test repr(ev) == "ElementEvent(:fit, 2, line = 1, x = 5.0, y = 2.0)"
         # Points ship as Float32; the event reads back what was plotted, not its widened bits.
         @test Masque._coord(0.4f0) === 0.4 && isnan(Masque._coord(NaN32))
+        # The pick reads x and y at full precision from the Julia side, so a time axis in
+        # seconds still names the sample it picked (Float32 spacing there is 128).
+        t0 = 1.7e9
+        fb = Figure(size = (400, 300)); ab = Axis(fb[1, 1])
+        lb = lines!(ab, [t0, t0 + 1, t0 + 2], [0.1, 0.2, 0.3])
+        ev = commit_field(masque(fb; bind = (t = lb,)), pick("t", 0, 1))
+        @test ev.x === t0 + 1 && ev.y === 0.2
+        si = SegmentInteractable(ab, [Point2(t0, 0.1), Point2(t0 + 3, 0.2)]; unit = :line, id = :manual)
+        ev = commit_field(masque(fb, si; bind = :manual), pick("manual", 0, 1))
+        @test ev.x === t0 + 3 && ev.y === 0.2
         # A plot of several lines says which one, and keeps each line's own payload.
         ev = commit_field(w, pick("many", 1, 2))
         @test ev.index == 3 && ev.line == 2 && ev.x == 3.0 && ev.y == 6.0 && ev.label == "series 2"
@@ -394,6 +404,11 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             e
         end
         @test err isa ArgumentError && occursin(":many draws 2 lines", err.msg)
+
+        # Hand-built payloads: a Dict keeps its keys but `index`; anything else rides as `value`.
+        @test Masque._point_payload(Dict(:index => 1, :tag => "a"), 2, 0.5, 1.5) == Dict(:line => 2, :x => 0.5, :y => 1.5, :tag => "a")
+        @test Masque._point_payload("note", 1, 0.5, 1.5) == (; line = 1, x = 0.5, y = 1.5, value = "note")
+        @test_throws ArgumentError Masque._line_point(ElementEvent(:fit, 1, (; index = 1)), Dict{String, Any}(), 1)
 
         # A recipe's line part picks a point too.
         sl = scatterlines!(ax, [6.0, 7.0], [6.0, 7.0])

@@ -9,7 +9,8 @@ import { showTipAt, hideTip, updateLinkForHit, layoutAnchor } from "./hover"
 import { commitClick } from "./bond"
 import { plainTextForHit } from "./template"
 import { cssAnchor } from "./state"
-import { anchorFor, lineReadout } from "./geometry"
+import { anchorFor, lineReadout, samplePoint } from "./geometry"
+import type { Anchor } from "./geometry"
 import type { OverlayCtx, OverlayState } from "./state"
 import type { FocusRef, Hit, HitLayer, Manifest } from "./types"
 
@@ -92,18 +93,41 @@ export function focusTo(ctx: OverlayCtx, state: OverlayState, i: number | null):
         const pt = lineReadout(hit.layer, hit.index, mid.x, mid.y)
         if (pt) hit.pt_ = pt
     }
+    // anchorFor(hit, null): no pointer to derive a "closest point on segment"/"cursor inside
+    // polygon" placement from, so this falls back to the midpoint/centroid rule (geometry.ts).
+    paintFocus(ctx, state, ref, hit, anchorFor(hit, null))
+}
+
+// Draw the focus ring, tooltip and announcement for `hit` with the tooltip at `anchor`.
+function paintFocus(ctx: OverlayCtx, state: OverlayState, ref: FocusRef, hit: Hit, anchor: Anchor): void {
     state.focusHit_ = hit
     ctx.surface_.classList.add("kbd-ring")
     drawHover(ctx, state, hit)
     updateLinkForHit(ctx, state, hit)
-    // anchorFor(hit, null): no pointer to derive a "closest point on segment"/"cursor inside
-    // polygon" placement from, so this falls back to the midpoint/centroid rule (geometry.ts).
-    const anchor = anchorFor(hit, null)
     const css = cssAnchor(ctx.base_, ctx.manifest_, layoutAnchor(state.photo_, hit, anchor))
     const html = showTipAt(ctx, state, hit, anchor.x, anchor.y, css)
     state.focusTipHtml_ = html
     state.focusTipCss_ = html === null ? null : css
     scheduleAnnounce(ctx, state, announceText(ref, plainTextForHit(hit, ctx.tipDigits_, ctx.manifest_.transforms[hit.layer.axis])))
+}
+
+// Shift+←/→ on a focused line with data points moves the readout to the previous or next
+// point, skipping gaps, and Enter then picks that point. false when there is no such line, so
+// the key falls through to plain navigation.
+function stepSample(ctx: OverlayCtx, state: OverlayState, dir: 1 | -1): boolean {
+    const cur = state.focusIdx_, hit = state.focusHit_
+    if (cur === null || !hit || hit.layer.kind !== "lines") return false
+    const pts = hit.layer.points?.[hit.index]
+    if (!pts || !hit.pt_) return false
+    const t = ctx.manifest_.transforms[hit.layer.axis]
+    for (let s = hit.pt_[0] + dir; s >= 0 && s < pts.length / 2; s += dir) {
+        const at = samplePoint(hit.layer, hit.index, s, t)
+        if (!at) continue
+        const next: Hit = { ...hit, pt_: [s, pts[2 * s], pts[2 * s + 1]] }
+        paintFocus(ctx, state, ctx.focusable_[cur], next, anchorFor(next, at))
+        return true
+    }
+    return true // at the line's end: stay on its last point
 }
 
 // First index of each distinct layer run in `list` (list is manifest-order, so a layer's
@@ -129,8 +153,8 @@ function adjacentLayerStart(starts: number[], cur: number, dir: 1 | -1): number 
     return starts[0]
 }
 
-// Handles ArrowRight/Down (next), ArrowLeft/Up (previous), Home/End, PageDown/Up (next/previous
-// layer), Enter/Space (dispatch the click bond for the focused element), and Escape (clear +
+// Handles ArrowRight/Down (next), ArrowLeft/Up (previous), Shift+ArrowRight/Left (next/previous
+// data point on a focused line), Home/End, PageDown/Up (next/previous layer), Enter/Space (dispatch the click bond for the focused element), and Escape (clear +
 // blur). Everything else — Tab above all, so the browser's own focus order still works — passes
 // through untouched. Gated on the surface actually having DOM focus (not just this listener
 // being attached to it): a keydown dispatched programmatically at the surface without focus, or
@@ -140,6 +164,10 @@ export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardE
     const n = ctx.focusable_.length
     if (n === 0) return
     const cur = state.focusIdx_
+    if (e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft") && stepSample(ctx, state, e.key === "ArrowRight" ? 1 : -1)) {
+        e.preventDefault(); e.stopPropagation()
+        return
+    }
     switch (e.key) {
         case "ArrowRight":
         case "ArrowDown":
@@ -177,7 +205,9 @@ export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardE
             const ref = ctx.focusable_[cur]
             if (!ref.layer_.events.includes("click")) return // hover-only layer: nothing to dispatch
             e.preventDefault(); e.stopPropagation()
-            const hit = hitFor(ref)
+            // The focused hit carries a line's readout point, so Enter picks the point shown.
+            const f = state.focusHit_
+            const hit = f && f.layer === ref.layer_ && f.index === ref.index_ ? f : hitFor(ref)
             const { x, y } = anchorFor(hit, null)
             commitClick(ctx, state, hit, x, y)
             return

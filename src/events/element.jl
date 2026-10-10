@@ -41,7 +41,9 @@ _picks_points(L::HitLayer) = L.kind === :lines && L.points !== nothing
 
 # `ev` is the picked line; `s` the 1-based data point on it. `index` becomes the point, so
 # `xs[pick]` reads it, and the payload adds `line` (which line of a `series!`), `x` and `y`.
-function _line_point(ev::ElementEvent, d::AbstractDict, s::Int)
+# `data` is the line's samples at full precision from the Julia side, when the layer has an
+# owner there; without one the manifest's Float32 points stand in.
+function _line_point(ev::ElementEvent, d::AbstractDict, s::Int, data = nothing)
     id, k = getfield(ev, :layer), getfield(ev, :index)
     pts = get(d, "points", nothing)
     pts === nothing && throw(ArgumentError("bond: layer :$id sent a point, but its lines have no data points"))
@@ -50,11 +52,12 @@ function _line_point(ev::ElementEvent, d::AbstractDict, s::Int)
     (1 <= s <= n) || throw(
         ArgumentError("bond: layer :$id point $s out of range for line $k's $n data points" * (n > 0 ? " (valid: 1:$n)" : "")),
     )
-    return ElementEvent(id, s, _point_payload(getfield(ev, :payload), k, _coord(p[2s - 1]), _coord(p[2s])))
+    q = data !== nothing && length(data) == length(p) ? data : p
+    return ElementEvent(id, s, _point_payload(getfield(ev, :payload), k, _coord(q[2s - 1]), _coord(q[2s])))
 end
-# The manifest keeps a line's points as Float32. Widening by value turns 0.4f0 into
-# 0.4000000059604645; the shortest decimal that reads back as the same Float32 is what was
-# plotted, as far as the Float32 knows. `xs[pick]` reads the exact value.
+# Without an owner, a line's points come from the manifest as Float32. Widening by value turns
+# 0.4f0 into 0.4000000059604645; the shortest decimal that reads back as the same Float32 is
+# what was plotted, as far as the Float32 knows.
 _coord(v::Float32) = isfinite(v) ? parse(Float64, Base.Ryu.writeshortest(v)) : Float64(v)
 _coord(v::AbstractFloat) = Float64(v)
 _coord(v) = v

@@ -12,6 +12,7 @@ mark as you move to it. A `masque` widget needs no extra setup for this.
 | ← / ↑ | Previous mark |
 | Home / End | First / last mark |
 | Page Down / Page Up | First mark of the next / previous layer |
+| Shift + → / Shift + ← | On a line, the next / previous data point. The tooltip moves to it, and Enter selects it |
 | Enter / Space | Select the focused mark: its plot's field in the `@bind` value becomes what a click on it gives |
 | Escape | Clear focus and leave the plot |
 

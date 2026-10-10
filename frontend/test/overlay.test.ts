@@ -2385,6 +2385,36 @@ describe("tooltips (mount/showTip)", () => {
     })
 })
 
+describe("frame swap keeps a line's picked point (#335)", () => {
+    it("re-keys the point pick to the same sample at its new position, or drops it if gone", async () => {
+        const line = { id: "fit", kind: "lines" as const, geometry: [[200, 600, 600, 600, 1000, 600]], points: [[0, 0, 1, 1, 2, 2]],
+            payloads: [{ index: 1 }], axis: "ax1", events: ["click", "hover"] as ("click" | "hover")[] }
+        const view = { id: "view", kind: "view" as const, axis: "ax1", events: ["drag"] as "drag"[], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }
+        const t = { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false }
+        const m: Manifest = { width: 1200, height: 800, scaling: 2, transforms: { ax1: t }, layers: [line, view] } as Manifest
+        const pan = async (next: Manifest) => {
+            const { host, script } = setup()
+            mount(script, m, undefined, vi.fn(async () => ({ png: new Uint8Array([1, 2, 3]), manifest: next })))
+            const shadow = shadowOf(host)
+            const surface = shadow.querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 300, bubbles: true })) // sample 1
+            const ring = () => shadow.querySelector("svg.masque-plain circle.masque-ring-inner")
+            expect(ring()?.getAttribute("cx")).toBe("600")
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+            await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+            host.querySelector("img")!.dispatchEvent(new Event("load"))
+            return ring()?.getAttribute("cx") ?? null
+        }
+        expect(await pan({ ...m, layers: [{ ...line, geometry: [[0, 600, 400, 600, 800, 600]] }, view] } as Manifest)).toBe("400")
+        // The line lost its points (as on a frame that no longer ships them): the pick is dropped.
+        expect(await pan({ ...m, layers: [{ ...line, points: undefined }, view] } as Manifest)).toBeNull()
+    })
+})
+
 // Overlay visual recipes (locked — a color-dodge fill of #141414 plus a flat chrome edge,
 // #7a7a7a on a light figure and #c8c8c8 on a dark one; see CLAUDE.md — do not reopen).
 // Units are necessary, not live-verify: agents still run
