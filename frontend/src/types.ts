@@ -147,7 +147,7 @@ export interface HitLayer {
     tol?: number // hit-test slack, image px: :segments/:polyline/:lines (absent → geometry.ts's SEG_TOL fallback); :rects/:polygons reach past the shape's edge (absent → none)
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
-    selected?: number[] // 0-based element indices seeding the highlight at mount
+    brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds
     // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | none
     bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "none"
     selects?: string   // id of the target layer this ROI selects; absent → bounds-ROI (no multi-select)
@@ -186,15 +186,12 @@ export interface Manifest {
     overlayStyle?: Record<string, string> // figure-level overlay chrome custom properties (overlaystyle)
     tipDigits?: number // tooltip_sigdigits; absent means the frontend default (4)
     background?: string // the figure's background colour (CSS string) — drives the tooltip's light/dark theme
-    // Set when the widget contains a selects-ROI. "elements" hydrates and commits a vector of
-    // element hits; "grid" commits one window. selectionTarget is that layer's id.
-    selection?: "elements" | "grid"
-    selectionTarget?: string
-    // Set when a threshold, an ROI, or a colorbar the caller passed owns the bond: the only
-    // layer that commits. `initial` is the envelope the bond starts at (absent: `null`): a
-    // box over a grid's is the `{items}` holding the cells its starting bounds contain.
-    bondOwner?: string
-    initial?: { layer: string; index: number; payload: unknown } | { items: { layer: string; index: number; payload: unknown }[] }
+    // The layer ids whose commits make the `@bind` value, one field each. Every other layer
+    // takes no clicks. The browser sends `{field: envelope}` for all of them on every commit.
+    fields?: string[]
+    // Every field's starting envelope (`null`: nothing picked yet). Only the mount manifest
+    // carries it; a frame's manifest leaves it out.
+    initial?: Record<string, unknown>
 }
 
 // `layer`/`index` are excluded from the trailing-underscore mangle convention (see

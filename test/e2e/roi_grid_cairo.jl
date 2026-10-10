@@ -55,13 +55,14 @@ end
 
 # ╔═╡ e2000000-0000-0000-0000-000000000006
 HTML(
-    "<span id=\"out_grid\">REGION=$(repr(region))</span>" *
+    "<span id=\"out_grid\">REGION=$(repr(region.img))</span>" *
+        "<span id=\"bond_grid\" style=\"display:none\">$(repr(region))</span>" *
         "<span id=\"meta_grid\" style=\"display:none\">$(JSON3.write(roi_grid_meta(widget)))</span>" *
         "<span id=\"roi_grid_backend\">cairo</span>",
 )
 
 # ╔═╡ e2000000-0000-0000-0000-000000000007
-HTML("<span id=\"readout_grid\">READOUT=$(roi_grid_readout(region))</span>")
+HTML("<span id=\"readout_grid\">READOUT=$(roi_grid_readout(region.img))</span>")
 
 # ╔═╡ e2000000-0000-0000-0000-000000000008
 @bind picks pwidget

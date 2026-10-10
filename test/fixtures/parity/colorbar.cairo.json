@@ -53,6 +53,7 @@
             },
             "bond": "gridcell",
             "events": [
+                "click",
                 "hover"
             ]
         },
@@ -94,6 +95,7 @@
             },
             "bond": "element",
             "events": [
+                "click",
                 "hover"
             ]
         },
@@ -136,6 +138,7 @@
             },
             "bond": "element",
             "events": [
+                "click",
                 "hover"
             ]
         },
@@ -161,7 +164,12 @@
             ]
         }
     ],
-    "bondOwner": "colorbar",
+    "initial": {
+        "colorbar": null,
+        "lines": null,
+        "scatter": null,
+        "cells": null
+    },
     "transforms": {
         "ax1": {
             "xscale": "identity",
@@ -217,5 +225,11 @@
         }
     },
     "width": 1200,
-    "scaling": 2
+    "scaling": 2,
+    "fields": [
+        "cells",
+        "scatter",
+        "lines",
+        "colorbar"
+    ]
 }

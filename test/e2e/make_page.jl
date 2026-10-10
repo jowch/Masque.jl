@@ -4,7 +4,7 @@
 # Writes <outdir>/page.html (the real widget HTML — overlay + canvas, scene/manifest/
 # bundle/shim inlined as JSON, no server / no published_to_js) and <outdir>/expected.json
 # (the host-relative CSS pixel to click marker 0, and the bond value that click must produce).
-# The browser half asserts host.value == {layer, index}; the Julia half (runtests.jl
+# The browser half asserts host.value == {scatter: {layer, index}}; the Julia half (runtests.jl
 # "@bind round-trip contract") asserts transform_value rebuilds the InteractionEvent.
 #
 # WGLMakie is a weak dep of Masque (the extension only loads when WGLMakie is `using`'d), so a

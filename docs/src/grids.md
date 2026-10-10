@@ -16,16 +16,19 @@ Main.masque_fallback("grids_heatmap")
 ## Hover and click cells
 
 `masque(fig)` makes every `heatmap!` and `image!` interactive. Each
-grid gets a layer id, `:cells` for the first and `:cells_2` for the
-second, which `pick.layer` reports. To give a
-grid a name of your own, for example when a figure has two grids, pass
-the plot to [`interactables`](@ref) with an `id`:
+grid gets its own field in the `@bind` value, `sel.cells` for the first
+and `sel.cells_2` for the second, and its events report that name as
+`pick.layer`. To give a grid a name of your own, for example when a
+figure has two grids, pass the plot to [`interactables`](@ref) with an
+`id`:
 
 ```julia
-@bind pick masque(fig, interactables(p; id = :temps))
+@bind sel masque(fig, interactables(p; id = :temps))
 ```
 
-A click makes `pick` a [`GridCellEvent`](@ref). `pick.i` is the cell's
+A click makes `sel.temps` a [`GridCellEvent`](@ref). With
+`pick = sel.temps`, or with `bind = p` as in the example above, which
+makes the value the cell itself, `pick.i` is the cell's
 first index in the matrix you plotted and `pick.j` its second, so
 `z[pick]` is the same as `z[pick.i, pick.j]`. Makie draws the first
 index along x and the second along y. `pick.value` is the cell's value,
@@ -44,7 +47,7 @@ names = ["F17", "I24", "K31"]
 p = heatmap!(ax, 1:3, 1:3, contacts)
 @bind pick masque(fig, interactables(p;
     payloads = (i, j) -> (; x = names[i], y = names[j]),
-    tooltip = masque"($(x), $(y)) = $(value)"))
+    tooltip = masque"($(x), $(y)) = $(value)"); bind = p)
 ```
 
 Name the fields after the axes, because `i` runs along x and `j` along
@@ -90,11 +93,11 @@ or image you plotted:
 
 ```julia
 box = ROIInteractable(ax; bounds = (1.0, 3.0, 1.0, 2.0), selects = p)
-@bind win masque(fig, box)
+@bind win masque(fig, box; bind = p)
 ```
 
-`win` is a [`GridWindowEvent`](@ref) for the block of cells under the
-box. It starts with the block under `bounds`, and each release replaces
+The box fills the heatmap's value, so with `bind = p`, `win` is a
+[`GridWindowEvent`](@ref) for the block of cells under the box. It starts with the block under `bounds`, and each release replaces
 it with the block under the box then. `win.i1:win.i2` is the range of
 the matrix's first index, drawn along x, and `win.j1:win.j2` the range
 of its second index, drawn along y, so `z[win]` is

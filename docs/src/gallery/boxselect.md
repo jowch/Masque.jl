@@ -3,7 +3,8 @@
 Drag the box, or one of its corner handles, and release. The last cell
 counts the points inside by group and averages their coordinates.
 
-`picks` is a `Vector{ElementEvent}` with one event per point inside the
+`bind = s` makes `picks` the scatter's value, which the box fills: a
+`Vector{ElementEvent}` with one event per point inside the
 box, carrying that point's payload (`group`, `x`, `y`), so
 `count(e -> e.group == "A", picks)` counts one group. The events also
 work as indices into your data, so `xs[picks]` is the `x` of the points

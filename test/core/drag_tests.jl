@@ -169,26 +169,28 @@ end
 
 @testset "bond_from_js builds concrete events from the wire" begin
     tv = Masque.APD.Bonds.transform_value
-    function wdg(kind, bond; extra = Dict{String, Any}())
+    # One field, `L`, unwrapped: the value is that field's event.
+    function wdg(kind, bond; brush = nothing)
         layer = Dict{String, Any}("id" => "L", "kind" => kind, "bond" => bond, "payloads" => Any[])
-        manifest = Dict{String, Any}("layers" => [layer])
-        merge!(manifest, extra)
+        brush === nothing || (layer["brush"] = brush)
+        manifest = Dict{String, Any}("layers" => [layer], "fields" => ["L"], "bare" => true)
         return Masque.MasqueWidget("", manifest, 100)
     end
+    tvL(w, env) = tv(w, Dict("L" => env))
 
-    ev = tv(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => Dict("x" => 1.0, "y" => 2.0)))
+    ev = tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => Dict("x" => 1.0, "y" => 2.0)))
     @test ev isa AxisEvent && ev.x == 1.0 && ev.y == 2.0
-    ev = tv(wdg("axis", "colorbar"), Dict("layer" => "L", "index" => -1, "payload" => Dict("value" => 3.0)))
+    ev = tvL(wdg("axis", "colorbar"), Dict("layer" => "L", "index" => -1, "payload" => Dict("value" => 3.0)))
     @test ev isa ColorbarEvent && ev.value == 3.0
 
-    ev = tv(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 5, "payload" => Dict("i" => 1, "j" => 2)))
+    ev = tvL(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 5, "payload" => Dict("i" => 1, "j" => 2)))
     @test ev isa GridCellEvent && ev.i == 2 && ev.j == 3 && ev.value === nothing
-    ev = tv(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 5, "payload" => Dict("i" => 1, "j" => 2, "value" => 9.5)))
+    ev = tvL(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 5, "payload" => Dict("i" => 1, "j" => 2, "value" => 9.5)))
     @test ev.value == 9.5
 
     # wire i0/i1/j0/j1 are 0-based inclusive; Julia stores i1/i2/j1/j2 1-based inclusive
-    gridw = wdg("grid", "gridcell"; extra = Dict{String, Any}("selection" => "grid", "selectionTarget" => "L"))
-    win = tv(
+    gridw = wdg("grid", "gridcell"; brush = "grid")
+    win = tvL(
         gridw, Dict(
             "items" => [
                 Dict(
@@ -201,29 +203,29 @@ end
     @test win isa GridWindowEvent
     @test (win.i1, win.i2, win.j1, win.j2) == (1, 2, 1, 2)
     @test (win.xmin, win.xmax, win.ymin, win.ymax) == (0.0, 1.0, 2.0, 3.0)
-    miss = tv(gridw, Dict("items" => []))
+    miss = tvL(gridw, Dict("items" => []))
     @test miss isa GridWindowEvent && isempty(miss.i1:miss.i2) && isempty(miss.j1:miss.j2)
-    # the box owns a brushed grid's bond: a single-cell envelope is refused, not a GridCellEvent
-    @test_throws ArgumentError tv(gridw, Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1, "j" => 2)))
+    # a brushed grid's field holds the box's window: a single-cell envelope is refused
+    @test_throws ArgumentError tvL(gridw, Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1, "j" => 2)))
 
-    ev = tv(wdg("roi", "bounds"), Dict("layer" => "L", "index" => 0, "payload" => Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 2.0, "ymax" => 3.0)))
+    ev = tvL(wdg("roi", "bounds"), Dict("layer" => "L", "index" => 0, "payload" => Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 2.0, "ymax" => 3.0)))
     @test ev isa BoundsEvent && (ev.xmin, ev.xmax, ev.ymin, ev.ymax) == (0.0, 1.0, 2.0, 3.0)
-    ev = tv(wdg("threshold", "threshold"), Dict("layer" => "L", "index" => 0, "payload" => 4.5))
+    ev = tvL(wdg("threshold", "threshold"), Dict("layer" => "L", "index" => 0, "payload" => 4.5))
     @test ev isa ThresholdEvent && ev.value === 4.5
 
-    @test_throws ArgumentError tv(wdg("view", "none"), Dict("layer" => "L", "index" => 0, "payload" => Dict("azimuth" => 0.1)))
-    @test_throws ArgumentError tv(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => Dict("x" => 1.0)))
-    @test_throws ArgumentError tv(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1)))
-    @test_throws ArgumentError tv(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
+    @test_throws ArgumentError tvL(wdg("view", "none"), Dict("layer" => "L", "index" => 0, "payload" => Dict("azimuth" => 0.1)))
+    @test_throws ArgumentError tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => Dict("x" => 1.0)))
+    @test_throws ArgumentError tvL(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1)))
+    @test_throws ArgumentError tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
     let err = try
-            tv(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
+            tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
             nothing
         catch e
             e
         end
         @test err isa ArgumentError && occursin(":L", err.msg)
     end
-    @test_throws ArgumentError tv(wdg("axis", "axis"), Dict("layer" => "missing", "index" => -1, "payload" => Dict("x" => 1.0, "y" => 2.0)))
+    @test_throws ArgumentError tvL(wdg("axis", "axis"), Dict("layer" => "missing", "index" => -1, "payload" => Dict("x" => 1.0, "y" => 2.0)))
     @test_throws ArgumentError tv(Masque.MasqueWidget("", Dict{String, Any}(), 100), Dict("layer" => "L", "index" => 0))
 end
 

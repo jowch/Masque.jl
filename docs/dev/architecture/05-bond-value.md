@@ -1,47 +1,58 @@
 # 5. The bond value
 
-`@bind sel masque(fig, interactables)` returns `nothing` until a commit, then one event or a
-`Vector{ElementEvent}`. The type matches the interactables in that call. A
-[`PointInteractable`](@ref) is always an [`ElementEvent`](@ref). A vector appears only when
-the same call contains an [`ROIInteractable`](@ref) whose `selects` aims at those points. A
-`selects` ROI over a grid returns one [`GridWindowEvent`](@ref). A view pan or orbit commits
-nothing.
+`@bind sel masque(fig, interactables)` returns a `NamedTuple` with one field per layer a reader
+can set (#335). A field is named by its layer id and holds that layer's value alone, so a
+click on one plot never touches another's field. `src/fields.jl` decides which layers are
+fields; `build_manifest` ships them as the manifest's `fields`, in layer order (before the
+legend-first hit sort), and strips `"click"` from every other layer's `events`, so those keep
+hover and take no clicks.
 
-A threshold, any ROI, or a colorbar the caller passed owns the bond (#309; `owns_bond`).
-`build_manifest` ships every other layer hover-only (no `"click"` in its `events`), so they take
-no clicks and show no `pointer` cursor, and stamps `bondOwner` with the owner's layer id. The
-other layers are transparent to clicks, not click sinks: a click on them falls through `hitTest`
-and finds nothing that commits. For a `selects` box, `bond_from_js` also refuses a
-single-element envelope for its target. The colorbars `masque(fig)` adds by itself
-(`ColorbarInteractable.auto`) own nothing, or any figure with a colorbar would take no clicks.
-Two owners in one call raise `ArgumentError` naming both: each would overwrite the other, and the
-bond could not start at both initial states.
+A layer's role decides its field:
 
-The owner sets the bond's starting value. A threshold starts at a `ThresholdEvent` at `value`
-(with its category's label when `value` is a category's position) and a bounds-only ROI at a
-`BoundsEvent` at `bounds`: `build_manifest` writes that wire envelope as `initial`, the same shape
-a release sends. A `selects` ROI starts at what its starting box holds (#330), the value a release of the
-untouched box would send. Over marks, `build_manifest` writes the indices of the marks inside
-as the target's `selected` (one integer array, the same field `selected=` fills), so
-`mount_envelope` and `mount.ts` seed and highlight them as they would a `selected=` start.
-Over a grid, `initial` is the one-item `{items}` envelope holding the overlapped cell block,
-which `mount.ts` highlights at mount. `_contained_indices` and `_contained_cells` compute both
-from the manifest's own image-px numbers (circle centres, grid edges) with the comparisons
-`computeSelection` makes. Julia rather than the browser computes them because `initial_value`
-must equal what the browser seeds. The `roiselect`, `roigrid`, `roiedge` and `roigridover`
-parity goldens pin the two together: `selection.test.ts` runs `computeSelection` on them and
-compares. A grid item carries the box's `bounds` as given, where a release inverts the box's
-pixel corners, so those four numbers can differ in the last bits. `selected=` on the target
-still wins, and an explicit empty one starts the box empty. A colorbar has no value before its
-first click, so it starts at `nothing`. With an owner, `selected=` on another layer only
-highlights; for a box over marks that holds because the bond is built from the target's
-indices alone.
+- **Pick**: a layer with `"click"` in its `events` and a bond stamp other than `"none"`.
+  `nothing` until a click, then one event; a second click on the same element clears it. A
+  default line (`:polyline` or `:lines` kind from a plot `masque(fig)` found by itself) is
+  hover-only unless `bind` names it: neither the whole line nor a point on it is the obvious
+  pick.
+- **Control**: a threshold (stamp `"threshold"`) or an ROI box (stamp `"bounds"`, with or
+  without `selects`). Always holds its event, starting at the constructor's `value` or
+  `bounds`.
+- **Brush**: the target of a `selects` box, stamped `"brush"` (`"elements"` or `"grid"`). It
+  holds what the box contains, a `Vector{ElementEvent}` or one `GridWindowEvent`, and takes no
+  clicks.
+- Views, slices and `"none"` stamps have no field.
 
-The alternatives for a `selects` target were a one-element commit (a one-cell window, or a
-one-point vector, which is what points did before) and moving the box to the clicked mark. Both
-were rejected: the first leaves the box drawn over its old region while the value names a
-different mark, and the second builds further on one value per widget. Compound binds (a value
-keyed by layer) are deferred; a hover-only layer is easy to make clickable again if they land.
+`bind` narrows and orders the fields (`_Binding`). Each entry is a field name (a `Symbol`), a
+plot (its layers from `plotmap`), or an interactable (its final id, after `_number_builtin_ids`;
+an interactable with several layers, such as `RegionInteractable`'s `:region_c`, gives all of
+them). One entry outside a tuple sets `"bare"`, and `bond_from_js` returns that field's value
+alone. Names come from `id=`, a `NamedTuple` argument, or a `NamedTuple` `bind`; `_bind_call`
+checks by object identity that every name an object gets is the same, then rebuilds it under
+that id. A constructor's default id (`_BUILTIN_IDS`) names nothing. The binding travels with
+the interactables as a `_Plan`, an `AbstractVector`, so a backend's `make_widget` passes it to
+`_view_render_frame` unchanged and every frame's manifest has the same fields.
+
+The manifest's `initial` holds every field's starting envelope, the value the browser sends
+until the first commit. A pick starts at `null`, or at `{layer, index}` when `selected=` names
+it. A control starts at `initial_envelope`: a threshold's `{layer, index: 0, payload: value}`
+(the category's label when `value` is a category's position), a box's `BoundsEvent` payload. A
+brush starts at what the first box on it contains (#330): `_contained_indices` (circle centres)
+or `_contained_cells` (grid edges), computed from the manifest's own image-px numbers with the
+comparisons `computeSelection` makes, so a release of the untouched box sends the same value.
+Julia rather than the browser computes them because `initial_value` must equal what the
+browser seeds. The `roiselect`, `roigrid`, `roiedge` and `roigridover` parity goldens pin the
+two together: `selection.test.ts` runs `computeSelection` on them and compares. A grid item
+carries the box's `bounds` as given, where a release inverts the box's pixel corners, so those
+four numbers can differ in the last bits. `selected=` on the target wins, and an empty one
+keyed to the target (`(pts = Int[],)`) starts the box empty; a bare `Int[]` seeds nothing. A frame's manifest leaves `initial` out.
+
+`mount.ts` seeds `host.value` with `initial` (every field a key) and draws each field's
+highlight from its envelope with `selectionForValue`. A commit (`ctx.commit_`) sets the fields
+it names and sends the whole value, as a new object: a click sets its layer's field, a
+threshold release its own, and a box release both its bounds and, with `selects`, its
+target's items, in one `input` event. Keys that are not fields are dropped. The browser never
+sends a diff: Pluto keeps only the latest value of a bond and replays it on reload, so a diff
+could not be rebuilt reliably.
 
 | Commit | Type | Fields the cell reads |
 |---|---|---|
@@ -54,27 +65,28 @@ keyed by layer) are deferred; a hover-only layer is easy to make clickable again
 | threshold release | `ThresholdEvent` | `value`; `category` on a categorical dimension, else `nothing`; `value=` accepts the event or a number |
 | bounds-only ROI | `BoundsEvent` | `xmin`, `xmax`, `ymin`, `ymax`; `bounds=` accepts the event or the 4-tuple |
 
-`bondtype(interactable)` is the commit type. The default is `ElementEvent`. A custom
+`bondtype(interactable)` is the type a field holds. The default is `ElementEvent`. A custom
 interactable implements `hitlayers`, and `bondtype` plus `transform_bond` when the commit is
 not an element event. `transform_bond` is a method on the instance. Both backends call
-`bond_from_js`, which dispatches to that method when the widget still holds the owner and
-otherwise rebuilds the event from the layer's `bond` stamp. The stamp is one of
-`"element"`, `"legend"`, `"gridcell"`, `"axis"`, `"colorbar"`, `"threshold"`, `"bounds"`,
-`"none"`. Owners are not serialized.
+`bond_from_js`, which decodes each field with that method when the widget holds the layer's
+interactable (`LayerOwner`) and otherwise rebuilds the event from the layer's `bond` stamp.
+The stamp is one of `"element"`, `"legend"`, `"gridcell"`, `"axis"`, `"colorbar"`,
+`"threshold"`, `"bounds"`, `"none"`. Owners are not serialized. A field's envelope must come
+from its own layer; `bond_from_js` rejects one that names another.
 
-The wire stays 0-based. `mount.ts` writes an envelope (`null`, `{items}`, the owner's
-`initial`, or `{layer, index}` with no payload for an element). Pluto overwrites `initial_value` with
-`transform_value` of that same envelope. Subtract 1 only when writing the manifest; add 1
-when reading the wire. Grid window keys on the wire are `i0,i1,j0,j1` (0-based inclusive);
-Julia stores `i1,i2,j1,j2`. An element or legend row is looked up as `payloads[index]` with
-the 1-based index. The browser payload for those kinds is ignored.
+The wire stays 0-based. The browser sends `{field: envelope}`, each envelope `null`, `{items}`
+for a brush, or `{layer, index}` (no payload for an element kind) or `{layer, index, payload}`.
+Pluto overwrites `initial_value` with `transform_value` of the value `mount.ts` seeds, so the
+two must agree. Subtract 1 only when writing the manifest; add 1 when reading the wire. Grid
+window keys on the wire are `i0,i1,j0,j1` (0-based inclusive); Julia stores `i1,i2,j1,j2`. An
+element or legend row is looked up as `payloads[index]` with the 1-based index. The browser
+payload for those kinds is ignored.
 
-`selected=` accepts `nothing`, one event, a vector of events, an `Int` or
-`AbstractVector{<:Integer}` when exactly one seedable layer is present, or a `NamedTuple` /
-`AbstractDict` keyed by layer id. `selected = 1` and `selected = [1]` are the same seed.
-On a scalar point layer that seed is one `ElementEvent`; several indices highlight those
-marks and leave the bond `nothing`. On a `selects` point call the same seeds are a vector,
-and an explicit empty vector hydrates `ElementEvent[]`. Indices are checked `1 <= idx <= n`; `0` errors, naming `1:n`. The
-manifest stores the 0-based index the overlay already paints.
+`selected=` names fields: a `NamedTuple` or `AbstractDict` keyed by field, one event or a
+vector of events, or an `Int` or `AbstractVector{<:Integer}` when exactly one field takes
+element picks. `selected = 1` and `selected = [1]` are the same seed. A pick holds one
+element, so several indices for one are an `ArgumentError`; a brush takes any number. A
+control, a layer outside the fields, or a kind outside `_SELECTED_KINDS` is an
+`ArgumentError` too. Indices are checked `1 <= idx <= n`; `0` errors, naming `1:n`.
 
 Hover never sets the bond. Only a commit round-trips.

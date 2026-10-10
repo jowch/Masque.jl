@@ -169,42 +169,41 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test hs_right <= vp_x + vp_w  # hspan right edge must not poke right of a4's viewport
     end
 
-    @testset "initial_value hydrates the selection from selected=" begin
+    @testset "initial_value hydrates each pick from selected=" begin
         hfig = Figure(size = (600, 400)); hax = Axis(hfig[1, 1])
         pts = DEFAULT_PTS
         scatter!(hax, first.(pts), last.(pts))
         _, _, hctx = ctx_for(hfig)
         pts_i = PointInteractable(hax, pts; id = :scatter, payloads = ["a", "b", "c"])
+        iv(m) = IP.APD.Bonds.initial_value(MasqueWidget("", m, 100))
 
-        # no selected= → initial_value is nothing, same as an unselected widget
+        # no selected= → the pick's field starts at nothing
         m0 = build_manifest([pts_i], hctx)
-        w0 = MasqueWidget("", m0, 100)
-        @test IP.APD.Bonds.initial_value(w0) === nothing
+        @test m0["fields"] == ["scatter"] && m0["initial"] == Dict("scatter" => nothing)
+        @test iv(m0) === (scatter = nothing,)
 
-        # several indices on a scalar layer highlight only; the bond stays nothing
-        m2 = build_manifest([pts_i], hctx; selected = Dict(:scatter => [1, 3]))
-        @test m2["layers"][1]["selected"] == [0, 2]
-        iv2 = IP.APD.Bonds.initial_value(MasqueWidget("", m2, 100))
-        @test iv2 === nothing
-
-        # one index unwraps: `2` and `[2]` are the same ElementEvent (the second point)
+        # one index seeds the pick: `2` and `[2]` are the same ElementEvent (the second point)
         m1 = build_manifest([pts_i], hctx; selected = 2)
-        iv1 = IP.APD.Bonds.initial_value(MasqueWidget("", m1, 100))
-        @test iv1 isa ElementEvent
-        @test iv1.layer === :scatter && iv1.index == 2 && iv1.payload == "b"
-        m1b = build_manifest([pts_i], hctx; selected = [2])
-        iv1b = IP.APD.Bonds.initial_value(MasqueWidget("", m1b, 100))
-        @test iv1b == iv1
+        @test m1["initial"] == Dict("scatter" => Dict("layer" => "scatter", "index" => 1))
+        ev1 = iv(m1).scatter
+        @test ev1 isa ElementEvent
+        @test ev1.layer === :scatter && ev1.index == 2 && ev1.payload == "b"
+        @test iv(build_manifest([pts_i], hctx; selected = [2])).scatter == ev1
 
-        # two seedable layers: a set is highlight-only, not a vector bond
+        # a pick holds one element: several indices are an error, not a highlight
+        @test_throws ArgumentError build_manifest([pts_i], hctx; selected = Dict(:scatter => [1, 3]))
+
+        # two pick fields: each is seeded from its own key
         segs_i = SegmentInteractable(
             hax, [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0)];
             mode = :pairs, id = :segs, payloads = ["s0", "s1"],
         )
         mmulti = build_manifest([pts_i, segs_i], hctx; selected = Dict(:scatter => [1], :segs => [2]))
-        @test mmulti["layers"][1]["selected"] == [0]
-        @test mmulti["layers"][2]["selected"] == [1]
-        @test IP.APD.Bonds.initial_value(MasqueWidget("", mmulti, 100)) === nothing
+        both = iv(mmulti)
+        @test keys(both) == (:scatter, :segs)
+        @test both.scatter.index == 1 && both.scatter.payload == "a"
+        @test both.segs.index == 2 && both.segs.payload == "s1"
+        # a bare index is ambiguous across two pick fields, and the error names both
         err_bare = try
             build_manifest([pts_i, segs_i], hctx; selected = 1)
             nothing
@@ -218,13 +217,49 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # no explicit payloads= (the common case): PointInteractable auto-fills one
         # `(; index, x, y)` NamedTuple per point. `selected = 2` is the second point.
         w_auto = masque(hfig, PointInteractable(hax, pts; id = :scatter); selected = 2, auto = false)
-        iv_auto = IP.APD.Bonds.initial_value(w_auto)
+        iv_auto = IP.APD.Bonds.initial_value(w_auto).scatter
         @test iv_auto isa ElementEvent
         @test iv_auto.layer === :scatter && iv_auto.index == 2
         @test iv_auto.payload == (; index = 2, x = pts[2][1], y = pts[2][2])
     end
 
-    @testset "selects ROI hydrates a Vector{ElementEvent} through initial_value" begin
+    @testset "selected= names fields (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        sc = scatter!(ax, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
+        ln = lines!(ax, [1.0, 9.0], [9.0, 1.0])
+        th = ThresholdInteractable(ax; value = 4.0)
+        iv = IP.APD.Bonds.initial_value
+        msg(f) = try
+            f()
+            ""
+        catch e
+            e isa ArgumentError || rethrow()
+            e.msg
+        end
+
+        # the keyed, bare, and event forms all seed the one pick field
+        @test iv(masque(fig; selected = (scatter = 3,))).scatter.index == 3
+        @test iv(masque(fig; selected = 3)).scatter.index == 3
+        @test iv(masque(fig; selected = ElementEvent(:scatter, 3, nothing))).scatter.index == 3
+        # with `bind` narrowed to the pick, the value is the seeded event itself
+        bare = iv(masque(fig; bind = sc, selected = 2))
+        @test bare isa ElementEvent && bare.layer === :scatter && bare.index == 2
+
+        # several indices for one pick
+        @test occursin("holds one pick", msg(() -> masque(fig; selected = (scatter = [1, 2],))))
+        # a control starts at its own value
+        @test occursin("control", msg(() -> masque(fig, th; selected = (threshold = 1,))))
+        # a default line takes no picks until it is bound; once bound, it does
+        @test occursin("takes no picks", msg(() -> masque(fig; selected = (lines = 1,))))
+        @test iv(masque(fig; bind = (sc, ln), selected = (lines = 1,))).lines.index == 1
+        # a layer left out of `bind`
+        @test occursin("isn't in bind", msg(() -> masque(fig; bind = ln, selected = (scatter = 1,))))
+        # a layer that isn't in the call, and an index out of range
+        @test occursin("not a layer", msg(() -> masque(fig; selected = (nope = 1,))))
+        @test occursin("out of range", msg(() -> masque(fig; selected = (scatter = 4,))))
+    end
+
+    @testset "a selects box seeds its target's field from selected=" begin
         fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
         pts = [(Float64(k), 1.0) for k in 1:8]
         scatter!(ax, first.(pts), last.(pts))
@@ -232,16 +267,24 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         pi = PointInteractable(ax, pts; id = :pts, payloads)
         roi = ROIInteractable(ax; bounds = (1.0, 3.0, 0.0, 2.0), selects = :pts, id = :box)
         iv(sel) = IP.APD.Bonds.initial_value(masque(fig, [pi, roi]; selected = sel, auto = false))
-        one = iv(1)
+        # the box and its target are both fields; the box starts at its bounds
+        start = iv(nothing)
+        @test keys(start) == (:pts, :box)
+        @test start.box == BoundsEvent(:box, 1.0, 3.0, 0.0, 2.0)
+        one = iv(1).pts
         @test one isa Vector{ElementEvent} && length(one) == 1
         @test one[1].layer === :pts && one[1].index == 1 && one[1].payload == "p1"
-        @test iv([1]) == one
-        two = iv([1, 8])
+        @test iv([1]).pts == one
+        # a brush holds any number of elements
+        two = iv([1, 8]).pts
         @test two isa Vector{ElementEvent}
         @test [e.index for e in two] == [1, 8]
         @test [e.payload for e in two] == ["p1", "p8"]
-        empty = iv(Int[])
+        # an explicit empty seed starts the brush empty
+        empty = iv((pts = Int[],)).pts
         @test empty isa Vector{ElementEvent} && isempty(empty)
+        # the box itself is a control: `selected=` can't name it
+        @test_throws ArgumentError iv((box = 1,))
     end
 
     @testset "transform_value reconstructs the payload from the manifest, not the wire" begin
@@ -252,11 +295,10 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # What the widget holds: each payload merged onto its point's x and y (#308).
         stored = PointInteractable(bax, pts; payloads).payloads
         w = masque(bfig, PointInteractable(bax, pts; id = :scatter, payloads = payloads); auto = false)
-        tv = IP.APD.Bonds.transform_value
 
         # element kind: the identical object comes back, not a JSON-shaped copy of it — a
         # NamedTuple stays a NamedTuple, and it's the payload the widget holds.
-        ev = tv(w, Dict("layer" => "scatter", "index" => 1, "payload" => Dict("wrong" => "value")))
+        ev = commit_field(w, Dict("layer" => "scatter", "index" => 1, "payload" => Dict("wrong" => "value")))
         @test ev isa ElementEvent
         @test ev.index == 2
         @test ev.payload isa NamedTuple
@@ -264,7 +306,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test ev.name == "b"
 
         # the browser's own reported payload is ignored outright for an element kind
-        ev0 = tv(w, Dict("layer" => "scatter", "index" => 0, "payload" => "anything at all"))
+        ev0 = commit_field(w, Dict("layer" => "scatter", "index" => 0, "payload" => "anything at all"))
         @test ev0.index == 1 && ev0.payload === stored[1]
 
         # an axis click is an AxisEvent, not a payload NamedTuple
@@ -274,29 +316,32 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             auto = false,
         )
         computed = Dict("x" => 1.23, "y" => 4.56)
-        evax = tv(w2, Dict("layer" => "readout", "index" => -1, "payload" => computed))
+        evax = commit_field(w2, Dict("layer" => "readout", "index" => -1, "payload" => computed))
         @test evax isa AxisEvent && evax.x == 1.23 && evax.y == 4.56
 
-        # a selects-ROI makes the items envelope a Vector{ElementEvent}
+        # a selects-ROI's target field decodes its items envelope as a Vector{ElementEvent}
         roi = ROIInteractable(bax; bounds = (0.0, 1.0, 0.0, 1.0), selects = :scatter, id = :roi)
         wselroi = masque(
             bfig, [PointInteractable(bax, pts; id = :scatter, payloads = payloads), roi];
             auto = false,
         )
-        multi = tv(
-            wselroi, Dict(
-                "items" => [
-                    Dict("layer" => "scatter", "index" => 0, "payload" => "garbage"),
-                    Dict("layer" => "scatter", "index" => 2, "payload" => "garbage"),
-                ]
-            )
+        items = Dict(
+            "items" => [
+                Dict("layer" => "scatter", "index" => 0, "payload" => "garbage"),
+                Dict("layer" => "scatter", "index" => 2, "payload" => "garbage"),
+            ]
         )
+        multi = commit_field(wselroi, items; field = "scatter")
         @test multi isa Vector{ElementEvent}
         @test multi[1].payload === stored[1] && multi[1].index == 1
         @test multi[2].payload === stored[3] && multi[2].index == 3
+        # an item from another layer doesn't belong in the target's field
+        @test_throws ArgumentError commit_field(
+            wselroi, Dict("items" => [Dict("layer" => "roi", "index" => 0)]); field = "scatter",
+        )
 
         # out-of-range index: reconstruction fails loud rather than passing the bad index through
-        @test_throws ArgumentError tv(w, Dict("layer" => "scatter", "index" => 99, "payload" => nothing))
+        @test_throws ArgumentError commit_field(w, Dict("layer" => "scatter", "index" => 99, "payload" => nothing))
 
         # one hydrated index and the click on that element are the same object
         wsel = masque(
@@ -304,14 +349,14 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             selected = 2,
             auto = false,
         )
-        iv = IP.APD.Bonds.initial_value(wsel)
+        iv = IP.APD.Bonds.initial_value(wsel).scatter
         @test iv isa ElementEvent && iv.payload === stored[2] && iv.index == 2
-        ev_same = tv(wsel, Dict("layer" => "scatter", "index" => 1, "payload" => nothing))
+        ev_same = commit_field(wsel, Dict("layer" => "scatter", "index" => 1, "payload" => nothing))
         @test ev_same.payload === iv.payload
         @test ev_same == iv
     end
 
-    @testset "a selects box owns a brushed grid's bond; a cell click commits nothing" begin
+    @testset "a selects box gives fields for the box and its grid target; the grid takes no clicks" begin
         gfig = Figure(size = (400, 300)); gax = Axis(gfig[1, 1])
         vals = [Float64(i + 10j) for i in 1:4, j in 1:3]
         heatmap!(gax, 0 .. 4.0, 0 .. 3.0, vals)
@@ -319,42 +364,42 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         roi = ROIInteractable(gax; bounds = (1.0, 3.0, 1.0, 2.0), selects = :img, id = :roi)
         tv = IP.APD.Bonds.transform_value
 
-        # Without a box the grid is clickable: a click is a GridCellEvent.
+        # Without a box the grid is a pick: a click is a GridCellEvent.
         alone = masque(gfig, grid; auto = false)
         @test "click" in only(alone.manifest["layers"])["events"]
-        cell = tv(alone, Dict("layer" => "img", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
+        @test !haskey(only(alone.manifest["layers"]), "brush")
+        cell = commit_field(alone, Dict("layer" => "img", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
         @test cell isa GridCellEvent && (cell.i, cell.j) == (1, 1)
 
-        # With the box, the grid layer is hover-only, so the overlay never posts a cell.
+        # With the box, the grid is a grid brush, hover-only, so the overlay never posts a cell.
         w = masque(gfig, [grid, roi]; auto = false)
-        @test w.manifest["selection"] == "grid" && w.manifest["selectionTarget"] == "img"
+        @test w.manifest["fields"] == ["img", "roi"]
         img = only(filter(l -> l["id"] == "img", w.manifest["layers"]))
+        @test img["brush"] == "grid"
         @test img["events"] == ["hover"]
-        # The bond starts at the cells the starting bounds overlap, as a release there would (#330).
+        # The target starts at the cells the starting bounds overlap, as a release there would (#330).
         start = IP.APD.Bonds.initial_value(w)
-        @test start isa GridWindowEvent && start.layer === :img
-        @test (start.xmin, start.xmax, start.ymin, start.ymax) == (1.0, 3.0, 1.0, 2.0)
+        @test start.roi == BoundsEvent(:roi, 1.0, 3.0, 1.0, 2.0)
+        @test start.img isa GridWindowEvent && start.img.layer === :img
+        @test (start.img.xmin, start.img.xmax, start.img.ymin, start.img.ymax) == (1.0, 3.0, 1.0, 2.0)
         # Columns 2:3 and row 2 exactly (#337): the box's data edges sit on cell edges and land a
         # fraction of a pixel past the whole-pixel edges into the neighbours, which doesn't count.
-        @test (start.i1, start.i2, start.j1, start.j2) == (2, 3, 2, 2)
-        @test start == tv(w, w.manifest["initial"])
+        @test (start.img.i1, start.img.i2, start.img.j1, start.img.j2) == (2, 3, 2, 2)
+        @test start == tv(w, w.manifest["initial"]) == tv(w, nothing)
 
-        # A cell envelope can still reach Julia from a stale bundle or a hand-set bond. It fails
-        # with a message that names the box, not `GridCellEvent has no field i1` downstream.
-        err = try
-            tv(w, Dict("layer" => "img", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
-            nothing
-        catch e
-            e
-        end
-        @test err isa ArgumentError
-        @test occursin("selects", err.msg) && occursin(":img", err.msg)
+        # A stale bundle's single cell envelope isn't a field-keyed value, so it is refused.
+        @test_throws ArgumentError tv(w, Dict("layer" => "img", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
 
-        # The brush still commits a GridWindowEvent.
+        # The brush commits a GridWindowEvent.
         payload = Dict("i0" => 1, "i1" => 2, "j0" => 1, "j1" => 1, "xmin" => 1.0, "xmax" => 3.0, "ymin" => 1.0, "ymax" => 2.0)
-        win = tv(w, Dict("items" => [Dict("layer" => "img", "index" => 0, "payload" => payload)]))
+        win = commit_field(w, Dict("items" => [Dict("layer" => "img", "index" => 0, "payload" => payload)]); field = "img")
         @test win isa GridWindowEvent && (win.i1, win.i2, win.j1, win.j2) == (2, 3, 2, 2)
         @test vals[win] == vals[2:3, 2:2]
+        # A box over no cells leaves an empty window, and so does an empty items list.
+        @test isempty(vals[commit_field(w, Dict("items" => Any[]); field = "img")])
+        @test_throws ArgumentError commit_field(
+            w, Dict("items" => [Dict("layer" => "img", "index" => 0, "payload" => payload) for _ in 1:2]); field = "img",
+        )
     end
 
     @testset "_cell_range leaves out an end cell the box only grazes (#337)" begin
@@ -373,7 +418,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test cr(asc, 450.0, 500.0) === nothing
     end
 
-    @testset "a selects box owns its point target's bond; a point click commits nothing" begin
+    @testset "a selects box gives fields for the box and its point target; other layers keep their clicks" begin
         pfig = Figure(size = (400, 300)); pax = Axis(pfig[1, 1])
         pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0)]
         scatter!(pax, first.(pts), last.(pts))
@@ -382,52 +427,74 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         roi = ROIInteractable(pax; bounds = (1.5, 3.5, 1.5, 3.5), selects = :pts, id = :box)
         tv = IP.APD.Bonds.transform_value
 
-        # Without a box the points are clickable: a click is one ElementEvent.
+        # Without a box the points are a pick: a click is one ElementEvent.
         alone = masque(pfig, pi; auto = false)
         @test "click" in only(alone.manifest["layers"])["events"]
-        @test tv(alone, Dict("layer" => "pts", "index" => 1)) isa ElementEvent
+        @test commit_field(alone, Dict("layer" => "pts", "index" => 1)) isa ElementEvent
 
-        # With the box, the target is hover-only, and so is every other layer in the call (#309).
+        # With the box, the target is hover-only; every other layer keeps its clicks (#335).
         w = masque(pfig, [pi, other, roi]; auto = false)
-        ev_of(id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))["events"]
-        @test ev_of("pts") == ["hover"]
-        @test ev_of("other") == ["hover"]
-        @test w.manifest["bondOwner"] == "box"
-        # The bond starts at the points inside the starting bounds (#330).
+        layer_of(id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))
+        @test layer_of("pts")["events"] == ["hover"] && layer_of("pts")["brush"] == "elements"
+        @test "click" in layer_of("other")["events"] && !haskey(layer_of("other"), "brush")
+        @test w.manifest["fields"] == ["pts", "other", "box"]
+        # The target starts at the points inside the starting bounds (#330), the other pick at
+        # nothing, and the box at its bounds.
         start = IP.APD.Bonds.initial_value(w)
-        @test start isa Vector{ElementEvent} && [e.payload for e in start] == ["b", "c"]
+        @test start.pts isa Vector{ElementEvent} && [e.payload for e in start.pts] == ["b", "c"]
+        @test start.other === nothing
+        @test start.box == BoundsEvent(:box, 1.5, 3.5, 1.5, 3.5)
 
-        err = try
-            tv(w, Dict("layer" => "pts", "index" => 1))
-            nothing
-        catch e
-            e
-        end
-        @test err isa ArgumentError && occursin("selects", err.msg) && occursin(":pts", err.msg)
-
-        # The brush still commits a Vector{ElementEvent}, and `selected=` still seeds it.
-        got = tv(w, Dict("items" => [Dict("layer" => "pts", "index" => 1), Dict("layer" => "pts", "index" => 2)]))
+        # The brush commits a Vector{ElementEvent}; a click on the other layer an ElementEvent.
+        got = commit_field(w, Dict("items" => [Dict("layer" => "pts", "index" => 1), Dict("layer" => "pts", "index" => 2)]); field = "pts")
         @test got isa Vector{ElementEvent} && [e.payload for e in got] == ["b", "c"]
+        oev = commit_field(w, Dict("layer" => "other", "index" => 0))
+        @test oev isa ElementEvent && oev.layer === :other && oev.index == 1
+        # One release sets the box and its target together, and the other pick stays.
+        bounds = Dict("xmin" => 0.5, "xmax" => 1.5, "ymin" => 0.5, "ymax" => 1.5)
+        rel = tv(
+            w, Dict(
+                "pts" => Dict("items" => [Dict("layer" => "pts", "index" => 0)]),
+                "other" => Dict("layer" => "other", "index" => 0),
+                "box" => Dict("layer" => "box", "index" => 0, "payload" => bounds),
+            )
+        )
+        @test [e.payload for e in rel.pts] == ["a"]
+        @test rel.other.index == 1
+        @test rel.box == BoundsEvent(:box, 0.5, 1.5, 0.5, 1.5)
+        # A point click can't land in the brush field, nor a brush's items in a pick's.
+        @test_throws ArgumentError tv(w, Dict("pts" => Dict("layer" => "pts", "index" => 1)))
+        @test_throws ArgumentError tv(w, Dict("other" => Dict("items" => Any[])))
+
+        # `selected=` seeds the brush. With two fields that take picks, name the field.
         seeded = IP.APD.Bonds.initial_value(masque(pfig, [pi, roi]; selected = 2, auto = false))
-        @test seeded isa Vector{ElementEvent} && only(seeded).payload == "b"
+        @test only(seeded.pts).payload == "b"
+        @test_throws ArgumentError masque(pfig, [pi, other, roi]; selected = 2, auto = false)
+        keyed = IP.APD.Bonds.initial_value(masque(pfig, [pi, other, roi]; selected = (pts = [1, 4], other = 1), auto = false))
+        @test [e.payload for e in keyed.pts] == ["a", "d"] && keyed.other.index == 1
     end
+
     @testset "a selecting box starts at the marks inside its starting bounds (#330)" begin
         fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
         pts = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (8.0, 8.0)]
         scatter!(ax, first.(pts), last.(pts))
         pi = PointInteractable(ax, pts; id = :pts, payloads = ["a", "b", "c", "d"])
-        iv = IP.APD.Bonds.initial_value
+        iv(w) = IP.APD.Bonds.initial_value(w).pts
         box(b) = ROIInteractable(ax; bounds = b, selects = :pts, id = :box)
 
-        # The start ships as the target's `selected` indices, one array, not a list of items.
+        # The start ships in `initial` as the target's items, next to the box's own bounds.
         w = masque(fig, [pi, box((1.5, 3.5, 1.5, 3.5))]; auto = false)
-        @test only(filter(l -> l["id"] == "pts", w.manifest["layers"]))["selected"] == [1, 2]
-        @test !haskey(w.manifest, "initial")
+        @test !haskey(only(filter(l -> l["id"] == "pts", w.manifest["layers"])), "selected")
         env = IP.mount_envelope(w.manifest)
-        @test env == Dict("items" => [Dict("layer" => "pts", "index" => 1), Dict("layer" => "pts", "index" => 2)])
+        @test env === w.manifest["initial"]
+        @test env["pts"] == Dict("items" => [Dict("layer" => "pts", "index" => 1), Dict("layer" => "pts", "index" => 2)])
+        @test env["box"] == Dict(
+            "layer" => "box", "index" => 0,
+            "payload" => Dict("xmin" => 1.5, "xmax" => 3.5, "ymin" => 1.5, "ymax" => 3.5),
+        )
         @test [e.payload for e in iv(w)] == ["b", "c"]
         # The same value a release of the untouched box would send.
-        @test iv(w) == IP.APD.Bonds.transform_value(w, env)
+        @test IP.APD.Bonds.initial_value(w) == IP.APD.Bonds.transform_value(w, env)
 
         # A box over no marks starts empty, not at `nothing`.
         @test iv(masque(fig, [pi, box((4.0, 6.0, 4.0, 6.0))]; auto = false)) == ElementEvent[]
@@ -435,20 +502,28 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         # A box covering everything starts at every mark, in layer order.
         @test [e.index for e in iv(masque(fig, [pi, box((0.5, 9.0, 0.5, 9.0))]; auto = false))] == 1:4
 
-        # `selected=` on the target still wins, including an explicit empty brush.
+        # `selected=` on the target wins, including an explicit empty brush.
         b = box((1.5, 3.5, 1.5, 3.5))
         @test [e.payload for e in iv(masque(fig, [pi, b]; selected = 4, auto = false))] == ["d"]
-        @test iv(masque(fig, [pi, b]; selected = Int[], auto = false)) == ElementEvent[]
+        @test iv(masque(fig, [pi, b]; selected = (pts = Int[],), auto = false)) == ElementEvent[]
 
-        # `selected=` on another layer only highlights: the box still starts at its own marks.
+        # `selected=` on another pick seeds that field; the box still starts at its own marks.
         other = PointInteractable(ax, [(9.0, 1.0)]; id = :other)
         wo = masque(fig, [pi, other, b]; selected = Dict(:other => [1]), auto = false)
-        @test only(filter(l -> l["id"] == "other", wo.manifest["layers"]))["selected"] == [0]
+        @test IP.APD.Bonds.initial_value(wo).other.index == 1
         @test [(e.layer, e.payload) for e in iv(wo)] == [(:pts, "b"), (:pts, "c")]
+
+        # Two boxes on one figure each have a field.
+        b2 = ROIInteractable(ax; bounds = (7.0, 9.0, 7.0, 9.0), id = :zoom)
+        w2 = masque(fig, [pi, b, b2]; auto = false)
+        @test w2.manifest["fields"] == ["pts", "box", "zoom"]
+        @test IP.APD.Bonds.initial_value(w2).zoom == BoundsEvent(:zoom, 7.0, 9.0, 7.0, 9.0)
     end
 
     @testset "selects takes a plot (#302)" begin
         layer(w, id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))
+        # The box's target is the one layer stamped as a brush.
+        target(w) = only(l["id"] for l in w.manifest["layers"] if haskey(l, "brush"))
         bounds = (0.0, 4.0, 0.0, 4.0)
 
         # Two scatters: the box finds the second one's numbered layer without the caller naming it.
@@ -456,16 +531,16 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         s1 = scatter!(ax, [1.0, 2.0], [1.0, 2.0])
         s2 = scatter!(ax, [1.5, 3.0], [2.5, 3.0])
         w = masque(fig, ROIInteractable(ax; bounds, selects = s2))
-        @test w.manifest["selectionTarget"] == "scatter_2"
+        @test target(w) == "scatter_2"
         @test layer(w, "roi")["selects"] == "scatter_2"
         # Same widget as naming the id, so the browser sees nothing new.
         @test w.manifest == masque(fig, ROIInteractable(ax; bounds, selects = :scatter_2)).manifest
         w1 = masque(fig, ROIInteractable(ax; bounds, selects = s1))
-        @test w1.manifest["selectionTarget"] == "scatter"
+        @test target(w1) == "scatter"
 
         # The plot's own id, set through `interactables`, is the one the box takes.
         w = masque(fig, interactables(s2; id = :pts), ROIInteractable(ax; bounds, selects = s2))
-        @test w.manifest["selectionTarget"] == "pts"
+        @test target(w) == "pts"
 
         # Without `auto`, the plot needs its own interactables in the call.
         err = try
@@ -476,20 +551,19 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         end
         @test err isa ArgumentError && occursin("auto = false", err.msg)
         w = masque(fig, interactables(s2), ROIInteractable(ax; bounds, selects = s2); auto = false)
-        @test w.manifest["selectionTarget"] == "scatter"
+        @test target(w) == "scatter"
 
         # A composite brushes the layer of a compatible kind: scatterlines' points, not its line.
         cfig = Figure(size = (400, 300)); cax = Axis(cfig[1, 1])
         sl = scatterlines!(cax, [1.0, 2.0, 3.0], [1.0, 3.0, 2.0])
         w = masque(cfig, ROIInteractable(cax; bounds, selects = sl))
-        @test layer(w, w.manifest["selectionTarget"])["kind"] == "circles"
+        @test layer(w, target(w))["kind"] == "circles"
 
         # A heatmap gives a grid brush.
         hfig = Figure(size = (400, 300)); hax = Axis(hfig[1, 1])
         hm = heatmap!(hax, 0 .. 4.0, 0 .. 3.0, [Float64(i + j) for i in 1:4, j in 1:3])
         w = masque(hfig, ROIInteractable(hax; bounds, selects = hm))
-        @test w.manifest["selection"] == "grid"
-        @test layer(w, w.manifest["selectionTarget"])["kind"] == "grid"
+        @test layer(w, target(w))["kind"] == "grid" && layer(w, target(w))["brush"] == "grid"
 
         # A plot with no brushable layer names the kinds it found.
         lfig = Figure(size = (400, 300)); lax = Axis(lfig[1, 1])
@@ -524,64 +598,60 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         )
     end
 
-    @testset "a threshold, an ROI, or a passed colorbar owns the bond (#309)" begin
+    @testset "a threshold, an ROI, or a passed colorbar is a field next to the picks (#335)" begin
         fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
         sc = scatter!(ax, [2.0, 8.0], [2.0, 8.0]; color = [1.0, 2.0])
         cb = Colorbar(fig[1, 2], sc)
-        tv = IP.APD.Bonds.transform_value
         iv = IP.APD.Bonds.initial_value
         ev_of(w, id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))["events"]
 
-        # Without an owner, the automatic layers take clicks and the bond starts as `nothing`.
+        # Without a control, the automatic layers take clicks and every pick starts at `nothing`.
         plain = masque(fig)
         @test "click" in ev_of(plain, "scatter") && "click" in ev_of(plain, "colorbar")
-        @test !haskey(plain.manifest, "bondOwner") && iv(plain) === nothing
+        @test Set(plain.manifest["fields"]) == Set(["scatter", "colorbar"])
+        @test all(isnothing, values(iv(plain)))
 
-        # A threshold keeps hover on everything else, takes their clicks, and starts at `value`.
+        # A threshold is a field of its own, starting at `value`; the other layers keep their clicks.
         th = ThresholdInteractable(ax; value = 4.0)
         w = masque(fig, th)
-        @test ev_of(w, "scatter") == ["hover"] && ev_of(w, "colorbar") == ["hover"]
+        @test "click" in ev_of(w, "scatter") && "click" in ev_of(w, "colorbar")
         @test ev_of(w, "threshold") == ["drag"]
-        @test w.manifest["bondOwner"] == "threshold"
-        @test iv(w) == ThresholdEvent(:threshold, 4.0, nothing)
-        @test tv(w, Dict("layer" => "threshold", "index" => 0, "payload" => 6.5)) == ThresholdEvent(:threshold, 6.5, nothing)
+        @test "threshold" in w.manifest["fields"]
+        @test iv(w).threshold == ThresholdEvent(:threshold, 4.0, nothing)
+        @test iv(w).scatter === nothing
+        @test commit_field(w, Dict("layer" => "threshold", "index" => 0, "payload" => 6.5)) == ThresholdEvent(:threshold, 6.5, nothing)
+        # `bind` narrows to the threshold alone.
+        @test iv(masque(fig, th; bind = th)) == ThresholdEvent(:threshold, 4.0, nothing)
 
         # A bounds ROI starts at its `bounds`.
         roi = ROIInteractable(ax; bounds = (1.0, 3.0, 2.0, 5.0))
         wr = masque(fig, roi)
-        @test ev_of(wr, "scatter") == ["hover"]
-        @test iv(wr) == BoundsEvent(:roi, 1.0, 3.0, 2.0, 5.0)
+        @test "click" in ev_of(wr, "scatter")
+        @test iv(wr).roi == BoundsEvent(:roi, 1.0, 3.0, 2.0, 5.0)
 
-        # A colorbar you pass owns the bond, with no value before the first click; one `masque`
-        # adds by itself does not.
+        # A colorbar is a pick, with no value before the first click.
         wc = masque(fig, ColorbarInteractable(cb))
-        @test ev_of(wc, "scatter") == ["hover"] && "click" in ev_of(wc, "colorbar")
-        @test wc.manifest["bondOwner"] == "colorbar" && iv(wc) === nothing
-        @test !Masque.owns_bond(only(filter(i -> i isa ColorbarInteractable, interactables(fig))))
+        @test "click" in ev_of(wc, "scatter") && "click" in ev_of(wc, "colorbar")
+        @test iv(wc).colorbar === nothing
 
-        # `selected=` on another layer highlights it but leaves the bond at the owner's start.
+        # `selected=` on a pick seeds it; the threshold keeps its own start.
         ws = masque(fig, th; selected = Dict(:scatter => [1]))
-        @test only(filter(l -> l["id"] == "scatter", ws.manifest["layers"]))["selected"] == [0]
-        @test iv(ws) == ThresholdEvent(:threshold, 4.0, nothing)
+        @test iv(ws).scatter.index == 1
+        @test iv(ws).threshold == ThresholdEvent(:threshold, 4.0, nothing)
 
-        # Two owners name both.
-        err = try
-            masque(fig, th, roi)
-            nothing
-        catch e
-            e
-        end
-        @test err isa ArgumentError && occursin(":threshold and :roi", err.msg)
-        @test_throws ArgumentError masque(fig, th, ThresholdInteractable(ax; value = 6.0, id = :t2))
-        @test_throws ArgumentError masque(fig, th, ColorbarInteractable(cb))
+        # Several controls share a figure, each with its own field.
+        both = iv(masque(fig, th, roi; bind = (th, roi)))
+        @test both == (threshold = ThresholdEvent(:threshold, 4.0, nothing), roi = BoundsEvent(:roi, 1.0, 3.0, 2.0, 5.0))
+        two = iv(masque(fig, th, ThresholdInteractable(ax; value = 6.0, id = :t2); bind = (:threshold, :t2)))
+        @test two.t2 == ThresholdEvent(:t2, 6.0, nothing)
 
         # On a categorical axis, a `value` at a category's position starts with its label.
         cfig = Figure(size = (400, 300))
         cax = Axis(cfig[1, 1]; dim2_conversion = Makie.CategoricalConversion())
         scatter!(cax, [1.0, 2.0, 3.0], ["a", "b", "c"])
-        @test iv(masque(cfig, ThresholdInteractable(cax; value = 2.0); auto = false)) ==
+        @test iv(masque(cfig, ThresholdInteractable(cax; value = 2.0); auto = false)).threshold ==
             ThresholdEvent(:threshold, 2.0, "b")
-        @test iv(masque(cfig, ThresholdInteractable(cax; value = 2.5); auto = false)) ==
+        @test iv(masque(cfig, ThresholdInteractable(cax; value = 2.5); auto = false)).threshold ==
             ThresholdEvent(:threshold, 2.5, nothing)
     end
 end

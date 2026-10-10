@@ -62,8 +62,9 @@ end
 ```
 
 ```julia
-# react to clicks: `sel` is `nothing` until a click, then an ElementEvent
-isnothing(sel) ? "click a point" : "you picked $(sel.index)"
+# react to clicks: `sel` has one field per plot, and `sel.scatter`
+# is `nothing` until a click, then an ElementEvent
+isnothing(sel.scatter) ? "click a point" : "you picked $(sel.scatter.index)"
 ```
 
 For more information, see [Masque documentation](https://jowch.github.io/Masque.jl). Demos are in the [gallery](https://jowch.github.io/Masque.jl/dev/gallery/).

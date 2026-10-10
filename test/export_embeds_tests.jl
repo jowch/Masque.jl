@@ -62,7 +62,8 @@ end
     @test !haskey(states[1], "payload")
 
     # A grid the `selects` box brushes belongs to the box.
-    brushed = merge(man, Dict{String, Any}("selection" => "grid", "selectionTarget" => "cells"))
+    brushed = deepcopy(man)
+    only(L for L in brushed["layers"] if L["id"] == "cells")["brush"] = "grid"
     @test !any(v -> v["layer"] == "cells", discrete_states(brushed))
 
     # Sub-pixel cells ship no `values`: the clicks cannot be listed, so the notebook must change.
@@ -86,7 +87,7 @@ end
     states = discrete_states(w.manifest)
     @test length(states) == 12
     for v in states
-        ev = Masque.bond_from_js(w, v)
+        ev = only(Masque.bond_from_js(w, Dict(v["layer"] => v)))
         @test z[ev.i, ev.j] == ev.value
     end
 end
@@ -145,10 +146,8 @@ function _brush_manifest(target)
         "xscale" => "identity", "yscale" => "identity", "xreversed" => false, "yreversed" => false,
     )
     roi = Dict{String, Any}("id" => "roi", "kind" => "roi", "events" => ["drag"], "bond" => "none", "axis" => "ax")
-    return Dict{String, Any}(
-        "layers" => Any[target, roi], "transforms" => Dict("ax" => t),
-        "selection" => target["kind"] == "grid" ? "grid" : "elements", "selectionTarget" => target["id"],
-    )
+    target = merge(target, Dict{String, Any}("brush" => target["kind"] == "grid" ? "grid" : "elements"))
+    return Dict{String, Any}("layers" => Any[target, roi], "transforms" => Dict("ax" => t))
 end
 
 @testset "brush_states: every box a reader can draw" begin
@@ -209,7 +208,7 @@ end
     stray = Dict{String, Any}("states" => Any[Dict("id" => "s", "value" => Dict("items" => Any[Dict("layer" => "pts", "index" => 5)]))])
     @test_throws r"lists a brush" player_states(stray, brushed)
     # An axis readout cannot be recorded; the chip must say clicks are not simulated.
-    axis = Dict{String, Any}("layers" => Any[Dict{String, Any}("id" => "axis", "kind" => "axis", "events" => ["click", "hover"], "bond" => "axis")])
+    axis = Dict{String, Any}("fields" => ["axis"], "layers" => Any[Dict{String, Any}("id" => "axis", "kind" => "axis", "events" => ["click", "hover"], "bond" => "axis")])
     @test_throws r"chip = false" player_states(Dict{String, Any}(), axis)
     @test [r.key for r in player_states(Dict{String, Any}("chip" => false), axis)] == ["null"]
 end
@@ -244,6 +243,23 @@ end
     @test n >= 28
 end
 
+@testset "the player shows the latest change when two fields differ" begin
+    node = Sys.which("node")
+    if node === nothing
+        @test_skip "node not installed"
+    else
+        js = PLAYER_LOOKUP_JS * raw"""
+            const t = {initial: {a: null, b: null}, keyed: ["a", "b"], keys: {"null": 0, "a:0": 1, "b:1": 2}, snaps: ["idle", "A0", "B1"]};
+            const A = {layer: "a", index: 0}, B = {layer: "b", index: 1};
+            const got = [lookup(t, {a: null, b: null}), lookup(t, {a: A, b: null}), lookup(t, {a: A, b: B}),
+                         lookup(t, {a: A, b: B}), lookup(t, {a: null, b: B})];
+            process.stdout.write(got.join(","));
+            """
+        # Clicking a then b shows b; the same value again keeps it; clearing a shows b alone.
+        @test read(`$node -e $js`, String) == "idle,A0,B1,B1,B1"
+    end
+end
+
 @testset "home quickstart is the 3-point Pluto export" begin
     path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_quickstart.jl")
     player = parse_player_toml(path)
@@ -255,9 +271,9 @@ end
     @test endswith(player["cells"][1], "0009")
     src = read(path, String)
     @test occursin("Hover over a point to see its name", src)
-    @test occursin("`sel.index` is its position in your data", src)
+    @test occursin("`sel.scatter.index` is its position in your data", src)
     @test occursin("name = \"one\"", src)
-    @test occursin("if isnothing(sel)", src)
+    @test occursin("if isnothing(sel.scatter)", src)
     @test occursin("interactables(s; payloads = points)", src)
 end
 

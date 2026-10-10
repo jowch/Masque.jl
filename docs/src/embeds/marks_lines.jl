@@ -26,7 +26,7 @@ Click a line, and the last cell names it.
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
 md"""
-Plot two lines with one `lines!` call each, so each line is one mark you can click.
+Plot both curves with one `series!` call, so each curve is one mark of the same plot.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000102
@@ -34,30 +34,29 @@ begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1])
     xs = 0:0.1:10
-    lines!(ax, xs, sin.(xs))
-    lines!(ax, xs, cos.(xs))
+    sr = series!(ax, xs, [sin.(xs) cos.(xs)]'; labels = ["sine", "cosine"])
     nothing
 end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000103
 md"""
-`@bind pick` saves the clicked line in `pick`.
+A line only shows its tooltip until you name it in `bind`. `bind = sr` makes the curves clickable, and `@bind pick` saves the clicked curve in `pick`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000104
-@bind pick masque(fig)
+@bind pick masque(fig; bind = sr)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
 md"""
-`pick` starts as `nothing`, and this cell responds when you click a line. After a click, `pick.layer` is `:lines` for the first line and `:lines_2` for the second.
+`pick` starts as `nothing`, and this cell responds when you click a curve. After a click, `pick.index` is `1` for the first curve and `2` for the second.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000106
 if isnothing(pick)
     "click a line"
 else
-    names = Dict(:lines => "sine", :lines_2 => "cosine")
-    "you clicked the $(names[pick.layer]) line"
+    names = ["sine", "cosine"]
+    "you clicked the $(names[pick.index]) line"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

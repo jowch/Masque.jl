@@ -17,17 +17,25 @@ Main.masque_fallback("legend_lines")
 
 ## What a click returns
 
-Clicking an entry keeps its series highlighted and makes `pick` a
-[`LegendEvent`](@ref): `pick.label` is the entry's text,
-`pick.group` is the group title in a grouped legend (`nothing`
-otherwise), and `pick.targets` lists the layers the entry highlights.
-Click the entry again to clear the highlight, and `pick` is `nothing`
-again. A click on the plot itself still gives the plot's own event, so check
-which kind you got:
+Clicking an entry keeps its series highlighted and sets the legend's
+field, `sel.legend`, to a [`LegendEvent`](@ref). The examples on this
+page pass `bind = :legend`, so the value, `pick`, is the event itself:
 
 ```julia
-pick isa LegendEvent ? "series $(pick.label)" : "click a legend entry"
+@bind pick masque(fig; bind = :legend)
 ```
+
+`pick.label` is the entry's text, `pick.group` is the group title in a
+grouped legend (`nothing` otherwise), and `pick.targets` lists the
+layers the entry highlights. Click the entry again to clear the
+highlight, and `pick` is `nothing` again:
+
+```julia
+isnothing(pick) ? "click a legend entry" : "series $(pick.label)"
+```
+
+A figure with a second legend gives `sel.legend_2` in the same way, and
+plots that take clicks keep their own fields.
 
 ## Fade the other series
 
@@ -87,8 +95,14 @@ See [Tooltips](@ref) for how templates work.
 
 Clicking an entry keeps its series highlighted, but the highlight is
 gone when the figure is created again. To keep it, select the series'
-own layer, for example with `selected = Dict(:lines => [1])`. See
-[Selection](@ref).
+own plot. A line takes a selection only once it takes clicks, so pass
+it as `interactables(l1)`, where `l1` is what `lines!` returned:
+
+```julia
+@bind sel masque(fig, interactables(l1); selected = (lines = 1,))
+```
+
+See [Selection](@ref).
 
 A legend can also highlight series on other axes of the same figure;
 [Linked views](@ref) shows this across two panels. You can also reach

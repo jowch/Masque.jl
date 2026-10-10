@@ -57,4 +57,19 @@ if !@isdefined(MASQUE_TESTUTILS_LOADED)
         bk, ppu, ctx = ctx_for(fig; max_width)
         return (; fig, ax, pts, bk, ppu, ctx)
     end
+
+    # One commit through the bond: `env` (one layer's wire envelope, or `{items}` for `field`)
+    # set into the widget's starting value, decoded, and that field's value returned. A widget
+    # or manifest whose bind is bare returns the value itself.
+    function commit_field(w, env; field = nothing)
+        m = w isa AbstractDict ? w : w.manifest
+        owners = w isa AbstractDict ? Dict{String, IP.LayerOwner}() : w.owners
+        f = something(field, env isa AbstractDict && haskey(env, "layer") ? string(env["layer"]) : nothing)
+        f === nothing && error("commit_field: name the field of an {items} envelope")
+        # A hand-built manifest lists no fields: decode the one envelope as that layer's field.
+        haskey(m, "fields") || return IP._field_value(m, owners, f, env)
+        js = merge(Dict{String, Any}(IP.mount_envelope(m)), Dict{String, Any}(f => env))
+        v = IP.bond_from_js(m, owners, js)
+        return get(m, "bare", false) === true ? v : getproperty(v, Symbol(f))
+    end
 end

@@ -1,8 +1,7 @@
 """
     BoundsEvent(layer, xmin, xmax, ymin, ymax)
 
-A bounds-only ROI release. Pass back as `bounds=` to restore the box. A `selects` ROI is not a
-`BoundsEvent`.
+Where an ROI box sits, the value of its field. Pass back as `bounds=` to restore the box.
 """
 struct BoundsEvent <: InteractionEvent
     layer::Symbol
@@ -19,11 +18,6 @@ function transform_bond(::Type{BoundsEvent}, i, layer::HitLayer, index, js_paylo
 end
 
 function transform_bond(i::ROIInteractable, layer::HitLayer, index, js_payload)
-    i.selects === nothing || throw(
-        ArgumentError(
-            "bond: ROI :$(i.id) selects :$(i.selects); the bond is the selection, not bounds",
-        ),
-    )
     return _bounds_event(i.id, js_payload)
 end
 

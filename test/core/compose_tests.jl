@@ -286,7 +286,7 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         w = @test_logs masque(f; auto = false)
         @test isempty(w.manifest["layers"])
         w = masque(f; selected = Dict(:scatter => [2]))
-        @test only(filter(L -> L["id"] == "scatter", w.manifest["layers"]))["selected"] == [1]
+        @test w.manifest["initial"]["scatter"] == Dict("layer" => "scatter", "index" => 1)
     end
 
     @testset "a scatter sized in data units doesn't stop the widget (#291)" begin

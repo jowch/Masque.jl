@@ -1,5 +1,5 @@
 import { pathData, polygonRings, ringsPathData, screenFixedLayer } from "./geometry"
-import { hitKey, prefersReducedMotion, MOTION_MS } from "./state"
+import { hitKey, prefersReducedMotion, selectedHits, MOTION_MS } from "./state"
 import type { HiGroups, OverlayCtx, OverlayState } from "./state"
 import type { Hit, LayerStyle } from "./types"
 
@@ -329,13 +329,14 @@ export function drawSelection(state: OverlayState, selGroups: HiGroups, hits: Hi
     if (state.hiKey_ !== null && next.has(state.hiKey_)) clearHiImmediate(state, hiGroups)
 }
 
-// The single funnel to g.sel — every writer of state.selHits_ calls this after assigning it.
+// The single funnel to g.sel — every writer of state.sel_ calls this after assigning it.
 // Screen-fixed hits (a legend entry) land outside the photograph clip. Linked data marks stay in.
 export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
     const data: Hit[] = []
     const fixed: Hit[] = []
-    for (const h of state.selHits_) (screenFixedLayer(h.layer) ? fixed : data).push(h)
-    const next = new Set(state.selHits_.map(hitKey))
+    const hits = selectedHits(state)
+    for (const h of hits) (screenFixedLayer(h.layer) ? fixed : data).push(h)
+    const next = new Set(hits.map(hitKey))
     const entering = new Set<string>()
     for (const k of next) if (!state.selKeys_.has(k)) entering.add(k)
     placeSel(ctx.selGroup_, data, entering)

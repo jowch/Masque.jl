@@ -1,11 +1,19 @@
 # Click marks
 
 You can click any plot `masque(fig)` recognizes, not just scatters.
-Clicking a point, bar, polygon, line, or text label sets `pick` to an
-[`ElementEvent`](@ref), which holds `pick.index`, the mark's position
-in your data, and fields that depend on the kind of mark. Heatmap cells,
-legend entries, and colorbars give their own event types; see
-[Concepts](@ref).
+Clicking a point, bar, polygon, or text label sets that plot's field in
+the `@bind` value to an [`ElementEvent`](@ref), which holds `index`, the
+mark's position in your data, and fields that depend on the kind of
+mark. Heatmap cells, legend entries, and colorbars give their own event
+types; see [Concepts](@ref).
+
+The examples on this page pass the plot as `bind`, so the value, `pick`,
+is the clicked mark's event itself rather than a named tuple of fields:
+
+```julia
+b = barplot!(ax, 1:4, [2.0, 3.0, 1.5, 2.5])
+@bind pick masque(fig; bind = b)
+```
 
 [Plot-object defaults](@ref) lists the fields each plot type reports,
 and [Supported plots and axes](@ref) lists which plots work on which
@@ -62,7 +70,7 @@ clicked polygon's name:
 regions = interactables(p;
     payloads = [(name = "North",), (name = "South",), (name = "East",)],
 )
-@bind pick masque(fig, regions)
+@bind pick masque(fig, regions; bind = p)
 ```
 
 Bands, densities, filled contours, violins, Voronoi cells, and hexbin
@@ -71,10 +79,16 @@ hexagons are polygons too. A filled contour also reports the `low` and
 
 ## Lines
 
-A `lines!` call is one mark. Clicking anywhere along it selects the
-whole line, since a line plot is read as one series. Hovering it shows
-the point you plotted nearest the pointer (see [Tooltips](@ref)). To
-read every line at the same `x`, use a [`SliceInteractable`](@ref).
+Hovering a line shows the point you plotted nearest the pointer (see
+[Tooltips](@ref)), but a click on it changes nothing, since you might
+mean the whole line or one point on it. To make a line clickable, name
+it in `bind`. A click then selects the whole line, since a line plot is
+read as one series. To read every line at the same `x`, use a
+[`SliceInteractable`](@ref) instead.
+
+In the example below, one `series!` call draws both curves, and
+`bind = sr` makes it clickable, so `pick.index` says which curve you
+clicked:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -86,10 +100,8 @@ read every line at the same `x`, use a [`SliceInteractable`](@ref).
 Main.masque_fallback("marks_lines")
 ```
 
-`pick.layer` tells the two lines apart: it is `:lines` for the first
-and `:lines_2` for the second, and `stairs!` plots get `:stairs` and
-`:stairs_2` the same way. To choose the names yourself, pass each line
-to [`interactables`](@ref) with an `id`:
+To click lines from separate `lines!` calls, name each one in `bind`,
+and each gets its own field:
 
 ```julia
 begin
@@ -98,21 +110,23 @@ begin
     xs = 0:0.1:10
     l1 = lines!(ax, xs, sin.(xs))
     l2 = lines!(ax, xs, cos.(xs))
-    sine = interactables(l1; id = :sine)
-    cosine = interactables(l2; id = :cosine)
     nothing
 end
 ```
 
 ```julia
-@bind pick masque(fig, sine, cosine)
+@bind sel masque(fig; bind = (sine = l1, cosine = l2))
 ```
 
-Then `pick.layer` is `:sine` or `:cosine`. A `series!` call is one
-layer, and `pick.index` says which series was clicked.
+Then `sel.sine` and `sel.cosine` each hold `nothing` or the clicked
+line's event. The same works for `stairs!`. A `scatterlines!` plot's
+points take clicks without `bind`, and its line does not. To make a line
+clickable while keeping every other plot's field, pass
+`interactables(l1)` after the figure instead of naming it in `bind`.
 
-Plots made of separate pieces make each piece its own mark:
-`linesegments!`, error bars, range bars, `hlines!`, and `vlines!`.
+Plots made of separate pieces make each piece its own mark and take
+clicks without `bind`: `linesegments!`, error bars, range bars,
+`hlines!`, and `vlines!`.
 
 ## Points on a polar axis
 

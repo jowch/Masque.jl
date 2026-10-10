@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
 import type { Manifest } from "../src/types"
+import { withFields } from "./fields"
 
 // Image 1200×800 drawn at 600×400 CSS px: one CSS px is two image px.
 function setup(manifest: Manifest, requestFrame?: (input: Record<string, unknown>) => Promise<unknown>) {
@@ -12,10 +13,11 @@ function setup(manifest: Manifest, requestFrame?: (input: Record<string, unknown
     const script = document.createElement("script")
     host.append(img, script)
     document.body.append(host)
-    mount(script, manifest, undefined, requestFrame as never)
+    mount(script, withFields(manifest), undefined, requestFrame as never)
     const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
-    const inputs: unknown[] = []
-    host.addEventListener("input", () => inputs.push((host as unknown as { value: unknown }).value))
+    // Each "input" event's whole bond value: one key per field (fields.ts).
+    const inputs: Record<string, unknown>[] = []
+    host.addEventListener("input", () => inputs.push((host as unknown as { value: Record<string, unknown> }).value))
     return { host, shadow, inputs }
 }
 
@@ -93,8 +95,10 @@ describe("drag-layer tab stops", () => {
         release(stop, "ArrowUp")
         expect(inputs).toHaveLength(1)
         // image y 394: 1 - 394/800 = 0.5075 → 50.75
-        expect((inputs[0] as { payload: number }).payload).toBeCloseTo(50.75)
-        expect(inputs[0]).toMatchObject({ layer: "thr", index: 0 })
+        expect((inputs[0].thr as { payload: number }).payload).toBeCloseTo(50.75)
+        expect(inputs[0].thr).toMatchObject({ layer: "thr", index: 0 })
+        // The point layer is a field too, and keeps its value: nothing picked.
+        expect(inputs[0].pts).toBeNull()
     })
 
     it("threshold: the cross-axis pair is consumed without moving; Page is 10 CSS px; Home/End reach the ends", () => {
@@ -116,7 +120,7 @@ describe("drag-layer tab stops", () => {
         press(stop, "Home")
         expect(line.getAttribute("y1")).toBe("800")
         release(stop, "Home")
-        expect((inputs[inputs.length - 1] as { payload: number }).payload).toBeCloseTo(0)
+        expect((inputs[inputs.length - 1].thr as { payload: number }).payload).toBeCloseTo(0)
     })
 
     it("threshold: a vertical line takes Left and Right", () => {
@@ -129,7 +133,7 @@ describe("drag-layer tab stops", () => {
         press(stop, "ArrowRight")
         expect(line.getAttribute("x1")).toBe("602")
         release(stop, "ArrowRight")
-        expect((inputs[inputs.length - 1] as { payload: number }).payload).toBeCloseTo(5.0167, 3)
+        expect((inputs[inputs.length - 1].thr as { payload: number }).payload).toBeCloseTo(5.0167, 3)
     })
 
     it("arrows on the plot surface still walk marks, not the line", () => {
@@ -186,7 +190,7 @@ describe("drag-layer tab stops", () => {
         expect(rect.getAttribute("y")).toBe("220")
         release(stop, "PageDown")
         expect(inputs).toHaveLength(4)
-        expect((inputs[3] as { payload: { xmin: number } }).payload.xmin).toBeCloseTo(202 / 120)
+        expect((inputs[3].roi as { payload: { xmin: number } }).payload.xmin).toBeCloseTo(202 / 120)
     })
 
     it("ROI: translation clamps at the viewport edge and shrinking never flips the box", () => {
@@ -214,7 +218,10 @@ describe("drag-layer tab stops", () => {
         expect(shadow.querySelector(".masque-tip")?.textContent).toBe("0 selected")
         expect(inputs).toHaveLength(0)
         release(stop, "ArrowRight")
-        expect(inputs).toEqual([{ items: [] }])
+        // One release commits both fields: the box's bounds and what it holds.
+        expect(inputs).toHaveLength(1)
+        expect(inputs[0].pts).toEqual({ items: [] })
+        expect(inputs[0].roi).toMatchObject({ layer: "roi", index: 0 })
     })
 
     it("view pan: arrows request a preview frame, keyup settles once, the bond is never written", async () => {
@@ -332,7 +339,7 @@ describe("drag-layer tab stops", () => {
         stop.focus()
         press(stop, "ArrowUp")
         release(stop, "ArrowUp")
-        expect(inputs[0]).toMatchObject({ payload: "c" })
+        expect(inputs[0].thr).toMatchObject({ payload: "c" })
     })
 
     it("a key while a pointer drag holds the line does nothing", () => {
@@ -353,7 +360,7 @@ describe("drag-layer tab stops", () => {
         const script = document.createElement("script")
         host.append(img, script)
         document.body.append(host)
-        mount(script, { ...thresholdManifest("h"), scaling: 3 })
+        mount(script, withFields({ ...thresholdManifest("h"), scaling: 3 }))
         const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
         const stop = stopOf(shadow, "thr")
         stop.focus()
@@ -446,7 +453,7 @@ describe("drag-layer tab stops", () => {
         document.body.append(host)
         const m = viewManifest("pan")
         const requestFrame = vi.fn(async () => ({ scene: { tag: "frame" }, pxPerUnit: 1, width: 600, height: 400, manifest: viewManifest("pan") }))
-        mount(script, m, undefined, requestFrame)
+        mount(script, withFields(m), undefined, requestFrame)
         const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
         const stop = stopOf(shadow, "view")
         const tip = shadow.querySelector(".masque-tip") as HTMLElement
@@ -466,7 +473,7 @@ describe("drag-layer tab stops", () => {
         const script = document.createElement("script")
         host.append(img, script)
         document.body.append(host)
-        const m = mount(script, thresholdManifest("h"))
+        const m = mount(script, withFields(thresholdManifest("h")))
         const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
         const stop = stopOf(shadow, "thr")
         m.cleanup()

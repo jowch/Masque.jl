@@ -157,11 +157,14 @@ end
             Lg = only(hitlayers(SegmentInteractable(a, pg), c))
             @test Lg.kind === :lines && length(Lg.payloads) == 1 && length(Lg.geometry) == 1
             @test any(isnan, Lg.geometry[1])
-            w = masque(f; selected = Dict(:lines => [1]))
+            # A default line answers hover only; `bind` makes it take clicks.
+            @test_throws ArgumentError masque(f; selected = Dict(:lines => [1]))
+            w = masque(f; bind = (:lines,), selected = Dict(:lines => [1]))
             line = only(filter(d -> d["id"] == "lines", w.manifest["layers"]))
-            @test line["selected"] == [0] && length(line["payloads"]) == 1
-            @test_throws ArgumentError masque(f; selected = Dict(:lines => [2]))
-            ev = Masque.APD.Bonds.transform_value(w, Dict("layer" => "lines", "index" => 0))
+            @test w.manifest["initial"]["lines"] == Dict("layer" => "lines", "index" => 0)
+            @test length(line["payloads"]) == 1 && "click" in line["events"]
+            @test_throws ArgumentError masque(f; bind = (:lines,), selected = Dict(:lines => [2]))
+            ev = commit_field(w, Dict("layer" => "lines", "index" => 0))
             @test ev isa ElementEvent && ev.index == 1 && ev.payload == (; index = 1)
             # #262: each line ships its data samples for the hover readout; a gap stays a gap.
             @test L.points == [Float32[0, 0, 1, 2, 2, 1, 3, 3]] && L.step === nothing
@@ -1168,8 +1171,8 @@ end
             @test L.payloads[2].index == 2
             @test L.payloads[2].label == "series 2"
             @test L.points[2] == Float32[1, 3.0, 2, 2.4, 3, 1.2, 4, 1.5]   # series 2's samples (x = 1:4)
-            w = masque(f)
-            ev = Masque.APD.Bonds.transform_value(w, Dict("layer" => "series", "index" => 1))
+            w = masque(f; bind = :series)
+            ev = commit_field(w, Dict("layer" => "series", "index" => 1))
             @test ev isa ElementEvent && ev.index == 2 && ev.layer === :series
             @test ev.payload.index == 2
         end

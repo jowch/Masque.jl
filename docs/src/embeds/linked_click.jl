@@ -26,7 +26,7 @@ Click a point in the xy plot, and the same sample is selected in the xz plot. Ho
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000010
 md"""
-Plot the same samples, in the same order, in two figures. The xy figure stores the click in `pick`.
+Plot the same samples, in the same order, in two figures. The xy figure stores the click in `pick`, and `bind = s_xy` makes `pick` the clicked point itself.
 """
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000002
@@ -36,12 +36,12 @@ begin
     zs = [0.8, 2.5, 1.2, 3.1]
     fig_xy = Figure(size = (420, 280))
     ax_xy = Axis(fig_xy[1, 1]; xlabel = "x", ylabel = "y", title = "xy")
-    scatter!(ax_xy, xs, ys; markersize = 18)
+    s_xy = scatter!(ax_xy, xs, ys; markersize = 18)
     nothing
 end
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000003
-@bind pick masque(fig_xy)
+@bind pick masque(fig_xy; bind = s_xy)
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000011
 md"""

@@ -48,10 +48,11 @@ begin
 end
 ```
 
-Then show the figure and bind the points that the box selects:
+Then show the figure and bind the points that the box selects. The box
+fills the scatter's value, so `bind = s` makes `picks` that value:
 
 ```julia
-@bind picks masque(fig, pts, roi)
+@bind picks masque(fig, pts, roi; bind = s)
 ```
 
 Finally, compare the points inside the box with every sample:
@@ -78,16 +79,17 @@ end
 
 Each point's payload carries its three measurements, and the template
 rounds them to two decimals, so hovering over a point shows them. The [`ROIInteractable`](@ref) names the points'
-layer with `selects = :pts`, so when you release the box, `picks` is a
-vector with one event per point inside. Index your data with it:
+layer with `selects = :pts`, so `picks` is a vector with one event per
+point inside the box. It starts with the points inside `bounds` and
+changes when you release the box. Index your data with it:
 `zs[picks]` is the `z` of the points in the box.
 
 ## Variations
 
 - Keep your samples in a `DataFrame` and pass it as `payloads`. Then
-  `df[picks, :]` is the rows inside the box. Before the first release,
-  `picks` is `nothing`, so check for it as [Brush a region](@ref)
-  shows.
+  `df[picks, :]` is the rows inside the box. When the box is empty,
+  `picks` is empty too, so show an empty table as
+  [Brush a region](@ref) shows.
 - Replace the histogram with whatever the comparison needs: a table of
   means, a second scatter of two other columns, or a model fitted to the
   selected points only.

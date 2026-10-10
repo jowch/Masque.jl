@@ -33,8 +33,8 @@ function _string_keys(x)
     return Dict{String, Any}(string(k) => _string_keys(v) for (k, v) in x)
 end
 
-# Key the player lookup on the pre-transform JS shape the overlay posts.
-# Must stay in lockstep with `keyOf` in `PLAYER_LOOKUP_JS` below.
+# Key one field's envelope, the pre-transform JS shape the overlay posts for it.
+# Must stay in lockstep with `envKey` in `PLAYER_LOOKUP_JS` below.
 function snapshot_key(v)
     v === nothing && return "null"
     d = v isa AbstractDict ? _string_keys(v) : Dict{String, Any}("value" => v)
@@ -57,12 +57,45 @@ function _item_key(it)
 end
 
 """
+    value_key(table, v)
+
+The key of a whole bind value, `{field => envelope}`: the [`snapshot_key`](@ref) of the one
+field that differs from the widget's starting value, `"null"` when none does, and the keys
+joined with `+` when several do (a player records one field at a time, so that misses).
+`table` carries the starting value (`initial`) and the fields that count (`keyed`): every
+field but the bounds of a `selects` box, a position no recording can match. Must stay in
+lockstep with `keyOf` in `PLAYER_LOOKUP_JS`.
+"""
+function value_key(table::AbstractDict, v)
+    v === nothing && return "null"
+    init = get(table, "initial", Dict{String, Any}())
+    parts = String[]
+    for f in get(table, "keyed", String[])
+        cur = get(v, f, nothing)
+        isequal(jsonable(cur), jsonable(get(init, f, nothing))) && continue
+        push!(parts, cur === nothing ? "null@" * f : snapshot_key(cur))
+    end
+    return isempty(parts) ? "null" : join(parts, "+")
+end
+
+# The starting value and the fields a player keys on, from the widget's manifest.
+function player_keying(manifest::AbstractDict)
+    boxes = Set(string(l["id"]) for l in manifest["layers"] if get(l, "selects", nothing) !== nothing)
+    return Dict{String, Any}(
+        "initial" => jsonable(get(manifest, "initial", Dict{String, Any}())),
+        "keyed" => String[string(f) for f in get(manifest, "fields", Any[]) if !(string(f) in boxes)],
+    )
+end
+
+"""
     PLAYER_LOOKUP_JS
 
 The docs players' snapshot lookup, shared by the static player (`emit_player`) and the
 Pluto export (`PLUTO_EXPORT_SIM_JS`). `lookup(table, v)` returns the snapshot for the value
 the overlay posted, or `null`. The harvest records every click and every brush release
-(`discrete_states`, `brush_states`), so a miss means the recording and the overlay disagree.
+(`discrete_states`, `brush_states`) one field at a time. When the reader has changed two
+fields, `lookup` shows the snapshot of the latest change alone, so a miss means the recording
+and the overlay disagree.
 """
 const PLAYER_LOOKUP_JS = raw"""
 function layerIndexKey(layer, index) {
@@ -74,7 +107,7 @@ function itemKey(it) {
   if (!p || p.i0 == null) return k;
   return k + "@" + p.i0 + "-" + p.i1 + "/" + p.j0 + "-" + p.j1;
 }
-function keyOf(v) {
+function envKey(v) {
   if (v == null) return "null";
   if (Array.isArray(v.items)) return "items:" + v.items.map(itemKey).join(",");
   if (v.layer != null && v.index != null && v.index !== "") {
@@ -82,18 +115,62 @@ function keyOf(v) {
   }
   return JSON.stringify(v);
 }
-function lookup(table, v) {
-  const keys = [keyOf(v)];
-  if (v && v.layer != null && v.index != null && v.index !== "") {
-    keys.push(String(v.layer) + ":" + String(v.index));
-    keys.push(String(v.layer) + ":" + String(v.index | 0));
+function stable(x) {
+  if (x === undefined) x = null;
+  if (x === null || typeof x !== "object") return JSON.stringify(x);
+  if (Array.isArray(x)) return "[" + x.map(stable).join(",") + "]";
+  return "{" + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(x[k]); }).join(",") + "}";
+}
+function changed(table, v) {
+  const out = [];
+  const init = table.initial || {};
+  (table.keyed || []).forEach(function (f) {
+    const cur = v[f] === undefined ? null : v[f];
+    if (stable(cur) !== stable(init[f])) out.push([f, cur]);
+  });
+  return out;
+}
+function keyOf(table, v) {
+  if (v == null) return "null";
+  const d = changed(table, v);
+  if (!d.length) return "null";
+  return d.map(function (p) { return p[1] == null ? "null@" + p[0] : envKey(p[1]); }).join("+");
+}
+function keysFor(table, v) {
+  const keys = [keyOf(table, v)];
+  const d = v == null ? [] : changed(table, v);
+  const one = d.length === 1 ? d[0][1] : null;
+  if (one && one.layer != null && one.index != null && one.index !== "") {
+    keys.push(String(one.layer) + ":" + String(one.index));
+    keys.push(String(one.layer) + ":" + String(one.index | 0));
   }
+  return keys;
+}
+function find(table, keys) {
   for (let i = 0; i < keys.length; i++) {
     if (Object.prototype.hasOwnProperty.call(table.keys, keys[i])) {
       return table.snaps[table.keys[keys[i]]];
     }
   }
   return null;
+}
+// A reader who clicks one plot and then another changes two fields, a value the harvest never
+// recorded. Show the latest change on its own: the field that differs from the last value.
+function lookup(table, v) {
+  const prev = table.last_;
+  table.last_ = v;
+  let hit = find(table, keysFor(table, v));
+  if (!hit && v != null && prev != null) {
+    const moved = (table.keyed || []).filter(function (f) { return stable(v[f]) !== stable(prev[f]); });
+    if (moved.length === 0) return table.shown_ || null;
+    if (moved.length === 1) {
+      const alone = Object.assign({}, table.initial || {});
+      alone[moved[0]] = v[moved[0]];
+      hit = find(table, keysFor(table, alone));
+    }
+  }
+  if (hit) table.shown_ = hit;
+  return hit;
 }
 """
 
@@ -130,17 +207,17 @@ commit index `0`), so such a layer can list one position only. Brushes are enume
 [`brush_states`](@ref); a grid brush keys on its cell window (`items:<layer>:0@i0-i1/j0-j1`).
 """
 function discrete_states(manifest::AbstractDict)
-    brushed = get(manifest, "selection", nothing) == "grid" ? get(manifest, "selectionTarget", nothing) : nothing
     states = Dict{String, Any}[]
     for L in manifest["layers"]
         id = string(L["id"])
         "click" in string.(L["events"]) || continue
+        haskey(L, "brush") && continue
         bond = get(L, "bond", "none")
         if bond == "element" || bond == "legend"
             for k in 0:(length(L["payloads"]) - 1)
                 push!(states, Dict{String, Any}("layer" => id, "index" => k))
             end
-        elseif bond == "gridcell" && id != brushed
+        elseif bond == "gridcell"
             g = L["geometry"]
             vals = _field(g, "values")
             vals === nothing && error(
@@ -195,9 +272,15 @@ window is reachable. A space larger than `BRUSH_STATES_MAX` fails the harvest: s
 example or record a clip.
 """
 function brush_states(manifest::AbstractDict)
-    get(manifest, "selection", nothing) === nothing && return Dict{String, Any}[]
-    target = string(manifest["selectionTarget"])
-    L = only(l for l in manifest["layers"] if string(l["id"]) == target)
+    out = Dict{String, Any}[]
+    for L in manifest["layers"]
+        haskey(L, "brush") && append!(out, _brush_states(manifest, L))
+    end
+    return out
+end
+
+function _brush_states(manifest::AbstractDict, L)
+    target = string(L["id"])
     kind = string(L["kind"])
     t = manifest["transforms"][string(L["axis"])]
     out = Dict{String, Any}[Dict{String, Any}("items" => Any[])]
@@ -253,16 +336,28 @@ _too_many(target, what) = error(
 Idle first, then every click from [`discrete_states`](@ref) and every brush release from
 [`brush_states`](@ref), then the TOML's hand-listed `[[player.states]]` (axis, threshold,
 and bounds positions only). A hand-listed click or brush fails: the harvest already records
-it.
+it. Each state changes one field: its `value` is the widget's starting value with that
+field's envelope in place, and its `key` is that envelope's [`snapshot_key`](@ref).
 """
 function player_states(player::AbstractDict, manifest::AbstractDict)
     out = NamedTuple{(:key, :value), Tuple{String, Any}}[(; key = "null", value = nothing)]
     seen = Set(["null"])
-    for v in Iterators.flatten((discrete_states(manifest), brush_states(manifest)))
+    init = Dict{String, Any}(string(k) => v for (k, v) in get(manifest, "initial", Dict{String, Any}()))
+    whole(f, env) = merge(init, Dict{String, Any}(f => env))
+    for v in discrete_states(manifest)
         k = snapshot_key(v)
         k in seen && continue
         push!(seen, k)
-        push!(out, (; key = k, value = v))
+        push!(out, (; key = k, value = whole(string(v["layer"]), v)))
+    end
+    for L in manifest["layers"]
+        haskey(L, "brush") || continue
+        for v in _brush_states(manifest, L)
+            k = snapshot_key(v)
+            k in seen && continue
+            push!(seen, k)
+            push!(out, (; key = k, value = whole(string(L["id"]), v)))
+        end
     end
     clicks = copy(seen)
     for row in get(player, "states", Any[])
@@ -278,7 +373,7 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
                 "can list one position only"
         )
         push!(seen, k)
-        push!(out, (; key = k, value = v))
+        push!(out, (; key = k, value = whole(string(v["layer"]), v)))
     end
     check_reachable(player, manifest, [r.key for r in out])
     return out
@@ -298,9 +393,11 @@ state must run with `chip = false`, and its page must say that clicks need a liv
 """
 function check_reachable(player::AbstractDict, manifest::AbstractDict, keys)
     get(player, "chip", true) === false && return nothing
+    keyed = Set(player_keying(manifest)["keyed"])
     for L in manifest["layers"]
         string(get(L, "bond", "none")) in _CONTINUOUS_BONDS || continue
         id = string(L["id"])
+        id in keyed || continue
         any(k -> startswith(k, id * ":"), keys) && continue
         error(
             "layer :$id commits a position the player cannot record, and the chip says clicks are simulated: " *
@@ -318,7 +415,7 @@ once: a plot below the widget that reads only part of the bond (a legend, a clus
 repeats itself across many clicks. `table` is `{snaps, keys}` with `keys[key]` a 0-based
 index into `snaps`. `extra_bytes` is what the table ships beyond the idle snapshot.
 """
-function snapshot_table(keyed)
+function snapshot_table(keyed; manifest = nothing)
     snaps = Any[]
     index = Dict{String, Int}()
     keys = Dict{String, Int}()
@@ -332,7 +429,9 @@ function snapshot_table(keyed)
     end
     idle = sizeof(json_write(jsonable(first(snaps))))
     extra = sizeof(json_write(jsonable(snaps))) - idle + sizeof(json_write(keys))
-    return Dict{String, Any}("snaps" => snaps, "keys" => keys), extra
+    table = Dict{String, Any}("snaps" => snaps, "keys" => keys)
+    manifest === nothing || merge!(table, player_keying(manifest))
+    return table, extra
 end
 
 function html_escape(s::AbstractString)

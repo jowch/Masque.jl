@@ -2,7 +2,8 @@
 
 Click a point on the left, and the same sample is highlighted on the
 right, where it is plotted against another column. Nothing links the
-two plots except your code: the second `masque` call passes the clicked
+two plots except your code: the first `masque` call binds the left
+scatter, so `pick` is the clicked point, and the second passes
 `pick.index` as `selected=`. That index is the point's position in the
 data you plotted, so it finds the same sample as long as both plots
 list the samples in the same order.
@@ -25,7 +26,7 @@ Main.masque_fallback("gallery_selection")
   `selected=` on the second widget.
 - A slider that rebuilds the figure drops the highlight unless you pass
   the indices again.
-- Passing a widget's own `pick` back into the same `masque` call does
+- Passing a widget's own value back into the same `masque` call does
   not work; see [Selection](@ref) for highlighting on one figure.
 
 Next, [Linked views](@ref) updates other plots from a selection.

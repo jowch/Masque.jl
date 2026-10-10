@@ -119,7 +119,7 @@ export const SELECTED_KINDS = new Set(["circles", "rects", "polygons", "segments
 // nothing: `[]`). :axis/:threshold/:roi/:view return `null`, not `[]` — a click on one of these
 // is not a selection gesture at all (an axis click is a `:click`-kind gesture with nowhere to
 // put a highlight, not a click that selected zero elements), so `commitClick` must leave
-// `state.selHits_` untouched rather than clearing it.
+// its field's entry in `state.sel_` untouched rather than clearing it.
 export function selectionFor(hit: Hit, manifest: Manifest): Hit[] | null {
     if (hit.layer.links && hit.layer.links.length) return linkedHits(manifest, hit.layer, hit.index)
     if (SELECTED_KINDS.has(hit.layer.kind) || hit.layer.kind === "grid" || hit.layer.kind === "surface") return [hit]

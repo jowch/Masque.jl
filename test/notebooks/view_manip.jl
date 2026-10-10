@@ -79,8 +79,8 @@ HTML("<span id=\"zoomout\">ZOOM=$(repr(zoom_sel)) xmax=$(xmax)</span>")
 md"""
 ## Selection survives view re-renders
 
-Click points in the **left** plot to select them; the **right** plot pre-highlights that
-selection via `selected=` — and because Julia re-derives the highlight on every render,
+Click a point in the **left** plot to select it; the **right** plot pre-highlights the
+last one clicked via `selected=` (a plot holds one pick) — and because Julia re-derives the highlight on every render,
 it survives the zoom slider re-rendering the right plot. This is the backend-symmetric
 persistence rule: a re-render clears client state, so selection state lives in Julia and
 rides the manifest.
@@ -99,13 +99,13 @@ begin
 end
 
 # ╔═╡ 50000000-0000-0000-0000-000000000023
-@bind vm_sel masque(vm_fig_l, vm_int_l; auto = false)
+@bind vm_sel masque(vm_fig_l, vm_int_l; auto = false, bind = vm_int_l)
 
 # ╔═╡ 50000000-0000-0000-0000-000000000024
-# accumulate clicked indices (acyclic: depends on vm_sel + the once-init Ref)
+# keep the last clicked index (acyclic: depends on vm_sel + the once-init Ref)
 vm_picked = begin
-    vm_sel === nothing || push!(vm_acc[], vm_sel.index)
-    unique!(sort!(vm_acc[]))
+    vm_sel === nothing || (vm_acc[] = [vm_sel.index])
+    vm_acc[]
 end
 
 # ╔═╡ 50000000-0000-0000-0000-000000000025

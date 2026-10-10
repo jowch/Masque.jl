@@ -57,11 +57,11 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind picks` saves the stations inside the box when you release it, so `picks` stays the same while you drag.
+`bind = s` makes `picks` the scatter's value, which the box fills. `@bind picks` saves the stations inside the box when you release it, so `picks` stays the same while you drag.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind picks masque(fig, pts, roi)
+@bind picks masque(fig, pts, roi; bind = s)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""

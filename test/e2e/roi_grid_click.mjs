@@ -1,12 +1,14 @@
-// `selects`-box live check (LOCAL — not CI), over a grid and over points. The box owns the
-// `@bind` value: dragging it commits a GridWindowEvent or a Vector{ElementEvent}; a click on the
-// target layer outside the box hovers (tooltip, no pointer cursor) but commits nothing, so the
-// value stays what the box holds. Before #194 a grid cell click turned the bond into a
+// `selects`-box live check (LOCAL — not CI), over a grid and over points. The box fills its
+// target's field of the `@bind` value (#335): dragging it commits a GridWindowEvent or a
+// Vector{ElementEvent}; a click on the target layer outside the box hovers (tooltip, no pointer
+// cursor) but commits nothing, so the value stays what the box holds. The grid widget's value has
+// two fields (`img`, `roi`); the points widget binds `:pts` alone, so its value is the vector. Before #194 a grid cell click turned the bond into a
 // GridCellEvent (`ArgumentError: … has no field i1`); before #195 a point click replaced the
 // brushed vector with a one-point vector while the box stayed put.
 //
 //   node roi_grid_click.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
+import { shutdownOpenSession } from "./fresh_session.mjs";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -42,6 +44,9 @@ try {
     console.error(benign ? "PAGEERROR (known-benign):" : "PAGEERROR:", e.message);
   });
 
+  // A fresh session: Pluto keeps a bond's last value, so a session an earlier run moved the box
+  // in would start the target's field where that run left it, not at the box's bounds.
+  await shutdownOpenSession(base, notebook);
   await page.goto(`${base}/open?path=${encodeURIComponent(notebook)}`, { waitUntil: "domcontentloaded", timeout: 60000 });
   const deadline = Date.now() + 1500000;
   let ready = false, tick = 0;
@@ -94,13 +99,15 @@ try {
   // `unit` is one data unit in image px along x (the box moves by it).
   const CASES = [
     {
-      key: "grid", target: "img", mode: "grid", bond: /GridWindowEvent/, readout: /READOUT=i=/,
+      key: "grid", target: "img", mode: "grid", fields: ["img", "roi"], bare: false, bond: /GridWindowEvent/, readout: /READOUT=i=/,
       unit: (t) => Math.abs(t.geometry.xedges[1] - t.geometry.xedges[0]),
       outside: (t) => ({ x: (t.geometry.xedges[10] + t.geometry.xedges[11]) / 2, y: (t.geometry.yedges[1] + t.geometry.yedges[2]) / 2 }),
     },
     {
-      key: "points", target: "pts", mode: "elements", bond: /ElementEvent\[/, readout: /READOUT=n=[1-9]/,
-      unit: (_t, roi) => roi.geometry.w / 4,
+      key: "points", target: "pts", mode: "elements", fields: ["pts"], bare: true, bond: /ElementEvent\[/, readout: /READOUT=n=[1-9]/,
+      // Two data units: one would move the 2..6 box to 3..7, which holds the same two points
+      // it starts with, (3, 3) and (5, 5), and the value would not change.
+      unit: (_t, roi) => roi.geometry.w / 2,
       outside: (t) => ({ x: t.geometry[3 * 4], y: t.geometry[3 * 4 + 1] }),
     },
   ];
@@ -110,9 +117,9 @@ try {
     const target = meta.layers.find((l) => l.id === c.target);
     const roi = meta.layers.find((l) => l.id === "roi");
     if (!target || !roi) throw new Error(`${c.key}: manifest lacks :${c.target}/:roi layers: ${meta.layers.map((l) => l.id)}`);
-    console.error(`${c.key} manifest: selection=${meta.selection} target=${meta.selectionTarget} events=${JSON.stringify(target.events)}`);
-    if (meta.selection !== c.mode || meta.selectionTarget !== c.target) {
-      throw new Error(`${c.key}: manifest selection ${meta.selection}/${meta.selectionTarget}, expected ${c.mode}/${c.target}`);
+    console.error(`${c.key} manifest: fields=${JSON.stringify(meta.fields)} bare=${meta.bare} brush=${target.brush} events=${JSON.stringify(target.events)}`);
+    if (target.brush !== c.mode || JSON.stringify(meta.fields) !== JSON.stringify(c.fields) || !!meta.bare !== c.bare) {
+      throw new Error(`${c.key}: manifest fields ${JSON.stringify(meta.fields)} bare ${meta.bare} brush ${target.brush}, expected ${JSON.stringify(c.fields)} bare ${c.bare} brush ${c.mode}`);
     }
     // Recorded, not thrown: the click step below still runs, so a failure shows what the click did.
     if (target.events.includes("click")) problems.push(`${c.key}: selects target :${c.target} still lists "click" in events ${JSON.stringify(target.events)}`);
@@ -147,12 +154,21 @@ try {
     const centre = { x: g.x + g.w / 2, y: g.y + g.h / 2 };
 
     // 1. Brush: drag the box one unit right. The bond becomes the box's value.
+    // The target's field starts at what the box's starting bounds hold (#330), so wait for the
+    // drag's value to replace it, not just for the right type.
     const moved = { x: centre.x + u, y: centre.y };
+    const start = await out(), startReadout = await readout();
+    if (!c.bond.test(start)) throw new Error(`${c.key}: the value starts at ${start}, want ${c.bond}`);
     await drag(toPage(centre), toPage(moved));
-    const brushed = await waitFor(out, (s) => c.bond.test(s), `${c.key}: brush -> ${c.bond}`);
-    const brushedReadout = await waitFor(readout, (s) => c.readout.test(s), `${c.key}: brush readout`);
+    const brushed = await waitFor(out, (s) => c.bond.test(s) && s !== start, `${c.key}: brush -> ${c.bond}`);
+    const brushedReadout = await waitFor(readout, (s) => c.readout.test(s) && s !== startReadout, `${c.key}: brush readout`);
     console.error(`${c.key} brushed: ${brushed.slice(0, 200)} | ${brushedReadout}`);
     const brushedHost = await hostValue();
+    // The browser holds every field, the target's being what the box holds (#335).
+    const hv = JSON.parse(brushedHost);
+    if (JSON.stringify(Object.keys(hv ?? {}).sort()) !== JSON.stringify([...c.fields].sort()) || !hv[c.target]?.items?.length) {
+      throw new Error(`${c.key}: host.value after the brush ${brushedHost.slice(0, 300)}, want fields ${JSON.stringify(c.fields)} with :${c.target} items`);
+    }
     const brushedSel = (await shadowState()).sel;
     passed.push(`${c.key}/brush`);
 
@@ -164,7 +180,7 @@ try {
     if (hov.hot) problems.push(`${c.key}: hovering the selects target shows the pointer cursor`);
     else passed.push(`${c.key}/hover-tooltip-no-pointer`);
 
-    // 3. Click it. The box owns the bond: host.value, the bond, the readout and the drawn
+    // 3. Click it. The target takes no click: host.value, the bond, the readout and the drawn
     //    selection are unchanged, and no cell errors.
     await page.mouse.click(outside.x, outside.y);
     await page.waitForTimeout(backend === "webgl" ? 4000 : 3000); // any round-trip would land by now

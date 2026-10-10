@@ -492,6 +492,9 @@ try {
       if (mid.valuetext === null || !mid.tip.includes(mid.valuetext)) throw new Error(`${key}: aria-valuetext ${mid.valuetext} vs readout ${mid.tip}`);
       const after = await waitFor(async () => { const t = await textOf(`#out_${key}`); return { ok: t !== before, t }; }, `${key} bond`);
       if (!/ThresholdEvent|:threshold/.test(after.t)) throw new Error(`${key}: bond readout ${after.t.slice(0, 200)}`);
+      // The key commit sets the line's field only (#335): the scatter's stays as it was.
+      const all = await textOf(`#bond_${key}`);
+      if (!/scatter = nothing/.test(all) || !/threshold = ThresholdEvent/.test(all)) throw new Error(`${key}: whole value after the nudge ${all.slice(0, 200)}`);
       s = await waitForLiveRegion(key, /\d/);
       if (!/\d/.test(s.liveText)) throw new Error(`${key}: live region did not announce the value: ${JSON.stringify(s.liveText)}`);
       passed.push(`${key}/arrow-nudge+single-bind+announce`);
@@ -519,9 +522,8 @@ try {
       const s3 = await dragState(key, id);
       if (Math.abs(s3.rect[3] - s.rect[3]) > 0.5) throw new Error(`${key}: Alt+Shift+ArrowDown did not shrink back: ${JSON.stringify(s3.rect)}`);
       if (s3.inputs !== n0 + 3) throw new Error(`${key}: expected three bond writes, got ${s3.inputs - n0}`);
-      // The bond starts at the points the box holds (#330), and a few pixels of nudging keep the
-      // same points, so the value can be unchanged here. Page the box down until a point leaves
-      // it: that release has to reach the kernel.
+      // #out_roi prints the box's own field, its bounds (#335), which every release moves; the
+      // loop still pages the box down, in case a release lands on the bounds it started at.
       let t = before;
       for (let i = 0; i < 6 && t === before; i++) {
         await page.keyboard.press("PageDown");

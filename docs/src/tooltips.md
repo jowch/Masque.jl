@@ -24,25 +24,27 @@ Without `tooltip`, the tooltip is a small table of the payload's
 fields: for a scatter, the point's `index`, `x`, and `y`, and when you
 pass `payloads`, your fields followed by `x` and `y` (see
 [Concepts](@ref) for how the two combine). On a categorical or
-date axis, `x` and `y` in the tooltip and in `pick` are text: the
+date axis, `x` and `y` in the tooltip and in the clicked mark's event
+are text: the
 category's label, such as `"b"`, or the date or time you plotted, such
 as `"2024-01-02"`, `"2024-01-01T01:00:00"`, or `"01:00:00"`.
 
 Hovering a line from `lines!`, `stairs!`, `series!`, or `scatterlines!`
 adds `x` and `y` of the point you plotted nearest the pointer along the
 line. In a template you can also use `i`, that point's position in the
-line's data, so `$(i)` is `3` over `xs[3], ys[3]`. A click still picks
-the whole line. A line on an `Axis3` shows only its payload.
+line's data, so `$(i)` is `3` over `xs[3], ys[3]`. A click on a line
+picks the whole line once you name it in `bind`; see
+[Click marks](@ref). A line on an `Axis3` shows only its payload.
 
 Numbers show up to four significant figures, so `0.30000000000000004`
 reads `0.3` and `2.71828` reads `2.718`. Whole numbers show in full. To
 show more or fewer figures, pass `tooltip_sigdigits` to `masque`:
 
 ```julia
-@bind pick masque(fig; tooltip_sigdigits = 6)
+@bind sel masque(fig; tooltip_sigdigits = 6)
 ```
 
-The value in `pick` keeps every digit; only the tooltip is rounded.
+The `@bind` value keeps every digit; only the tooltip is rounded.
 
 Two interactables work differently. A legend entry shows no tooltip by
 default, because its label is already next to the swatch. To add one,

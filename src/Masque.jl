@@ -6,9 +6,8 @@ or live Makie `Figure` for use in a [Pluto](https://plutojl.org) notebook.
 
 Call [`masque`](@ref)`(fig)` for every default interaction (see [`interactables`](@ref)),
 pass [`AbstractInteractable`](@ref)s to add to or replace them, and bind the result with
-`@bind`; the bond
-reports the current selection — `nothing` when nothing is selected, otherwise an
-[`InteractionEvent`](@ref). Needs a rendering backend
+`@bind`. The value has one field per plot or control a reader can set: `nothing` while
+nothing is picked, otherwise an [`InteractionEvent`](@ref). Needs a rendering backend
 loaded: `using CairoMakie` for a static image with a JS hit-test overlay, or `using WGLMakie`
 for a live browser-GPU canvas (animation, large/live data, 3D) — both expose the same
 `masque`/`@bind` contract.
@@ -18,7 +17,7 @@ for a live browser-GPU canvas (animation, large/live data, 3D) — both expose t
 using Masque, CairoMakie
 fig = Figure(); ax = Axis(fig[1, 1])
 scatter!(ax, [1, 2, 3], [1, 4, 9])
-@bind sel masque(fig)   # zero-config: auto-extracts the scatter
+@bind sel masque(fig)   # zero-config: auto-extracts the scatter; sel.scatter is the pick
 ```
 """
 module Masque
@@ -82,6 +81,7 @@ include("markup.jl")
 include("interactables.jl")
 include("introspect.jl")
 include("compose.jl")
+include("fields.jl")
 include("events.jl")
 include("bond.jl")
 include("render.jl")

@@ -258,8 +258,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     applyDrag(ctx, state, d, e)
     const { layout, content } = pointerSpace(ctx, state, e)
     if (d.kind === "threshold") {
-        ctx.setValue_(thresholdDrag.end(d, content))
-        ctx.host_.dispatchEvent(new CustomEvent("input"))
+        ctx.commit_({ [d.id_]: thresholdDrag.end(d, content) })
     } else if (d.kind === "view") {
         // §12.3: a view gesture commits nothing — no bond write, no "input" event.
         // Settle is gated on whether a request actually went out during this drag
@@ -277,8 +276,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
         }
         state.photoAnchor_ = null
     } else {
-        ctx.setValue_(roiDrag.end(ctx, state, d))
-        ctx.host_.dispatchEvent(new CustomEvent("input"))
+        ctx.commit_(roiDrag.end(ctx, state, d))
     }
     hideTip(ctx, state); ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     if (d.kind === "view") {
@@ -360,13 +358,13 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     // means this click isn't a selection gesture at all (e.g. an :axis hit) — leave the
     // selection untouched rather than clearing it.
     const next = selectionFor(hit, ctx.manifest_)
-    // A second click on the element that made the selection takes it back: the highlight clears
-    // and the bond returns to `null`, its value before any click.
-    const src = state.selSource_
-    const off = next !== null && src !== null && src.layer === hit.layer.id && src.index === hit.index
+    // A second click on the element that made the field's pick takes it back: the highlight
+    // clears and the field returns to `null`, its value before any click. Other fields keep theirs.
+    const field = hit.layer.id
+    const src = state.sel_.get(field)?.source_ ?? null
+    const off = next !== null && src !== null && src.index === hit.index
     if (next !== null) {
-        state.selHits_ = off ? [] : next
-        state.selSource_ = off ? null : { layer: hit.layer.id, index: hit.index }
+        state.sel_.set(field, off ? { hits_: [], source_: null } : { hits_: next, source_: { layer: field, index: hit.index } })
         renderSelection(ctx, state)
     }
     drawHover(ctx, state, hit)
@@ -400,8 +398,7 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
         value = { layer: hit.layer.id, index: hit.index }
         if (!SELECTED_KINDS.has(hit.layer.kind)) value.payload = resolvePayload(hit, ctx.manifest_, px, py)
     }
-    ctx.setValue_(value)
-    ctx.host_.dispatchEvent(new CustomEvent("input"))
+    ctx.commit_({ [field]: value })
 }
 
 export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {

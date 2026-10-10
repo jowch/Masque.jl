@@ -2,7 +2,7 @@
 
 A click in a Masque widget updates its `@bind` variable, and cells that
 use the variable respond to the change. So linking a scatter to a detail
-plot, a table, or a model fit is ordinary Pluto code: use `pick` in
+plot, a table, or a model fit is ordinary Pluto code: use the value in
 another cell to create a plot or compute a result.
 
 Click a point in the xy plot below, and the same sample is selected in
@@ -50,8 +50,11 @@ end
 ```
 
 ```julia
-@bind pick masque(fig, pts)
+@bind pick masque(fig, pts; bind = s)
 ```
+
+`bind = s` makes `pick` the clicked city itself, or `nothing` before
+the first click.
 
 ```julia
 begin
@@ -71,29 +74,38 @@ that widget's `selected=`. [Selection round-trip](@ref) shows how.
 
 ## Several axes in one figure
 
-One `masque` call covers every axis in a figure. Each scatter gets its
-own layer id (`:scatter`, `:scatter_2`, and so on), so `pick.layer`
-tells you which panel was clicked. Hovering or clicking a point
-highlights it only on its own panel, even when another panel plots the
-same row of your data.
+One `masque` call covers every axis in a figure, and each plot gets its
+own field in the value, so two scatters give `sel.scatter` and
+`sel.scatter_2`. To name the fields after your panels, pass the plots
+that `scatter!` returned as `bind`:
 
-To highlight the same row on both panels, select it on both layers
-from a value `i` set in another cell, such as a slider. The value cannot
-come from this widget's own `pick`, for the reason given in
+```julia
+@bind sel masque(fig; bind = (xy = p_xy, xz = p_xz))
+```
+
+Each panel keeps its own selection: clicking a point in the xy panel
+sets `sel.xy` and leaves `sel.xz` as it was. Hovering or clicking a
+point highlights it only on its own panel, even when another panel plots
+the same row of your data.
+
+To highlight the same row on both panels, select it on both plots from
+a value `i` set in another cell, such as a slider. The value cannot come
+from this widget's own `sel`, for the reason given in
 [Selection](@ref):
 
 ```julia
-masque(fig; selected = Dict(:scatter => [i], :scatter_2 => [i]))
+masque(fig; selected = (scatter = i, scatter_2 = i))
 ```
 
-To link clicks between panels, put each panel in its own figure, as in
-the example at the top of this page.
+To have a click in one panel select the same row in the other, put each
+panel in its own figure, as in the example at the top of this page.
 
 ## Highlight a series across panels
 
 Hovering a legend entry highlights every mark of its series, on every
-axis where the series appears. Clicking an entry sets `pick` to a
-[`LegendEvent`](@ref), which another cell can use to filter your data.
+axis where the series appears. Clicking an entry sets `sel.legend` to
+a [`LegendEvent`](@ref), which another cell can use to filter your
+data.
 See [Legend](@ref).
 
 ```@raw html
@@ -110,10 +122,10 @@ Main.masque_fallback("linked_legend_wash")
 
 To select many points at once, drag a box. When you release an
 [`ROIInteractable`](@ref) with `selects`, it returns every point inside
-the box. If you bind that result to `picks`, another cell can take those
-rows from your table with `df[picks, :]`, or create another plot from
-them.
+the box, in the field of the plot it selects from. With that list as
+`picks`, another cell can take those rows from your table with
+`df[picks, :]`, or create another plot from them.
 [Brush a region](@ref) shows how.
 
-For what each click, release, and drag sets `pick` to, see
+For what each click, release, and drag sets in the value, see
 [Concepts](@ref).

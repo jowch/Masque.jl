@@ -12,7 +12,7 @@ mark as you move to it. A `masque` widget needs no extra setup for this.
 | ← / ↑ | Previous mark |
 | Home / End | First / last mark |
 | Page Down / Page Up | First mark of the next / previous layer |
-| Enter / Space | Select the focused mark: the `@bind` value becomes what a click on it gives |
+| Enter / Space | Select the focused mark: its plot's field in the `@bind` value becomes what a click on it gives |
 | Escape | Clear focus and leave the plot |
 
 Arrow keys and Home / End stop at the first and last mark rather than

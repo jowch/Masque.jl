@@ -1,13 +1,14 @@
 // THROUGH-PLUTO @bind E2E. Drives a live headless Pluto kernel (serve.jl) in real Chromium:
 // open the notebook, exit safe preview, click scatter marker 0, and assert the bond round-trips
-// THROUGH Pluto — the kernel re-runs the readout cell so #bondout flips from "BOND=nothing" to
-// the InteractionEvent. This is the mile the static E2E (click.mjs) skips: Pluto/APD bond
-// transport + reactive re-render, not just the overlay's emit. Verified locally against a real
-// kernel: click -> BOND=ElementEvent(:scatter, 1, …) for wire marker 0.
+// THROUGH Pluto — the kernel re-runs the readout cell so #bondout flips from
+// "BOND=(scatter = nothing,)" to the scatter's field holding the event (#335: the value has one
+// field per plot that takes clicks). This is the mile the static E2E (click.mjs) skips: Pluto/APD
+// bond transport + reactive re-render, not just the overlay's emit. Verified locally against a
+// real kernel: click -> BOND=(scatter = ElementEvent(:scatter, 1, …),) for wire marker 0.
 //
 // Readiness is split on purpose (de-flake):
 //   1. layout — host/base have non-zero width (MARKER0 scale isn't 0)
-//   2. overlay emit — host.value set on click (same signal click.mjs asserts)
+//   2. overlay emit — host.value.scatter set on click (same signal click.mjs asserts)
 //   3. Pluto round-trip — #bondout flips (only after emit; longer patience; no re-clicks)
 // Failures name which mile broke instead of the ambiguous "bond stayed nothing".
 //
@@ -179,7 +180,8 @@ try {
 
     const before = document.querySelector("#bondout").innerText;
     // --- Mile 2: overlay emit (host.value). Retries OK — same marker is idempotent. -----------
-    // onClick sets host.value synchronously on hit; a miss leaves it null (mount init).
+    // host.value is one envelope per field, seeded `{scatter: null}` at mount. onClick sets the
+    // scatter's field synchronously on hit; a miss leaves it null.
     let emitAttempt = -1;
     let emitted = null;
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -189,10 +191,10 @@ try {
         const after = bondText(before);
         if (after !== before) {
           // Pluto already flipped — rare but treat as full success (emit implied).
-          return { before, after, emitAttempt: attempt, emitted: host.value, plutoMs: 0, inputRefires: 0, sawCellActivity: false, lastState: cellState(), error: null };
+          return { before, after, emitAttempt: attempt, emitted: host.value?.scatter ?? null, plutoMs: 0, inputRefires: 0, sawCellActivity: false, lastState: cellState(), error: null };
         }
-        if (host.value != null) {
-          emitted = host.value;
+        if (host.value?.scatter != null) {
+          emitted = host.value.scatter;
           emitAttempt = attempt;
           break;
         }
@@ -271,7 +273,7 @@ try {
   // window — #bondout then flips to marker 0's event (Julia index 1) even though marker 1 was
   // clicked last. That's still a genuine `@bind` round-trip. On the happy path (clickedIndex
   // still 0) only Julia index 1 is valid; Julia index 2 would mean the click hit marker 1.
-  const landedMatch = /ElementEvent\(:scatter, (\d+)/.exec(result.after);
+  const landedMatch = /scatter = ElementEvent\(:scatter, (\d+)/.exec(result.after);
   const landedIndex = landedMatch ? Number(landedMatch[1]) : null;
   // Wire marker 0 is Julia index 1. A late retry may still show marker 0's event.
   const validIndices = clickedIndex === 1 ? [1, 2] : [1];

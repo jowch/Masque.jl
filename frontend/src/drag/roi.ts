@@ -131,8 +131,7 @@ export function move(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { ki
     setROI(box)
     if (d.target_) {
         const sel = computeSelection(box.g_, d.target_, ctx.manifest_.transforms[d.target_.axis])
-        state.selHits_ = sel.hits
-        state.selSource_ = null // the box owns this selection, not a click
+        state.sel_.set(d.target_.id, { hits_: sel.hits, source_: null }) // the box chose these, not a click
         renderSelection(ctx, state)
         return `${sel.items.length} selected`
     }
@@ -141,17 +140,19 @@ export function move(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { ki
     return `x:[${fmt(b.xmin, n)}, ${fmt(b.xmax, n)}] y:[${fmt(b.ymin, n)}, ${fmt(b.ymax, n)}]`
 }
 
+// The fields a release sets: the box's bounds, and with `selects` what it now holds, under
+// its target's field.
 export function end(
     ctx: OverlayCtx,
     state: OverlayState,
     d: Extract<Drag, { kind: "roi" }>,
-): { items: unknown[] } | { layer: string; index: number; payload: unknown } {
+): Record<string, unknown> {
+    const out: Record<string, unknown> = { [d.id_]: { layer: d.id_, index: 0, payload: roiBounds(d.box_) } }
     if (d.target_) {
         const sel = computeSelection(d.box_.g_, d.target_, ctx.manifest_.transforms[d.target_.axis])
-        state.selHits_ = sel.hits
-        state.selSource_ = null // the box owns this selection, not a click
+        state.sel_.set(d.target_.id, { hits_: sel.hits, source_: null }) // the box chose these, not a click
         renderSelection(ctx, state)
-        return { items: sel.items }
+        out[d.target_.id] = { items: sel.items }
     }
-    return { layer: d.id_, index: 0, payload: roiBounds(d.box_) }
+    return out
 }

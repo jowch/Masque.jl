@@ -155,9 +155,12 @@ export interface OverlayCtx {
     gesture_: GestureChannel
     // Paints the photographic matrix onto the base and the overlay groups. Mount owns the DOM.
     photoPaint_: (m: PhotoMatrix) => void
-    // Writes the bond value from a gesture. `host_.value` itself is an accessor (mount.ts):
-    // a write through it is Pluto restoring the kernel's value, which redraws the selection.
-    setValue_: (v: unknown) => void
+    // Commits a gesture: sets these fields of the bond value, keeps the others, and sends the
+    // whole value. A key that is not a field (a layer the `bind` left out) is dropped, and a
+    // commit that leaves no field changes nothing. `host_.value` itself is an accessor
+    // (mount.ts): a write through it is Pluto restoring the kernel's value, which redraws the
+    // selection.
+    commit_: (fields: Record<string, unknown>) => void
 }
 
 export interface OverlayState {
@@ -167,20 +170,16 @@ export interface OverlayState {
     // drawSelection reads it to drop a ring whose key just entered the selection (#97).
     hiKey_: string | null
     selKeys_: Set<string>
-    // THE selection. Seeded at mount from the manifest's `selected=` hits (hydration only, an
-    // initial value). Written by two gestures, both wholesale-REPLACING this, never unioning with
-    // what was there: a click whose hit kind participates in the selection model (selection.ts's
-    // `selectionFor` returns non-null — an element-indexed kind, :grid, or a legend link, which
-    // may itself resolve to `[]`), and a selects-ROI move/release. A click on a kind that does
-    // NOT participate (:axis/:threshold/:roi/:view — `selectionFor` returns `null`) leaves this
-    // field untouched. Reset on remount falls out of createOverlayState() re-running, not a reset
-    // this field needs of its own.
-    selHits_: Hit[]
-    // The element whose click wrote `selHits_` (or the one `selected=` index hydrated it from),
-    // id-keyed so a manifest rebuild needs no re-keying. Clicking it again clears the selection
-    // and sends `null` — the toggle off. Null when nothing is selected or the selection holds
-    // several hydrated indices, which no single click owns.
-    selSource_: { layer: string; index: number } | null
+    // The selection, one entry per field (a layer id), drawn together. Seeded at mount from the
+    // manifest's `initial` value. Written by two gestures, each REPLACING its own field's entry
+    // and leaving the others: a click whose hit kind participates in the selection model
+    // (selection.ts's `selectionFor` returns non-null — an element-indexed kind, :grid, or a
+    // legend link, which may itself resolve to `[]`), and a selects-ROI move/release, which
+    // writes its target's entry. A click on a kind that does NOT participate (:axis/:threshold/
+    // :roi/:view — `selectionFor` returns `null`) leaves its entry untouched. `source_` is the
+    // element whose click wrote the entry: clicking it again clears the field and sends `null`,
+    // the toggle off. Null for a box's selection, which no single click owns.
+    sel_: Map<string, FieldSelection>
     hiLeaveTimer_: ReturnType<typeof setTimeout> | null
     // g.link (legend-linked highlight): keyed by hitKey() of the SOURCE element (the hovered/
     // focused legend entry), not any one target hit — one source can fan out to many target
@@ -234,8 +233,7 @@ export function createOverlayState(): OverlayState {
         justDragged_: false,
         hiKey_: null,
         selKeys_: new Set(),
-        selHits_: [],
-        selSource_: null,
+        sel_: new Map(),
         hiLeaveTimer_: null,
         linkKey_: null,
         linkLeaveTimer_: null,
@@ -265,6 +263,24 @@ export function createOverlayState(): OverlayState {
         keyView_: false,
         view3_: new Map(),
     }
+}
+
+export type FieldSelection = { hits_: Hit[]; source_: { layer: string; index: number } | null }
+
+// Every field's selected hits, in one list: what g.sel draws. A mark two fields both hold (a
+// legend pick's series and a box's brush) is drawn once, or its wash would stack.
+export function selectedHits(state: OverlayState): Hit[] {
+    const out: Hit[] = []
+    const seen = new Set<string>()
+    for (const s of state.sel_.values()) {
+        for (const h of s.hits_) {
+            const k = hitKey(h)
+            if (seen.has(k)) continue
+            seen.add(k)
+            out.push(h)
+        }
+    }
+    return out
 }
 
 export function cancelPendingMove(state: OverlayState): void {

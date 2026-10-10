@@ -295,7 +295,16 @@ try {
     return { ok: !!(sr && sr.querySelector(".surface")) };
   }, key);
 
-  const inspect = (key) => page.evaluate((k) => {
+  // The `@bind` value is one envelope per field (#335): `bond` is the field the spec is about
+  // (its `field`, else its `layerId`), `bondAll` the whole `host.value`.
+  const fieldOf = new Map(meta.map((s) => [s.key, s.field ?? s.layerId]));
+  const inspect = async (key) => {
+    const r = await inspectRaw(key);
+    const f = fieldOf.get(key);
+    r.bond = f === "*" ? r.bondAll : (r.bondAll?.[f] ?? null);
+    return r;
+  };
+  const inspectRaw = (key) => page.evaluate((k) => {
     const span = document.querySelector(`#coords_${k}`);
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -364,7 +373,7 @@ try {
       sel: count("g.sel"),
       hi: count("g.hi"),
       // The overlay's own bond value, read before any kernel round-trip.
-      bond: host.value ?? null,
+      bondAll: host.value ?? null,
     };
   }, key);
 
@@ -671,6 +680,76 @@ try {
       passed.push(`${key}/overlap-pixel-contested`);
     }
 
+    // Several fields at once (#335): a click on a point sets `scatter`, a drag of the threshold
+    // sets its own field, both print in the `@bind` value, and a default line beside them shows
+    // its tooltip but has no field and takes no click.
+    if (spec.mode === "composite") {
+      const all0 = await textOf(`#bond_${key}`);
+      const ctl = spec.control, start = spec.controlStart;
+      const ctlRe = (v) => new RegExp(`${ctl} = ThresholdEvent\\(:${ctl}, value = ${v === null ? "(-?[\\d.e+-]+)" : (Number.isInteger(v) ? v.toFixed(1) : String(v)).replace(".", "\\.") + "\\b"}`);
+      if (!/scatter = nothing/.test(all0) || !ctlRe(start).test(all0)) {
+        throw new Error(`${key}: mount value ${JSON.stringify(all0)}, want scatter = nothing and ${ctl} at ${start}`);
+      }
+      const m0 = await inspect(key);
+      const keys0 = Object.keys(m0.bondAll ?? {}).sort();
+      if (JSON.stringify(keys0) !== JSON.stringify([...spec.fields].sort())) {
+        throw new Error(`${key}: host.value keys ${JSON.stringify(keys0)}, want ${JSON.stringify(spec.fields)}`);
+      }
+      passed.push(`${key}/fields-at-mount`);
+
+      // The default line: tooltip, no click, no field.
+      const line = layers.find((l) => l.id === spec.line);
+      if (!line) throw new Error(`${key}: no line layer "${spec.line}" in ${layers.map((l) => l.id)}`);
+      if (line.events.includes("click") || !line.events.includes("hover")) {
+        throw new Error(`${key}: default line events ${JSON.stringify(line.events)}, want hover without click`);
+      }
+      const lp = hitPoint(line, 0);
+      const lineHit = await dispatchAt(key, lp.x, lp.y, "click");
+      if (!lineHit.show) throw new Error(`${key}: hovering the default line showed no tooltip ${JSON.stringify(lineHit)}`);
+      await new Promise((r) => setTimeout(r, 1500));
+      if ((await textOf(`#bond_${key}`)) !== all0) throw new Error(`${key}: a click on the default line changed the value`);
+      if (lineHit.sel !== 0) throw new Error(`${key}: a click on the default line drew a pick (g.sel=${lineHit.sel})`);
+      passed.push(`${key}/default-line-hover-only`);
+
+      // A point: its field takes the pick, the control's keeps its start.
+      const pt = hitPoint(layer, spec.clickIndex);
+      const picked = await dispatchAt(key, pt.x, pt.y, "click");
+      const all1 = await waitChange(`#bond_${key}`, all0, `${key}/pick`);
+      if (!new RegExp(`scatter = ElementEvent\\(:scatter, ${spec.clickIndex + 1},`).test(all1) || !ctlRe(start).test(all1)) {
+        throw new Error(`${key}/pick: value ${JSON.stringify(all1)}, want scatter = :scatter ${spec.clickIndex + 1} and ${ctl} still ${start}`);
+      }
+      if (picked.sel !== 2) throw new Error(`${key}/pick: g.sel=${picked.sel}, want one closed pick (2 shapes)`);
+      const pickedAll = (await inspect(key)).bondAll;
+      if (pickedAll?.scatter?.index !== spec.clickIndex || pickedAll?.[ctl]?.payload !== start) {
+        throw new Error(`${key}/pick: host.value ${JSON.stringify(pickedAll)}`);
+      }
+      passed.push(`${key}/pick-own-field`);
+      await dispatchAt(key, 1, 1, "pointermove");
+
+      // The threshold: its field moves, the pick stays (in the value and on screen).
+      const ctlLayer = layers.find((l) => l.id === ctl);
+      if (!ctlLayer) throw new Error(`${key}: no control layer "${ctl}"`);
+      const cp = hitPoint(ctlLayer, 0);
+      await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host?.scrollIntoView({ block: "center", inline: "nearest" });
+      }, key);
+      await drag(key, cp.x, cp.y, cp.x + 80, cp.y, false);
+      const all2 = await waitChange(`#bond_${key}`, all1, `${key}/drag`, 120);
+      const mv = ctlRe(null).exec(all2);
+      if (!mv || !(Number(mv[1]) > start)) throw new Error(`${key}/drag: value ${JSON.stringify(all2)}, want ${ctl} moved right of ${start}`);
+      if (!new RegExp(`scatter = ElementEvent\\(:scatter, ${spec.clickIndex + 1},`).test(all2)) {
+        throw new Error(`${key}/drag: the drag dropped the scatter's pick: ${JSON.stringify(all2)}`);
+      }
+      const afterDrag = await inspect(key);
+      if (afterDrag.sel !== 2) throw new Error(`${key}/drag: g.sel=${afterDrag.sel} after the drag, want the pick still drawn (2)`);
+      passed.push(`${key}/drag-own-field`);
+      passed.push(`${key}/bind-shows-both`);
+      console.error(`OK  ${key} — ${all2.slice(0, 160)}`);
+      continue;
+    }
+
     // mount.ts used to force host.value = null unconditionally, so the real Pluto bond settled
     // on `nothing` at mount even with selected= baked in. Read #out_${key} (repr(ev) off the
     // actual bond) before any click/drag on this widget to catch that directly.
@@ -722,19 +801,24 @@ try {
       );
     }
 
-    // A threshold, a box, or a colorbar the caller passed owns the bond (#309). The bond starts
-    // at the owner's value (`spec.owner.initial`, a regex on #out), and another layer of the
-    // same widget shows its tooltip but takes no click: the overlay drops its "click" event,
-    // and a real click on it leaves the bond as it was.
+    // A threshold, a box, or a colorbar is a field of its own (#335). Its field starts at the
+    // control's value (`spec.owner.initial`, a regex on the whole value, #bond), and another layer
+    // of the same widget shows its tooltip. With `otherClicks` that layer is a field too: a click
+    // on it sets its own field and leaves the control's. Without (a `selects` box's target), it
+    // takes no click: the overlay drops its "click" event, and a real click leaves the value.
+    let ownerMountAll = null;
     if (spec.owner) {
-      if (!new RegExp(spec.owner.initial).test(mountBond)) {
-        throw new Error(`${key}: mount bond ${JSON.stringify(mountBond)}, want /${spec.owner.initial}/`);
+      const mountAll = await textOf(`#bond_${key}`);
+      ownerMountAll = mountAll;
+      if (!new RegExp(spec.owner.initial).test(mountAll)) {
+        throw new Error(`${key}: mount value ${JSON.stringify(mountAll)}, want /${spec.owner.initial}/`);
       }
       passed.push(`${key}/owner-initial-bond`);
       const other = layers.find((l) => l.id === spec.owner.layer);
       if (!other) throw new Error(`${key}: no layer "${spec.owner.layer}" in ${layers.map((l) => l.id)}`);
-      if (other.events.includes("click") || !other.events.includes("hover")) {
-        throw new Error(`${key}: :${other.id} events ${JSON.stringify(other.events)}, want hover without click`);
+      const otherClicks = !!spec.owner.otherClicks;
+      if (other.events.includes("click") !== otherClicks || !other.events.includes("hover")) {
+        throw new Error(`${key}: :${other.id} events ${JSON.stringify(other.events)}, want hover ${otherClicks ? "and" : "without"} click`);
       }
       const op = hitPoint(other, 0);
       const hov = await dispatchAt(key, op.x, op.y, "pointermove");
@@ -746,13 +830,34 @@ try {
         passed.push(`${key}/owner-start-highlight`);
       }
       const clicked = await dispatchAt(key, op.x, op.y, "click");
-      await new Promise((r) => setTimeout(r, 1500));
-      const afterClick = await textOf(`#out_${key}`);
-      if (afterClick !== mountBond) throw new Error(`${key}: clicking :${other.id} changed the bond ${JSON.stringify(mountBond)} -> ${JSON.stringify(afterClick)}`);
-      if (clicked.sel !== hov.sel) throw new Error(`${key}: clicking :${other.id} changed the selection (${hov.sel} -> ${clicked.sel})`);
-      passed.push(`${key}/owner-other-no-click`);
+      if (otherClicks) {
+        // The other layer's field takes the pick; the control's field (#out) keeps its value.
+        const afterAll = await waitChange(`#bond_${key}`, mountAll, `${key}/owner-other-click`);
+        const want = other.kind === "grid" ? `${other.id} = GridCellEvent(:${other.id}, i = 1, j = 1` : `${other.id} = ElementEvent(:${other.id}, 1,`;
+        if (!afterAll.includes(want)) throw new Error(`${key}: clicking :${other.id} gave ${JSON.stringify(afterAll)}, want ${JSON.stringify(want)}`);
+        if (!new RegExp(spec.owner.initial).test(afterAll)) {
+          throw new Error(`${key}: clicking :${other.id} changed the control's field: ${JSON.stringify(afterAll)}`);
+        }
+        const afterOut = await textOf(`#out_${key}`);
+        if (afterOut !== mountBond) throw new Error(`${key}: clicking :${other.id} changed #out ${JSON.stringify(mountBond)} -> ${JSON.stringify(afterOut)}`);
+        if (!(clicked.sel > hov.sel)) throw new Error(`${key}: clicking :${other.id} drew no pick (${hov.sel} -> ${clicked.sel})`);
+        const keys = Object.keys((await inspect(key)).bondAll ?? {}).sort();
+        if (!keys.includes(other.id) || !keys.includes(layer.id)) {
+          throw new Error(`${key}: host.value keys ${JSON.stringify(keys)}, want :${other.id} and :${layer.id}`);
+        }
+        passed.push(`${key}/owner-other-click-own-field`);
+        // Take the pick back, so the checks below start from the control's own value.
+        await dispatchAt(key, op.x, op.y, "click");
+        await waitChange(`#bond_${key}`, afterAll, `${key}/owner-other-unclick`);
+      } else {
+        await new Promise((r) => setTimeout(r, 1500));
+        const afterAll = await textOf(`#bond_${key}`);
+        if (afterAll !== mountAll) throw new Error(`${key}: clicking :${other.id} changed the value ${JSON.stringify(mountAll)} -> ${JSON.stringify(afterAll)}`);
+        if (clicked.sel !== hov.sel) throw new Error(`${key}: clicking :${other.id} changed the selection (${hov.sel} -> ${clicked.sel})`);
+        passed.push(`${key}/owner-other-no-click`);
+      }
       await dispatchAt(key, 1, 1, "pointermove");
-      console.error(`OK  ${key}/owner — starts ${mountBond.slice(0, 80)}, :${other.id} hover-only`);
+      console.error(`OK  ${key}/owner — starts ${mountAll.slice(0, 120)}, :${other.id} ${otherClicks ? "its own field" : "hover-only"}`);
     }
     if (spec.mode === "owner") continue;
 
@@ -1009,6 +1114,25 @@ try {
       const re = spec.layerKind === "roi" ? /:roi|ElementEvent\[|BoundsEvent/i : /:threshold|:thr|ThresholdEvent/i;
       if (!re.test(after)) throw new Error(`${key}-drag: readout mismatch ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/drag-bind`);
+      // A `selects` box's release sets both of its fields (#335): its bounds (#out) and its
+      // target's, which now holds what the moved box contains (points (1, 1) and (3, 3) here,
+      // where it started with (3, 3) and (5, 5)).
+      if (spec.owner?.startsSelected) {
+        const tgt = spec.owner.layer;
+        const targetOf = (t) => new RegExp(`${tgt} = (.*), ${spec.layerId} = `).exec(t)?.[1] ?? null;
+        const bounds = after.replace(/^[A-Z_]+=/, "");
+        let all = await textOf(`#bond_${key}`);
+        for (let i = 0; i < 40 && !all.includes(bounds); i++) {
+          await new Promise((r) => setTimeout(r, 200));
+          all = await textOf(`#bond_${key}`);
+        }
+        const t0 = targetOf(ownerMountAll ?? ""), t1 = targetOf(all);
+        if (!all.includes(bounds) || t0 === null || t1 === null || t1 === t0) {
+          throw new Error(`${key}-drag: whole value ${JSON.stringify(all).slice(0, 300)}, want the released bounds and a new :${tgt} (was ${JSON.stringify(t0)})`);
+        }
+        passed.push(`${key}/drag-sets-target-field`);
+        console.error(`OK  ${key}/drag target — ${tgt} = ${t1.slice(0, 160)}`);
+      }
       if (catTarget) {
         // The release commits the target category's 1-based position and its label (#192), and
         // the line lands on that category's row (#199). This fixture is a horizontal threshold, so
@@ -1367,6 +1491,12 @@ try {
         throw new Error(`${key}/colorbar-click-preserves-selection: g.sel ${beforeClicks.sel} -> ${afterCbClick.sel} after a colorbar click`);
       }
       passed.push(`${key}/colorbar-click-preserves-selection`);
+      // Each layer has its own field (#335): the axis and colorbar clicks set theirs and the
+      // `pts` pick stays in its own.
+      if (!/pts = ElementEvent\(:pts, 2,/.test(cbAfter) || !/axis = AxisEvent\(:axis,/.test(cbAfter)) {
+        throw new Error(`${key}/fields-kept: after the axis and colorbar clicks the value is ${JSON.stringify(cbAfter).slice(0, 260)}, want pts = :pts 2 and an axis = AxisEvent`);
+      }
+      passed.push(`${key}/fields-kept`);
       console.error(`OK  ${key}/colorbar-click — ${cbAfter.slice(0, 110)}`);
       continue;
     }
@@ -1907,6 +2037,25 @@ try {
       }
       if (afterLinkLeave.count !== 0) throw new Error(`${key}/links: g.link lingered ${afterLinkLeave.count}`);
       passed.push(`${key}/links-fade`);
+    }
+
+    // A default line shows its tooltip and takes no click (#335): the layer has no "click" event
+    // and no field, and a click on it draws no pick and leaves the value as it was.
+    if (spec.hoverOnly) {
+      if (layer.events.includes("click")) throw new Error(`${key}: default line :${layer.id} events ${JSON.stringify(layer.events)}, want no click`);
+      const beforeAll = await textOf(`#bond_${key}`);
+      const p = hitPoint(layer, spec.clickIndex);
+      const r = await dispatchAt(key, p.x, p.y, "click");
+      if (!r.show) throw new Error(`${key}: no tooltip on the hover-only line ${JSON.stringify(r)}`);
+      await new Promise((res) => setTimeout(res, 1500));
+      const afterAll = await textOf(`#bond_${key}`);
+      if (afterAll !== beforeAll) throw new Error(`${key}: a click on the hover-only line changed the value ${JSON.stringify(beforeAll)} -> ${JSON.stringify(afterAll)}`);
+      if (r.sel !== 0) throw new Error(`${key}: a click on the hover-only line drew a pick (g.sel=${r.sel})`);
+      const valueKeys = Object.keys((await inspect(key)).bondAll ?? {});
+      if (valueKeys.includes(layer.id)) throw new Error(`${key}: host.value has a field for the hover-only line: ${JSON.stringify(r.bondAll)}`);
+      passed.push(`${key}/hover-only-no-click`);
+      console.error(`OK  ${key} — hover-only, value ${afterAll}`);
+      continue;
     }
 
     let clickIdx = spec.clickIndex;

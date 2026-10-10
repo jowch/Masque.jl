@@ -47,30 +47,30 @@ end
 
 # ╔═╡ a1410006-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores the click, and a click on a marker gives a different value from a click on a label.
+`@bind sel` stores the clicks, with one field per plot: `sel.text` for the three point labels, `sel.text_2` for the tilted one, `sel.annotation` for the annotation, and `sel.scatter` for the markers.
 """
 
 # ╔═╡ a1410006-0001-4000-8000-000000000003
-@bind pick masque(fig)
+@bind sel masque(fig)
 
 # ╔═╡ a1410006-0001-4000-8000-000000000012
 md"""
-This cell responds to the click.
+This cell responds to the click, and quotes each label that is selected.
 """
 
 # ╔═╡ a1410006-0001-4000-8000-000000000004
-if isnothing(pick)
-    "click a label"
-elseif hasproperty(pick, :text)
-    "\"$(pick.text)\""
-else
-    "that was a marker; click a label"
+begin
+    quoted = String[]
+    for label in (sel.text, sel.text_2, sel.annotation)
+        isnothing(label) || push!(quoted, "\"$(label.text)\"")
+    end
+    isempty(quoted) ? "click a label" : join(quoted, ", ")
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
-bond = "pick"
+bond = "sel"
 show_code = true
 pluto_html = true
 

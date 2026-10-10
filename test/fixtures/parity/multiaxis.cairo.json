@@ -68,6 +68,10 @@
             ]
         }
     ],
+    "initial": {
+        "right": null,
+        "left": null
+    },
     "transforms": {
         "ax1": {
             "xscale": "identity",
@@ -123,5 +127,9 @@
         }
     },
     "width": 1200,
-    "scaling": 2
+    "scaling": 2,
+    "fields": [
+        "left",
+        "right"
+    ]
 }

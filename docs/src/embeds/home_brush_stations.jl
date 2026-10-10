@@ -53,7 +53,7 @@ begin
 end
 
 # ╔═╡ c0e10004-0001-4000-8000-000000000003
-@bind picks masque(fig, pts, roi)
+@bind picks masque(fig, pts, roi; bind = sc)
 
 # ╔═╡ c0e10004-0001-4000-8000-000000000004
 if isempty(picks)

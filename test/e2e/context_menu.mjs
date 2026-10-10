@@ -244,8 +244,25 @@ try {
     }, { timeout: 3000 });
     await page.mouse.click(x, y);
     await page.waitForFunction(() => window.__masqueClick?.fired === true, { timeout: 5000 });
-    const result = await page.evaluate(() => window.__masqueClick);
-    if (!result?.value || result.value.layer !== pts.id) {
+    let result = await page.evaluate(() => window.__masqueClick);
+    // A notebook session an earlier driver used can hold this point as the scatter's pick
+    // already (Pluto keeps a bond's value), and a click on the picked point takes it back: the
+    // field goes `null`. Click once more, so the field holds the point again.
+    if (result?.value && result.value[pts.id] === null) {
+      await page.evaluate(() => {
+        const span = document.querySelector("#coords_scatter");
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        window.__masqueClick = { fired: false, value: null };
+        host.addEventListener("input", () => { window.__masqueClick = { fired: true, value: host.value }; }, { once: true });
+      });
+      await page.waitForTimeout(400);   // not a double-click
+      await page.mouse.click(x, y);
+      await page.waitForFunction(() => window.__masqueClick?.fired === true, { timeout: 5000 });
+      result = await page.evaluate(() => window.__masqueClick);
+    }
+    // host.value holds one envelope per field (#335): the click sets the scatter's.
+    if (result?.value?.[pts.id]?.layer !== pts.id) {
       throw new Error(`scatter click after menu: ${JSON.stringify(result)}`);
     }
     passed.push("scatter/click-and-hover-after-menu");

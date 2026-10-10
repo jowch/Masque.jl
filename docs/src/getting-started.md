@@ -38,18 +38,26 @@ end
 Pass the figure to `masque` and bind the result to a variable:
 
 ```julia
-@bind pick masque(fig)
+@bind sel masque(fig)
 ```
 
-Hover over a point to see its `index`, `x`, and `y`. Clicking a point
-stores it in `pick`, and cells that use `pick` respond to the change:
+`sel` has one field for each plot you can click, named after the plot,
+so this figure's scatter is `sel.scatter`. Hover over a point to see its
+`index`, `x`, and `y`. Clicking a point stores it in `sel.scatter`, and
+cells that use `sel` respond to the change:
+
+```julia
+pick = sel.scatter
+```
 
 ```julia
 isnothing(pick) ? "click a point" : "point $(pick.index) at x = $(pick.x)"
 ```
 
-`pick` is an [`ElementEvent`](@ref), and `pick.index` is the clicked
-point's position in the data you plotted, so `ys[pick]` is its `y`.
+`pick` is `nothing` until you click, then an [`ElementEvent`](@ref), and
+`pick.index` is the clicked point's position in the data you plotted, so
+`ys[pick]` is its `y`. To have `sel` be the point itself, without the
+field, see [What the `@bind` value holds](@ref).
 
 `masque(fig)` works on scatters, lines, bars, heatmaps, polygons, text,
 legends, and colorbars. [Recipes masque(fig) extracts](@ref) has the
@@ -77,7 +85,7 @@ end
 and pass `pts` to `masque` in the `@bind` cell:
 
 ```julia
-@bind pick masque(fig, pts)
+@bind sel masque(fig, pts)
 ```
 
 Hovering a point now shows its `name`, `x`, and `y`, and clicking it

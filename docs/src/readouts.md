@@ -11,7 +11,8 @@ colorbar a readout for you. For the other two, pass an
 
 With an [`AxisInteractable`](@ref), a tooltip follows the pointer
 anywhere on the axis and shows the data coordinates under it. A click
-sets `pick` to an [`AxisEvent`](@ref) with `pick.x` and `pick.y`:
+sets the readout's field, `sel.axis`, to an [`AxisEvent`](@ref) with
+`x` and `y`. The examples on this page call that event `pick`:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -32,7 +33,7 @@ or `pick.ycat`. On a numeric axis, that field is `nothing`.
 
 The example above shows only the tooltip, because this site does not
 record clicks on a position ([Static exports and this site](@ref)). In
-your notebook, a click sets `pick`.
+your notebook, a click sets `sel.axis`.
 
 On a `PolarAxis`, the readout is the angle and radius under the
 pointer, in the same order as your data: `pick.x` is the angle in
@@ -45,11 +46,11 @@ of an ordinary axis.
 ## Read a colorbar value
 
 Hover over a colorbar to see the value its color stands for, and click
-it to set `pick` to a [`ColorbarEvent`](@ref) with `pick.value`.
+it to set `sel.colorbar` to a [`ColorbarEvent`](@ref) with `value`.
 `masque(fig)` adds a [`ColorbarInteractable`](@ref) for every
-`Colorbar` in the figure, and the heatmap's cells take clicks too. To
-have `pick` hold only the colorbar's value, create the
-`ColorbarInteractable` yourself and pass it to `masque`:
+`Colorbar` in the figure, and the heatmap's cells take clicks too, into
+`sel.cells`. To have the value be only the colorbar's, create the
+`ColorbarInteractable` yourself and pass it as `bind`:
 
 ```julia
 begin
@@ -64,12 +65,11 @@ end
 ```
 
 ```julia
-@bind pick masque(fig, cbint)
+@bind pick masque(fig; bind = cbint)
 ```
 
-A colorbar you pass owns `pick`: the cells still show their tooltips,
-but clicking them does not change `pick`. `pick` is `nothing` until
-the first click on the colorbar.
+`pick` is `nothing` until the first click on the colorbar. The cells
+still show their tooltips, but clicking them does not change `pick`.
 
 A later cell could use `pick.value` as a contour level or a threshold
 for the heatmap.
@@ -94,14 +94,14 @@ end
 ```
 
 ```julia
-@bind level masque(fig, cutoff)
+@bind level masque(fig; bind = cutoff)
 ```
 
-The line owns `level`: the points still show their tooltips, but
-clicking them does not change `level`, so it only ever holds the line's
-position. `level` is a [`ThresholdEvent`](@ref), and `level.value` is
-the line's position in data coordinates. It starts at `value`, and
-changes when you release the line after a drag:
+`bind = cutoff` makes `level` the line's value: the points still show
+their tooltips, but clicking them does not change `level`. `level` is a
+[`ThresholdEvent`](@ref), and `level.value` is the line's position in
+data coordinates. It starts at `value`, and changes when you release
+the line after a drag:
 
 ```julia
 "$(count(>(level.value), ys)) of $(length(ys)) points above $(round(level.value; digits = 2))"
@@ -120,16 +120,25 @@ When the cell that creates the figure runs again, for example because a
 slider it uses changed, the line and `level` both go back to `value`.
 To keep a cutoff you like,
 write its number as `value` in the figure code. Writing
-`value = level.value` there does not work, for the same reason as
-`selected = pick`; see [Selection](@ref).
+`value = level.value` there does not work, for the same reason a widget
+cannot take its own value as `selected=`; see [Selection](@ref).
 
 ## Where these work
 
 The axis readout and the threshold need a 2D `Axis`; see
 [Supported plots and axes](@ref) for which axes and scales.
 
-One widget takes one threshold, colorbar you pass, or box from
-[Brush a region](@ref), since each owns the widget's value. To use two,
-pass each to its own `masque` call.
+One widget can hold several thresholds, boxes, and plots you click, each
+in its own field. Give each a name with a named tuple, so you know which
+field is which:
+
+```julia
+low = ThresholdInteractable(ax; orientation = :horizontal, value = 0.2)
+high = ThresholdInteractable(ax; orientation = :horizontal, value = 0.8)
+@bind band masque(fig; bind = (low = low, high = high))
+```
+
+Then `band.low.value` and `band.high.value` are the two lines'
+positions, and moving one leaves the other's field as it was.
 
 To drag a box instead of a line, see [Brush a region](@ref).

@@ -42,15 +42,15 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click on a legend entry in `pick`, while hovering over an entry only highlights its line and leaves `pick` as it was.
+`bind = :legend` makes `pick` the legend's value, and `@bind pick` saves a click on a legend entry in `pick`, while hovering over an entry only highlights its line and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind pick masque(fig)
+@bind pick masque(fig; bind = :legend)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`, and this cell responds when you click. Clicking a legend entry makes `pick` a `LegendEvent`, and `pick.label` is the entry's text. Clicking a line gives an `ElementEvent`, which has no `label`.
+`pick` starts as `nothing`, and this cell responds when you click a legend entry. A click makes `pick` a `LegendEvent`, and `pick.label` is the entry's text. Clicking the same entry again sets `pick` back to `nothing`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004

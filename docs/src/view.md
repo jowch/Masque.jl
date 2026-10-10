@@ -38,13 +38,13 @@ end
 ```
 
 ```julia
-@bind pick masque(fig, pan)
+@bind pick masque(fig, pan; bind = s)
 ```
 
 Drag the plot to pan, and scroll to zoom around the pointer. The axis
 frame stays in place while the data moves inside it, and you can hover
 over and click the points wherever they move to. `pick` changes only
-when you click a point.
+when you click a point, and the view has no field of its own.
 
 Panning and orbiting need a running notebook, so in a static HTML
 export the view does not move. The two backends show the moving view

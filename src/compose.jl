@@ -259,7 +259,7 @@ const _BUILTIN_IDS = Set{Symbol}(
 # id that meets one moves instead. A numbered id that names a default replaces it, so
 # `ColorbarInteractable(cb1)`, `ColorbarInteractable(cb2)` replace `:colorbar` and
 # `:colorbar_2`. Only calls that raised a duplicate-id error before see a new id.
-function _number_builtin_ids(given, installed)
+function _number_builtin_ids(given, installed; final_ids = IdDict{Any, Symbol}())
     used = Set{Symbol}()
     for g in given
         if g isa _PlotRequest
@@ -273,6 +273,7 @@ function _number_builtin_ids(given, installed)
     for g in given
         id = g isa _PlotRequest ? nothing : _layer_id(g)
         if id === nothing || !(id in _BUILTIN_IDS)
+            id === nothing || (final_ids[g] = id)
             push!(out, g)
             continue
         end
@@ -282,6 +283,7 @@ function _number_builtin_ids(given, installed)
         end
         new = n == 1 ? id : Symbol(id, :_, n)
         push!(used, new)
+        final_ids[g] = new
         push!(out, new === id ? g : _with_id(g, new))
     end
     return out
@@ -300,7 +302,7 @@ it replaces. Everything else is added after the defaults, in argument order. Leg
 explicit `targets` are linked again, to the layers of this call. Plots it skips are warned
 on once, together, at the end.
 """
-_assemble(fig, xs; auto::Bool) = _collecting_skips(() -> _assemble_all(fig, xs; auto))
+_assemble(fig, xs; auto::Bool) = _collecting_skips(() -> _assemble_all(fig, xs; auto).ints)
 function _assemble_all(fig, xs; auto::Bool)
     given = AbstractInteractable[_resolve_slice_axis(fig, g) for g in _flatten_args!(AbstractInteractable[], collect(Any, xs))]
     if auto
@@ -313,7 +315,8 @@ function _assemble_all(fig, xs; auto::Bool)
         plotmap = IdDict{Any, Vector{Symbol}}()
         installed = IdDict{Any, Vector{Symbol}}()
     end
-    given = _number_builtin_ids(given, installed)
+    final_ids = IdDict{Any, Symbol}()
+    given = _number_builtin_ids(given, installed; final_ids)
     default_ids = Set{Symbol}(id for id in map(_layer_id, defaults) if id !== nothing)
 
     # One group per argument; `replaces` maps a default's id to the group that takes its place.
@@ -405,5 +408,7 @@ function _assemble_all(fig, xs; auto::Bool)
         i isa LegendInteractable && i.lenient || continue
         out[k] = _legend_interactable(i.leg; id = i.id, events = i.evs, tooltip = i.tooltip, plotmap)
     end
-    return out
+    # The defaults left in the call, by id: a default line takes no clicks unless it is bound.
+    kept = Set{Symbol}(id for id in map(_layer_id, defaults) if id !== nothing && !haskey(replaces, id))
+    return (; ints = out, plotmap, final_ids, defaults = kept)
 end

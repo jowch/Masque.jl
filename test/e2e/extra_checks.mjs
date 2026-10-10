@@ -135,7 +135,8 @@ try {
     // can coincidentally show unchanged text if this clamped release lands on the same boundary
     // value as a prior run against this same long-lived notebook session — that's a test-harness
     // artifact, not a functional failure, so it's not asserted here.
-    if (!state.fired || !state.value || state.value.layer !== thr.id) {
+    // host.value holds one envelope per field (#335): the release sets the line's own.
+    if (!state.fired || state.value?.[thr.id]?.layer !== thr.id) {
       throw new Error(`threshold off-page release: no commit: ${JSON.stringify(state)}`);
     }
     passed.push("threshold/off-page-release-commits+unsticks");
@@ -148,7 +149,8 @@ try {
     const hx = roi.geometry.x + roi.geometry.w / 2, hy = roi.geometry.y + roi.geometry.h / 2;
     const h = await hostInfo("roi");
     const down = { cx: h.left + hx * h.s, cy: h.top + hy * h.s };
-    const before = await textOf("#out_roi");
+    // The whole value (#bond_roi): neither the box's bounds nor its target's points may move.
+    const before = await textOf("#bond_roi");
     const state = await page.evaluate(([k, ax, ay]) => {
       const span = document.querySelector(`#coords_${k}`);
       const hosts = [...document.querySelectorAll(".ip-host")];
@@ -165,7 +167,7 @@ try {
     if (!state.grabbingMid) throw new Error(`roi pointercancel: drag never engaged: ${JSON.stringify(state)}`);
     if (state.grabbingAfter || state.capturedAfter) throw new Error(`roi pointercancel: not cleaned up: ${JSON.stringify(state)}`);
     await new Promise((r) => setTimeout(r, 1000));
-    const after = await textOf("#out_roi");
+    const after = await textOf("#bond_roi");
     if (after !== before) throw new Error(`roi pointercancel: unexpectedly committed (before=${before} after=${after})`);
     passed.push("roi/pointercancel-ends-clean-no-commit");
   }
@@ -199,8 +201,24 @@ try {
     }, "scatter");
     await page.touchscreen.tap(tx, ty);
     await page.waitForFunction(() => window.__masqueTouchTapResult?.fired === true, { timeout: 5000 }).catch(() => {});
-    const result = await page.evaluate(() => window.__masqueTouchTapResult);
-    if (!result?.fired || !result.value || result.value.layer !== pts.id) {
+    let result = await page.evaluate(() => window.__masqueTouchTapResult);
+    // A notebook session an earlier driver used can hold this point as the scatter's pick
+    // already (Pluto keeps a bond's value), and a tap on the picked point takes it back: the
+    // field goes `null`. Tap once more, so the field holds the point again.
+    if (result?.fired && result.value && result.value[pts.id] === null) {
+      await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        window.__masqueTouchTapResult = { fired: false, value: null };
+        host.addEventListener("input", () => { window.__masqueTouchTapResult = { fired: true, value: host.value }; }, { once: true });
+      }, "scatter");
+      await page.waitForTimeout(400);   // not a double-tap
+      await page.touchscreen.tap(tx, ty);
+      await page.waitForFunction(() => window.__masqueTouchTapResult?.fired === true, { timeout: 5000 }).catch(() => {});
+      result = await page.evaluate(() => window.__masqueTouchTapResult);
+    }
+    if (!result?.fired || result.value?.[pts.id]?.layer !== pts.id) {
       throw new Error(`scatter touch tap: no commit: ${JSON.stringify(result)}`);
     }
     passed.push("scatter/touch-tap-bind");

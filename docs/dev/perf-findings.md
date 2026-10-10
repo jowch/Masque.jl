@@ -189,6 +189,12 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `clip` + `fill` | each 2-D pan view layer | under 50 B |
 | `is3d`, `valueaxis` | each axis transform | 6 B and 11 B |
 | `selects` | each selector ROI layer | one short string |
+| `fields`, `initial` | once per manifest (#335) | ~10–20 B per field: its id twice, plus its start (`null` for a pick; a box's four bounds) |
+| `brush` | the target of a `selects` box | ~15 B |
+
+Re-running `payload_envelope.jl` for the composite bind value (#335, 2026-10-10) moved no
+manifest in the tables above by more than 0.1 KB; `fields` and `initial` replace the old
+`bondOwner`, `selection`, `selectionTarget` and per-layer `selected`.
 
 A `:view` layer is one viewport bbox plus a mode and two angles, the same order as an ROI layer.
 

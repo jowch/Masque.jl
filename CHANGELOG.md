@@ -48,29 +48,48 @@ All notable changes to this project are documented here. The format is based on
   other than the plotted coordinate, such as a category name, now sits next to the mark's
   other coordinate, and on a line it takes the place of the `x` the hover reads out from
   the nearest point. Rename that field if you want both.
-- **Breaking:** a `ThresholdInteractable`, an `ROIInteractable`, or a `ColorbarInteractable`
-  you pass to `masque` owns the `@bind` value. Every other layer in that widget keeps its
-  hover and tooltip but no longer takes clicks, so `masque(fig, cutoff)` keeps hover on the
-  points and the value only ever holds the threshold. Before, a click on a point replaced
-  the threshold's value, which is why the docs passed `auto = false`. Code that relied on
-  clicking marks in the same widget as one of these controls needs a second `masque` call
-  for the marks. The colorbars `masque(fig)` adds by itself still leave the other layers
-  clickable. This changes widgets with a selecting box too: the box's target already took
-  no clicks, but the other layers kept theirs, and an `AxisInteractable` click replaced the
-  selection with an `AxisEvent`. Those layers now only show tooltips (#309).
-- **Breaking:** in a widget with one of these controls, `selected=` on another layer only
-  highlights its marks. Before, `masque(fig, cutoff; selected = Dict(:scatter => [1]))`
-  started the value as that point's `ElementEvent`; now it starts at the threshold (#309).
-- **Breaking:** the value starts at the control's starting position instead of `nothing`: a
-  threshold at a `ThresholdEvent` at `value`, and a box without `selects` at a `BoundsEvent`
-  at `bounds`. `level.value` works from the first run, and code that falls back with
-  `isnothing(level) ? 0.5 : level.value` still gets the same number. Code that tests
-  `isnothing(level)` to mean "not dragged yet" no longer sees `nothing`. A colorbar still
-  starts at `nothing`, since it has no value before the first click (#309).
-- **Breaking:** two of these controls in one widget raise an error naming both, since each
-  would overwrite the other's value. That includes several boxes that select from the same
-  layer, which the Brush a region page used to allow; the last box released replaced the
-  others' selection anyway. Pass each to its own `masque` call (#309).
+- **Breaking: the `@bind` value is now a `NamedTuple` with one field for each thing a reader
+  can set in the figure, so every notebook that reads it changes.** Each plot that takes
+  clicks gets a field, and so does each control you pass (a threshold, an ROI box). A field
+  is named by the plot's layer id, so code that read `sel.index` now reads
+  `sel.scatter.index`, and a figure with two scatters gives `sel.scatter` and
+  `sel.scatter_2`, each holding its own pick. Clicking one plot no longer clears the other's
+  pick. Before, one widget held one value, so a click anywhere replaced it (#335):
+
+  ```julia
+  @bind sel masque(fig)       # before: sel was an ElementEvent or nothing
+  sel.scatter                 # now: one field per plot, an ElementEvent or nothing
+  ```
+
+  To get one value back, name it with `bind`: `masque(fig; bind = sc)`, with `sc` the plot
+  `scatter!` returned, makes `sel` that plot's `ElementEvent` or `nothing` again, and
+  `bind = thr` makes it the threshold's `ThresholdEvent`. `bind` also takes several, as a
+  tuple of plots, interactables or field names (`bind = (sc, :cutoff)`), and a `NamedTuple`
+  that names the fields where you list them: `bind = (left = sc1, right = sc2)` gives
+  `sel.left` and `sel.right`, and the events carry those names as their `layer`. A
+  `NamedTuple` argument names interactables the same way, as in
+  `masque(fig, (cutoff = thr,))`. An object given two different names, by `id`, by a
+  `NamedTuple` argument or by `bind`, raises an `ArgumentError`. Plots and fields left out
+  of `bind` keep their hover and tooltip and take no clicks.
+
+  A threshold's field starts at a `ThresholdEvent` at its `value`, and a box's at a
+  `BoundsEvent` at its `bounds`, so `sel.cutoff.value` works from the first run. A pick
+  starts at `nothing`, or at the element `selected=` names.
+- **Breaking:** a box with `selects` adds two fields: its own `BoundsEvent`, which used to be
+  left out, and its target's, holding what the box contains. The target's field starts at
+  what the box's starting `bounds` contain, highlighted: a `Vector{ElementEvent}` of the
+  points inside, or a `GridWindowEvent` for the cells under it. Before, the value was
+  `nothing` until the first drag. The target takes no clicks, and the other plots in the
+  widget keep theirs. Several boxes may now share a figure (#330, #335).
+- **Breaking:** a `lines!` plot, the line of a `scatterlines!`, a `stairs!` and a `series!`
+  show their tooltip on hover but take no clicks, since neither the whole line nor a point
+  on it is the obvious pick. Bind one to make it clickable, as in `bind = (fit = ln,)`, or
+  pass `interactables(ln)` (#335).
+- **Breaking:** `selected=` names fields: `selected = (scatter = 3,)`, or `selected = 3` when
+  the widget has one plot that takes picks. A field holds one pick, so several indices for
+  one plot raise an `ArgumentError`, where they used to highlight without setting the value.
+  So does `selected=` for a control, which starts at its own value, or for a plot left out
+  of `bind`. Several indices still work on the target of a box with `selects` (#335).
 - **Breaking:** a `wireframe!` layer has one element per drawn edge. Makie outlines every
   face, so an edge shared by two faces used to ship twice, and its second copy could never
   be hovered or clicked. Edges keep Makie's drawing order, with a shared edge kept where it
@@ -79,13 +98,6 @@ All notable changes to this project are documented here. The format is based on
   edge count. A `payloads` vector of the old length, or a `selected` index past the new
   count, raises an `ArgumentError`. An in-range `selected` index, or a saved `pick.index`,
   silently points at a different edge, so check those by hand (#316).
-- **Breaking:** a box with `selects` starts at what its `bounds` contain, highlighted, instead
-  of `nothing`: a `Vector{ElementEvent}` of the points inside, or a `GridWindowEvent` for the
-  cells under it. Code that checks `isnothing(picks) || isempty(picks)` still
-  runs, but on the first run it now shows the points inside `bounds` instead of its empty case.
-  Code that tests `isnothing(picks)` to mean "not released yet" no longer sees `nothing`.
-  `selected=` on the target still sets the starting value instead, and `selected=` on another
-  layer now only highlights there, where it used to replace the box's value (#330).
 - **Breaking:** a color string in `overlaystyle` or `tooltipstyle` must be a color, so a
   typo such as `color = "steelbleu"` raises an `ArgumentError` instead of being dropped by
   the browser. Names, hex codes, and `rgb(…)` and `hsl(…)` strings work as before, and

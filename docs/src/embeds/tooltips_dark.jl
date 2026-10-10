@@ -62,11 +62,11 @@ end
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`, while hovering only shows the tooltip and leaves `pick` as it was.
+`bind = s` makes `pick` the clicked point itself. `@bind pick` saves a click in `pick`, while hovering only shows the tooltip and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000003
-@bind pick masque(fig, pts)
+@bind pick masque(fig, pts; bind = s)
 
 # ╔═╡ a1b2c3d4-0012-4000-8000-000000000012
 md"""
