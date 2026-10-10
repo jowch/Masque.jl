@@ -270,7 +270,8 @@ export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]
             if (item?.layer !== many.id || typeof item.index !== "number") continue
             items.push(item.payload === undefined ? { layer: many.id, index: item.index } : { layer: many.id, index: item.index, payload: item.payload })
         }
-        return { hits: manyHits(manifest, items), source: null, items }
+        const kept = keptPicks(manifest, items)
+        return { hits: manyHits(manifest, kept), source: null, items: kept }
     }
     if (Array.isArray(o.items)) {
         const hits: Hit[] = []
@@ -301,6 +302,16 @@ export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]
 
 // What a `many` field's picks highlight: each one's own selection (a legend entry's linked
 // marks, a mark itself), drawn together. A pick with nothing to draw, such as an axis spot, adds none.
+// The picks that still match the manifest: a mark's index must name an element of its layer.
+// An axis spot carries its own payload and has no element, so it is kept while its layer is.
+export function keptPicks(manifest: Manifest, items: FieldPick[]): FieldPick[] {
+    return items.filter((it) => {
+        const layer = manifest.layers.find((l) => l.id === it.layer)
+        if (!layer) return false
+        return !SELECTED_KINDS.has(layer.kind) || elementHit(layer, it.index) !== null
+    })
+}
+
 export function manyHits(manifest: Manifest, items: FieldPick[]): Hit[] {
     const out: Hit[] = []
     for (const it of items) {

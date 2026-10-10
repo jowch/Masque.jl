@@ -26,7 +26,8 @@ highlight goes and `sel.cities` is `nothing` again.
 Each plot keeps its own selection, so in a figure with two scatters,
 clicking a point in one leaves the other's field as it was. A click on
 empty space clears only the plots in the axis you clicked, and Escape
-clears every plot in the figure.
+clears every plot in the figure. A click on a line or another mark that
+only shows a tooltip is not empty space, so it keeps the selection.
 
 ## Select several marks
 

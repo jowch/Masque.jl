@@ -385,17 +385,7 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     // still resyncs focusHit_ to B (so a later miss doesn't wrongly restore A's stale ring), but
     // clicking B with no prior keyboard focus leaves focusHit_ null and the plain hover-fade
     // path (clearHi) runs exactly as before this feature existed.
-    if (state.focusIdx_ !== null) {
-        // A click on a non-focus-list kind (e.g. :grid/:axis) while keyboard focus was already
-        // on some other element must leave that focus alone, not clear it.
-        const idx = ctx.focusable_.findIndex((r) => r.layer_ === hit.layer && r.index_ === hit.index)
-        if (idx >= 0) {
-            state.focusIdx_ = idx
-            state.focusHit_ = hit
-            state.focusTipHtml_ = null
-            state.focusTipCss_ = null
-        }
-    }
+    syncFocus(ctx, state, hit)
     // No `payload` for an element kind: Julia already reconstructs it from the manifest
     // (`_bond_payload`), so uploading it here is dead weight the receiver discards (#109).
     // `resolvePayload` still resolves it for hover.ts's tooltip templates, which need it for
@@ -406,6 +396,19 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
         if (!SELECTED_KINDS.has(hit.layer.kind)) value.payload = resolvePayload(hit, ctx.manifest_, px, py)
     }
     ctx.commit_({ [field]: value })
+}
+
+function syncFocus(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
+    if (state.focusIdx_ === null) return
+    // A click on a non-focus-list kind (e.g. :grid/:axis) while keyboard focus was already
+    // on some other element must leave that focus alone, not clear it.
+    const idx = ctx.focusable_.findIndex((r) => r.layer_ === hit.layer && r.index_ === hit.index)
+    if (idx >= 0) {
+        state.focusIdx_ = idx
+        state.focusHit_ = hit
+        state.focusTipHtml_ = null
+        state.focusTipCss_ = null
+    }
 }
 
 // A click on a `many` field: a plain click makes the mark the only pick, or clears the field
@@ -423,17 +426,18 @@ function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: num
     state.sel_.set(field, { hits_: manyHits(ctx.manifest_, next), source_: null, items_: next })
     renderSelection(ctx, state)
     drawHover(ctx, state, hit)
+    syncFocus(ctx, state, hit)
     ctx.commit_({ [field]: { items: next } })
 }
 
-// Clears the picks of every click field on `axis` (every axis when it is null), leaving the
+// Clears the picks of every click field on `axes` (every axis when it is null), leaving the
 // controls and a box's target alone. A field that already holds nothing sends nothing.
-export function clearPicks(ctx: OverlayCtx, state: OverlayState, axis: string | null): void {
+export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] | null): void {
     const cur = ctx.value_()
     const updates: Record<string, unknown> = {}
     for (const layer of ctx.manifest_.layers) {
         if (layer.brush || !layer.events.includes("click") || !(layer.id in cur)) continue
-        if (axis !== null && layer.axis !== axis) continue
+        if (axes !== null && !axes.includes(layer.axis)) continue
         const v = cur[layer.id] as { items?: unknown[] } | null
         if (v === null || v === undefined || (layer.many && !v.items?.length)) continue
         state.sel_.set(layer.id, layer.many ? { hits_: [], source_: null, items_: [] } : { hits_: [], source_: null })
@@ -444,14 +448,22 @@ export function clearPicks(ctx: OverlayCtx, state: OverlayState, axis: string | 
     ctx.commit_(updates)
 }
 
-// The axis whose plot area holds image px (x, y), or null outside every axis.
-function axisAt(ctx: OverlayCtx, x: number, y: number): string | null {
-    for (const [id, t] of Object.entries(ctx.manifest_.transforms)) {
+// The plot axes under image px (x, y): every axis whose plot area holds the point, so twin
+// axes and an inset's parent all count. A colorbar's readout is a hit, not a plot area, and a
+// click inside a legend's box, even on its padding, is on the legend, so it finds none.
+function axesAt(ctx: OverlayCtx, x: number, y: number): string[] {
+    const legends = new Set(ctx.manifest_.layers.filter((l) => l.bond === "legend").map((l) => l.axis))
+    const inside = (t: { viewport: [number, number, number, number] }) => {
         const [vx, vy, vw, vh] = t.viewport
-        if (t.valueaxis) continue // a colorbar: its readout is a hit, not a plot area
-        if (x >= vx && x <= vx + vw && y >= vy && y <= vy + vh) return id
+        return x >= vx && x <= vx + vw && y >= vy && y <= vy + vh
     }
-    return null
+    const out: string[] = []
+    for (const [id, t] of Object.entries(ctx.manifest_.transforms)) {
+        if (!inside(t)) continue
+        if (legends.has(id)) return []
+        if (!t.valueaxis) out.push(id)
+    }
+    return out
 }
 
 export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
@@ -461,9 +473,13 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     const { layout, content } = pointerSpace(ctx, state, e)
     const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))
     if (!hit) {
-        // A click on an empty part of a plot clears that plot's picks.
-        const axis = axisAt(ctx, layout.x, layout.y)
-        if (axis !== null) clearPicks(ctx, state, axis)
+        // A click on an empty part of a plot clears the picks of the plots there. A mark that
+        // only shows a tooltip isn't empty space, and a Cmd/Ctrl-click that misses keeps the
+        // picks, as a modified miss does in a file browser.
+        if (isToggleClick(e)) return
+        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))) return
+        const axes = axesAt(ctx, layout.x, layout.y)
+        if (axes.length > 0) clearPicks(ctx, state, axes)
         return
     }
     const sample = layoutSpaceLayer(hit.layer) ? layout : content

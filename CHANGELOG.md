@@ -36,8 +36,9 @@ All notable changes to this project are documented here. The format is based on
   `@bind` field is a `Vector{ElementEvent}`, empty to start. A click replaces the selection
   with one mark, and Cmd-click on a Mac, or Ctrl-click elsewhere, adds a mark or takes it
   out. With the keyboard, Cmd+Enter or Ctrl+Enter does the same. Legends and
-  `AxisInteractable` take `select = :many` too and hold a vector of their events, and every
-  constructor for marks takes the keyword. `selected = (scatter = [1, 3],)` starts with
+  `AxisInteractable` take `select = :many` too and hold a vector of their events, and so do
+  the constructors for points, bars, polygons, segments, lines, text and regions; heatmap,
+  image and surface cells don't take it yet. `selected = (scatter = [1, 3],)` starts with
   several marks selected. A colorbar's pick is one value, so `select = :many` on one raises an
   `ArgumentError` (#335).
 
@@ -92,8 +93,11 @@ All notable changes to this project are documented here. The format is based on
 
   A pick starts at `nothing`, or at the element `selected=` names.
 - **Breaking:** clicking an empty part of a plot, or pressing Escape on a focused figure,
-  clears the selection. A click on empty space clears the picks of the plots in that axis,
-  and Escape clears every pick in the figure before it clears the focus. Before, both left
+  clears the selection. A click on empty space clears the picks of the plots in that axis
+  (both axes, for twin axes), and Escape clears every pick in the figure before it clears
+  the focus. A click on a mark that only shows a tooltip, such as a line, inside a legend's
+  box, or with Cmd/Ctrl held, keeps the picks. Cells that use the `@bind` value run again
+  when a clear changes it. Before, both left
   the selection as it was, and only a second click on the selected mark cleared it (#335).
 - **Breaking:** a plot that builds several layers names them as its parts. A `stem!` gives
   `stem.points` and `stem.stems`, a `scatterlines!` gives `scatterlines.points` and

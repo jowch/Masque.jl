@@ -18,8 +18,9 @@ plot drawn outside data space (`space = :relative`, `:pixel`, `:clip`).
 
 `select = :many` lets a reader hold several of the plot's marks at once: its `@bind` field is
 then a `Vector{ElementEvent}`, empty to start, and Cmd-click (Ctrl-click off a Mac) adds or
-removes a mark. It applies to every layer the plot builds. The default, `:one`, holds one
-mark or `nothing`.
+removes a mark. It applies to every layer the plot builds, so a `stem!` gives a `NamedTuple`
+of two vectors, `(points = …, stems = …)`. The default, `:one`, holds one mark or `nothing`.
+Heatmap, image and surface cells don't take `:many` yet.
 
 This is also how a recipe gets layers of its own. Define a method for your plot type, and
 `masque(fig)` uses it instead of walking the plots your recipe draws:
@@ -192,12 +193,15 @@ interactables(cb::Makie.Colorbar; select = nothing, kwargs...) =
 # `select = :many` for every layer a plot built, so a `stem!` picks many points and many stems.
 # A layer that can only pick one, such as a colorbar's, refuses `:many`.
 _with_select(built::AbstractVector, select) = AbstractInteractable[_with_select(i, select) for i in built]
+_with_select(r::_PlotRequest, select) = (_check_select(_PlotRequest, select); _PlotRequest(r.plot, merge(r.kwargs, (; select))))
 function _with_select(i::AbstractInteractable, select)
     T = typeof(i)
     if !hasfield(T, :select)
         select === :one && return i
         _check_select(T, select)
-        what = i isa ColorbarInteractable ? "a colorbar pick is one value" : "a $(nameof(T)) holds one value"
+        what = i isa ColorbarInteractable ? "a colorbar pick is one value" :
+            i isa Union{GridInteractable, SurfaceInteractable} ? "heatmap, image and surface cells don't take several picks yet" :
+            "a $(nameof(T)) holds one value"
         throw(ArgumentError("$what; select = :many isn't supported"))
     end
     _check_select(T, select)

@@ -457,5 +457,42 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             Colorbar(fig[1, 2], heatmap!(Axis(fig[2, 1]), rand(2, 2))); select = :many,
         )
         @test_throws ArgumentError tv(w, Dict("scatter" => Dict("layer" => "scatter", "index" => 0)))
+        # A pick named twice is held once.
+        @test [e.index for e in iv(masque(fig, interactables(sc; select = :many); selected = (scatter = [1, 1, 3],))).scatter] == [1, 3]
+        # `select` on an interactables(plot) request carries through to the built layers.
+        @test iv(masque(fig, interactables(only(interactables(sc)); select = :many))).scatter == ElementEvent[]
+        # The positional constructors from before `select` still build a one-pick interactable.
+        leg = fig.content[findfirst(c -> c isa Legend, fig.content)]
+        for i in (
+                pts, TextInteractable(ax, text!(ax, [(1.0, 1.0)]; text = ["a"])),
+                PolygonInteractable(ax, [[(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)]]), AxisInteractable(ax),
+                LegendInteractable(leg), RegionInteractable(ax, [(:rect, (1.0, 1.0), 1.0, 1.0)]),
+            )
+            T = typeof(i)
+            old = T((getfield(i, f) for f in fieldnames(T)[1:(end - 1)])...)
+            @test Masque.select_mode(old) === :one
+        end
+        # Cells don't take several picks yet, and say so.
+        hm = heatmap!(Axis(fig[3, 1]), [1 2; 3 4])
+        @test_throws "heatmap, image and surface cells don't take several picks yet" masque(fig, interactables(hm; select = :many))
+    end
+
+    @testset "select = :many on a recipe's parts and a box's target (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        iv = Masque.APD.Bonds.initial_value
+        tv = Masque.APD.Bonds.transform_value
+        st = stem!(ax, [2.0, 5.0], [3.0, 6.0])
+        w = masque(fig, interactables(st; select = :many); bind = (stem = st,))
+        @test all(get(l, "many", false) for l in w.manifest["layers"] if startswith(l["id"], "stem."))
+        v = tv(w, Dict("stem.points" => Dict("items" => [Dict("layer" => "stem.points", "index" => 1)]), "stem.stems" => Dict("items" => [])))
+        @test only(v.stem.points).index == 2 && only(v.stem.points).part == (:points,)
+        @test v.stem.stems == ElementEvent[]
+        # A box's target stays a brush: no `many` flag, and its value is what the box holds.
+        pts = scatter!(ax, [1.0, 5.0, 9.0], [1.0, 5.0, 9.0])
+        box = ROIInteractable(ax; bounds = (4.0, 6.0, 4.0, 6.0), selects = pts)
+        wb = masque(fig, interactables(pts; select = :many), box; bind = (box, pts))
+        L = only(l for l in wb.manifest["layers"] if l["id"] == "scatter")
+        @test !haskey(L, "many") && haskey(L, "brush")
+        @test [e.index for e in iv(wb).scatter] == [2]
     end
 end

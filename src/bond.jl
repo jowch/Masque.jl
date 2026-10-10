@@ -667,7 +667,8 @@ function _field_seeds(built, fields, roles, binding, selected)
                     "pass its interactable with `select = :many`",
             ),
         )
-        seeds[id] = _check_selected(by_id[id], idxs)
+        # A pick held twice is one pick: the browser's toggle would take out one copy.
+        seeds[id] = _check_selected(by_id[id], roles[id] === :pick ? unique(idxs) : idxs)
     end
     return seeds
 end

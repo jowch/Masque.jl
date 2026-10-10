@@ -1,5 +1,5 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
-import { hitLayerByIndex, sameValue, selectionForValue, surfaceSelection } from "./selection"
+import { hitLayerByIndex, keptPicks, sameValue, selectionForValue, surfaceSelection } from "./selection"
 import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
@@ -674,7 +674,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                     /* index no longer valid against the new geometry — drop rather than throw mid-gesture */
                 }
             }
-            state.sel_.set(f, { ...sel, hits_: nextSel })
+            // A `many` field's picks follow its hits: one whose element is gone is dropped, so
+            // the next toggle doesn't send its stale index.
+            state.sel_.set(f, sel.items_ ? { ...sel, hits_: nextSel, items_: keptPicks(newManifest, sel.items_) } : { ...sel, hits_: nextSel })
         }
         renderSelection(ctx, state)
         adoptPhoto(input)
