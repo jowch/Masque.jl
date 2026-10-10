@@ -97,8 +97,9 @@ symbol: `bind = (:a,)`.
 start at.
 
 **Fix:** pass one index per plot, as in `selected = (scatter = 1,)`.
-To start with several marks selected, use a box with `selects`, whose
-plot's field holds a list; see [Selection](@ref).
+To start with several marks selected, pass the plot with
+`select = :many`, as in `interactables(sc; select = :many)`, so its
+field holds a list; see [Select several marks](@ref).
 
 ### Tried `selected=` on a line, a control, or a plot left out of `bind`
 

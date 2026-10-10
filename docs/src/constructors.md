@@ -10,7 +10,9 @@ of its field in the `@bind` value, which its events also report as
 take `payloads` (a vector or a `DataFrame`, one entry per mark) and
 `tooltip` (a `masque"..."` template, or `false`). Without `payloads`,
 each mark reports its `index` and coordinates, and `payloads` adds your
-fields to those coordinates.
+fields to those coordinates. Constructors for marks, `AxisInteractable`
+and `LegendInteractable` take `select = :many` too, which makes the
+field a vector of picks instead of one (see [Select several marks](@ref)).
 
 ## What `masque(fig)` builds
 

@@ -433,6 +433,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // Through `host.value`, not into `bondValue`: a page may wrap the property after mount
         // (the docs player does, to swap its snapshots) and must see every commit. The value is
         // a fresh object each time, so Pluto sees a change.
+        value_: () => {
+            const v = (host as unknown as { value: unknown }).value
+            return v && typeof v === "object" ? v as Record<string, unknown> : hostValue
+        },
         commit_: (updates) => {
             const isField = new Set(ctx.manifest_.fields ?? fields)
             const kept = Object.entries(updates).filter(([k]) => isField.has(k))
@@ -455,7 +459,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const restoreSelection = (v: Record<string, unknown>) => {
         for (const f of fields) {
             const sel = selectionForValue(ctx.manifest_, v[f] ?? null)
-            if (sel) state.sel_.set(f, { hits_: sel.hits, source_: sel.source })
+            if (sel) state.sel_.set(f, sel.items ? { hits_: sel.hits, source_: null, items_: sel.items } : { hits_: sel.hits, source_: sel.source })
         }
     }
     restoreSelection(hostValue)
@@ -670,7 +674,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                     /* index no longer valid against the new geometry — drop rather than throw mid-gesture */
                 }
             }
-            state.sel_.set(f, { hits_: nextSel, source_: sel.source_ })
+            state.sel_.set(f, { ...sel, hits_: nextSel })
         }
         renderSelection(ctx, state)
         adoptPhoto(input)

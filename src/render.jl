@@ -505,11 +505,13 @@ function build_manifest(
     fields, roles = _fields(binding, built, brushed)
     # A layer outside the bind value takes no clicks, and keeps hover (its tooltip). A box's
     # target takes none either: the box chooses its elements.
-    for (_, L, d) in built
+    for (i, L, d) in built
         L.id in fields && roles[L.id] === :pick || filter!(!=("click"), d["events"])
         if roles[L.id] === :brush
             d["brush"] = L.kind === :grid ? "grid" : "elements"
         end
+        # A `select = :many` field holds a vector of picks, `{items: [...]}` on the wire.
+        roles[L.id] === :pick && "click" in d["events"] && select_mode(i) === :many && (d["many"] = true)
     end
     initial = with_initial ? _initial_value(built, fields, roles, binding, selected, ctx, layers) : nothing
     # Precedence for the frontend's first-match-in-manifest-order `hitTest` (geometry.ts):
@@ -671,8 +673,8 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   when one field takes picks. Also accepts the event itself, a vector of events, or a `Dict`
   keyed by field. A plot with parts takes a `NamedTuple` of them, as in
   `selected = (stem = (stems = [2],),)`. A pick holds one element, so several indices for one field raise
-  `ArgumentError`, except on the target of a box with `selects`, where they replace what the
-  box starts at, and an empty one keyed to the target, as in `selected = (pts = Int[],)`,
+  `ArgumentError`, except on a field built with `select = :many`, which starts with all of
+  them, and on the target of a box with `selects`, where they replace what the box starts at, and an empty one keyed to the target, as in `selected = (pts = Int[],)`,
   starts it empty (a bare `Int[]` sets nothing). Works on
   `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines`; any other kind, an
   out-of-range index (`0` included), a control, or a layer that is not a field raises

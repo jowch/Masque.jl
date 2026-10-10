@@ -490,6 +490,13 @@ kind_sweep_meta() = [
         "control" => "cutoff", "controlStart" => 3.0, "line" => "lines", "fields" => ["cutoff", "scatter"],
     ),
     Dict(
+        # `select = :many` (#335): a click replaces, Ctrl-click adds and removes, a click on
+        # empty space and Escape clear. The driver's "many" block drives it.
+        "key" => "many", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "many",
+    ),
+    Dict(
         "key" => "slice_lines", "layerId" => "slice", "layerKind" => "slice",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "slice",
@@ -1173,6 +1180,13 @@ function build_kind_sweep()
         masque(fig, ThresholdInteractable(ax; orientation = :vertical, value = 3.0, id = :cutoff))
     end
 
+    many = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "select many", limits = (0, 10, 0, 10))
+        sc = scatter!(ax, [2.0, 5.0, 8.0], [3.0, 7.0, 3.0]; markersize = 20, color = :gray)
+        masque(fig, interactables(sc; select = :many))
+    end
+
     slice_lines = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "slice lines", limits = (0, 4, 0, 4))
@@ -1227,7 +1241,7 @@ function build_kind_sweep()
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
-        legend_overlap, legend_template, axis, composite, slice_lines, slice_density, slice_auto, slice_gap,
+        legend_overlap, legend_template, axis, composite, many, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
 

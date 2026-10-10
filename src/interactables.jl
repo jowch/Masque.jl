@@ -154,6 +154,14 @@ every [`AbstractInteractable`](@ref) subtype must implement. Project data-space 
 function hitlayers end
 validate(::AbstractInteractable, ::InteractionContext) = nothing
 events(::AbstractInteractable) = (:click, :hover)
+# How many elements a click field holds: `:one` (a pick, or `nothing`) or `:many` (a vector).
+# Types that carry a `select` field read it; every other type picks one.
+select_mode(i::AbstractInteractable) = hasfield(typeof(i), :select) ? getfield(i, :select) : :one
+function _check_select(T, select)
+    select in (:one, :many) ||
+        throw(ArgumentError("$(nameof(T)): select must be :one or :many, got $(repr(select))"))
+    return select
+end
 # Per-layer: nothing = auto name/value table (default), Markup = template, false = suppress.
 tooltip_spec(::AbstractInteractable) = nothing
 # One hover style per LAYER (the manifest ships one `style` dict per layer, not per element).
@@ -471,11 +479,16 @@ struct PointInteractable <: AbstractInteractable
     # A scatter's `strokewidth` in px. How much of it lies outside the marker depends on the
     # backend (`InteractionContext.marker_stroke`), so it is added to `radius` in `hitlayers`.
     stroke::Float64
+    select::Symbol
 end
+PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke) =
+    PointInteractable(ax, points, id, payloads, radius, radius3d, tooltip, label, colors, offset, stroke, :one)
 function PointInteractable(
         ax, points; id = :points, payloads = nothing,
-        radius = nothing, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing
+        radius = nothing, radius3d = nothing, tooltip = nothing, label = nothing, colors = nothing,
+        select = :one,
     )
+    _check_select(PointInteractable, select)
     _check_tooltip(tooltip)
     pts = [_pt3(p) for p in points]
     defaults = _unconvert_payloads(
@@ -495,7 +508,7 @@ function PointInteractable(
     # including the `9` the MeshScatter constructor still forwards when it has no pixel radius.
     r, s = radius === nothing ? _point_radius(ax, pts) : (radius, 0.0)
     r = _check_radius(r, length(pts))
-    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0), s)
+    return PointInteractable(ax, pts, id, pl, r, r3, tooltip, label === nothing ? nothing : String(label), colors, Makie.Vec2f(0, 0), s, select)
 end
 function _check_radius(r, n)
     r isa AbstractVector || return Float64(r)
@@ -633,12 +646,16 @@ struct SegmentInteractable <: AbstractInteractable
     # when the drawn path adds a corner between samples. Placement (`translate!`, …) moves the
     # drawn path, never these. `nothing` reads the samples from the path itself.
     samples::Union{Nothing, Tuple{Union{Nothing, Symbol}, Vector{Vector{Point3d}}}}
+    select::Symbol
 end
+SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples) =
+    SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples, :one)
 function SegmentInteractable(
         ax, vertices; mode = :polyline, unit = :segment, id = :segments,
-        payloads = nothing, tol = 6, tooltip = nothing, label = nothing
+        payloads = nothing, tol = 6, tooltip = nothing, label = nothing, select = :one,
     )
     _check_tooltip(tooltip)
+    _check_select(SegmentInteractable, select)
     mode in (:polyline, :pairs) ||
         throw(ArgumentError("SegmentInteractable: mode must be :polyline or :pairs, got :$mode"))
     unit in (:segment, :line) ||
@@ -655,7 +672,7 @@ function SegmentInteractable(
     end
     return SegmentInteractable(
         ax, vs, mode, id, pl, Float64(tol), tooltip, nothing,
-        label === nothing ? nothing : String(label), unit, nothing, nothing,
+        label === nothing ? nothing : String(label), unit, nothing, nothing, select,
     )
 end
 # Internal-only: construct with a lazy `resolve(ax) -> vertices`. Called directly by the
@@ -846,18 +863,22 @@ struct RectInteractable <: AbstractInteractable
     label::Union{Nothing, String}
     # px of hit slack outside each rect: half a plot's drawn outline. 0 = none.
     tol::Float64
+    select::Symbol
 end
 RectInteractable(ax, data, id, payloads, tooltip, clamp_to_viewport, resolve, label) =
     RectInteractable(ax, data, id, payloads, tooltip, clamp_to_viewport, resolve, label, 0.0)
+RectInteractable(ax, data, id, payloads, tooltip, clamp_to_viewport, resolve, label, tol) =
+    RectInteractable(ax, data, id, payloads, tooltip, clamp_to_viewport, resolve, label, tol, :one)
 function RectInteractable(
         ax, rects::AbstractVector; id = :rects, payloads = nothing,
-        tooltip = nothing, clamp_to_viewport = false, label = nothing
+        tooltip = nothing, clamp_to_viewport = false, label = nothing, select = :one,
     )
     _check_tooltip(tooltip)
+    _check_select(RectInteractable, select)
     lbl = label === nothing ? nothing : String(label)
     rs = [(Float64(r[1]), Float64(r[2]), Float64(r[3]), Float64(r[4])) for r in rects]
     pl = payloads === nothing ? Any[(; index = k) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "RectInteractable")
-    return RectInteractable(ax, rs, id, pl, tooltip, clamp_to_viewport, nothing, lbl)
+    return RectInteractable(ax, rs, id, pl, tooltip, clamp_to_viewport, nothing, lbl, 0.0, select)
 end
 # Internal-only: construct a RectInteractable with a lazy `resolve(ax) -> rects`.
 function _rect_with_resolve(ax, rects, id, payloads, clamp_to_viewport, resolve; tooltip = nothing, label = nothing)
@@ -1247,9 +1268,12 @@ TextInteractable(ax, p)
 struct TextInteractable <: AbstractInteractable
     ax; p; id::Symbol; payloads::Vector{Any}; tooltip::Union{Nothing, Markup, Bool}   # p::Makie.Text
     label::Union{Nothing, String}
+    select::Symbol
 end
-function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, tooltip = nothing, label = _plot_label(p))
+TextInteractable(ax, p, id, payloads, tooltip, label) = TextInteractable(ax, p, id, payloads, tooltip, label, :one)
+function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, tooltip = nothing, label = _plot_label(p), select = :one)
     _check_tooltip(tooltip)
+    _check_select(TextInteractable, select)
     strs = p.text[]
     anchors = p.positions[]
     length(anchors) == length(strs) ||
@@ -1263,7 +1287,7 @@ function TextInteractable(ax, p::Makie.Text; id = :text, payloads = nothing, too
         ]
     )
     pl = _merge_payloads(defaults, payloads, "TextInteractable")
-    return TextInteractable(ax, p, id, pl, tooltip, label === nothing ? nothing : String(label))
+    return TextInteractable(ax, p, id, pl, tooltip, label === nothing ? nothing : String(label), select)
 end
 tooltip_spec(i::TextInteractable) = i.tooltip
 function hitlayers(i::TextInteractable, ctx)
@@ -1374,9 +1398,12 @@ struct PolygonInteractable <: AbstractInteractable
     holes::Vector # one vector of hole-rings per element; empty when that element is solid
     # px of hit slack outside each ring: half a plot's drawn outline. 0 = none.
     tol::Float64
+    select::Symbol
 end
 PolygonInteractable(ax, rings, id, payloads, tooltip, label, holes) =
     PolygonInteractable(ax, rings, id, payloads, tooltip, label, holes, 0.0)
+PolygonInteractable(ax, rings, id, payloads, tooltip, label, holes, tol) =
+    PolygonInteractable(ax, rings, id, payloads, tooltip, label, holes, tol, :one)
 # `nothing` → every element is solid. A group is the hole rings of one element.
 function _hole_groups(holes, n)
     holes === nothing && return [Vector{Point3f}[] for _ in 1:n]
@@ -1390,11 +1417,12 @@ function _hole_groups(holes, n)
         out
     end
 end
-function PolygonInteractable(ax, rings; id = :polygons, payloads = nothing, tooltip = nothing, label = nothing, holes = nothing)
+function PolygonInteractable(ax, rings; id = :polygons, payloads = nothing, tooltip = nothing, label = nothing, holes = nothing, select = :one)
+    _check_select(PolygonInteractable, select)
     _check_tooltip(tooltip)
     rs = [[_pt3(p) for p in ring] for ring in rings]
     pl = payloads === nothing ? Any[(; index = k) for k in 1:length(rs)] : _check_payloads(payloads, length(rs), "PolygonInteractable")
-    return PolygonInteractable(ax, rs, id, pl, tooltip, label === nothing ? nothing : String(label), _hole_groups(holes, length(rs)))
+    return PolygonInteractable(ax, rs, id, pl, tooltip, label === nothing ? nothing : String(label), _hole_groups(holes, length(rs)), 0.0, select)
 end
 tooltip_spec(i::PolygonInteractable) = i.tooltip
 hit_tol(i::PolygonInteractable) = i.tol > 0 ? i.tol : nothing
@@ -1451,9 +1479,10 @@ AxisInteractable(ax)
 ```
 """
 struct AxisInteractable <: AbstractInteractable
-    ax; id::Symbol
+    ax; id::Symbol; select::Symbol
 end
-AxisInteractable(ax; id = :axis) = AxisInteractable(ax, id)
+AxisInteractable(ax, id::Symbol) = AxisInteractable(ax, id, :one)
+AxisInteractable(ax; id = :axis, select = :one) = AxisInteractable(ax, id, _check_select(AxisInteractable, select))
 function validate(i::AxisInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "AxisInteractable: ax is a Legend, not an Axis — use LegendInteractable(leg) instead."
     t = ctx.transforms[axis_id(ctx, i.ax)]
@@ -1700,19 +1729,23 @@ struct LegendInteractable <: AbstractInteractable
     # Internal: true when `targets` came from the plotmap/empty fallback (the auto path) rather
     # than a user-given Dict/Vector — see `_resolve_legend_targets`.
     lenient::Bool
+    select::Symbol
 end
-function LegendInteractable(leg; id = :legend, targets = nothing, events = (:click, :hover), tooltip = nothing)
-    return _legend_interactable(leg; id, targets, events, tooltip)
+LegendInteractable(leg, id, targets, evs, tooltip, lenient) = LegendInteractable(leg, id, targets, evs, tooltip, lenient, :one)
+function LegendInteractable(leg; id = :legend, targets = nothing, events = (:click, :hover), tooltip = nothing, select = :one)
+    return _legend_interactable(leg; id, targets, events, tooltip, select)
 end
 # `plotmap` is plot -> layer ids. `masque` passes the one for the layers it assembled, so an
 # entry with no `targets` links to whatever its plots became in this call.
 function _legend_interactable(
         leg; id = :legend, targets = nothing, events = (:click, :hover), tooltip = nothing, plotmap = nothing,
+        select = :one,
     )
     _check_tooltip(tooltip)
+    _check_select(LegendInteractable, select)
     entries = _legend_entries_meta(leg)   # pre-render metadata only — bbox comes later, in hitlayers
     resolved, lenient = _resolve_legend_targets(entries, targets, plotmap)
-    return LegendInteractable(leg, id, resolved, events, tooltip, lenient)
+    return LegendInteractable(leg, id, resolved, events, tooltip, lenient, select)
 end
 events(i::LegendInteractable) = i.evs
 # `nothing` suppresses the card, same as `false`. A `masque"..."` template still shows.
@@ -2071,15 +2104,18 @@ RegionInteractable(
 """
 struct RegionInteractable <: AbstractInteractable
     ax; regions::Vector; payloads::Vector{Any}; id::Symbol; tooltip::Union{Nothing, Markup, Bool}; evs::Tuple
+    select::Symbol
 end
+RegionInteractable(ax, regions, payloads, id, tooltip, evs) = RegionInteractable(ax, regions, payloads, id, tooltip, evs, :one)
 function RegionInteractable(
         ax, regions::AbstractVector; payloads = nothing, id = :region,
-        tooltip = nothing, events = (:click, :hover)
+        tooltip = nothing, events = (:click, :hover), select = :one,
     )
     _check_tooltip(tooltip)
+    _check_select(RegionInteractable, select)
     pl = payloads === nothing ? Any[(; index = k) for k in 1:length(regions)] :
         expand_payloads(payloads, length(regions), "RegionInteractable")
-    return RegionInteractable(ax, collect(regions), pl, id, tooltip, events)
+    return RegionInteractable(ax, collect(regions), pl, id, tooltip, events, select)
 end
 events(i::RegionInteractable) = i.evs
 tooltip_spec(i::RegionInteractable) = i.tooltip

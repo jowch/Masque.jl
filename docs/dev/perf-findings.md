@@ -191,10 +191,16 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `selects` | each selector ROI layer | one short string |
 | `fields`, `initial` | once per manifest (#335) | ~10–20 B per field: its id twice, plus its start (`null` for a pick; a box's four bounds) |
 | `brush` | the target of a `selects` box | ~15 B |
+| `many` | each `select = :many` layer (#335) | 6 B |
 
 Re-running `payload_envelope.jl` for the composite bind value (#335, 2026-10-10) moved no
 manifest in the tables above by more than 0.1 KB; `fields` and `initial` replace the old
 `bondOwner`, `selection`, `selectionTarget` and per-layer `selected`.
+
+A `select = :many` field's `@bind` value travels from the browser as `{items: [...]}`, one
+`{layer, index}` per pick: 22–24 B a pick for a layer named `scatter` (MsgPack byte model, counted
+by hand on 2026-10-10), so a reader holding 1 000 picks sends ~22 KB per click, well under one rendered
+PNG. No bench fixture sets `select`, so the tables above are unchanged by it.
 
 A `:view` layer is one viewport bbox plus a mode and two angles, the same order as an ROI layer.
 

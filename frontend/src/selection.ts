@@ -1,6 +1,7 @@
 import { findBin, invertAxis, polygonRings } from "./geometry"
 import { surfacePointHit } from "./surface"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, SurfaceGeometry } from "./types"
+import type { FieldPick } from "./state"
 
 // Bond item shape emitted per contained element in a selects-ROI { items: SelectionItem[] }.
 // `payload` is present only for a computed (non-element) target — a `:grid` cell range, since
@@ -258,10 +259,19 @@ export function linkedHits(manifest: Manifest, layer: HitLayer, index: number): 
 // selection gesture (an axis click, a threshold or ROI value). An entry that no longer
 // matches the manifest is dropped, the way a frame's re-key in mount.ts drops it.
 export type SelSource = { layer: string; index: number }
-export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]; source: SelSource | null } | null {
+export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]; source: SelSource | null; items?: FieldPick[] } | null {
     if (v === null || v === undefined) return { hits: [], source: null }
     if (typeof v !== "object") return null
     const o = v as { layer?: unknown; index?: unknown; items?: unknown }
+    const many = Array.isArray(o.items) && o.items.length > 0 ? manifest.layers.find((l) => l.id === (o.items as { layer?: unknown }[])[0]?.layer) : undefined
+    if (many?.many) {
+        const items: FieldPick[] = []
+        for (const item of o.items as { layer?: unknown; index?: unknown; payload?: unknown }[]) {
+            if (item?.layer !== many.id || typeof item.index !== "number") continue
+            items.push(item.payload === undefined ? { layer: many.id, index: item.index } : { layer: many.id, index: item.index, payload: item.payload })
+        }
+        return { hits: manyHits(manifest, items), source: null, items }
+    }
     if (Array.isArray(o.items)) {
         const hits: Hit[] = []
         for (const item of o.items) {
@@ -287,6 +297,18 @@ export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]
     const hit = elementHit(layer, index)
     const hits = hit ? selectionFor(hit, manifest) : null
     return hits === null ? null : { hits, source: { layer: layer.id, index } }
+}
+
+// What a `many` field's picks highlight: each one's own selection (a legend entry's linked
+// marks, a mark itself), drawn together. A pick with nothing to draw, such as an axis spot, adds none.
+export function manyHits(manifest: Manifest, items: FieldPick[]): Hit[] {
+    const out: Hit[] = []
+    for (const it of items) {
+        const layer = manifest.layers.find((l) => l.id === it.layer)
+        const hit = layer ? elementHit(layer, it.index) : null
+        if (hit) out.push(...(selectionFor(hit, manifest) ?? []))
+    }
+    return out
 }
 
 // A surface value's shipped-point index, found from its source (i, j) rather than its stored

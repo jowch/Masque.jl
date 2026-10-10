@@ -3,7 +3,7 @@
 # known: a plot does not know its axis, and its default id counts across the figure.
 
 """
-    interactables(ax, plot; id, kwargs...) -> Vector{AbstractInteractable}
+    interactables(ax, plot; id, select, kwargs...) -> Vector{AbstractInteractable}
 
 The interactables Masque builds for one `plot` on `ax`, the ones `masque(fig)` uses by
 default. `id` names the plot: a plot with one layer takes it as its layer id, and one that
@@ -15,6 +15,11 @@ tooltip = masque"…")` for a scatter. A two-layer plot takes `tooltip` and `lab
 layers and refuses `payloads`. Unlike the constructor, it also moves the layers to where the
 plot is drawn when `translate!`, `scale!`, or `rotate!` moved it, and returns no layers for a
 plot drawn outside data space (`space = :relative`, `:pixel`, `:clip`).
+
+`select = :many` lets a reader hold several of the plot's marks at once: its `@bind` field is
+then a `Vector{ElementEvent}`, empty to start, and Cmd-click (Ctrl-click off a Mac) adds or
+removes a mark. It applies to every layer the plot builds. The default, `:one`, holds one
+mark or `nothing`.
 
 This is also how a recipe gets layers of its own. Define a method for your plot type, and
 `masque(fig)` uses it instead of walking the plots your recipe draws:
@@ -29,7 +34,8 @@ end
 then `:myplot_2` for a second `myplot!`, and each other layer adds its own name to it
 (`:myplot_bars`). A method that takes `id` by name names its layers itself instead.
 """
-function interactables(ax, p::Makie.AbstractPlot; id = nothing, kwargs...)
+function interactables(ax, p::Makie.AbstractPlot; id = nothing, select = nothing, kwargs...)
+    select === nothing || return _with_select(interactables(ax, p; id, kwargs...), select)
     base = _plotbase(p)
     base === nothing && throw(
         ArgumentError(
@@ -49,7 +55,8 @@ end
 # which reports no default for the plot. Read the keywords the method declares and name the
 # fix instead. A `MethodError` raised inside the method's body is not this case and passes
 # through.
-function _plot_interactables(ax, p; id, kwargs...)
+function _plot_interactables(ax, p; id, select = nothing, kwargs...)
+    select === nothing || return _with_select(_plot_interactables(ax, p; id, kwargs...), select)
     _has_custom(ax, p) || return interactables(ax, p; id, kwargs...)
     declared = Base.kwarg_decl(which(interactables, Tuple{typeof(ax), typeof(p)}))
     slurps = any(k -> endswith(string(k), "..."), declared)
@@ -145,8 +152,8 @@ function validate(r::_PlotRequest, ::InteractionContext)
 end
 
 """
-    interactables(plot; tooltip, payloads, label, id, kwargs...) -> Vector{AbstractInteractable}
-    interactables(i::AbstractInteractable) -> [i]
+    interactables(plot; tooltip, payloads, label, id, select, kwargs...) -> Vector{AbstractInteractable}
+    interactables(i::AbstractInteractable; select) -> [i]
 
 One plot's interactables, for `masque(fig, …)`: they replace that plot's default layers, at
 the same position and with the same ids, so `selected=` and legend links keep working. Pass
@@ -157,12 +164,14 @@ default id counts across the figure. To inspect or edit the built interactables,
 `interactables(ax, plot)` instead; those are added like any other interactable, or replace
 the default with the same id.
 
-`interactables(i)` returns `[i]`, so lists of plots and interactables mix freely.
+`interactables(i)` returns `[i]`, so lists of plots and interactables mix freely;
+`interactables(i; select = :many)` returns it holding several picks.
 
 # Examples
 ```julia
 s = scatter!(ax, xs, ys)
 masque(fig, interactables(s; tooltip = masque"x = \$(x)"))   # defaults, with this tooltip
+masque(fig, interactables(s; select = :many))   # w.scatter is a Vector{ElementEvent}
 ```
 """
 function interactables(p::Makie.AbstractPlot; kwargs...)
@@ -173,7 +182,27 @@ function interactables(p::Makie.AbstractPlot; kwargs...)
     end
     return AbstractInteractable[_PlotRequest(p, NamedTuple(kwargs))]
 end
-interactables(i::AbstractInteractable) = AbstractInteractable[i]
+interactables(i::AbstractInteractable; select = nothing) =
+    AbstractInteractable[select === nothing ? i : _with_select(i, select)]
+
+# A colorbar's layer, so `interactables(cb; select = :many)` names why it can't hold several.
+interactables(cb::Makie.Colorbar; select = nothing, kwargs...) =
+    interactables(ColorbarInteractable(cb; kwargs...); select)
+
+# `select = :many` for every layer a plot built, so a `stem!` picks many points and many stems.
+# A layer that can only pick one, such as a colorbar's, refuses `:many`.
+_with_select(built::AbstractVector, select) = AbstractInteractable[_with_select(i, select) for i in built]
+function _with_select(i::AbstractInteractable, select)
+    T = typeof(i)
+    if !hasfield(T, :select)
+        select === :one && return i
+        _check_select(T, select)
+        what = i isa ColorbarInteractable ? "a colorbar pick is one value" : "a $(nameof(T)) holds one value"
+        throw(ArgumentError("$what; select = :many isn't supported"))
+    end
+    _check_select(T, select)
+    return T((f === :select ? select : getfield(i, f) for f in fieldnames(T))...)
+end
 function _has_custom_for(A, p)
     m = which(interactables, Tuple{A, typeof(p)})
     return m.sig != Tuple{typeof(interactables), Any, Makie.AbstractPlot}
@@ -432,7 +461,7 @@ function _assemble_all(fig, xs; auto::Bool, named = Base.IdSet{Any}(), names = S
             out[k] = SliceInteractable(i.ax, i.orientation, i.series, i.id, covers, i.tooltip, i.crosshair, i.cover_plots)
         end
         i isa LegendInteractable && i.lenient || continue
-        out[k] = _legend_interactable(i.leg; id = i.id, events = i.evs, tooltip = i.tooltip, plotmap)
+        out[k] = _legend_interactable(i.leg; id = i.id, events = i.evs, tooltip = i.tooltip, plotmap, select = i.select)
     end
     # The defaults left in the call, by id: a default line takes no clicks unless it is bound.
     kept = Set{Symbol}(id for id in map(_layer_id, defaults) if id !== nothing && !haskey(replaces, id))
