@@ -340,7 +340,7 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
     # A pick `selected=` seeds can be clicked off: record that field cleared.
     for L in manifest["layers"]
         f = string(L["id"])
-        haskey(L, "brush") || string(get(L, "bond", "none")) in _CONTINUOUS_BONDS && continue
+        (haskey(L, "brush") || string(get(L, "bond", "none")) in _CONTINUOUS_BONDS) && continue
         get(init, f, nothing) === nothing && continue
         k = "null@" * f
         push!(seen, k)

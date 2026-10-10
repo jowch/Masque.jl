@@ -213,6 +213,25 @@ end
     @test [r.key for r in player_states(Dict{String, Any}("chip" => false), axis)] == ["null"]
 end
 
+@testset "player_states records a seeded pick cleared, not a box target" begin
+    pick = Dict{String, Any}("id" => "pick", "kind" => "circles", "events" => ["click", "hover"], "bond" => "element", "payloads" => Any[1, 2])
+    pts = Dict{String, Any}("id" => "pts", "kind" => "circles", "events" => ["hover"], "bond" => "element", "payloads" => Any[1, 2])
+    pts["axis"] = "ax"
+    pts["geometry"] = Any[100, 250, 5, 200, 150, 5]
+    man = _brush_manifest(pts)
+    push!(man["layers"], pick)
+    man["fields"] = ["pick", "pts", "roi"]
+    man["initial"] = Dict{String, Any}(
+        "pick" => Dict{String, Any}("layer" => "pick", "index" => 0),
+        "pts" => Dict{String, Any}("items" => Any[Dict{String, Any}("layer" => "pts", "index" => 0)]),
+    )
+    rows = player_states(Dict{String, Any}(), man)
+    keys = [r.key for r in rows]
+    @test "null@pick" in keys && !("null@pts" in keys)
+    cleared = only(r for r in rows if r.key == "null@pick")
+    @test cleared.value["pick"] === nothing && cleared.value["pts"] == man["initial"]["pts"]
+end
+
 @testset "snapshot_table stores each distinct snapshot once" begin
     idle = Dict("cells" => Dict("c" => "idle"))
     a = Dict("cells" => Dict("c" => "adelie"))
