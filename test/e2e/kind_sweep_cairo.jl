@@ -604,6 +604,17 @@ HTML(
         "<span id=\"coords_many\" style=\"display:none\">$(JSON3.write(sweep.many.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000131
+@bind ev_marquee sweep.marquee
+
+# ╔═╡ c1000000-0000-0000-0000-000000000132
+HTML(
+    "<span id=\"out_marquee\">MARQUEE=$(sweep_field("marquee", ev_marquee))</span>" *
+        "<span id=\"bond_marquee\" style=\"display:none\">$(repr(ev_marquee))</span>" *
+        "<span id=\"coords_marquee\" style=\"display:none\">$(JSON3.write(sweep.marquee.manifest["layers"]))</span>" *
+        "<span id=\"axes_marquee\" style=\"display:none\">$(JSON3.write(sweep.marquee.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000050
 @bind ev_slice_lines sweep.slice_lines
 
@@ -771,6 +782,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000128
 # ╠═c1000000-0000-0000-0000-000000000129
 # ╠═c1000000-0000-0000-0000-000000000130
+# ╠═c1000000-0000-0000-0000-000000000131
+# ╠═c1000000-0000-0000-0000-000000000132
 # ╠═c1000000-0000-0000-0000-000000000050
 # ╠═c1000000-0000-0000-0000-000000000051
 # ╠═c1000000-0000-0000-0000-000000000052

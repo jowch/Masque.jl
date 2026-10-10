@@ -330,11 +330,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const surface = document.createElement("div")
     surface.className = "surface"
     // touch-action: block native scroll/pinch on the surface ONLY when this manifest has a drag
-    // interaction (threshold / ROI / view) — a hover/click-only plot (e.g. a plain scatter) must
-    // not hijack page scrolling when a finger lands on it. This has to be decided up front, not
+    // interaction (threshold / ROI / view, or a marquee over a `many` field) — a hover/click-only
+    // plot (e.g. a plain scatter) must not hijack page scrolling when a finger lands on it. This has to be decided up front, not
     // toggled per-pointerdown: UAs resolve touch-action at the touch's first contact, so setting
     // it later has no effect on the gesture already in flight.
-    if (manifest.layers.some((l) => l.events.includes("drag"))) surface.style.touchAction = "none"
+    if (manifest.layers.some((l) => l.events.includes("drag") || (l.many && !l.brush))) surface.style.touchAction = "none"
     const tip = document.createElement("div")
     tip.className = "masque-tip"
     tip.setAttribute("role", "tooltip")
@@ -425,7 +425,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const ctx: OverlayCtx = {
         manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
         hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup,
-        thresholdLines_: thresholdLines, roiBoxes_: roiBoxes,
+        thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, chrome_: plainPhoto,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
         cross_: cross,
         gesture_: channel,

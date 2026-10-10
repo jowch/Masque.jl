@@ -87,6 +87,14 @@ are left alone. An empty click is one with no `click` hit and no `hover` hit, wi
 Cmd/Ctrl; `axesAt` takes every non-colorbar axis whose viewport holds the point (twins and an
 inset's parent alike), and none when the point is inside a legend's box (a `bond: "legend"`
 layer's transform).
+Two more tools edit `many` fields, and add nothing to the wire. A marquee (`drag/marquee.ts`)
+starts on a plot area with a `many` field: a plain drag where no view takes the drag, or
+Alt-drag over a view. It holds no value of its own; on release it sets every `many` field on
+that axis to the elements whose centre is inside the box (replace), adds them (Cmd/Ctrl), or
+removes them (Cmd/Ctrl starting on a held element), sending one value. A press that moves less
+than `VIEW_MIN_PX` stays a click. A legend click also edits each linked `many` field
+(`legendPicks`): the entry's marks replace its picks, or a Cmd/Ctrl-click adds them, and a
+gesture that would leave the field as it is takes them out instead (`editPicks`).
 Pluto overwrites `initial_value` with `transform_value` of the value `mount.ts` seeds, so the
 two must agree. Subtract 1 only when writing the manifest; add 1 when reading the wire. Grid
 window keys on the wire are `i0,i1,j0,j1` (0-based inclusive); Julia stores `i1,i2,j1,j2`. An

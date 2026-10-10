@@ -497,6 +497,15 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "many",
     ),
     Dict(
+        # Marquee and legend picks under `select = :many` (#335). Left axis: no view, so a
+        # plain drag draws the box; Ctrl-drag adds, and one starting on a picked mark takes out.
+        # Its legend entry picks every mark of `a`. Right axis: a pan view, so Alt-drag draws
+        # the box and a plain drag pans. The driver's "marquee" block drives it.
+        "key" => "marquee", "layerId" => "a", "layerKind" => "circles",
+        "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "marquee", "field" => "*",
+    ),
+    Dict(
         "key" => "slice_lines", "layerId" => "slice", "layerKind" => "slice",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "slice",
@@ -1187,6 +1196,19 @@ function build_kind_sweep()
         masque(fig, interactables(sc; select = :many))
     end
 
+    marquee = let
+        fig = Figure(size = (560, 260))
+        ax1 = Axis(fig[1, 1]; title = "marquee", limits = (0, 10, 0, 10))
+        a = scatter!(ax1, [2.0, 5.0, 8.0], [2.0, 5.0, 2.0]; markersize = 20, color = :gray, label = "a")
+        axislegend(ax1; position = :rt)
+        ax2 = Axis(fig[1, 2]; title = "marquee pan", limits = (0, 10, 0, 10))
+        b = scatter!(ax2, [2.0, 5.0, 8.0], [2.0, 5.0, 2.0]; markersize = 20, color = :gray)
+        masque(
+            fig, interactables(a; id = :a, select = :many), interactables(b; id = :b, select = :many),
+            ViewInteractable(ax2; id = :view),
+        )
+    end
+
     slice_lines = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "slice lines", limits = (0, 4, 0, 4))
@@ -1241,7 +1263,7 @@ function build_kind_sweep()
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
-        legend_overlap, legend_template, axis, composite, many, slice_lines, slice_density, slice_auto, slice_gap,
+        legend_overlap, legend_template, axis, composite, many, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
 

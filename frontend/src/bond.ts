@@ -2,14 +2,15 @@ import { hitTestAt, layoutSpaceLayer, matrixLimits, photoClip, resolvePayload } 
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { hideCross } from "./cross"
-import { manyHits, selectionFor, SELECTED_KINDS } from "./selection"
+import { editPicks, linkedIndices, manyHits, selectionFor, SELECTED_KINDS } from "./selection"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, FieldPick, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
+import * as marquee from "./drag/marquee"
 import { contentPoint, panTo, unmapPoint } from "./photo"
-import type { AxisTransform, Hit, Limits3, ThresholdGeometry, ViewGeometry } from "./types"
+import type { AxisTransform, Hit, HitLayer, Limits3, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
 // (observed live in Chromium for a synthetic/non-primary pointerId — real touch/pen input can
@@ -74,7 +75,11 @@ function pointerSpace(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): { la
 function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEvent): void {
     const { layout, content } = pointerSpace(ctx, state, e)
     let text: string
-    if (d.kind === "threshold") {
+    if (d.kind === "marquee") {
+        const readout = marquee.move(ctx, state, d, content)
+        if (readout === null) return // still a click
+        text = readout
+    } else if (d.kind === "threshold") {
         text = thresholdDrag.move(d, content, ctx.tipDigits_)
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {
@@ -175,6 +180,15 @@ function passContextToBase(surface: HTMLElement, pointerId: number): void {
     timer = window.setTimeout(restore, 1000)
 }
 
+// Cmd/Ctrl-marquee adds to the picks, or takes out what it covers when it starts on a mark
+// that is already picked (as in Finder). Without the key it replaces them.
+function marqueeMode(state: OverlayState, e: PointerEvent, under: Hit | null, targets: HitLayer[]): marquee.MarqueeMode {
+    if (!isToggleClick(e)) return "replace"
+    const held = under !== null && targets.includes(under.layer) &&
+        (state.sel_.get(under.layer.id)?.items_ ?? []).some((it) => it.index === under.index)
+    return held ? "subtract" : "add"
+}
+
 export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void {
     // A drag is already in progress (e.g. a second concurrent touch) — refuse to let a new
     // pointer overwrite the first one's `drag` and pointer capture mid-gesture.
@@ -207,6 +221,20 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         }
     }
     const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))
+    // A marquee: a drag on a plot with no view, or Alt-drag on any plot, where a field holds
+    // several picks. A threshold line or an ROI box under the press still takes the drag.
+    if (!hit || (hit.layer.kind === "view" && e.altKey)) {
+        const axis = marquee.marqueeAxis(ctx, axesAt(ctx, layout.x, layout.y))
+        const targets = axis === null ? [] : marquee.marqueeTargets(ctx, axis)
+        // A press on a legend inside the axis is a press on the legend.
+        const under = targets.length ? hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", photoClip(ctx.manifest_, state.photo_, state.photoViewId_)) : null
+        if (axis !== null && targets.length && !under?.layer.links) {
+            state.drag_ = marquee.begin(state, axis, targets, marqueeMode(state, e, under, targets), content.x, content.y, e.pointerId)
+            tryCapture(ctx.surface_, e.pointerId)
+            e.preventDefault()
+            return
+        }
+    }
     if (!hit) return
     if (hit.layer.kind === "threshold") {
         const line = ctx.thresholdLines_.get(hit.layer.id)
@@ -258,6 +286,14 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     // below operates on the locally-claimed `d`, never `state.drag_`.
     state.drag_ = null
     if (ctx.surface_.hasPointerCapture(e.pointerId)) ctx.surface_.releasePointerCapture(e.pointerId)
+    if (d.kind === "marquee") {
+        applyDrag(ctx, state, d, e)
+        // A press that never became a drag is a click, which onClick handles.
+        state.justDragged_ = marquee.active(d)
+        if (state.justDragged_) ctx.commit_(marquee.end(ctx, state, d))
+        hideTip(ctx, state)
+        return
+    }
     // Apply the release event's own position synchronously — a coalesced rAF frame may have
     // been dropped, and the commit below reads mutated drag state, not e, so the final visual
     // (and the value it derives from) must come from this event.
@@ -308,6 +344,7 @@ export function onCancel(ctx: OverlayCtx, state: OverlayState, e: PointerEvent):
     if (ctx.surface_.hasPointerCapture(e.pointerId)) ctx.surface_.releasePointerCapture(e.pointerId)
     ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     hideTip(ctx, state)
+    if (d.kind === "marquee") { marquee.cancel(ctx, state, d); return }
     // §12.5 (round-1 review, finding #2): a cancelled gesture is not a commit, but if it already
     // sent an in-drag (ppu=1) request it still owes the ppu restore — nothing else ever
     // re-renders this static widget, so skipping settle here strands it at low resolution
@@ -344,6 +381,7 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
     ctx.surface_.classList.remove("grabbing"); setDragHoverChrome(ctx, state, null)
     hideTip(ctx, state)
     state.drag_ = null
+    if (d.kind === "marquee") { marquee.cancel(ctx, state, d); return }
     // Same §12.5 obligation as onCancel — but this handler gets no event/position at all, so the
     // last camera a request actually carried is the only thing available to resettle with.
     if (d.kind === "view" && viewNeedsSettle(d)) {
@@ -370,6 +408,7 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     const field = hit.layer.id
     const src = state.sel_.get(field)?.source_ ?? null
     const off = next !== null && src !== null && src.index === hit.index
+    const linked = legendPicks(ctx, state, hit, toggle)
     if (next !== null) {
         state.sel_.set(field, off ? { hits_: [], source_: null } : { hits_: next, source_: { layer: field, index: hit.index } })
         renderSelection(ctx, state)
@@ -395,7 +434,24 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
         value = { layer: hit.layer.id, index: hit.index }
         if (!SELECTED_KINDS.has(hit.layer.kind)) value.payload = resolvePayload(hit, ctx.manifest_, px, py)
     }
-    ctx.commit_({ [field]: value })
+    ctx.commit_({ ...linked, [field]: value })
+}
+
+// A legend click is also a tool on the plots its entry stands for: each linked plot whose
+// field holds several picks gets the entry's marks, as a click on a mark picks that mark
+// (`editPicks`). Returns the fields it changed.
+function legendPicks(ctx: OverlayCtx, state: OverlayState, hit: Hit, toggle: boolean): Record<string, unknown> {
+    const out: Record<string, unknown> = {}
+    if (!hit.layer.links?.length) return out
+    const fields = ctx.manifest_.fields
+    for (const [layer, picked] of linkedIndices(ctx.manifest_, hit.layer, hit.index)) {
+        if (!layer.many || layer.brush || !layer.events.includes("click")) continue
+        if (fields && !fields.includes(layer.id)) continue
+        const items = editPicks(state.sel_.get(layer.id)?.items_ ?? [], layer.id, picked, toggle)
+        state.sel_.set(layer.id, { hits_: manyHits(ctx.manifest_, items), source_: null, items_: items })
+        out[layer.id] = { items }
+    }
+    return out
 }
 
 function syncFocus(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
@@ -423,11 +479,12 @@ function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: num
     const next = toggle ?
         (at >= 0 ? items.filter((_, k) => k !== at) : [...items, pick]) :
         (at >= 0 && items.length === 1 ? [] : [pick])
+    const linked = legendPicks(ctx, state, hit, toggle)
     state.sel_.set(field, { hits_: manyHits(ctx.manifest_, next), source_: null, items_: next })
     renderSelection(ctx, state)
     drawHover(ctx, state, hit)
     syncFocus(ctx, state, hit)
-    ctx.commit_({ [field]: { items: next } })
+    ctx.commit_({ ...linked, [field]: { items: next } })
 }
 
 // Clears the picks of every click field on `axes` (every axis when it is null), leaving the

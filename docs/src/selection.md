@@ -49,9 +49,18 @@ they were picked. A legend entry and an
 vector of their events; a colorbar's pick is one value, so it raises an
 `ArgumentError`.
 
-To select every mark in an area at once, drag a box over them instead:
-an [`ROIInteractable`](@ref) with `selects` returns every mark inside
-it, as [Brush a region](@ref) shows.
+To select every mark in an area, drag across it: a box follows the
+pointer, and when you let go the marks whose centre is inside it become
+the selection. Cmd-drag or Ctrl-drag adds them to the selection
+instead, and one that starts on a selected mark takes the marks it
+covers out. On a plot you can pan or orbit, a plain drag still moves
+the view, so hold Alt (Option on a Mac) to draw the box; Alt-drag works
+on every plot. Clicking a legend entry selects every mark of its plot,
+and Cmd-click or Ctrl-click on the entry adds them or takes them out.
+
+To keep a box on the plot that the reader can move and resize, use an
+[`ROIInteractable`](@ref) with `selects`, as [Brush a region](@ref)
+shows.
 
 ## Start with a mark selected
 

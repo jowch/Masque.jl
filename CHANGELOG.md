@@ -41,6 +41,12 @@ All notable changes to this project are documented here. The format is based on
   image and surface cells don't take it yet. `selected = (scatter = [1, 3],)` starts with
   several marks selected. A colorbar's pick is one value, so `select = :many` on one raises an
   `ArgumentError` (#335).
+- On a plot with `select = :many`, dragging across the plot selects every mark whose centre
+  is inside the box, replacing the selection; Cmd-drag on a Mac, or Ctrl-drag elsewhere,
+  adds them, and takes them out when the drag starts on a selected mark. On a plot that pans
+  or orbits, a plain drag still moves the view and Alt-drag draws the box; Alt-drag works on
+  every plot. A legend click selects every mark of its entry's plot, and Cmd-click or
+  Ctrl-click adds them or takes them out (#335).
 
 ### Changed
 - **Breaking:** `payloads` add to a mark's own data instead of replacing it. A scatter

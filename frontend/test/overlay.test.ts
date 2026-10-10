@@ -5265,3 +5265,215 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }, { layer: "pts", index: 0 }] })
     })
 })
+
+describe("marquee and legend picks under select = :many (#335)", () => {
+    // Points at image (200,200), (600,400), (1000,600) in a `many` field; client px are half.
+    const tf = { xlims: [0, 10] as [number, number], ylims: [0, 10] as [number, number], xscale: "identity", yscale: "identity",
+        viewport: [0, 0, 1200, 800] as [number, number, number, number], xreversed: false, yreversed: false }
+    const many = (): Manifest => ({
+        width: 1200, height: 800, scaling: 2,
+        transforms: { ax1: tf },
+        fields: ["pts"],
+        initial: { pts: { items: [] } },
+        layers: [
+            { id: "pts", kind: "circles", geometry: [200, 200, 20, 600, 400, 20, 1000, 600, 20], payloads: [{}, {}, {}], axis: "ax1", events: ["click", "hover"], many: true },
+        ],
+    })
+    const val = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+    const items = (...ks: number[]) => ({ items: ks.map((index) => ({ layer: "pts", index })) })
+    const ptr = (s: HTMLElement, type: string, x: number, y: number, mod: PointerEventInit = {}) =>
+        s.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, cancelable: true, ...mod }))
+    const click = (s: HTMLElement, x: number, y: number, mod: MouseEventInit = {}) =>
+        s.dispatchEvent(new MouseEvent("click", { clientX: x, clientY: y, bubbles: true, ...mod }))
+    // A full drag: press, move, release, and the click the browser sends after it.
+    const drag = (s: HTMLElement, from: [number, number], to: [number, number], mod: PointerEventInit = {}) => {
+        ptr(s, "pointerdown", from[0], from[1], mod)
+        ptr(s, "pointermove", (from[0] + to[0]) / 2, (from[1] + to[1]) / 2, mod)
+        ptr(s, "pointermove", to[0], to[1], mod)
+        ptr(s, "pointerup", to[0], to[1], mod)
+        click(s, to[0], to[1], mod)
+    }
+    const mounted = (m: Manifest) => {
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        return { host, shadow, surface: shadow.querySelector(".surface") as HTMLElement }
+    }
+
+    it("a drag on a plot with no view picks the marks inside, replacing, and the box goes on release", () => {
+        const { host, shadow, surface } = mounted(many())
+        let n = 0
+        host.addEventListener("input", () => { n++ })
+        ptr(surface, "pointerdown", 50, 50)
+        ptr(surface, "pointermove", 350, 250)
+        const box = shadow.querySelector("rect.masque-marquee") as SVGRectElement
+        expect(box).toBeTruthy()
+        expect(box.classList.contains("masque-roi")).toBe(true)
+        expect([box.getAttribute("x"), box.getAttribute("y"), box.getAttribute("width"), box.getAttribute("height")]).toEqual(["100", "100", "600", "400"])
+        expect(n).toBe(0) // nothing commits mid-drag
+        expect(selChildren(shadow).length).toBe(4) // the preview: two points × (fill + edge)
+        ptr(surface, "pointerup", 350, 250)
+        click(surface, 350, 250)
+        expect(n).toBe(1)
+        expect(val(host).pts).toEqual(items(0, 1))
+        expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
+        // A second plain marquee replaces.
+        drag(surface, [450, 250], [550, 350])
+        expect(val(host).pts).toEqual(items(2))
+    })
+
+    it("Ctrl-marquee adds; one that starts on a picked mark takes out what it covers", () => {
+        const { host, surface } = mounted(many())
+        drag(surface, [50, 50], [150, 150])
+        expect(val(host).pts).toEqual(items(0))
+        drag(surface, [250, 150], [550, 350], { ctrlKey: true })
+        expect(val(host).pts).toEqual(items(0, 1, 2))
+        // Starts on point 1 (image 600,400), which is picked: subtracts points 1 and 2.
+        drag(surface, [300, 200], [550, 350], { ctrlKey: true })
+        expect(val(host).pts).toEqual(items(0))
+    })
+
+    it("a press that doesn't move is still a click", () => {
+        const { host, surface } = mounted(many())
+        ptr(surface, "pointerdown", 100, 100)
+        ptr(surface, "pointerup", 100, 100)
+        click(surface, 100, 100)
+        expect(val(host).pts).toEqual(items(0))
+    })
+
+    it("a marquee on a plot with a pan view needs Alt; a plain drag still pans", () => {
+        const m = many()
+        m.layers.push({ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { mode: "pan", x: 0, y: 0, w: 1200, h: 800 } as unknown as HitLayer["geometry"] })
+        const { host, shadow, surface } = mounted(m)
+        drag(surface, [50, 50], [350, 250], { altKey: true })
+        expect(val(host).pts).toEqual(items(0, 1))
+        ptr(surface, "pointerdown", 50, 50)
+        ptr(surface, "pointermove", 350, 250)
+        expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
+        ptr(surface, "pointerup", 350, 250)
+        click(surface, 350, 250)
+        expect(val(host).pts).toEqual(items(0, 1)) // the pan picked nothing
+    })
+
+    it("a cancelled marquee puts the picks back and commits nothing", () => {
+        const { host, shadow, surface } = mounted(many())
+        drag(surface, [50, 50], [150, 150])
+        let n = 0
+        host.addEventListener("input", () => { n++ })
+        ptr(surface, "pointerdown", 250, 150)
+        ptr(surface, "pointermove", 550, 350)
+        expect(selChildren(shadow).length).toBe(4)
+        ptr(surface, "pointercancel", 550, 350)
+        expect(n).toBe(0)
+        expect(val(host).pts).toEqual(items(0))
+        expect(selChildren(shadow).length).toBe(2)
+        expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
+    })
+
+    it("leaves a grid field to its own tool, and an uncaptured drag that leaves the plot is cancelled", () => {
+        const m = many()
+        m.fields = ["pts", "img"]
+        m.initial = { pts: { items: [] }, img: null }
+        m.layers.push({ id: "img", kind: "grid", axis: "ax1", events: ["click", "hover"], many: true, payloads: [],
+            geometry: { xedges: [0, 600, 1200], yedges: [0, 400, 800], ncols: 2, nrows: 2 } as unknown as HitLayer["geometry"] })
+        const { host, shadow, surface } = mounted(m)
+        drag(surface, [50, 50], [350, 250])
+        expect(val(host)).toEqual({ pts: items(0, 1), img: null })
+        let n = 0
+        host.addEventListener("input", () => { n++ })
+        ptr(surface, "pointerdown", 450, 250)
+        ptr(surface, "pointermove", 550, 350)
+        expect(shadow.querySelector("rect.masque-marquee")).toBeTruthy()
+        Object.defineProperty(surface, "hasPointerCapture", { value: () => false }) // a UA that refused capture
+        surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
+        expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
+        expect(n).toBe(0)
+        expect(val(host).pts).toEqual(items(0, 1))
+    })
+
+    it("a plot whose field holds one pick takes no marquee", () => {
+        const m = many()
+        delete m.layers[0].many
+        m.initial = { pts: null }
+        const { host, shadow, surface } = mounted(m)
+        ptr(surface, "pointerdown", 50, 50)
+        ptr(surface, "pointermove", 350, 250)
+        expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
+        ptr(surface, "pointerup", 350, 250)
+        expect(val(host).pts).toBeNull()
+    })
+
+    it("bars and polygons count by their centre", () => {
+        const m = many()
+        m.fields = ["bars", "poly"]
+        m.initial = { bars: { items: [] }, poly: { items: [] } }
+        m.layers = [
+            // bars centred at (200,600) and (600,600)
+            { id: "bars", kind: "rects", geometry: [200, 600, 100, 300, 600, 600, 100, 300], payloads: [{}, {}], axis: "ax1", events: ["click", "hover"], many: true },
+            // a triangle whose extent centres at (1000,200)
+            { id: "poly", kind: "polygons", geometry: [[900, 100, 1100, 100, 1000, 300]], payloads: [{}], axis: "ax1", events: ["click", "hover"], many: true },
+        ]
+        const { host, surface } = mounted(m)
+        drag(surface, [50, 250], [400, 390]) // image (100,500)-(800,780): both bar centres
+        expect(val(host).bars).toEqual({ items: [{ layer: "bars", index: 0 }, { layer: "bars", index: 1 }] })
+        expect(val(host).poly).toEqual({ items: [] })
+        drag(surface, [440, 40], [560, 160]) // image (880,80)-(1120,320)
+        expect(val(host).poly).toEqual({ items: [{ layer: "poly", index: 0 }] })
+        expect(val(host).bars).toEqual({ items: [] })
+    })
+
+    it("a legend click picks every mark of its plot; again clears; Ctrl-click adds and removes them", () => {
+        const m = many()
+        m.fields = ["pts", "other", "legend"]
+        m.initial = { pts: { items: [] }, other: { items: [] }, legend: null }
+        m.layers.push(
+            { id: "other", kind: "circles", geometry: [1100, 700, 20], payloads: [{}], axis: "ax1", events: ["click", "hover"], many: true },
+            // entries at image (1100,100) → pts and (1100,150) → other
+            { id: "legend", kind: "rects", axis: "leg", events: ["click", "hover"], geometry: [1100, 100, 40, 20, 1100, 150, 40, 20],
+                payloads: [{}, {}], links: [["pts"], ["other"]] },
+        )
+        const { host, surface } = mounted(m)
+        click(surface, 550, 50)
+        expect(val(host).pts).toEqual(items(0, 1, 2))
+        expect(val(host).legend).toEqual({ layer: "legend", index: 0 })
+        click(surface, 100, 100) // a plain click on a mark replaces, as always
+        expect(val(host).pts).toEqual(items(0))
+        click(surface, 550, 50, { ctrlKey: true })
+        expect(val(host).pts).toEqual(items(0, 1, 2))
+        click(surface, 550, 75, { ctrlKey: true })
+        expect(val(host).other).toEqual({ items: [{ layer: "other", index: 0 }] })
+        expect(val(host).pts).toEqual(items(0, 1, 2)) // another entry leaves this plot alone
+        click(surface, 550, 50, { ctrlKey: true })
+        expect(val(host).pts).toEqual(items())
+        click(surface, 550, 50)
+        click(surface, 550, 50)
+        expect(val(host).pts).toEqual(items())
+    })
+
+    it("a drag that starts on a legend inside the axis draws no box", () => {
+        const m = many()
+        m.fields = ["pts", "legend"]
+        m.initial = { pts: { items: [] }, legend: null }
+        m.layers.push({ id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"], geometry: [1100, 100, 40, 20],
+            payloads: [{}], links: [["pts"]] })
+        const { host, shadow, surface } = mounted(m)
+        ptr(surface, "pointerdown", 550, 50)
+        ptr(surface, "pointermove", 300, 300)
+        expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
+        ptr(surface, "pointerup", 300, 300)
+        expect(val(host).pts).toEqual(items())
+    })
+
+    it("a legend click leaves a plot that holds one pick, or isn't bound, alone", () => {
+        const m = many()
+        delete m.layers[0].many
+        m.fields = ["pts", "legend"]
+        m.initial = { pts: null, legend: null }
+        m.layers.push({ id: "legend", kind: "rects", axis: "leg", events: ["click", "hover"], geometry: [1100, 100, 40, 20],
+            payloads: [{}], links: [["pts"]] })
+        const { host, surface } = mounted(m)
+        click(surface, 550, 50)
+        expect(val(host)).toEqual({ pts: null, legend: { layer: "legend", index: 0 } })
+    })
+})
