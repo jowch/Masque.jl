@@ -58,6 +58,7 @@ function __init__()
     dir = normpath(joinpath(@__DIR__, ".."))
     _OVERLAY_JS[] = read(joinpath(dir, "assets", "overlay.js"), String)
     _OVERLAY_CDN[] = _overlay_cdn(dir, pkgversion(@__MODULE__), _OVERLAY_JS[])
+    _register_error_hints()
     return nothing
 end
 
@@ -85,6 +86,7 @@ include("fields.jl")
 include("events.jl")
 include("bond.jl")
 include("render.jl")
+include("hints.jl")
 
 export AbstractBackend
 export AbstractInteractable, AbstractSelector, HitLayer, InteractionContext, AxisTransform

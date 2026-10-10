@@ -285,7 +285,7 @@ version that worked.
 Masque 0.2 renamed or reshaped a few calls. 0.2 still ran the old forms
 with a warning; 0.3 removed them, so each one now fails with a
 `MethodError` ("no method matching …"), or an `UndefVarError` for
-`auto_interactables`. Use the new form instead:
+`auto_interactables`, and the error message names the new form:
 
 | Removed in 0.3 | Use instead |
 |---|---|
