@@ -556,6 +556,36 @@ describe("keyboard navigation", () => {
         expect((host as unknown as { value: Record<string, unknown> }).value.curves).toMatchObject({ layer: "curves", index: 1 })
     })
 
+    it("Shift+ArrowRight/Left step a line's picked point, skipping gaps, and Enter picks it (#335)", () => {
+        const manifest: Manifest = {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{
+                id: "fit", kind: "lines",
+                geometry: [[0, 100, 100, 100, 200, 100, NaN, NaN, 400, 100]],
+                points: [[0, 1, 1, 2, 2, 3, NaN, NaN, 4, 5]],
+                payloads: [{ index: 1 }], axis: "ax1", events: ["click", "hover"],
+            }],
+        }
+        const { surface, host } = setup(manifest)
+        const value = () => (host as unknown as { value: Record<string, unknown> }).value.fit
+        const shift = (key: string) => surface.dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey: true, bubbles: true, cancelable: true }))
+        surface.focus()
+        down(surface, "ArrowRight") // the line; its readout starts at the point nearest its middle
+        down(surface, "Enter")
+        expect(value()).toMatchObject({ layer: "fit", index: 0, sample: 1 })
+        shift("ArrowRight")
+        shift("ArrowRight") // past the gap at 3
+        down(surface, "Enter")
+        expect(value()).toMatchObject({ sample: 4 })
+        shift("ArrowRight") // the line's last point: stays
+        shift("ArrowLeft") // back past the gap, to 2
+        shift("ArrowLeft")
+        shift("ArrowLeft")
+        shift("ArrowLeft") // the first point: stays
+        down(surface, "Enter")
+        expect(value()).toMatchObject({ sample: 0 })
+    })
+
     it("announces position/count over non-gap segments only, for a gapped :polyline", async () => {
         vi.useFakeTimers()
         try {

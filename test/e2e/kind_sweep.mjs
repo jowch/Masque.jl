@@ -345,6 +345,14 @@ try {
               x2: ln.getAttribute("x2"), y2: ln.getAttribute("y2"),
             };
           }),
+          circles: [...el.querySelectorAll("circle")].map((c) => {
+            const cs = getComputedStyle(c);
+            return {
+              className: c.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
+              width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
+              cx: c.getAttribute("cx"), cy: c.getAttribute("cy"), r: c.getAttribute("r"),
+            };
+          }),
           paths: [...el.querySelectorAll("path")].map((p) => {
             const cs = getComputedStyle(p);
             return {
@@ -763,6 +771,78 @@ try {
     // removes one (Linux Chromium, so Ctrl rather than Cmd), a click on empty plot space clears
     // them, and Escape on the focused figure clears them too. Each step checks the printed
     // `@bind` value, host.value's `{items}`, and how many picks are drawn.
+    // A grid with `select = :many` (#335): a click picks one cell, Ctrl-click flips one, a click
+    // on the axis off the grid clears it, and so does Escape. Each step checks the printed
+    // `GridSelection` count, host.value's `{runs}`, and the drawing: one fill path over the
+    // cells and one edge path around their outline (an inner side would be a 5th subpath for
+    // two cells side by side), and no hover on a selected cell.
+    if (spec.mode === "many_grid") {
+      const g = layer.geometry;
+      if (!layer.many) throw new Error(`${key}: layer ${layer.id} ships no many flag`);
+      const v0 = await textOf(`#bond_${key}`);
+      if (!/GridSelection\(:region, 0 of 12 cells\)/.test(v0)) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want an empty GridSelection`);
+      passed.push(`${key}/empty-mask-at-mount`);
+      const at = (i, j) => ({ x: (g.xedges[i] + g.xedges[i + 1]) / 2, y: (g.yedges[j] + g.yedges[j + 1]) / 2 });
+      const selPaths = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const d = (svg) => sr.querySelector(`svg.${svg} g.sel path`)?.getAttribute("d") ?? null;
+        const edge = sr.querySelector("svg.masque-edge g.sel path");
+        return { fill: d("masque-fill"), edge: d("masque-edge"), edgeWidth: edge ? getComputedStyle(edge).strokeWidth : null };
+      }, key);
+      const step = async (what, before, act, wantCount, wantRuns, wantSel) => {
+        const r = await act();
+        const t = await waitChange(`#bond_${key}`, before, `${key}/${what}`);
+        if (!t.includes(`GridSelection(:region, ${wantCount} of 12 cells)`)) throw new Error(`${key}/${what}: value ${JSON.stringify(t)}, want ${wantCount} cells`);
+        const runs = (await inspect(key)).bondAll?.region?.runs;
+        if (JSON.stringify(runs) !== JSON.stringify(wantRuns)) throw new Error(`${key}/${what}: host.value runs ${JSON.stringify(runs)}, want ${JSON.stringify(wantRuns)}`);
+        const sel = r?.sel ?? (await inspect(key)).sel;
+        if (sel !== wantSel) throw new Error(`${key}/${what}: g.sel=${sel}, want ${wantSel}`);
+        passed.push(`${key}/${what}`);
+        return t;
+      };
+      let t = await step("click-picks-one", v0, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click"), 1, [1, 1, 1], 2);
+      t = await step("ctrl-click-adds", t, () => dispatchAt(key, at(2, 1).x, at(2, 1).y, "click", { ctrlKey: true }), 2, [1, 1, 2], 2);
+      const p = await selPaths();
+      if ((p.fill?.match(/M/g) ?? []).length !== 1) throw new Error(`${key}: fill path ${p.fill}, want one rect for the two cells`);
+      if ((p.edge?.match(/M/g) ?? []).length !== 4) throw new Error(`${key}: edge path ${p.edge}, want the outline only (4 sides)`);
+      if (parseFloat(p.edgeWidth) !== 2) throw new Error(`${key}: edge stroke ${p.edgeWidth}, want the 2px selected width`);
+      passed.push(`${key}/outline-only`);
+      const hov = await dispatchAt(key, at(1, 1).x, at(1, 1).y, "pointermove");
+      if (hov.hi.fill || hov.hi.edge || hov.hi.plain) throw new Error(`${key}: hovering a selected cell drew ${JSON.stringify(hov.hi)}`);
+      if (!hov.show) throw new Error(`${key}: hovering a selected cell hid its tooltip`);
+      passed.push(`${key}/no-hover-on-selected`);
+      t = await step("ctrl-click-adds-row", t, () => dispatchAt(key, at(0, 2).x, at(0, 2).y, "click", { ctrlKey: true }), 3, [1, 1, 2, 2, 0, 1], 2);
+      t = await step("ctrl-click-removes", t, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click", { ctrlKey: true }), 2, [1, 2, 1, 2, 0, 1], 2);
+      t = await step("click-replaces", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 1, [0, 3, 1], 2);
+      // The axis runs to y = 4; the grid stops at 3.
+      const off = { x: at(1, 2).x, y: g.yedges[3] - (g.yedges[2] - g.yedges[3]) / 2 };
+      t = await step("empty-click-clears", t, () => dispatchAt(key, off.x, off.y, "click"), 0, [], 0);
+      t = await step("click-again", t, () => dispatchAt(key, at(0, 0).x, at(0, 0).y, "click"), 1, [0, 0, 1], 2);
+      t = await step("escape-clears", t, () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const surface = sr.querySelector(".surface");
+        surface.focus();
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true, cancelable: true }));
+        return null;
+      }, key), 0, [], 0);
+      // A marquee takes the cells the box touches; Ctrl from a held cell takes them out (#335).
+      const gdrag = async (from, to, mod = {}) => {
+        await dispatchAt(key, from.x, from.y, "pointerdown", mod);
+        await dispatchAt(key, (from.x + to.x) / 2, (from.y + to.y) / 2, "pointermove", mod);
+        await dispatchAt(key, to.x, to.y, "pointermove", mod);
+        return dispatchAt(key, to.x, to.y, "pointerup", mod);
+      };
+      t = await step("marquee-takes-touched-cells", t, () => gdrag(at(1, 0), at(2, 1)), 4, [0, 1, 2, 1, 1, 2], 2);
+      t = await step("ctrl-marquee-from-held-removes", t, () => gdrag(at(1, 0), at(2, 0), { ctrlKey: true }), 2, [1, 1, 2], 2);
+      await dispatchAt(key, 1, 1, "pointermove");
+      console.error(`OK  ${key} — ${t.slice(0, 160)}`);
+      continue;
+    }
+
     if (spec.mode === "many") {
       const picks = (t) => [...t.matchAll(/ElementEvent\(:scatter, (\d+),/g)].map((m) => Number(m[1]));
       const items = async () => ((await inspect(key)).bondAll?.scatter?.items ?? null)?.map((i) => i.index);
@@ -1691,6 +1771,18 @@ try {
         }
       }
       passed.push(`${key}/selected-wash`);
+    } else if (spec.selected === "point") {
+      // A bound line's pick is a data point on it (#335): the selected ring around that point,
+      // and none around the line.
+      const ring = m.kids.find((k) => k.kind === "ring");
+      assertRing(ring, key, wantDark);
+      const c = ring.circles[0], v = layer.geometry[spec.selectedIndex];
+      const ex = v[2 * spec.selectedSample], ey = v[2 * spec.selectedSample + 1];
+      if (Math.abs(Number(c.cx) - ex) > 1.2 || Math.abs(Number(c.cy) - ey) > 1.2) {
+        throw new Error(`${key}: point ring ${JSON.stringify(c)} not on sample ${spec.selectedSample} at (${ex}, ${ey})`);
+      }
+      if (ring.paths.length) throw new Error(`${key}: the picked point's whole line is ringed too ${JSON.stringify(ring)}`);
+      passed.push(`${key}/selected-point`);
     } else if (spec.selected === "ring") {
       const ring = m.kids.find((k) => k.kind === "ring");
       assertRing(ring, key, wantDark);
@@ -1800,7 +1892,8 @@ try {
     // already-selected mark, which draws no highlight. The series row (several whole lines)
     // is what exercises the hover stroke.
     const closedHover = layer.kind !== "polyline" && layer.kind !== "segments" && layer.kind !== "lines";
-    const hoverIsSelected = !!(spec.selected && hoverIndex === spec.selectedIndex);
+    // A picked point is not its line: hovering the line still outlines it.
+    const hoverIsSelected = !!(spec.selected && spec.selected !== "point" && hoverIndex === spec.selectedIndex);
     if (hoverIsSelected) {
       assertNoHighlight(tip.hi, `${key}/hover-on-selected`);
       if (tip.sel < 1) throw new Error(`${key}: g.sel gone while hovering the selected mark`);
@@ -2197,8 +2290,11 @@ try {
 
     let clickIdx = spec.clickIndex;
     const before = await textOf(`#out_${key}`);
-    // The overlay's hit index stays 0-based. The bond prints the Julia 1-based index.
-    const juliaIdx = () => clickIdx + 1;
+    // The overlay's hit index stays 0-based. The bond prints the Julia 1-based index. A bound
+    // line with data points picks one (#335): the spec clicks on its `clickSample`, and the
+    // index printed is that point's, with `line` naming the line.
+    const clickSample = spec.clickSample ?? null;
+    const juliaIdx = () => (clickSample === null ? clickIdx : clickSample) + 1;
     const already = new RegExp(`:${jlLayer(spec.layerId)},\\s*${juliaIdx()}\\b`);
     // Collision-avoidance (#114): re-running this driver against a warm Pluto session (no
     // restart) can start a spec with its bond ALREADY holding the index we're about to click —
@@ -2254,7 +2350,8 @@ try {
       }
     }
     if (key === "scatter") scatterClickIdx = clickIdx;
-    const clickPt = hitPoint(layer, clickIdx);
+    const clickPt = clickSample === null ? hitPoint(layer, clickIdx)
+      : { x: layer.geometry[clickIdx][2 * clickSample], y: layer.geometry[clickIdx][2 * clickSample + 1] };
     let after = before;
     if (skipChangeWait) {
       // This holds unless the click clears the `selected=` seed (handled after the dispatch):
@@ -2294,7 +2391,7 @@ try {
         // A second click on the element the first one selected would clear it, so retry the
         // click only when the overlay never took the first one.
         const held = (await inspect(key)).bond;
-        if (a === 0 || !(held && held.layer === layer.id && held.index === clickIdx)) {
+        if (a === 0 || !(held && held.layer === layer.id && held.index === clickIdx && (held.sample ?? null) === clickSample)) {
           await dispatchAt(key, clickPt.x, clickPt.y, "click");
         }
         try {
@@ -2317,6 +2414,9 @@ try {
     } else if (spec.layerKind !== "grid") {
       if (!new RegExp(`:${jlLayer(spec.layerId)},\\s*${juliaIdx()}\\b`).test(after)) {
         throw new Error(`${key}-click: expected Julia index ${juliaIdx()}: ${after.slice(0, 220)}`);
+      }
+      if (clickSample !== null && !new RegExp(`\\bline = ${clickIdx + 1}\\b`).test(after)) {
+        throw new Error(`${key}-click: expected the point on line ${clickIdx + 1}: ${after.slice(0, 220)}`);
       }
     }
     if (spec.layerId === "legend" && !/LegendEvent\(/.test(after)) {
@@ -2353,7 +2453,10 @@ try {
       // exactly the clicked hit's own recipe (2 shapes — fill+edge — for a closed kind, 1 ring
       // for an open one), independent of whatever `selected=` hydration was there before — a
       // spec that bakes a `selected=` index no longer "grows" g.sel on click, it's simply reset.
-      if (echo.hi !== 0) throw new Error(`${key}/click-echo: hover chrome drawn over the echo (g.hi=${echo.hi})`);
+      // A picked point keeps its line's hover outline under the pointer; any other pick is
+      // the hovered mark itself, which draws no hover chrome once selected.
+      const wantHi = clickSample === null ? 0 : 1;
+      if (echo.hi !== wantHi) throw new Error(`${key}/click-echo: g.hi=${echo.hi} over the echo, expected ${wantHi}`);
       const expectSel = closedHover ? 2 : 1;
       if (echo.sel !== expectSel) {
         throw new Error(`${key}/click-echo: g.sel=${echo.sel}, expected ${expectSel} for one echoed ${closedHover ? "closed" : "open"} hit (was ${afterLeave.sel} before the click)`);

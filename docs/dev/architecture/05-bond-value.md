@@ -13,7 +13,12 @@ A layer's role decides its field:
   `nothing` until a click, then one event; a second click on the same element clears it. A
   default line (`:polyline` or `:lines` kind from a plot `masque(fig)` found by itself) is
   hover-only unless `bind` names it: neither the whole line nor a point on it is the obvious
-  pick.
+  pick. A bound `:lines` layer with `points` (any 2D line) picks the data point a hover reads
+  out: the wire adds `sample` (0-based) to `{layer, index}`, `index` still naming the line, and
+  the `ElementEvent`'s `index` is the 1-based sample, its payload the line's plus `line`, `x`,
+  `y`. The overlay rings the point (the selected-open ring around a circle of the line's hit
+  slack). `selected=` indices on such a layer are samples, for one line only. A line without
+  `points` (an `Axis3` line) still picks the whole line.
 - **Control**: a threshold (stamp `"threshold"`) or an ROI box (stamp `"bounds"`, with or
   without `selects`). Always holds its event, starting at the constructor's `value` or
   `bounds`.
@@ -79,7 +84,14 @@ for a brush, or `{layer, index}` (no payload for an element kind) or `{layer, in
 A field built with `select = :many` (its manifest layer carries `many: true`) always sends
 `{items: [{layer, index[, payload]}, ...]}`, empty to start, in the order the picks were made;
 `_many_value` decodes each item as the one-pick field would and returns a typed vector
-(`Vector{ElementEvent}`, `Vector{LegendEvent}`, `Vector{AxisEvent}`). A plain click replaces
+(`Vector{ElementEvent}`, `Vector{LegendEvent}`, `Vector{AxisEvent}`). A `many` grid is the
+exception: it holds a cell mask, sent as `{runs: [j, i0, n, ...]}` (0-based flat triples, n cells
+of row j from column i0) or, once the runs pass 1 KB and packed bits are shorter,
+`{bits: base64}` (cell `k = j*ncols + i` at bit `k % 8` of byte `k ÷ 8`), and `_grid_selection`
+returns a `GridSelection` with a `BitMatrix` shaped like `values`. A value that doesn't fit
+the grid raises `ArgumentError`. The browser holds the mask as one byte per cell
+(`frontend/src/gridmask.ts`) and draws it as one hit: a fill path of the runs and an edge path of
+the cell sides that border an unselected cell. A plain click replaces
 the items with its one pick (or empties them when that pick was the only one), Cmd/Ctrl-click
 and Cmd/Ctrl+Enter toggle one, and `clearPicks` empties every pick field on the clicked axes
 (an empty click) or the whole figure (Escape), sending one value; brush targets and controls
@@ -91,7 +103,9 @@ Two more tools edit `many` fields, and add nothing to the wire. A marquee (`drag
 starts on a plot area with a `many` field: a plain drag where no view takes the drag, or
 Alt-drag over a view. It holds no value of its own; on release it sets every `many` field on
 that axis to the elements whose centre is inside the box (replace), adds them (Cmd/Ctrl), or
-removes them (Cmd/Ctrl starting on a held element), sending one value. A press that moves less
+removes them (Cmd/Ctrl starting on a held element), sending one value. On a line that takes
+points each sample inside is a pick (`picksInBox`); on a grid, `applyGridMarquee` sets the
+cells the box overlaps, recomputed from the press-time mask on every move. A press that moves less
 than `MARQUEE_MIN_CSS` client px stays a click; Escape or a pointercancel restores the picks
 held at the press. A legend click also edits each linked `many` field (`legendPicks`), decided
 by the entry's own field so the two never disagree: an entry the click turns on replaces the

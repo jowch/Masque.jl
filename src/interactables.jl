@@ -672,7 +672,9 @@ function SegmentInteractable(
     end
     return SegmentInteractable(
         ax, vs, mode, id, pl, Float64(tol), tooltip, nothing,
-        label === nothing ? nothing : String(label), unit, nothing, nothing, select,
+        label === nothing ? nothing : String(label), unit, nothing,
+        # A line's data points keep full precision for the `@bind` pick; `vs` is Float32.
+        unit === :line ? (nothing, [[_pt3d(v) for v in vertices]]) : nothing, select,
     )
 end
 # Internal-only: construct with a lazy `resolve(ax) -> vertices`. Called directly by the
@@ -763,8 +765,9 @@ function _clipped_pairs_px(ctx, ax, vs, box)
 end
 # One line's samples as `[x1, y1, x2, y2, …]`. On a categorical or date axis a coordinate is
 # shown as the label or date the user plotted, the same text a scatter's default payload holds.
-function _flat_data(ax, vs)
-    g = Float32[]
+# The manifest ships Float32; the `@bind` pick reads the same samples as Float64.
+function _flat_data(ax, vs, ::Type{T} = Float32) where {T}
+    g = T[]
     for v in vs
         push!(g, v[1], v[2])
     end
@@ -791,10 +794,8 @@ function hitlayers(i::SegmentInteractable, ctx)
         # The readout's samples. Axis3 has no 2D sample to show the cursor's position on a path.
         points, step = if ctx.transforms[aid].is3d
             nothing, nothing
-        elseif i.samples === nothing
-            [_flat_data(i.ax, path) for path in raw], nothing
         else
-            [_flat_data(i.ax, path) for path in i.samples[2]], i.samples[1]
+            [_flat_data(i.ax, path) for path in _sample_paths(i, raw)], _step(i)
         end
         return [HitLayer(i.id, :lines, geom, i.payloads, aid, events(i), i.label, nothing, nothing, points, step)]
     end
@@ -808,6 +809,16 @@ function hitlayers(i::SegmentInteractable, ctx)
     pairs = [vs[k + j] for k in 1:(length(vs) - 1) for j in 0:1]
     return [HitLayer(i.id, :segments, _clipped_pairs_px(ctx, i.ax, pairs, box), i.payloads, aid, events(i), i.label)]
 end
+
+# Each line's data samples, as plotted. A line built without samples reads them off its path.
+_sample_paths(i::SegmentInteractable, raw = nothing) = i.samples !== nothing ? i.samples[2] :
+    raw !== nothing ? raw : i.paths !== nothing ? i.paths :
+    [i.resolve === nothing ? i.vertices : [_pt3(v) for v in i.resolve(i.ax)]]
+_step(i::SegmentInteractable) = i.samples === nothing ? nothing : i.samples[1]
+# Line `k`'s samples `[x1, y1, …]` at full precision, for the `@bind` pick; `nothing` when the
+# owner isn't a line of data points.
+_line_data(i::SegmentInteractable, k) = i.unit === :line ? _flat_data(i.ax, _sample_paths(i)[k], Float64) : nothing
+_line_data(i, k) = nothing
 
 # ============================ RectInteractable =============================
 """
@@ -916,11 +927,13 @@ end
 
 # ============================ GridInteractable =============================
 """
-    GridInteractable(ax, xedges, yedges, values; id=:cells, payloads=nothing, tooltip=nothing, label=nothing)
-    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, payloads=nothing, tooltip=nothing, label=nothing)
+    GridInteractable(ax, xedges, yedges, values; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one)
+    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one)
 
 A binned grid, such as a heatmap or image. Produces one `:grid` [`HitLayer`](@ref). A click
-commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value.
+commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value. With `select = :many`
+the reader picks any set of cells (click, Cmd/Ctrl-click), and the field holds a
+[`GridSelection`](@ref).
 
 # Arguments
 - `xedges`, `yedges` — cell-edge vectors (length `ncols+1`/`nrows+1`), each strictly
@@ -939,6 +952,8 @@ commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value.
 - `label` — the layer's name (see [`PointInteractable`](@ref)); from a plot object, the plot's
   own Makie `label`. It is stored and shipped, but has no effect yet: a grid is not
   keyboard-navigable.
+- `select` — `:one` (default): the field holds one `GridCellEvent` or `nothing`. `:many`: it
+  holds a [`GridSelection`](@ref), every selected cell as a mask.
 
 When a cell is at least one screen pixel, the manifest carries `values` (row-major). Below
 that it carries `sample`: one source value per screen pixel of the axis viewport, the cell
@@ -968,10 +983,13 @@ struct GridInteractable <: AbstractInteractable
     id::Symbol; tooltip::Union{Nothing, Markup, Bool}; label::Union{Nothing, String}
     # Row-major like the shipped `values` (cell `(i, j)` at `(j-1)*ncols + i`); empty for none.
     payloads::Vector{Any}
+    select::Symbol
 end
 # The 7-field form from before `payloads` existed: a grid with no payloads.
 GridInteractable(ax, xedges, yedges, values, id, tooltip, label) =
     GridInteractable(ax, xedges, yedges, values, id, tooltip, label, Any[])
+GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads) =
+    GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads, :one)
 # One payload per cell, row-major. `payloads` is a `(ncols, nrows)` matrix or `(i, j) -> payload`.
 function _grid_payloads(payloads, ncols, nrows)
     payloads === nothing && return Any[]
@@ -986,8 +1004,11 @@ function _grid_payloads(payloads, ncols, nrows)
         ),
     )
 end
-function GridInteractable(ax, xedges, yedges, values; id = :cells, payloads = nothing, tooltip = nothing, label = nothing)
+function GridInteractable(
+        ax, xedges, yedges, values; id = :cells, payloads = nothing, tooltip = nothing, label = nothing, select = :one,
+    )
     _check_tooltip(tooltip)
+    _check_select(GridInteractable, select)
     xe = collect(Float64, xedges); ye = collect(Float64, yedges)
     # geometry.ts's findBin binary-searches these edges assuming strict monotonicity (asc or
     # desc); a non-monotone array silently picks a different (still-plausible-looking) bin
@@ -1005,7 +1026,7 @@ function GridInteractable(ax, xedges, yedges, values; id = :cells, payloads = no
     )
     return GridInteractable(
         ax, xe, ye, values, id, tooltip, label === nothing ? nothing : String(label),
-        _grid_payloads(payloads, expected...),
+        _grid_payloads(payloads, expected...), select,
     )
 end
 tooltip_spec(i::GridInteractable) = i.tooltip

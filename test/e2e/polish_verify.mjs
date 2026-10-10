@@ -133,6 +133,14 @@ try {
               width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
             };
           }),
+          circles: [...el.querySelectorAll("circle")].map((c) => {
+            const cs = getComputedStyle(c);
+            return {
+              className: c.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
+              width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
+              cx: c.getAttribute("cx"), cy: c.getAttribute("cy"), r: c.getAttribute("r"),
+            };
+          }),
           paths: [...el.querySelectorAll("path")].map((p) => {
             const cs = getComputedStyle(p);
             return {

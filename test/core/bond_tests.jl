@@ -353,6 +353,87 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test v === (circles = nothing, rects = nothing)
     end
 
+    @testset "a bound line picks its nearest data point (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        xs, ys = [1.0, 5.0, 9.0], [9.0, 2.0, 1.0]
+        ln = lines!(ax, xs, ys)
+        se = series!(ax, [1.0, 2.0, 3.0], [1.0 2.0 3.0; 4.0 5.0 6.0])
+        st = stairs!(ax, [1.0, 2.0, 3.0], [3.0, 4.0, 5.0])
+        iv = Masque.APD.Bonds.initial_value
+        pick(id, k, s) = Dict{String, Any}("layer" => id, "index" => k, "sample" => s)
+
+        w = masque(fig; bind = (fit = ln, many = se, steps = st))
+        ev = commit_field(w, pick("fit", 0, 1))
+        @test ev isa ElementEvent && ev.layer === :fit && ev.index == 2
+        @test ev.line == 1 && ev.x == 5.0 && ev.y == 2.0
+        @test xs[ev] == 5.0 && ys[ev] == 2.0
+        @test !(:index in keys(ev.payload))
+        @test repr(ev) == "ElementEvent(:fit, 2, line = 1, x = 5.0, y = 2.0)"
+        # Points ship as Float32; the event reads back what was plotted, not its widened bits.
+        @test Masque._coord(0.4f0) === 0.4 && isnan(Masque._coord(NaN32))
+        # The pick reads x and y at full precision from the Julia side, so a time axis in
+        # seconds still names the sample it picked (Float32 spacing there is 128).
+        t0 = 1.7e9
+        fb = Figure(size = (400, 300)); ab = Axis(fb[1, 1])
+        lb = lines!(ab, [t0, t0 + 1, t0 + 2], [0.1, 0.2, 0.3])
+        ev = commit_field(masque(fb; bind = (t = lb,)), pick("t", 0, 1))
+        @test ev.x === t0 + 1 && ev.y === 0.2
+        si = SegmentInteractable(ab, [Point2(t0, 0.1), Point2(t0 + 3, 0.2)]; unit = :line, id = :manual)
+        ev = commit_field(masque(fb, si; bind = :manual), pick("manual", 0, 1))
+        @test ev.x === t0 + 3 && ev.y === 0.2
+        # A plot of several lines says which one, and keeps each line's own payload.
+        ev = commit_field(w, pick("many", 1, 2))
+        @test ev.index == 3 && ev.line == 2 && ev.x == 3.0 && ev.y == 6.0 && ev.label == "series 2"
+        # A staircase picks its own samples, not the corners it adds between them.
+        ev = commit_field(w, pick("steps", 0, 1))
+        @test ev.index == 2 && ev.x == 2.0 && ev.y == 4.0
+        @test_throws ArgumentError commit_field(w, pick("fit", 0, 3))
+        @test_throws ArgumentError commit_field(w, pick("many", 2, 0))
+        # A commit without a point is the whole line, as from a line with no points to pick.
+        @test commit_field(w, Dict{String, Any}("layer" => "fit", "index" => 0)).index == 1
+
+        # `selected=` names a point on the line, the way the pick does.
+        ws = masque(fig; bind = (fit = ln,), selected = (fit = [3],))
+        @test ws.manifest["initial"]["fit"] == Dict("layer" => "fit", "index" => 0, "sample" => 2)
+        @test iv(ws).fit.index == 3 && iv(ws).fit.x == 9.0
+        @test iv(masque(fig; bind = (fit = ln,), selected = (fit = commit_field(w, pick("fit", 0, 0)),))).fit.index == 1
+        @test_throws ArgumentError masque(fig; bind = (fit = ln,), selected = (fit = [4],))
+        err = try
+            masque(fig; bind = (many = se,), selected = (many = [1],)); nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin(":many draws 2 lines", err.msg)
+
+        # Hand-built payloads: a Dict keeps its keys but `index`; anything else rides as `value`.
+        @test Masque._point_payload(Dict(:index => 1, :tag => "a"), 2, 0.5, 1.5) == Dict(:line => 2, :x => 0.5, :y => 1.5, :tag => "a")
+        @test Masque._point_payload("note", 1, 0.5, 1.5) == (; line = 1, x = 0.5, y = 1.5, value = "note")
+        @test_throws ArgumentError Masque._line_point(ElementEvent(:fit, 1, (; index = 1)), Dict{String, Any}(), 1)
+
+        # A recipe's line part picks a point too.
+        sl = scatterlines!(ax, [6.0, 7.0], [6.0, 7.0])
+        tv = Masque.APD.Bonds.transform_value
+        ev = tv(masque(fig; bind = (trend = sl,)), Dict("trend.line" => pick("trend.line", 0, 1))).trend.line
+        @test ev.layer === :trend && ev.part === (:line,) && ev.index == 2 && ev.x == 7.0
+
+        # With `select = :many`, each pick is a point on the line, and `selected=` seeds points.
+        wm = masque(fig, interactables(ln; select = :many); bind = :lines, selected = (lines = [1, 3],))
+        @test wm.manifest["initial"]["lines"]["items"] == Any[
+            Dict("layer" => "lines", "index" => 0, "sample" => 0), Dict("layer" => "lines", "index" => 0, "sample" => 2),
+        ]
+        @test [(e.index, e.x) for e in iv(wm)] == [(1, 1.0), (3, 9.0)]
+        v = tv(wm, Dict("lines" => Dict("items" => [pick("lines", 0, 1)])))
+        @test only(v).index == 2 && only(v).line == 1 && only(v).y == 2.0
+
+        # A line on an Axis3 has no points to pick: its pick stays the whole line.
+        f3 = Figure(size = (400, 300)); a3 = Axis3(f3[1, 1])
+        l3 = lines!(a3, [0.0, 1.0, 2.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0])
+        w3 = masque(f3; bind = (path = l3,))
+        @test !haskey(only(w3.manifest["layers"]), "points")
+        @test commit_field(w3, Dict{String, Any}("layer" => "path", "index" => 0)).index == 1
+        @test iv(masque(f3; bind = (path = l3,), selected = (path = [1],))).path.index == 1
+    end
+
     @testset "recipes nest: parts under the plot's name (#335)" begin
         fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
         sl = scatterlines!(ax, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
@@ -472,9 +553,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             old = T((getfield(i, f) for f in fieldnames(T)[1:(end - 1)])...)
             @test Masque.select_mode(old) === :one
         end
-        # Cells don't take several picks yet, and say so.
-        hm = heatmap!(Axis(fig[3, 1]), [1 2; 3 4])
-        @test_throws "heatmap, image and surface cells don't take several picks yet" masque(fig, interactables(hm; select = :many))
+        # A heatmap's cells hold a mask (a GridSelection, tested below).
+        axh = Axis(fig[3, 1]); hm = heatmap!(axh, [1 2; 3 4])
+        @test Masque.select_mode(only(interactables(GridInteractable(axh, hm); select = :many))) === :many
     end
 
     @testset "select = :many on a recipe's parts and a box's target (#335)" begin
@@ -494,5 +575,52 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         L = only(l for l in wb.manifest["layers"] if l["id"] == "scatter")
         @test !haskey(L, "many") && haskey(L, "brush")
         @test [e.index for e in iv(wb).scatter] == [2]
+    end
+
+    @testset "a grid with select = :many holds a GridSelection (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        img = reshape(Float64.(1:12), 4, 3)
+        hm = heatmap!(ax, img)
+        iv = Masque.APD.Bonds.initial_value
+        tv = Masque.APD.Bonds.transform_value
+        w = masque(fig, (region = interactables(hm; select = :many),))
+        L = only(l for l in w.manifest["layers"] if l["id"] == "region")
+        @test L["many"] === true
+        @test w.manifest["initial"]["region"] == Dict("runs" => Any[])
+        s0 = iv(w).region
+        @test s0 isa GridSelection && s0.layer === :region && size(s0.mask) == (4, 3) && isempty(s0)
+        # Runs: row j = 1 (0-based), columns 1..2; row 2, column 0.
+        v = tv(w, Dict("region" => Dict("runs" => [1, 1, 2, 2, 0, 1]))).region
+        @test findall(v) == [CartesianIndex(2, 2), CartesianIndex(3, 2), CartesianIndex(1, 3)]
+        @test img[v] == img[v.mask] == [6.0, 7.0, 9.0]
+        @test count(v) == 3 && v.mask isa BitMatrix
+        @test v == GridSelection(:region, copy(v.mask)) && hash(v) == hash(GridSelection(:region, copy(v.mask)))
+        @test sprint(show, v) == "GridSelection(:region, 3 of 12 cells)"
+        # Bits: the same cells, row-major, cell k at bit k % 8 of byte k ÷ 8.
+        bytes = zeros(UInt8, 2)
+        for k in (5, 6, 8)
+            bytes[k >> 3 + 1] |= UInt8(1) << (k & 7)
+        end
+        @test tv(w, Dict("region" => Dict("bits" => Masque.base64encode(bytes)))).region == v
+        # The constructor takes it, and `:one` stays a GridCellEvent.
+        g = GridInteractable(ax, hm; select = :many, id = :g)
+        @test Masque.select_mode(g) === :many
+        @test iv(masque(fig, g; bind = g)) isa GridSelection
+        @test iv(masque(fig, GridInteractable(ax, hm; id = :g); bind = (:g,))) == (g = nothing,)
+        # A bad mask names the problem.
+        @test_throws "outside the 4×3 grid" tv(w, Dict("region" => Dict("runs" => [0, 3, 2])))
+        @test_throws "not triples" tv(w, Dict("region" => Dict("runs" => [0, 1])))
+        @test_throws "expected 2" tv(w, Dict("region" => Dict("bits" => Masque.base64encode(UInt8[1]))))
+        @test_throws "expected `runs` or `bits`" tv(w, Dict("region" => Dict("items" => [])))
+        @test_throws "isn't a whole cell" tv(w, Dict("region" => Dict("runs" => [0, 1.5, 1])))
+        @test_throws "not base64 text" tv(w, Dict("region" => Dict("bits" => 3)))
+        @test_throws ArgumentError tv(w, Dict("region" => Dict("bits" => "!!")))
+        @test_throws "got \"x\"" tv(w, Dict("region" => "x"))
+        @test isempty(Masque._grid_selection(:region, nothing, 4, 3))
+        # A surface holds one point.
+        ax3 = Axis3(fig[1, 2])
+        @test_throws "surface cells don't take several picks yet" interactables(
+            ax3, surface!(ax3, rand(3, 3)); select = :many,
+        )
     end
 end

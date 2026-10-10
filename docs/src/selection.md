@@ -47,11 +47,13 @@ Mac) or Ctrl-click (elsewhere) adds a city or takes it out again, so
 they were picked. A legend entry and an
 [`AxisInteractable`](@ref) take `select = :many` the same way and give a
 vector of their events; a colorbar's pick is one value, so it raises an
-`ArgumentError`.
+`ArgumentError`. A heatmap with `select = :many` holds a set of cells,
+as [Select several cells](@ref) shows.
 
 To select every mark in an area, drag across it: a box follows the
 pointer, and when you let go the marks whose centre is inside it become
-the selection. Cmd-drag or Ctrl-drag adds them to the selection
+the selection. On a line, that is its data points inside the box; on a
+heatmap, the cells the box touches. Cmd-drag or Ctrl-drag adds them to the selection
 instead, and one that starts on a selected mark takes the marks it
 covers out. On a plot you can pan or orbit, a plain drag still moves
 the view, so hold Alt (Option on a Mac) to draw the box; Alt-drag works

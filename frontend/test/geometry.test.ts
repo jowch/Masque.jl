@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
-    anchorFor, computeAnchoredPlacement, photoClip, lineReadout,
+    anchorFor, computeAnchoredPlacement, photoClip, lineReadout, samplePoint,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
 import { begin as beginView, tip as viewTip, limitsTip } from "../src/drag/view"
@@ -1057,5 +1057,40 @@ describe("lineReadout", () => {
         const L = layer([[0, 100, 100, 100, 200, 100]], [[1, 5, 2, 6, 3, 7]])
         expect(hitLayer(L, 95, 102)?.pt_).toEqual([1, 2, 6])
         expect(hitLayer({ ...L, points: undefined }, 95, 102)?.pt_).toBeUndefined()
+    })
+})
+
+// A picked line point is drawn where Makie draws that sample.
+describe("samplePoint", () => {
+    const layer = (geometry: number[][], points: number[][], step?: HitLayer["step"]): HitLayer => ({
+        id: "l", kind: "lines", geometry, payloads: [{ index: 1 }], axis: "ax1", events: ["click"], points, ...(step ? { step } : {}),
+    })
+    const samples = [0, 0, 1, 1, 2, 2]
+
+    it("a plain line's sample is its own vertex", () => {
+        const L = layer([[0, 100, 100, 50, 200, 0]], [samples])
+        expect(samplePoint(L, 0, 1)).toEqual({ x: 100, y: 50 })
+        expect(samplePoint(L, 0, 3)).toBeNull()
+        expect(samplePoint(L, 1, 0)).toBeNull()
+        expect(samplePoint({ ...L, points: undefined }, 0, 0)).toBeNull()
+        expect(samplePoint(layer([[0, 0, NaN, NaN, 200, 0]], [samples]), 0, 1)).toBeNull()
+    })
+
+    it("a pre or post staircase draws sample k at vertex 2k", () => {
+        const pre = layer([[0, 0, 0, -100, 100, -100, 100, -200, 200, -200]], [samples], "pre")
+        expect(samplePoint(pre, 0, 1)).toEqual({ x: 100, y: -100 })
+        const post = layer([[0, 0, 100, 0, 100, -100, 200, -100, 200, -200]], [samples], "post")
+        expect(samplePoint(post, 0, 2)).toEqual({ x: 200, y: -200 })
+    })
+
+    it("a center staircase puts an inner sample on its tread, at its own x when the axis can place it", () => {
+        // Samples (0,0), (1,1), (4,2): the middle tread runs from x = 50 to 250, its sample at 100.
+        const center = layer([[0, 0, 50, 0, 50, -100, 250, -100, 250, -200, 400, -200]], [[0, 0, 1, 1, 4, 2]], "center")
+        expect(samplePoint(center, 0, 0)).toEqual({ x: 0, y: 0 })
+        expect(samplePoint(center, 0, 2)).toEqual({ x: 400, y: -200 })
+        expect(samplePoint(center, 0, 1)).toEqual({ x: 150, y: -100 }) // no transform: the tread's middle
+        const t: AxisTransform = { xlims: [0, 4], ylims: [0, 2], xscale: "identity", yscale: "identity",
+            viewport: [0, -200, 400, 200], xreversed: false, yreversed: false }
+        expect(samplePoint(center, 0, 1, t)).toEqual({ x: 100, y: -100 })
     })
 })

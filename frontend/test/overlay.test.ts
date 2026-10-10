@@ -2385,6 +2385,36 @@ describe("tooltips (mount/showTip)", () => {
     })
 })
 
+describe("frame swap keeps a line's picked point (#335)", () => {
+    it("re-keys the point pick to the same sample at its new position, or drops it if gone", async () => {
+        const line = { id: "fit", kind: "lines" as const, geometry: [[200, 600, 600, 600, 1000, 600]], points: [[0, 0, 1, 1, 2, 2]],
+            payloads: [{ index: 1 }], axis: "ax1", events: ["click", "hover"] as ("click" | "hover")[] }
+        const view = { id: "view", kind: "view" as const, axis: "ax1", events: ["drag"] as "drag"[], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }
+        const t: Manifest["transforms"][string] = { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false }
+        const m: Manifest = { width: 1200, height: 800, scaling: 2, transforms: { ax1: t }, layers: [line, view] } as Manifest
+        const pan = async (next: Manifest) => {
+            const { host, script } = setup()
+            mount(script, m, undefined, vi.fn(async () => ({ png: new Uint8Array([1, 2, 3]), manifest: next })))
+            const shadow = shadowOf(host)
+            const surface = shadow.querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 300, bubbles: true })) // sample 1
+            const ring = () => shadow.querySelector("svg.masque-plain circle.masque-ring-inner")
+            expect(ring()?.getAttribute("cx")).toBe("600")
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+            await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+            host.querySelector("img")!.dispatchEvent(new Event("load"))
+            return ring()?.getAttribute("cx") ?? null
+        }
+        expect(await pan({ ...m, layers: [{ ...line, geometry: [[0, 600, 400, 600, 800, 600]] }, view] } as Manifest)).toBe("400")
+        // The line lost its points (as on a frame that no longer ships them): the pick is dropped.
+        expect(await pan({ ...m, layers: [{ ...line, points: undefined }, view] } as Manifest)).toBeNull()
+    })
+})
+
 // Overlay visual recipes (locked — a color-dodge fill of #141414 plus a flat chrome edge,
 // #7a7a7a on a light figure and #c8c8c8 on a dark one; see CLAUDE.md — do not reopen).
 // Units are necessary, not live-verify: agents still run
@@ -2978,12 +3008,73 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             expect(hoverAt(host, 280, 402).textContent).toBe("index1")
         })
 
-        it("the bond value stays the whole line", () => {
+        const clickAt = (host: HTMLElement, x: number, y: number) =>
+            (shadowOf(host).querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new MouseEvent("click", { clientX: x / 2, clientY: y / 2, bubbles: true }))
+        const ringAt = (host: HTMLElement) => {
+            const c = shadowOf(host).querySelector("svg.masque-plain .masque-ring-inner") as SVGCircleElement | null
+            return c && c.tagName === "circle" ? [Number(c.getAttribute("cx")), Number(c.getAttribute("cy"))] : null
+        }
+        const valueOf = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+
+        it("a click picks the nearest data point and rings it", () => {
             const { host, script } = setup()
             mount(script, lineManifest())
-            ;(shadowOf(host).querySelector(".surface") as HTMLElement)
-                .dispatchEvent(new MouseEvent("click", { clientX: 140, clientY: 200, bubbles: true }))
-            expect((host as unknown as { value: unknown }).value).toEqual({ lines: { layer: "lines", index: 0 } })
+            clickAt(host, 280, 402)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0, sample: 1 } })
+            expect(ringAt(host)).toEqual([300, 400])
+            // The line itself carries no selected ring.
+            expect(shadowOf(host).querySelector("svg.masque-plain path.masque-ring-inner")).toBeNull()
+        })
+
+        it("another point moves the pick, and the same point again takes it back", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest())
+            clickAt(host, 280, 402)
+            clickAt(host, 480, 398)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0, sample: 2 } })
+            expect(ringAt(host)).toEqual([500, 400])
+            clickAt(host, 490, 400)
+            expect(valueOf(host)).toEqual({ lines: null })
+            expect(ringAt(host)).toBeNull()
+        })
+
+        it("hovering a line whose point is picked still outlines the line", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest())
+            clickAt(host, 280, 402)
+            const shadow = shadowOf(host)
+            ;(shadow.querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new PointerEvent("pointermove", { clientX: 60, clientY: 200, bubbles: true }))
+            expect(shadow.querySelector("svg.masque-edge path.masque-hi")).not.toBeNull()
+        })
+
+        it("on a layer of several lines the pick names the line and the point", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest({
+                geometry: [[100, 400, 300, 400, 500, 400], [100, 200, 300, 200, 500, 200]],
+                points: [[1, 2.5, 2, 3.25, 3, 4], [1, 7, 2, 8, 3, 9]], payloads: [{ index: 1 }, { index: 2 }],
+            }))
+            clickAt(host, 120, 204)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 1, sample: 0 } })
+            expect(ringAt(host)).toEqual([100, 200])
+        })
+
+        it("a line without points (on an Axis3) still picks the whole line", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest({ points: undefined }))
+            clickAt(host, 280, 402)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0 } })
+            expect(shadowOf(host).querySelector("svg.masque-plain path.masque-ring-inner")).not.toBeNull()
+        })
+
+        it("a starting value with a sample rings that point", () => {
+            const { host, script } = setup()
+            mount(script, { ...lineManifest(), initial: { lines: { layer: "lines", index: 0, sample: 2 } } })
+            expect(ringAt(host)).toEqual([500, 400])
+            // A second click there takes it back, as for a clicked pick.
+            clickAt(host, 500, 400)
+            expect(valueOf(host)).toEqual({ lines: null })
         })
     })
 
@@ -5112,6 +5203,34 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host).pts).toEqual({ items: [] })
     })
 
+    it("on a line, each pick is a point; Ctrl-click adds and removes points, and a restored value rings them", () => {
+        const m: Manifest = {
+            ...many(),
+            fields: ["fit"],
+            initial: { fit: { items: [] } },
+            layers: [{ id: "fit", kind: "lines", geometry: [[200, 400, 600, 400, 1000, 400]], points: [[0, 0, 1, 1, 2, 2]],
+                payloads: [{ index: 1 }], axis: "ax1", events: ["click", "hover"], many: true }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const rings = () => [...shadow.querySelectorAll("svg.masque-plain circle.masque-ring-inner")].map((c) => c.getAttribute("cx"))
+        click(surface, 110, 200) // nearest point 0
+        expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 0 }] })
+        click(surface, 490, 200, { ctrlKey: true }) // adds point 2
+        expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 0 }, { layer: "fit", index: 0, sample: 2 }] })
+        expect(rings().sort()).toEqual(["1000", "200"])
+        click(surface, 110, 200, { ctrlKey: true }) // takes point 0 out, keeps the same line's point 2
+        expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 2 }] })
+        expect(rings()).toEqual(["1000"])
+
+        const restored = setup()
+        mount(restored.script, { ...m, initial: { fit: { items: [{ layer: "fit", index: 0, sample: 1 }, { layer: "fit", index: 0, sample: 7 }] } } })
+        const r = [...shadowOf(restored.host).querySelectorAll("svg.masque-plain circle.masque-ring-inner")].map((c) => c.getAttribute("cx"))
+        expect(r).toEqual(["600"]) // a point the line doesn't have is dropped
+    })
+
     it("a click on an empty part of the plot clears its picks; a miss with none sends nothing", () => {
         const { host, script } = setup()
         mount(script, many())
@@ -5371,25 +5490,40 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
     })
 
-    it("leaves a grid field to its own tool, and an uncaptured drag that leaves the plot is cancelled", () => {
+    it("edits a grid's cells with the same mode as the marks, previewing them live; an uncaptured leave cancels", () => {
         const m = many()
         m.fields = ["pts", "img"]
-        m.initial = { pts: { items: [] }, img: null }
+        m.initial = { pts: { items: [] }, img: { runs: [] } }
+        // 2×2 cells: (i, j) spans x 600i..600(i+1), y 400j..400(j+1) image px.
         m.layers.push({ id: "img", kind: "grid", axis: "ax1", events: ["click", "hover"], many: true, payloads: [],
             geometry: { xedges: [0, 600, 1200], yedges: [0, 400, 800], ncols: 2, nrows: 2 } as unknown as HitLayer["geometry"] })
         const { host, shadow, surface } = mounted(m)
-        drag(surface, [50, 50], [350, 250])
-        expect(val(host)).toEqual({ pts: items(0, 1), img: null })
         let n = 0
         host.addEventListener("input", () => { n++ })
-        ptr(surface, "pointerdown", 450, 250)
+        // Image (100,100)-(300,300): point 0's centre, and the cell it touches.
+        ptr(surface, "pointerdown", 50, 50)
+        ptr(surface, "pointermove", 150, 150)
+        expect(n).toBe(0)
+        expect(selChildren(shadow).length).toBeGreaterThan(2) // the cell previews with the mark
+        ptr(surface, "pointerup", 150, 150)
+        click(surface, 150, 150)
+        expect(n).toBe(1)
+        expect(val(host)).toEqual({ pts: items(0), img: { runs: [0, 0, 1] } })
+        // Ctrl adds: point 2 and cell (1,1).
+        drag(surface, [450, 250], [550, 350], { ctrlKey: true })
+        expect(val(host)).toEqual({ pts: items(0, 2), img: { runs: [0, 0, 1, 1, 1, 1] } })
+        // Ctrl starting on a held cell (off any mark) subtracts from both.
+        drag(surface, [60, 60], [150, 150], { ctrlKey: true })
+        expect(val(host)).toEqual({ pts: items(2), img: { runs: [1, 1, 1] } })
+        n = 0
+        ptr(surface, "pointerdown", 50, 50)
         ptr(surface, "pointermove", 550, 350)
         expect(shadow.querySelector("rect.masque-marquee")).toBeTruthy()
         Object.defineProperty(surface, "hasPointerCapture", { value: () => false }) // a UA that refused capture
         surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
         expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
         expect(n).toBe(0)
-        expect(val(host).pts).toEqual(items(0, 1))
+        expect(val(host)).toEqual({ pts: items(2), img: { runs: [1, 1, 1] } })
     })
 
     it("a plot whose field holds one pick takes no marquee", () => {
@@ -5576,8 +5710,174 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         expect(val(host)).toEqual({ pts: items(0, 1), twin: { items: [{ layer: "twin", index: 0 }] }, ins: { items: [{ layer: "ins", index: 0 }] } })
     })
 
+    it("on a line that takes points, a box and a legend entry pick its data points, as a click does", () => {
+        const m = many()
+        m.fields = ["ln", "legend"]
+        m.initial = { ln: { items: [] }, legend: null }
+        m.layers = [
+            // one line through image (200,200), (600,400), (1000,600)
+            { id: "ln", kind: "lines", geometry: [[200, 200, 600, 400, 1000, 600]], points: [[1, 2, 3, 4, 5, 6]],
+                payloads: [{}], axis: "ax1", events: ["click", "hover"], many: true } as unknown as HitLayer,
+            { id: "legend", kind: "rects", axis: "leg", events: ["click", "hover"], geometry: [1100, 100, 40, 20],
+                payloads: [{}], links: [["ln"]] },
+        ]
+        const pts = (...ss: number[]) => ({ items: ss.map((sample) => ({ layer: "ln", index: 0, sample })) })
+        const { host, surface } = mounted(m)
+        drag(surface, [50, 50], [350, 250]) // image (100,100)-(700,500): points 0 and 1
+        expect(val(host).ln).toEqual(pts(0, 1))
+        // Ctrl from the held point 1 takes out the points it covers.
+        drag(surface, [300, 200], [550, 350], { ctrlKey: true })
+        expect(val(host).ln).toEqual(pts(0))
+        click(surface, 550, 50) // the legend entry: every point of its line
+        expect(val(host).ln).toEqual(pts(0, 1, 2))
+        click(surface, 550, 50)
+        expect(val(host).ln).toEqual(pts())
+    })
+
     it("a click-only plot with a `many` field leaves page scrolling to a finger", () => {
         const { surface } = mounted(many())
         expect(surface.style.touchAction).not.toBe("none")
+    })
+})
+
+describe("a grid with select = :many holds a cell mask (#335)", () => {
+    // A 4×3 grid filling the axis: cell (i, j) spans x 300i..300(i+1), y 200j..200(j+1) image px.
+    const grid = (initial: unknown = { runs: [] }): Manifest => ({
+        width: 1200, height: 800, scaling: 2,
+        transforms: { ax1: { xlims: [0, 4], ylims: [0, 4], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+        fields: ["region"],
+        initial: { region: initial },
+        layers: [{ id: "region", kind: "grid", axis: "ax1", events: ["click", "hover"], payloads: [], many: true,
+            geometry: { xedges: [0, 300, 600, 900, 1200], yedges: [0, 200, 400, 600], ncols: 4, nrows: 3, values: Array.from({ length: 12 }, (_, k) => k) } }],
+    })
+    // Client px of cell (i, j)'s centre: image px / scaling.
+    const cell = (s: HTMLElement, i: number, j: number, mod: MouseEventInit = {}) =>
+        s.dispatchEvent(new MouseEvent("click", { clientX: (300 * i + 150) / 2, clientY: (200 * j + 100) / 2, bubbles: true, ...mod }))
+    const val = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+
+    it("a click picks one cell, Ctrl-click flips one, and the value is row runs", () => {
+        const { host, script } = setup()
+        mount(script, grid())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        cell(surface, 1, 1)
+        expect(val(host).region).toEqual({ runs: [1, 1, 1] })
+        cell(surface, 2, 1, { ctrlKey: true })
+        expect(val(host).region).toEqual({ runs: [1, 1, 2] })
+        cell(surface, 0, 2, { ctrlKey: true })
+        expect(val(host).region).toEqual({ runs: [1, 1, 2, 2, 0, 1] })
+        cell(surface, 1, 1, { ctrlKey: true })
+        expect(val(host).region).toEqual({ runs: [1, 2, 1, 2, 0, 1] })
+        cell(surface, 3, 0)
+        expect(val(host).region).toEqual({ runs: [0, 3, 1] })
+        // A plain click on the only selected cell clears the field.
+        cell(surface, 3, 0)
+        expect(val(host).region).toEqual({ runs: [] })
+        expect(selChildren(shadow).length).toBe(0)
+    })
+
+    it("draws one fill and one outline, and a selected cell takes no hover", () => {
+        const { host, script } = setup()
+        mount(script, grid())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        cell(surface, 0, 0)
+        cell(surface, 1, 0, { ctrlKey: true })
+        const fill = fillSelGroup(shadow).querySelector("path")!
+        expect(fill.getAttribute("d")).toBe("M0 0H600V200H0Z")
+        expect(fill.classList.contains("masque-fillshape")).toBe(true)
+        const edge = selGroupEls(shadow).find((g) => g.closest("svg")!.classList.contains("masque-edge"))!.querySelector("path")!
+        // The outline only: no side between the two cells.
+        expect(edge.getAttribute("d")).toBe("M0 0H600M0 200H600M0 0V200M600 0V200")
+        expect(edge.classList.contains("masque-w-selected")).toBe(true)
+        expect(hiChildren(shadow).length).toBe(0)
+    })
+
+    it("an explicit hoverstyle stroke draws the cells unblended, as one tinted area and its outline", () => {
+        const { host, script } = setup()
+        const m = grid({ runs: [0, 0, 1] })
+        m.layers[0].style = { stroke: "#123456", width: 2 }
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const wrap = selGroupEls(shadow).find((g) => g.closest("svg")!.classList.contains("masque-plain"))!.firstElementChild as SVGGElement
+        expect(wrap.tagName.toLowerCase()).toBe("g")
+        expect(wrap.style.getPropertyValue("--masque-hi-stroke")).toBe("#123456")
+        const [fill, edge] = [...wrap.children] as SVGElement[]
+        expect(fill.getAttribute("d")).toBe("M0 0H300V200H0Z")
+        expect(fill.classList.contains("masque-nostroke")).toBe(true)
+        expect(edge.classList.contains("masque-w-selected")).toBe(true)
+        expect(edge.style.getPropertyValue("fill")).toBe("none")
+        expect(fillSelGroup(shadow).children.length).toBe(0)
+    })
+
+    it("a frame that moves the grid redraws the held cells at the new edges", async () => {
+        const m = grid()
+        m.layers.push({ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } })
+        const g0 = m.layers[0].geometry as GridGeometry
+        const moved: Manifest = { ...m, initial: undefined,
+            layers: [{ ...m.layers[0], geometry: { ...g0, xedges: g0.xedges.map((x) => x - 200) } }, m.layers[1]] }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1, 2, 3]), manifest: moved }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        cell(surface, 1, 0)
+        expect(fillSelGroup(shadow).querySelector("path")!.getAttribute("d")).toBe("M300 0H600V200H300Z")
+        // A pan from a point off the grid's cells, so the press lands on the view.
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 350, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 350, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 350, bubbles: true }))
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+        host.querySelector("img")!.dispatchEvent(new Event("load"))
+        expect(requestFrame).toHaveBeenCalled()
+        expect(fillSelGroup(shadow).querySelector("path")!.getAttribute("d")).toBe("M100 0H400V200H100Z")
+        expect(val(host).region).toEqual({ runs: [0, 1, 1] })
+    })
+
+    it("a frame whose grid changed size draws no held cells, and the next click starts over", async () => {
+        const m = grid()
+        m.layers.push({ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } })
+        const g0 = m.layers[0].geometry as GridGeometry
+        const resized: Manifest = { ...m, initial: undefined,
+            layers: [{ ...m.layers[0], geometry: { ...g0, xedges: [0, 600, 1200], ncols: 2, values: g0.values!.slice(0, 6) } }, m.layers[1]] }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1, 2, 3]), manifest: resized }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        cell(surface, 1, 0)
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 350, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 350, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 350, bubbles: true }))
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+        host.querySelector("img")!.dispatchEvent(new Event("load"))
+        expect(requestFrame).toHaveBeenCalled()
+        expect(fillSelGroup(shadow).children.length).toBe(0)
+        // The pan's own click, which the overlay swallows.
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 200, clientY: 350, bubbles: true }))
+        // Ctrl-click adds to nothing: the old 4-column mask doesn't carry over.
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 150 / 2, clientY: 100 / 2, bubbles: true, ctrlKey: true }))
+        expect(val(host).region).toEqual({ runs: [0, 0, 1] })
+    })
+
+    it("a click on an empty part of the axis and Escape clear it; a restored value draws", () => {
+        const { host, script } = setup()
+        mount(script, grid({ runs: [0, 0, 2] }))
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect(fillSelGroup(shadow).querySelector("path")!.getAttribute("d")).toBe("M0 0H600V200H0Z")
+        cell(surface, 2, 2, { ctrlKey: true })
+        expect(val(host).region).toEqual({ runs: [0, 0, 2, 2, 2, 1] })
+        // y = 700 image px is inside the axis, below the grid.
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 350, bubbles: true }))
+        expect(val(host).region).toEqual({ runs: [] })
+        expect(selChildren(shadow).length).toBe(0)
+        cell(surface, 1, 1)
+        surface.focus()
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+        expect(val(host).region).toEqual({ runs: [] })
     })
 })

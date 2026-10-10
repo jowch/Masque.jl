@@ -161,9 +161,10 @@ end
             @test_throws ArgumentError masque(f; selected = Dict(:lines => [1]))
             w = masque(f; bind = (:lines,), selected = Dict(:lines => [1]))
             line = only(filter(d -> d["id"] == "lines", w.manifest["layers"]))
-            @test w.manifest["initial"]["lines"] == Dict("layer" => "lines", "index" => 0)
+            # A bound line's index is a point on it (#335): `[1]` is its first data point.
+            @test w.manifest["initial"]["lines"] == Dict("layer" => "lines", "index" => 0, "sample" => 0)
             @test length(line["payloads"]) == 1 && "click" in line["events"]
-            @test_throws ArgumentError masque(f; bind = (:lines,), selected = Dict(:lines => [2]))
+            @test_throws ArgumentError masque(f; bind = (:lines,), selected = Dict(:lines => [5]))
             ev = commit_field(w, Dict("layer" => "lines", "index" => 0))
             @test ev isa ElementEvent && ev.index == 1 && ev.payload == (; index = 1)
             # #262: each line ships its data samples for the hover readout; a gap stays a gap.

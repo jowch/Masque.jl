@@ -77,7 +77,7 @@ its own, define a method of [`interactables`](@ref) for its type; see
 | [`PointInteractable`](@ref) | `(ax, points; radius, radius3d, id=:points)` or `(ax, p::Scatter)` | [`ElementEvent`](@ref): `index`, `x`, `y`[, `z`] | [Getting started](@ref), [Click marks](@ref) |
 | [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, unit=:segment, tol=6, id=:segments)` | [`ElementEvent`](@ref): `segment_index`, or `index` with `unit = :line` | [Click marks](@ref) |
 | [`RectInteractable`](@ref) | `(ax, rects; clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot)` | [`ElementEvent`](@ref): `index`; bars give `low`, `high`, `value` | [Click marks](@ref) |
-| [`GridInteractable`](@ref) | `(ax, xedges, yedges, values; id=:cells)` or `(ax, p::Union{Heatmap,Image})` | [`GridCellEvent`](@ref): `i`, `j`, `value` | [Inspect a grid](@ref) |
+| [`GridInteractable`](@ref) | `(ax, xedges, yedges, values; id=:cells)` or `(ax, p::Union{Heatmap,Image})` | [`GridCellEvent`](@ref): `i`, `j`, `value`; with `select = :many`, a [`GridSelection`](@ref) | [Inspect a grid](@ref) |
 | [`SurfaceInteractable`](@ref) | `(ax, x, y, z; value, id=:surface)` or `(ax, p::Surface)` | [`GridCellEvent`](@ref): `i`, `j`, `value` (the point's `z`) | [Supported plots and axes](@ref) |
 | [`PolygonInteractable`](@ref) | `(ax, rings; holes=nothing, id=:polygons)` or `(ax, p::Poly)` | [`ElementEvent`](@ref): `index` | [Click marks](@ref) |
 | [`TextInteractable`](@ref) | `(ax, p::Text; id=:text)` | [`ElementEvent`](@ref): `text`, `index`, `x`, `y` | [Click marks](@ref) |
@@ -105,8 +105,8 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 |---|---|---|---|
 | `Scatter` | `PointInteractable` | `index`, `x`, `y`[, `z`] | `:scatter` |
 | `MeshScatter` | `PointInteractable` | `index`, `x`, `y`, `z` | `:meshscatter` |
-| `Lines` / `Stairs` | `SegmentInteractable` | `index` (the whole line is one mark; takes clicks once named in `bind`) | `:lines` / `:stairs` |
-| `Series` | `SegmentInteractable` | `index`; `label` when the series has one (takes clicks once named in `bind`) | `:series` |
+| `Lines` / `Stairs` | `SegmentInteractable` | `index` (the whole line is one mark); a click, once the line is named in `bind`, picks its nearest data point: `index`, `line`, `x`, `y` | `:lines` / `:stairs` |
+| `Series` | `SegmentInteractable` | `index`; `label` when the series has one; a click, once named in `bind`, picks a data point as for `Lines` | `:series` |
 | `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | `segment_index` | `:segments`, `:errorbars`, … |
 | `Arrows3D` | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
 | `Arrows2D` | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |

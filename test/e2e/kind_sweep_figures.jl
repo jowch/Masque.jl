@@ -57,15 +57,20 @@ kind_sweep_meta() = [
         "hoverFields" => ["labelalpha", "x1", "y1"],
     ),
     Dict(
+        # A bound line picks a data point (#335): `selected = [1]` rings its first point, and the
+        # click lands on its third.
         "key" => "lines", "layerId" => "lines", "layerKind" => "lines",
-        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "selected" => "point", "circle" => false, "selectedIndex" => 0, "selectedSample" => 0,
+        "clickIndex" => 0, "clickSample" => 2,
         "tip" => "curve", "hoverIndex" => 0, "hoverTip" => "curve", "mode" => "element",
         # The hover readout at the third plotted point, (2.0, 0.4) (#262).
         "readout" => Dict("vertex" => 2, "text" => ["x2", "y0.4"]),
     ),
     Dict(
+        # A click picks the third point of the second series (#335). A point on one of several
+        # lines can't be given to `selected=`, so nothing starts picked.
         "key" => "series", "layerId" => "series", "layerKind" => "lines",
-        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 1, "clickSample" => 2,
         "tip" => "series 1", "hoverIndex" => 1, "hoverTip" => "series 2", "mode" => "element",
         "readout" => Dict("vertex" => 2, "text" => ["x3", "y1.5"]),
     ),
@@ -506,6 +511,14 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "marquee", "field" => "*",
     ),
     Dict(
+        # A grid with `select = :many` (#335): a click picks one cell, Ctrl-click flips one,
+        # the cells draw as one outlined area, and a click off the grid and Escape clear it.
+        # The driver's "many_grid" block drives it.
+        "key" => "many_grid", "layerId" => "region", "layerKind" => "grid",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "many_grid",
+    ),
+    Dict(
         "key" => "slice_lines", "layerId" => "slice", "layerKind" => "slice",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "slice",
@@ -580,7 +593,7 @@ function build_kind_sweep()
         ys = [1.0 1.6 2.1 1.4; 2.8 2.2 1.5 0.9; 0.5 1.2 1.9 2.6]
         sp = series!(ax, ys; linewidth = 4)
         # A default line takes no clicks (#335); `bind` names it, so it takes them again.
-        masque(fig; bind = (sp,), selected = Dict(:series => [1]))
+        masque(fig; bind = (sp,))
     end
 
     segments = let
@@ -1209,6 +1222,13 @@ function build_kind_sweep()
         )
     end
 
+    many_grid = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "select many cells", limits = (0, 4, 0, 4))
+        hm = heatmap!(ax, 0:4, 0:3, reshape(Float64.(1:12), 4, 3))
+        masque(fig, (region = interactables(hm; select = :many),))
+    end
+
     slice_lines = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "slice lines", limits = (0, 4, 0, 4))
@@ -1263,7 +1283,7 @@ function build_kind_sweep()
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
-        legend_overlap, legend_template, axis, composite, many, marquee, slice_lines, slice_density, slice_auto, slice_gap,
+        legend_overlap, legend_template, axis, composite, many, many_grid, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
 

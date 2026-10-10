@@ -4,7 +4,7 @@ import { hitSurface, surfaceVertex } from "./surface"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3 } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
-const SEG_TOL = 8 // px slack for segments/polylines
+export const SEG_TOL = 8 // px slack for segments/polylines
 
 // closest point on the clamped segment (x0,y0)-(x1,y1) to (px,py) — the projection distToSegment
 // already computes, factored out so anchorFor can reuse the point (not just its distance) for the
@@ -61,6 +61,26 @@ export function lineReadout(layer: HitLayer, index: number, px: number, py: numb
     const x = pts[2 * s], y = pts[2 * s + 1]
     const shown = (v: number | string | undefined) => typeof v === "string" || Number.isFinite(v)
     return x !== undefined && y !== undefined && shown(x) && shown(y) ? [s, x, y] : null
+}
+
+// Where sample `s` of line `index` sits on screen, image px: the vertex Makie draws it at. A
+// `:center` staircase draws no vertex at an inner sample; it sits on its tread, the edge from
+// vertex 2s to 2s + 1, at its own x when the axis can place it, else the tread's middle.
+// null when the sample is not on screen (a NaN gap, or out of range).
+export function samplePoint(layer: HitLayer, index: number, s: number, t?: AxisTransform): { x: number; y: number } | null {
+    const verts = (layer.geometry as number[][] | null)?.[index]
+    const n = (layer.points?.[index]?.length ?? 0) / 2
+    if (!verts || !Number.isInteger(s) || s < 0 || s >= n) return null
+    const at = (k: number) => (finitePair(verts[2 * k], verts[2 * k + 1]) ? { x: verts[2 * k], y: verts[2 * k + 1] } : null)
+    if (layer.step === undefined) return at(s)
+    if (layer.step !== "center") return at(2 * s)
+    if (s === 0) return at(0)
+    if (s === n - 1) return at(verts.length / 2 - 1)
+    const a = at(2 * s), b = at(2 * s + 1)
+    if (!a || !b) return null
+    const x = layer.points?.[index]?.[2 * s]
+    const px = typeof x === "number" && t && !t.polar ? projectAxis(t, x, 0).x : (a.x + b.x) / 2
+    return { x: Math.max(Math.min(a.x, b.x), Math.min(Math.max(a.x, b.x), px)), y: a.y }
 }
 
 // Keyboard focus has no cursor: sit at the arc-length midpoint, the same idea as a segment's midpoint.

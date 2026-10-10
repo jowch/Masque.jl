@@ -60,9 +60,10 @@ export interface HiResult {
 export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null {
     if (!hit.geom_) return null
     const st = hit.layer.style ?? DEFAULT_STYLE
+    if (hit.geom_[0] === "mask") return maskElements(hit.geom_ as [string, string, string], st.stroke)
     const g = hit.geom_ as [string, ...number[]] | [string, number[]]
     let el: SVGElement | null = null
-    if (g[0] === "circle") {
+    if (g[0] === "circle" || g[0] === "point") {
         el = document.createElementNS(SVG_NS, "circle")
         el.setAttribute("cx", String(g[1])); el.setAttribute("cy", String(g[2])); el.setAttribute("r", String(g[3]))
     } else if (g[0] === "rect" || g[0] === "rectfill") {
@@ -96,7 +97,8 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
         }
     }
     if (!el) return null
-    const open = g[0] === "seg" || g[0] === "path"
+    // A picked point on a line is open too: a ring around the point, the line showing through.
+    const open = g[0] === "seg" || g[0] === "path" || g[0] === "point"
     const rectfill = g[0] === "rectfill"
 
     // Explicit hoverstyle stroke: today's single unblended element in svg.masque-plain, unchanged.
@@ -149,6 +151,31 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
         edgeEl.classList.add("masque-wash", "masque-w-selected")
     }
     return { fill: fillEl, edge: edgeEl }
+}
+
+// A grid's selected cells (gridmask.ts's maskHit): the closed-mark recipe, with the fill over
+// the cells and the 2px edge on the outline only, so the cells inside a selected area show no
+// grid lines. Square caps close the corners where a row side meets a column side.
+function maskElements(g: [string, string, string], stroke: string | undefined): HiResult {
+    const fill = document.createElementNS(SVG_NS, "path")
+    fill.setAttribute("d", g[1])
+    const edge = document.createElementNS(SVG_NS, "path")
+    edge.setAttribute("d", g[2])
+    edge.setAttribute("fill", "none")
+    edge.setAttribute("stroke-linecap", "square")
+    edge.setAttribute("vector-effect", "non-scaling-stroke")
+    if (stroke) {
+        const wrap = document.createElementNS(SVG_NS, "g")
+        setHiStroke(wrap, stroke)
+        fill.classList.add("masque-hi", "masque-wash", "masque-nostroke")
+        edge.classList.add("masque-hi", "masque-wash", "masque-w-selected")
+        edge.style.setProperty("fill", "none")
+        wrap.append(fill, edge)
+        return { plain: wrap }
+    }
+    fill.classList.add("masque-hi", "masque-fillshape")
+    edge.classList.add("masque-hi", "masque-wash", "masque-w-selected")
+    return { fill, edge }
 }
 
 // --- highlight/selection DOM-lifecycle: keyed by OverlayState.hiKey_ / selKeys_ ---
@@ -225,7 +252,7 @@ export function clearSel(selGroups: HiGroups): void {
 // becomes selected.
 export function drawHi(state: OverlayState, hiGroups: HiGroups, hit: Hit, also?: HiGroups): void {
     const key = hitKey(hit)
-    if (state.selKeys_.has(key)) { clearHiImmediate(state, hiGroups, also); return }
+    if (state.selKeys_.has(key) || maskHolds(state, key)) { clearHiImmediate(state, hiGroups, also); return }
     const cur = hiGroups.fill_.firstElementChild ?? hiGroups.edge_.firstElementChild ?? hiGroups.plain_.firstElementChild
     if (key === state.hiKey_ && cur && !cur.classList.contains("masque-leave")) return
     clearHiImmediate(state, hiGroups, also)
@@ -342,5 +369,13 @@ export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
     placeSel(ctx.selGroup_, data, entering)
     placeSel(ctx.selFixed_, fixed, entering)
     state.selKeys_ = next
-    if (state.hiKey_ !== null && next.has(state.hiKey_)) clearHiImmediate(state, ctx.hiGroup_, ctx.hiFixed_)
+    if (state.hiKey_ !== null && (next.has(state.hiKey_) || maskHolds(state, state.hiKey_))) clearHiImmediate(state, ctx.hiGroup_, ctx.hiFixed_)
+}
+
+// A grid cell a mask holds counts as selected for the hover guard above, though the mask is
+// drawn as one hit rather than a key per cell.
+function maskHolds(state: OverlayState, key: string): boolean {
+    const at = key.lastIndexOf(":")
+    const mask = state.sel_.get(key.slice(0, at))?.mask_
+    return mask !== undefined && mask[Number(key.slice(at + 1))] === 1
 }

@@ -203,6 +203,21 @@ named `scatter`: 2.2 KB for 100 picks and 23.2 KB for 1 000, about 22–24 B a p
 reader holding every point of a 1 000-point scatter sends less per click than one rendered
 PNG. No other fixture sets `select`, so the tables above are unchanged by it.
 
+A `select = :many` grid's value is a cell mask, `{runs: [j, i0, n, ...]}`, so its size follows the
+shape's outline, one triple per row it crosses, not its area. On a 512×512 image (JSON bytes,
+counted by script on 2026-10-10; MsgPack packs the small integers tighter): one cell 18 B, a
+300×300 block 3.6 KB, the same block minus a corner 3.6 KB. Past 1 KB of runs the browser sends
+`{bits: base64}` when that is shorter, which caps any shape at 43.7 KB for 512×512 (a
+checkerboard; clicks and boxes can't reach it in practice). The browser holds the mask as one byte
+per cell, 0.26 MB at 512×512.
+
+Each click or marquee step on such a grid copies the mask, encodes it and redraws its outline, so
+it costs time in proportion to the cell count. Measured in Node 22 on the 4-core cloud container
+(2026-10-10, median of 9, a block covering half the grid plus one cell): 4.0 ms at 512×512,
+43 ms at 2048×2048 and 157 ms at 4096×4096, with the value at 3.1, 14.4 and 30.0 KB (runs) and
+the outline path at 5.4, 24.2 and 50.6 KB. Up to about 2048×2048 a click stays within a few
+frames; a photo-sized image past that pauses visibly on each click.
+
 A `:view` layer is one viewport bbox plus a mode and two angles, the same order as an ROI layer.
 
 ### Tooltips

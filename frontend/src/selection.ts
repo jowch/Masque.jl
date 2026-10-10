@@ -1,7 +1,9 @@
-import { findBin, invertAxis, polygonRings } from "./geometry"
+import { findBin, invertAxis, polygonRings, samplePoint, SEG_TOL } from "./geometry"
 import { surfacePointHit } from "./surface"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, SurfaceGeometry } from "./types"
 import type { FieldPick } from "./state"
+import { decodeMask, maskHit } from "./gridmask"
+import type { GridMask } from "./gridmask"
 
 // Bond item shape emitted per contained element in a selects-ROI { items: SelectionItem[] }.
 // `payload` is present only for a computed (non-element) target — a `:grid` cell range, since
@@ -108,6 +110,18 @@ export function surfaceSelection(layer: HitLayer, index: number): Hit | null {
     if ((layer.geometry as { suspended?: boolean }).suspended) return Number.isInteger(index) && index >= 0 ? { layer, index } : null
     const h = surfacePointHit(layer, index)
     return h ? { layer, ...h } : null
+}
+
+// A line takes picks as its data points: the pick is the sample nearest the click, as hover
+// reads it out, not the whole line. A line without `points` (one on an Axis3) has no samples to
+// pick, so its pick stays the whole line.
+export const picksPoints = (layer: HitLayer): boolean => layer.kind === "lines" && Array.isArray(layer.points)
+
+// Picked sample `s` of line `index`, drawn as a ring around the point, its radius the line's
+// hit slack. null when that sample is not on screen.
+export function linePointHit(manifest: Manifest, layer: HitLayer, index: number, s: number): Hit | null {
+    const p = samplePoint(layer, index, s, manifest.transforms[layer.axis])
+    return p ? { layer, index, sample_: s, geom_: ["point", p.x, p.y, layer.tol ?? SEG_TOL] } : null
 }
 
 // Kinds that can be drawn as a persistent pre-highlight (mirrors Julia `_SELECTED_KINDS`).
@@ -258,8 +272,16 @@ export function linkedHits(manifest: Manifest, layer: HitLayer, index: number): 
 // on would clear. `null` leaves the selection as it is, the same as a click that is not a
 // selection gesture (an axis click, a threshold or ROI value). An entry that no longer
 // matches the manifest is dropped, the way a frame's re-key in mount.ts drops it.
-export type SelSource = { layer: string; index: number }
-export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]; source: SelSource | null; items?: FieldPick[] } | null {
+export type SelSource = { layer: string; index: number; sample?: number }
+export function selectionForValue(manifest: Manifest, v: unknown, field?: string): { hits: Hit[]; source: SelSource | null; items?: FieldPick[]; mask?: GridMask } | null {
+    // A `many` grid's value is its mask, which names no layer: the field says which.
+    const grid = field === undefined ? undefined : manifest.layers.find((l) => l.id === field && l.many && l.kind === "grid")
+    if (grid) {
+        const mask = decodeMask(grid, v)
+        if (!mask) return null
+        const hit = maskHit(grid, mask)
+        return { hits: hit ? [hit] : [], source: null, mask }
+    }
     if (v === null || v === undefined) return { hits: [], source: null }
     if (typeof v !== "object") return null
     const o = v as { layer?: unknown; index?: unknown; items?: unknown }
@@ -268,7 +290,11 @@ export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]
         const items: FieldPick[] = []
         for (const item of o.items as { layer?: unknown; index?: unknown; payload?: unknown }[]) {
             if (item?.layer !== many.id || typeof item.index !== "number") continue
-            items.push(item.payload === undefined ? { layer: many.id, index: item.index } : { layer: many.id, index: item.index, payload: item.payload })
+            const sample = (item as { sample?: unknown }).sample
+            items.push(
+                typeof sample === "number" ? { layer: many.id, index: item.index, sample } :
+                    item.payload === undefined ? { layer: many.id, index: item.index } : { layer: many.id, index: item.index, payload: item.payload },
+            )
         }
         const kept = keptPicks(manifest, items)
         return { hits: manyHits(manifest, kept), source: null, items: kept }
@@ -276,7 +302,7 @@ export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]
     if (Array.isArray(o.items)) {
         const hits: Hit[] = []
         for (const item of o.items) {
-            const it = item as { layer?: unknown; index?: unknown; payload?: unknown }
+            const it = item as { layer?: unknown; index?: unknown; sample?: unknown; payload?: unknown }
             const layer = manifest.layers.find((l) => l.id === it?.layer)
             if (!layer || typeof it.index !== "number") continue
             const p = it.payload as { i0?: unknown; i1?: unknown; j0?: unknown; j1?: unknown } | undefined
@@ -286,13 +312,18 @@ export function selectionForValue(manifest: Manifest, v: unknown): { hits: Hit[]
                 if (i0 >= 0 && j0 >= 0 && i0 <= i1 && j0 <= j1 && i1 < gg.ncols && j1 < gg.nrows) hits.push(gridBlockHit(layer, i0, i1, j0, j1))
                 continue
             }
-            const hit = elementHit(layer, it.index)
+            const hit = typeof it.sample === "number" && picksPoints(layer) ? linePointHit(manifest, layer, it.index, it.sample) : elementHit(layer, it.index)
             if (hit) hits.push(hit)
         }
         return { hits, source: null }
     }
     const layer = manifest.layers.find((l) => l.id === o.layer)
     if (!layer || typeof o.index !== "number") return null
+    const sample = (o as { sample?: unknown }).sample
+    if (typeof sample === "number" && picksPoints(layer)) {
+        const hit = linePointHit(manifest, layer, o.index, sample)
+        return hit ? { hits: [hit], source: { layer: layer.id, index: o.index, sample } } : null
+    }
     const index = layer.kind === "surface" ? surfaceIndexOf(layer, (o as { payload?: unknown }).payload) : o.index
     if (index === null) return null
     const hit = elementHit(layer, index)
@@ -308,6 +339,7 @@ export function keptPicks(manifest: Manifest, items: FieldPick[]): FieldPick[] {
     return items.filter((it) => {
         const layer = manifest.layers.find((l) => l.id === it.layer)
         if (!layer) return false
+        if (it.sample !== undefined) return picksPoints(layer) && linePointHit(manifest, layer, it.index, it.sample) !== null
         return !SELECTED_KINDS.has(layer.kind) || elementHit(layer, it.index) !== null
     })
 }
@@ -316,6 +348,11 @@ export function manyHits(manifest: Manifest, items: FieldPick[]): Hit[] {
     const out: Hit[] = []
     for (const it of items) {
         const layer = manifest.layers.find((l) => l.id === it.layer)
+        if (layer && it.sample !== undefined) {
+            const point = picksPoints(layer) ? linePointHit(manifest, layer, it.index, it.sample) : null
+            if (point) out.push(point)
+            continue
+        }
         const hit = layer ? elementHit(layer, it.index) : null
         if (hit) out.push(...(selectionFor(hit, manifest) ?? []))
     }
@@ -419,15 +456,47 @@ export function drawnIndices(layer: HitLayer): number[] {
     return out
 }
 
+// The picks a marquee box holds on one layer, in element order. A mark counts when its centre
+// is inside; on a line that takes points (#353), each data point inside is its own pick, as a
+// click picks one.
+export function picksInBox(manifest: Manifest, layer: HitLayer, box: { x: number; y: number; w: number; h: number }): FieldPick[] {
+    if (!picksPoints(layer)) return indicesInBox(layer, box).map((index) => ({ layer: layer.id, index }))
+    const inside = (p: { x: number; y: number }) => p.x >= box.x && p.x <= box.x + box.w && p.y >= box.y && p.y <= box.y + box.h
+    return linePicks(manifest, layer, drawnIndices(layer), inside)
+}
+
+// The picks that stand for elements `indices` of a layer: the elements themselves, or every
+// data point on screen of a line that takes points. What a legend entry selects of its plot.
+export function elementPicks(manifest: Manifest, layer: HitLayer, indices: number[]): FieldPick[] {
+    if (!picksPoints(layer)) return indices.map((index) => ({ layer: layer.id, index }))
+    return linePicks(manifest, layer, indices, () => true)
+}
+
+function linePicks(manifest: Manifest, layer: HitLayer, indices: number[], keep: (p: { x: number; y: number }) => boolean): FieldPick[] {
+    const out: FieldPick[] = []
+    const t = manifest.transforms[layer.axis]
+    for (const index of indices) {
+        const n = (layer.points?.[index]?.length ?? 0) / 2
+        for (let sample = 0; sample < n; sample++) {
+            const p = samplePoint(layer, index, sample, t)
+            if (p && keep(p)) out.push({ layer: layer.id, index, sample })
+        }
+    }
+    return out
+}
+
+// Picks are the same mark when their element and data point agree.
+export const pickKey = (it: { index: number; sample?: number }): string => it.sample === undefined ? `${it.index}` : `${it.index}:${it.sample}`
+
 // A legend entry's edit of a linked `many` field: an entry turned on makes `picked` the field's
 // picks, or adds the ones it lacks with `toggle`; an entry turned off takes them out. Picks keep
 // the order they were made in.
-export function legendEdit(items: FieldPick[], layer: string, picked: number[], on: boolean, toggle: boolean): FieldPick[] {
-    const want = new Set(picked)
-    if (!on) return items.filter((it) => !want.has(it.index))
-    if (!toggle) return picked.map((index) => ({ layer, index }))
-    const held = new Set(items.map((it) => it.index))
-    return [...items, ...picked.filter((k) => !held.has(k)).map((index) => ({ layer, index }))]
+export function legendEdit(items: FieldPick[], picked: FieldPick[], on: boolean, toggle: boolean): FieldPick[] {
+    const want = new Set(picked.map(pickKey))
+    if (!on) return items.filter((it) => !want.has(pickKey(it)))
+    if (!toggle) return picked
+    const held = new Set(items.map(pickKey))
+    return [...items, ...picked.filter((it) => !held.has(pickKey(it)))]
 }
 
 // The marks one legend entry links to, by layer: every drawn element of a linked layer, or the

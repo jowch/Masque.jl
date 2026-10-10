@@ -1,5 +1,7 @@
 import { SVG_NS, renderSelection } from "../highlight"
-import { indicesInBox, manyHits } from "../selection"
+import { applyGridMarquee } from "../bond"
+import { maskCount } from "../gridmask"
+import { manyHits, pickKey, picksInBox } from "../selection"
 import { clampX, clampY, MARQUEE_MIN_CSS } from "../state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "../state"
 import type { HitLayer } from "../types"
@@ -49,14 +51,14 @@ function picksOf(sel: FieldSelection | undefined): FieldPick[] {
 }
 
 // What field `t` holds with the box where it is now.
-function nextPicks(d: Marquee, t: HitLayer): FieldPick[] {
-    const inside = indicesInBox(t, d.box_)
+function nextPicks(ctx: OverlayCtx, d: Marquee, t: HitLayer): FieldPick[] {
+    const inside = picksInBox(ctx.manifest_, t, d.box_)
     const held = picksOf(d.before_.get(t.id))
-    if (d.mode_ === "replace") return inside.map((index) => ({ layer: t.id, index }))
-    const ins = new Set(inside)
-    if (d.mode_ === "subtract") return held.filter((it) => !ins.has(it.index))
-    const have = new Set(held.map((it) => it.index))
-    return [...held, ...inside.filter((k) => !have.has(k)).map((index) => ({ layer: t.id, index }))]
+    if (d.mode_ === "replace") return inside
+    const ins = new Set(inside.map(pickKey))
+    if (d.mode_ === "subtract") return held.filter((it) => !ins.has(pickKey(it)))
+    const have = new Set(held.map(pickKey))
+    return [...held, ...inside.filter((it) => !have.has(pickKey(it)))]
 }
 
 function setPicks(ctx: OverlayCtx, state: OverlayState, t: HitLayer, items: FieldPick[]): void {
@@ -90,8 +92,14 @@ export function move(
     d.rect_.setAttribute("width", String(d.box_.w)); d.rect_.setAttribute("height", String(d.box_.h))
     let n = 0
     for (const tl of d.targets_) {
-        if (tl.kind === "grid") continue // a grid's cells are a mask, not element picks
-        const items = nextPicks(d, tl)
+        if (tl.kind === "grid") {
+            // A grid's cells are a mask: recomputed from the press-time mask on every move.
+            applyGridMarquee(ctx, state, tl, d.box_, d.mode_, d.before_.get(tl.id))
+            const mask = state.sel_.get(tl.id)?.mask_
+            if (mask) n += maskCount(mask)
+            continue
+        }
+        const items = nextPicks(ctx, d, tl)
         setPicks(ctx, state, tl, items)
         n += items.length
     }
@@ -104,11 +112,15 @@ export function end(ctx: OverlayCtx, state: OverlayState, d: Marquee): Record<st
     remove(d)
     const out: Record<string, unknown> = {}
     for (const t of d.targets_) {
-        if (t.kind === "grid") continue // a grid's cells are a mask, not element picks
-        const items = nextPicks(d, t)
+        if (t.kind === "grid") {
+            const env = applyGridMarquee(ctx, state, t, d.box_, d.mode_, d.before_.get(t.id))
+            if (!sameMask(d.before_.get(t.id), state.sel_.get(t.id))) out[t.id] = env
+            continue
+        }
+        const items = nextPicks(ctx, d, t)
         setPicks(ctx, state, t, items)
         const was = picksOf(d.before_.get(t.id))
-        const same = was.length === items.length && was.every((it, k) => it.index === items[k].index)
+        const same = was.length === items.length && was.every((it, k) => pickKey(it) === pickKey(items[k]))
         if (!same) out[t.id] = { items }
     }
     renderSelection(ctx, state)
@@ -122,6 +134,14 @@ export function cancel(ctx: OverlayCtx, state: OverlayState, d: Marquee): void {
         state.sel_.set(id, sel ?? { hits_: [], source_: null, items_: [] })
     }
     renderSelection(ctx, state)
+}
+
+// Whether two selections of a grid field hold the same cells (no mask = none).
+function sameMask(a: FieldSelection | undefined, b: FieldSelection | undefined): boolean {
+    const x = a?.mask_, y = b?.mask_
+    const nx = x ? maskCount(x) : 0, ny = y ? maskCount(y) : 0
+    if (nx === 0 || ny === 0) return nx === ny
+    return x!.length === y!.length && x!.every((v, k) => v === y![k])
 }
 
 function remove(d: Marquee): void {

@@ -41,8 +41,17 @@ All notable changes to this project are documented here. The format is based on
   image and surface cells don't take it yet. `selected = (scatter = [1, 3],)` starts with
   several marks selected. A colorbar's pick is one value, so `select = :many` on one raises an
   `ArgumentError` (#335).
+- A heatmap or image built with `interactables(hm; select = :many)`, or
+  `GridInteractable(ax, hm; select = :many)`, lets a reader select any set of cells: its
+  `@bind` field is a `GridSelection`, a `BitMatrix` of the selected cells the size of the
+  plotted matrix, empty to start. `img[sel.region]` gives the selected values,
+  `findall(sel.region)` the cells, and `sel.region.mask` the matrix. A click selects one cell,
+  Cmd-click on a Mac or Ctrl-click elsewhere adds a cell or takes it out, and a click on empty
+  plot space or Escape clears it. The selected cells are drawn as one highlighted area with
+  an outline around its edge (#335).
 - On a plot with `select = :many`, dragging across the plot selects every mark whose centre
-  is inside the box, replacing the selection; Cmd-drag on a Mac, or Ctrl-drag elsewhere,
+  is inside the box (a line's data points inside it, a heatmap's cells it touches), replacing
+  the selection; Cmd-drag on a Mac, or Ctrl-drag elsewhere,
   adds them, and takes them out when the drag starts on a selected mark. On a plot that pans
   or orbits, a plain drag still moves the view and Alt-drag draws the box; Alt-drag works on
   every plot; Escape drops the box. A finger drag still scrolls the page, so the box is drawn
@@ -158,6 +167,15 @@ All notable changes to this project are documented here. The format is based on
   `currentColor`, `color-mix(…)`, or `oklch(…)`, now raise; pass a Makie color or wrap the
   value in a custom property your page sets. An `overlaystyle` colour given as a bare number,
   which used to be read as a grey level, raises too, as it already did in `tooltipstyle` (#342).
+- **Breaking:** a click on a line named in `bind` picks the point you plotted nearest the
+  click, the one its tooltip shows, instead of the whole line, and a ring marks that point.
+  `pick.index` is now the point's position in the line's data, so `xs[pick]` reads it; the
+  event also holds `x` and `y`, and `line`, which line of a `series!` it is on. Code that
+  read `pick.index` as which line reads `pick.line` now. `selected = (fit = [3],)` on a bound
+  line starts at its third point; on a `series!` the starting point can't be given by index.
+  From the keyboard, Shift + ← / → moves along a focused line's points and Enter picks one.
+  With `select = :many`, each pick on a line is a point, and `selected=` names points.
+  A line on an `Axis3` has no points to pick, so its click still picks the whole line (#335).
 
 ### Deprecated
 - The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,

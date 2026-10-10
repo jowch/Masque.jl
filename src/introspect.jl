@@ -402,7 +402,10 @@ _arrow_payload(::Type{Makie.Point2f}, k, pt, d) =
 # `EndPoints` (length 2), expanded here to n+1 uniform edges.
 _edges(e, n) = length(e) == n + 1 ? collect(Float64, e) :
     collect(range(Float64(e[1]), Float64(e[end]); length = n + 1))
-function GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells, payloads = nothing, tooltip = nothing, label = _plot_label(p))
+function GridInteractable(
+        ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells, payloads = nothing, tooltip = nothing,
+        label = _plot_label(p), select = :one,
+    )
     xr, yr, vals = _conv(p)
     # A `datashader!` image holds the colour-mapped aggregate (histogram-equalized by
     # default); hover reads the aggregate itself, the count for the default `AggCount`.
@@ -411,7 +414,7 @@ function GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id = :cells,
         counts === nothing || size(counts) != size(vals) || (vals = counts)
     end
     ncols, nrows = size(vals)
-    return GridInteractable(ax, _edges(xr, ncols), _edges(yr, nrows), vals; id, payloads, tooltip, label)
+    return GridInteractable(ax, _edges(xr, ncols), _edges(yr, nrows), vals; id, payloads, tooltip, label, select)
 end
 # A surface's converted `x`/`y` are vectors or matrices (a range or an interval converts to a
 # vector). `color` colours it by a separate matrix when it is one of `z`'s shape.
@@ -1290,7 +1293,7 @@ function _place(i::GridInteractable, f)
     y0, x0 = i.yedges[1], i.xedges[1]
     xe = Float64[f.place((x, y0))[1] for x in i.xedges]
     ye = Float64[f.place((x0, y))[2] for y in i.yedges]
-    return GridInteractable(i.ax, xe, ye, i.values, i.id, i.tooltip, i.label, i.payloads)
+    return GridInteractable(i.ax, xe, ye, i.values, i.id, i.tooltip, i.label, i.payloads, i.select)
 end
 _place(i::SurfaceInteractable, f) = SurfaceInteractable(
     i.ax, map(f.place, i.pos), i.x, i.y, i.z, i.value, i.id, i.payloads, i.tooltip, i.label,
