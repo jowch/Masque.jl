@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-10
+
 ### Added
 - A `surface!` on an `Axis3` responds to hover and click. Hovering shows the data point
   under the pointer, its `i`, `j`, `x`, `y`, and `z`, and `value` when `color` is a separate
@@ -100,7 +102,7 @@ All notable changes to this project are documented here. The format is based on
   A threshold's field starts at a `ThresholdEvent` at its `value`, and a box's at a
   `BoundsEvent` at its `bounds`, so `sel.cutoff.value` works from the first run. Before, a
   threshold's or a box's value was `nothing` until the first drag, so a check such as
-  `isnothing(level)` is now never true:
+  `isnothing(level)` is now never true (#309):
 
   ```julia
   @bind level masque(fig, thr; bind = thr)
@@ -187,7 +189,7 @@ All notable changes to this project are documented here. The format is based on
 ### Removed
 - **Breaking:** the forms deprecated in 0.2 are gone. Calling one now raises a
   `MethodError` ("no method matching …"), or an `UndefVarError` for `auto_interactables`,
-  and the error message names the form to use instead (#299):
+  and the error message names the form to use instead (#299, #348):
 
   | Removed | Use instead |
   |---|---|
@@ -467,7 +469,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/jowch/Masque.jl/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/jowch/Masque.jl/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/jowch/Masque.jl/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jowch/Masque.jl/compare/v0.1.1...v0.2.0
