@@ -269,6 +269,13 @@ end
     @test w.px_per_unit == 3.0 && w.manifest["scaling"] == 3.0 && w.manifest["width"] == 1800
 
     @test_throws MethodError _WGLExt.WebGLBackend(; px_per_unit = 3.0, max_width = 300)   # removed in 0.3 (#299)
+    err = try
+        _WGLExt.WebGLBackend(; px_per_unit = 3.0, max_width = 300)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("`WebGLBackend(; px_per_unit, max_width)` was removed in Masque 0.3", err)
+    @test occursin("masque(fig; backend = :webgl, px_per_unit, max_width)", err)
 end
 
 @testset "a scatter's outline lies outside the marker on WebGL (#246)" begin

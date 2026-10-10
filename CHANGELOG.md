@@ -103,8 +103,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Removed
 - **Breaking:** the forms deprecated in 0.2 are gone. Calling one now raises a
-  `MethodError` ("no method matching …"), or an `UndefVarError` for `auto_interactables`
-  (#299):
+  `MethodError` ("no method matching …"), or an `UndefVarError` for `auto_interactables`,
+  and the error message names the form to use instead (#299):
 
   | Removed | Use instead |
   |---|---|
