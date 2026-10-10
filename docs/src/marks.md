@@ -120,7 +120,8 @@ end
 
 Then `sel.sine` and `sel.cosine` each hold `nothing` or the clicked
 line's event. The same works for `stairs!`. A `scatterlines!` plot's
-points take clicks without `bind`, and its line does not. To make a line
+points take clicks without `bind`, as `sel.scatterlines.points`, and its
+line does not. To make a line
 clickable while keeping every other plot's field, pass
 `interactables(l1)` after the figure instead of naming it in `bind`.
 

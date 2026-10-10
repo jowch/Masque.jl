@@ -28,6 +28,17 @@ Makie.plot!(p::BrushedDots) = (scatter!(p, p.positions); p)
 Masque.interactables(ax, p::BrushedDots) = AbstractInteractable[
     PointInteractable(ax, p.positions[]), ROIInteractable(ax; bounds = (0.0, 1.0, 0.0, 1.0), selects = :points),
 ]
+Makie.@recipe PartedDots (positions,) begin
+end
+Makie.plot!(p::PartedDots) = (scatter!(p, p.positions); p)
+Masque.interactables(ax, p::PartedDots) = (
+    dots = PointInteractable(ax, p.positions[]),
+    pair = (first = PointInteractable(ax, p.positions[][1:1]), last = PointInteractable(ax, p.positions[][2:2])),
+)
+Makie.@recipe TwinDots (positions,) begin
+end
+Makie.plot!(p::TwinDots) = (scatter!(p, p.positions); p)
+Masque.interactables(ax, p::TwinDots) = AbstractInteractable[PointInteractable(ax, p.positions[]), PointInteractable(ax, p.positions[])]
 Makie.@recipe IdOnlyDots (positions,) begin
 end
 Makie.plot!(p::IdOnlyDots) = (scatter!(p, p.positions); p)
@@ -81,9 +92,9 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
     @testset "a two-layer plot is replaced as a whole" begin
         f = Figure(); ax = Axis(f[1, 1])
         st = stem!(ax, xs, ys)
-        @test ids(assemble(f)) == [:stem, :stem_stems]
+        @test ids(assemble(f)) == [Symbol("stem.points"), Symbol("stem.stems")]
         out = assemble(f, interactables(st; label = "stems"))
-        @test ids(out) == [:stem, :stem_stems]
+        @test ids(out) == [Symbol("stem.points"), Symbol("stem.stems")]
         @test all(i -> i.label == "stems", out)
         @test_throws ArgumentError assemble(f, interactables(st; payloads = ["a", "b", "c"]))
     end
@@ -234,13 +245,14 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test COMPOSEDOTS_BUILDS[] == 2
     end
 
-    @testset "fresh ids skip a taken id and the layers that extend it" begin
+    @testset "fresh ids skip a taken id and the parts under it" begin
         f = Figure(); ax = Axis(f[1, 1])
         st1 = stem!(ax, xs, ys); st2 = stem!(ax, xs, ys .+ 1)
+        parts(id) = [Symbol(id, ".points"), Symbol(id, ".stems")]
         @test ids(assemble(f, interactables(st1), interactables(st2); auto = false)) ==
-            [:stem, :stem_stems, :stem_2, :stem_2_stems]
-        @test ids(assemble(f, PointInteractable(ax, collect(zip(xs, ys)); id = :stem_stems), interactables(st1); auto = false)) ==
-            [:stem_stems, :stem_2, :stem_2_stems]
+            [parts(:stem); parts(:stem_2)]
+        @test ids(assemble(f, PointInteractable(ax, collect(zip(xs, ys)); id = :stem), interactables(st1); auto = false)) ==
+            [:stem; parts(:stem_2)]
     end
 
     @testset "interactables(boxplot) passes the box keywords through" begin
@@ -328,8 +340,20 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         f = Figure(); ax = Axis(f[1, 1])
         brusheddots!(ax, pts)
         built = assemble(f)
-        @test ids(built) == [:brusheddots, :brusheddots_roi]
-        @test Masque.selects(built[2]) === :brusheddots
+        @test ids(built) == [Symbol("brusheddots.points"), Symbol("brusheddots.roi")]
+        @test Masque.selects(built[2]) === Symbol("brusheddots.points")
+        # A NamedTuple names the parts, and a nested one nests the ids.
+        f = Figure(); ax = Axis(f[1, 1])
+        q = parteddots!(ax, pts)
+        @test ids(assemble(f)) == Symbol.(["parteddots.dots", "parteddots.pair.first", "parteddots.pair.last"])
+        @test ids(assemble(f, interactables(q; id = :pd))) == Symbol.(["pd.dots", "pd.pair.first", "pd.pair.last"])
+        w = masque(f; bind = q)
+        @test w.manifest["fields"] == ["parteddots.dots", "parteddots.pair.first", "parteddots.pair.last"]
+        @test Masque.APD.Bonds.initial_value(w) === (dots = nothing, pair = (first = nothing, last = nothing))
+        # Two unnamed layers with one id can't become two parts.
+        f = Figure(); ax = Axis(f[1, 1])
+        twindots!(ax, pts)
+        @test_throws "two layers with the id :points" assemble(f)
         # `id` through `interactables(plot; id)` names it too.
         f = Figure(); ax = Axis(f[1, 1])
         p = nokwdots!(ax, pts)

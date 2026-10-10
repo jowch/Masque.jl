@@ -531,7 +531,7 @@ function build_manifest(
         "transforms" => Dict(string(id) => _transform_dict(t) for (id, t) in ctx.transforms),
     )
     m["fields"] = String[string(f) for f in fields]
-    binding.bare && length(fields) == 1 && (m["bare"] = true)
+    binding.bare && length(unique(_head.(fields))) == 1 && (m["bare"] = true)
     initial === nothing || (m["initial"] = initial)
     (tip_style === nothing || isempty(tip_style)) || (m["tipStyle"] = tip_style)
     (overlay_style === nothing || isempty(overlay_style)) || (m["overlayStyle"] = overlay_style)
@@ -650,7 +650,10 @@ at its `value`, and an [`ROIInteractable`](@ref) a [`BoundsEvent`](@ref), starti
 [`GridWindowEvent`](@ref) over a grid, starting at what its `bounds` contain. That target
 takes no clicks. A line (`lines!`, `stairs!`, `series!`, the line of a `scatterlines!`) only
 shows its tooltip unless `bind` names it or it is passed as `interactables(plot)`. A view or
-a slice has no field.
+a slice has no field. A plot that builds several layers (`stem!`, `scatterlines!`, a recipe
+whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its parts, as in
+`sel.stem.stems`; their events have the plot's name as `layer` and the path inside it as
+`part`.
 
 # Keywords
 - `auto` — start from the figure's defaults. Default `true`.
@@ -660,14 +663,14 @@ a slice has no field.
   `sel.right`, and their events' `layer` is `:left` and `:right`. One plot, interactable or
   name instead of a tuple makes the value that one field's own value: `bind = thr` gives a
   `ThresholdEvent`, and `bind = sc` an `ElementEvent` or `nothing`. An object that builds
-  several layers, such as a `scatterlines!` plot or a `RegionInteractable` of several shape
-  kinds, still gives one field per layer in a `NamedTuple`. A plot or interactable not
+  several layers, such as a `stem!` plot, gives the `NamedTuple` of its parts. A plot or interactable not
   otherwise passed is added. Every other layer keeps hover and takes no clicks. An object
   named two different ways, by `id`, a `NamedTuple` argument or `bind`, raises
   `ArgumentError`.
 - `selected` — a pick's starting value, 1-based: `selected = (scatter = 3,)`, or `selected = 3`
   when one field takes picks. Also accepts the event itself, a vector of events, or a `Dict`
-  keyed by field. A pick holds one element, so several indices for one field raise
+  keyed by field. A plot with parts takes a `NamedTuple` of them, as in
+  `selected = (stem = (stems = [2],),)`. A pick holds one element, so several indices for one field raise
   `ArgumentError`, except on the target of a box with `selects`, where they replace what the
   box starts at, and an empty one keyed to the target, as in `selected = (pts = Int[],)`,
   starts it empty (a bare `Int[]` sets nothing). Works on

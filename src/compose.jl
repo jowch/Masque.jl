@@ -6,8 +6,9 @@
     interactables(ax, plot; id, kwargs...) -> Vector{AbstractInteractable}
 
 The interactables Masque builds for one `plot` on `ax`, the ones `masque(fig)` uses by
-default. `id` names the first layer, and a plot that builds two layers (`stem!`,
-`scatterlines!`) suffixes the second (`:stem_stems`, `:scatterlines_line`). Other keywords
+default. `id` names the plot: a plot with one layer takes it as its layer id, and one that
+builds several (`stem!`, `scatterlines!`) names them as its parts, `stem.points` and
+`stem.stems`, which the `@bind` value nests as `w.stem.points`. Other keywords
 (`tooltip`, `payloads`, `label`, and any the plot's constructor takes) pass through to the
 constructor, so `interactables(ax, s; tooltip = masque"…")` is `PointInteractable(ax, s;
 tooltip = masque"…")` for a scatter. A two-layer plot takes `tooltip` and `label` on both
@@ -65,18 +66,39 @@ function _plot_interactables(ax, p; id, kwargs...)
             ),
         )
     end
-    :id in declared && return interactables(ax, p; id, kwargs...)
-    return _name_layers(interactables(ax, p; kwargs...), id)
+    :id in declared && return _parts_of(interactables(ax, p; id, kwargs...), id; named = true)
+    return _parts_of(interactables(ax, p; kwargs...), id)
 end
 
-# The layers of a recipe method that took no `id`, named after `id`: the first takes it, the
-# rest add their own name to it. A layer that points at another of them by id (a slice's
-# `covers`, a selector's `selects`) follows the rename.
+# The layers a recipe method returned, as a flat vector. A `NamedTuple` names its parts:
+# each entry, an interactable, a vector of them, or a `NamedTuple` for a recipe of recipes, is
+# built under `id.name`. A vector is named by `_name_layers`, unless the method took `id` and
+# named its layers itself (`named`).
+function _parts_of(built::NamedTuple, id::Symbol; named = false)
+    out = AbstractInteractable[]
+    for (k, v) in pairs(built)
+        sub = v isa AbstractInteractable ? AbstractInteractable[v] : v
+        append!(out, _parts_of(sub, _part_id(id, k)))
+    end
+    return out
+end
+_parts_of(built, id::Symbol; named = false) = named ? built : _name_layers(built, id)
+
+# The layers of a recipe method that took no `id`, named after `id`: one layer takes it, and
+# several become its parts, each under its own id (`id.scatter`, `id.bars`). A layer that
+# points at another of them by id (a slice's `covers`, a selector's `selects`) follows the
+# rename.
 function _name_layers(built, id::Symbol)
+    owned = [_layer_id(l) for l in built if _layer_id(l) !== nothing]
     names = Dict{Symbol, Symbol}()
-    for l in built
-        own = _layer_id(l)
-        own === nothing || haskey(names, own) || (names[own] = isempty(names) ? id : Symbol(id, :_, own))
+    for own in owned
+        haskey(names, own) && throw(
+            ArgumentError(
+                "masque: the interactables method for :$id returns two layers with the id :$own; " *
+                    "give them distinct ids, or return a NamedTuple that names its parts",
+            ),
+        )
+        names[own] = length(owned) == 1 ? id : _part_id(id, own)
     end
     rename(f, v) = f === :id ? names[v] :
         f === :selects && v isa Symbol ? get(names, v, v) :
@@ -87,6 +109,12 @@ function _name_layers(built, id::Symbol)
             for l in built
     ]
 end
+
+# A recipe part's layer id, `head.part`, and back. The wire carries it as the string
+# `"head.part"`; the `@bind` value nests it as `w.head.part`.
+_part_id(id, part) = Symbol(id, '.', part)
+_head(id::Symbol) = (s = string(id); k = findfirst('.', s); k === nothing ? id : Symbol(s[1:prevind(s, k)]))
+_path(id::Symbol) = Tuple(Symbol.(split(string(id), '.')))
 
 # A plot named as an ROI's `selects`, with the layers it became in this call. A series
 # child's `id:k` entry names one element, not a layer, so only real layer ids count.
@@ -214,11 +242,9 @@ function _flatten_args!(out, x)
     return out
 end
 
-# Build `r` under `id` when given, else under the first free id from its base. Layers of one
-# plot share its first id as a prefix (`:stem`, `:stem_stems`), and numbering keeps the
-# suffix, as the defaults do (`:stem_2`, `:stem_2_stems`). So an id is free when it is not
-# taken and no taken id extends it with a suffix: `:stem_stems` claims `:stem`, while
-# `:stem_2` and `:stem_2_stems` do not, since their tail starts with a digit.
+# Build `r` under `id` when given, else under the first free id from its base. The parts of
+# a plot that builds several layers share its id as a head (`:stem` gives `stem.points` and
+# `stem.stems`), so an id is free when no taken id is it or has it as a head.
 function _build_fresh(r::_PlotRequest, ax, taken)
     haskey(r.kwargs, :id) && return _plot_interactables(ax, r.plot; r.kwargs...)
     base = _base(ax, r.plot)
@@ -229,16 +255,7 @@ function _build_fresh(r::_PlotRequest, ax, taken)
     return _plot_interactables(ax, r.plot; r.kwargs..., id = n == 1 ? base : Symbol(base, :_, n))
 end
 
-function _claimed(id, taken)
-    pre = string(id, "_")
-    return any(taken) do t
-        t === id && return true
-        s = string(t)
-        startswith(s, pre) || return false
-        tail = chopprefix(s, pre)
-        return !isempty(tail) && !isdigit(first(tail))
-    end
-end
+_claimed(id, taken) = any(t -> _head(t) === id, taken)
 
 # The ids constructors give when the caller passes none. A list rather than a flag on each
 # interactable, so an explicit `id = :view` counts too: it is the same name.
@@ -340,7 +357,7 @@ function _assemble_all(fig, xs; auto::Bool, named = Base.IdSet{Any}(), names = S
                 push!(fresh, (length(groups), g, ax))
                 continue
             end
-            built = _plot_interactables(ax, g.plot; id = first(old), g.kwargs...)
+            built = _plot_interactables(ax, g.plot; id = _head(first(old)), g.kwargs...)
             push!(groups, built)
             for o in old
                 replaces[o] = length(groups)

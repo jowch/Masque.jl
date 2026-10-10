@@ -7,7 +7,9 @@
 
 Abstract type of every value a field of the `masque` `@bind` value holds, other than
 `nothing`. Concrete subtypes carry the fields of that commit: an element pick, a legend entry,
-a grid cell or window, an axis or colorbar click, a threshold, or ROI bounds. The target of a
+a grid cell or window, an axis or colorbar click, a threshold, or ROI bounds. Every event has
+`layer`, the name of the plot or interactable it came from, and `part`, the path to the layer
+inside it for a plot with parts (`(:stems,)` on a `stem!`), else `()`. The target of a
 `selects` ROI over points holds a `Vector{ElementEvent}` instead of one event. Field names on the struct win over a payload key
 of the same name; on an [`ElementEvent`](@ref), a [`LegendEvent`](@ref), or a
 [`GridCellEvent`](@ref) with a payload, other names forward to the payload. See [`bondtype`](@ref) and [`transform_bond`](@ref).
@@ -32,8 +34,13 @@ _forwards(ev::Union{ElementEvent, LegendEvent}) = true
 _forwards(ev::GridCellEvent) = getfield(ev, :payload) !== nothing
 _forwards(ev) = false
 
+# A recipe part's events store its whole layer id, `fit.line`: `layer` reads the plot's name,
+# `:fit`, and `part` the path inside it, `(:line,)`, which is `()` for a plain plot.
+_ev_part(ev) = Base.tail(_path(getfield(ev, :layer)))
+
 function Base.getproperty(ev::InteractionEvent, name::Symbol)
-    name === :layer && return getfield(ev, :layer)
+    name === :layer && return _head(getfield(ev, :layer))
+    name === :part && return _ev_part(ev)
     hasfield(typeof(ev), name) && return getfield(ev, name)
     _forwards(ev) || throw(ArgumentError("$(typeof(ev)) has no field $name"))
     pl = getfield(ev, :payload)
@@ -66,7 +73,8 @@ function _payload_names(pl)
 end
 
 function Base.propertynames(ev::InteractionEvent)
-    fs = fieldnames(typeof(ev))
+    # `part` reads on every event; it is listed where the layer is a recipe's part.
+    fs = (fieldnames(typeof(ev))..., (isempty(_ev_part(ev)) ? () : (:part,))...)
     ev isa GridCellEvent && !_forwards(ev) && return filter(!=(:payload), fs)
     _forwards(ev) || return fs
     pl = getfield(ev, :payload)
@@ -85,7 +93,8 @@ end
 
 function Base.show(io::IO, ev::InteractionEvent)
     print(io, nameof(typeof(ev)), '(')
-    show(io, getfield(ev, :layer))
+    show(io, ev.layer)
+    isempty(_ev_part(ev)) || (print(io, ", part = "); show(io, _ev_part(ev)))
     if ev isa Union{ElementEvent, LegendEvent}
         print(io, ", ")
         show(io, getfield(ev, :index))

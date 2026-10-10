@@ -373,7 +373,7 @@ end
             fs = Figure(size = (500, 350)); as = Axis(fs[1, 1])
             lines!(as, [0.0, 3.0], [0.0, 3.0])
             stem!(as, [1.0, 2.0], [1.0, 2.0])
-            @test [i.id for i in interactables(fs)] == [:stem, :stem_stems, :lines]
+            @test [i.id for i in interactables(fs)] == [Symbol("stem.points"), Symbol("stem.stems"), :lines]
         end
 
         @testset "skips unsupported plot types with a warning" begin
@@ -1143,7 +1143,7 @@ end
             kinds = [only(hitlayers(i, c)).kind for i in ints]
             ids = [only(hitlayers(i, c)).id for i in ints]
             @test kinds == [:circles, :segments]
-            @test ids == [:stem, :stem_stems]
+            @test ids == [Symbol("stem.points"), Symbol("stem.stems")]
         end
 
         @testset "scatterlines -> Point + one whole line (composite)" begin
@@ -1152,7 +1152,7 @@ end
             ints = interactables(f)
             @test length(ints) == 2
             @test [only(hitlayers(i, c)).kind for i in ints] == [:circles, :lines]
-            @test [only(hitlayers(i, c)).id for i in ints] == [:scatterlines, :scatterlines_line]
+            @test [only(hitlayers(i, c)).id for i in ints] == [Symbol("scatterlines.points"), Symbol("scatterlines.line")]
             @test length(only(hitlayers(ints[2], c)).payloads) == 1
         end
 

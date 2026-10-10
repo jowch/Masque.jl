@@ -51,7 +51,7 @@ end
     @test labels[:scatter] == "wild type"
     @test labels[:lines] === nothing          # no Makie label: no name, as before
     @test labels[:bars] === nothing           # an empty label names nothing
-    @test labels[:stem] == labels[:stem_stems] == "stems"   # both layers of a two-layer plot
+    @test labels[Symbol("stem.points")] == labels[Symbol("stem.stems")] == "stems"   # both layers of a two-layer plot
     @test labels[:scatter_2] === nothing      # LaTeX would be read out as markup
     @test labels[:scatter_3] === nothing      # so would rich text
 

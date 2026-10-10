@@ -83,6 +83,26 @@ All notable changes to this project are documented here. The format is based on
   ```
 
   A pick starts at `nothing`, or at the element `selected=` names.
+- **Breaking:** a plot that builds several layers names them as its parts. A `stem!` gives
+  `stem.points` and `stem.stems`, a `scatterlines!` gives `scatterlines.points` and
+  `scatterlines.line`, and a `RegionInteractable` with more than one kind of shape gives
+  `region.circles`, `region.rects` and `region.polygons`. A `RegionInteractable` of one kind
+  of shape is just `:region`, where it used to be `:region_c`, `:region_r` or `:region_p`. The `@bind` value nests them, as
+  in `sel.stem.stems`, and an event on a part has the plot's name as its `layer` and the
+  rest in `part`, so `pick.layer == :stem` and `pick.part == (:stems,)`. Before, the second
+  layer added a suffix (`:stem_stems`, `:scatterlines_line`, `:region_c`), and the first
+  took the plot's name, so code that read `pick.layer == :stem` for a stem's points now
+  reads `pick.part`. `selected=` nests the same way:
+  `selected = (stem = (stems = [2],),)`. A recipe's `interactables` method names its parts
+  by returning a `NamedTuple`; one that returns a vector still works, and its layers become
+  parts named by their own ids (#335):
+
+  ```julia
+  st = stem!(ax, x, y)
+  @bind sel masque(fig; bind = st)
+  sel.stems.layer     # before, a stem click gave an event whose layer was :stem_stems
+  sel.stems.part      # now its layer is :stem and its part (:stems,)
+  ```
 - **Breaking:** a box with `selects` adds two fields: its own `BoundsEvent`, which used to be
   left out, and its target's, holding what the box contains. The target's field starts at
   what the box's starting `bounds` contain, highlighted: a `Vector{ElementEvent}` of the

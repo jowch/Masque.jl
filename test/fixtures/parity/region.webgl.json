@@ -3,7 +3,7 @@
     "layers": [
         {
             "kind": "circles",
-            "id": "region_c",
+            "id": "region.circles",
             "geometry": [
                 329,
                 565,
@@ -24,7 +24,7 @@
         },
         {
             "kind": "rects",
-            "id": "region_r",
+            "id": "region.rects",
             "geometry": [
                 625,
                 377,
@@ -46,7 +46,7 @@
         },
         {
             "kind": "polygons",
-            "id": "region_p",
+            "id": "region.polygons",
             "geometry": [
                 [
                     822,
@@ -72,9 +72,9 @@
         }
     ],
     "initial": {
-        "region_r": null,
-        "region_c": null,
-        "region_p": null
+        "region.rects": null,
+        "region.polygons": null,
+        "region.circles": null
     },
     "transforms": {
         "ax1": {
@@ -107,8 +107,8 @@
     "width": 1200,
     "scaling": 2,
     "fields": [
-        "region_c",
-        "region_r",
-        "region_p"
+        "region.circles",
+        "region.rects",
+        "region.polygons"
     ]
 }

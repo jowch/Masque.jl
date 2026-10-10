@@ -347,10 +347,49 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         end
         @test occursin("isn't in bind (fields: :left)", msg(() -> masque(fig; bind = (left = s1,), selected = (right = [1],))))
         @test occursin("as a tuple", msg(() -> masque(fig; bind = [s1, s2])))
-        # One object that builds several layers keeps a field per layer.
+        # One object that builds several layers gives its parts.
         reg = RegionInteractable(ax, [(:circle, (1.0, 1.0), 0.5), (:rect, (5.0, 5.0), 1.0, 1.0)]; id = :cells)
         v = Masque.APD.Bonds.initial_value(masque(fig, reg; bind = reg))
-        @test v isa NamedTuple && length(v) == 2
+        @test v === (circles = nothing, rects = nothing)
+    end
+
+    @testset "recipes nest: parts under the plot's name (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        sl = scatterlines!(ax, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
+        st = stem!(ax, [5.0, 6.0], [5.0, 6.0])
+        sc = scatter!(ax, [8.0], [8.0])
+        iv = Masque.APD.Bonds.initial_value
+        tv = Masque.APD.Bonds.transform_value
+        w = masque(fig; bind = (fit = sl, spikes = st, dots = sc))
+        @test w.manifest["fields"] == ["fit.points", "fit.line", "spikes.points", "spikes.stems", "dots"]
+        @test iv(w) === (fit = (points = nothing, line = nothing), spikes = (points = nothing, stems = nothing), dots = nothing)
+        # The wire keeps flat names; the value nests them.
+        v = tv(w, Dict("spikes.stems" => Dict("layer" => "spikes.stems", "index" => 1)))
+        ev = v.spikes.stems
+        @test ev.layer === :spikes && ev.part === (:stems,) && ev.index == 2
+        @test :part in propertynames(ev)
+        @test occursin("part = (:stems,)", repr(ev))
+        @test v.dots === nothing
+        plain = tv(w, Dict("dots" => Dict("layer" => "dots", "index" => 0))).dots
+        @test plain.layer === :dots && plain.part === () && !(:part in propertynames(plain))
+        # The plot's name in `bind` keeps all its parts; a part's own name keeps that part.
+        @test masque(fig; bind = (fit = sl, spikes = st)).manifest["fields"] == ["fit.points", "fit.line", "spikes.points", "spikes.stems"]
+        @test masque(fig, (spikes = interactables(st),); bind = (:spikes,)).manifest["fields"] == ["spikes.points", "spikes.stems"]
+        @test masque(fig, (spikes = interactables(st),); bind = (Symbol("spikes.stems"),)).manifest["fields"] == ["spikes.stems"]
+        # One recipe in `bind` gives its parts, bare.
+        @test iv(masque(fig; bind = st)) === (points = nothing, stems = nothing)
+        # selected= nests the same way, and a recipe's name alone is not enough.
+        ws = masque(fig; bind = (fit = sl, spikes = st), selected = (spikes = (stems = [2],),))
+        @test iv(ws).spikes.stems.index == 2 && iv(ws).spikes.points === nothing
+        ws = masque(fig; bind = (fit = sl, spikes = st), selected = Dict(Symbol("spikes.points") => [1]))
+        @test iv(ws).spikes.points.index == 1
+        err = try
+            masque(fig; bind = (fit = sl, spikes = st), selected = (spikes = [1],)); nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("has parts :spikes.points, :spikes.stems", err.msg) &&
+            occursin("`spikes = (points = …,)`", err.msg)
     end
 
     @testset "bind and a box with selects (#335)" begin

@@ -152,8 +152,12 @@ this table is `docs/src/support.md`.
 | `SliceInteractable` | `:slice` (not a hit target) | declared 1-D series on an Axis, or Lines, Stairs, Series, Band, Density — declared, never auto-extracted | none — hover samples client-side; the live tooltip is the probe coordinate plus one field per series id. Bond stamp `"none"` |
 
 Layer ids are the plot kind (`:scatter`, `:lines`, `:cells`, `:bars`, `:poly`, …, `:colorbar`,
-`:legend`), suffixed `_2`, `_3`, … when a kind repeats; a composite's second layer takes a suffix
-(`:stem_stems`, `:scatterlines_line`). On `Axis3` only Scatter/Lines/LineSegments/MeshScatter/
+`:legend`), suffixed `_2`, `_3`, … when a kind repeats. A plot or interactable with several
+layers names them as its parts, `head.part` (`stem.points` + `stem.stems`, `scatterlines.points` +
+`scatterlines.line`, `region.circles` + `region.rects`); a user recipe names its parts by returning
+a `NamedTuple` from `interactables(ax, p)`, and nested `NamedTuple`s nest deeper. The wire keeps the
+flat string `"stem.stems"`; `bond_from_js` nests the value (`_nest`), and an event's `layer` reads
+the head while `part` reads the rest of the path. On `Axis3` only Scatter/Lines/LineSegments/MeshScatter/
 Wireframe/Arrows3D/ScatterLines extract; on `PolarAxis` only Scatter/Lines/LineSegments/ScatterLines/Series.
 Other kinds on those axes are skipped with a warning.
 

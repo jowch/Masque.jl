@@ -4,7 +4,7 @@
 
 # What one `masque` call binds. `refs` holds the `bind` entries in order, each as the label an
 # error names it by and the ids it stands for: a layer id, or an interactable's id whose layers
-# all count (`RegionInteractable` builds `:region_c` and `:region_r`). `refs === nothing` binds
+# all count (`RegionInteractable` builds `region.circles` and `region.rects`). `refs === nothing` binds
 # every layer that can commit. `bare` unwraps a value of one field. `defaults` are the ids of
 # the defaults left in the call: a default line takes no clicks unless `bind` names it.
 struct _Binding
@@ -231,7 +231,8 @@ function _fields(binding::_Binding, built, brushed)
             if haskey(roles, r)
                 push!(layers, r)
             else
-                append!(layers, (id for id in order if owner[id] === r))
+                # A recipe's name keeps all its parts: `:fit` binds `fit.points` and `fit.line`.
+                append!(layers, (id for id in order if owner[id] === r || _head(id) === r))
             end
         end
         isempty(layers) && throw(

@@ -276,11 +276,35 @@ function _value_indices(id::Symbol, v)
     )
 end
 
+# `selected = (fit = (line = [2],),)` as flat ids, `fit.line => [2]`, the way the wire names
+# fields. A NamedTuple value is a recipe's parts; anything else is that id's indices.
+function _flat_selected(selected, prefix = nothing)
+    out = Pair{Symbol, Any}[]
+    for (k, v) in pairs(selected)
+        id = prefix === nothing ? Symbol(k) : _part_id(prefix, k)
+        if v isa NamedTuple
+            append!(out, _flat_selected(v, id))
+        else
+            push!(out, id => v)
+        end
+    end
+    return out
+end
+
 function _keyed_selected(layer_ids::Vector{Symbol}, selected)
     known = Set(layer_ids)
     d = Dict{Symbol, Vector{Int}}()
-    for (k, v) in pairs(selected)
-        id = k isa Symbol ? k : Symbol(k)
+    for (id, v) in _flat_selected(selected)
+        parts = Symbol[l for l in layer_ids if startswith(string(l), "$id.")]
+        if !(id in known) && !isempty(parts)
+            part = first(split(string(first(parts))[(ncodeunits(string(id)) + 2):end], '.'))
+            throw(
+                ArgumentError(
+                    "selected: :$id has parts $(_field_list(parts)); give each its own " *
+                        "indices, `$(last(_path(id))) = ($part = …,)`",
+                ),
+            )
+        end
         id in known || throw(
             ArgumentError(
                 "selected: :$id is not a layer in this masque() call " *
@@ -523,9 +547,35 @@ function bond_from_js(manifest::AbstractDict, owners, js)
             ArgumentError("bond: `$(k)` is not a field of this value (fields: $(join(fields, ", ")))"),
         )
     end
-    vals = Tuple(_field_value(manifest, owners, f, get(js, f, nothing)) for f in fields)
-    get(manifest, "bare", false) === true && return only(vals)
-    return NamedTuple{Tuple(Symbol.(fields))}(vals)
+    vals = Any[_field_value(manifest, owners, f, get(js, f, nothing)) for f in fields]
+    v = _nest(Symbol.(fields), vals)
+    get(manifest, "bare", false) === true && return only(v)
+    return v
+end
+
+# Flat fields to the nested value: `fit.points` and `fit.line` become `fit = (points, line)`,
+# grouped where the head first appears. A field with no dot is its value.
+function _nest(ids::Vector{Symbol}, vals)
+    heads = Symbol[]
+    groups = Dict{Symbol, Vector{Int}}()
+    for (k, id) in enumerate(ids)
+        h = _head(id)
+        haskey(groups, h) || push!(heads, h)
+        push!(get!(() -> Int[], groups, h), k)
+    end
+    out = map(heads) do h
+        ks = groups[h]
+        length(ks) == 1 && ids[only(ks)] === h && return vals[only(ks)]
+        rest = Symbol[_tail_id(ids[k]) for k in ks]
+        return _nest(rest, vals[ks])
+    end
+    return NamedTuple{Tuple(heads)}(Tuple(out))
+end
+
+# `fit.line` → `line`; `a.b.c` → `b.c`.
+function _tail_id(id::Symbol)
+    s = string(id)
+    return Symbol(s[(nextind(s, findfirst('.', s))):end])
 end
 
 function bond_from_js(w, js)
@@ -552,8 +602,8 @@ function _field_seeds(built, fields, roles, binding, selected)
     seedable = Symbol[f for f in fields if roles[f] in (:pick, :brush) && by_id[f].kind in _SELECTED_KINDS]
     # A key `bind` left out names a field, so it gets the field list, not the layer list.
     if binding.refs !== nothing && (selected isa NamedTuple || selected isa AbstractDict)
-        for k in keys(selected)
-            Symbol(k) in fields || throw(
+        for (k, _) in _flat_selected(selected)
+            k in fields || any(f -> startswith(string(f), "$k."), fields) || throw(
                 ArgumentError("selected= names :$(k), which isn't in bind (fields: $(_field_list(fields)))"),
             )
         end

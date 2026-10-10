@@ -556,7 +556,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test length(ints) == 2
         pt = only(filter(i -> i isa PointInteractable, ints))
         ln = only(filter(i -> i isa SegmentInteractable, ints))
-        @test pt.id === :scatterlines && ln.id === :scatterlines_line
+        @test pt.id === Symbol("scatterlines.points") && ln.id === Symbol("scatterlines.line")
         @test pt.payloads[1] == (; index = 1, x = 1.0, y = 2.0, z = 3.0)
         _, ppu, ctx = ctx_for(f)
         img = Makie.colorbuffer(f; px_per_unit = ppu)
