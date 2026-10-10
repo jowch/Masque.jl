@@ -52,6 +52,10 @@ function _line_point(ev::ElementEvent, d::AbstractDict, s::Int)
     )
     return ElementEvent(id, s, _point_payload(getfield(ev, :payload), k, _coord(p[2s - 1]), _coord(p[2s])))
 end
+# The manifest keeps a line's points as Float32. Widening by value turns 0.4f0 into
+# 0.4000000059604645; the shortest decimal that reads back as the same Float32 is what was
+# plotted, as far as the Float32 knows. `xs[pick]` reads the exact value.
+_coord(v::Float32) = isfinite(v) ? parse(Float64, Base.Ryu.writeshortest(v)) : Float64(v)
 _coord(v::AbstractFloat) = Float64(v)
 _coord(v) = v
 # The line's own payload keys stay, except its `index`, which named the line and is now `line`.

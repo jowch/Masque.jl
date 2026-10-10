@@ -369,6 +369,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test xs[ev] == 5.0 && ys[ev] == 2.0
         @test !(:index in keys(ev.payload))
         @test repr(ev) == "ElementEvent(:fit, 2, line = 1, x = 5.0, y = 2.0)"
+        # Points ship as Float32; the event reads back what was plotted, not its widened bits.
+        @test Masque._coord(0.4f0) === 0.4 && isnan(Masque._coord(NaN32))
         # A plot of several lines says which one, and keeps each line's own payload.
         ev = commit_field(w, pick("many", 1, 2))
         @test ev.index == 3 && ev.line == 2 && ev.x == 3.0 && ev.y == 6.0 && ev.label == "series 2"
