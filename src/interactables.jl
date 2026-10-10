@@ -2052,10 +2052,10 @@ present), so a single call can mix shapes freely.
   Any other first element raises `ArgumentError`.
 - `payloads` — one entry per region, matched 1:1 by position (`ArgumentError` on a length
   mismatch). Default: `(; index)`, 1-based.
-- `id` — the base layer id. The generated layers are `Symbol(id, :_c)` (circles),
-  `Symbol(id, :_r)` (rects), `Symbol(id, :_p)` (polygons) — only the kinds actually present are
-  emitted. `InteractionEvent.layer` and `selected=` keys use these suffixed ids, not `id`
-  itself. Default `:region`.
+- `id` — the layer id. Regions of one kind make one layer under `id`. Several kinds make one
+  layer each, the parts `circles`, `rects` and `polygons` of `id` (only the kinds present): the
+  `@bind` value nests them as `w.region.circles`, and their events have `layer == id` and
+  `part == (:circles,)`. Default `:region`.
 - `tooltip` — `nothing` for the auto name/value table (default), `masque"..."` for a template, or
   `false` to suppress; applies to every generated layer. `tooltip = true` is rejected
   (`ArgumentError`).
@@ -2103,9 +2103,12 @@ function hitlayers(i::RegionInteractable, ctx)
         end
     end
     aid = axis_id(ctx, i.ax); ls = HitLayer[]
-    isempty(cpl) || push!(ls, HitLayer(Symbol(i.id, :_c), :circles, circ, cpl, aid, i.evs))
-    isempty(rpl) || push!(ls, HitLayer(Symbol(i.id, :_r), :rects, rect, rpl, aid, i.evs))
-    isempty(ppl) || push!(ls, HitLayer(Symbol(i.id, :_p), :polygons, polys, ppl, aid, i.evs))
+    # One shape kind is the region's own layer; several are its parts (`region.circles`).
+    one = count(!isempty, (cpl, rpl, ppl)) == 1
+    lid(part) = one ? i.id : _part_id(i.id, part)
+    isempty(cpl) || push!(ls, HitLayer(lid(:circles), :circles, circ, cpl, aid, i.evs))
+    isempty(rpl) || push!(ls, HitLayer(lid(:rects), :rects, rect, rpl, aid, i.evs))
+    isempty(ppl) || push!(ls, HitLayer(lid(:polygons), :polygons, polys, ppl, aid, i.evs))
     return ls
 end
 

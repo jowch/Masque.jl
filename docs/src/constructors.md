@@ -119,8 +119,8 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `Violin` | `PolygonInteractable` | `x` | `:violin` |
 | `Hexbin` | `PolygonInteractable` | `x`, `y`, `count` | `:hexbin` |
 | `Text` | `TextInteractable` | `text`, `index`, `x`, `y` | `:text` |
-| `Stem` | `interactables(p)` | points, and stems as a second layer | `:stem`, `:stem_stems` |
-| `ScatterLines` | `interactables(p)` | points, and the line as a second layer that only shows its tooltip | `:scatterlines`, `:scatterlines_line` |
+| `Stem` | `interactables(p)` | points, and stems as a second layer | `stem.points`, `stem.stems` |
+| `ScatterLines` | `interactables(p)` | points, and the line as a second layer that only shows its tooltip | `scatterlines.points`, `scatterlines.line` |
 | `BoxPlot` | `interactables(p)` | `q1`, `median`, `q3` (the box only) | `:boxplot` |
 | `Annotation` | `interactables(p)` | the text's fields | `:annotation` |
 

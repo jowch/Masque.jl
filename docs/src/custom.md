@@ -53,11 +53,13 @@ The regions are not drawn on the figure, so only the hover highlight
 shows where one is. To show them all the time, draw their outlines with
 Makie.
 
-Each kind of shape gets its own layer id, which names its field in the
-`@bind` value and is what `pick.layer` reports and what `selected=`
-takes. With `id = :cells`, circles are `sel.cells_c`, rectangles are
-`sel.cells_r`, and polygons are `sel.cells_p`, and each holds its own
-selection, so a circle and a rectangle can be selected at once. To have
+When the regions mix kinds of shape, each kind is a part of the
+`@bind` value. With `id = :cells`, circles are `sel.cells.circles`,
+rectangles are `sel.cells.rects`, and polygons are
+`sel.cells.polygons`. A pick on one says `pick.layer == :cells` and
+`pick.part == (:circles,)`. Each part holds its own selection, so a
+circle and a rectangle can be selected at once. Regions of one kind
+are just `sel.cells`. To have
 one selection across every region, make them all the same kind, such as
 polygons.
 

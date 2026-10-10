@@ -175,8 +175,8 @@ try {
     let mx = 0, my = 0, n = ring.length / 2;
     for (let k = 0; k < ring.length; k += 2) { mx += ring[k]; my += ring[k + 1]; }
     await clickAssert(4, mx / n, my / n, "#out_poly", /ElementEvent\(:tri, 1/, "polygon-click");
-    const regC = Ls.find((l) => l.id === "reg_c");
-    await clickAssert(4, regC.geometry[0], regC.geometry[1], "#out_poly", /:reg_c, 1.*circ/, "region-click");
+    const regC = Ls.find((l) => l.id === "reg.circles");
+    await clickAssert(4, regC.geometry[0], regC.geometry[1], "#out_poly", /:reg, part = \(:circles,\), 1.*circ/, "region-click");
     const lbl = Ls.find((l) => l.id === "lbl");
     await clickAssert(4, lbl.geometry[0], lbl.geometry[1], "#out_poly", /:lbl, 1.*labelled/, "text-click");
   }

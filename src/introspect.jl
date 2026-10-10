@@ -1007,15 +1007,15 @@ end
 function _stem_parts(ax, p, base; kw...)
     _composite_kwargs(p, kw)
     return AbstractInteractable[
-        PointInteractable(ax, _childof(p, Makie.Scatter); id = base, kw...),
-        SegmentInteractable(ax, _childof(p, Makie.LineSegments); id = Symbol(base, :_stems), kw...),
+        PointInteractable(ax, _childof(p, Makie.Scatter); id = _part_id(base, :points), kw...),
+        SegmentInteractable(ax, _childof(p, Makie.LineSegments); id = _part_id(base, :stems), kw...),
     ]
 end
 function _scatterlines_parts(ax, p, base; kw...)
     _composite_kwargs(p, kw)
     return AbstractInteractable[
-        PointInteractable(ax, _childof(p, Makie.Scatter); id = base, kw...),
-        SegmentInteractable(ax, _childof(p, Makie.Lines); id = Symbol(base, :_line), kw...),
+        PointInteractable(ax, _childof(p, Makie.Scatter); id = _part_id(base, :points), kw...),
+        SegmentInteractable(ax, _childof(p, Makie.Lines); id = _part_id(base, :line), kw...),
     ]
 end
 

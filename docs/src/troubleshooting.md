@@ -163,11 +163,11 @@ and `ymin < ymax`.
 
 **Cause:** a region tuple's first element is not `:circle`, `:rect`, or
 `:polygon`, or `regions` and `payloads` differ in length.
-`selected = (cells = 1,)` with `id = :cells` also fails, because
-the region layers are named `:cells_c`, `:cells_r`, and `:cells_p`.
+`selected = (cells = 1,)` with `id = :cells` also fails when the
+regions mix kinds of shape, because each kind is a part of `:cells`.
 
-**Fix:** check the region tuples against [Custom hits](@ref). Use the
-suffixed ids as the keys of `selected=`.
+**Fix:** check the region tuples against [Custom hits](@ref). Name the
+part in `selected=`, as in `selected = (cells = (circles = 1,),)`.
 
 ### Tried a scale Masque cannot invert in the browser
 

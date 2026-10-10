@@ -119,23 +119,30 @@ end
 
 ## Several layers
 
-To make two parts of your plot respond separately, return a layer for
-each, and give every layer after the first a short name with `id`.
-`masque` puts your plot's name in front of it, so the layers below are
-`:dumbbell`, `:dumbbell_ends`, and `:dumbbell_bars`.
+To make parts of your plot respond separately, return a named tuple
+with a layer for each part. The names you give are the parts' names:
+the `@bind` value holds your plot as a named tuple of its parts, as in
+`sel.dumbbell.ends`, and a pick on a part says `pick.layer == :dumbbell`
+and `pick.part == (:ends,)`.
 
 Where two of your layers overlap, the pointer reaches the one that
-comes first in the vector, so put the part drawn on top first. This
-version makes each dot its own mark, ahead of the bar under it:
+comes first, so put the part drawn on top first. This version makes
+each dot its own mark, ahead of the bar under it:
 
 ```julia
 function Masque.interactables(ax, p::Dumbbell; kwargs...)
-    starts = interactables(ax, p.plots[2]; kwargs...)
-    ends = interactables(ax, p.plots[3]; id = :ends, kwargs...)
-    bars = interactables(ax, p.plots[1]; id = :bars, kwargs...)
-    return vcat(starts, ends, bars)
+    return (
+        starts = interactables(ax, p.plots[2]; kwargs...),
+        ends = interactables(ax, p.plots[3]; kwargs...),
+        bars = interactables(ax, p.plots[1]; kwargs...),
+    )
 end
 ```
+
+`selected=` names a part the same way:
+`selected = (dumbbell = (ends = [2],),)` starts with the second end
+picked. A part can itself be a named tuple, for a recipe built from
+other recipes, and its parts nest one level deeper.
 
 Your plot as a whole takes its place among the other plots on the axis
 the same way as any plot: where marks of two plots overlap, the plot

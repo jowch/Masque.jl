@@ -24,9 +24,9 @@ A layer's role decides its field:
 
 `bind` narrows and orders the fields (`_Binding`). Each entry is a field name (a `Symbol`), a
 plot (its layers from `plotmap`), or an interactable (its final id, after `_number_builtin_ids`;
-an interactable with several layers, such as `RegionInteractable`'s `:region_c`, gives all of
-them). One entry outside a tuple sets `"bare"`, and `bond_from_js` returns that field's value
-alone. Names come from `id=`, a `NamedTuple` argument, or a `NamedTuple` `bind`; `_bind_call`
+an interactable or plot with several layers, such as a `stem!` plot's `stem.points` and
+`stem.stems`, gives all of them; a symbol that is a head, `:stem`, does too). One entry outside a tuple sets `"bare"`, which `bond_from_js` reads as that one object's value: the field's own,
+or a `NamedTuple` of its parts. Names come from `id=`, a `NamedTuple` argument, or a `NamedTuple` `bind`; `_bind_call`
 checks by object identity that every name an object gets is the same, then rebuilds it under
 that id. A constructor's default id (`_BUILTIN_IDS`) names nothing. The binding travels with
 the interactables as a `_Plan`, an `AbstractVector`, so a backend's `make_widget` passes it to

@@ -23,6 +23,15 @@ import { installRecorder, logCursor, logSince, pollLog } from "./transient_log.m
 // (geometry.ts's grid case), so its hover is closed/filled the same as circles/rects/polygons.
 const TINT_CHECK_KEYS = new Set(["scatter", "scatter_dark", "barplot", "heatmap", "poly"]);
 
+// A layer id as an event prints it: a recipe part's `head.part` shows as
+// `head, part = (:part,)`, regex-escaped so it can sit inside a `new RegExp`.
+const jlLayer = (id) => {
+  const [h, ...p] = id.split(".");
+  const s = p.length === 0 ? h : `${h}, part = (${p.map((x) => ":" + x).join(", ")}${p.length === 1 ? "," : ""})`;
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
+const jlLayerText = (id) => jlLayer(id).replace(/\\(.)/g, "$1");
+
 // Mirrors selection.ts's selectionFor: these kinds (plus :grid) pin the clicked hit itself; a
 // legend layer (has `links`) pins its linked target(s) instead.
 const SELF_PIN_KINDS = new Set(["circles", "rects", "polygons", "segments", "polyline", "lines", "grid", "surface"]);
@@ -772,16 +781,16 @@ try {
         // guarded — never literally `nothing` when a real selection is baked — is already
         // checked above; which of the widget's OWN layers a non-`nothing` value names is not
         // itself a regression.
-        if (!layers.some((l) => mountBond.includes(`:${l.id},`))) {
+        if (!layers.some((l) => mountBond.includes(`:${jlLayerText(l.id)},`))) {
           throw new Error(`${key}: mount bond ${JSON.stringify(mountBond)} doesn't name any of this widget's own layers`);
         }
-      } else if (!mountBond.includes(`:${spec.layerId}`)) {
+      } else if (!mountBond.includes(`:${jlLayerText(spec.layerId)}`)) {
         throw new Error(`${key}: mount bond ${JSON.stringify(mountBond)} doesn't name layer :${spec.layerId}`);
       }
       passed.push(`${key}/hydrated-bond`);
     } else if (/=\s*nothing$/.test(mountBond)) {
       passed.push(`${key}/hydrated-bond-control`);
-    } else if (/Event\(/.test(mountBond) && layers.some((l) => mountBond.includes(`:${l.id},`))) {
+    } else if (/Event\(/.test(mountBond) && layers.some((l) => mountBond.includes(`:${jlLayerText(l.id)},`))) {
       // A prior kind_sweep.mjs run against this SAME warm Pluto session leaves the bond holding
       // its last value — Pluto's normal reconnect hydration (a bond keeps its value across a
       // page reload), not a regression of the mount.ts "force host.value = null" bug the check
@@ -2062,7 +2071,7 @@ try {
     const before = await textOf(`#out_${key}`);
     // The overlay's hit index stays 0-based. The bond prints the Julia 1-based index.
     const juliaIdx = () => clickIdx + 1;
-    const already = new RegExp(`:${spec.layerId},\\s*${juliaIdx()}\\b`);
+    const already = new RegExp(`:${jlLayer(spec.layerId)},\\s*${juliaIdx()}\\b`);
     // Collision-avoidance (#114): re-running this driver against a warm Pluto session (no
     // restart) can start a spec with its bond ALREADY holding the index we're about to click —
     // clicking the same index again produces byte-identical `repr(ev)` text, so `waitChange`
@@ -2168,7 +2177,7 @@ try {
         }
       }
     }
-    const idRe = new RegExp(`:${spec.layerId}|${spec.layerId}`, "i");
+    const idRe = new RegExp(`:${jlLayer(spec.layerId)}|${jlLayer(spec.layerId)}`, "i");
     if (!idRe.test(after)) throw new Error(`${key}-click: no layer in ${JSON.stringify(after).slice(0, 220)}`);
     if (spec.layerKind === "surface") {
       // A surface point binds as a GridCellEvent of its source (i, j) and its z (#259).
@@ -2178,7 +2187,7 @@ try {
         throw new Error(`${key}-click: expected GridCellEvent i=${g.i[a] + 1}, j=${g.j[b] + 1}, value≈${g.z[clickIdx]}: ${after.slice(0, 220)}`);
       }
     } else if (spec.layerKind !== "grid") {
-      if (!new RegExp(`:${spec.layerId},\\s*${juliaIdx()}\\b`).test(after)) {
+      if (!new RegExp(`:${jlLayer(spec.layerId)},\\s*${juliaIdx()}\\b`).test(after)) {
         throw new Error(`${key}-click: expected Julia index ${juliaIdx()}: ${after.slice(0, 220)}`);
       }
     }

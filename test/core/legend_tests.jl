@@ -106,8 +106,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
         # Derive expected ids from the constructed interactables themselves (not hardcoded),
         # grouped by which source plot (sl/st/ln) built them.
-        sl_ids = [i.id for i in non_legend if i.id in (:scatterlines, :scatterlines_line)]
-        st_ids = [i.id for i in non_legend if i.id in (:stem, :stem_stems)]
+        sl_ids = [i.id for i in non_legend if Masque._head(i.id) === :scatterlines]
+        st_ids = [i.id for i in non_legend if Masque._head(i.id) === :stem]
         ln_ids = [i.id for i in non_legend if i.id == :lines]
         @test li.targets == [sl_ids, st_ids, ln_ids]
         # linking a compound entry to BOTH its layers is correct, not over-linking

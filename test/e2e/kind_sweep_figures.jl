@@ -121,8 +121,9 @@ kind_sweep_meta() = [
         "tip" => "rect-a", "hoverIndex" => 1, "hoverTip" => "rect-b", "mode" => "element",
     ),
     Dict(
-        # RegionInteractable's rects layer: the base id `:zone` plus the `_r` suffix.
-        "key" => "regions", "layerId" => "zone_r", "layerKind" => "rects",
+        # RegionInteractable of two shape kinds: each kind is a part of `:zone`, and the case
+        # drives the rects part, `zone.rects`.
+        "key" => "regions", "layerId" => "zone.rects", "layerKind" => "rects",
         "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
         "tip" => "zone-a", "hoverIndex" => 1, "hoverTip" => "zone-b", "mode" => "element",
     ),
@@ -163,9 +164,9 @@ kind_sweep_meta() = [
         "tip" => "index", "hoverIndex" => 1, "hoverTip" => "index", "mode" => "element",
     ),
     Dict(
-        # `scatterlines!` on Axis3 (#273): the markers are the `:scatterlines` layer, drawn
-        # over the `:scatterlines_line` layer, so a hover on a marker takes the marker.
-        "key" => "scatterlines3d", "layerId" => "scatterlines", "layerKind" => "circles",
+        # `scatterlines!` on Axis3 (#273): the markers are the `scatterlines.points` layer, drawn
+        # over the `scatterlines.line` layer, so a hover on a marker takes the marker.
+        "key" => "scatterlines3d", "layerId" => "scatterlines.points", "layerKind" => "circles",
         "selected" => "wash", "circle" => true, "selectedIndex" => 1, "clickIndex" => 0,
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
     ),
@@ -665,10 +666,14 @@ function build_kind_sweep()
         for (_, (xc, yc), w, h) in zones
             poly!(ax, Rect2f(xc - w / 2, yc - h / 2, w, h); color = (:steelblue, 0.35), strokewidth = 2)
         end
+        scatter!(ax, [2.5], [2.6]; markersize = 14, color = :gray)
         masque(
             fig,
-            RegionInteractable(ax, zones; id = :zone, payloads = [(; label = "zone-a"), (; label = "zone-b")]);
-            selected = Dict(:zone_r => [1]),
+            RegionInteractable(
+                ax, [zones; (:circle, (2.5, 2.6), 7)]; id = :zone,
+                payloads = [(; label = "zone-a"), (; label = "zone-b"), (; label = "dot")],
+            );
+            selected = (zone = (rects = [1],),),
             auto = false,
         )
     end
@@ -777,7 +782,7 @@ function build_kind_sweep()
         ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "scatterlines3d")
         spts = Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3)]
         scatterlines!(ax, spts; color = :gray, markersize = 14)
-        masque(fig; selected = Dict(:scatterlines => [2]))
+        masque(fig; selected = (scatterlines = (points = [2],),))
     end
 
     scatter3d = let
@@ -1234,7 +1239,12 @@ function sweep_field(key, ev)
     i = findfirst(d -> d["key"] == key, kind_sweep_meta())
     name = i === nothing ? nothing : get(kind_sweep_meta()[i], "field", kind_sweep_meta()[i]["layerId"])
     name == "*" && return repr(ev)
-    name !== nothing && haskey(ev, Symbol(name)) && return repr(getproperty(ev, Symbol(name)))
+    # A recipe part's field, `scatterlines.points`, sits nested in the value.
+    v = ev
+    for k in (name === nothing ? () : Symbol.(split(name, '.')))
+        v = v isa NamedTuple && haskey(v, k) ? getproperty(v, k) : missing
+    end
+    name !== nothing && v !== missing && return repr(v)
     length(ev) == 1 && return repr(only(ev))
     return all(isnothing, ev) ? "nothing" : repr(ev)
 end

@@ -89,8 +89,8 @@ and `PolarAxis`. Constructor signatures and default fields are in
 | `violin!` | `:violin` | `:polygons` | — | — |
 | `voronoiplot!` | `:voronoiplot` | `:polygons` | — | — |
 | `hexbin!` | `:hexbin` | `:polygons` | — | — |
-| `stem!` | `:stem` + `:stem_stems` | `:circles` + `:segments` | — | — |
-| `scatterlines!` | `:scatterlines` + `:scatterlines_line` | `:circles` + `:lines` | yes | yes |
+| `stem!` | `stem.points` + `stem.stems` | `:circles` + `:segments` | — | — |
+| `scatterlines!` | `scatterlines.points` + `scatterlines.line` | `:circles` + `:lines` | yes | yes |
 | `boxplot!` | `:boxplot` | `:rects` or `:polygons` (body only) | — | — |
 | `text!` | `:text` | `:rects` | yes | — |
 | `annotation!` | `:annotation` | `:rects` | — | — |
