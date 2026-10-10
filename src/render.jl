@@ -510,7 +510,8 @@ function build_manifest(
         if roles[L.id] === :brush
             d["brush"] = L.kind === :grid ? "grid" : "elements"
         end
-        # A `select = :many` field holds a vector of picks, `{items: [...]}` on the wire.
+        # A `select = :many` field holds a vector of picks, `{items: [...]}` on the wire, or on a
+        # grid a cell mask, `{runs}` or `{bits}`.
         roles[L.id] === :pick && "click" in d["events"] && select_mode(i) === :many && (d["many"] = true)
     end
     initial = with_initial ? _initial_value(built, fields, roles, binding, selected, ctx, layers) : nothing

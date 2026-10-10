@@ -79,7 +79,14 @@ for a brush, or `{layer, index}` (no payload for an element kind) or `{layer, in
 A field built with `select = :many` (its manifest layer carries `many: true`) always sends
 `{items: [{layer, index[, payload]}, ...]}`, empty to start, in the order the picks were made;
 `_many_value` decodes each item as the one-pick field would and returns a typed vector
-(`Vector{ElementEvent}`, `Vector{LegendEvent}`, `Vector{AxisEvent}`). A plain click replaces
+(`Vector{ElementEvent}`, `Vector{LegendEvent}`, `Vector{AxisEvent}`). A `many` grid is the
+exception: it holds a cell mask, sent as `{runs: [j, i0, n, ...]}` (0-based flat triples, n cells
+of row j from column i0) or, once the runs pass 1 KB and packed bits are shorter,
+`{bits: base64}` (cell `k = j*ncols + i` at bit `k % 8` of byte `k ÷ 8`), and `_grid_selection`
+returns a `GridSelection` with a `BitMatrix` shaped like `values`. A value that doesn't fit
+the grid raises `ArgumentError`. The browser holds the mask as one byte per cell
+(`frontend/src/gridmask.ts`) and draws it as one hit: a fill path of the runs and an edge path of
+the cell sides that border an unselected cell. A plain click replaces
 the items with its one pick (or empties them when that pick was the only one), Cmd/Ctrl-click
 and Cmd/Ctrl+Enter toggle one, and `clearPicks` empties every pick field on the clicked axes
 (an empty click) or the whole figure (Escape), sending one value; brush targets and controls

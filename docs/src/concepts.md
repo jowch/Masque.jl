@@ -106,6 +106,7 @@ starts with the marks inside the box. To start with marks selected, see
 | Click a legend entry | [`LegendEvent`](@ref) | `pick.label` |
 | Release an ROI with `selects` over points | `Vector{ElementEvent}` | one event per enclosed point; `[]` when empty |
 | Click a heatmap or image cell | [`GridCellEvent`](@ref) | `pick.i`, `pick.j`, `pick.value`; `A[pick]` |
+| Click cells of a heatmap built with `select = :many` | [`GridSelection`](@ref) | `A[sel]`, `findall(sel)`, `sel.mask` |
 | Release an ROI with `selects` over a grid | [`GridWindowEvent`](@ref) | `win.i1:win.i2`, `win.j1:win.j2`; `A[win]` |
 | Release an ROI | [`BoundsEvent`](@ref) | `box.xmin`, `box.xmax`, `box.ymin`, `box.ymax` |
 | Click an axis ([`AxisInteractable`](@ref)) | [`AxisEvent`](@ref) | `pick.x`, `pick.y` |

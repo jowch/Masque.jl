@@ -19,8 +19,9 @@ plot drawn outside data space (`space = :relative`, `:pixel`, `:clip`).
 `select = :many` lets a reader hold several of the plot's marks at once: its `@bind` field is
 then a `Vector{ElementEvent}`, empty to start, and Cmd-click (Ctrl-click off a Mac) adds or
 removes a mark. It applies to every layer the plot builds, so a `stem!` gives a `NamedTuple`
-of two vectors, `(points = …, stems = …)`. The default, `:one`, holds one mark or `nothing`.
-Heatmap, image and surface cells don't take `:many` yet.
+of two vectors, `(points = …, stems = …)`. On a heatmap or image the field is a
+[`GridSelection`](@ref) instead, a mask of the selected cells; surface cells don't take
+`:many` yet. The default, `:one`, holds one mark or `nothing`.
 
 This is also how a recipe gets layers of its own. Define a method for your plot type, and
 `masque(fig)` uses it instead of walking the plots your recipe draws:
@@ -200,7 +201,7 @@ function _with_select(i::AbstractInteractable, select)
         select === :one && return i
         _check_select(T, select)
         what = i isa ColorbarInteractable ? "a colorbar pick is one value" :
-            i isa Union{GridInteractable, SurfaceInteractable} ? "heatmap, image and surface cells don't take several picks yet" :
+            i isa SurfaceInteractable ? "surface cells don't take several picks yet" :
             "a $(nameof(T)) holds one value"
         throw(ArgumentError("$what; select = :many isn't supported"))
     end

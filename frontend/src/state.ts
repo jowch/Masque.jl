@@ -1,3 +1,4 @@
+import type { GridMask } from "./gridmask"
 import type { Anchor } from "./geometry"
 import type { CrossEls } from "./cross"
 import type { GestureChannel } from "./gesture"
@@ -269,8 +270,9 @@ export function createOverlayState(): OverlayState {
 
 // One pick of a `many` field, as the wire carries it: an element, or an axis spot with its payload.
 export type FieldPick = { layer: string; index: number; payload?: unknown }
-// `items_` is set on a `many` field: every pick it holds, in the order they were made.
-export type FieldSelection = { hits_: Hit[]; source_: { layer: string; index: number } | null; items_?: FieldPick[] }
+// `items_` is set on a `many` field: every pick it holds, in the order they were made. A `many`
+// grid holds `mask_` instead (gridmask.ts), and `hits_` is its one outline hit.
+export type FieldSelection = { hits_: Hit[]; source_: { layer: string; index: number } | null; items_?: FieldPick[]; mask_?: GridMask }
 
 // Every field's selected hits, in one list: what g.sel draws. A mark two fields both hold (a
 // legend pick's series and a box's brush) is drawn once, or its wash would stack.

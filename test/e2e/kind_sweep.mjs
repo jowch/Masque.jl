@@ -763,6 +763,69 @@ try {
     // removes one (Linux Chromium, so Ctrl rather than Cmd), a click on empty plot space clears
     // them, and Escape on the focused figure clears them too. Each step checks the printed
     // `@bind` value, host.value's `{items}`, and how many picks are drawn.
+    // A grid with `select = :many` (#335): a click picks one cell, Ctrl-click flips one, a click
+    // on the axis off the grid clears it, and so does Escape. Each step checks the printed
+    // `GridSelection` count, host.value's `{runs}`, and the drawing: one fill path over the
+    // cells and one edge path around their outline (an inner side would be a 5th subpath for
+    // two cells side by side), and no hover on a selected cell.
+    if (spec.mode === "many_grid") {
+      const g = layer.geometry;
+      if (!layer.many) throw new Error(`${key}: layer ${layer.id} ships no many flag`);
+      const v0 = await textOf(`#bond_${key}`);
+      if (!/GridSelection\(:region, 0 of 12 cells\)/.test(v0)) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want an empty GridSelection`);
+      passed.push(`${key}/empty-mask-at-mount`);
+      const at = (i, j) => ({ x: (g.xedges[i] + g.xedges[i + 1]) / 2, y: (g.yedges[j] + g.yedges[j + 1]) / 2 });
+      const selPaths = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const d = (svg) => sr.querySelector(`svg.${svg} g.sel path`)?.getAttribute("d") ?? null;
+        const edge = sr.querySelector("svg.masque-edge g.sel path");
+        return { fill: d("masque-fill"), edge: d("masque-edge"), edgeWidth: edge ? getComputedStyle(edge).strokeWidth : null };
+      }, key);
+      const step = async (what, before, act, wantCount, wantRuns, wantSel) => {
+        const r = await act();
+        const t = await waitChange(`#bond_${key}`, before, `${key}/${what}`);
+        if (!t.includes(`GridSelection(:region, ${wantCount} of 12 cells)`)) throw new Error(`${key}/${what}: value ${JSON.stringify(t)}, want ${wantCount} cells`);
+        const runs = (await inspect(key)).bondAll?.region?.runs;
+        if (JSON.stringify(runs) !== JSON.stringify(wantRuns)) throw new Error(`${key}/${what}: host.value runs ${JSON.stringify(runs)}, want ${JSON.stringify(wantRuns)}`);
+        const sel = r?.sel ?? (await inspect(key)).sel;
+        if (sel !== wantSel) throw new Error(`${key}/${what}: g.sel=${sel}, want ${wantSel}`);
+        passed.push(`${key}/${what}`);
+        return t;
+      };
+      let t = await step("click-picks-one", v0, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click"), 1, [1, 1, 1], 2);
+      t = await step("ctrl-click-adds", t, () => dispatchAt(key, at(2, 1).x, at(2, 1).y, "click", { ctrlKey: true }), 2, [1, 1, 2], 2);
+      const p = await selPaths();
+      if ((p.fill?.match(/M/g) ?? []).length !== 1) throw new Error(`${key}: fill path ${p.fill}, want one rect for the two cells`);
+      if ((p.edge?.match(/M/g) ?? []).length !== 4) throw new Error(`${key}: edge path ${p.edge}, want the outline only (4 sides)`);
+      if (parseFloat(p.edgeWidth) !== 2) throw new Error(`${key}: edge stroke ${p.edgeWidth}, want the 2px selected width`);
+      passed.push(`${key}/outline-only`);
+      const hov = await dispatchAt(key, at(1, 1).x, at(1, 1).y, "pointermove");
+      if (hov.hi.fill || hov.hi.edge || hov.hi.plain) throw new Error(`${key}: hovering a selected cell drew ${JSON.stringify(hov.hi)}`);
+      if (!hov.show) throw new Error(`${key}: hovering a selected cell hid its tooltip`);
+      passed.push(`${key}/no-hover-on-selected`);
+      t = await step("ctrl-click-adds-row", t, () => dispatchAt(key, at(0, 2).x, at(0, 2).y, "click", { ctrlKey: true }), 3, [1, 1, 2, 2, 0, 1], 2);
+      t = await step("ctrl-click-removes", t, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click", { ctrlKey: true }), 2, [1, 2, 1, 2, 0, 1], 2);
+      t = await step("click-replaces", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 1, [0, 3, 1], 2);
+      // The axis runs to y = 4; the grid stops at 3.
+      const off = { x: at(1, 2).x, y: g.yedges[3] - (g.yedges[2] - g.yedges[3]) / 2 };
+      t = await step("empty-click-clears", t, () => dispatchAt(key, off.x, off.y, "click"), 0, [], 0);
+      t = await step("click-again", t, () => dispatchAt(key, at(0, 0).x, at(0, 0).y, "click"), 1, [0, 0, 1], 2);
+      t = await step("escape-clears", t, () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const surface = sr.querySelector(".surface");
+        surface.focus();
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true, cancelable: true }));
+        return null;
+      }, key), 0, [], 0);
+      await dispatchAt(key, 1, 1, "pointermove");
+      console.error(`OK  ${key} — ${t.slice(0, 160)}`);
+      continue;
+    }
+
     if (spec.mode === "many") {
       const picks = (t) => [...t.matchAll(/ElementEvent\(:scatter, (\d+),/g)].map((m) => Number(m[1]));
       const items = async () => ((await inspect(key)).bondAll?.scatter?.items ?? null)?.map((i) => i.index);

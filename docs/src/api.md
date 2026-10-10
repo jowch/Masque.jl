@@ -14,6 +14,7 @@ ElementEvent
 LegendEvent
 GridCellEvent
 GridWindowEvent
+GridSelection
 AxisEvent
 ThresholdEvent
 ColorbarEvent

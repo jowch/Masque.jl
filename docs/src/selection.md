@@ -47,7 +47,8 @@ Mac) or Ctrl-click (elsewhere) adds a city or takes it out again, so
 they were picked. A legend entry and an
 [`AxisInteractable`](@ref) take `select = :many` the same way and give a
 vector of their events; a colorbar's pick is one value, so it raises an
-`ArgumentError`.
+`ArgumentError`. A heatmap with `select = :many` holds a set of cells,
+as [Select several cells](@ref) shows.
 
 To select every mark in an area at once, drag a box over them instead:
 an [`ROIInteractable`](@ref) with `selects` returns every mark inside

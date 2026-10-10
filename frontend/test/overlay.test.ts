@@ -5265,3 +5265,118 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }, { layer: "pts", index: 0 }] })
     })
 })
+
+describe("a grid with select = :many holds a cell mask (#335)", () => {
+    // A 4×3 grid filling the axis: cell (i, j) spans x 300i..300(i+1), y 200j..200(j+1) image px.
+    const grid = (initial: unknown = { runs: [] }): Manifest => ({
+        width: 1200, height: 800, scaling: 2,
+        transforms: { ax1: { xlims: [0, 4], ylims: [0, 4], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+        fields: ["region"],
+        initial: { region: initial },
+        layers: [{ id: "region", kind: "grid", axis: "ax1", events: ["click", "hover"], payloads: [], many: true,
+            geometry: { xedges: [0, 300, 600, 900, 1200], yedges: [0, 200, 400, 600], ncols: 4, nrows: 3, values: Array.from({ length: 12 }, (_, k) => k) } }],
+    })
+    // Client px of cell (i, j)'s centre: image px / scaling.
+    const cell = (s: HTMLElement, i: number, j: number, mod: MouseEventInit = {}) =>
+        s.dispatchEvent(new MouseEvent("click", { clientX: (300 * i + 150) / 2, clientY: (200 * j + 100) / 2, bubbles: true, ...mod }))
+    const val = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+
+    it("a click picks one cell, Ctrl-click flips one, and the value is row runs", () => {
+        const { host, script } = setup()
+        mount(script, grid())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        cell(surface, 1, 1)
+        expect(val(host).region).toEqual({ runs: [1, 1, 1] })
+        cell(surface, 2, 1, { ctrlKey: true })
+        expect(val(host).region).toEqual({ runs: [1, 1, 2] })
+        cell(surface, 0, 2, { ctrlKey: true })
+        expect(val(host).region).toEqual({ runs: [1, 1, 2, 2, 0, 1] })
+        cell(surface, 1, 1, { ctrlKey: true })
+        expect(val(host).region).toEqual({ runs: [1, 2, 1, 2, 0, 1] })
+        cell(surface, 3, 0)
+        expect(val(host).region).toEqual({ runs: [0, 3, 1] })
+        // A plain click on the only selected cell clears the field.
+        cell(surface, 3, 0)
+        expect(val(host).region).toEqual({ runs: [] })
+        expect(selChildren(shadow).length).toBe(0)
+    })
+
+    it("draws one fill and one outline, and a selected cell takes no hover", () => {
+        const { host, script } = setup()
+        mount(script, grid())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        cell(surface, 0, 0)
+        cell(surface, 1, 0, { ctrlKey: true })
+        const fill = fillSelGroup(shadow).querySelector("path")!
+        expect(fill.getAttribute("d")).toBe("M0 0H600V200H0Z")
+        expect(fill.classList.contains("masque-fillshape")).toBe(true)
+        const edge = selGroupEls(shadow).find((g) => g.closest("svg")!.classList.contains("masque-edge"))!.querySelector("path")!
+        // The outline only: no side between the two cells.
+        expect(edge.getAttribute("d")).toBe("M0 0H600M0 200H600M0 0V200M600 0V200")
+        expect(edge.classList.contains("masque-w-selected")).toBe(true)
+        expect(hiChildren(shadow).length).toBe(0)
+    })
+
+    it("an explicit hoverstyle stroke draws the cells unblended, as one tinted area and its outline", () => {
+        const { host, script } = setup()
+        const m = grid({ runs: [0, 0, 1] })
+        m.layers[0].style = { stroke: "#123456", width: 2 }
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const wrap = selGroupEls(shadow).find((g) => g.closest("svg")!.classList.contains("masque-plain"))!.firstElementChild as SVGGElement
+        expect(wrap.tagName.toLowerCase()).toBe("g")
+        expect(wrap.style.getPropertyValue("--masque-hi-stroke")).toBe("#123456")
+        const [fill, edge] = [...wrap.children] as SVGElement[]
+        expect(fill.getAttribute("d")).toBe("M0 0H300V200H0Z")
+        expect(fill.classList.contains("masque-nostroke")).toBe(true)
+        expect(edge.classList.contains("masque-w-selected")).toBe(true)
+        expect(edge.style.getPropertyValue("fill")).toBe("none")
+        expect(fillSelGroup(shadow).children.length).toBe(0)
+    })
+
+    it("a frame that moves the grid redraws the held cells at the new edges", async () => {
+        const m = grid()
+        m.layers.push({ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } })
+        const g0 = m.layers[0].geometry as GridGeometry
+        const moved: Manifest = { ...m, initial: undefined,
+            layers: [{ ...m.layers[0], geometry: { ...g0, xedges: g0.xedges.map((x) => x - 200) } }, m.layers[1]] }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1, 2, 3]), manifest: moved }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        cell(surface, 1, 0)
+        expect(fillSelGroup(shadow).querySelector("path")!.getAttribute("d")).toBe("M300 0H600V200H300Z")
+        // A pan from a point off the grid's cells, so the press lands on the view.
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 350, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 350, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 350, bubbles: true }))
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+        host.querySelector("img")!.dispatchEvent(new Event("load"))
+        expect(requestFrame).toHaveBeenCalled()
+        expect(fillSelGroup(shadow).querySelector("path")!.getAttribute("d")).toBe("M100 0H400V200H100Z")
+        expect(val(host).region).toEqual({ runs: [0, 1, 1] })
+    })
+
+    it("a click on an empty part of the axis and Escape clear it; a restored value draws", () => {
+        const { host, script } = setup()
+        mount(script, grid({ runs: [0, 0, 2] }))
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect(fillSelGroup(shadow).querySelector("path")!.getAttribute("d")).toBe("M0 0H600V200H0Z")
+        cell(surface, 2, 2, { ctrlKey: true })
+        expect(val(host).region).toEqual({ runs: [0, 0, 2, 2, 2, 1] })
+        // y = 700 image px is inside the axis, below the grid.
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 350, bubbles: true }))
+        expect(val(host).region).toEqual({ runs: [] })
+        expect(selChildren(shadow).length).toBe(0)
+        cell(surface, 1, 1)
+        surface.focus()
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+        expect(val(host).region).toEqual({ runs: [] })
+    })
+})

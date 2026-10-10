@@ -472,9 +472,11 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             old = T((getfield(i, f) for f in fieldnames(T)[1:(end - 1)])...)
             @test Masque.select_mode(old) === :one
         end
-        # Cells don't take several picks yet, and say so.
-        hm = heatmap!(Axis(fig[3, 1]), [1 2; 3 4])
-        @test_throws "heatmap, image and surface cells don't take several picks yet" masque(fig, interactables(hm; select = :many))
+        # A heatmap's cells hold a mask; surface cells don't take several picks yet, and say so.
+        axh = Axis(fig[3, 1]); hm = heatmap!(axh, [1 2; 3 4])
+        @test Masque.select_mode(only(interactables(GridInteractable(axh, hm); select = :many))) === :many
+        sp = surface!(Axis3(fig[4, 1]), [1.0 2; 3 4])
+        @test_throws "surface cells don't take several picks yet" masque(fig, interactables(sp; select = :many))
     end
 
     @testset "select = :many on a recipe's parts and a box's target (#335)" begin
@@ -494,5 +496,47 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         L = only(l for l in wb.manifest["layers"] if l["id"] == "scatter")
         @test !haskey(L, "many") && haskey(L, "brush")
         @test [e.index for e in iv(wb).scatter] == [2]
+    end
+
+    @testset "a grid with select = :many holds a GridSelection (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        img = reshape(Float64.(1:12), 4, 3)
+        hm = heatmap!(ax, img)
+        iv = Masque.APD.Bonds.initial_value
+        tv = Masque.APD.Bonds.transform_value
+        w = masque(fig, (region = interactables(hm; select = :many),))
+        L = only(l for l in w.manifest["layers"] if l["id"] == "region")
+        @test L["many"] === true
+        @test w.manifest["initial"]["region"] == Dict("runs" => Any[])
+        s0 = iv(w).region
+        @test s0 isa GridSelection && s0.layer === :region && size(s0.mask) == (4, 3) && isempty(s0)
+        # Runs: row j = 1 (0-based), columns 1..2; row 2, column 0.
+        v = tv(w, Dict("region" => Dict("runs" => [1, 1, 2, 2, 0, 1]))).region
+        @test findall(v) == [CartesianIndex(2, 2), CartesianIndex(3, 2), CartesianIndex(1, 3)]
+        @test img[v] == img[v.mask] == [6.0, 7.0, 9.0]
+        @test count(v) == 3 && v.mask isa BitMatrix
+        @test v == GridSelection(:region, copy(v.mask)) && hash(v) == hash(GridSelection(:region, copy(v.mask)))
+        @test sprint(show, v) == "GridSelection(:region, 3 of 12 cells)"
+        # Bits: the same cells, row-major, cell k at bit k % 8 of byte k ÷ 8.
+        bytes = zeros(UInt8, 2)
+        for k in (5, 6, 8)
+            bytes[k >> 3 + 1] |= UInt8(1) << (k & 7)
+        end
+        @test tv(w, Dict("region" => Dict("bits" => Masque.base64encode(bytes)))).region == v
+        # The constructor takes it, and `:one` stays a GridCellEvent.
+        g = GridInteractable(ax, hm; select = :many, id = :g)
+        @test Masque.select_mode(g) === :many
+        @test iv(masque(fig, g; bind = g)) isa GridSelection
+        @test iv(masque(fig, GridInteractable(ax, hm; id = :g); bind = (:g,))) == (g = nothing,)
+        # A bad mask names the problem.
+        @test_throws "outside the 4×3 grid" tv(w, Dict("region" => Dict("runs" => [0, 3, 2])))
+        @test_throws "not triples" tv(w, Dict("region" => Dict("runs" => [0, 1])))
+        @test_throws "expected 2" tv(w, Dict("region" => Dict("bits" => Masque.base64encode(UInt8[1]))))
+        @test_throws "expected `runs` or `bits`" tv(w, Dict("region" => Dict("items" => [])))
+        # A surface holds one point.
+        ax3 = Axis3(fig[1, 2])
+        @test_throws "holds one value; select = :many isn't supported" interactables(
+            ax3, surface!(ax3, rand(3, 3)); select = :many,
+        )
     end
 end
