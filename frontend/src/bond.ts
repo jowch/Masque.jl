@@ -12,7 +12,7 @@ import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
 import * as marquee from "./drag/marquee"
 import { contentPoint, panTo, unmapPoint } from "./photo"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, ThresholdGeometry, ViewGeometry } from "./types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
 // (observed live in Chromium for a synthetic/non-primary pointerId — real touch/pen input can
@@ -185,12 +185,12 @@ function passContextToBase(surface: HTMLElement, pointerId: number): void {
 // Cmd/Ctrl-marquee adds to the picks, or takes out what it covers when it starts on a mark or
 // a grid cell that is already picked (as in Finder). Without the key it replaces them. One mode
 // covers every field the box edits, so marks and cells always agree.
-function marqueeMode(state: OverlayState, e: PointerEvent, under: Hit | null, targets: HitLayer[], p: { x: number; y: number }): marquee.MarqueeMode {
+function marqueeMode(manifest: Manifest, state: OverlayState, e: PointerEvent, under: Hit | null, targets: HitLayer[], p: { x: number; y: number }): marquee.MarqueeMode {
     if (!isToggleClick(e)) return "replace"
     if (under === null || !targets.includes(under.layer)) return "add"
     const sel = state.sel_.get(under.layer.id)
     // On a line that takes points, the pick under the press is its nearest data point.
-    const sample = picksPoints(under.layer) ? lineSample(under, p.x, p.y) : undefined
+    const sample = picksPoints(under.layer) ? lineSample(manifest, under, p.x, p.y) : undefined
     const held = under.layer.kind === "grid" ?
         sel?.mask_?.[under.index] === 1 :
         (sel?.items_ ?? []).some((it) => it.index === under.index && it.sample === sample)
@@ -237,7 +237,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         // A press on a legend inside the axis is a press on the legend.
         const under = targets.length ? hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", photoClip(ctx.manifest_, state.photo_, state.photoViewId_)) : null
         if (axis !== null && targets.length && !under?.layer.links) {
-            state.drag_ = marquee.begin(state, axis, targets, marqueeMode(state, e, under, targets, content), content.x, content.y, { x: e.clientX, y: e.clientY }, e.pointerId)
+            state.drag_ = marquee.begin(state, axis, targets, marqueeMode(ctx.manifest_, state, e, under, targets, content), content.x, content.y, { x: e.clientX, y: e.clientY }, e.pointerId)
             tryCapture(ctx.surface_, e.pointerId)
             e.preventDefault()
             return
@@ -427,7 +427,7 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     let sample: number | undefined
     let point: Hit | null = null
     if (picksPoints(hit.layer)) {
-        sample = lineSample(hit, px, py)
+        sample = lineSample(ctx.manifest_, hit, px, py)
         point = sample === undefined ? null : linePointHit(ctx.manifest_, hit.layer, hit.index, sample)
         if (!point) return
     }
@@ -505,8 +505,8 @@ function syncFocus(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
 // when it already is; Cmd/Ctrl-click adds it, or takes it out when it is held. An axis spot is
 // never "held": each click is a new spot.
 // The data point a click on line `hit` names: the one its readout shows, else the nearest.
-function lineSample(hit: Hit, px: number, py: number): number | undefined {
-    return (hit.pt_ ?? lineReadout(hit.layer, hit.index, px, py))?.[0]
+function lineSample(manifest: Manifest, hit: Hit, px: number, py: number): number | undefined {
+    return (hit.pt_ ?? lineReadout(hit.layer, hit.index, px, py, manifest.transforms[hit.layer.axis]))?.[0]
 }
 
 function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number, toggle: boolean): void {
@@ -515,7 +515,7 @@ function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: num
     const items = state.sel_.get(field)?.items_ ?? []
     const element = SELECTED_KINDS.has(hit.layer.kind)
     // On a line, each pick is a point on it, as a single pick is.
-    const sample = picksPoints(hit.layer) ? lineSample(hit, px, py) : undefined
+    const sample = picksPoints(hit.layer) ? lineSample(ctx.manifest_, hit, px, py) : undefined
     if (picksPoints(hit.layer) && (sample === undefined || !linePointHit(ctx.manifest_, hit.layer, hit.index, sample))) return
     const at = element ? items.findIndex((it) => it.index === hit.index && it.sample === sample) : -1
     const pick: FieldPick = sample !== undefined ? { layer: field, index: hit.index, sample } :

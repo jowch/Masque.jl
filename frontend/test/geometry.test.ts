@@ -1047,6 +1047,21 @@ describe("lineReadout", () => {
         expect(lineReadout(center, 0, 190, -200)).toEqual([2, 2, 2])
     })
 
+    // The path runs on past the axis limits, where Makie draws nothing (#335 review): a sample
+    // there is never the one read, even when the cursor is nearer it.
+    it("reads only samples inside the plot area", () => {
+        const t = { xlims: [0, 10], ylims: [0, 8], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1000, 800], xreversed: false, yreversed: false } as AxisTransform
+        // Samples at x = 100 (inside), 1300 (past the right limit) and 1500 (past it too).
+        const L = layer([[100, 400, 1300, 400, 1500, 400]], [[1, 4, 13, 4, 15, 4]])
+        expect(lineReadout(L, 0, 900, 400)).toEqual([1, 13, 4]) // without the axis, the nearer end
+        expect(lineReadout(L, 0, 900, 400, t)).toEqual([0, 1, 4])
+        expect(lineReadout(L, 0, 1400, 400, t)).toBeNull() // an edge wholly outside reads nothing
+        expect(hitLayer(L, 900, 402, t)?.pt_).toEqual([0, 1, 4])
+        expect(samplePoint(L, 0, 1, t)).toEqual({ x: 1300, y: 400 }) // where it is drawn, for a pick it holds
+        expect(samplePoint(L, 0, 1, t, true)).toBeNull() // but not shown
+    })
+
     it("returns null when the path has no edge or the samples run short", () => {
         expect(lineReadout(layer([[50, 50]], [[1, 1]]), 0, 50, 50)).toBeNull()
         expect(lineReadout(layer([[0, 0, 100, 0]], [[1, 1]]), 0, 95, 0)).toBeNull()

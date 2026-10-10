@@ -12,7 +12,7 @@ import { cssAnchor } from "./state"
 import { anchorFor, lineReadout, samplePoint } from "./geometry"
 import type { Anchor } from "./geometry"
 import type { OverlayCtx, OverlayState } from "./state"
-import type { FocusRef, Hit, HitLayer, Manifest } from "./types"
+import type { AxisTransform, FocusRef, Hit, HitLayer, Manifest } from "./types"
 
 // Debounce so a burst of arrow presses (holding the key down) announces only the element you
 // land on, not every one you pass through.
@@ -87,15 +87,41 @@ export function focusTo(ctx: OverlayCtx, state: OverlayState, i: number | null):
     state.focusIdx_ = clamped
     const ref = ctx.focusable_[clamped]
     const hit = hitFor(ref)
-    // No cursor: read out the sample nearest the path's arc-length midpoint, where the tooltip sits.
-    if (hit.layer.kind === "lines") {
-        const mid = anchorFor(hit, null)
-        const pt = lineReadout(hit.layer, hit.index, mid.x, mid.y)
-        if (pt) hit.pt_ = pt
-    }
     // anchorFor(hit, null): no pointer to derive a "closest point on segment"/"cursor inside
     // polygon" placement from, so this falls back to the midpoint/centroid rule (geometry.ts).
-    paintFocus(ctx, state, ref, hit, anchorFor(hit, null))
+    const mid = anchorFor(hit, null)
+    // No cursor: read out the sample nearest the path's arc-length midpoint, where the tooltip
+    // sits. When the middle runs past the axis limits, start on the shown point nearest it, and
+    // put the tooltip there.
+    if (hit.layer.kind === "lines") {
+        const t = ctx.manifest_.transforms[hit.layer.axis]
+        const pt = lineReadout(hit.layer, hit.index, mid.x, mid.y, t)
+        if (pt) hit.pt_ = pt
+        else {
+            const near = nearestShownSample(hit, t, mid)
+            if (near) {
+                hit.pt_ = near.pt
+                paintFocus(ctx, state, ref, hit, anchorFor(hit, near.at))
+                return
+            }
+        }
+    }
+    paintFocus(ctx, state, ref, hit, mid)
+}
+
+// The point of line `hit` drawn inside the plot area nearest image px `p`, or null if none is.
+function nearestShownSample(hit: Hit, t: AxisTransform | undefined, p: { x: number; y: number }): { pt: NonNullable<Hit["pt_"]>; at: { x: number; y: number } } | null {
+    const pts = hit.layer.points?.[hit.index]
+    if (!pts || !t) return null
+    let best: { pt: NonNullable<Hit["pt_"]>; at: { x: number; y: number } } | null = null
+    let bd = Infinity
+    for (let s = 0; s < pts.length / 2; s++) {
+        const at = samplePoint(hit.layer, hit.index, s, t, true)
+        if (!at) continue
+        const d = Math.hypot(at.x - p.x, at.y - p.y)
+        if (d < bd) { bd = d; best = { pt: [s, pts[2 * s], pts[2 * s + 1]], at } }
+    }
+    return best
 }
 
 // Draw the focus ring, tooltip and announcement for `hit` with the tooltip at `anchor`.
@@ -121,7 +147,7 @@ function stepSample(ctx: OverlayCtx, state: OverlayState, dir: 1 | -1): boolean 
     if (!pts || !hit.pt_) return false
     const t = ctx.manifest_.transforms[hit.layer.axis]
     for (let s = hit.pt_[0] + dir; s >= 0 && s < pts.length / 2; s += dir) {
-        const at = samplePoint(hit.layer, hit.index, s, t)
+        const at = samplePoint(hit.layer, hit.index, s, t, true) // a point past the axis limits is not shown
         if (!at) continue
         const next: Hit = { ...hit, pt_: [s, pts[2 * s], pts[2 * s + 1]] }
         paintFocus(ctx, state, ctx.focusable_[cur], next, anchorFor(next, at))
