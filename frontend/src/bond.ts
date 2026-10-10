@@ -6,7 +6,7 @@ import { cellRange, manyHits, selectionFor, SELECTED_KINDS } from "./selection"
 import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
 import type { GridMask, MaskEnvelope } from "./gridmask"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
-import type { Drag, FieldPick, OverlayCtx, OverlayState } from "./state"
+import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
@@ -467,31 +467,39 @@ function showGridMask(ctx: OverlayCtx, state: OverlayState, layer: HitLayer, mas
     return encodeMask(layer, mask)
 }
 
-// A marquee released over a `many` grid, `box` in the layer's image px (as computeSelection
-// takes it), `start` where the drag began. A plain marquee replaces the selection with the cells
-// inside; with Cmd/Ctrl (`additive`) it adds them, or takes them out when the drag started on a
-// selected cell, as in Finder. A marquee that misses the grid still replaces (with nothing).
-// Redraws the selection and returns the field's new envelope; the caller commits it with the
-// release's other fields, so one release sends one value.
+// A marquee over a `many` grid, `box` in the layer's image px (as computeSelection takes it).
+// `mode` is the marquee's, decided once at the press for every field: "replace" takes the cells
+// the box overlaps, "add" adds them, "subtract" (Cmd/Ctrl from a held pick, as in Finder) takes
+// them out. `before` is the field's selection at the press. Each call starts again from
+// `before` and never reads the live mask, so the marquee calls it on every move to preview and
+// once more on release; cancel restores `before` itself. A box that misses the grid replaces
+// with nothing. Redraws the selection and returns the field's new envelope; the caller commits
+// it with the release's other fields, so one release sends one value.
 export function applyGridMarquee(
     ctx: OverlayCtx, state: OverlayState, layer: HitLayer,
-    box: { x: number; y: number; w: number; h: number }, additive: boolean, start: { x: number; y: number },
+    box: { x: number; y: number; w: number; h: number }, mode: "replace" | "add" | "subtract", before: FieldSelection | undefined,
 ): MaskEnvelope {
-    return showGridMask(ctx, state, layer, gridMarqueeMask(layer, gridMaskOf(state, layer), box, additive, start))
+    const base = before?.mask_
+    const from = base && base.length === emptyMask(layer).length ? base.slice() : emptyMask(layer)
+    return showGridMask(ctx, state, layer, gridMarqueeMask(layer, from, box, mode))
 }
 
-// applyGridMarquee's new mask, written into `mask` and returned.
+// applyGridMarquee's new mask, written into `mask` (the gesture's base) and returned.
 export function gridMarqueeMask(
-    layer: HitLayer, mask: GridMask,
-    box: { x: number; y: number; w: number; h: number }, additive: boolean, start: { x: number; y: number },
+    layer: HitLayer, mask: GridMask, box: { x: number; y: number; w: number; h: number }, mode: "replace" | "add" | "subtract",
 ): GridMask {
     const gg = layer.geometry as GridGeometry
-    const startCell = gridCellAt(gg, start.x, start.y)
-    const subtract = additive && startCell !== null && mask[startCell] === 1
-    if (!additive) mask.fill(0)
+    if (mode === "replace") mask.fill(0)
     const ci = cellRange(gg.xedges, box.x, box.x + box.w), cj = cellRange(gg.yedges, box.y, box.y + box.h)
-    if (ci && cj) setBlock(mask, gg.ncols, ci[0], ci[1], cj[0], cj[1], !subtract)
+    if (ci && cj) setBlock(mask, gg.ncols, ci[0], ci[1], cj[0], cj[1], mode !== "subtract")
     return mask
+}
+
+// Whether the field holds the cell under image px `pt`: a Cmd/Ctrl marquee pressed there
+// subtracts.
+export function gridCellHeld(state: OverlayState, layer: HitLayer, pt: { x: number; y: number }): boolean {
+    const k = gridCellAt(layer.geometry as GridGeometry, pt.x, pt.y)
+    return k !== null && state.sel_.get(layer.id)?.mask_?.[k] === 1
 }
 
 // The row-major index of the cell under image px (x, y), or null off the grid.

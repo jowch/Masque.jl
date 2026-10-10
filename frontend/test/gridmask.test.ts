@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { decodeMask, emptyMask, encodeMask, maskHit, setBlock } from "../src/gridmask"
-import { gridMarqueeMask } from "../src/bond"
+import { gridCellHeld, gridMarqueeMask } from "../src/bond"
+import type { OverlayState } from "../src/state"
 import type { HitLayer } from "../src/types"
 
 // A 4×3 grid, cells 10 px square; y edges descending as a y-up axis projects them.
@@ -62,22 +63,41 @@ describe("grid masks (#335)", () => {
         expect(maskHit(L, emptyMask(L))).toBeNull()
     })
 
-    it("marquee: plain replaces, Ctrl adds, Ctrl from a selected cell subtracts", () => {
+    it("marquee: replace, add and subtract", () => {
         const L = layer()
         // Cells (0..1, 0..1): x 0..20, y 30..10 px (row 0 at the bottom).
-        const box = { x: 1, y: 11, w: 18, h: 18 }
         let m = emptyMask(L)
         m[11] = 1
-        m = gridMarqueeMask(L, m, box, false, { x: 1, y: 11 })
+        m = gridMarqueeMask(L, m, { x: 1, y: 11, w: 18, h: 18 }, "replace")
         expect(encodeMask(L, m)).toEqual({ runs: [0, 0, 2, 1, 0, 2] })
-        // Ctrl from an empty cell adds the column to the right.
-        m = gridMarqueeMask(L, m, { x: 21, y: 11, w: 8, h: 18 }, true, { x: 25, y: 15 })
+        m = gridMarqueeMask(L, m, { x: 21, y: 11, w: 8, h: 18 }, "add")
         expect(encodeMask(L, m)).toEqual({ runs: [0, 0, 3, 1, 0, 3] })
-        // Ctrl from a selected cell takes the block out.
-        m = gridMarqueeMask(L, m, { x: 1, y: 21, w: 28, h: 8 }, true, { x: 5, y: 25 })
+        m = gridMarqueeMask(L, m, { x: 1, y: 21, w: 28, h: 8 }, "subtract")
         expect(encodeMask(L, m)).toEqual({ runs: [1, 0, 3] })
-        // A plain marquee off the grid empties it.
-        m = gridMarqueeMask(L, m, { x: 100, y: 100, w: 5, h: 5 }, false, { x: 100, y: 100 })
+        // A replacing box off the grid empties it.
+        m = gridMarqueeMask(L, m, { x: 100, y: 100, w: 5, h: 5 }, "replace")
         expect(encodeMask(L, m)).toEqual({ runs: [] })
+    })
+
+    it("marquee: each move starts again from the gesture's base, so the drag previews live", () => {
+        const L = layer()
+        const base = emptyMask(L)
+        base[11] = 1
+        const step = (w: number) => encodeMask(L, gridMarqueeMask(L, base.slice(), { x: 21, y: 11, w, h: 18 }, "add"))
+        expect(step(4)).toEqual({ runs: [0, 2, 1, 1, 2, 1, 2, 3, 1] })
+        expect(step(14)).toEqual({ runs: [0, 2, 2, 1, 2, 2, 2, 3, 1] })
+        // Shrinking the box takes back what the larger box added.
+        expect(step(4)).toEqual({ runs: [0, 2, 1, 1, 2, 1, 2, 3, 1] })
+        expect(base[11]).toBe(1)
+    })
+    it("a press on a held cell is where a Cmd/Ctrl marquee subtracts", () => {
+        const L = layer()
+        const m = emptyMask(L)
+        m[6] = 1 // cell (2, 1): x 20..30, y 20..10
+        const state = { sel_: new Map([["g", { hits_: [], source_: null, mask_: m }]]) } as unknown as OverlayState
+        expect(gridCellHeld(state, L, { x: 25, y: 15 })).toBe(true)
+        expect(gridCellHeld(state, L, { x: 15, y: 15 })).toBe(false)
+        expect(gridCellHeld(state, L, { x: 99, y: 15 })).toBe(false)
+        expect(gridCellHeld({ sel_: new Map() } as unknown as OverlayState, L, { x: 25, y: 15 })).toBe(false)
     })
 })

@@ -5362,6 +5362,33 @@ describe("a grid with select = :many holds a cell mask (#335)", () => {
         expect(val(host).region).toEqual({ runs: [0, 1, 1] })
     })
 
+    it("a frame whose grid changed size draws no held cells, and the next click starts over", async () => {
+        const m = grid()
+        m.layers.push({ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } })
+        const g0 = m.layers[0].geometry as GridGeometry
+        const resized: Manifest = { ...m, initial: undefined,
+            layers: [{ ...m.layers[0], geometry: { ...g0, xedges: [0, 600, 1200], ncols: 2, values: g0.values!.slice(0, 6) } }, m.layers[1]] }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1, 2, 3]), manifest: resized }))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        cell(surface, 1, 0)
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 350, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 350, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 350, bubbles: true }))
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+        host.querySelector("img")!.dispatchEvent(new Event("load"))
+        expect(requestFrame).toHaveBeenCalled()
+        expect(fillSelGroup(shadow).children.length).toBe(0)
+        // The pan's own click, which the overlay swallows.
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 200, clientY: 350, bubbles: true }))
+        // Ctrl-click adds to nothing: the old 4-column mask doesn't carry over.
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 150 / 2, clientY: 100 / 2, bubbles: true, ctrlKey: true }))
+        expect(val(host).region).toEqual({ runs: [0, 0, 1] })
+    })
+
     it("a click on an empty part of the axis and Escape clear it; a restored value draws", () => {
         const { host, script } = setup()
         mount(script, grid({ runs: [0, 0, 2] }))

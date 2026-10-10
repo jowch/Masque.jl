@@ -472,11 +472,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             old = T((getfield(i, f) for f in fieldnames(T)[1:(end - 1)])...)
             @test Masque.select_mode(old) === :one
         end
-        # A heatmap's cells hold a mask; surface cells don't take several picks yet, and say so.
+        # A heatmap's cells hold a mask (a GridSelection, tested below).
         axh = Axis(fig[3, 1]); hm = heatmap!(axh, [1 2; 3 4])
         @test Masque.select_mode(only(interactables(GridInteractable(axh, hm); select = :many))) === :many
-        sp = surface!(Axis3(fig[4, 1]), [1.0 2; 3 4])
-        @test_throws "surface cells don't take several picks yet" masque(fig, interactables(sp; select = :many))
     end
 
     @testset "select = :many on a recipe's parts and a box's target (#335)" begin
@@ -533,9 +531,14 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws "not triples" tv(w, Dict("region" => Dict("runs" => [0, 1])))
         @test_throws "expected 2" tv(w, Dict("region" => Dict("bits" => Masque.base64encode(UInt8[1]))))
         @test_throws "expected `runs` or `bits`" tv(w, Dict("region" => Dict("items" => [])))
+        @test_throws "isn't a whole cell" tv(w, Dict("region" => Dict("runs" => [0, 1.5, 1])))
+        @test_throws "not base64 text" tv(w, Dict("region" => Dict("bits" => 3)))
+        @test_throws ArgumentError tv(w, Dict("region" => Dict("bits" => "!!")))
+        @test_throws "got \"x\"" tv(w, Dict("region" => "x"))
+        @test isempty(Masque._grid_selection(:region, nothing, 4, 3))
         # A surface holds one point.
         ax3 = Axis3(fig[1, 2])
-        @test_throws "holds one value; select = :many isn't supported" interactables(
+        @test_throws "surface cells don't take several picks yet" interactables(
             ax3, surface!(ax3, rand(3, 3)); select = :many,
         )
     end

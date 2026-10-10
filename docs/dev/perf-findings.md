@@ -211,6 +211,13 @@ counted by script on 2026-10-10; MsgPack packs the small integers tighter): one 
 checkerboard; clicks and boxes can't reach it in practice). The browser holds the mask as one byte
 per cell, 0.26 MB at 512×512.
 
+Each click or marquee step on such a grid copies the mask, encodes it and redraws its outline, so
+it costs time in proportion to the cell count. Measured in Node 22 on the 4-core cloud container
+(2026-10-10, median of 9, a block covering half the grid plus one cell): 4.0 ms at 512×512,
+43 ms at 2048×2048 and 157 ms at 4096×4096, with the value at 3.1, 14.4 and 30.0 KB (runs) and
+the outline path at 5.4, 24.2 and 50.6 KB. Up to about 2048×2048 a click stays within a few
+frames; a photo-sized image past that pauses visibly on each click.
+
 A `:view` layer is one viewport bbox plus a mode and two angles, the same order as an ROI layer.
 
 ### Tooltips

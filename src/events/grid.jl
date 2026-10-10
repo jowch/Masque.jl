@@ -122,7 +122,9 @@ function _grid_selection(id::Symbol, env, ncols::Int, nrows::Int)
     env isa AbstractDict || bad("got $(repr(env))")
     if haskey(env, "runs")
         runs = env["runs"]
+        runs isa AbstractVector || bad("`runs` is $(repr(runs)), not a list")
         length(runs) % 3 == 0 || bad("`runs` holds $(length(runs)) numbers, not triples")
+        all(r -> r isa Real && isinteger(r), runs) || bad("`runs` holds a number that isn't a whole cell")
         for k in 1:3:length(runs)
             j, i0, n = Int(runs[k]) + 1, Int(runs[k + 1]) + 1, Int(runs[k + 2])
             (1 <= j <= nrows && 1 <= i0 && n >= 1 && i0 + n - 1 <= ncols) ||
@@ -130,7 +132,13 @@ function _grid_selection(id::Symbol, env, ncols::Int, nrows::Int)
             mask[i0:(i0 + n - 1), j] .= true
         end
     elseif haskey(env, "bits")
-        bytes = base64decode(String(env["bits"]))
+        bits = env["bits"]
+        bits isa AbstractString || bad("`bits` is $(repr(bits)), not base64 text")
+        bytes = try
+            base64decode(bits)
+        catch
+            bad("`bits` isn't base64")
+        end
         length(bytes) == cld(ncols * nrows, 8) ||
             bad("`bits` holds $(length(bytes)) bytes, expected $(cld(ncols * nrows, 8))")
         for j in 1:nrows, i in 1:ncols

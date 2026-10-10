@@ -64,9 +64,9 @@ export function encodeMask(layer: HitLayer, mask: GridMask): MaskEnvelope {
     // Each number takes at least two JSON bytes, so a short list needs no measuring.
     if (runs.length * 2 + 1 <= RUNS_KEPT) return { runs }
     const json = JSON.stringify(runs).length
-    if (json <= RUNS_KEPT) return { runs }
-    const bits = bitsOf(mask)
-    return json <= bits.length ? { runs } : { bits }
+    // The bits' base64 length is known before building them, so a mask whose runs win skips that.
+    if (json <= Math.max(RUNS_KEPT, 4 * Math.ceil(Math.ceil(mask.length / 8) / 3))) return { runs }
+    return { bits: bitsOf(mask) }
 }
 
 // The mask an envelope describes, or null when it doesn't fit this grid (a frame that changed
@@ -107,38 +107,46 @@ export function maskHit(layer: HitLayer, mask: GridMask): Hit | null {
     const gg = layer.geometry as GridGeometry
     const { ncols: nc, nrows: nr, xedges: xe, yedges: ye } = gg
     if (mask.length !== nc * nr) return null
-    const on = (i: number, j: number) => i >= 0 && j >= 0 && i < nc && j < nr && mask[j * nc + i] === 1
+    // Walks the typed array directly (no per-cell closure): a click on a photo-sized grid walks
+    // every cell three times here.
     let fill = ""
     for (let j = 0; j < nr; j++) {
+        const row = j * nc
         let i = 0
         while (i < nc) {
-            if (!on(i, j)) { i++; continue }
+            if (!mask[row + i]) { i++; continue }
             const i0 = i
-            while (i < nc && on(i, j)) i++
+            while (i < nc && mask[row + i]) i++
             fill += `M${xe[i0]} ${ye[j]}H${xe[i]}V${ye[j + 1]}H${xe[i0]}Z`
         }
     }
     if (fill === "") return null
     let edge = ""
-    // Horizontal sides: the line y = ye[j] between rows j-1 and j, for j in 0..nr.
+    // Horizontal sides: the line y = ye[j] between rows j-1 and j, for j in 0..nr (a row
+    // outside the grid counts as unselected), joined along the row.
     for (let j = 0; j <= nr; j++) {
+        const a = j * nc, b = a - nc
         let i = 0
         while (i < nc) {
-            if (on(i, j) === on(i, j - 1)) { i++; continue }
+            const lo = j > 0 ? mask[b + i] : 0, hi = j < nr ? mask[a + i] : 0
+            if (lo === hi) { i++; continue }
             const i0 = i
-            while (i < nc && on(i, j) !== on(i, j - 1)) i++
+            for (i++; i < nc; i++) if ((j > 0 ? mask[b + i] : 0) === (j < nr ? mask[a + i] : 0)) break
             edge += `M${xe[i0]} ${ye[j]}H${xe[i]}`
         }
     }
-    // Vertical sides: the line x = xe[i] between columns i-1 and i.
-    for (let i = 0; i <= nc; i++) {
-        let j = 0
-        while (j < nr) {
-            if (on(i, j) === on(i - 1, j)) { j++; continue }
-            const j0 = j
-            while (j < nr && on(i, j) !== on(i - 1, j)) j++
-            edge += `M${xe[i]} ${ye[j0]}V${ye[j]}`
+    // Vertical sides: the line x = xe[i] between columns i-1 and i, joined down the column.
+    // Walked row by row (the array's order); open[i] is the row a side on line i began at.
+    const open = new Int32Array(nc + 1).fill(-1)
+    const vside = (i: number, j0: number, j1: number) => { edge += `M${xe[i]} ${ye[j0]}V${ye[j1]}` }
+    for (let j = 0; j < nr; j++) {
+        const row = j * nc
+        for (let i = 0; i <= nc; i++) {
+            const d = (i < nc ? mask[row + i] : 0) !== (i > 0 ? mask[row + i - 1] : 0)
+            if (d && open[i] < 0) open[i] = j
+            else if (!d && open[i] >= 0) { vside(i, open[i], j); open[i] = -1 }
         }
     }
+    for (let i = 0; i <= nc; i++) if (open[i] >= 0) vside(i, open[i], nr)
     return { layer, index: -1, geom_: ["mask", fill, edge] }
 }
