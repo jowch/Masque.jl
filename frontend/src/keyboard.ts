@@ -6,7 +6,7 @@
 import { hitLayerByIndex, isGapElement, layerNElements } from "./selection"
 import { drawHover, clearHover, clearLink } from "./highlight"
 import { showTipAt, hideTip, updateLinkForHit, layoutAnchor } from "./hover"
-import { clearPicks, commitClick, isToggleClick } from "./bond"
+import { abortMarquee, clearPicks, commitClick, isToggleClick } from "./bond"
 import { plainTextForHit } from "./template"
 import { cssAnchor } from "./state"
 import { anchorFor, lineReadout, samplePoint } from "./geometry"
@@ -215,6 +215,7 @@ export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardE
         }
         case "Escape":
             e.preventDefault(); e.stopPropagation()
+            if (abortMarquee(ctx, state)) return // a box in flight: Escape drops just the box
             clearPicks(ctx, state, null)
             focusTo(ctx, state, null)
             ctx.surface_.blur()

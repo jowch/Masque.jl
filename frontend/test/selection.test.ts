@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { cellRange, computeSelection, layerNElements, selectionFor, linkedHits, selectionForValue, sameValue } from "../src/selection"
+import { cellRange, computeSelection, layerNElements, selectionFor, linkedHits, selectionForValue, sameValue, indicesInBox, linkedIndices } from "../src/selection"
 import type { Hit, HitLayer, Manifest } from "../src/types"
 
 // layerNElements' other kind branches (circles/rects/polygons/segments/polyline) are exercised
@@ -217,4 +217,29 @@ describe("a selecting box's starting value matches computeSelection (Julia parit
             })
         }
     }
+})
+
+describe("indicesInBox and linkedIndices (#335)", () => {
+    const L = (kind: string, geometry: unknown, extra: Partial<HitLayer> = {}): HitLayer =>
+        ({ id: kind, kind, geometry, payloads: [], axis: "ax1", events: ["click"], ...extra }) as HitLayer
+    const box = { x: 0, y: 0, w: 100, h: 100 }
+
+    it("finds each kind's elements by centre, skipping undrawn ones", () => {
+        expect(indicesInBox(L("segments", [0, 0, 100, 100, 150, 150, 300, 300]), box)).toEqual([0])
+        expect(indicesInBox(L("polyline", [10, 10, 50, 50, NaN, NaN, 60, 60, 200, 200]), box)).toEqual([0])
+        expect(indicesInBox(L("lines", [[10, 10, 90, 90], [NaN, NaN], [150, 10, 300, 10]]), box)).toEqual([0])
+        expect(indicesInBox(L("rects", [50, 50, 10, 10, 60, 60, 10, 10], { order: [1] }), box)).toEqual([1])
+        expect(indicesInBox(L("axis", null), box)).toEqual([])
+        // NaN vertices inside a path are skipped; a polygon with no vertices has no centre.
+        expect(indicesInBox(L("lines", [[NaN, NaN, 10, 10, 90, 90]]), box)).toEqual([0])
+        expect(indicesInBox(L("polygons", [[]]), box)).toEqual([])
+    })
+
+    it("resolves a whole-layer link and a 1-based pin; a bad pin adds nothing", () => {
+        const pts = L("circles", [10, 10, 5, 20, 20, 5, NaN, NaN, 5], { id: "pts" })
+        const leg = L("rects", [0, 0, 1, 1, 0, 0, 1, 1], { id: "leg", links: [["pts"], ["pts:2", "pts:3", "pts:9", "nope:1", "nope"]] })
+        const m = { width: 100, height: 100, scaling: 1, transforms: {}, layers: [pts, leg] } as Manifest
+        expect([...linkedIndices(m, leg, 0)].map(([l, ks]) => [l.id, ks])).toEqual([["pts", [0, 1]]])
+        expect([...linkedIndices(m, leg, 1)].map(([l, ks]) => [l.id, ks])).toEqual([["pts", [1]]])
+    })
 })

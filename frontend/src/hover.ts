@@ -5,6 +5,7 @@ import { drawHover, clearHover, drawLink, clearLink, markColorFor } from "./high
 import { hideCross, syncCross } from "./cross"
 import { linkedHits } from "./selection"
 import { surfaceFields } from "./surface"
+import { cancel as cancelMarquee } from "./drag/marquee"
 import { fmt, cssAnchor, hitKey, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
 import { contentPoint, isIdentity, mapPoint, type PhotoMatrix } from "./photo"
 import type { OverlayCtx, OverlayState } from "./state"
@@ -471,7 +472,9 @@ export function onLeave(ctx: OverlayCtx, state: OverlayState): void {
     // real capture this check is false (hasPointerCapture is still true) and it's a no-op.
     if (state.drag_ && !ctx.surface_.hasPointerCapture(state.drag_.pointerId_)) {
         cancelPendingDrag(state)
+        const d = state.drag_
         state.drag_ = null
         ctx.surface_.classList.remove("grabbing")
+        if (d.kind === "marquee") cancelMarquee(ctx, state, d)
     }
 }
