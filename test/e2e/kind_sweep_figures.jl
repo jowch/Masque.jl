@@ -57,15 +57,20 @@ kind_sweep_meta() = [
         "hoverFields" => ["labelalpha", "x1", "y1"],
     ),
     Dict(
+        # A bound line picks a data point (#335): `selected = [1]` rings its first point, and the
+        # click lands on its third.
         "key" => "lines", "layerId" => "lines", "layerKind" => "lines",
-        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "selected" => "point", "circle" => false, "selectedIndex" => 0, "selectedSample" => 0,
+        "clickIndex" => 0, "clickSample" => 2,
         "tip" => "curve", "hoverIndex" => 0, "hoverTip" => "curve", "mode" => "element",
         # The hover readout at the third plotted point, (2.0, 0.4) (#262).
         "readout" => Dict("vertex" => 2, "text" => ["x2", "y0.4"]),
     ),
     Dict(
+        # A click picks the third point of the second series (#335). A point on one of several
+        # lines can't be given to `selected=`, so nothing starts picked.
         "key" => "series", "layerId" => "series", "layerKind" => "lines",
-        "selected" => "ring", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 1, "clickSample" => 2,
         "tip" => "series 1", "hoverIndex" => 1, "hoverTip" => "series 2", "mode" => "element",
         "readout" => Dict("vertex" => 2, "text" => ["x3", "y1.5"]),
     ),
@@ -564,7 +569,7 @@ function build_kind_sweep()
         ys = [1.0 1.6 2.1 1.4; 2.8 2.2 1.5 0.9; 0.5 1.2 1.9 2.6]
         sp = series!(ax, ys; linewidth = 4)
         # A default line takes no clicks (#335); `bind` names it, so it takes them again.
-        masque(fig; bind = (sp,), selected = Dict(:series => [1]))
+        masque(fig; bind = (sp,))
     end
 
     segments = let

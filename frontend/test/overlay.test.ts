@@ -2978,12 +2978,73 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             expect(hoverAt(host, 280, 402).textContent).toBe("index1")
         })
 
-        it("the bond value stays the whole line", () => {
+        const clickAt = (host: HTMLElement, x: number, y: number) =>
+            (shadowOf(host).querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new MouseEvent("click", { clientX: x / 2, clientY: y / 2, bubbles: true }))
+        const ringAt = (host: HTMLElement) => {
+            const c = shadowOf(host).querySelector("svg.masque-plain .masque-ring-inner") as SVGCircleElement | null
+            return c && c.tagName === "circle" ? [Number(c.getAttribute("cx")), Number(c.getAttribute("cy"))] : null
+        }
+        const valueOf = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+
+        it("a click picks the nearest data point and rings it", () => {
             const { host, script } = setup()
             mount(script, lineManifest())
-            ;(shadowOf(host).querySelector(".surface") as HTMLElement)
-                .dispatchEvent(new MouseEvent("click", { clientX: 140, clientY: 200, bubbles: true }))
-            expect((host as unknown as { value: unknown }).value).toEqual({ lines: { layer: "lines", index: 0 } })
+            clickAt(host, 280, 402)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0, sample: 1 } })
+            expect(ringAt(host)).toEqual([300, 400])
+            // The line itself carries no selected ring.
+            expect(shadowOf(host).querySelector("svg.masque-plain path.masque-ring-inner")).toBeNull()
+        })
+
+        it("another point moves the pick, and the same point again takes it back", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest())
+            clickAt(host, 280, 402)
+            clickAt(host, 480, 398)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0, sample: 2 } })
+            expect(ringAt(host)).toEqual([500, 400])
+            clickAt(host, 490, 400)
+            expect(valueOf(host)).toEqual({ lines: null })
+            expect(ringAt(host)).toBeNull()
+        })
+
+        it("hovering a line whose point is picked still outlines the line", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest())
+            clickAt(host, 280, 402)
+            const shadow = shadowOf(host)
+            ;(shadow.querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new PointerEvent("pointermove", { clientX: 60, clientY: 200, bubbles: true }))
+            expect(shadow.querySelector("svg.masque-edge path.masque-hi")).not.toBeNull()
+        })
+
+        it("on a layer of several lines the pick names the line and the point", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest({
+                geometry: [[100, 400, 300, 400, 500, 400], [100, 200, 300, 200, 500, 200]],
+                points: [[1, 2.5, 2, 3.25, 3, 4], [1, 7, 2, 8, 3, 9]], payloads: [{ index: 1 }, { index: 2 }],
+            }))
+            clickAt(host, 120, 204)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 1, sample: 0 } })
+            expect(ringAt(host)).toEqual([100, 200])
+        })
+
+        it("a line without points (on an Axis3) still picks the whole line", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest({ points: undefined }))
+            clickAt(host, 280, 402)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0 } })
+            expect(shadowOf(host).querySelector("svg.masque-plain path.masque-ring-inner")).not.toBeNull()
+        })
+
+        it("a starting value with a sample rings that point", () => {
+            const { host, script } = setup()
+            mount(script, { ...lineManifest(), initial: { lines: { layer: "lines", index: 0, sample: 2 } } })
+            expect(ringAt(host)).toEqual([500, 400])
+            // A second click there takes it back, as for a clicked pick.
+            clickAt(host, 500, 400)
+            expect(valueOf(host)).toEqual({ lines: null })
         })
     })
 

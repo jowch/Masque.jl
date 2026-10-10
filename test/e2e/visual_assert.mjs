@@ -139,8 +139,9 @@ export function assertWash(wash, where, wantDark) {
 // Selected-open-geometry ring: unblended, lives only in `svg.masque-plain`. Stroke is the
 // flat chrome grey (GREY.dark when wantDark). Same 2px/4px recipe as before the fill/edge split.
 export function assertRing(ring, where, wantDark = false) {
-  // A per-segment ring is two <line>s; a whole-line ring is two <path>s. Same 2px/4px recipe.
-  const strokes = ring?.paths?.length ? ring.paths : ring?.lines;
+  // A per-segment ring is two <line>s; a whole-line ring is two <path>s; a picked point on a
+  // line is two <circle>s. Same 2px/4px recipe.
+  const strokes = ring?.paths?.length ? ring.paths : ring?.circles?.length ? ring.circles : ring?.lines;
   if (!ring || !strokes || strokes.length !== 2) throw new Error(`${where}: ring ${JSON.stringify(ring)}`);
   if (!strokes.every((l) => hasClass(l.className, "masque-hi"))) {
     throw new Error(`${where}: ring line missing masque-hi class ${JSON.stringify(ring)}`);

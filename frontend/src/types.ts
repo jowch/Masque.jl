@@ -208,6 +208,7 @@ export interface Hit {
     geom_?: unknown[] // shape descriptor for highlight drawing
     grid_?: [number, number, number?] // [i, j, value]; value absent only when neither values nor sample was sent. A :surface point: [source i, source j, z]
     pt_?: [number, number | string, number | string] // :lines readout: [0-based sample index, x, y] nearest the cursor
+    sample_?: number // a picked point on a :lines layer: 0-based sample on line `index`, drawn as a ring
     axis_?: string // transform id, for continuous inversion
     roiPart_?: { corner?: number; edge?: "n" | "s" | "w" | "e"; move?: boolean } // which sub-part of an :roi a drag grabbed
 }

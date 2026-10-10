@@ -18,7 +18,8 @@ export const clampY = (t: AxisTransform, y: number): number => Math.max(t.viewpo
 export const prefersReducedMotion = (): boolean =>
     typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches
 
-export const hitKey = (h: Hit): string => `${h.layer.id}:${h.index}`
+// A picked point on a line is keyed apart from the line, so hovering that line still outlines it.
+export const hitKey = (h: Hit): string => (h.sample_ === undefined ? `${h.layer.id}:${h.index}` : `${h.layer.id}:${h.index}@${h.sample_}`)
 
 // Image-px scale comes from manifest.width, not the element's intrinsic size, so a
 // <canvas> needs no sizer shim.
@@ -265,7 +266,7 @@ export function createOverlayState(): OverlayState {
     }
 }
 
-export type FieldSelection = { hits_: Hit[]; source_: { layer: string; index: number } | null }
+export type FieldSelection = { hits_: Hit[]; source_: { layer: string; index: number; sample?: number } | null }
 
 // Every field's selected hits, in one list: what g.sel draws. A mark two fields both hold (a
 // legend pick's series and a box's brush) is drawn once, or its wash would stack.

@@ -101,8 +101,8 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 |---|---|---|---|
 | `Scatter` | `PointInteractable` | `index`, `x`, `y`[, `z`] | `:scatter` |
 | `MeshScatter` | `PointInteractable` | `index`, `x`, `y`, `z` | `:meshscatter` |
-| `Lines` / `Stairs` | `SegmentInteractable` | `index` (the whole line is one mark; takes clicks once named in `bind`) | `:lines` / `:stairs` |
-| `Series` | `SegmentInteractable` | `index`; `label` when the series has one (takes clicks once named in `bind`) | `:series` |
+| `Lines` / `Stairs` | `SegmentInteractable` | `index` (the whole line is one mark); a click, once the line is named in `bind`, picks its nearest data point: `index`, `line`, `x`, `y` | `:lines` / `:stairs` |
+| `Series` | `SegmentInteractable` | `index`; `label` when the series has one; a click, once named in `bind`, picks a data point as for `Lines` | `:series` |
 | `LineSegments` / `Errorbars` / `Rangebars` / `HLines` / `VLines` / `Wireframe` | `SegmentInteractable` | `segment_index` | `:segments`, `:errorbars`, … |
 | `Arrows3D` | `SegmentInteractable` | `index`, `x`, `y`, `z`, `u`, `v`, `w` | `:arrows3d` |
 | `Arrows2D` | `SegmentInteractable` | `index`, `x`, `y`, `u`, `v` | `:arrows2d` |

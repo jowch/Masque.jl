@@ -1,8 +1,8 @@
-import { hitTestAt, layoutSpaceLayer, matrixLimits, photoClip, resolvePayload } from "./geometry"
+import { hitTestAt, layoutSpaceLayer, lineReadout, matrixLimits, photoClip, resolvePayload } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { hideCross } from "./cross"
-import { selectionFor, SELECTED_KINDS } from "./selection"
+import { linePointHit, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
@@ -354,17 +354,27 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
 // identical bond value for a keyboard-focused hit — same highlight draw, same payload
 // resolution, same "input" event.
 export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number): void {
+    // A line picks the data point nearest the click, the one hover reads out. A click with no
+    // sample to name (the nearest one is off screen) commits nothing.
+    let sample: number | undefined
+    let point: Hit | null = null
+    if (picksPoints(hit.layer)) {
+        sample = (hit.pt_ ?? lineReadout(hit.layer, hit.index, px, py))?.[0]
+        point = sample === undefined ? null : linePointHit(ctx.manifest_, hit.layer, hit.index, sample)
+        if (!point) return
+    }
     // Must precede drawHi so its already-selected guard sees the new selKeys_ entry. `null`
     // means this click isn't a selection gesture at all (e.g. an :axis hit) — leave the
     // selection untouched rather than clearing it.
-    const next = selectionFor(hit, ctx.manifest_)
+    const next = point ? [point] : selectionFor(hit, ctx.manifest_)
     // A second click on the element that made the field's pick takes it back: the highlight
     // clears and the field returns to `null`, its value before any click. Other fields keep theirs.
     const field = hit.layer.id
     const src = state.sel_.get(field)?.source_ ?? null
-    const off = next !== null && src !== null && src.index === hit.index
+    const off = next !== null && src !== null && src.index === hit.index && src.sample === sample
+    const source = sample === undefined ? { layer: field, index: hit.index } : { layer: field, index: hit.index, sample }
     if (next !== null) {
-        state.sel_.set(field, off ? { hits_: [], source_: null } : { hits_: next, source_: { layer: field, index: hit.index } })
+        state.sel_.set(field, off ? { hits_: [], source_: null } : { hits_: next, source_: source })
         renderSelection(ctx, state)
     }
     drawHover(ctx, state, hit)
@@ -393,9 +403,9 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     // (`_bond_payload`), so uploading it here is dead weight the receiver discards (#109).
     // `resolvePayload` still resolves it for hover.ts's tooltip templates, which need it for
     // every kind including element ones — only the wire value skips it.
-    let value: { layer: string; index: number; payload?: unknown } | null = null
+    let value: { layer: string; index: number; sample?: number; payload?: unknown } | null = null
     if (!off) {
-        value = { layer: hit.layer.id, index: hit.index }
+        value = { ...source }
         if (!SELECTED_KINDS.has(hit.layer.kind)) value.payload = resolvePayload(hit, ctx.manifest_, px, py)
     }
     ctx.commit_({ [field]: value })

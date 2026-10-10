@@ -388,8 +388,28 @@ function _layer_n_elements(kind::Symbol, geometry)
 end
 
 # Validate `selected=` indices for one layer: supported kind + in-range (1-based). Stores 0-based.
+# On a line with data points an index is a point on it, as its pick is.
 function _check_selected(L::HitLayer, sel)
     kind = L.kind
+    if _picks_points(L)
+        nl = length(L.points)
+        nl == 1 || throw(
+            ArgumentError(
+                "selected: :$(L.id) draws $nl lines, so an index can't say which line's point it is; " *
+                    "leave it out and pick the point by clicking",
+            ),
+        )
+        n = length(only(L.points)) ÷ 2
+        for idx in sel
+            (1 <= idx <= n) || throw(
+                ArgumentError(
+                    "selected: :$(L.id) point $idx out of range for its $n data points" *
+                        (n > 0 ? " (valid: 1:$n)" : ""),
+                ),
+            )
+        end
+        return collect(Int, sel) .- 1
+    end
     if !(kind in _SELECTED_KINDS)
         throw(
             ArgumentError(
@@ -474,6 +494,9 @@ function _one_event(manifest, owners, js)
     else
         event_from_stamp(d, index, js_payload)
     end
+    # A line's pick names one of its data points; `index` above is which line.
+    s = get(js, "sample", nothing)
+    s === nothing || kind !== :lines || !(ev isa ElementEvent) || (ev = _line_point(ev, d, Int(s) + 1))
     return ev
 end
 
@@ -651,12 +674,14 @@ end
     _initial_value(built, fields, roles, binding, selected, ctx, layers) -> Dict
 
 Every field's starting wire envelope, the value the browser sends until the first commit:
-`nothing` for a pick `selected=` does not seed, `{layer, index}` for one it does, a control's
+`nothing` for a pick `selected=` does not seed, `{layer, index}` for one it does (with `sample`
+for a point on a line), a control's
 start, and the elements a box's starting bounds hold for its target.
 """
 function _initial_value(built, fields, roles, binding, selected, ctx, layers)
     seeds = _field_seeds(built, fields, roles, binding, selected)
     by_id = Dict(L.id => i for (i, L, _) in built)
+    by_layer = Dict(L.id => L for (_, L, _) in built)
     out = Dict{String, Any}()
     for f in fields
         out[string(f)] = if roles[f] === :control
@@ -665,7 +690,13 @@ function _initial_value(built, fields, roles, binding, selected, ctx, layers)
             _brush_start(f, built, get(seeds, f, nothing), layers)
         else
             idxs = get(seeds, f, Int[])
-            isempty(idxs) ? nothing : Dict{String, Any}("layer" => string(f), "index" => only(idxs))
+            if isempty(idxs)
+                nothing
+            elseif _picks_points(by_layer[f])
+                Dict{String, Any}("layer" => string(f), "index" => 0, "sample" => only(idxs))
+            else
+                Dict{String, Any}("layer" => string(f), "index" => only(idxs))
+            end
         end
     end
     return out

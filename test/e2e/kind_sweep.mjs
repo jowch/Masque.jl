@@ -345,6 +345,14 @@ try {
               x2: ln.getAttribute("x2"), y2: ln.getAttribute("y2"),
             };
           }),
+          circles: [...el.querySelectorAll("circle")].map((c) => {
+            const cs = getComputedStyle(c);
+            return {
+              className: c.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
+              width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
+              cx: c.getAttribute("cx"), cy: c.getAttribute("cy"), r: c.getAttribute("r"),
+            };
+          }),
           paths: [...el.querySelectorAll("path")].map((p) => {
             const cs = getComputedStyle(p);
             return {
@@ -1563,6 +1571,18 @@ try {
         }
       }
       passed.push(`${key}/selected-wash`);
+    } else if (spec.selected === "point") {
+      // A bound line's pick is a data point on it (#335): the selected ring around that point,
+      // and none around the line.
+      const ring = m.kids.find((k) => k.kind === "ring");
+      assertRing(ring, key, wantDark);
+      const c = ring.circles[0], v = layer.geometry[spec.selectedIndex];
+      const ex = v[2 * spec.selectedSample], ey = v[2 * spec.selectedSample + 1];
+      if (Math.abs(Number(c.cx) - ex) > 1.2 || Math.abs(Number(c.cy) - ey) > 1.2) {
+        throw new Error(`${key}: point ring ${JSON.stringify(c)} not on sample ${spec.selectedSample} at (${ex}, ${ey})`);
+      }
+      if (ring.paths.length) throw new Error(`${key}: the picked point's whole line is ringed too ${JSON.stringify(ring)}`);
+      passed.push(`${key}/selected-point`);
     } else if (spec.selected === "ring") {
       const ring = m.kids.find((k) => k.kind === "ring");
       assertRing(ring, key, wantDark);
@@ -1672,7 +1692,8 @@ try {
     // already-selected mark, which draws no highlight. The series row (several whole lines)
     // is what exercises the hover stroke.
     const closedHover = layer.kind !== "polyline" && layer.kind !== "segments" && layer.kind !== "lines";
-    const hoverIsSelected = !!(spec.selected && hoverIndex === spec.selectedIndex);
+    // A picked point is not its line: hovering the line still outlines it.
+    const hoverIsSelected = !!(spec.selected && spec.selected !== "point" && hoverIndex === spec.selectedIndex);
     if (hoverIsSelected) {
       assertNoHighlight(tip.hi, `${key}/hover-on-selected`);
       if (tip.sel < 1) throw new Error(`${key}: g.sel gone while hovering the selected mark`);
@@ -2069,8 +2090,11 @@ try {
 
     let clickIdx = spec.clickIndex;
     const before = await textOf(`#out_${key}`);
-    // The overlay's hit index stays 0-based. The bond prints the Julia 1-based index.
-    const juliaIdx = () => clickIdx + 1;
+    // The overlay's hit index stays 0-based. The bond prints the Julia 1-based index. A bound
+    // line with data points picks one (#335): the spec clicks on its `clickSample`, and the
+    // index printed is that point's, with `line` naming the line.
+    const clickSample = spec.clickSample ?? null;
+    const juliaIdx = () => (clickSample === null ? clickIdx : clickSample) + 1;
     const already = new RegExp(`:${jlLayer(spec.layerId)},\\s*${juliaIdx()}\\b`);
     // Collision-avoidance (#114): re-running this driver against a warm Pluto session (no
     // restart) can start a spec with its bond ALREADY holding the index we're about to click —
@@ -2126,7 +2150,8 @@ try {
       }
     }
     if (key === "scatter") scatterClickIdx = clickIdx;
-    const clickPt = hitPoint(layer, clickIdx);
+    const clickPt = clickSample === null ? hitPoint(layer, clickIdx)
+      : { x: layer.geometry[clickIdx][2 * clickSample], y: layer.geometry[clickIdx][2 * clickSample + 1] };
     let after = before;
     if (skipChangeWait) {
       // This holds unless the click clears the `selected=` seed (handled after the dispatch):
@@ -2166,7 +2191,7 @@ try {
         // A second click on the element the first one selected would clear it, so retry the
         // click only when the overlay never took the first one.
         const held = (await inspect(key)).bond;
-        if (a === 0 || !(held && held.layer === layer.id && held.index === clickIdx)) {
+        if (a === 0 || !(held && held.layer === layer.id && held.index === clickIdx && (held.sample ?? null) === clickSample)) {
           await dispatchAt(key, clickPt.x, clickPt.y, "click");
         }
         try {
@@ -2189,6 +2214,9 @@ try {
     } else if (spec.layerKind !== "grid") {
       if (!new RegExp(`:${jlLayer(spec.layerId)},\\s*${juliaIdx()}\\b`).test(after)) {
         throw new Error(`${key}-click: expected Julia index ${juliaIdx()}: ${after.slice(0, 220)}`);
+      }
+      if (clickSample !== null && !new RegExp(`\\bline = ${clickIdx + 1}\\b`).test(after)) {
+        throw new Error(`${key}-click: expected the point on line ${clickIdx + 1}: ${after.slice(0, 220)}`);
       }
     }
     if (spec.layerId === "legend" && !/LegendEvent\(/.test(after)) {
@@ -2225,7 +2253,10 @@ try {
       // exactly the clicked hit's own recipe (2 shapes — fill+edge — for a closed kind, 1 ring
       // for an open one), independent of whatever `selected=` hydration was there before — a
       // spec that bakes a `selected=` index no longer "grows" g.sel on click, it's simply reset.
-      if (echo.hi !== 0) throw new Error(`${key}/click-echo: hover chrome drawn over the echo (g.hi=${echo.hi})`);
+      // A picked point keeps its line's hover outline under the pointer; any other pick is
+      // the hovered mark itself, which draws no hover chrome once selected.
+      const wantHi = clickSample === null ? 0 : 1;
+      if (echo.hi !== wantHi) throw new Error(`${key}/click-echo: g.hi=${echo.hi} over the echo, expected ${wantHi}`);
       const expectSel = closedHover ? 2 : 1;
       if (echo.sel !== expectSel) {
         throw new Error(`${key}/click-echo: g.sel=${echo.sel}, expected ${expectSel} for one echoed ${closedHover ? "closed" : "open"} hit (was ${afterLeave.sel} before the click)`);
