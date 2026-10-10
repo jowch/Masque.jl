@@ -586,6 +586,28 @@ describe("keyboard navigation", () => {
         expect(value()).toMatchObject({ sample: 0 })
     })
 
+    it("Shift+arrow skips a line's points past the axis limits", () => {
+        const manifest: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1000, 800], xreversed: false, yreversed: false } },
+            layers: [{
+                id: "fit", kind: "lines",
+                geometry: [[100, 100, 400, 100, 1100, 100]], // the last point is past the right edge, at 1100
+                points: [[0, 1, 1, 2, 2, 3]],
+                payloads: [{ index: 1 }], axis: "ax1", events: ["click", "hover"],
+            }],
+        }
+        const { surface, host } = setup(manifest)
+        const shift = (key: string) => surface.dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey: true, bubbles: true, cancelable: true }))
+        surface.focus()
+        down(surface, "ArrowRight")
+        shift("ArrowRight")
+        shift("ArrowRight")
+        down(surface, "Enter")
+        expect((host as unknown as { value: Record<string, unknown> }).value.fit).toMatchObject({ sample: 1 })
+    })
+
     it("announces position/count over non-gap segments only, for a gapped :polyline", async () => {
         vi.useFakeTimers()
         try {

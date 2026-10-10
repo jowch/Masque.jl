@@ -47,7 +47,10 @@ export function closestPointOnPath(px: number, py: number, verts: number[]): { x
 // cursor. A staircase's corners are not samples: Makie draws sample k at vertex 2k, and a
 // corner belongs to the step it sits on (the next sample for `pre`, its own for `post` and
 // `center`). Returns [0-based sample, x, y] in data space, or null without `points`.
-export function lineReadout(layer: HitLayer, index: number, px: number, py: number): [number, number | string, number | string] | null {
+// With the axis transform `t`, only a sample Makie draws inside the plot area is read: the
+// path runs on past the axis limits, unseen, so where an edge leaves the plot its far end is
+// not a choice. An edge with neither end inside reads nothing.
+export function lineReadout(layer: HitLayer, index: number, px: number, py: number, t?: AxisTransform): [number, number | string, number | string] | null {
     const pts = layer.points?.[index]
     const verts = (layer.geometry as number[][] | null)?.[index]
     if (!pts || !verts) return null
@@ -56,18 +59,32 @@ export function lineReadout(layer: HitLayer, index: number, px: number, py: numb
     const a = on.edge, b = a + 1
     const da = Math.hypot(verts[2 * a] - on.x, verts[2 * a + 1] - on.y)
     const db = Math.hypot(verts[2 * b] - on.x, verts[2 * b + 1] - on.y)
-    const k = db < da ? b : a // a tie keeps the earlier vertex
-    const s = layer.step === undefined ? k : layer.step === "pre" ? Math.ceil(k / 2) : Math.floor(k / 2)
-    const x = pts[2 * s], y = pts[2 * s + 1]
     const shown = (v: number | string | undefined) => typeof v === "string" || Number.isFinite(v)
-    return x !== undefined && y !== undefined && shown(x) && shown(y) ? [s, x, y] : null
+    for (const k of db < da ? [b, a] : [a, b]) { // a tie keeps the earlier vertex
+        const s = layer.step === undefined ? k : layer.step === "pre" ? Math.ceil(k / 2) : Math.floor(k / 2)
+        if (t && !samplePoint(layer, index, s, t, true)) continue
+        const x = pts[2 * s], y = pts[2 * s + 1]
+        return x !== undefined && y !== undefined && shown(x) && shown(y) ? [s, x, y] : null
+    }
+    return null
+}
+
+// Whether image px (x, y) is inside axis `t`'s plot area, give or take half a pixel of rounding.
+function inPlot(t: AxisTransform, x: number, y: number): boolean {
+    const [vx, vy, vw, vh] = t.viewport
+    return x >= vx - 0.5 && x <= vx + vw + 0.5 && y >= vy - 0.5 && y <= vy + vh + 0.5
 }
 
 // Where sample `s` of line `index` sits on screen, image px: the vertex Makie draws it at. A
 // `:center` staircase draws no vertex at an inner sample; it sits on its tread, the edge from
 // vertex 2s to 2s + 1, at its own x when the axis can place it, else the tread's middle.
-// null when the sample is not on screen (a NaN gap, or out of range).
-export function samplePoint(layer: HitLayer, index: number, s: number, t?: AxisTransform): { x: number; y: number } | null {
+// null when the sample is not on screen (a NaN gap, or out of range), and with `visible`, when
+// it lies outside the plot area, past the axis limits.
+export function samplePoint(layer: HitLayer, index: number, s: number, t?: AxisTransform, visible = false): { x: number; y: number } | null {
+    const p = samplePosition(layer, index, s, t)
+    return p && visible && t && !inPlot(t, p.x, p.y) ? null : p
+}
+function samplePosition(layer: HitLayer, index: number, s: number, t?: AxisTransform): { x: number; y: number } | null {
     const verts = (layer.geometry as number[][] | null)?.[index]
     const n = (layer.points?.[index]?.length ?? 0) / 2
     if (!verts || !Number.isInteger(s) || s < 0 || s >= n) return null
@@ -291,7 +308,7 @@ function hitGridSample(gg: GridGeometry, px: number, py: number): Omit<Hit, "lay
 }
 
 // hit-test one layer at (px,py); null if no element under the point
-export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "layer"> | null {
+export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransform): Omit<Hit, "layer"> | null {
     const g = layer.geometry
     switch (layer.kind) {
         case "circles": {
@@ -348,7 +365,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number): Omit<Hit, "la
                 if (hit && hit.dist < bd) { bd = hit.dist; best = k }
             }
             if (bd <= tol && best >= 0) {
-                const pt = lineReadout(layer, best, px, py)
+                const pt = lineReadout(layer, best, px, py, t)
                 return pt ? { index: best, geom_: ["path", paths[best]], pt_: pt } : { index: best, geom_: ["path", paths[best]] }
             }
             return null
@@ -682,7 +699,7 @@ export function hitTest(manifest: Manifest, px: number, py: number, event: strin
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
         if (yieldsToOtherAxis(manifest, layer, px, py, event)) continue
-        const h = hitLayer(layer, px, py)
+        const h = hitLayer(layer, px, py, manifest.transforms[layer.axis])
         if (h) return { layer, ...h }
     }
     return null
@@ -726,7 +743,7 @@ export function hitTestAt(
         if (!layoutSpace && outside) continue
         if (yieldsToOtherAxis(manifest, layer, x, y, event)) continue
         const p = layoutSpace ? { x, y } : content
-        const h = hitLayer(layer, p.x, p.y)
+        const h = hitLayer(layer, p.x, p.y, manifest.transforms[layer.axis])
         if (h) return { layer, ...h }
     }
     return null

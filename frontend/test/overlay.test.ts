@@ -3017,6 +3017,15 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         }
         const valueOf = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
 
+        it("a click near the axis edge picks the point inside, not the one past the limits", () => {
+            const { host, script } = setup()
+            // The last sample sits at x = 1500, past the plot's right edge at 1200.
+            mount(script, lineManifest({ geometry: [[100, 400, 300, 400, 1500, 400]] }))
+            clickAt(host, 1150, 402)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0, sample: 1 } })
+            expect(ringAt(host)).toEqual([300, 400])
+        })
+
         it("a click picks the nearest data point and rings it", () => {
             const { host, script } = setup()
             mount(script, lineManifest())

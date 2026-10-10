@@ -199,6 +199,9 @@ All notable changes to this project are documented here. The format is based on
   its edge sits exactly on a cell edge. With cell edges at 0, 1, 2, 3, a box from 1 to 2
   selects only the cell between them, where it used to take the cells on either side too.
   This changes the cells a release and the starting value return for such boxes (#337).
+- Hovering a line near the edge of its axis reads out the nearest point you can see. It
+  used to show a point past the axis limits when that one was closer along the line, and a
+  click on a bound line there picked that hidden point (#335).
 
 ## [0.2.2] - 2026-10-09
 

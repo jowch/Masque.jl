@@ -11,7 +11,7 @@ import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
 import { contentPoint, panTo, unmapPoint } from "./photo"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, ThresholdGeometry, ViewGeometry } from "./types"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
 // (observed live in Chromium for a synthetic/non-primary pointerId — real touch/pen input can
@@ -369,7 +369,7 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     let sample: number | undefined
     let point: Hit | null = null
     if (picksPoints(hit.layer)) {
-        sample = lineSample(hit, px, py)
+        sample = lineSample(ctx.manifest_, hit, px, py)
         point = sample === undefined ? null : linePointHit(ctx.manifest_, hit.layer, hit.index, sample)
         if (!point) return
     }
@@ -428,8 +428,8 @@ function syncFocus(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
 // when it already is; Cmd/Ctrl-click adds it, or takes it out when it is held. An axis spot is
 // never "held": each click is a new spot.
 // The data point a click on line `hit` names: the one its readout shows, else the nearest.
-function lineSample(hit: Hit, px: number, py: number): number | undefined {
-    return (hit.pt_ ?? lineReadout(hit.layer, hit.index, px, py))?.[0]
+function lineSample(manifest: Manifest, hit: Hit, px: number, py: number): number | undefined {
+    return (hit.pt_ ?? lineReadout(hit.layer, hit.index, px, py, manifest.transforms[hit.layer.axis]))?.[0]
 }
 
 function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number, toggle: boolean): void {
@@ -438,7 +438,7 @@ function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: num
     const items = state.sel_.get(field)?.items_ ?? []
     const element = SELECTED_KINDS.has(hit.layer.kind)
     // On a line, each pick is a point on it, as a single pick is.
-    const sample = picksPoints(hit.layer) ? lineSample(hit, px, py) : undefined
+    const sample = picksPoints(hit.layer) ? lineSample(ctx.manifest_, hit, px, py) : undefined
     if (picksPoints(hit.layer) && (sample === undefined || !linePointHit(ctx.manifest_, hit.layer, hit.index, sample))) return
     const at = element ? items.findIndex((it) => it.index === hit.index && it.sample === sample) : -1
     const pick: FieldPick = sample !== undefined ? { layer: field, index: hit.index, sample } :

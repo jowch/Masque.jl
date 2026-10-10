@@ -90,7 +90,7 @@ export function focusTo(ctx: OverlayCtx, state: OverlayState, i: number | null):
     // No cursor: read out the sample nearest the path's arc-length midpoint, where the tooltip sits.
     if (hit.layer.kind === "lines") {
         const mid = anchorFor(hit, null)
-        const pt = lineReadout(hit.layer, hit.index, mid.x, mid.y)
+        const pt = lineReadout(hit.layer, hit.index, mid.x, mid.y, ctx.manifest_.transforms[hit.layer.axis])
         if (pt) hit.pt_ = pt
     }
     // anchorFor(hit, null): no pointer to derive a "closest point on segment"/"cursor inside
@@ -121,7 +121,7 @@ function stepSample(ctx: OverlayCtx, state: OverlayState, dir: 1 | -1): boolean 
     if (!pts || !hit.pt_) return false
     const t = ctx.manifest_.transforms[hit.layer.axis]
     for (let s = hit.pt_[0] + dir; s >= 0 && s < pts.length / 2; s += dir) {
-        const at = samplePoint(hit.layer, hit.index, s, t)
+        const at = samplePoint(hit.layer, hit.index, s, t, true) // a point past the axis limits is not shown
         if (!at) continue
         const next: Hit = { ...hit, pt_: [s, pts[2 * s], pts[2 * s + 1]] }
         paintFocus(ctx, state, ctx.focusable_[cur], next, anchorFor(next, at))
