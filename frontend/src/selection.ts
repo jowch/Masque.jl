@@ -419,17 +419,14 @@ export function drawnIndices(layer: HitLayer): number[] {
     return out
 }
 
-// A tool's edit of a `many` field: a plain gesture makes `picked` the field's picks, or clears
-// the field when it already holds exactly those; a toggle adds them, or takes them out when it
-// holds them all. Picks keep the order they were made in.
-export function editPicks(items: FieldPick[], layer: string, picked: number[], toggle: boolean): FieldPick[] {
-    const held = new Set(items.map((it) => it.index))
+// A legend entry's edit of a linked `many` field: an entry turned on makes `picked` the field's
+// picks, or adds the ones it lacks with `toggle`; an entry turned off takes them out. Picks keep
+// the order they were made in.
+export function legendEdit(items: FieldPick[], layer: string, picked: number[], on: boolean, toggle: boolean): FieldPick[] {
     const want = new Set(picked)
-    if (!toggle) {
-        const same = held.size === want.size && picked.every((k) => held.has(k))
-        return same && picked.length > 0 ? [] : picked.map((index) => ({ layer, index }))
-    }
-    if (picked.length > 0 && picked.every((k) => held.has(k))) return items.filter((it) => !want.has(it.index))
+    if (!on) return items.filter((it) => !want.has(it.index))
+    if (!toggle) return picked.map((index) => ({ layer, index }))
+    const held = new Set(items.map((it) => it.index))
     return [...items, ...picked.filter((k) => !held.has(k)).map((index) => ({ layer, index }))]
 }
 

@@ -55,8 +55,12 @@ the selection. Cmd-drag or Ctrl-drag adds them to the selection
 instead, and one that starts on a selected mark takes the marks it
 covers out. On a plot you can pan or orbit, a plain drag still moves
 the view, so hold Alt (Option on a Mac) to draw the box; Alt-drag works
-on every plot. Clicking a legend entry selects every mark of its plot,
-and Cmd-click or Ctrl-click on the entry adds them or takes them out.
+on every plot, and on a 3D plot it counts marks hidden behind others
+too. Escape while dragging drops the box and keeps the selection you
+had. On a touch screen a finger drag scrolls the page, so the box is
+drawn with a mouse or pen. Clicking a legend entry selects every mark
+of its plot, Cmd-click or Ctrl-click adds them to the selection, and
+clicking a selected entry again takes them out.
 
 To keep a box on the plot that the reader can move and resize, use an
 [`ROIInteractable`](@ref) with `selects`, as [Brush a region](@ref)

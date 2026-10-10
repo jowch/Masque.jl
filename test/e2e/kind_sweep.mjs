@@ -873,6 +873,9 @@ try {
       await step("ctrl-drag-on-picked-removes", () => drag({ x: pa[1].x, y: pa[1].y }, { x: pa[2].x + pad, y: pa[2].y + pad }, { ctrlKey: true }, true), { a: [0], b: [] }, 2);
       const e = hitPoint(leg, leg.links.findIndex((ls) => ls.includes("a")));
       await step("legend-click-picks-plot", () => dispatchAt(key, e.x, e.y, "click"), { a: [0, 1, 2], b: [] }, null);
+      // The entry's own field decides: clicked again it turns off and its marks go with it.
+      await step("legend-click-again-takes-out", () => dispatchAt(key, e.x, e.y, "click"), { a: [], b: [] }, null);
+      await step("legend-click-picks-again", () => dispatchAt(key, e.x, e.y, "click"), { a: [0, 1, 2], b: [] }, null);
       await step("alt-drag-on-view", () => drag({ x: pb[0].x - pad, y: pb[1].y - pad }, { x: pb[1].x + pad, y: pb[0].y + pad }, { altKey: true }, true), { a: [0, 1, 2], b: [0, 1] }, null);
       const before = await textOf(`#bond_${key}`);
       await drag({ x: pb[2].x + 10, y: pb[1].y }, { x: pb[2].x - 60, y: pb[1].y + 40 }, {}, false);

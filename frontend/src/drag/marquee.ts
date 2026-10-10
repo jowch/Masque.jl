@@ -1,6 +1,6 @@
 import { SVG_NS, renderSelection } from "../highlight"
 import { indicesInBox, manyHits } from "../selection"
-import { clampX, clampY, VIEW_MIN_PX } from "../state"
+import { clampX, clampY, MARQUEE_MIN_CSS } from "../state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "../state"
 import type { HitLayer } from "../types"
 
@@ -34,12 +34,12 @@ export function marqueeTargets(ctx: OverlayCtx, axis: string): HitLayer[] {
 
 export function begin(
     state: OverlayState, axis: string, targets: HitLayer[], mode: MarqueeMode,
-    x: number, y: number, pointerId: number,
+    x: number, y: number, client: { x: number; y: number }, pointerId: number,
 ): Drag {
     const before = new Map<string, FieldSelection | undefined>()
     for (const t of targets) before.set(t.id, state.sel_.get(t.id))
     return {
-        kind: "marquee", axis_: axis, targets_: targets, mode_: mode, x0_: x, y0_: y,
+        kind: "marquee", axis_: axis, targets_: targets, mode_: mode, x0_: x, y0_: y, cx0_: client.x, cy0_: client.y,
         box_: { x, y, w: 0, h: 0 }, rect_: null, before_: before, pointerId_: pointerId,
     }
 }
@@ -63,18 +63,21 @@ function setPicks(ctx: OverlayCtx, state: OverlayState, t: HitLayer, items: Fiel
     state.sel_.set(t.id, { hits_: manyHits(ctx.manifest_, items), source_: null, items_: items })
 }
 
-// A press that hasn't moved VIEW_MIN_PX yet is still a click.
+// A press that hasn't moved MARQUEE_MIN_CSS yet is still a click.
 export function active(d: Marquee): boolean {
     return d.rect_ !== null
 }
 
 // Moves the box's free corner to `p` (content px, clamped to the plot area) and shows what a
-// release would pick. Returns the readout, or null while the press is still a click.
-export function move(ctx: OverlayCtx, state: OverlayState, d: Marquee, p: { x: number; y: number }): string | null {
+// release would pick. `client` is the pointer in client px. Returns the readout, or null while
+// the press is still a click.
+export function move(
+    ctx: OverlayCtx, state: OverlayState, d: Marquee, p: { x: number; y: number }, client: { x: number; y: number },
+): string | null {
     const t = ctx.manifest_.transforms[d.axis_] // marqueeAxis took the axis from these
     const cx = clampX(t, p.x), cy = clampY(t, p.y)
     if (d.rect_ === null) {
-        if (Math.hypot(p.x - d.x0_, p.y - d.y0_) < VIEW_MIN_PX) return null
+        if (Math.hypot(client.x - d.cx0_, client.y - d.cy0_) < MARQUEE_MIN_CSS) return null
         const rect = document.createElementNS(SVG_NS, "rect")
         rect.classList.add("masque-hi", "masque-roi", "masque-marquee")
         rect.setAttribute("vector-effect", "non-scaling-stroke")

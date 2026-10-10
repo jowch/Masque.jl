@@ -5423,32 +5423,60 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         expect(val(host).bars).toEqual({ items: [] })
     })
 
-    it("a legend click picks every mark of its plot; again clears; Ctrl-click adds and removes them", () => {
+    // Two entries: (1100,100) → pts and (1100,150) → other, in a legend whose own field is `legendMany` or one pick.
+    const withLegend = (legendMany = false) => {
         const m = many()
         m.fields = ["pts", "other", "legend"]
-        m.initial = { pts: { items: [] }, other: { items: [] }, legend: null }
+        m.initial = { pts: { items: [] }, other: { items: [] }, legend: legendMany ? { items: [] } : null }
         m.layers.push(
             { id: "other", kind: "circles", geometry: [1100, 700, 20], payloads: [{}], axis: "ax1", events: ["click", "hover"], many: true },
-            // entries at image (1100,100) → pts and (1100,150) → other
             { id: "legend", kind: "rects", axis: "leg", events: ["click", "hover"], geometry: [1100, 100, 40, 20, 1100, 150, 40, 20],
-                payloads: [{}, {}], links: [["pts"], ["other"]] },
+                payloads: [{}, {}], links: [["pts"], ["other"]], ...(legendMany ? { many: true } : {}) },
         )
-        const { host, surface } = mounted(m)
+        return m
+    }
+
+    it("a legend click picks every mark of its plot; again takes them out; Ctrl-click adds them", () => {
+        const { host, surface } = mounted(withLegend())
         click(surface, 550, 50)
         expect(val(host).pts).toEqual(items(0, 1, 2))
         expect(val(host).legend).toEqual({ layer: "legend", index: 0 })
-        click(surface, 100, 100) // a plain click on a mark replaces, as always
-        expect(val(host).pts).toEqual(items(0))
+        click(surface, 550, 50) // the entry turns off and its marks go
+        expect(val(host)).toMatchObject({ pts: items(), legend: null })
+        click(surface, 300, 200) // a plain click on a mark replaces, as always
+        expect(val(host).pts).toEqual(items(1))
         click(surface, 550, 50, { ctrlKey: true })
-        expect(val(host).pts).toEqual(items(0, 1, 2))
+        expect(val(host)).toMatchObject({ pts: items(1, 0, 2), legend: { layer: "legend", index: 0 } })
         click(surface, 550, 75, { ctrlKey: true })
         expect(val(host).other).toEqual({ items: [{ layer: "other", index: 0 }] })
-        expect(val(host).pts).toEqual(items(0, 1, 2)) // another entry leaves this plot alone
+        expect(val(host).pts).toEqual(items(1, 0, 2)) // another entry leaves this plot alone
+    })
+
+    it("the legend and its plot agree after a marquee or a mark click (review round 1)", () => {
+        // A: the plot already holds all its marks, and the entry turns on: it keeps them.
+        const a = mounted(withLegend())
+        drag(a.surface, [50, 50], [550, 350])
+        expect(val(a.host).pts).toEqual(items(0, 1, 2))
+        click(a.surface, 550, 50)
+        expect(val(a.host)).toMatchObject({ pts: items(0, 1, 2), legend: { layer: "legend", index: 0 } })
+        // B: entry on, one mark clicked, entry again: the entry turns off and so do its marks.
+        const b = mounted(withLegend())
+        click(b.surface, 550, 50)
+        click(b.surface, 100, 100)
+        expect(val(b.host).pts).toEqual(items(0))
+        click(b.surface, 550, 50)
+        expect(val(b.host)).toMatchObject({ pts: items(), legend: null })
+    })
+
+    it("a legend that holds several entries drives its plots from whether the entry is in it", () => {
+        const { host, surface } = mounted(withLegend(true))
+        const legend = (...ks: number[]) => ({ items: ks.map((index) => ({ layer: "legend", index })) })
         click(surface, 550, 50, { ctrlKey: true })
-        expect(val(host).pts).toEqual(items())
-        click(surface, 550, 50)
-        click(surface, 550, 50)
-        expect(val(host).pts).toEqual(items())
+        expect(val(host)).toMatchObject({ pts: items(0, 1, 2), legend: legend(0) })
+        click(surface, 550, 75, { ctrlKey: true })
+        expect(val(host)).toMatchObject({ pts: items(0, 1, 2), other: { items: [{ layer: "other", index: 0 }] }, legend: legend(0, 1) })
+        click(surface, 550, 50, { ctrlKey: true })
+        expect(val(host)).toMatchObject({ pts: items(), other: { items: [{ layer: "other", index: 0 }] }, legend: legend(1) })
     })
 
     it("a drag that starts on a legend inside the axis draws no box", () => {
@@ -5475,5 +5503,81 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         const { host, surface } = mounted(m)
         click(surface, 550, 50)
         expect(val(host)).toEqual({ pts: null, legend: { layer: "legend", index: 0 } })
+    })
+
+    it("a press that jitters under the drag threshold stays a click (review round 1)", () => {
+        const { host, shadow, surface } = mounted(many())
+        // 2 CSS px left of point 1's centre, then 2 more: a box there would miss it and clear.
+        ptr(surface, "pointerdown", 298, 200)
+        ptr(surface, "pointermove", 296, 200)
+        expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
+        ptr(surface, "pointerup", 296, 200)
+        click(surface, 296, 200)
+        expect(val(host).pts).toEqual(items(1))
+        // 4 CSS px is a drag.
+        ptr(surface, "pointerdown", 50, 50)
+        ptr(surface, "pointermove", 54, 50)
+        expect(shadow.querySelector("rect.masque-marquee")).toBeTruthy()
+        ptr(surface, "pointercancel", 54, 50)
+    })
+
+    it("Escape during a marquee drops the box, keeps the picks, and swallows the release's click", () => {
+        const { host, shadow, surface } = mounted(many())
+        drag(surface, [50, 50], [150, 150])
+        let n = 0
+        host.addEventListener("input", () => { n++ })
+        surface.focus()
+        ptr(surface, "pointerdown", 250, 150)
+        ptr(surface, "pointermove", 550, 350)
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+        expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
+        ptr(surface, "pointerup", 550, 350)
+        click(surface, 550, 350)
+        expect(n).toBe(0)
+        expect(val(host).pts).toEqual(items(0))
+        expect(selChildren(shadow).length).toBe(2)
+    })
+
+    it("Alt-drag over an orbit view draws the box; a plain drag orbits", () => {
+        const m = many()
+        m.transforms.ax1 = { ...tf, is3d: true } as typeof tf
+        m.layers.push({ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "orbit", azimuth: 0.4, elevation: 0.5 } as unknown as HitLayer["geometry"] })
+        const { host, shadow, surface } = mounted(m)
+        drag(surface, [50, 50], [350, 250], { altKey: true })
+        expect(val(host).pts).toEqual(items(0, 1))
+        ptr(surface, "pointerdown", 50, 50)
+        ptr(surface, "pointermove", 350, 250)
+        expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
+        ptr(surface, "pointercancel", 350, 250)
+        expect(val(host).pts).toEqual(items(0, 1))
+    })
+
+    it("a box started in an inset stays in the inset; one over twin axes edits both", () => {
+        const m = many()
+        m.fields = ["pts", "twin", "ins"]
+        m.initial = { pts: { items: [] }, twin: { items: [] }, ins: { items: [] } }
+        m.transforms.twin = { ...tf }
+        m.transforms.inset = { ...tf, viewport: [800, 0, 400, 300] as [number, number, number, number] }
+        m.layers.push(
+            { id: "twin", kind: "circles", geometry: [400, 300, 20], payloads: [{}], axis: "twin", events: ["click", "hover"], many: true },
+            { id: "ins", kind: "circles", geometry: [1000, 150, 20], payloads: [{}], axis: "inset", events: ["click", "hover"], many: true },
+        )
+        const { host, shadow, surface } = mounted(m)
+        drag(surface, [50, 50], [350, 250])
+        expect(val(host)).toEqual({ pts: items(0, 1), twin: { items: [{ layer: "twin", index: 0 }] }, ins: { items: [] } })
+        ptr(surface, "pointerdown", 450, 50)
+        ptr(surface, "pointermove", 100, 300)
+        const box = shadow.querySelector("rect.masque-marquee") as SVGRectElement
+        expect([box.getAttribute("x"), box.getAttribute("y"), box.getAttribute("width"), box.getAttribute("height")]).toEqual(["800", "100", "100", "200"])
+        ptr(surface, "pointermove", 600, 120)
+        ptr(surface, "pointerup", 600, 120)
+        click(surface, 600, 120)
+        expect(val(host)).toEqual({ pts: items(0, 1), twin: { items: [{ layer: "twin", index: 0 }] }, ins: { items: [{ layer: "ins", index: 0 }] } })
+    })
+
+    it("a click-only plot with a `many` field leaves page scrolling to a finger", () => {
+        const { surface } = mounted(many())
+        expect(surface.style.touchAction).not.toBe("none")
     })
 })
