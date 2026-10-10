@@ -81,6 +81,17 @@ from its own layer; `bond_from_js` rejects one that names another.
 
 The wire stays 0-based. The browser sends `{field: envelope}`, each envelope `null`, `{items}`
 for a brush, or `{layer, index}` (no payload for an element kind) or `{layer, index, payload}`.
+A field built with `select = :many` (its manifest layer carries `many: true`) always sends
+`{items: [{layer, index[, payload]}, ...]}`, empty to start, in the order the picks were made;
+`_many_value` decodes each item as the one-pick field would and returns a typed vector
+(`Vector{ElementEvent}`, `Vector{LegendEvent}`, `Vector{AxisEvent}`). A plain click replaces
+the items with its one pick (or empties them when that pick was the only one), Cmd/Ctrl-click
+and Cmd/Ctrl+Enter toggle one, and `clearPicks` empties every pick field on the clicked axes
+(an empty click) or the whole figure (Escape), sending one value; brush targets and controls
+are left alone. An empty click is one with no `click` hit and no `hover` hit, without
+Cmd/Ctrl; `axesAt` takes every non-colorbar axis whose viewport holds the point (twins and an
+inset's parent alike), and none when the point is inside a legend's box (a `bond: "legend"`
+layer's transform).
 Pluto overwrites `initial_value` with `transform_value` of the value `mount.ts` seeds, so the
 two must agree. Subtract 1 only when writing the manifest; add 1 when reading the wire. Grid
 window keys on the wire are `i0,i1,j0,j1` (0-based inclusive); Julia stores `i1,i2,j1,j2`. An

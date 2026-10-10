@@ -406,7 +406,7 @@ try {
   // layer dict every other kind gets by from `layersOf`.
   const transformsOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#axes_${k}`).textContent), key);
 
-  const dispatchAt = async (key, x, y, type) => page.evaluate(async ([k, ix, iy, typ]) => {
+  const dispatchAt = async (key, x, y, type, mod = {}) => page.evaluate(async ([k, ix, iy, typ, md]) => {
     const span = document.querySelector(`#coords_${k}`);
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -415,7 +415,7 @@ try {
     const outW = sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
     const s = b.width / outW;
     const cx = b.left + ix * s, cy = b.top + iy * s;
-    const o = { bubbles: true, composed: true, cancelable: true, clientX: cx, clientY: cy, pointerId: 1, pointerType: "mouse", isPrimary: true };
+    const o = { bubbles: true, composed: true, cancelable: true, clientX: cx, clientY: cy, pointerId: 1, pointerType: "mouse", isPrimary: true, ...md };
     const surface = sr.querySelector(".surface");
     surface.dispatchEvent(new PointerEvent(typ === "click" ? "pointermove" : typ, o));
     if (typ === "click") {
@@ -466,7 +466,7 @@ try {
       sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel"),
       cross: sr.querySelector(".masque-cross")?.classList.contains("is-on") ?? false,
     };
-  }, [key, x, y, type]);
+  }, [key, x, y, type, mod]);
 
   const textOf = (sel) => page.evaluate((q) => document.querySelector(q)?.innerText ?? "", sel);
 
@@ -764,6 +764,51 @@ try {
       passed.push(`${key}/drag-own-field`);
       passed.push(`${key}/bind-shows-both`);
       console.error(`OK  ${key} — ${all2.slice(0, 160)}`);
+      continue;
+    }
+
+    // `select = :many` (#335): a plain click replaces the picks with one, Ctrl-click adds and
+    // removes one (Linux Chromium, so Ctrl rather than Cmd), a click on empty plot space clears
+    // them, and Escape on the focused figure clears them too. Each step checks the printed
+    // `@bind` value, host.value's `{items}`, and how many picks are drawn.
+    if (spec.mode === "many") {
+      const picks = (t) => [...t.matchAll(/ElementEvent\(:scatter, (\d+),/g)].map((m) => Number(m[1]));
+      const items = async () => ((await inspect(key)).bondAll?.scatter?.items ?? null)?.map((i) => i.index);
+      const v0 = await textOf(`#bond_${key}`);
+      if (!/ElementEvent\[\]/.test(v0)) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want an empty ElementEvent[]`);
+      if (!layer.many) throw new Error(`${key}: layer ${layer.id} ships no many flag`);
+      passed.push(`${key}/empty-vector-at-mount`);
+      const p = [0, 1, 2].map((i) => hitPoint(layer, i));
+      const step = async (what, before, act, want, wantSel) => {
+        const r = await act();
+        const t = await waitChange(`#bond_${key}`, before, `${key}/${what}`);
+        const got = picks(t);
+        if (JSON.stringify(got) !== JSON.stringify(want)) throw new Error(`${key}/${what}: value ${JSON.stringify(t)}, want picks ${JSON.stringify(want)}`);
+        const it = await items();
+        if (JSON.stringify(it) !== JSON.stringify(want.map((i) => i - 1))) throw new Error(`${key}/${what}: host.value items ${JSON.stringify(it)}`);
+        const sel = r?.sel ?? (await inspect(key)).sel;
+        if (sel !== wantSel) throw new Error(`${key}/${what}: g.sel=${sel}, want ${wantSel}`);
+        passed.push(`${key}/${what}`);
+        return t;
+      };
+      // A closed pick draws 2 shapes (fill + edge), as in the composite case.
+      let t = await step("click-picks-one", v0, () => dispatchAt(key, p[0].x, p[0].y, "click"), [1], 2);
+      t = await step("ctrl-click-adds", t, () => dispatchAt(key, p[2].x, p[2].y, "click", { ctrlKey: true }), [1, 3], 4);
+      t = await step("ctrl-click-removes", t, () => dispatchAt(key, p[0].x, p[0].y, "click", { ctrlKey: true }), [3], 2);
+      t = await step("click-replaces", t, () => dispatchAt(key, p[1].x, p[1].y, "click"), [2], 2);
+      t = await step("empty-click-clears", t, () => dispatchAt(key, (p[0].x + p[1].x) / 2, p[2].y, "click"), [], 0);
+      t = await step("click-again", t, () => dispatchAt(key, p[1].x, p[1].y, "click"), [2], 2);
+      t = await step("escape-clears", t, () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const surface = sr.querySelector(".surface");
+        surface.focus();
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true, cancelable: true }));
+        return null;
+      }, key), [], 0);
+      await dispatchAt(key, 1, 1, "pointermove");
+      console.error(`OK  ${key} — ${t.slice(0, 160)}`);
       continue;
     }
 

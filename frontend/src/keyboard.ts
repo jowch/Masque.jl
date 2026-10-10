@@ -6,7 +6,7 @@
 import { hitLayerByIndex, isGapElement, layerNElements } from "./selection"
 import { drawHover, clearHover, clearLink } from "./highlight"
 import { showTipAt, hideTip, updateLinkForHit, layoutAnchor } from "./hover"
-import { commitClick } from "./bond"
+import { clearPicks, commitClick, isToggleClick } from "./bond"
 import { plainTextForHit } from "./template"
 import { cssAnchor } from "./state"
 import { anchorFor, lineReadout, samplePoint } from "./geometry"
@@ -154,15 +154,16 @@ function adjacentLayerStart(starts: number[], cur: number, dir: 1 | -1): number 
 }
 
 // Handles ArrowRight/Down (next), ArrowLeft/Up (previous), Shift+ArrowRight/Left (next/previous
-// data point on a focused line), Home/End, PageDown/Up (next/previous layer), Enter/Space (dispatch the click bond for the focused element), and Escape (clear +
-// blur). Everything else — Tab above all, so the browser's own focus order still works — passes
+// data point on a focused line), Home/End, PageDown/Up (next/previous layer), Enter/Space
+// (dispatch the click bond for the focused element), and Escape (clear every pick, then the
+// focus, and blur). Everything else — Tab above all, so the browser's own focus order still works — passes
 // through untouched. Gated on the surface actually having DOM focus (not just this listener
 // being attached to it): a keydown dispatched programmatically at the surface without focus, or
 // arriving after a click moved focus elsewhere, must not steer the overlay.
 export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardEvent): void {
     if (ctx.shadowRoot_.activeElement !== ctx.surface_) return
     const n = ctx.focusable_.length
-    if (n === 0) return
+    if (n === 0 && e.key !== "Escape") return
     const cur = state.focusIdx_
     if (e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft") && stepSample(ctx, state, e.key === "ArrowRight" ? 1 : -1)) {
         e.preventDefault(); e.stopPropagation()
@@ -209,11 +210,12 @@ export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardE
             const f = state.focusHit_
             const hit = f && f.layer === ref.layer_ && f.index === ref.index_ ? f : hitFor(ref)
             const { x, y } = anchorFor(hit, null)
-            commitClick(ctx, state, hit, x, y)
+            commitClick(ctx, state, hit, x, y, isToggleClick(e))
             return
         }
         case "Escape":
             e.preventDefault(); e.stopPropagation()
+            clearPicks(ctx, state, null)
             focusTo(ctx, state, null)
             ctx.surface_.blur()
             return

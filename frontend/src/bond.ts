@@ -2,9 +2,9 @@ import { hitTestAt, layoutSpaceLayer, lineReadout, matrixLimits, photoClip, reso
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { hideCross } from "./cross"
-import { linePointHit, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
+import { linePointHit, manyHits, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
-import type { Drag, OverlayCtx, OverlayState } from "./state"
+import type { Drag, FieldPick, OverlayCtx, OverlayState } from "./state"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
@@ -136,6 +136,12 @@ function isApplePlatform(): boolean {
 
 function isMacContextClick(e: { button: number; ctrlKey: boolean }): boolean {
     return e.button === 0 && e.ctrlKey && isApplePlatform()
+}
+
+// The click that adds a pick to a `many` field, or takes one out: Cmd on Apple platforms, where
+// Ctrl-click is the context menu, and Ctrl elsewhere.
+export function isToggleClick(e: { metaKey: boolean; ctrlKey: boolean }): boolean {
+    return isApplePlatform() ? e.metaKey : e.ctrlKey
 }
 
 // The menu is hit-tested after pointerdown returns, or after pointerup on Windows.
@@ -353,14 +359,15 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
 // The click→bond commit, factored out of onClick so keyboard.ts's Enter/Space can dispatch the
 // identical bond value for a keyboard-focused hit — same highlight draw, same payload
 // resolution, same "input" event.
-export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number): void {
+export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number, toggle = false): void {
+    if (hit.layer.many) { commitManyClick(ctx, state, hit, px, py, toggle); return }
     // A line picks the data point nearest the click, the one hover reads out. A click with no
     // sample to name (the nearest one is off screen) commits nothing, and returns before
     // drawHover: the pointer is already over the line, so its hover outline is already drawn.
     let sample: number | undefined
     let point: Hit | null = null
     if (picksPoints(hit.layer)) {
-        sample = (hit.pt_ ?? lineReadout(hit.layer, hit.index, px, py))?.[0]
+        sample = lineSample(hit, px, py)
         point = sample === undefined ? null : linePointHit(ctx.manifest_, hit.layer, hit.index, sample)
         if (!point) return
     }
@@ -389,17 +396,7 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     // still resyncs focusHit_ to B (so a later miss doesn't wrongly restore A's stale ring), but
     // clicking B with no prior keyboard focus leaves focusHit_ null and the plain hover-fade
     // path (clearHi) runs exactly as before this feature existed.
-    if (state.focusIdx_ !== null) {
-        // A click on a non-focus-list kind (e.g. :grid/:axis) while keyboard focus was already
-        // on some other element must leave that focus alone, not clear it.
-        const idx = ctx.focusable_.findIndex((r) => r.layer_ === hit.layer && r.index_ === hit.index)
-        if (idx >= 0) {
-            state.focusIdx_ = idx
-            state.focusHit_ = hit
-            state.focusTipHtml_ = null
-            state.focusTipCss_ = null
-        }
-    }
+    syncFocus(ctx, state, hit)
     // No `payload` for an element kind: Julia already reconstructs it from the manifest
     // (`_bond_payload`), so uploading it here is dead weight the receiver discards (#109).
     // `resolvePayload` still resolves it for hover.ts's tooltip templates, which need it for
@@ -412,15 +409,101 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     ctx.commit_({ [field]: value })
 }
 
+function syncFocus(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
+    if (state.focusIdx_ === null) return
+    // A click on a non-focus-list kind (e.g. :grid/:axis) while keyboard focus was already
+    // on some other element must leave that focus alone, not clear it.
+    const idx = ctx.focusable_.findIndex((r) => r.layer_ === hit.layer && r.index_ === hit.index)
+    if (idx >= 0) {
+        state.focusIdx_ = idx
+        state.focusHit_ = hit
+        state.focusTipHtml_ = null
+        state.focusTipCss_ = null
+    }
+}
+
+// A click on a `many` field: a plain click makes the mark the only pick, or clears the field
+// when it already is; Cmd/Ctrl-click adds it, or takes it out when it is held. An axis spot is
+// never "held": each click is a new spot.
+// The data point a click on line `hit` names: the one its readout shows, else the nearest.
+function lineSample(hit: Hit, px: number, py: number): number | undefined {
+    return (hit.pt_ ?? lineReadout(hit.layer, hit.index, px, py))?.[0]
+}
+
+function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number, toggle: boolean): void {
+    const field = hit.layer.id
+    const items = state.sel_.get(field)?.items_ ?? []
+    const element = SELECTED_KINDS.has(hit.layer.kind)
+    // On a line, each pick is a point on it, as a single pick is.
+    const sample = picksPoints(hit.layer) ? lineSample(hit, px, py) : undefined
+    if (picksPoints(hit.layer) && (sample === undefined || !linePointHit(ctx.manifest_, hit.layer, hit.index, sample))) return
+    const at = element ? items.findIndex((it) => it.index === hit.index && it.sample === sample) : -1
+    const pick: FieldPick = sample !== undefined ? { layer: field, index: hit.index, sample } :
+        element ? { layer: field, index: hit.index } : { layer: field, index: hit.index, payload: resolvePayload(hit, ctx.manifest_, px, py) }
+    const next = toggle ?
+        (at >= 0 ? items.filter((_, k) => k !== at) : [...items, pick]) :
+        (at >= 0 && items.length === 1 ? [] : [pick])
+    state.sel_.set(field, { hits_: manyHits(ctx.manifest_, next), source_: null, items_: next })
+    renderSelection(ctx, state)
+    drawHover(ctx, state, hit)
+    syncFocus(ctx, state, hit)
+    ctx.commit_({ [field]: { items: next } })
+}
+
+// Clears the picks of every click field on `axes` (every axis when it is null), leaving the
+// controls and a box's target alone. A field that already holds nothing sends nothing.
+export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] | null): void {
+    const cur = ctx.value_()
+    const updates: Record<string, unknown> = {}
+    for (const layer of ctx.manifest_.layers) {
+        if (layer.brush || !layer.events.includes("click") || !(layer.id in cur)) continue
+        if (axes !== null && !axes.includes(layer.axis)) continue
+        const v = cur[layer.id] as { items?: unknown[] } | null
+        if (v === null || v === undefined || (layer.many && !v.items?.length)) continue
+        state.sel_.set(layer.id, layer.many ? { hits_: [], source_: null, items_: [] } : { hits_: [], source_: null })
+        updates[layer.id] = layer.many ? { items: [] } : null
+    }
+    if (Object.keys(updates).length === 0) return
+    renderSelection(ctx, state)
+    ctx.commit_(updates)
+}
+
+// The plot axes under image px (x, y): every axis whose plot area holds the point, so twin
+// axes and an inset's parent all count. A colorbar's readout is a hit, not a plot area, and a
+// click inside a legend's box, even on its padding, is on the legend, so it finds none.
+function axesAt(ctx: OverlayCtx, x: number, y: number): string[] {
+    const legends = new Set(ctx.manifest_.layers.filter((l) => l.bond === "legend").map((l) => l.axis))
+    const inside = (t: { viewport: [number, number, number, number] }) => {
+        const [vx, vy, vw, vh] = t.viewport
+        return x >= vx && x <= vx + vw && y >= vy && y <= vy + vh
+    }
+    const out: string[] = []
+    for (const [id, t] of Object.entries(ctx.manifest_.transforms)) {
+        if (!inside(t)) continue
+        if (legends.has(id)) return []
+        if (!t.valueaxis) out.push(id)
+    }
+    return out
+}
+
 export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
     if (state.justDragged_) { state.justDragged_ = false; return }
     // Chromium still dispatches click after a Mac ctrl-click.
     if (isMacContextClick(e)) return
     const { layout, content } = pointerSpace(ctx, state, e)
     const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))
-    if (!hit) return // miss = no-op, no round-trip
+    if (!hit) {
+        // A click on an empty part of a plot clears the picks of the plots there. A mark that
+        // only shows a tooltip isn't empty space, and a Cmd/Ctrl-click that misses keeps the
+        // picks, as a modified miss does in a file browser.
+        if (isToggleClick(e)) return
+        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))) return
+        const axes = axesAt(ctx, layout.x, layout.y)
+        if (axes.length > 0) clearPicks(ctx, state, axes)
+        return
+    }
     const sample = layoutSpaceLayer(hit.layer) ? layout : content
-    commitClick(ctx, state, hit, sample.x, sample.y)
+    commitClick(ctx, state, hit, sample.x, sample.y, isToggleClick(e))
 }
 
 // Single entry point for pointermove: while a drag owns the pointer, route to the

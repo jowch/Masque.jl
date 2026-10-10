@@ -282,4 +282,19 @@ let
         )
     end
 end
+println("\n=== K. select = :many — the `many` flag, and the bond value the browser sends ===")
+# A `:many` layer (#335) adds one `many` flag to the manifest. Its bond value is
+# `{items: [{layer, index}, …]}`, one entry per pick, sent from the browser on each click; that
+# value's MsgPack size is what Pluto carries back to Julia.
+let n = 1_000
+    f = Figure(size = (600, 400)); ax = Axis(f[1, 1])
+    sc = scatter!(ax, rand(n), rand(n); markersize = 6)
+    one, many = masque(f; bind = sc), masque(f, interactables(sc; select = :many); bind = sc)
+    @printf("  manifest, scatter %d:  :one %s B   :many %s B\n", n, mp(one.manifest), mp(many.manifest))
+    for k in (1, 100, 1_000)
+        v = Dict("scatter" => Dict("items" => [Dict("layer" => "scatter", "index" => i - 1) for i in 1:k]))
+        @printf("  bond value, %5d picks:  %8.1f KB  (%.1f B/pick)\n", k, mp(v) / 1024, mp(v) / k)
+    end
+end
+
 println()

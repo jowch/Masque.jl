@@ -250,7 +250,7 @@ function _shift_data_markers(ax, i::PointInteractable, mo)
         Point3f(d[1], d[2], ax isa Makie.Axis3 ? d[3] : x[3])
     end
     return PointInteractable(
-        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke,
+        i.ax, pts, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.select,
     )
 end
 function _marker_offset_vec(mo, n)
@@ -267,10 +267,10 @@ function _warn_no_inverse(id)
     return nothing
 end
 _with_offset(i::PointInteractable, o) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o, i.stroke,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, o, i.stroke, i.select,
 )
 _with_marker_stroke(i::PointInteractable, s) = PointInteractable(
-    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, s,
+    i.ax, i.points, i.id, i.payloads, i.radius, i.radius3d, i.tooltip, i.label, i.colors, i.offset, s, i.select,
 )
 
 # markersize is DATA-space (no markerspace attribute), so pixel radius is camera/depth-dependent;
@@ -607,7 +607,7 @@ end
 function _place_hexbin(i::PolygonInteractable, p, f)
     isempty(i.rings) && return i
     rings = _hex_rings(Makie.inverse_transform(_transform_func(i.ax.scene)), p; place = f.place)
-    return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol)
+    return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol, i.select)
 end
 
 # A scatter sized in data units (`markerspace = :data`) draws each marker as an area,
@@ -685,7 +685,7 @@ function _place_data_markers(i::PolygonInteractable, p, f)
     tm = p.transform_marker[] === true
     place = tm ? ((pt, _) -> f.place(pt)) : f.place
     rings = _data_marker_rings(tf, Makie.inverse_transform(tf), p; place)
-    return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol)
+    return PolygonInteractable(i.ax, rings, i.id, i.payloads, i.tooltip, i.label, i.holes, i.tol, i.select)
 end
 
 # Cells come back in tessellation order, not input-site order, so there's no cheap
@@ -772,7 +772,7 @@ function SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothi
     return _with_samples(i, p.step[], [[_pt3d(v) for v in _converted(p)[1]]])
 end
 _with_samples(i::SegmentInteractable, step, paths) = SegmentInteractable(
-    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, (step, paths),
+    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, (step, paths), i.select,
 )
 
 # Each child line (or a ScatterLines child's line, when markers are on) is one element.
@@ -1105,10 +1105,10 @@ function _construct(ax, p, id; kw...)
 end
 _with_stroke(i::AbstractInteractable, sw) = i
 _with_stroke(i::RectInteractable, sw) = RectInteractable(
-    i.ax, i.data, i.id, i.payloads, i.tooltip, i.clamp_to_viewport, i.resolve, i.label, sw,
+    i.ax, i.data, i.id, i.payloads, i.tooltip, i.clamp_to_viewport, i.resolve, i.label, sw, i.select,
 )
 _with_stroke(i::PolygonInteractable, sw) = PolygonInteractable(
-    i.ax, i.rings, i.id, i.payloads, i.tooltip, i.label, i.holes, sw,
+    i.ax, i.rings, i.id, i.payloads, i.tooltip, i.label, i.holes, sw, i.select,
 )
 
 # A positional default payload (`x`, `y`, `z`) holds Makie's converted number. On an axis
@@ -1258,19 +1258,19 @@ function _place(i::PointInteractable, f)
         [f.place(i.points[k], offs[k]) for k in eachindex(i.points)]
     end
     return PointInteractable(
-        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset, i.stroke,
+        i.ax, pts, i.id, i.payloads, i.radius, r3, i.tooltip, i.label, i.colors, i.offset, i.stroke, i.select,
     )
 end
 function _place(i::SegmentInteractable, f)
     res = i.resolve === nothing ? nothing : (ax -> map(f.place, i.resolve(ax)))
     paths = i.paths === nothing ? nothing : [map(f.place, path) for path in i.paths]
     return SegmentInteractable(
-        i.ax, map(f.place, i.vertices), i.mode, i.id, i.payloads, i.tol, i.tooltip, res, i.label, i.unit, paths, i.samples,
+        i.ax, map(f.place, i.vertices), i.mode, i.id, i.payloads, i.tol, i.tooltip, res, i.label, i.unit, paths, i.samples, i.select,
     )
 end
 _place(i::PolygonInteractable, f) = PolygonInteractable(
     i.ax, [map(f.place, ring) for ring in i.rings], i.id, i.payloads, i.tooltip, i.label,
-    [[map(f.place, h) for h in group] for group in i.holes],
+    [[map(f.place, h) for h in group] for group in i.holes], i.tol, i.select,
 )
 # A rect or a grid cell stays axis-aligned only when the plot is not rotated.
 function _place_rect(f, r)
@@ -1282,7 +1282,7 @@ function _place(i::RectInteractable, f)
     _warn_rotated(i, f) && return nothing
     res = i.resolve === nothing ? nothing : (ax -> [_place_rect(f, r) for r in i.resolve(ax)])
     return RectInteractable(
-        i.ax, [_place_rect(f, r) for r in i.data], i.id, i.payloads, i.tooltip, i.clamp_to_viewport, res, i.label,
+        i.ax, [_place_rect(f, r) for r in i.data], i.id, i.payloads, i.tooltip, i.clamp_to_viewport, res, i.label, i.tol, i.select,
     )
 end
 function _place(i::GridInteractable, f)

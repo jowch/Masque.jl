@@ -532,9 +532,29 @@ function _brush_value(manifest, owners, d, env)
     return out
 end
 
+# A `select = :many` field: every pick it holds, in the order they were made.
+function _many_value(manifest, owners, d, env)
+    id = Symbol(d["id"])
+    env === nothing || (env isa AbstractDict && haskey(env, "items")) || throw(
+        ArgumentError("bond: field :$id holds several picks, `{items: [...]}`; got $(repr(env))"),
+    )
+    T = d["bond"] == "legend" ? LegendEvent : d["bond"] == "axis" ? AxisEvent : ElementEvent
+    out = T[]
+    for it in (env === nothing ? Any[] : env["items"])
+        String(it["layer"]) == d["id"] || throw(
+            ArgumentError("bond: field :$id holds a pick from layer :$(it["layer"])"),
+        )
+        ev = _one_event(manifest, owners, it)
+        ev isa T || throw(ArgumentError("bond: a pick in field :$id is a $(typeof(ev)), expected $T"))
+        push!(out, ev)
+    end
+    return out
+end
+
 function _field_value(manifest, owners, field::AbstractString, env)
     d = _manifest_layer(manifest, field)
     haskey(d, "brush") && return _brush_value(manifest, owners, d, env)
+    get(d, "many", false) === true && return _many_value(manifest, owners, d, env)
     env === nothing && return nothing
     env isa AbstractDict && haskey(env, "layer") || throw(
         ArgumentError("bond: field :$field holds $(repr(env)), expected a commit `{layer, index}`"),
@@ -631,6 +651,8 @@ function _under_bare_head(binding, fields, selected)
     return NamedTuple{(h,)}((selected,))
 end
 
+_is_many(built, id) = any(((_, L, d),) -> L.id === id && get(d, "many", false) === true, built)
+
 function _field_seeds(built, fields, roles, binding, selected)
     seeds = Dict{Symbol, Vector{Int}}()
     selected === nothing && return seeds
@@ -665,10 +687,14 @@ function _field_seeds(built, fields, roles, binding, selected)
         roles[id] === :control && throw(
             ArgumentError("selected: :$id is a control; it starts at its own value, which its constructor sets"),
         )
-        roles[id] === :pick && length(idxs) > 1 && throw(
-            ArgumentError("selected: :$id holds one pick, got $(length(idxs)) indices"),
+        roles[id] === :pick && !_is_many(built, id) && length(idxs) > 1 && throw(
+            ArgumentError(
+                "selected: :$id holds one pick, got $(length(idxs)) indices; to hold several, " *
+                    "pass its interactable with `select = :many`",
+            ),
         )
-        seeds[id] = _check_selected(by_id[id], idxs)
+        # A pick held twice is one pick: the browser's toggle would take out one copy.
+        seeds[id] = _check_selected(by_id[id], roles[id] === :pick ? unique(idxs) : idxs)
     end
     return seeds
 end
@@ -678,7 +704,7 @@ end
 
 Every field's starting wire envelope, the value the browser sends until the first commit:
 `nothing` for a pick `selected=` does not seed, `{layer, index}` for one it does (with `sample`
-for a point on a line), a control's
+for a point on a line), `{items: [...]}` for a `select = :many` field, a control's
 start, and the elements a box's starting bounds hold for its target.
 """
 function _initial_value(built, fields, roles, binding, selected, ctx, layers)
@@ -691,6 +717,14 @@ function _initial_value(built, fields, roles, binding, selected, ctx, layers)
             initial_envelope(by_id[f], ctx, layers)
         elseif roles[f] === :brush
             _brush_start(f, built, get(seeds, f, nothing), layers)
+        elseif _is_many(built, f)
+            pts = _picks_points(by_layer[f])
+            Dict{String, Any}(
+                "items" => Any[
+                    pts ? Dict{String, Any}("layer" => string(f), "index" => 0, "sample" => k) :
+                        Dict{String, Any}("layer" => string(f), "index" => k) for k in get(seeds, f, Int[])
+                ],
+            )
         else
             idxs = get(seeds, f, Int[])
             if isempty(idxs)

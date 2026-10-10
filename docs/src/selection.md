@@ -19,18 +19,39 @@ The `id` names the field, so the selected city is `sel.cities`.
 
 `sel.cities` starts as `nothing`, and clicking a city makes it that
 city's [`ElementEvent`](@ref). Clicking another city replaces it,
-because a plot holds one selection. Clicking empty space changes
-nothing: the highlight stays and `sel.cities` keeps its value, so a
-stray click does not lose your choice. Clicking the selected city again
-clears it: the highlight goes and `sel.cities` is `nothing` again.
+because a plot holds one selection. Clicking the selected city again,
+clicking empty space inside the axis, or pressing Escape clears it: the
+highlight goes and `sel.cities` is `nothing` again.
 
 Each plot keeps its own selection, so in a figure with two scatters,
-clicking a point in one leaves the other's field as it was.
+clicking a point in one leaves the other's field as it was. A click on
+empty space clears only the plots in the axis you clicked, and Escape
+clears every plot in the figure. A click on a line or another mark that
+only shows a tooltip is not empty space, so it keeps the selection.
+
+## Select several marks
 
 A click selects one mark of a plot and replaces that plot's previous
-selection. To select several marks at once, drag a box over them
-instead: an [`ROIInteractable`](@ref) with `selects` returns every mark
-inside it, as [Brush a region](@ref) shows.
+selection. To let a reader hold several, pass the plot's interactable
+with `select = :many`:
+
+```julia
+cities = interactables(s; id = :cities, payloads = rows, select = :many)
+@bind sel masque(fig, cities)
+```
+
+`sel.cities` is then a `Vector{ElementEvent}`, empty to start. A click
+still replaces the selection with the one city, and a Cmd-click (on a
+Mac) or Ctrl-click (elsewhere) adds a city or takes it out again, so
+`[c.city for c in sel.cities]` lists the cities picked, in the order
+they were picked. A legend entry and an
+[`AxisInteractable`](@ref) take `select = :many` the same way and give a
+vector of their events; a colorbar's pick is one value, so it raises an
+`ArgumentError`.
+
+To select every mark in an area at once, drag a box over them instead:
+an [`ROIInteractable`](@ref) with `selects` returns every mark inside
+it, as [Brush a region](@ref) shows.
 
 ## Start with a mark selected
 
@@ -62,10 +83,10 @@ for one mark in each of two plots. In that case a bare number raises an
 `ArgumentError`, and so does a position outside your data.
 
 A plot holds one selected mark, so `selected = [1, 3]` raises an
-`ArgumentError`. To start with several marks selected, use a box with
-`selects`: its plot's field takes a list, as in
-`selected = (cities = [1, 3],)`, which replaces what the box starts
-with.
+`ArgumentError`. To start with several marks selected, pass the plot
+with `select = :many`, and `selected = (cities = [1, 3],)` starts with
+both. The target of a box with `selects` also takes a list, which
+replaces what the box starts with.
 
 Points, bars, polygons, segments, and lines you name in `bind` can
 start selected, but heatmap cells, axis readouts, boxes, thresholds, and

@@ -89,9 +89,10 @@ the payload's fields, such as `pick.city`, along with `pick.layer`, the
 plot you clicked, and `pick.index`, the mark's position in your data.
 The event indexes your data too: `xs[pick]` is that mark's value and
 `df[pick, :]` is its row. Clicking another mark of the same plot
-replaces the event, clicking the selected mark again sets the field back
-to `nothing`, and clicking empty space keeps it. Each plot keeps its own
-pick, so clicking a bar leaves `sel.scatter` as it was.
+replaces the event, and clicking the selected mark again, clicking empty
+space in its axis, or pressing Escape sets the field back to `nothing`.
+Each plot keeps its own pick, so clicking a bar leaves `sel.scatter` as
+it was. To hold several marks of one plot, see [Select several marks](@ref).
 
 A threshold or a box always has a value: its field starts at the line's
 `value` or the box's `bounds`, and changes when you release it. A box
@@ -111,9 +112,9 @@ starts with the marks inside the box. To start with marks selected, see
 | Click a colorbar | [`ColorbarEvent`](@ref) | `pick.value` |
 | Release a threshold line | [`ThresholdEvent`](@ref) | `pick.value` |
 
-Hovering a line shows its tooltip, but a click on it changes nothing
-until you name the line in `bind`, as below. A click then picks the
-point you plotted nearest it; see [Click marks](@ref).
+Hovering a line shows its tooltip, but a click on it changes nothing,
+not even the other picks, until you name the line in `bind`, as below.
+A click then picks the point you plotted nearest it; see [Click marks](@ref).
 
 ### Choose the fields with `bind`
 

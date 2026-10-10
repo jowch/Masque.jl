@@ -162,6 +162,8 @@ export interface OverlayCtx {
     // (mount.ts): a write through it is Pluto restoring the kernel's value, which redraws the
     // selection.
     commit_: (fields: Record<string, unknown>) => void
+    // The bond value now: every field's envelope.
+    value_: () => Record<string, unknown>
 }
 
 export interface OverlayState {
@@ -266,7 +268,11 @@ export function createOverlayState(): OverlayState {
     }
 }
 
-export type FieldSelection = { hits_: Hit[]; source_: { layer: string; index: number; sample?: number } | null }
+// One pick of a `many` field, as the wire carries it: an element, a point on a line (`sample`),
+// or an axis spot with its payload.
+export type FieldPick = { layer: string; index: number; sample?: number; payload?: unknown }
+// `items_` is set on a `many` field: every pick it holds, in the order they were made.
+export type FieldSelection = { hits_: Hit[]; source_: { layer: string; index: number; sample?: number } | null; items_?: FieldPick[] }
 
 // Every field's selected hits, in one list: what g.sel draws. A mark two fields both hold (a
 // legend pick's series and a box's brush) is drawn once, or its wash would stack.
