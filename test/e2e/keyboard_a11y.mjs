@@ -218,6 +218,29 @@ try {
     passed.push(`${key}/escape`);
   }
 
+  // #335: Shift+←/→ step a focused line's readout through its data points, and Enter picks
+  // the point shown. `series` bakes no selection, so the first line's point 1 (Julia index 2)
+  // is a fresh value unless a warm re-run already picked it; then point 2 is.
+  {
+    const key = "series";
+    const surface = await surfaceHandle(key);
+    await surface.focus();
+    await page.keyboard.press("ArrowRight"); // the first line
+    for (let i = 0; i < 30; i++) await page.keyboard.press("Shift+ArrowLeft"); // its first point
+    await page.keyboard.press("Shift+ArrowRight");
+    const before = await textOf(`#out_${key}`);
+    let want = 2;
+    if (new RegExp(`:series,\\s*2,\\s*line = 1\\b`).test(before)) { await page.keyboard.press("Shift+ArrowRight"); want = 3; }
+    await page.keyboard.press("Enter");
+    let after = before;
+    for (let i = 0; i < 40 && after === before; i++) { await page.waitForTimeout(100); after = await textOf(`#out_${key}`); }
+    if (!new RegExp(`:series,\\s*${want},\\s*line = 1\\b`).test(after)) {
+      throw new Error(`${key}: Shift+Arrow then Enter expected point ${want} of line 1: ${after.slice(0, 200)}`);
+    }
+    passed.push(`${key}/shift-arrow-steps-point`);
+    await page.keyboard.press("Escape");
+  }
+
   // Tab-away (not just Escape) must clear keyboard focus — the case mount.ts's `focusout`
   // listener exists for: leaving the surface any other way (Tab onward, a click elsewhere)
   // must not leave the ring/tooltip pinned to the last-focused element indefinitely.

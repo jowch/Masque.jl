@@ -1,5 +1,5 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
-import { hitLayerByIndex, keptPicks, sameValue, selectionForValue, surfaceSelection } from "./selection"
+import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, selectionForValue, surfaceSelection } from "./selection"
 import { emptyMask, maskHit } from "./gridmask"
 import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
@@ -676,6 +676,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 if (!layer) continue
                 if (layer.kind === "surface") {
                     const kept = surfaceSelection(layer, h.index)
+                    if (kept) nextSel.push(kept)
+                    continue
+                }
+                if (h.sample_ !== undefined) {
+                    const kept = picksPoints(layer) ? linePointHit(newManifest, layer, h.index, h.sample_) : null
                     if (kept) nextSel.push(kept)
                     continue
                 }

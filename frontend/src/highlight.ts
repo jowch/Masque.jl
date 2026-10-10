@@ -63,7 +63,7 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
     if (hit.geom_[0] === "mask") return maskElements(hit.geom_ as [string, string, string], st.stroke)
     const g = hit.geom_ as [string, ...number[]] | [string, number[]]
     let el: SVGElement | null = null
-    if (g[0] === "circle") {
+    if (g[0] === "circle" || g[0] === "point") {
         el = document.createElementNS(SVG_NS, "circle")
         el.setAttribute("cx", String(g[1])); el.setAttribute("cy", String(g[2])); el.setAttribute("r", String(g[3]))
     } else if (g[0] === "rect" || g[0] === "rectfill") {
@@ -97,7 +97,8 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
         }
     }
     if (!el) return null
-    const open = g[0] === "seg" || g[0] === "path"
+    // A picked point on a line is open too: a ring around the point, the line showing through.
+    const open = g[0] === "seg" || g[0] === "path" || g[0] === "point"
     const rectfill = g[0] === "rectfill"
 
     // Explicit hoverstyle stroke: today's single unblended element in svg.masque-plain, unchanged.

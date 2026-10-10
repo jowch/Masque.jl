@@ -2385,6 +2385,36 @@ describe("tooltips (mount/showTip)", () => {
     })
 })
 
+describe("frame swap keeps a line's picked point (#335)", () => {
+    it("re-keys the point pick to the same sample at its new position, or drops it if gone", async () => {
+        const line = { id: "fit", kind: "lines" as const, geometry: [[200, 600, 600, 600, 1000, 600]], points: [[0, 0, 1, 1, 2, 2]],
+            payloads: [{ index: 1 }], axis: "ax1", events: ["click", "hover"] as ("click" | "hover")[] }
+        const view = { id: "view", kind: "view" as const, axis: "ax1", events: ["drag"] as "drag"[], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }
+        const t: Manifest["transforms"][string] = { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false }
+        const m: Manifest = { width: 1200, height: 800, scaling: 2, transforms: { ax1: t }, layers: [line, view] } as Manifest
+        const pan = async (next: Manifest) => {
+            const { host, script } = setup()
+            mount(script, m, undefined, vi.fn(async () => ({ png: new Uint8Array([1, 2, 3]), manifest: next })))
+            const shadow = shadowOf(host)
+            const surface = shadow.querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 300, bubbles: true })) // sample 1
+            const ring = () => shadow.querySelector("svg.masque-plain circle.masque-ring-inner")
+            expect(ring()?.getAttribute("cx")).toBe("600")
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
+            await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+            host.querySelector("img")!.dispatchEvent(new Event("load"))
+            return ring()?.getAttribute("cx") ?? null
+        }
+        expect(await pan({ ...m, layers: [{ ...line, geometry: [[0, 600, 400, 600, 800, 600]] }, view] } as Manifest)).toBe("400")
+        // The line lost its points (as on a frame that no longer ships them): the pick is dropped.
+        expect(await pan({ ...m, layers: [{ ...line, points: undefined }, view] } as Manifest)).toBeNull()
+    })
+})
+
 // Overlay visual recipes (locked — a color-dodge fill of #141414 plus a flat chrome edge,
 // #7a7a7a on a light figure and #c8c8c8 on a dark one; see CLAUDE.md — do not reopen).
 // Units are necessary, not live-verify: agents still run
@@ -2978,12 +3008,73 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             expect(hoverAt(host, 280, 402).textContent).toBe("index1")
         })
 
-        it("the bond value stays the whole line", () => {
+        const clickAt = (host: HTMLElement, x: number, y: number) =>
+            (shadowOf(host).querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new MouseEvent("click", { clientX: x / 2, clientY: y / 2, bubbles: true }))
+        const ringAt = (host: HTMLElement) => {
+            const c = shadowOf(host).querySelector("svg.masque-plain .masque-ring-inner") as SVGCircleElement | null
+            return c && c.tagName === "circle" ? [Number(c.getAttribute("cx")), Number(c.getAttribute("cy"))] : null
+        }
+        const valueOf = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+
+        it("a click picks the nearest data point and rings it", () => {
             const { host, script } = setup()
             mount(script, lineManifest())
-            ;(shadowOf(host).querySelector(".surface") as HTMLElement)
-                .dispatchEvent(new MouseEvent("click", { clientX: 140, clientY: 200, bubbles: true }))
-            expect((host as unknown as { value: unknown }).value).toEqual({ lines: { layer: "lines", index: 0 } })
+            clickAt(host, 280, 402)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0, sample: 1 } })
+            expect(ringAt(host)).toEqual([300, 400])
+            // The line itself carries no selected ring.
+            expect(shadowOf(host).querySelector("svg.masque-plain path.masque-ring-inner")).toBeNull()
+        })
+
+        it("another point moves the pick, and the same point again takes it back", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest())
+            clickAt(host, 280, 402)
+            clickAt(host, 480, 398)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0, sample: 2 } })
+            expect(ringAt(host)).toEqual([500, 400])
+            clickAt(host, 490, 400)
+            expect(valueOf(host)).toEqual({ lines: null })
+            expect(ringAt(host)).toBeNull()
+        })
+
+        it("hovering a line whose point is picked still outlines the line", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest())
+            clickAt(host, 280, 402)
+            const shadow = shadowOf(host)
+            ;(shadow.querySelector(".surface") as HTMLElement)
+                .dispatchEvent(new PointerEvent("pointermove", { clientX: 60, clientY: 200, bubbles: true }))
+            expect(shadow.querySelector("svg.masque-edge path.masque-hi")).not.toBeNull()
+        })
+
+        it("on a layer of several lines the pick names the line and the point", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest({
+                geometry: [[100, 400, 300, 400, 500, 400], [100, 200, 300, 200, 500, 200]],
+                points: [[1, 2.5, 2, 3.25, 3, 4], [1, 7, 2, 8, 3, 9]], payloads: [{ index: 1 }, { index: 2 }],
+            }))
+            clickAt(host, 120, 204)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 1, sample: 0 } })
+            expect(ringAt(host)).toEqual([100, 200])
+        })
+
+        it("a line without points (on an Axis3) still picks the whole line", () => {
+            const { host, script } = setup()
+            mount(script, lineManifest({ points: undefined }))
+            clickAt(host, 280, 402)
+            expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0 } })
+            expect(shadowOf(host).querySelector("svg.masque-plain path.masque-ring-inner")).not.toBeNull()
+        })
+
+        it("a starting value with a sample rings that point", () => {
+            const { host, script } = setup()
+            mount(script, { ...lineManifest(), initial: { lines: { layer: "lines", index: 0, sample: 2 } } })
+            expect(ringAt(host)).toEqual([500, 400])
+            // A second click there takes it back, as for a clicked pick.
+            clickAt(host, 500, 400)
+            expect(valueOf(host)).toEqual({ lines: null })
         })
     })
 
@@ -5110,6 +5201,34 @@ describe("select = :many and clearing picks (#335)", () => {
         // A plain click on the only pick takes it back.
         click(surface, 100, 100)
         expect(val(host).pts).toEqual({ items: [] })
+    })
+
+    it("on a line, each pick is a point; Ctrl-click adds and removes points, and a restored value rings them", () => {
+        const m: Manifest = {
+            ...many(),
+            fields: ["fit"],
+            initial: { fit: { items: [] } },
+            layers: [{ id: "fit", kind: "lines", geometry: [[200, 400, 600, 400, 1000, 400]], points: [[0, 0, 1, 1, 2, 2]],
+                payloads: [{ index: 1 }], axis: "ax1", events: ["click", "hover"], many: true }],
+        }
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const rings = () => [...shadow.querySelectorAll("svg.masque-plain circle.masque-ring-inner")].map((c) => c.getAttribute("cx"))
+        click(surface, 110, 200) // nearest point 0
+        expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 0 }] })
+        click(surface, 490, 200, { ctrlKey: true }) // adds point 2
+        expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 0 }, { layer: "fit", index: 0, sample: 2 }] })
+        expect(rings().sort()).toEqual(["1000", "200"])
+        click(surface, 110, 200, { ctrlKey: true }) // takes point 0 out, keeps the same line's point 2
+        expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 2 }] })
+        expect(rings()).toEqual(["1000"])
+
+        const restored = setup()
+        mount(restored.script, { ...m, initial: { fit: { items: [{ layer: "fit", index: 0, sample: 1 }, { layer: "fit", index: 0, sample: 7 }] } } })
+        const r = [...shadowOf(restored.host).querySelectorAll("svg.masque-plain circle.masque-ring-inner")].map((c) => c.getAttribute("cx"))
+        expect(r).toEqual(["600"]) // a point the line doesn't have is dropped
     })
 
     it("a click on an empty part of the plot clears its picks; a miss with none sends nothing", () => {

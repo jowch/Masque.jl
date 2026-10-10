@@ -1,8 +1,8 @@
-import { findBin, hitTestAt, layoutSpaceLayer, matrixLimits, photoClip, resolvePayload } from "./geometry"
+import { findBin, hitTestAt, layoutSpaceLayer, lineReadout, matrixLimits, photoClip, resolvePayload } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { hideCross } from "./cross"
-import { cellRange, manyHits, selectionFor, SELECTED_KINDS } from "./selection"
+import { cellRange, linePointHit, manyHits, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
 import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
 import type { GridMask, MaskEnvelope } from "./gridmask"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
@@ -363,17 +363,28 @@ export function onLostCapture(ctx: OverlayCtx, state: OverlayState): void {
 // resolution, same "input" event.
 export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number, toggle = false): void {
     if (hit.layer.many) { commitManyClick(ctx, state, hit, px, py, toggle); return }
+    // A line picks the data point nearest the click, the one hover reads out. A click with no
+    // sample to name (the nearest one is off screen) commits nothing, and returns before
+    // drawHover: the pointer is already over the line, so its hover outline is already drawn.
+    let sample: number | undefined
+    let point: Hit | null = null
+    if (picksPoints(hit.layer)) {
+        sample = lineSample(hit, px, py)
+        point = sample === undefined ? null : linePointHit(ctx.manifest_, hit.layer, hit.index, sample)
+        if (!point) return
+    }
     // Must precede drawHi so its already-selected guard sees the new selKeys_ entry. `null`
     // means this click isn't a selection gesture at all (e.g. an :axis hit) — leave the
     // selection untouched rather than clearing it.
-    const next = selectionFor(hit, ctx.manifest_)
+    const next = point ? [point] : selectionFor(hit, ctx.manifest_)
     // A second click on the element that made the field's pick takes it back: the highlight
     // clears and the field returns to `null`, its value before any click. Other fields keep theirs.
     const field = hit.layer.id
     const src = state.sel_.get(field)?.source_ ?? null
-    const off = next !== null && src !== null && src.index === hit.index
+    const off = next !== null && src !== null && src.index === hit.index && src.sample === sample
+    const source = sample === undefined ? { layer: field, index: hit.index } : { layer: field, index: hit.index, sample }
     if (next !== null) {
-        state.sel_.set(field, off ? { hits_: [], source_: null } : { hits_: next, source_: { layer: field, index: hit.index } })
+        state.sel_.set(field, off ? { hits_: [], source_: null } : { hits_: next, source_: source })
         renderSelection(ctx, state)
     }
     drawHover(ctx, state, hit)
@@ -392,9 +403,9 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     // (`_bond_payload`), so uploading it here is dead weight the receiver discards (#109).
     // `resolvePayload` still resolves it for hover.ts's tooltip templates, which need it for
     // every kind including element ones — only the wire value skips it.
-    let value: { layer: string; index: number; payload?: unknown } | null = null
+    let value: { layer: string; index: number; sample?: number; payload?: unknown } | null = null
     if (!off) {
-        value = { layer: hit.layer.id, index: hit.index }
+        value = { ...source }
         if (!SELECTED_KINDS.has(hit.layer.kind)) value.payload = resolvePayload(hit, ctx.manifest_, px, py)
     }
     ctx.commit_({ [field]: value })
@@ -416,13 +427,22 @@ function syncFocus(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
 // A click on a `many` field: a plain click makes the mark the only pick, or clears the field
 // when it already is; Cmd/Ctrl-click adds it, or takes it out when it is held. An axis spot is
 // never "held": each click is a new spot.
+// The data point a click on line `hit` names: the one its readout shows, else the nearest.
+function lineSample(hit: Hit, px: number, py: number): number | undefined {
+    return (hit.pt_ ?? lineReadout(hit.layer, hit.index, px, py))?.[0]
+}
+
 function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number, toggle: boolean): void {
     if (hit.layer.kind === "grid") { commitGridClick(ctx, state, hit, toggle); return }
     const field = hit.layer.id
     const items = state.sel_.get(field)?.items_ ?? []
     const element = SELECTED_KINDS.has(hit.layer.kind)
-    const at = element ? items.findIndex((it) => it.index === hit.index) : -1
-    const pick: FieldPick = element ? { layer: field, index: hit.index } : { layer: field, index: hit.index, payload: resolvePayload(hit, ctx.manifest_, px, py) }
+    // On a line, each pick is a point on it, as a single pick is.
+    const sample = picksPoints(hit.layer) ? lineSample(hit, px, py) : undefined
+    if (picksPoints(hit.layer) && (sample === undefined || !linePointHit(ctx.manifest_, hit.layer, hit.index, sample))) return
+    const at = element ? items.findIndex((it) => it.index === hit.index && it.sample === sample) : -1
+    const pick: FieldPick = sample !== undefined ? { layer: field, index: hit.index, sample } :
+        element ? { layer: field, index: hit.index } : { layer: field, index: hit.index, payload: resolvePayload(hit, ctx.manifest_, px, py) }
     const next = toggle ?
         (at >= 0 ? items.filter((_, k) => k !== at) : [...items, pick]) :
         (at >= 0 && items.length === 1 ? [] : [pick])

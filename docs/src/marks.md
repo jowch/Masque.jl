@@ -81,13 +81,16 @@ hexagons are polygons too. A filled contour also reports the `low` and
 
 Hovering a line shows the point you plotted nearest the pointer (see
 [Tooltips](@ref)), but a click on it changes nothing, not even the
-other picks, since you might mean the whole line or one point on it. To make a line clickable, name
-it in `bind`. A click then selects the whole line, since a line plot is
-read as one series. To read every line at the same `x`, use a
-[`SliceInteractable`](@ref) instead.
+other picks, until you name the line in `bind`. A click then picks that
+same point, and a ring marks it. `pick.index` is the point's position
+in your data, so `xs[pick]` reads it, and `pick.x` and `pick.y` hold it
+too. With `select = :many`, each click adds a point. A line on an
+`Axis3` has no points to pick, so a click there picks the whole line.
+To read every line at the same `x`, use a [`SliceInteractable`](@ref)
+instead.
 
 In the example below, one `series!` call draws both curves, and
-`bind = sr` makes it clickable, so `pick.index` says which curve you
+`bind = sr` makes it clickable, so `pick.line` says which curve you
 clicked:
 
 ```@raw html
@@ -118,8 +121,8 @@ end
 @bind sel masque(fig; bind = (sine = l1, cosine = l2))
 ```
 
-Then `sel.sine` and `sel.cosine` each hold `nothing` or the clicked
-line's event. The same works for `stairs!`. A `scatterlines!` plot's
+Then `sel.sine` and `sel.cosine` each hold `nothing` or the point
+clicked on that line. The same works for `stairs!`. A `scatterlines!` plot's
 points take clicks without `bind`, as `sel.scatterlines.points`, and its
 line does not. To make a line
 clickable while keeping every other plot's field, pass

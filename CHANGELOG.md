@@ -159,6 +159,15 @@ All notable changes to this project are documented here. The format is based on
   `currentColor`, `color-mix(…)`, or `oklch(…)`, now raise; pass a Makie color or wrap the
   value in a custom property your page sets. An `overlaystyle` colour given as a bare number,
   which used to be read as a grey level, raises too, as it already did in `tooltipstyle` (#342).
+- **Breaking:** a click on a line named in `bind` picks the point you plotted nearest the
+  click, the one its tooltip shows, instead of the whole line, and a ring marks that point.
+  `pick.index` is now the point's position in the line's data, so `xs[pick]` reads it; the
+  event also holds `x` and `y`, and `line`, which line of a `series!` it is on. Code that
+  read `pick.index` as which line reads `pick.line` now. `selected = (fit = [3],)` on a bound
+  line starts at its third point; on a `series!` the starting point can't be given by index.
+  From the keyboard, Shift + ← / → moves along a focused line's points and Enter picks one.
+  With `select = :many`, each pick on a line is a point, and `selected=` names points.
+  A line on an `Axis3` has no points to pick, so its click still picks the whole line (#335).
 
 ### Deprecated
 - The keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,

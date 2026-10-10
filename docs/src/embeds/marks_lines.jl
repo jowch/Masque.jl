@@ -21,7 +21,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000100
 md"""
-Click a line, and the last cell names it.
+Click a line, and the last cell names the point you clicked.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
@@ -33,14 +33,14 @@ Plot both curves with one `series!` call, so each curve is one mark of the same 
 begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1])
-    xs = 0:0.1:10
+    xs = 0:0.5:10
     sr = series!(ax, xs, [sin.(xs) cos.(xs)]'; labels = ["sine", "cosine"])
     nothing
 end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000103
 md"""
-A line only shows its tooltip until you name it in `bind`. `bind = sr` makes the curves clickable, and `@bind pick` saves the clicked curve in `pick`.
+A line only shows its tooltip until you name it in `bind`. `bind = sr` makes the curves clickable, and `@bind pick` saves the point you clicked in `pick`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000104
@@ -48,7 +48,7 @@ A line only shows its tooltip until you name it in `bind`. `bind = sr` makes the
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
 md"""
-`pick` starts as `nothing`, and this cell responds when you click a curve. After a click, `pick.index` is `1` for the first curve and `2` for the second.
+`pick` starts as `nothing`, and this cell responds when you click a curve. A click picks the point nearest it: `pick.line` is `1` for the first curve and `2` for the second, `pick.index` is the point's position in `xs`, and `pick.x` and `pick.y` are the point.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000106
@@ -56,7 +56,7 @@ if isnothing(pick)
     "click a line"
 else
     names = ["sine", "cosine"]
-    "you clicked the $(names[pick.index]) line"
+    "you clicked the $(names[pick.line]) line at x = $(pick.x)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
