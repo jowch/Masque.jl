@@ -58,13 +58,13 @@ md"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`sel` has one field for each kind of shape: `sel.cells_c` for the circle, `sel.cells_r` for the rectangle, and `sel.cells_p` for the triangle. Each starts as `nothing`, and this cell responds when you click a region. After a click, the field's `name` is the region's name.
+`sel.cells` has one part for each kind of shape: `sel.cells.circles` for the circle, `sel.cells.rects` for the rectangle, and `sel.cells.polygons` for the triangle. Each starts as `nothing`, and this cell responds when you click a region. After a click, the part's `name` is the region's name.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
 begin
     chosen = String[]
-    for region in (sel.cells_c, sel.cells_r, sel.cells_p)
+    for region in sel.cells
         isnothing(region) || push!(chosen, region.name)
     end
     isempty(chosen) ? "click a region" : join(chosen, ", ") * " selected"
