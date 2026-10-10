@@ -332,7 +332,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     surface.className = "surface"
     // touch-action: block native scroll/pinch on the surface ONLY when this manifest has a drag
     // interaction (threshold / ROI / view) — a hover/click-only plot (e.g. a plain scatter) must
-    // not hijack page scrolling when a finger lands on it. This has to be decided up front, not
+    // not hijack page scrolling when a finger lands on it. A `select = :many` field alone doesn't
+    // count: on a touch screen a finger drag there scrolls the page (the browser cancels the
+    // marquee), so the marquee is a mouse and pen gesture. This has to be decided up front, not
     // toggled per-pointerdown: UAs resolve touch-action at the touch's first contact, so setting
     // it later has no effect on the gesture already in flight.
     if (manifest.layers.some((l) => l.events.includes("drag"))) surface.style.touchAction = "none"
@@ -426,7 +428,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const ctx: OverlayCtx = {
         manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
         hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup,
-        thresholdLines_: thresholdLines, roiBoxes_: roiBoxes,
+        thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, chrome_: plainPhoto,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
         cross_: cross,
         gesture_: channel,

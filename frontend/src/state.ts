@@ -12,6 +12,9 @@ export const fmt = (v: unknown, digits = 4): string => (typeof v === "number" ? 
 
 export const MOTION_MS = 100 // 80–120 ms window; prefers-reduced-motion disables below
 export const VIEW_MIN_PX = 3 // image-px; ignore accidental micro-drags
+// CSS px a press must move before it is a marquee rather than a click: a missed box clears the
+// picks, so it gets the OS drag threshold, not VIEW_MIN_PX (1.5 CSS px at a 2x image).
+export const MARQUEE_MIN_CSS = 4
 
 export const clampX = (t: AxisTransform, x: number): number => Math.max(t.viewport[0], Math.min(t.viewport[0] + t.viewport[2], x))
 export const clampY = (t: AxisTransform, y: number): number => Math.max(t.viewport[1], Math.min(t.viewport[1] + t.viewport[3], y))
@@ -125,6 +128,15 @@ export type Drag =
         // also sets `lastInput_` settles once.
         settleOwed_?: boolean
     }
+    | {
+        // A marquee (drag/marquee.ts) on `axis_`, editing the picks of `targets_`. `box_` is in
+        // content px; `rect_` is null until the press moves MARQUEE_MIN_CSS from (`cx0_`, `cy0_`),
+        // the press in client px, so a click with a little jitter stays a click at any zoom.
+        // `before_` is each target's selection at the press, which a cancel puts back.
+        kind: "marquee"; axis_: string; targets_: HitLayer[]; mode_: "replace" | "add" | "subtract"
+        x0_: number; y0_: number; cx0_: number; cy0_: number; box_: { x: number; y: number; w: number; h: number }
+        rect_: SVGRectElement | null; before_: Map<string, FieldSelection | undefined>; pointerId_: number
+    }
 
 // Construction-time DOM/manifest refs, built once by mount.ts and threaded read-mostly through
 // hover/drag/bond as `ctx`. Distinct from OverlayState, which is the mutable interaction state.
@@ -146,6 +158,7 @@ export interface OverlayCtx {
     linkGroup_: HiGroups // transient legend-linked highlights (g.link), z-ordered between sel and hi
     thresholdLines_: Map<string, SVGLineElement>
     roiBoxes_: Map<string, ROIBox>
+    chrome_: SVGGElement // svg.masque-plain's group that slides with the photograph: ROI boxes, threshold lines, the marquee
     shadowRoot_: ShadowRoot // for `shadowRoot.activeElement === surface` focus gating (keyboard.ts)
     focusable_: FocusRef[] // flat, manifest-order list of element-indexed hits — keyboard.ts's nav domain
     layerStarts_: number[] // computeLayerStarts(focusable), cached once — PageUp/PageDown's layer-jump index

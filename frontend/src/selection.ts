@@ -392,3 +392,130 @@ export function sameValue(a: unknown, b: unknown): boolean {
     if (ka.length !== kb.length) return false
     return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && sameValue((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
 }
+
+// Where a marquee looks for element k: a marker's centre, a bar's or label's centre, a
+// segment's midpoint, the middle of a polygon's or a whole line's extent. Null when the
+// element isn't drawn.
+function elementCentre(layer: HitLayer, k: number): [number, number] | null {
+    if (isGapElement(layer, k)) return null
+    const g = layer.geometry
+    switch (layer.kind) {
+        case "circles": {
+            const a = g as number[]
+            return [a[3 * k], a[3 * k + 1]]
+        }
+        case "rects": {
+            if (layer.order && !layer.order.includes(k)) return null
+            const a = g as number[]
+            return [a[4 * k], a[4 * k + 1]]
+        }
+        case "segments": {
+            const a = g as number[]
+            return [(a[4 * k] + a[4 * k + 2]) / 2, (a[4 * k + 1] + a[4 * k + 3]) / 2]
+        }
+        case "polyline": {
+            const a = g as number[]
+            return [(a[2 * k] + a[2 * k + 2]) / 2, (a[2 * k + 1] + a[2 * k + 3]) / 2]
+        }
+        case "polygons":
+            return extentCentre(polygonRings((g as (number[] | number[][])[])[k])[0] ?? [])
+        case "lines":
+            return extentCentre((g as number[][])[k] ?? [])
+        default:
+            return null
+    }
+}
+
+function extentCentre(flat: number[]): [number, number] | null {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity
+    for (let i = 0; i + 1 < flat.length; i += 2) {
+        const x = flat[i], y = flat[i + 1]
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y)
+    }
+    return x0 <= x1 ? [(x0 + x1) / 2, (y0 + y1) / 2] : null
+}
+
+// The elements of a layer a marquee box holds, in element order: those whose centre is inside.
+export function indicesInBox(layer: HitLayer, box: { x: number; y: number; w: number; h: number }): number[] {
+    const out: number[] = []
+    if (!SELECTED_KINDS.has(layer.kind)) return out
+    const n = layerNElements(layer)
+    for (let k = 0; k < n; k++) {
+        const c = elementCentre(layer, k)
+        if (c && c[0] >= box.x && c[0] <= box.x + box.w && c[1] >= box.y && c[1] <= box.y + box.h) out.push(k)
+    }
+    return out
+}
+
+// Every element of a layer on screen, by index: what a legend click selects of its plot.
+export function drawnIndices(layer: HitLayer): number[] {
+    const out: number[] = []
+    const n = layerNElements(layer)
+    for (let k = 0; k < n; k++) if (!isGapElement(layer, k)) out.push(k)
+    return out
+}
+
+// The picks a marquee box holds on one layer, in element order. A mark counts when its centre
+// is inside; on a line that takes points (#353), each data point inside is its own pick, as a
+// click picks one.
+export function picksInBox(manifest: Manifest, layer: HitLayer, box: { x: number; y: number; w: number; h: number }): FieldPick[] {
+    if (!picksPoints(layer)) return indicesInBox(layer, box).map((index) => ({ layer: layer.id, index }))
+    const inside = (p: { x: number; y: number }) => p.x >= box.x && p.x <= box.x + box.w && p.y >= box.y && p.y <= box.y + box.h
+    return linePicks(manifest, layer, drawnIndices(layer), inside)
+}
+
+// The picks that stand for elements `indices` of a layer: the elements themselves, or every
+// data point on screen of a line that takes points. What a legend entry selects of its plot.
+export function elementPicks(manifest: Manifest, layer: HitLayer, indices: number[]): FieldPick[] {
+    if (!picksPoints(layer)) return indices.map((index) => ({ layer: layer.id, index }))
+    return linePicks(manifest, layer, indices, () => true)
+}
+
+function linePicks(manifest: Manifest, layer: HitLayer, indices: number[], keep: (p: { x: number; y: number }) => boolean): FieldPick[] {
+    const out: FieldPick[] = []
+    const t = manifest.transforms[layer.axis]
+    for (const index of indices) {
+        const n = (layer.points?.[index]?.length ?? 0) / 2
+        for (let sample = 0; sample < n; sample++) {
+            const p = samplePoint(layer, index, sample, t)
+            if (p && keep(p)) out.push({ layer: layer.id, index, sample })
+        }
+    }
+    return out
+}
+
+// Picks are the same mark when their element and data point agree.
+export const pickKey = (it: { index: number; sample?: number }): string => it.sample === undefined ? `${it.index}` : `${it.index}:${it.sample}`
+
+// A legend entry's edit of a linked `many` field: an entry turned on makes `picked` the field's
+// picks, or adds the ones it lacks with `toggle`; an entry turned off takes them out. Picks keep
+// the order they were made in.
+export function legendEdit(items: FieldPick[], picked: FieldPick[], on: boolean, toggle: boolean): FieldPick[] {
+    const want = new Set(picked.map(pickKey))
+    if (!on) return items.filter((it) => !want.has(pickKey(it)))
+    if (!toggle) return picked
+    const held = new Set(items.map(pickKey))
+    return [...items, ...picked.filter((it) => !held.has(pickKey(it)))]
+}
+
+// The marks one legend entry links to, by layer: every drawn element of a linked layer, or the
+// one element a `id:k` pin names. Resolved as resolveLinkedTarget resolves them for the highlight.
+export function linkedIndices(manifest: Manifest, layer: HitLayer, index: number): Map<HitLayer, number[]> {
+    const out = new Map<HitLayer, number[]>()
+    const add = (l: HitLayer, ks: number[]) => {
+        const cur = out.get(l) ?? []
+        for (const k of ks) if (!cur.includes(k)) cur.push(k)
+        out.set(l, cur)
+    }
+    for (const spec of layer.links?.[index] ?? []) {
+        const exact = manifest.layers.find((l) => l.id === spec)
+        if (exact) { add(exact, drawnIndices(exact)); continue }
+        const m = /^(.*):(\d+)$/.exec(spec)
+        const target = m ? manifest.layers.find((l) => l.id === m[1]) : undefined
+        if (!m || !target) continue
+        const i = Number(m[2]) - 1
+        if (i >= 0 && i < layerNElements(target) && !isGapElement(target, i)) add(target, [i])
+    }
+    return out
+}

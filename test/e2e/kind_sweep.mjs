@@ -829,6 +829,15 @@ try {
         surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true, cancelable: true }));
         return null;
       }, key), 0, [], 0);
+      // A marquee takes the cells the box touches; Ctrl from a held cell takes them out (#335).
+      const gdrag = async (from, to, mod = {}) => {
+        await dispatchAt(key, from.x, from.y, "pointerdown", mod);
+        await dispatchAt(key, (from.x + to.x) / 2, (from.y + to.y) / 2, "pointermove", mod);
+        await dispatchAt(key, to.x, to.y, "pointermove", mod);
+        return dispatchAt(key, to.x, to.y, "pointerup", mod);
+      };
+      t = await step("marquee-takes-touched-cells", t, () => gdrag(at(1, 0), at(2, 1)), 4, [0, 1, 2, 1, 1, 2], 2);
+      t = await step("ctrl-marquee-from-held-removes", t, () => gdrag(at(1, 0), at(2, 0), { ctrlKey: true }), 2, [1, 1, 2], 2);
       await dispatchAt(key, 1, 1, "pointermove");
       console.error(`OK  ${key} — ${t.slice(0, 160)}`);
       continue;
@@ -872,6 +881,89 @@ try {
       }, key), [], 0);
       await dispatchAt(key, 1, 1, "pointermove");
       console.error(`OK  ${key} — ${t.slice(0, 160)}`);
+      continue;
+    }
+
+    // Marquee and legend picks under `select = :many` (#335). Left axis (no view): a plain
+    // drag picks the marks inside, Ctrl-drag adds, and a Ctrl-drag starting on a picked mark
+    // takes out what it covers; a legend click picks every mark of `a`. Right axis (pan view):
+    // Alt-drag picks, a plain drag pans and picks nothing. Mid-drag the box is the ROI outline
+    // recipe (1px chrome, no fill); on release it is gone. Each step checks host.value, the
+    // printed `@bind` value, and how many picks are drawn.
+    if (spec.mode === "marquee") {
+      const la = layers.find((l) => l.id === "a"), lb = layers.find((l) => l.id === "b");
+      const leg = layers.find((l) => l.links?.some((ls) => ls.includes("a")));
+      if (!la?.many || !lb?.many) throw new Error(`${key}: a/b ship no many flag`);
+      if (!leg) throw new Error(`${key}: no legend entry linked to a`);
+      const pa = [0, 1, 2].map((i) => hitPoint(la, i)), pb = [0, 1, 2].map((i) => hitPoint(lb, i));
+      const held = async () => {
+        const v = (await inspect(key)).bondAll ?? {};
+        return { a: v.a?.items?.map((i) => i.index) ?? null, b: v.b?.items?.map((i) => i.index) ?? null };
+      };
+      const boxNow = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const r = sr.querySelector("rect.masque-marquee");
+        if (!r) return null;
+        const cs = getComputedStyle(r);
+        return { svg: r.closest("svg").getAttribute("class"), stroke: cs.stroke, fill: cs.fill, width: parseFloat(cs.strokeWidth), w: Number(r.getAttribute("width")) };
+      }, key);
+      const drag = async (from, to, mod, checkBox) => {
+        await dispatchAt(key, from.x, from.y, "pointermove", mod);
+        await dispatchAt(key, from.x, from.y, "pointerdown", mod);
+        await dispatchAt(key, (from.x + to.x) / 2, (from.y + to.y) / 2, "pointermove", mod);
+        await dispatchAt(key, to.x, to.y, "pointermove", mod);
+        const box = await boxNow();
+        if (checkBox === true) {
+          if (!box || box.svg !== "masque-plain" || box.fill !== "none" || box.width !== 1 || !(box.w > 0)) throw new Error(`${key}: mid-drag box ${JSON.stringify(box)}, want the ROI outline`);
+          if (!/rgb\((122, 122, 122|200, 200, 200)\)/.test(box.stroke)) throw new Error(`${key}: box stroke ${box.stroke}, want chrome grey`);
+        } else if (checkBox === false && box) throw new Error(`${key}: a box drew where the drag should pan`);
+        await dispatchAt(key, to.x, to.y, "pointerup", mod);
+        await page.evaluate(([k, x, y, md]) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const b = host.querySelector("img, canvas").getBoundingClientRect();
+          const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+          sr.querySelector(".surface").dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true, cancelable: true, clientX: b.left + x * s, clientY: b.top + y * s, ...md }));
+        }, [key, to.x, to.y, mod]);
+        if (await boxNow()) throw new Error(`${key}: the box stayed after release`);
+      };
+      const v0 = await textOf(`#bond_${key}`);
+      let h = await held();
+      if (JSON.stringify(h) !== JSON.stringify({ a: [], b: [] })) throw new Error(`${key}: mount value ${JSON.stringify(h)}`);
+      passed.push(`${key}/empty-at-mount`);
+      let t = v0;
+      const step = async (what, act, want, wantSel) => {
+        await act();
+        t = await waitChange(`#bond_${key}`, t, `${key}/${what}`);
+        h = await held();
+        if (JSON.stringify(h) !== JSON.stringify(want)) throw new Error(`${key}/${what}: host.value ${JSON.stringify(h)}, want ${JSON.stringify(want)}`);
+        const na = [...t.matchAll(/ElementEvent\(:a, /g)].length, nb = [...t.matchAll(/ElementEvent\(:b, /g)].length;
+        if (na !== want.a.length || nb !== want.b.length) throw new Error(`${key}/${what}: @bind value ${JSON.stringify(t)}`);
+        const sel = (await dispatchAt(key, 1, 1, "pointermove")).sel;
+        if (wantSel !== null && sel !== wantSel) throw new Error(`${key}/${what}: g.sel=${sel}, want ${wantSel}`);
+        passed.push(`${key}/${what}`);
+      };
+      const pad = 30;
+      // a closed pick draws 2 shapes (fill + edge)
+      await step("drag-picks-inside", () => drag({ x: pa[0].x - pad, y: pa[1].y - pad }, { x: pa[1].x + pad, y: pa[0].y + pad }, {}, true), { a: [0, 1], b: [] }, 4);
+      await step("ctrl-drag-adds", () => drag({ x: pa[2].x - pad, y: pa[2].y - pad }, { x: pa[2].x + pad, y: pa[2].y + pad }, { ctrlKey: true }, true), { a: [0, 1, 2], b: [] }, 6);
+      await step("ctrl-drag-on-picked-removes", () => drag({ x: pa[1].x, y: pa[1].y }, { x: pa[2].x + pad, y: pa[2].y + pad }, { ctrlKey: true }, true), { a: [0], b: [] }, 2);
+      const e = hitPoint(leg, leg.links.findIndex((ls) => ls.includes("a")));
+      await step("legend-click-picks-plot", () => dispatchAt(key, e.x, e.y, "click"), { a: [0, 1, 2], b: [] }, null);
+      // The entry's own field decides: clicked again it turns off and its marks go with it.
+      await step("legend-click-again-takes-out", () => dispatchAt(key, e.x, e.y, "click"), { a: [], b: [] }, null);
+      await step("legend-click-picks-again", () => dispatchAt(key, e.x, e.y, "click"), { a: [0, 1, 2], b: [] }, null);
+      await step("alt-drag-on-view", () => drag({ x: pb[0].x - pad, y: pb[1].y - pad }, { x: pb[1].x + pad, y: pb[0].y + pad }, { altKey: true }, true), { a: [0, 1, 2], b: [0, 1] }, null);
+      const before = await textOf(`#bond_${key}`);
+      await drag({ x: pb[2].x + 10, y: pb[1].y }, { x: pb[2].x - 60, y: pb[1].y + 40 }, {}, false);
+      await new Promise((r) => setTimeout(r, 1500));
+      h = await held();
+      if (JSON.stringify(h) !== JSON.stringify({ a: [0, 1, 2], b: [0, 1] }) || (await textOf(`#bond_${key}`)) !== before) throw new Error(`${key}: a plain drag on the view changed the picks: ${JSON.stringify(h)}`);
+      passed.push(`${key}/plain-drag-pans`);
+      console.error(`OK  ${key} — ${before.slice(0, 160)}`);
       continue;
     }
 

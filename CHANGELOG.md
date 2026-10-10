@@ -49,6 +49,14 @@ All notable changes to this project are documented here. The format is based on
   Cmd-click on a Mac or Ctrl-click elsewhere adds a cell or takes it out, and a click on empty
   plot space or Escape clears it. The selected cells are drawn as one highlighted area with
   an outline around its edge (#335).
+- On a plot with `select = :many`, dragging across the plot selects every mark whose centre
+  is inside the box (a line's data points inside it, a heatmap's cells it touches), replacing
+  the selection; Cmd-drag on a Mac, or Ctrl-drag elsewhere,
+  adds them, and takes them out when the drag starts on a selected mark. On a plot that pans
+  or orbits, a plain drag still moves the view and Alt-drag draws the box; Alt-drag works on
+  every plot; Escape drops the box. A finger drag still scrolls the page, so the box is drawn
+  with a mouse or pen. A legend click selects every mark of its entry's plot, Cmd-click or
+  Ctrl-click adds them, and clicking a selected entry again takes them out (#335).
 
 ### Changed
 - **Breaking:** `payloads` add to a mark's own data instead of replacing it. A scatter
