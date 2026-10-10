@@ -2391,7 +2391,7 @@ describe("frame swap keeps a line's picked point (#335)", () => {
             payloads: [{ index: 1 }], axis: "ax1", events: ["click", "hover"] as ("click" | "hover")[] }
         const view = { id: "view", kind: "view" as const, axis: "ax1", events: ["drag"] as "drag"[], payloads: [],
             geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } }
-        const t = { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+        const t: Manifest["transforms"][string] = { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
             viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false }
         const m: Manifest = { width: 1200, height: 800, scaling: 2, transforms: { ax1: t }, layers: [line, view] } as Manifest
         const pan = async (next: Manifest) => {
