@@ -1,6 +1,8 @@
 # Error hints for the forms removed in 0.3 (#299). Calling one still raises the plain
 # `MethodError` or `UndefVarError`; Julia prints these lines under it, naming the 0.3 form.
 # They add no methods, so nothing dispatches to an old call.
+# Delete this file, its `_register_error_hints()` call in `__init__`, and
+# `test/core/hints_tests.jl` (plus the `WebGLBackend` hint test) in 0.4.0.
 
 function _register_error_hints()
     Base.Experimental.register_error_hint(_removed_method_hint, MethodError)
