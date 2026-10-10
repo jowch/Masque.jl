@@ -42,11 +42,11 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000103
 md"""
-`@bind pick` saves a legend click in `pick`.
+`bind = :legend` makes `pick` the legend's value, and `@bind pick` saves a legend click in `pick`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000104
-@bind pick masque(fig)
+@bind pick masque(fig; bind = :legend)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
 md"""

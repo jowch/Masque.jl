@@ -27,7 +27,7 @@ Click a point on the left, and the plot on the right highlights the same sample,
 
 # ╔═╡ a1410002-0001-4000-8000-000000000010
 md"""
-Create the scatter and store the click with `@bind pick`.
+Create the scatter and store the click with `@bind pick`. `bind = s_left` makes `pick` the clicked point itself.
 """
 
 # ╔═╡ a1410002-0001-4000-8000-000000000002
@@ -42,7 +42,7 @@ begin
 end
 
 # ╔═╡ a1410002-0001-4000-8000-000000000003
-@bind pick masque(fig_l)
+@bind pick masque(fig_l; bind = s_left)
 
 # ╔═╡ a1410002-0001-4000-8000-000000000011
 md"""

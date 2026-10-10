@@ -55,8 +55,9 @@ function Masque.interactables(ax, p::Dumbbell; payloads = nothing, kwargs...)
 end
 ```
 
-Now hovering a row anywhere along its bar shows its values, and a click
-sets `pick` to that row, so `pick.change` is how much the row changed:
+Now hovering a row anywhere along its bar shows its values. With
+`bind = d`, where `d` is what `dumbbell!` returned, a click sets `pick`
+to that row, so `pick.change` is how much the row changed:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -79,15 +80,16 @@ vector of interactables, built with the same constructors you would use
 in a `masque` call; see [Constructors](@ref).
 
 `masque` names the layer after your plot function, so the first
-`dumbbell!` is `:dumbbell`, the second is `:dumbbell_2`, and
-`pick.layer` and `selected=` use these names.
+`dumbbell!` is `:dumbbell`, the second is `:dumbbell_2`. These names
+are the fields of the `@bind` value, and `pick.layer` and `selected=`
+use them too.
 
 Pass `kwargs...` on to the constructors. A caller who wants a different
 tooltip or payloads for one plot passes them with the plot:
 
 ```julia
 d = dumbbell!(ax, before, after)
-@bind pick masque(fig, interactables(d; tooltip = masque"change $(change)"))
+@bind pick masque(fig, interactables(d; tooltip = masque"change $(change)"); bind = d)
 ```
 
 Those keywords reach your method, so without `kwargs...` in its

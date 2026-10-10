@@ -199,7 +199,7 @@ const PLUTO_EXPORT_SIM_JS = raw"""
     if (!window.editor_state_set) return;
     const snap = lookup(TABLE, v);
     if (!snap) {
-      console.warn("masque player: no snapshot for", keyOf(v));
+      console.warn("masque player: no snapshot for", keyOf(TABLE, v));
       return;
     }
     const t = nextStamp();
@@ -344,7 +344,7 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
         push!(states, (; key, payloads, htmls, n_inlined))
     end
     first(states).key == "null" || error("first player state must be idle in $(basename(path))")
-    snapshots, extra = snapshot_table([st.key => Dict("cells" => st.payloads) for st in states])
+    snapshots, extra = snapshot_table([st.key => Dict("cells" => st.payloads) for st in states]; manifest = widget_manifest(widget))
     check_budget(path, length(states), length(snapshots["snaps"]), extra)
     # Back to the widget's starting value by re-running its cell, not to `nothing`: a selecting
     # box starts at the points inside it (#330), so its notebook need not handle `nothing`.

@@ -5,10 +5,10 @@
 """
     InteractionEvent
 
-Abstract type of every `masque` `@bind` value that is not `nothing`. Concrete subtypes carry
-the fields of that commit: an element pick, a legend entry, a grid cell or window, an axis or
-colorbar click, a threshold, or ROI bounds. A `selects` ROI over points yields a
-`Vector{ElementEvent}` instead of one event. Field names on the struct win over a payload key
+Abstract type of every value a field of the `masque` `@bind` value holds, other than
+`nothing`. Concrete subtypes carry the fields of that commit: an element pick, a legend entry,
+a grid cell or window, an axis or colorbar click, a threshold, or ROI bounds. The target of a
+`selects` ROI over points holds a `Vector{ElementEvent}` instead of one event. Field names on the struct win over a payload key
 of the same name; on an [`ElementEvent`](@ref), a [`LegendEvent`](@ref), or a
 [`GridCellEvent`](@ref) with a payload, other names forward to the payload. See [`bondtype`](@ref) and [`transform_bond`](@ref).
 """

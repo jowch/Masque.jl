@@ -282,49 +282,6 @@ function _resolve_plot_targets(interactables, pairs)
     return Any[get(swap, i, i) for i in interactables], Tuple{Any, HitLayer}[(get(swap, i, i), L) for (i, L) in pairs]
 end
 
-# The interactable that owns the widget's bond and its first layer's id, or `nothing`. Two owners
-# would each overwrite the other's value, and the bond could not start at both initial states.
-function _bond_owner(built)
-    owners = Tuple{Any, Symbol}[]
-    for (i, L, _) in built
-        owns_bond(i) && !any(o -> o[1] === i, owners) && push!(owners, (i, L.id))
-    end
-    isempty(owners) && return nothing
-    length(owners) == 1 && return only(owners)
-    names = join([":" * string(id) for (_, id) in owners], ", ", " and ")
-    throw(
-        ArgumentError(
-            "masque: $names each own the `@bind` value, and a widget has one. A threshold, an ROI " *
-                "box, or a colorbar you pass takes every click in its widget; pass the others " *
-                "to separate masque() calls",
-        ),
-    )
-end
-
-# The widget's `selects` target, or `nothing`. A selector owns the bond, so `_bond_owner` has
-# already rejected a second one and `only` holds.
-function _selection_spec(interactables, layers)
-    targets = Symbol[s for s in map(selects, interactables) if s !== nothing]
-    isempty(targets) && return nothing
-    target = only(targets)
-    kinds = Dict(Symbol(l["id"]) => Symbol(l["kind"]) for l in layers)
-    kind = kinds[target]
-    return (mode = kind === :grid ? "grid" : "elements", target = target)
-end
-
-# A box over marks with no `selected=` for its target starts at the marks inside `bounds`:
-# stamp them as the target's `selected`, so they ship as one index array and both
-# `mount_envelope` and `mount.ts` seed and highlight them as they would a `selected=` start.
-_seed_contained!(owner, layers) = nothing
-function _seed_contained!(owner::ROIInteractable, layers)
-    target = only(l for l in layers if l["id"] == string(owner.selects))
-    target["kind"] == "circles" || return nothing
-    box = only(l for l in layers if l["id"] == string(owner.id))["geometry"]
-    idxs = _contained_indices(box, target["geometry"])
-    isempty(idxs) || (target["selected"] = idxs)
-    return nothing
-end
-
 # A slice from plots covers the layers `_assemble` found for them unless told otherwise. Keep
 # the coverable ones in this call. Covers the caller named stay, so `_validate_slices` still
 # reports a missing or uncoverable one.
@@ -508,10 +465,11 @@ _polar_dict(p::PolarFrame) = Dict{String, Any}(
 Validate every interactable (fail loud) and assemble the JS-facing manifest. Pure — the unit
 tests call this directly; the Pluto-only `published_to_js` step happens later in `show`.
 
-`selected` seeds the selection, 1-based. Accepted forms: `nothing`; one event or a vector of
-them; an `Int` or a vector of `Int`s when exactly one layer can be seeded; a `NamedTuple` or
-`Dict` keyed by layer id. Indices are stored 0-based on each layer's `"selected"` array. Each
-layer carries a `"bond"` stamp. A `selects` ROI stamps `"selection"` and `"selectionTarget"`.
+`interactables` is a plain vector, or the `_Plan` `masque` builds, whose binding says which
+layers are fields. `"fields"` lists them; a layer outside it loses its `"click"` event.
+`"initial"` holds every field's starting wire envelope, with `selected` (1-based, the forms
+`masque` documents) seeding the picks; `with_initial = false` leaves it out, for a frame.
+Each layer carries a `"bond"` stamp, and a `selects` box's target a `"brush"` stamp.
 
 `owners_out`, when a `Ref`, receives `layer id => LayerOwner` for the widget. It is not part of
 the published manifest.
@@ -519,8 +477,9 @@ the published manifest.
 function build_manifest(
         interactables, ctx::InteractionContext;
         selected = nothing, tip_style = nothing, tip_digits = _DEFAULT_SIGDIGITS, background = nothing,
-        overlay_style = nothing, owners_out = nothing, suspend_surfaces = false,
+        overlay_style = nothing, owners_out = nothing, suspend_surfaces = false, with_initial = true,
     )
+    plan = interactables
     pairs = Tuple{Any, HitLayer}[]
     for i in interactables
         msg = validate(i, ctx)
@@ -538,36 +497,21 @@ function build_manifest(
     _drop_absent_default_covers!(built)
     _validate_slices(layers)
     _validate_links(layer_owners, layers)
-    owner = _bond_owner(built)
-    spec = _selection_spec(interactables, layers)
-    # The owner is the only layer that commits: a click elsewhere would replace the threshold's
-    # value or the brushed selection while the control stays drawn at its own. Every other layer
-    # keeps hover (tooltip); the overlay hit-tests clicks by `events`.
-    if owner !== nothing
-        for (i, _, d) in built
-            i === owner[1] || filter!(!=("click"), d["events"])
-        end
-    end
-    layer_ids = Symbol[L.id for (_, L, _) in built]
-    seedable = Symbol[L.id for (_, L, _) in built if L.kind in _SELECTED_KINDS]
-    norm = normalize_selected(layer_ids, seedable, selected)
-    for id in keys(norm)
-        id in layer_ids || throw(
-            ArgumentError(
-                "selected: :$id is not a layer in this masque() call " *
-                    "(available: $(join(sort(string.(layer_ids)), ", ")))",
-            ),
-        )
-    end
+    binding = _binding(plan)
+    brushed = Set{Symbol}(s for s in map(selects, interactables) if s !== nothing)
     for (i, L, d) in built
-        idxs = get(norm, L.id, nothing)
-        if idxs !== nothing && !isempty(idxs)
-            d["selected"] = _check_selected(L, idxs)
-        end
         d["bond"] = bond_stamp(i, L)
     end
-    spec === nothing || haskey(norm, spec.target) || explicit_empty_seed(selected) ||
-        _seed_contained!(owner[1], layers)
+    fields, roles = _fields(binding, built, brushed)
+    # A layer outside the bind value takes no clicks, and keeps hover (its tooltip). A box's
+    # target takes none either: the box chooses its elements.
+    for (_, L, d) in built
+        L.id in fields && roles[L.id] === :pick || filter!(!=("click"), d["events"])
+        if roles[L.id] === :brush
+            d["brush"] = L.kind === :grid ? "grid" : "elements"
+        end
+    end
+    initial = with_initial ? _initial_value(built, fields, roles, binding, selected, ctx, layers) : nothing
     # Precedence for the frontend's first-match-in-manifest-order `hitTest` (geometry.ts):
     # `LegendInteractable` layers sort FIRST (a legend drawn over plot geometry must win the
     # pixels under it, or it's unhoverable), `:view` layers sort LAST (catch-all viewport hits
@@ -586,15 +530,9 @@ function build_manifest(
         "layers" => layers,
         "transforms" => Dict(string(id) => _transform_dict(t) for (id, t) in ctx.transforms),
     )
-    if owner !== nothing
-        m["bondOwner"] = string(owner[2])
-        env = initial_envelope(owner[1], ctx, layers)
-        env === nothing || (m["initial"] = env)
-    end
-    if spec !== nothing
-        m["selection"] = spec.mode
-        m["selectionTarget"] = string(spec.target)
-    end
+    m["fields"] = String[string(f) for f in fields]
+    binding.bare && length(fields) == 1 && (m["bare"] = true)
+    initial === nothing || (m["initial"] = initial)
     (tip_style === nothing || isempty(tip_style)) || (m["tipStyle"] = tip_style)
     (overlay_style === nothing || isempty(overlay_style)) || (m["overlayStyle"] = overlay_style)
     tip_digits == _DEFAULT_SIGDIGITS || (m["tipDigits"] = tip_digits)
@@ -683,7 +621,7 @@ function _backend_settings(backend, max_width, px_per_unit)
 end
 
 """
-    masque(fig, xs...; auto = true, kwargs...) -> MasqueWidget
+    masque(fig, xs...; auto = true, bind = nothing, kwargs...) -> MasqueWidget
 
 Overlay `fig` with JS hit-testing and return a Pluto `@bind` source. `fig` is not mutated.
 
@@ -698,33 +636,46 @@ them, or `interactables(plot; …)` for one plot.
   `PointInteractable(ax, pts)`, …) is added after the defaults, in argument order.
 
 Two layers with the same id raise `ArgumentError`. Legends link to the layers of this call.
-`auto = false` drops the defaults, so only the arguments are overlaid.
+`auto = false` drops the defaults, so only the arguments are overlaid. A `NamedTuple`
+argument names what it holds: `masque(fig, (cutoff = thr,))` builds `thr` under the id
+`:cutoff`.
 
-The bond is `nothing` until the first commit, unless `selected=` restored one or an owner
-(below) sets its start. A click is one [`InteractionEvent`](@ref). A `selects`
-[`ROIInteractable`](@ref) aimed at points commits a `Vector{ElementEvent}` (an empty box is
-`ElementEvent[]`); aimed at a grid, one [`GridWindowEvent`](@ref).
-
-A [`ThresholdInteractable`](@ref), an [`ROIInteractable`](@ref), or a
-[`ColorbarInteractable`](@ref) you pass owns the bond: every other layer shows tooltips but
-commits no clicks, and `selected=` on those layers only highlights. A threshold's bond starts
-as a [`ThresholdEvent`](@ref) at its `value`, a box without `selects` as a
-[`BoundsEvent`](@ref) at its `bounds`, and a box with `selects` at what its `bounds` contain.
-One widget takes one owner; two raise `ArgumentError`. The colorbars `masque(fig)` adds by
-itself own nothing.
+The `@bind` value is a `NamedTuple` with one field per layer a reader can set, named by its
+id, in the order the layers are listed. A plot that takes clicks holds its pick: `nothing`
+until a click, then one [`InteractionEvent`](@ref), and `nothing` again when the same mark is
+clicked twice. A [`ThresholdInteractable`](@ref) holds a [`ThresholdEvent`](@ref), starting
+at its `value`, and an [`ROIInteractable`](@ref) a [`BoundsEvent`](@ref), starting at its
+`bounds`. A box with `selects` also fills its target's field with what it contains: a
+`Vector{ElementEvent}` over points (an empty box is `ElementEvent[]`), one
+[`GridWindowEvent`](@ref) over a grid, starting at what its `bounds` contain. That target
+takes no clicks. A line (`lines!`, `stairs!`, `series!`, the line of a `scatterlines!`) only
+shows its tooltip unless `bind` names it or it is passed as `interactables(plot)`. A view or
+a slice has no field.
 
 # Keywords
 - `auto` — start from the figure's defaults. Default `true`.
-- `selected` — the selection's starting value, 1-based. One index on a point layer mounts as
-  that [`ElementEvent`](@ref); `1` and `[1]` are the same. Several indices highlight those marks
-  and leave the bond `nothing` (a point layer holds one event). On a `selects` point brush, `1`
-  and `[1]` mount as a one-element vector, and `[]` mounts as `ElementEvent[]`. Also accepts the
-  event itself, or a `NamedTuple` / `Dict` keyed by layer id when the figure has more than one
-  seedable layer. A bare index is an `ArgumentError` in that case. Works on
-  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines`; any other kind, or an out-of-range
-  index (`0` included), raises `ArgumentError` naming `1:n`. Clicking replaces the selection, so
-  this is only needed to carry one through a rebuild — and it must come from a cell that doesn't
-  read this widget's own bond, which Pluto rejects as a cyclic reference.
+- `bind` — the fields to keep. Default `nothing`, every field. A tuple of plots,
+  interactables or field names keeps those, in that order: `bind = (sc, :cutoff)`. A
+  `NamedTuple` also names them, so `bind = (left = sc1, right = sc2)` gives `sel.left` and
+  `sel.right`, and their events' `layer` is `:left` and `:right`. One plot, interactable or
+  name instead of a tuple makes the value that one field's own value: `bind = thr` gives a
+  `ThresholdEvent`, and `bind = sc` an `ElementEvent` or `nothing`. An object that builds
+  several layers, such as a `scatterlines!` plot or a `RegionInteractable` of several shape
+  kinds, still gives one field per layer in a `NamedTuple`. A plot or interactable not
+  otherwise passed is added. Every other layer keeps hover and takes no clicks. An object
+  named two different ways, by `id`, a `NamedTuple` argument or `bind`, raises
+  `ArgumentError`.
+- `selected` — a pick's starting value, 1-based: `selected = (scatter = 3,)`, or `selected = 3`
+  when one field takes picks. Also accepts the event itself, a vector of events, or a `Dict`
+  keyed by field. A pick holds one element, so several indices for one field raise
+  `ArgumentError`, except on the target of a box with `selects`, where they replace what the
+  box starts at, and an empty one keyed to the target, as in `selected = (pts = Int[],)`,
+  starts it empty (a bare `Int[]` sets nothing). Works on
+  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines`; any other kind, an
+  out-of-range index (`0` included), a control, or a layer that is not a field raises
+  `ArgumentError`. This is only needed to carry a pick through a rebuild — and it must come
+  from a cell that doesn't read this widget's own value, which Pluto rejects as a cyclic
+  reference.
 - `backend` — `:cairo` (a static image) or `:webgl` (a live canvas). Defaults to whichever of
   `CairoMakie` / `WGLMakie` is loaded, `:cairo` if both. Raises `ArgumentError` if neither is
   loaded, if the named backend's package is not loaded, or for an unknown name.
@@ -754,16 +705,17 @@ using Masque, CairoMakie
 fig = Figure(); ax = Axis(fig[1, 1])
 pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
 s = scatter!(ax, first.(pts), last.(pts))
-@bind sel masque(fig)                                                # every default
+@bind sel masque(fig)                                                # sel.scatter
+@bind sel masque(fig; bind = s)                                      # sel is the pick itself
 @bind sel masque(fig, interactables(s; payloads = ["a", "b", "c"]))  # one plot customised
 @bind sel masque(fig, ViewInteractable(ax))                          # defaults plus pan
-@bind sel masque(fig, PointInteractable(ax, pts); auto = false)      # only this layer
+@bind sel masque(fig, (pts = PointInteractable(ax, pts),); auto = false)  # sel.pts
 ```
 """
-function masque(fig, xs...; auto::Bool = true, kwargs...)
-    ints = _assemble(fig, xs; auto)
-    auto && isempty(ints) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
-    return _masque(fig, ints; kwargs...)
+function masque(fig, xs...; auto::Bool = true, bind = nothing, kwargs...)
+    plan = _bind_call(fig, xs, bind; auto)
+    auto && isempty(plan) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
+    return _masque(fig, plan; kwargs...)
 end
 
 function _masque(
@@ -1045,7 +997,9 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
         fig.scene.backgroundcolor[] = RGBAf(Makie.red(bg0), Makie.green(bg0), Makie.blue(bg0), 1)
         _finalize!(fig)
         ctx = context(backend, fig, ppu, max_width)
-        manifest = build_manifest(interactables, ctx; suspend_surfaces = get(input, "settle", false) !== true)
+        manifest = build_manifest(
+            interactables, ctx; suspend_surfaces = get(input, "settle", false) !== true, with_initial = false,
+        )
         result = render(backend, fig, render_ppu)
         frame = _gesture_frame(result)
         frame["manifest"] = manifest

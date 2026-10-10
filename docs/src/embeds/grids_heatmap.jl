@@ -45,11 +45,11 @@ end
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`, while hovering over a cell only shows its value and leaves `pick` as it was.
+`bind = p` makes `pick` the clicked cell itself. `@bind pick` saves a click in `pick`, while hovering over a cell only shows its value and leaves `pick` as it was.
 """
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000003
-@bind pick masque(fig)
+@bind pick masque(fig; bind = p)
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000012
 md"""

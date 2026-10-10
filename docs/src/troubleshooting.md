@@ -8,7 +8,9 @@ saw, then gives the cause and the fix. For constructor signatures, see
 
 - No Makie backend loaded: see
   [Tried `masque` with no Makie backend](@ref).
-- Pluto reports cyclic references for `selected=pick`: see
+- `type NamedTuple has no field index`: see
+  [Tried `sel.index` and got "has no field"](@ref troubleshooting-no-field).
+- Pluto reports cyclic references for `selected=sel.scatter`: see
   [Tried feeding this widget's bond into the same call's `selected=`](@ref).
 - Hover does not update `pick`: see
   [Tried reading pick on hover](@ref).
@@ -74,16 +76,41 @@ matches a layer that `masque(fig)` builds on its own replaces that
 layer instead of raising this error; see
 [Adding to what `masque(fig)` builds](@ref).
 
-### Tried two thresholds, boxes, or colorbars in one widget
+### Tried giving one plot or interactable two names
 
-**Error prefix:** ``masque: :threshold and :roi each own the `@bind` value``
+**Error prefix:** `masque: … is named both`
 
-**Cause:** a [`ThresholdInteractable`](@ref), an [`ROIInteractable`](@ref),
-or a [`ColorbarInteractable`](@ref) you pass sets the widget's value,
-and the rest of the widget takes no clicks. A widget has one value, so
-it takes one of them.
+**Cause:** the same plot or interactable got two different names, from
+its `id`, a named tuple passed after `fig`, or a named tuple in `bind`,
+as in `masque(fig, (a = thr,); bind = (b = thr,))`.
 
-**Fix:** pass each to its own `masque` call on the same figure.
+**Fix:** give it one name, and use the same name everywhere you list
+it. To refer to a name you already gave, put the name in `bind` as a
+symbol: `bind = (:a,)`.
+
+### Tried several indices in `selected=` for one plot
+
+**Error prefix:** `selected: :scatter holds one pick`
+
+**Cause:** a plot's field holds one selected mark, so
+`selected = [1, 3]` or `selected = (scatter = [1, 3],)` has no value to
+start at.
+
+**Fix:** pass one index per plot, as in `selected = (scatter = 1,)`.
+To start with several marks selected, use a box with `selects`, whose
+plot's field holds a list; see [Selection](@ref).
+
+### Tried `selected=` on a line, a control, or a plot left out of `bind`
+
+**Error prefix:** `takes no picks` / `isn't in bind` / `is a control`
+
+**Cause:** `selected=` names a field that holds no pick. A line takes
+clicks only once you name it in `bind` or pass it as
+`interactables(plot)`, `bind` leaves out every plot it does not list,
+and a threshold or a box starts at its own `value` or `bounds`.
+
+**Fix:** name the line in `bind`, add the plot to `bind`, or set the
+control's `value` or `bounds` in its constructor instead.
 
 ### Passed a keyword your plot type's `interactables` method does not take
 
@@ -136,7 +163,7 @@ and `ymin < ymax`.
 
 **Cause:** a region tuple's first element is not `:circle`, `:rect`, or
 `:polygon`, or `regions` and `payloads` differ in length.
-`selected = Dict(:cells => [1])` with `id = :cells` also fails, because
+`selected = (cells = 1,)` with `id = :cells` also fails, because
 the region layers are named `:cells_c`, `:cells_r`, and `:cells_p`.
 
 **Fix:** check the region tuples against [Custom hits](@ref). Use the
@@ -233,8 +260,8 @@ itself instead of `masque(fig)`.
 **Cause:** either the layer's kind cannot start with a selection from
 `selected=`, or an index is out of range. Layers of kind `:circles`,
 `:rects`, `:polygons`, `:segments`, `:polyline`, and `:lines` can start
-selected, while `:grid`, `:axis`, `:threshold`, `:roi`, and `:view`
-cannot.
+selected, with a line only once it takes clicks, while `:grid`, `:axis`,
+`:threshold`, `:roi`, and `:view` cannot.
 
 **Fix:** check the layer's kind against [Selection](@ref), and keep
 each index between 1 and the number of marks in that layer. For a
@@ -298,6 +325,42 @@ replacement, and are removed in 0.4:
 | `tooltip_accent`, `tooltip_font`, `tooltip_font_size`, `tooltip_radius`, `tooltip_caret` | the `tooltipstyle` keys `accent`, `font`, `font_size`, `radius`, `caret` |
 
 `tooltip_sigdigits` stays a keyword of its own. See [Tooltip styling](@ref).
+
+### Upgrading code that reads the `@bind` value
+
+In Masque 0.3, the `@bind` value is a named tuple with one field for
+each plot that takes clicks and each threshold or box, named after it,
+so every notebook that reads it changes:
+
+| 0.2 | 0.3 |
+|---|---|
+| `@bind sel masque(fig)`, then `sel.index` | `sel.scatter.index`, or `@bind sel masque(fig; bind = s)` to keep `sel.index` |
+| `@bind level masque(fig, thr)`, then `level.value` | `level.threshold.value`, or `bind = thr` to keep `level.value` |
+| `@bind picks masque(fig, pts, roi)`, the points inside | `picks.scatter` for the points and `picks.roi` for the box, or `bind = s` for the points alone |
+| a click on a line gives its event | a line only shows its tooltip until you name it in `bind` |
+| `selected = [1, 3]` highlights two marks | one index per plot: `selected = (scatter = 1,)` |
+| one threshold, box, or colorbar per widget | as many as you like, each in its own field |
+
+Clicking one plot no longer clears another plot's selection, and a box
+with `selects` starts with the marks inside its `bounds`. See
+[What the `@bind` value holds](@ref).
+
+### [Tried `sel.index` and got "has no field"](@id troubleshooting-no-field)
+
+**Error prefix:** `type NamedTuple has no field index`
+
+**Cause:** the `@bind` value is a named tuple with one field per plot,
+so the event is one level down, as in `sel.scatter.index`.
+
+**Fix:** read the plot's field, or pass the plot as `bind` to make the
+value the event itself:
+
+```julia
+@bind sel masque(fig; bind = s)
+```
+
+Here `s` is what `scatter!` returned. See
+[What the `@bind` value holds](@ref).
 
 ### Tried `CairoMakie.activate!(type = "svg")` and the widget is a PNG
 
@@ -364,9 +427,12 @@ Check, in order:
    error, so its marks do not respond, as with a
    [heatmap or bar plot on a `PolarAxis`](@ref polar-skipped-plots).
    [Recipes masque(fig) extracts](@ref) lists the supported plots.
-4. Does the widget have a threshold, a box, or a colorbar you passed?
-   That control owns the value, so the other marks show tooltips but
-   do not take clicks. Put the marks in a separate `masque` call.
+4. Did you click a line, or a plot left out of `bind`? A line shows its
+   tooltip but takes no clicks until you name it in `bind`, a plot that
+   `bind` leaves out takes no clicks, and neither does the plot a box
+   with `selects` fills. See [What the `@bind` value holds](@ref).
+5. Are you reading the right field? A click on a bar sets `sel.bars`,
+   not `sel.scatter`, and each plot keeps its own selection.
 
 ### Tried a tooltip and saw `[object Object]`
 

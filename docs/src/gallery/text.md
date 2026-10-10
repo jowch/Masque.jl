@@ -1,13 +1,14 @@
 # Text labels
 
-Click a label and `pick.text` is its string. `masque(fig)` makes
+Click a label and its event's `text` is its string. `masque(fig)` makes
 `text!` and `annotation!` labels clickable, including the tilted one.
-`pick` is an `ElementEvent` that also has the label's `index`, `x`, and
-`y`.
+The event is an `ElementEvent` that also has the label's `index`, `x`,
+and `y`.
 
-The scatter on the same axis responds too, and a marker click has no
-`text` field, so the last cell checks `hasproperty(pick, :text)` before
-reading the string.
+Each `text!` call, the `annotation!`, and the scatter on the same axis
+get their own field in `sel`, so the last cell reads the three label
+fields, `sel.text`, `sel.text_2`, and `sel.annotation`, and quotes each
+label that is selected. A marker click goes to `sel.scatter`.
 
 ```@raw html
 <div class="masque-embed-wrap">

@@ -1,7 +1,8 @@
 // Real-browser E2E for the :webgl @bind round-trip. Loads the self-contained widget pages
 // (test/e2e/make_page.jl), clicks scatter marker 0 in a real headless Chromium, and asserts the
-// overlay emits the correct bond value — host.value = {layer, index} (an element kind carries no
-// `payload` on the wire; Julia reconstructs it from its own manifest, #109) + an `input` event
+// overlay emits the correct bond value — host.value = {scatter: {layer, index}}, one envelope per
+// field (#335; an element kind carries no `payload` on the wire; Julia reconstructs it from its
+// own manifest, #109) + an `input` event
 // (the Pluto @bind contract, overlay.ts:273-274). This is the BROWSER half a unit test can't
 // reach (real overlay JS, real shadow-DOM hit-test, real click on the :webgl <canvas> base); the
 // Julia half (runtests.jl "@bind round-trip contract") asserts transform_value rebuilds the
@@ -85,11 +86,17 @@ async function runCase(browser, c) {
     }, expected);
 
     if (!got) throw new Error(`[${c.name}] no bond value emitted on click (host.value never set / no input event)`);
-    // Persist the REAL emitted host.value so verify_capture.jl can feed it through the actual
-    // Julia transform_value — closing the emit→consume seam empirically (not at a synthesized shape).
+    // Persist the REAL emitted host.value (the whole `{field: envelope}` object) so
+    // verify_capture.jl can feed it through the actual Julia transform_value — closing the
+    // emit→consume seam empirically (not at a synthesized shape).
     writeFileSync(join(dir, c.captured), JSON.stringify(got));
-    if (got.layer !== expected.layer || got.index !== expected.index) {
-      throw new Error(`[${c.name}] bond mismatch: got ${JSON.stringify(got)}, expected layer=${expected.layer} index=${expected.index}`);
+    const keys = Object.keys(got);
+    if (keys.length !== 1 || keys[0] !== expected.layer) {
+      throw new Error(`[${c.name}] bond fields ${JSON.stringify(keys)}, expected exactly [${expected.layer}]`);
+    }
+    const env = got[expected.layer];
+    if (!env || env.layer !== expected.layer || env.index !== expected.index) {
+      throw new Error(`[${c.name}] bond mismatch: got ${JSON.stringify(got)}, expected ${expected.layer} = {layer: ${expected.layer}, index: ${expected.index}}`);
     }
     console.log(`E2E OK [${c.name}] — click round-tripped bond value:`, JSON.stringify(got));
   } finally {

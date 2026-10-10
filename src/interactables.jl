@@ -1483,9 +1483,8 @@ like [`AxisInteractable`](@ref) but scoped to the colorbar and 1-D. Produces one
 
 Payload on hit (client-side): `(; value)`.
 
-A colorbar you pass to `masque` owns the bond: every other layer in that widget keeps its hover
-tooltip but takes no clicks, so the bond only ever holds a [`ColorbarEvent`](@ref). It starts
-as `nothing`. The colorbars `masque(fig)` adds on its own do not own the bond.
+Its field in the `@bind` value holds a [`ColorbarEvent`](@ref), `nothing` until the first
+click. `masque(fig)` adds one for every colorbar in the figure.
 
 `masque` raises `ArgumentError` at build time if the colorbar's value-axis scale isn't
 client-invertible (supported: `identity`, `log10`, `log`).
@@ -1499,8 +1498,7 @@ ColorbarInteractable(cb)
 struct ColorbarInteractable <: AbstractInteractable
     cb
     id::Symbol
-    # `masque` added it for a figure's colorbar, rather than the caller passing it. Only one
-    # the caller passed owns the bond: otherwise any figure with a colorbar would take no clicks.
+    # `masque` added it for a figure's colorbar, rather than the caller passing it.
     auto::Bool
 end
 ColorbarInteractable(cb, id::Symbol) = ColorbarInteractable(cb, id, false)
@@ -1903,9 +1901,8 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 
 Payload on commit (client-side): the scalar data coordinate.
 
-The line owns the bond: every other layer in that widget keeps its hover tooltip but takes no
-clicks, and the bond starts as a [`ThresholdEvent`](@ref) at `value` (with its `category` on a
-categorical axis, when `value` is a category's position).
+Its field in the `@bind` value starts as a [`ThresholdEvent`](@ref) at `value` (with its
+`category` on a categorical axis, when `value` is a category's position).
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data value — inversion is undefined), a `PolarAxis` (a straight line is neither a constant r nor
@@ -1975,13 +1972,12 @@ compatible layer, reporting the contained elements. Produces one `:roi` [`HitLay
   `selects` names a layer absent from the same call, one of an unsupported kind, or a plot
   with no point or grid layer in the call.
 
-Payload on commit (no `selects`): a [`BoundsEvent`](@ref). With `selects` set, the bond is a
+The box's field in the `@bind` value is a [`BoundsEvent`](@ref), starting at `bounds`. With
+`selects` set, the box also fills its target's field with what it contains: a
 `Vector{ElementEvent}` for a `:circles` target (one per contained element), or one
-[`GridWindowEvent`](@ref) for a `:grid` target — see [`InteractionEvent`](@ref). The box owns
-the bond: every other layer in that widget, the target included, keeps its hover tooltip but
-takes no clicks. Without `selects`, the bond starts as a `BoundsEvent` at `bounds`; with it, the
-bond starts at what `bounds` contains, highlighted, as a release there would set it, unless
-`selected=` on the target seeds it. `bounds=` accepts a `BoundsEvent` or a
+[`GridWindowEvent`](@ref) for a `:grid` target. That field starts at what `bounds` contains,
+highlighted, as a release there would set it, unless `selected=` on the target seeds it. The
+target takes no clicks; every other layer keeps its own. `bounds=` accepts a `BoundsEvent` or a
 `(xmin, xmax, ymin, ymax)` tuple.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not

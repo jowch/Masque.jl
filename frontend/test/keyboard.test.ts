@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
 import type { Manifest } from "../src/types"
+import { withFields } from "./fields"
 
 function setup(manifest: Manifest) {
     const host = document.createElement("div")
@@ -11,7 +12,7 @@ function setup(manifest: Manifest) {
     const script = document.createElement("script")
     host.append(img, script)
     document.body.append(host)
-    mount(script, manifest)
+    mount(script, withFields(manifest))
     const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
     const surface = shadow.querySelector(".surface") as HTMLElement
     return { host, surface, shadow }
@@ -80,7 +81,7 @@ describe("keyboard navigation", () => {
         down(surface, "ArrowRight") // a[0]
         down(surface, "PageDown") // -> b[0], the only element of layer b
         down(surface, "Enter")
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "b", index: 0 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.b).toMatchObject({ layer: "b", index: 0 })
     })
 
     it("Enter dispatches the identical bond payload a click on the same element would", () => {
@@ -109,7 +110,7 @@ describe("keyboard navigation", () => {
         surface.focus()
         down(surface, "ArrowRight") // a[0]
         down(surface, "Enter")
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "a", index: 0 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.a).toMatchObject({ layer: "a", index: 0 })
         const echo = shadow.querySelector("g.sel > *") as SVGCircleElement
         expect(echo).toBeTruthy()
         expect(echo.getAttribute("cx")).toBe("100") // a[0]'s cx
@@ -188,8 +189,10 @@ describe("keyboard navigation", () => {
             width: 1200, height: 800, scaling: 2, transforms: {},
             layers: [
                 { id: "a", kind: "circles", geometry: [100, 100, 10, 300, 100, 10], payloads: [{ v: 1 }, { v: 2 }],
-                    axis: "ax1", events: ["click", "hover"], label: "Scatter", selected: [0] },
+                    axis: "ax1", events: ["click", "hover"], label: "Scatter" },
             ],
+            fields: ["a"],
+            initial: { a: { layer: "a", index: 0 } },
         }
         const { surface, shadow } = setup(selManifest)
         surface.focus()
@@ -241,7 +244,7 @@ describe("keyboard navigation", () => {
         down(surface, "ArrowDown") // a[1]
         down(surface, "ArrowUp") // back to a[0]
         down(surface, "Enter")
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "a", index: 0 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.a).toMatchObject({ layer: "a", index: 0 })
     })
 
     it("PageUp with no current focus goes to the last layer's start; PageDown with none goes to the first", () => {
@@ -249,13 +252,13 @@ describe("keyboard navigation", () => {
         surface.focus()
         down(surface, "PageUp") // no focus yet -> last layer ("b")'s first element
         down(surface, "Enter")
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "b", index: 0 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.b).toMatchObject({ layer: "b", index: 0 })
 
         down(surface, "Escape")
         surface.focus() // Escape blurred the surface — re-focus, same as a real Tab back in
         down(surface, "PageDown") // no focus yet -> first layer ("a")'s first element
         down(surface, "Enter")
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "a", index: 0 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.a).toMatchObject({ layer: "a", index: 0 })
     })
 
     it("Enter on a hover-only layer (no :click) is a no-op — no bond dispatch", () => {
@@ -361,12 +364,12 @@ describe("keyboard navigation", () => {
         down(surface, "End") // -> b[0], the last layer
         down(surface, "PageDown") // already in the last layer — clamp, stay at b[0]
         down(surface, "Enter")
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "b", index: 0 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.b).toMatchObject({ layer: "b", index: 0 })
 
         down(surface, "Home") // -> a[0], the first layer
         down(surface, "PageUp") // already in the first layer — clamp, stay at a[0]
         down(surface, "Enter")
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "a", index: 0 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.a).toMatchObject({ layer: "a", index: 0 })
     })
 
     it("DOM focus leaving the surface (Tab-away or focus moving elsewhere) clears keyboard focus, not just Escape", () => {
@@ -424,7 +427,7 @@ describe("keyboard navigation", () => {
         down(surface, "ArrowRight") // keyboard-focus a[0]
         // mouse-click a[1]: circle at image (300,100), display scale 1200/600=2 -> client (150,50)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 150, clientY: 50, bubbles: true }))
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "a", index: 1 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.a).toMatchObject({ layer: "a", index: 1 })
         const echo = shadow.querySelector("g.sel > *") as SVGCircleElement
         expect(echo).toBeTruthy()
         expect(echo.getAttribute("cx")).toBe("300") // a[1]'s cx, not a[0]'s (100)
@@ -443,7 +446,7 @@ describe("keyboard navigation", () => {
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 50, clientY: 50, bubbles: true }))
         await flushFrame() // let onMove's rAF coalescing settle before the next pointermove
         surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "a", index: 0 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.a).toMatchObject({ layer: "a", index: 0 })
         expect(shadow.querySelector("g.hi > *")).toBeFalsy()
         expect(shadow.querySelector("g.sel > *")).toBeTruthy()
         // move to empty canvas — the echo is persistent selection state, not a hover ring: it
@@ -470,7 +473,7 @@ describe("keyboard navigation", () => {
         down(surface, "ArrowRight") // keyboard-focus a[0] (the only focusable element)
         // click a grid cell (not in the focus list): image (300,600) -> client (150,300)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 150, clientY: 300, bubbles: true }))
-        expect((host as unknown as { value: { layer: string } }).value).toMatchObject({ layer: "g" })
+        expect((host as unknown as { value: Record<string, unknown> }).value.g).toMatchObject({ layer: "g" })
         // keyboard focus (a[0]'s ring) must still be there — the grid click didn't clear it
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 5, clientY: 5, bubbles: true }))
         expect(shadow.querySelector(".hi > *")).toBeTruthy()
@@ -498,7 +501,7 @@ describe("keyboard navigation", () => {
         expect(ring.getAttribute("x1")).toBe("100")
         expect(ring.getAttribute("x2")).toBe("200")
         down(surface, "Enter")
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "l", index: 3 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.l).toMatchObject({ layer: "l", index: 3 })
     })
 
     it("skips segments, circles and lines a zoomed Axis3 clipped off screen (#321)", async () => {
@@ -513,20 +516,20 @@ describe("keyboard navigation", () => {
                 ],
             }
             const { surface, shadow, host } = setup(manifest)
-            const value = () => (host as unknown as { value: { layer: string; index: number } }).value
+            const value = () => (host as unknown as { value: Record<string, unknown> }).value
             surface.focus()
             down(surface, "ArrowRight") // the clipped pair 0 is skipped
             vi.advanceTimersByTime(200)
             const live = shadow.querySelector('[aria-live="polite"]') as HTMLElement
             expect(live.textContent).toBe("Edges, element 1 of 1: s 1")
             down(surface, "Enter")
-            expect(value()).toMatchObject({ layer: "seg", index: 1 })
+            expect(value().seg).toMatchObject({ layer: "seg", index: 1 })
             down(surface, "ArrowRight") // circle 0 has a NaN centre
             down(surface, "Enter")
-            expect(value()).toMatchObject({ layer: "pts", index: 1 })
+            expect(value().pts).toMatchObject({ layer: "pts", index: 1 })
             down(surface, "ArrowRight") // path 0 has no vertex left
             down(surface, "Enter")
-            expect(value()).toMatchObject({ layer: "ln", index: 1 })
+            expect(value().ln).toMatchObject({ layer: "ln", index: 1 })
         } finally {
             vi.useRealTimers()
         }
@@ -547,10 +550,10 @@ describe("keyboard navigation", () => {
         const path = shadow.querySelector(".hi path") as SVGPathElement
         expect(path.getAttribute("d")).toBe("M0 0L50 0M80 40")
         down(surface, "Enter")
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "curves", index: 0 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.curves).toMatchObject({ layer: "curves", index: 0 })
         down(surface, "ArrowRight")
         down(surface, "Enter")
-        expect((host as unknown as { value: { layer: string; index: number } }).value).toMatchObject({ layer: "curves", index: 1 })
+        expect((host as unknown as { value: Record<string, unknown> }).value.curves).toMatchObject({ layer: "curves", index: 1 })
     })
 
     it("announces position/count over non-gap segments only, for a gapped :polyline", async () => {

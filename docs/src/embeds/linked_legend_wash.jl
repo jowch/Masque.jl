@@ -45,11 +45,11 @@ end
 
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000011
 md"""
-In your own notebook, `@bind pick` saves a click on an entry in `pick`, but this page does not show that value.
+In your own notebook, `@bind pick` saves a click on an entry in `pick`, and `bind = :legend` makes `pick` the legend's value, but this page does not show it.
 """
 
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000003
-@bind pick masque(fig)
+@bind pick masque(fig; bind = :legend)
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """

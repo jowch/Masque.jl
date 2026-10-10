@@ -74,7 +74,6 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         z = [11.0 21.0 31.0; 12.0 22.0 32.0]   # 2 columns (x) × 3 rows (y)
         hm = heatmap!(ax, 1:2, 1:3, z)
         rows = ["r1", "r2"]; cols = ["c1", "c2", "c3"]
-        tv = Masque.APD.Bonds.transform_value
         tip = masque"($(row), $(col)) = $(value) at $(i),$(j)"
         w = masque(fig, interactables(hm; payloads = (i, j) -> (; row = rows[i], col = cols[j]), tooltip = tip))
         L = only(l for l in w.manifest["layers"] if l["kind"] == "grid")
@@ -82,17 +81,17 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test [p.row * p.col for p in L["payloads"]] == ["r1c1", "r2c1", "r1c2", "r2c2", "r1c3", "r2c3"]
         js = Dict("layer" => L["id"], "index" => 3, "payload" => Dict("i" => 1, "j" => 1, "value" => 22.0))
         for widget in (w, Masque.MasqueWidget("", w.manifest, 100))   # by interactable, and by stamp
-            ev = tv(widget, js)
+            ev = commit_field(widget, js)
             @test ev isa GridCellEvent && ev.i == 2 && ev.j == 2 && ev.value == 22.0
             @test ev.row == "r2" && ev.col == "c2" && ev.payload == (; row = "r2", col = "c2")
             @test z[ev] == 22.0
         end
-        ev = tv(w, js)
+        ev = commit_field(w, js)
         @test propertynames(ev) == (:layer, :i, :j, :value, :row, :col, :payload)
         @test sprint(show, ev) == "GridCellEvent(:$(L["id"]), i = 2, j = 2, value = 22.0, payload = (row = \"r2\", col = \"c2\"))"
         @test_throws ArgumentError ev.nope
         # A cell outside the grid is an error, not a wrong payload.
-        @test_throws ArgumentError tv(w, Dict("layer" => L["id"], "index" => 0, "payload" => Dict("i" => 5, "j" => 0)))
+        @test_throws ArgumentError commit_field(w, Dict("layer" => L["id"], "index" => 0, "payload" => Dict("i" => 5, "j" => 0)))
         @test_throws ArgumentError AxisEvent(:axis, 1.0, 2.0).row   # no payload to forward to
 
         # A matrix the same shape as the values gives the same layout.
@@ -107,7 +106,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws ArgumentError masque(fig, bad)
 
         # Without payloads, a cell is unchanged: no payload, no forwarding.
-        plain = tv(masque(fig), Dict("layer" => "cells", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
+        plain = commit_field(masque(fig), Dict("layer" => "cells", "index" => 0, "payload" => Dict("i" => 0, "j" => 0, "value" => 11.0)))
         @test plain.payload === nothing
         @test propertynames(plain) == (:layer, :i, :j, :value)
         @test sprint(show, plain) == "GridCellEvent(:cells, i = 1, j = 1, value = 11.0)"
@@ -120,13 +119,14 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         lines!(ax, 1:3; label = "trend")
         axislegend(ax)
         w = masque(fig)
-        tv = Masque.APD.Bonds.transform_value
-        ev = tv(w, Dict("layer" => "legend", "index" => 0))
+        # The line is hover-only by default; the legend takes clicks, so it is the one field.
+        @test w.manifest["fields"] == ["legend"]
+        ev = commit_field(w, Dict("layer" => "legend", "index" => 0))
         @test ev isa LegendEvent
         @test ev.layer === :legend && ev.index == 1 && ev.label == "trend"
         @test_throws ArgumentError Base.to_index(ev)
         bare = Masque.MasqueWidget("", w.manifest, 100)
-        stamped = tv(bare, Dict("layer" => "legend", "index" => 0))
+        stamped = commit_field(bare, Dict("layer" => "legend", "index" => 0))
         @test stamped isa LegendEvent && stamped.index == 1 && stamped.label == "trend"
     end
 
@@ -136,37 +136,35 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         fig = Figure()
         ax = Axis(fig[1, 1]; dim1_conversion = Makie.CategoricalConversion())
         scatter!(ax, ["a", "b", "c"], [1.0, 2.0, 3.0])
-        tv = Masque.APD.Bonds.transform_value
         w = masque(fig, AxisInteractable(ax); auto = false)
         id = only(w.manifest["layers"])["id"]
-        ev = tv(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => "b", "y" => 2.0)))
+        ev = commit_field(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => "b", "y" => 2.0)))
         @test ev isa AxisEvent
         @test ev.x == 2.0 && ev.xcat == "b"
         @test ev.y == 2.0 && ev.ycat === nothing
         @test sprint(show, ev) == "AxisEvent(:$id, x = 2.0, y = 2.0, xcat = \"b\")"
-        @test_throws ArgumentError tv(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => "z", "y" => 2.0)))
-        @test_throws ArgumentError tv(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => 1.0, "y" => "b")))
+        @test_throws ArgumentError commit_field(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => "z", "y" => 2.0)))
+        @test_throws ArgumentError commit_field(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => 1.0, "y" => "b")))
         # A numeric click on the same axis is unchanged.
-        num = tv(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => 1.2, "y" => 2.0)))
+        num = commit_field(w, Dict("layer" => id, "index" => -1, "payload" => Dict("x" => 1.2, "y" => 2.0)))
         @test num.x == 1.2 && num.xcat === nothing
 
         vt = masque(fig, ThresholdInteractable(ax; orientation = :vertical, value = 2.0); auto = false)
-        tev = tv(vt, Dict("layer" => "threshold", "index" => -1, "payload" => "c"))
+        tev = commit_field(vt, Dict("layer" => "threshold", "index" => -1, "payload" => "c"))
         @test tev isa ThresholdEvent && tev.value == 3.0 && tev.category == "c"
         # Passing the event back restores the line at that category.
         @test Masque._threshold_value(tev) == 3.0
         ht = masque(fig, ThresholdInteractable(ax; orientation = :horizontal, value = 2.0); auto = false)
-        hev = tv(ht, Dict("layer" => "threshold", "index" => -1, "payload" => 1.5))
+        hev = commit_field(ht, Dict("layer" => "threshold", "index" => -1, "payload" => 1.5))
         @test hev.value == 1.5 && hev.category === nothing
         @test sprint(show, hev) == "ThresholdEvent(:threshold, value = 1.5)"
-        @test_throws ArgumentError tv(ht, Dict("layer" => "threshold", "index" => -1, "payload" => "c"))
+        @test_throws ArgumentError commit_field(ht, Dict("layer" => "threshold", "index" => -1, "payload" => "c"))
     end
 
     @testset "FunctionInteractable follows the layer kind" begin
         fig = Figure(); ax = Axis(fig[1, 1])
         scatter!(ax, [1.0], [1.0])
         axis = ctx -> first(keys(ctx.transforms))
-        tv = Masque.APD.Bonds.transform_value
         el = masque(
             fig, FunctionInteractable(
                 ctx -> [
@@ -175,7 +173,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             );
             auto = false,
         )
-        got = tv(el, Dict("layer" => "el", "index" => 0))
+        got = commit_field(el, Dict("layer" => "el", "index" => 0))
         @test got isa ElementEvent && got.index == 1 && got.v == "a"
         grid = masque(
             fig, FunctionInteractable(
@@ -185,7 +183,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             );
             auto = false,
         )
-        cell = tv(grid, Dict("layer" => "g", "index" => -1, "payload" => Dict("i" => 1, "j" => 0, "value" => 12)))
+        cell = commit_field(grid, Dict("layer" => "g", "index" => -1, "payload" => Dict("i" => 1, "j" => 0, "value" => 12)))
         @test cell isa GridCellEvent && cell.i == 2 && cell.j == 1 && cell.value == 12
         axisw = masque(
             fig, FunctionInteractable(
@@ -195,7 +193,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             );
             auto = false,
         )
-        aev = tv(axisw, Dict("layer" => "ax", "index" => -1, "payload" => Dict("x" => 1.5, "y" => 2.5)))
+        aev = commit_field(axisw, Dict("layer" => "ax", "index" => -1, "payload" => Dict("x" => 1.5, "y" => 2.5)))
         @test aev isa AxisEvent && aev.x == 1.5 && aev.y == 2.5
         thr = masque(
             fig, FunctionInteractable(
@@ -205,7 +203,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             );
             auto = false,
         )
-        tev = tv(thr, Dict("layer" => "thr", "index" => 0, "payload" => 3.25))
+        tev = commit_field(thr, Dict("layer" => "thr", "index" => 0, "payload" => 3.25))
         @test tev isa ThresholdEvent && tev.value == 3.25
         roi = masque(
             fig, FunctionInteractable(
@@ -215,7 +213,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             );
             auto = false,
         )
-        bev = tv(
+        bev = commit_field(
             roi, Dict(
                 "layer" => "box", "index" => 0,
                 "payload" => Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 2.0, "ymax" => 3.0),
@@ -230,6 +228,147 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             );
             auto = false,
         )
-        @test_throws ArgumentError tv(view, Dict("layer" => "view", "index" => -1, "payload" => nothing))
+        # A view has no field, so the browser can't name it.
+        @test isempty(view.manifest["fields"])
+        @test_throws ArgumentError commit_field(view, Dict("layer" => "view", "index" => -1, "payload" => nothing))
+    end
+
+    @testset "the value has one field per layer that commits (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        s1 = scatter!(ax, [1.0, 2.0], [1.0, 2.0])
+        s2 = scatter!(ax, [5.0, 6.0], [5.0, 6.0])
+        ln = lines!(ax, [1.0, 9.0], [9.0, 1.0])
+        tv = Masque.APD.Bonds.transform_value
+        iv = Masque.APD.Bonds.initial_value
+        layer(w, id) = only(filter(l -> l["id"] == id, w.manifest["layers"]))
+        env(id, k) = Dict{String, Any}("layer" => id, "index" => k)
+
+        # Every plot that takes clicks, in layer order: the plot drawn last comes first, as it
+        # wins the hover. A default line is hover-only.
+        w = masque(fig)
+        @test w.manifest["fields"] == ["scatter_2", "scatter"]
+        @test !haskey(w.manifest, "bare")
+        @test layer(w, "lines")["events"] == ["hover"]
+        @test w.manifest["initial"] == Dict("scatter" => nothing, "scatter_2" => nothing)
+        @test iv(w) === (scatter_2 = nothing, scatter = nothing)
+        # `nothing` from the browser is the starting value.
+        @test tv(w, nothing) === iv(w)
+        # Each field holds its own pick: setting one leaves the other.
+        both = tv(w, Dict("scatter" => env("scatter", 0), "scatter_2" => env("scatter_2", 1)))
+        @test keys(both) == (:scatter_2, :scatter)
+        @test both.scatter.layer === :scatter && both.scatter.index == 1
+        @test both.scatter_2.layer === :scatter_2 && both.scatter_2.index == 2
+        one = tv(w, Dict("scatter" => nothing, "scatter_2" => env("scatter_2", 0)))
+        @test one.scatter === nothing && one.scatter_2.index == 1
+        # A key that is not a field, or an envelope from another layer, is refused: the old
+        # single-envelope wire value included.
+        @test_throws ArgumentError tv(w, Dict("lines" => env("lines", 0)))
+        @test_throws ArgumentError tv(w, env("scatter", 0))
+        @test_throws ArgumentError tv(w, Dict("scatter" => env("scatter_2", 0)))
+        @test_throws ArgumentError tv(w, [env("scatter", 0)])
+
+        # One entry gives that field's bare value.
+        wb = masque(fig; bind = s2)
+        @test wb.manifest["fields"] == ["scatter_2"] && wb.manifest["bare"] === true
+        @test iv(wb) === nothing
+        @test layer(wb, "scatter")["events"] == ["hover"]   # left out of `bind`: hover only
+        bev = tv(wb, Dict("scatter_2" => env("scatter_2", 1)))
+        @test bev isa ElementEvent && bev.layer === :scatter_2 && bev.index == 2
+        @test masque(fig; bind = :scatter_2).manifest == wb.manifest
+
+        # A tuple keeps those fields, in its order; a one-element tuple stays a NamedTuple.
+        wt = masque(fig; bind = (s1, :scatter_2))
+        @test wt.manifest["fields"] == ["scatter", "scatter_2"]
+        @test keys(iv(wt)) == (:scatter, :scatter_2)
+        @test iv(masque(fig; bind = (s1,))) === (scatter = nothing,)
+
+        # A NamedTuple names its fields, and the events carry the names.
+        wn = masque(fig; bind = (left = s1, right = s2))
+        @test wn.manifest["fields"] == ["left", "right"]
+        @test commit_field(wn, env("right", 0)).layer === :right
+
+        # Binding a line makes it clickable.
+        wl = masque(fig; bind = (fit = ln,))
+        @test wl.manifest["fields"] == ["fit"]
+        @test "click" in layer(wl, "fit")["events"]
+
+        # A NamedTuple argument names interactables; a control starts at its own value.
+        thr = ThresholdInteractable(ax; value = 4.0)
+        wc = masque(fig, (cutoff = thr,))
+        @test wc.manifest["fields"] == ["scatter_2", "scatter", "cutoff"]
+        @test iv(wc).cutoff == ThresholdEvent(:cutoff, 4.0, nothing)
+        @test iv(masque(fig, (cutoff = thr,); bind = :cutoff)) == ThresholdEvent(:cutoff, 4.0, nothing)
+
+        # An object given two names, or a name where `bind` wants an object, is an error.
+        @test_throws ArgumentError masque(fig, (a = interactables(s1),); bind = (b = s1,))
+        @test_throws ArgumentError masque(fig, (cutoff = ThresholdInteractable(ax; value = 4.0, id = :t),))
+        @test_throws ArgumentError masque(fig; bind = (a = :scatter,))
+        # A plot in a NamedTuple argument must go through `interactables`.
+        @test_throws ArgumentError masque(fig, (a = s1,))
+        # A name that isn't a layer, a layer that takes no value, or one listed twice.
+        @test_throws ArgumentError masque(fig; bind = :nope)
+        @test_throws ArgumentError masque(fig, ViewInteractable(ax; id = :pan); bind = :pan)
+        @test_throws ArgumentError masque(fig; bind = (s1, :scatter))
+    end
+
+    @testset "a name keeps the id it names, even a constructor's default (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        s1 = scatter!(ax, [1.0, 2.0], [1.0, 2.0])
+        s2 = scatter!(ax, [5.0, 6.0], [5.0, 6.0])
+        iv = Masque.APD.Bonds.initial_value
+        t1 = ThresholdInteractable(ax; value = 1.0)
+        t2 = ThresholdInteractable(ax; value = 2.0, orientation = :vertical)
+        # The unnamed threshold moves off the default id; the named one keeps it.
+        w = masque(fig, t1; bind = (threshold = t2,))
+        @test w.manifest["fields"] == ["threshold"]
+        @test iv(w).threshold.value == 2.0
+        v = iv(masque(fig, t1, (threshold = t2,); bind = (:threshold, :threshold_2)))
+        @test v.threshold.value == 2.0 && v.threshold_2.value == 1.0
+        r1 = ROIInteractable(ax; bounds = (1.0, 2.0, 1.0, 2.0))
+        r2 = ROIInteractable(ax; bounds = (3.0, 4.0, 3.0, 4.0))
+        @test iv(masque(fig, r1; bind = (roi = r2,))).roi.xmin == 3.0
+        # A plot's default id is taken by the plot: naming another plot that says so.
+        err = try
+            masque(fig; bind = (scatter = s2,)); nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("the name :scatter is already the id", err.msg)
+    end
+
+    @testset "bind and selected= errors name the fields (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        s1 = scatter!(ax, [1.0, 2.0], [1.0, 2.0])
+        s2 = scatter!(ax, [5.0, 6.0], [5.0, 6.0])
+        msg(f) = try
+            f(); ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("isn't in bind (fields: :left)", msg(() -> masque(fig; bind = (left = s1,), selected = (right = [1],))))
+        @test occursin("as a tuple", msg(() -> masque(fig; bind = [s1, s2])))
+        # One object that builds several layers keeps a field per layer.
+        reg = RegionInteractable(ax, [(:circle, (1.0, 1.0), 0.5), (:rect, (5.0, 5.0), 1.0, 1.0)]; id = :cells)
+        v = Masque.APD.Bonds.initial_value(masque(fig, reg; bind = reg))
+        @test v isa NamedTuple && length(v) == 2
+    end
+
+    @testset "bind and a box with selects (#335)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1]; limits = (0, 10, 0, 10))
+        pts = scatter!(ax, [1.0, 5.0, 9.0], [1.0, 5.0, 9.0])
+        iv = Masque.APD.Bonds.initial_value
+        box = ROIInteractable(ax; bounds = (4.0, 6.0, 4.0, 6.0), selects = pts)
+        # The box alone: its bounds, and its target is not a field.
+        wb = masque(fig, box; bind = box)
+        @test wb.manifest["fields"] == ["roi"] && !haskey(wb.manifest["initial"], "scatter")
+        @test iv(wb) isa BoundsEvent
+        # The target alone: what the box holds.
+        wt = masque(fig, box; bind = pts)
+        @test wt.manifest["fields"] == ["scatter"]
+        @test [e.index for e in iv(wt)] == [2]
+        # A box named only in `bind` is added to the call.
+        wa = masque(fig; bind = (box, pts))
+        @test wa.manifest["fields"] == ["roi", "scatter"]
+        @test iv(wa).roi.xmin == 4.0 && [e.index for e in iv(wa).scatter] == [2]
     end
 end

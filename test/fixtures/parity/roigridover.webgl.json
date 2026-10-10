@@ -2,6 +2,7 @@
     "height": 800,
     "layers": [
         {
+            "brush": "grid",
             "kind": "grid",
             "id": "img",
             "geometry": {
@@ -73,32 +74,42 @@
             "style": {
                 "width": 2
             },
-            "bond": "none",
+            "bond": "bounds",
             "events": [
                 "drag"
             ]
         }
     ],
     "initial": {
-        "items": [
-            {
-                "payload": {
-                    "xmin": 0,
-                    "xmax": 2.2,
-                    "ymin": 3.5,
-                    "i0": 0,
-                    "ymax": 9,
-                    "i1": 1,
-                    "j0": 3,
-                    "j1": 4
-                },
-                "layer": "img",
-                "index": 0
-            }
-        ]
+        "img": {
+            "items": [
+                {
+                    "payload": {
+                        "xmin": 0,
+                        "xmax": 2.2,
+                        "ymin": 3.5,
+                        "i0": 0,
+                        "ymax": 9,
+                        "i1": 1,
+                        "j0": 3,
+                        "j1": 4
+                    },
+                    "layer": "img",
+                    "index": 0
+                }
+            ]
+        },
+        "roi": {
+            "payload": {
+                "xmin": 0,
+                "xmax": 2.2,
+                "ymin": 3.5,
+                "ymax": 9
+            },
+            "layer": "roi",
+            "index": 0
+        }
     },
-    "bondOwner": "roi",
-    "selectionTarget": "img",
     "transforms": {
         "ax1": {
             "xscale": "identity",
@@ -129,5 +140,8 @@
     },
     "width": 1200,
     "scaling": 2,
-    "selection": "grid"
+    "fields": [
+        "img",
+        "roi"
+    ]
 }

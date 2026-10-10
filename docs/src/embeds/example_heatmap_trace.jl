@@ -40,17 +40,16 @@ begin
     ax = Axis(fig[1, 1]; xlabel = "day", yticks = (eachindex(stations), stations), title = "daily mean temperature: click a cell")
     hm = heatmap!(ax, 1:7, eachindex(stations), daily; colormap = :thermal)
     Colorbar(fig[1, 2], hm; label = "°C")
-    cells = GridInteractable(ax, hm)
     nothing
 end
 
 # ╔═╡ a1420002-0001-4000-8000-000000000011
 md"""
-`@bind pick` stores the clicked cell: `pick.i` is the day (1 to 7), `pick.j` is the station's position in `stations`, and `pick.value` is the daily mean. `auto = false` leaves the colorbar out, so `pick` is always a cell.
+`@bind pick` stores the clicked cell: `pick.i` is the day (1 to 7), `pick.j` is the station's position in `stations`, and `pick.value` is the daily mean. `bind = hm` makes `pick` the clicked cell itself, and the colorbar still shows its tooltip but takes no clicks.
 """
 
 # ╔═╡ a1420002-0001-4000-8000-000000000003
-@bind pick masque(fig, cells; auto = false)
+@bind pick masque(fig; bind = hm)
 
 # ╔═╡ a1420002-0001-4000-8000-000000000012
 md"""

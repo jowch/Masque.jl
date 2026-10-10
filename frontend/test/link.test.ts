@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 // Legend `links`: hovering/focusing a HitLayer element whose `links[index]` names other layers
 // draws the selected recipe (wash/ring) for every element of those layers into a dedicated
-// g.link group, distinct from g.sel (persistent `selected=`) and g.hi (the single hover ring).
+// g.link group, distinct from g.sel (the persistent picks of the bond's fields) and g.hi (the single hover ring).
 import { describe, it, expect } from "vitest"
 import { mount } from "../src/overlay"
 import type { Manifest } from "../src/types"
+import { withFields } from "./fields"
 
 function setup(manifest: Manifest) {
     const host = document.createElement("div")
@@ -14,7 +15,7 @@ function setup(manifest: Manifest) {
     const script = document.createElement("script")
     host.append(img, script)
     document.body.append(host)
-    mount(script, manifest)
+    mount(script, withFields(manifest))
     const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
     const surface = shadow.querySelector(".surface") as HTMLElement
     return { host, surface, shadow }
@@ -73,7 +74,7 @@ describe("legend links: hover", () => {
         expect(linkGroupSize(shadow)).toBe(0)
     })
 
-    it("g.sel (persistent selected=) is untouched by legend hover", () => {
+    it("g.sel (a field's starting pick) is untouched by legend hover", () => {
         const selManifest: Manifest = {
             ...manifest,
             layers: [
@@ -83,9 +84,10 @@ describe("legend links: hover", () => {
                     id: "other", kind: "circles", axis: "ax1", events: ["hover"],
                     geometry: [900, 700, 15],
                     payloads: [{}],
-                    selected: [0],
                 },
             ],
+            fields: ["other"],
+            initial: { other: { layer: "other", index: 0 } },
         }
         const { surface, shadow } = setup(selManifest)
         // "other"'s one selected circle also splits into fill + edge — g.sel across all three
@@ -99,7 +101,9 @@ describe("legend links: hover", () => {
     it("hovering a legend entry whose linked target is already fully pinned in g.sel draws nothing new in g.link", () => {
         const pinnedManifest: Manifest = {
             ...manifest,
-            layers: [manifest.layers[0], { ...manifest.layers[1], selected: [0, 1, 2] }],
+            // The legend's pick of entry 0 holds its whole series: all three "pts" circles.
+            fields: ["legend"],
+            initial: { legend: { layer: "legend", index: 0 } },
         }
         const { surface, shadow } = setup(pinnedManifest)
         expect(shadow.querySelectorAll("g.sel > *").length).toBe(6) // 3 circles × fill + edge

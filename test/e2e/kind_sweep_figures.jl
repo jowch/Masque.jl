@@ -40,6 +40,11 @@
 #
 # `slice_lines` and `slice_density` are hover samples, not hit targets. The driver projects a
 # data point through the axis transform and checks the slice tooltip plus the crosshair.
+#
+# The `@bind` value is a NamedTuple with one field per layer that takes a value (#335). Each
+# notebook prints two things per widget: `#out_<key>` is the one field the case is about (its
+# `field`, else its `layerId`; `"*"` prints the whole value), so the drivers' single-event regexes
+# still apply, and `#bond_<key>` is the whole value, which the multi-field checks read.
 
 using Random
 
@@ -247,9 +252,12 @@ kind_sweep_meta() = [
     ),
     Dict(
         # `stairs!`: one stepped line is one element; hover reads out the nearest step (#262).
+        # A default line, so it shows its tooltip and takes no click (#335): `hoverOnly` makes
+        # the driver check that a click commits nothing in place of the click checks.
         "key" => "stairs", "layerId" => "stairs", "layerKind" => "lines",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "index", "hoverIndex" => 0, "hoverTip" => "index", "mode" => "element",
+        "hoverOnly" => true,
     ),
     Dict(
         # `arrows2d!` (#274): each arrow is one segment from tail to tip.
@@ -303,27 +311,32 @@ kind_sweep_meta() = [
         "key" => "threshold", "layerId" => "threshold", "layerKind" => "threshold",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
-        # The line owns the bond (#309): the scatter beside it keeps its tooltip, takes no
-        # click, and the bond starts as the line's value.
-        "owner" => Dict("layer" => "scatter", "initial" => "ThresholdEvent"),
+        # The line's field starts at its value, and the scatter beside it has its own field, so a
+        # click on a point sets that field and leaves the line's (#335). `initial` is a regex on
+        # the whole value (`#bond_<key>`).
+        "owner" => Dict(
+            "layer" => "scatter", "otherClicks" => true,
+            "initial" => "threshold = ThresholdEvent\\(:threshold, value = 4\\.0",
+        ),
     ),
     Dict(
-        # A colorbar the caller passed owns the bond (#309): the heatmap keeps its tooltip, takes
-        # no click, and the bond stays `nothing` until the colorbar is clicked.
+        # A colorbar the caller passed is a field of its own, `nothing` until clicked, next to the
+        # heatmap's, which a click on a cell sets (#335).
         "key" => "colorbar_owner", "layerId" => "colorbar", "layerKind" => "axis",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "owner",
-        "owner" => Dict("layer" => "cells", "initial" => "^COLORBAR_OWNER=nothing\$"),
+        "owner" => Dict("layer" => "cells", "otherClicks" => true, "initial" => "colorbar = nothing"),
     ),
     Dict(
-        # A box without `selects` owns the bond and starts at its `bounds` (#309). The scatter's
-        # first point sits outside the box, so the no-click check never presses on the box.
+        # A box without `selects` is a field that starts at its `bounds`, next to the scatter's
+        # (#335). The scatter's first point sits outside the box, so the click on it never
+        # presses on the box.
         "key" => "roi_bounds", "layerId" => "roi", "layerKind" => "roi",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "owner",
         "owner" => Dict(
-            "layer" => "scatter",
-            "initial" => "^ROI_BOUNDS=BoundsEvent\\(:roi, xmin = 3\\.0, xmax = 6\\.0, ymin = 3\\.0, ymax = 6\\.0\\)\$",
+            "layer" => "scatter", "otherClicks" => true,
+            "initial" => "roi = BoundsEvent\\(:roi, xmin = 3\\.0, xmax = 6\\.0, ymin = 3\\.0, ymax = 6\\.0\\)",
         ),
     ),
     Dict(
@@ -342,15 +355,16 @@ kind_sweep_meta() = [
         "category" => "b", "position" => 2,
     ),
     Dict(
-        # A selecting box owns the bond and starts at the points inside its bounds, (3, 3) and
-        # (5, 5), highlighted (#330). The first point sits outside, so the no-click check never
-        # presses on the box. Each driver opens a fresh session, so the bond is the start's.
+        # A selecting box adds two fields: its bounds, and its target's, which starts at the
+        # points inside the bounds, (3, 3) and (5, 5), highlighted (#330, #335). The target takes
+        # no click. The first point sits outside, so the no-click check never presses on the box.
+        # Each driver opens a fresh session, so the value is the start's.
         "key" => "roi", "layerId" => "roi", "layerKind" => "roi",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
         "owner" => Dict(
             "layer" => "pts", "startsSelected" => true,
-            "initial" => "^ROI=(Masque\\.)?ElementEvent\\[ElementEvent\\(:pts, 2, [^\\]]*, ElementEvent\\(:pts, 3, [^\\]]*\\]\$",
+            "initial" => "pts = (Masque\\.)?ElementEvent\\[ElementEvent\\(:pts, 2, [^\\]]*, ElementEvent\\(:pts, 3, [^\\]]*\\], roi = BoundsEvent\\(:roi, xmin = 2\\.0",
         ),
     ),
     Dict(
@@ -362,7 +376,7 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "owner",
         "owner" => Dict(
             "layer" => "cells", "startsSelected" => true,
-            "initial" => "^ROI_GRID=(Masque\\.)?GridWindowEvent\\(:cells, i1 = 3, i2 = 4, j1 = 2, j2 = 3, xmin = 2\\.5, xmax = 4\\.5, ymin = 1\\.5, ymax = 3\\.5\\)\$",
+            "initial" => "cells = (Masque\\.)?GridWindowEvent\\(:cells, i1 = 3, i2 = 4, j1 = 2, j2 = 3, xmin = 2\\.5, xmax = 4\\.5, ymin = 1\\.5, ymax = 3\\.5\\)",
         ),
     ),
     Dict(
@@ -460,6 +474,19 @@ kind_sweep_meta() = [
         # (geometry.ts's unbounded branch) — a different hit-test code path, exercised in the
         # same widget so one fixture covers both.
         "pinLayerId" => "pts", "colorbarLayerId" => "colorbar",
+        # Three fields (`pts`, `colorbar`, `axis`): `#out_axis` prints them all, so the axis and
+        # colorbar clicks and the `pts` pick they must leave alone read from one line.
+        "field" => "*",
+    ),
+    Dict(
+        # Several fields at once (#335): a scatter, a vertical threshold `:cutoff`, and a default
+        # `lines!`. A click on a point sets `scatter` and leaves `cutoff`; a drag of the line
+        # sets `cutoff` and leaves `scatter`; the line shows its tooltip, has no field, and a
+        # click on it commits nothing. `#out_composite` prints the whole value.
+        "key" => "composite", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "composite", "field" => "*",
+        "control" => "cutoff", "controlStart" => 3.0, "line" => "lines", "fields" => ["cutoff", "scatter"],
     ),
     Dict(
         "key" => "slice_lines", "layerId" => "slice", "layerKind" => "slice",
@@ -534,8 +561,9 @@ function build_kind_sweep()
         ax = Axis(fig[1, 1]; title = "series")
         # Three rows, four samples each: one element per series, not per chord.
         ys = [1.0 1.6 2.1 1.4; 2.8 2.2 1.5 0.9; 0.5 1.2 1.9 2.6]
-        series!(ax, ys; linewidth = 4)
-        masque(fig; selected = Dict(:series => [1]))
+        sp = series!(ax, ys; linewidth = 4)
+        # A default line takes no clicks (#335); `bind` names it, so it takes them again.
+        masque(fig; bind = (sp,), selected = Dict(:series => [1]))
     end
 
     segments = let
@@ -762,8 +790,9 @@ function build_kind_sweep()
     lines3d = let
         fig = Figure(size = (480, 320))
         ax = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "lines3d")
-        lines!(ax, Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3), (4, 4, 2)]; color = :gray, linewidth = 4)
-        masque(fig)
+        ln = lines!(ax, Makie.Point3f[(1, 1, 1), (3, 2, 1), (2, 4, 3), (4, 4, 2)]; color = :gray, linewidth = 4)
+        # Bound, so the Axis3 line takes clicks; a default line is hover-only (#335).
+        masque(fig; bind = (ln,))
     end
 
     meshscatter3d = let
@@ -1131,6 +1160,14 @@ function build_kind_sweep()
         )
     end
 
+    composite = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "composite", limits = (0, 10, 0, 10))
+        lines!(ax, [0.5, 9.5], [1.5, 1.5]; color = :gray, linewidth = 4)
+        scatter!(ax, [2.0, 5.0, 8.0], [6.5, 8.5, 6.5]; markersize = 18, color = :gray)
+        masque(fig, ThresholdInteractable(ax; orientation = :vertical, value = 3.0, id = :cutoff))
+    end
+
     slice_lines = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "slice lines", limits = (0, 4, 0, 4))
@@ -1185,6 +1222,19 @@ function build_kind_sweep()
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
-        legend_overlap, legend_template, axis, slice_lines, slice_density, slice_auto, slice_gap,
+        legend_overlap, legend_template, axis, composite, slice_lines, slice_density, slice_auto, slice_gap,
     )
+end
+
+# The text a notebook prints for one sweep widget's `@bind` value `ev`: the field the case is
+# about (its `field`, else its `layerId`), or the whole value for `"*"`. A widget without that
+# field prints `nothing` while none of its fields holds a value (a slice or view case).
+function sweep_field(key, ev)
+    ev isa NamedTuple || return repr(ev)
+    i = findfirst(d -> d["key"] == key, kind_sweep_meta())
+    name = i === nothing ? nothing : get(kind_sweep_meta()[i], "field", kind_sweep_meta()[i]["layerId"])
+    name == "*" && return repr(ev)
+    name !== nothing && haskey(ev, Symbol(name)) && return repr(getproperty(ev, Symbol(name)))
+    length(ev) == 1 && return repr(only(ev))
+    return all(isnothing, ev) ? "nothing" : repr(ev)
 end

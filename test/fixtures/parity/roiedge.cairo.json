@@ -2,6 +2,7 @@
     "height": 800,
     "layers": [
         {
+            "brush": "elements",
             "kind": "circles",
             "id": "pts",
             "geometry": [
@@ -23,9 +24,6 @@
                 617,
                 377,
                 6
-            ],
-            "selected": [
-                5
             ],
             "payloads": [
                 {
@@ -86,14 +84,32 @@
             "style": {
                 "width": 2
             },
-            "bond": "none",
+            "bond": "bounds",
             "events": [
                 "drag"
             ]
         }
     ],
-    "bondOwner": "roi",
-    "selectionTarget": "pts",
+    "initial": {
+        "roi": {
+            "payload": {
+                "xmin": 2,
+                "xmax": 3,
+                "ymin": 2,
+                "ymax": 3
+            },
+            "layer": "roi",
+            "index": 0
+        },
+        "pts": {
+            "items": [
+                {
+                    "layer": "pts",
+                    "index": 5
+                }
+            ]
+        }
+    },
     "transforms": {
         "ax1": {
             "xscale": "identity",
@@ -124,5 +140,8 @@
     },
     "width": 1200,
     "scaling": 2,
-    "selection": "elements"
+    "fields": [
+        "pts",
+        "roi"
+    ]
 }

@@ -50,28 +50,30 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`auto = false` leaves out the image's own cells, so only the regions respond. `@bind pick` saves a click in `pick`, while hovering only shows the tooltip and leaves `pick` as it was.
+`auto = false` leaves out the image's own cells, so only the regions respond. `@bind sel` saves a click in `sel`, while hovering only shows the tooltip and leaves `sel` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind pick masque(fig, hits; auto = false)
+@bind sel masque(fig, hits; auto = false)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`, and this cell responds when you click a region. After a click, `pick.name` is the region's name.
+`sel` has one field for each kind of shape: `sel.cells_c` for the circle, `sel.cells_r` for the rectangle, and `sel.cells_p` for the triangle. Each starts as `nothing`, and this cell responds when you click a region. After a click, the field's `name` is the region's name.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if isnothing(pick)
-    "click a region"
-else
-    "$(pick.name) selected"
+begin
+    chosen = String[]
+    for region in (sel.cells_c, sel.cells_r, sel.cells_p)
+        isnothing(region) || push!(chosen, region.name)
+    end
+    isempty(chosen) ? "click a region" : join(chosen, ", ") * " selected"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
-bond = "pick"
+bond = "sel"
 show_code = true
 pluto_html = true
 

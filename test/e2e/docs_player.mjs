@@ -226,7 +226,7 @@ async function clickPoint(frame, index) {
     };
     surface.dispatchEvent(new PointerEvent("pointermove", o));
     surface.dispatchEvent(new MouseEvent("click", o));
-    return host.value;
+    return host.value?.scatter ?? null;
   }, index);
 }
 
@@ -288,13 +288,14 @@ try {
   }
 
   for (let i = 0; i < POINTS.length; i++) {
-    await setHost(frame, { layer: "scatter", index: i });
+    // host.value holds one envelope per field (#335): the quick start's one field is `scatter`.
+    await setHost(frame, { scatter: { layer: "scatter", index: i } });
     const want = `${POINTS[i].name} selected, y = ${POINTS[i].y}`;
     const text = await waitReadout(frame, (t) => t.includes(want));
     if (!text.includes(want)) {
       throw new Error(`host.value {layer:"scatter",index:${i}} did not key a snapshot; readout=${JSON.stringify(text)}`);
     }
-    await setHost(frame, null);
+    await setHost(frame, { scatter: null });
     await waitReadout(frame, (t) => t === "click a point");
   }
 
@@ -367,7 +368,8 @@ try {
 
   {
     const img = await openPlayer("image", "gallery_image");
-    const win = (i0, i1, j0, j1) => ({ items: [{ layer: "img", index: 0, payload: { i0, i1, j0, j1, xmin: 0, xmax: 1, ymin: 0, ymax: 1 } }] });
+    // `bind = :img`: the value's one field is the grid's, holding the box's window.
+    const win = (i0, i1, j0, j1) => ({ img: { items: [{ layer: "img", index: 0, payload: { i0, i1, j0, j1, xmin: 0, xmax: 1, ymin: 0, ymax: 1 } }] } });
     const windows = [[0, 7, 0, 5], [3, 3, 2, 2], [1, 4, 0, 3], [6, 7, 4, 5]];
     for (const [i0, i1, j0, j1] of windows) {
       const before = await img.outputs();
@@ -386,8 +388,11 @@ try {
   const dragChecks = async (pl, embed, moves, describe) => {
     // A selecting box starts at what it holds (#330), so the page already shows that value: a
     // release with the same points leaves it as it is.
-    let prevKey = await pl.frame.evaluate(() => document.querySelector(".ip-host").value?.items ?? null)
-      .then((items) => (items ? itemsKey(items) : ""));
+    // The box fills its target's field (#335), the one envelope holding `items`.
+    let prevKey = await pl.frame.evaluate(() => {
+      const v = document.querySelector(".ip-host").value;
+      return Object.values(v ?? {}).find((e) => e && Array.isArray(e.items))?.items ?? null;
+    }).then((items) => (items ? itemsKey(items) : ""));
     const boxCentre = () => pl.frame.evaluate(() => {
       const host = document.querySelector(".ip-host");
       let sr = null; host.querySelectorAll("*").forEach((n) => { if (n.shadowRoot) sr = n.shadowRoot; });
@@ -420,7 +425,10 @@ try {
       await page.mouse.down();
       for (let k = 1; k <= 10; k++) await page.mouse.move(x + dx * k / 10, y + dy * k / 10);
       await page.mouse.up();
-      const items = await pl.frame.evaluate(() => { const v = document.querySelector(".ip-host").value; return v && v.items ? v.items : null; });
+      const items = await pl.frame.evaluate(() => {
+        const v = document.querySelector(".ip-host").value;
+        return Object.values(v ?? {}).find((e) => e && Array.isArray(e.items))?.items ?? null;
+      });
       if (items === null) throw new Error(`${embed}: a drag did not commit an items value`);
       const what = describe(items);
       const v = itemsKey(items);

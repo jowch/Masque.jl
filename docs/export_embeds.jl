@@ -557,7 +557,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     end
 
     n_states = length(states)
-    snapshots, extra = snapshot_table(keyed)
+    snapshots, extra = snapshot_table(keyed; manifest = widget_manifest(widget))
     check_budget(path, n_states, length(snapshots["snaps"]), extra)
 
     widget_html = inject_manifest_snapshots(something(idle_html), snapshots)
@@ -651,7 +651,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         if (!snaps) return false;
         const snap = lookup(snaps, host.value);
         if (!snap) {
-          if (host.value != null) console.warn("masque player: no snapshot for", keyOf(host.value));
+          if (host.value != null) console.warn("masque player: no snapshot for", keyOf(snaps, host.value));
           return false;
         }
         const img = host.querySelector("img");

@@ -10,11 +10,11 @@ Tooltips and highlights respond in the browser without Julia, so they
 are instant. The `@bind` value changes only when you click. To use a
 mark in Julia, click it. See [How interactions work](@ref).
 
-A click selects one mark and replaces the previous selection. To select
-several marks at once, drag a box over them with an
-[`ROIInteractable`](@ref). The box is a rectangle, and a widget takes
-one box, which selects from one layer: a set of points, or a heatmap or
-image.
+A click selects one mark of a plot and replaces that plot's previous
+selection, and each plot in the figure keeps its own. To select several
+marks at once, drag a box over them with an [`ROIInteractable`](@ref).
+The box is a rectangle and selects from one layer: a set of points, or
+a heatmap or image.
 
 Your figure stays as you created it. Highlights are drawn on top of the
 image, so a click on its own cannot hide a series, recolor a mark, or
@@ -58,7 +58,7 @@ want, with the scatter before the polygon, and add `auto = false` so
 that `masque` uses your list in place of its own:
 
 ```julia
-@bind pick masque(
+@bind sel masque(
     fig,
     [PointInteractable(ax, s), PolygonInteractable(ax, p)];
     auto = false,

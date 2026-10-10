@@ -34,17 +34,17 @@ begin
     fig = Figure(size = (480, 400))
     ax = PolarAxis(fig[1, 1])
     pts = Point2f[(0.0, 1.0), (π / 2, 2.0), (π, 1.5), (3π / 2, 2.5)]
-    scatter!(ax, pts; markersize = 18)
+    s = scatter!(ax, pts; markersize = 18)
     nothing
 end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`: `pick.x` is the angle and `pick.y` is the radius.
+`bind = s` makes `pick` the clicked point itself, and `@bind pick` saves a click in `pick`: `pick.x` is the angle and `pick.y` is the radius.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind pick masque(fig)
+@bind pick masque(fig; bind = s)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""

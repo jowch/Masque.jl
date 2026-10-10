@@ -43,12 +43,14 @@ end;
 
 # ╔═╡ c0000000-0000-0000-0000-000000000011
 # The @bind under test: clicking a scatter marker in the :webgl widget round-trips an
-# InteractionEvent back to `ev` THROUGH the live Pluto kernel (bond transport + reactive re-run).
+# InteractionEvent back to `ev.scatter` THROUGH the live Pluto kernel (bond transport + reactive
+# re-run). `ev` holds one field per plot that takes clicks (#335).
 @bind ev masque(fig)
 
 # ╔═╡ c0000000-0000-0000-0000-000000000012
 # Stable output element the browser asserts on (a distinct id, so it can't match the cell SOURCE
-# which also contains "BOND="). Starts "BOND=nothing"; a click makes the kernel re-run this cell.
+# which also contains "BOND="). Starts "BOND=(scatter = nothing,)"; a click makes the kernel
+# re-run this cell.
 HTML("<span id=\"bondout\">BOND=$(repr(ev))</span>")
 
 # ╔═╡ Cell order:

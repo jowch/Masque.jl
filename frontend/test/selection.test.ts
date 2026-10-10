@@ -6,7 +6,7 @@ import { cellRange, computeSelection, layerNElements, selectionFor, linkedHits, 
 import type { Hit, HitLayer, Manifest } from "../src/types"
 
 // layerNElements' other kind branches (circles/rects/polygons/segments/polyline) are exercised
-// indirectly via overlay.test.ts's `selected=` pre-highlight cases (through hitLayerByIndex,
+// indirectly via overlay.test.ts's starting-pick (`initial`) pre-highlight cases (through hitLayerByIndex,
 // which gates on SELECTED_KINDS before calling in). :grid is not in SELECTED_KINDS — that path
 // never reaches this branch — so it needs a direct call to cover.
 describe("layerNElements", () => {
@@ -183,6 +183,12 @@ describe("selectionForValue", () => {
     })
 })
 
+// The `{items}` a selecting box's target starts at: its field in the manifest's `initial`.
+function startItems(m: Manifest, target: HitLayer): { layer: string; index: number; payload?: Record<string, number> }[] {
+    const field = m.initial?.[target.id] as { items?: [] } | null | undefined
+    return field?.items ?? []
+}
+
 // A selecting box's bond starts at what Julia computes its starting bounds contain (#330).
 // These goldens are Julia manifests (test/parity_corpus.jl); a release of the untouched box
 // runs computeSelection, so the two must agree or the value would change on a no-op drag.
@@ -196,10 +202,9 @@ describe("a selecting box's starting value matches computeSelection (Julia parit
                 const target = m.layers.find((l) => l.id === roi.selects) as HitLayer
                 const box = roi.geometry as { x: number; y: number; w: number; h: number }
                 const got = computeSelection(box, target, m.transforms[target.axis]).items
-                // Marks start as the target's `selected`; a grid's cell block ships in `initial`.
-                const want: { layer: string; index: number; payload?: Record<string, number> }[] = target.kind === "grid"
-                    ? (m.initial as { items: { layer: string; index: number; payload: Record<string, number> }[] }).items
-                    : (target.selected ?? []).map((index) => ({ layer: target.id, index }))
+                // The target's field starts at `{items}`: the marks or the cell block the box holds.
+                type Item = { layer: string; index: number; payload?: Record<string, number> }
+                const want: Item[] = startItems(m, target)
                 expect(got.length).toBeGreaterThan(0)
                 expect(got.map(({ layer, index }) => ({ layer, index }))).toEqual(want.map(({ layer, index }) => ({ layer, index })))
                 for (let k = 0; k < got.length; k++) {

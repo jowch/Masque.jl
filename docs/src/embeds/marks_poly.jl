@@ -33,7 +33,7 @@ Create the polygons the way you normally would, and `masque` makes each polygon 
 begin
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; aspect = DataAspect())
-    poly!(
+    p = poly!(
         ax,
         [
             Point2f[(0.0, 0.0), (1.0, 0.0), (0.5, 0.85)],
@@ -47,11 +47,11 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`, while hovering only highlights the polygon and leaves `pick` as it was.
+`bind = p` makes `pick` the clicked polygon itself. `@bind pick` saves a click in `pick`, while hovering only highlights the polygon and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind pick masque(fig)
+@bind pick masque(fig; bind = p)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""

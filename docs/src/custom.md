@@ -20,7 +20,7 @@ see [Your own plot types](@ref).
 
 Pass a list of shapes and one payload per shape. Hovering over a region
 shows its payload in the tooltip. A click returns an
-[`ElementEvent`](@ref) with the payload's fields, such as `pick.name`:
+[`ElementEvent`](@ref) with the payload's fields, such as `name`:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -53,9 +53,13 @@ The regions are not drawn on the figure, so only the hover highlight
 shows where one is. To show them all the time, draw their outlines with
 Makie.
 
-Each kind of shape gets its own layer id, which is what `pick.layer`
-reports and what `selected=` takes. With `id = :cells`, circles are
-`:cells_c`, rectangles are `:cells_r`, and polygons are `:cells_p`.
+Each kind of shape gets its own layer id, which names its field in the
+`@bind` value and is what `pick.layer` reports and what `selected=`
+takes. With `id = :cells`, circles are `sel.cells_c`, rectangles are
+`sel.cells_r`, and polygons are `sel.cells_p`, and each holds its own
+selection, so a circle and a rectangle can be selected at once. To have
+one selection across every region, make them all the same kind, such as
+polygons.
 
 ## Compute hit geometry
 
@@ -97,12 +101,13 @@ end
 ```
 
 ```julia
-@bind pick masque(fig, track; auto = false)
+@bind pick masque(fig, track; auto = false, bind = :track)
 ```
 
 `auto = false` leaves out the layer `masque` would add for the
 `linesegments!` plot itself, so each segment responds once, through
-`track`.
+`track`. The value has a field for each layer the function returns,
+named by its id, and `bind = :track` makes the value that layer's pick.
 
 How a layer's `geometry` is laid out depends on the layer's kind: it
 is a flat vector of image pixels for most kinds, and a vector of paths
@@ -193,11 +198,13 @@ end
 ```
 
 ```julia
-@bind pick masque(fig, cities; auto = false)
+@bind pick masque(fig, cities; auto = false, bind = cities)
 ```
 
 `auto = false` leaves out the layer `masque` would add for the scatter
-itself, so a click on a city reaches `cities` and returns a `CityPick`.
+itself, so a click on a city reaches `cities` and returns a `CityPick`,
+and `bind = cities` makes the value that `CityPick`, or `nothing` before
+the first click.
 
 ```julia
 isnothing(pick) ? "click a city" : "$(pick.city), $(pick.pop) million"

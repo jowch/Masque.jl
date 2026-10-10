@@ -30,17 +30,17 @@ roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = s)
 ```
 
 ```julia
-@bind picks masque(fig, pts, roi)
+@bind picks masque(fig, pts, roi; bind = s)
 ```
 
 `bounds` is where the box starts, as `(xmin, xmax, ymin, ymax)` in data
 coordinates.
 
-`picks` lists the points inside the box: one [`ElementEvent`](@ref)
-per point, holding that point's payload fields, such as `name` and
-`group`. It starts with the points inside `bounds`, highlighted, and
-each release replaces it with the points inside the box then. A box
-with no points inside gives an empty list.
+`bind = s` makes `picks` the scatter's field: the points inside the box,
+as one [`ElementEvent`](@ref) per point, holding that point's payload
+fields, such as `name` and `group`. It starts with the points inside
+`bounds`, highlighted, and each release replaces it with the points
+inside the box then. A box with no points inside gives an empty list.
 
 Use `picks` to index your data: `samples[picks]` is the rows of
 `samples` inside the box.
@@ -59,9 +59,17 @@ with the same columns when the box is empty, use `df[1:0, :]`:
 isempty(picks) ? df[1:0, :] : df[picks, :]
 ```
 
-Only the box sets `picks`: hovering a point, or anything else in the
-widget, still shows its tooltip, but clicking it does not change
-`picks`. To click marks as well, put them in a separate `masque` call.
+Only the box sets `picks`: hovering a point still shows its tooltip, but
+clicking it does not change `picks`. Without `bind`, the value is a
+named tuple with a field for the scatter and one for the box, which
+holds a [`BoundsEvent`](@ref) with where the box sits:
+
+```julia
+@bind sel masque(fig, pts, roi)
+```
+
+Here `sel.scatter` is the points inside and `sel.roi` is the box. Other
+plots in the figure keep their own fields and still take clicks.
 
 ## Brush heatmap cells
 
@@ -71,10 +79,16 @@ one [`GridWindowEvent`](@ref) for the block of cells it covers.
 
 ## Read the box itself
 
-Leave out `selects` and the value is the box: a [`BoundsEvent`](@ref)
-with `xmin`, `xmax`, `ymin`, and `ymax`. It starts at `bounds`, so
-`box.xmin` works before the first drag. Use this when the region is
-what you want, such as a time window, a crop, or a range to fit over.
+Leave out `selects`, and the box's field holds only the box: a
+[`BoundsEvent`](@ref) with `xmin`, `xmax`, `ymin`, and `ymax`. It starts
+at `bounds`, so `box.xmin` works before the first drag. Use this when
+the region is what you want, such as a time window, a crop, or a range
+to fit over. To have the value be the box itself, pass it as `bind`:
+
+```julia
+box = ROIInteractable(ax; bounds = (2.0, 5.0, 0.0, 1.0))
+@bind window masque(fig, box; bind = box)
+```
 
 To start one widget's box where another's was released, pass that
 widget's `BoundsEvent` as `bounds`.
@@ -96,9 +110,10 @@ that arrow points to, and Alt+Shift with an arrow shrinks it. See
 image. A plot that draws both lines and points, such as `scatterlines`,
 gives the box its points. `selects` also takes a layer id, such as the
 `id` you gave [`interactables`](@ref), and that layer must be in the
-same `masque` call. A widget takes one box, and no threshold or
-colorbar you pass alongside it, since each owns the widget's value. The
-box needs a 2D `Axis`; see
+same `masque` call. One widget can hold several boxes, each with its own
+field, along with thresholds and plots you click. The plot a box selects
+from takes no clicks, since the box sets its field. The box needs a 2D
+`Axis`; see
 [Supported plots and axes](@ref) for which axes and scales.
 
 For larger examples, [Box-select scatter](@ref) summarizes two groups

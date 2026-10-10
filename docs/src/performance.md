@@ -38,6 +38,12 @@ leave the value unchanged, so those cells do not run. Panning and orbiting rende
 each frame while you drag, so they cost one render per frame. For what
 each gesture changes, see [How interactions work](@ref).
 
+Cells that use the `@bind` value respond when any of its fields
+changes, so a slow cell that needs one plot's pick also runs again when
+you click another plot or release a box. To keep it from running, pass
+`bind` the fields that cell needs, so the value holds only those; see
+[What the `@bind` value holds](@ref).
+
 ## Keeping large figures fast
 
 Every payload field is sent with every mark, so keep payloads to the
@@ -56,7 +62,7 @@ so the other points are left out:
 
 ```julia
 outliers = PointInteractable(ax, [(2.0, 9.5), (7.0, 0.3)])
-@bind pick masque(fig, outliers; auto = false)
+@bind sel masque(fig, outliers; auto = false)
 ```
 
 With `auto = false`, only what you pass is interactive, so to keep

@@ -270,35 +270,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const host: WebGLHost = hostEl
     let base: HTMLElement = found
 
-    // The @bind target is the host element. Seed the same envelope Julia's `mount_envelope`
-    // builds, or Pluto's mount-time read overwrites `initial_value`. A selects-elements widget
-    // seeds `{items}` from its target's indices (Julia stamps the marks inside the box's
-    // starting bounds there when `selected=` names none); indices on other layers only
-    // highlight. Otherwise a widget whose bond has an owner seeds that owner's `initial`
-    // envelope (a box over a grid holds the cells inside its starting bounds), and hydrated
-    // indices are a highlight only. One
-    // hydrated index on a scalar layer seeds `{layer, index}`. Several indices on a scalar layer
-    // are a highlight only (`null`): that interaction holds one event, so a set is not a value
-    // it can carry.
-    //
-    // No `payload` key: `selected=` only ever hydrates a SELECTED_KINDS layer (hitLayerByIndex
-    // throws otherwise), and Julia reconstructs an element hit from its own manifest rather than
-    // trusting an upload. Built in the same loop as `selHits` so both read `hitLayerByIndex` —
-    // which throws on an unsupported kind or an out-of-range index — before either is assigned.
-    const hydrated: { layer: string; index: number }[] = []
-    const selHits: Hit[] = []
-    for (const layer of manifest.layers) {
-        for (const idx of layer.selected ?? []) {
-            selHits.push({ layer, ...hitLayerByIndex(layer, idx) })
-            hydrated.push({ layer: layer.id, index: idx })
-        }
-    }
-    const selection = manifest.selection
-    const seedItems = selection === "elements"
-    const owned = manifest.bondOwner !== undefined
-    const hostValue = seedItems ? { items: hydrated.filter((h) => h.layer === manifest.selectionTarget) }
-        : owned ? (manifest.initial ?? null)
-        : hydrated.length === 1 ? hydrated[0] : null
+    // The @bind target is the host element. Seed the same value Julia's `mount_envelope`
+    // reads, the manifest's `initial` (one envelope per field), or Pluto's mount-time read
+    // overwrites `initial_value`. Every field is a key, `null` until something is picked.
+    const fields = manifest.fields ?? []
+    const hostValue: Record<string, unknown> = {}
+    for (const f of fields) hostValue[f] = manifest.initial?.[f] ?? null
 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })
@@ -454,24 +431,34 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         gesture_: channel,
         photoPaint_: (m) => paintPhoto(m),
         // Through `host.value`, not into `bondValue`: a page may wrap the property after mount
-        // (the docs player does, to swap its snapshots) and must see every commit.
-        setValue_: (v) => {
+        // (the docs player does, to swap its snapshots) and must see every commit. The value is
+        // a fresh object each time, so Pluto sees a change.
+        commit_: (updates) => {
+            const isField = new Set(ctx.manifest_.fields ?? fields)
+            const kept = Object.entries(updates).filter(([k]) => isField.has(k))
+            if (!kept.length) return
+            const cur = (host as unknown as { value: unknown }).value
+            const next: Record<string, unknown> = { ...(cur && typeof cur === "object" ? cur as Record<string, unknown> : hostValue) }
+            for (const [k, v] of kept) next[k] = v
             committing = true
             try {
-                (host as unknown as { value: unknown }).value = v
+                (host as unknown as { value: unknown }).value = next
             } finally {
                 committing = false
             }
+            host.dispatchEvent(new CustomEvent("input"))
         },
     }
     const state = createOverlayState()
-    // A box over a grid starts at the cells inside its starting bounds, which Julia computed
-    // into `initial`. Highlight them as a release would. (A box over marks already highlights
-    // its start through the target's `selected`.)
-    const startHits = owned && !seedItems ? (selectionForValue(manifest, hostValue)?.hits ?? []) : []
-    state.selHits_ = [...selHits, ...startHits]
-    // A brush seed belongs to the box, not a click, so only a scalar seed can be clicked off.
-    if (!seedItems && !owned && hydrated.length === 1) state.selSource_ = hydrated[0]
+    // Each field starts highlighted at its `initial` value: a `selected=` pick, or what a box
+    // over marks or cells holds at its starting bounds.
+    const restoreSelection = (v: Record<string, unknown>) => {
+        for (const f of fields) {
+            const sel = selectionForValue(ctx.manifest_, v[f] ?? null)
+            if (sel) state.sel_.set(f, { hits_: sel.hits, source_: sel.source })
+        }
+    }
+    restoreSelection(hostValue)
 
     // `host.value` is the bond. Pluto writes it after mount: on a page reload it restores the
     // kernel's value, which can be a click made since the `selected=` seed. Until a gesture of
@@ -493,13 +480,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         get: getBond,
         set: (v: unknown) => {
             if (committing) restoring = false
-            else if (restoring && !sameValue(v, bondValue)) {
-                const sel = selectionForValue(ctx.manifest_, v)
-                if (sel) {
-                    state.selHits_ = sel.hits
-                    state.selSource_ = sel.source
-                    renderSelection(ctx, state)
-                }
+            else if (restoring && !sameValue(v, bondValue) && v && typeof v === "object") {
+                restoreSelection(v as Record<string, unknown>)
+                renderSelection(ctx, state)
             }
             bondValue = v
         },
@@ -667,26 +650,28 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideTip(ctx, state)
 
         // Re-key the LIVE selection against the new layer objects — do NOT re-derive it from
-        // the new manifest's own `selected=` field, which is only the mount-time hydration seed;
-        // reading it here would resurrect that and silently drop every click since (#102
-        // tripwire #3, the #107 regression shape). `selKeys_` is already id-keyed and gets
-        // rebuilt by `renderSelection` itself, so only `selHits_` needs re-keying here.
-        const nextSel: Hit[] = []
-        for (const h of state.selHits_) {
-            const layer = newManifest.layers.find((l) => l.id === h.layer.id)
-            if (!layer) continue
-            if (layer.kind === "surface") {
-                const kept = surfaceSelection(layer, h.index)
-                if (kept) nextSel.push(kept)
-                continue
+        // the mount manifest's `initial`, which is only the starting value (a frame's manifest
+        // leaves it out); reading it here would resurrect that and silently drop every click
+        // since (#102 tripwire #3, the #107 regression shape). `selKeys_` is already id-keyed and gets
+        // rebuilt by `renderSelection` itself, so only `sel_` needs re-keying here.
+        for (const [f, sel] of state.sel_) {
+            const nextSel: Hit[] = []
+            for (const h of sel.hits_) {
+                const layer = newManifest.layers.find((l) => l.id === h.layer.id)
+                if (!layer) continue
+                if (layer.kind === "surface") {
+                    const kept = surfaceSelection(layer, h.index)
+                    if (kept) nextSel.push(kept)
+                    continue
+                }
+                try {
+                    nextSel.push({ layer, ...hitLayerByIndex(layer, h.index) })
+                } catch {
+                    /* index no longer valid against the new geometry — drop rather than throw mid-gesture */
+                }
             }
-            try {
-                nextSel.push({ layer, ...hitLayerByIndex(layer, h.index) })
-            } catch {
-                /* index no longer valid against the new geometry — drop rather than throw mid-gesture */
-            }
+            state.sel_.set(f, { hits_: nextSel, source_: sel.source_ })
         }
-        state.selHits_ = nextSel
         renderSelection(ctx, state)
         adoptPhoto(input)
         dragStops?.sync_()
@@ -1025,7 +1010,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
 
     // Drawn into g.sel, not g.hi: it must survive hovers (onMove clears g.hi on every miss)
     // and support multiple selected indices (drawHi keeps only the last).
-    if (state.selHits_.length) renderSelection(ctx, state)
+    if (state.sel_.size) renderSelection(ctx, state)
 
     let cleaned = false
     const cleanup = () => {

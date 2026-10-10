@@ -88,7 +88,7 @@ end;
 ```
 
 ```julia
-@bind pick fig
+@bind sel fig
 ```
 
 End the cell with `;` so Pluto doesn't show the figure twice.

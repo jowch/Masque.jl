@@ -8,7 +8,8 @@ channel.
 inside the box, not the pixel values, so you index your own arrays with
 it: `R[region]` is the block of `R` under the box. A
 [`GridInteractable`](@ref) over the image gives the box pixels to
-select, and `selects = :img` ties the box to it. See
+select, `selects = :img` ties the box to it, and `bind = :img` makes
+`region` that grid's value. See
 [Inspect a grid](@ref) and [Brush a region](@ref).
 
 ```@raw html

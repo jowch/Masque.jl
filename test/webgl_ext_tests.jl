@@ -171,19 +171,19 @@ include("wgl_compat_tests.jl")
     wrong = JSON3.read(JSON3.write(Dict("bogus" => true)))
     js = Dict{String, Any}("layer" => layer["id"], "index" => k, "payload" => wrong)
 
-    ev = APD.Bonds.transform_value(w, js)
+    ev = APD.Bonds.transform_value(w, Dict{String, Any}("scatter" => js)).scatter
     @test ev isa IE
     @test ev.layer === :scatter
     @test ev.index == k + 1
     @test ev.payload === layer["payloads"][k + 1]   # reconstructed, not `wrong`
 
-    @test APD.Bonds.initial_value(w) === nothing
-    @test APD.Bonds.transform_value(w, nothing) === nothing
+    @test APD.Bonds.initial_value(w) === (; scatter = nothing)
+    @test APD.Bonds.transform_value(w, nothing) === (; scatter = nothing)
 
-    # second item has no "payload" key at all — reconstruction doesn't need one
-    # a plain scatter has no selects-ROI, so an items envelope is not a vector bond
+    # a plain scatter is a pick, not a box's target, so an items envelope is refused
     multi = Dict{String, Any}("items" => [js, Dict{String, Any}("layer" => "scatter", "index" => 0)])
-    @test_throws ArgumentError APD.Bonds.transform_value(w, multi)
+    @test_throws ArgumentError APD.Bonds.transform_value(w, Dict{String, Any}("scatter" => multi))
+    @test_throws ArgumentError APD.Bonds.transform_value(w, js)   # the old single-envelope value
 end
 
 @testset "@bind payload reconstruction matches Masque._bond_payload (WGL/Cairo must not drift)" begin
@@ -195,17 +195,17 @@ end
     scatter!(ax, first.(pts), last.(pts))
     payloads = [(; label = "p1"), (; label = "p2"), (; label = "p3")]
     pt = PointInteractable(ax, pts; id = :scatter, payloads = payloads)
-    w = masque(fig, pt; backend = :webgl, auto = false)
+    w = masque(fig, pt; backend = :webgl, auto = false, bind = pt)
 
-    ev = APD.Bonds.transform_value(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "wrong"))
+    ev = APD.Bonds.transform_value(w, Dict{String, Any}("scatter" => Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "wrong")))
     @test ev isa Masque.ElementEvent && ev.index == 2
     @test ev.payload === pt.payloads[2]   # the label merged onto the point's x and y (#308)
     # both backends call Masque.bond_from_js — not a second copy of the transform
-    @test ev == Masque.bond_from_js(w, Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "ignored"))
+    @test ev == Masque.bond_from_js(w, Dict{String, Any}("scatter" => Dict{String, Any}("layer" => "scatter", "index" => 1, "payload" => "ignored")))
 
     # out-of-range index: same fail-loud contract as the Cairo widget
     @test_throws ArgumentError APD.Bonds.transform_value(
-        w, Dict{String, Any}("layer" => "scatter", "index" => 99, "payload" => nothing)
+        w, Dict{String, Any}("scatter" => Dict{String, Any}("layer" => "scatter", "index" => 99, "payload" => nothing))
     )
 end
 
@@ -221,17 +221,15 @@ end
     w = masque(fig; backend = :webgl, selected = 2)
     layer = only(w.manifest["layers"])
     @test layer["id"] == "scatter"
-    @test layer["selected"] == [1]
+    @test w.manifest["initial"]["scatter"] == Dict("layer" => "scatter", "index" => 1)
 
-    hydrated = APD.Bonds.initial_value(w)
+    hydrated = APD.Bonds.initial_value(w).scatter
     @test hydrated isa Masque.ElementEvent
     @test hydrated.layer === :scatter && hydrated.index == 2
     @test hydrated.payload == layer["payloads"][2]
 
-    # several indices highlight and leave the bond nothing
-    wmany = masque(fig; backend = :webgl, selected = [2, 4])
-    @test only(wmany.manifest["layers"])["selected"] == [1, 3]
-    @test APD.Bonds.initial_value(wmany) === nothing
+    # a pick holds one element
+    @test_throws ArgumentError masque(fig; backend = :webgl, selected = [2, 4])
 end
 
 # MUST run last in this file: this loads CairoMakie on top of the already-loaded WGLMakie.

@@ -1,8 +1,8 @@
 # Selection
 
-Clicking a mark selects it. The mark stays highlighted, and the `@bind`
-variable holds it until another click replaces it. Click the mark again
-to clear the selection. You can also start
+Clicking a mark selects it. The mark stays highlighted, and its plot's
+field in the `@bind` value holds it until another click on that plot
+replaces it. Click the mark again to clear the selection. You can also start
 with a mark selected, or keep a selection when the figure is rebuilt.
 
 The examples on this page use a scatter of cities, with each city's
@@ -10,21 +10,27 @@ name in its payload's `city` field:
 
 ```julia
 cities = interactables(s; id = :cities, payloads = rows)
-@bind pick masque(fig, cities)
+@bind sel masque(fig, cities)
 ```
+
+The `id` names the field, so the selected city is `sel.cities`.
 
 ## What replaces a selection
 
-`pick` starts as `nothing`, and clicking a mark makes `pick` that
-mark's [`ElementEvent`](@ref). Clicking another mark replaces it,
-because one widget holds one selection. Clicking empty space changes
-nothing: the highlight stays and `pick` keeps its value, so a stray
-click does not lose your choice. Clicking the selected mark again
-clears it: the highlight goes and `pick` is `nothing` again.
+`sel.cities` starts as `nothing`, and clicking a city makes it that
+city's [`ElementEvent`](@ref). Clicking another city replaces it,
+because a plot holds one selection. Clicking empty space changes
+nothing: the highlight stays and `sel.cities` keeps its value, so a
+stray click does not lose your choice. Clicking the selected city again
+clears it: the highlight goes and `sel.cities` is `nothing` again.
 
-To select several marks at once, drag a box over them instead: an
-[`ROIInteractable`](@ref) with `selects` returns every mark inside it,
-as [Brush a region](@ref) shows.
+Each plot keeps its own selection, so in a figure with two scatters,
+clicking a point in one leaves the other's field as it was.
+
+A click selects one mark of a plot and replaces that plot's previous
+selection. To select several marks at once, drag a box over them
+instead: an [`ROIInteractable`](@ref) with `selects` returns every mark
+inside it, as [Brush a region](@ref) shows.
 
 ## Start with a mark selected
 
@@ -33,10 +39,10 @@ plotted as `selected=`. These are the same numbers `pick.index` gives,
 so `selected = 1` is the first city:
 
 ```julia
-@bind pick masque(fig, cities; selected = 1)
+@bind sel masque(fig, cities; selected = 1)
 ```
 
-The first city starts highlighted and `pick` starts as its event, so
+The first city starts highlighted and `sel.cities` starts as its event, so
 other cells have something to show before anyone clicks. Click another
 city to replace it:
 
@@ -50,17 +56,20 @@ city to replace it:
 Main.masque_fallback("selection_start")
 ```
 
-When the widget has more than one layer you could select, name the
-layer: `selected = (; cities = 1)`, or `selected = Dict(:cities => [1, 3])`
-for several marks. In that case a bare number raises an
+When the widget has more than one plot you could select, name the
+field: `selected = (cities = 1,)`, or `selected = (cities = 1, scatter_2 = 3)`
+for one mark in each of two plots. In that case a bare number raises an
 `ArgumentError`, and so does a position outside your data.
 
-`selected = [1, 3]` highlights both cities, but `pick` stays `nothing`
-until the next click, because a click holds one mark. With a `selects`
-box in the widget, `pick` starts as both events.
+A plot holds one selected mark, so `selected = [1, 3]` raises an
+`ArgumentError`. To start with several marks selected, use a box with
+`selects`: its plot's field takes a list, as in
+`selected = (cities = [1, 3],)`, which replaces what the box starts
+with.
 
-Points, bars, polygons, lines, and segments can start selected, but
-heatmap cells, axis readouts, boxes, thresholds, and the view cannot. A
+Points, bars, polygons, segments, and lines you name in `bind` can
+start selected, but heatmap cells, axis readouts, boxes, thresholds, and
+the view cannot. A
 box or a threshold line starts where its `bounds` or `value` puts it,
 so to start one somewhere else, set those instead; see
 [Read the box itself](@ref) and [Drag a threshold](@ref).
@@ -78,17 +87,17 @@ not carry it over.
 
 To keep a selection, keep what identifies the mark, such as the city's
 name, and look up its position after the rebuild. First, store the
-name in a cell that does not use `pick`:
+name in a cell that does not use `sel`:
 
 ```julia
 last_city = Ref("Delhi")
 ```
 
-Update it from `pick` in another cell:
+Update it from `sel.cities` in another cell:
 
 ```julia
-if !isnothing(pick)
-    last_city[] = pick.city
+if !isnothing(sel.cities)
+    last_city[] = sel.cities.city
 end
 ```
 
@@ -101,13 +110,13 @@ start = findfirst(name -> name == last_city[], city_names)
 ```
 
 ```julia
-@bind pick masque(fig, cities; selected = start)
+@bind sel masque(fig, cities; selected = start)
 ```
 
 If the city is no longer in the data, `findfirst` returns `nothing` and
 no city starts selected.
 
-Passing the widget its own value, `selected = pick`, does not work:
+Passing the widget its own value, `selected = sel.cities`, does not work:
 Pluto refuses the cell with a **Cyclic references** error. Between
 rebuilds you do not need it, because the widget keeps its highlight.
 

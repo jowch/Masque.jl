@@ -35,16 +35,19 @@
             },
             "bond": "axis",
             "events": [
+                "click",
                 "hover"
             ]
         }
     ],
     "initial": {
-        "payload": 4,
-        "layer": "threshold",
-        "index": 0
+        "threshold": {
+            "payload": 4,
+            "layer": "threshold",
+            "index": 0
+        },
+        "axis": null
     },
-    "bondOwner": "threshold",
     "transforms": {
         "ax1": {
             "xscale": "identity",
@@ -74,5 +77,9 @@
         }
     },
     "width": 1200,
-    "scaling": 2
+    "scaling": 2,
+    "fields": [
+        "threshold",
+        "axis"
+    ]
 }

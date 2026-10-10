@@ -66,7 +66,7 @@ your notebook gets their value:
 | To get | Use | You | Your notebook gets |
 |---|---|---|---|
 | The value of each line you pass it, at the pointer | [`SliceInteractable`](@ref) | hover | nothing |
-| Which line you clicked | `masque(fig)` | click a line | that line ([Click marks](@ref)) |
+| Which line you clicked | `masque(fig)`, with the line in `bind` | click a line | that line ([Click marks](@ref)) |
 | The coordinates you clicked | [`AxisInteractable`](@ref) | click | `x` and `y` ([Read coordinates](@ref)) |
 | A cutoff | [`ThresholdInteractable`](@ref) | drag a line | its position ([Read coordinates](@ref)) |
 | A range of `x` and `y`, or the points in it | [`ROIInteractable`](@ref) | drag a box | the box or the points inside ([Brush a region](@ref)) |
@@ -83,15 +83,17 @@ saves the position:
 ```julia
 @bind at masque(
     fig,
-    SliceInteractable([a, b]),
-    AxisInteractable(ax);
+    SliceInteractable([a, b]);
     auto = false,
+    bind = AxisInteractable(ax),
 )
 ```
 
-`auto = false` keeps the lines from taking the click, so a click on a
-line still saves a position rather than the line. `at` is `nothing`
-until the first click. After that, `at.x` is the `x` you clicked, and a later cell can
+`bind = AxisInteractable(ax)` adds the readout and makes `at` its
+value, and `auto = false`
+leaves out what `masque(fig)` would add for the lines and their legend,
+so only the slice and the readout respond to the pointer. `at` is
+`nothing` until the first click. After that, `at.x` is the `x` you clicked, and a later cell can
 read your data there:
 
 ```julia

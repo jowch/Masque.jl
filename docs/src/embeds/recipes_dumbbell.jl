@@ -73,17 +73,17 @@ end
 begin
     fig = Figure(size = (560, 300))
     ax = Axis(fig[1, 1]; xlabel = "score", yticks = (1:3, ["north", "east", "south"]))
-    dumbbell!(ax, [3.0, 5.5, 2.0], [4.5, 4.0, 6.0])
+    d = dumbbell!(ax, [3.0, 5.5, 2.0], [4.5, 4.0, 6.0])
     nothing
 end
 
 # ╔═╡ c5d1e7a0-0001-4000-8000-000000000012
 md"""
-`masque(fig)` uses the method for the `dumbbell!` plot, and `@bind pick` saves a click in `pick`.
+`masque(fig)` uses the method for the `dumbbell!` plot, `bind = d` makes `pick` the clicked row itself, and `@bind pick` saves a click in `pick`.
 """
 
 # ╔═╡ c5d1e7a0-0001-4000-8000-000000000005
-@bind pick masque(fig)
+@bind pick masque(fig; bind = d)
 
 # ╔═╡ c5d1e7a0-0001-4000-8000-000000000013
 md"""

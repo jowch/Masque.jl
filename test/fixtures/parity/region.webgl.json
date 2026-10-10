@@ -71,6 +71,11 @@
             ]
         }
     ],
+    "initial": {
+        "region_r": null,
+        "region_c": null,
+        "region_p": null
+    },
     "transforms": {
         "ax1": {
             "xscale": "identity",
@@ -100,5 +105,10 @@
         }
     },
     "width": 1200,
-    "scaling": 2
+    "scaling": 2,
+    "fields": [
+        "region_c",
+        "region_r",
+        "region_p"
+    ]
 }

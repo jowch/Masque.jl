@@ -16,26 +16,16 @@ end
 """
     bondtype(interactable) -> Type
 
-The type of one commit from this interactable. Default [`ElementEvent`](@ref). When the same
-widget carries a threshold, an ROI, or a colorbar the caller passed, this interactable's layer
-commits no clicks at all: that control owns the bond. That is a property of the call, not of the
-layer's `bondtype`.
+The type of one commit from this interactable, the value its field holds. Default
+[`ElementEvent`](@ref).
 """
 bondtype(::AbstractInteractable) = ElementEvent
 bondtype(::ViewInteractable) = Nothing
 bondtype(::GridInteractable) = GridCellEvent
 bondtype(::SurfaceInteractable) = GridCellEvent
 
-# Whether this interactable owns its widget's bond. An owner is the only layer that commits:
-# every other layer keeps hover and takes no clicks. A widget has at most one.
-owns_bond(i::AbstractInteractable) = selects(i) !== nothing
-owns_bond(::ThresholdInteractable) = true
-owns_bond(::ROIInteractable) = true
-owns_bond(i::ColorbarInteractable) = !i.auto
-
-# The wire envelope an owner's bond starts at, as the browser would send it on release, or
-# `nothing` when the owner has no value before its first commit. `layers` are the manifest's
-# layer dicts, whose image-px geometry a selecting box tests its target against.
+# The wire envelope a control's field starts at, as the browser would send it on release.
+# `layers` are the manifest's layer dicts.
 initial_envelope(::AbstractInteractable, ctx, layers) = nothing
 function initial_envelope(i::ThresholdInteractable, ctx, layers)
     t = ctx.transforms[axis_id(ctx, i.ax)]
@@ -47,23 +37,33 @@ function initial_envelope(i::ThresholdInteractable, ctx, layers)
 end
 function initial_envelope(i::ROIInteractable, ctx, layers)
     xmin, xmax, ymin, ymax = i.bounds
-    if i.selects === nothing
-        payload = Dict{String, Any}("xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax)
-        return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
+    payload = Dict{String, Any}("xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax)
+    return Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => payload)
+end
+
+# What a box's target holds before the first drag: the elements inside the box's starting
+# bounds, as a release of the untouched box would send them. `seed` is the target's 0-based
+# `selected=` indices, which win over the box. The first box on the target decides.
+function _brush_start(target, built, seed, layers)
+    tl = only(l for l in layers if l["id"] == string(target))
+    if tl["kind"] != "grid"
+        idxs = seed !== nothing ? seed : begin
+                box = first(d for (i, _, d) in built if selects(i) === target)["geometry"]
+                _contained_indices(box, tl["geometry"])
+            end
+        return Dict{String, Any}("items" => [Dict{String, Any}("layer" => string(target), "index" => k) for k in idxs])
     end
-    # A box over marks starts from its target's `selected` (`_seed_contained!`), not here.
-    target = only(l for l in layers if l["id"] == string(i.selects))
-    target["kind"] == "grid" || return nothing
-    box = only(l for l in layers if l["id"] == string(i.id))["geometry"]
-    cells = _contained_cells(box, target["geometry"])
+    i, _, d = first((i, L, d) for (i, L, d) in built if selects(i) === target)
+    cells = _contained_cells(d["geometry"], tl["geometry"])
     cells === nothing && return Dict{String, Any}("items" => Dict{String, Any}[])
     ci, cj = cells
+    xmin, xmax, ymin, ymax = i.bounds
     # The data bounds the box was given, where the browser inverts its pixel corners.
     payload = Dict{String, Any}(
         "i0" => ci[1], "i1" => ci[2], "j0" => cj[1], "j1" => cj[2],
         "xmin" => xmin, "xmax" => xmax, "ymin" => ymin, "ymax" => ymax,
     )
-    return Dict{String, Any}("items" => [Dict{String, Any}("layer" => target["id"], "index" => 0, "payload" => payload)])
+    return Dict{String, Any}("items" => [Dict{String, Any}("layer" => string(target), "index" => 0, "payload" => payload)])
 end
 
 # What a box at image-px `box` holds: the 0-based indices of the circles whose centres it
@@ -161,9 +161,7 @@ function bond_stamp(i::AbstractInteractable, L::HitLayer)
     i isa AxisInteractable && return "axis"
     i isa ColorbarInteractable && return "colorbar"
     i isa ThresholdInteractable && return "threshold"
-    if i isa ROIInteractable
-        return i.selects === nothing ? "bounds" : "none"
-    end
+    i isa ROIInteractable && return "bounds"
     i isa Union{GridInteractable, SurfaceInteractable} && return "gridcell"
     i isa SliceInteractable && return "none"
     i isa FunctionInteractable && return kind_bond_stamp(L.kind)
@@ -340,16 +338,6 @@ function normalize_selected(layer_ids::Vector{Symbol}, seedable_ids::Vector{Symb
     )
 end
 
-function explicit_empty_seed(selected)::Bool
-    selected === nothing && return false
-    selected isa AbstractVector && return isempty(selected)
-    if selected isa NamedTuple || selected isa AbstractDict
-        isempty(selected) && return false
-        return all(v -> v isa AbstractVector && isempty(v), values(selected))
-    end
-    return false
-end
-
 # Closed kinds get the selected wash; open kinds (:segments/:polyline/:lines) get the ring.
 # `selected=` on any other kind fails loud.
 const _SELECTED_KINDS = (:circles, :rects, :polygons, :segments, :polyline, :lines)
@@ -465,29 +453,26 @@ function _one_event(manifest, owners, js)
     return ev
 end
 
-function selection_value(manifest, owners, items)
-    sel = get(manifest, "selection", nothing)
-    if sel == "grid"
-        target = get(manifest, "selectionTarget", nothing)
-        target === nothing && throw(ArgumentError("bond: grid selection has no selectionTarget"))
-        id = Symbol(target)
+# A box's target field: the marks it holds as a `Vector{ElementEvent}`, or the grid cells as
+# one `GridWindowEvent`.
+function _brush_value(manifest, owners, d, env)
+    id = Symbol(d["id"])
+    env === nothing || (env isa AbstractDict && haskey(env, "items")) || throw(
+        ArgumentError("bond: field :$id holds the elements a box encloses, `{items: [...]}`; got $(repr(env))"),
+    )
+    items = env === nothing ? Any[] : env["items"]
+    if d["brush"] == "grid"
         isempty(items) && return _grid_window_event(id, nothing)
         length(items) == 1 || throw(
             ArgumentError("bond: a grid brush must carry one window item, got $(length(items))"),
         )
-        it = only(items)
-        return _grid_window_event(id, get(it, "payload", nothing))
-    end
-    if sel != "elements"
-        throw(
-            ArgumentError(
-                "bond: an items envelope needs a selects target " *
-                    "(manifest selection is $(repr(sel)))",
-            ),
-        )
+        return _grid_window_event(id, get(only(items), "payload", nothing))
     end
     out = ElementEvent[]
     for it in items
+        String(it["layer"]) == d["id"] || throw(
+            ArgumentError("bond: field :$id holds an element of layer :$(it["layer"])"),
+        )
         ev = _one_event(manifest, owners, it)
         ev isa ElementEvent || throw(
             ArgumentError("bond: selection item is a $(typeof(ev)), expected ElementEvent"),
@@ -497,53 +482,50 @@ function selection_value(manifest, owners, items)
     return out
 end
 
-"""
-    mount_envelope(manifest) -> Union{Nothing, Dict}
-
-The wire envelope `mount.ts` seeds into `host.value` at mount, so Julia `initial_value` and the
-browser agree. A `selects` elements call seeds `{items}` from its target's `selected` indices
-(possibly none); `selected` on any other layer only highlights. Otherwise a widget whose bond has an owner seeds the owner's `initial` envelope (absent means
-`nothing`), and its hydrated indices are highlight-only. A single hydrated index on a scalar
-layer seeds `{layer, index}`. Multiple indices on a scalar layer are highlight-only (`nothing`).
-"""
-function mount_envelope(manifest::AbstractDict)
-    hydrated = Dict{String, Any}[]
-    for d in get(manifest, "layers", Any[])
-        idxs = get(d, "selected", nothing)
-        idxs === nothing && continue
-        for idx in idxs
-            push!(hydrated, Dict{String, Any}("layer" => d["id"], "index" => Int(idx)))
-        end
-    end
-    if get(manifest, "selection", nothing) == "elements"
-        target = manifest["selectionTarget"]
-        return Dict{String, Any}("items" => filter(h -> h["layer"] == target, hydrated))
-    end
-    haskey(manifest, "bondOwner") && return get(manifest, "initial", nothing)
-    length(hydrated) == 1 && return only(hydrated)
-    return nothing
+function _field_value(manifest, owners, field::AbstractString, env)
+    d = _manifest_layer(manifest, field)
+    haskey(d, "brush") && return _brush_value(manifest, owners, d, env)
+    env === nothing && return nothing
+    env isa AbstractDict && haskey(env, "layer") || throw(
+        ArgumentError("bond: field :$field holds $(repr(env)), expected a commit `{layer, index}`"),
+    )
+    String(env["layer"]) == field || throw(
+        ArgumentError("bond: field :$field holds a commit from layer :$(env["layer"])"),
+    )
+    return _one_event(manifest, owners, env)
 end
 
 """
-    bond_from_js(manifest, owners, js) -> Union{Nothing, InteractionEvent, Vector}
+    mount_envelope(manifest) -> Dict
 
-Pluto's `transform_value` entry: turn the browser envelope into the Julia bond. `owners` maps
-layer id strings to [`LayerOwner`](@ref) (empty for hand-built test manifests; the layer's
-`bond` stamp is enough for built-ins).
+The wire value `mount.ts` seeds into `host.value` at mount, so Julia `initial_value` and the
+browser agree: every field's starting envelope (`build_manifest`'s `initial`).
+"""
+mount_envelope(manifest::AbstractDict) = get(manifest, "initial", Dict{String, Any}())
+
+"""
+    bond_from_js(manifest, owners, js) -> NamedTuple or one field's value
+
+Pluto's `transform_value` entry: turn the browser's value, one envelope per field, into the
+`@bind` value. A `NamedTuple` with one entry per field, in the manifest's `fields` order, or
+that one field's value when `bind` named one. `owners` maps layer id strings to
+[`LayerOwner`](@ref) (empty for hand-built test manifests; the layer's `bond` stamp is enough
+for built-ins).
 """
 function bond_from_js(manifest::AbstractDict, owners, js)
-    js === nothing && return nothing
-    haskey(js, "items") && return selection_value(manifest, owners, js["items"])
-    target = get(manifest, "selectionTarget", nothing)
-    if target !== nothing && String(js["layer"]) == target
-        throw(
-            ArgumentError(
-                "bond: :$target is brushed by a `selects` box, which owns the bond; a click on it " *
-                    "commits nothing (expected an {items} envelope)",
-            ),
+    js === nothing && (js = mount_envelope(manifest))
+    js isa AbstractDict || throw(
+        ArgumentError("bond: expected one value per field, got $(typeof(js))"),
+    )
+    fields = get(manifest, "fields", String[])
+    for k in keys(js)
+        k in fields || throw(
+            ArgumentError("bond: `$(k)` is not a field of this value (fields: $(join(fields, ", ")))"),
         )
     end
-    return _one_event(manifest, owners, js)
+    vals = Tuple(_field_value(manifest, owners, f, get(js, f, nothing)) for f in fields)
+    get(manifest, "bare", false) === true && return only(vals)
+    return NamedTuple{Tuple(Symbol.(fields))}(vals)
 end
 
 function bond_from_js(w, js)
@@ -555,3 +537,74 @@ function initial_bond(w)
 end
 
 function with_owners end   # backends that own a distinct widget type extend this
+
+# ---------------------------------------------------------------------------
+# A call's starting value
+# ---------------------------------------------------------------------------
+
+# `selected=` as 0-based indices per field. A key must be a field that holds picks: a control
+# starts at its own value, and a layer outside the bind value takes no picks.
+function _field_seeds(built, fields, roles, binding, selected)
+    seeds = Dict{Symbol, Vector{Int}}()
+    selected === nothing && return seeds
+    layer_ids = Symbol[L.id for (_, L, _) in built]
+    by_id = Dict(L.id => L for (_, L, _) in built)
+    seedable = Symbol[f for f in fields if roles[f] in (:pick, :brush) && by_id[f].kind in _SELECTED_KINDS]
+    # A key `bind` left out names a field, so it gets the field list, not the layer list.
+    if binding.refs !== nothing && (selected isa NamedTuple || selected isa AbstractDict)
+        for k in keys(selected)
+            Symbol(k) in fields || throw(
+                ArgumentError("selected= names :$(k), which isn't in bind (fields: $(_field_list(fields)))"),
+            )
+        end
+    end
+    for (id, idxs) in normalize_selected(layer_ids, seedable, selected)
+        id in layer_ids || throw(
+            ArgumentError(
+                "selected: :$id is not a layer in this masque() call " *
+                    "(available: $(join(sort(string.(layer_ids)), ", ")))",
+            ),
+        )
+        if !(id in fields)
+            throw(
+                ArgumentError(
+                    binding.refs === nothing ?
+                        "selected: :$id takes no picks; it has no `:click` in its `events`, or it is a line, which takes clicks once it is bound" :
+                        "selected= names :$id, which isn't in bind (fields: $(_field_list(fields)))",
+                ),
+            )
+        end
+        roles[id] === :control && throw(
+            ArgumentError("selected: :$id is a control; it starts at its own value, which its constructor sets"),
+        )
+        roles[id] === :pick && length(idxs) > 1 && throw(
+            ArgumentError("selected: :$id holds one pick, got $(length(idxs)) indices"),
+        )
+        seeds[id] = _check_selected(by_id[id], idxs)
+    end
+    return seeds
+end
+
+"""
+    _initial_value(built, fields, roles, binding, selected, ctx, layers) -> Dict
+
+Every field's starting wire envelope, the value the browser sends until the first commit:
+`nothing` for a pick `selected=` does not seed, `{layer, index}` for one it does, a control's
+start, and the elements a box's starting bounds hold for its target.
+"""
+function _initial_value(built, fields, roles, binding, selected, ctx, layers)
+    seeds = _field_seeds(built, fields, roles, binding, selected)
+    by_id = Dict(L.id => i for (i, L, _) in built)
+    out = Dict{String, Any}()
+    for f in fields
+        out[string(f)] = if roles[f] === :control
+            initial_envelope(by_id[f], ctx, layers)
+        elseif roles[f] === :brush
+            _brush_start(f, built, get(seeds, f, nothing), layers)
+        else
+            idxs = get(seeds, f, Int[])
+            isempty(idxs) ? nothing : Dict{String, Any}("layer" => string(f), "index" => only(idxs))
+        end
+    end
+    return out
+end

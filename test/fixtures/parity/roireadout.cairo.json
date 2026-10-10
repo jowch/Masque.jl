@@ -34,21 +34,24 @@
             },
             "bond": "axis",
             "events": [
+                "click",
                 "hover"
             ]
         }
     ],
     "initial": {
-        "payload": {
-            "xmin": 1.5,
-            "xmax": 2.5,
-            "ymin": 2,
-            "ymax": 6
+        "roi": {
+            "payload": {
+                "xmin": 1.5,
+                "xmax": 2.5,
+                "ymin": 2,
+                "ymax": 6
+            },
+            "layer": "roi",
+            "index": 0
         },
-        "layer": "roi",
-        "index": 0
+        "axis": null
     },
-    "bondOwner": "roi",
     "transforms": {
         "ax1": {
             "xscale": "identity",
@@ -78,5 +81,9 @@
         }
     },
     "width": 1200,
-    "scaling": 2
+    "scaling": 2,
+    "fields": [
+        "roi",
+        "axis"
+    ]
 }

@@ -33,7 +33,8 @@ PolygonInteractable(
 )
 ```
 
-A click gives an `ElementEvent` with `index` and the payload fields, so
-`pick.shape` is `"triangle"` or `"square"`.
+A click sets the `regions` field of the `@bind` value to an
+`ElementEvent` with `index` and the payload fields, so its `shape` is
+`"triangle"` or `"square"`.
 
 Next, [Text labels](@ref) makes labels clickable.

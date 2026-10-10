@@ -327,20 +327,21 @@ struct _NotReal end
         @test mc["layers"][1]["style"]["width"] == 3
 
         # selection round-trip: author indices are 1-based; the manifest stores 0-based
-        @test !haskey(m["layers"][1], "selected")                       # absent when unselected
-        ms = build_manifest([PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [1, 3]))
-        @test ms["layers"][1]["selected"] == [0, 2]
+        @test m["fields"] == ["scatter", "axis"]
+        @test m["initial"] == Dict("scatter" => nothing, "axis" => nothing)   # picks start empty
+        ms = build_manifest([PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [3]))
+        @test ms["initial"]["scatter"] == Dict("layer" => "scatter", "index" => 2)
         @test ms["layers"][1]["bond"] == "element"
-        @test !haskey(
-            build_manifest(
-                [PointInteractable(bax, pts; id = :scatter)], bctx;
-                selected = Dict(:scatter => Int[])
-            )["layers"][1], "selected"
-        )   # empty omitted
+        # a pick holds one element
+        @test_throws ArgumentError build_manifest([PointInteractable(bax, pts; id = :scatter)], bctx; selected = Dict(:scatter => [1, 3]))
+        @test build_manifest(
+            [PointInteractable(bax, pts; id = :scatter)], bctx;
+            selected = Dict(:scatter => Int[])
+        )["initial"]["scatter"] === nothing
         @test masque(
             bfig, PointInteractable(bax, pts; id = :scatter);
             selected = Dict(:scatter => [2]), auto = false,
-        ).manifest["layers"][1]["selected"] == [1]
+        ).manifest["initial"]["scatter"]["index"] == 1
 
         # selected= fail-loud (issue #39): still-unsupported kinds (grid/axis/…) and OOB
         # indices throw at build_manifest. Open kinds (segments/polyline) now accept
@@ -348,7 +349,7 @@ struct _NotReal end
         @testset "selected= fails loud on unsupported kinds and OOB indices" begin
             segs = SegmentInteractable(bax, [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (4.0, 4.0)]; mode = :pairs, id = :segs)
             ms_seg = build_manifest([segs], bctx; selected = Dict(:segs => [1]))
-            @test ms_seg["layers"][1]["selected"] == [0]
+            @test ms_seg["initial"]["segs"]["index"] == 0
             @test ms_seg["layers"][1]["kind"] == "segments"
 
             grid_i = GridInteractable(bax, 0.5:1:3.5, 0.5:1:3.5, rand(3, 3); id = :heat)
@@ -389,13 +390,13 @@ struct _NotReal end
             # supported kinds still accept in-range indices (rects list + polygons + polyline)
             rects = RectInteractable(bax, [(1.0, 1.0, 0.5, 0.5), (2.0, 2.0, 0.5, 0.5)]; id = :boxes)
             mr = build_manifest([rects], bctx; selected = Dict(:boxes => [2]))
-            @test mr["layers"][1]["selected"] == [1]
+            @test mr["initial"]["boxes"]["index"] == 1
             polys = PolygonInteractable(bax, [[(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]]; id = :poly)
             mp = build_manifest([polys], bctx; selected = Dict(:poly => [1]))
-            @test mp["layers"][1]["selected"] == [0]
+            @test mp["initial"]["poly"]["index"] == 0
             poly = SegmentInteractable(bax, [(1.0, 1.0), (2.0, 2.0), (3.0, 1.5)]; mode = :polyline, id = :line)
             ml = build_manifest([poly], bctx; selected = Dict(:line => [2]))
-            @test ml["layers"][1]["selected"] == [1]
+            @test ml["initial"]["line"]["index"] == 1
             @test ml["layers"][1]["kind"] == "polyline"
         end
 
@@ -405,10 +406,15 @@ struct _NotReal end
         @test !isempty(w.b64)
         @test w.display_css == 600
 
-        @test IP.APD.Bonds.initial_value(w) === nothing
-        @test IP.APD.Bonds.transform_value(w, nothing) === nothing
-        ev = IP.APD.Bonds.transform_value(w, Dict("layer" => "scatter", "index" => 2, "payload" => Dict("i" => 2)))
-        @test ev isa ElementEvent && ev.layer === :scatter && ev.index == 3
+        # one field per bound layer, named by its id; nothing picked yet
+        @test IP.APD.Bonds.initial_value(w) === (; scatter = nothing)
+        @test IP.APD.Bonds.transform_value(w, nothing) === (; scatter = nothing)
+        v = IP.APD.Bonds.transform_value(w, Dict("scatter" => Dict("layer" => "scatter", "index" => 2, "payload" => Dict("i" => 2))))
+        @test v.scatter isa ElementEvent && v.scatter.layer === :scatter && v.scatter.index == 3
+        # `bind` naming one object unwraps its value
+        wb = masque(bfig, PointInteractable(bax, pts; id = :scatter); auto = false, bind = :scatter)
+        @test IP.APD.Bonds.initial_value(wb) === nothing
+        @test commit_field(wb, Dict("layer" => "scatter", "index" => 0)).index == 1
     end
 
     @testset "axis_id fails loud on unregistered blocks" begin
@@ -430,44 +436,43 @@ struct _NotReal end
         @test err isa ArgumentError && occursin("not registered", err.msg)
     end
 
-    @testset "transform_value multi-select envelope" begin
+    @testset "transform_value: a box's target field" begin
         tv = Masque.APD.Bonds.transform_value
         manifest = Dict{String, Any}(
-            "selection" => "elements", "selectionTarget" => "pts",
+            "fields" => ["pts"], "bare" => true,
             "layers" => [
                 Dict{String, Any}(
-                    "id" => "pts", "kind" => "circles", "bond" => "element",
+                    "id" => "pts", "kind" => "circles", "bond" => "element", "brush" => "elements",
                     "payloads" => Any["a", "b", "c", "d", "e"],
                 ),
             ],
         )
         w = Masque.MasqueWidget("", manifest, 100)
-        @test tv(w, nothing) === nothing
-        # the box owns the target's bond: a single click envelope on it is refused
-        err = try
-            tv(w, Dict("layer" => "pts", "index" => 3, "payload" => Dict("city" => "NYC")))
-            nothing
-        catch e
-            e
-        end
-        @test err isa ArgumentError && occursin("selects", err.msg) && occursin(":pts", err.msg)
+        @test tv(w, nothing) == ElementEvent[]
+        # the field holds the box's items: a single click envelope is not that shape
+        @test_throws Exception tv(w, Dict("pts" => Dict("layer" => "pts", "index" => 3)))
         # a one-item brush is still a one-element vector; wire index 3 is Julia index 4
-        single = tv(w, Dict("items" => [Dict("layer" => "pts", "index" => 3)]))
+        single = tv(w, Dict("pts" => Dict("items" => [Dict("layer" => "pts", "index" => 3)])))
         @test single isa Vector{ElementEvent} && only(single).layer === :pts && only(single).index == 4
         @test only(single).payload == "d"
         multi = tv(
             w, Dict(
-                "items" => [
-                    Dict("layer" => "pts", "index" => 1, "payload" => Dict("v" => 10)),
-                    Dict("layer" => "pts", "index" => 4, "payload" => Dict("v" => 40)),
-                ]
+                "pts" => Dict(
+                    "items" => [
+                        Dict("layer" => "pts", "index" => 1, "payload" => Dict("v" => 10)),
+                        Dict("layer" => "pts", "index" => 4, "payload" => Dict("v" => 40)),
+                    ]
+                ),
             )
         )
         @test multi isa Vector{ElementEvent} && length(multi) == 2
         @test multi[1].index == 2 && multi[1].payload == "b"
         @test multi[2].index == 5 && multi[2].payload == "e"
-        empty = tv(w, Dict("items" => []))
+        empty = tv(w, Dict("pts" => Dict("items" => [])))
         @test empty isa Vector{ElementEvent} && isempty(empty)
+        # an item from another layer, or a key that is not a field, is refused
+        @test_throws ArgumentError tv(w, Dict("pts" => Dict("items" => [Dict("layer" => "q", "index" => 0)])))
+        @test_throws ArgumentError tv(w, Dict("items" => []))
         @test_throws ArgumentError tv(Masque.MasqueWidget("", Dict{String, Any}(), 100), Dict("items" => []))
     end
 

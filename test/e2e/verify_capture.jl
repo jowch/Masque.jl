@@ -1,6 +1,6 @@
 # Seam closure for the @bind round-trip: feed the value the browser ACTUALLY emitted
-# (captured.json, written by click.mjs from the real host.value) through the real Julia
-# `transform_value` and assert the typed InteractionEvent. The runtests.jl contract test
+# (captured.json, written by click.mjs from the real host.value, `{scatter: envelope}`) through
+# the real Julia `transform_value` and assert the typed InteractionEvent in its field. The runtests.jl contract test
 # proves transform_value against a payload synthesized from the manifest; this proves
 # `layer`/`index` against the byte-for-byte browser emission — stitching emit→consume with no
 # synthesized middle (the closest we get to the Pluto round-trip without launching a Pluto
@@ -66,23 +66,33 @@ wp = masque(figp)
 manifest_payload(w, layer_id::Symbol, index::Integer) =
     only(filter(d -> d["id"] == string(layer_id), w.manifest["layers"]))["payloads"][index + 1]
 
-# Proves the payload half of the contract: copy the parsed capture, overwrite its "payload" with
-# an obviously-wrong sentinel, and confirm transform_value still returns the manifest's own
-# object — unchanged from what an untouched capture reconstructs. Never touches the .json files
-# on disk (`copy` is on the parsed Dict).
+# Proves the payload half of the contract: copy the parsed capture, overwrite its field's
+# "payload" with an obviously-wrong sentinel, and confirm transform_value still returns the
+# manifest's own object — unchanged from what an untouched capture reconstructs. Never touches
+# the .json files on disk (the copies are of the parsed Dicts).
 function assert_payload_ignored(w, captured, layer_id::Symbol, index::Integer, label::AbstractString)
     poisoned = copy(captured)
-    poisoned["payload"] = "SENTINEL-must-never-surface"
-    ev_poisoned = APD.Bonds.transform_value(w, poisoned)
+    envelope = copy(poisoned[string(layer_id)])
+    envelope["payload"] = "SENTINEL-must-never-surface"
+    poisoned[string(layer_id)] = envelope
+    ev_poisoned = getproperty(APD.Bonds.transform_value(w, poisoned), layer_id)
     want = manifest_payload(w, layer_id, index)
     ev_poisoned.payload === want ||
         error("$label: payload not reconstructed from the manifest (got $(ev_poisoned.payload), want $want)")
-    ev_untouched = APD.Bonds.transform_value(w, captured)
+    ev_untouched = getproperty(APD.Bonds.transform_value(w, captured), layer_id)
     return ev_untouched.payload === ev_poisoned.payload ||
         error("$label: poisoning the capture's payload changed the reconstructed result")
 end
 
-ev = APD.Bonds.transform_value(w, captured)   # the REAL browser emission -> InteractionEvent
+# The browser sends one envelope per field (#335), so the value is a NamedTuple with the
+# scatter's field.
+function field_event(w, captured, label)
+    v = APD.Bonds.transform_value(w, captured)
+    v isa NamedTuple && keys(v) == (:scatter,) || error("$label: transform_value gave $(repr(v)), want a NamedTuple with one field, :scatter")
+    return v.scatter
+end
+
+ev = field_event(w, captured, "scatter")   # the REAL browser emission -> InteractionEvent
 
 ev isa Masque.InteractionEvent || error("transform_value did not return an InteractionEvent: $(typeof(ev))")
 ev.layer === :scatter || error("layer mismatch: $(ev.layer)")
@@ -94,7 +104,7 @@ println("seam OK — browser host.value -> ", ev)
 # Axis3 case (WS-3D): same seam. The z-carrying payload shape is pinned in
 # test/core/axis3_polar_tests.jl (lines 124, 152), not here — see the header comment.
 captured3 = JSON3.read(read(joinpath(dir, "captured3d.json"), String), Dict{String, Any})
-ev3 = APD.Bonds.transform_value(w3, captured3)
+ev3 = field_event(w3, captured3, "Axis3")
 ev3 isa Masque.InteractionEvent || error("transform_value (3D) did not return an InteractionEvent: $(typeof(ev3))")
 ev3.layer === :scatter || error("3D layer mismatch: $(ev3.layer)")
 ev3.index == 1 || error("3D index mismatch: $(ev3.index)")
@@ -104,7 +114,7 @@ println("seam OK (Axis3) — browser host.value -> ", ev3)
 
 # PolarAxis case: same seam.
 capturedp = JSON3.read(read(joinpath(dir, "capturedpolar.json"), String), Dict{String, Any})
-evp = APD.Bonds.transform_value(wp, capturedp)
+evp = field_event(wp, capturedp, "PolarAxis")
 evp isa Masque.InteractionEvent || error("transform_value (polar) did not return an InteractionEvent: $(typeof(evp))")
 evp.layer === :scatter || error("polar layer mismatch: $(evp.layer)")
 evp.index == 1 || error("polar index mismatch: $(evp.index)")

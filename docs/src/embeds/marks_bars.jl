@@ -38,17 +38,17 @@ begin
         ylabel = "Value",
         xticks = (1:4, ["Q1", "Q2", "Q3", "Q4"]),
     )
-    barplot!(ax, 1:4, [2.0, 3.0, 1.5, 2.5])
+    b = barplot!(ax, 1:4, [2.0, 3.0, 1.5, 2.5])
     nothing
 end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`@bind pick` saves a click in `pick`, while hovering only highlights the bar and leaves `pick` as it was.
+`bind = b` makes `pick` the clicked bar itself. `@bind pick` saves a click in `pick`, while hovering only highlights the bar and leaves `pick` as it was.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind pick masque(fig)
+@bind pick masque(fig; bind = b)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""

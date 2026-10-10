@@ -10,7 +10,7 @@ box or a threshold line, sends a value to your notebook through `@bind`.
 top. A figure with several axes still needs only one `masque` call.
 
 ```julia
-@bind pick masque(fig)
+@bind sel masque(fig)
 ```
 
 On its own, `masque(fig)` makes every plot it recognizes interactive,
@@ -37,8 +37,8 @@ as a vector of named tuples or a `DataFrame` with one row per mark:
 cities = interactables(s; payloads = rows)   # rows[i] belongs to point i
 ```
 
-The tooltip shows the payload, and a click returns it to Julia as
-`pick.city`, `pick.pop`, and so on. Without `payloads`, each mark gets
+The tooltip shows the payload, and a click returns it to Julia, so with
+`pick = sel.scatter` you read `pick.city`, `pick.pop`, and so on. Without `payloads`, each mark gets
 an `index` and its own data, such as `x` and `y` for a scatter point or
 `low`, `high`, and `value` for a bar.
 
@@ -67,43 +67,84 @@ the mark without changing the variable.
 | Gesture | On the figure | The `@bind` value | Cells that use it |
 |---|---|---|---|
 | Hover a mark | Tooltip and highlight | Unchanged | No change |
-| Click a mark (or Enter / Space on a focused mark) | Mark stays highlighted | The clicked mark's event | Respond |
-| Click the selected mark again (or Enter / Space on it) | Highlight clears | `nothing` | Respond |
+| Click a mark (or Enter / Space on a focused mark) | Mark stays highlighted | Its plot's field holds the clicked mark's event | Respond |
+| Click the selected mark again (or Enter / Space on it) | Highlight clears | Its plot's field is `nothing` | Respond |
 | Drag an ROI box or threshold line | Box or line moves | Unchanged while dragging | No change |
-| Release the ROI or threshold | Enclosed marks highlight (with `selects`) | The box, the enclosed marks, or the line's value | Respond |
+| Release the ROI or threshold | Enclosed marks highlight (with `selects`) | The box's or line's field, and with `selects` the enclosed marks | Respond |
 | Pan or orbit ([`ViewInteractable`](@ref)) | The view moves | Never changes | No change |
 
 ## What the `@bind` value holds
 
-A `masque` widget's `@bind` value starts as `nothing`, or at the
-starting position of a threshold or a box. A box with `selects` starts
-at the marks inside it. After a
-click or release it is an *event*, a small struct whose fields you read
-directly. A clicked mark's event has the payload's fields, such as
-`pick.city`, along with `pick.layer`, the interactable you clicked, and
-`pick.index`, the mark's position in your data. The event indexes your
-data too: `xs[pick]` is that mark's value and `df[pick, :]` is its row.
-Clicking the selected mark again sets the value back to `nothing`.
+The `@bind` value is a named tuple with one field for each thing you can
+set in the figure: each plot that takes clicks, and each threshold or box
+you pass. A field is named after its plot, the same name the plot's
+events carry as `pick.layer`, so a figure with a scatter and a bar plot
+gives `sel.scatter` and `sel.bars`, and a second scatter is
+`sel.scatter_2`. [What `masque(fig)` builds](@ref) lists the names. A
+figure with only one plot still gives a named tuple, `sel.scatter`.
 
-| Interaction | `@bind` value | Read it as |
+A plot's field starts as `nothing`. After a click it is an *event*, a
+small struct whose fields you read directly. A clicked mark's event has
+the payload's fields, such as `pick.city`, along with `pick.layer`, the
+plot you clicked, and `pick.index`, the mark's position in your data.
+The event indexes your data too: `xs[pick]` is that mark's value and
+`df[pick, :]` is its row. Clicking another mark of the same plot
+replaces the event, clicking the selected mark again sets the field back
+to `nothing`, and clicking empty space keeps it. Each plot keeps its own
+pick, so clicking a bar leaves `sel.scatter` as it was.
+
+A threshold or a box always has a value: its field starts at the line's
+`value` or the box's `bounds`, and changes when you release it. A box
+with `selects` also fills the field of the plot it selects from, which
+starts with the marks inside the box. To start with marks selected, see
+[Selection](@ref).
+
+| Interaction | The field holds | Read it as |
 |---|---|---|
-| Click a point, bar, polygon, line, or text label | [`ElementEvent`](@ref) | `pick.index`, payload fields; `xs[pick]` |
+| Click a point, bar, polygon, or text label | [`ElementEvent`](@ref) | `pick.index`, payload fields; `xs[pick]` |
 | Click a legend entry | [`LegendEvent`](@ref) | `pick.label` |
 | Release an ROI with `selects` over points | `Vector{ElementEvent}` | one event per enclosed point; `[]` when empty |
 | Click a heatmap or image cell | [`GridCellEvent`](@ref) | `pick.i`, `pick.j`, `pick.value`; `A[pick]` |
 | Release an ROI with `selects` over a grid | [`GridWindowEvent`](@ref) | `win.i1:win.i2`, `win.j1:win.j2`; `A[win]` |
-| Release an ROI without `selects` | [`BoundsEvent`](@ref) | `box.xmin`, `box.xmax`, `box.ymin`, `box.ymax` |
+| Release an ROI | [`BoundsEvent`](@ref) | `box.xmin`, `box.xmax`, `box.ymin`, `box.ymax` |
 | Click an axis ([`AxisInteractable`](@ref)) | [`AxisEvent`](@ref) | `pick.x`, `pick.y` |
 | Click a colorbar | [`ColorbarEvent`](@ref) | `pick.value` |
 | Release a threshold line | [`ThresholdEvent`](@ref) | `pick.value` |
 
-A widget with several interactables holds the most recent event, so to
-tell them apart, check `pick.layer` or the event's type. A threshold, a
-box, or a colorbar you pass is the exception: it owns the value, and
-the rest of the widget shows tooltips but takes no clicks. Clicking another
-mark replaces the event, clicking the selected mark again clears it to
-`nothing`, and clicking empty space keeps it. To start
-with marks selected, see [Selection](@ref).
+Hovering a line shows its tooltip, but a click on it changes nothing,
+since you might want the whole line or one point on it. To click a whole
+line, name it in `bind`, as below; see [Click marks](@ref).
+
+### Choose the fields with `bind`
+
+To make the value one plot's pick, with no named tuple around it, pass
+that plot as `bind`. Here `s` is what `scatter!` returned:
+
+```julia
+@bind pick masque(fig; bind = s)
+```
+
+`pick` is now `nothing` or an [`ElementEvent`](@ref), and the other
+plots in the figure still show their tooltips but take no clicks. The
+same works for a threshold or a box: with
+`cutoff = ThresholdInteractable(ax; value = 0.5)`, `bind = cutoff` makes
+the value the line's [`ThresholdEvent`](@ref).
+
+To keep several fields under their usual names, pass a tuple, as in
+`bind = (s, cutoff)`, which gives `sel.scatter` and `sel.threshold`. To
+name the fields yourself, pass a named tuple. Both take the plots
+`scatter!` and the like return, or the interactables you pass:
+
+```julia
+@bind sel masque(fig; bind = (left = s1, right = s2))
+```
+
+Then `sel.left` and `sel.right` each hold their plot's pick, and the
+events say `:left` or `:right` in `pick.layer`. A named tuple passed
+after `fig` names interactables the same way, so
+`masque(fig, (cutoff = ThresholdInteractable(ax; value = 0.5),))` gives
+`sel.cutoff`. Giving one plot two different names raises an
+`ArgumentError`.
 
 ## Static exports and this site
 

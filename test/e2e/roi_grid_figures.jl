@@ -1,7 +1,10 @@
 # Shared figures for the `selects`-box notebooks (Cairo / WGL), driven by roi_grid_click.mjs.
-# The box owns the `@bind` value: a click on its target layer outside the box must not replace
-# what the box holds (a `GridWindowEvent`, or a `Vector{ElementEvent}` over points). The image is
-# 12 × 8 cells so a cell is many screen pixels wide and a click lands on one cell for sure.
+# The box fills its target's field of the `@bind` value (#335): a click on the target layer
+# outside the box must not replace what the box holds (a `GridWindowEvent`, or a
+# `Vector{ElementEvent}` over points). The grid widget binds both fields, `img` and `roi`; the
+# points widget names its target with `bind`, as the docs' box-select example does, so its value
+# is the vector itself. The image is 12 × 8 cells so a cell is many screen pixels wide and a click
+# lands on one cell for sure.
 
 function build_roi_grid()
     nx, ny = 12, 8
@@ -30,18 +33,19 @@ function build_roi_points()
             PointInteractable(ax, pts; id = :pts, payloads = ["a", "b", "c", "d", "e"]),
             ROIInteractable(ax; bounds = (2.0, 6.0, 2.0, 6.0), selects = :pts, id = :roi),
         ];
-        auto = false,
+        auto = false, bind = :pts,
     )
 end
 
 roi_grid_meta(w) = Dict(
     "width" => w.manifest["width"], "height" => w.manifest["height"],
-    "selection" => get(w.manifest, "selection", nothing),
-    "selectionTarget" => get(w.manifest, "selectionTarget", nothing),
+    "fields" => get(w.manifest, "fields", nothing),
+    "bare" => get(w.manifest, "bare", false),
     "layers" => w.manifest["layers"],
 )
 
 # The readout the docs gallery cell does: `region.i1:region.i2` throws on a `GridCellEvent`.
+# `region` is the target's field, `value.img`.
 function roi_grid_readout(region)
     region === nothing && return "nothing"
     isempty(region.i1:region.i2) && return "empty"
