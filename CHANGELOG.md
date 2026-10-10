@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-10
+
 ### Added
 - A `surface!` on an `Axis3` responds to hover and click. Hovering shows the data point
   under the pointer, its `i`, `j`, `x`, `y`, and `z`, and `value` when `color` is a separate
@@ -467,7 +469,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/jowch/Masque.jl/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/jowch/Masque.jl/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/jowch/Masque.jl/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jowch/Masque.jl/compare/v0.1.1...v0.2.0
