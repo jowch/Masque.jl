@@ -73,7 +73,7 @@ wire indices for the tooltip only, and the `@bind` payload keeps the wire indice
 A 2D `:lines` layer also synthesises `$(x)`, `$(y)` and `$(i)` at hover: the data sample nearest
 the cursor along the drawn path, read from the layer's `points` ([§3](03-interactables.md)),
 and that sample's 1-based index in its line. They replace payload fields of the same name at
-hover. Like the grid fields they reach the tooltip only; click and `@bind` keep the whole line.
+hover. A click on a bound line commits the same sample ([§5](05-bond-value.md)).
 
 d3-format spec *structure* (the type character and arrangement of flags) is validated in Julia
 against d3's canonical grammar; the *meaning* of precision, trim, and sign modifiers is only

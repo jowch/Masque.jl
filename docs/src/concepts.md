@@ -113,9 +113,8 @@ starts with the marks inside the box. To start with marks selected, see
 | Release a threshold line | [`ThresholdEvent`](@ref) | `pick.value` |
 
 Hovering a line shows its tooltip, but a click on it changes nothing,
-not even the other picks, since you might want the whole line or one
-point on it. To click a whole
-line, name it in `bind`, as below; see [Click marks](@ref).
+not even the other picks, until you name the line in `bind`, as below.
+A click then picks the point you plotted nearest it; see [Click marks](@ref).
 
 ### Choose the fields with `bind`
 

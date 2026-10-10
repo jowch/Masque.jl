@@ -4,6 +4,10 @@
 One element of a point, bar, polygon, segment, polyline, or list-of-rects layer. `index` is
 1-based. Other fields (e.g. `city`) are read from `payload`. Use as a row index:
 `df[pick, :]`, `xs[pick]`.
+
+A line's pick is the data point nearest the click: `index` is that point, and the payload adds
+`line` (which line, for a plot of several like `series!`), `x` and `y`. A line on an `Axis3`
+has no points to pick, so its pick is the whole line and `index` is which line.
 """
 struct ElementEvent <: InteractionEvent
     layer::Symbol
@@ -30,3 +34,42 @@ function _element_event(id::Symbol, index, payloads)
     )
     return ElementEvent(id, idx, payloads[idx])
 end
+
+# A line's pick is one of its data points, the one nearest the click. Lines on a 2D axis ship
+# their data points (`points`); a line on an `Axis3` doesn't, so its pick stays the whole line.
+_picks_points(L::HitLayer) = L.kind === :lines && L.points !== nothing
+
+# `ev` is the picked line; `s` the 1-based data point on it. `index` becomes the point, so
+# `xs[pick]` reads it, and the payload adds `line` (which line of a `series!`), `x` and `y`.
+# `data` is the line's samples at full precision from the Julia side, when the layer has an
+# owner there; without one the manifest's Float32 points stand in.
+function _line_point(ev::ElementEvent, d::AbstractDict, s::Int, data = nothing)
+    id, k = getfield(ev, :layer), getfield(ev, :index)
+    pts = get(d, "points", nothing)
+    pts === nothing && throw(ArgumentError("bond: layer :$id sent a point, but its lines have no data points"))
+    p = pts[k]
+    n = length(p) ÷ 2
+    (1 <= s <= n) || throw(
+        ArgumentError("bond: layer :$id point $s out of range for line $k's $n data points" * (n > 0 ? " (valid: 1:$n)" : "")),
+    )
+    q = data !== nothing && length(data) == length(p) ? data : p
+    return ElementEvent(id, s, _point_payload(getfield(ev, :payload), k, _coord(q[2s - 1]), _coord(q[2s])))
+end
+# Without an owner, a line's points come from the manifest as Float32. Widening by value turns
+# 0.4f0 into 0.4000000059604645; the shortest decimal that reads back as the same Float32 is
+# what was plotted, as far as the Float32 knows.
+_coord(v::Float32) = isfinite(v) ? parse(Float64, Base.Ryu.writeshortest(v)) : Float64(v)
+_coord(v::AbstractFloat) = Float64(v)
+_coord(v) = v
+# The line's own payload keys stay, except its `index`, which named the line and is now `line`.
+function _point_payload(pl::NamedTuple, line, x, y)
+    return merge((; line, x, y), Base.structdiff(pl, NamedTuple{(:index,)}))
+end
+function _point_payload(pl::AbstractDict, line, x, y)
+    out = Dict{Any, Any}(:line => line, :x => x, :y => y)
+    for (k, v) in pl
+        string(k) == "index" || (out[k] = v)
+    end
+    return out
+end
+_point_payload(pl, line, x, y) = (; line, x, y, value = pl)

@@ -41,6 +41,8 @@ end
         ],
     )
     @test snapshot_key(items) == "items:cities:0,cities:2"
+    # A point picked on a line keys on its line and sample.
+    @test snapshot_key(Dict("layer" => "sr", "index" => 1, "sample" => 3)) == "sr:1@3"
 end
 
 @testset "discrete_states lists every click in its wire shape" begin
@@ -52,13 +54,14 @@ end
             Dict{String, Any}("id" => "tips", "kind" => "circles", "events" => ["hover"], "bond" => "element", "payloads" => Any[1, 2, 3]),
             Dict{String, Any}("id" => "x", "kind" => "axis", "events" => ["hover", "click"], "bond" => "axis", "payloads" => Any[]),
             Dict{String, Any}("id" => "cells", "kind" => "grid", "events" => ["hover", "click"], "bond" => "gridcell", "payloads" => Any[], "geometry" => grid),
+            Dict{String, Any}("id" => "sr", "kind" => "lines", "events" => ["hover", "click"], "bond" => "element", "payloads" => Any[1, 2], "points" => Any[[0.0, 1, 1, 2], [0.0, 3]]),
         ],
     )
     states = discrete_states(man)
     @test [snapshot_key(v) for v in states] ==
-        ["pts:0", "pts:1", "legend:0", "cells:0", "cells:1", "cells:2", "cells:3", "cells:4", "cells:5"]
+        ["pts:0", "pts:1", "legend:0", "cells:0", "cells:1", "cells:2", "cells:3", "cells:4", "cells:5", "sr:0@0", "sr:0@1", "sr:1@0"]
     # `resolvePayload`: 0-based i (column), j (row), values[j * ncols + i]
-    @test states[end]["payload"] == Dict("i" => 2, "j" => 1, "value" => 6.0)
+    @test states[9]["payload"] == Dict("i" => 2, "j" => 1, "value" => 6.0)
     @test !haskey(states[1], "payload")
 
     # A grid the `selects` box brushes belongs to the box.

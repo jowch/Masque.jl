@@ -33,7 +33,9 @@ still fire for that hit, only the highlight is skipped. Per geometry: a closed m
 (circle/rect/polygon) draws BOTH shapes, identical geometry; an open seg (a line has no
 interior) draws the edge shape only, no fill shape; a `selects`-ROI's grid cell-block union rect
 (`"rectfill"` geom tag) draws the fill shape only, since the ROI box itself is already the
-rect's outline. The third svg, `svg.masque-plain` (unblended), holds ROI/threshold, the
+rect's outline. A picked point on a bound line draws the selected-seg ring around a circle at
+that data point, radius the line's hit slack (`tol`); the line itself is not ringed, and
+hovering it still draws its hover outline. The third svg, `svg.masque-plain` (unblended), holds ROI/threshold, the
 selected-seg ring (inner 2px + outer 4px @ 0.25, chrome grey), and hover/selected highlights
 for a layer with an explicit `hoverstyle` stroke — single element, stroke verbatim + 18%/35%
 tint in that colour (the pre-split recipe, unchanged), open shapes staying stroke-only there (no

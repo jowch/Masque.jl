@@ -41,16 +41,22 @@ function snapshot_key(v)
     if haskey(d, "items")
         return "items:" * join((_item_key(it) for it in d["items"]), ",")
     end
-    (haskey(d, "layer") && haskey(d, "index")) &&
-        return string(d["layer"], ":", Int(d["index"]))
+    (haskey(d, "layer") && haskey(d, "index")) && return _pick_key(d)
     return json_write(jsonable(d))
+end
+
+# `layer:index`, and `@sample` for a point picked on a line.
+function _pick_key(d)
+    k = string(d["layer"], ":", Int(d["index"]))
+    s = get(d, "sample", nothing)
+    return s === nothing ? k : string(k, "@", Int(s))
 end
 
 # A grid brush item carries its cell window (`i0:i1`, `j0:j1`, 0-based inclusive) in the
 # payload, and every grid brush on a layer has index 0, so the window is what tells two
 # brushes apart. A point brush item is just `layer:index`.
 function _item_key(it)
-    k = string(it["layer"], ":", Int(it["index"]))
+    k = _pick_key(it)
     p = get(it, "payload", nothing)
     (p isa AbstractDict && haskey(p, "i0")) || return k
     return string(k, "@", Int(p["i0"]), "-", Int(p["i1"]), "/", Int(p["j0"]), "-", Int(p["j1"]))
@@ -79,8 +85,12 @@ const PLAYER_LOOKUP_JS = raw"""
 function layerIndexKey(layer, index) {
   return String(layer) + ":" + String(Number(index));
 }
+function pickKey(v) {
+  const k = layerIndexKey(v.layer, v.index);
+  return v.sample == null ? k : k + "@" + String(Number(v.sample));
+}
 function itemKey(it) {
-  const k = layerIndexKey(it.layer, it.index);
+  const k = pickKey(it);
   const p = it.payload;
   if (!p || p.i0 == null) return k;
   return k + "@" + p.i0 + "-" + p.i1 + "/" + p.j0 + "-" + p.j1;
@@ -89,7 +99,7 @@ function envKey(v) {
   if (v == null) return "null";
   if (Array.isArray(v.items)) return "items:" + v.items.map(itemKey).join(",");
   if (v.layer != null && v.index != null && v.index !== "") {
-    return layerIndexKey(v.layer, v.index);
+    return pickKey(v);
   }
   return JSON.stringify(v);
 }
@@ -173,7 +183,8 @@ _field(g, k::String) = hasproperty(g, Symbol(k)) ? getproperty(g, Symbol(k)) : n
     discrete_states(manifest) -> Vector{Dict{String, Any}}
 
 Every single-click `@bind` value the overlay can post, in its wire shape: one
-`{layer, index}` per element of each `element`/`legend` layer, and one
+`{layer, index}` per element of each `element`/`legend` layer (`{layer, index, sample}` per
+data point of a line), and one
 `{layer, index, payload = {i, j, value}}` per cell of each `gridcell` layer, the payload
 built the way `resolvePayload` (frontend/src/geometry.ts) builds it. A grid whose cells are
 under a screen pixel ships no `values`, so its clicks cannot be listed: that fails, and the
@@ -191,7 +202,13 @@ function discrete_states(manifest::AbstractDict)
         "click" in string.(L["events"]) || continue
         haskey(L, "brush") && continue
         bond = get(L, "bond", "none")
-        if bond == "element" || bond == "legend"
+        pts = get(L, "points", nothing)
+        if bond == "element" && string(L["kind"]) == "lines" && pts !== nothing
+            # A line's click picks one of its data points.
+            for k in 0:(length(pts) - 1), s in 0:(length(pts[k + 1]) ÷ 2 - 1)
+                push!(states, Dict{String, Any}("layer" => id, "index" => k, "sample" => s))
+            end
+        elseif bond == "element" || bond == "legend"
             for k in 0:(length(L["payloads"]) - 1)
                 push!(states, Dict{String, Any}("layer" => id, "index" => k))
             end

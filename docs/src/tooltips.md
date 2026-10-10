@@ -33,7 +33,7 @@ Hovering a line from `lines!`, `stairs!`, `series!`, or `scatterlines!`
 adds `x` and `y` of the point you plotted nearest the pointer along the
 line. In a template you can also use `i`, that point's position in the
 line's data, so `$(i)` is `3` over `xs[3], ys[3]`. A click on a line
-picks the whole line once you name it in `bind`; see
+picks that point once you name the line in `bind`; see
 [Click marks](@ref). A line on an `Axis3` shows only its payload.
 
 Numbers show up to four significant figures, so `0.30000000000000004`
