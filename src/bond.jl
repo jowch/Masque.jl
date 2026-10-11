@@ -658,13 +658,93 @@ end
 _is_grid(built, id) = any(((_, L, _),) -> L.id === id && L.kind === :grid, built)
 _is_many(built, id) = any(((_, L, d),) -> L.id === id && get(d, "many", false) === true, built)
 
+# A `select = :many` grid starts with the cells `selected=` names (#356): a `Bool` matrix the
+# size of the plotted matrix, a `GridSelection`, `CartesianIndex`es, or linear indices into
+# that matrix. The first three become linear indices here, where the grid's size is known.
+_grid_size(L::HitLayer) = (Int(L.geometry["ncols"]), Int(L.geometry["nrows"]))
+_grid_form(v) = v isa GridSelection || v isa AbstractMatrix{Bool} ||
+    (v isa AbstractVector && !isempty(v) && all(x -> x isa CartesianIndex{2}, v))
+
+function _grid_cells(id::Symbol, L::HitLayer, v)
+    nc, nr = _grid_size(L)
+    if v isa GridSelection
+        getfield(v, :layer) === id || throw(
+            ArgumentError("selected: key :$id does not match GridSelection layer :$(getfield(v, :layer))"),
+        )
+        v = v.mask
+    end
+    if v isa AbstractMatrix
+        size(v) == (nc, nr) || throw(
+            ArgumentError("selected: :$id is a $nc×$nr grid, so its mask must be $nc×$nr; got $(join(size(v), "×"))"),
+        )
+        return findall(vec(v))
+    end
+    lin = LinearIndices((nc, nr))
+    return map(v) do I
+        checkbounds(Bool, lin, I) || throw(
+            ArgumentError("selected: :$id cell $(Tuple(I)) is outside the $nc×$nr grid"),
+        )
+        lin[I]
+    end
+end
+
+function _grid_selected(selected, grids::Vector{Symbol}, by_id)
+    isempty(grids) && return selected
+    if _grid_form(selected)
+        id = if selected isa GridSelection
+            getfield(selected, :layer)
+        elseif length(grids) == 1
+            only(grids)
+        else
+            throw(ArgumentError("selected: a mask is ambiguous across grids $(_field_list(grids)); name the field"))
+        end
+        id in grids || throw(ArgumentError("selected: :$id is not a `select = :many` grid in this masque() call"))
+        return Dict{Symbol, Any}(id => _grid_cells(id, by_id[id], selected))
+    end
+    selected isa NamedTuple || selected isa AbstractDict || return selected
+    any(((k, v),) -> Symbol(k) in grids && _grid_form(v), pairs(selected)) || return selected
+    return Dict{Symbol, Any}(
+        Symbol(k) => (Symbol(k) in grids && _grid_form(v) ? _grid_cells(Symbol(k), by_id[Symbol(k)], v) : v)
+            for (k, v) in pairs(selected)
+    )
+end
+
+# Range-checked, sorted, 0-based: cell k is column k % ncols of row k ÷ ncols.
+function _check_grid_selected(L::HitLayer, idxs)
+    n = prod(_grid_size(L))
+    for idx in idxs
+        (1 <= idx <= n) || throw(
+            ArgumentError("selected: :$(L.id) cell $idx out of range for its $n cells (valid: 1:$n)"),
+        )
+    end
+    return sort!(collect(Int, idxs)) .- 1
+end
+
+# The wire's mask envelope for sorted 0-based cells: `runs`, flat triples `[j, i0, n, ...]`.
+function _grid_runs(L::HitLayer, cells)
+    nc = first(_grid_size(L))
+    runs = Int[]
+    for k in cells
+        j, i = divrem(k, nc)
+        if !isempty(runs) && runs[end - 2] == j && runs[end - 1] + runs[end] == i
+            runs[end] += 1
+        else
+            push!(runs, j, i, 1)
+        end
+    end
+    return Dict{String, Any}("runs" => runs)
+end
+
 function _field_seeds(built, fields, roles, binding, selected)
     seeds = Dict{Symbol, Vector{Int}}()
     selected === nothing && return seeds
     selected = _under_bare_head(binding, fields, selected)
     layer_ids = Symbol[L.id for (_, L, _) in built]
     by_id = Dict(L.id => L for (_, L, _) in built)
-    seedable = Symbol[f for f in fields if roles[f] in (:pick, :brush) && by_id[f].kind in _SELECTED_KINDS]
+    grids = Symbol[f for f in fields if roles[f] === :pick && by_id[f].kind === :grid && _is_many(built, f)]
+    seedable = Symbol[
+        f for f in fields if roles[f] in (:pick, :brush) && (by_id[f].kind in _SELECTED_KINDS || f in grids)
+    ]
     # A key `bind` left out names a field, so it gets the field list, not the layer list.
     if binding.refs !== nothing && (selected isa NamedTuple || selected isa AbstractDict)
         for (k, _) in _flat_selected(selected)
@@ -673,6 +753,7 @@ function _field_seeds(built, fields, roles, binding, selected)
             )
         end
     end
+    selected = _grid_selected(selected, grids, by_id)
     for (id, idxs) in normalize_selected(layer_ids, seedable, selected)
         id in layer_ids || throw(
             ArgumentError(
@@ -699,7 +780,8 @@ function _field_seeds(built, fields, roles, binding, selected)
             ),
         )
         # A pick held twice is one pick: the browser's toggle would take out one copy.
-        seeds[id] = _check_selected(by_id[id], roles[id] === :pick ? unique(idxs) : idxs)
+        seeds[id] = id in grids ? _check_grid_selected(by_id[id], unique(idxs)) :
+            _check_selected(by_id[id], roles[id] === :pick ? unique(idxs) : idxs)
     end
     return seeds
 end
@@ -709,8 +791,9 @@ end
 
 Every field's starting wire envelope, the value the browser sends until the first commit:
 `nothing` for a pick `selected=` does not seed, `{layer, index}` for one it does (with `sample`
-for a point on a line), `{items: [...]}` for a `select = :many` field (`{runs: []}` on a
-grid), a control's start, and the elements a box's starting bounds hold for its target.
+for a point on a line), `{items: [...]}` for a `select = :many` field (`{runs: [...]}` on a
+grid, empty unless `selected=` seeds it), a control's start, and the elements a box's
+starting bounds hold for its target.
 """
 function _initial_value(built, fields, roles, binding, selected, ctx, layers)
     seeds = _field_seeds(built, fields, roles, binding, selected)
@@ -723,7 +806,7 @@ function _initial_value(built, fields, roles, binding, selected, ctx, layers)
         elseif roles[f] === :brush
             _brush_start(f, built, get(seeds, f, nothing), layers)
         elseif _is_many(built, f) && _is_grid(built, f)
-            Dict{String, Any}("runs" => Int[])
+            _grid_runs(by_layer[f], get(seeds, f, Int[]))
         elseif _is_many(built, f)
             pts = _picks_points(by_layer[f])
             Dict{String, Any}(

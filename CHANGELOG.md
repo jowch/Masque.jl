@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A heatmap or image built with `select = :many` can start with cells selected:
+  `selected = (region = mask,)` takes a `Bool` matrix the size of the plotted matrix, and
+  also a `GridSelection`, `CartesianIndex`es, or linear indices. The cells start highlighted
+  and in the `@bind` value, so a selection saved to a file can be loaded back, and a
+  Cmd-click or Ctrl-click takes one out like any other. A mask of the wrong size raises an
+  `ArgumentError` (#356).
+
 ## [0.3.0] - 2026-10-10
 
 ### Added

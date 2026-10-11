@@ -1,6 +1,7 @@
 # Shared figures for the agent kind-sweep notebooks (Cairo / WGL).
 # Each widget is one interactable kind (interaction + visual). `selected=` is baked only
-# on supported kinds (`circles`, `rects`, `polygons`, `segments`, `polyline`, `lines`). `circle` marks a
+# on supported kinds (`circles`, `rects`, `polygons`, `segments`, `polyline`, `lines`, and the
+# `select = :many` grid of `many_grid_seeded`). `circle` marks a
 # kind whose highlight is a circle, so the driver checks r == geometry r (no halo offset).
 # Grid / threshold / roi / view are hover-click or drag only. `scatter_dark` is a dark
 # Makie figure so the split recipe (dodge fill both figures, flat chrome edge stroke on
@@ -517,6 +518,14 @@ kind_sweep_meta() = [
         "key" => "many_grid", "layerId" => "region", "layerKind" => "grid",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "many_grid",
+    ),
+    Dict(
+        # The same grid started with `selected=` (#356): it mounts with cells (2, 2) and
+        # (3, 2) drawn and in the value, and Ctrl-click takes one out like any other cell.
+        # The driver's "many_grid_seeded" block drives it.
+        "key" => "many_grid_seeded", "layerId" => "region", "layerKind" => "grid",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "many_grid_seeded",
     ),
     Dict(
         "key" => "slice_lines", "layerId" => "slice", "layerKind" => "slice",
@@ -1229,6 +1238,15 @@ function build_kind_sweep()
         masque(fig, (region = interactables(hm; select = :many),))
     end
 
+    many_grid_seeded = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "seeded cells", limits = (0, 4, 0, 4))
+        hm = heatmap!(ax, 0:4, 0:3, reshape(Float64.(1:12), 4, 3))
+        mask = falses(4, 3)
+        mask[2, 2] = mask[3, 2] = true
+        masque(fig, (region = interactables(hm; select = :many),); selected = (region = mask,))
+    end
+
     slice_lines = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "slice lines", limits = (0, 4, 0, 4))
@@ -1283,7 +1301,7 @@ function build_kind_sweep()
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
-        legend_overlap, legend_template, axis, composite, many, many_grid, marquee, slice_lines, slice_density, slice_auto, slice_gap,
+        legend_overlap, legend_template, axis, composite, many, many_grid, many_grid_seeded, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
 

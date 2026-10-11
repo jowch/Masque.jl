@@ -623,4 +623,55 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             ax3, surface!(ax3, rand(3, 3)); select = :many,
         )
     end
+
+    @testset "selected= starts a select = :many grid with cells (#356)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        img = reshape(Float64.(1:12), 4, 3)
+        hm = heatmap!(ax, img)
+        iv = Masque.APD.Bonds.initial_value
+        region = interactables(hm; select = :many)
+        mask = falses(4, 3)
+        mask[2, 2] = mask[3, 2] = mask[1, 3] = true
+        cells = findall(mask)
+        # Every form gives the same starting mask, and the value reads it back.
+        for sel in (
+                (region = mask,), (region = cells,), (region = LinearIndices(mask)[cells],),
+                (region = GridSelection(:region, mask),), Dict(:region => mask),
+            )
+            w = masque(fig, (; region); selected = sel)
+            # Row j = 1 (0-based), columns 1..2; row 2, column 0.
+            @test w.manifest["initial"]["region"] == Dict("runs" => [1, 1, 2, 2, 0, 1])
+            @test iv(w).region == GridSelection(:region, mask)
+        end
+        # Bare forms, with the grid as the bind value.
+        g = GridInteractable(ax, hm; select = :many, id = :g)
+        @test iv(masque(fig, g; bind = g, selected = mask)) == GridSelection(:g, mask)
+        @test iv(masque(fig, g; bind = g, selected = cells)).mask == mask
+        @test iv(masque(fig, g; bind = g, selected = GridSelection(:g, mask))).mask == mask
+        # A whole row is one run; an empty mask, or none, starts empty; a repeat is one cell.
+        @test masque(fig, (; region); selected = (region = trues(4, 3),)).manifest["initial"]["region"] ==
+            Dict("runs" => [0, 0, 4, 1, 0, 4, 2, 0, 4])
+        @test isempty(iv(masque(fig, (; region); selected = (region = falses(4, 3),))).region)
+        @test isempty(iv(masque(fig, (; region))).region)
+        @test count(iv(masque(fig, (; region); selected = (region = [5, 5, 6],))).region) == 2
+        # Mistakes name the grid's size or the field.
+        @test_throws "is a 4×3 grid, so its mask must be 4×3; got 3×4" masque(
+            fig, (; region); selected = (region = falses(3, 4),),
+        )
+        @test_throws "cell (5, 1) is outside the 4×3 grid" masque(
+            fig, (; region); selected = (region = [CartesianIndex(5, 1)],),
+        )
+        @test_throws "cell 13 out of range for its 12 cells" masque(fig, (; region); selected = (region = [13],))
+        @test_throws "does not match GridSelection layer :other" masque(
+            fig, (; region); selected = (region = GridSelection(:other, mask),),
+        )
+        @test_throws "ambiguous across grids" masque(
+            fig, (a = interactables(hm; select = :many), b = GridInteractable(ax, hm; select = :many));
+            selected = mask,
+        )
+        # A `select = :one` grid still can't start selected.
+        @test_throws "does not support pre-highlight" masque(
+            fig, (one = interactables(hm),); selected = (one = 2,),
+        )
+    end
 end
