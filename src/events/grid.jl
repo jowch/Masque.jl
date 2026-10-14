@@ -1,12 +1,13 @@
 """
-    GridCellEvent(layer, i, j, value, payload = nothing)
+    GridCellEvent(layer, i, j, value, payload = nothing, region = nothing)
 
 One heatmap or image cell, or one point of a 3D surface. `i` and `j` are the cell's first
 and second index in the matrix you plotted; Makie draws the first index along x and the second
 along y. `A[cell]` is `A[cell.i, cell.j]`. `value` is the shipped cell value (a surface
 point's `z`), or `nothing` when values were not sent. `payload` is the cell's entry from the grid's
 `payloads`, or `nothing` when it has none; its fields read through, so `cell.row` is
-`cell.payload.row`.
+`cell.payload.row`. `region` is the cell's id in the grid's `regions` (`0` for a cell in no
+region), or `nothing` when the grid has none.
 """
 struct GridCellEvent <: InteractionEvent
     layer::Symbol
@@ -14,8 +15,10 @@ struct GridCellEvent <: InteractionEvent
     j::Int
     value::Any
     payload::Any
+    region::Union{Nothing, Int}
 end
 GridCellEvent(layer, i, j, value) = GridCellEvent(layer, i, j, value, nothing)
+GridCellEvent(layer, i, j, value, payload) = GridCellEvent(layer, i, j, value, payload, nothing)
 
 Base.to_indices(A, inds, I::Tuple{GridCellEvent, Vararg{Any}}) =
     to_indices(A, inds, (I[1].i, I[1].j, Base.tail(I)...))
@@ -33,13 +36,44 @@ function _grid_cell_event(id::Symbol, js_payload, payloads = Any[], geometry = n
     i = Int(_js_req(js_payload, "i", id)) + 1
     j = Int(_js_req(js_payload, "j", id)) + 1
     value = haskey(js_payload, "value") ? js_payload["value"] : nothing
-    isempty(payloads) && return GridCellEvent(id, i, j, value, nothing)
+    region = geometry isa AbstractDict && haskey(geometry, "regions") ? _region_at(id, geometry, i, j) : nothing
+    isempty(payloads) && return GridCellEvent(id, i, j, value, nothing, region)
     haskey(geometry, "ni") && return GridCellEvent(id, i, j, value, _surface_payload(id, i, j, payloads, geometry))
     ncols = Int(geometry["ncols"])
     nrows = Int(geometry["nrows"])
     (1 <= i <= ncols && 1 <= j <= nrows) ||
         throw(ArgumentError("bond: layer :$id cell ($i, $j) is outside the $ncols×$nrows grid"))
-    return GridCellEvent(id, i, j, value, payloads[(j - 1) * ncols + i])
+    return GridCellEvent(id, i, j, value, payloads[(j - 1) * ncols + i], region)
+end
+
+# The region id of cell `(i, j)`, read from the grid's shipped runs, flat pairs `[id, n, ...]`
+# over the row-major cells.
+function _region_at(id::Symbol, geometry, i::Int, j::Int)
+    ncols, nrows = Int(geometry["ncols"]), Int(geometry["nrows"])
+    (1 <= i <= ncols && 1 <= j <= nrows) ||
+        throw(ArgumentError("bond: layer :$id cell ($i, $j) is outside the $ncols×$nrows grid"))
+    k = (j - 1) * ncols + i
+    runs = geometry["regions"]
+    seen = 0
+    for r in 1:2:length(runs)
+        seen += Int(runs[r + 1])
+        seen >= k && return Int(runs[r])
+    end
+    throw(ArgumentError("bond: layer :$id regions cover $seen cells, not the $(ncols * nrows) of its grid"))
+end
+
+# Every cell's region id, `(ncols, nrows)` like the grid's `values`.
+function _region_matrix(geometry)
+    ncols, nrows = Int(geometry["ncols"]), Int(geometry["nrows"])
+    ids = Vector{Int}(undef, ncols * nrows)
+    k = 0
+    runs = geometry["regions"]
+    for r in 1:2:length(runs)
+        n = Int(runs[r + 1])
+        ids[(k + 1):(k + n)] .= Int(runs[r])
+        k += n
+    end
+    return reshape(ids, ncols, nrows)
 end
 
 """
@@ -79,12 +113,13 @@ function _grid_window_event(id::Symbol, js_payload)
 end
 
 """
-    GridSelection(layer, mask)
+    GridSelection(layer, mask, regions = Int[])
 
 The cells a reader selected on a heatmap or image built with `select = :many`: a `BitMatrix`
 the size of the plotted matrix, `true` where a cell is selected, so any shape is one value.
 `A[sel]` is the selected values, `findall(sel)` their `CartesianIndex`es, and `sel.mask` the
-matrix itself. It starts empty.
+matrix itself. It starts empty. On a grid with `regions`, `sel.regions` is the ids of the
+regions every cell of which is selected, in ascending order; it is empty on a grid without.
 
 ```julia
 hm = heatmap!(ax, img)
@@ -96,7 +131,9 @@ findall(w.region)    # the selected cells
 struct GridSelection <: InteractionEvent
     layer::Symbol
     mask::BitMatrix
+    regions::Vector{Int}
 end
+GridSelection(layer, mask) = GridSelection(layer, mask, Int[])
 
 Base.to_indices(A, inds, I::Tuple{GridSelection, Vararg{Any}}) =
     to_indices(A, inds, (I[1].mask, Base.tail(I)...))
@@ -109,15 +146,18 @@ function Base.show(io::IO, sel::GridSelection)
     print(io, "GridSelection(")
     show(io, sel.layer)
     isempty(_ev_part(sel)) || (print(io, ", part = "); show(io, _ev_part(sel)))
-    return print(io, ", ", count(sel), " of ", length(sel.mask), " cells)")
+    print(io, ", ", count(sel), " of ", length(sel.mask), " cells")
+    isempty(sel.regions) || print(io, ", ", length(sel.regions), length(sel.regions) == 1 ? " region" : " regions")
+    return print(io, ")")
 end
 
 # The browser's mask envelope: `runs`, flat 0-based triples `[j, i0, n, ...]` (n cells of row
 # j from column i0), or `bits`, the cells row-major as packed bits (cell k is bit k % 8 of byte
 # k ÷ 8), base64. `ncols`/`nrows` are the grid's; the mask is `(ncols, nrows)` like `values`.
-function _grid_selection(id::Symbol, env, ncols::Int, nrows::Int)
+# `geometry` is the grid's; with shipped `regions` it names the regions the mask holds whole.
+function _grid_selection(id::Symbol, env, ncols::Int, nrows::Int, geometry = nothing)
     mask = falses(ncols, nrows)
-    env === nothing && return GridSelection(id, mask)
+    env === nothing && return _with_regions(GridSelection(id, mask), geometry)
     bad(why) = throw(ArgumentError("bond: field :$id holds a cell mask; $why"))
     env isa AbstractDict || bad("got $(repr(env))")
     if haskey(env, "runs")
@@ -148,7 +188,21 @@ function _grid_selection(id::Symbol, env, ncols::Int, nrows::Int)
     else
         bad("expected `runs` or `bits`, got $(repr(env))")
     end
-    return GridSelection(id, mask)
+    return _with_regions(GridSelection(id, mask), geometry)
+end
+
+# `sel` with the ids of the regions it holds every cell of.
+function _with_regions(sel::GridSelection, geometry)
+    geometry isa AbstractDict && haskey(geometry, "regions") || return sel
+    R = _region_matrix(geometry)
+    size(R) == size(sel.mask) || return sel
+    whole = Dict{Int, Bool}()
+    for k in eachindex(R)
+        r = R[k]
+        r == 0 && continue
+        whole[r] = get(whole, r, true) & sel.mask[k]
+    end
+    return GridSelection(getfield(sel, :layer), sel.mask, sort!([r for (r, held) in whole if held]))
 end
 
 function _surface_payload(id, i, j, payloads, geometry)

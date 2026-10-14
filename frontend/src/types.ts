@@ -30,6 +30,9 @@ export interface GridGeometry {
     sample_origin?: [number, number] // image px, top-left of sample (0, 0)
     sample_span?: [number, number]   // image px width, height of the sampled viewport
     sample_px?: number                // image px per sample; the last bin may be shorter
+    // Each cell's region id (`regions=`, #359) as runs over the row-major cells, flat pairs
+    // [id, n, ...]; 0 is a cell in no region. Absent on a grid without regions.
+    regions?: number[]
 }
 
 // A 3D surface's shipped points (a strided subset of the source grid on a dense surface).
@@ -210,6 +213,7 @@ export interface Hit {
     grid_?: [number, number, number?] // [i, j, value]; value absent only when neither values nor sample was sent. A :surface point: [source i, source j, z]
     pt_?: [number, number | string, number | string] // :lines readout: [0-based sample index, x, y] nearest the cursor
     sample_?: number // a picked point on a :lines layer: 0-based sample on line `index`, drawn as a ring
+    region_?: number // a grid cell's region id (regions.ts), when it is in one: the hit stands for the whole region
     axis_?: string // transform id, for continuous inversion
     roiPart_?: { corner?: number; edge?: "n" | "s" | "w" | "e"; move?: boolean } // which sub-part of an :roi a drag grabbed
 }

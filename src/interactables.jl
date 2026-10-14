@@ -927,13 +927,14 @@ end
 
 # ============================ GridInteractable =============================
 """
-    GridInteractable(ax, xedges, yedges, values; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one)
-    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one)
+    GridInteractable(ax, xedges, yedges, values; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one, regions=nothing)
+    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one, regions=nothing)
 
 A binned grid, such as a heatmap or image. Produces one `:grid` [`HitLayer`](@ref). A click
 commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value. With `select = :many`
 the reader picks any set of cells (click, Cmd/Ctrl-click), and the field holds a
-[`GridSelection`](@ref).
+[`GridSelection`](@ref). With `regions`, the cells of one region are hovered and picked
+together.
 
 # Arguments
 - `xedges`, `yedges` — cell-edge vectors (length `ncols+1`/`nrows+1`), each strictly
@@ -954,6 +955,13 @@ the reader picks any set of cells (click, Cmd/Ctrl-click), and the field holds a
   keyboard-navigable.
 - `select` — `:one` (default): the field holds one `GridCellEvent` or `nothing`. `:many`: it
   holds a [`GridSelection`](@ref), every selected cell as a mask.
+- `regions` — optional integer matrix the same shape as `values`, a region id for each cell:
+  the objects of a label image, or the fragments of a picture. Cells that share an id act as
+  one: hover outlines the whole region, a click (or Cmd/Ctrl-click) on a `select = :many` grid
+  picks or drops all of it, and a box takes every region it touches. A `GridCellEvent` carries
+  the clicked cell's `region`, and a `GridSelection` lists the regions it holds whole in
+  `regions`. A cell whose id is `0` belongs to no region and acts alone. The default tooltip of
+  a region cell is `region id`, and a `masque"..."` template can use `region`. Default `nothing`.
 
 When a cell is at least one screen pixel, the manifest carries `values` (row-major). Below
 that it carries `sample`: one source value per screen pixel of the axis viewport, the cell
@@ -984,12 +992,47 @@ struct GridInteractable <: AbstractInteractable
     # Row-major like the shipped `values` (cell `(i, j)` at `(j-1)*ncols + i`); empty for none.
     payloads::Vector{Any}
     select::Symbol
+    # Each cell's region id, row-major like `payloads`; empty for a grid without regions.
+    regions::Vector{Int32}
 end
 # The 7-field form from before `payloads` existed: a grid with no payloads.
 GridInteractable(ax, xedges, yedges, values, id, tooltip, label) =
     GridInteractable(ax, xedges, yedges, values, id, tooltip, label, Any[])
 GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads) =
     GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads, :one)
+GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads, select) =
+    GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads, select, Int32[])
+# Each cell's region id, row-major; empty for `regions = nothing`.
+function _grid_regions(regions, ncols, nrows)
+    regions === nothing && return Int32[]
+    regions isa AbstractMatrix && size(regions) == (ncols, nrows) || throw(
+        ArgumentError(
+            "GridInteractable: `regions` must be an integer matrix the same shape as `values` " *
+                "$((ncols, nrows)), got $(regions isa AbstractArray ? "an array of size $(size(regions))" : typeof(regions))",
+        ),
+    )
+    eltype(regions) <: Integer || all(r -> r isa Integer, regions) ||
+        throw(ArgumentError("GridInteractable: `regions` must hold integer region ids, got eltype $(eltype(regions))"))
+    out = Int32[regions[c, r] for r in 1:nrows for c in 1:ncols]
+    all(>=(0), out) || throw(ArgumentError("GridInteractable: `regions` ids must be 0 (no region) or positive"))
+    return out
+end
+# Region ids as runs over the row-major cells, flat pairs `[id, n, ...]`, so a label image ships
+# about one pair per boundary crossed along each row.
+function _region_runs(ids::Vector{Int32})
+    runs = Int[]
+    k = 1
+    while k <= length(ids)
+        id = ids[k]
+        n = 1
+        while k + n <= length(ids) && ids[k + n] == id
+            n += 1
+        end
+        push!(runs, id, n)
+        k += n
+    end
+    return runs
+end
 # One payload per cell, row-major. `payloads` is a `(ncols, nrows)` matrix or `(i, j) -> payload`.
 function _grid_payloads(payloads, ncols, nrows)
     payloads === nothing && return Any[]
@@ -1006,6 +1049,7 @@ function _grid_payloads(payloads, ncols, nrows)
 end
 function GridInteractable(
         ax, xedges, yedges, values; id = :cells, payloads = nothing, tooltip = nothing, label = nothing, select = :one,
+        regions = nothing,
     )
     _check_tooltip(tooltip)
     _check_select(GridInteractable, select)
@@ -1026,7 +1070,7 @@ function GridInteractable(
     )
     return GridInteractable(
         ax, xe, ye, values, id, tooltip, label === nothing ? nothing : String(label),
-        _grid_payloads(payloads, expected...), select,
+        _grid_payloads(payloads, expected...), select, _grid_regions(regions, expected...),
     )
 end
 tooltip_spec(i::GridInteractable) = i.tooltip
@@ -1051,6 +1095,7 @@ function hitlayers(i::GridInteractable, ctx)
     geom = Dict{String, Any}(
         "xedges" => xedges, "yedges" => yedges, "ncols" => ncols, "nrows" => nrows
     )
+    isempty(i.regions) || (geom["regions"] = _region_runs(i.regions))
     cell_px = min(
         abs(xedges[end] - xedges[1]) / ncols,
         abs(yedges[end] - yedges[1]) / nrows,

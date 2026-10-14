@@ -1,7 +1,8 @@
 import { pathData, polygonRings, ringsPathData, screenFixedLayer } from "./geometry"
 import { hitKey, prefersReducedMotion, selectedHits, MOTION_MS } from "./state"
 import type { HiGroups, OverlayCtx, OverlayState } from "./state"
-import type { Hit, LayerStyle } from "./types"
+import { regionCells } from "./regions"
+import type { Hit, HitLayer, LayerStyle } from "./types"
 
 export const SVG_NS = "http://www.w3.org/2000/svg"
 
@@ -60,7 +61,7 @@ export interface HiResult {
 export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null {
     if (!hit.geom_) return null
     const st = hit.layer.style ?? DEFAULT_STYLE
-    if (hit.geom_[0] === "mask") return maskElements(hit.geom_ as [string, string, string], st.stroke)
+    if (hit.geom_[0] === "mask") return maskElements(hit.geom_ as [string, string, string], st.stroke, mode)
     const g = hit.geom_ as [string, ...number[]] | [string, number[]]
     let el: SVGElement | null = null
     if (g[0] === "circle" || g[0] === "point") {
@@ -153,10 +154,12 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
     return { fill: fillEl, edge: edgeEl }
 }
 
-// A grid's selected cells (gridmask.ts's maskHit): the closed-mark recipe, with the fill over
-// the cells and the 2px edge on the outline only, so the cells inside a selected area show no
-// grid lines. Square caps close the corners where a row side meets a column side.
-function maskElements(g: [string, string, string], stroke: string | undefined): HiResult {
+// A grid's selected cells (gridmask.ts's maskHit), or a hovered region (regions.ts): the
+// closed-mark recipe, with the fill over the cells and the edge on the outline only, so the
+// cells inside the area show no grid lines. Square caps close the corners where a row side
+// meets a column side. Hover draws the hover edge (1.5px), a selection the selected one (2px).
+function maskElements(g: [string, string, string], stroke: string | undefined, mode: HiMode): HiResult {
+    const edgeClasses = mode === "hover" ? ["masque-hover", "masque-w-hover"] : ["masque-wash", "masque-w-selected"]
     const fill = document.createElementNS(SVG_NS, "path")
     fill.setAttribute("d", g[1])
     const edge = document.createElementNS(SVG_NS, "path")
@@ -168,13 +171,13 @@ function maskElements(g: [string, string, string], stroke: string | undefined): 
         const wrap = document.createElementNS(SVG_NS, "g")
         setHiStroke(wrap, stroke)
         fill.classList.add("masque-hi", "masque-wash", "masque-nostroke")
-        edge.classList.add("masque-hi", "masque-wash", "masque-w-selected")
+        edge.classList.add("masque-hi", ...edgeClasses)
         edge.style.setProperty("fill", "none")
         wrap.append(fill, edge)
         return { plain: wrap }
     }
     fill.classList.add("masque-hi", "masque-fillshape")
-    edge.classList.add("masque-hi", "masque-wash", "masque-w-selected")
+    edge.classList.add("masque-hi", ...edgeClasses)
     return { fill, edge }
 }
 
@@ -252,7 +255,7 @@ export function clearSel(selGroups: HiGroups): void {
 // becomes selected.
 export function drawHi(state: OverlayState, hiGroups: HiGroups, hit: Hit, also?: HiGroups): void {
     const key = hitKey(hit)
-    if (state.selKeys_.has(key) || maskHolds(state, key)) { clearHiImmediate(state, hiGroups, also); return }
+    if (state.selKeys_.has(key) || maskHolds(state, key, hit.layer)) { clearHiImmediate(state, hiGroups, also); return }
     const cur = hiGroups.fill_.firstElementChild ?? hiGroups.edge_.firstElementChild ?? hiGroups.plain_.firstElementChild
     if (key === state.hiKey_ && cur && !cur.classList.contains("masque-leave")) return
     clearHiImmediate(state, hiGroups, also)
@@ -369,13 +372,23 @@ export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
     placeSel(ctx.selGroup_, data, entering)
     placeSel(ctx.selFixed_, fixed, entering)
     state.selKeys_ = next
-    if (state.hiKey_ !== null && (next.has(state.hiKey_) || maskHolds(state, state.hiKey_))) clearHiImmediate(state, ctx.hiGroup_, ctx.hiFixed_)
+    const hi = state.hiKey_
+    if (hi !== null && (next.has(hi) || maskHolds(state, hi, ctx.manifest_.layers.find((l) => l.id === hi.slice(0, hi.lastIndexOf(":")))))) {
+        clearHiImmediate(state, ctx.hiGroup_, ctx.hiFixed_)
+    }
 }
 
 // A grid cell a mask holds counts as selected for the hover guard above, though the mask is
-// drawn as one hit rather than a key per cell.
-function maskHolds(state: OverlayState, key: string): boolean {
+// drawn as one hit rather than a key per cell. A region's key (`:r<id>`) is held when its
+// cells are, read from its first cell.
+function maskHolds(state: OverlayState, key: string, layer: HitLayer | undefined): boolean {
     const at = key.lastIndexOf(":")
     const mask = state.sel_.get(key.slice(0, at))?.mask_
-    return mask !== undefined && mask[Number(key.slice(at + 1))] === 1
+    if (mask === undefined) return false
+    const tail = key.slice(at + 1)
+    if (tail.startsWith("r")) {
+        const cells = layer ? regionCells(layer, Number(tail.slice(1))) : []
+        return cells.length > 0 && mask[cells[0]] === 1
+    }
+    return mask[Number(tail)] === 1
 }

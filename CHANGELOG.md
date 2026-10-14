@@ -13,6 +13,13 @@ All notable changes to this project are documented here. The format is based on
   and in the `@bind` value, so a selection saved to a file can be loaded back, and a
   Cmd-click or Ctrl-click takes one out like any other. A mask of the wrong size raises an
   `ArgumentError` (#356).
+- A heatmap or image takes `regions`, a matrix of whole numbers the size of the plotted one
+  that gives each cell a region id, such as the labels of a segmentation. Cells that share
+  an id act as one: hovering outlines the whole region, and on a `select = :many` grid a
+  click, Cmd-click, or Ctrl-click picks or drops the whole region, and a box picks every
+  region it touches. `GridSelection` gains `regions`, the ids of the regions it holds whole,
+  and a click on a grid that picks one cell carries the region's id in `GridCellEvent`'s
+  `region`. Cells with id `0` act alone, as before (#359).
 
 ## [0.3.0] - 2026-10-10
 

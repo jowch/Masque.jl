@@ -297,4 +297,37 @@ let n = 1_000
     end
 end
 
+println("\n=== L. regions on a grid — each cell's region id, as runs over the cells ===")
+# `regions = R` (#359) ships `regions`, flat `[id, n, …]` pairs over the row-major cells, so it
+# costs about one pair per region boundary crossed along each row. Two shapes: a label image of
+# round objects on a background, and an image cut into small fragments (a mask editor's crop).
+let
+    f = Figure(size = (600, 600)); ax = Axis(f[1, 1])
+    for n in (512, 2048)
+        Random.seed!(1)
+        R = zeros(Int, n, n)
+        r = n ÷ 40
+        for k in 1:200
+            cx, cy = rand(1:n), rand(1:n)
+            for i in max(1, cx - r):min(n, cx + r), j in max(1, cy - r):min(n, cy + r)
+                (i - cx)^2 + (j - cy)^2 <= r^2 && (R[i, j] = k)
+            end
+        end
+        hm = heatmap!(ax, rand(Float32, n, n))
+        plain = masque(f, (cells = interactables(hm),))
+        labels = masque(f, (cells = interactables(hm; regions = R),))
+        @printf("  %4d×%-4d label image, 200 objects:  manifest %8.1f KB  → %8.1f KB with regions\n",
+            n, n, mp(plain.manifest) / 1024, mp(labels.manifest) / 1024)
+        delete!(ax, hm)
+    end
+    # 121×121 cut into 4×4 blocks: 961 fragments, the densest case a crop editor ships.
+    n = 121
+    R = [(i - 1) ÷ 4 + ((j - 1) ÷ 4) * cld(n, 4) + 1 for i in 1:n, j in 1:n]
+    hm = heatmap!(ax, rand(Float32, n, n))
+    plain = masque(f, (cells = interactables(hm; select = :many),))
+    frags = masque(f, (cells = interactables(hm; select = :many, regions = R),))
+    @printf("  %d×%d crop, %d fragments:     manifest %8.1f KB  → %8.1f KB with regions\n",
+        n, n, maximum(R), mp(plain.manifest) / 1024, mp(frags.manifest) / 1024)
+end
+
 println()
