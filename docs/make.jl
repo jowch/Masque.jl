@@ -57,6 +57,7 @@ makedocs(;
             "Read coordinates" => "readouts.md",
             "Slice across series" => "slice.md",
             "Pan and orbit" => "view.md",
+            "Update the figure" => "onchange.md",
             "Linked views" => "linked-views.md",
             "Custom hits" => "custom.md",
             "Your own plot types" => "recipes.md",

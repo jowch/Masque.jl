@@ -143,6 +143,14 @@ export function move(ctx: OverlayCtx, state: OverlayState, d: Extract<Drag, { ki
     return `x:[${fmt(b.xmin, n)}, ${fmt(b.xmax, n)}] y:[${fmt(b.ymin, n)}, ${fmt(b.ymax, n)}]`
 }
 
+// The fields a release here would set, without touching the selection: what an in-drag
+// `onchange` frame is sent.
+export function fieldsNow(ctx: OverlayCtx, d: Extract<Drag, { kind: "roi" }>): Record<string, unknown> {
+    const out: Record<string, unknown> = { [d.id_]: { layer: d.id_, index: 0, payload: roiBounds(d.box_) } }
+    if (d.target_) out[d.target_.id] = { items: computeSelection(d.box_.g_, d.target_, ctx.manifest_.transforms[d.target_.axis]).items }
+    return out
+}
+
 // The fields a release sets: the box's bounds, and with `selects` what it now holds, under
 // its target's field.
 export function end(

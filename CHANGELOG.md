@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `masque(fig, ...; onchange = state -> ...)` changes the figure as the reader works the
+  widget, without running the cell again, so picks, controls and the view stay put. `state`
+  has a field for every plot you can pick from and every control, named as in the `@bind`
+  value, and a field `bind` leaves out still reaches `onchange`. The function changes plots
+  that already exist, with Makie's `update!`; it runs once before the figure first shows, then
+  after every click and release, and while a threshold or box moves. `update_while_dragging =
+  false` on a `ThresholdInteractable` or `ROIInteractable` waits for the release. A plot whose
+  number of marks changes loses its picks. Works on both backends (#334).
+
 ## [0.3.0] - 2026-10-10
 
 ### Added

@@ -8,6 +8,8 @@ export interface FrameResponse {
     height?: number
     pxPerUnit?: number
     manifest?: unknown // Manifest, kept loose here to avoid a cycle with mount.ts's own import of this file
+    error?: string     // `onchange` threw: no picture, a note instead
+    clear?: string[]   // fields whose plot changed its number of marks; their picks go
 }
 
 export type RenderFrame = (input: Record<string, unknown>) => Promise<FrameResponse>

@@ -53,6 +53,13 @@ export function move(d: Extract<Drag, { kind: "threshold" }>, p: { x: number; y:
     return fmt(d.tg_.orientation === "h" ? v.y : v.x, digits)
 }
 
+// The field a release here would set, without moving the line: what an in-drag `onchange`
+// frame is sent.
+export function envelopeAt(d: Extract<Drag, { kind: "threshold" }>, p: { x: number; y: number }): { layer: string; index: number; payload: unknown } {
+    const v = invertAxis(d.t_, clampX(d.t_, p.x), clampY(d.t_, p.y))
+    return { layer: d.id_, index: 0, payload: d.tg_.orientation === "h" ? v.y : v.x }
+}
+
 export function end(d: Extract<Drag, { kind: "threshold" }>, p: { x: number; y: number }): { layer: string; index: number; payload: unknown } {
     const v = invertAxis(d.t_, clampX(d.t_, p.x), clampY(d.t_, p.y))
     const h = d.tg_.orientation === "h"

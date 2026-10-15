@@ -1938,7 +1938,7 @@ end
 
 # ============================ ThresholdInteractable ========================
 """
-    ThresholdInteractable(ax; orientation=:horizontal, value, id=:threshold)
+    ThresholdInteractable(ax; orientation=:horizontal, value, id=:threshold, update_while_dragging=true)
 
 A draggable horizontal or vertical line: drag for a live client-side readout, and the pixel
 position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up. Produces one
@@ -1952,6 +1952,9 @@ position inverts to a data-space scalar via [`AxisTransform`](@ref) on mouse-up.
 - `value` — the line's initial data-space position (a y-value for `:horizontal`, x-value for
   `:vertical`). Required, no default.
 - `id` — the layer id; becomes `InteractionEvent.layer` on commit. Default `:threshold`.
+- `update_while_dragging` — with `onchange` on [`masque`](@ref), redraw the figure while the
+  line moves, not only when it is let go. Default `true`, like Makie's `Slider`. The `@bind`
+  value changes only on release either way.
 
 Payload on commit (client-side): the scalar data coordinate.
 
@@ -1971,11 +1974,14 @@ ThresholdInteractable(ax; orientation = :horizontal, value = 5.0)
 """
 struct ThresholdInteractable <: AbstractInteractable
     ax; orientation::Symbol; value::Float64; id::Symbol
+    update_while_dragging::Bool
 end
-function ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold)
+# The 0.3.0 positional form, before `update_while_dragging`.
+ThresholdInteractable(ax, orientation::Symbol, value::Real, id::Symbol) = ThresholdInteractable(ax, orientation, value, id, true)
+function ThresholdInteractable(ax; orientation = :horizontal, value, id = :threshold, update_while_dragging::Bool = true)
     orientation in (:horizontal, :vertical) ||
         throw(ArgumentError("ThresholdInteractable: orientation must be :horizontal or :vertical, got $(orientation)"))
-    return ThresholdInteractable(ax, orientation, _threshold_value(value), id)
+    return ThresholdInteractable(ax, orientation, _threshold_value(value), id, update_while_dragging)
 end
 events(::ThresholdInteractable) = (:drag,)
 function validate(i::ThresholdInteractable, ctx::InteractionContext)
@@ -2000,13 +2006,14 @@ function hitlayers(i::ThresholdInteractable, ctx)
         pos = _proj(ctx, i.ax, (i.value, t.ylims[1]))[1]   # constant data-x → its pixel-x
         span = Float32[vy, vy + vh]; orient = "v"
     end
-    geom = Dict("orientation" => orient, "pos" => Float32(pos), "span" => span)
+    geom = Dict{String, Any}("orientation" => orient, "pos" => Float32(pos), "span" => span)
+    i.update_while_dragging || (geom["settleOnly"] = true)
     return [HitLayer(i.id, :threshold, geom, Any[], axis_id(ctx, i.ax), events(i))]
 end
 
 # ============================ ROIInteractable ==============================
 """
-    ROIInteractable(ax; bounds, id=:roi, selects=nothing)
+    ROIInteractable(ax; bounds, id=:roi, selects=nothing, update_while_dragging=true)
 
 A draggable and resizable rectangle: drag the interior to move it, a corner to resize both
 edges, or the middle of a side (no drawn grip there) to resize just that one edge; on mouse-up
@@ -2025,6 +2032,9 @@ compatible layer, reporting the contained elements. Produces one `:roi` [`HitLay
   geometry falls inside the ROI are reported. `masque` raises `ArgumentError` at build time if
   `selects` names a layer absent from the same call, one of an unsupported kind, or a plot
   with no point or grid layer in the call.
+- `update_while_dragging` — with `onchange` on [`masque`](@ref), redraw the figure while the
+  box moves, not only when it is let go. Default `true`, like Makie's `Slider`. The `@bind`
+  value changes only on release either way.
 
 The box's field in the `@bind` value is a [`BoundsEvent`](@ref), starting at `bounds`. With
 `selects` set, the box also fills its target's field with what it contains: a
@@ -2054,12 +2064,14 @@ struct ROIInteractable <: AbstractSelector
     # bounds: (xmin,xmax,ymin,ymax) data space. A plot `selects` becomes a `_PlotTarget` in
     # `_assemble`, then the one compatible layer id in `build_manifest`.
     ax; bounds::NTuple{4, Float64}; id::Symbol; selects::Union{Nothing, Symbol, Makie.AbstractPlot, _PlotTarget}
+    update_while_dragging::Bool
 end
-function ROIInteractable(ax; bounds, id = :roi, selects = nothing)
+ROIInteractable(ax, bounds::NTuple{4, Real}, id::Symbol, selects) = ROIInteractable(ax, bounds, id, selects, true)
+function ROIInteractable(ax; bounds, id = :roi, selects = nothing, update_while_dragging::Bool = true)
     xmin, xmax, ymin, ymax = _roi_bounds(bounds)
     (xmin < xmax && ymin < ymax) ||
         throw(ArgumentError("ROIInteractable: need xmin < xmax and ymin < ymax, got $(bounds)"))
-    return ROIInteractable(ax, (xmin, xmax, ymin, ymax), id, selects)
+    return ROIInteractable(ax, (xmin, xmax, ymin, ymax), id, selects, update_while_dragging)
 end
 selects(i::ROIInteractable) = i.selects
 compatible_kinds(::ROIInteractable) = (:circles, :grid)
@@ -2082,11 +2094,12 @@ end
 function hitlayers(i::ROIInteractable, ctx)
     xmin, xmax, ymin, ymax = i.bounds
     a = _proj(ctx, i.ax, (xmin, ymin)); b = _proj(ctx, i.ax, (xmax, ymax))  # y flips → normalize below
-    geom = Dict(
+    geom = Dict{String, Any}(
         "x" => Float32(min(a[1], b[1])), "y" => Float32(min(a[2], b[2])),
         "w" => Float32(abs(b[1] - a[1])), "h" => Float32(abs(b[2] - a[2])),
         "handle" => Float32(8 * ctx.scaling),
     )
+    i.update_while_dragging || (geom["settleOnly"] = true)
     return [HitLayer(i.id, :roi, geom, Any[], axis_id(ctx, i.ax), events(i))]
 end
 

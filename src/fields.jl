@@ -17,15 +17,42 @@ _Binding() = _Binding(nothing, false, Set{Symbol}())
 # The interactables of one call with its binding. It is a vector, so a backend's `make_widget`
 # passes it on to `_view_render_frame` as it is, and every frame's manifest makes the same
 # fields as the first.
+# `onchange` is the author's function (§2 of the widget design), or `nothing`. `rebuild` makes
+# the plan again from the figure as it is now: an interactable holds its plot's data as it was
+# built, so after `onchange` changes a plot its layers are built afresh. `mount` holds the
+# mount manifest and the layer owners once `masque` has built them, so the gesture closure
+# decodes the state the same way the first render did.
 struct _Plan <: AbstractVector{AbstractInteractable}
     ints::Vector{AbstractInteractable}
     binding::_Binding
+    onchange::Union{Nothing, Function}
+    rebuild::Union{Nothing, Function}
+    mount::Base.RefValue{Any}
 end
+_Plan(ints, binding) = _Plan(ints, binding, nothing, nothing, Ref{Any}(nothing))
 Base.size(p::_Plan) = size(p.ints)
 Base.getindex(p::_Plan, k::Int) = p.ints[k]
+Base.setindex!(p::_Plan, v, k::Int) = (p.ints[k] = v; p)
 Base.IndexStyle(::Type{_Plan}) = IndexLinear()
 _binding(p::_Plan) = p.binding
 _binding(_) = _Binding()
+_onchange(p::_Plan) = p.onchange
+_onchange(_) = nothing
+_with_onchange(p::_Plan, f, rebuild = p.rebuild) = _Plan(p.ints, p.binding, f, rebuild, p.mount)
+function _with_onchange(p, f, rebuild = nothing)
+    f === nothing && return p
+    ints = collect(AbstractInteractable, p)
+    return _Plan(ints, _Binding(), f, something(rebuild, () -> _Plan(copy(ints), _Binding())), Ref{Any}(nothing))
+end
+
+# The plan built again, quietly: its skip notices were already shown at mount.
+function _rebuilt(p::_Plan)
+    p.rebuild === nothing && return p
+    fresh = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
+        p.rebuild()
+    end
+    return _Plan(fresh.ints, p.binding, p.onchange, p.rebuild, p.mount)
+end
 
 # The object a name belongs to: a plot for `interactables(plot)`, else the interactable.
 _named_key(r::_PlotRequest) = r.plot
@@ -252,6 +279,18 @@ function _fields(binding::_Binding, built, brushed)
         end
     end
     return fields, roles
+end
+
+"""
+    _state_fields(binding, built, brushed, fields, roles) -> Vector{Symbol}
+
+The fields `onchange` receives: every layer that would be a field with no `bind`, and every
+field `bind` keeps (a bound line), in layer order. `fields` are the bind's own.
+"""
+function _state_fields(binding::_Binding, built, brushed, fields, roles)
+    all_fields, _ = _fields(_Binding(nothing, false, binding.defaults), built, brushed)
+    keep = Set{Symbol}(all_fields) ∪ Set{Symbol}(fields)
+    return Symbol[L.id for (_, L, _) in built if L.id in keep]
 end
 
 _layer_kind(built, id) = first(L.kind for (_, L, _) in built if L.id === id)

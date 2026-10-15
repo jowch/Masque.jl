@@ -587,11 +587,12 @@ that one field's value when `bind` named one. `owners` maps layer id strings to
 for built-ins).
 """
 function bond_from_js(manifest::AbstractDict, owners, js)
-    js === nothing && (js = mount_envelope(manifest))
+    js === nothing && (js = _bind_envelope(manifest))
     js isa AbstractDict || throw(
         ArgumentError("bond: expected one value per field, got $(typeof(js))"),
     )
-    fields = get(manifest, "fields", String[])
+    # With `onchange` the browser holds every state field and sends only the bind's.
+    fields = get(manifest, "bind", get(manifest, "fields", String[]))
     for k in keys(js)
         k in fields || throw(
             ArgumentError("bond: `$(k)` is not a field of this value (fields: $(join(fields, ", ")))"),
@@ -601,6 +602,27 @@ function bond_from_js(manifest::AbstractDict, owners, js)
     v = _nest(Symbol.(fields), vals)
     get(manifest, "bare", false) === true && return only(v)
     return v
+end
+
+# The mount value Pluto sees: the bind's fields of the starting state.
+function _bind_envelope(manifest::AbstractDict)
+    env = mount_envelope(manifest)
+    haskey(manifest, "bind") || return env
+    return Dict{String, Any}(f => get(env, f, nothing) for f in manifest["bind"])
+end
+
+"""
+    state_from_js(manifest, owners, js) -> NamedTuple
+
+What `onchange` receives: every field of the state, `js` holding one envelope per field (a
+missing one is the field's start), nested as the bind value is, and never unwrapped.
+"""
+function state_from_js(manifest::AbstractDict, owners, js)
+    js isa AbstractDict || throw(ArgumentError("onchange: expected one value per field, got $(typeof(js))"))
+    start = mount_envelope(manifest)
+    fields = get(manifest, "fields", String[])
+    vals = Any[_field_value(manifest, owners, f, haskey(js, f) ? js[f] : get(start, f, nothing)) for f in fields]
+    return _nest(Symbol.(fields), vals)
 end
 
 # Flat fields to the nested value: `fit.points` and `fit.line` become `fit = (points, line)`,
@@ -633,7 +655,7 @@ function bond_from_js(w, js)
 end
 
 function initial_bond(w)
-    return bond_from_js(w.manifest, w.owners, mount_envelope(w.manifest))
+    return bond_from_js(w.manifest, w.owners, _bind_envelope(w.manifest))
 end
 
 function with_owners end   # backends that own a distinct widget type extend this

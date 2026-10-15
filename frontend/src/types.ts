@@ -54,6 +54,7 @@ export interface ThresholdGeometry {
     orientation: "h" | "v"
     pos: number            // image-px coordinate of the line (y if "h", x if "v")
     span: [number, number] // image-px extent along the axis viewport
+    settleOnly?: true      // `update_while_dragging = false`: `onchange` runs on release only
 }
 
 export interface ROIGeometry {
@@ -62,6 +63,7 @@ export interface ROIGeometry {
     w: number
     h: number
     handle: number // hit half-size, image px; the painted grip is HANDLE_CSS in drag/roi.ts
+    settleOnly?: true // `update_while_dragging = false`: `onchange` runs on release only
 }
 
 export interface SliceSeries {
@@ -193,6 +195,10 @@ export interface Manifest {
     // True when `bind` named one object of one field: Julia unwraps that field's value. The
     // browser ignores it and sends `{field: envelope}` either way.
     bare?: boolean
+    // `masque(...; onchange)`: `fields` are the state, every commit also goes to Julia over the
+    // gesture channel, and only `bind`'s fields make the bond value.
+    onchange?: true
+    bind?: string[]
     // Every field's starting envelope (`null`: nothing picked yet). Only the mount manifest
     // carries it; a frame's manifest leaves it out.
     initial?: Record<string, unknown>
