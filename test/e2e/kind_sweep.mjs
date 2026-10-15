@@ -1134,18 +1134,50 @@ try {
       const moved = old[1];
       const rOld = await dispatchAt(key, moved.x, moved.y, "pointermove");
       const rect = await hostRect();
+      // A grid finer than the marker's hit radius, stopping at the first hit away from the old spot.
       const hits = [];
-      for (let y = 4; y < rect.h; y += 6) {
-        for (let x = rect.w / 2 + 4; x < rect.w; x += 6) {
+      const step = Math.max(4, Math.floor(moved.r));
+      let far = null;
+      for (let y = 4; y < rect.h && !far; y += step) {
+        for (let x = rect.w / 2 + 4; x < rect.w; x += step) {
           const r = await dispatchAt(key, x, y, "pointermove");
-          if (r.show && /\bx 4\b.*\by 4\b.*\bz 4\b/.test(r.text ?? "")) hits.push({ x, y, text: r.text });
+          if (!r.show || !/\bx 4\b.*\by 4\b.*\bz 4\b/.test(r.text ?? "")) continue;
+          hits.push({ x, y });
+          if (Math.hypot(x - moved.x, y - moved.y) > moved.r + 6) { far = { x, y, text: r.text }; break; }
         }
       }
-      const far = hits.filter((h) => Math.hypot(h.x - moved.x, h.y - moved.y) > moved.r + 6);
-      if (!far.length) throw new Error(`${key}: the follower's corner point answers nowhere new after the orbit (old spot show=${rOld.show}; ${hits.length} hits near the old spot)`);
+      if (!far) throw new Error(`${key}: the follower's corner point answers nowhere new after the orbit (old spot show=${rOld.show}; ${hits.length} hits near the old spot)`);
       passed.push(`${key}/follower-hits-moved`);
       await dispatchAt(key, 1, 1, "pointermove");
-      console.error(`OK  ${key} — orbit az ${g.azimuth.toFixed(2)} -> ${st.azimuth.toFixed(2)}, follower redrawn, its point answers at ${JSON.stringify(far[0])}`);
+      // Wheel a1, then a2, then a1. Each zoom must start from the limits both panels share now,
+      // so the third is narrower than the second; starting from a1's own earlier request would
+      // throw a2's zoom away. That a1's base moved at all also shows a2's zoom reached a1.
+      const g2 = layers.find((l) => l.id === "view2")?.geometry;
+      if (!g2) throw new Error(`${key}: no view2 layer`);
+      const wheelOn = async (vg, prev) => {
+        await page.evaluate(([k, ix, iy]) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const b = host.querySelector("img, canvas").getBoundingClientRect();
+          const sc = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+          sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * sc, clientY: b.top + iy * sc, deltaY: -300 }));
+        }, [key, vg.x + vg.w / 2, vg.y + vg.h / 2]);
+        for (let i = 0; i < tries; i++) {
+          await new Promise((r) => setTimeout(r, delayMs));
+          const s2 = await stamp();
+          if (s2 && s2.n > prev.n && s2.settle === true && Array.isArray(s2.limits)) return s2;
+        }
+        throw new Error(`${key}: no settled zoom frame (last ${JSON.stringify(await stamp())})`);
+      };
+      const wx = (l) => l[1] - l[0];
+      const z1 = await wheelOn(g, st);
+      const z2 = await wheelOn(g2, z1);
+      const z3 = await wheelOn(g, z2);
+      if (!(wx(z2.limits) < 0.95 * wx(z1.limits))) throw new Error(`${key}: the second panel's zoom did not start from the first's (${wx(z1.limits)} -> ${wx(z2.limits)})`);
+      if (!(wx(z3.limits) < 0.95 * wx(z2.limits))) throw new Error(`${key}: zooming the first panel again dropped the second panel's zoom (${wx(z1.limits)}, ${wx(z2.limits)}, ${wx(z3.limits)})`);
+      passed.push(`${key}/alternating-zoom`);
+      console.error(`OK  ${key} — orbit az ${g.azimuth.toFixed(2)} -> ${st.azimuth.toFixed(2)}, follower redrawn, its point answers at ${JSON.stringify(far)}; zoom widths ${[z1, z2, z3].map((z) => wx(z.limits).toFixed(3)).join(" > ")}`);
       continue;
     }
 

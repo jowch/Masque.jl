@@ -204,6 +204,13 @@ end
         a3.azimuth[] = -0.3
         @test a1.azimuth[] == -0.3 && a2.azimuth[] == -0.3
         @test linkcameras!(a1) === nothing
+        @test linkcameras!() === nothing
+        @test linkcameras!(Any[]) === nothing
+        # An untyped vector of Axis3 links like a typed one.
+        b1, b2 = Axis3(fig[2, 2]), Axis3(fig[2, 3])
+        linkcameras!(Any[b1, b2])
+        b2.azimuth[] = 0.25
+        @test b1.azimuth[] == 0.25
 
         ax2d = Axis(fig[2, 1])
         err = try
@@ -213,6 +220,12 @@ end
         end
         @test err isa ArgumentError
         @test occursin("linkaxes!", err.msg)
+        err2 = try
+            linkcameras!(Any[a1, ax2d])
+        catch e
+            e
+        end
+        @test err2 isa ArgumentError && occursin("argument 2 is Axis", err2.msg)
     end
 
     @testset "a line crossing the zoomed limits keeps its drawn part (#321)" begin

@@ -400,8 +400,9 @@ kind_sweep_meta() = [
         "inside" => 2, "outside" => 0,
     ),
     Dict(
-        # Two Axis3 panels turned together by `linkcameras!` (#362), with a view on the left
-        # one only. Orbiting it must turn the right panel's picture and move its hit areas.
+        # Two Axis3 panels linked by `linkcameras!(...; limits = true)` (#362), a view on each.
+        # Orbiting the left one must turn the right panel's picture and move its hit areas, and
+        # wheel zooms that alternate between the panels must each start from the shared limits.
         "key" => "view3d_linked", "layerId" => "view", "layerKind" => "view",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
@@ -1114,8 +1115,11 @@ function build_kind_sweep()
         a2 = Axis3(fig[1, 2]; title = "follows")
         s1 = scatter!(a1, pts; markersize = 14, color = :gray)
         s2 = scatter!(a2, pts; markersize = 14, color = :seagreen)
-        linkcameras!(a1, a2)
-        masque(fig, interactables(s1; id = :pts), interactables(s2; id = :pts2), ViewInteractable(a1; id = :view))
+        linkcameras!(a1, a2; limits = true)
+        masque(
+            fig, interactables(s1; id = :pts), interactables(s2; id = :pts2),
+            ViewInteractable(a1; id = :view), ViewInteractable(a2; id = :view2),
+        )
     end
 
     legend = let

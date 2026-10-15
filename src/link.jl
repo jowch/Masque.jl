@@ -36,11 +36,12 @@ function linkcameras!(axes::AbstractVector{<:Makie.Axis3}; limits::Bool = false)
     return nothing
 end
 linkcameras!(axes::Makie.Axis3...; limits::Bool = false) = linkcameras!(collect(axes); limits)
+linkcameras!(axes::AbstractVector; limits::Bool = false) = isempty(axes) ? nothing : linkcameras!(axes...; limits)
 function linkcameras!(axes...; limits::Bool = false)
     bad = findfirst(ax -> !(ax isa Makie.Axis3), axes)
     throw(
         ArgumentError(
-            "linkcameras! links Axis3 panels; argument $(bad) is a $(nameof(typeof(axes[bad]))). " *
+            "linkcameras! links Axis3 panels, but argument $(bad) is $(nameof(typeof(axes[bad]))). " *
                 "To link 2D axes, use Makie's `linkaxes!`, `linkxaxes!`, or `linkyaxes!`.",
         ),
     )

@@ -5,8 +5,9 @@ import {
     anchorFor, computeAnchoredPlacement, photoClip, lineReadout, samplePoint,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
-import { begin as beginView, tip as viewTip, limitsTip } from "../src/drag/view"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, ThresholdGeometry } from "../src/types"
+import { begin as beginView, tip as viewTip, limitsTip, view3Base, rememberView3, seedView3Homes, zoom3 } from "../src/drag/view"
+import { createOverlayState } from "../src/state"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry } from "../src/types"
 
 describe("primitives", () => {
     it("distToSegment", () => {
@@ -727,6 +728,45 @@ describe("view pan / orbit math", () => {
 
 // Julia's `_decategorize` (src/bond.jl) reads these exact payloads: the category label as `x`/`y`
 // for an axis click, and the bare label for a threshold release. A change here breaks the bond.
+describe("Axis3 zoom base across linked views (#362)", () => {
+    const home: Limits3 = [0, 10, 0, 10, 0, 10]
+    const layers = ["v1", "v2"].map((id) => ({ id, kind: "view", geometry: { x: 0, y: 0, w: 1, h: 1, mode: "orbit", limits: home } }))
+
+    it("a view starts from the frame on screen once another view has asked since", () => {
+        // `linkcameras!(a1, a2; limits = true)`: every request moves both panels, so each frame
+        // shows both at the latest request's limits.
+        const state = createOverlayState()
+        seedView3Homes(state, layers)
+        const l1 = zoom3(state, "v1", home, 2)               // wheel on a1
+        expect(l1).toEqual([2.5, 7.5, 2.5, 7.5, 2.5, 7.5])
+        const l2 = zoom3(state, "v2", l1, 2)                 // wheel on a2, shown = l1
+        expect(l2).toEqual([3.75, 6.25, 3.75, 6.25, 3.75, 6.25])
+        const l3 = zoom3(state, "v1", l2, 2)                 // wheel on a1 again, shown = l2
+        expect(l3[1] - l3[0]).toBeCloseTo(1.25)            // a2's zoom kept, not a1's own l1
+        // Pan goes through the same base.
+        rememberView3(state, "v2", l3, [1, 2, 1, 2, 1, 2])
+        expect(view3Base(state, "v1", l3)).toEqual(l3)
+        expect(view3Base(state, "v2", l3)).toEqual([1, 2, 1, 2, 1, 2])
+    })
+
+    it("a view's own requests still win over a frame that trails them", () => {
+        const state = createOverlayState()
+        seedView3Homes(state, layers)
+        const l1 = zoom3(state, "v1", home, 2)
+        expect(zoom3(state, "v1", home, 2)).toEqual([3.75, 6.25, 3.75, 6.25, 3.75, 6.25])
+        expect(view3Base(state, "v1", home)).not.toEqual(l1)
+    })
+
+    it("the zoom is bounded around each view's mount limits, not where a linked view had zoomed", () => {
+        const state = createOverlayState()
+        seedView3Homes(state, layers)
+        let shown = home
+        for (let i = 0; i < 20; i++) shown = zoom3(state, "v1", shown, 2)
+        const out = zoom3(state, "v2", shown, 1 / 1e6)     // zoom a2 all the way out
+        expect(out).toEqual(zoom3(createOverlayState(), "x", home, 1 / 1e6))
+    })
+})
+
 describe("photoClip", () => {
     const view = (clip?: [number, number, number, number]): Manifest => ({
         width: 400, height: 300, transforms: {},
