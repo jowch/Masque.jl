@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A WGLMakie widget shown outside Pluto, in Documenter or in an HTML page written with
+  `show(io, MIME"text/html"(), w)`, draws its figure and keeps its tooltips and highlights,
+  where it used to show a box saying it is drawn only in Pluto. As with CairoMakie, a click
+  highlights a mark but sets no `@bind` value, and orbiting or panning the view needs Pluto
+  (#300).
+
+  The page loads WGLMakie's script, about 1 MB, once from jsDelivr (or GitHub when jsDelivr
+  is down), from the Makie release you have installed and checked against your copy's
+  hash. Read offline, each figure shows a note in its box saying it couldn't load. A
+  WGLMakie installed with `Pkg.develop` writes the script into each widget instead.
+
 ## [0.3.0] - 2026-10-10
 
 ### Added

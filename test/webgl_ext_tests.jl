@@ -2,6 +2,7 @@ using Test
 using Masque
 using WGLMakie
 import Makie
+import JSON3
 
 const _WGLExt = Base.get_extension(Masque, :MasqueWGLMakieExt)
 
@@ -410,16 +411,87 @@ end
     @test occursin("window.Masque.mount", html)
 end
 
-@testset "webgl show outside Pluto gives a sized placeholder (#288)" begin
+@testset "webgl show outside Pluto draws the scene with hover (#300)" begin
     fig = Figure(; size = (300, 200))
     ax = Axis(fig[1, 1])
     scatter!(ax, 1:3, 1:3)
     w = masque(fig; backend = :webgl)
     html = sprint(show, MIME"text/html"(), w)
-    @test occursin("masque-webgl-static", html)
-    @test occursin("aspect-ratio:$(w.width) / $(w.height)", html)
-    @test !occursin("<script", html)
-    @test !occursin("<canvas", html)
+    @test occursin("<canvas class=\"masque-webgl-base\" width=\"$(w.width)\" height=\"$(w.height)\"", html)
+    @test occursin("max-width:$(w.display_css)px", html)
+    @test !occursin("published_to_js", html) && !occursin("getPublishedObject", html)
+    # One block per widget, found by id, so two widgets on a page don't collide and a
+    # script run from `<head>` still finds its canvas.
+    id = match(r"<div class=\"ip-host\" id=\"([^\"]+)\"", html).captures[1]
+    @test occursin("document.getElementById(\"$(id)\")", html)
+    script = match(r"<script>(.*?)</script>"s, html).captures[1]
+    @test startswith(strip(script), "{") && endswith(strip(script), "}")
+    @test occursin("Masque.mount(canvas, ", html)
+    lit = match(r"Masque\.mount\(canvas, (.*), new Promise"s, html).captures[1]
+    @test length(JSON3.read(lit; allow_inf = true)["layers"]) == length(w.manifest["layers"])
+    # The test env's WGLMakie is a registered install, so the page fetches its script.
+    cdn = _WGLExt._wgl_cdn()
+    @test cdn !== nothing
+    @test !occursin(_WGLExt._bundle_text()[1:2000], html)
+    @test all(u -> occursin(u, html), cdn.urls) && occursin(cdn.integrity, html)
+    # Smaller than the scene's JSON, which Pluto publishes as is.
+    @test sizeof(html) < sizeof(JSON3.write(w.scene))
+    @test occursin("couldn't load WGLMakie's script", html)
+end
+
+@testset "outside Pluto, WGLMakie's script comes from its Makie tag (#300)" begin
+    js = _WGLExt._bundle_text()
+    depot = mktempdir()
+    pkg = joinpath(depot, "packages", "WGLMakie", "AbCd1")
+    mkpath(pkg)
+    pushfirst!(DEPOT_PATH, depot)
+    cdn = try
+        _WGLExt._wgl_cdn(pkg, v"0.24.15", js)
+    finally
+        popfirst!(DEPOT_PATH)
+    end
+    @test cdn.urls == [
+        "https://cdn.jsdelivr.net/gh/MakieOrg/Makie.jl@v0.24.15/WGLMakie/src/javascript/WGLMakie.bundled.js",
+        "https://raw.githubusercontent.com/MakieOrg/Makie.jl/v0.24.15/WGLMakie/src/javascript/WGLMakie.bundled.js",
+    ]
+    @test cdn.integrity == "sha384-" * Masque.base64encode(Masque.sha384(js))
+    # A developed WGLMakie, or no Makie version, inlines the script in each widget.
+    @test _WGLExt._wgl_cdn(mktempdir(), v"0.24.15", js) === nothing
+    @test _WGLExt._wgl_cdn(pkg, nothing, js) === nothing
+
+    fig = Figure(; size = (300, 200))
+    scatter!(Axis(fig[1, 1]), 1:3, 1:3)
+    w = masque(fig; backend = :webgl)
+    old = _WGLExt._WGL_CDN[]
+    _WGLExt._WGL_CDN[] = nothing
+    html = try
+        sprint(show, MIME"text/html"(), w)
+    finally
+        _WGLExt._WGL_CDN[] = old
+    end
+    @test occursin("H.inlineUrl", html) && !occursin("fetch(url", html)
+    @test occursin(sprint(Masque._js_literal, js[1:2000])[2:(end - 1)], html)
+end
+
+@testset "the page's scene: base64 arrays, long strings once (#300)" begin
+    shader = "void main() { gl_FragColor = vec4(1.0); }"^10
+    scene = Dict{String, Any}(
+        "a" => Dict{String, Any}("__t__" => "f32", "d" => Float32[1.5, -2, 3]),
+        "b" => Dict{String, Any}("__t__" => "u8", "d" => UInt8[255, 0]),
+        "s" => Any[shader, shader, "short", nothing, true, 2],
+        "o" => Dict{String, Any}("__obs__" => 0.5),
+    )
+    js = _WGLExt._scene_js(scene)
+    strs, body = match(r"^const strs = (.*);\nconst scene = (.*);\n$"s, js).captures
+    @test JSON3.read(strs) == [shader]
+    @test count("strs[0]", body) == 2
+    b64(x) = Masque.base64encode(reinterpret(UInt8, x))
+    @test occursin("{\"__t__\":\"f32\",\"b64\":\"$(b64(Float32[1.5, -2, 3]))\"}", body)
+    @test occursin("{\"__t__\":\"u8\",\"b64\":\"$(b64(UInt8[255, 0]))\"}", body)
+    @test occursin("\"short\",null,true,2", body)
+    @test occursin("{\"__obs__\":0.5}", body)
+    # A `</script>` inside a string can't end the script element.
+    @test !occursin("</script", _WGLExt._scene_js(Dict{String, Any}("x" => "</script>"^40)))
 end
 
 @testset "webgl show kicks the view warmup before it runs" begin

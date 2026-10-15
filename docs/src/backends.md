@@ -149,10 +149,15 @@ build at 200 KB, so a page with several large figures goes in
 makedocs(; format = Documenter.HTML(; size_threshold_ignore = ["plots.md"]), ...)
 ```
 
+A WGLMakie widget works there too: the page draws the figure on the
+reader's GPU and loads WGLMakie's script, about 1 MB, once from
+jsDelivr, the version that matches your installed Makie. Read offline,
+each figure shows a note in its box saying it couldn't load. To put a
+figure in a document that must read offline, use `backend = :cairo`
+there.
+
 A click highlights a mark there too, but nothing reads the choice: the
 `@bind` value and dragging the view with a [`ViewInteractable`](@ref)
 need a running Pluto notebook. A display that doesn't run the page's
-scripts shows the plain figure, and a WGLMakie widget, which has no
-image to fall back on, shows a box of the figure's size saying it is
-drawn only in Pluto. To put a WGLMakie figure in a document, use
-`backend = :cairo` there.
+scripts shows the plain CairoMakie figure, or an empty box for
+WGLMakie.
