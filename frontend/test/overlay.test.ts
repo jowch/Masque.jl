@@ -6161,6 +6161,22 @@ describe("onchange (#334)", () => {
         expect(mid.state.roi).toMatchObject({ layer: "roi", index: 0 })
     })
 
+    it("after a restored value, a commit back to the mount value still reaches Pluto", async () => {
+        const m = onchangeManifest({ bind: ["thr", "pts"] })
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(frame(m)))
+        // Pluto restores a pick the kernel holds.
+        ;(host as unknown as { value: unknown }).value = { thr: { layer: "thr", index: 0, payload: 50 }, pts: { layer: "pts", index: 0 } }
+        await Promise.resolve()
+        let inputs = 0
+        host.addEventListener("input", () => { inputs += 1 })
+        // A click on the picked point clears it: the value is the mount one again.
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true }))
+        expect(val(host).pts).toBeNull()
+        expect(inputs).toBe(1)
+    })
+
     it("a value Pluto restores at mount redraws the figure", async () => {
         const m = onchangeManifest()
         const { host, script } = setup()

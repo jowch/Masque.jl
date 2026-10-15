@@ -447,8 +447,6 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     let dragStops: DragStops | null = null
     // A frame that arrives while an ROI or threshold drag holds those nodes. Rebuilt when the drag ends.
     let pendingChrome: Manifest | null = null
-    // The last \`@bind\` value a commit sent.
-    let sentBond: unknown = toBond(hostValue)
     // Where the pointer last moved over the plot, so an \`onchange\` frame can redraw its hover.
     let lastMove: PointerEvent | null = null
     const onchangeSettle = (): Record<string, unknown> => ({ onchange: true, state: currentState(), settle: true })
@@ -494,9 +492,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             stateValue = next
             const bond = toBond(next)
             // With \`onchange\`, a commit can change only fields the bind leaves out. The \`@bind\`
-            // value is then the same, and the cells that read it have nothing new.
-            if (!manifest.onchange || !sameValue(bond, sentBond)) {
-                sentBond = bond
+            // value is then the same, and the cells that read it have nothing new. Compared with
+            // the value the host holds now, which a restore from Pluto may have changed.
+            if (!manifest.onchange || !sameValue(bond, (host as unknown as { value: unknown }).value)) {
                 committing = true
                 try {
                     (host as unknown as { value: unknown }).value = bond
