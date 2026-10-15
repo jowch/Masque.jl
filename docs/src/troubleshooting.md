@@ -261,8 +261,9 @@ itself instead of `masque(fig)`.
 **Cause:** either the layer's kind cannot start with a selection from
 `selected=`, or an index is out of range. Layers of kind `:circles`,
 `:rects`, `:polygons`, `:segments`, `:polyline`, and `:lines` can start
-selected, with a line only once it takes clicks, while `:grid`, `:axis`,
-`:threshold`, `:roi`, and `:view` cannot.
+selected, with a line only once it takes clicks, and so can `:grid` on a
+heatmap built with `select = :many`. A grid built without
+`select = :many`, `:axis`, `:threshold`, `:roi`, and `:view` cannot.
 
 **Fix:** check the layer's kind against [Selection](@ref), and keep
 each index between 1 and the number of marks in that layer. For a
@@ -378,14 +379,15 @@ figure, return `masque(fig)`. For more information, see
 
 ### Tried showing a widget outside Pluto and hover does nothing
 
-**Cause:** the display doesn't run the page's scripts, the page can't
-reach jsDelivr to load Masque's script, or the widget uses WGLMakie. A
-CairoMakie widget then shows the plain figure, and a WGLMakie widget
-shows an empty box saying it is drawn only in Pluto.
+**Cause:** the display doesn't run the page's scripts, or the page
+can't reach jsDelivr to load Masque's script. A CairoMakie widget then
+shows the plain figure, and a WGLMakie widget shows an empty box or a
+note saying it couldn't load.
 
-**Fix:** show a CairoMakie widget in a display that runs scripts, such
-as Documenter or an HTML page you write with `show`, and read the page
-with an internet connection, or open the notebook in Pluto. For what works outside Pluto, see
+**Fix:** show the widget in a display that runs scripts, such as
+Documenter or an HTML page you write with `show`, and read the page
+with an internet connection, or open the notebook in Pluto. To read a
+page offline, use `backend = :cairo`. For what works outside Pluto, see
 [Outside Pluto](@ref outside-pluto).
 
 ### Tried feeding this widget's bond into the same call's `selected=`

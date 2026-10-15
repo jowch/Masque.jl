@@ -5,8 +5,9 @@ import {
     anchorFor, computeAnchoredPlacement, photoClip, lineReadout, samplePoint,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
-import { begin as beginView, tip as viewTip, limitsTip } from "../src/drag/view"
-import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, ThresholdGeometry } from "../src/types"
+import { begin as beginView, tip as viewTip, limitsTip, view3Base, rememberView3, seedView3Homes, zoom3 } from "../src/drag/view"
+import { createOverlayState } from "../src/state"
+import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry } from "../src/types"
 
 describe("primitives", () => {
     it("distToSegment", () => {
@@ -260,7 +261,56 @@ describe("hitLayer + hitTest", () => {
         expect(hitLayer(rects, 115, 100)).toMatchObject({ index: 2 })   // inside all three
         expect(hitLayer(rects, 95, 100)).toMatchObject({ index: 1 })    // inside 0 and 1
         expect(hitLayer(rects, 82, 100)).toBeNull()                     // inside 0 only
-        expect(hitLayer({ ...rects, order: undefined }, 115, 100)).toMatchObject({ index: 0 })
+        // no order: the last one listed is drawn on top (#340)
+        expect(hitLayer({ ...rects, order: undefined }, 115, 100)).toMatchObject({ index: 2 })
+        expect(hitLayer({ ...rects, order: undefined }, 95, 100)).toMatchObject({ index: 1 })
+        expect(hitLayer({ ...rects, order: undefined }, 82, 100)).toMatchObject({ index: 0 })
+    })
+    it("overlapping circles: the last listed wins, or the first in order (#331)", () => {
+        const pair: HitLayer = { ...circles, geometry: [100, 100, 10, 110, 100, 10, 300, 300, 10], payloads: [{}, {}, {}] }
+        expect(hitLayer(pair, 105, 100)?.index).toBe(1)    // inside both: 1 is drawn over 0
+        expect(hitLayer(pair, 92, 100)?.index).toBe(0)     // inside 0 only
+        expect(hitLayer(pair, 300, 300)?.index).toBe(2)
+        // nearest first on an Axis3; 2 is not drawn
+        const deep: HitLayer = { ...pair, order: [0, 1] }
+        expect(hitLayer(deep, 105, 100)?.index).toBe(0)
+        expect(hitLayer(deep, 118, 100)?.index).toBe(1)
+        expect(hitLayer(deep, 300, 300)).toBeNull()
+    })
+    it("neighbouring circles: inside one beats the other's reach", () => {
+        // radius 5 at x = 0 and x = 12: they don't overlap, but each one's 4 px reach covers
+        // the other's edge
+        const pair: HitLayer = { ...circles, geometry: [0, 0, 5, 12, 0, 5], payloads: [{}, {}] }
+        expect(hitLayer(pair, 3, 0)?.index).toBe(0)    // inside 0, in 1's reach
+        expect(hitLayer(pair, 8, 0)?.index).toBe(1)    // inside 1, in 0's reach
+        expect(hitLayer(pair, 6, 0)?.index).toBe(1)    // in both reaches: the top one, 1
+        expect(hitLayer({ ...pair, order: [0, 1] }, 6, 0)?.index).toBe(0)
+        expect(hitLayer({ ...pair, order: [0, 1] }, 8, 0)?.index).toBe(1)
+    })
+    it("overlapping spheres: the top one drawn under the pointer wins before a circle's reach (#331)", () => {
+        // 0 is in front: a wide, flat ellipse (40 × 10 px semi-axes) whose hit circle (r 40)
+        // reaches over 1, a round sphere just below it.
+        const spheres: HitLayer = {
+            ...circles, geometry: [100, 100, 40, 100, 130, 15], payloads: [{}, {}], order: [0, 1],
+            ellipses: [1600, 0, 100, 225, 0, 225],
+        }
+        expect(hitLayer(spheres, 100, 105)?.index).toBe(0)    // inside 0's ellipse
+        expect(hitLayer(spheres, 100, 125)?.index).toBe(1)    // 0's circle, but 1 is drawn there
+        expect(hitLayer({ ...spheres, ellipses: undefined }, 100, 125)?.index).toBe(0)
+        expect(hitLayer(spheres, 135, 100)?.index).toBe(0)    // inside 0's ellipse only
+        expect(hitLayer(spheres, 100, 75)?.index).toBe(0)     // outside both ellipses: 0's reach
+        // a clipped sphere (no outline) still never hits
+        const clipped: HitLayer = { ...spheres, geometry: [NaN, NaN, 0, 100, 130, 15], ellipses: [0, 0, 0, 225, 0, 225] }
+        expect(hitLayer(clipped, 100, 100)).toBeNull()
+        expect(hitLayer(clipped, 100, 130)?.index).toBe(1)
+    })
+    it("overlapping polygons: the last listed wins", () => {
+        const polys: HitLayer = {
+            id: "polys", kind: "polygons", axis: "ax1", events: ["click"], payloads: [{}, {}],
+            geometry: [[0, 0, 20, 0, 20, 20, 0, 20], [10, 10, 30, 10, 30, 30, 10, 30]],
+        }
+        expect(hitLayer(polys, 15, 15)?.index).toBe(1)
+        expect(hitLayer(polys, 5, 5)?.index).toBe(0)
     })
     it("polygons with tol: the outline reach responds, inside a neighbour still wins", () => {
         const polys: HitLayer = {
@@ -727,6 +777,45 @@ describe("view pan / orbit math", () => {
 
 // Julia's `_decategorize` (src/bond.jl) reads these exact payloads: the category label as `x`/`y`
 // for an axis click, and the bare label for a threshold release. A change here breaks the bond.
+describe("Axis3 zoom base across linked views (#362)", () => {
+    const home: Limits3 = [0, 10, 0, 10, 0, 10]
+    const layers = ["v1", "v2"].map((id) => ({ id, kind: "view", geometry: { x: 0, y: 0, w: 1, h: 1, mode: "orbit", limits: home } }))
+
+    it("a view starts from the frame on screen once another view has asked since", () => {
+        // `linkcameras!(a1, a2; limits = true)`: every request moves both panels, so each frame
+        // shows both at the latest request's limits.
+        const state = createOverlayState()
+        seedView3Homes(state, layers)
+        const l1 = zoom3(state, "v1", home, 2)               // wheel on a1
+        expect(l1).toEqual([2.5, 7.5, 2.5, 7.5, 2.5, 7.5])
+        const l2 = zoom3(state, "v2", l1, 2)                 // wheel on a2, shown = l1
+        expect(l2).toEqual([3.75, 6.25, 3.75, 6.25, 3.75, 6.25])
+        const l3 = zoom3(state, "v1", l2, 2)                 // wheel on a1 again, shown = l2
+        expect(l3[1] - l3[0]).toBeCloseTo(1.25)            // a2's zoom kept, not a1's own l1
+        // Pan goes through the same base.
+        rememberView3(state, "v2", l3, [1, 2, 1, 2, 1, 2])
+        expect(view3Base(state, "v1", l3)).toEqual(l3)
+        expect(view3Base(state, "v2", l3)).toEqual([1, 2, 1, 2, 1, 2])
+    })
+
+    it("a view's own requests still win over a frame that trails them", () => {
+        const state = createOverlayState()
+        seedView3Homes(state, layers)
+        const l1 = zoom3(state, "v1", home, 2)
+        expect(zoom3(state, "v1", home, 2)).toEqual([3.75, 6.25, 3.75, 6.25, 3.75, 6.25])
+        expect(view3Base(state, "v1", home)).not.toEqual(l1)
+    })
+
+    it("the zoom is bounded around each view's mount limits, not where a linked view had zoomed", () => {
+        const state = createOverlayState()
+        seedView3Homes(state, layers)
+        let shown = home
+        for (let i = 0; i < 20; i++) shown = zoom3(state, "v1", shown, 2)
+        const out = zoom3(state, "v2", shown, 1 / 1e6)     // zoom a2 all the way out
+        expect(out).toEqual(zoom3(createOverlayState(), "x", home, 1 / 1e6))
+    })
+})
+
 describe("photoClip", () => {
     const view = (clip?: [number, number, number, number]): Manifest => ({
         width: 400, height: 300, transforms: {},

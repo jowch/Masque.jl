@@ -47,6 +47,15 @@
         @test all(isfinite, fl.origin) && all(>=(0), fl.widths)
     end
 
+    @testset "_axis_links" begin
+        lfig = Figure()
+        a1 = Axis(lfig[1, 1]); a2 = Axis(lfig[1, 2]); a3 = Axis(lfig[1, 3])
+        linkxaxes!(a1, a2)
+        xl, yl = Masque._axis_links(a1)
+        @test any(l -> l === a2, xl) && isempty(yl)
+        @test all(isempty, Masque._axis_links(a3))
+    end
+
     @testset "_scene_viewport" begin
         vp = Masque._scene_viewport(ax)
         @test vp isa Makie.Rect2
@@ -115,6 +124,7 @@
         @test_throws r"^Masque: Makie internal `plots`" Masque._child_plots(nothing)
         @test_throws r"^Masque: Makie internal `finallimits`" Masque._finallimits(nothing)
         @test_throws r"^Masque: Makie internal `viewport`" Masque._scene_viewport(nothing)
+        @test_throws r"^Masque: Makie internal `xaxislinks`" Masque._axis_links(nothing)
         @test_throws r"^Masque: Makie internal `computed_levels`" Masque._computed_levels(sc)   # KeyError path (missing attribute)
         @test_throws r"^Masque: Makie internal `computedbbox`" Masque._colorbar_bbox(nothing)
         @test_throws r"^Masque: Makie internal `string_boundingboxes`" Masque._string_bboxes(nothing)

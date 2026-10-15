@@ -29,15 +29,29 @@ export function limits3Tip(l: Limits3, digits: number): string {
     return `x:[${fmt(l[0], digits)}, ${fmt(l[1], digits)}] y:[${fmt(l[2], digits)}, ${fmt(l[3], digits)}] z:[${fmt(l[4], digits)}, ${fmt(l[5], digits)}]`
 }
 
-// The Axis3 limits the next zoom or pan starts from: the last ones asked for, else `shown`, the
-// limits of the frame on screen. A frame's limits can trail the requests still in flight.
+// The Axis3 limits the next zoom or pan starts from: the last ones this view asked for, else
+// `shown`, the limits of the frame on screen. A frame's limits can trail the requests still in
+// flight. Once another view has asked since, panels linked with `limits = true` may have moved,
+// so the frame on screen is the truth (#362).
 export function view3Base(state: OverlayState, id: string, shown: Limits3): Limits3 {
-    return state.view3_.get(id)?.limits ?? shown
+    return (state.view3Last_ === id ? state.view3_.get(id)?.limits : undefined) ?? shown
 }
 
-// The first remembered limits' `shown` frame is the home the zoom is bounded around.
+// Each view's limits at mount are the home its zoom is bounded around (see `seedView3Homes`);
+// a view without one takes the frame on screen at its first zoom or pan.
 export function rememberView3(state: OverlayState, id: string, shown: Limits3, limits: Limits3): void {
     state.view3_.set(id, { limits, home: state.view3_.get(id)?.home ?? shown })
+    state.view3Last_ = id
+}
+
+// Record each Axis3 view's mount limits as its home, so a panel whose limits a linked panel
+// moved first still zooms around its own starting view.
+export function seedView3Homes(state: OverlayState, layers: { id: string; kind: string; geometry: unknown }[]): void {
+    for (const l of layers) {
+        const g = l.geometry as ViewGeometry
+        if (l.kind !== "view" || g?.mode !== "orbit" || !g.limits || state.view3_.has(l.id)) continue
+        state.view3_.set(l.id, { home: Array.from(g.limits) as Limits3 })
+    }
 }
 
 // One Axis3 zoom step from the remembered limits.

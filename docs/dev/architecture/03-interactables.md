@@ -74,14 +74,14 @@ Geometry layout by `kind` (all coords image-px, top-left origin):
 
 | kind | geometry | JS hit-test | element index |
 |---|---|---|---|
-| `:circles` | `Float32[cx,cy,r, …]` | distance ≤ r + the overlay's fixed `HIT_TOL` | triple index |
+| `:circles` | `Float32[cx,cy,r, …]`, optional `ellipses` (`[sxx,sxy,syy, …]`, image px², a sphere's drawn outline) | inside a drawn ellipse, else distance ≤ r, else ≤ r + the overlay's fixed `HIT_TOL`; each pass top element first | triple index |
 | `:polyline` | `Float32[x,y, …]` (NaN = gap) | nearest segment, dist ≤ tol | segment i = (v[i],v[i+1]) |
 | `:lines` | `Vector{Real}[]` paths, one flat `[x,y,…]` per element (NaN = a gap inside that path) | nearest edge of any path, dist ≤ tol | path index — one element per plotted line |
 | `:segments` | `Float32[x0,y0,x1,y1, …]` | nearest of disjoint pairs | pair index |
-| `:rects` | `Float32[cx,cy,w,h, …]` | point-in-rect, else the nearest rect within `tol` of its edge | quad index |
+| `:rects` | `Float32[cx,cy,w,h, …]` | point-in-rect, top element first, else the nearest rect within `tol` of its edge | quad index |
 | `:grid` | `(xedges, yedges, ncols, nrows)` plus `values[]` **or** `sample` (screen pixels; [§8](08-scaling.md)) | source bin, or the screen pixel then the cell at its center | `j*ncols+i` |
 | `:surface` | a projected vertex grid: `ni`, `nj`, source `i`/`j` per shipped row/column, `xy` (image px, row-major, NaN = not drawn), `order` (quads front to back), data `x`/`y`/`z`[/`value`] arrays | quads in `order`, point-in-quad as two triangles; the first hit answers with its corner nearest the pointer | `b*ni+a`, the shipped point |
-| `:polygons` | one flat ring per element, or a list of rings when that element has holes (exterior, then each hole) | even-odd across that element's rings, else the nearest element within `tol` of a ring | element index |
+| `:polygons` | one flat ring per element, or a list of rings when that element has holes (exterior, then each hole) | even-odd across that element's rings, last element first, else the nearest element within `tol` of a ring | element index |
 | `:axis` | `nothing` (unbounded, `AxisInteractable`) or `Real[x,y,w,h]` bbox (bounded, `ColorbarInteractable`) | absent geometry = always-hit; bbox present = point-in-bbox; invert pixel via `AxisTransform` | `-1` (continuous); `valueaxis ≠ nothing` → 1-D `(; value)` |
 
 `tol` (the hit-test slack above) is an optional per-layer manifest field, `"tol"` (image px),
@@ -101,6 +101,16 @@ samples cannot be recovered from it. Numbers ship as Float32. On a date or categ
 coordinate ships as the text a scatter's default payload holds. `step` (`"pre"`, `"post"` or
 `"center"`, from a `stairs` plot) says which sample each drawn corner belongs to. Placement
 (`translate!`, …) moves the path but not the samples.
+
+Where elements of one `:circles`, `:rects` or `:polygons` layer overlap, the one drawn on top
+answers (#331, #340). With no `order`, that is the last one listed, since both backends paint a
+plot's elements in list order. `order` (optional, `:circles` and `:rects`) lists 0-based element
+indices top first, and an element left out is not drawn; Julia ships it on an `Axis3` where the
+backend draws by depth (a meshscatter on both backends, a scatter or text on WebGL), nearest
+first with depth ties to the later element. `ellipses` (optional, `:circles`) is three numbers
+per element, the outline `M·Mᵀ` of a sphere whose semi-axes project to the columns of `M`; it
+is shipped for every `radius3d` layer, since an axis that stretches a sphere into an ellipse
+leaves its hit circle (the long radius) reaching into the sphere behind.
 
 `label` (optional, per-layer, `String`) is the layer's name, which keyboard navigation
 announces before the position ([§11](11-keyboard.md)): "wild type, element 3 of 10: …".

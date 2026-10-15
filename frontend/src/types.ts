@@ -31,6 +31,9 @@ export interface GridGeometry {
     sample_origin?: [number, number] // image px, top-left of sample (0, 0)
     sample_span?: [number, number]   // image px width, height of the sampled viewport
     sample_px?: number                // image px per sample; the last bin may be shorter
+    // Each cell's region id (`regions=`, #359) as runs over the row-major cells, flat pairs
+    // [id, n, ...]; 0 is a cell in no region. Absent on a grid without regions.
+    regions?: number[]
 }
 
 // A 3D surface's shipped points (a strided subset of the source grid on a dense surface).
@@ -101,6 +104,17 @@ export interface SliceGeometry {
     series: SliceSeries[]
 }
 
+// A linked axis, its preview window (`clip`, `fill`, as on ViewGeometry) and, per shared
+// dimension, `[p, q, r]`: one data value's image px on the pan axis (`p`) and on this axis
+// (`q`), and the ratio of this axis's px per data unit to the pan axis's (`r`).
+export interface ViewLink {
+    axis: string // the linked axis's transform id
+    clip: [number, number, number, number]
+    fill?: string
+    x?: [number, number, number]
+    y?: [number, number, number]
+}
+
 export interface ViewGeometry {
     x: number      // axis viewport bbox, image px
     y: number
@@ -112,6 +126,8 @@ export interface ViewGeometry {
     clip?: [number, number, number, number]
     // pan only: the empty plot's colour (CSS), painted behind the sliding copy (#171).
     fill?: string
+    // pan only: axes tied to this one by Makie's `linkaxes!` (#363), whose data slides too.
+    links?: ViewLink[]
     azimuth?: number    // radians; orbit only (current Axis3 camera)
     elevation?: number  // radians; orbit only
     // orbit only (#321): the Axis3 limits [xmin, xmax, ymin, ymax, zmin, zmax] this frame
@@ -192,10 +208,15 @@ export interface HitLayer {
     // is its label or date text. Absent → no readout (Axis3, or a layer built by hand).
     points?: (number | string)[][]
     step?: "pre" | "post" | "center"
-    // :rects: 0-based element indices, front to back, to hit-test in (text on an Axis3, where
-    // the label nearest the camera wins an overlap). An element left out is not drawn.
-    // Absent → index order.
+    // :circles and :rects: 0-based element indices, top first, to hit-test in, so the element
+    // drawn on top wins an overlap (points and text on an Axis3, ordered by depth where the
+    // backend sorts or depth-tests them). An element left out is not drawn. Absent → the last
+    // element listed is on top, the order both backends paint a layer in.
     order?: number[]
+    // :circles: per element, the drawn outline as an ellipse [sxx, sxy, syy] (image px²): the
+    // points p with (p - c)ᵀ S⁻¹ (p - c) ≤ 1 around the circle's centre c. A sphere's outline,
+    // which its hit circle reaches past. Absent → the circles alone.
+    ellipses?: number[]
     // A field's envelope: a `selects` target's or a `many` field holds { items: [...] }; a
     // click or a box's bounds hold { layer, index, payload }.
 }
@@ -237,6 +258,7 @@ export interface Hit {
     grid_?: [number, number, number?] // [i, j, value]; value absent only when neither values nor sample was sent. A :surface point: [source i, source j, z]
     pt_?: [number, number | string, number | string] // :lines readout: [0-based sample index, x, y] nearest the cursor
     sample_?: number // a picked point on a :lines layer: 0-based sample on line `index`, drawn as a ring
+    region_?: number // a grid cell's region id (regions.ts), when it is in one: the hit stands for the whole region
     axis_?: string // transform id, for continuous inversion
     roiPart_?: { corner?: number; edge?: "n" | "s" | "w" | "e"; move?: boolean } // which sub-part of an :roi a drag grabbed
 }

@@ -115,3 +115,38 @@ for (name, mk) in cases
         isempty(tiles) ? "" : string(" (", kb(minimum(tiles)), "–", kb(maximum(tiles)), " KB, mean ", kb(sum(tiles) / length(tiles)), " KB)"),
     )
 end
+
+# Outside Pluto (#300) a `:webgl` widget writes its scene into the page as a JS literal
+# (`_scene_js`: typed arrays as base64, long strings once) and fetches the WGLMakie bundle from
+# the Makie tag. `scene JS` is that literal; `page` is the widget's whole HTML as a registered
+# install writes it (overlay and bundle loaded from the CDN), and `checkout` adds the inlined
+# overlay a git checkout writes. Each figure is one widget, so `page` is the least a Documenter
+# page with that figure carries.
+println("\noutside Pluto, per widget — scene JSON · scene JS · page (registered) · checkout:")
+outside = [
+    cases...,
+    "4-pt scatter (400×260)" => () -> (f = Figure(; size = (400, 260)); scatter!(Axis(f[1, 1]), [1, 2, 3, 4], [1, 4, 9, 16]; markersize = 14); f),
+    "heatmap + colorbar + legend" => () -> (
+        f = Figure(; size = (600, 450)); ax = Axis(f[1, 1]); hm = heatmap!(ax, reshape(Float64.(1:400), 20, 20));
+        Colorbar(f[1, 2], hm); lines!(ax, 1:20, 1:20; label = "diagonal"); axislegend(ax); f
+    ),
+]
+old_overlay, old_wgl = Masque._OVERLAY_CDN[], _WGLExt._WGL_CDN[]
+for (name, mk) in outside
+    w = masque(mk(); backend = :webgl)
+    html(overlay) = (
+        Masque._OVERLAY_CDN[] = overlay;
+        _WGLExt._WGL_CDN[] = (; urls = ["https://example.invalid/WGLMakie.bundled.js"], integrity = "sha384-x", makie = v"0.0.0");
+        sizeof(sprint(show, MIME"text/html"(), w))
+    )
+    page, checkout = try
+        html((; url = "https://example.invalid/overlay.js", integrity = "sha384-x")), html(nothing)
+    finally
+        Masque._OVERLAY_CDN[], _WGLExt._WGL_CDN[] = old_overlay, old_wgl
+    end
+    println(
+        "  ", rpad(name, 28), "scene JSON ", kb(sizeof(JSON3.write(w.scene))), " KB",
+        "  scene JS ", kb(sizeof(_WGLExt._scene_js(w.scene))), " KB",
+        "  page ", kb(page), " KB  checkout ", kb(checkout), " KB",
+    )
+end

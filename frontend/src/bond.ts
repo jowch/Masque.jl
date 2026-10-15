@@ -4,6 +4,7 @@ import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDra
 import { hideCross } from "./cross"
 import { cellRange, elementPicks, legendEdit, linePointHit, linkedIndices, manyHits, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
 import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
+import { hasRegions, regionCells, regionOf, setRegionsOf } from "./regions"
 import type { GridMask, MaskEnvelope } from "./gridmask"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "./state"
@@ -546,16 +547,19 @@ function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: num
 }
 
 // The same gestures on a `many` grid, cell by cell: a plain click makes the cell the only one
-// selected (or clears the field when it already is), Cmd/Ctrl-click flips it.
+// selected (or clears the field when it already is), Cmd/Ctrl-click flips it. A cell in a
+// region (`regions=`) stands for the whole region.
 function commitGridClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, toggle: boolean): void {
     const mask = gridMaskOf(state, hit.layer)
+    const id = regionOf(hit.layer, hit.index)
+    const cells = id === 0 ? [hit.index] : regionCells(hit.layer, id)
     const held = mask[hit.index] === 1
     if (toggle) {
-        mask[hit.index] = held ? 0 : 1
+        for (const k of cells) mask[k] = held ? 0 : 1
     } else {
-        const only = held && maskCount(mask) === 1
+        const only = held && maskCount(mask) === cells.length && cells.every((k) => mask[k] === 1)
         mask.fill(0)
-        if (!only) mask[hit.index] = 1
+        if (!only) for (const k of cells) mask[k] = 1
     }
     setGridMask(ctx, state, hit.layer, mask)
     drawHover(ctx, state, hit)
@@ -603,7 +607,15 @@ export function gridMarqueeMask(
     const gg = layer.geometry as GridGeometry
     if (mode === "replace") mask.fill(0)
     const ci = cellRange(gg.xedges, box.x, box.x + box.w), cj = cellRange(gg.yedges, box.y, box.y + box.h)
-    if (ci && cj) setBlock(mask, gg.ncols, ci[0], ci[1], cj[0], cj[1], mode !== "subtract")
+    if (!ci || !cj) return mask
+    if (!hasRegions(layer)) {
+        setBlock(mask, gg.ncols, ci[0], ci[1], cj[0], cj[1], mode !== "subtract")
+        return mask
+    }
+    // With regions, the box takes every region it touches, whole.
+    const touched: number[] = []
+    for (let j = cj[0]; j <= cj[1]; j++) for (let i = ci[0]; i <= ci[1]; i++) touched.push(j * gg.ncols + i)
+    setRegionsOf(layer, mask, touched, mode !== "subtract")
     return mask
 }
 

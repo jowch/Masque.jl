@@ -21,7 +21,7 @@ import { mapPoint, unmapPoint } from "../src/photo"
 import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
 import { createOverlayState, MOTION_MS, type HiGroups } from "../src/state"
-import type { ControlGeometry, GridGeometry, Hit, HitLayer, Manifest } from "../src/types"
+import type { ControlGeometry, GridGeometry, Hit, HitLayer, Manifest, ViewGeometry } from "../src/types"
 
 // build a light-DOM host (img + script) like the Julia widget emits, with layout mocked
 function setup() {
@@ -4309,6 +4309,51 @@ describe("photographic pan / wheel zoom", () => {
             .toEqual(["104", "84", "992", "632"])
     })
 
+    it("a linked axis's data slides with the pan, in its own window, on the dimensions it shares (#363)", async () => {
+        const { host, img, script } = setup()
+        const m = viewManifest("pan")
+        m.transforms.ax1.viewport = [100, 80, 500, 640]
+        const g = m.layers[0].geometry as ViewGeometry
+        g.x = 100; g.y = 80; g.w = 500; g.h = 640
+        g.clip = [104, 84, 492, 632]
+        // x linked only: one data value sits at px 100 on the pan axis and px 700 on the linked
+        // one, which draws it at half the px per data unit.
+        g.links = [{ axis: "ax2", clip: [704, 84, 242, 632], fill: "rgb(240, 240, 240)", x: [100, 700, 0.5] }]
+        let release: (r: { png: Uint8Array; manifest: Manifest }) => void = () => {}
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, m, undefined, requestFrame)
+        img.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        host.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        const clips = host.querySelectorAll(".masque-data-clip")
+        expect(clips.length).toBe(2)
+        const link = clips[1] as HTMLElement
+        expect(link.classList.contains("masque-link-clip")).toBe(true)
+        // clip (704, 84, 242, 632) on a 1200×800 image laid out at 600×400 → half scale
+        expect([link.style.left, link.style.top, link.style.width, link.style.height]).toEqual(["352px", "42px", "121px", "316px"])
+        expect(link.style.background).toContain("rgb(240, 240, 240)")
+        const [s, tx, ty] = host.dataset.masquePhoto!.split(",").map(Number)
+        expect(s).not.toBe(1)
+        const t = (q0: number, p0: number, r: number, t0: number) => q0 * (1 - s) + r * (t0 + p0 * (s - 1))
+        const linkCopy = link.firstElementChild as HTMLElement
+        // x zooms by s about the same data value; y, not shared, stays put
+        const mt = /translate\(([-\d.e]+)px, ([-\d.e]+)px\) scale\(([-\d.e]+), ([-\d.e]+)\)/.exec(linkCopy.style.transform)!
+        expect(Number(mt[1])).toBeCloseTo(t(700, 100, 0.5, tx) * 0.5, 4)
+        expect(Number(mt[2])).toBeCloseTo(0, 6)
+        expect(Number(mt[3])).toBeCloseTo(s, 6)
+        expect(Number(mt[4])).toBe(1)
+        expect(ty).not.toBe(0)
+        await Promise.resolve()
+        release({ png: new Uint8Array([1, 2, 3]), manifest: m })
+        await Promise.resolve()
+        await Promise.resolve()
+        if (host.dataset.masquePhoto) img.dispatchEvent(new Event("load"))
+        expect(host.querySelector(".masque-data-clip")).toBeNull()
+    })
+
     it("an orbit without limits ignores the wheel, and a wheel during a drag does nothing", async () => {
         const { host, script } = setup()
         const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]) }))
@@ -6189,6 +6234,100 @@ describe("onchange (#334)", () => {
         expect(requestFrame.mock.calls[0][0]).toMatchObject({
             onchange: true, settle: true, state: { thr: { payload: 80 }, pts: null },
         })
+    })
+})
+
+describe("a grid with regions picks and outlines whole regions (#359)", () => {
+    // The 4×3 grid of the cell-mask tests above, cut into regions (row j, then i):
+    //   row 0: 1 1 2 0
+    //   row 1: 1 3 2 0
+    //   row 2: 3 3 2 2
+    // Cell (i, j) spans x 300i..300(i+1), y 200j..200(j+1) image px; region 0 is no region.
+    const regions = [1, 2, 2, 1, 0, 1, 1, 1, 3, 1, 2, 1, 0, 1, 3, 2, 2, 2]
+    const grid = (many = true): Manifest => ({
+        width: 1200, height: 800, scaling: 2,
+        transforms: { ax1: { xlims: [0, 4], ylims: [0, 4], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+        fields: ["cells"],
+        initial: { cells: many ? { runs: [] } : null },
+        layers: [{ id: "cells", kind: "grid", axis: "ax1", events: ["click", "hover"], payloads: [], ...(many ? { many: true as const } : {}),
+            geometry: { xedges: [0, 300, 600, 900, 1200], yedges: [0, 200, 400, 600], ncols: 4, nrows: 3,
+                values: Array.from({ length: 12 }, (_, k) => k), regions } }],
+    })
+    // Client px of cell (i, j)'s centre: image px / scaling.
+    const at = (i: number, j: number): [number, number] => [(300 * i + 150) / 2, (200 * j + 100) / 2]
+    const cell = (s: HTMLElement, i: number, j: number, mod: MouseEventInit = {}) =>
+        s.dispatchEvent(new MouseEvent("click", { clientX: at(i, j)[0], clientY: at(i, j)[1], bubbles: true, ...mod }))
+    const move = (s: HTMLElement, x: number, y: number) =>
+        s.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, bubbles: true }))
+    const ptr = (s: HTMLElement, type: string, x: number, y: number) =>
+        s.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, cancelable: true }))
+    const val = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+    const mounted = (m: Manifest) => {
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        return { host, shadow, surface: shadow.querySelector(".surface") as HTMLElement }
+    }
+
+    it("a click picks the cell's whole region, Ctrl-click adds or drops one, and a cell in none acts alone", () => {
+        const { host, surface } = mounted(grid())
+        cell(surface, 0, 0)
+        expect(val(host).cells).toEqual({ runs: [0, 0, 2, 1, 0, 1] }) // region 1
+        cell(surface, 2, 2, { ctrlKey: true })
+        expect(val(host).cells).toEqual({ runs: [0, 0, 3, 1, 0, 1, 1, 2, 1, 2, 2, 2] }) // + region 2
+        cell(surface, 1, 0, { ctrlKey: true })
+        expect(val(host).cells).toEqual({ runs: [0, 2, 1, 1, 2, 1, 2, 2, 2] }) // − region 1
+        cell(surface, 3, 0)
+        expect(val(host).cells).toEqual({ runs: [0, 3, 1] }) // a cell in no region, alone
+    })
+
+    it("a plain click on the only selected region clears the field", () => {
+        const { host, surface } = mounted(grid())
+        cell(surface, 1, 1)
+        expect(val(host).cells).toEqual({ runs: [1, 1, 1, 2, 0, 2] }) // region 3
+        cell(surface, 0, 2)
+        expect(val(host).cells).toEqual({ runs: [] })
+    })
+
+    it("a box takes every region it touches, whole", () => {
+        const { host, surface } = mounted(grid())
+        // A small box inside cell (1, 1) alone, of region 3.
+        const [x, y] = at(1, 1)
+        ptr(surface, "pointerdown", x - 20, y - 20)
+        ptr(surface, "pointermove", x, y)
+        ptr(surface, "pointermove", x + 20, y + 20)
+        ptr(surface, "pointerup", x + 20, y + 20)
+        expect(val(host).cells).toEqual({ runs: [1, 1, 1, 2, 0, 2] })
+    })
+
+    it("hover outlines the whole region, keeps one highlight across it, and names it", async () => {
+        const { shadow, surface } = mounted(grid())
+        move(surface, ...at(0, 0))
+        const edge = edgeHiGroup(shadow).firstElementChild as SVGElement
+        // Region 1: cells (0,0), (1,0), (0,1).
+        expect(edge.getAttribute("d")).toBe("M0 0H600M300 200H600M0 400H300M600 0V200M0 0V400M300 200V400")
+        expect(edge.classList.contains("masque-w-hover")).toBe(true)
+        move(surface, ...at(1, 0))
+        await flushFrame()
+        expect(edgeHiGroup(shadow).firstElementChild).toBe(edge)
+        expect((shadow.querySelector(".masque-tip") as HTMLElement).textContent).toBe("region 1")
+    })
+
+    it("a seed that cuts through a region still lets hover outline it", () => {
+        // `selected=` holds cell (0, 0) only, one of region 1's three cells.
+        const m = grid()
+        m.initial = { cells: { runs: [0, 0, 1] } }
+        const { shadow, surface } = mounted(m)
+        move(surface, ...at(1, 0))
+        expect(edgeHiGroup(shadow).firstElementChild).not.toBeNull()
+    })
+
+    it("with select = :one, the picked cell is drawn as its region", () => {
+        const { shadow, surface } = mounted(grid(false))
+        cell(surface, 2, 1)
+        // Region 2: cells (2,0), (2,1), (2,2), (3,2).
+        expect(fillSelGroup(shadow).querySelector("path")!.getAttribute("d")).toBe("M600 0H900V200H600ZM600 200H900V400H600ZM600 400H1200V600H600Z")
     })
 })
 
