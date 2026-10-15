@@ -296,6 +296,26 @@ let n = 1_000
         @printf("  bond value, %5d picks:  %8.1f KB  (%.1f B/pick)\n", k, mp(v) / 1024, mp(v) / k)
     end
 end
+println("\n=== L. points on Axis3 — top-first `order` and sphere `ellipses` ===")
+# Overlapping marks answer with the one drawn on top (#331). On an Axis3 a `meshscatter!` layer
+# ships a top-first `order` (one index per drawn point) on both backends, and on WebGL a
+# `scatter!` layer does too. A sphere also ships its drawn outline as an ellipse, three
+# integers in image px² (`ellipses`), on any axis.
+let
+    for (kind, n) in ((:scatter, 1_000), (:meshscatter, 100), (:meshscatter, 1_000))
+        f = Figure(size = (600, 450)); ax = Axis3(f[1, 1])
+        xs, ys, zs = rand(n), rand(n), rand(n)
+        kind === :scatter ? scatter!(ax, xs, ys, zs) : meshscatter!(ax, xs, ys, zs; markersize = 0.02)
+        w = masque(f)
+        layer = only(w.manifest["layers"])
+        o = get(layer, "order", nothing); e = get(layer, "ellipses", nothing)
+        @printf(
+            "  %-28s  manifest=%6s KB   geometry=%6s KB   order=%6s KB   ellipses=%6s KB\n",
+            "$(kind) $(n) on Axis3", kb(mp(w.manifest)), kb(mp(layer["geometry"])),
+            o === nothing ? "-" : kb(mp(o)), e === nothing ? "-" : kb(mp(e)),
+        )
+    end
+end
 
 println("\n=== L. regions on a grid — each cell's region id, as runs over the cells ===")
 # `regions = R` (#359) ships `regions`, flat `[id, n, …]` pairs over the row-major cells, so it

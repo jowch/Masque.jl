@@ -331,6 +331,46 @@ HTML(
         "<span id=\"coords_text\" style=\"display:none\">$(JSON3.write(sweep.text.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-00000000014a
+@bind ev_scatter_overlap sweep.scatter_overlap
+
+# ╔═╡ c1000000-0000-0000-0000-00000000014b
+HTML(
+    "<span id=\"out_scatter_overlap\">SCATTER_OVERLAP=$(sweep_field("scatter_overlap", ev_scatter_overlap))</span>" *
+        "<span id=\"bond_scatter_overlap\" style=\"display:none\">$(repr(ev_scatter_overlap))</span>" *
+        "<span id=\"coords_scatter_overlap\" style=\"display:none\">$(JSON3.write(sweep.scatter_overlap.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-00000000014c
+@bind ev_text_overlap sweep.text_overlap
+
+# ╔═╡ c1000000-0000-0000-0000-00000000014d
+HTML(
+    "<span id=\"out_text_overlap\">TEXT_OVERLAP=$(sweep_field("text_overlap", ev_text_overlap))</span>" *
+        "<span id=\"bond_text_overlap\" style=\"display:none\">$(repr(ev_text_overlap))</span>" *
+        "<span id=\"coords_text_overlap\" style=\"display:none\">$(JSON3.write(sweep.text_overlap.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000150
+@bind ev_poly_overlap sweep.poly_overlap
+
+# ╔═╡ c1000000-0000-0000-0000-000000000151
+HTML(
+    "<span id=\"out_poly_overlap\">POLY_OVERLAP=$(sweep_field("poly_overlap", ev_poly_overlap))</span>" *
+        "<span id=\"bond_poly_overlap\" style=\"display:none\">$(repr(ev_poly_overlap))</span>" *
+        "<span id=\"coords_poly_overlap\" style=\"display:none\">$(JSON3.write(sweep.poly_overlap.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-00000000014e
+@bind ev_spheres3d sweep.spheres3d
+
+# ╔═╡ c1000000-0000-0000-0000-00000000014f
+HTML(
+    "<span id=\"out_spheres3d\">SPHERES3D=$(sweep_field("spheres3d", ev_spheres3d))</span>" *
+        "<span id=\"bond_spheres3d\" style=\"display:none\">$(repr(ev_spheres3d))</span>" *
+        "<span id=\"coords_spheres3d\" style=\"display:none\">$(JSON3.write(sweep.spheres3d.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-00000000010d
 @bind ev_datashader sweep.datashader
 
@@ -768,6 +808,14 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000126
 # ╠═c1000000-0000-0000-0000-00000000010b
 # ╠═c1000000-0000-0000-0000-00000000010c
+# ╠═c1000000-0000-0000-0000-00000000014a
+# ╠═c1000000-0000-0000-0000-00000000014b
+# ╠═c1000000-0000-0000-0000-00000000014c
+# ╠═c1000000-0000-0000-0000-00000000014d
+# ╠═c1000000-0000-0000-0000-000000000150
+# ╠═c1000000-0000-0000-0000-000000000151
+# ╠═c1000000-0000-0000-0000-00000000014e
+# ╠═c1000000-0000-0000-0000-00000000014f
 # ╠═c1000000-0000-0000-0000-00000000010d
 # ╠═c1000000-0000-0000-0000-00000000010e
 # ╠═c1000000-0000-0000-0000-00000000010f

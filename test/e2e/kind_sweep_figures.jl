@@ -239,6 +239,39 @@ kind_sweep_meta() = [
         ),
     ),
     Dict(
+        # Two markers of one `scatter!` overlap on a 2D axis (#331): "over", listed second, is
+        # painted over "under" on both backends and answers where both claim the pixel.
+        "key" => "scatter_overlap", "layerId" => "scatter", "layerKind" => "circles",
+        "selected" => nothing, "circle" => true, "selectedIndex" => 1, "clickIndex" => 1,
+        "tip" => "over", "hoverIndex" => 1, "hoverTip" => "over", "mode" => "element",
+        "overlapsElement" => 0, "topColour" => "blue",
+    ),
+    Dict(
+        # Two `text!` labels overlap on a 2D axis (#340): "over", listed second, is painted over
+        # "under" on both backends and answers.
+        "key" => "text_overlap", "layerId" => "text", "layerKind" => "rects",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 1, "clickIndex" => 1,
+        "tip" => "over", "hoverIndex" => 1, "hoverTip" => "over", "mode" => "element",
+        "overlapsElement" => 0, "topColour" => "blue",
+    ),
+    Dict(
+        # Two shapes of one `poly!` overlap on a 2D axis: "over", listed second, is painted
+        # over "under" on both backends and answers.
+        "key" => "poly_overlap", "layerId" => "poly", "layerKind" => "polygons",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 1, "clickIndex" => 1,
+        "tip" => "over", "hoverIndex" => 1, "hoverTip" => "over", "mode" => "element",
+        "overlapsElement" => 0, "topColour" => "blue",
+    ),
+    Dict(
+        # Two spheres of one `meshscatter!` on one line of sight on Axis3 (#331): "front",
+        # listed first, is drawn over "back" on both backends (CairoMakie paints spheres far to
+        # near, WebGL depth-tests them) and answers.
+        "key" => "spheres3d", "layerId" => "meshscatter", "layerKind" => "circles",
+        "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "front", "hoverIndex" => 0, "hoverTip" => "front", "mode" => "element",
+        "overlapsElement" => 1, "topColour" => "blue",
+    ),
+    Dict(
         # `text!` (#301): each string is one element, hit on its drawn box.
         "key" => "text", "layerId" => "text", "layerKind" => "rects",
         "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
@@ -927,6 +960,48 @@ function build_kind_sweep()
         masque(fig; selected = Dict(:text => [2]))
     end
 
+    # Overlapping marks within one plot (#331, #340): the blue one is drawn on top.
+    scatter_overlap = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "scatter overlap", limits = (0, 4, 0, 3))
+        sc = scatter!(ax, [1.9, 2.0], [1.5, 1.5]; color = [:red, :blue], markersize = 40)
+        masque(fig, interactables(sc; payloads = [(; label = "under"), (; label = "over")]))
+    end
+
+    text_overlap = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "text overlap", limits = (0, 4, 0, 3))
+        # Same glyphs in both, so where the boxes overlap the top label's ink covers the other's.
+        tx = text!(
+            ax, [Point2f(1.85, 1.5), Point2f(2.0, 1.5)]; text = ["MMMM", "MMMM"], color = [:red, :blue],
+            fontsize = 40, align = (:center, :center),
+        )
+        masque(fig, interactables(tx; payloads = [(; label = "under"), (; label = "over")]))
+    end
+
+    poly_overlap = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "poly overlap", limits = (0, 4, 0, 3))
+        pl = poly!(ax, [Rect2f(1, 1, 1.2, 1), Rect2f(1.4, 1.2, 1.2, 1)]; color = [:red, :blue])
+        masque(fig, interactables(pl; payloads = [(; label = "under"), (; label = "over")]))
+    end
+
+    spheres3d = let
+        fig = Figure(size = (480, 320))
+        ax = Axis3(
+            fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "spheres3d",
+            limits = (0, 4, 0, 4, 0, 4),
+        )
+        el, az = 0.5, 0.4
+        toward = Makie.Vec3f(cos(el) * cos(az), cos(el) * sin(az), sin(el))
+        back = Makie.Point3f(2, 2, 2)
+        ms = meshscatter!(
+            ax, [back + 1.2f0 * toward + Makie.Vec3f(0, 0, 0.15), back]; color = [:blue, :red],
+            markersize = 0.5, shading = NoShading,
+        )
+        masque(fig, interactables(ms; payloads = [(; label = "front"), (; label = "back")]))
+    end
+
     # Four clumps laid out on a golden-angle spiral (no RNG: `randn` streams differ between
     # Julia versions, and CI's sweep runs 1.10), plus twenty copies of one point, so exactly one
     # cell holds twenty points and every other cell fewer.
@@ -1337,7 +1412,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view3d, legend, series_legend,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view3d, legend, series_legend,
         legend_overlap, legend_template, axis, composite, many, many_grid, many_grid_seeded, many_grid_regions, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

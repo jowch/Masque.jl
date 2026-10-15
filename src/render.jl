@@ -217,6 +217,7 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     L.points === nothing || (d["points"] = L.points)
     L.step === nothing || (d["step"] = string(L.step))
     L.order === nothing || (d["order"] = L.order)
+    L.ellipses === nothing || (d["ellipses"] = L.ellipses)
     spec = tooltip_spec(i)
     spec === true && throw(ArgumentError("tooltip = true is not meaningful — omit `tooltip` for the auto name/value table (the default), pass masque\"…\" for a template, or `false` to suppress."))
     if spec isa Markup

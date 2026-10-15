@@ -22,6 +22,12 @@ All notable changes to this project are documented here. The format is based on
   `region`. Cells with id `0` act alone, as before (#359).
 
 ### Fixed
+- Where marks of one plot overlap, hover and click answer with the one drawn on top. On a 2D
+  `Axis` that is the one listed last: a later `scatter!` marker, `text!` label or `poly!`
+  shape no longer loses to an earlier one hidden under it (#340). On an `Axis3`, the
+  `meshscatter!` sphere nearer the camera answers on both backends, and so does the nearer
+  `scatter!` marker with `backend = :webgl`; CairoMakie draws `scatter!` markers in the order
+  you give them, so the last one listed answers there (#331).
 - A `series!` works again under Makie 0.24.16, which draws its lines one level further down
   and without their default `series k` names: hover and click on a `PolarAxis`, a slice
   readout over it, and its legend links find the lines, and the tooltip names each line as

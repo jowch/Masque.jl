@@ -62,10 +62,18 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
   otherwise, for explicitly-given targets — the auto-extracted path drops an unsupported target
   with a `@warn` instead of failing the whole build). An `id:k` pin whose `k` is out of range
   is the same kind of error as an unknown layer.
-- `order` — `:rects` only, optional: the 0-based element indices front to back, which the
-  overlay hit-tests in, so the nearest of overlapping boxes wins. An element left out is not
-  drawn and never hit. `nothing` (default) tests in index order. Built by
-  [`TextInteractable`](@ref) on an `Axis3`.
+- `order` — `:circles` and `:rects` only, optional: the 0-based element indices top first,
+  which the overlay hit-tests in, so the element drawn on top of an overlap wins. An element
+  left out is not drawn and never hit. `nothing` (default) puts the last element listed on top,
+  as the backends paint a plot's elements in list order; `:polygons` always does. Built by
+  [`PointInteractable`](@ref) and [`TextInteractable`](@ref) on an `Axis3`, where the backend
+  draws the nearest element on top.
+- `ellipses` — `:circles` only, optional: per element, the drawn outline as an ellipse, a flat
+  `Real[]` of `(sxx, sxy, syy)` (image px²): the points `p` with `(p - c)ᵀ S⁻¹ (p - c) ≤ 1`
+  around the circle's centre `c`. Where outlines overlap, the top element whose ellipse holds
+  the pointer wins before any circle's reach. `nothing` (default) hit-tests the circles alone.
+  Built by [`PointInteractable`](@ref) with `radius3d`, whose markers are spheres or
+  ellipsoids that each axis stretches on its own.
 """
 struct HitLayer
     id::Symbol
@@ -81,10 +89,14 @@ struct HitLayer
     # snaps to, and the staircase `step` mode when the drawn path adds corners between them.
     points::Union{Nothing, Vector}
     step::Union{Nothing, Symbol}
-    # :rects: 0-based element indices, front to back, that the overlay hit-tests in; an
-    # element left out is not drawn. `nothing` is index order.
+    # :circles/:rects: 0-based element indices, top first, that the overlay hit-tests in; an
+    # element left out is not drawn. `nothing` puts the last element listed on top.
     order::Union{Nothing, Vector{Int}}
+    # :circles: per element, the drawn outline as an ellipse, `(sxx, sxy, syy)` (image px²).
+    ellipses::Union{Nothing, Vector}
 end
+HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order) =
+    HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step) =
     HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events) = HitLayer(id, kind, geometry, payloads, axis, events, nothing, nothing, nothing)
@@ -528,7 +540,12 @@ tooltip_spec(i::PointInteractable) = i.tooltip
 # edge crosses the limits keeps its full radius. A semi-axis whose projection isn't finite is
 # left out.
 function _px_radius3d(ctx, ax, p, e, q)
-    all(isfinite, q) || return 0.0   # a clipped sphere, skipped by the hit layer anyway
+    r, _ = _px_outline3d(ctx, ax, p, e, q)
+    return r
+end
+# `_px_radius3d`'s radius and the outline ellipse `M·Mᵀ` itself, `(a, b, d)` for `[a b; b d]`.
+function _px_outline3d(ctx, ax, p, e, q)
+    all(isfinite, q) || return 0.0, (0.0, 0.0, 0.0)   # a clipped sphere, skipped by the hit layer anyway
     a = b = d = 0.0   # M·Mᵀ = [a b; b d]
     half = 0.0
     for i in 1:3
@@ -542,15 +559,20 @@ function _px_radius3d(ctx, ax, p, e, q)
         d += cy^2
         half = max(half, hypot(hi[1] - q[1], hi[2] - q[2]), hypot(q[1] - lo[1], q[2] - lo[2]))
     end
-    return max(half, sqrt((a + d) / 2 + hypot((a - d) / 2, b)))
+    return max(half, sqrt((a + d) / 2 + hypot((a - d) / 2, b))), (a, b, d)
 end
 function hitlayers(i::PointInteractable, ctx)
     g = Real[]
+    # A sphere's outline is an ellipse wherever the axes stretch it, and its hit circle (the
+    # ellipse's long radius) reaches past it into the sphere drawn behind.
+    ell = i.radius3d === nothing ? nothing : Real[]
     box = _clipbox(i.ax)
     for (k, p) in enumerate(i.points)
         q = _proj(ctx, i.ax, p, box)
         r = if i.radius3d !== nothing
-            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q)
+            r3, (a, b, d) = _px_outline3d(ctx, i.ax, p, i.radius3d[k], q)
+            append!(ell, (_q(a), _q(b), _q(d)))
+            r3
         else
             ((i.radius isa Vector ? i.radius[k] : i.radius) + i.stroke * ctx.marker_stroke) * ctx.scaling
         end
@@ -558,7 +580,29 @@ function hitlayers(i::PointInteractable, ctx)
         cx, cy = q[1] + o[1] * ctx.scaling, q[2] - o[2] * ctx.scaling   # image px are y-down
         append!(g, (_q(cx), _q(cy), _q(r)))
     end
-    return [HitLayer(i.id, :circles, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label, i.colors)]
+    # With no `order` the overlay puts the last point listed on top, as CairoMakie paints a
+    # `scatter!`. On an Axis3, WebGL depth-tests markers and CairoMakie paints a `meshscatter!`
+    # (the points with `radius3d`) far to near, so there the nearest point is on top.
+    order = nothing
+    if i.ax isa Makie.Axis3 && (ctx.depth_test || i.radius3d !== nothing)
+        depth = _project_depth(ctx, i.ax, i.points)[3]
+        ks = [k for k in eachindex(i.points) if isfinite(g[3k - 2]) && isfinite(g[3k - 1]) && isfinite(depth[k])]
+        order = _top_first(ks, depth)
+    end
+    return [
+        HitLayer(
+            i.id, :circles, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label, i.colors, nothing, nothing, nothing, order,
+            ell,
+        ),
+    ]
+end
+
+# The drawn elements `ks` (1-based), top first, as the 0-based `order` of a hit layer. With
+# `depth`, the nearest is on top; elements at the same depth, and every element without
+# `depth`, stack in list order, the last one on top.
+function _top_first(ks, depth = nothing)
+    r = reverse(ks)
+    return (depth === nothing ? r : r[sortperm(depth[r])]) .- 1
 end
 
 # ============================ SegmentInteractable ==========================
@@ -1404,7 +1448,7 @@ end
 # The drawn labels on an Axis3, top one first, as 0-based indices: by their anchor's clip-space
 # depth where the backend depth-tests text (WebGL), else last-listed first, since CairoMakie
 # paints them in list order. A label whose anchor is not drawn (outside the axis limits, or not
-# finite) is left out.
+# finite) is left out. On a 2D Axis the overlay's default, last listed on top, already holds.
 function _text_order(ctx, ax, anchors)
     pts = Point3f[Point3f(a[1], a[2], length(a) >= 3 ? a[3] : 0) for a in anchors]
     px, py, depth = _project_depth(ctx, ax, pts)
@@ -1413,7 +1457,7 @@ function _text_order(ctx, ax, anchors)
         k for k in eachindex(pts) if all(isfinite, pts[k]) && (box === nothing || _in_clipbox(box, pts[k])) &&
             isfinite(px[k]) && isfinite(py[k]) && isfinite(depth[k])
     ]
-    return (ctx.depth_test ? ks[sortperm(depth[ks])] : reverse(ks)) .- 1
+    return _top_first(ks, ctx.depth_test ? depth : nothing)
 end
 
 # ============================ PolygonInteractable ==========================

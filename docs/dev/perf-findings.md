@@ -11,7 +11,7 @@ load Pluto (see `CLAUDE.md`; `scripts/cloud-warm.sh julia` builds the env with a
 
 ```sh
 ENV_DIR="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}"
-julia --project="$ENV_DIR" bench/payload_envelope.jl        # :cairo envelope (sections A–J)
+julia --project="$ENV_DIR" bench/payload_envelope.jl        # :cairo envelope (sections A–L)
 julia --project="$ENV_DIR" bench/stress.jl                  # :cairo 10× extremes (STRESS A–E)
 julia --project="$ENV_DIR" bench/gesture_channel.jl         # :cairo gesture frames
 julia --project="$ENV_DIR" bench/gesture_channel_webgl.jl   # :webgl gesture frames
@@ -146,6 +146,19 @@ Section G, text labels (2026-07-01). A label is a 4-int `:rects` box (~8 B) plus
 
 On an `Axis3` (2026-10-09, #292, Julia 1.13.1) each label's payload adds its anchor's `z` (~11 B)
 and the layer adds a front-to-back `order`, one small integer per drawn label (~1 B each).
+
+Section L, points on Axis3 (2026-10-15 at `c2fc49f` plus #331, Julia 1.13.1). So that the point
+drawn on top answers an overlap, a `meshscatter!` layer on an `Axis3` ships a top-first `order`
+(one small integer per drawn point, ~2.7 B each), and on WebGL a `scatter!` layer on an `Axis3`
+ships the same. Any `meshscatter!` layer also ships each sphere's outline ellipse, three integers
+in image px² (`ellipses`, ~3 B per point). A Cairo `scatter!` on an `Axis3`, and every 2D layer,
+ship neither: the overlay already treats the last point listed as the one on top.
+
+| Case (600×450 figure, Cairo) | manifest | geometry | order | ellipses |
+|---|---:|---:|---:|---:|
+| scatter, 1 000 points | 49.0 KB | 6.8 KB | – | – |
+| meshscatter, 100 points | 5.5 KB | 0.7 KB | 0.1 KB | 0.3 KB |
+| meshscatter, 1 000 points | 54.6 KB | 6.8 KB | 2.7 KB | 2.9 KB |
 
 Section J, surface on Axis3 (2026-10-09 at `0e764bb` plus #259, Julia 1.13.1). A `:surface`
 layer ships each shipped point's integer-px `xy` and Float32 `z`, one quad index per quad in
