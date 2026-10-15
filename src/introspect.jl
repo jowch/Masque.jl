@@ -792,24 +792,21 @@ end
 # as markup.
 function _plot_label(p)
     hasproperty(p, :label) || return nothing
-    l = p.label[]
-    l isa AbstractString && !(l isa Makie.LaTeXString) && !isempty(l) || return nothing
-    return String(l)
+    return _label_text(p.label[])
 end
+_label_text(l) = l isa AbstractString && !(l isa Makie.LaTeXString) && !isempty(l) ? String(l) : nothing
 
-function _series_payloads(children)
+function _series_payloads(labels)
     return Any[
-        let lab = children[k].label[]
-            lab isa AbstractString && !isempty(lab) ? (; index = k, label = String(lab)) : (; index = k)
-        end
-            for k in eachindex(children)
+        labels[k] === nothing ? (; index = k) : (; index = k, label = labels[k])
+            for k in eachindex(labels)
     ]
 end
 function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
-    children = _child_plots(p)
+    children = _series_children(p)
     isempty(children) && error("Series introspection: no child lines (Makie internals changed?)")
     paths = [_conv(_series_line(c))[1] for c in children]
-    pl = _merge_payloads(_series_payloads(children), payloads, "SegmentInteractable")
+    pl = _merge_payloads(_series_payloads(_series_labels(p, children)), payloads, "SegmentInteractable")
     i = _whole_lines(ax, paths, id, pl, tol, label; tooltip)
     return _with_samples(i, nothing, [[_pt3d(v) for v in path] for path in paths])
 end
@@ -1323,7 +1320,7 @@ end
 # the Series) must pin that one element of the parent `:lines` layer, not every series. The
 # spec is `id:k` (1-based); the bare layer id still means the whole layer.
 function _register_series_elements!(plotmap, p, layer_id; overwrite = false)
-    for (k, c) in enumerate(_child_plots(p))
+    for (k, c) in enumerate(_series_children(p))
         ids = [Symbol(layer_id, :(:), k)]
         (overwrite || !haskey(plotmap, c)) && (plotmap[c] = ids)
         _register_descendants!(plotmap, c, ids; overwrite)
@@ -1631,7 +1628,11 @@ function _defaults(fig; replaced = Base.IdSet{Any}())
         c isa Makie.Legend || continue
         nl += 1
         id = nl == 1 ? :legend : Symbol(:legend_, nl)
-        push!(d.ints, _legend_interactable(c; id, plotmap = d.plotmap))
+        li = _legend_interactable(c; id, plotmap = d.plotmap)
+        # A legend Makie draws no entries in (a bare `series!` under Makie 0.24.16 labels its
+        # entries `nothing`) has nothing to hit. Its id stays taken, so later legends keep theirs.
+        isempty(li.targets) && continue
+        push!(d.ints, li)
     end
     return d
 end
@@ -1750,13 +1751,15 @@ function _slice_parts(p)
         # sampler holds the tread instead of interpolating across the step.
         return :vertical, [(; id = _slice_ident_id(lab), label = lab, color = col, x = xs, y = ys, plateau = true)]
     elseif p isa Makie.Series
-        children = _child_plots(p)
+        children = _series_children(p)
         isempty(children) && error("SliceInteractable: Series has no child lines")
         series = NamedTuple[]
-        for c in children
+        for (c, fallback) in zip(children, _series_labels(p, children))
+            # A line's own label as other slices read it (LaTeX kept), else the Series' default.
+            own = _slice_label(c)
+            lab = own === nothing ? fallback : own
             line = _series_line(c)
             xs, ys = _slice_xy(_conv(line)[1])
-            lab = _slice_label(c)
             push!(series, (; id = _slice_ident_id(lab), label = lab, color = _slice_color(line), x = xs, y = ys))
         end
         return :vertical, series

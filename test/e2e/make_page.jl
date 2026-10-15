@@ -11,8 +11,8 @@
 # bare `--project=.` can't `using WGLMakie` directly — same temp-env dance as test/notebooks/webgl_demo.jl.
 import Pkg
 Pkg.activate(; temp = true)
+Pkg.add(["WGLMakie", "JSON3", "HypertextLiteral"])   # before the develop, so Parsers is not downgraded (JSON3 caps it at 2.x)
 Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "..")))   # test/e2e -> package root
-Pkg.add(["WGLMakie", "JSON3", "HypertextLiteral"])
 Pkg.instantiate()
 
 using Masque
