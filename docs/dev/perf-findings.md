@@ -402,6 +402,30 @@ source and glyph-atlas tiles repeat across scenes and could be shared like the b
 are the larger share. Revisit only if per-frame scene re-shipping shows up as the bottleneck;
 every `:webgl` view-gesture frame re-ships the full scene (#86, closed not planned).
 
+### Outside Pluto
+
+Measured by the outside-Pluto section of `bench/webgl_payload_size.jl` on 2026-10-15 at
+`c47f40d`, WGLMakie 0.13.15, Makie 0.24.15, Julia 1.13. Outside Pluto (#300) a widget writes its
+scene into the page as a JS literal, with typed arrays as base64 and each string of 256 B or more
+written once (`_scene_js`), and fetches the WGLMakie bundle (1.09 MB, above) once per page from
+the Makie tag. **scene JSON** is the scene as JSON, for scale; **scene JS** is the literal;
+**page** is the whole widget as a registered install writes it (overlay script and bundle loaded
+from the CDN); **checkout** adds the overlay script a git checkout inlines.
+
+| figure | scene JSON | scene JS | page | checkout |
+|---|---:|---:|---:|---:|
+| 2D lines (200 pts), 600×450 | 324.5 KB | 176.3 KB | **193.1 KB** | 292.6 KB |
+| 2D scatter + text (40), 600×450 | 424.9 KB | 243.0 KB | **257.0 KB** | 356.5 KB |
+| 3D helix (300 pts), 600×450 | 544.4 KB | 266.1 KB | **279.7 KB** | 379.2 KB |
+| 4-pt scatter, 400×260 | 482.0 KB | 274.1 KB | **285.5 KB** | 385.0 KB |
+| heatmap + colorbar + legend, 600×450 | 882.5 KB | 455.2 KB | **470.4 KB** | 569.9 KB |
+
+The literal is about half the JSON. What is left is mostly glyph bitmaps, Float32 distance
+fields sent as base64 (about 260 KB of a 504 KB kind-sweep scatter page, by the #364 review's
+count), then shader source written once per widget. So nearly every page with a WebGL figure
+passes Documenter's 200 KiB limit and needs `size_threshold_ignore`. Sending the distance
+fields as `u8` and widening them in `rewrap` would cut that part about 4×; not done yet.
+
 ## Backend comparison
 
 `bench/vs_cairo.jl` builds the same seeded figures on both backends (WebGL in-process, Cairo in a

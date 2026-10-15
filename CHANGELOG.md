@@ -14,9 +14,11 @@ All notable changes to this project are documented here. The format is based on
   (#300).
 
   The page loads WGLMakie's script, about 1 MB, once from jsDelivr (or GitHub when jsDelivr
-  is down), from the Makie release you have installed and checked against your copy's
-  hash. Read offline, each figure shows a note in its box saying it couldn't load. A
-  WGLMakie installed with `Pkg.develop` writes the script into each widget instead.
+  is down), from the release of your installed Makie, checked against your copy's hash.
+  Read offline, or if the published script differs from your copy, each figure shows a note
+  in its box saying which. Each figure writes its scene into the page, so a Documenter page
+  with one goes in `size_threshold_ignore`. A WGLMakie installed with `Pkg.develop` writes
+  the script into each widget instead.
 
 ## [0.3.0] - 2026-10-10
 

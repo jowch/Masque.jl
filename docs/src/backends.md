@@ -151,10 +151,13 @@ makedocs(; format = Documenter.HTML(; size_threshold_ignore = ["plots.md"]), ...
 
 A WGLMakie widget works there too: the page draws the figure on the
 reader's GPU and loads WGLMakie's script, about 1 MB, once from
-jsDelivr, the version that matches your installed Makie. Read offline,
-each figure shows a note in its box saying it couldn't load. To put a
-figure in a document that must read offline, use `backend = :cairo`
-there.
+jsDelivr, from the release of your installed Makie and checked against
+your copy. Each WGLMakie figure writes its whole scene into the page,
+which on its own is more than Documenter's 200 KB limit, so every page
+with a WGLMakie figure goes in `size_threshold_ignore`. Read offline,
+or if the published script differs from your copy, each figure shows a
+note in its box saying it couldn't load. To put a figure in a document
+that must stay small or read offline, use `backend = :cairo` there.
 
 A click highlights a mark there too, but nothing reads the choice: the
 `@bind` value and dragging the view with a [`ViewInteractable`](@ref)
