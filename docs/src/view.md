@@ -50,6 +50,11 @@ Panning and orbiting need a running notebook, so in a static HTML
 export the view does not move. The two backends show the moving view
 differently; see [Pan and orbit preview](@ref).
 
+Axes you tie together with Makie's `linkaxes!`, `linkxaxes!`, or
+`linkyaxes!` pan together: drag one, and the others follow on the
+directions they share. Only the axes you want to drag from need a
+`ViewInteractable`.
+
 If the same axis has a threshold line or a brushing box, a plain drag
 moves the line or box, and Shift+drag pans.
 

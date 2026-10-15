@@ -11,7 +11,7 @@ load Pluto (see `CLAUDE.md`; `scripts/cloud-warm.sh julia` builds the env with a
 
 ```sh
 ENV_DIR="${MASQUE_DEV_ENV:-$HOME/.julia/environments/masque-dev}"
-julia --project="$ENV_DIR" bench/payload_envelope.jl        # :cairo envelope (sections A–J)
+julia --project="$ENV_DIR" bench/payload_envelope.jl        # :cairo envelope (sections A–L)
 julia --project="$ENV_DIR" bench/stress.jl                  # :cairo 10× extremes (STRESS A–E)
 julia --project="$ENV_DIR" bench/gesture_channel.jl         # :cairo gesture frames
 julia --project="$ENV_DIR" bench/gesture_channel_webgl.jl   # :webgl gesture frames
@@ -147,6 +147,19 @@ Section G, text labels (2026-07-01). A label is a 4-int `:rects` box (~8 B) plus
 On an `Axis3` (2026-10-09, #292, Julia 1.13.1) each label's payload adds its anchor's `z` (~11 B)
 and the layer adds a front-to-back `order`, one small integer per drawn label (~1 B each).
 
+Section L, points on Axis3 (2026-10-15 at `c2fc49f` plus #331, Julia 1.13.1). So that the point
+drawn on top answers an overlap, a `meshscatter!` layer on an `Axis3` ships a top-first `order`
+(one small integer per drawn point, ~2.7 B each), and on WebGL a `scatter!` layer on an `Axis3`
+ships the same. Any `meshscatter!` layer also ships each sphere's outline ellipse, three integers
+in image px² (`ellipses`, ~3 B per point). A Cairo `scatter!` on an `Axis3`, and every 2D layer,
+ship neither: the overlay already treats the last point listed as the one on top.
+
+| Case (600×450 figure, Cairo) | manifest | geometry | order | ellipses |
+|---|---:|---:|---:|---:|
+| scatter, 1 000 points | 49.0 KB | 6.8 KB | – | – |
+| meshscatter, 100 points | 5.5 KB | 0.7 KB | 0.1 KB | 0.3 KB |
+| meshscatter, 1 000 points | 54.6 KB | 6.8 KB | 2.7 KB | 2.9 KB |
+
 Section J, surface on Axis3 (2026-10-09 at `0e764bb` plus #259, Julia 1.13.1). A `:surface`
 layer ships each shipped point's integer-px `xy` and Float32 `z`, one quad index per quad in
 depth order, and the source row and column indices. A matrix grid adds per-point `x` and `y`; a
@@ -192,6 +205,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `fields`, `initial` | once per manifest (#335) | ~10–20 B per field: its id twice, plus its start (`null` for a pick; a box's four bounds) |
 | `brush` | the target of a `selects` box | ~15 B |
 | `many` | each `select = :many` layer (#335) | 13 B (`payload_envelope.jl` §K) |
+| `regions` | each grid layer given `regions = R` (#359) | `[id, n, …]` runs over the row-major cells, one pair per region edge crossed along a row (`payload_envelope.jl` §L) |
 
 Re-running `payload_envelope.jl` for the composite bind value (#335, 2026-10-10) moved no
 manifest in the tables above by more than 0.1 KB; `fields` and `initial` replace the old
@@ -202,6 +216,24 @@ A `select = :many` field's `@bind` value travels from the browser as `{items: [.
 named `scatter`: 2.2 KB for 100 picks and 23.2 KB for 1 000, about 22–24 B a pick, so even a
 reader holding every point of a 1 000-point scatter sends less per click than one rendered
 PNG. No other fixture sets `select`, so the tables above are unchanged by it.
+
+`bench/payload_envelope.jl` §L (#359, 2026-10-15) measures `regions` on a heatmap. The runs cost
+about one `[id, n]` pair per region edge crossed along each row, so the cost follows the outlines,
+not the cell count, and is large when regions are small next to the grid. A 512×512 label image
+with 200 round objects grows from 1283.3 KB to 1303.6 KB (+20 KB), the same at 2048×2048 from
+1417.2 KB to 1512.5 KB (+95 KB), and a 121×121 crop cut into 961 fragments of 4×4 cells from
+72.6 KB to 86.3 KB (+14 KB). A whole 2048×2048 image cut into fragments is the expensive case:
+16 384 fragments of 16×16 cells take it from 1417.2 KB to 2437.3 KB (+1.0 MB), and 65 536 of 8×8
+to 3975.3 KB (+2.5 MB), more than the rest of the manifest. Such a grid ships no `values[]` (it
+takes the sampled path), so the runs are most of what it sends. Crop to the part being edited
+before cutting it into fragments, as the mask-editor pattern does.
+
+A pick in a region sends the same cell mask as below, holding every cell of the regions picked.
+Julia turns each value into a `GridSelection` and names the regions it holds whole by walking the
+runs against the mask: for half of a 2048×2048 grid, 5.4 ms and 1.6 MB with 16 384 fragments, and
+12.2 ms and 4.9 MB with 65 536 (§L, one run on the 4-core cloud container). In the browser, the
+first hover or pick after a mount decodes the runs for every cell, about 0.4 s on a 2048×2048
+grid with 16×16 fragments (timed in review of #360); after that a region costs its own size.
 
 A `select = :many` grid's value is a cell mask, `{runs: [j, i0, n, ...]}`, so its size follows the
 shape's outline, one triple per row it crosses, not its area. On a 512×512 image (JSON bytes,

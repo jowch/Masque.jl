@@ -2,6 +2,7 @@
     "height": 900,
     "layers": [
         {
+            "bond": "element",
             "kind": "circles",
             "id": "scatter",
             "geometry": [
@@ -40,7 +41,11 @@
             "style": {
                 "width": 2
             },
-            "bond": "element",
+            "order": [
+                2,
+                1,
+                0
+            ],
             "events": [
                 "click",
                 "hover"

@@ -73,6 +73,63 @@ end
         @test ax.limits[][1] ≈ new_xmin atol = 1.0e-6
     end
 
+    @testset "a pan moves the axes linked to it (#363)" begin
+        _xlims(ax) = (fl = ax.finallimits[]; (fl.origin[1], fl.origin[1] + fl.widths[1]))
+        _ylims(ax) = (fl = ax.finallimits[]; (fl.origin[2], fl.origin[2] + fl.widths[2]))
+        function linked_fig(link!)
+            fig = Figure(size = (700, 300))
+            a1 = Axis(fig[1, 1]); a2 = Axis(fig[1, 2])
+            scatter!(a1, 0:10, 0:10)
+            scatter!(a2, 0:5, 100:20:200)
+            link!(a1, a2)
+            return fig, a1, a2
+        end
+        pan(w, id, x, y) = w.render_frame(
+            Dict(
+                "id" => id, "xmin" => x[1], "xmax" => x[2], "ymin" => y[1], "ymax" => y[2], "settle" => true,
+            ),
+        )
+
+        # Both dimensions linked, the view on the first axis: the finalize step used to reset the
+        # second axis's automatic limits and push them back, so nothing moved.
+        fig, a1, a2 = linked_fig(linkaxes!)
+        w = masque(fig, [ViewInteractable(a1)]; auto = false)
+        resp = pan(w, "view", (20.0, 30.0), (-5.0, 5.0))
+        for ax in (a1, a2)
+            @test all(isapprox.(_xlims(ax), (20.0, 30.0); atol = 1.0e-6))
+            @test all(isapprox.(_ylims(ax), (-5.0, 5.0); atol = 1.0e-6))
+        end
+        view = only(l for l in resp["manifest"]["layers"] if l["kind"] == "view")
+        link = only(view["geometry"]["links"])
+        @test haskey(link, "x") && haskey(link, "y")
+        @test length(link["clip"]) == 4 && link["fill"] isa String
+        # The linked axis's tick-label space is pinned too, so its box holds still (#171).
+        @test a2.yticklabelspace[] isa Real
+
+        # x only, the view on the last axis: the linked axis keeps its own automatic y.
+        fig, a1, a2 = linked_fig(linkxaxes!)
+        w = masque(fig, [ViewInteractable(a2)]; auto = false)
+        y2 = _ylims(a2)
+        resp = pan(w, "view", (2.0, 4.0), y2)
+        @test all(isapprox.(_xlims(a1), (2.0, 4.0); atol = 1.0e-6))
+        @test all(isapprox.(_xlims(a2), (2.0, 4.0); atol = 1.0e-6))
+        @test _ylims(a1)[2] < 50       # a1's own data, not a2's
+        @test a1.limits[][2] === nothing
+        link = only(only(l for l in resp["manifest"]["layers"] if l["kind"] == "view")["geometry"]["links"])
+        @test haskey(link, "x") && !haskey(link, "y")
+        # Same x limits and boxes of about the same width: about the same px per data unit.
+        @test 0.7 < link["x"][3] < 1.3
+        @test link["x"][2] < link["x"][1]
+
+        # The compile-ahead warmup puts the linked axes' limits back.
+        fig, a1, a2 = linked_fig(linkaxes!)
+        w = masque(fig, [ViewInteractable(a1)]; auto = false)
+        lim0 = a2.limits[]
+        Masque._warm_view_render_frame!(w.render_frame, Dict{Symbol, Any}(:view => a1))
+        @test a2.limits[] == lim0
+        @test all(isapprox.(_xlims(a2), _xlims(a1); atol = 1.0e-6))
+    end
+
     @testset "3D orbit: azimuth/elevation drive the same axis live" begin
         fig = Figure(size = (400, 400))
         ax = Axis3(fig[1, 1])

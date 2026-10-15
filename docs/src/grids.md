@@ -51,6 +51,50 @@ selected cells, `findall(sel.region)` their positions in `img`, and
 `sel.region.mask` a matrix the size of `img` that is `true` where a cell
 is selected, so a selection of any shape is one value to index with.
 
+To start with cells already selected, such as a selection you saved
+earlier, pass `selected` a matrix the size of `img` that is `true` at
+those cells:
+
+```julia
+@bind sel masque(fig, (region = interactables(hm; select = :many),);
+    selected = (region = saved_mask,))
+```
+
+The cells start highlighted, `sel.region` holds them before anyone
+clicks, and a Cmd-click or Ctrl-click takes one out like any other.
+`selected` also takes a `GridSelection` or the positions `findall` gives,
+and a matrix of a different size from `img` raises an `ArgumentError`.
+
+## Pick whole regions
+
+When the cells of an image stand for larger things, such as the objects
+of a segmentation or the small patches an image is cut into, pass
+`regions`: a matrix of whole numbers the size of `img` that gives each
+cell the id of its region. Cells that share an id then act as one.
+Hovering outlines the whole region, and a click picks all of it:
+
+```julia
+labels = label_components(mask)   # ImageMorphology: 0 for the background, 1, 2, … for the objects
+@bind sel masque(fig, (objects = interactables(hm; select = :many, regions = labels),))
+```
+
+A click selects one region, a Cmd-click or Ctrl-click adds a region or
+takes it out, and a box selects every region it touches. `sel.objects`
+is the same [`GridSelection`](@ref) as before, so `sel.objects.mask` is
+every selected cell, and `sel.objects.regions` lists the ids of the
+regions it holds whole. A cell whose id is `0` belongs to no region and
+is picked on its own, so the background stays as fine-grained as
+before.
+
+Many small regions on a large image make the figure slower to load.
+Crop to the part being edited before cutting it into patches.
+
+On a grid that picks one cell, `regions` turns a click into a pick of
+the object under the pointer: the click's [`GridCellEvent`](@ref)
+carries `region`, the clicked object's id, and the whole object stays
+highlighted. The tooltip names the region, and a `masque"…"` template
+can use `$(region)`.
+
 ## Label cells
 
 To show your own data for each cell, such as the names along each side

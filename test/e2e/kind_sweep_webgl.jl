@@ -24,14 +24,17 @@ begin
         Pkg.activate(dev)
     else
         Pkg.activate(; temp = true)
+        Pkg.add(["WGLMakie", "JSON3"])   # before the develop, so Parsers is not downgraded (JSON3 caps it at 2.x)
         Pkg.develop(path = joinpath(@__DIR__, "..", ".."))
-        Pkg.add(["WGLMakie", "JSON3"])
         Pkg.instantiate()
     end
     using Masque
     using WGLMakie
     import JSON3
 end
+
+# ╔═╡ d1000000-0000-0000-0000-000000000003
+include(joinpath(@__DIR__, "kind_sweep_figures.jl"))  # kind-sweep figures v2
 
 # ╔═╡ d1000000-0000-0000-0000-000000000002
 md"""
@@ -41,9 +44,6 @@ One widget per interactable kind. Agents drive this with `test/e2e/kind_sweep.mj
 and `test/e2e/polish_verify.mjs` (interaction **and** visual).
 Not a human Try Live notebook.
 """
-
-# ╔═╡ d1000000-0000-0000-0000-000000000003
-include(joinpath(@__DIR__, "kind_sweep_figures.jl"))  # kind-sweep figures v2
 
 # ╔═╡ d1000000-0000-0000-0000-000000000004
 begin
@@ -332,6 +332,46 @@ HTML(
         "<span id=\"coords_text\" style=\"display:none\">$(JSON3.write(sweep.text.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-00000000014a
+@bind ev_scatter_overlap sweep.scatter_overlap
+
+# ╔═╡ d1000000-0000-0000-0000-00000000014b
+HTML(
+    "<span id=\"out_scatter_overlap\">SCATTER_OVERLAP=$(sweep_field("scatter_overlap", ev_scatter_overlap))</span>" *
+        "<span id=\"bond_scatter_overlap\" style=\"display:none\">$(repr(ev_scatter_overlap))</span>" *
+        "<span id=\"coords_scatter_overlap\" style=\"display:none\">$(JSON3.write(sweep.scatter_overlap.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000014c
+@bind ev_text_overlap sweep.text_overlap
+
+# ╔═╡ d1000000-0000-0000-0000-00000000014d
+HTML(
+    "<span id=\"out_text_overlap\">TEXT_OVERLAP=$(sweep_field("text_overlap", ev_text_overlap))</span>" *
+        "<span id=\"bond_text_overlap\" style=\"display:none\">$(repr(ev_text_overlap))</span>" *
+        "<span id=\"coords_text_overlap\" style=\"display:none\">$(JSON3.write(sweep.text_overlap.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000150
+@bind ev_poly_overlap sweep.poly_overlap
+
+# ╔═╡ d1000000-0000-0000-0000-000000000151
+HTML(
+    "<span id=\"out_poly_overlap\">POLY_OVERLAP=$(sweep_field("poly_overlap", ev_poly_overlap))</span>" *
+        "<span id=\"bond_poly_overlap\" style=\"display:none\">$(repr(ev_poly_overlap))</span>" *
+        "<span id=\"coords_poly_overlap\" style=\"display:none\">$(JSON3.write(sweep.poly_overlap.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-00000000014e
+@bind ev_spheres3d sweep.spheres3d
+
+# ╔═╡ d1000000-0000-0000-0000-00000000014f
+HTML(
+    "<span id=\"out_spheres3d\">SPHERES3D=$(sweep_field("spheres3d", ev_spheres3d))</span>" *
+        "<span id=\"bond_spheres3d\" style=\"display:none\">$(repr(ev_spheres3d))</span>" *
+        "<span id=\"coords_spheres3d\" style=\"display:none\">$(JSON3.write(sweep.spheres3d.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-00000000010d
 @bind ev_datashader sweep.datashader
 
@@ -524,6 +564,16 @@ HTML(
         "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000146
+@bind ev_view_linked sweep.view_linked
+
+# ╔═╡ d1000000-0000-0000-0000-000000000147
+HTML(
+    "<span id=\"out_view_linked\">VIEW_LINKED=$(sweep_field("view_linked", ev_view_linked))</span>" *
+        "<span id=\"bond_view_linked\" style=\"display:none\">$(repr(ev_view_linked))</span>" *
+        "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000115
 @bind ev_view3d sweep.view3d
 
@@ -534,10 +584,10 @@ HTML(
         "<span id=\"coords_view3d\" style=\"display:none\">$(JSON3.write(sweep.view3d.manifest["layers"]))</span>",
 )
 
-# ╔═╡ d1000000-0000-0000-0000-000000000144
+# ╔═╡ d1000000-0000-0000-0000-000000000152
 @bind ev_view3d_linked sweep.view3d_linked
 
-# ╔═╡ d1000000-0000-0000-0000-000000000145
+# ╔═╡ d1000000-0000-0000-0000-000000000153
 HTML(
     "<span id=\"out_view3d_linked\">VIEW3D_LINKED=$(sweep_field("view3d_linked", ev_view3d_linked))</span>" *
         "<span id=\"bond_view3d_linked\" style=\"display:none\">$(repr(ev_view3d_linked))</span>" *
@@ -634,6 +684,26 @@ HTML(
     "<span id=\"out_many_grid\">MANY_GRID=$(sweep_field("many_grid", ev_many_grid))</span>" *
         "<span id=\"bond_many_grid\" style=\"display:none\">$(repr(ev_many_grid))</span>" *
         "<span id=\"coords_many_grid\" style=\"display:none\">$(JSON3.write(sweep.many_grid.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000142
+@bind ev_many_grid_seeded sweep.many_grid_seeded
+
+# ╔═╡ d1000000-0000-0000-0000-000000000143
+HTML(
+    "<span id=\"out_many_grid_seeded\">MANY_GRID_SEEDED=$(sweep_field("many_grid_seeded", ev_many_grid_seeded))</span>" *
+        "<span id=\"bond_many_grid_seeded\" style=\"display:none\">$(repr(ev_many_grid_seeded))</span>" *
+        "<span id=\"coords_many_grid_seeded\" style=\"display:none\">$(JSON3.write(sweep.many_grid_seeded.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000144
+@bind ev_many_grid_regions sweep.many_grid_regions
+
+# ╔═╡ d1000000-0000-0000-0000-000000000145
+HTML(
+    "<span id=\"out_many_grid_regions\">MANY_GRID_REGIONS=$(sweep_field("many_grid_regions", ev_many_grid_regions))</span>" *
+        "<span id=\"bond_many_grid_regions\" style=\"display:none\">$(repr(ev_many_grid_regions))</span>" *
+        "<span id=\"coords_many_grid_regions\" style=\"display:none\">$(JSON3.write(sweep.many_grid_regions.manifest["layers"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000050
@@ -749,6 +819,14 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000126
 # ╠═d1000000-0000-0000-0000-00000000010b
 # ╠═d1000000-0000-0000-0000-00000000010c
+# ╠═d1000000-0000-0000-0000-00000000014a
+# ╠═d1000000-0000-0000-0000-00000000014b
+# ╠═d1000000-0000-0000-0000-00000000014c
+# ╠═d1000000-0000-0000-0000-00000000014d
+# ╠═d1000000-0000-0000-0000-000000000150
+# ╠═d1000000-0000-0000-0000-000000000151
+# ╠═d1000000-0000-0000-0000-00000000014e
+# ╠═d1000000-0000-0000-0000-00000000014f
 # ╠═d1000000-0000-0000-0000-00000000010d
 # ╠═d1000000-0000-0000-0000-00000000010e
 # ╠═d1000000-0000-0000-0000-00000000010f
@@ -787,10 +865,12 @@ HTML(
 # ╠═d1000000-0000-0000-0000-0000000000c1
 # ╠═d1000000-0000-0000-0000-000000000034
 # ╠═d1000000-0000-0000-0000-000000000035
+# ╠═d1000000-0000-0000-0000-000000000146
+# ╠═d1000000-0000-0000-0000-000000000147
 # ╠═d1000000-0000-0000-0000-000000000115
 # ╠═d1000000-0000-0000-0000-000000000116
-# ╠═d1000000-0000-0000-0000-000000000144
-# ╠═d1000000-0000-0000-0000-000000000145
+# ╠═d1000000-0000-0000-0000-000000000152
+# ╠═d1000000-0000-0000-0000-000000000153
 # ╠═d1000000-0000-0000-0000-000000000038
 # ╠═d1000000-0000-0000-0000-000000000039
 # ╠═d1000000-0000-0000-0000-000000000047
@@ -809,6 +889,10 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000132
 # ╠═d1000000-0000-0000-0000-000000000140
 # ╠═d1000000-0000-0000-0000-000000000141
+# ╠═d1000000-0000-0000-0000-000000000142
+# ╠═d1000000-0000-0000-0000-000000000143
+# ╠═d1000000-0000-0000-0000-000000000144
+# ╠═d1000000-0000-0000-0000-000000000145
 # ╠═d1000000-0000-0000-0000-000000000050
 # ╠═d1000000-0000-0000-0000-000000000051
 # ╠═d1000000-0000-0000-0000-000000000052

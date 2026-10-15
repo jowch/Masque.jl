@@ -23,7 +23,10 @@ export const prefersReducedMotion = (): boolean =>
     typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches
 
 // A picked point on a line is keyed apart from the line, so hovering that line still outlines it.
-export const hitKey = (h: Hit): string => (h.sample_ === undefined ? `${h.layer.id}:${h.index}` : `${h.layer.id}:${h.index}@${h.sample_}`)
+// A grid cell in a region is keyed by the region, so moving within it keeps one highlight.
+export const hitKey = (h: Hit): string =>
+    h.region_ !== undefined ? `${h.layer.id}:r${h.region_}` :
+    h.sample_ === undefined ? `${h.layer.id}:${h.index}` : `${h.layer.id}:${h.index}@${h.sample_}`
 
 // Image-px scale comes from manifest.width, not the element's intrinsic size, so a
 // <canvas> needs no sizer shim.
