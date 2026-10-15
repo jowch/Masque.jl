@@ -316,8 +316,10 @@ let
         hm = heatmap!(ax, rand(Float32, n, n))
         plain = masque(f, (cells = interactables(hm),))
         labels = masque(f, (cells = interactables(hm; regions = R),))
-        @printf("  %4d×%-4d label image, 200 objects:  manifest %8.1f KB  → %8.1f KB with regions\n",
-            n, n, mp(plain.manifest) / 1024, mp(labels.manifest) / 1024)
+        @printf(
+            "  %4d×%-4d label image, 200 objects:  manifest %8.1f KB  → %8.1f KB with regions\n",
+            n, n, mp(plain.manifest) / 1024, mp(labels.manifest) / 1024
+        )
         delete!(ax, hm)
     end
     # 121×121 cut into 4×4 blocks: 961 fragments, the densest case a crop editor ships.
@@ -326,8 +328,10 @@ let
     hm = heatmap!(ax, rand(Float32, n, n))
     plain = masque(f, (cells = interactables(hm; select = :many),))
     frags = masque(f, (cells = interactables(hm; select = :many, regions = R),))
-    @printf("  %d×%d crop, %d fragments:     manifest %8.1f KB  → %8.1f KB with regions\n",
-        n, n, maximum(R), mp(plain.manifest) / 1024, mp(frags.manifest) / 1024)
+    @printf(
+        "  %d×%d crop, %d fragments:     manifest %8.1f KB  → %8.1f KB with regions\n",
+        n, n, maximum(R), mp(plain.manifest) / 1024, mp(frags.manifest) / 1024
+    )
 end
 
 println()
