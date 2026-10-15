@@ -58,6 +58,12 @@ function _child_plots(p)
     return plots
 end
 
+# A Series' lines. Since Makie 0.24.16 a Series on a PolarAxis draws them through a `PlotList`
+# child (the spec API), so step into any `PlotList` to reach the plots it holds.
+_series_children(p) = reduce(
+    vcat, (c isa Makie.PlotList ? _series_children(c) : Any[c] for c in _child_plots(p)); init = Any[],
+)
+
 # Wraps `ax.finallimits[]`, the axis's post-layout data limits; no public equivalent.
 function _finallimits(ax)
     fl = try

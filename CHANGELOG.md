@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- A `series!` on a `PolarAxis` responds to hover and click again under Makie 0.24.16, which
+  draws its lines one level further down; before, Masque skipped it with a warning.
+
 ## [0.3.0] - 2026-10-10
 
 ### Added

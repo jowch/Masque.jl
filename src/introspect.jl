@@ -806,7 +806,7 @@ function _series_payloads(children)
     ]
 end
 function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
-    children = _child_plots(p)
+    children = _series_children(p)
     isempty(children) && error("Series introspection: no child lines (Makie internals changed?)")
     paths = [_conv(_series_line(c))[1] for c in children]
     pl = _merge_payloads(_series_payloads(children), payloads, "SegmentInteractable")
