@@ -15,7 +15,14 @@ depth of their corners, the order CairoMakie paints them in, so on `:cairo` the 
 picture agree to within a cell and on `:webgl` they differ only where two faces of close average
 depth overlap (#259). Every other layer keeps every projected vertex hittable, including
 far-side points on solid 3D objects, and between layers the plot drawn last wins (#242), which
-is what CairoMakie draws. On `:webgl`, which depth-tests every pixel, a mark hidden behind a
+is what CairoMakie draws. Within a `:circles`, `:rects` or `:polygons` layer the element drawn on
+top wins an overlap (#331, #340): with no `order` that is the last one listed, since both backends
+paint a plot's elements in list order (on a 2D axis WebGL's depth test ties and the later one
+wins). An `Axis3` layer ships a top-first `order` where a backend draws by depth instead: a
+`meshscatter!` on both (CairoMakie paints spheres far to near by centre), and `scatter!` and
+`text!` on `:webgl`. That order follows each backend's picture, so it differs between backends
+the way the pictures do. A sphere also ships its outline ellipse, which wins before any hit
+circle's reach, because Axis3 stretches spheres into ellipses that the circle overshoots. On `:webgl`, which depth-tests every pixel, a mark hidden behind a
 surface still answers hover and beats the surface in front of it; accepted, since a
 backend-dependent rule is ruled out (`roadmap.md`). A painter's cull (dropping hidden quads) is
 not built: the depth order already resolves every overlap, and a cull would only save bytes at

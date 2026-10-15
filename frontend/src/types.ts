@@ -169,10 +169,15 @@ export interface HitLayer {
     // is its label or date text. Absent → no readout (Axis3, or a layer built by hand).
     points?: (number | string)[][]
     step?: "pre" | "post" | "center"
-    // :rects: 0-based element indices, front to back, to hit-test in (text on an Axis3, where
-    // the label nearest the camera wins an overlap). An element left out is not drawn.
-    // Absent → index order.
+    // :circles and :rects: 0-based element indices, top first, to hit-test in, so the element
+    // drawn on top wins an overlap (points and text on an Axis3, ordered by depth where the
+    // backend sorts or depth-tests them). An element left out is not drawn. Absent → the last
+    // element listed is on top, the order both backends paint a layer in.
     order?: number[]
+    // :circles: per element, the drawn outline as an ellipse [sxx, sxy, syy] (image px²): the
+    // points p with (p - c)ᵀ S⁻¹ (p - c) ≤ 1 around the circle's centre c. A sphere's outline,
+    // which its hit circle reaches past. Absent → the circles alone.
+    ellipses?: number[]
     // A field's envelope: a `selects` target's or a `many` field holds { items: [...] }; a
     // click or a box's bounds hold { layer, index, payload }.
 }

@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Where marks of one plot overlap, hover and click answer with the one drawn on top. On a 2D
+  `Axis` that is the one listed last: a later `scatter!` marker, `text!` label or `poly!`
+  shape no longer loses to an earlier one hidden under it (#340). On an `Axis3`, the
+  `meshscatter!` sphere nearer the camera answers on both backends, and so does the nearer
+  `scatter!` marker with `backend = :webgl`; CairoMakie draws `scatter!` markers in the order
+  you give them, so the last one listed answers there (#331).
+
 ## [0.3.0] - 2026-10-10
 
 ### Added

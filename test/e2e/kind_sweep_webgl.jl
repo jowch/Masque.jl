@@ -332,6 +332,36 @@ HTML(
         "<span id=\"coords_text\" style=\"display:none\">$(JSON3.write(sweep.text.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000142
+@bind ev_scatter_overlap sweep.scatter_overlap
+
+# ╔═╡ d1000000-0000-0000-0000-000000000143
+HTML(
+    "<span id=\"out_scatter_overlap\">SCATTER_OVERLAP=$(sweep_field("scatter_overlap", ev_scatter_overlap))</span>" *
+        "<span id=\"bond_scatter_overlap\" style=\"display:none\">$(repr(ev_scatter_overlap))</span>" *
+        "<span id=\"coords_scatter_overlap\" style=\"display:none\">$(JSON3.write(sweep.scatter_overlap.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000144
+@bind ev_text_overlap sweep.text_overlap
+
+# ╔═╡ d1000000-0000-0000-0000-000000000145
+HTML(
+    "<span id=\"out_text_overlap\">TEXT_OVERLAP=$(sweep_field("text_overlap", ev_text_overlap))</span>" *
+        "<span id=\"bond_text_overlap\" style=\"display:none\">$(repr(ev_text_overlap))</span>" *
+        "<span id=\"coords_text_overlap\" style=\"display:none\">$(JSON3.write(sweep.text_overlap.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000146
+@bind ev_spheres3d sweep.spheres3d
+
+# ╔═╡ d1000000-0000-0000-0000-000000000147
+HTML(
+    "<span id=\"out_spheres3d\">SPHERES3D=$(sweep_field("spheres3d", ev_spheres3d))</span>" *
+        "<span id=\"bond_spheres3d\" style=\"display:none\">$(repr(ev_spheres3d))</span>" *
+        "<span id=\"coords_spheres3d\" style=\"display:none\">$(JSON3.write(sweep.spheres3d.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-00000000010d
 @bind ev_datashader sweep.datashader
 
@@ -739,6 +769,12 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000126
 # ╠═d1000000-0000-0000-0000-00000000010b
 # ╠═d1000000-0000-0000-0000-00000000010c
+# ╠═d1000000-0000-0000-0000-000000000142
+# ╠═d1000000-0000-0000-0000-000000000143
+# ╠═d1000000-0000-0000-0000-000000000144
+# ╠═d1000000-0000-0000-0000-000000000145
+# ╠═d1000000-0000-0000-0000-000000000146
+# ╠═d1000000-0000-0000-0000-000000000147
 # ╠═d1000000-0000-0000-0000-00000000010d
 # ╠═d1000000-0000-0000-0000-00000000010e
 # ╠═d1000000-0000-0000-0000-00000000010f

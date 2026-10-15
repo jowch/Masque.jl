@@ -312,8 +312,28 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
     const g = layer.geometry
     switch (layer.kind) {
         case "circles": {
+            // The element drawn on top wins an overlap. `order`, when present, lists the
+            // elements top first (by depth on an Axis3); absent, the last one listed is on top,
+            // since both backends paint a layer's elements in list order.
+            // A sphere's drawn outline is an ellipse (`ellipses`) that its hit circle reaches
+            // past, so the top sphere drawn under the pointer wins before any circle's reach.
             const a = g as number[]
-            for (let k = 0; k < a.length / 3; k++) {
+            const order = layer.order, ell = layer.ellipses
+            const n = order ? order.length : a.length / 3
+            if (ell) {
+                for (let m = 0; m < n; m++) {
+                    const k = order ? order[m] : n - 1 - m
+                    const sxx = ell[3 * k], sxy = ell[3 * k + 1], syy = ell[3 * k + 2]
+                    const det = sxx * syy - sxy * sxy
+                    if (!(det > 0)) continue
+                    const dx = px - a[3 * k], dy = py - a[3 * k + 1]
+                    if (syy * dx * dx - 2 * sxy * dx * dy + sxx * dy * dy <= det) {
+                        return { index: k, geom_: ["circle", a[3 * k], a[3 * k + 1], a[3 * k + 2]] }
+                    }
+                }
+            }
+            for (let m = 0; m < n; m++) {
+                const k = order ? order[m] : n - 1 - m
                 const cx = a[3 * k], cy = a[3 * k + 1], r = a[3 * k + 2]
                 if ((px - cx) ** 2 + (py - cy) ** 2 <= (r + HIT_TOL) ** 2) return { index: k, geom_: ["circle", cx, cy, r] }
             }
@@ -322,15 +342,16 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
         case "rects": {
             // `tol` reaches past each rect's edge, over its drawn outline (absent → none).
             // Inside wins over any rect's reach, so touching bars split at their edge; between
-            // rects, the nearest outline wins. `order`, when present, is the front-to-back
-            // order to test them in (text on an Axis3); a rect not in it is not drawn.
+            // rects, the nearest outline wins. Where rects overlap, the one drawn on top wins:
+            // `order`, when present, lists them top first (text on an Axis3), and a rect not in
+            // it is not drawn; absent, the last one listed is on top.
             const a = g as number[]
             const tol = layer.tol ?? 0
             const order = layer.order
             const n = order ? order.length : a.length / 4
             let near = -1, nd = tol * tol
             for (let m = 0; m < n; m++) {
-                const k = order ? order[m] : m
+                const k = order ? order[m] : n - 1 - m
                 const cx = a[4 * k], cy = a[4 * k + 1], w = a[4 * k + 2], h = a[4 * k + 3]
                 const dx = Math.max(Math.abs(px - cx) - w / 2, 0), dy = Math.max(Math.abs(py - cy) - h / 2, 0)
                 if (dx === 0 && dy === 0) return { index: k, geom_: ["rect", cx, cy, w, h] }
@@ -383,11 +404,12 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
         }
         case "polygons": {
             // Inside wins over any element's outline reach (`tol`, absent → none); between
-            // elements, the nearest outline wins.
+            // elements, the nearest outline wins. Where elements overlap, the last one listed
+            // is drawn on top and wins.
             const elems = g as (number[] | number[][])[]
             const tol = layer.tol ?? 0
             let near = -1, nd = tol
-            for (let k = 0; k < elems.length; k++) {
+            for (let k = elems.length - 1; k >= 0; k--) {
                 const rings = polygonRings(elems[k])
                 if (pointInRings(px, py, rings)) return { index: k, geom_: ["poly", rings.length === 1 ? rings[0] : rings] }
                 if (tol <= 0) continue

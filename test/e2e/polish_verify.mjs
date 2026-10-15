@@ -610,6 +610,81 @@ try {
     passed.push(`${key}/highlight`);
   }
 
+  // Overlapping marks within one plot (#331, #340). The screen shows the blue mark over the
+  // red one where they overlap, on both backends (read from a screenshot, so WebGL's own draw
+  // order is checked too), and the hover there answers with the blue mark and highlights its
+  // shape, not the one underneath.
+  for (const [key, layerId, top, under, topLabel, underLabel] of [
+    ["scatter_overlap", "scatter", 1, 0, "over", "under"],
+    ["text_overlap", "text", 1, 0, "over", "under"],
+    ["spheres3d", "meshscatter", 0, 1, "front", "back"],
+  ]) {
+    const m = await inspect(key);
+    pin(m, key);
+    const layer = (await layersOf(key)).find((l) => l.id === layerId);
+    if (!layer) throw new Error(`${key}: no layer ${layerId}`);
+    const g = layer.geometry, circles = layer.kind === "circles";
+    const shape = (k) => circles ? { x: g[3 * k], y: g[3 * k + 1], r: g[3 * k + 2] }
+      : { x: g[4 * k], y: g[4 * k + 1], w: g[4 * k + 2], h: g[4 * k + 3] };
+    // Inside a shape's drawn part: 0.8 of a circle's hit radius (which reaches past the mark),
+    // or the box.
+    const inside = (s, x, y) => circles ? Math.hypot(x - s.x, y - s.y) < 0.8 * s.r
+      : Math.abs(x - s.x) < s.w / 2 && Math.abs(y - s.y) < s.h / 2;
+    const a = shape(top), b = shape(under);
+    const box = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const r = host.querySelector("img, canvas").getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height, s: r.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+    }, key);
+    const png = await page.screenshot({ clip: { x: box.left, y: box.top, width: box.width, height: box.height } });
+    const shot = await page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const cx = c.getContext("2d");
+      cx.drawImage(img, 0, 0);
+      return { w: img.width, h: img.height, data: Array.from(cx.getImageData(0, 0, img.width, img.height).data) };
+    }, png.toString("base64"));
+    // Screenshot px -> image px: CSS px per screenshot px, then image px per CSS px.
+    const perImg = shot.w / box.width * box.s;
+    let blue = 0, red = 0;
+    for (let j = 0; j < shot.h; j++) {
+      for (let i = 0; i < shot.w; i++) {
+        const x = i / perImg, y = j / perImg;
+        if (!inside(a, x, y) || !inside(b, x, y)) continue;
+        const o = 4 * (j * shot.w + i), [r, gg, bb] = shot.data.slice(o, o + 3);
+        if (bb > 150 && r < 100 && gg < 100) blue++;
+        if (r > 150 && gg < 100 && bb < 100) red++;
+      }
+    }
+    if (!(blue > 20 && blue > 1.5 * red)) {
+      throw new Error(`${key}/top-drawn: where ${topLabel} and ${underLabel} overlap the screen shows ${blue} blue and ${red} red px; want blue (${topLabel}) on top`);
+    }
+    passed.push(`${key}/top-drawn`);
+
+    // Hover a pixel both shapes claim: the top mark's centre.
+    let t = null;
+    for (let n = 0; n < 8; n++) {
+      t = await hoverAt(key, a.x, a.y);
+      if (t.show && (t.hi.fill || t.hi.edge)) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (!t?.show) throw new Error(`${key}: no tooltip on hover ${JSON.stringify(t)}`);
+    if (!t.text.includes(topLabel) || t.text.includes(underLabel)) {
+      throw new Error(`${key}: tooltip ${JSON.stringify(t.text)} is not the ${topLabel} mark`);
+    }
+    assertHoverRecipe(t.hi, key, true, false);
+    if (circles) {
+      for (const sh of [t.hi.fill, t.hi.edge].filter(Boolean)) assertCircleR(sh.r, a.r, `${key}/hover-${sh.layer}`);
+    }
+    passed.push(`${key}/hover-top`);
+  }
+
   // A surface point (#259) is highlighted as its dual cell: a closed polygon through the midpoints
   // of its grid edges and the centres of its quads, so the polygon surrounds the point. The hover
   // and the selection use the closed-mark recipe; the tooltip sits over the point. On Cairo the
