@@ -1,6 +1,7 @@
 // All coordinates here are image pixels.
 import { contentPoint, isIdentity, type PhotoMatrix } from "./photo"
 import { hitSurface, surfaceVertex } from "./surface"
+import { withRegion } from "./regions"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3 } from "./types"
 
 const HIT_TOL = 4 // px slack for circles/rects
@@ -427,17 +428,21 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             return null
         }
         case "grid": {
+            // A cell in a region (`regions=`) stands for the whole region (regions.ts).
             const gg = g as GridGeometry
-            if (gg.sample) return hitGridSample(gg, px, py)
+            if (gg.sample) {
+                const h = hitGridSample(gg, px, py)
+                return h && withRegion(layer, h)
+            }
             const i = findBin(gg.xedges, px), j = findBin(gg.yedges, py)
             if (i < 0 || j < 0) return null
             const idx = j * gg.ncols + i
-            return {
+            return withRegion(layer, {
                 index: idx,
                 grid_: [i, j, gg.values?.[idx]],
                 geom_: ["rect", (gg.xedges[i] + gg.xedges[i + 1]) / 2, (gg.yedges[j] + gg.yedges[j + 1]) / 2,
                     Math.abs(gg.xedges[i + 1] - gg.xedges[i]), Math.abs(gg.yedges[j + 1] - gg.yedges[j])],
-            }
+            })
         }
         case "surface":
             return hitSurface(layer, px, py)

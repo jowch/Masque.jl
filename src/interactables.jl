@@ -971,13 +971,14 @@ end
 
 # ============================ GridInteractable =============================
 """
-    GridInteractable(ax, xedges, yedges, values; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one)
-    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one)
+    GridInteractable(ax, xedges, yedges, values; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one, regions=nothing)
+    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one, regions=nothing)
 
 A binned grid, such as a heatmap or image. Produces one `:grid` [`HitLayer`](@ref). A click
 commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value. With `select = :many`
 the reader picks any set of cells (click, Cmd/Ctrl-click), and the field holds a
-[`GridSelection`](@ref).
+[`GridSelection`](@ref). With `regions`, the cells of one region are hovered and picked
+together.
 
 # Arguments
 - `xedges`, `yedges` — cell-edge vectors (length `ncols+1`/`nrows+1`), each strictly
@@ -998,6 +999,13 @@ the reader picks any set of cells (click, Cmd/Ctrl-click), and the field holds a
   keyboard-navigable.
 - `select` — `:one` (default): the field holds one `GridCellEvent` or `nothing`. `:many`: it
   holds a [`GridSelection`](@ref), every selected cell as a mask.
+- `regions` — optional integer matrix the same shape as `values`, a region id for each cell:
+  the objects of a label image, or the fragments of a picture. Cells that share an id act as
+  one: hover outlines the whole region, a click (or Cmd/Ctrl-click) on a `select = :many` grid
+  picks or drops all of it, and a box takes every region it touches. A `GridCellEvent` carries
+  the clicked cell's `region`, and a `GridSelection` lists the regions it holds whole in
+  `regions`. A cell whose id is `0` belongs to no region and acts alone. The default tooltip of
+  a region cell is `region id`, and a `masque"..."` template can use `region`. Default `nothing`.
 
 When a cell is at least one screen pixel, the manifest carries `values` (row-major). Below
 that it carries `sample`: one source value per screen pixel of the axis viewport, the cell
@@ -1028,12 +1036,49 @@ struct GridInteractable <: AbstractInteractable
     # Row-major like the shipped `values` (cell `(i, j)` at `(j-1)*ncols + i`); empty for none.
     payloads::Vector{Any}
     select::Symbol
+    # Each cell's region id, row-major like `payloads`; empty for a grid without regions.
+    regions::Vector{Int32}
 end
 # The 7-field form from before `payloads` existed: a grid with no payloads.
 GridInteractable(ax, xedges, yedges, values, id, tooltip, label) =
     GridInteractable(ax, xedges, yedges, values, id, tooltip, label, Any[])
 GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads) =
     GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads, :one)
+GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads, select) =
+    GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads, select, Int32[])
+# Each cell's region id, row-major; empty for `regions = nothing`.
+function _grid_regions(regions, ncols, nrows)
+    regions === nothing && return Int32[]
+    regions isa AbstractMatrix && size(regions) == (ncols, nrows) || throw(
+        ArgumentError(
+            "GridInteractable: `regions` must be an integer matrix the same shape as `values` " *
+                "$((ncols, nrows)), got $(regions isa AbstractArray ? "an array of size $(size(regions))" : typeof(regions))",
+        ),
+    )
+    eltype(regions) <: Integer || all(r -> r isa Integer, regions) ||
+        throw(ArgumentError("GridInteractable: `regions` must hold integer region ids, got eltype $(eltype(regions))"))
+    all(r -> 0 <= r <= typemax(Int32), regions) || throw(
+        ArgumentError("GridInteractable: `regions` ids must be 0 (no region) or positive, at most $(typemax(Int32))"),
+    )
+    out = Int32[regions[c, r] for r in 1:nrows for c in 1:ncols]
+    return out
+end
+# Region ids as runs over the row-major cells, flat pairs `[id, n, ...]`, so a label image ships
+# about one pair per boundary crossed along each row.
+function _region_runs(ids::Vector{Int32})
+    runs = Int[]
+    k = 1
+    while k <= length(ids)
+        id = ids[k]
+        n = 1
+        while k + n <= length(ids) && ids[k + n] == id
+            n += 1
+        end
+        push!(runs, id, n)
+        k += n
+    end
+    return runs
+end
 # One payload per cell, row-major. `payloads` is a `(ncols, nrows)` matrix or `(i, j) -> payload`.
 function _grid_payloads(payloads, ncols, nrows)
     payloads === nothing && return Any[]
@@ -1050,6 +1095,7 @@ function _grid_payloads(payloads, ncols, nrows)
 end
 function GridInteractable(
         ax, xedges, yedges, values; id = :cells, payloads = nothing, tooltip = nothing, label = nothing, select = :one,
+        regions = nothing,
     )
     _check_tooltip(tooltip)
     _check_select(GridInteractable, select)
@@ -1070,7 +1116,7 @@ function GridInteractable(
     )
     return GridInteractable(
         ax, xe, ye, values, id, tooltip, label === nothing ? nothing : String(label),
-        _grid_payloads(payloads, expected...), select,
+        _grid_payloads(payloads, expected...), select, _grid_regions(regions, expected...),
     )
 end
 tooltip_spec(i::GridInteractable) = i.tooltip
@@ -1095,6 +1141,7 @@ function hitlayers(i::GridInteractable, ctx)
     geom = Dict{String, Any}(
         "xedges" => xedges, "yedges" => yedges, "ncols" => ncols, "nrows" => nrows
     )
+    isempty(i.regions) || (geom["regions"] = _region_runs(i.regions))
     cell_px = min(
         abs(xedges[end] - xedges[1]) / ncols,
         abs(yedges[end] - yedges[1]) / nrows,
@@ -1912,6 +1959,56 @@ function _axis_fill(ax)
     mix(f, b) = a * f + (1 - a) * b
     return Makie.RGBAf(mix(fg.r, bg.r), mix(fg.g, bg.g), mix(fg.b, bg.b), 1)
 end
+# The photographic preview (#85) slides a copy of the data inside the axis box. Makie strokes
+# each spine centred on the box edge, so half the stroke, plus a pixel when the edge rounds onto
+# a device pixel, lies inside the viewport. The preview crops the copy to the clip rect and shows
+# it through a window of the same rect, so neither a spine nor the ticks, labels, or title
+# outside the box slide in with the data (#171). The window is painted with the empty plot's
+# colour, so the strip the copy leaves behind reads as blank plot, not as the unmoved picture
+# underneath. The hit region stays the whole viewport.
+function _pan_window(ctx, ax)
+    vx, vy, vw, vh = ctx.transforms[axis_id(ctx, ax)].viewport
+    ins = ceil(Float64(ax.spinewidth[]) * ctx.scaling / 2) + 1
+    clip = Float32[vx + ins, vy + ins, max(vw - 2ins, 0), max(vh - 2ins, 0)]
+    return clip, _css_color(_axis_fill(ax))
+end
+
+# Axes tied to a pan axis by `linkaxes!`, `linkxaxes!` or `linkyaxes!` move with its pan
+# (#363), so the preview slides their data too. `axis` names the linked axis's transform, and
+# `clip` and `fill` are its window. Per shared dimension, `x` or `y` is `[p, q, r]`: the image
+# px of one data value on the pan axis (`p`) and on the linked axis (`q`), and the ratio of the
+# linked axis's px per data unit to the pan axis's (`r`, negative when one of them is
+# reversed). A dimension the two draw on different scales doesn't map linearly; it is left
+# out, and that part of the panel waits for the frame.
+function _pan_links(ctx, ax)
+    xlinks, ylinks = _axis_links(ax)
+    out = Dict{String, Any}[]
+    fl = _finallimits(ax)
+    lo = Float64.(Tuple(fl.origin)); hi = lo .+ Float64.(Tuple(fl.widths))
+    c = (lo .+ hi) ./ 2
+    for link in union(xlinks, ylinks)
+        link isa Makie.Axis && haskey(ctx.ids, link) || continue
+        lfl = _finallimits(link)
+        lc = Float64.(Tuple(lfl.origin)) .+ Float64.(Tuple(lfl.widths)) ./ 2
+        entry = Dict{String, Any}()
+        for (d, links, scale) in ((1, xlinks, :xscale), (2, ylinks, :yscale))
+            any(l -> l === link, links) || continue
+            getproperty(ax, scale)[] === getproperty(link, scale)[] || continue
+            at(a, p, v) = data_to_image_px(ctx, a, d == 1 ? (v, p[2]) : (p[1], v))[d]
+            p0 = at(ax, c, lo[d]); p1 = at(ax, c, hi[d])
+            q0 = at(link, lc, lo[d]); q1 = at(link, lc, hi[d])
+            r = (q1 - q0) / (p1 - p0)
+            all(isfinite, (p0, q0, r)) || continue
+            entry[d == 1 ? "x" : "y"] = Float32[p0, q0, r]
+        end
+        isempty(entry) && continue
+        entry["axis"] = String(axis_id(ctx, link))
+        entry["clip"], entry["fill"] = _pan_window(ctx, link)
+        push!(out, entry)
+    end
+    return out
+end
+
 function hitlayers(i::ViewInteractable, ctx)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     vx, vy, vw, vh = t.viewport
@@ -1921,17 +2018,9 @@ function hitlayers(i::ViewInteractable, ctx)
         "mode" => t.is3d ? "orbit" : "pan",
     )
     if !t.is3d && i.ax isa Makie.Axis
-        # The photographic preview (#85) slides a copy of the data inside the axis box. Makie
-        # strokes each spine centred on the box edge, so half the stroke, plus a pixel when the
-        # edge rounds onto a device pixel, lies inside the viewport. The preview crops the copy
-        # to `clip` and shows it through a window of the same rect, so neither a spine nor the
-        # ticks, labels, or title outside the box slide in with the data (#171). The hit region
-        # stays `x, y, w, h`.
-        ins = ceil(Float64(i.ax.spinewidth[]) * ctx.scaling / 2) + 1
-        geom["clip"] = Float32[vx + ins, vy + ins, max(vw - 2ins, 0), max(vh - 2ins, 0)]
-        # The window is painted with the empty plot's colour, so the strip the copy leaves
-        # behind reads as blank plot, not as the unmoved picture underneath.
-        geom["fill"] = _css_color(_axis_fill(i.ax))
+        geom["clip"], geom["fill"] = _pan_window(ctx, i.ax)
+        links = _pan_links(ctx, i.ax)
+        isempty(links) || (geom["links"] = links)
     end
     if t.is3d
         # Current camera — JS computes the drag's (azimuth, elevation) from the pixel delta, for

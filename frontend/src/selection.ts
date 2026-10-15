@@ -3,6 +3,7 @@ import { surfacePointHit } from "./surface"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Manifest, SurfaceGeometry } from "./types"
 import type { FieldPick } from "./state"
 import { decodeMask, maskHit } from "./gridmask"
+import { withRegion } from "./regions"
 import type { GridMask } from "./gridmask"
 
 // Bond item shape emitted per contained element in a selects-ROI { items: SelectionItem[] }.
@@ -98,8 +99,9 @@ function gridCellHit(layer: HitLayer, index: number): Hit | null {
     const i = index % gg.ncols, j = Math.floor(index / gg.ncols)
     const x0 = gg.xedges[i], x1 = gg.xedges[i + 1], y0 = gg.yedges[j], y1 = gg.yedges[j + 1]
     const min = gg.sample ? gg.sample_px ?? 0 : 0
-    return { layer, index, grid_: [i, j, gg.values?.[index]],
-        geom_: ["rect", (x0 + x1) / 2, (y0 + y1) / 2, Math.max(Math.abs(x1 - x0), min), Math.max(Math.abs(y1 - y0), min)] }
+    // A cell in a region is drawn as the whole region, as hover draws it.
+    return withRegion(layer, { layer, index, grid_: [i, j, gg.values?.[index]],
+        geom_: ["rect", (x0 + x1) / 2, (y0 + y1) / 2, Math.max(Math.abs(x1 - x0), min), Math.max(Math.abs(y1 - y0), min)] })
 }
 
 // A selected surface point, re-keyed onto a new frame's layer. An in-drag frame ships no

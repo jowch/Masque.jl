@@ -711,7 +711,13 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             ? { azimuth: geom?.azimuth ?? NaN, elevation: geom?.elevation ?? NaN, ...(geom?.limits ? { limits: Array.from(geom.limits) } : {}) }
             : (() => {
                 const t = viewLayer ? newManifest.transforms[viewLayer.axis] : undefined
-                return { xmin: t?.xlims[0] ?? NaN, xmax: t?.xlims[1] ?? NaN, ymin: t?.ylims[0] ?? NaN, ymax: t?.ylims[1] ?? NaN }
+                const cam: Record<string, number | number[]> = { xmin: t?.xlims[0] ?? NaN, xmax: t?.xlims[1] ?? NaN, ymin: t?.ylims[0] ?? NaN, ymax: t?.ylims[1] ?? NaN }
+                // Each linked axis's limits (#363), keyed `linked:<axis id>`, so a driver can see it moved too.
+                for (const l of geom?.links ?? []) {
+                    const lt = newManifest.transforms[l.axis]
+                    if (lt) cam[`linked:${l.axis}`] = [lt.xlims[0], lt.xlims[1], lt.ylims[0], lt.ylims[1]]
+                }
+                return cam
             })()
         gestureFrameCount += 1
         ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueGestureFrame = JSON.stringify({
@@ -762,9 +768,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // The axis frame (spines, ticks, labels) stays on the untransformed base. A copy of the
     // same pixels, clipped to the pan view's viewport, carries the matrix, so only the data
     // inside the axes slides.
-    let dataClip: HTMLDivElement | null = null
-    let dataCopy: HTMLImageElement | HTMLCanvasElement | null = null
-    let copyGen = -1
+    // One window per axis whose data slides: the pan view's, then each axis linked to it (#363).
+    interface DataWindow { clip: HTMLDivElement; copy: HTMLImageElement | HTMLCanvasElement; gen: number }
+    let windows: DataWindow[] = []
     const clipIds = ["masque-clip-fill", "masque-clip-edge", "masque-clip-plain"]
     const photoViewport = (): ViewGeometry | null => {
         const id = state.photoViewId_
@@ -775,12 +781,38 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (!(g.w > 0) || !(g.h > 0)) return null
         return g
     }
+    const dropWindows = (keep: number) => {
+        for (const w of windows.slice(keep)) w.clip.remove()
+        windows = windows.slice(0, keep)
+    }
     const clearDataClip = () => {
-        dataClip?.remove()
-        dataClip = null
-        dataCopy = null
-        copyGen = -1
+        dropWindows(0)
         for (const g of clipGroups) g.removeAttribute("clip-path")
+    }
+    const makeWindow = (cls: string): DataWindow => {
+        const clip = document.createElement("div")
+        clip.className = cls
+        clip.style.position = "absolute"
+        clip.style.overflow = "hidden"
+        clip.style.pointerEvents = "none"
+        const copy = ctx.base_ instanceof HTMLCanvasElement
+            ? document.createElement("canvas")
+            : document.createElement("img")
+        if (copy instanceof HTMLImageElement) copy.alt = ""
+        copy.style.position = "absolute"
+        copy.style.transformOrigin = "0 0"
+        copy.style.maxWidth = "none"
+        clip.appendChild(copy)
+        host.insertBefore(clip, shadowHost)
+        return { clip, copy, gen: -1 }
+    }
+    // A linked axis shares one dimension or both with the pan axis, so a data value the matrix
+    // moves from p to s*p + t on the pan axis moves from q to s*q + t' on the linked one, with
+    // t' = q0*(1 - s) + r*(t + p0*(s - 1)). A dimension it doesn't share stays put.
+    const linkedMove = (m: PhotoMatrix, d: [number, number, number] | undefined, t: number): [number, number] => {
+        if (!d) return [1, 0]
+        const [p0, q0, r] = d
+        return [m.s, q0 * (1 - m.s) + r * (t + p0 * (m.s - 1))]
     }
     paintPhoto = (m) => {
         paintMatrix(m)
@@ -806,57 +838,60 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             if (id || !view) g.removeAttribute("transform")
             else g.setAttribute("transform", svgT)
         }
-        if (!view) {
-            clearDataClip()
-        } else {
-            if (!dataClip || !dataCopy) {
-                dataClip = document.createElement("div")
-                dataClip.className = "masque-data-clip"
-                dataClip.style.position = "absolute"
-                dataClip.style.overflow = "hidden"
-                dataClip.style.pointerEvents = "none"
-                dataCopy = ctx.base_ instanceof HTMLCanvasElement
-                    ? document.createElement("canvas")
-                    : document.createElement("img")
-                if (dataCopy instanceof HTMLImageElement) dataCopy.alt = ""
-                dataCopy.style.position = "absolute"
-                dataCopy.style.transformOrigin = "0 0"
-                dataCopy.style.maxWidth = "none"
-                dataClip.appendChild(dataCopy)
-                host.insertBefore(dataClip, shadowHost)
-                copyGen = -1
-            }
-            // Only data pixels slide (#171). The copy is cropped to the clip rect, inside the
-            // spine stroke, and the crop moves with it, so the chrome outside the axis box never
-            // enters the window. The window, the same rect, is painted with the empty plot's
-            // colour, so the strip the copy leaves shows no stale picture from underneath.
-            const [cx, cy, cw, ch] = view.clip ?? [view.x, view.y, view.w, view.h]
-            dataClip.style.left = `${br.left - hr.left + cx * sx}px`
-            dataClip.style.top = `${br.top - hr.top + cy * sy}px`
-            dataClip.style.width = `${cw * sx}px`
-            dataClip.style.height = `${ch * sy}px`
-            dataClip.style.background = view.fill ?? ""
-            dataCopy.style.left = `${-cx * sx}px`
-            dataCopy.style.top = `${-cy * sy}px`
-            dataCopy.style.width = `${ow}px`
-            dataCopy.style.height = `${oh}px`
-            dataCopy.style.setProperty(
+        // Only data pixels slide (#171). Each copy is cropped to its clip rect, inside the spine
+        // stroke, and the crop moves with it, so the chrome outside the axis box never enters
+        // the window. The window, the same rect, is painted with the empty plot's colour, so
+        // the strip the copy leaves shows no stale picture from underneath.
+        const paintWindow = (
+            win: DataWindow, rect: [number, number, number, number], fill: string | undefined,
+            k: { sx: number; sy: number; tx: number; ty: number },
+        ) => {
+            const [cx, cy, cw, ch] = rect
+            win.clip.style.left = `${br.left - hr.left + cx * sx}px`
+            win.clip.style.top = `${br.top - hr.top + cy * sy}px`
+            win.clip.style.width = `${cw * sx}px`
+            win.clip.style.height = `${ch * sy}px`
+            win.clip.style.background = fill ?? ""
+            const copy = win.copy
+            copy.style.left = `${-cx * sx}px`
+            copy.style.top = `${-cy * sy}px`
+            copy.style.width = `${ow}px`
+            copy.style.height = `${oh}px`
+            copy.style.setProperty(
                 "clip-path",
                 `inset(${cy * sy}px ${ow - (cx + cw) * sx}px ${oh - (cy + ch) * sy}px ${cx * sx}px)`,
             )
-            dataCopy.style.transform = `translate(${m.tx * sx}px, ${m.ty * sy}px) scale(${m.s})`
-            if (dataCopy instanceof HTMLImageElement && ctx.base_ instanceof HTMLImageElement) {
-                if (dataCopy.src !== ctx.base_.src) dataCopy.src = ctx.base_.src
-            } else if (dataCopy instanceof HTMLCanvasElement && ctx.base_ instanceof HTMLCanvasElement && copyGen !== frameGen) {
+            copy.style.transform = k.sx === k.sy
+                ? `translate(${k.tx * sx}px, ${k.ty * sy}px) scale(${k.sx})`
+                : `translate(${k.tx * sx}px, ${k.ty * sy}px) scale(${k.sx}, ${k.sy})`
+            if (copy instanceof HTMLImageElement && ctx.base_ instanceof HTMLImageElement) {
+                if (copy.src !== ctx.base_.src) copy.src = ctx.base_.src
+            } else if (copy instanceof HTMLCanvasElement && ctx.base_ instanceof HTMLCanvasElement && win.gen !== frameGen) {
                 const bw = ctx.base_.width
                 const bh = ctx.base_.height
                 if (bw > 0 && bh > 0) {
-                    dataCopy.width = bw
-                    dataCopy.height = bh
-                    dataCopy.getContext("2d")?.drawImage(ctx.base_, 0, 0)
-                    copyGen = frameGen
+                    copy.width = bw
+                    copy.height = bh
+                    copy.getContext("2d")?.drawImage(ctx.base_, 0, 0)
+                    win.gen = frameGen
                 }
             }
+        }
+        if (!view) {
+            clearDataClip()
+        } else {
+            const links = view.links ?? []
+            dropWindows(1 + links.length)
+            while (windows.length < 1 + links.length) {
+                windows.push(makeWindow(windows.length === 0 ? "masque-data-clip" : "masque-data-clip masque-link-clip"))
+            }
+            const [cx, cy, cw, ch] = view.clip ?? [view.x, view.y, view.w, view.h]
+            paintWindow(windows[0], [cx, cy, cw, ch], view.fill, { sx: m.s, sy: m.s, tx: m.tx, ty: m.ty })
+            links.forEach((link, i) => {
+                const [lsx, ltx] = linkedMove(m, link.x, m.tx)
+                const [lsy, lty] = linkedMove(m, link.y, m.ty)
+                paintWindow(windows[i + 1], link.clip, link.fill, { sx: lsx, sy: lsy, tx: ltx, ty: lty })
+            })
             clipGroups.forEach((g, i) => {
                 const svg = g.ownerSVGElement
                 if (!svg) return

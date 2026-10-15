@@ -30,6 +30,9 @@ export interface GridGeometry {
     sample_origin?: [number, number] // image px, top-left of sample (0, 0)
     sample_span?: [number, number]   // image px width, height of the sampled viewport
     sample_px?: number                // image px per sample; the last bin may be shorter
+    // Each cell's region id (`regions=`, #359) as runs over the row-major cells, flat pairs
+    // [id, n, ...]; 0 is a cell in no region. Absent on a grid without regions.
+    regions?: number[]
 }
 
 // A 3D surface's shipped points (a strided subset of the source grid on a dense surface).
@@ -78,6 +81,17 @@ export interface SliceGeometry {
     series: SliceSeries[]
 }
 
+// A linked axis, its preview window (`clip`, `fill`, as on ViewGeometry) and, per shared
+// dimension, `[p, q, r]`: one data value's image px on the pan axis (`p`) and on this axis
+// (`q`), and the ratio of this axis's px per data unit to the pan axis's (`r`).
+export interface ViewLink {
+    axis: string // the linked axis's transform id
+    clip: [number, number, number, number]
+    fill?: string
+    x?: [number, number, number]
+    y?: [number, number, number]
+}
+
 export interface ViewGeometry {
     x: number      // axis viewport bbox, image px
     y: number
@@ -89,6 +103,8 @@ export interface ViewGeometry {
     clip?: [number, number, number, number]
     // pan only: the empty plot's colour (CSS), painted behind the sliding copy (#171).
     fill?: string
+    // pan only: axes tied to this one by Makie's `linkaxes!` (#363), whose data slides too.
+    links?: ViewLink[]
     azimuth?: number    // radians; orbit only (current Axis3 camera)
     elevation?: number  // radians; orbit only
     // orbit only (#321): the Axis3 limits [xmin, xmax, ymin, ymax, zmin, zmax] this frame
@@ -215,6 +231,7 @@ export interface Hit {
     grid_?: [number, number, number?] // [i, j, value]; value absent only when neither values nor sample was sent. A :surface point: [source i, source j, z]
     pt_?: [number, number | string, number | string] // :lines readout: [0-based sample index, x, y] nearest the cursor
     sample_?: number // a picked point on a :lines layer: 0-based sample on line `index`, drawn as a ring
+    region_?: number // a grid cell's region id (regions.ts), when it is in one: the hit stands for the whole region
     axis_?: string // transform id, for continuous inversion
     roiPart_?: { corner?: number; edge?: "n" | "s" | "w" | "e"; move?: boolean } // which sub-part of an :roi a drag grabbed
 }
