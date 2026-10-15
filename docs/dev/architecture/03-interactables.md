@@ -59,7 +59,7 @@ data to resolve a hit to an element index and its payload.
 struct HitLayer
     id       :: Symbol            # stable key for this layer (links to events/style)
     kind     :: Symbol            # :circles | :polyline | :lines | :segments | :rects | :grid | :surface | :polygons | :axis
-                                  #   | :threshold | :roi | :view | :slice
+                                  #   | :threshold | :roi | :view | :slice | :control
     geometry :: Any               # compact, image-px; layout keyed by `kind` (see below)
     payloads :: Vector{Any}       # element index -> JSON-serializable payload (the linkage key)
     axis     :: Symbol            # which AxisTransform applies (for data-coord tooltips / inversion)
@@ -149,6 +149,7 @@ this table is `docs/src/support.md`.
 | `ViewInteractable` | `:view` | the Axis/Axis3 view itself — declared, never auto-extracted | none — commits nothing ([§12](12-gesture-channel.md) §12.3); in-drag frames stream over the gesture channel instead (`:cairo` PNG, `:webgl` serialized scene) |
 | `ThresholdInteractable` | `:threshold` | a draggable horizontal/vertical line on an Axis — declared | a `ThresholdEvent`: `value`, plus `category` on a categorical dimension (#192) |
 | `ROIInteractable` | `:roi` | a draggable box on an Axis — declared; an `AbstractSelector` | a `BoundsEvent` (`xmin`, `xmax`, `ymin`, `ymax`), or a `Vector{ElementEvent}` of enclosed elements (`GridWindowEvent` on a grid) when `selects=` is set ([§5](05-bond-value.md)) |
+| `BlockControl` | `:control` (not a hit target; the browser draws an HTML `<input>`/`<select>` over the box) | a named `Slider`, `IntervalSlider`, `Toggle`, `Checkbox` or `Menu` — built by `masque` from the block, never auto-extracted (an unnamed block in the figure warns and stays a picture) | the block's plain value. The wire carries a 0-based index, a pair of them, or a Bool; Julia maps it through the block's `range`/`options`. Bond stamp `"control"`, role `:control`. The block's own plots are hidden while the picture renders (`_with_blocks_hidden`), and under `onchange` the block takes the state's value before the author's function runs (`_sync_controls!`) |
 | `SliceInteractable` | `:slice` (not a hit target) | declared 1-D series on an Axis, or Lines, Stairs, Series, Band, Density — declared, never auto-extracted | none — hover samples client-side; the live tooltip is the probe coordinate plus one field per series id. Bond stamp `"none"` |
 
 Layer ids are the plot kind (`:scatter`, `:lines`, `:cells`, `:bars`, `:poly`, …, `:colorbar`,

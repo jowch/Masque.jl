@@ -162,6 +162,7 @@ function bond_stamp(i::AbstractInteractable, L::HitLayer)
     i isa ColorbarInteractable && return "colorbar"
     i isa ThresholdInteractable && return "threshold"
     i isa ROIInteractable && return "bounds"
+    i isa BlockControl && return "control"
     i isa Union{GridInteractable, SurfaceInteractable} && return "gridcell"
     i isa SliceInteractable && return "none"
     i isa FunctionInteractable && return kind_bond_stamp(L.kind)
@@ -200,6 +201,7 @@ function event_from_stamp(d::AbstractDict, index, js_payload)
     bond == "threshold" && return _threshold_event(id, js_payload)
     bond == "bounds" && return _bounds_event(id, js_payload)
     bond == "none" && throw(ArgumentError("bond: layer :$id commits nothing"))
+    bond == "control" && throw(ArgumentError("bond: control :$id needs its block to decode; pass the widget's owners"))
     throw(ArgumentError("bond: layer :$id has unknown bond stamp $(repr(bond))"))
 end
 

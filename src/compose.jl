@@ -270,6 +270,8 @@ function _flatten_args!(out, x)
         end
     elseif x isa Makie.AbstractPlot
         throw(ArgumentError("masque: pass `interactables(plot)` for a plot, not the plot itself"))
+    elseif x isa _CONTROL_BLOCKS
+        throw(_unnamed_block_error(x))
     else
         throw(ArgumentError("masque: expected interactables or vectors of them, got $(typeof(x))"))
     end
@@ -296,7 +298,7 @@ _claimed(id, taken) = any(t -> _head(t) === id, taken)
 # `test/compose_tests.jl` checks it against every constructor's default.
 const _BUILTIN_IDS = Set{Symbol}(
     [
-        :arrows2d, :arrows3d, :axis, :band, :bars, :boxplot, :cells, :colorbar, :contourf,
+        :arrows2d, :arrows3d, :axis, :band, :bars, :boxplot, :cells, :colorbar, :contourf, :control,
         :crossbar, :density, :errorbars, :hexbin, :hist, :hlines, :hspan, :legend, :lines,
         :meshscatter, :points, :poly, :polygons, :rangebars, :rects, :region, :roi, :scatter,
         :segments, :series, :slice, :spy, :stairs, :surface, :text, :threshold, :view, :violin, :vlines,

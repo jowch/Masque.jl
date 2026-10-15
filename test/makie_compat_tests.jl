@@ -186,4 +186,23 @@
         @test sum(agg) == 4   # one count per point
         @test Masque._datashader_aggregate(hm) === nothing   # not a datashader's image
     end
+
+    @testset "block accessors (#345)" begin
+        fb = Figure(; size = (300, 200))
+        sl = Slider(fb[1, 1]; range = 0:5, startvalue = 2)
+        isl = IntervalSlider(fb[2, 1]; range = 1:5, startvalues = (2, 4))
+        Masque._finalize!(fb)
+        @test Masque._block_bbox(sl) isa Makie.Rect2
+        @test Masque._block_scene(sl) isa Makie.Scene
+        @test !isempty(Masque._block_scene(sl).plots)
+        # Setting the index moves the value, which is what `_set_control!` relies on.
+        idx = Masque._slider_index(sl)
+        @test idx[] == 3
+        idx[] = 5
+        @test sl.value[] == 4
+        ids = Masque._interval_indices(isl)
+        @test ids[] == (2, 4)
+        ids[] = (1, 5)
+        @test isl.interval[] == (1, 5)
+    end
 end

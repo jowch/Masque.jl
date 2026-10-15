@@ -15,6 +15,13 @@ All notable changes to this project are documented here. The format is based on
   after every click and release, and while a threshold or box moves. `update_while_dragging =
   false` on a `ThresholdInteractable` or `ROIInteractable` waits for the release. A plot whose
   number of marks changes loses its picks. Works on both backends (#334).
+- Makie's `Slider`, `IntervalSlider`, `Toggle`, `Checkbox` and `Menu` work in the notebook:
+  name one in `masque` (`masque(fig, (freq = sl,))`) and the reader gets a real control where
+  the figure's layout put it. Its field holds the block's plain value: the slider's value,
+  `(lo, hi)`, `true`/`false`, or the menu's selection. With `onchange` the figure follows the
+  control as it moves (`update_while_dragging = false` waits for the release), and the block's
+  own value is set first, so `on(sl.value)` and `@lift` code keeps working. A block in the
+  figure that `masque` isn't given stays a picture, with a warning (#345).
 
 ## [0.3.0] - 2026-10-10
 

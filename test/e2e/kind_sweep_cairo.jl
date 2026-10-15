@@ -605,6 +605,17 @@ HTML(
         "<span id=\"axes_onchange\" style=\"display:none\">$(JSON3.write(sweep.onchange.manifest["transforms"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000160
+@bind ev_controls sweep.controls
+
+# ╔═╡ c1000000-0000-0000-0000-000000000161
+HTML(
+    "<span id=\"out_controls\">CONTROLS=$(sweep_field("controls", ev_controls))</span>" *
+        "<span id=\"bond_controls\" style=\"display:none\">$(repr(ev_controls))</span>" *
+        "<span id=\"coords_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["layers"]))</span>" *
+        "<span id=\"axes_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000129
 @bind ev_many sweep.many
 
@@ -803,6 +814,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000128
 # ╠═c1000000-0000-0000-0000-000000000150
 # ╠═c1000000-0000-0000-0000-000000000151
+# ╠═c1000000-0000-0000-0000-000000000160
+# ╠═c1000000-0000-0000-0000-000000000161
 # ╠═c1000000-0000-0000-0000-000000000129
 # ╠═c1000000-0000-0000-0000-000000000130
 # ╠═c1000000-0000-0000-0000-000000000131

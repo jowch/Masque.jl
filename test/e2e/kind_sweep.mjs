@@ -767,6 +767,130 @@ try {
       continue;
     }
 
+    // Makie blocks as controls (#345): each named block is a native HTML control over the box
+    // its layout cell gave it, and the picture under it is empty. The slider drives the red line
+    // through `onchange` (keyboard and pointer), the toggle hides it, and the interval slider,
+    // checkbox and menu each change their own field of the `@bind` value.
+    if (spec.mode === "controls") {
+      const t = JSON.parse(await textOf(`#axes_${key}`));
+      const ax = Object.values(t).find((tt) => tt.viewport && tt.ylims);
+      const [, vy, , vh] = ax.viewport;
+      const yPx = (v) => vy + vh * (1 - (v - ax.ylims[0]) / (ax.ylims[1] - ax.ylims[0]));
+      const ctl = (id, sel = "input") => page.locator(`[data-masque-control="${id}"] ${sel}`);
+      const geo = (id) => layers.find((l) => l.id === id).geometry;
+      // Screen px of an image-px box, and the image px of a screen row.
+      const screenOf = async () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        return { left: b.left, top: b.top, sc: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+      }, key);
+      const redRow = async () => {
+        const s0 = await screenOf();
+        const x = s0.left + (ax.viewport[0] + ax.viewport[2] * 0.5) * s0.sc;
+        const png = PNG.sync.read(await page.screenshot({ clip: { x: x - 1, y: s0.top + vy * s0.sc, width: 3, height: vh * s0.sc } }));
+        const rows = [];
+        for (let r = 0; r < png.height; r++) {
+          const o = (r * png.width + 1) * 4;
+          if (png.data[o] > 180 && png.data[o + 1] < 90 && png.data[o + 2] < 90) rows.push(r);
+        }
+        return rows.length ? vy + ((rows[0] + rows.at(-1)) / 2) * vh / png.height : null;
+      };
+      const expectLevel = async (level, what) => {
+        let got = null;
+        for (let i = 0; i < (backend === "webgl" ? 60 : 40); i++) {
+          got = await redRow();
+          if (level === null ? got === null : got !== null && Math.abs(got - yPx(level)) <= 6) return;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        throw new Error(`${key}/${what}: red line at image y ${got}, want ${level === null ? "none" : yPx(level).toFixed(1)}`);
+      };
+      const bondHas = async (re, before, what) => {
+        const v = before === null ? await textOf(`#bond_${key}`) : await waitChange(`#bond_${key}`, before, `${key}/${what}`);
+        if (!re.test(v)) throw new Error(`${key}/${what}: value ${JSON.stringify(v)} doesn't match ${re}`);
+        return v;
+      };
+
+      // Each control sits on its block's box.
+      const s0 = await screenOf();
+      for (const id of ["level", "show", "span", "fine", "pick"]) {
+        const g = geo(id);
+        if (layers.find((l) => l.id === id)?.kind !== "control") throw new Error(`${key}: no control layer ${id}`);
+        const bb = await page.locator(`[data-masque-control="${id}"]`).boundingBox();
+        const want = { x: s0.left + g.x * s0.sc, y: s0.top + g.y * s0.sc, w: g.w * s0.sc, h: g.h * s0.sc };
+        if (!bb || Math.abs(bb.x - want.x) > 2 || Math.abs(bb.y - want.y) > 2 || Math.abs(bb.width - want.w) > 2 || Math.abs(bb.height - want.h) > 2) {
+          throw new Error(`${key}/${id}: control box ${JSON.stringify(bb)}, want ${JSON.stringify(want)}`);
+        }
+      }
+      passed.push(`${key}/controls-on-blocks`);
+
+      // The picture under the controls is empty: with the HTML hidden, every pixel in each box
+      // is the figure's background.
+      await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        sr.querySelector(".masque-controls").style.visibility = "hidden";
+      }, key);
+      for (const id of ["level", "show", "span", "fine", "pick"]) {
+        const g = geo(id);
+        const png = PNG.sync.read(await page.screenshot({ clip: { x: s0.left + g.x * s0.sc + 1, y: s0.top + g.y * s0.sc + 1, width: Math.max(1, g.w * s0.sc - 2), height: Math.max(1, g.h * s0.sc - 2) } }));
+        let ink = 0;
+        for (let o = 0; o < png.data.length; o += 4) if (png.data[o] < 235 || png.data[o + 1] < 235 || png.data[o + 2] < 235) ink++;
+        if (ink > 0) throw new Error(`${key}/${id}: ${ink} drawn pixels in the block's box; Makie's own drawing should be hidden`);
+      }
+      await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        sr.querySelector(".masque-controls").style.visibility = "";
+      }, key);
+      passed.push(`${key}/block-drawing-hidden`);
+
+      let v = await bondHas(/level = 3, show = true, span = \(2, 4\), fine = false, pick = "a"/, null, "mount");
+      await expectLevel(spec.controlStart, "mount");
+      passed.push(`${key}/start-values`);
+
+      // Keyboard: two steps right on the focused slider.
+      await ctl("level").focus();
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("ArrowRight");
+      v = await bondHas(/level = 5,/, v, "keyboard");
+      await expectLevel(5, "keyboard");
+      passed.push(`${key}/slider-keyboard`);
+
+      // Pointer: drag the knob to the right end. The line follows while the knob moves.
+      const sb = await ctl("level").boundingBox();
+      const knobX = sb.x + sb.width * 0.5, y = sb.y + sb.height / 2;
+      await page.mouse.move(knobX, y);
+      await page.mouse.down();
+      await page.mouse.move(sb.x + sb.width - 1, y, { steps: 8 });
+      await page.mouse.up();
+      v = await bondHas(/level = 10,/, v, "drag");
+      await expectLevel(10, "drag");
+      passed.push(`${key}/slider-drag`);
+
+      // The toggle hides the line.
+      await ctl("show").click();
+      v = await bondHas(/show = false,/, v, "toggle");
+      await expectLevel(null, "toggle");
+      passed.push(`${key}/toggle`);
+
+      // The interval slider's high knob, the checkbox and the menu change only their own field.
+      await ctl("span", "input >> nth=1").focus();
+      await page.keyboard.press("ArrowRight");
+      v = await bondHas(/span = \(2, 5\),/, v, "interval");
+      await ctl("fine").click();
+      v = await bondHas(/fine = true,/, v, "checkbox");
+      await ctl("pick", "select").selectOption("2");
+      v = await bondHas(/level = 10, show = false, span = \(2, 5\), fine = true, pick = "c"/, v, "menu");
+      passed.push(`${key}/interval-checkbox-menu`);
+      console.error(`OK  ${key} — ${v.slice(0, 120)}`);
+      continue;
+    }
+
     // `onchange` (#334): the red level line is redrawn at cutoff + picks on every click and
     // threshold drag, on both backends, without the cell running again. The line is found in
     // the picture's own pixels, so a frame that arrives with stale plot data (the WebGL
@@ -827,7 +951,7 @@ try {
       };
 
       const v0 = await textOf(`#bond_${key}`);
-      if (!/^ElementEvent\[\]$/.test(v0.trim())) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want ElementEvent[] (bind = :pts)`);
+      if (!/^(Masque\.)?ElementEvent\[\]$/.test(v0.trim())) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want ElementEvent[] (bind = :pts)`);
       await expectLevel(spec.controlStart, "mount");
       passed.push(`${key}/drawn-from-start-state`);
 
