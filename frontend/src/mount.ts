@@ -416,6 +416,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         live_: (id, env) => {
             if (ctx.manifest_.onchange === true) ctx.gesture_.request({ onchange: true, state: { ...ctx.value_(), [id]: env }, settle: false })
         },
+        adopt_: (id, env) => ctx.commit_({ [id]: env }, true),
         digits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS,
     })
     host.appendChild(shadowHost)
@@ -719,7 +720,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             replaceDraggedChrome(newManifest)
         }
         ctx.manifest_ = newManifest
-        controls.update_(newManifest)
+        controls.update_(newManifest, onchangeFrame && input.state && typeof input.state === "object" ? input.state as Record<string, unknown> : null)
         // Drop a cross that described the previous frame. The hair stays on the plain svg;
         // the dots stay in the photo group, above the chrome just rebuilt there.
         hideCross(ctx, state)

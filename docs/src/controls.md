@@ -54,9 +54,7 @@ above, or in `bind`: `masque(fig; bind = (freq = freq,))`. A block in the
 figure that `masque` isn't given stays a picture that does nothing, and
 `masque` warns about it.
 
-Buttons, text boxes and `SliderGrid` are pictures for now. To use the
-sliders of a `SliderGrid`, pass them one by one:
-`masque(fig, (a = sg.sliders[1], b = sg.sliders[2]))`.
+Buttons, text boxes and `SliderGrid` are pictures for now.
 
 With WGLMakie loaded, `Slider` also names a slider from Bonito, so Julia
 asks which one you mean; write `Makie.Slider` instead.

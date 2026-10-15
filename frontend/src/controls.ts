@@ -14,19 +14,24 @@ export interface ControlHooks {
     commit_: (id: string, env: ControlEnvelope) => void
     // A slider moving under `onchange` (not `settleOnly`): redraw without committing.
     live_: (id: string, env: ControlEnvelope) => void
+    // A value `onchange` gave the block itself: the field takes it without another round trip.
+    adopt_: (id: string, env: ControlEnvelope) => void
     digits_: number
 }
 
 interface ControlEl {
     layer_: HitLayer
+    shape_: string
     box_: HTMLElement
     get_: () => unknown
     set_: (payload: unknown) => void
 }
 
 export interface Controls {
-    // A new frame's manifest: boxes move with the layout; values stay as the reader set them.
-    update_: (m: Manifest) => void
+    // A new frame's manifest: boxes move with the layout. For an `onchange` frame, `sent` is the
+    // state the request carried: a control whose options or range changed is built again, and
+    // one whose value differs from what was sent (the author's function set it) takes it.
+    update_: (m: Manifest, sent: Record<string, unknown> | null) => void
     // A value written from outside (Pluto restoring the bond on reload).
     set_: (id: string, env: unknown) => void
     remove_: () => void
@@ -45,6 +50,11 @@ export const CONTROLS_STYLE = `
 .masque-range { -webkit-appearance: none; appearance: none; position: absolute; inset: 0; width: 100%; height: 100%;
   margin: 0; opacity: 0; cursor: pointer; background: transparent; }
 .masque-range.v { writing-mode: vertical-lr; direction: rtl; }
+/* Two knobs: each input takes the pointer only on its own thumb, so either knob can be dragged;
+   a press on the bar moves the nearer knob (controls.ts). */
+.masque-interval .masque-range { pointer-events: none; }
+.masque-interval .masque-range::-webkit-slider-thumb { pointer-events: auto; }
+.masque-interval .masque-range::-moz-range-thumb { pointer-events: auto; }
 .masque-range::-webkit-slider-thumb { -webkit-appearance: none; width: 100cqmin; height: 100cqmin; }
 .masque-range::-moz-range-thumb { width: 100cqmin; height: 100cqmin; border: none; }
 .masque-range:focus-visible { outline: none; }
@@ -136,6 +146,22 @@ function fillTrack(t: HTMLElement, g: ControlGeometry, lo: number, hi: number, k
     t.querySelectorAll<HTMLElement>(".masque-knob").forEach((el, i) => el.style.setProperty("--k", String(knobs[i] / last)))
 }
 
+// What a control is built from, apart from its box and value: when this changes, it is built again.
+function shape(g: ControlGeometry): string {
+    return JSON.stringify([g.control, g.n, g.horizontal, g.range, g.labels, g.settleOnly])
+}
+
+// The knob index under a pointer at (x, y) on a slider's box.
+function indexAt(box: HTMLElement, g: ControlGeometry, x: number, y: number): number {
+    const r = box.getBoundingClientRect()
+    const vertical = g.horizontal === false
+    const knob = Math.min(r.width, r.height)
+    const span = (vertical ? r.height : r.width) - knob
+    const along = vertical ? r.bottom - y - knob / 2 : x - r.left - knob / 2
+    const last = Math.max(0, (g.n ?? 1) - 1)
+    return span > 0 ? Math.max(0, Math.min(last, Math.round((along / span) * last))) : 0
+}
+
 function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | null {
     const g = layer.geometry as ControlGeometry
     const id = layer.id
@@ -167,7 +193,7 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             el.addEventListener("change", () => hooks.commit_(id, envelope(id, Number(el.value))))
             box.append(t, el)
             return {
-                layer_: layer, box_: box, get_: () => Number(el.value),
+                layer_: layer, shape_: shape(g), box_: box, get_: () => Number(el.value),
                 set_: (p) => { if (typeof p === "number") { el.value = String(p); show() } },
             }
         }
@@ -188,6 +214,17 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
                 hi.setAttribute("aria-valuetext", valueText(g, Number(hi.value), hooks.digits_))
             }
             show()
+            // A press on the bar, away from both thumbs, moves the nearer knob there.
+            box.addEventListener("pointerdown", (e) => {
+                if (e.target === lo || e.target === hi || e.button !== 0) return
+                const k = indexAt(box, g, e.clientX, e.clientY)
+                const a = Number(lo.value), b = Number(hi.value)
+                const el = Math.abs(k - a) < Math.abs(k - b) || (a === b && k < a) ? lo : hi
+                el.value = String(k)
+                el.focus()
+                show()
+                hooks.commit_(id, envelope(id, pair()))
+            })
             for (const el of [lo, hi]) {
                 el.addEventListener("input", () => {
                     show()
@@ -197,7 +234,7 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             }
             box.append(t, lo, hi)
             return {
-                layer_: layer, box_: box, get_: pair,
+                layer_: layer, shape_: shape(g), box_: box, get_: pair,
                 set_: (p) => {
                     if (!Array.isArray(p) || p.length !== 2) return
                     lo.value = String(p[0])
@@ -217,7 +254,7 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             el.addEventListener("change", () => hooks.commit_(id, envelope(id, el.checked)))
             box.append(el)
             return {
-                layer_: layer, box_: box, get_: () => el.checked,
+                layer_: layer, shape_: shape(g), box_: box, get_: () => el.checked,
                 set_: (p) => { if (typeof p === "boolean") el.checked = p },
             }
         }
@@ -244,7 +281,7 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             el.addEventListener("change", () => hooks.commit_(id, envelope(id, Number(el.value))))
             box.append(el)
             return {
-                layer_: layer, box_: box, get_: () => Number(el.value),
+                layer_: layer, shape_: shape(g), box_: box, get_: () => Number(el.value),
                 set_: (p) => { if (typeof p === "number") el.value = String(p) },
             }
         }
@@ -257,21 +294,56 @@ export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manife
     const layer = document.createElement("div")
     layer.className = "masque-controls"
     const els = new Map<string, ControlEl>()
+    // The control the reader is dragging: a frame leaves it alone until the release's frame.
+    let held: string | null = null
+    const release = () => { held = null }
+    const make = (l: HitLayer, m: Manifest): ControlEl | null => {
+        const c = build(l, m, hooks)
+        if (!c) return null
+        c.box_.addEventListener("pointerdown", () => { held = l.id }, { capture: true })
+        return c
+    }
+    window.addEventListener("pointerup", release, true)
+    window.addEventListener("pointercancel", release, true)
     for (const l of manifest.layers) {
         if (l.kind !== "control") continue
-        const c = build(l, manifest, hooks)
+        const c = make(l, manifest)
         if (!c) continue
         els.set(l.id, c)
         layer.append(c.box_)
     }
     if (els.size) parent.append(layer)
     return {
-        update_(m) {
+        update_(m, sent) {
             for (const l of m.layers) {
-                const c = l.kind === "control" ? els.get(l.id) : undefined
+                let c = l.kind === "control" ? els.get(l.id) : undefined
                 if (!c) continue
-                c.layer_ = l
-                place(c.box_, l.geometry as ControlGeometry, m)
+                const g = l.geometry as ControlGeometry
+                // The block can't change without the author's function, which runs only for an
+                // `onchange` frame; a control the reader is dragging stays as it is.
+                const was = sent?.[l.id]
+                const sentValue = was && typeof was === "object" && "payload" in was ? JSON.stringify((was as ControlEnvelope).payload) : undefined
+                if (sentValue === undefined || held === l.id) {
+                    c.layer_ = l
+                    place(c.box_, g, m)
+                    continue
+                }
+                if (shape(g) !== c.shape_) {
+                    const fresh = make(l, m)
+                    if (!fresh) continue
+                    c.box_.replaceWith(fresh.box_)
+                    els.set(l.id, fresh)
+                    c = fresh
+                } else {
+                    c.layer_ = l
+                    place(c.box_, g, m)
+                }
+                // The author moved the block: the control and the field follow. Otherwise the
+                // frame echoes what was sent, and the control keeps what the reader has now.
+                if (JSON.stringify(g.value) !== sentValue) {
+                    c.set_(g.value)
+                    hooks.adopt_(l.id, envelope(l.id, g.value))
+                }
             }
         },
         set_(id, env) {
@@ -279,6 +351,8 @@ export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manife
             if (c && env && typeof env === "object" && "payload" in env) c.set_((env as ControlEnvelope).payload)
         },
         remove_() {
+            window.removeEventListener("pointerup", release, true)
+            window.removeEventListener("pointercancel", release, true)
             layer.remove()
             els.clear()
         },

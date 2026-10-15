@@ -882,10 +882,30 @@ try {
       await ctl("span", "input >> nth=1").focus();
       await page.keyboard.press("ArrowRight");
       v = await bondHas(/span = \(2, 5\),/, v, "interval");
+      // Pointer: drag the low knob (index 1 of 0..4) to the bar's start. The high input sits
+      // over the whole box, so this proves each knob takes its own drag.
+      const ib = await ctl("span", "input >> nth=0").boundingBox();
+      const knob = Math.min(ib.width, ib.height), iy = ib.y + ib.height / 2;
+      const at = (k) => ib.x + knob / 2 + (k / 4) * (ib.width - knob);
+      await page.mouse.move(at(1), iy);
+      await page.mouse.down();
+      await page.mouse.move(ib.x + 1, iy, { steps: 6 });
+      await page.mouse.up();
+      v = await bondHas(/span = \(1, 5\),/, v, "interval-low-drag");
+      passed.push(`${key}/interval-low-knob-drag`);
+      // The checkbox swaps the menu's options in `onchange`: the menu follows, with nothing chosen.
       await ctl("fine").click();
-      v = await bondHas(/fine = true,/, v, "checkbox");
+      for (let i = 0; ; i++) {
+        v = await textOf(`#bond_${key}`);
+        if (/fine = true, pick = nothing/.test(v)) break;
+        if (i > 120) throw new Error(`${key}/checkbox: value ${JSON.stringify(v)}, want fine = true, pick = nothing`);
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      const opts = await page.locator(`[data-masque-control="pick"] option:not([disabled])`).allTextContents();
+      if (opts.join(",") !== "x,y,z") throw new Error(`${key}/menu-follows: options ${JSON.stringify(opts)}, want x,y,z`);
+      passed.push(`${key}/menu-follows-onchange`);
       await ctl("pick", "select").selectOption("2");
-      v = await bondHas(/level = 10, show = false, span = \(2, 5\), fine = true, pick = "c"/, v, "menu");
+      v = await bondHas(/level = 10, show = false, span = \(1, 5\), fine = true, pick = "z"/, v, "menu");
       passed.push(`${key}/interval-checkbox-menu`);
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);
       continue;

@@ -150,6 +150,27 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test sl.value[] == 4.0
     end
 
+    @testset "onchange can change a block's options, and the manifest carries them" begin
+        fig = Figure()
+        src = Menu(fig[1, 1]; options = ["fruit", "veg"], default = "fruit")
+        item = Menu(fig[2, 1]; options = ["apple", "pear", "plum"], default = "apple")
+        choices = Dict("fruit" => ["apple", "pear", "plum"], "veg" => ["kale", "leek"])
+        w = masque(
+            fig, (src = src, item = item); onchange = st -> begin
+                opts = choices[st.src]
+                item.options[] == opts || (item.options[] = opts)
+            end
+        )
+        Masque._sync_view_warmup!(w.render_frame)
+        r = w.render_frame(Dict{String, Any}("onchange" => true, "settle" => true, "state" => Dict("src" => _env("src", 1), "item" => _env("item", 0))))
+        g = _layer(r["manifest"], "item")["geometry"]
+        @test g["labels"] == ["kale", "leek"] && g["n"] == 2
+        @test g["value"] == -1
+        r2 = w.render_frame(Dict{String, Any}("onchange" => true, "settle" => true, "state" => Dict("src" => _env("src", 1), "item" => _env("item", 1))))
+        @test _layer(r2["manifest"], "item")["geometry"]["value"] == 1
+        @test item.selection[] == "leek"
+    end
+
     @testset "update_while_dragging = false marks the slider settle-only" begin
         fig = Figure()
         sl = Slider(fig[1, 1]; range = 1:3, update_while_dragging = false)

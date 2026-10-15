@@ -1244,7 +1244,12 @@ function build_kind_sweep()
         pick = Menu(fig[4, 1:2]; options = ["a", "b", "c"], default = "a")
         masque(
             fig, (level = sl, show = tg, span = span, fine = fine, pick = pick);
-            onchange = st -> update!(level, [0.0, 10.0], fill(Float64(st.level), 2); visible = st.show),
+            onchange = st -> begin
+                update!(level, [0.0, 10.0], fill(Float64(st.level), 2); visible = st.show)
+                # A dependent menu: the checkbox swaps the menu's options.
+                opts = st.fine ? ["x", "y", "z"] : ["a", "b", "c"]
+                pick.options[] == opts || (pick.options[] = opts)
+            end,
         )
     end
 

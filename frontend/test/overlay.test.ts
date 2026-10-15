@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { CONTROLS_STYLE } from "../src/controls"
 import { afterEach, describe, it, expect, vi } from "vitest"
 import { mount as mountOverlay } from "../src/overlay"
 
@@ -20,7 +21,7 @@ import { mapPoint, unmapPoint } from "../src/photo"
 import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
 import { createOverlayState, MOTION_MS, type HiGroups } from "../src/state"
-import type { GridGeometry, Hit, HitLayer, Manifest } from "../src/types"
+import type { ControlGeometry, GridGeometry, Hit, HitLayer, Manifest } from "../src/types"
 
 // build a light-DOM host (img + script) like the Julia widget emits, with layout mocked
 function setup() {
@@ -6317,7 +6318,7 @@ describe("block controls (#345)", () => {
 
     it("a frame moves the boxes and keeps the values the reader set", async () => {
         const m = controlsManifest({ onchange: true })
-        const moved = controlsManifest({ onchange: true }, { x: 200 })
+        const moved = controlsManifest({ onchange: true }, { x: 200, value: 6 })
         const { host, img, script } = setup()
         const requestFrame = vi.fn(frame(moved))
         mount(script, m, undefined, requestFrame)
@@ -6328,6 +6329,64 @@ describe("block controls (#345)", () => {
         img.dispatchEvent(new Event("load"))
         expect(ctl(host, "deg").style.left).toBe(`${100 * 200 / 1200}%`)
         expect(range.value).toBe("6")
+    })
+
+    it("a press on an interval's bar moves the nearer knob; each knob takes its own drag", () => {
+        const m = controlsManifest()
+        const { host, script } = setup()
+        mount(script, m)
+        const box = ctl(host, "span")
+        // 6 indices over a 220 × 20 px box: the knob is 20 px, so index k sits at 10 + 40k.
+        box.getBoundingClientRect = () => ({ left: 0, top: 0, right: 220, bottom: 20, width: 220, height: 20, x: 0, y: 0, toJSON: () => ({}) })
+        box.dispatchEvent(new PointerEvent("pointerdown", { clientX: 10, clientY: 10, button: 0, bubbles: true }))
+        expect(val(host).span).toEqual({ layer: "span", index: 0, payload: [0, 4] })
+        box.dispatchEvent(new PointerEvent("pointerdown", { clientX: 210, clientY: 10, button: 0, bubbles: true }))
+        expect(val(host).span).toEqual({ layer: "span", index: 0, payload: [0, 5] })
+        // Only the thumbs take the pointer, so the low knob isn't under the high input.
+        expect(CONTROLS_STYLE).toMatch(/\.masque-interval \.masque-range \{ pointer-events: none; \}/)
+        expect(CONTROLS_STYLE).toMatch(/\.masque-interval \.masque-range::-webkit-slider-thumb \{ pointer-events: auto; \}/)
+    })
+
+    it("when onchange changes a menu's options, the menu is built again and the field takes the author's value", async () => {
+        const m = controlsManifest({ onchange: true })
+        const after = controlsManifest({ onchange: true })
+        after.layers = after.layers.map((l): HitLayer => l.id === "pick" ? { ...l, geometry: { ...(l.geometry as ControlGeometry), labels: ["kale", "leek"], value: -1 } }
+            : l.id === "show" ? { ...l, geometry: { ...(l.geometry as ControlGeometry), value: false } } : l)
+        const { host, img, script } = setup()
+        const requestFrame = vi.fn(frame(after))
+        mount(script, m, undefined, requestFrame)
+        const toggle = ctl(host, "show").querySelector("input") as HTMLInputElement
+        toggle.checked = false
+        toggle.dispatchEvent(new Event("change", { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        img.dispatchEvent(new Event("load"))
+        const select = ctl(host, "pick").querySelector("select") as HTMLSelectElement
+        expect([...select.options].filter((o) => !o.disabled).map((o) => o.textContent)).toEqual(["kale", "leek"])
+        expect(select.value).toBe("-1")
+        expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: -1 })
+        // The toggle the reader clicked keeps its value; the frame echoes it.
+        expect(val(host).show).toEqual({ layer: "show", index: 0, payload: false })
+    })
+
+    it("a late frame doesn't pull back a control the reader has moved since", async () => {
+        const m = controlsManifest({ onchange: true })
+        const { host, img, script } = setup()
+        let release!: () => void
+        const requestFrame = vi.fn(async () => {
+            await new Promise<void>((r) => { release = r })
+            return { png: new Uint8Array([1, 2, 3]), manifest: controlsManifest({ onchange: true }, { value: 4 }) }
+        })
+        mount(script, m, undefined, requestFrame)
+        const range = ctl(host, "deg").querySelector("input") as HTMLInputElement
+        range.value = "4"
+        range.dispatchEvent(new Event("input", { bubbles: true }))
+        await Promise.resolve()
+        range.value = "8"
+        range.dispatchEvent(new Event("input", { bubbles: true }))
+        release()
+        await new Promise((r) => setTimeout(r, 0))
+        img.dispatchEvent(new Event("load"))
+        expect(range.value).toBe("8")
     })
 
     it("cleanup takes the controls down", () => {
