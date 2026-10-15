@@ -22,8 +22,11 @@ end
     onchange = state -> begin
         picked = [e.index for e in state.pts]
         if length(picked) >= 2
-            a, b = [ones(length(picked)) xs[picked]] \ ys[picked]
-            update!(fitline, [1.0, 8.0], [a + b, a + 8b])
+            x, y = xs[picked], ys[picked]
+            # The straight line closest to the picked points
+            mx, my = sum(x) / length(x), sum(y) / length(y)
+            slope = sum((x .- mx) .* (y .- my)) / sum((x .- mx) .^ 2)
+            update!(fitline, [1.0, 8.0], my .+ slope .* ([1.0, 8.0] .- mx))
         end
     end,
 )
@@ -36,27 +39,28 @@ other cells.
 `state` has one field for each plot you can pick from and each control,
 with the same names and values as the `@bind` value. The function runs once
 when the cell runs, before the figure first shows, and then after every
-click and every release of a drag. While the reader drags a threshold line
-or a box, it runs as the control moves; to wait for the release instead,
-build the control with `update_while_dragging = false`.
+change the reader makes. While the reader
+drags a threshold line or a box, it runs as the control moves; to wait for
+the release instead, build the control with `update_while_dragging = false`.
 
 ## Change the plots you already have
 
 Create every plot `onchange` will change before you call `masque`, give it a
-name, and change it with Makie's `update!`:
+name, and change it with Makie's `update!`, or set one of its arguments:
 
 ```julia
 update!(fitline, newxs, newys)               # new data
+maskplot[1] = newmatrix                      # one argument
 update!(maskplot; visible = state.show)      # an attribute
 ```
 
 Adding a plot or deleting one inside `onchange` raises an error that names
 the plot. To show a plot only sometimes, create it at the start and switch
-its `visible` attribute.
+its `visible` attribute. A hidden plot shows no tooltip and takes no clicks.
 
 If a plot ends up with a different number of marks, for example a scatter
-that shows only the points above a threshold, the points picked on it are
-cleared, and the `@bind` value changes with them.
+that shows only the points above a threshold, or you hide it, the points
+picked on it are cleared, and the `@bind` value changes with them.
 
 ## Keep a field out of the value
 
@@ -80,7 +84,7 @@ end
 
 ```julia
 @bind mask masque(fig2, (cutoff = cutoff,); bind = :cutoff,
-    onchange = state -> update!(maskplot, img .> state.cutoff.value))
+    onchange = state -> (maskplot[1] = img .> state.cutoff.value))
 ```
 
 Drag the line on the histogram and the red mask follows it. `mask` is the

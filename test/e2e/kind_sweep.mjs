@@ -827,7 +827,7 @@ try {
       };
 
       const v0 = await textOf(`#bond_${key}`);
-      if (!/^ElementEvent\[\]$/.test(v0.trim())) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want ElementEvent[] (bind = :pts)`);
+      if (!/^(Masque\.)?ElementEvent\[\]$/.test(v0.trim())) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want ElementEvent[] (bind = :pts)`);
       await expectLevel(spec.controlStart, "mount");
       passed.push(`${key}/drawn-from-start-state`);
 

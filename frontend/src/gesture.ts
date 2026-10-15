@@ -14,13 +14,19 @@ export interface FrameResponse {
 
 export type RenderFrame = (input: Record<string, unknown>) => Promise<FrameResponse>
 
+// A settle's input, or a function that builds it when the round trip starts, so it carries
+// the state as it is then rather than when it was queued.
+export type SettleInput = Record<string, unknown> | (() => Record<string, unknown>)
+
 export interface GestureChannel {
     // Fire-and-coalesce: an in-drag position. Never awaited by the caller — a burst of these
     // collapses to the latest one still pending when the previous round trip resolves.
     request(input: Record<string, unknown>): void
     // The terminal request (drag release): supersedes anything still pending and is awaited,
-    // so a caller that wants to know "the last frame has landed" can `await` this.
-    settle(input: Record<string, unknown>): Promise<void>
+    // so a caller that wants to know "the last frame has landed" can `await` this. `slot`
+    // keeps different kinds of terminal frame apart: a view's settle and an `onchange` settle
+    // each replace only an older one of their own kind, and both run, in the order queued.
+    settle(input: SettleInput, slot?: string): Promise<void>
     // Stops delivering frames and drops anything queued — call from mount's own cleanup so a
     // response arriving after unmount never touches a dead DOM.
     dispose(): void
@@ -57,26 +63,30 @@ export function createGestureChannel(
     if (!render || uiDisabled()) return noopChannel
     let lock: Promise<void> = Promise.resolve()
     let latest: Record<string, unknown> | null = null // a newer position overwrites an older one still queued
-    // A queued terminal request. Kept in its OWN slot, never `latest` (round-1 review, finding
-    // #1): the caller's `settle()` isn't awaited (a `PointerEvent` handler can't block on one
-    // without going async itself), so nothing stops a second drag's `request()` from arriving
-    // before the round trip ahead of it in `lock` has even started — if that request shared
-    // `latest` with a still-unsent settle, it would silently overwrite it, and the widget would
-    // never see the settle:true frame that restores `px_per_unit` back from the in-drag `1`.
-    // Once this is set it can only be consumed by `runLatest` or cleared by `dispose`/a fresh
-    // `settle` — `request` below refuses to touch it at all.
-    let pendingSettle: Record<string, unknown> | null = null
+    // Queued terminal requests, one per slot ("view" unless the caller names another). Kept
+    // apart from `latest` (round-1 review, finding #1): the caller's `settle()` isn't awaited
+    // (a `PointerEvent` handler can't block on one without going async itself), so nothing
+    // stops a second drag's `request()` from arriving before the round trip ahead of it in
+    // `lock` has even started — if that request shared `latest` with a still-unsent settle, it
+    // would silently overwrite it, and the widget would never see the settle:true frame that
+    // restores `px_per_unit` back from the in-drag `1`. A view settle and an `onchange` settle
+    // queued together are both sent, oldest slot first: either alone would leave the picture
+    // without the other's change. A slot is consumed by `runLatest` or cleared by `dispose`;
+    // `request` below refuses to touch any of them.
+    const pendingSettles = new Map<string, SettleInput>()
     let disposed = false
 
-    // Prefers `pendingSettle` over `latest` — a terminal request always wins over a stray
+    // Prefers a pending settle over `latest` — a terminal request always wins over a stray
     // in-drag position still sitting in the coalescing slot. Consumes whichever it picks AT THE
     // TIME THIS RUNS, which may already be newer than whatever scheduled this call, if further
     // positions arrived while this was waiting its turn in `lock`.
     const runLatest = (): Promise<void> => {
         let input: Record<string, unknown> | null
-        if (pendingSettle !== null) {
-            input = pendingSettle
-            pendingSettle = null
+        const first = pendingSettles.entries().next()
+        if (!first.done) {
+            const [slot, queued] = first.value
+            pendingSettles.delete(slot)
+            input = typeof queued === "function" ? queued() : queued
         } else {
             input = latest
             latest = null
@@ -95,8 +105,9 @@ export function createGestureChannel(
             onDead?.()
             return Promise.resolve()
         }
+        const sent = input
         return pending.then(
-            (r) => { if (!disposed) onFrame(input as Record<string, unknown>, r) },
+            (r) => { if (!disposed) onFrame(sent, r) },
             () => { disposed = true; onDead?.() }, // a rejected round trip degrades the same way a thrown one does
         )
     }
@@ -108,14 +119,14 @@ export function createGestureChannel(
             // that hasn't even been sent yet, so painting it first would show a preview the
             // about-to-land settle frame immediately supersedes anyway — the brief gap until the
             // settle round trip clears is the cost, paid instead of ever losing a terminal frame.
-            if (disposed || pendingSettle !== null) return
+            if (disposed || pendingSettles.size > 0) return
             latest = input
             lock = lock.then(runLatest)
         },
-        settle(input) {
+        settle(input, slot = "view") {
             if (disposed) return Promise.resolve()
             latest = null // a terminal request supersedes anything mid-drag still queued
-            pendingSettle = input
+            pendingSettles.set(slot, input)
             const done = lock.then(runLatest)
             lock = done
             return done
@@ -123,7 +134,7 @@ export function createGestureChannel(
         dispose() {
             disposed = true
             latest = null
-            pendingSettle = null
+            pendingSettles.clear()
         },
     }
 }

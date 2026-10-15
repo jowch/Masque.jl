@@ -507,6 +507,24 @@ The frame's manifest adds 1–3 KB packed. The heavy scene is not render-bound h
 the light one does and pays in payload instead. Transfer and three.js deserialize and paint are
 not timed; `test/e2e/kind_sweep.mjs` confirms a frame lands on both backends but does not time it.
 
+### `onchange` frames
+
+`bench/onchange_frames.jl`, 2026-10-15, at #366's round-1 fixes on `7b2f959`, Julia 1.13.1,
+the cloud box, p50 of 10 after one discarded frame. The figure is a 10k-point scatter with a
+line the function refits from a threshold; on `:webgl` two 300×300 heatmaps sit beside it.
+Since #334 an `onchange` widget's manifest carries `onchange` and a `bind` list, and its frames
+send the whole state. Julia side only, as above.
+
+| backend | `onchange` in-drag | `onchange` release | pan in-drag / release | manifest | picture |
+|---|---:|---:|---:|---:|---:|
+| cairo | 175 ms | 263 ms | 175 / 245 ms | 381 KB | PNG 91 KB → 219 KB |
+| webgl | 150 ms | 113 ms | 90 / 99 ms | 996 KB | scene 1480 KB packed |
+
+An `onchange` frame costs what a pan frame on the same figure costs, plus the function and a
+rebuild of the plan. Each frame sends the whole picture and manifest even when only the
+2-point line changed: on `:webgl` that is about 2.5 MB per click. That is the settled
+pipeline; sending only what changed is on the roadmap.
+
 ### View warmup
 
 `bench/view_warmup.jl`, 2026-09-22, Julia 1.10.12, `OPENBLAS_NUM_THREADS=1`, two fresh processes
