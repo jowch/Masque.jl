@@ -58,17 +58,25 @@ function _child_plots(p)
     return plots
 end
 
-# A Series' lines. Since Makie 0.24.16 a Series draws them through a `PlotList` child (the
-# spec API), so step into any `PlotList` to reach the plots it holds.
-_series_children(p) = reduce(
-    vcat, (c isa Makie.PlotList ? _series_children(c) : Any[c] for c in _child_plots(p)); init = Any[],
-)
+# A Series' lines, through `Makie.get_plots`, the mapping Makie's own legend uses. Since Makie
+# 0.24.16 a Series draws its lines through a `PlotList` child, and `get_plots` steps into it.
+function _series_children(p)
+    plots = try
+        Makie.get_plots(p)
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("get_plots", "`Makie.get_plots(::Series)` to return its lines")
+    end
+    plots isa AbstractVector || return _makie_compat_error("get_plots", "`Makie.get_plots(::Series)` to be a Vector")
+    return plots
+end
 
 # Each of a Series' lines' label, or `nothing`. Makie 0.24.16 builds the lines from the raw
 # `labels` attribute (`nothing` by default), so a line carries no label of its own; the
-# defaults (`series 1`, …) are in the Series' `series_labels`. A line's own label wins.
+# defaults (`series 1`, …) are in the Series' `series_labels`. A line's own label wins. The
+# fallback works around Makie passing `labels`, not `series_labels`, to the line specs in
+# `basic_recipes/series.jl`; drop it once Makie passes `series_labels`.
 function _series_labels(p, children)
-    text(l) = l isa AbstractString && !(l isa Makie.LaTeXString) && !isempty(l) ? String(l) : nothing
     fallback = try
         p.series_labels[]
     catch e
@@ -76,9 +84,9 @@ function _series_labels(p, children)
         nothing
     end
     return map(enumerate(children)) do (k, c)
-        own = hasproperty(c, :label) ? text(c.label[]) : nothing
+        own = _plot_label(c)
         own !== nothing && return own
-        fallback isa AbstractVector && k <= length(fallback) ? text(fallback[k]) : nothing
+        fallback isa AbstractVector && k <= length(fallback) ? _label_text(fallback[k]) : nothing
     end
 end
 

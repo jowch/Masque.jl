@@ -792,10 +792,9 @@ end
 # as markup.
 function _plot_label(p)
     hasproperty(p, :label) || return nothing
-    l = p.label[]
-    l isa AbstractString && !(l isa Makie.LaTeXString) && !isempty(l) || return nothing
-    return String(l)
+    return _label_text(p.label[])
 end
+_label_text(l) = l isa AbstractString && !(l isa Makie.LaTeXString) && !isempty(l) ? String(l) : nothing
 
 function _series_payloads(labels)
     return Any[
@@ -1629,7 +1628,11 @@ function _defaults(fig; replaced = Base.IdSet{Any}())
         c isa Makie.Legend || continue
         nl += 1
         id = nl == 1 ? :legend : Symbol(:legend_, nl)
-        push!(d.ints, _legend_interactable(c; id, plotmap = d.plotmap))
+        li = _legend_interactable(c; id, plotmap = d.plotmap)
+        # A legend Makie draws no entries in (a bare `series!` under Makie 0.24.16 labels its
+        # entries `nothing`) has nothing to hit. Its id stays taken, so later legends keep theirs.
+        isempty(li.targets) && continue
+        push!(d.ints, li)
     end
     return d
 end
@@ -1751,7 +1754,10 @@ function _slice_parts(p)
         children = _series_children(p)
         isempty(children) && error("SliceInteractable: Series has no child lines")
         series = NamedTuple[]
-        for (c, lab) in zip(children, _series_labels(p, children))
+        for (c, fallback) in zip(children, _series_labels(p, children))
+            # A line's own label as other slices read it (LaTeX kept), else the Series' default.
+            own = _slice_label(c)
+            lab = own === nothing ? fallback : own
             line = _series_line(c)
             xs, ys = _slice_xy(_conv(line)[1])
             push!(series, (; id = _slice_ident_id(lab), label = lab, color = _slice_color(line), x = xs, y = ys))
