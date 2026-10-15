@@ -20,8 +20,8 @@ end
 begin
     import Pkg
     Pkg.activate(; temp = true)
+    Pkg.add(["WGLMakie", "JSON3"])   # before the develop, so Parsers is not downgraded (JSON3 caps it at 2.x)
     Pkg.develop(path = joinpath(@__DIR__, "..", ".."))
-    Pkg.add(["WGLMakie", "JSON3"])
     Pkg.instantiate()
     using Masque
     using WGLMakie
