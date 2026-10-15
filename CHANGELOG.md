@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `linkcameras!(ax1, ax2, ...)` turns several `Axis3` panels together: orbiting one turns
+  the others to the same azimuth and elevation. With `limits = true`, zooming and panning
+  are shared too. Add a `ViewInteractable` to each panel you want to drag (#362).
+
 ## [0.3.0] - 2026-10-10
 
 ### Added

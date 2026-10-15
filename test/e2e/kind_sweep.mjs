@@ -1078,6 +1078,77 @@ try {
     }
     if (spec.mode === "owner") continue;
 
+    if (key === "view3d_linked") {
+      // `linkcameras!` (#362): orbiting the left panel turns the right one. The right panel's
+      // picture must change and its points must answer where they are drawn now, not where
+      // they were at mount.
+      const pts2 = layers.find((l) => l.id === "pts2");
+      if (!pts2) throw new Error(`${key}: no pts2 layer`);
+      const hostRect = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const vb = sr.querySelector("svg.masque-plain").viewBox.baseVal;
+        return { left: b.left, top: b.top, s: b.width / vb.width, w: vb.width, h: vb.height };
+      }, key);
+      const stamp = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        return host?.dataset.masqueGestureFrame ? JSON.parse(host.dataset.masqueGestureFrame) : null;
+      }, key);
+      // The right half of the image, where the follower is drawn.
+      const shotRight = async () => {
+        const r = await hostRect();
+        return page.screenshot({ clip: { x: r.left + (r.w / 2) * r.s, y: r.top, width: (r.w / 2) * r.s, height: r.h * r.s } });
+      };
+      const old = [0, 1].map((i) => hitPoint(pts2, i));
+      for (const p of old) {
+        const r = await dispatchAt(key, p.x, p.y, "pointermove");
+        if (!r.show) throw new Error(`${key}: the follower's point at ${JSON.stringify(p)} should hover before the orbit`);
+      }
+      await dispatchAt(key, 1, 1, "pointermove");
+      const shot0 = await shotRight();
+      const s0 = await stamp();
+      const g = layer.geometry;
+      const c = { x: g.x + g.w / 2, y: g.y + g.h / 2 };
+      await drag(key, c.x, c.y, c.x + 90, c.y + 20, false);
+      const tries = backend === "webgl" ? 50 : 25;
+      const delayMs = backend === "webgl" ? 300 : 200;
+      let st = null;
+      for (let i = 0; i < tries; i++) {
+        await new Promise((r) => setTimeout(r, delayMs));
+        st = await stamp();
+        if (st && st.n > (s0?.n ?? 0) && st.settle === true && Math.abs(st.azimuth - g.azimuth) > 0.05) break;
+        st = null;
+      }
+      if (!st) throw new Error(`${key}: no settled orbit frame landed (last ${JSON.stringify(await stamp())})`);
+      await dispatchAt(key, 1, 1, "pointermove");
+      await new Promise((r) => setTimeout(r, backend === "webgl" ? 600 : 100));
+      const shot1 = await shotRight();
+      if (Buffer.compare(shot0, shot1) === 0) throw new Error(`${key}: the follower panel's picture did not change after the orbit`);
+      passed.push(`${key}/follower-redrawn`);
+      // The corner point (index 1, at (4, 4, 4)) moves on screen when the camera turns; its old
+      // spot must go quiet, and a scan of the right panel must find it again somewhere else.
+      const moved = old[1];
+      const rOld = await dispatchAt(key, moved.x, moved.y, "pointermove");
+      const rect = await hostRect();
+      const hits = [];
+      for (let y = 4; y < rect.h; y += 6) {
+        for (let x = rect.w / 2 + 4; x < rect.w; x += 6) {
+          const r = await dispatchAt(key, x, y, "pointermove");
+          if (r.show && /\bx 4\b.*\by 4\b.*\bz 4\b/.test(r.text ?? "")) hits.push({ x, y, text: r.text });
+        }
+      }
+      const far = hits.filter((h) => Math.hypot(h.x - moved.x, h.y - moved.y) > moved.r + 6);
+      if (!far.length) throw new Error(`${key}: the follower's corner point answers nowhere new after the orbit (old spot show=${rOld.show}; ${hits.length} hits near the old spot)`);
+      passed.push(`${key}/follower-hits-moved`);
+      await dispatchAt(key, 1, 1, "pointermove");
+      console.error(`OK  ${key} — orbit az ${g.azimuth.toFixed(2)} -> ${st.azimuth.toFixed(2)}, follower redrawn, its point answers at ${JSON.stringify(far[0])}`);
+      continue;
+    }
+
     if (key === "view3d") {
       // Axis3 zoom and pan (#321). The wheel scales the limits about their center, so the
       // middle point stays put on screen and the corner leaves the limits: it is clipped from

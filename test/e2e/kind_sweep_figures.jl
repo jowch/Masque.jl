@@ -400,6 +400,13 @@ kind_sweep_meta() = [
         "inside" => 2, "outside" => 0,
     ),
     Dict(
+        # Two Axis3 panels turned together by `linkcameras!` (#362), with a view on the left
+        # one only. Orbiting it must turn the right panel's picture and move its hit areas.
+        "key" => "view3d_linked", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+    ),
+    Dict(
         "key" => "legend", "layerId" => "legend", "layerKind" => "rects",
         "selected" => nothing, "halo" => false, "selectedIndex" => 2, "clickIndex" => 2,
         "tip" => "pts", "mode" => "element",
@@ -1100,6 +1107,17 @@ function build_kind_sweep()
         masque(fig, interactables(sc; id = :pts), interactables(ln; id = :line), ViewInteractable(ax; id = :view))
     end
 
+    view3d_linked = let
+        pts = Makie.Point3f[(0, 0, 0), (4, 4, 4), (4, 0, 0)]
+        fig = Figure(size = (640, 320))
+        a1 = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5, title = "drag")
+        a2 = Axis3(fig[1, 2]; title = "follows")
+        s1 = scatter!(a1, pts; markersize = 14, color = :gray)
+        s2 = scatter!(a2, pts; markersize = 14, color = :seagreen)
+        linkcameras!(a1, a2)
+        masque(fig, interactables(s1; id = :pts), interactables(s2; id = :pts2), ViewInteractable(a1; id = :view))
+    end
+
     legend = let
         xs = collect(0.0:0.5:3.0)
         fig = Figure(size = (480, 320))
@@ -1282,7 +1300,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, view3d_linked, legend, series_legend,
         legend_overlap, legend_template, axis, composite, many, many_grid, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

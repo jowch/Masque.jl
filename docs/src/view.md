@@ -105,6 +105,36 @@ responding once its center leaves the box, even if part of it is still
 showing. From the keyboard, `+` / `-` zoom and Shift with an
 arrow key pans.
 
+## Turn several panels together
+
+To orbit several `Axis3` panels as one, link them with
+[`linkcameras!`](@ref) and add a view to the panel you want to drag.
+Turning that panel turns the others to the same azimuth and elevation:
+
+```julia
+begin
+    pts = Makie.Point3f[(1, 2, 3), (4, 5, 6), (7, 8, 2)]
+    fig = Figure(size = (720, 340))
+    a1 = Axis3(fig[1, 1]; title = "drag me")
+    a2 = Axis3(fig[1, 2]; title = "follows")
+    scatter!(a1, pts; color = :crimson, markersize = 16)
+    scatter!(a2, pts; color = :dodgerblue, markersize = 16)
+    linkcameras!(a1, a2)
+    orbit = ViewInteractable(a1)
+    nothing
+end
+```
+
+```julia
+@bind pick masque(fig, orbit)
+```
+
+Give each panel its own `ViewInteractable` to drag any of them. Zoom and
+pan stay separate unless you pass `limits = true`, which suits panels
+that show the same coordinates. Only panels in the same figure can be
+linked, so draw the panels you want to turn together in one figure
+rather than in separate cells.
+
 ## When the figure is rebuilt
 
 Dragging changes the axis itself: its limits, and its azimuth and

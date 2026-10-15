@@ -129,6 +129,92 @@ end
         @test_throws ArgumentError w.render_frame(Dict("id" => "view", "limits" => [1.0, 0.0, 0, 1, 0, 1]))
     end
 
+    @testset "linkcameras! turns the other panels with the dragged one (#362)" begin
+        fig = Figure(size = (700, 350))
+        a1 = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5)
+        a2 = Axis3(fig[1, 2]; azimuth = 1.5, elevation = 0.1)
+        a3 = Axis3(fig[1, 3])
+        pts = Makie.Point3f[(0, 0, 0), (1, 1, 1), (0.5, 0.5, 0.5)]
+        scatter!(a1, pts)
+        scatter!(a2, pts)
+        scatter!(a3, pts)
+        @test linkcameras!(a1, a2, a3) === nothing
+        # Linking gives every panel the first one's camera.
+        @test (a2.azimuth[], a2.elevation[]) == (a1.azimuth[], a1.elevation[])
+        @test (a3.azimuth[], a3.elevation[]) == (a1.azimuth[], a1.elevation[])
+
+        w = masque(
+            fig, [
+                ViewInteractable(a1; id = :v1),
+                PointInteractable(a1, pts; id = :p1),
+                PointInteractable(a2, pts; id = :p2),
+            ]; auto = false,
+        )
+        lay(m, id) = only(l for l in m["layers"] if l["id"] == id)
+        p2_before = lay(w.manifest, "p2")["geometry"]
+        m = w.render_frame(Dict("id" => "v1", "azimuth" => 1.1, "elevation" => 0.2, "settle" => true))["manifest"]
+        for ax in (a2, a3)
+            @test ax.azimuth[] ≈ 1.1 atol = 1.0e-9
+            @test ax.elevation[] ≈ 0.2 atol = 1.0e-9
+        end
+        # The follower's hit areas are re-projected onto its new view, in the same frame.
+        bk = Masque._resolve_backend(:cairo)
+        ctx = Masque.context(bk, fig, Masque._ppu(bk, fig, 700), 700)
+        p2 = lay(m, "p2")["geometry"]
+        q = data_to_image_px(ctx, a2, pts[2])
+        @test p2[4] ≈ q[1] atol = 0.5   # circles ship x, y, r per point
+        @test p2[5] ≈ q[2] atol = 0.5
+        @test p2 != p2_before
+
+        # Rotation only by default: a zoom on the dragged panel leaves the others' limits alone.
+        lim2 = a2.limits[]
+        w.render_frame(Dict("id" => "v1", "limits" => [0.4, 0.6, 0.4, 0.6, 0.4, 0.6], "settle" => true))
+        @test a2.limits[] == lim2
+        @test collect(maximum(a2.finallimits[])) != [0.6, 0.6, 0.6]
+
+        # Turning a follower turns the first panel too.
+        a3.azimuth[] = 2.0
+        @test a1.azimuth[] == 2.0 && a2.azimuth[] == 2.0
+    end
+
+    @testset "linkcameras!(...; limits = true) shares zoom and pan (#362)" begin
+        fig = Figure(size = (600, 350))
+        a1 = Axis3(fig[1, 1])
+        a2 = Axis3(fig[1, 2]; limits = (-5, 5, -5, 5, -5, 5))
+        pts = Makie.Point3f[(0, 0, 0), (1, 1, 1)]
+        scatter!(a1, pts)
+        scatter!(a2, pts)
+        linkcameras!([a1, a2]; limits = true)
+        @test a2.limits[] == a1.limits[]
+        w = masque(fig, [ViewInteractable(a1)]; auto = false)
+        zl = Float64[0.4, 0.6, 0.4, 0.6, 0.4, 0.6]
+        w.render_frame(Dict("id" => "view", "limits" => zl, "settle" => true))
+        @test collect(minimum(a2.finallimits[])) ≈ [0.4, 0.4, 0.4] atol = 1.0e-6
+        @test collect(maximum(a2.finallimits[])) ≈ [0.6, 0.6, 0.6] atol = 1.0e-6
+    end
+
+    @testset "linkcameras! groups can overlap, and 2D axes point to linkaxes! (#362)" begin
+        fig = Figure()
+        a1, a2, a3 = Axis3(fig[1, 1]), Axis3(fig[1, 2]), Axis3(fig[1, 3])
+        linkcameras!(a1, a2)
+        linkcameras!(a2, a3)
+        linkcameras!(a3, a1)
+        a1.elevation[] = 0.9
+        @test a2.elevation[] == 0.9 && a3.elevation[] == 0.9
+        a3.azimuth[] = -0.3
+        @test a1.azimuth[] == -0.3 && a2.azimuth[] == -0.3
+        @test linkcameras!(a1) === nothing
+
+        ax2d = Axis(fig[2, 1])
+        err = try
+            linkcameras!(a1, ax2d)
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("linkaxes!", err.msg)
+    end
+
     @testset "a line crossing the zoomed limits keeps its drawn part (#321)" begin
         box = ((0.4, 0.4, 0.4), (0.6, 0.6, 0.6))
         @test all(Masque._clip_segment(box, (0, 0, 0), (1, 1, 1)) .≈ (0.4, 0.6))
