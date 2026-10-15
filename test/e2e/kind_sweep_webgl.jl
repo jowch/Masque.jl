@@ -524,6 +524,16 @@ HTML(
         "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000142
+@bind ev_view_linked sweep.view_linked
+
+# ╔═╡ d1000000-0000-0000-0000-000000000143
+HTML(
+    "<span id=\"out_view_linked\">VIEW_LINKED=$(sweep_field("view_linked", ev_view_linked))</span>" *
+        "<span id=\"bond_view_linked\" style=\"display:none\">$(repr(ev_view_linked))</span>" *
+        "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000115
 @bind ev_view3d sweep.view3d
 
@@ -777,6 +787,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-0000000000c1
 # ╠═d1000000-0000-0000-0000-000000000034
 # ╠═d1000000-0000-0000-0000-000000000035
+# ╠═d1000000-0000-0000-0000-000000000142
+# ╠═d1000000-0000-0000-0000-000000000143
 # ╠═d1000000-0000-0000-0000-000000000115
 # ╠═d1000000-0000-0000-0000-000000000116
 # ╠═d1000000-0000-0000-0000-000000000038

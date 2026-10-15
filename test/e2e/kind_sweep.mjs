@@ -1215,6 +1215,20 @@ try {
       passed.push(`${key}/view-gesture-frame`);
       console.error(`OK  ${key}/drag — no commit (§12.3), gesture frame ${stampAfter}`);
 
+      // #363: an axis tied by `linkaxes!` lands at the pan's limits too (it used to snap back).
+      const links = layer.geometry?.links ?? [];
+      for (const l of links) {
+        const lim = cam[`linked:${l.axis}`];
+        const close = (a, b) => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b));
+        if (!Array.isArray(lim) || !close(lim[0], cam.xmin) || !close(lim[1], cam.xmax) || !close(lim[2], cam.ymin) || !close(lim[3], cam.ymax)) {
+          throw new Error(`${key}-drag: linked axis ${l.axis} did not follow the pan: ${stampAfter}`);
+        }
+      }
+      if (links.length) {
+        passed.push(`${key}/linked-pan`);
+        console.error(`OK  ${key}/linked — ${links.length} linked axis followed the pan`);
+      }
+
       if (layer.geometry && layer.geometry.mode === "pan") {
         const zoom = await page.evaluate(([k, ix, iy]) => {
           const span = document.querySelector(`#coords_${k}`);
@@ -1235,12 +1249,17 @@ try {
           return {
             photo: host.dataset.masquePhoto || "",
             clip: !!host.querySelector(".masque-data-clip"),
+            windows: host.querySelectorAll(".masque-data-clip").length,
             baseTransform: base?.style.transform || "",
             prevented: ev.defaultPrevented,
           };
         }, [key, p.x, p.y]);
         if (!zoom.prevented || !zoom.photo || !zoom.clip || zoom.baseTransform) {
           throw new Error(`${key}-wheel: photographic zoom did not engage (${JSON.stringify(zoom)})`);
+        }
+        // #363: each linked axis's data slides in a window of its own.
+        if (zoom.windows !== 1 + links.length) {
+          throw new Error(`${key}-wheel: expected ${1 + links.length} sliding windows, got ${zoom.windows}`);
         }
         let photo = zoom.photo;
         let zoomStamp = stampAfter;

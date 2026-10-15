@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Panning an axis tied to others with `linkaxes!`, `linkxaxes!`, or `linkyaxes!` moves them
+  all. Before, the pan did nothing. While you drag, the data in the linked axes slides along
+  with the axis you hold (#363).
+
 ## [0.3.0] - 2026-10-10
 
 ### Added

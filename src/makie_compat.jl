@@ -71,6 +71,20 @@ function _finallimits(ax)
     return fl
 end
 
+# Wraps `ax.xaxislinks` / `ax.yaxislinks`: the axes `linkxaxes!`, `linkyaxes!` and `linkaxes!`
+# tied to `ax`. Makie keeps each link group complete on every member; no public accessor exists.
+function _axis_links(ax)
+    links = try
+        (ax.xaxislinks, ax.yaxislinks)
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("xaxislinks", "an Axis to expose `.xaxislinks` and `.yaxislinks`")
+    end
+    all(l -> l isa AbstractVector, links) ||
+        return _makie_compat_error("xaxislinks", "`.xaxislinks` and `.yaxislinks` to be vectors of axes")
+    return links
+end
+
 # Wraps `scene.viewport[]`, the pixel rectangle a scene occupies; no public equivalent.
 function _scene_viewport(scene_or_ax)
     vp = try

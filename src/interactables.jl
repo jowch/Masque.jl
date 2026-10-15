@@ -1868,6 +1868,56 @@ function _axis_fill(ax)
     mix(f, b) = a * f + (1 - a) * b
     return Makie.RGBAf(mix(fg.r, bg.r), mix(fg.g, bg.g), mix(fg.b, bg.b), 1)
 end
+# The photographic preview (#85) slides a copy of the data inside the axis box. Makie strokes
+# each spine centred on the box edge, so half the stroke, plus a pixel when the edge rounds onto
+# a device pixel, lies inside the viewport. The preview crops the copy to the clip rect and shows
+# it through a window of the same rect, so neither a spine nor the ticks, labels, or title
+# outside the box slide in with the data (#171). The window is painted with the empty plot's
+# colour, so the strip the copy leaves behind reads as blank plot, not as the unmoved picture
+# underneath. The hit region stays the whole viewport.
+function _pan_window(ctx, ax)
+    vx, vy, vw, vh = ctx.transforms[axis_id(ctx, ax)].viewport
+    ins = ceil(Float64(ax.spinewidth[]) * ctx.scaling / 2) + 1
+    clip = Float32[vx + ins, vy + ins, max(vw - 2ins, 0), max(vh - 2ins, 0)]
+    return clip, _css_color(_axis_fill(ax))
+end
+
+# Axes tied to a pan axis by `linkaxes!`, `linkxaxes!` or `linkyaxes!` move with its pan
+# (#363), so the preview slides their data too. `axis` names the linked axis's transform, and
+# `clip` and `fill` are its window. Per shared dimension, `x` or `y` is `[p, q, r]`: the image
+# px of one data value on the pan axis (`p`) and on the linked axis (`q`), and the ratio of the
+# linked axis's px per data unit to the pan axis's (`r`, negative when one of them is
+# reversed). A dimension the two draw on different scales doesn't map linearly; it is left
+# out, and that part of the panel waits for the frame.
+function _pan_links(ctx, ax)
+    xlinks, ylinks = _axis_links(ax)
+    out = Dict{String, Any}[]
+    fl = _finallimits(ax)
+    lo = Float64.(Tuple(fl.origin)); hi = lo .+ Float64.(Tuple(fl.widths))
+    c = (lo .+ hi) ./ 2
+    for link in union(xlinks, ylinks)
+        link isa Makie.Axis && haskey(ctx.ids, link) || continue
+        lfl = _finallimits(link)
+        lc = Float64.(Tuple(lfl.origin)) .+ Float64.(Tuple(lfl.widths)) ./ 2
+        entry = Dict{String, Any}()
+        for (d, links, scale) in ((1, xlinks, :xscale), (2, ylinks, :yscale))
+            any(l -> l === link, links) || continue
+            getproperty(ax, scale)[] === getproperty(link, scale)[] || continue
+            at(a, p, v) = data_to_image_px(ctx, a, d == 1 ? (v, p[2]) : (p[1], v))[d]
+            p0 = at(ax, c, lo[d]); p1 = at(ax, c, hi[d])
+            q0 = at(link, lc, lo[d]); q1 = at(link, lc, hi[d])
+            r = (q1 - q0) / (p1 - p0)
+            all(isfinite, (p0, q0, r)) || continue
+            entry[d == 1 ? "x" : "y"] = Float32[p0, q0, r]
+        end
+        isempty(entry) && continue
+        entry["axis"] = String(axis_id(ctx, link))
+        entry["clip"], entry["fill"] = _pan_window(ctx, link)
+        push!(out, entry)
+    end
+    return out
+end
+
 function hitlayers(i::ViewInteractable, ctx)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     vx, vy, vw, vh = t.viewport
@@ -1877,17 +1927,9 @@ function hitlayers(i::ViewInteractable, ctx)
         "mode" => t.is3d ? "orbit" : "pan",
     )
     if !t.is3d && i.ax isa Makie.Axis
-        # The photographic preview (#85) slides a copy of the data inside the axis box. Makie
-        # strokes each spine centred on the box edge, so half the stroke, plus a pixel when the
-        # edge rounds onto a device pixel, lies inside the viewport. The preview crops the copy
-        # to `clip` and shows it through a window of the same rect, so neither a spine nor the
-        # ticks, labels, or title outside the box slide in with the data (#171). The hit region
-        # stays `x, y, w, h`.
-        ins = ceil(Float64(i.ax.spinewidth[]) * ctx.scaling / 2) + 1
-        geom["clip"] = Float32[vx + ins, vy + ins, max(vw - 2ins, 0), max(vh - 2ins, 0)]
-        # The window is painted with the empty plot's colour, so the strip the copy leaves
-        # behind reads as blank plot, not as the unmoved picture underneath.
-        geom["fill"] = _css_color(_axis_fill(i.ax))
+        geom["clip"], geom["fill"] = _pan_window(ctx, i.ax)
+        links = _pan_links(ctx, i.ax)
+        isempty(links) || (geom["links"] = links)
     end
     if t.is3d
         # Current camera — JS computes the drag's (azimuth, elevation) from the pixel delta, for
