@@ -210,8 +210,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/masque-dev"
           julia --project="$RUNNER_TEMP/masque-dev" -e '
             using Pkg
+            Pkg.add(["CairoMakie", "WGLMakie", "JSON3"])   # before the develop, so Parsers is not downgraded (JSON3 caps it at 2.x)
             Pkg.develop(path=pwd())
-            Pkg.add(["CairoMakie", "WGLMakie", "JSON3"])
             Pkg.instantiate()
           '
           echo "MASQUE_DEV_ENV=$RUNNER_TEMP/masque-dev" >> "$GITHUB_ENV"
