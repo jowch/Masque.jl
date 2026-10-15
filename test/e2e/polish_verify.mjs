@@ -794,7 +794,8 @@ try {
       sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", {
         bubbles: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, deltaY: dy,
       }));
-      await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+      // Read in the same turn as the wheel: the readout hides 150 ms after the last notch, and
+      // on a loaded software-GL page two animation frames can take longer than that.
       const t = sr.querySelector(".masque-tip");
       const cs = getComputedStyle(t);
       const during = { show: t.classList.contains("show"), text: t.innerText, bg: cs.backgroundColor, color: cs.color };
