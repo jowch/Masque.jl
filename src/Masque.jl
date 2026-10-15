@@ -73,7 +73,9 @@ function _overlay_cdn(dir, version, js)
 end
 
 # A package folder installed from a registry: under a depot's `packages/` and not a git
-# checkout. Its files are those of its release tag.
+# checkout. Its files are those of the registered tree, which for Masque is its release tag's
+# (see `_overlay_cdn`); a monorepo package such as WGLMakie can be registered from a commit
+# between tags.
 function _registered_tree(dir)
     isdir(joinpath(dir, ".git")) && return false
     return any(DEPOT_PATH) do depot

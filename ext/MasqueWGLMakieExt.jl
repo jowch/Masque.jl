@@ -319,10 +319,12 @@ _shim_text() = (isempty(_SHIM_TEXT[]) && (_SHIM_TEXT[] = read(SHIM_JS, String));
 
 # Outside Pluto (#300): the page draws the scene itself, with hover, highlights and tooltips
 # as in Pluto. Clicks highlight but nothing reads the bond, and no frame comes back for an
-# orbit or pan. WGLMakie's ~1 MB script is fetched once per page from the Makie release whose
-# tag is the installed Makie's version, from jsDelivr and then GitHub, and checked against the
-# installed copy's hash. A WGLMakie that isn't a registered install (`Pkg.develop`, Makie
-# master) may differ from every tag, so its script is inlined in each widget instead.
+# orbit or pan. WGLMakie's ~1 MB script is fetched once per page from the Makie monorepo tag of
+# the installed Makie's version, from jsDelivr and then GitHub, and checked against the
+# installed copy's hash. The registry can install a WGLMakie from a commit between Makie tags
+# (WGLMakie 0.13.16 is not the `v0.24.16` tree), so nothing promises the two files match; the
+# script rarely changes, so they usually do, and the hash catches the release where they don't.
+# A WGLMakie that isn't a registered install (`Pkg.develop`, Makie master) inlines its script.
 const _WGL_CDN = Ref{Any}(missing)
 function _wgl_cdn()
     _WGL_CDN[] === missing || return _WGL_CDN[]
@@ -335,26 +337,38 @@ function _wgl_cdn(dir, makie_version, js)
         "https://cdn.jsdelivr.net/gh/MakieOrg/" * replace(path, "/v" => "@v"; count = 1),
         "https://raw.githubusercontent.com/MakieOrg/" * path,
     ]
-    return (; urls, integrity = "sha384-" * Masque.base64encode(Masque.sha384(js)))
+    return (; urls, integrity = "sha384-" * Masque.base64encode(Masque.sha384(js)), makie = makie_version)
 end
+
+const _WGL_OFFLINE_NOTE = "This WebGL figure couldn't load WGLMakie's script. Outside Pluto it needs an internet connection."
+_wgl_mismatch_note(makie) = "This WebGL figure couldn't load WGLMakie's script: the copy published with Makie v$(makie) differs from the one installed here. Show it in Pluto, or use backend = :cairo."
 
 const _BONITO_PRELUDE = "const Bonito = globalThis.__MasqueWGL.bonito;\n"
 
 # Defines `wgl`, a promise of a blob URL for WGLMakie's script with the Bonito prelude. Widgets
-# on one page share one fetch through `__MasqueWGL.loads`, keyed by hash.
+# on one page share one fetch through `__MasqueWGL.loads`, keyed by hash. When no copy passes
+# the hash, one unchecked fetch tells a mismatch from being offline, so the note says which;
+# its text is never run.
 function _wgl_boot(cdn::NamedTuple)
     lit(x) = sprint(Masque._js_literal, x)
     return JavaScript(
         """
         const wglLoads = H.loads || (H.loads = {});
         const wgl = wglLoads[$(lit(cdn.integrity))] || (wglLoads[$(lit(cdn.integrity))] = (async () => {
-          for (const url of $(lit(cdn.urls))) {
+          const urls = $(lit(cdn.urls));
+          for (const url of urls) {
             try {
               const r = await fetch(url, { integrity: $(lit(cdn.integrity)) });
               if (r.ok) return blob($(lit(_BONITO_PRELUDE)) + await r.text());
             } catch (e) {}
           }
-          throw new Error("WGLMakie's script didn't load");
+          let online = false;
+          for (const url of urls) {
+            try { if ((await fetch(url)).ok) { online = true; break; } } catch (e) {}
+          }
+          throw Object.assign(new Error("WGLMakie's script didn't load"), {
+            masqueNote: online ? $(lit(_wgl_mismatch_note(cdn.makie))) : $(lit(_WGL_OFFLINE_NOTE)),
+          });
         })());
         """
     )
@@ -408,8 +422,6 @@ function _scene_js(scene)
     return "const strs = " * sprint(Masque._js_literal, first.(table)) * ";\nconst scene = " * body * ";\n"
 end
 
-const _WGL_FAILED_NOTE = "This WebGL figure couldn't load WGLMakie's script. It needs an internet connection outside Pluto."
-
 function _standalone_html(w::WebGLWidget)
     lit(x) = JavaScript(sprint(Masque._js_literal, x))
     id = Masque._standalone_id()
@@ -432,10 +444,11 @@ function _standalone_html(w::WebGLWidget)
                 mountWebGL({ canvas, wglBundleUrl: url, scene, width: $(w.width), height: $(w.height), pxPerUnit: $(w.px_per_unit) });
                 Masque.mount(canvas, $(lit(w.manifest)), new Promise(() => {}), null);
               }, (e) => {
-                console.warn("Masque: this WebGL figure couldn't load its scripts.", e);
+                const text = (e && e.masqueNote) || $(lit(_WGL_OFFLINE_NOTE));
+                console.warn("Masque: " + text, e);
                 const note = document.createElement("div");
                 note.className = "masque-webgl-static";
-                note.textContent = $(lit(_WGL_FAILED_NOTE));
+                note.textContent = text;
                 note.style.cssText = "position:absolute; inset:0; display:flex; align-items:center; justify-content:center; border:1px dashed #999; color:#666; font:14px sans-serif; text-align:center; padding:1em; box-sizing:border-box;";
                 host.appendChild(note);
               });

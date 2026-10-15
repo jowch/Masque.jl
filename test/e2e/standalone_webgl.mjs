@@ -1,8 +1,9 @@
-// A plain page of two WGLMakie widgets outside Pluto (#300; page from standalone_webgl.jl).
-// With the first URL serving WGLMakie's script, both widgets draw their scene from one
-// request and hovering a point shows its tooltip. With that URL down, the second one serves
-// it. With the script altered or every URL blocked, each widget shows a note in its box and
-// the page throws no error.
+// A plain page of three WGLMakie widgets outside Pluto (#300; page from standalone_webgl.jl).
+// With the first URL serving WGLMakie's script, all three widgets draw their scene from
+// one request and hovering a point shows its tooltip. With that URL down, the second one serves
+// it. With the script altered, each widget's note says the published copy differs from the
+// installed one; with every URL blocked, it says the page needs a connection. The page throws
+// no error either way.
 //
 //   node standalone_webgl.mjs <dir with page.html, cdn.txt, WGLMakie.bundled.js>
 
@@ -87,30 +88,30 @@ try {
     ["first URL down, second serves", [(r) => r.abort(), serveBundle(bundle)], [1, 1]],
   ]) {
     const { ctx, p, log, requests } = await open(serves);
-    await p.waitForFunction(() => document.querySelectorAll(".ip-host canvas").length === 2, null, { timeout: 20000 });
+    await p.waitForFunction(() => document.querySelectorAll(".ip-host canvas").length === 3, null, { timeout: 20000 });
     let ok = [];
-    for (let t = 0; t < 120 && !(ok.length === 2 && ok.every(Boolean)); t++) { await sleep(250); ok = await drawn(p); }
-    if (!(ok.length === 2 && ok.every(Boolean))) throw new Error(`${what}: widgets never drew, ${JSON.stringify(ok)} | ${log.join(" | ")}`);
+    for (let t = 0; t < 120 && !(ok.length === 3 && ok.every(Boolean)); t++) { await sleep(250); ok = await drawn(p); }
+    if (!(ok.length === 3 && ok.every(Boolean))) throw new Error(`${what}: widgets never drew, ${JSON.stringify(ok)} | ${log.join(" | ")}`);
     if (JSON.stringify(requests) !== JSON.stringify(want)) throw new Error(`${what}: expected requests ${JSON.stringify(want)}, saw ${JSON.stringify(requests)}`);
     const tip = await hoverFirstPoint(p);
     if (!tip) throw new Error(`${what}: hovering the first point showed no tooltip`);
     const errs = errorsIn(log);
     if (errs.length) throw new Error(`${what}: page logged errors: ${errs.join(" | ")}`);
     await p.screenshot({ path: join(dir, `${what.replace(/\W+/g, "-")}.png`) });
-    console.log(`E2E OK [WebGL page] ${what}: 2 widgets drew from ${requests.reduce((a, b) => a + b)} script request(s), hover tooltip ${JSON.stringify(tip)}`);
+    console.log(`E2E OK [WebGL page] ${what}: 3 widgets drew from ${requests.reduce((a, b) => a + b)} script request(s), hover tooltip ${JSON.stringify(tip)}`);
     await ctx.close();
   }
 
-  for (const [what, serves] of [
-    ["an altered script", urls.map(() => serveBundle(bundle.toString() + "\n//x"))],
-    ["blocked requests", urls.map(() => (r) => r.abort())],
+  for (const [what, serves, says] of [
+    ["an altered script", urls.map(() => serveBundle(bundle.toString() + "\n//x")), "differs from the one installed"],
+    ["blocked requests", urls.map(() => (r) => r.abort()), "needs an internet connection"],
   ]) {
     const { ctx, p, log } = await open(serves);
     await sleep(1500);
     const notes = await p.evaluate(() => [...document.querySelectorAll(".ip-host")].map((h) => h.querySelector(".masque-webgl-static")?.textContent ?? ""));
-    if (notes.length !== 2 || notes.some((n) => !n.includes("couldn't load"))) throw new Error(`${what}: expected a note in each box, got ${JSON.stringify(notes)}`);
+    if (notes.length !== 3 || notes.some((n) => !n.includes(says))) throw new Error(`${what}: expected a note saying "${says}" in each box, got ${JSON.stringify(notes)}`);
     if (log.some((l) => l.startsWith("pageerror:"))) throw new Error(`${what}: page threw | ${log.join(" | ")}`);
-    console.log(`E2E OK [WebGL page] ${what}: each widget shows its note`);
+    console.log(`E2E OK [WebGL page] ${what}: each widget's note says it ${JSON.stringify(says)}`);
     await ctx.close();
   }
 } finally {

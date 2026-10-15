@@ -436,7 +436,9 @@ end
     @test all(u -> occursin(u, html), cdn.urls) && occursin(cdn.integrity, html)
     # Smaller than the scene's JSON, which Pluto publishes as is.
     @test sizeof(html) < sizeof(JSON3.write(w.scene))
-    @test occursin("couldn't load WGLMakie's script", html)
+    # The note tells a copy that fails the hash apart from being offline, and names the Makie.
+    @test occursin("needs an internet connection", html)
+    @test occursin("published with Makie v$(cdn.makie) differs", html)
 end
 
 @testset "outside Pluto, WGLMakie's script comes from its Makie tag (#300)" begin
@@ -455,6 +457,7 @@ end
         "https://raw.githubusercontent.com/MakieOrg/Makie.jl/v0.24.15/WGLMakie/src/javascript/WGLMakie.bundled.js",
     ]
     @test cdn.integrity == "sha384-" * Masque.base64encode(Masque.sha384(js))
+    @test cdn.makie == v"0.24.15"
     # A developed WGLMakie, or no Makie version, inlines the script in each widget.
     @test _WGLExt._wgl_cdn(mktempdir(), v"0.24.15", js) === nothing
     @test _WGLExt._wgl_cdn(pkg, nothing, js) === nothing
