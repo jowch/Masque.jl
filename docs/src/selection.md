@@ -104,8 +104,9 @@ both. The target of a box with `selects` also takes a list, which
 replaces what the box starts with.
 
 Points, bars, polygons, segments, and lines you name in `bind` can
-start selected, but heatmap cells, axis readouts, boxes, thresholds, and
-the view cannot. A
+start selected, and so can the cells of a heatmap built with
+`select = :many`, as [Select several cells](@ref) shows. Axis readouts,
+boxes, thresholds, and the view cannot. A
 box or a threshold line starts where its `bounds` or `value` puts it,
 so to start one somewhere else, set those instead; see
 [Read the box itself](@ref) and [Drag a threshold](@ref).

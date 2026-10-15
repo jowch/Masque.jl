@@ -24,14 +24,17 @@ begin
         Pkg.activate(dev)
     else
         Pkg.activate(; temp = true)
+        Pkg.add(["WGLMakie", "JSON3"])   # before the develop, so Parsers is not downgraded (JSON3 caps it at 2.x)
         Pkg.develop(path = joinpath(@__DIR__, "..", ".."))
-        Pkg.add(["WGLMakie", "JSON3"])
         Pkg.instantiate()
     end
     using Masque
     using WGLMakie
     import JSON3
 end
+
+# ╔═╡ d1000000-0000-0000-0000-000000000003
+include(joinpath(@__DIR__, "kind_sweep_figures.jl"))  # kind-sweep figures v2
 
 # ╔═╡ d1000000-0000-0000-0000-000000000002
 md"""
@@ -41,9 +44,6 @@ One widget per interactable kind. Agents drive this with `test/e2e/kind_sweep.mj
 and `test/e2e/polish_verify.mjs` (interaction **and** visual).
 Not a human Try Live notebook.
 """
-
-# ╔═╡ d1000000-0000-0000-0000-000000000003
-include(joinpath(@__DIR__, "kind_sweep_figures.jl"))  # kind-sweep figures v2
 
 # ╔═╡ d1000000-0000-0000-0000-000000000004
 begin
@@ -524,10 +524,10 @@ HTML(
         "<span id=\"coords_view\" style=\"display:none\">$(JSON3.write(sweep.view.manifest["layers"]))</span>",
 )
 
-# ╔═╡ d1000000-0000-0000-0000-000000000142
+# ╔═╡ d1000000-0000-0000-0000-000000000146
 @bind ev_view_linked sweep.view_linked
 
-# ╔═╡ d1000000-0000-0000-0000-000000000143
+# ╔═╡ d1000000-0000-0000-0000-000000000147
 HTML(
     "<span id=\"out_view_linked\">VIEW_LINKED=$(sweep_field("view_linked", ev_view_linked))</span>" *
         "<span id=\"bond_view_linked\" style=\"display:none\">$(repr(ev_view_linked))</span>" *
@@ -634,6 +634,26 @@ HTML(
     "<span id=\"out_many_grid\">MANY_GRID=$(sweep_field("many_grid", ev_many_grid))</span>" *
         "<span id=\"bond_many_grid\" style=\"display:none\">$(repr(ev_many_grid))</span>" *
         "<span id=\"coords_many_grid\" style=\"display:none\">$(JSON3.write(sweep.many_grid.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000142
+@bind ev_many_grid_seeded sweep.many_grid_seeded
+
+# ╔═╡ d1000000-0000-0000-0000-000000000143
+HTML(
+    "<span id=\"out_many_grid_seeded\">MANY_GRID_SEEDED=$(sweep_field("many_grid_seeded", ev_many_grid_seeded))</span>" *
+        "<span id=\"bond_many_grid_seeded\" style=\"display:none\">$(repr(ev_many_grid_seeded))</span>" *
+        "<span id=\"coords_many_grid_seeded\" style=\"display:none\">$(JSON3.write(sweep.many_grid_seeded.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000144
+@bind ev_many_grid_regions sweep.many_grid_regions
+
+# ╔═╡ d1000000-0000-0000-0000-000000000145
+HTML(
+    "<span id=\"out_many_grid_regions\">MANY_GRID_REGIONS=$(sweep_field("many_grid_regions", ev_many_grid_regions))</span>" *
+        "<span id=\"bond_many_grid_regions\" style=\"display:none\">$(repr(ev_many_grid_regions))</span>" *
+        "<span id=\"coords_many_grid_regions\" style=\"display:none\">$(JSON3.write(sweep.many_grid_regions.manifest["layers"]))</span>",
 )
 
 # ╔═╡ d1000000-0000-0000-0000-000000000050
@@ -787,8 +807,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-0000000000c1
 # ╠═d1000000-0000-0000-0000-000000000034
 # ╠═d1000000-0000-0000-0000-000000000035
-# ╠═d1000000-0000-0000-0000-000000000142
-# ╠═d1000000-0000-0000-0000-000000000143
+# ╠═d1000000-0000-0000-0000-000000000146
+# ╠═d1000000-0000-0000-0000-000000000147
 # ╠═d1000000-0000-0000-0000-000000000115
 # ╠═d1000000-0000-0000-0000-000000000116
 # ╠═d1000000-0000-0000-0000-000000000038
@@ -809,6 +829,10 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000132
 # ╠═d1000000-0000-0000-0000-000000000140
 # ╠═d1000000-0000-0000-0000-000000000141
+# ╠═d1000000-0000-0000-0000-000000000142
+# ╠═d1000000-0000-0000-0000-000000000143
+# ╠═d1000000-0000-0000-0000-000000000144
+# ╠═d1000000-0000-0000-0000-000000000145
 # ╠═d1000000-0000-0000-0000-000000000050
 # ╠═d1000000-0000-0000-0000-000000000051
 # ╠═d1000000-0000-0000-0000-000000000052

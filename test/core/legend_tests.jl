@@ -256,11 +256,37 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test [p.label for p in L.payloads] == ["H1", "H2", "H3"]
     end
 
+    @testset "bare series! legend builds on every Makie" begin
+        # No labels: Makie up to 0.24.15 draws `series k` entries; 0.24.16 labels them
+        # `nothing` and draws none. Either way the figure builds, and a legend with no drawn
+        # entries leaves no layer behind.
+        fig = Figure(); ax = Axis(fig[1, 1])
+        series!(ax, [1.0 1.5 2.2 2.8; 3.0 2.4 1.2 1.5; 0.6 1.4 2.6 2.0])
+        leg = axislegend(ax)
+        Makie.update_state_before_display!(fig)
+        drawn = count(e -> e.label[] !== nothing, only(leg.entrygroups[])[2])
+
+        ints = interactables(fig)
+        _, _, ctx = ctx_for(fig)
+        m = @test_logs build_manifest(ints, ctx)
+        legds = filter(d -> d["id"] == "legend", m["layers"])
+        if drawn == 0
+            @test isempty(legds)
+        else
+            @test drawn == 3
+            @test only(legds)["links"] == [["series:1"], ["series:2"], ["series:3"]]
+        end
+        ser = only(filter(d -> d["id"] == "series", m["layers"]))
+        @test [p.label for p in ser["payloads"]] == ["series 1", "series 2", "series 3"]
+    end
+
     @testset "series! legend pins one element per entry, not the whole layer" begin
         fig = Figure(); ax = Axis(fig[1, 1])
         # 3 rows × 4 columns: each row is one series (Makie's matrix convention).
         ys = [1.0 1.5 2.2 2.8; 3.0 2.4 1.2 1.5; 0.6 1.4 2.6 2.0]
-        series!(ax, ys)
+        # Labels are given: Makie 0.24.16 leaves a series' default `series k` labels out of
+        # its legend (each entry is labelled `nothing` and not drawn).
+        series!(ax, ys; labels = ["series 1", "series 2", "series 3"])
         axislegend(ax)
         Makie.update_state_before_display!(fig)
 

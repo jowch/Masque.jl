@@ -676,10 +676,13 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   `selected = (stem = (stems = [2],),)`. A pick holds one element, so several indices for one field raise
   `ArgumentError`, except on a field built with `select = :many`, which starts with all of
   them, and on the target of a box with `selects`, where they replace what the box starts at, and an empty one keyed to the target, as in `selected = (pts = Int[],)`,
-  starts it empty (a bare `Int[]` sets nothing). Works on
-  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines`; any other kind, an
-  out-of-range index (`0` included), a control, or a layer that is not a field raises
-  `ArgumentError`. This is only needed to carry a pick through a rebuild — and it must come
+  starts it empty (a bare `Int[]` sets nothing). A heatmap or image built with
+  `select = :many` starts with the cells you give it: a `Bool` matrix the size of the plotted
+  matrix (`selected = (region = mask,)`), a `GridSelection`, `CartesianIndex`es, or linear
+  indices into that matrix; a mask of another size raises `ArgumentError`. Works on
+  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines` and those grids; any other
+  kind, an out-of-range index (`0` included), a control, or a layer that is not a field raises
+  `ArgumentError`. Use it to carry a pick through a rebuild or to restore a saved one — and it must come
   from a cell that doesn't read this widget's own value, which Pluto rejects as a cyclic
   reference.
 - `backend` — `:cairo` (a static image) or `:webgl` (a live canvas). Defaults to whichever of

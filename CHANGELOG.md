@@ -6,7 +6,27 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A heatmap or image built with `select = :many` can start with cells selected:
+  `selected = (region = mask,)` takes a `Bool` matrix the size of the plotted matrix, and
+  also a `GridSelection`, `CartesianIndex`es, or linear indices. The cells start highlighted
+  and in the `@bind` value, so a selection saved to a file can be loaded back, and a
+  Cmd-click or Ctrl-click takes one out like any other. A mask of the wrong size raises an
+  `ArgumentError` (#356).
+- A heatmap or image takes `regions`, a matrix of whole numbers the size of the plotted one
+  that gives each cell a region id, such as the labels of a segmentation. Cells that share
+  an id act as one: hovering outlines the whole region, and on a `select = :many` grid a
+  click, Cmd-click, or Ctrl-click picks or drops the whole region, and a box picks every
+  region it touches. `GridSelection` gains `regions`, the ids of the regions it holds whole,
+  and a click on a grid that picks one cell carries the region's id in `GridCellEvent`'s
+  `region`. Cells with id `0` act alone, as before (#359).
+
 ### Fixed
+- A `series!` works again under Makie 0.24.16, which draws its lines one level further down
+  and without their default `series k` names: hover and click on a `PolarAxis`, a slice
+  readout over it, and its legend links find the lines, and the tooltip names each line as
+  before. A legend whose entries Makie leaves unlabelled (and so doesn't draw) no longer stops
+  the figure from building, and a legend with no drawn entries gets no hover or click layer.
 - Panning an axis tied to others with `linkaxes!`, `linkxaxes!`, or `linkyaxes!` moves them
   all. Before, the pan did nothing. While you drag, the data in the linked axes slides along
   with the axis you hold (#363).
