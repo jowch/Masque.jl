@@ -1115,7 +1115,9 @@ function build_kind_sweep()
         fig = Figure(size = (480, 320))
         ax = Axis(fig[1, 1]; title = "series_legend")
         ys = [1.0 1.5 2.2 2.8; 3.0 2.4 1.2 1.5; 0.6 1.4 2.6 2.0]
-        series!(ax, ys; linewidth = 4)
+        # Labels are given: Makie 0.24.16 leaves a series' default `series k` labels out of
+        # its legend (each entry is labelled `nothing` and not drawn).
+        series!(ax, ys; linewidth = 4, labels = ["series 1", "series 2", "series 3"])
         axislegend(ax; position = :lt)
         masque(fig)
     end
