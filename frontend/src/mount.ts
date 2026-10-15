@@ -457,6 +457,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         },
     }
     const state = createOverlayState()
+    viewDrag.seedView3Homes(state, manifest.layers)
     // Each field starts highlighted at its `initial` value: a `selected=` pick, or what a box
     // over marks or cells holds at its starting bounds.
     const restoreSelection = (v: Record<string, unknown>) => {

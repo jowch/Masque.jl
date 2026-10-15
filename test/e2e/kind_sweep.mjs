@@ -1184,6 +1184,109 @@ try {
     }
     if (spec.mode === "owner") continue;
 
+    if (key === "view3d_linked") {
+      // `linkcameras!` (#362): orbiting the left panel turns the right one. The right panel's
+      // picture must change and its points must answer where they are drawn now, not where
+      // they were at mount.
+      const pts2 = layers.find((l) => l.id === "pts2");
+      if (!pts2) throw new Error(`${key}: no pts2 layer`);
+      const hostRect = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const vb = sr.querySelector("svg.masque-plain").viewBox.baseVal;
+        return { left: b.left, top: b.top, s: b.width / vb.width, w: vb.width, h: vb.height };
+      }, key);
+      const stamp = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        return host?.dataset.masqueGestureFrame ? JSON.parse(host.dataset.masqueGestureFrame) : null;
+      }, key);
+      // The right half of the image, where the follower is drawn.
+      const shotRight = async () => {
+        const r = await hostRect();
+        return page.screenshot({ clip: { x: r.left + (r.w / 2) * r.s, y: r.top, width: (r.w / 2) * r.s, height: r.h * r.s } });
+      };
+      const old = [0, 1].map((i) => hitPoint(pts2, i));
+      for (const p of old) {
+        const r = await dispatchAt(key, p.x, p.y, "pointermove");
+        if (!r.show) throw new Error(`${key}: the follower's point at ${JSON.stringify(p)} should hover before the orbit`);
+      }
+      await dispatchAt(key, 1, 1, "pointermove");
+      const shot0 = await shotRight();
+      const s0 = await stamp();
+      const g = layer.geometry;
+      const c = { x: g.x + g.w / 2, y: g.y + g.h / 2 };
+      await drag(key, c.x, c.y, c.x + 90, c.y + 20, false);
+      const tries = backend === "webgl" ? 50 : 25;
+      const delayMs = backend === "webgl" ? 300 : 200;
+      let st = null;
+      for (let i = 0; i < tries; i++) {
+        await new Promise((r) => setTimeout(r, delayMs));
+        st = await stamp();
+        if (st && st.n > (s0?.n ?? 0) && st.settle === true && Math.abs(st.azimuth - g.azimuth) > 0.05) break;
+        st = null;
+      }
+      if (!st) throw new Error(`${key}: no settled orbit frame landed (last ${JSON.stringify(await stamp())})`);
+      await dispatchAt(key, 1, 1, "pointermove");
+      await new Promise((r) => setTimeout(r, backend === "webgl" ? 600 : 100));
+      const shot1 = await shotRight();
+      if (Buffer.compare(shot0, shot1) === 0) throw new Error(`${key}: the follower panel's picture did not change after the orbit`);
+      passed.push(`${key}/follower-redrawn`);
+      // The corner point (index 1, at (4, 4, 4)) moves on screen when the camera turns; its old
+      // spot must go quiet, and a scan of the right panel must find it again somewhere else.
+      const moved = old[1];
+      const rOld = await dispatchAt(key, moved.x, moved.y, "pointermove");
+      const rect = await hostRect();
+      // A grid finer than the marker's hit radius, stopping at the first hit away from the old spot.
+      const hits = [];
+      const step = Math.max(4, Math.floor(moved.r));
+      let far = null;
+      for (let y = 4; y < rect.h && !far; y += step) {
+        for (let x = rect.w / 2 + 4; x < rect.w; x += step) {
+          const r = await dispatchAt(key, x, y, "pointermove");
+          if (!r.show || !/\bx 4\b.*\by 4\b.*\bz 4\b/.test(r.text ?? "")) continue;
+          hits.push({ x, y });
+          if (Math.hypot(x - moved.x, y - moved.y) > moved.r + 6) { far = { x, y, text: r.text }; break; }
+        }
+      }
+      if (!far) throw new Error(`${key}: the follower's corner point answers nowhere new after the orbit (old spot show=${rOld.show}; ${hits.length} hits near the old spot)`);
+      passed.push(`${key}/follower-hits-moved`);
+      await dispatchAt(key, 1, 1, "pointermove");
+      // Wheel a1, then a2, then a1. Each zoom must start from the limits both panels share now,
+      // so the third is narrower than the second; starting from a1's own earlier request would
+      // throw a2's zoom away. That a1's base moved at all also shows a2's zoom reached a1.
+      const g2 = layers.find((l) => l.id === "view2")?.geometry;
+      if (!g2) throw new Error(`${key}: no view2 layer`);
+      const wheelOn = async (vg, prev) => {
+        await page.evaluate(([k, ix, iy]) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const b = host.querySelector("img, canvas").getBoundingClientRect();
+          const sc = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+          sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * sc, clientY: b.top + iy * sc, deltaY: -300 }));
+        }, [key, vg.x + vg.w / 2, vg.y + vg.h / 2]);
+        for (let i = 0; i < tries; i++) {
+          await new Promise((r) => setTimeout(r, delayMs));
+          const s2 = await stamp();
+          if (s2 && s2.n > prev.n && s2.settle === true && Array.isArray(s2.limits)) return s2;
+        }
+        throw new Error(`${key}: no settled zoom frame (last ${JSON.stringify(await stamp())})`);
+      };
+      const wx = (l) => l[1] - l[0];
+      const z1 = await wheelOn(g, st);
+      const z2 = await wheelOn(g2, z1);
+      const z3 = await wheelOn(g, z2);
+      if (!(wx(z2.limits) < 0.95 * wx(z1.limits))) throw new Error(`${key}: the second panel's zoom did not start from the first's (${wx(z1.limits)} -> ${wx(z2.limits)})`);
+      if (!(wx(z3.limits) < 0.95 * wx(z2.limits))) throw new Error(`${key}: zooming the first panel again dropped the second panel's zoom (${wx(z1.limits)}, ${wx(z2.limits)}, ${wx(z3.limits)})`);
+      passed.push(`${key}/alternating-zoom`);
+      console.error(`OK  ${key} — orbit az ${g.azimuth.toFixed(2)} -> ${st.azimuth.toFixed(2)}, follower redrawn, its point answers at ${JSON.stringify(far)}; zoom widths ${[z1, z2, z3].map((z) => wx(z.limits).toFixed(3)).join(" > ")}`);
+      continue;
+    }
+
     if (key === "view3d") {
       // Axis3 zoom and pan (#321). The wheel scales the limits about their center, so the
       // middle point stays put on screen and the corner leaves the limits: it is clipped from
