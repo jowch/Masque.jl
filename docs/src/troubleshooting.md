@@ -379,14 +379,15 @@ figure, return `masque(fig)`. For more information, see
 
 ### Tried showing a widget outside Pluto and hover does nothing
 
-**Cause:** the display doesn't run the page's scripts, the page can't
-reach jsDelivr to load Masque's script, or the widget uses WGLMakie. A
-CairoMakie widget then shows the plain figure, and a WGLMakie widget
-shows an empty box saying it is drawn only in Pluto.
+**Cause:** the display doesn't run the page's scripts, or the page
+can't reach jsDelivr to load Masque's script. A CairoMakie widget then
+shows the plain figure, and a WGLMakie widget shows an empty box or a
+note saying it couldn't load.
 
-**Fix:** show a CairoMakie widget in a display that runs scripts, such
-as Documenter or an HTML page you write with `show`, and read the page
-with an internet connection, or open the notebook in Pluto. For what works outside Pluto, see
+**Fix:** show the widget in a display that runs scripts, such as
+Documenter or an HTML page you write with `show`, and read the page
+with an internet connection, or open the notebook in Pluto. To read a
+page offline, use `backend = :cairo`. For what works outside Pluto, see
 [Outside Pluto](@ref outside-pluto).
 
 ### Tried feeding this widget's bond into the same call's `selected=`

@@ -67,13 +67,20 @@ end
 # widget (#311). The browser checks it against this copy's hash. A git checkout may carry an
 # unreleased bundle, so it inlines its own.
 function _overlay_cdn(dir, version, js)
-    (version === nothing || isdir(joinpath(dir, ".git"))) && return nothing
-    in_depot = any(DEPOT_PATH) do depot
-        startswith(dir, normpath(joinpath(depot, "packages")) * Base.Filesystem.path_separator)
-    end
-    in_depot || return nothing
+    (version === nothing || !_registered_tree(dir)) && return nothing
     url = "https://cdn.jsdelivr.net/gh/jowch/Masque.jl@v$(version)/assets/overlay.js"
     return (; url, integrity = "sha384-" * base64encode(sha384(js)))
+end
+
+# A package folder installed from a registry: under a depot's `packages/` and not a git
+# checkout. Its files are those of the registered tree, which for Masque is its release tag's
+# (see `_overlay_cdn`); a monorepo package such as WGLMakie can be registered from a commit
+# between tags.
+function _registered_tree(dir)
+    isdir(joinpath(dir, ".git")) && return false
+    return any(DEPOT_PATH) do depot
+        startswith(dir, normpath(joinpath(depot, "packages")) * Base.Filesystem.path_separator)
+    end
 end
 
 include("makie_compat.jl")
