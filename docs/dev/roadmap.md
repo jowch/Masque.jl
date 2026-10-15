@@ -86,6 +86,8 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
   on top of the CairoMakie `show` that already mounts outside Pluto (#298; WebGL is #300).
 - *idea* — GLMakie rendering to PNG behind `AbstractBackend`.
 - *idea* — `:webgl` in-place data patching on a canvas that is still alive.
+- *idea* — incremental `onchange` frames: send only the plots and the layers that changed.
+  Today every frame carries the whole picture and manifest (perf-findings.md, `onchange` frames).
 - *idea* — level-of-detail hit layers for high-N plots: a decimated layer, with exact
   membership resolved in Julia on click.
 - *idea* — manifest compaction (delta or column-wise encoding), decided by re-running

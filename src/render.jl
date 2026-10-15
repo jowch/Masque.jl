@@ -519,6 +519,16 @@ function build_manifest(
         # grid a cell mask, `{runs}` or `{bits}`.
         roles[L.id] === :pick && "click" in d["events"] && select_mode(i) === :many && (d["many"] = true)
     end
+    # With `onchange`, hiding a plot is how a figure shows it only sometimes: a hidden plot
+    # takes no hover and no clicks, and keeps its field, with nothing to pick.
+    if stateful
+        hidden = _hidden(plan)
+        for (_, L, d) in built
+            L.id in hidden || continue
+            empty!(d["events"])
+            d["hidden"] = true
+        end
+    end
     initial = with_initial ? _initial_value(built, fields, roles, binding, selected, ctx, layers) : nothing
     # Precedence for the frontend's first-match-in-manifest-order `hitTest` (geometry.ts):
     # `LegendInteractable` layers sort FIRST (a legend drawn over plot geometry must win the
@@ -999,11 +1009,11 @@ function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu, m
     live = nothing
     warm = Dict{String, Any}[]
     if onchange !== nothing
-        manifest, owners = interactables.mount[]
+        manifest, _ = interactables.mount[]
         # Frames rebuild and move the controls in their own plan; the widget's stays as built.
         live = _LiveFigure(
-            _Plan(copy(interactables.ints), interactables.binding, onchange, interactables.rebuild, interactables.mount),
-            manifest, owners, _pick_counts(manifest),
+            _Plan(copy(interactables.ints), interactables.binding, onchange, interactables.rebuild, interactables.mount, interactables.hidden),
+            manifest, _pick_counts(manifest), "",
         )
         start = mount_envelope(manifest)
         warm = [
@@ -1015,24 +1025,49 @@ function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu, m
         input -> _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, max_width; live),
         view_axes, warm, nothing, nothing, false, false, false,
     )
-    frame = function (input)
-        _join_view_warmup!(state, frame)
-        return state.apply(input)
-    end
+    local frame
+    frame = _GestureFrame(
+        function (input)
+            _join_view_warmup!(state, frame)
+            return state.apply(input)
+        end,
+        live === nothing ? nothing : interactables.mount,
+    )
     lock(_VIEW_WARMUP_LOCK) do
         _VIEW_WARMUPS[frame] = state
     end
     return frame
 end
 
+# The widget's gesture callback. With `onchange`, `decode` holds the manifest and layer owners
+# of the picture the browser shows now, which the state and the `@bind` value are read with:
+# a pick names a mark of that picture, not of the first one.
+struct _GestureFrame <: Function
+    f::Function
+    decode::Union{Nothing, Base.RefValue{Any}}
+end
+(g::_GestureFrame)(input) = g.f(input)
+
+# The manifest and owners a value from the browser is read with.
+function _decoder(w)
+    rf = w.render_frame
+    if rf isa _GestureFrame && rf.decode !== nothing
+        d = rf.decode[]
+        d === nothing || return d
+    end
+    return (w.manifest, w.owners)
+end
+
 # What an `onchange` widget's frames share: the plan they rebuild the manifest from, with its
-# controls moved to where the browser has them; the mount manifest and owners the state is
-# decoded with; and each pick field's mark count in the picture the browser holds now.
+# controls moved to where the browser has them; the mount manifest, whose starting value fills
+# a field the state leaves out; each pick field's mark count in the picture the browser holds
+# now; and the last error logged, so a drag that keeps failing logs it once. The manifest and
+# owners the state is read with are in `plan.mount`, shared with the widget.
 mutable struct _LiveFigure
     plan::_Plan
-    manifest::Dict{String, Any}
-    owners::Dict{String, LayerOwner}
+    start::Dict{String, Any}
     counts::Dict{String, Int}
+    last_error::String
 end
 
 function _pick_counts(manifest)
@@ -1040,6 +1075,8 @@ function _pick_counts(manifest)
     fields = Set{String}(get(manifest, "fields", String[]))
     for d in manifest["layers"]
         d["id"] in fields && get(d, "bond", nothing) ∉ ("threshold", "bounds", "control") || continue
+        # A hidden plot has no marks to pick: hiding it clears its picks.
+        get(d, "hidden", false) === true && (counts[d["id"]] = 0; continue)
         n = try
             _layer_n_elements(Symbol(d["kind"]), d["geometry"])
         catch
@@ -1070,7 +1107,7 @@ function _run_onchange(f, fig, state)
         p in before || throw(
             ArgumentError(
                 "onchange: it added a `$(Makie.plotkey(p))` plot; onchange can only change plots " *
-                    "that already exist. Draw it before `masque` and change it with `update!(plot, …)`",
+                    "that already exist. Create it before `masque` and change it with `update!(plot, …)`",
             ),
         )
     end
@@ -1085,20 +1122,16 @@ function _run_onchange(f, fig, state)
     return nothing
 end
 
-# The plan a frame builds its manifest from.
-_frame_plan(interactables, live::_LiveFigure) = live.plan
-_frame_plan(interactables, ::Nothing) = interactables
-
 # A control in the state moves to where the browser has it, so the rebuilt manifest draws the
 # line or the box there instead of at its start.
-function _move_controls!(live::_LiveFigure, js)
+function _move_controls!(live::_LiveFigure, manifest, owners, js)
     ints = live.plan.ints
     for k in eachindex(ints)
         i = ints[k]
         i isa Union{ThresholdInteractable, ROIInteractable} || continue
         f = string(i.id)
         haskey(js, f) && js[f] !== nothing || continue
-        ev = _field_value(live.manifest, live.owners, f, js[f])
+        ev = _field_value(manifest, owners, f, js[f])
         ints[k] = i isa ThresholdInteractable ?
             ThresholdInteractable(i.ax, i.orientation, _threshold_value(ev), i.id, i.update_while_dragging) :
             ROIInteractable(i.ax, _roi_bounds(ev), i.id, i.selects, i.update_while_dragging)
@@ -1113,24 +1146,42 @@ function _short_error(err)
     return length(line) > 160 ? first(line, 159) * "…" : line
 end
 
+# The manifest and owners the next value from the browser is read with: this frame's, with
+# the mount's starting value, which a frame leaves out.
+function _store_decoder!(live::_LiveFigure, frame, owners)
+    m = copy(frame["manifest"])
+    haskey(live.start, "initial") && (m["initial"] = live.start["initial"])
+    live.plan.mount[] = (m, owners)
+    return nothing
+end
+
 function _apply_onchange_frame(input, live::_LiveFigure, backend, fig, ppu, max_width)
     js = input["state"]
     local frame
+    owners_out = Ref(Dict{String, LayerOwner}())
     try
         js isa AbstractDict || throw(ArgumentError("onchange: expected one value per field, got $(typeof(js))"))
-        state = state_from_js(live.manifest, live.owners, js)
+        manifest, owners = live.plan.mount[]
+        state = state_from_js(manifest, owners, js)
         _sync_controls!(live.plan, js)
         _run_onchange(live.plan.onchange, fig, state)
         _finalize!(fig)
         live.plan = _rebuilt(live.plan)
-        _move_controls!(live, js)
-        frame = _render_gesture_frame(input, backend, fig, live.plan, ppu, max_width)
+        _move_controls!(live, manifest, owners, js)
+        frame = _render_gesture_frame(input, backend, fig, live.plan, ppu, max_width; owners_out)
     catch err
         # A thrown frame would reject the round trip, and the browser takes that as a dead
-        # kernel. The reader gets a note instead and can keep going.
-        @error "Masque onchange failed; the picture stays as it was" exception = (err, catch_backtrace())
-        return Dict{String, Any}("error" => _short_error(err))
+        # kernel. The reader gets a note instead and can keep going. A drag that keeps
+        # failing the same way logs once.
+        short = _short_error(err)
+        if short != live.last_error || get(input, "settle", false) === true
+            @error "Masque onchange failed; the picture stays as it was" exception = (err, catch_backtrace())
+        end
+        live.last_error = short
+        return Dict{String, Any}("error" => short)
     end
+    live.last_error = ""
+    _store_decoder!(live, frame, owners_out[])
     counts = _pick_counts(frame["manifest"])
     clear = String[f for (f, n) in counts if get(live.counts, f, n) != n]
     live.counts = counts
@@ -1165,10 +1216,14 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
             Float64(input["ymin"]), Float64(input["ymax"]),
         )
     end
-    return _render_gesture_frame(input, backend, fig, _frame_plan(interactables, live), ppu, max_width)
+    live === nothing && return _render_gesture_frame(input, backend, fig, interactables, ppu, max_width)
+    owners_out = Ref(Dict{String, LayerOwner}())
+    frame = _render_gesture_frame(input, backend, fig, live.plan, ppu, max_width; owners_out)
+    _store_decoder!(live, frame, owners_out[])
+    return frame
 end
 
-function _render_gesture_frame(input, backend, fig, interactables, ppu, max_width)
+function _render_gesture_frame(input, backend, fig, interactables, ppu, max_width; owners_out = nothing)
     # Frame resolution drops to 1x for every in-drag frame and restores to the mount ppu on
     # release ("settle", the frontend's terminal request) — the MANIFEST always stays in the
     # mount ppu's coordinate space below, so image-px geometry (viewBox, hit regions) never
@@ -1185,6 +1240,7 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
         ctx = context(backend, fig, ppu, max_width)
         manifest = build_manifest(
             interactables, ctx; suspend_surfaces = get(input, "settle", false) !== true, with_initial = false,
+            owners_out,
         )
         result = _with_blocks_hidden(() -> render(backend, fig, render_ppu), interactables)
         frame = _gesture_frame(result)

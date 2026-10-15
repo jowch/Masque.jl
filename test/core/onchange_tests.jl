@@ -170,4 +170,119 @@ _state_input(state; settle = true) = Dict{String, Any}("onchange" => true, "stat
         g0 = only(l for l in w.manifest["layers"] if l["id"] == "cutoff")["geometry"]
         @test g["pos"] < g0["pos"]
     end
+
+    @testset "picks are read against the picture the browser shows" begin
+        fig = Figure(size = (500, 300))
+        ax = Axis(fig[1, 1])
+        x = [4.0, 5.0, 6.0]
+        sc = scatter!(ax, x, [1.0, 2.0, 3.0])
+        cut(v) = Dict("layer" => "cutoff", "index" => 0, "payload" => v)
+        pick = Dict("items" => Any[Dict("layer" => "pts", "index" => 1)])
+        seen = Any[]
+        w2 = masque(
+            fig, (pts = interactables(sc; select = :many), cutoff = ThresholdInteractable(ax; value = 0.0));
+            onchange = st -> (push!(seen, st); update!(sc, x, [1.0, 2.0, 3.0] .+ 10 * st.cutoff.value)),
+        )
+        Masque._sync_view_warmup!(w2.render_frame)
+        w2.render_frame(_state_input(Dict("cutoff" => cut(2.0))))
+        w2.render_frame(_state_input(Dict("pts" => pick, "cutoff" => cut(2.0))))
+        @test only(last(seen).pts).y == 22.0
+        # The `@bind` value agrees with the tooltip.
+        @test only(Masque.bond_from_js(w2, Dict("pts" => pick, "cutoff" => cut(2.0))).pts).y == 22.0
+        # The mount value is still the starting one.
+        @test isempty(Masque.initial_bond(w2).pts)
+    end
+
+    @testset "a mark that exists only after onchange grew the plot can be picked" begin
+        fig = Figure(size = (500, 300))
+        ax = Axis(fig[1, 1])
+        sc = scatter!(ax, 1.0:3.0, 1.0:3.0)
+        thr = ThresholdInteractable(ax; value = 3.0, orientation = :vertical)
+        seen = Any[]
+        w = masque(
+            fig, (pts = interactables(sc; select = :many), cutoff = thr);
+            onchange = st -> (push!(seen, st); n = round(Int, st.cutoff.value); update!(sc, collect(1.0:n), collect(1.0:n))),
+        )
+        Masque._sync_view_warmup!(w.render_frame)
+        cut(v) = Dict("layer" => "cutoff", "index" => 0, "payload" => v)
+        grown = w.render_frame(_state_input(Dict("cutoff" => cut(5.0))))
+        @test grown["clear"] == ["pts"]
+        pick = Dict("items" => Any[Dict("layer" => "pts", "index" => 4)])
+        r = w.render_frame(_state_input(Dict("pts" => pick, "cutoff" => cut(5.0))))
+        @test !haskey(r, "error")
+        @test only(last(seen).pts).index == 5
+        @test only(Masque.bond_from_js(w, Dict("pts" => pick, "cutoff" => cut(5.0))).pts).index == 5
+    end
+
+    @testset "a hidden plot takes no hover or clicks and keeps its field" begin
+        fig = Figure(size = (500, 300))
+        ax = Axis(fig[1, 1])
+        a = scatter!(ax, 1.0:3.0, 1.0:3.0)
+        b = scatter!(ax, 1.0:3.0, 3.0:-1.0:1.0)
+        thr = ThresholdInteractable(ax; value = 1.0)
+        w = masque(
+            fig, (a = interactables(a), b = interactables(b; select = :many), cutoff = thr);
+            onchange = st -> update!(b; visible = st.cutoff.value < 2),
+        )
+        layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
+        @test !isempty(layer(w.manifest, "b")["events"])
+        Masque._sync_view_warmup!(w.render_frame)
+        cut(v) = Dict("layer" => "cutoff", "index" => 0, "payload" => v)
+        pick = Dict("items" => Any[Dict("layer" => "b", "index" => 0)])
+        r = w.render_frame(_state_input(Dict("b" => pick, "cutoff" => cut(2.5))))
+        @test isempty(layer(r["manifest"], "b")["events"]) && layer(r["manifest"], "b")["hidden"] === true
+        @test "b" in r["manifest"]["fields"]
+        @test r["clear"] == ["b"]   # its picks go with it
+        @test !isempty(layer(r["manifest"], "a")["events"])
+        back = w.render_frame(_state_input(Dict("b" => Dict("items" => Any[]), "cutoff" => cut(1.0))))
+        @test "click" in layer(back["manifest"], "b")["events"]
+        # Without onchange a hidden plot keeps its layer as before.
+        b.visible = false
+        w2 = masque(fig, (b = interactables(b),))
+        @test !isempty(layer(w2.manifest, "b")["events"])
+        b.visible = true
+    end
+
+    @testset "the docs examples run as written" begin
+        xs = Float64[1, 2, 3, 4, 5, 6, 7, 8]
+        ys = Float64[1.2, 1.9, 3.2, 3.8, 5.1, 6.3, 6.8, 8.1]
+        fig = Figure(size = (560, 320))
+        ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
+        sc = scatter!(ax, xs, ys; markersize = 14)
+        fitline = lines!(ax, [1.0, 8.0], [1.0, 8.0]; color = :crimson)
+        w = masque(
+            fig, (pts = interactables(sc; select = :many),);
+            onchange = state -> begin
+                picked = [e.index for e in state.pts]
+                if length(picked) >= 2
+                    x, y = xs[picked], ys[picked]
+                    # The straight line closest to the picked points
+                    mx, my = sum(x) / length(x), sum(y) / length(y)
+                    slope = sum((x .- mx) .* (y .- my)) / sum((x .- mx) .^ 2)
+                    update!(fitline, [1.0, 8.0], my .+ slope .* ([1.0, 8.0] .- mx))
+                end
+            end,
+        )
+        Masque._sync_view_warmup!(w.render_frame)
+        picks = Dict("items" => Any[Dict("layer" => "pts", "index" => k) for k in (0, 7)])
+        w.render_frame(_state_input(Dict("pts" => picks)))
+        fit = Point2f.(fitline[1][])
+        @test fit[1] ≈ Point2f(1, 1.2) && fit[2] ≈ Point2f(8, 8.1)
+
+        img = [sin(i / 6) * cos(j / 9) for i in 1:80, j in 1:120]
+        fig2 = Figure(size = (640, 280))
+        ax_img = Axis(fig2[1, 1]; aspect = DataAspect())
+        heatmap!(ax_img, img; colormap = :grays)
+        maskplot = heatmap!(ax_img, img .> 0.5; colormap = [(:red, 0), (:red, 0.5)])
+        ax_hist = Axis(fig2[1, 2]; xlabel = "value")
+        hist!(ax_hist, vec(img))
+        cutoff = ThresholdInteractable(ax_hist; orientation = :vertical, value = 0.5)
+        mask = masque(
+            fig2, (cutoff = cutoff,); bind = :cutoff,
+            onchange = state -> (maskplot[1] = img .> state.cutoff.value),
+        )
+        Masque._sync_view_warmup!(mask.render_frame)
+        mask.render_frame(_state_input(Dict("cutoff" => Dict("layer" => "cutoff", "index" => 0, "payload" => 0.2))))
+        @test maskplot[3][] == (img .> 0.2)   # the matrix, after Makie adds its x and y
+    end
 end

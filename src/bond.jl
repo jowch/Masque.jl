@@ -653,7 +653,8 @@ function _tail_id(id::Symbol)
 end
 
 function bond_from_js(w, js)
-    return bond_from_js(w.manifest, w.owners, js)
+    manifest, owners = _decoder(w)
+    return bond_from_js(manifest, owners, js)
 end
 
 function initial_bond(w)
