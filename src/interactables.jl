@@ -1013,8 +1013,10 @@ function _grid_regions(regions, ncols, nrows)
     )
     eltype(regions) <: Integer || all(r -> r isa Integer, regions) ||
         throw(ArgumentError("GridInteractable: `regions` must hold integer region ids, got eltype $(eltype(regions))"))
+    all(r -> 0 <= r <= typemax(Int32), regions) || throw(
+        ArgumentError("GridInteractable: `regions` ids must be 0 (no region) or positive, at most $(typemax(Int32))"),
+    )
     out = Int32[regions[c, r] for r in 1:nrows for c in 1:ncols]
-    all(>=(0), out) || throw(ArgumentError("GridInteractable: `regions` ids must be 0 (no region) or positive"))
     return out
 end
 # Region ids as runs over the row-major cells, flat pairs `[id, n, ...]`, so a label image ships

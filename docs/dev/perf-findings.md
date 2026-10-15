@@ -204,13 +204,23 @@ named `scatter`: 2.2 KB for 100 picks and 23.2 KB for 1 000, about 22–24 B a p
 reader holding every point of a 1 000-point scatter sends less per click than one rendered
 PNG. No other fixture sets `select`, so the tables above are unchanged by it.
 
-`bench/payload_envelope.jl` §L (#359, 2026-10-14, on top of `6201d3a`) measures `regions` on a
-heatmap: a 512×512 label image with 200 round objects grows from 1283.3 KB to 1303.6 KB (+20 KB),
-the same at 2048×2048 from 1417.2 KB to 1512.5 KB (+95 KB), and a 121×121 crop cut into 961
-fragments of 4×4 cells, the densest case a mask editor ships, from 72.6 KB to 86.3 KB (+14 KB). The
-cost follows the region outlines, not the cell count, so it stays small next to the PNG and
-`values[]`. A pick in a region sends the same cell mask as below, holding every cell of the regions
-picked.
+`bench/payload_envelope.jl` §L (#359, 2026-10-15) measures `regions` on a heatmap. The runs cost
+about one `[id, n]` pair per region edge crossed along each row, so the cost follows the outlines,
+not the cell count, and is large when regions are small next to the grid. A 512×512 label image
+with 200 round objects grows from 1283.3 KB to 1303.6 KB (+20 KB), the same at 2048×2048 from
+1417.2 KB to 1512.5 KB (+95 KB), and a 121×121 crop cut into 961 fragments of 4×4 cells from
+72.6 KB to 86.3 KB (+14 KB). A whole 2048×2048 image cut into fragments is the expensive case:
+16 384 fragments of 16×16 cells take it from 1417.2 KB to 2437.3 KB (+1.0 MB), and 65 536 of 8×8
+to 3975.3 KB (+2.5 MB), more than the rest of the manifest. Such a grid ships no `values[]` (it
+takes the sampled path), so the runs are most of what it sends. Crop to the part being edited
+before cutting it into fragments, as the mask-editor pattern does.
+
+A pick in a region sends the same cell mask as below, holding every cell of the regions picked.
+Julia turns each value into a `GridSelection` and names the regions it holds whole by walking the
+runs against the mask: for half of a 2048×2048 grid, 5.4 ms and 1.6 MB with 16 384 fragments, and
+12.2 ms and 4.9 MB with 65 536 (§L, one run on the 4-core cloud container). In the browser, the
+first hover or pick after a mount decodes the runs for every cell, about 0.4 s on a 2048×2048
+grid with 16×16 fragments (timed in review of #360); after that a region costs its own size.
 
 A `select = :many` grid's value is a cell mask, `{runs: [j, i0, n, ...]}`, so its size follows the
 shape's outline, one triple per row it crosses, not its area. On a 512×512 image (JSON bytes,

@@ -379,8 +379,8 @@ export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
 }
 
 // A grid cell a mask holds counts as selected for the hover guard above, though the mask is
-// drawn as one hit rather than a key per cell. A region's key (`:r<id>`) is held when its
-// cells are, read from its first cell.
+// drawn as one hit rather than a key per cell. A region's key (`:r<id>`) is held when every
+// one of its cells is: a `selected=` seed can cut through a region.
 function maskHolds(state: OverlayState, key: string, layer: HitLayer | undefined): boolean {
     const at = key.lastIndexOf(":")
     const mask = state.sel_.get(key.slice(0, at))?.mask_
@@ -388,7 +388,7 @@ function maskHolds(state: OverlayState, key: string, layer: HitLayer | undefined
     const tail = key.slice(at + 1)
     if (tail.startsWith("r")) {
         const cells = layer ? regionCells(layer, Number(tail.slice(1))) : []
-        return cells.length > 0 && mask[cells[0]] === 1
+        return cells.length > 0 && cells.every((c) => mask[c] === 1)
     }
     return mask[Number(tail)] === 1
 }

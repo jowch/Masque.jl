@@ -718,5 +718,6 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws "same shape as `values` (4, 3)" GridInteractable(ax, hm; regions = zeros(Int, 3, 4))
         @test_throws "0 (no region) or positive" GridInteractable(ax, hm; regions = fill(-1, 4, 3))
         @test_throws "integer region ids" GridInteractable(ax, hm; regions = Float64.(R))
+        @test_throws "at most $(typemax(Int32))" GridInteractable(ax, hm; regions = fill(Int(typemax(Int32)) + 1, 4, 3))
     end
 end

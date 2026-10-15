@@ -299,8 +299,9 @@ end
 
 println("\n=== L. regions on a grid — each cell's region id, as runs over the cells ===")
 # `regions = R` (#359) ships `regions`, flat `[id, n, …]` pairs over the row-major cells, so it
-# costs about one pair per region boundary crossed along each row. Two shapes: a label image of
-# round objects on a background, and an image cut into small fragments (a mask editor's crop).
+# costs about one pair per region boundary crossed along each row. Three shapes: a label image of
+# round objects on a background, a crop cut into small fragments (a mask editor's), and a whole
+# image cut into fragments, the uncropped worst case.
 let
     f = Figure(size = (600, 600)); ax = Axis(f[1, 1])
     for n in (512, 2048)
@@ -332,6 +333,27 @@ let
         "  %d×%d crop, %d fragments:     manifest %8.1f KB  → %8.1f KB with regions\n",
         n, n, maximum(R), mp(plain.manifest) / 1024, mp(frags.manifest) / 1024
     )
+    delete!(ax, hm)
+    # A whole 2048×2048 image cut into square fragments, the uncropped worst case: the runs cost
+    # one pair per fragment edge per row. Each pick's value is decoded into a `GridSelection`
+    # that names the regions it holds whole; time that decode for a mask of half the grid.
+    n = 2048
+    for s in (16, 8)
+        R = [(i - 1) ÷ s + ((j - 1) ÷ s) * cld(n, s) + 1 for i in 1:n, j in 1:n]
+        hm = heatmap!(ax, rand(Float32, n, n))
+        plain = masque(f, (cells = interactables(hm; select = :many),))
+        frags = masque(f, (cells = interactables(hm; select = :many, regions = R),))
+        g = only(l for l in frags.manifest["layers"] if l["id"] == "cells")["geometry"]
+        env = Dict("runs" => [x for j in 0:(n ÷ 2 - 1) for x in (j, 0, n)])
+        Masque._grid_selection(:cells, env, n, n, g)
+        t = @elapsed sel = Masque._grid_selection(:cells, env, n, n, g)
+        a = @allocated Masque._grid_selection(:cells, env, n, n, g)
+        @printf(
+            "  %d×%d image, %5d fragments of %d×%d:  manifest %8.1f KB  → %8.1f KB with regions;  decode %6.1f ms, %5.1f MB (%d regions held)\n",
+            n, n, maximum(R), s, s, mp(plain.manifest) / 1024, mp(frags.manifest) / 1024, 1000t, a / 2^20, length(sel.regions)
+        )
+        delete!(ax, hm)
+    end
 end
 
 println()

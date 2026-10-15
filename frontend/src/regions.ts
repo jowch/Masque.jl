@@ -4,8 +4,10 @@ import type { GridMask } from "./gridmask"
 
 // A grid's regions (`regions=`, #359): each cell's region id, shipped as runs over the
 // row-major cells, flat pairs [id, n, ...]. Id 0 is a cell in no region. Decoded once per
-// layer, with each region's cells and the block of cells around them, and each region's
-// outline built the first time it is drawn.
+// layer, on the first hover or pick after a mount, with each region's cells and the block of
+// cells around them; that first decode walks every cell (about 0.4 s on a 2048×2048 grid), and
+// after it a region costs its own size. Each region's outline is built the first time it is
+// drawn.
 type RegionIndex = {
     ids_: Int32Array
     cells_: Map<number, number[]>

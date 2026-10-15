@@ -5968,6 +5968,15 @@ describe("a grid with regions picks and outlines whole regions (#359)", () => {
         expect((shadow.querySelector(".masque-tip") as HTMLElement).textContent).toBe("region 1")
     })
 
+    it("a seed that cuts through a region still lets hover outline it", () => {
+        // `selected=` holds cell (0, 0) only, one of region 1's three cells.
+        const m = grid()
+        m.initial = { cells: { runs: [0, 0, 1] } }
+        const { shadow, surface } = mounted(m)
+        move(surface, ...at(1, 0))
+        expect(edgeHiGroup(shadow).firstElementChild).not.toBeNull()
+    })
+
     it("with select = :one, the picked cell is drawn as its region", () => {
         const { shadow, surface } = mounted(grid(false))
         cell(surface, 2, 1)

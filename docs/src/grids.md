@@ -86,6 +86,9 @@ regions it holds whole. A cell whose id is `0` belongs to no region and
 is picked on its own, so the background stays as fine-grained as
 before.
 
+Many small regions on a large image make the figure slower to load.
+Crop to the part being edited before cutting it into patches.
+
 On a grid that picks one cell, `regions` turns a click into a pick of
 the object under the pointer: the click's [`GridCellEvent`](@ref)
 carries `region`, the clicked object's id, and the whole object stays

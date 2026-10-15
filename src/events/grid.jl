@@ -62,20 +62,6 @@ function _region_at(id::Symbol, geometry, i::Int, j::Int)
     throw(ArgumentError("bond: layer :$id regions cover $seen cells, not the $(ncols * nrows) of its grid"))
 end
 
-# Every cell's region id, `(ncols, nrows)` like the grid's `values`.
-function _region_matrix(geometry)
-    ncols, nrows = Int(geometry["ncols"]), Int(geometry["nrows"])
-    ids = Vector{Int}(undef, ncols * nrows)
-    k = 0
-    runs = geometry["regions"]
-    for r in 1:2:length(runs)
-        n = Int(runs[r + 1])
-        ids[(k + 1):(k + n)] .= Int(runs[r])
-        k += n
-    end
-    return reshape(ids, ncols, nrows)
-end
-
 """
     GridWindowEvent(layer, i1, i2, j1, j2, xmin, xmax, ymin, ymax)
 
@@ -123,9 +109,9 @@ regions every cell of which is selected, in ascending order; it is empty on a gr
 
 ```julia
 hm = heatmap!(ax, img)
-@bind w masque(fig, (region = interactables(hm; select = :many),))
-img[w.region]        # the selected values
-findall(w.region)    # the selected cells
+@bind w masque(fig, (cells = interactables(hm; select = :many),))
+img[w.cells]        # the selected values
+findall(w.cells)    # the selected cells
 ```
 """
 struct GridSelection <: InteractionEvent
@@ -191,18 +177,29 @@ function _grid_selection(id::Symbol, env, ncols::Int, nrows::Int, geometry = not
     return _with_regions(GridSelection(id, mask), geometry)
 end
 
-# `sel` with the ids of the regions it holds every cell of.
+# `sel` with the ids of the regions it holds every cell of. Walks the shipped runs against the
+# mask, so it costs one check per cell and one lookup per run, with no per-cell id matrix.
 function _with_regions(sel::GridSelection, geometry)
     geometry isa AbstractDict && haskey(geometry, "regions") || return sel
-    R = _region_matrix(geometry)
-    size(R) == size(sel.mask) || return sel
+    held = _regions_held(sel.mask, geometry["regions"])
+    held === nothing && return sel
+    return GridSelection(getfield(sel, :layer), sel.mask, held)
+end
+
+# The ids whose runs lie wholly in `mask`, ascending; `nothing` when the runs don't cover it.
+function _regions_held(mask::BitMatrix, runs::AbstractVector)
     whole = Dict{Int, Bool}()
-    for k in eachindex(R)
-        r = R[k]
-        r == 0 && continue
-        whole[r] = get(whole, r, true) & sel.mask[k]
+    k = 0
+    for r in 1:2:length(runs)
+        id, n = Int(runs[r]), Int(runs[r + 1])
+        k + n <= length(mask) || return nothing
+        if id != 0 && get(whole, id, true)
+            whole[id] = all(view(mask, (k + 1):(k + n)))
+        end
+        k += n
     end
-    return GridSelection(getfield(sel, :layer), sel.mask, sort!([r for (r, held) in whole if held]))
+    k == length(mask) || return nothing
+    return sort!([id for (id, h) in whole if h])
 end
 
 function _surface_payload(id, i, j, payloads, geometry)
