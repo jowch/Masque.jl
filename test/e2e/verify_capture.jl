@@ -25,8 +25,8 @@
 # temp-env dance as make_page.jl / test/notebooks/webgl_demo.jl.
 import Pkg
 Pkg.activate(; temp = true)
+Pkg.add(["WGLMakie", "JSON3", "AbstractPlutoDingetjes"])   # before the develop, so Parsers is not downgraded (JSON3 caps it at 2.x)
 Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "..")))   # test/e2e -> package root
-Pkg.add(["WGLMakie", "JSON3", "AbstractPlutoDingetjes"])
 Pkg.instantiate()
 
 using Masque

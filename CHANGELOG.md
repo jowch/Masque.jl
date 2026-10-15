@@ -14,6 +14,13 @@ All notable changes to this project are documented here. The format is based on
   Cmd-click or Ctrl-click takes one out like any other. A mask of the wrong size raises an
   `ArgumentError` (#356).
 
+### Fixed
+- A `series!` works again under Makie 0.24.16, which draws its lines one level further down
+  and without their default `series k` names: hover and click on a `PolarAxis`, a slice
+  readout over it, and its legend links find the lines, and the tooltip names each line as
+  before. A legend whose entries Makie leaves unlabelled (and so doesn't draw) no longer stops
+  the figure from building, and a legend with no drawn entries gets no hover or click layer.
+
 ## [0.3.0] - 2026-10-10
 
 ### Added
