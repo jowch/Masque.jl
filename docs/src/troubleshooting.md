@@ -261,8 +261,9 @@ itself instead of `masque(fig)`.
 **Cause:** either the layer's kind cannot start with a selection from
 `selected=`, or an index is out of range. Layers of kind `:circles`,
 `:rects`, `:polygons`, `:segments`, `:polyline`, and `:lines` can start
-selected, with a line only once it takes clicks, while `:grid`, `:axis`,
-`:threshold`, `:roi`, and `:view` cannot.
+selected, with a line only once it takes clicks, and so can `:grid` on a
+heatmap built with `select = :many`. A grid built without
+`select = :many`, `:axis`, `:threshold`, `:roi`, and `:view` cannot.
 
 **Fix:** check the layer's kind against [Selection](@ref), and keep
 each index between 1 and the number of marks in that layer. For a

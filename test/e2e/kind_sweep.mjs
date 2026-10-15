@@ -679,19 +679,30 @@ try {
       passed.push(`${key}/overlap-pixel-contested`);
     }
 
-    // Two elements of one layer claim the hovered pixel (#292, text on Axis3): the one drawn on
-    // top must come first in the layer's `order`, so the generic hover/click checks below prove
-    // it answers.
+    // Two elements of one layer claim the hovered pixel (#292, #331, #340): the one drawn on
+    // top must come first in the layer's `order`, or, with no `order`, be listed after the one
+    // underneath, so the generic hover/click checks below prove it answers.
     if (spec.overlapsElement !== undefined) {
       const order = layer.order;
-      if (!Array.isArray(order)) throw new Error(`${key}: layer "${layer.id}" ships no order`);
-      const front = order.indexOf(spec.hoverIndex), behind = order.indexOf(spec.overlapsElement);
-      if (front < 0 || behind < 0 || !(front < behind)) {
-        throw new Error(`${key}: order ${JSON.stringify(order)} doesn't put ${spec.hoverIndex} before ${spec.overlapsElement}`);
+      const top = spec.hoverIndex, under = spec.overlapsElement;
+      if (Array.isArray(order)) {
+        const front = order.indexOf(top), behind = order.indexOf(under);
+        if (front < 0 || behind < 0 || !(front < behind)) {
+          throw new Error(`${key}: order ${JSON.stringify(order)} doesn't put ${top} before ${under}`);
+        }
+      } else if (!(top > under)) {
+        throw new Error(`${key}: no order, and ${top} is not listed after ${under}`);
       }
-      const hp = hitPoint(layer, spec.hoverIndex), b = hitPoint(layer, spec.overlapsElement);
-      if (!(Math.abs(hp.x - b.x) < b.w / 2 && Math.abs(hp.y - b.y) < b.h / 2)) {
-        throw new Error(`${key}: hover pixel ${JSON.stringify(hp)} is not inside element ${spec.overlapsElement}'s box ${JSON.stringify(b)}`);
+      const hp = hitPoint(layer, top), b = hitPoint(layer, under);
+      const inBox = (r) => {
+        const xs = r.filter((_, i) => i % 2 === 0), ys = r.filter((_, i) => i % 2 === 1);
+        return Math.min(...xs) < hp.x && hp.x < Math.max(...xs) && Math.min(...ys) < hp.y && hp.y < Math.max(...ys);
+      };
+      const inside = layer.kind === "circles" ? Math.hypot(hp.x - b.x, hp.y - b.y) < b.r
+        : layer.kind === "polygons" ? inBox(b.ring) // the sweep's overlapping shapes are rectangles
+        : Math.abs(hp.x - b.x) < b.w / 2 && Math.abs(hp.y - b.y) < b.h / 2;
+      if (!inside) {
+        throw new Error(`${key}: hover pixel ${JSON.stringify(hp)} is not inside element ${under}'s shape ${JSON.stringify(b)}`);
       }
       passed.push(`${key}/overlap-order`);
       passed.push(`${key}/overlap-pixel-contested`);
@@ -838,6 +849,101 @@ try {
       };
       t = await step("marquee-takes-touched-cells", t, () => gdrag(at(1, 0), at(2, 1)), 4, [0, 1, 2, 1, 1, 2], 2);
       t = await step("ctrl-marquee-from-held-removes", t, () => gdrag(at(1, 0), at(2, 0), { ctrlKey: true }), 2, [1, 1, 2], 2);
+      await dispatchAt(key, 1, 1, "pointermove");
+      console.error(`OK  ${key} — ${t.slice(0, 160)}`);
+      continue;
+    }
+
+    // The same grid started with `selected=` (#356): before any gesture, the printed value holds
+    // the two seeded cells, host.value's `{runs}` names them, and they draw as one outlined area
+    // (one fill rect, a 4-sided edge). Ctrl-click then takes a seeded cell out and puts it back,
+    // and a plain click replaces both, as on a grid that started empty.
+    // The same grid cut into regions (#359), rows along x: row 0 is 1 1 2 0, row 1 is 1 3 2 0,
+    // row 2 is 3 3 2 2 (0 = no region). Hover outlines the whole region with the hover edge,
+    // keeps one highlight while the pointer moves inside it, and names it; a click picks the
+    // whole region, Ctrl-click adds or drops one, a cell in no region is picked alone, and a
+    // box inside one cell takes that cell's whole region. The value counts the whole regions.
+    if (spec.mode === "many_grid_regions") {
+      const g = layer.geometry;
+      if (!layer.many) throw new Error(`${key}: layer ${layer.id} ships no many flag`);
+      if (JSON.stringify(g.regions) !== JSON.stringify([1, 2, 2, 1, 0, 1, 1, 1, 3, 1, 2, 1, 0, 1, 3, 2, 2, 2])) {
+        throw new Error(`${key}: regions ${JSON.stringify(g.regions)}, want the region runs`);
+      }
+      const v0 = await textOf(`#bond_${key}`);
+      if (!/GridSelection\(:region, 0 of 12 cells\)/.test(v0)) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want empty`);
+      const at = (i, j) => ({ x: (g.xedges[i] + g.xedges[i + 1]) / 2, y: (g.yedges[j] + g.yedges[j + 1]) / 2 });
+      const h1 = await dispatchAt(key, at(0, 0).x, at(0, 0).y, "pointermove");
+      if (h1.text !== "region 1") throw new Error(`${key}: hover tip ${JSON.stringify(h1.text)}, want "region 1"`);
+      if (!h1.hi.edge || !/masque-w-hover/.test(h1.hi.edge.className ?? "")) throw new Error(`${key}: hover edge ${JSON.stringify(h1.hi.edge)}, want the hover edge`);
+      if ((h1.hi.edge.d?.match(/M/g) ?? []).length !== 6) throw new Error(`${key}: hover edge ${h1.hi.edge.d}, want region 1's 6-sided outline`);
+      if (!h1.hi.fill || h1.hi.fill.blend !== "color-dodge") throw new Error(`${key}: hover fill ${JSON.stringify(h1.hi.fill)}, want the dodge fill`);
+      const h2 = await dispatchAt(key, at(1, 0).x, at(1, 0).y, "pointermove");
+      if (h2.hi.edge?.d !== h1.hi.edge.d || h2.text !== "region 1") throw new Error(`${key}: moving inside region 1 drew ${h2.hi.edge?.d} / ${h2.text}`);
+      passed.push(`${key}/hover-outlines-region`);
+      const words = (n, r) => `GridSelection(:region, ${n} of 12 cells${r ? `, ${r} region${r === 1 ? "" : "s"}` : ""})`;
+      const step = async (what, before, act, wantCount, wantRegions, wantRuns) => {
+        await act();
+        const t = await waitChange(`#bond_${key}`, before, `${key}/${what}`);
+        if (!t.includes(words(wantCount, wantRegions))) throw new Error(`${key}/${what}: value ${JSON.stringify(t)}, want ${words(wantCount, wantRegions)}`);
+        const m = await inspect(key);
+        if (JSON.stringify(m.bondAll?.region?.runs) !== JSON.stringify(wantRuns)) throw new Error(`${key}/${what}: host.value runs ${JSON.stringify(m.bondAll?.region?.runs)}, want ${JSON.stringify(wantRuns)}`);
+        if (m.sel !== 2) throw new Error(`${key}/${what}: g.sel=${m.sel}, want one fill and one outline`);
+        passed.push(`${key}/${what}`);
+        return t;
+      };
+      let t = await step("click-picks-region", v0, () => dispatchAt(key, at(0, 0).x, at(0, 0).y, "click"), 3, 1, [0, 0, 2, 1, 0, 1]);
+      const hs = await dispatchAt(key, at(0, 1).x, at(0, 1).y, "pointermove");
+      if (hs.hi.fill || hs.hi.edge || hs.hi.plain) throw new Error(`${key}: hovering a selected region drew ${JSON.stringify(hs.hi)}`);
+      passed.push(`${key}/no-hover-on-selected-region`);
+      t = await step("ctrl-click-adds-region", t, () => dispatchAt(key, at(2, 2).x, at(2, 2).y, "click", { ctrlKey: true }), 7, 2, [0, 0, 3, 1, 0, 1, 1, 2, 1, 2, 2, 2]);
+      t = await step("ctrl-click-drops-region", t, () => dispatchAt(key, at(1, 0).x, at(1, 0).y, "click", { ctrlKey: true }), 4, 1, [0, 2, 1, 1, 2, 1, 2, 2, 2]);
+      t = await step("click-cell-in-no-region", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 1, 0, [0, 3, 1]);
+      // A box well inside cell (1, 1), of region 3, takes the whole region.
+      const c = at(1, 1), dx = (g.xedges[2] - g.xedges[1]) / 4, dy = (g.yedges[2] - g.yedges[1]) / 4;
+      const gdrag = async (from, to) => {
+        await dispatchAt(key, from.x, from.y, "pointerdown");
+        await dispatchAt(key, (from.x + to.x) / 2, (from.y + to.y) / 2, "pointermove");
+        await dispatchAt(key, to.x, to.y, "pointermove");
+        return dispatchAt(key, to.x, to.y, "pointerup");
+      };
+      t = await step("box-takes-touched-region", t, () => gdrag({ x: c.x - dx, y: c.y - dy }, { x: c.x + dx, y: c.y + dy }), 3, 1, [1, 1, 1, 2, 0, 2]);
+      await dispatchAt(key, 1, 1, "pointermove");
+      console.error(`OK  ${key} — ${t.slice(0, 160)}`);
+      continue;
+    }
+
+    if (spec.mode === "many_grid_seeded") {
+      const g = layer.geometry;
+      if (!layer.many) throw new Error(`${key}: layer ${layer.id} ships no many flag`);
+      const v0 = await textOf(`#bond_${key}`);
+      if (!/GridSelection\(:region, 2 of 12 cells\)/.test(v0)) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want the 2 seeded cells`);
+      const m0 = await inspect(key);
+      if (JSON.stringify(m0.bondAll?.region?.runs) !== "[1,1,2]") throw new Error(`${key}: mount runs ${JSON.stringify(m0.bondAll?.region)}, want [1,1,2]`);
+      if (m0.sel !== 2) throw new Error(`${key}: mount g.sel=${m0.sel}, want the seeded cells drawn`);
+      const p0 = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const d = (svg) => sr.querySelector(`svg.${svg} g.sel path`)?.getAttribute("d") ?? null;
+        return { fill: d("masque-fill"), edge: d("masque-edge") };
+      }, key);
+      if ((p0.fill?.match(/M/g) ?? []).length !== 1) throw new Error(`${key}: mount fill path ${p0.fill}, want one rect for the two cells`);
+      if ((p0.edge?.match(/M/g) ?? []).length !== 4) throw new Error(`${key}: mount edge path ${p0.edge}, want the outline only (4 sides)`);
+      passed.push(`${key}/seeded-at-mount`);
+      const at = (i, j) => ({ x: (g.xedges[i] + g.xedges[i + 1]) / 2, y: (g.yedges[j] + g.yedges[j + 1]) / 2 });
+      const step = async (what, before, act, wantCount, wantRuns) => {
+        await act();
+        const t = await waitChange(`#bond_${key}`, before, `${key}/${what}`);
+        if (!t.includes(`GridSelection(:region, ${wantCount} of 12 cells)`)) throw new Error(`${key}/${what}: value ${JSON.stringify(t)}, want ${wantCount} cells`);
+        const m = await inspect(key);
+        if (JSON.stringify(m.bondAll?.region?.runs) !== JSON.stringify(wantRuns)) throw new Error(`${key}/${what}: host.value runs ${JSON.stringify(m.bondAll?.region?.runs)}, want ${JSON.stringify(wantRuns)}`);
+        if (m.sel !== 2) throw new Error(`${key}/${what}: g.sel=${m.sel}, want 2`);
+        passed.push(`${key}/${what}`);
+        return t;
+      };
+      let t = await step("ctrl-click-removes-seed", v0, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click", { ctrlKey: true }), 1, [1, 2, 1]);
+      t = await step("ctrl-click-adds-back", t, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click", { ctrlKey: true }), 2, [1, 1, 2]);
+      t = await step("click-replaces-seeds", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 1, [0, 3, 1]);
       await dispatchAt(key, 1, 1, "pointermove");
       console.error(`OK  ${key} — ${t.slice(0, 160)}`);
       continue;
@@ -1078,6 +1184,109 @@ try {
     }
     if (spec.mode === "owner") continue;
 
+    if (key === "view3d_linked") {
+      // `linkcameras!` (#362): orbiting the left panel turns the right one. The right panel's
+      // picture must change and its points must answer where they are drawn now, not where
+      // they were at mount.
+      const pts2 = layers.find((l) => l.id === "pts2");
+      if (!pts2) throw new Error(`${key}: no pts2 layer`);
+      const hostRect = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        host.scrollIntoView({ block: "center", inline: "nearest" });
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        const vb = sr.querySelector("svg.masque-plain").viewBox.baseVal;
+        return { left: b.left, top: b.top, s: b.width / vb.width, w: vb.width, h: vb.height };
+      }, key);
+      const stamp = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        return host?.dataset.masqueGestureFrame ? JSON.parse(host.dataset.masqueGestureFrame) : null;
+      }, key);
+      // The right half of the image, where the follower is drawn.
+      const shotRight = async () => {
+        const r = await hostRect();
+        return page.screenshot({ clip: { x: r.left + (r.w / 2) * r.s, y: r.top, width: (r.w / 2) * r.s, height: r.h * r.s } });
+      };
+      const old = [0, 1].map((i) => hitPoint(pts2, i));
+      for (const p of old) {
+        const r = await dispatchAt(key, p.x, p.y, "pointermove");
+        if (!r.show) throw new Error(`${key}: the follower's point at ${JSON.stringify(p)} should hover before the orbit`);
+      }
+      await dispatchAt(key, 1, 1, "pointermove");
+      const shot0 = await shotRight();
+      const s0 = await stamp();
+      const g = layer.geometry;
+      const c = { x: g.x + g.w / 2, y: g.y + g.h / 2 };
+      await drag(key, c.x, c.y, c.x + 90, c.y + 20, false);
+      const tries = backend === "webgl" ? 50 : 25;
+      const delayMs = backend === "webgl" ? 300 : 200;
+      let st = null;
+      for (let i = 0; i < tries; i++) {
+        await new Promise((r) => setTimeout(r, delayMs));
+        st = await stamp();
+        if (st && st.n > (s0?.n ?? 0) && st.settle === true && Math.abs(st.azimuth - g.azimuth) > 0.05) break;
+        st = null;
+      }
+      if (!st) throw new Error(`${key}: no settled orbit frame landed (last ${JSON.stringify(await stamp())})`);
+      await dispatchAt(key, 1, 1, "pointermove");
+      await new Promise((r) => setTimeout(r, backend === "webgl" ? 600 : 100));
+      const shot1 = await shotRight();
+      if (Buffer.compare(shot0, shot1) === 0) throw new Error(`${key}: the follower panel's picture did not change after the orbit`);
+      passed.push(`${key}/follower-redrawn`);
+      // The corner point (index 1, at (4, 4, 4)) moves on screen when the camera turns; its old
+      // spot must go quiet, and a scan of the right panel must find it again somewhere else.
+      const moved = old[1];
+      const rOld = await dispatchAt(key, moved.x, moved.y, "pointermove");
+      const rect = await hostRect();
+      // A grid finer than the marker's hit radius, stopping at the first hit away from the old spot.
+      const hits = [];
+      const step = Math.max(4, Math.floor(moved.r));
+      let far = null;
+      for (let y = 4; y < rect.h && !far; y += step) {
+        for (let x = rect.w / 2 + 4; x < rect.w; x += step) {
+          const r = await dispatchAt(key, x, y, "pointermove");
+          if (!r.show || !/\bx 4\b.*\by 4\b.*\bz 4\b/.test(r.text ?? "")) continue;
+          hits.push({ x, y });
+          if (Math.hypot(x - moved.x, y - moved.y) > moved.r + 6) { far = { x, y, text: r.text }; break; }
+        }
+      }
+      if (!far) throw new Error(`${key}: the follower's corner point answers nowhere new after the orbit (old spot show=${rOld.show}; ${hits.length} hits near the old spot)`);
+      passed.push(`${key}/follower-hits-moved`);
+      await dispatchAt(key, 1, 1, "pointermove");
+      // Wheel a1, then a2, then a1. Each zoom must start from the limits both panels share now,
+      // so the third is narrower than the second; starting from a1's own earlier request would
+      // throw a2's zoom away. That a1's base moved at all also shows a2's zoom reached a1.
+      const g2 = layers.find((l) => l.id === "view2")?.geometry;
+      if (!g2) throw new Error(`${key}: no view2 layer`);
+      const wheelOn = async (vg, prev) => {
+        await page.evaluate(([k, ix, iy]) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const b = host.querySelector("img, canvas").getBoundingClientRect();
+          const sc = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+          sr.querySelector(".surface").dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: b.left + ix * sc, clientY: b.top + iy * sc, deltaY: -300 }));
+        }, [key, vg.x + vg.w / 2, vg.y + vg.h / 2]);
+        for (let i = 0; i < tries; i++) {
+          await new Promise((r) => setTimeout(r, delayMs));
+          const s2 = await stamp();
+          if (s2 && s2.n > prev.n && s2.settle === true && Array.isArray(s2.limits)) return s2;
+        }
+        throw new Error(`${key}: no settled zoom frame (last ${JSON.stringify(await stamp())})`);
+      };
+      const wx = (l) => l[1] - l[0];
+      const z1 = await wheelOn(g, st);
+      const z2 = await wheelOn(g2, z1);
+      const z3 = await wheelOn(g, z2);
+      if (!(wx(z2.limits) < 0.95 * wx(z1.limits))) throw new Error(`${key}: the second panel's zoom did not start from the first's (${wx(z1.limits)} -> ${wx(z2.limits)})`);
+      if (!(wx(z3.limits) < 0.95 * wx(z2.limits))) throw new Error(`${key}: zooming the first panel again dropped the second panel's zoom (${wx(z1.limits)}, ${wx(z2.limits)}, ${wx(z3.limits)})`);
+      passed.push(`${key}/alternating-zoom`);
+      console.error(`OK  ${key} — orbit az ${g.azimuth.toFixed(2)} -> ${st.azimuth.toFixed(2)}, follower redrawn, its point answers at ${JSON.stringify(far)}; zoom widths ${[z1, z2, z3].map((z) => wx(z.limits).toFixed(3)).join(" > ")}`);
+      continue;
+    }
+
     if (key === "view3d") {
       // Axis3 zoom and pan (#321). The wheel scales the limits about their center, so the
       // middle point stays put on screen and the corner leaves the limits: it is clipped from
@@ -1215,6 +1424,20 @@ try {
       passed.push(`${key}/view-gesture-frame`);
       console.error(`OK  ${key}/drag — no commit (§12.3), gesture frame ${stampAfter}`);
 
+      // #363: an axis tied by `linkaxes!` lands at the pan's limits too (it used to snap back).
+      const links = layer.geometry?.links ?? [];
+      for (const l of links) {
+        const lim = cam[`linked:${l.axis}`];
+        const close = (a, b) => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b));
+        if (!Array.isArray(lim) || !close(lim[0], cam.xmin) || !close(lim[1], cam.xmax) || !close(lim[2], cam.ymin) || !close(lim[3], cam.ymax)) {
+          throw new Error(`${key}-drag: linked axis ${l.axis} did not follow the pan: ${stampAfter}`);
+        }
+      }
+      if (links.length) {
+        passed.push(`${key}/linked-pan`);
+        console.error(`OK  ${key}/linked — ${links.length} linked axis followed the pan`);
+      }
+
       if (layer.geometry && layer.geometry.mode === "pan") {
         const zoom = await page.evaluate(([k, ix, iy]) => {
           const span = document.querySelector(`#coords_${k}`);
@@ -1235,12 +1458,17 @@ try {
           return {
             photo: host.dataset.masquePhoto || "",
             clip: !!host.querySelector(".masque-data-clip"),
+            windows: host.querySelectorAll(".masque-data-clip").length,
             baseTransform: base?.style.transform || "",
             prevented: ev.defaultPrevented,
           };
         }, [key, p.x, p.y]);
         if (!zoom.prevented || !zoom.photo || !zoom.clip || zoom.baseTransform) {
           throw new Error(`${key}-wheel: photographic zoom did not engage (${JSON.stringify(zoom)})`);
+        }
+        // #363: each linked axis's data slides in a window of its own.
+        if (zoom.windows !== 1 + links.length) {
+          throw new Error(`${key}-wheel: expected ${1 + links.length} sliding windows, got ${zoom.windows}`);
         }
         let photo = zoom.photo;
         let zoomStamp = stampAfter;

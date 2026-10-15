@@ -44,6 +44,12 @@ RegionInteractable
 FunctionInteractable
 ```
 
+## Linking views
+
+```@docs
+linkcameras!
+```
+
 ## Tooltip macro and type
 
 ```@docs

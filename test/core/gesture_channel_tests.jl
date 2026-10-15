@@ -73,6 +73,63 @@ end
         @test ax.limits[][1] ≈ new_xmin atol = 1.0e-6
     end
 
+    @testset "a pan moves the axes linked to it (#363)" begin
+        _xlims(ax) = (fl = ax.finallimits[]; (fl.origin[1], fl.origin[1] + fl.widths[1]))
+        _ylims(ax) = (fl = ax.finallimits[]; (fl.origin[2], fl.origin[2] + fl.widths[2]))
+        function linked_fig(link!)
+            fig = Figure(size = (700, 300))
+            a1 = Axis(fig[1, 1]); a2 = Axis(fig[1, 2])
+            scatter!(a1, 0:10, 0:10)
+            scatter!(a2, 0:5, 100:20:200)
+            link!(a1, a2)
+            return fig, a1, a2
+        end
+        pan(w, id, x, y) = w.render_frame(
+            Dict(
+                "id" => id, "xmin" => x[1], "xmax" => x[2], "ymin" => y[1], "ymax" => y[2], "settle" => true,
+            ),
+        )
+
+        # Both dimensions linked, the view on the first axis: the finalize step used to reset the
+        # second axis's automatic limits and push them back, so nothing moved.
+        fig, a1, a2 = linked_fig(linkaxes!)
+        w = masque(fig, [ViewInteractable(a1)]; auto = false)
+        resp = pan(w, "view", (20.0, 30.0), (-5.0, 5.0))
+        for ax in (a1, a2)
+            @test all(isapprox.(_xlims(ax), (20.0, 30.0); atol = 1.0e-6))
+            @test all(isapprox.(_ylims(ax), (-5.0, 5.0); atol = 1.0e-6))
+        end
+        view = only(l for l in resp["manifest"]["layers"] if l["kind"] == "view")
+        link = only(view["geometry"]["links"])
+        @test haskey(link, "x") && haskey(link, "y")
+        @test length(link["clip"]) == 4 && link["fill"] isa String
+        # The linked axis's tick-label space is pinned too, so its box holds still (#171).
+        @test a2.yticklabelspace[] isa Real
+
+        # x only, the view on the last axis: the linked axis keeps its own automatic y.
+        fig, a1, a2 = linked_fig(linkxaxes!)
+        w = masque(fig, [ViewInteractable(a2)]; auto = false)
+        y2 = _ylims(a2)
+        resp = pan(w, "view", (2.0, 4.0), y2)
+        @test all(isapprox.(_xlims(a1), (2.0, 4.0); atol = 1.0e-6))
+        @test all(isapprox.(_xlims(a2), (2.0, 4.0); atol = 1.0e-6))
+        @test _ylims(a1)[2] < 50       # a1's own data, not a2's
+        @test a1.limits[][2] === nothing
+        link = only(only(l for l in resp["manifest"]["layers"] if l["kind"] == "view")["geometry"]["links"])
+        @test haskey(link, "x") && !haskey(link, "y")
+        # Same x limits and boxes of about the same width: about the same px per data unit.
+        @test 0.7 < link["x"][3] < 1.3
+        @test link["x"][2] < link["x"][1]
+
+        # The compile-ahead warmup puts the linked axes' limits back.
+        fig, a1, a2 = linked_fig(linkaxes!)
+        w = masque(fig, [ViewInteractable(a1)]; auto = false)
+        lim0 = a2.limits[]
+        Masque._warm_view_render_frame!(w.render_frame, Dict{Symbol, Any}(:view => a1))
+        @test a2.limits[] == lim0
+        @test all(isapprox.(_xlims(a2), _xlims(a1); atol = 1.0e-6))
+    end
+
     @testset "3D orbit: azimuth/elevation drive the same axis live" begin
         fig = Figure(size = (400, 400))
         ax = Axis3(fig[1, 1])
@@ -127,6 +184,105 @@ end
         w.render_frame(Dict("id" => "view", "azimuth" => 0.9, "elevation" => 0.3, "settle" => false))
         @test collect(maximum(ax.finallimits[])) ≈ [0.6, 0.6, 0.6] atol = 1.0e-6
         @test_throws ArgumentError w.render_frame(Dict("id" => "view", "limits" => [1.0, 0.0, 0, 1, 0, 1]))
+    end
+
+    @testset "linkcameras! turns the other panels with the dragged one (#362)" begin
+        fig = Figure(size = (700, 350))
+        a1 = Axis3(fig[1, 1]; azimuth = 0.4, elevation = 0.5)
+        a2 = Axis3(fig[1, 2]; azimuth = 1.5, elevation = 0.1)
+        a3 = Axis3(fig[1, 3])
+        pts = Makie.Point3f[(0, 0, 0), (1, 1, 1), (0.5, 0.5, 0.5)]
+        scatter!(a1, pts)
+        scatter!(a2, pts)
+        scatter!(a3, pts)
+        @test linkcameras!(a1, a2, a3) === nothing
+        # Linking gives every panel the first one's camera.
+        @test (a2.azimuth[], a2.elevation[]) == (a1.azimuth[], a1.elevation[])
+        @test (a3.azimuth[], a3.elevation[]) == (a1.azimuth[], a1.elevation[])
+
+        w = masque(
+            fig, [
+                ViewInteractable(a1; id = :v1),
+                PointInteractable(a1, pts; id = :p1),
+                PointInteractable(a2, pts; id = :p2),
+            ]; auto = false,
+        )
+        lay(m, id) = only(l for l in m["layers"] if l["id"] == id)
+        p2_before = lay(w.manifest, "p2")["geometry"]
+        m = w.render_frame(Dict("id" => "v1", "azimuth" => 1.1, "elevation" => 0.2, "settle" => true))["manifest"]
+        for ax in (a2, a3)
+            @test ax.azimuth[] ≈ 1.1 atol = 1.0e-9
+            @test ax.elevation[] ≈ 0.2 atol = 1.0e-9
+        end
+        # The follower's hit areas are re-projected onto its new view, in the same frame.
+        bk = Masque._resolve_backend(:cairo)
+        ctx = Masque.context(bk, fig, Masque._ppu(bk, fig, 700), 700)
+        p2 = lay(m, "p2")["geometry"]
+        q = data_to_image_px(ctx, a2, pts[2])
+        @test p2[4] ≈ q[1] atol = 0.5   # circles ship x, y, r per point
+        @test p2[5] ≈ q[2] atol = 0.5
+        @test p2 != p2_before
+
+        # Rotation only by default: a zoom on the dragged panel leaves the others' limits alone.
+        lim2 = a2.limits[]
+        w.render_frame(Dict("id" => "v1", "limits" => [0.4, 0.6, 0.4, 0.6, 0.4, 0.6], "settle" => true))
+        @test a2.limits[] == lim2
+        @test collect(maximum(a2.finallimits[])) != [0.6, 0.6, 0.6]
+
+        # Turning a follower turns the first panel too.
+        a3.azimuth[] = 2.0
+        @test a1.azimuth[] == 2.0 && a2.azimuth[] == 2.0
+    end
+
+    @testset "linkcameras!(...; limits = true) shares zoom and pan (#362)" begin
+        fig = Figure(size = (600, 350))
+        a1 = Axis3(fig[1, 1])
+        a2 = Axis3(fig[1, 2]; limits = (-5, 5, -5, 5, -5, 5))
+        pts = Makie.Point3f[(0, 0, 0), (1, 1, 1)]
+        scatter!(a1, pts)
+        scatter!(a2, pts)
+        linkcameras!([a1, a2]; limits = true)
+        @test a2.limits[] == a1.limits[]
+        w = masque(fig, [ViewInteractable(a1)]; auto = false)
+        zl = Float64[0.4, 0.6, 0.4, 0.6, 0.4, 0.6]
+        w.render_frame(Dict("id" => "view", "limits" => zl, "settle" => true))
+        @test collect(minimum(a2.finallimits[])) ≈ [0.4, 0.4, 0.4] atol = 1.0e-6
+        @test collect(maximum(a2.finallimits[])) ≈ [0.6, 0.6, 0.6] atol = 1.0e-6
+    end
+
+    @testset "linkcameras! groups can overlap, and 2D axes point to linkaxes! (#362)" begin
+        fig = Figure()
+        a1, a2, a3 = Axis3(fig[1, 1]), Axis3(fig[1, 2]), Axis3(fig[1, 3])
+        linkcameras!(a1, a2)
+        linkcameras!(a2, a3)
+        linkcameras!(a3, a1)
+        a1.elevation[] = 0.9
+        @test a2.elevation[] == 0.9 && a3.elevation[] == 0.9
+        a3.azimuth[] = -0.3
+        @test a1.azimuth[] == -0.3 && a2.azimuth[] == -0.3
+        @test linkcameras!(a1) === nothing
+        @test linkcameras!() === nothing
+        @test linkcameras!(Any[]) === nothing
+        # An untyped vector of Axis3 links like a typed one.
+        b1, b2 = Axis3(fig[2, 2]), Axis3(fig[2, 3])
+        linkcameras!(Any[b1, b2])
+        b2.azimuth[] = 0.25
+        @test b1.azimuth[] == 0.25
+
+        ax2d = Axis(fig[2, 1])
+        err = try
+            linkcameras!(a1, ax2d)
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("linkaxes!", err.msg)
+        err2 = try
+            linkcameras!(Any[a1, ax2d])
+        catch e
+            e
+        end
+        @test err2 isa ArgumentError && occursin("argument 2 is Axis", err2.msg)
     end
 
     @testset "a line crossing the zoomed limits keeps its drawn part (#321)" begin

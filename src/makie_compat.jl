@@ -58,6 +58,38 @@ function _child_plots(p)
     return plots
 end
 
+# A Series' lines, through `Makie.get_plots`, the mapping Makie's own legend uses. Since Makie
+# 0.24.16 a Series draws its lines through a `PlotList` child, and `get_plots` steps into it.
+function _series_children(p)
+    plots = try
+        Makie.get_plots(p)
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("get_plots", "`Makie.get_plots(::Series)` to return its lines")
+    end
+    plots isa AbstractVector || return _makie_compat_error("get_plots", "`Makie.get_plots(::Series)` to be a Vector")
+    return plots
+end
+
+# Each of a Series' lines' label, or `nothing`. Makie 0.24.16 builds the lines from the raw
+# `labels` attribute (`nothing` by default), so a line carries no label of its own; the
+# defaults (`series 1`, …) are in the Series' `series_labels`. A line's own label wins. The
+# fallback works around Makie passing `labels`, not `series_labels`, to the line specs in
+# `basic_recipes/series.jl`; drop it once Makie passes `series_labels`.
+function _series_labels(p, children)
+    fallback = try
+        p.series_labels[]
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        nothing
+    end
+    return map(enumerate(children)) do (k, c)
+        own = _plot_label(c)
+        own !== nothing && return own
+        fallback isa AbstractVector && k <= length(fallback) ? _label_text(fallback[k]) : nothing
+    end
+end
+
 # Wraps `ax.finallimits[]`, the axis's post-layout data limits; no public equivalent.
 function _finallimits(ax)
     fl = try
@@ -69,6 +101,20 @@ function _finallimits(ax)
     # Axis3.finallimits is a Rect3d, not a Rect2; accept any-dimension Rect.
     fl isa Makie.Rect || return _makie_compat_error("finallimits", "`.finallimits[]` to be a `Rect`")
     return fl
+end
+
+# Wraps `ax.xaxislinks` / `ax.yaxislinks`: the axes `linkxaxes!`, `linkyaxes!` and `linkaxes!`
+# tied to `ax`. Makie keeps each link group complete on every member; no public accessor exists.
+function _axis_links(ax)
+    links = try
+        (ax.xaxislinks, ax.yaxislinks)
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("xaxislinks", "an Axis to expose `.xaxislinks` and `.yaxislinks`")
+    end
+    all(l -> l isa AbstractVector, links) ||
+        return _makie_compat_error("xaxislinks", "`.xaxislinks` and `.yaxislinks` to be vectors of axes")
+    return links
 end
 
 # Wraps `scene.viewport[]`, the pixel rectangle a scene occupies; no public equivalent.
@@ -304,6 +350,9 @@ function _legend_entries_meta(leg)
                 err isa _MAKIE_SHAPE_ERRORS || rethrow()
                 return _makie_compat_error("label", "a LegendEntry to expose `.label[]`")
             end
+            # Makie draws no row for an entry labelled `nothing` (a `series!` under Makie
+            # 0.24.16 gives its entries no label), so it has no box to hit either.
+            lbl === nothing && continue
             label = lbl isa AbstractString ? String(lbl) : string(lbl)
             elements = try
                 e.elements

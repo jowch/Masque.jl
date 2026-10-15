@@ -6,6 +6,7 @@ import { hideCross, syncCross } from "./cross"
 import { linkedHits } from "./selection"
 import { surfaceFields } from "./surface"
 import { cancel as cancelMarquee } from "./drag/marquee"
+import { hasRegions, regionOf } from "./regions"
 import { fmt, cssAnchor, hitKey, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
 import { contentPoint, isIdentity, mapPoint, type PhotoMatrix } from "./photo"
 import type { OverlayCtx, OverlayState } from "./state"
@@ -173,6 +174,12 @@ export function placeAnchored(ctx: OverlayCtx, state: OverlayState, anchor: Anch
 // The html-selection branching shared by pointer hover (showTip, below) and keyboard focus
 // (keyboard.ts's focusTo) — factored out so keyboard.ts can build the same content without a
 // MouseEvent to derive an offset from.
+// A grid cell's `region` for a template: its region id on a grid with regions (0 for a cell in
+// none), nothing on a grid without.
+function regionField(hit: Hit): { region?: number } {
+    return hasRegions(hit.layer) ? { region: regionOf(hit.layer, hit.index) } : {}
+}
+
 // A grid cell's payload as fields to spread: an object as is, a bare value as `payload`.
 function cellObject(hit: Hit): object {
     const cell = hit.layer.payloads[hit.index]
@@ -196,7 +203,7 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
         // the Julia GridCellEvent.
         return renderTemplate(
             layer.template,
-            hit.grid_ ? { ...cellObject(hit), ...(payload as object), i: hit.grid_[0] + 1, j: hit.grid_[1] + 1 } : withReadout(payload, hit, ctx.manifest_.transforms[layer.axis], true),
+            hit.grid_ ? { ...cellObject(hit), ...(payload as object), i: hit.grid_[0] + 1, j: hit.grid_[1] + 1, ...regionField(hit) } : withReadout(payload, hit, ctx.manifest_.transforms[layer.axis], true),
             ctx.tipDigits_,
         )
     } else if (hit.grid_) {
@@ -211,6 +218,8 @@ export function tipHtmlForHit(ctx: OverlayCtx, hit: Hit, x: number, y: number): 
             }
             return renderAutoTable(v === undefined ? cell : { ...cell, value: v }, ctx.tipDigits_)
         }
+        // A cell in a region names its region.
+        if (hit.region_ !== undefined) return `region ${hit.region_}`
         // Wire i/j are 0-based; the tooltip shows the Julia 1-based cell.
         const i = hit.grid_[0] + 1, j = hit.grid_[1] + 1
         return hit.grid_[2] === undefined ? `(${i},${j})` : `(${i},${j}) = ${esc(fmtNum(hit.grid_[2], ctx.tipDigits_))}`

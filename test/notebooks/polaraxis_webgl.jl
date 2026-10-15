@@ -21,8 +21,10 @@ end
 begin
     import Pkg
     Pkg.activate(; temp = true)
-    Pkg.develop(path = joinpath(@__DIR__, "..", ".."))
+    # Add before developing: JSON3 caps Parsers at 2.x, and downgrading the Parsers that
+    # the develop resolved fails the precompile on a fresh depot ("Unknown package: Parsers").
     Pkg.add(["WGLMakie", "JSON3"])
+    Pkg.develop(path = joinpath(@__DIR__, "..", ".."))
     Pkg.instantiate()
     using Masque
     using WGLMakie

@@ -121,10 +121,13 @@ A `surface!` responds on an `Axis3` only: hovering it shows the
 data point under the pointer on the side you can see, and a
 `wireframe!` drawn over the same grid is left as decoration so the
 surface answers. A `surface!` on a 2D `Axis` is skipped with a
-warning; to inspect a grid there, draw it with `heatmap!`. On an
-`Axis3`, where `text!` labels can overlap, the label drawn on top
-answers: the nearest one with `backend = :webgl`, and the one listed
-last with CairoMakie, which draws labels in the order you give them. If Masque can't make one plot
+warning; to inspect a grid there, draw it with `heatmap!`. Where marks
+of one plot overlap, the one drawn on top answers. On a 2D `Axis` that
+is the one listed last. On an `Axis3`, the `meshscatter!` sphere
+nearer the camera answers. For `scatter!` markers and `text!` labels
+there it is the nearest one with `backend = :webgl`, and the one
+listed last with CairoMakie, which draws them in the order you give
+them. If Masque can't make one plot
 interactive, it skips that plot with a warning and the rest of the
 figure still responds. To make a recipe of your own
 respond as one mark, see [Your own plot types](@ref), and to add hit

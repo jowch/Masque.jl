@@ -23,7 +23,10 @@ export const prefersReducedMotion = (): boolean =>
     typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches
 
 // A picked point on a line is keyed apart from the line, so hovering that line still outlines it.
-export const hitKey = (h: Hit): string => (h.sample_ === undefined ? `${h.layer.id}:${h.index}` : `${h.layer.id}:${h.index}@${h.sample_}`)
+// A grid cell in a region is keyed by the region, so moving within it keeps one highlight.
+export const hitKey = (h: Hit): string =>
+    h.region_ !== undefined ? `${h.layer.id}:r${h.region_}` :
+    h.sample_ === undefined ? `${h.layer.id}:${h.index}` : `${h.layer.id}:${h.index}@${h.sample_}`
 
 // Image-px scale comes from manifest.width, not the element's intrinsic size, so a
 // <canvas> needs no sizer shim.
@@ -240,8 +243,11 @@ export interface OverlayState {
     // A frame that lands meanwhile keeps the readout, as it does for a pointer pan or a wheel.
     keyView_: boolean
     // Axis3 limits per view id (#321): the last ones a zoom or pan asked for, which a frame's
-    // geometry can trail, and the ones on screen at the first zoom or pan, which bound the zoom.
-    view3_: Map<string, { limits: Limits3; home: Limits3 }>
+    // geometry can trail, and the ones at mount, which bound the zoom.
+    view3_: Map<string, { limits?: Limits3; home: Limits3 }>
+    // The view id that made the latest Axis3 zoom or pan request. Another id's remembered
+    // limits are stale once `linkcameras!(...; limits = true)` lets this one move them (#362).
+    view3Last_: string | null
 }
 
 export function createOverlayState(): OverlayState {
@@ -279,6 +285,7 @@ export function createOverlayState(): OverlayState {
         wheelTimer_: null,
         keyView_: false,
         view3_: new Map(),
+        view3Last_: null,
     }
 }
 

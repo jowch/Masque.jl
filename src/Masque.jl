@@ -94,6 +94,7 @@ include("events.jl")
 include("bond.jl")
 include("render.jl")
 include("hints.jl")
+include("link.jl")
 
 export AbstractBackend
 export AbstractInteractable, AbstractSelector, HitLayer, InteractionContext, AxisTransform
@@ -101,7 +102,7 @@ export PointInteractable, SegmentInteractable, RectInteractable, GridInteractabl
     AxisInteractable, ColorbarInteractable, LegendInteractable, RegionInteractable, FunctionInteractable,
     ThresholdInteractable, ROIInteractable, TextInteractable, ViewInteractable, SliceInteractable,
     SurfaceInteractable
-export masque, interactables, data_to_image_px, hitlayers, bondtype, transform_bond
+export masque, interactables, data_to_image_px, hitlayers, bondtype, transform_bond, linkcameras!
 export InteractionEvent, ElementEvent, LegendEvent, GridCellEvent, GridWindowEvent, GridSelection,
     AxisEvent, ThresholdEvent, ColorbarEvent, BoundsEvent
 export Markup, @masque_str
