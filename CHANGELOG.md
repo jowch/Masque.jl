@@ -27,6 +27,9 @@ All notable changes to this project are documented here. The format is based on
   readout over it, and its legend links find the lines, and the tooltip names each line as
   before. A legend whose entries Makie leaves unlabelled (and so doesn't draw) no longer stops
   the figure from building, and a legend with no drawn entries gets no hover or click layer.
+- Panning an axis tied to others with `linkaxes!`, `linkxaxes!`, or `linkyaxes!` moves them
+  all. Before, the pan did nothing. While you drag, the data in the linked axes slides along
+  with the axis you hold (#363).
 
 ## [0.3.0] - 2026-10-10
 

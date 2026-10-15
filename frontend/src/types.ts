@@ -81,6 +81,17 @@ export interface SliceGeometry {
     series: SliceSeries[]
 }
 
+// A linked axis, its preview window (`clip`, `fill`, as on ViewGeometry) and, per shared
+// dimension, `[p, q, r]`: one data value's image px on the pan axis (`p`) and on this axis
+// (`q`), and the ratio of this axis's px per data unit to the pan axis's (`r`).
+export interface ViewLink {
+    axis: string // the linked axis's transform id
+    clip: [number, number, number, number]
+    fill?: string
+    x?: [number, number, number]
+    y?: [number, number, number]
+}
+
 export interface ViewGeometry {
     x: number      // axis viewport bbox, image px
     y: number
@@ -92,6 +103,8 @@ export interface ViewGeometry {
     clip?: [number, number, number, number]
     // pan only: the empty plot's colour (CSS), painted behind the sliding copy (#171).
     fill?: string
+    // pan only: axes tied to this one by Makie's `linkaxes!` (#363), whose data slides too.
+    links?: ViewLink[]
     azimuth?: number    // radians; orbit only (current Axis3 camera)
     elevation?: number  // radians; orbit only
     // orbit only (#321): the Axis3 limits [xmin, xmax, ymin, ymax, zmin, zmax] this frame
