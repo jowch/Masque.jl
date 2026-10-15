@@ -75,6 +75,8 @@ end
 function Base.propertynames(ev::InteractionEvent)
     # `part` reads on every event; it is listed where the layer is a recipe's part.
     fs = (fieldnames(typeof(ev))..., (isempty(_ev_part(ev)) ? () : (:part,))...)
+    # A grid cell lists `region` only on a grid with regions.
+    ev isa GridCellEvent && getfield(ev, :region) === nothing && (fs = filter(!=(:region), fs))
     ev isa GridCellEvent && !_forwards(ev) && return filter(!=(:payload), fs)
     _forwards(ev) || return fs
     pl = getfield(ev, :payload)
@@ -114,7 +116,7 @@ function Base.show(io::IO, ev::InteractionEvent)
             f === :layer && continue
             # A category label is only set on a categorical axis; omit the unset one.
             f in (:xcat, :ycat, :category) && getfield(ev, f) === nothing && continue
-            f === :payload && getfield(ev, f) === nothing && continue
+            f in (:payload, :region) && getfield(ev, f) === nothing && continue
             print(io, ", ", f, " = ")
             show(io, getfield(ev, f))
         end

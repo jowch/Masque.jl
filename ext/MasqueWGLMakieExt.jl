@@ -341,20 +341,150 @@ const _SHIM_TEXT = Ref{String}("")
 _bundle_text() = (isempty(_BUNDLE_TEXT[]) && (_BUNDLE_TEXT[] = read(_wgl_bundle_path(), String)); _BUNDLE_TEXT[])
 _shim_text() = (isempty(_SHIM_TEXT[]) && (_SHIM_TEXT[] = read(SHIM_JS, String)); _SHIM_TEXT[])
 
-# Outside Pluto there is nothing to draw the scene with and no PNG to fall back on, so show a
-# box the figure's size that says so, rather than throwing (#288).
-_static_html(w::WebGLWidget) = @htl(
-    """
-    <div class="ip-host" style="position:relative; display:inline-block; width:100%; max-width:$(w.display_css)px;">
-      <div class="masque-webgl-static" style="aspect-ratio:$(w.width) / $(w.height); display:flex; align-items:center; justify-content:center; border:1px dashed #999; color:#666; font:14px sans-serif; text-align:center; padding:1em; box-sizing:border-box;">
-        This WebGL figure is drawn only in Pluto.
-      </div>
-    </div>
-    """
+# Outside Pluto (#300): the page draws the scene itself, with hover, highlights and tooltips
+# as in Pluto. Clicks highlight but nothing reads the bond, and no frame comes back for an
+# orbit or pan. WGLMakie's ~1 MB script is fetched once per page from the Makie monorepo tag of
+# the installed Makie's version, from jsDelivr and then GitHub, and checked against the
+# installed copy's hash. The registry can install a WGLMakie from a commit between Makie tags
+# (WGLMakie 0.13.16 is not the `v0.24.16` tree), so nothing promises the two files match; the
+# script rarely changes, so they usually do, and the hash catches the release where they don't.
+# A WGLMakie that isn't a registered install (`Pkg.develop`, Makie master) inlines its script.
+const _WGL_CDN = Ref{Any}(missing)
+function _wgl_cdn()
+    _WGL_CDN[] === missing || return _WGL_CDN[]
+    return _WGL_CDN[] = _wgl_cdn(pkgdir(WGLMakie), pkgversion(Makie), _bundle_text())
+end
+function _wgl_cdn(dir, makie_version, js)
+    (makie_version === nothing || !Masque._registered_tree(dir)) && return nothing
+    path = "Makie.jl/v$(makie_version)/WGLMakie/src/javascript/WGLMakie.bundled.js"
+    urls = [
+        "https://cdn.jsdelivr.net/gh/MakieOrg/" * replace(path, "/v" => "@v"; count = 1),
+        "https://raw.githubusercontent.com/MakieOrg/" * path,
+    ]
+    return (; urls, integrity = "sha384-" * Masque.base64encode(Masque.sha384(js)), makie = makie_version)
+end
+
+const _WGL_OFFLINE_NOTE = "This WebGL figure couldn't load WGLMakie's script. Outside Pluto it needs an internet connection."
+_wgl_mismatch_note(makie) = "This WebGL figure couldn't load WGLMakie's script: the copy published with Makie v$(makie) differs from the one installed here. Show it in Pluto, or use backend = :cairo."
+
+const _BONITO_PRELUDE = "const Bonito = globalThis.__MasqueWGL.bonito;\n"
+
+# Defines `wgl`, a promise of a blob URL for WGLMakie's script with the Bonito prelude. Widgets
+# on one page share one fetch through `__MasqueWGL.loads`, keyed by hash. When no copy passes
+# the hash, one unchecked fetch tells a mismatch from being offline, so the note says which;
+# its text is never run.
+function _wgl_boot(cdn::NamedTuple)
+    lit(x) = sprint(Masque._js_literal, x)
+    return JavaScript(
+        """
+        const wglLoads = H.loads || (H.loads = {});
+        const wgl = wglLoads[$(lit(cdn.integrity))] || (wglLoads[$(lit(cdn.integrity))] = (async () => {
+          const urls = $(lit(cdn.urls));
+          for (const url of urls) {
+            try {
+              const r = await fetch(url, { integrity: $(lit(cdn.integrity)) });
+              if (r.ok) return blob($(lit(_BONITO_PRELUDE)) + await r.text());
+            } catch (e) {}
+          }
+          let online = false;
+          for (const url of urls) {
+            try { if ((await fetch(url)).ok) { online = true; break; } } catch (e) {}
+          }
+          throw Object.assign(new Error("WGLMakie's script didn't load"), {
+            masqueNote: online ? $(lit(_wgl_mismatch_note(cdn.makie))) : $(lit(_WGL_OFFLINE_NOTE)),
+          });
+        })());
+        """
+    )
+end
+_wgl_boot(::Nothing) = JavaScript(
+    "const wgl = Promise.resolve(H.inlineUrl || (H.inlineUrl = blob(" *
+        sprint(Masque._js_literal, _BONITO_PRELUDE * _bundle_text()) * ")));\n"
 )
 
+# The scene as a JS expression, smaller than the JSON Pluto publishes: each typed array is
+# base64 of its bytes, and each long string is written once in `strs` and named by index, so
+# WGLMakie's shaders (repeated per plot) and glyph bitmaps (repeated per axis) appear once.
+# `strs` is filled as `_scene_js` writes.
+const _SCENE_STR_MIN = 256
+function _scene_js(io::IO, x, strs::Dict{String, Int})
+    if x isa AbstractDict
+        if haskey(x, "__t__") && haskey(x, "d")
+            print(io, "{\"__t__\":")
+            Masque._js_literal(io, x["__t__"])
+            print(io, ",\"b64\":")
+            _scene_js(io, Masque.base64encode(reinterpret(UInt8, x["d"])), strs)
+            print(io, '}')
+            return
+        end
+        print(io, '{')
+        for (i, (k, v)) in enumerate(pairs(x))
+            i > 1 && print(io, ',')
+            Masque._js_literal(io, string(k))
+            print(io, ':')
+            _scene_js(io, v, strs)
+        end
+        print(io, '}')
+    elseif x isa AbstractVector
+        print(io, '[')
+        for (i, v) in enumerate(x)
+            i > 1 && print(io, ',')
+            _scene_js(io, v, strs)
+        end
+        print(io, ']')
+    elseif x isa AbstractString && sizeof(x) >= _SCENE_STR_MIN
+        print(io, "strs[", get!(strs, x, length(strs)), ']')
+    else
+        Masque._js_literal(io, x)
+    end
+    return
+end
+function _scene_js(scene)
+    strs = Dict{String, Int}()
+    body = sprint(_scene_js, scene, strs)
+    table = sort!(collect(strs); by = last)
+    return "const strs = " * sprint(Masque._js_literal, first.(table)) * ";\nconst scene = " * body * ";\n"
+end
+
+function _standalone_html(w::WebGLWidget)
+    lit(x) = JavaScript(sprint(Masque._js_literal, x))
+    id = Masque._standalone_id()
+    return @htl(
+        """
+        <div class="ip-host" id="$(id)" style="position:relative; display:inline-block; width:100%; max-width:$(w.display_css)px;">
+          <canvas class="masque-webgl-base" width="$(w.width)" height="$(w.height)"
+                  style="display:block; width:100%; height:auto; aspect-ratio:$(w.width) / $(w.height);"></canvas>
+          <script>
+            {
+              $(Masque._standalone_boot(Masque._OVERLAY_CDN[]))
+              const H = (window.__MasqueWGL ??= {});
+              const blob = (t) => URL.createObjectURL(new Blob([t], { type: "text/javascript" }));
+              $(_wgl_boot(_wgl_cdn()))
+              const shim = import(H.shimUrl ??= blob($(lit(_shim_text()))));
+              $(JavaScript(_scene_js(w.scene)))
+              const host = document.getElementById($(id));
+              const canvas = host && host.querySelector("canvas.masque-webgl-base");
+              if (canvas) Promise.all([wgl, shim, load]).then(([url, { mountWebGL }, Masque]) => {
+                mountWebGL({ canvas, wglBundleUrl: url, scene, width: $(w.width), height: $(w.height), pxPerUnit: $(w.px_per_unit) });
+                Masque.mount(canvas, $(lit(w.manifest)), new Promise(() => {}), null);
+              }, (e) => {
+                const text = (e && e.masqueNote) || $(lit(_WGL_OFFLINE_NOTE));
+                console.warn("Masque: " + text, e);
+                const note = document.createElement("div");
+                note.className = "masque-webgl-static";
+                note.textContent = text;
+                note.style.cssText = "position:absolute; inset:0; display:flex; align-items:center; justify-content:center; border:1px dashed #999; color:#666; font:14px sans-serif; text-align:center; padding:1em; box-sizing:border-box;";
+                host.appendChild(note);
+              });
+            }
+          </script>
+        </div>
+        """
+    )
+end
+
 function Base.show(io::IO, m::MIME"text/html", w::WebGLWidget)
-    Masque._hosts_overlay(io) || return show(io, m, _static_html(w))
+    Masque._hosts_overlay(io) || return show(io, m, _standalone_html(w))
     # published_to_js ids are content-addressed, so this one cached bundle string (_bundle_text)
     # always gets the same id and crosses the wire once per notebook, not once per widget.
     pub = APD.Display.published_to_js

@@ -217,6 +217,7 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     L.points === nothing || (d["points"] = L.points)
     L.step === nothing || (d["step"] = string(L.step))
     L.order === nothing || (d["order"] = L.order)
+    L.ellipses === nothing || (d["ellipses"] = L.ellipses)
     spec = tooltip_spec(i)
     spec === true && throw(ArgumentError("tooltip = true is not meaningful — omit `tooltip` for the auto name/value table (the default), pass masque\"…\" for a template, or `false` to suppress."))
     if spec isa Markup
@@ -695,10 +696,13 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
   `selected = (stem = (stems = [2],),)`. A pick holds one element, so several indices for one field raise
   `ArgumentError`, except on a field built with `select = :many`, which starts with all of
   them, and on the target of a box with `selects`, where they replace what the box starts at, and an empty one keyed to the target, as in `selected = (pts = Int[],)`,
-  starts it empty (a bare `Int[]` sets nothing). Works on
-  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines`; any other kind, an
-  out-of-range index (`0` included), a control, or a layer that is not a field raises
-  `ArgumentError`. This is only needed to carry a pick through a rebuild — and it must come
+  starts it empty (a bare `Int[]` sets nothing). A heatmap or image built with
+  `select = :many` starts with the cells you give it: a `Bool` matrix the size of the plotted
+  matrix (`selected = (region = mask,)`), a `GridSelection`, `CartesianIndex`es, or linear
+  indices into that matrix; a mask of another size raises `ArgumentError`. Works on
+  `:circles`/`:rects`/`:polygons`/`:segments`/`:polyline`/`:lines` and those grids; any other
+  kind, an out-of-range index (`0` included), a control, or a layer that is not a field raises
+  `ArgumentError`. Use it to carry a pick through a rebuild or to restore a saved one — and it must come
   from a cell that doesn't read this widget's own value, which Pluto rejects as a cyclic
   reference.
 - `onchange` — a function of the widget's state, `state -> …`, that changes the figure's
@@ -818,14 +822,20 @@ end
 
 # A pan frame changes `ax.limits[]`, and a tick label that grows wider (a minus sign, one more
 # digit) moves Makie's axis box: every later frame, and the settle, would shift the frame the
-# preview held still (#171). Pin each pan axis's automatic tick-label space to the width it has
-# now, after layout, so the first picture is unchanged and no later frame moves the box. Labels
-# that later outgrow it hang into the margin instead. An explicit space is left alone.
+# preview held still (#171). Pin the automatic tick-label space of each pan axis, and of each
+# axis linked to one, to the width it has now, after layout, so the first picture is unchanged
+# and no later frame moves the box. Labels that later outgrow it hang into the margin instead.
+# An explicit space is left alone.
 function _pin_pan_ticklabelspace!(fig, interactables)
     pinned = false
-    for i in interactables
-        i isa ViewInteractable && i.ax isa Makie.Axis || continue
-        ax = i.ax
+    # A linked axis moves with the pan (#363), so its box is pinned too.
+    pan_axes = unique(
+        Iterators.flatten(
+            (i.ax, union(_axis_links(i.ax)...)...) for i in interactables if i isa ViewInteractable && i.ax isa Makie.Axis
+        ),
+    )
+    for ax in pan_axes
+        ax isa Makie.Axis || continue
         # `tight_*ticklabel_spacing!` returns the measured space; assign it, so the pin lives
         # on the axis attribute the author can see rather than only in the axis internals.
         if ax.xticklabelspace[] isa Makie.Automatic
@@ -1209,10 +1219,10 @@ function _apply_view_frame(input, view_axes, backend, fig, interactables, ppu, m
             ax.limits[] = (l[1], l[2], l[3], l[4], l[5], l[6])
         end
     else
-        ax.limits[] = (
-            Float64(input["xmin"]), Float64(input["xmax"]),
-            Float64(input["ymin"]), Float64(input["ymax"]),
-        )
+        xlims = (Float64(input["xmin"]), Float64(input["xmax"]))
+        ylims = (Float64(input["ymin"]), Float64(input["ymax"]))
+        ax.limits[] = (xlims..., ylims...)
+        _pan_linked_axes!(ax, xlims, ylims)
     end
     live === nothing && return _render_gesture_frame(input, backend, fig, interactables, ppu, max_width)
     owners_out = Ref(Dict{String, LayerOwner}())
@@ -1247,6 +1257,34 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
     finally
         fig.scene.backgroundcolor[] = bg0
     end
+end
+
+# Makie's `linkaxes!` shares the target limits, but the finalize step resets every axis from its
+# own `limits`: a linked axis still on automatic limits recomputes the shared autolimits and
+# pushes them back through the link, so the pan did nothing (#363). Write the pan into each
+# linked axis's `limits` too, as `xlims!` and `ylims!` do, keeping the dimension it doesn't share.
+function _pan_linked_axes!(ax, xlims, ylims)
+    xlinks, ylinks = _axis_links(ax)
+    for link in union(xlinks, ylinks)
+        lx, ly = _limit_dims(link.limits[])
+        lims = (any(l -> l === link, xlinks) ? xlims : lx, any(l -> l === link, ylinks) ? ylims : ly)
+        link.limits[] == lims || (link.limits[] = lims)
+    end
+    return nothing
+end
+
+# The two forms Makie's `Axis.limits` takes.
+_limit_dims(l::Tuple{Any, Any, Any, Any}) = ((l[1], l[2]), (l[3], l[4]))
+_limit_dims(l::Tuple{Any, Any}) = l
+
+# The `limits` of every axis linked to `ax`, so the warmup can put them back.
+_linked_limits(ax) = [(l, l.limits[]) for l in union(_axis_links(ax)...)]
+
+function _restore_limits!(saved)
+    for (l, lim) in saved
+        l.limits[] == lim || (l.limits[] = lim)
+    end
+    return nothing
 end
 
 # An in-drag frame (any view drag in the figure: an orbit, or a pan of a 2D axis beside the
@@ -1298,6 +1336,7 @@ function _warm_view_poses!(frame, view_axes, stop)
             end
         else
             lim0 = ax.limits[]
+            links0 = _linked_limits(ax)
             fl = _finallimits(ax)
             xmin = Float64(fl.origin[1])
             ymin = Float64(fl.origin[2])
@@ -1325,6 +1364,7 @@ function _warm_view_poses!(frame, view_axes, stop)
                     ),
                 )
             finally
+                _restore_limits!(links0)
                 ax.limits[] == lim0 || (ax.limits[] = lim0)
             end
         end

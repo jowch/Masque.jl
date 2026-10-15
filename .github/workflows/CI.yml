@@ -210,11 +210,18 @@ jobs:
           mkdir -p "$RUNNER_TEMP/masque-dev"
           julia --project="$RUNNER_TEMP/masque-dev" -e '
             using Pkg
+            Pkg.add(["CairoMakie", "WGLMakie", "JSON3"])   # before the develop, so Parsers is not downgraded (JSON3 caps it at 2.x)
             Pkg.develop(path=pwd())
-            Pkg.add(["CairoMakie", "WGLMakie", "JSON3"])
             Pkg.instantiate()
           '
           echo "MASQUE_DEV_ENV=$RUNNER_TEMP/masque-dev" >> "$GITHUB_ENV"
+      # A WebGL widget outside Pluto fetches WGLMakie's script from Makie's release tag; the
+      # driver serves the installed copy at those URLs (#300).
+      - name: WebGL page outside Pluto
+        if: matrix.backend == 'webgl'
+        run: |
+          julia --color=yes --project="$MASQUE_DEV_ENV" test/e2e/standalone_webgl.jl "$RUNNER_TEMP/standalone-webgl"
+          cd test/e2e && node standalone_webgl.mjs "$RUNNER_TEMP/standalone-webgl"
       - name: Kind sweep + polish verify
         working-directory: test/e2e
         env:

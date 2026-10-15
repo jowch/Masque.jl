@@ -55,6 +55,16 @@ export function makeBonitoShim() {
 const TA = { f32: Float32Array, i32: Int32Array, u32: Uint32Array, u8: Uint8Array } as const
 type TKey = keyof typeof TA
 
+// A page outside Pluto writes each typed array as base64 of its little-endian bytes
+// (`{__t__, b64}`, MasqueWGLMakieExt's `_scene_js`), a third of the size of its numbers.
+function fromBase64(b64: string): ArrayBuffer {
+    const s = atob(b64)
+    const buf = new ArrayBuffer(s.length)
+    const out = new Uint8Array(buf)
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i)
+    return buf
+}
+
 // rebuild the structures WGLMakie's deserialize expects from the 4-rule tags. `__obs__`/`__t__`
 // are Julia's wire tags (MasqueWGLMakieExt.jl's `_plain`) — bracket-accessed, not `x.__obs__`,
 // so esbuild's `mangleProps: /_$/` (which would otherwise catch the trailing "__") can never
@@ -62,7 +72,10 @@ type TKey = keyof typeof TA
 export function rewrap(x: any): any {
     if (x && typeof x === "object" && !Array.isArray(x)) {
         if ("__obs__" in x) return obs(rewrap(x["__obs__"]))    // Observable shim
-        if ("__t__" in x) return new TA[x["__t__"] as TKey](x.d) // 1-D TypedArray
+        if ("__t__" in x) {                                      // 1-D TypedArray
+            const T = TA[x["__t__"] as TKey]
+            return "b64" in x ? new T(fromBase64(x.b64)) : new T(x.d)
+        }
         const o: Record<string, unknown> = {}
         for (const k in x) o[k] = rewrap(x[k])               // {array,size} recurse; nested dicts
         return o

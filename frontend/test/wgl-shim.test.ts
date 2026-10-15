@@ -25,6 +25,16 @@ describe("rewrap — the _plain 4-rule decode", () => {
         expect(rewrap({ __t__: "u8", d: [255, 0] })).toBeInstanceOf(Uint8Array)
     })
 
+    it("{__t__,b64} decodes little-endian bytes into the matching TypedArray", () => {
+        const b64 = (a: ArrayBufferView) => btoa(String.fromCharCode(...new Uint8Array(a.buffer, a.byteOffset, a.byteLength)))
+        const f = rewrap({ __t__: "f32", b64: b64(new Float32Array([1.5, -2, 3])) })
+        expect(f).toBeInstanceOf(Float32Array)
+        expect(Array.from(f)).toEqual([1.5, -2, 3])
+        expect(Array.from(rewrap({ __t__: "i32", b64: b64(new Int32Array([-1, 70000])) }))).toEqual([-1, 70000])
+        expect(Array.from(rewrap({ __t__: "u8", b64: b64(new Uint8Array([255, 0, 7])) }))).toEqual([255, 0, 7])
+        expect(rewrap({ __t__: "u32", b64: "" })).toHaveLength(0)
+    })
+
     it("{array,size} recurses: inner array becomes a TypedArray, size stays plain", () => {
         const r = rewrap({ array: { __t__: "f32", d: [1, 2, 3, 4] }, size: [2, 2] })
         expect(r.array).toBeInstanceOf(Float32Array)

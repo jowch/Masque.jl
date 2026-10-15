@@ -296,5 +296,84 @@ let n = 1_000
         @printf("  bond value, %5d picks:  %8.1f KB  (%.1f B/pick)\n", k, mp(v) / 1024, mp(v) / k)
     end
 end
+println("\n=== L. points on Axis3 — top-first `order` and sphere `ellipses` ===")
+# Overlapping marks answer with the one drawn on top (#331). On an Axis3 a `meshscatter!` layer
+# ships a top-first `order` (one index per drawn point) on both backends, and on WebGL a
+# `scatter!` layer does too. A sphere also ships its drawn outline as an ellipse, three
+# integers in image px² (`ellipses`), on any axis.
+let
+    for (kind, n) in ((:scatter, 1_000), (:meshscatter, 100), (:meshscatter, 1_000))
+        f = Figure(size = (600, 450)); ax = Axis3(f[1, 1])
+        xs, ys, zs = rand(n), rand(n), rand(n)
+        kind === :scatter ? scatter!(ax, xs, ys, zs) : meshscatter!(ax, xs, ys, zs; markersize = 0.02)
+        w = masque(f)
+        layer = only(w.manifest["layers"])
+        o = get(layer, "order", nothing); e = get(layer, "ellipses", nothing)
+        @printf(
+            "  %-28s  manifest=%6s KB   geometry=%6s KB   order=%6s KB   ellipses=%6s KB\n",
+            "$(kind) $(n) on Axis3", kb(mp(w.manifest)), kb(mp(layer["geometry"])),
+            o === nothing ? "-" : kb(mp(o)), e === nothing ? "-" : kb(mp(e)),
+        )
+    end
+end
+
+println("\n=== L. regions on a grid — each cell's region id, as runs over the cells ===")
+# `regions = R` (#359) ships `regions`, flat `[id, n, …]` pairs over the row-major cells, so it
+# costs about one pair per region boundary crossed along each row. Three shapes: a label image of
+# round objects on a background, a crop cut into small fragments (a mask editor's), and a whole
+# image cut into fragments, the uncropped worst case.
+let
+    f = Figure(size = (600, 600)); ax = Axis(f[1, 1])
+    for n in (512, 2048)
+        Random.seed!(1)
+        R = zeros(Int, n, n)
+        r = n ÷ 40
+        for k in 1:200
+            cx, cy = rand(1:n), rand(1:n)
+            for i in max(1, cx - r):min(n, cx + r), j in max(1, cy - r):min(n, cy + r)
+                (i - cx)^2 + (j - cy)^2 <= r^2 && (R[i, j] = k)
+            end
+        end
+        hm = heatmap!(ax, rand(Float32, n, n))
+        plain = masque(f, (cells = interactables(hm),))
+        labels = masque(f, (cells = interactables(hm; regions = R),))
+        @printf(
+            "  %4d×%-4d label image, 200 objects:  manifest %8.1f KB  → %8.1f KB with regions\n",
+            n, n, mp(plain.manifest) / 1024, mp(labels.manifest) / 1024
+        )
+        delete!(ax, hm)
+    end
+    # 121×121 cut into 4×4 blocks: 961 fragments, the densest case a crop editor ships.
+    n = 121
+    R = [(i - 1) ÷ 4 + ((j - 1) ÷ 4) * cld(n, 4) + 1 for i in 1:n, j in 1:n]
+    hm = heatmap!(ax, rand(Float32, n, n))
+    plain = masque(f, (cells = interactables(hm; select = :many),))
+    frags = masque(f, (cells = interactables(hm; select = :many, regions = R),))
+    @printf(
+        "  %d×%d crop, %d fragments:     manifest %8.1f KB  → %8.1f KB with regions\n",
+        n, n, maximum(R), mp(plain.manifest) / 1024, mp(frags.manifest) / 1024
+    )
+    delete!(ax, hm)
+    # A whole 2048×2048 image cut into square fragments, the uncropped worst case: the runs cost
+    # one pair per fragment edge per row. Each pick's value is decoded into a `GridSelection`
+    # that names the regions it holds whole; time that decode for a mask of half the grid.
+    n = 2048
+    for s in (16, 8)
+        R = [(i - 1) ÷ s + ((j - 1) ÷ s) * cld(n, s) + 1 for i in 1:n, j in 1:n]
+        hm = heatmap!(ax, rand(Float32, n, n))
+        plain = masque(f, (cells = interactables(hm; select = :many),))
+        frags = masque(f, (cells = interactables(hm; select = :many, regions = R),))
+        g = only(l for l in frags.manifest["layers"] if l["id"] == "cells")["geometry"]
+        env = Dict("runs" => [x for j in 0:(n ÷ 2 - 1) for x in (j, 0, n)])
+        Masque._grid_selection(:cells, env, n, n, g)
+        t = @elapsed sel = Masque._grid_selection(:cells, env, n, n, g)
+        a = @allocated Masque._grid_selection(:cells, env, n, n, g)
+        @printf(
+            "  %d×%d image, %5d fragments of %d×%d:  manifest %8.1f KB  → %8.1f KB with regions;  decode %6.1f ms, %5.1f MB (%d regions held)\n",
+            n, n, maximum(R), s, s, mp(plain.manifest) / 1024, mp(frags.manifest) / 1024, 1000t, a / 2^20, length(sel.regions)
+        )
+        delete!(ax, hm)
+    end
+end
 
 println()

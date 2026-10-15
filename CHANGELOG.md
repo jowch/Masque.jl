@@ -7,6 +7,34 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- A WGLMakie widget shown outside Pluto, in Documenter or in an HTML page written with
+  `show(io, MIME"text/html"(), w)`, draws its figure and keeps its tooltips and highlights,
+  where it used to show a box saying it is drawn only in Pluto. As with CairoMakie, a click
+  highlights a mark but sets no `@bind` value, and orbiting or panning the view needs Pluto
+  (#300).
+
+  The page loads WGLMakie's script, about 1 MB, once from jsDelivr (or GitHub when jsDelivr
+  is down), from the release of your installed Makie, checked against your copy's hash.
+  Read offline, or if the published script differs from your copy, each figure shows a note
+  in its box saying which. Each figure writes its scene into the page, so a Documenter page
+  with one goes in `size_threshold_ignore`. A WGLMakie installed with `Pkg.develop` writes
+  the script into each widget instead.
+- `linkcameras!(ax1, ax2, ...)` turns several `Axis3` panels together: orbiting one turns
+  the others to the same azimuth and elevation. With `limits = true`, zooming and panning
+  are shared too. Add a `ViewInteractable` to each panel you want to drag (#362).
+- A heatmap or image built with `select = :many` can start with cells selected:
+  `selected = (region = mask,)` takes a `Bool` matrix the size of the plotted matrix, and
+  also a `GridSelection`, `CartesianIndex`es, or linear indices. The cells start highlighted
+  and in the `@bind` value, so a selection saved to a file can be loaded back, and a
+  Cmd-click or Ctrl-click takes one out like any other. A mask of the wrong size raises an
+  `ArgumentError` (#356).
+- A heatmap or image takes `regions`, a matrix of whole numbers the size of the plotted one
+  that gives each cell a region id, such as the labels of a segmentation. Cells that share
+  an id act as one: hovering outlines the whole region, and on a `select = :many` grid a
+  click, Cmd-click, or Ctrl-click picks or drops the whole region, and a box picks every
+  region it touches. `GridSelection` gains `regions`, the ids of the regions it holds whole,
+  and a click on a grid that picks one cell carries the region's id in `GridCellEvent`'s
+  `region`. Cells with id `0` act alone, as before (#359).
 - `masque(fig, ...; onchange = state -> ...)` changes the figure as the reader works the
   widget, without running the cell again, so picks, controls and the view stay put. `state`
   has a field for every plot you can pick from and every control, named as in the `@bind`
@@ -15,6 +43,22 @@ All notable changes to this project are documented here. The format is based on
   after every click and release, and while a threshold or box moves. `update_while_dragging =
   false` on a `ThresholdInteractable` or `ROIInteractable` waits for the release. A plot whose
   number of marks changes loses its picks. Works on both backends (#334).
+
+### Fixed
+- Where marks of one plot overlap, hover and click answer with the one drawn on top. On a 2D
+  `Axis` that is the one listed last: a later `scatter!` marker, `text!` label or `poly!`
+  shape no longer loses to an earlier one hidden under it (#340). On an `Axis3`, the
+  `meshscatter!` sphere nearer the camera answers on both backends, and so does the nearer
+  `scatter!` marker with `backend = :webgl`; CairoMakie draws `scatter!` markers in the order
+  you give them, so the last one listed answers there (#331).
+- A `series!` works again under Makie 0.24.16, which draws its lines one level further down
+  and without their default `series k` names: hover and click on a `PolarAxis`, a slice
+  readout over it, and its legend links find the lines, and the tooltip names each line as
+  before. A legend whose entries Makie leaves unlabelled (and so doesn't draw) no longer stops
+  the figure from building, and a legend with no drawn entries gets no hover or click layer.
+- Panning an axis tied to others with `linkaxes!`, `linkxaxes!`, or `linkyaxes!` moves them
+  all. Before, the pan did nothing. While you drag, the data in the linked axes slides along
+  with the axis you hold (#363).
 
 ## [0.3.0] - 2026-10-10
 

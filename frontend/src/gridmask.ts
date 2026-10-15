@@ -105,8 +105,15 @@ export function decodeMask(layer: HitLayer, env: unknown): GridMask | null {
 // edge, joined along a row or column. Index -1 keeps its key apart from every cell's.
 export function maskHit(layer: HitLayer, mask: GridMask): Hit | null {
     const gg = layer.geometry as GridGeometry
-    const { ncols: nc, nrows: nr, xedges: xe, yedges: ye } = gg
-    if (mask.length !== nc * nr) return null
+    if (mask.length !== gg.ncols * gg.nrows) return null
+    const paths = maskPaths(mask, gg.ncols, gg.nrows, gg.xedges, gg.yedges)
+    return paths ? { layer, index: -1, geom_: ["mask", paths[0], paths[1]] } : null
+}
+
+// The fill and edge paths of `mask`, an `nc` × `nr` row-major block of cells whose edges are
+// `xe` (nc + 1) and `ye` (nr + 1); null when it holds no cell. A region's outline passes the
+// block around the region alone (regions.ts), so it walks that block, not the whole grid.
+export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<number>, ye: ArrayLike<number>): [string, string] | null {
     // Walks the typed array directly (no per-cell closure): a click on a photo-sized grid walks
     // every cell three times here.
     let fill = ""
@@ -148,5 +155,5 @@ export function maskHit(layer: HitLayer, mask: GridMask): Hit | null {
         }
     }
     for (let i = 0; i <= nc; i++) if (open[i] >= 0) vside(i, open[i], nr)
-    return { layer, index: -1, geom_: ["mask", fill, edge] }
+    return [fill, edge]
 }

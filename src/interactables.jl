@@ -62,10 +62,18 @@ data needed to resolve a pointer hit to an element index and its payload. Built 
   otherwise, for explicitly-given targets — the auto-extracted path drops an unsupported target
   with a `@warn` instead of failing the whole build). An `id:k` pin whose `k` is out of range
   is the same kind of error as an unknown layer.
-- `order` — `:rects` only, optional: the 0-based element indices front to back, which the
-  overlay hit-tests in, so the nearest of overlapping boxes wins. An element left out is not
-  drawn and never hit. `nothing` (default) tests in index order. Built by
-  [`TextInteractable`](@ref) on an `Axis3`.
+- `order` — `:circles` and `:rects` only, optional: the 0-based element indices top first,
+  which the overlay hit-tests in, so the element drawn on top of an overlap wins. An element
+  left out is not drawn and never hit. `nothing` (default) puts the last element listed on top,
+  as the backends paint a plot's elements in list order; `:polygons` always does. Built by
+  [`PointInteractable`](@ref) and [`TextInteractable`](@ref) on an `Axis3`, where the backend
+  draws the nearest element on top.
+- `ellipses` — `:circles` only, optional: per element, the drawn outline as an ellipse, a flat
+  `Real[]` of `(sxx, sxy, syy)` (image px²): the points `p` with `(p - c)ᵀ S⁻¹ (p - c) ≤ 1`
+  around the circle's centre `c`. Where outlines overlap, the top element whose ellipse holds
+  the pointer wins before any circle's reach. `nothing` (default) hit-tests the circles alone.
+  Built by [`PointInteractable`](@ref) with `radius3d`, whose markers are spheres or
+  ellipsoids that each axis stretches on its own.
 """
 struct HitLayer
     id::Symbol
@@ -81,10 +89,14 @@ struct HitLayer
     # snaps to, and the staircase `step` mode when the drawn path adds corners between them.
     points::Union{Nothing, Vector}
     step::Union{Nothing, Symbol}
-    # :rects: 0-based element indices, front to back, that the overlay hit-tests in; an
-    # element left out is not drawn. `nothing` is index order.
+    # :circles/:rects: 0-based element indices, top first, that the overlay hit-tests in; an
+    # element left out is not drawn. `nothing` puts the last element listed on top.
     order::Union{Nothing, Vector{Int}}
+    # :circles: per element, the drawn outline as an ellipse, `(sxx, sxy, syy)` (image px²).
+    ellipses::Union{Nothing, Vector}
 end
+HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order) =
+    HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, order, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step) =
     HitLayer(id, kind, geometry, payloads, axis, events, label, colors, links, points, step, nothing)
 HitLayer(id, kind, geometry, payloads, axis, events) = HitLayer(id, kind, geometry, payloads, axis, events, nothing, nothing, nothing)
@@ -528,7 +540,12 @@ tooltip_spec(i::PointInteractable) = i.tooltip
 # edge crosses the limits keeps its full radius. A semi-axis whose projection isn't finite is
 # left out.
 function _px_radius3d(ctx, ax, p, e, q)
-    all(isfinite, q) || return 0.0   # a clipped sphere, skipped by the hit layer anyway
+    r, _ = _px_outline3d(ctx, ax, p, e, q)
+    return r
+end
+# `_px_radius3d`'s radius and the outline ellipse `M·Mᵀ` itself, `(a, b, d)` for `[a b; b d]`.
+function _px_outline3d(ctx, ax, p, e, q)
+    all(isfinite, q) || return 0.0, (0.0, 0.0, 0.0)   # a clipped sphere, skipped by the hit layer anyway
     a = b = d = 0.0   # M·Mᵀ = [a b; b d]
     half = 0.0
     for i in 1:3
@@ -542,15 +559,20 @@ function _px_radius3d(ctx, ax, p, e, q)
         d += cy^2
         half = max(half, hypot(hi[1] - q[1], hi[2] - q[2]), hypot(q[1] - lo[1], q[2] - lo[2]))
     end
-    return max(half, sqrt((a + d) / 2 + hypot((a - d) / 2, b)))
+    return max(half, sqrt((a + d) / 2 + hypot((a - d) / 2, b))), (a, b, d)
 end
 function hitlayers(i::PointInteractable, ctx)
     g = Real[]
+    # A sphere's outline is an ellipse wherever the axes stretch it, and its hit circle (the
+    # ellipse's long radius) reaches past it into the sphere drawn behind.
+    ell = i.radius3d === nothing ? nothing : Real[]
     box = _clipbox(i.ax)
     for (k, p) in enumerate(i.points)
         q = _proj(ctx, i.ax, p, box)
         r = if i.radius3d !== nothing
-            _px_radius3d(ctx, i.ax, p, i.radius3d[k], q)
+            r3, (a, b, d) = _px_outline3d(ctx, i.ax, p, i.radius3d[k], q)
+            append!(ell, (_q(a), _q(b), _q(d)))
+            r3
         else
             ((i.radius isa Vector ? i.radius[k] : i.radius) + i.stroke * ctx.marker_stroke) * ctx.scaling
         end
@@ -558,7 +580,29 @@ function hitlayers(i::PointInteractable, ctx)
         cx, cy = q[1] + o[1] * ctx.scaling, q[2] - o[2] * ctx.scaling   # image px are y-down
         append!(g, (_q(cx), _q(cy), _q(r)))
     end
-    return [HitLayer(i.id, :circles, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label, i.colors)]
+    # With no `order` the overlay puts the last point listed on top, as CairoMakie paints a
+    # `scatter!`. On an Axis3, WebGL depth-tests markers and CairoMakie paints a `meshscatter!`
+    # (the points with `radius3d`) far to near, so there the nearest point is on top.
+    order = nothing
+    if i.ax isa Makie.Axis3 && (ctx.depth_test || i.radius3d !== nothing)
+        depth = _project_depth(ctx, i.ax, i.points)[3]
+        ks = [k for k in eachindex(i.points) if isfinite(g[3k - 2]) && isfinite(g[3k - 1]) && isfinite(depth[k])]
+        order = _top_first(ks, depth)
+    end
+    return [
+        HitLayer(
+            i.id, :circles, g, i.payloads, axis_id(ctx, i.ax), events(i), i.label, i.colors, nothing, nothing, nothing, order,
+            ell,
+        ),
+    ]
+end
+
+# The drawn elements `ks` (1-based), top first, as the 0-based `order` of a hit layer. With
+# `depth`, the nearest is on top; elements at the same depth, and every element without
+# `depth`, stack in list order, the last one on top.
+function _top_first(ks, depth = nothing)
+    r = reverse(ks)
+    return (depth === nothing ? r : r[sortperm(depth[r])]) .- 1
 end
 
 # ============================ SegmentInteractable ==========================
@@ -927,13 +971,14 @@ end
 
 # ============================ GridInteractable =============================
 """
-    GridInteractable(ax, xedges, yedges, values; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one)
-    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one)
+    GridInteractable(ax, xedges, yedges, values; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one, regions=nothing)
+    GridInteractable(ax, p::Union{Makie.Heatmap, Makie.Image}; id=:cells, payloads=nothing, tooltip=nothing, label=nothing, select=:one, regions=nothing)
 
 A binned grid, such as a heatmap or image. Produces one `:grid` [`HitLayer`](@ref). A click
 commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value. With `select = :many`
 the reader picks any set of cells (click, Cmd/Ctrl-click), and the field holds a
-[`GridSelection`](@ref).
+[`GridSelection`](@ref). With `regions`, the cells of one region are hovered and picked
+together.
 
 # Arguments
 - `xedges`, `yedges` — cell-edge vectors (length `ncols+1`/`nrows+1`), each strictly
@@ -954,6 +999,13 @@ the reader picks any set of cells (click, Cmd/Ctrl-click), and the field holds a
   keyboard-navigable.
 - `select` — `:one` (default): the field holds one `GridCellEvent` or `nothing`. `:many`: it
   holds a [`GridSelection`](@ref), every selected cell as a mask.
+- `regions` — optional integer matrix the same shape as `values`, a region id for each cell:
+  the objects of a label image, or the fragments of a picture. Cells that share an id act as
+  one: hover outlines the whole region, a click (or Cmd/Ctrl-click) on a `select = :many` grid
+  picks or drops all of it, and a box takes every region it touches. A `GridCellEvent` carries
+  the clicked cell's `region`, and a `GridSelection` lists the regions it holds whole in
+  `regions`. A cell whose id is `0` belongs to no region and acts alone. The default tooltip of
+  a region cell is `region id`, and a `masque"..."` template can use `region`. Default `nothing`.
 
 When a cell is at least one screen pixel, the manifest carries `values` (row-major). Below
 that it carries `sample`: one source value per screen pixel of the axis viewport, the cell
@@ -984,12 +1036,49 @@ struct GridInteractable <: AbstractInteractable
     # Row-major like the shipped `values` (cell `(i, j)` at `(j-1)*ncols + i`); empty for none.
     payloads::Vector{Any}
     select::Symbol
+    # Each cell's region id, row-major like `payloads`; empty for a grid without regions.
+    regions::Vector{Int32}
 end
 # The 7-field form from before `payloads` existed: a grid with no payloads.
 GridInteractable(ax, xedges, yedges, values, id, tooltip, label) =
     GridInteractable(ax, xedges, yedges, values, id, tooltip, label, Any[])
 GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads) =
     GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads, :one)
+GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads, select) =
+    GridInteractable(ax, xedges, yedges, values, id, tooltip, label, payloads, select, Int32[])
+# Each cell's region id, row-major; empty for `regions = nothing`.
+function _grid_regions(regions, ncols, nrows)
+    regions === nothing && return Int32[]
+    regions isa AbstractMatrix && size(regions) == (ncols, nrows) || throw(
+        ArgumentError(
+            "GridInteractable: `regions` must be an integer matrix the same shape as `values` " *
+                "$((ncols, nrows)), got $(regions isa AbstractArray ? "an array of size $(size(regions))" : typeof(regions))",
+        ),
+    )
+    eltype(regions) <: Integer || all(r -> r isa Integer, regions) ||
+        throw(ArgumentError("GridInteractable: `regions` must hold integer region ids, got eltype $(eltype(regions))"))
+    all(r -> 0 <= r <= typemax(Int32), regions) || throw(
+        ArgumentError("GridInteractable: `regions` ids must be 0 (no region) or positive, at most $(typemax(Int32))"),
+    )
+    out = Int32[regions[c, r] for r in 1:nrows for c in 1:ncols]
+    return out
+end
+# Region ids as runs over the row-major cells, flat pairs `[id, n, ...]`, so a label image ships
+# about one pair per boundary crossed along each row.
+function _region_runs(ids::Vector{Int32})
+    runs = Int[]
+    k = 1
+    while k <= length(ids)
+        id = ids[k]
+        n = 1
+        while k + n <= length(ids) && ids[k + n] == id
+            n += 1
+        end
+        push!(runs, id, n)
+        k += n
+    end
+    return runs
+end
 # One payload per cell, row-major. `payloads` is a `(ncols, nrows)` matrix or `(i, j) -> payload`.
 function _grid_payloads(payloads, ncols, nrows)
     payloads === nothing && return Any[]
@@ -1006,6 +1095,7 @@ function _grid_payloads(payloads, ncols, nrows)
 end
 function GridInteractable(
         ax, xedges, yedges, values; id = :cells, payloads = nothing, tooltip = nothing, label = nothing, select = :one,
+        regions = nothing,
     )
     _check_tooltip(tooltip)
     _check_select(GridInteractable, select)
@@ -1026,7 +1116,7 @@ function GridInteractable(
     )
     return GridInteractable(
         ax, xe, ye, values, id, tooltip, label === nothing ? nothing : String(label),
-        _grid_payloads(payloads, expected...), select,
+        _grid_payloads(payloads, expected...), select, _grid_regions(regions, expected...),
     )
 end
 tooltip_spec(i::GridInteractable) = i.tooltip
@@ -1051,6 +1141,7 @@ function hitlayers(i::GridInteractable, ctx)
     geom = Dict{String, Any}(
         "xedges" => xedges, "yedges" => yedges, "ncols" => ncols, "nrows" => nrows
     )
+    isempty(i.regions) || (geom["regions"] = _region_runs(i.regions))
     cell_px = min(
         abs(xedges[end] - xedges[1]) / ncols,
         abs(yedges[end] - yedges[1]) / nrows,
@@ -1357,7 +1448,7 @@ end
 # The drawn labels on an Axis3, top one first, as 0-based indices: by their anchor's clip-space
 # depth where the backend depth-tests text (WebGL), else last-listed first, since CairoMakie
 # paints them in list order. A label whose anchor is not drawn (outside the axis limits, or not
-# finite) is left out.
+# finite) is left out. On a 2D Axis the overlay's default, last listed on top, already holds.
 function _text_order(ctx, ax, anchors)
     pts = Point3f[Point3f(a[1], a[2], length(a) >= 3 ? a[3] : 0) for a in anchors]
     px, py, depth = _project_depth(ctx, ax, pts)
@@ -1366,7 +1457,7 @@ function _text_order(ctx, ax, anchors)
         k for k in eachindex(pts) if all(isfinite, pts[k]) && (box === nothing || _in_clipbox(box, pts[k])) &&
             isfinite(px[k]) && isfinite(py[k]) && isfinite(depth[k])
     ]
-    return (ctx.depth_test ? ks[sortperm(depth[ks])] : reverse(ks)) .- 1
+    return _top_first(ks, ctx.depth_test ? depth : nothing)
 end
 
 # ============================ PolygonInteractable ==========================
@@ -1868,6 +1959,56 @@ function _axis_fill(ax)
     mix(f, b) = a * f + (1 - a) * b
     return Makie.RGBAf(mix(fg.r, bg.r), mix(fg.g, bg.g), mix(fg.b, bg.b), 1)
 end
+# The photographic preview (#85) slides a copy of the data inside the axis box. Makie strokes
+# each spine centred on the box edge, so half the stroke, plus a pixel when the edge rounds onto
+# a device pixel, lies inside the viewport. The preview crops the copy to the clip rect and shows
+# it through a window of the same rect, so neither a spine nor the ticks, labels, or title
+# outside the box slide in with the data (#171). The window is painted with the empty plot's
+# colour, so the strip the copy leaves behind reads as blank plot, not as the unmoved picture
+# underneath. The hit region stays the whole viewport.
+function _pan_window(ctx, ax)
+    vx, vy, vw, vh = ctx.transforms[axis_id(ctx, ax)].viewport
+    ins = ceil(Float64(ax.spinewidth[]) * ctx.scaling / 2) + 1
+    clip = Float32[vx + ins, vy + ins, max(vw - 2ins, 0), max(vh - 2ins, 0)]
+    return clip, _css_color(_axis_fill(ax))
+end
+
+# Axes tied to a pan axis by `linkaxes!`, `linkxaxes!` or `linkyaxes!` move with its pan
+# (#363), so the preview slides their data too. `axis` names the linked axis's transform, and
+# `clip` and `fill` are its window. Per shared dimension, `x` or `y` is `[p, q, r]`: the image
+# px of one data value on the pan axis (`p`) and on the linked axis (`q`), and the ratio of the
+# linked axis's px per data unit to the pan axis's (`r`, negative when one of them is
+# reversed). A dimension the two draw on different scales doesn't map linearly; it is left
+# out, and that part of the panel waits for the frame.
+function _pan_links(ctx, ax)
+    xlinks, ylinks = _axis_links(ax)
+    out = Dict{String, Any}[]
+    fl = _finallimits(ax)
+    lo = Float64.(Tuple(fl.origin)); hi = lo .+ Float64.(Tuple(fl.widths))
+    c = (lo .+ hi) ./ 2
+    for link in union(xlinks, ylinks)
+        link isa Makie.Axis && haskey(ctx.ids, link) || continue
+        lfl = _finallimits(link)
+        lc = Float64.(Tuple(lfl.origin)) .+ Float64.(Tuple(lfl.widths)) ./ 2
+        entry = Dict{String, Any}()
+        for (d, links, scale) in ((1, xlinks, :xscale), (2, ylinks, :yscale))
+            any(l -> l === link, links) || continue
+            getproperty(ax, scale)[] === getproperty(link, scale)[] || continue
+            at(a, p, v) = data_to_image_px(ctx, a, d == 1 ? (v, p[2]) : (p[1], v))[d]
+            p0 = at(ax, c, lo[d]); p1 = at(ax, c, hi[d])
+            q0 = at(link, lc, lo[d]); q1 = at(link, lc, hi[d])
+            r = (q1 - q0) / (p1 - p0)
+            all(isfinite, (p0, q0, r)) || continue
+            entry[d == 1 ? "x" : "y"] = Float32[p0, q0, r]
+        end
+        isempty(entry) && continue
+        entry["axis"] = String(axis_id(ctx, link))
+        entry["clip"], entry["fill"] = _pan_window(ctx, link)
+        push!(out, entry)
+    end
+    return out
+end
+
 function hitlayers(i::ViewInteractable, ctx)
     t = ctx.transforms[axis_id(ctx, i.ax)]
     vx, vy, vw, vh = t.viewport
@@ -1877,17 +2018,9 @@ function hitlayers(i::ViewInteractable, ctx)
         "mode" => t.is3d ? "orbit" : "pan",
     )
     if !t.is3d && i.ax isa Makie.Axis
-        # The photographic preview (#85) slides a copy of the data inside the axis box. Makie
-        # strokes each spine centred on the box edge, so half the stroke, plus a pixel when the
-        # edge rounds onto a device pixel, lies inside the viewport. The preview crops the copy
-        # to `clip` and shows it through a window of the same rect, so neither a spine nor the
-        # ticks, labels, or title outside the box slide in with the data (#171). The hit region
-        # stays `x, y, w, h`.
-        ins = ceil(Float64(i.ax.spinewidth[]) * ctx.scaling / 2) + 1
-        geom["clip"] = Float32[vx + ins, vy + ins, max(vw - 2ins, 0), max(vh - 2ins, 0)]
-        # The window is painted with the empty plot's colour, so the strip the copy leaves
-        # behind reads as blank plot, not as the unmoved picture underneath.
-        geom["fill"] = _css_color(_axis_fill(i.ax))
+        geom["clip"], geom["fill"] = _pan_window(ctx, i.ax)
+        links = _pan_links(ctx, i.ax)
+        isempty(links) || (geom["links"] = links)
     end
     if t.is3d
         # Current camera — JS computes the drag's (azimuth, elevation) from the pixel delta, for
