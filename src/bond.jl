@@ -537,7 +537,7 @@ function _many_value(manifest, owners, d, env)
     id = Symbol(d["id"])
     if d["bond"] == "gridcell"
         g = d["geometry"]
-        return _grid_selection(id, env, Int(g["ncols"]), Int(g["nrows"]))
+        return _grid_selection(id, env, Int(g["ncols"]), Int(g["nrows"]), g)
     end
     env === nothing || (env isa AbstractDict && haskey(env, "items")) || throw(
         ArgumentError("bond: field :$id holds several picks, `{items: [...]}`; got $(repr(env))"),

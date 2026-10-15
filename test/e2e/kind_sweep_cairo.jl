@@ -33,6 +33,9 @@ begin
     import JSON3
 end
 
+# ╔═╡ c1000000-0000-0000-0000-000000000003
+include(joinpath(@__DIR__, "kind_sweep_figures.jl"))  # kind-sweep figures v2
+
 # ╔═╡ c1000000-0000-0000-0000-000000000002
 md"""
 # Kind sweep — `:cairo` (agent live-verify)
@@ -40,9 +43,6 @@ md"""
 One widget per interactable kind. Agents drive this with `test/e2e/kind_sweep.mjs`
 and `test/e2e/polish_verify.mjs` (interaction **and** visual). Not a human Try Live notebook.
 """
-
-# ╔═╡ c1000000-0000-0000-0000-000000000003
-include(joinpath(@__DIR__, "kind_sweep_figures.jl"))  # kind-sweep figures v2
 
 # ╔═╡ c1000000-0000-0000-0000-000000000004
 begin
@@ -635,6 +635,16 @@ HTML(
         "<span id=\"coords_many_grid_seeded\" style=\"display:none\">$(JSON3.write(sweep.many_grid_seeded.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000144
+@bind ev_many_grid_regions sweep.many_grid_regions
+
+# ╔═╡ c1000000-0000-0000-0000-000000000145
+HTML(
+    "<span id=\"out_many_grid_regions\">MANY_GRID_REGIONS=$(sweep_field("many_grid_regions", ev_many_grid_regions))</span>" *
+        "<span id=\"bond_many_grid_regions\" style=\"display:none\">$(repr(ev_many_grid_regions))</span>" *
+        "<span id=\"coords_many_grid_regions\" style=\"display:none\">$(JSON3.write(sweep.many_grid_regions.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000050
 @bind ev_slice_lines sweep.slice_lines
 
@@ -808,6 +818,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000141
 # ╠═c1000000-0000-0000-0000-000000000142
 # ╠═c1000000-0000-0000-0000-000000000143
+# ╠═c1000000-0000-0000-0000-000000000144
+# ╠═c1000000-0000-0000-0000-000000000145
 # ╠═c1000000-0000-0000-0000-000000000050
 # ╠═c1000000-0000-0000-0000-000000000051
 # ╠═c1000000-0000-0000-0000-000000000052

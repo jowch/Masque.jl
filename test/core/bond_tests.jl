@@ -726,4 +726,50 @@ Masque.interactables(ax, p::SeedHeatParts) = (
         block = falses(64, 64); block[1:10, 1:10] .= true
         @test haskey(masque(fig, (; region); selected = (region = block,)).manifest["initial"]["region"], "runs")
     end
+
+    @testset "regions group a grid's cells (#359)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        img = reshape(Float64.(1:12), 4, 3)
+        hm = heatmap!(ax, img)
+        tv = Masque.APD.Bonds.transform_value
+        # Region ids, (i, j) like `img`: column j of R is row j of the grid.
+        R = [1 1 3; 1 3 3; 2 2 2; 0 0 2]
+        cells = interactables(hm; select = :many, regions = R)
+        w = masque(fig, (; cells))
+        L = only(l for l in w.manifest["layers"] if l["id"] == "cells")
+        # Runs over the row-major cells, [id, n, ...].
+        @test L["geometry"]["regions"] == [1, 2, 2, 1, 0, 1, 1, 1, 3, 1, 2, 1, 0, 1, 3, 2, 2, 2]
+        # The value lists the regions it holds whole, in order.
+        sel = tv(w, Dict("cells" => Dict("runs" => [0, 0, 2, 1, 0, 1, 1, 2, 1])))   # region 1, and (3, 2)
+        @test sel.cells.regions == [1]
+        @test count(sel.cells) == 4
+        @test sprint(show, sel.cells) == "GridSelection(:cells, 4 of 12 cells, 1 region)"
+        all3 = tv(w, Dict("cells" => Dict("runs" => [0, 0, 3, 1, 0, 3, 2, 0, 4])))
+        @test all3.cells.regions == [1, 2, 3]
+        @test isempty(tv(w, Dict("cells" => Dict("runs" => []))).cells.regions)
+        # A grid without regions lists none, and its show is unchanged.
+        plain = tv(masque(fig, (cells = interactables(hm; select = :many),)), Dict("cells" => Dict("runs" => [0, 0, 1])))
+        @test isempty(plain.cells.regions)
+        @test sprint(show, plain.cells) == "GridSelection(:cells, 1 of 12 cells)"
+        # A `select = :one` click carries the cell's region; without regions it carries none.
+        one = masque(fig, (one = interactables(hm; regions = R),))
+        ev = tv(one, Dict("one" => Dict("layer" => "one", "index" => 5, "payload" => Dict("i" => 1, "j" => 1, "value" => 6.0)))).one
+        @test ev isa GridCellEvent && ev.i == 2 && ev.j == 2 && ev.region == 3
+        @test :region in propertynames(ev)
+        @test sprint(show, ev) == "GridCellEvent(:one, i = 2, j = 2, value = 6.0, region = 3)"
+        ev0 = tv(one, Dict("one" => Dict("layer" => "one", "index" => 3, "payload" => Dict("i" => 3, "j" => 0)))).one
+        @test ev0.region == 0
+        none = tv(masque(fig, (one = interactables(hm),)), Dict("one" => Dict("layer" => "one", "index" => 0, "payload" => Dict("i" => 0, "j" => 0)))).one
+        @test none.region === nothing
+        @test !(:region in propertynames(none))
+        # Stored row-major, like the shipped values; the positional form from before has none.
+        g = GridInteractable(ax, hm; regions = R, id = :g)
+        @test g.regions == Int32[1, 1, 2, 0, 1, 3, 2, 0, 3, 3, 2, 2]
+        @test isempty(GridInteractable(ax, g.xedges, g.yedges, g.values, :g, nothing, nothing, Any[], :one).regions)
+        # Mistakes name the shape or the ids.
+        @test_throws "same shape as `values` (4, 3)" GridInteractable(ax, hm; regions = zeros(Int, 3, 4))
+        @test_throws "0 (no region) or positive" GridInteractable(ax, hm; regions = fill(-1, 4, 3))
+        @test_throws "integer region ids" GridInteractable(ax, hm; regions = Float64.(R))
+        @test_throws "at most $(typemax(Int32))" GridInteractable(ax, hm; regions = fill(Int(typemax(Int32)) + 1, 4, 3))
+    end
 end
