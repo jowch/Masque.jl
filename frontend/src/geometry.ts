@@ -332,10 +332,14 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
                     }
                 }
             }
-            for (let m = 0; m < n; m++) {
-                const k = order ? order[m] : n - 1 - m
-                const cx = a[3 * k], cy = a[3 * k + 1], r = a[3 * k + 2]
-                if ((px - cx) ** 2 + (py - cy) ** 2 <= (r + HIT_TOL) ** 2) return { index: k, geom_: ["circle", cx, cy, r] }
+            // Inside wins over any circle's `HIT_TOL` reach, so a neighbour's reach never takes
+            // the pointer off the marker it is on.
+            for (const reach of [0, HIT_TOL]) {
+                for (let m = 0; m < n; m++) {
+                    const k = order ? order[m] : n - 1 - m
+                    const cx = a[3 * k], cy = a[3 * k + 1], r = a[3 * k + 2]
+                    if ((px - cx) ** 2 + (py - cy) ** 2 <= (r + reach) ** 2) return { index: k, geom_: ["circle", cx, cy, r] }
+                }
             }
             return null
         }

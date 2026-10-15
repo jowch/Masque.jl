@@ -276,6 +276,16 @@ describe("hitLayer + hitTest", () => {
         expect(hitLayer(deep, 118, 100)?.index).toBe(1)
         expect(hitLayer(deep, 300, 300)).toBeNull()
     })
+    it("neighbouring circles: inside one beats the other's reach", () => {
+        // radius 5 at x = 0 and x = 12: they don't overlap, but each one's 4 px reach covers
+        // the other's edge
+        const pair: HitLayer = { ...circles, geometry: [0, 0, 5, 12, 0, 5], payloads: [{}, {}] }
+        expect(hitLayer(pair, 3, 0)?.index).toBe(0)    // inside 0, in 1's reach
+        expect(hitLayer(pair, 8, 0)?.index).toBe(1)    // inside 1, in 0's reach
+        expect(hitLayer(pair, 6, 0)?.index).toBe(1)    // in both reaches: the top one, 1
+        expect(hitLayer({ ...pair, order: [0, 1] }, 6, 0)?.index).toBe(0)
+        expect(hitLayer({ ...pair, order: [0, 1] }, 8, 0)?.index).toBe(1)
+    })
     it("overlapping spheres: the top one drawn under the pointer wins before a circle's reach (#331)", () => {
         // 0 is in front: a wide, flat ellipse (40 × 10 px semi-axes) whose hit circle (r 40)
         // reaches over 1, a round sphere just below it.

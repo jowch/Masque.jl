@@ -694,8 +694,12 @@ try {
         throw new Error(`${key}: no order, and ${top} is not listed after ${under}`);
       }
       const hp = hitPoint(layer, top), b = hitPoint(layer, under);
-      const inside = layer.kind === "circles"
-        ? Math.hypot(hp.x - b.x, hp.y - b.y) < b.r
+      const inBox = (r) => {
+        const xs = r.filter((_, i) => i % 2 === 0), ys = r.filter((_, i) => i % 2 === 1);
+        return Math.min(...xs) < hp.x && hp.x < Math.max(...xs) && Math.min(...ys) < hp.y && hp.y < Math.max(...ys);
+      };
+      const inside = layer.kind === "circles" ? Math.hypot(hp.x - b.x, hp.y - b.y) < b.r
+        : layer.kind === "polygons" ? inBox(b.ring) // the sweep's overlapping shapes are rectangles
         : Math.abs(hp.x - b.x) < b.w / 2 && Math.abs(hp.y - b.y) < b.h / 2;
       if (!inside) {
         throw new Error(`${key}: hover pixel ${JSON.stringify(hp)} is not inside element ${under}'s shape ${JSON.stringify(b)}`);

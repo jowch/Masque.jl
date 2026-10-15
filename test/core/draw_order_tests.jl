@@ -11,7 +11,7 @@ isblue(c) = Float64(Makie.blue(c)) > 0.6 && Float64(Makie.red(c)) < 0.4 && Float
 
 # The 1-based element a `:circles` layer answers at image px (x, y), as `hitLayer` in
 # frontend/src/geometry.ts tests them: `order` first to last, else the last listed first; the
-# drawn `ellipses` before the circles' reach.
+# drawn `ellipses` first, then inside a circle, then within its `tol` reach.
 function circle_hit(L, x, y; tol = 4)
     g = Float64.(L.geometry)
     ks = L.order === nothing ? reverse(1:(length(g) ÷ 3)) : L.order .+ 1
@@ -25,9 +25,9 @@ function circle_hit(L, x, y; tol = 4)
             syy * dx^2 - 2 * sxy * dx * dy + sxx * dy^2 <= det && return k
         end
     end
-    for k in ks
+    for reach in (0, tol), k in ks
         cx, cy, r = g[3k - 2], g[3k - 1], g[3k]
-        (x - cx)^2 + (y - cy)^2 <= (r + tol)^2 && return k
+        (x - cx)^2 + (y - cy)^2 <= (r + reach)^2 && return k
     end
     return nothing
 end

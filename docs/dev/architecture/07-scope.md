@@ -22,7 +22,8 @@ wins). An `Axis3` layer ships a top-first `order` where a backend draws by depth
 `meshscatter!` on both (CairoMakie paints spheres far to near by centre), and `scatter!` and
 `text!` on `:webgl`. That order follows each backend's picture, so it differs between backends
 the way the pictures do. A sphere also ships its outline ellipse, which wins before any hit
-circle's reach, because Axis3 stretches spheres into ellipses that the circle overshoots. On `:webgl`, which depth-tests every pixel, a mark hidden behind a
+circle's reach, because Axis3 stretches spheres into ellipses that the circle overshoots.
+On `:webgl`, which depth-tests every pixel, a mark hidden behind a
 surface still answers hover and beats the surface in front of it; accepted, since a
 backend-dependent rule is ruled out (`roadmap.md`). A painter's cull (dropping hidden quads) is
 not built: the depth order already resolves every overlap, and a cull would only save bytes at

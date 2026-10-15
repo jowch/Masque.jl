@@ -351,6 +351,16 @@ HTML(
         "<span id=\"coords_text_overlap\" style=\"display:none\">$(JSON3.write(sweep.text_overlap.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000148
+@bind ev_poly_overlap sweep.poly_overlap
+
+# ╔═╡ c1000000-0000-0000-0000-000000000149
+HTML(
+    "<span id=\"out_poly_overlap\">POLY_OVERLAP=$(sweep_field("poly_overlap", ev_poly_overlap))</span>" *
+        "<span id=\"bond_poly_overlap\" style=\"display:none\">$(repr(ev_poly_overlap))</span>" *
+        "<span id=\"coords_poly_overlap\" style=\"display:none\">$(JSON3.write(sweep.poly_overlap.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000146
 @bind ev_spheres3d sweep.spheres3d
 
@@ -772,6 +782,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000143
 # ╠═c1000000-0000-0000-0000-000000000144
 # ╠═c1000000-0000-0000-0000-000000000145
+# ╠═c1000000-0000-0000-0000-000000000148
+# ╠═c1000000-0000-0000-0000-000000000149
 # ╠═c1000000-0000-0000-0000-000000000146
 # ╠═c1000000-0000-0000-0000-000000000147
 # ╠═c1000000-0000-0000-0000-00000000010d

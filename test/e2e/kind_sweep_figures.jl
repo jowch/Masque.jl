@@ -254,6 +254,14 @@ kind_sweep_meta() = [
         "overlapsElement" => 0, "topColour" => "blue",
     ),
     Dict(
+        # Two shapes of one `poly!` overlap on a 2D axis: "over", listed second, is painted
+        # over "under" on both backends and answers.
+        "key" => "poly_overlap", "layerId" => "poly", "layerKind" => "polygons",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 1, "clickIndex" => 1,
+        "tip" => "over", "hoverIndex" => 1, "hoverTip" => "over", "mode" => "element",
+        "overlapsElement" => 0, "topColour" => "blue",
+    ),
+    Dict(
         # Two spheres of one `meshscatter!` on one line of sight on Axis3 (#331): "front",
         # listed first, is drawn over "back" on both backends (CairoMakie paints spheres far to
         # near, WebGL depth-tests them) and answers.
@@ -947,6 +955,13 @@ function build_kind_sweep()
         masque(fig, interactables(tx; payloads = [(; label = "under"), (; label = "over")]))
     end
 
+    poly_overlap = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "poly overlap", limits = (0, 4, 0, 3))
+        pl = poly!(ax, [Rect2f(1, 1, 1.2, 1), Rect2f(1.4, 1.2, 1.2, 1)]; color = [:red, :blue])
+        masque(fig, interactables(pl; payloads = [(; label = "under"), (; label = "over")]))
+    end
+
     spheres3d = let
         fig = Figure(size = (480, 320))
         ax = Axis3(
@@ -1342,7 +1357,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view3d, legend, series_legend,
         legend_overlap, legend_template, axis, composite, many, many_grid, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

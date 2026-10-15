@@ -617,6 +617,7 @@ try {
   for (const [key, layerId, top, under, topLabel, underLabel] of [
     ["scatter_overlap", "scatter", 1, 0, "over", "under"],
     ["text_overlap", "text", 1, 0, "over", "under"],
+    ["poly_overlap", "poly", 1, 0, "over", "under"],
     ["spheres3d", "meshscatter", 0, 1, "front", "back"],
   ]) {
     const m = await inspect(key);
@@ -624,7 +625,14 @@ try {
     const layer = (await layersOf(key)).find((l) => l.id === layerId);
     if (!layer) throw new Error(`${key}: no layer ${layerId}`);
     const g = layer.geometry, circles = layer.kind === "circles";
+    // A polygon is taken as its bounding box: the sweep's overlapping shapes are rectangles.
+    const ringBox = (r) => {
+      const xs = r.filter((_, i) => i % 2 === 0), ys = r.filter((_, i) => i % 2 === 1);
+      const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+      return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0 };
+    };
     const shape = (k) => circles ? { x: g[3 * k], y: g[3 * k + 1], r: g[3 * k + 2] }
+      : layer.kind === "polygons" ? ringBox(g[k])
       : { x: g[4 * k], y: g[4 * k + 1], w: g[4 * k + 2], h: g[4 * k + 3] };
     // Inside a shape's drawn part: 0.8 of a circle's hit radius (which reaches past the mark),
     // or the box.
