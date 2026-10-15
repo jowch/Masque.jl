@@ -674,6 +674,12 @@ function _grid_cells(id::Symbol, L::HitLayer, v)
         v = v.mask
     end
     if v isa AbstractMatrix
+        eltype(v) <: Bool || throw(
+            ArgumentError(
+                "selected: :$id takes a Bool mask; got $(typeof(v)). For a 0/1 matrix, pass " *
+                    "`mask .== 1` or `Bool.(mask)`",
+            ),
+        )
         size(v) == (nc, nr) || throw(
             ArgumentError("selected: :$id is a $nc×$nr grid, so its mask must be $nc×$nr; got $(join(size(v), "×"))"),
         )
@@ -690,7 +696,7 @@ end
 
 function _grid_selected(selected, grids::Vector{Symbol}, by_id)
     isempty(grids) && return selected
-    if _grid_form(selected)
+    if _grid_form(selected) || selected isa AbstractMatrix
         id = if selected isa GridSelection
             getfield(selected, :layer)
         elseif length(grids) == 1
@@ -702,10 +708,12 @@ function _grid_selected(selected, grids::Vector{Symbol}, by_id)
         return Dict{Symbol, Any}(id => _grid_cells(id, by_id[id], selected))
     end
     selected isa NamedTuple || selected isa AbstractDict || return selected
-    any(((k, v),) -> Symbol(k) in grids && _grid_form(v), pairs(selected)) || return selected
+    # Keys flattened to full layer ids, so a grid that is a recipe part (`seg.heat`) converts too.
+    flat = _flat_selected(selected)
+    any(((id, v),) -> id in grids && (_grid_form(v) || v isa AbstractMatrix), flat) || return selected
     return Dict{Symbol, Any}(
-        Symbol(k) => (Symbol(k) in grids && _grid_form(v) ? _grid_cells(Symbol(k), by_id[Symbol(k)], v) : v)
-            for (k, v) in pairs(selected)
+        id => (id in grids && (_grid_form(v) || v isa AbstractMatrix) ? _grid_cells(id, by_id[id], v) : v)
+            for (id, v) in flat
     )
 end
 
@@ -720,9 +728,13 @@ function _check_grid_selected(L::HitLayer, idxs)
     return sort!(collect(Int, idxs)) .- 1
 end
 
-# The wire's mask envelope for sorted 0-based cells: `runs`, flat triples `[j, i0, n, ...]`.
+# The wire's mask envelope for sorted 0-based cells, chosen as the browser's `encodeMask`
+# chooses (`frontend/src/gridmask.ts`): `runs`, flat triples `[j, i0, n, ...]`, while they stay
+# under a kilobyte or beat the bits; else `bits`, cell k as bit k % 8 of byte k ÷ 8, base64.
+const _RUNS_KEPT = 1024
+
 function _grid_runs(L::HitLayer, cells)
-    nc = first(_grid_size(L))
+    nc, nr = _grid_size(L)
     runs = Int[]
     for k in cells
         j, i = divrem(k, nc)
@@ -732,7 +744,15 @@ function _grid_runs(L::HitLayer, cells)
             push!(runs, j, i, 1)
         end
     end
-    return Dict{String, Any}("runs" => runs)
+    length(runs) * 2 + 1 <= _RUNS_KEPT && return Dict{String, Any}("runs" => runs)
+    nbytes = cld(nc * nr, 8)
+    json = 2 + sum(k -> ndigits(k) + 1, runs) - 1
+    json <= max(_RUNS_KEPT, 4 * cld(nbytes, 3)) && return Dict{String, Any}("runs" => runs)
+    bytes = zeros(UInt8, nbytes)
+    for k in cells
+        bytes[(k >> 3) + 1] |= 0x01 << (k & 7)
+    end
+    return Dict{String, Any}("bits" => base64encode(bytes))
 end
 
 function _field_seeds(built, fields, roles, binding, selected)
@@ -791,8 +811,8 @@ end
 
 Every field's starting wire envelope, the value the browser sends until the first commit:
 `nothing` for a pick `selected=` does not seed, `{layer, index}` for one it does (with `sample`
-for a point on a line), `{items: [...]}` for a `select = :many` field (`{runs: [...]}` on a
-grid, empty unless `selected=` seeds it), a control's start, and the elements a box's
+for a point on a line), `{items: [...]}` for a `select = :many` field (`{runs: [...]}` or `{bits}`
+on a grid, empty unless `selected=` seeds it), a control's start, and the elements a box's
 starting bounds hold for its target.
 """
 function _initial_value(built, fields, roles, binding, selected, ctx, layers)

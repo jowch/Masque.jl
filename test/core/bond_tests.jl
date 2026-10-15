@@ -1,6 +1,20 @@
 using Test, Masque, CairoMakie, Makie
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
+# A recipe whose parts include a `select = :many` grid, so `selected=` reaches it by a
+# hierarchical id (`seg.heat`). Types can't be defined inside a testset.
+Makie.@recipe SeedHeatParts (values,) begin
+end
+function Makie.plot!(p::SeedHeatParts)
+    heatmap!(p, p.values)
+    scatter!(p, [Point2f(1, 1), Point2f(2, 2)])
+    return p
+end
+Masque.interactables(ax, p::SeedHeatParts) = (
+    heat = GridInteractable(ax, p.plots[1]; select = :many),
+    dot = PointInteractable(ax, p.plots[2][1][]),
+)
+
 @testset "Bond" begin
     @testset "element fields and indexing" begin
         pl = (; city = "Tokyo", pop = 37)
@@ -669,9 +683,47 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
             fig, (a = interactables(hm; select = :many), b = GridInteractable(ax, hm; select = :many));
             selected = mask,
         )
+        @test_throws "takes a Bool mask; got Matrix{Int64}. For a 0/1 matrix, pass `mask .== 1`" masque(
+            fig, (; region); selected = (region = Int.(mask),),
+        )
+        @test_throws "takes a Bool mask" masque(fig, g; bind = g, selected = Int.(mask))
         # A `select = :one` grid still can't start selected.
         @test_throws "does not support pre-highlight" masque(
             fig, (one = interactables(hm),); selected = (one = 2,),
         )
+    end
+
+    @testset "selected= reaches a grid that is a recipe part" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        hp = seedheatparts!(ax, reshape(Float64.(1:12), 4, 3))
+        iv = Masque.APD.Bonds.initial_value
+        mask = falses(4, 3)
+        mask[1, 1] = mask[2, 1] = true
+        w = masque(fig; bind = (seg = hp,), selected = (seg = (heat = mask,),))
+        v = iv(w).seg.heat
+        @test v.mask == mask
+        # The value it gives, and `findall` of it, seed the same cells back.
+        for sel in (v, findall(v), [1, 2])
+            @test iv(masque(fig; bind = (seg = hp,), selected = (seg = (heat = sel,),))).seg.heat == v
+        end
+        # Under a bare head the keys are the parts.
+        @test iv(masque(fig; bind = hp, selected = (heat = mask,))).heat.mask == mask
+        @test_throws "does not match GridSelection layer" masque(
+            fig; bind = (seg = hp,), selected = (seg = (heat = GridSelection(:other, mask),),),
+        )
+    end
+
+    @testset "a large noisy seeded mask goes as bits, like the browser's" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        hm = heatmap!(ax, zeros(64, 64))
+        iv = Masque.APD.Bonds.initial_value
+        region = interactables(hm; select = :many)
+        noisy = BitMatrix([isodd(i + j) for i in 1:64, j in 1:64])
+        env = masque(fig, (; region); selected = (region = noisy,)).manifest["initial"]["region"]
+        @test collect(keys(env)) == ["bits"]
+        @test iv(masque(fig, (; region); selected = (region = noisy,))).region.mask == noisy
+        # Few runs stay readable.
+        block = falses(64, 64); block[1:10, 1:10] .= true
+        @test haskey(masque(fig, (; region); selected = (region = block,)).manifest["initial"]["region"], "runs")
     end
 end
