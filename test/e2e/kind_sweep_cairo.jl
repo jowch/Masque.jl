@@ -654,6 +654,17 @@ HTML(
         "<span id=\"coords_composite\" style=\"display:none\">$(JSON3.write(sweep.composite.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000160
+@bind ev_onchange sweep.onchange
+
+# ╔═╡ c1000000-0000-0000-0000-000000000161
+HTML(
+    "<span id=\"out_onchange\">ONCHANGE=$(sweep_field("onchange", ev_onchange))</span>" *
+        "<span id=\"bond_onchange\" style=\"display:none\">$(repr(ev_onchange))</span>" *
+        "<span id=\"coords_onchange\" style=\"display:none\">$(JSON3.write(sweep.onchange.manifest["layers"]))</span>" *
+        "<span id=\"axes_onchange\" style=\"display:none\">$(JSON3.write(sweep.onchange.manifest["transforms"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000129
 @bind ev_many sweep.many
 
@@ -882,6 +893,8 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000044
 # ╠═c1000000-0000-0000-0000-000000000127
 # ╠═c1000000-0000-0000-0000-000000000128
+# ╠═c1000000-0000-0000-0000-000000000160
+# ╠═c1000000-0000-0000-0000-000000000161
 # ╠═c1000000-0000-0000-0000-000000000129
 # ╠═c1000000-0000-0000-0000-000000000130
 # ╠═c1000000-0000-0000-0000-000000000131

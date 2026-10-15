@@ -544,6 +544,16 @@ kind_sweep_meta() = [
         "control" => "cutoff", "controlStart" => 3.0, "line" => "lines", "fields" => ["cutoff", "scatter"],
     ),
     Dict(
+        # `onchange` (#334): the red level line sits at the threshold's value plus the number of
+        # picked points, redrawn on every click and threshold drag without re-running the cell.
+        # `bind = :pts`, so the drag moves the line but leaves the `@bind` value alone. The
+        # driver's "onchange" block drives it and finds the line in the picture's pixels.
+        "key" => "onchange", "layerId" => "pts", "layerKind" => "circles",
+        "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 1,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "onchange", "field" => "*",
+        "control" => "cutoff", "controlStart" => 3.0,
+    ),
+    Dict(
         # `select = :many` (#335): a click replaces, Ctrl-click adds and removes, a click on
         # empty space and Escape clear. The driver's "many" block drives it.
         "key" => "many", "layerId" => "scatter", "layerKind" => "circles",
@@ -1336,6 +1346,18 @@ function build_kind_sweep()
         masque(fig, ThresholdInteractable(ax; orientation = :vertical, value = 3.0, id = :cutoff))
     end
 
+    onchange = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "onchange", limits = (0, 10, 0, 10))
+        sc = scatter!(ax, [2.0, 5.0, 8.0], [7.0, 8.5, 7.0]; markersize = 18, color = :gray)
+        level = lines!(ax, [0.0, 10.0], [3.0, 3.0]; color = :red, linewidth = 4)
+        cutoff = ThresholdInteractable(ax; orientation = :vertical, value = 3.0, id = :cutoff)
+        masque(
+            fig, (pts = interactables(sc; select = :many), cutoff = cutoff); bind = :pts,
+            onchange = st -> update!(level, [0.0, 10.0], fill(st.cutoff.value + length(st.pts), 2)),
+        )
+    end
+
     many = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "select many", limits = (0, 10, 0, 10))
@@ -1435,7 +1457,7 @@ function build_kind_sweep()
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view3d, view3d_linked, legend, series_legend,
-        legend_overlap, legend_template, axis, composite, many, many_grid, many_grid_seeded, many_grid_regions, marquee, slice_lines, slice_density, slice_auto, slice_gap,
+        legend_overlap, legend_template, axis, composite, onchange, many, many_grid, many_grid_seeded, many_grid_regions, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
 

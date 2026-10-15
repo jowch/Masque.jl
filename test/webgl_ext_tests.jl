@@ -524,3 +524,35 @@ end
     @test ax.azimuth[] ≈ az0 atol = 1.0e-12
     @test ax.elevation[] ≈ el0 atol = 1.0e-12
 end
+
+# #334: WGLMakie builds a plot's render object once and sends later changes to a live session.
+# A frame serialized after `update!` must carry the plot as it is now, not the first render.
+@testset "onchange frame serializes current plot data" begin
+    fig = Figure(; size = (400, 300))
+    ax = Axis(fig[1, 1])
+    scatter!(ax, 1.0:5.0, 1.0:5.0)
+    fitline = lines!(ax, [1.0, 5.0], [0.0, 0.0])
+    thr = ThresholdInteractable(ax; value = 2.0)
+    w = masque(fig, (cutoff = thr,); backend = :webgl, onchange = st -> update!(fitline, [1.0, 5.0], fill(st.cutoff.value, 2)))
+    Masque._sync_view_warmup!(w.render_frame)
+    # The serialized two-point line: its flat position buffer, x and y interleaved.
+    function line_ys(scene)
+        found = Vector{Float32}[]
+        walk(x) = if x isa AbstractDict
+            if get(x, "plot_type", nothing) == "Lines"
+                d = x["attributes"]["positions_transformed_f32c"]["flat"]["d"]
+                length(d) == 4 && d[1] == 1 && d[3] == 5 && push!(found, d[[2, 4]])
+            end
+            foreach(walk, values(x))
+        elseif x isa AbstractVector
+            foreach(walk, x)
+        end
+        walk(scene)
+        return only(found)
+    end
+    @test line_ys(w.scene) == Float32[2, 2]
+    for level in (4.0, 3.0)
+        r = w.render_frame(Dict{String, Any}("onchange" => true, "settle" => true, "state" => Dict("cutoff" => Dict("layer" => "cutoff", "index" => 0, "payload" => level))))
+        @test line_ys(r["scene"]) == Float32[level, level]
+    end
+end

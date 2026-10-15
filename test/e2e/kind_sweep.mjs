@@ -778,6 +778,104 @@ try {
       continue;
     }
 
+    // `onchange` (#334): the red level line is redrawn at cutoff + picks on every click and
+    // threshold drag, on both backends, without the cell running again. The line is found in
+    // the picture's own pixels, so a frame that arrives with stale plot data (the WebGL
+    // failure the spike hit) fails here. `bind = :pts`: the drag moves the line but leaves the
+    // `@bind` value, which only a pick changes.
+    if (spec.mode === "onchange") {
+      const t = JSON.parse(await textOf(`#axes_${key}`))[layer.axis];
+      const [, vy, , vh] = t.viewport;
+      const yPx = (v) => vy + vh * (1 - (v - t.ylims[0]) / (t.ylims[1] - t.ylims[0]));
+      const xData = (px) => t.xlims[0] + (px - t.viewport[0]) / t.viewport[2] * (t.xlims[1] - t.xlims[0]);
+      const stamp = async () => {
+        const raw = await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          return host?.dataset.masqueGestureFrame ?? "";
+        }, key);
+        return raw ? JSON.parse(raw) : null;
+      };
+      const waitFrame = async (after, what) => {
+        for (let i = 0; i < (backend === "webgl" ? 60 : 40); i++) {
+          await new Promise((r) => setTimeout(r, 250));
+          const st = await stamp();
+          if (st && st.onchange && st.settle && st.n > (after?.n ?? 0)) return st;
+        }
+        throw new Error(`${key}/${what}: no settled onchange frame after ${JSON.stringify(after)}`);
+      };
+      // The image-px row of the red line in a column clear of the points: the middle of the
+      // reddest run in a thin page screenshot down the plot area.
+      const redRow = async () => {
+        const g = await page.evaluate(([k, ix, top, h]) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((hh) => (hh.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          host.scrollIntoView({ block: "center", inline: "nearest" });
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const b = host.querySelector("img, canvas").getBoundingClientRect();
+          const sc = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+          return { x: b.left + ix * sc, y: b.top + top * sc, h: h * sc };
+        }, [key, t.viewport[0] + t.viewport[2] * 0.95, vy, vh]);
+        const png = PNG.sync.read(await page.screenshot({ clip: { x: g.x - 1, y: g.y, width: 3, height: g.h } }));
+        const rows = [];
+        for (let r = 0; r < png.height; r++) {
+          const o = (r * png.width + 1) * 4, R = png.data[o], G = png.data[o + 1], B = png.data[o + 2];
+          if (R > 180 && G < 90 && B < 90) rows.push(r);
+        }
+        if (!rows.length) return null;
+        const mid = (rows[0] + rows[rows.length - 1]) / 2;
+        return vy + mid * vh / png.height;
+      };
+      const expectLevel = async (level, what) => {
+        const want = yPx(level);
+        let got = null;
+        for (let i = 0; i < 12; i++) {
+          got = await redRow();
+          if (got !== null && Math.abs(got - want) <= 6) return;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        throw new Error(`${key}/${what}: red line at image y ${got}, want ${want.toFixed(1)} (level ${level})`);
+      };
+
+      const v0 = await textOf(`#bond_${key}`);
+      if (!/^(Masque\.)?ElementEvent\[\]$/.test(v0.trim())) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want ElementEvent[] (bind = :pts)`);
+      await expectLevel(spec.controlStart, "mount");
+      passed.push(`${key}/drawn-from-start-state`);
+
+      // A pick: the value changes and the line moves up by one.
+      const s0 = await stamp();
+      const pt = hitPoint(layer, spec.clickIndex);
+      await dispatchAt(key, pt.x, pt.y, "click");
+      const v1 = await waitChange(`#bond_${key}`, v0, `${key}/pick`);
+      if (!new RegExp(`ElementEvent\\(:pts, ${spec.clickIndex + 1},`).test(v1)) throw new Error(`${key}/pick: value ${JSON.stringify(v1)}`);
+      const s1 = await waitFrame(s0, "pick");
+      await expectLevel(spec.controlStart + 1, "pick");
+      passed.push(`${key}/pick-redraws`);
+      await dispatchAt(key, 1, 1, "pointermove");
+
+      // A threshold drag: the line follows the threshold, the value stays.
+      const ctlLayer = layers.find((l) => l.id === spec.control);
+      const cp = hitPoint(ctlLayer, 0);
+      await drag(key, cp.x, cp.y, cp.x + 120, cp.y, false);
+      await waitFrame(s1, "drag");
+      const lineX = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        return Number(sr.querySelector(".masque-threshold-line")?.getAttribute("x1"));
+      }, key);
+      const cutoff = xData(lineX);
+      if (!(cutoff > spec.controlStart + 0.5)) throw new Error(`${key}/drag: threshold at ${cutoff}, want it moved right of ${spec.controlStart}`);
+      await expectLevel(cutoff + 1, "drag");
+      if ((await textOf(`#bond_${key}`)) !== v1) throw new Error(`${key}/drag: the threshold drag changed the value; it is not in bind`);
+      const after = await inspect(key);
+      if (after.sel !== 2) throw new Error(`${key}/drag: g.sel=${after.sel}, want the pick still drawn (2)`);
+      passed.push(`${key}/drag-redraws`);
+      passed.push(`${key}/state-outside-bind`);
+      console.error(`OK  ${key} — cutoff ${cutoff.toFixed(2)}, ${v1.slice(0, 80)}`);
+      continue;
+    }
+
     // `select = :many` (#335): a plain click replaces the picks with one, Ctrl-click adds and
     // removes one (Linux Chromium, so Ctrl rather than Cmd), a click on empty plot space clears
     // them, and Escape on the focused figure clears them too. Each step checks the printed

@@ -10,6 +10,8 @@ import type { AxisTransform, FocusRef, Hit, HitLayer, Limits3, Manifest, Thresho
 // every move. A per-element tooltip value uses template.ts's fmtNum, which trims them.
 export const fmt = (v: unknown, digits = 4): string => (typeof v === "number" ? v.toPrecision(digits) : String(v))
 
+// How long an `onchange` error note stays up.
+export const NOTE_MS = 4000
 export const MOTION_MS = 100 // 80–120 ms window; prefers-reduced-motion disables below
 export const VIEW_MIN_PX = 3 // image-px; ignore accidental micro-drags
 // CSS px a press must move before it is a marquee rather than a click: a missed box clears the
@@ -177,9 +179,11 @@ export interface OverlayCtx {
     // whole value. A key that is not a field (a layer the `bind` left out) is dropped, and a
     // commit that leaves no field changes nothing. `host_.value` itself is an accessor
     // (mount.ts): a write through it is Pluto restoring the kernel's value, which redraws the
-    // selection.
-    commit_: (fields: Record<string, unknown>) => void
-    // The bond value now: every field's envelope.
+    // selection. With `onchange` the fields are the widget's state: every one is sent to Julia
+    // over the gesture channel, and only `bind`'s reach the bond. `quiet` skips that send (a
+    // frame's own clearing of picks).
+    commit_: (fields: Record<string, unknown>, quiet?: boolean) => void
+    // The state now: every field's envelope.
     value_: () => Record<string, unknown>
 }
 

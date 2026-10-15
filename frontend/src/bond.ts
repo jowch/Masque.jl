@@ -75,6 +75,18 @@ function pointerSpace(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): { la
     return { layout, content: contentPoint(state.photo_, layout) }
 }
 
+// A control moving under `onchange` redraws the figure as it goes, unless it was built with
+// `update_while_dragging = false`. The bond still changes only on release.
+function liveDrag(ctx: OverlayCtx, id: string): boolean {
+    if (ctx.manifest_.onchange !== true) return false
+    const g = ctx.manifest_.layers.find((l) => l.id === id)?.geometry as { settleOnly?: true } | undefined
+    return g?.settleOnly !== true
+}
+
+function requestState(ctx: OverlayCtx, fields: Record<string, unknown>): void {
+    ctx.gesture_.request({ onchange: true, state: { ...ctx.value_(), ...fields }, settle: false })
+}
+
 function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEvent): void {
     const { layout, content } = pointerSpace(ctx, state, e)
     let text: string
@@ -84,6 +96,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
         text = readout
     } else if (d.kind === "threshold") {
         text = thresholdDrag.move(d, content, ctx.tipDigits_)
+        if (liveDrag(ctx, d.id_)) requestState(ctx, { [d.id_]: thresholdDrag.envelopeAt(d, content) })
     } else if (d.kind === "view") {
         if (d.g_.mode === "orbit") {
             text = viewDrag.tip(d, layout, ctx.tipDigits_)
@@ -111,6 +124,7 @@ function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
         }
     } else {
         text = roiDrag.move(ctx, state, d, content)
+        if (liveDrag(ctx, d.id_)) requestState(ctx, roiDrag.fieldsNow(ctx, d))
     }
     setMarkAccent(ctx, null) // a drag readout is never a coloured element's tooltip
     setTipText(ctx, state, text)

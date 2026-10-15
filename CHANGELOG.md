@@ -35,6 +35,14 @@ All notable changes to this project are documented here. The format is based on
   region it touches. `GridSelection` gains `regions`, the ids of the regions it holds whole,
   and a click on a grid that picks one cell carries the region's id in `GridCellEvent`'s
   `region`. Cells with id `0` act alone, as before (#359).
+- `masque(fig, ...; onchange = state -> ...)` changes the figure as the reader works the
+  widget, without running the cell again, so picks, controls and the view stay put. `state`
+  has a field for every plot you can pick from and every control, named as in the `@bind`
+  value, and a field `bind` leaves out still reaches `onchange`. The function changes plots
+  that already exist, with Makie's `update!`; it runs once before the figure first shows, then
+  after every click and release, and while a threshold or box moves. `update_while_dragging =
+  false` on a `ThresholdInteractable` or `ROIInteractable` waits for the release. A plot whose
+  number of marks changes loses its picks. Works on both backends (#334).
 
 ### Fixed
 - Where marks of one plot overlap, hover and click answer with the one drawn on top. On a 2D

@@ -1,7 +1,7 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, selectionForValue, surfaceSelection } from "./selection"
 import { emptyMask, maskHit } from "./gridmask"
-import { onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
+import { applyMove, onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
@@ -15,7 +15,7 @@ import { createGestureChannel } from "./gesture"
 import { DEFAULT_SIGDIGITS } from "./template"
 import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
-import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, MOTION_MS } from "./state"
+import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, MOTION_MS, NOTE_MS } from "./state"
 import type { HiGroups, OverlayCtx } from "./state"
 import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
 import { matrixLimits } from "./geometry"
@@ -224,6 +224,14 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: non
        display: var(--masque-tip-caret, block); }
 .masque-tip.flip-y::before { top: auto; bottom: -5px; border-bottom: none;
        border-top: 5px solid var(--masque-tip-bg-resolved); }
+/* An \`onchange\` error: the last picture stays, and this says why it didn't change. */
+.masque-note { position: absolute; left: 8px; bottom: 8px; opacity: 0; pointer-events: none; z-index: 11;
+       padding: 4px 8px; border-radius: var(--masque-tip-radius, 4px);
+       background: var(--masque-tip-bg-resolved); color: var(--masque-tip-color-resolved);
+       border: 1px solid var(--masque-tip-border-resolved);
+       font: var(--masque-tip-font-size, 11px)/1.4 var(--masque-tip-font, system-ui, -apple-system, sans-serif);
+       max-width: calc(100% - 32px); transition: opacity ${MOTION_MS}ms ease-out; }
+.masque-note.show { opacity: 1; }
 .masque-tip-row { display: flex; gap: 8px; justify-content: space-between; }
 .masque-tip-key { color: var(--masque-tip-accent, #6b7280); }
 .masque-tip-val { font-variant-numeric: tabular-nums; }
@@ -232,7 +240,7 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: non
 }
 @media (prefers-reduced-motion: reduce) {
   .masque-enter, .masque-leave { animation: none; }
-  .masque-tip, .masque-cross { transition: none; }
+  .masque-tip, .masque-cross, .masque-note { transition: none; }
 }
 `
 
@@ -277,6 +285,20 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const fields = manifest.fields ?? []
     const hostValue: Record<string, unknown> = {}
     for (const f of fields) hostValue[f] = manifest.initial?.[f] ?? null
+    // With \`onchange\` every field above is state, and the bond carries only \`bind\`'s. The
+    // full state lives here; \`host.value\` is its bind part.
+    const bindKeys = manifest.bind ?? null
+    const toBond = (v: Record<string, unknown>): Record<string, unknown> => {
+        if (!bindKeys) return v
+        const out: Record<string, unknown> = {}
+        for (const k of bindKeys) out[k] = v[k] ?? null
+        return out
+    }
+    let stateValue: Record<string, unknown> = { ...hostValue }
+    const currentState = (): Record<string, unknown> => {
+        const v = (host as unknown as { value: unknown }).value
+        return v && typeof v === "object" ? { ...stateValue, ...(v as Record<string, unknown>) } : stateValue
+    }
 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })
@@ -369,7 +391,23 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     liveRegion.setAttribute("aria-live", "polite")
     liveRegion.setAttribute("aria-atomic", "true")
 
-    shadow.append(style, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion)
+    const note = document.createElement("div")
+    note.className = "masque-note"
+    note.setAttribute("role", "status")
+    let noteTimer: ReturnType<typeof setTimeout> | null = null
+    // The same error again (a drag that keeps failing) keeps the note up without announcing
+    // it again. The text goes once the note has faded, so a screen reader doesn't find it later.
+    const showNote = (text: string) => {
+        if (note.textContent !== text) note.textContent = text
+        note.classList.add("show")
+        if (noteTimer !== null) clearTimeout(noteTimer)
+        noteTimer = setTimeout(() => {
+            note.classList.remove("show")
+            noteTimer = setTimeout(() => { noteTimer = null; note.textContent = "" }, MOTION_MS)
+        }, NOTE_MS)
+    }
+
+    shadow.append(style, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, note)
     host.appendChild(shadowHost)
     // --masque-fig-bg drives the CSS-only tooltip theme (mount.ts's STYLE, lch(from …)); set
     // before tipStyle below so an explicit tooltip_bg/tooltip_color kwarg (--masque-tip-bg/
@@ -409,6 +447,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     let dragStops: DragStops | null = null
     // A frame that arrives while an ROI or threshold drag holds those nodes. Rebuilt when the drag ends.
     let pendingChrome: Manifest | null = null
+    // Where the pointer last moved over the plot, so an \`onchange\` frame can redraw its hover.
+    let lastMove: PointerEvent | null = null
+    const onchangeSettle = (): Record<string, unknown> => ({ onchange: true, state: currentState(), settle: true })
     const rawChannel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto() })
     // A request's matrix is relative to the frame on screen when it was built. The channel runs
     // one round trip at a time, so a request can be built while an earlier one is still in
@@ -421,7 +462,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const builtAt = new WeakMap<Record<string, unknown>, number>()
     const channel: GestureChannel = {
         request(input) { builtAt.set(input, photoFrames); rawChannel.request(input) },
-        settle(input) { builtAt.set(input, photoFrames); return rawChannel.settle(input) },
+        settle(input, slot) {
+            // A built-when-sent input is relative to the frame on screen when it is sent.
+            if (typeof input === "function") return rawChannel.settle(() => { const o = input(); builtAt.set(o, photoFrames); return o }, slot)
+            builtAt.set(input, photoFrames)
+            return rawChannel.settle(input, slot)
+        },
         dispose() { rawChannel.dispose() },
     }
 
@@ -436,24 +482,31 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // Through `host.value`, not into `bondValue`: a page may wrap the property after mount
         // (the docs player does, to swap its snapshots) and must see every commit. The value is
         // a fresh object each time, so Pluto sees a change.
-        value_: () => {
-            const v = (host as unknown as { value: unknown }).value
-            return v && typeof v === "object" ? v as Record<string, unknown> : hostValue
-        },
-        commit_: (updates) => {
+        value_: currentState,
+        commit_: (updates, quiet = false) => {
             const isField = new Set(ctx.manifest_.fields ?? fields)
             const kept = Object.entries(updates).filter(([k]) => isField.has(k))
             if (!kept.length) return
-            const cur = (host as unknown as { value: unknown }).value
-            const next: Record<string, unknown> = { ...(cur && typeof cur === "object" ? cur as Record<string, unknown> : hostValue) }
+            const next: Record<string, unknown> = currentState()
             for (const [k, v] of kept) next[k] = v
-            committing = true
-            try {
-                (host as unknown as { value: unknown }).value = next
-            } finally {
-                committing = false
+            stateValue = next
+            const bond = toBond(next)
+            // With \`onchange\`, a commit can change only fields the bind leaves out. The \`@bind\`
+            // value is then the same, and the cells that read it have nothing new. Compared with
+            // the value the host holds now, which a restore from Pluto may have changed.
+            if (!manifest.onchange || !sameValue(bond, (host as unknown as { value: unknown }).value)) {
+                committing = true
+                try {
+                    (host as unknown as { value: unknown }).value = bond
+                } finally {
+                    committing = false
+                }
+                host.dispatchEvent(new CustomEvent("input"))
             }
-            host.dispatchEvent(new CustomEvent("input"))
+            // \`onchange\` sees every commit, bound or not. A \`quiet\` one (picks a frame cleared)
+            // came from Julia and goes no further. The state is read when the round trip starts,
+            // so a pick a frame cleared meanwhile is not sent back.
+            if (manifest.onchange && !quiet) void channel.settle(onchangeSettle, "onchange")
         },
     }
     const state = createOverlayState()
@@ -462,6 +515,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // over marks or cells holds at its starting bounds.
     const restoreSelection = (v: Record<string, unknown>) => {
         for (const f of fields) {
+            if (!(f in v)) continue // a state field the bond doesn't carry keeps its own
             const sel = selectionForValue(ctx.manifest_, v[f] ?? null, f)
             if (sel) state.sel_.set(f, sel.mask ? { hits_: sel.hits, source_: null, mask_: sel.mask } : sel.items ? { hits_: sel.hits, source_: null, items_: sel.items } : { hits_: sel.hits, source_: sel.source })
         }
@@ -474,14 +528,14 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // so the highlight shows what `@bind` holds (#272). After that our own commits are newer,
     // so a late write of an older value must not undo a click. Pluto also re-writes an equal
     // value whenever any bond in the notebook changes; that is a no-op here.
-    let bondValue: unknown = hostValue
+    let bondValue: unknown = toBond(hostValue)
     let restoring = true
     let committing = false
     const getBond = () => bondValue
     // An accessor already on the host belongs to the page (the docs player's survives a
     // remount, since ours is taken down on cleanup), so writes go through it untouched.
     const theirs = Object.getOwnPropertyDescriptor(host, "value")?.set
-    if (theirs) theirs.call(host, hostValue)
+    if (theirs) theirs.call(host, toBond(hostValue))
     else Object.defineProperty(host, "value", {
         configurable: true,
         enumerable: true,
@@ -491,6 +545,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             else if (restoring && !sameValue(v, bondValue) && v && typeof v === "object") {
                 restoreSelection(v as Record<string, unknown>)
                 renderSelection(ctx, state)
+                stateValue = { ...stateValue, ...(v as Record<string, unknown>) }
+                // Julia drew the starting state; the picture follows the restored one.
+                if (manifest.onchange) void channel.settle(onchangeSettle, "onchange")
             }
             bondValue = v
         },
@@ -562,6 +619,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             channel.dispose()
             return
         }
+        // \`onchange\` threw: the picture on screen is the last good one, and stays.
+        if (typeof r.error === "string") {
+            showNote(r.error)
+            ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueOnchangeError = r.error
+            return
+        }
+        delete (host as unknown as { dataset: DOMStringMap }).dataset.masqueOnchangeError
+        // Picks Julia cleared go now, not when the picture has loaded: a settle queued behind
+        // this frame reads the state as its round trip starts, which is before that.
+        if (r.clear?.length && r.manifest) clearFields(r.manifest as Manifest, r.clear)
         const canvas = base instanceof HTMLCanvasElement ? base as GestureCanvas : null
         const live = canvas != null && typeof canvas.masqueReplaceScene === "function"
         if (r.scene != null && !live) {
@@ -614,6 +681,18 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     function revealFrame(input: Record<string, unknown>, r: FrameResponse): void {
         const newManifest = r.manifest as Manifest | undefined
         if (!newManifest) return
+        const onchangeFrame = input.onchange === true
+        // An in-drag \`onchange\` frame trails the pointer by a round trip. Its lines and boxes
+        // would pull the control back to where it was then, so the ones on screen stay, with
+        // the geometry the drag writes to, until a settle frame redraws them from the state.
+        const keepControls = onchangeFrame && input.settle !== true
+        if (keepControls) {
+            newManifest.layers = newManifest.layers.map((l) =>
+                l.kind === "threshold" || l.kind === "roi" ? ctx.manifest_.layers.find((o) => o.id === l.id && o.kind === l.kind) ?? l : l)
+        }
+        // An \`onchange\` frame comes from a click or a key, and the pointer or the keyboard is
+        // still on the mark: the focus and the hover come back on the new picture.
+        const focused = onchangeFrame && state.focusHit_ ? { id: state.focusHit_.layer.id, index: state.focusHit_.index } : null
 
         // Threshold lines / ROI boxes are built once, from the mount manifest, and never
         // patched in place elsewhere — a camera move invalidates every hit region on the same
@@ -621,7 +700,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // the new one rather than mutated.
         // An ROI or threshold drag still holds these nodes. Replacing them detaches the
         // gesture. The photograph and the stamp still land; the chrome waits for pointerup.
-        if (chromeHeld()) pendingChrome = newManifest
+        if (keepControls) { /* the drag's own chrome stays */ }
+        else if (chromeHeld()) pendingChrome = newManifest
         else {
             pendingChrome = null
             replaceDraggedChrome(newManifest)
@@ -700,6 +780,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         renderSelection(ctx, state)
         adoptPhoto(input)
         dragStops?.sync_()
+        if (focused && !state.drag_) {
+            const k = ctx.focusable_.findIndex((f) => f.layer_.id === focused.id && f.index_ === focused.index)
+            if (k >= 0) focusTo(ctx, state, k)
+        } else if (onchangeFrame && lastMove && !state.drag_) applyMove(ctx, state, lastMove)
 
         // A paired, atomic stamp — written in the SAME synchronous block as the swap above, not
         // sampled separately — so an observer (e2e's kind_sweep.mjs) can tell "a frame actually
@@ -722,8 +806,20 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             })()
         gestureFrameCount += 1
         ;(host as unknown as { dataset: DOMStringMap }).dataset.masqueGestureFrame = JSON.stringify({
-            n: gestureFrameCount, settle: input.settle === true, ...camera,
+            n: gestureFrameCount, settle: input.settle === true, ...(input.onchange ? { onchange: true } : {}), ...camera,
         })
+    }
+
+    // A plot \`onchange\` gave a different number of marks loses its picks (Julia names them).
+    function clearFields(man: Manifest, ids: string[]): void {
+        const updates: Record<string, unknown> = {}
+        for (const f of ids) {
+            const layer = man.layers.find((l) => l.id === f)
+            if (!layer) continue
+            state.sel_.delete(f)
+            updates[f] = !layer.many ? null : layer.kind === "grid" ? { runs: [] } : { items: [] }
+        }
+        ctx.commit_(updates, true)
     }
 
     // The sent frame is the photograph now. Keep whatever the live matrix has moved since
@@ -948,7 +1044,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(overlayTick)
 
     const down = (e: PointerEvent) => onDown(ctx, state, e)
-    const move = (e: PointerEvent) => onPointerMove(ctx, state, e)
+    const move = (e: PointerEvent) => { lastMove = e; onPointerMove(ctx, state, e) }
     const releaseChrome = (kind: string | undefined) => {
         if ((kind === "roi" || kind === "threshold") && !state.drag_) flushPendingChrome()
     }
@@ -967,6 +1063,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // onLeave nulls an uncaptured drag. Capture the kind first or the deferred
         // ROI/threshold frame stays pending with the old nodes still on screen.
         const kind = state.drag_?.kind
+        lastMove = null
         onLeave(ctx, state)
         releaseChrome(kind)
     }

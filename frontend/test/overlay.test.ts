@@ -5936,6 +5936,306 @@ describe("a grid with select = :many holds a cell mask (#335)", () => {
     })
 })
 
+describe("onchange (#334)", () => {
+    // A threshold and a clickable point; with `onchange` both are state, and `bind` keeps only the line.
+    const onchangeManifest = (extra: Partial<Manifest> = {}, geom: Record<string, unknown> = {}): Manifest => ({
+        width: 1200, height: 800, scaling: 2,
+        transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+        layers: [
+            { id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+                geometry: { orientation: "h", pos: 400, span: [0, 1200], ...geom } },
+            { id: "pts", kind: "circles", geometry: [900, 200, 20], payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"] },
+        ],
+        fields: ["thr", "pts"], bind: ["thr"], onchange: true,
+        initial: { thr: { layer: "thr", index: 0, payload: 50 }, pts: null },
+        ...extra,
+    })
+    const val = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+    const frame = (m: Manifest) => async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]), manifest: m })
+
+    it("the bond holds the bind's fields; a click on a field outside it still reaches onchange", async () => {
+        const m = onchangeManifest()
+        const { host, script } = setup()
+        const requestFrame = vi.fn(frame(m))
+        mount(script, m, undefined, requestFrame)
+        expect(val(host)).toEqual({ thr: { layer: "thr", index: 0, payload: 50 } })
+        let inputs = 0
+        host.addEventListener("input", () => { inputs += 1 })
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true }))
+        await Promise.resolve()
+        // The bound part didn't change, so the cells reading it have nothing new.
+        expect(inputs).toBe(0)
+        expect(val(host)).toEqual({ thr: { layer: "thr", index: 0, payload: 50 } })
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        expect(requestFrame.mock.calls[0][0]).toMatchObject({
+            onchange: true, settle: true,
+            state: { thr: { layer: "thr", index: 0, payload: 50 }, pts: { layer: "pts", index: 0 } },
+        })
+    })
+
+    it("a threshold drag sends in-drag state, and its release commits and settles", async () => {
+        const m = onchangeManifest()
+        const { host, script } = setup()
+        const requestFrame = vi.fn(frame(m))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 300, bubbles: true }))
+        await Promise.resolve()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        const mid = requestFrame.mock.calls[0][0] as { settle: boolean; state: { thr: { payload: number } } }
+        expect(mid.settle).toBe(false)
+        expect(mid.state.thr.payload).toBeCloseTo(25)
+        // The bond waits for the release.
+        expect((val(host).thr as { payload: number }).payload).toBe(50)
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 300, bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        expect((val(host).thr as { payload: number }).payload).toBeCloseTo(25)
+        const last = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0] as { settle: boolean; state: { thr: { payload: number } } }
+        expect(last.settle).toBe(true)
+        expect(last.state.thr.payload).toBeCloseTo(25)
+    })
+
+    it("update_while_dragging = false sends only the release", async () => {
+        const m = onchangeManifest({}, { settleOnly: true })
+        const { host, script } = setup()
+        const requestFrame = vi.fn(frame(m))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 300, bubbles: true }))
+        await Promise.resolve()
+        expect(requestFrame).not.toHaveBeenCalled()
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 300, bubbles: true }))
+        await Promise.resolve()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        expect(requestFrame.mock.calls[0][0]).toMatchObject({ onchange: true, settle: true })
+    })
+
+    it("without onchange no commit reaches the channel", async () => {
+        const m = onchangeManifest({ onchange: undefined, bind: undefined, fields: ["thr"] })
+        const { host, script } = setup()
+        const requestFrame = vi.fn(frame(m))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 300, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 300, bubbles: true }))
+        await Promise.resolve()
+        expect(requestFrame).not.toHaveBeenCalled()
+        expect((val(host).thr as { payload: number }).payload).toBeCloseTo(25)
+    })
+
+    it("an error keeps the picture and shows a note; the next frame still lands", async () => {
+        const m = onchangeManifest()
+        const { host, img, script } = setup()
+        let fail = true
+        const requestFrame = vi.fn(async () => fail ? { error: "too high: 5.0" } : { png: new Uint8Array([1, 2, 3]), manifest: m })
+        mount(script, m, undefined, requestFrame)
+        const src0 = img.src
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        const note = shadowOf(host).querySelector(".masque-note") as HTMLElement
+        expect(note.textContent).toBe("too high: 5.0")
+        expect(note.classList.contains("show")).toBe(true)
+        expect(img.src).toBe(src0)
+        expect(host.dataset.masqueOnchangeError).toBe("too high: 5.0")
+        fail = false
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        expect(requestFrame).toHaveBeenCalledTimes(2)
+        expect(img.src).not.toBe(src0)
+    })
+
+    it("a frame that clears a field drops its picks without another onchange round", async () => {
+        const m = onchangeManifest({ bind: ["thr", "pts"] })
+        const { host, img, script } = setup()
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1, 2, 3]), manifest: m, clear: ["pts"] }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true }))
+        expect(val(host).pts).toMatchObject({ layer: "pts", index: 0 })
+        await new Promise((r) => setTimeout(r, 0))
+        img.dispatchEvent(new Event("load"))
+        expect(val(host).pts).toBeNull()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+    })
+
+    // Three points the keyboard can walk, and a frame that answers with a fresh copy of the manifest.
+    const threePoints = (): Manifest => onchangeManifest({
+        initial: { thr: { layer: "thr", index: 0, payload: 50 }, pts: null },
+    })
+    const withThree = (m: Manifest): Manifest => {
+        m.layers[1] = { ...m.layers[1], geometry: [300, 200, 20, 600, 200, 20, 900, 200, 20], payloads: [{ i: 0 }, { i: 1 }, { i: 2 }] }
+        return m
+    }
+    const flush = () => new Promise((r) => setTimeout(r, 0))
+
+    it("Enter and Escape reach onchange, and the focus stays on its mark across the frame", async () => {
+        const m = withThree(threePoints())
+        const { host, img, script } = setup()
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]), manifest: withThree(threePoints()) }))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.focus()
+        const key = (k: string) => surface.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }))
+        key("Home"); key("ArrowRight"); key("Enter")
+        await flush()
+        img.dispatchEvent(new Event("load"))
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        expect(requestFrame.mock.calls[0][0]).toMatchObject({ onchange: true, state: { pts: { layer: "pts", index: 1 } } })
+        expect(surface.classList.contains("kbd-ring")).toBe(true)
+        // The next key goes on from the second point, not from the first.
+        key("ArrowRight"); key("Enter")
+        await flush()
+        img.dispatchEvent(new Event("load"))
+        expect(requestFrame.mock.calls[1][0]).toMatchObject({ state: { pts: { layer: "pts", index: 2 } } })
+        key("Escape")
+        await flush()
+        expect(requestFrame).toHaveBeenCalledTimes(3)
+        expect((requestFrame.mock.calls[2][0] as { state: Record<string, unknown> }).state.pts).toBeNull()
+    })
+
+    it("the hover under the pointer comes back on the new picture", async () => {
+        const m = onchangeManifest()
+        const { host, img, script } = setup()
+        const requestFrame = vi.fn(frame(onchangeManifest()))
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 450, clientY: 100, bubbles: true }))
+        expect(tip.classList.contains("show")).toBe(true)
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true }))
+        await flush()
+        img.dispatchEvent(new Event("load"))
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        expect(tip.classList.contains("show")).toBe(true)
+    })
+
+    it("a pick a frame clears is not sent with a settle queued behind that frame", async () => {
+        const m = onchangeManifest({ bind: ["thr", "pts"] })
+        const { host, script } = setup()
+        let release!: () => void
+        const first = new Promise<void>((r) => { release = r })
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => {
+            if (requestFrame.mock.calls.length === 1) { await first; return { png: new Uint8Array([1]), manifest: onchangeManifest({ bind: ["thr", "pts"] }), clear: ["pts"] } }
+            return { png: new Uint8Array([2]), manifest: onchangeManifest({ bind: ["thr", "pts"] }) }
+        })
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true }))
+        await Promise.resolve()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        // While that frame is out, the threshold moves; its settle waits behind it.
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 300, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 300, bubbles: true }))
+        release()
+        await flush(); await flush()
+        expect(requestFrame).toHaveBeenCalledTimes(2)
+        const second = requestFrame.mock.calls[1][0] as { settle: boolean; state: Record<string, unknown> }
+        expect(second.settle).toBe(true)
+        expect(second.state.pts).toBeNull()
+        expect((second.state.thr as { payload: number }).payload).toBeCloseTo(25)
+        expect(val(host).pts).toBeNull()
+    })
+
+    it("an in-drag frame that lands after the release leaves the line where it was let go", async () => {
+        const m = onchangeManifest()
+        const { host, img, script } = setup()
+        let release!: () => void, settle!: () => void
+        const late = new Promise<void>((r) => { release = r })
+        const settled = new Promise<void>((r) => { settle = r })
+        // The in-drag frame answers with the line back at its start (pos 400).
+        const requestFrame = vi.fn(async (input: Record<string, unknown>) => {
+            if (input.settle !== true) { await late; return { png: new Uint8Array([1]), manifest: onchangeManifest() } }
+            await settled
+            return { png: new Uint8Array([2]), manifest: onchangeManifest({}, { pos: 600 }) }
+        })
+        mount(script, m, undefined, requestFrame)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const lineY = () => Number(shadow.querySelector(".masque-threshold-line")!.getAttribute("y1"))
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 300, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 300, bubbles: true }))
+        await Promise.resolve()
+        surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 300, clientY: 300, bubbles: true }))
+        expect(lineY()).toBe(600)
+        // The late in-drag picture shows before the settle frame comes back.
+        release()
+        await flush()
+        img.dispatchEvent(new Event("load"))
+        expect(lineY()).toBe(600)
+        settle()
+        await flush()
+        img.dispatchEvent(new Event("load"))
+        expect(lineY()).toBe(600)
+        expect((val(host).thr as { payload: number }).payload).toBeCloseTo(25)
+    })
+
+    it("a box drag sends the box and what it holds", async () => {
+        const m: Manifest = {
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 100], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "pts", kind: "circles", geometry: [300, 300, 10, 500, 500, 10, 900, 700, 10],
+                    payloads: [{ i: 0 }, { i: 1 }, { i: 2 }], axis: "ax1", events: ["hover"], brush: "elements" },
+                { id: "roi", kind: "roi", axis: "ax1", events: ["drag"], payloads: [],
+                    selects: "pts", geometry: { x: 200, y: 200, w: 400, h: 400, handle: 16 } },
+            ],
+            fields: ["roi", "pts"], bind: ["roi"], onchange: true,
+            initial: { roi: { layer: "roi", index: 0, payload: [1.67, 5, 25, 75] }, pts: { items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }] } },
+        }
+        const { host, script } = setup()
+        const requestFrame = vi.fn(frame(m))
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        // Move the box right by 200 image px: it now holds pts[1] only.
+        surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+        await Promise.resolve()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        const mid = requestFrame.mock.calls[0][0] as { settle: boolean; state: Record<string, { items?: unknown[] }> }
+        expect(mid.settle).toBe(false)
+        expect(mid.state.pts.items).toEqual([{ layer: "pts", index: 1 }])
+        expect(mid.state.roi).toMatchObject({ layer: "roi", index: 0 })
+    })
+
+    it("after a restored value, a commit back to the mount value still reaches Pluto", async () => {
+        const m = onchangeManifest({ bind: ["thr", "pts"] })
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(frame(m)))
+        // Pluto restores a pick the kernel holds.
+        ;(host as unknown as { value: unknown }).value = { thr: { layer: "thr", index: 0, payload: 50 }, pts: { layer: "pts", index: 0 } }
+        await Promise.resolve()
+        let inputs = 0
+        host.addEventListener("input", () => { inputs += 1 })
+        // A click on the picked point clears it: the value is the mount one again.
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true }))
+        expect(val(host).pts).toBeNull()
+        expect(inputs).toBe(1)
+    })
+
+    it("a value Pluto restores at mount redraws the figure", async () => {
+        const m = onchangeManifest()
+        const { host, script } = setup()
+        const requestFrame = vi.fn(frame(m))
+        mount(script, m, undefined, requestFrame)
+        ;(host as unknown as { value: unknown }).value = { thr: { layer: "thr", index: 0, payload: 80 } }
+        await Promise.resolve()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        expect(requestFrame.mock.calls[0][0]).toMatchObject({
+            onchange: true, settle: true, state: { thr: { payload: 80 }, pts: null },
+        })
+    })
+})
+
 describe("a grid with regions picks and outlines whole regions (#359)", () => {
     // The 4×3 grid of the cell-mask tests above, cut into regions (row j, then i):
     //   row 0: 1 1 2 0

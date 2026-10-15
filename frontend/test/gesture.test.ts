@@ -95,6 +95,39 @@ describe("createGestureChannel", () => {
         expect(onFrame).toHaveBeenLastCalledWith({ n: 2, settle: true }, expect.anything())
     })
 
+    it("a view settle and an onchange settle queued together both run, oldest first", async () => {
+        for (const order of [["view", "onchange"], ["onchange", "view"]]) {
+            const onFrame = vi.fn()
+            const d1 = deferred<{ png: Uint8Array }>()
+            const render = vi.fn().mockReturnValueOnce(d1.promise).mockResolvedValue({ png: new Uint8Array([2]) })
+            const ch = createGestureChannel(render as never, onFrame)
+            ch.request({ first: true })
+            await Promise.resolve() // the first round trip is out
+            for (const slot of order) void ch.settle({ slot, settle: true }, slot)
+            // A second settle of the same kind replaces the first one still waiting.
+            void ch.settle({ slot: order[0], settle: true, again: true }, order[0])
+            d1.resolve({ png: new Uint8Array([1]) })
+            for (let k = 0; k < 10; k++) await Promise.resolve()
+            expect(render.mock.calls.map((c) => c[0])).toEqual([
+                { first: true }, { slot: order[0], settle: true, again: true }, { slot: order[1], settle: true },
+            ])
+        }
+    })
+
+    it("a settle given as a function is built when its round trip starts", async () => {
+        const d1 = deferred<{ png: Uint8Array }>()
+        const render = vi.fn().mockReturnValueOnce(d1.promise).mockResolvedValue({ png: new Uint8Array([2]) })
+        const ch = createGestureChannel(render as never, vi.fn())
+        let state = "queued"
+        ch.request({ first: true })
+        await Promise.resolve()
+        void ch.settle(() => ({ state }), "onchange")
+        state = "sent"
+        d1.resolve({ png: new Uint8Array([1]) })
+        for (let k = 0; k < 10; k++) await Promise.resolve()
+        expect(render.mock.calls[1][0]).toEqual({ state: "sent" })
+    })
+
     it("a synchronous throw (the static-export dead-channel shape) degrades the channel permanently", async () => {
         const onFrame = vi.fn()
         const render = vi.fn(() => { throw new Error("nothing_actions") })

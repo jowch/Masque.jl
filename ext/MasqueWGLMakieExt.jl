@@ -151,6 +151,29 @@ function _plain(x)
     end
 end
 
+# WGLMakie builds a plot's render object once and sends later data changes as updates to a
+# live session, which a headless screen has not got: serializing again would send the first
+# render's data. A plot whose inputs changed since (an `onchange` `update!`, a pan that moved
+# its Float32 offset) has its render object dropped, so this serialization builds it from the
+# plot as it is now. An unchanged plot keeps its own.
+function _drop_stale_renderobjects!(scene)
+    try
+        Makie.for_each_atomic_plot(scene) do p
+            haskey(p.attributes, :wgl_renderobject) || return nothing
+            Makie.ComputePipeline.isdirty(p.attributes[:wgl_renderobject]) || return nothing
+            WGLMakie.delete_wgl_robj!(nothing, p)
+            return nothing
+        end
+    catch e
+        e isa _WGL_SHAPE_ERRORS || rethrow()
+        return _wgl_compat_error(
+            "render object refresh",
+            "`Makie.ComputePipeline.isdirty` and `WGLMakie.delete_wgl_robj!(nothing, plot)` to rebuild a changed plot",
+        )
+    end
+    return nothing
+end
+
 """
     scene_payload(fig) -> Dict
 
@@ -158,6 +181,7 @@ Serialize a finalized figure to the browser payload.
 """
 function scene_payload(fig)
     scene = fig.scene
+    _drop_stale_renderobjects!(scene)
     return _headless_screen(scene) do screen
         _plain(_serialize_scene(scene))
     end

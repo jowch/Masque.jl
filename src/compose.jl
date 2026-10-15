@@ -459,7 +459,7 @@ function _assemble_all(fig, xs; auto::Bool, named = Base.IdSet{Any}(), names = S
     for k in eachindex(out)
         i = out[k]
         if i isa ROIInteractable && i.selects isa Makie.AbstractPlot
-            out[k] = ROIInteractable(i.ax, i.bounds, i.id, _plot_target(i.selects, plotmap, seen))
+            out[k] = ROIInteractable(i.ax, i.bounds, i.id, _plot_target(i.selects, plotmap, seen), i.update_while_dragging)
         end
         if i isa SliceInteractable && !isempty(i.cover_plots)
             covers = unique!(Symbol[id for p in i.cover_plots for id in get(plotmap, p, Symbol[])])
