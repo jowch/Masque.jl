@@ -260,7 +260,9 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         fig = Figure(); ax = Axis(fig[1, 1])
         # 3 rows × 4 columns: each row is one series (Makie's matrix convention).
         ys = [1.0 1.5 2.2 2.8; 3.0 2.4 1.2 1.5; 0.6 1.4 2.6 2.0]
-        series!(ax, ys)
+        # Labels are given: Makie 0.24.16 leaves a series' default `series k` labels out of
+        # its legend (each entry is labelled `nothing` and not drawn).
+        series!(ax, ys; labels = ["series 1", "series 2", "series 3"])
         axislegend(ax)
         Makie.update_state_before_display!(fig)
 

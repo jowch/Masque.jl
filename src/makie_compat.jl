@@ -58,11 +58,29 @@ function _child_plots(p)
     return plots
 end
 
-# A Series' lines. Since Makie 0.24.16 a Series on a PolarAxis draws them through a `PlotList`
-# child (the spec API), so step into any `PlotList` to reach the plots it holds.
+# A Series' lines. Since Makie 0.24.16 a Series draws them through a `PlotList` child (the
+# spec API), so step into any `PlotList` to reach the plots it holds.
 _series_children(p) = reduce(
     vcat, (c isa Makie.PlotList ? _series_children(c) : Any[c] for c in _child_plots(p)); init = Any[],
 )
+
+# Each of a Series' lines' label, or `nothing`. Makie 0.24.16 builds the lines from the raw
+# `labels` attribute (`nothing` by default), so a line carries no label of its own; the
+# defaults (`series 1`, …) are in the Series' `series_labels`. A line's own label wins.
+function _series_labels(p, children)
+    text(l) = l isa AbstractString && !(l isa Makie.LaTeXString) && !isempty(l) ? String(l) : nothing
+    fallback = try
+        p.series_labels[]
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        nothing
+    end
+    return map(enumerate(children)) do (k, c)
+        own = hasproperty(c, :label) ? text(c.label[]) : nothing
+        own !== nothing && return own
+        fallback isa AbstractVector && k <= length(fallback) ? text(fallback[k]) : nothing
+    end
+end
 
 # Wraps `ax.finallimits[]`, the axis's post-layout data limits; no public equivalent.
 function _finallimits(ax)
@@ -310,6 +328,9 @@ function _legend_entries_meta(leg)
                 err isa _MAKIE_SHAPE_ERRORS || rethrow()
                 return _makie_compat_error("label", "a LegendEntry to expose `.label[]`")
             end
+            # Makie draws no row for an entry labelled `nothing` (a `series!` under Makie
+            # 0.24.16 gives its entries no label), so it has no box to hit either.
+            lbl === nothing && continue
             label = lbl isa AbstractString ? String(lbl) : string(lbl)
             elements = try
                 e.elements

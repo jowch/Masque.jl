@@ -7,8 +7,11 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Fixed
-- A `series!` on a `PolarAxis` responds to hover and click again under Makie 0.24.16, which
-  draws its lines one level further down; before, Masque skipped it with a warning.
+- A `series!` works again under Makie 0.24.16, which draws its lines one level further down
+  and without their default `series k` names: hover and click on a `PolarAxis`, a slice
+  readout over it, and its legend links find the lines, and the tooltip names each line as
+  before. A legend whose entries Makie leaves unlabelled (and so doesn't draw) no longer stops
+  the figure from building.
 
 ## [0.3.0] - 2026-10-10
 
