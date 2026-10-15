@@ -626,6 +626,16 @@ HTML(
         "<span id=\"coords_many_grid\" style=\"display:none\">$(JSON3.write(sweep.many_grid.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000142
+@bind ev_many_grid_seeded sweep.many_grid_seeded
+
+# ╔═╡ d1000000-0000-0000-0000-000000000143
+HTML(
+    "<span id=\"out_many_grid_seeded\">MANY_GRID_SEEDED=$(sweep_field("many_grid_seeded", ev_many_grid_seeded))</span>" *
+        "<span id=\"bond_many_grid_seeded\" style=\"display:none\">$(repr(ev_many_grid_seeded))</span>" *
+        "<span id=\"coords_many_grid_seeded\" style=\"display:none\">$(JSON3.write(sweep.many_grid_seeded.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000050
 @bind ev_slice_lines sweep.slice_lines
 
@@ -797,6 +807,8 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000132
 # ╠═d1000000-0000-0000-0000-000000000140
 # ╠═d1000000-0000-0000-0000-000000000141
+# ╠═d1000000-0000-0000-0000-000000000142
+# ╠═d1000000-0000-0000-0000-000000000143
 # ╠═d1000000-0000-0000-0000-000000000050
 # ╠═d1000000-0000-0000-0000-000000000051
 # ╠═d1000000-0000-0000-0000-000000000052

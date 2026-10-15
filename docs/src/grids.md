@@ -51,6 +51,20 @@ selected cells, `findall(sel.region)` their positions in `img`, and
 `sel.region.mask` a matrix the size of `img` that is `true` where a cell
 is selected, so a selection of any shape is one value to index with.
 
+To start with cells already selected, such as a selection you saved
+earlier, pass `selected` a matrix the size of `img` that is `true` at
+those cells:
+
+```julia
+@bind sel masque(fig, (region = interactables(hm; select = :many),);
+    selected = (region = saved_mask,))
+```
+
+The cells start highlighted, `sel.region` holds them before anyone
+clicks, and a Cmd-click or Ctrl-click takes one out like any other.
+`selected` also takes a `GridSelection` or the positions `findall` gives,
+and a matrix of a different size from `img` raises an `ArgumentError`.
+
 ## Label cells
 
 To show your own data for each cell, such as the names along each side

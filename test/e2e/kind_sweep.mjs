@@ -843,6 +843,47 @@ try {
       continue;
     }
 
+    // The same grid started with `selected=` (#356): before any gesture, the printed value holds
+    // the two seeded cells, host.value's `{runs}` names them, and they draw as one outlined area
+    // (one fill rect, a 4-sided edge). Ctrl-click then takes a seeded cell out and puts it back,
+    // and a plain click replaces both, as on a grid that started empty.
+    if (spec.mode === "many_grid_seeded") {
+      const g = layer.geometry;
+      if (!layer.many) throw new Error(`${key}: layer ${layer.id} ships no many flag`);
+      const v0 = await textOf(`#bond_${key}`);
+      if (!/GridSelection\(:region, 2 of 12 cells\)/.test(v0)) throw new Error(`${key}: mount value ${JSON.stringify(v0)}, want the 2 seeded cells`);
+      const m0 = await inspect(key);
+      if (JSON.stringify(m0.bondAll?.region?.runs) !== "[1,1,2]") throw new Error(`${key}: mount runs ${JSON.stringify(m0.bondAll?.region)}, want [1,1,2]`);
+      if (m0.sel !== 2) throw new Error(`${key}: mount g.sel=${m0.sel}, want the seeded cells drawn`);
+      const p0 = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const d = (svg) => sr.querySelector(`svg.${svg} g.sel path`)?.getAttribute("d") ?? null;
+        return { fill: d("masque-fill"), edge: d("masque-edge") };
+      }, key);
+      if ((p0.fill?.match(/M/g) ?? []).length !== 1) throw new Error(`${key}: mount fill path ${p0.fill}, want one rect for the two cells`);
+      if ((p0.edge?.match(/M/g) ?? []).length !== 4) throw new Error(`${key}: mount edge path ${p0.edge}, want the outline only (4 sides)`);
+      passed.push(`${key}/seeded-at-mount`);
+      const at = (i, j) => ({ x: (g.xedges[i] + g.xedges[i + 1]) / 2, y: (g.yedges[j] + g.yedges[j + 1]) / 2 });
+      const step = async (what, before, act, wantCount, wantRuns) => {
+        await act();
+        const t = await waitChange(`#bond_${key}`, before, `${key}/${what}`);
+        if (!t.includes(`GridSelection(:region, ${wantCount} of 12 cells)`)) throw new Error(`${key}/${what}: value ${JSON.stringify(t)}, want ${wantCount} cells`);
+        const m = await inspect(key);
+        if (JSON.stringify(m.bondAll?.region?.runs) !== JSON.stringify(wantRuns)) throw new Error(`${key}/${what}: host.value runs ${JSON.stringify(m.bondAll?.region?.runs)}, want ${JSON.stringify(wantRuns)}`);
+        if (m.sel !== 2) throw new Error(`${key}/${what}: g.sel=${m.sel}, want 2`);
+        passed.push(`${key}/${what}`);
+        return t;
+      };
+      let t = await step("ctrl-click-removes-seed", v0, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click", { ctrlKey: true }), 1, [1, 2, 1]);
+      t = await step("ctrl-click-adds-back", t, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click", { ctrlKey: true }), 2, [1, 1, 2]);
+      t = await step("click-replaces-seeds", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 1, [0, 3, 1]);
+      await dispatchAt(key, 1, 1, "pointermove");
+      console.error(`OK  ${key} — ${t.slice(0, 160)}`);
+      continue;
+    }
+
     if (spec.mode === "many") {
       const picks = (t) => [...t.matchAll(/ElementEvent\(:scatter, (\d+),/g)].map((m) => Number(m[1]));
       const items = async () => ((await inspect(key)).bondAll?.scatter?.items ?? null)?.map((i) => i.index);

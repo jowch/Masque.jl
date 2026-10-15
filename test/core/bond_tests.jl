@@ -1,6 +1,20 @@
 using Test, Masque, CairoMakie, Makie
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
+# A recipe whose parts include a `select = :many` grid, so `selected=` reaches it by a
+# hierarchical id (`seg.heat`). Types can't be defined inside a testset.
+Makie.@recipe SeedHeatParts (values,) begin
+end
+function Makie.plot!(p::SeedHeatParts)
+    heatmap!(p, p.values)
+    scatter!(p, [Point2f(1, 1), Point2f(2, 2)])
+    return p
+end
+Masque.interactables(ax, p::SeedHeatParts) = (
+    heat = GridInteractable(ax, p.plots[1]; select = :many),
+    dot = PointInteractable(ax, p.plots[2][1][]),
+)
+
 @testset "Bond" begin
     @testset "element fields and indexing" begin
         pl = (; city = "Tokyo", pop = 37)
@@ -622,5 +636,94 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws "surface cells don't take several picks yet" interactables(
             ax3, surface!(ax3, rand(3, 3)); select = :many,
         )
+    end
+
+    @testset "selected= starts a select = :many grid with cells (#356)" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        img = reshape(Float64.(1:12), 4, 3)
+        hm = heatmap!(ax, img)
+        iv = Masque.APD.Bonds.initial_value
+        region = interactables(hm; select = :many)
+        mask = falses(4, 3)
+        mask[2, 2] = mask[3, 2] = mask[1, 3] = true
+        cells = findall(mask)
+        # Every form gives the same starting mask, and the value reads it back.
+        for sel in (
+                (region = mask,), (region = cells,), (region = LinearIndices(mask)[cells],),
+                (region = GridSelection(:region, mask),), Dict(:region => mask),
+            )
+            w = masque(fig, (; region); selected = sel)
+            # Row j = 1 (0-based), columns 1..2; row 2, column 0.
+            @test w.manifest["initial"]["region"] == Dict("runs" => [1, 1, 2, 2, 0, 1])
+            @test iv(w).region == GridSelection(:region, mask)
+        end
+        # Bare forms, with the grid as the bind value.
+        g = GridInteractable(ax, hm; select = :many, id = :g)
+        @test iv(masque(fig, g; bind = g, selected = mask)) == GridSelection(:g, mask)
+        @test iv(masque(fig, g; bind = g, selected = cells)).mask == mask
+        @test iv(masque(fig, g; bind = g, selected = GridSelection(:g, mask))).mask == mask
+        # A whole row is one run; an empty mask, or none, starts empty; a repeat is one cell.
+        @test masque(fig, (; region); selected = (region = trues(4, 3),)).manifest["initial"]["region"] ==
+            Dict("runs" => [0, 0, 4, 1, 0, 4, 2, 0, 4])
+        @test isempty(iv(masque(fig, (; region); selected = (region = falses(4, 3),))).region)
+        @test isempty(iv(masque(fig, (; region))).region)
+        @test count(iv(masque(fig, (; region); selected = (region = [5, 5, 6],))).region) == 2
+        # Mistakes name the grid's size or the field.
+        @test_throws "is a 4×3 grid, so its mask must be 4×3; got 3×4" masque(
+            fig, (; region); selected = (region = falses(3, 4),),
+        )
+        @test_throws "cell (5, 1) is outside the 4×3 grid" masque(
+            fig, (; region); selected = (region = [CartesianIndex(5, 1)],),
+        )
+        @test_throws "cell 13 out of range for its 12 cells" masque(fig, (; region); selected = (region = [13],))
+        @test_throws "does not match GridSelection layer :other" masque(
+            fig, (; region); selected = (region = GridSelection(:other, mask),),
+        )
+        @test_throws "ambiguous across grids" masque(
+            fig, (a = interactables(hm; select = :many), b = GridInteractable(ax, hm; select = :many));
+            selected = mask,
+        )
+        @test_throws "takes a Bool mask; got Matrix{Int64}. For a 0/1 matrix, pass `mask .== 1`" masque(
+            fig, (; region); selected = (region = Int.(mask),),
+        )
+        @test_throws "takes a Bool mask" masque(fig, g; bind = g, selected = Int.(mask))
+        # A `select = :one` grid still can't start selected.
+        @test_throws "does not support pre-highlight" masque(
+            fig, (one = interactables(hm),); selected = (one = 2,),
+        )
+    end
+
+    @testset "selected= reaches a grid that is a recipe part" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        hp = seedheatparts!(ax, reshape(Float64.(1:12), 4, 3))
+        iv = Masque.APD.Bonds.initial_value
+        mask = falses(4, 3)
+        mask[1, 1] = mask[2, 1] = true
+        w = masque(fig; bind = (seg = hp,), selected = (seg = (heat = mask,),))
+        v = iv(w).seg.heat
+        @test v.mask == mask
+        # The value it gives, and `findall` of it, seed the same cells back.
+        for sel in (v, findall(v), [1, 2])
+            @test iv(masque(fig; bind = (seg = hp,), selected = (seg = (heat = sel,),))).seg.heat == v
+        end
+        # Under a bare head the keys are the parts.
+        @test iv(masque(fig; bind = hp, selected = (heat = mask,))).heat.mask == mask
+        @test_throws "does not match GridSelection layer" masque(
+            fig; bind = (seg = hp,), selected = (seg = (heat = GridSelection(:other, mask),),),
+        )
+    end
+
+    @testset "a large noisy seeded mask goes as bits, like the browser's" begin
+        fig = Figure(size = (400, 300)); ax = Axis(fig[1, 1])
+        hm = heatmap!(ax, zeros(64, 64))
+        iv = Masque.APD.Bonds.initial_value
+        region = interactables(hm; select = :many)
+        noisy = BitMatrix([isodd(i + j) for i in 1:64, j in 1:64])
+        env = masque(fig, (; region); selected = (region = noisy,)).manifest["initial"]["region"]
+        @test collect(keys(env)) == ["bits"]
+        @test iv(masque(fig, (; region); selected = (region = noisy,))).region.mask == noisy
+        # Few runs stay readable.
+        block = falses(64, 64); block[1:10, 1:10] .= true
+        @test haskey(masque(fig, (; region); selected = (region = block,)).manifest["initial"]["region"], "runs")
     end
 end
