@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { CONTROLS_STYLE } from "../src/controls"
 import { afterEach, describe, it, expect, vi } from "vitest"
 import { mount as mountOverlay } from "../src/overlay"
 
@@ -20,7 +21,7 @@ import { mapPoint, unmapPoint } from "../src/photo"
 import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
 import { createOverlayState, MOTION_MS, type HiGroups } from "../src/state"
-import type { GridGeometry, Hit, HitLayer, Manifest, ViewGeometry } from "../src/types"
+import type { ControlGeometry, GridGeometry, Hit, HitLayer, Manifest, ViewGeometry } from "../src/types"
 
 // build a light-DOM host (img + script) like the Julia widget emits, with layout mocked
 function setup() {
@@ -6327,5 +6328,229 @@ describe("a grid with regions picks and outlines whole regions (#359)", () => {
         cell(surface, 2, 1)
         // Region 2: cells (2,0), (2,1), (2,2), (3,2).
         expect(fillSelGroup(shadow).querySelector("path")!.getAttribute("d")).toBe("M600 0H900V200H600ZM600 200H900V400H600ZM600 400H1200V600H600Z")
+    })
+})
+
+describe("block controls (#345)", () => {
+    // A slider over 0:0.5:5 (start 1.0, index 2), a toggle, an interval slider and a menu.
+    const controlsManifest = (extra: Partial<Manifest> = {}, sl: Record<string, unknown> = {}): Manifest => ({
+        width: 1200, height: 800, scaling: 2, transforms: {},
+        layers: [
+            { id: "deg", kind: "control", axis: "", events: ["change"], payloads: [], label: "deg",
+                geometry: { control: "slider", x: 100, y: 700, w: 400, h: 20, value: 2, n: 11, horizontal: true, range: [0, 0.5], color: "rgb(1,2,3)", ...sl } },
+            { id: "show", kind: "control", axis: "", events: ["change"], payloads: [], label: "show",
+                geometry: { control: "toggle", x: 600, y: 700, w: 60, h: 30, value: true } },
+            { id: "span", kind: "control", axis: "", events: ["change"], payloads: [], label: "span",
+                geometry: { control: "intervalslider", x: 100, y: 740, w: 400, h: 20, value: [1, 4], n: 6, horizontal: true, labels: ["a", "b", "c", "d", "e", "f"] } },
+            { id: "pick", kind: "control", axis: "", events: ["change"], payloads: [], label: "pick",
+                geometry: { control: "menu", x: 700, y: 700, w: 200, h: 40, value: 0, n: 2, labels: ["red", "blue"] } },
+        ],
+        fields: ["deg", "show", "span", "pick"],
+        initial: {
+            deg: { layer: "deg", index: 0, payload: 2 }, show: { layer: "show", index: 0, payload: true },
+            span: { layer: "span", index: 0, payload: [1, 4] }, pick: { layer: "pick", index: 0, payload: 0 },
+        },
+        ...extra,
+    })
+    const val = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+    const ctl = (host: HTMLElement, id: string) => shadowOf(host).querySelector(`[data-masque-control="${id}"]`) as HTMLElement
+    const frame = (m: Manifest) => async (_input: Record<string, unknown>) => ({ png: new Uint8Array([1, 2, 3]), manifest: m })
+
+    it("draws one native control per block over its box, at its starting value", () => {
+        const m = controlsManifest()
+        const { host, script } = setup()
+        mount(script, m)
+        const slider = ctl(host, "deg")
+        expect(slider.style.left).toBe(`${100 * 100 / 1200}%`)
+        expect(slider.style.width).toBe(`${100 * 400 / 1200}%`)
+        expect(slider.style.top).toBe(`${100 * 700 / 800}%`)
+        expect(slider.style.getPropertyValue("--masque-ctl")).toBe("rgb(1,2,3)")
+        const range = slider.querySelector("input") as HTMLInputElement
+        expect(range.type).toBe("range")
+        expect(range.max).toBe("10")
+        expect(range.value).toBe("2")
+        expect(range.getAttribute("aria-valuetext")).toBe("1")
+        expect(range.getAttribute("aria-label")).toBe("deg")
+        const toggle = ctl(host, "show").querySelector("input") as HTMLInputElement
+        expect(toggle.getAttribute("role")).toBe("switch")
+        expect(toggle.checked).toBe(true)
+        const [lo, hi] = [...ctl(host, "span").querySelectorAll("input")] as HTMLInputElement[]
+        expect([lo.value, hi.value]).toEqual(["1", "4"])
+        expect(hi.getAttribute("aria-valuetext")).toBe("e")
+        const select = ctl(host, "pick").querySelector("select") as HTMLSelectElement
+        expect([...select.options].map((o) => o.textContent)).toEqual(["red", "blue"])
+        expect(select.value).toBe("0")
+    })
+
+    it("a release commits the field; moving alone doesn't", () => {
+        const m = controlsManifest()
+        const { host, script } = setup()
+        mount(script, m)
+        let inputs = 0
+        host.addEventListener("input", () => { inputs += 1 })
+        const range = ctl(host, "deg").querySelector("input") as HTMLInputElement
+        range.value = "7"
+        range.dispatchEvent(new Event("input", { bubbles: true }))
+        expect(range.getAttribute("aria-valuetext")).toBe("3.5")
+        expect(val(host).deg).toEqual({ layer: "deg", index: 0, payload: 2 })
+        range.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).deg).toEqual({ layer: "deg", index: 0, payload: 7 })
+        const toggle = ctl(host, "show").querySelector("input") as HTMLInputElement
+        toggle.checked = false
+        toggle.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).show).toEqual({ layer: "show", index: 0, payload: false })
+        const select = ctl(host, "pick").querySelector("select") as HTMLSelectElement
+        select.value = "1"
+        select.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: 1 })
+        expect(inputs).toBe(3)
+    })
+
+    it("an interval slider sends its two ends in order, whichever knob crossed", () => {
+        const m = controlsManifest()
+        const { host, script } = setup()
+        mount(script, m)
+        const [lo] = [...ctl(host, "span").querySelectorAll("input")] as HTMLInputElement[]
+        lo.value = "5"
+        lo.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).span).toEqual({ layer: "span", index: 0, payload: [4, 5] })
+    })
+
+    it("under onchange a moving slider redraws without committing, and its release settles", async () => {
+        const m = controlsManifest({ onchange: true, bind: ["deg"] })
+        const { host, script } = setup()
+        const requestFrame = vi.fn(frame(m))
+        mount(script, m, undefined, requestFrame)
+        const range = ctl(host, "deg").querySelector("input") as HTMLInputElement
+        range.value = "4"
+        range.dispatchEvent(new Event("input", { bubbles: true }))
+        await Promise.resolve()
+        expect(requestFrame).toHaveBeenCalledTimes(1)
+        expect(requestFrame.mock.calls[0][0]).toMatchObject({ onchange: true, settle: false, state: { deg: { payload: 4 }, show: { payload: true } } })
+        expect(val(host)).toEqual({ deg: { layer: "deg", index: 0, payload: 2 } })
+        range.dispatchEvent(new Event("change", { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        expect(val(host)).toEqual({ deg: { layer: "deg", index: 0, payload: 4 } })
+        const last = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0] as Record<string, unknown>
+        expect(last).toMatchObject({ onchange: true, settle: true, state: { deg: { payload: 4 } } })
+    })
+
+    it("update_while_dragging = false waits for the release", async () => {
+        const m = controlsManifest({ onchange: true }, { settleOnly: true })
+        const { host, script } = setup()
+        const requestFrame = vi.fn(frame(m))
+        mount(script, m, undefined, requestFrame)
+        const range = ctl(host, "deg").querySelector("input") as HTMLInputElement
+        range.value = "4"
+        range.dispatchEvent(new Event("input", { bubbles: true }))
+        await Promise.resolve()
+        expect(requestFrame).not.toHaveBeenCalled()
+    })
+
+    it("a control's pointer and key events never reach the overlay's gestures", () => {
+        const m = controlsManifest()
+        const { host, script } = setup()
+        mount(script, m)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        const seen: string[] = []
+        for (const t of ["pointerdown", "keydown", "wheel"]) surface.addEventListener(t, () => seen.push(t))
+        const shadowHost = host.lastElementChild as HTMLElement
+        shadowHost.addEventListener("pointerdown", () => seen.push("host"))
+        const range = ctl(host, "deg").querySelector("input") as HTMLInputElement
+        range.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, composed: true }))
+        range.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, composed: true }))
+        expect(seen).toEqual([])
+    })
+
+    it("a value Pluto restores moves the control", () => {
+        const m = controlsManifest()
+        const { host, script } = setup()
+        mount(script, m)
+        ;(host as unknown as { value: unknown }).value = { ...m.initial, deg: { layer: "deg", index: 0, payload: 9 }, show: { layer: "show", index: 0, payload: false } }
+        expect((ctl(host, "deg").querySelector("input") as HTMLInputElement).value).toBe("9")
+        expect((ctl(host, "show").querySelector("input") as HTMLInputElement).checked).toBe(false)
+    })
+
+    it("a frame moves the boxes and keeps the values the reader set", async () => {
+        const m = controlsManifest({ onchange: true })
+        const moved = controlsManifest({ onchange: true }, { x: 200, value: 6 })
+        const { host, img, script } = setup()
+        const requestFrame = vi.fn(frame(moved))
+        mount(script, m, undefined, requestFrame)
+        const range = ctl(host, "deg").querySelector("input") as HTMLInputElement
+        range.value = "6"
+        range.dispatchEvent(new Event("change", { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        img.dispatchEvent(new Event("load"))
+        expect(ctl(host, "deg").style.left).toBe(`${100 * 200 / 1200}%`)
+        expect(range.value).toBe("6")
+    })
+
+    it("a press on an interval's bar moves the nearer knob; each knob takes its own drag", () => {
+        const m = controlsManifest()
+        const { host, script } = setup()
+        mount(script, m)
+        const box = ctl(host, "span")
+        // 6 indices over a 220 × 20 px box: the knob is 20 px, so index k sits at 10 + 40k.
+        box.getBoundingClientRect = () => ({ left: 0, top: 0, right: 220, bottom: 20, width: 220, height: 20, x: 0, y: 0, toJSON: () => ({}) })
+        box.dispatchEvent(new PointerEvent("pointerdown", { clientX: 10, clientY: 10, button: 0, bubbles: true }))
+        expect(val(host).span).toEqual({ layer: "span", index: 0, payload: [0, 4] })
+        box.dispatchEvent(new PointerEvent("pointerdown", { clientX: 210, clientY: 10, button: 0, bubbles: true }))
+        expect(val(host).span).toEqual({ layer: "span", index: 0, payload: [0, 5] })
+        // Only the thumbs take the pointer, so the low knob isn't under the high input.
+        expect(CONTROLS_STYLE).toMatch(/\.masque-interval \.masque-range \{ pointer-events: none; \}/)
+        expect(CONTROLS_STYLE).toMatch(/\.masque-interval \.masque-range::-webkit-slider-thumb \{ pointer-events: auto; \}/)
+    })
+
+    it("when onchange changes a menu's options, the menu is built again and the field takes the author's value", async () => {
+        const m = controlsManifest({ onchange: true })
+        const after = controlsManifest({ onchange: true })
+        after.layers = after.layers.map((l): HitLayer => l.id === "pick" ? { ...l, geometry: { ...(l.geometry as ControlGeometry), labels: ["kale", "leek"], value: -1 } }
+            : l.id === "show" ? { ...l, geometry: { ...(l.geometry as ControlGeometry), value: false } } : l)
+        const { host, img, script } = setup()
+        const requestFrame = vi.fn(frame(after))
+        mount(script, m, undefined, requestFrame)
+        const toggle = ctl(host, "show").querySelector("input") as HTMLInputElement
+        toggle.checked = false
+        toggle.dispatchEvent(new Event("change", { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        img.dispatchEvent(new Event("load"))
+        const select = ctl(host, "pick").querySelector("select") as HTMLSelectElement
+        expect([...select.options].filter((o) => !o.disabled).map((o) => o.textContent)).toEqual(["kale", "leek"])
+        expect(select.value).toBe("-1")
+        expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: -1 })
+        // The toggle the reader clicked keeps its value; the frame echoes it.
+        expect(val(host).show).toEqual({ layer: "show", index: 0, payload: false })
+    })
+
+    it("a late frame doesn't pull back a control the reader has moved since", async () => {
+        const m = controlsManifest({ onchange: true })
+        const { host, img, script } = setup()
+        let release!: () => void
+        const requestFrame = vi.fn(async () => {
+            await new Promise<void>((r) => { release = r })
+            return { png: new Uint8Array([1, 2, 3]), manifest: controlsManifest({ onchange: true }, { value: 4 }) }
+        })
+        mount(script, m, undefined, requestFrame)
+        const range = ctl(host, "deg").querySelector("input") as HTMLInputElement
+        range.value = "4"
+        range.dispatchEvent(new Event("input", { bubbles: true }))
+        await Promise.resolve()
+        range.value = "8"
+        range.dispatchEvent(new Event("input", { bubbles: true }))
+        release()
+        await new Promise((r) => setTimeout(r, 0))
+        img.dispatchEvent(new Event("load"))
+        expect(range.value).toBe("8")
+    })
+
+    it("cleanup takes the controls down", () => {
+        const m = controlsManifest()
+        const { host, script } = setup()
+        const { cleanup } = mount(script, m)
+        const shadow = shadowOf(host)
+        expect(shadow.querySelector(".masque-controls")).not.toBeNull()
+        cleanup()
+        expect(shadow.querySelector(".masque-controls")).toBeNull()
     })
 })

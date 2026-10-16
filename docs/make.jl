@@ -58,6 +58,7 @@ makedocs(;
             "Slice across series" => "slice.md",
             "Pan and orbit" => "view.md",
             "Update the figure" => "onchange.md",
+            "Sliders and toggles" => "controls.md",
             "Linked views" => "linked-views.md",
             "Custom hits" => "custom.md",
             "Your own plot types" => "recipes.md",

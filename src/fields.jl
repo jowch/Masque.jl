@@ -59,6 +59,7 @@ end
 
 # The object a name belongs to: a plot for `interactables(plot)`, else the interactable.
 _named_key(r::_PlotRequest) = r.plot
+_named_key(i::BlockControl) = i.block
 _named_key(x) = x
 
 _describe(p::Makie.AbstractPlot) = "the `$(Makie.plotkey(p))` plot"
@@ -87,6 +88,7 @@ end
 function _one_object(where, k, v)
     v isa AbstractVector && length(v) == 1 && (v = only(v))
     v isa AbstractInteractable && return v
+    v isa _CONTROL_BLOCKS && return BlockControl(v)
     v isa Makie.AbstractPlot && where == "masque" && throw(
         ArgumentError("masque: `$k = …` is a plot; pass `$k = interactables(plot)`, or name it in `bind`"),
     )
@@ -233,7 +235,7 @@ end
 function _layer_role(L::HitLayer, d, brushed)
     L.id in brushed && return :brush
     stamp = d["bond"]
-    stamp in ("threshold", "bounds") && return :control
+    stamp in ("threshold", "bounds", "control") && return :control
     stamp == "none" && return nothing
     return "click" in d["events"] ? :pick : nothing
 end

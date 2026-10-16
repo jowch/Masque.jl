@@ -492,6 +492,8 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
         }
         case "slice":
             return null // data for the probe, not a hit target — hitTest stays first-match
+        case "control":
+            return null // an HTML element over the picture takes its own input (controls.ts)
     }
 }
 

@@ -13,6 +13,7 @@ export type Kind =
     | "roi"       // geometry: ROIGeometry — a draggable+resizable rect; bounds computed via AxisTransform
     | "view"      // geometry: ViewGeometry — drag-to-pan (2D) / drag-to-orbit (Axis3); commit on mouse-up
     | "slice"     // geometry: SliceGeometry — data-space series sampled at the cursor; not a hit target
+    | "control"   // geometry: ControlGeometry — a Makie block drawn as an HTML control (controls.ts); not a hit target
 
 export interface GridGeometry {
     xedges: number[]
@@ -67,6 +68,26 @@ export interface ROIGeometry {
     h: number
     handle: number // hit half-size, image px; the painted grip is HANDLE_CSS in drag/roi.ts
     settleOnly?: true // `update_while_dragging = false`: `onchange` runs on release only
+}
+
+// A Makie block drawn as an HTML control. `value` is the block's state as the wire carries it:
+// a 0-based index (slider, menu; -1 for a menu with nothing chosen), a pair of them (interval
+// slider), or a Bool (toggle, checkbox).
+export interface ControlGeometry {
+    control: "slider" | "intervalslider" | "toggle" | "checkbox" | "menu"
+    x: number // the block's box, image px, top-left origin
+    y: number
+    w: number
+    h: number
+    value: number | number[] | boolean
+    n?: number              // slider and menu: how many values
+    horizontal?: boolean    // slider: false for a vertical one
+    range?: [number, number] // slider over a numeric range: start and step, for the read-out value
+    labels?: string[]       // menu options, or the slider's values when the range isn't numeric
+    color?: string          // the block's accent colour: a slider's knob, a toggle's knob, a checked box
+    fill?: string           // a slider's filled stretch, an active toggle's frame
+    off?: string            // the empty bar, an inactive toggle's frame
+    settleOnly?: true       // `update_while_dragging = false`: `onchange` runs on release only
 }
 
 export interface SliceSeries {
@@ -157,18 +178,18 @@ export interface HitLayer {
     id: string
     kind: Kind
     // A polygon element is a flat ring (number[]) or, when it has holes, a ring group (number[][]).
-    geometry: number[] | Array<number[] | number[][]> | GridGeometry | SurfaceGeometry | ThresholdGeometry | ROIGeometry | ViewGeometry | SliceGeometry | null
+    geometry: number[] | Array<number[] | number[][]> | GridGeometry | SurfaceGeometry | ThresholdGeometry | ROIGeometry | ViewGeometry | SliceGeometry | ControlGeometry | null
     payloads: unknown[] // one per element; a :grid layer's are per cell, row-major like values; a :surface layer's per shipped point (empty for none)
     axis: string
-    events: string[] // "click" | "hover" | "drag"
+    events: string[] // "click" | "hover" | "drag" | "change" (a control)
     style?: LayerStyle
     tol?: number // hit-test slack, image px: :segments/:polyline/:lines (absent → geometry.ts's SEG_TOL fallback); :rects/:polygons reach past the shape's edge (absent → none)
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
     brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds
     many?: true // a `select = :many` field: it holds { items: [...] }, and Cmd/Ctrl-click toggles one in or out
-    // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | none
-    bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "none"
+    // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | control | none
+    bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "control" | "none"
     selects?: string   // id of the target layer this ROI selects; absent → bounds-ROI (no multi-select)
     // Per-element linked highlight (e.g. a Legend entry): other layers this element
     // highlights with the selected recipe on hover/focus; [] or absent-per-element = no link.

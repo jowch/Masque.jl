@@ -182,13 +182,13 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
                 end
                 if sig isa Expr && sig.head === :call
                     name = sig.args[1]
-                    name isa Symbol && occursin(r"interactable"i, string(name)) && walk(sig)
+                    name isa Symbol && occursin(r"interactable|control"i, string(name)) && walk(sig)
                 end
             end
             foreach(defs, ex.args)
             return
         end
-        for file in ("interactables.jl", "introspect.jl")
+        for file in ("interactables.jl", "introspect.jl", "controls.jl")
             defs(Meta.parseall(read(joinpath(pkgdir(Masque), "src", file), String)))
         end
         @test :view in found && :scatter in found && :points in found

@@ -12,6 +12,7 @@ import * as roiDrag from "./drag/roi"
 import { limitsTip } from "./drag/view"
 import * as viewDrag from "./drag/view"
 import { createGestureChannel } from "./gesture"
+import { buildControls, CONTROLS_STYLE } from "./controls"
 import { DEFAULT_SIGDIGITS } from "./template"
 import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
@@ -303,7 +304,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const shadowHost = document.createElement("div")
     const shadow = shadowHost.attachShadow({ mode: "open" })
     const style = document.createElement("style")
-    style.textContent = STYLE
+    style.textContent = STYLE + CONTROLS_STYLE
 
     // Three coordinate-identical top-level <svg>s. The fill svg carries color-dodge (Firefox
     // only honours mix-blend-mode on a top-level svg). The edge svg paints the flat chrome
@@ -408,6 +409,16 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
 
     shadow.append(style, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, note)
+    // Named Makie blocks, drawn as HTML over the empty boxes Julia left for them. A release
+    // commits like any field; a slider moving under `onchange` redraws as it goes.
+    const controls = buildControls(shadow, manifest, {
+        commit_: (id, env) => ctx.commit_({ [id]: env }),
+        live_: (id, env) => {
+            if (ctx.manifest_.onchange === true) ctx.gesture_.request({ onchange: true, state: { ...ctx.value_(), [id]: env }, settle: false })
+        },
+        adopt_: (id, env) => ctx.commit_({ [id]: env }, true),
+        digits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS,
+    })
     host.appendChild(shadowHost)
     // --masque-fig-bg drives the CSS-only tooltip theme (mount.ts's STYLE, lch(from …)); set
     // before tipStyle below so an explicit tooltip_bg/tooltip_color kwarg (--masque-tip-bg/
@@ -544,6 +555,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             if (committing) restoring = false
             else if (restoring && !sameValue(v, bondValue) && v && typeof v === "object") {
                 restoreSelection(v as Record<string, unknown>)
+                for (const [f, env] of Object.entries(v as Record<string, unknown>)) controls.set_(f, env)
                 renderSelection(ctx, state)
                 stateValue = { ...stateValue, ...(v as Record<string, unknown>) }
                 // Julia drew the starting state; the picture follows the restored one.
@@ -707,6 +719,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             replaceDraggedChrome(newManifest)
         }
         ctx.manifest_ = newManifest
+        controls.update_(newManifest, onchangeFrame && input.state && typeof input.state === "object" ? input.state as Record<string, unknown> : null)
         // Drop a cross that described the previous frame. The hair stays on the plain svg;
         // the dots stay in the photo group, above the chrome just rebuilt there.
         hideCross(ctx, state)
@@ -1176,6 +1189,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         if (cleaned) return
         cleaned = true
         loadToken += 1
+        controls.remove_()
         surface.removeEventListener("pointerdown", down)
         surface.removeEventListener("wheel", onWheel)
         surface.removeEventListener("pointermove", move)

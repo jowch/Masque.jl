@@ -12,6 +12,7 @@ export function defaultFields(m: Manifest): string[] {
         if (ev.includes("click")) add(l.id)
         if (ev.includes("drag") && (l.kind === "threshold" || l.kind === "roi")) add(l.id)
         if (l.kind === "roi" && l.selects) add(l.selects)
+        if (l.kind === "control") add(l.id)
     }
     return out
 }

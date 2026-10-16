@@ -389,3 +389,56 @@ function _legend_entries(leg)
     )
     return [merge(m, (; bbox = boxes[k])) for (k, m) in enumerate(meta)]
 end
+
+# ---------------------------------------------------------------------------
+# Blocks drawn as HTML controls (src/controls.jl)
+# ---------------------------------------------------------------------------
+
+# Wraps `b.layoutobservables.computedbbox[]` for any block, like `_colorbar_bbox`.
+function _block_bbox(b)
+    bb = try
+        b.layoutobservables.computedbbox[]
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("computedbbox", "a $(nameof(typeof(b))) to expose `.layoutobservables.computedbbox[]`")
+    end
+    bb isa Makie.Rect2 || return _makie_compat_error("computedbbox", "a block's `.computedbbox[]` to be a `Rect2`")
+    return bb
+end
+
+# Wraps `b.blockscene`, the scene a block draws into (Menu's dropdown is a child scene of it).
+function _block_scene(b)
+    sc = try
+        b.blockscene
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("blockscene", "a $(nameof(typeof(b))) to expose `.blockscene`")
+    end
+    sc isa Makie.Scene || return _makie_compat_error("blockscene", "`.blockscene` to be a `Scene`")
+    return sc
+end
+
+# Wraps `sl.selected_index`, the 1-based index into `sl.range[]` that `sl.value` follows.
+# `set_close_to!` is public but snaps by value, which can't tell repeated range values apart.
+function _slider_index(sl)
+    obs = try
+        sl.selected_index
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("selected_index", "a Slider to expose `.selected_index`")
+    end
+    obs isa Makie.Observable || return _makie_compat_error("selected_index", "`.selected_index` to be an Observable")
+    return obs
+end
+
+# Wraps `isl.selected_indices`, the `(lo, hi)` 1-based indices `isl.interval` follows.
+function _interval_indices(isl)
+    obs = try
+        isl.selected_indices
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("selected_indices", "an IntervalSlider to expose `.selected_indices`")
+    end
+    obs isa Makie.Observable || return _makie_compat_error("selected_indices", "`.selected_indices` to be an Observable")
+    return obs
+end

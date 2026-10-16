@@ -755,6 +755,7 @@ s = scatter!(ax, first.(pts), last.(pts))
 """
 function masque(fig, xs...; auto::Bool = true, bind = nothing, onchange = nothing, kwargs...)
     plan = _bind_call(fig, xs, bind; auto)
+    _warn_unnamed_blocks(fig, plan)
     auto && isempty(plan) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
     _check_onchange(onchange)
     onchange === nothing || (plan = _with_onchange(plan, onchange, () -> _bind_call(fig, xs, bind; auto)))
@@ -811,7 +812,7 @@ function _masque(
             manifest = build()
             interactables.mount[] = (manifest, owners_out[])
         end
-        result = render(backend, fig, ppu)
+        result = _with_blocks_hidden(() -> render(backend, fig, ppu), interactables)
         display_css = round(Int, min(size(fig.scene)[1], max_width))
         w = make_widget(backend, result, manifest, display_css, fig, interactables, ppu, max_width)
         return with_owners(w, owners_out[])
@@ -1083,7 +1084,7 @@ function _pick_counts(manifest)
     counts = Dict{String, Int}()
     fields = Set{String}(get(manifest, "fields", String[]))
     for d in manifest["layers"]
-        d["id"] in fields && get(d, "bond", nothing) ∉ ("threshold", "bounds") || continue
+        d["id"] in fields && get(d, "bond", nothing) ∉ ("threshold", "bounds", "control") || continue
         # A hidden plot has no marks to pick: hiding it clears its picks.
         get(d, "hidden", false) === true && (counts[d["id"]] = 0; continue)
         n = try
@@ -1172,6 +1173,7 @@ function _apply_onchange_frame(input, live::_LiveFigure, backend, fig, ppu, max_
         js isa AbstractDict || throw(ArgumentError("onchange: expected one value per field, got $(typeof(js))"))
         manifest, owners = live.plan.mount[]
         state = state_from_js(manifest, owners, js)
+        _sync_controls!(live.plan, js)
         _run_onchange(live.plan.onchange, fig, state)
         _finalize!(fig)
         live.plan = _rebuilt(live.plan)
@@ -1250,7 +1252,7 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
             interactables, ctx; suspend_surfaces = get(input, "settle", false) !== true, with_initial = false,
             owners_out,
         )
-        result = render(backend, fig, render_ppu)
+        result = _with_blocks_hidden(() -> render(backend, fig, render_ppu), interactables)
         frame = _gesture_frame(result)
         frame["manifest"] = manifest
         return frame

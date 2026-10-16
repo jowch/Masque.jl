@@ -554,6 +554,15 @@ kind_sweep_meta() = [
         "control" => "cutoff", "controlStart" => 3.0,
     ),
     Dict(
+        # Makie blocks as controls (#345): a Slider, Toggle, IntervalSlider, Checkbox and Menu,
+        # drawn as HTML over empty boxes. The slider sets the red line's level and the toggle
+        # shows it, through `onchange`. The driver's "controls" block drives each one.
+        "key" => "controls", "layerId" => "level", "layerKind" => "control",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "controls", "field" => "*",
+        "controlStart" => 3,
+    ),
+    Dict(
         # `select = :many` (#335): a click replaces, Ctrl-click adds and removes, a click on
         # empty space and Escape clear. The driver's "many" block drives it.
         "key" => "many", "layerId" => "scatter", "layerKind" => "circles",
@@ -1358,6 +1367,26 @@ function build_kind_sweep()
         )
     end
 
+    controls = let
+        fig = Figure(size = (480, 340))
+        ax = Axis(fig[1, 1:2]; title = "controls", limits = (0, 10, 0, 10))
+        level = lines!(ax, [0.0, 10.0], [3.0, 3.0]; color = :red, linewidth = 4)
+        sl = Makie.Slider(fig[2, 1]; range = 0:10, startvalue = 3)   # WGLMakie also exports Bonito's `Slider`
+        tg = Toggle(fig[2, 2]; active = true)
+        span = IntervalSlider(fig[3, 1]; range = 1:5, startvalues = (2, 4))
+        fine = Checkbox(fig[3, 2]; checked = false)
+        pick = Menu(fig[4, 1:2]; options = ["a", "b", "c"], default = "a")
+        masque(
+            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick);
+            onchange = st -> begin
+                update!(level, [0.0, 10.0], fill(Float64(st.level), 2); visible = st.show)
+                # A dependent menu: the checkbox swaps the menu's options.
+                opts = st.fine ? ["x", "y", "z"] : ["a", "b", "c"]
+                pick.options[] == opts || (pick.options[] = opts)
+            end,
+        )
+    end
+
     many = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "select many", limits = (0, 10, 0, 10))
@@ -1457,7 +1486,7 @@ function build_kind_sweep()
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view3d, view3d_linked, legend, series_legend,
-        legend_overlap, legend_template, axis, composite, onchange, many, many_grid, many_grid_seeded, many_grid_regions, marquee, slice_lines, slice_density, slice_auto, slice_gap,
+        legend_overlap, legend_template, axis, composite, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
 
