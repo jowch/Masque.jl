@@ -1,0 +1,99 @@
+/* Clip the iframe to Documenter's code-block radius so it stays an
+   implementation detail (no inner scrollbars). Outer Documenter gaps are
+   owned by the wrap (`margin-block: 1em`, same as `.content p:not(:last-child)`),
+   not the preceding paragraph's margin-bottom. */
+.content > p:has(+ .masque-embed-wrap) {
+  margin-bottom: 0 !important;
+}
+.masque-embed-wrap {
+  border-radius: 4px;
+  overflow: hidden;
+  margin-block: 1em;
+  /* 1px, mixed toward Pluto/page white so it stays slighter than
+     Documenter's `.content pre` `#dbdbdb`. */
+  border: 1px solid color-mix(in srgb, #fff 55%, #dbdbdb);
+}
+.masque-embed-wrap iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+  overflow: hidden;
+}
+
+/* Dark: same idea, mix Documenter's `#5e6d6f` toward Pluto
+   `--main-bg-color: hsl(0deg 0% 12%)` instead of reusing the code-block stroke. */
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-embed-wrap {
+  border: 1px solid color-mix(in srgb, hsl(0deg 0% 12%) 55%, #5e6d6f);
+}
+
+/* Diagrams ship as two <img> files (explicit palettes). Documenter dark is
+   html.theme--*, not prefers-color-scheme, so CSS picks the file. */
+.masque-diagram {
+  margin-block: 1em;
+  width: 100%;
+  max-width: 100%;
+}
+.masque-diagram img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+.masque-diagram .masque-diagram-dark {
+  display: none;
+}
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-diagram .masque-diagram-light {
+  display: none;
+}
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-diagram .masque-diagram-dark {
+  display: block;
+}
+
+/* Markdown `|---|` separators compile to inline `style="text-align: right"`
+   (and `:---:` to center). Left-align headers and cells on every docs page. */
+.content table th,
+.content table td {
+  text-align: left !important;
+}
+
+
+/* Gallery index: one card per demo. Screenshots are the figure only;
+   the player lives on the linked page. */
+.masque-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-block: 1em;
+}
+.masque-gallery-card {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, #fff 55%, #dbdbdb);
+  background: #fff;
+}
+.masque-gallery-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #fff;
+}
+.masque-gallery-card span {
+  padding: 10px 12px 12px;
+  font-weight: 600;
+}
+.masque-gallery-card:hover {
+  border-color: #4363d8;
+}
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-gallery-card {
+  border: 1px solid color-mix(in srgb, hsl(0deg 0% 12%) 55%, #5e6d6f);
+  background: hsl(0deg 0% 12%);
+}
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-gallery-card img {
+  background: hsl(0deg 0% 12%);
+}

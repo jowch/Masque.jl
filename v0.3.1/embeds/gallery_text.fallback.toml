@@ -1,0 +1,4 @@
+image = "gallery_text.png"
+
+[outputs]
+a1410006-0001-4000-8000-000000000004 = "click a label"
