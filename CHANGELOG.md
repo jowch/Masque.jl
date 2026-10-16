@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-16
+
 ### Added
 - A WGLMakie widget shown outside Pluto, in Documenter or in an HTML page written with
   `show(io, MIME"text/html"(), w)`, draws its figure and keeps its tooltips and highlights,
@@ -530,7 +532,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/jowch/Masque.jl/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jowch/Masque.jl/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/jowch/Masque.jl/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/jowch/Masque.jl/compare/v0.2.0...v0.2.1
