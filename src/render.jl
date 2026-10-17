@@ -578,13 +578,18 @@ struct MasqueWidget
     # Layer id → owner. Not published. Empty for hand-built test widgets; built-in bonds then
     # use the layer's `"bond"` stamp.
     owners::Dict{String, LayerOwner}
+    # Axis id => title, in figure order, for the text form (src/describe.jl). Not published.
+    titles::Vector{Pair{String, String}}
 end
-MasqueWidget(b64, manifest, display_css) = MasqueWidget(b64, manifest, display_css, nothing, Dict{String, LayerOwner}())
+MasqueWidget(b64, manifest, display_css) = MasqueWidget(b64, manifest, display_css, nothing)
 function MasqueWidget(b64, manifest, display_css, render_frame)
     return MasqueWidget(b64, manifest, display_css, render_frame, Dict{String, LayerOwner}())
 end
+function MasqueWidget(b64, manifest, display_css, render_frame, owners)
+    return MasqueWidget(b64, manifest, display_css, render_frame, owners, Pair{String, String}[])
+end
 function with_owners(w::MasqueWidget, owners::Dict{String, LayerOwner})
-    return MasqueWidget(w.b64, w.manifest, w.display_css, w.render_frame, owners)
+    return MasqueWidget(w.b64, w.manifest, w.display_css, w.render_frame, owners, w.titles)
 end
 
 # The built-in backends by `backend=` symbol: the extension that defines each, and the package
@@ -815,7 +820,7 @@ function _masque(
         result = _with_blocks_hidden(() -> render(backend, fig, ppu), interactables)
         display_css = round(Int, min(size(fig.scene)[1], max_width))
         w = make_widget(backend, result, manifest, display_css, fig, interactables, ppu, max_width)
-        return with_owners(w, owners_out[])
+        return with_titles(with_owners(w, owners_out[]), _axis_titles(fig, ctx))
     finally
         fig.scene.backgroundcolor[] = bg0
     end

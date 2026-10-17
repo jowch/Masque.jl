@@ -41,6 +41,9 @@ makedocs(;
         # The docs build from a checkout, so each `@example` widget on this page carries the
         # overlay script as well as its PNG (docs/dev/perf-findings.md, "Outside Pluto").
         size_threshold_ignore = ["backends.md"],
+        # A Cairo widget also has a PNG form, which Documenter shows in place of HTML past this
+        # size, so without it the page would show plain pictures.
+        example_size_threshold = nothing,
     ),
     pages = [
         "Home" => "index.md",
