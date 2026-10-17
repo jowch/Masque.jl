@@ -92,28 +92,6 @@ function tip_style_dict(style)
     return d
 end
 
-# The 0.2 flat `tooltip_*` keywords, deprecated in 0.3 and removed in 0.4: fold the ones
-# given into `tooltipstyle`, warning once with the replacement. A key given both ways is an
-# error rather than a silent pick.
-function _merge_tooltip_kwargs(tooltipstyle, flat::NamedTuple)
-    given = NamedTuple{Tuple(k for k in keys(flat) if flat[k] !== nothing)}(flat)
-    isempty(given) && return tooltipstyle
-    old = join(("`tooltip_$k = …`" for k in keys(given)), ", ")
-    new = join(("$k = …" for k in keys(given)), ", ")
-    _deprecate(
-        "$old $(length(given) > 1 ? "are" : "is") deprecated; use `tooltipstyle = (; $new)`. Removed in 0.4.",
-        :masque,
-    )
-    tooltipstyle === nothing && return given
-    tooltipstyle isa NamedTuple || return tooltipstyle   # tip_style_dict raises the error
-    for k in keys(given)
-        haskey(tooltipstyle, k) && throw(
-            ArgumentError("masque: `tooltip_$k` and `tooltipstyle.$k` both set; pass only `tooltipstyle`"),
-        )
-    end
-    return merge(tooltipstyle, given)
-end
-
 # `overlaystyle` key => (custom property, value kind). The colour keys override the light/dark
 # derivation mount.ts writes; the rest override the stylesheet fallbacks (the locked recipe).
 const _OVERLAY_STYLE_KEYS = (
@@ -739,8 +717,7 @@ whose `interactables` method returns a `NamedTuple`) holds a `NamedTuple` of its
 - `tooltipstyle` — the look of the tooltip card, as a `NamedTuple`:
   `tooltipstyle = (; bg = :black, color = :white, radius = 6)`. Keys: `bg`, `color`, `accent`,
   `font`, `font_size`, `radius`, `caret`. Each key you leave out keeps the built-in look. See
-  [Tooltip styling](@ref). The 0.2 keywords `tooltip_bg`, `tooltip_color`, … still work with
-  a deprecation warning and are removed in 0.4.
+  [Tooltip styling](@ref).
 - `overlaystyle` — the look of highlights, the selection, the crosshair, and ROI boxes, as a
   `NamedTuple`: `overlaystyle = (; color = :steelblue, hover_width = 2)`. Each key you leave
   out keeps the built-in look. See [Overlay styling](@ref) for the keys.
@@ -760,7 +737,7 @@ s = scatter!(ax, first.(pts), last.(pts))
 """
 function masque(fig, xs...; auto::Bool = true, bind = nothing, onchange = nothing, kwargs...)
     plan = _bind_call(fig, xs, bind; auto)
-    _warn_unnamed_blocks(fig, plan)
+    _check_unnamed_blocks(fig, plan)
     auto && isempty(plan) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
     _check_onchange(onchange)
     onchange === nothing || (plan = _with_onchange(plan, onchange, () -> _bind_call(fig, xs, bind; auto)))
@@ -775,19 +752,10 @@ function _masque(
         fig, interactables::AbstractVector; backend::Union{Nothing, Symbol, AbstractBackend} = nothing,
         max_width = nothing, px_per_unit = nothing, selected = nothing, onchange = nothing,
         tooltipstyle = nothing, tooltip_sigdigits = _DEFAULT_SIGDIGITS, overlaystyle = nothing,
-        tooltip_bg = nothing, tooltip_color = nothing, tooltip_accent = nothing,
-        tooltip_font = nothing, tooltip_font_size = nothing, tooltip_radius = nothing, tooltip_caret = nothing,
     )
     tip_digits = _check_sigdigits(tooltip_sigdigits)
     _check_onchange(onchange)
     interactables = _with_onchange(interactables, onchange)
-    tooltipstyle = _merge_tooltip_kwargs(
-        tooltipstyle,
-        (;
-            bg = tooltip_bg, color = tooltip_color, accent = tooltip_accent, font = tooltip_font,
-            font_size = tooltip_font_size, radius = tooltip_radius, caret = tooltip_caret,
-        ),
-    )
     tip_style = tip_style_dict(tooltipstyle)
     overlay_style = overlay_style_dict(overlaystyle)
     backend, max_width, px_per_unit = _backend_settings(backend, max_width, px_per_unit)

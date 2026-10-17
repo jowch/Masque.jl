@@ -3,16 +3,17 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
 
 # Makie blocks as controls (#345): a named block is a field holding its plain value, drawn by
 # the browser as an HTML control over an empty box in the picture.
-function _controls_fixture()
+# Every block a call doesn't name is an error, so a test lays out only the blocks it names.
+function _controls_fixture(blocks = (:sl, :tg, :isl, :cb, :menu))
     fig = Figure(size = (500, 400))
     ax = Axis(fig[1, 1:2])
     sc = scatter!(ax, 1.0:5.0, 1.0:5.0)
     fitline = lines!(ax, [1.0, 5.0], [0.0, 0.0])
-    sl = Slider(fig[2, 1]; range = 0:0.5:5, startvalue = 1.0)
-    tg = Toggle(fig[2, 2]; active = true)
-    isl = IntervalSlider(fig[3, 1]; range = 1:10, startvalues = (2, 7))
-    cb = Checkbox(fig[3, 2]; checked = false)
-    menu = Menu(fig[4, 1:2]; options = [("red", :red), ("blue", :blue)], default = "blue")
+    sl = :sl in blocks ? Slider(fig[2, 1]; range = 0:0.5:5, startvalue = 1.0) : nothing
+    tg = :tg in blocks ? Toggle(fig[2, 2]; active = true) : nothing
+    isl = :isl in blocks ? IntervalSlider(fig[3, 1]; range = 1:10, startvalues = (2, 7)) : nothing
+    cb = :cb in blocks ? Checkbox(fig[3, 2]; checked = false) : nothing
+    menu = :menu in blocks ? Menu(fig[4, 1:2]; options = [("red", :red), ("blue", :blue)], default = "blue") : nothing
     return (; fig, ax, sc, fitline, sl, tg, isl, cb, menu)
 end
 
@@ -57,7 +58,7 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
     end
 
     @testset "the box sits on the block, in image px" begin
-        (; fig, sl) = _controls_fixture()
+        (; fig, sl) = _controls_fixture((:sl,))
         w = masque(fig, (degree = sl,))
         g = _layer(w.manifest, "degree")["geometry"]
         bb = sl.layoutobservables.computedbbox[]
@@ -69,19 +70,19 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
     end
 
     @testset "named through bind, and a bare bind" begin
-        (; fig, sc, sl) = _controls_fixture()
+        (; fig, sc, sl) = _controls_fixture((:sl,))
         w = masque(fig; bind = (degree = sl, pts = sc))
         @test w.manifest["fields"] == ["degree", "pts"]
         @test Masque.initial_bond(w).degree == 1.0
-        (; fig, sl) = _controls_fixture()
+        (; fig, sl) = _controls_fixture((:sl,))
         w = masque(fig; bind = sl)
         @test Masque.initial_bond(w) == 1.0
-        (; fig, sl) = _controls_fixture()
+        (; fig, sl) = _controls_fixture((:sl,))
         @test_throws ArgumentError masque(fig, (a = sl,); bind = (b = sl,))
     end
 
     @testset "a block passed without a name says how to name it" begin
-        (; fig, sl) = _controls_fixture()
+        (; fig, sl) = _controls_fixture((:sl,))
         err = try
             masque(fig, sl)
             nothing
@@ -91,16 +92,29 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test err isa ArgumentError && occursin("needs a name", sprint(showerror, err))
     end
 
-    @testset "a block the call doesn't name stays a picture, with a warning" begin
-        (; fig, sl, tg) = _controls_fixture()
-        w = @test_logs (:warn, r"Name one to make it a control") match_mode = :any masque(fig, (degree = sl,))
-        @test !any(l -> l["kind"] == "control" && l["id"] != "degree", w.manifest["layers"])
+    @testset "a block the call doesn't name is an error naming its kind" begin
+        (; fig, sl) = _controls_fixture()
+        err = (@test_throws ArgumentError masque(fig, (degree = sl,))).value
+        msg = sprint(showerror, err)
+        @test occursin("(Toggle, IntervalSlider, Checkbox, Menu)", msg)
+        @test occursin("`masque(fig, (name = block,))`", msg)
+        @test_throws ArgumentError masque(fig)                          # zero-config names none
+        fig2 = Figure(); Axis(fig2[1, 1]); Toggle(fig2[2, 1])
+        msg1 = sprint(showerror, (@test_throws ArgumentError masque(fig2)).value)
+        @test occursin("a block that masque wasn't given (Toggle)", msg1) && occursin("Name it to make it", msg1)
+        @test_throws ArgumentError masque(fig; bind = (degree = sl,))
+        (; fig, sl) = _controls_fixture((:sl,))
+        @test_logs masque(fig, (degree = sl,))
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
+        @test_logs masque(fig)
+        # A `SliderGrid` is a picture, sliders included, so it isn't an error.
+        fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
+        SliderGrid(fig[2, 1], (label = "a", range = 1:3))
         @test_logs masque(fig)
     end
 
     @testset "the picture leaves the block's box empty, and the figure keeps its drawing" begin
-        (; fig, sl) = _controls_fixture()
+        (; fig, sl) = _controls_fixture((:sl,))
         plots = Masque._block_plots(sl)
         @test !isempty(plots)
         @test all(p -> p.visible[], plots)
@@ -123,7 +137,7 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
     end
 
     @testset "onchange sees the block's value, and the block takes it first" begin
-        (; fig, fitline, sl, tg) = _controls_fixture()
+        (; fig, fitline, sl, tg) = _controls_fixture((:sl, :tg))
         seen = Any[]
         on_value = Float64[]
         on(v -> push!(on_value, v), sl.value)
