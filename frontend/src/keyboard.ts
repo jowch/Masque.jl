@@ -130,7 +130,7 @@ function paintFocus(ctx: OverlayCtx, state: OverlayState, ref: FocusRef, hit: Hi
     ctx.surface_.classList.add("kbd-ring")
     drawHover(ctx, state, hit)
     updateLinkForHit(ctx, state, hit)
-    const css = cssAnchor(ctx.base_, ctx.manifest_, layoutAnchor(state.photo_, hit, anchor))
+    const css = cssAnchor(ctx.base_, ctx.manifest_, layoutAnchor(ctx, state, hit, anchor))
     const html = showTipAt(ctx, state, hit, anchor.x, anchor.y, css)
     state.focusTipHtml_ = html
     state.focusTipCss_ = html === null ? null : css

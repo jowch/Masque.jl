@@ -56,9 +56,9 @@ export async function installRecorder(page, key) {
         const svg = sr.querySelector(svgSel);
         if (!svg) continue;
         for (const group of ["hi", "sel", "link"]) {
-          // Both homes: g.masque-photo (data) and g.masque-fixed (legend, colorbar, axis).
-          // The photograph group is created first, so a single querySelector never sees a
-          // screen-fixed hover.
+          // Every home: g.masque-photo (data, one per axis, #368) and g.masque-fixed (legend,
+          // colorbar, axis). The photograph groups are created first, so a single querySelector
+          // never sees a screen-fixed hover, nor a mark on a later axis.
           for (const g of svg.querySelectorAll(`g.${group}`)) {
             const mo = new MutationObserver((muts) => {
               for (const m of muts) {
