@@ -103,11 +103,11 @@ Two more tools edit `many` fields, and add nothing to the wire. A marquee (`drag
 starts on a plot area with a `many` field: a plain drag where no view takes the drag, or
 Alt-drag over a view. It holds no value of its own; on release it sets every `many` field on
 that axis by adding the elements whose centre is inside the box, or removing them when the
-press lands on a held element, with or without Cmd/Ctrl (#358), sending one value. On a line that takes
-points each sample inside is a pick (`picksInBox`); on a grid, `applyGridMarquee` sets the
-cells the box overlaps, recomputed from the press-time mask on every move. A press that moves less
-than `MARQUEE_MIN_CSS` client px stays a click; Escape or a pointercancel restores the picks
-held at the press. A legend click also edits each linked `many` field (`legendPicks`), decided
+press lands on a held element, with or without Cmd/Ctrl (#358), sending one value. On a line
+that takes points each sample inside is a pick (`picksInBox`); on a grid, `applyGridMarquee`
+sets the cells the box overlaps, recomputed from the press-time mask on every move. A press
+that moves less than `MARQUEE_MIN_CSS` client px stays a click; Escape or a pointercancel
+restores the picks held at the press. A legend click also edits each linked `many` field (`legendPicks`), decided
 by the entry's own field so the two never disagree: an entry the click turns on replaces the
 picks with its marks (Cmd/Ctrl, or a legend whose own field is `many`, adds them), and one it
 turns off takes them out (`legendEdit`).

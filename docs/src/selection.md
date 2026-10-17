@@ -62,7 +62,9 @@ on every plot, and on a 3D plot it counts marks hidden behind others
 too. Escape while dragging drops the box and keeps the selection you
 had. On a touch screen a finger drag scrolls the page, so the box is
 drawn with a mouse or pen. Clicking a legend entry selects every mark
-of its plot, and clicking a selected entry again takes them out.
+of its plot in place of the ones you picked, Cmd-click or Ctrl-click
+adds them instead, and clicking a selected entry again takes them out.
+On a legend built with `select = :many`, a click adds them.
 
 To keep a box on the plot that the reader can move and resize, use an
 [`ROIInteractable`](@ref) with `selects`, as [Brush a region](@ref)
