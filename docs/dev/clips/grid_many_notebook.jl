@@ -47,7 +47,7 @@ end;
 
 # ╔═╡ c1d50005-0001-4000-8000-000000000004
 Base.Text(
-    "$(count(sel.region.mask)) cells selected" *
+    "selected: $(count(sel.region.mask))" *
         (isempty(findall(sel.region)) ? "" : ", mean $(round(sum(img[sel.region]) / count(sel.region.mask); digits = 2))")
 )
 

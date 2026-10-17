@@ -11,8 +11,8 @@ begin
     ys = Float64[1.2, 1.9, 3.2, 3.8, 5.1, 6.3, 6.8, 8.1]
     fig = Figure(size = (560, 320))
     ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    sc = scatter!(ax, xs, ys; markersize = 14)
     fitline = lines!(ax, [1.0, 8.0], [1.0, 8.0]; color = :crimson)
+    sc = scatter!(ax, xs, ys; markersize = 14)
     nothing
 end
 ```
