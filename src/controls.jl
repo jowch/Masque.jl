@@ -199,14 +199,21 @@ end
 # The blocks of `fig` drawn as controls, in layout order, nested layouts included.
 _figure_blocks(fig) = Any[c for c in fig.content if c isa _CONTROL_BLOCKS]
 
-# A block in the figure that this call doesn't name is drawn as Makie draws it, a picture.
-function _warn_unnamed_blocks(fig, interactables)
+# A block in the figure that this call doesn't name would look live and do nothing, so it is an
+# error (a warning in 0.3.1). A `SliderGrid`'s sliders aren't in `fig.content`, so the grid
+# stays a picture.
+function _check_unnamed_blocks(fig, interactables)
     named = Base.IdSet{Any}(i.block for i in interactables if i isa BlockControl)
     left = [b for b in _figure_blocks(fig) if !(b in named)]
     isempty(left) && return nothing
     kinds = join(unique(string(nameof(typeof(b))) for b in left), ", ")
-    @warn "masque: this figure has blocks that masque wasn't given ($(kinds)), so they are " *
-        "pictures and do nothing. Name one to make it a control: `masque(fig, (name = block,))`. " *
-        "From 0.4 this is an error."
-    return nothing
+    what = length(left) == 1 ? "a block that masque wasn't given ($(kinds)), which would" :
+        "blocks that masque wasn't given ($(kinds)), which would"
+    each = length(left) == 1 ? "Name it" : "Name each one"
+    throw(
+        ArgumentError(
+            "masque: this figure has $what look live and do nothing. $each to make it a " *
+                "control, `masque(fig, (name = block,))`, or take it out of the figure",
+        ),
+    )
 end
