@@ -22,6 +22,19 @@ All notable changes to this project are documented here. The format is based on
   `linkaxes!` keeps its ring, which slides with that axis's data. A ring on any other axis
   stays where it is. Both used to disappear until the new frame arrived (#368).
 
+### Removed
+- **Breaking:** the keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,
+  `tooltip_font_size`, `tooltip_radius`, and `tooltip_caret`, deprecated in 0.3, are gone.
+  Passing one raises a `MethodError` whose message names the `tooltipstyle` form, such as
+  `tooltipstyle = (; bg = …)`. `tooltip_sigdigits` stays (#374).
+- **Breaking:** a `Slider`, `Toggle`, `Checkbox`, `IntervalSlider` or `Menu` laid out in the
+  figure but not named in the `masque` call is an `ArgumentError`, where 0.3.1 warned. Name
+  it, `masque(fig, (name = block,))`, or take it out of the figure. A `SliderGrid` stays a
+  picture (#374).
+- The error messages that named the 0.3 replacement for a form removed in 0.3, such as
+  `RectInteractable(ax; grid = …)` or `auto_interactables`, are gone. The calls raise the same
+  errors as before, without the hint; the 0.3.0 entry below lists the replacements (#374).
+
 ## [0.3.1] - 2026-10-16
 
 ### Added

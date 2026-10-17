@@ -318,8 +318,8 @@ has the details.
 
 Masque 0.3 groups the tooltip style keywords into one `tooltipstyle`
 keyword, the way `overlaystyle` groups the overlay's. The old keywords
-still work in 0.3, show a warning in the cell's log that names the
-replacement, and are removed in 0.4:
+showed a warning in 0.3 and were removed in 0.4; passing one now raises
+an error that names the replacement:
 
 | 0.2 | 0.3 |
 |---|---|

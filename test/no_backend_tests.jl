@@ -90,22 +90,21 @@ else
     end
 end
 
-# #269: Pluto and the REPL run with `--depwarn=no`, which hides a plain `Base.depwarn`. Run a
-# deprecated form in a child process with that flag and check the warning still shows, once
-# per call site. The `tooltip_*` keywords are its only deprecation since 0.3; when they go in
-# 0.4, point this at the next deprecation or drop it.
+# #269: Pluto and the REPL run with `--depwarn=no`, which hides a plain `Base.depwarn`. Run
+# `_deprecate` in a child process with that flag and check the warning still shows, once per
+# call site. Nothing is deprecated in 0.4, so this calls it directly.
 @testset "deprecations warn without --depwarn=yes (#269)" begin
     code = """
     using Masque, Test
-    @noinline site() = Masque._merge_tooltip_kwargs(nothing, (; bg = :red))
-    @test_logs (:warn, r"`tooltipstyle = \\(; bg = …\\)`. Removed in 0.4") (site(); site(); site())
+    @noinline site() = Masque._deprecate("`old` is deprecated; use `new`.", :site)
+    @test_logs (:warn, r"use `new`") (site(); site(); site())
     """
     julia(flag, code) = `$(Base.julia_cmd()) $flag --startup-file=no --project=$(Base.active_project()) -e $code`
     @test success(pipeline(julia("--depwarn=no", code); stdout, stderr))
     # `--depwarn=error` still turns the warning into an error.
     code = """
     using Masque, Test
-    @test_throws ErrorException Masque._merge_tooltip_kwargs(nothing, (; bg = :red))
+    @test_throws ErrorException Masque._deprecate("`old` is deprecated; use `new`.", :site)
     """
     @test success(pipeline(julia("--depwarn=error", code); stdout, stderr))
     # Every deprecation goes through `_deprecate`, which forces the warning.
