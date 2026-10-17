@@ -32,7 +32,7 @@ end
 )
 ```
 
-Click a point, then Cmd-click (Ctrl-click off a Mac) more of them: the red
+Click a few points: the red
 line moves to fit the points you picked. `w.pts` holds the same picks for
 other cells.
 

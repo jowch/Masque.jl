@@ -13,8 +13,7 @@ mark as you move to it. A `masque` widget needs no extra setup for this.
 | Home / End | First / last mark |
 | Page Down / Page Up | First mark of the next / previous layer |
 | Shift + → / Shift + ← | On a line, the next / previous data point. The tooltip moves to it, and Enter selects it |
-| Enter / Space | Select the focused mark: its plot's field in the `@bind` value becomes what a click on it gives |
-| Cmd + Enter (Mac) / Ctrl + Enter | Add the focused mark to the selection, or take it out, on a plot with `select = :many` |
+| Enter / Space | Select the focused mark: its plot's field in the `@bind` value becomes what a click on it gives. On a plot with `select = :many`, add the mark to the selection or take it out |
 | Escape | Clear every selection, then the focus, and leave the plot |
 
 Arrow keys and Home / End stop at the first and last mark rather than

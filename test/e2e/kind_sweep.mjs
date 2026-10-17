@@ -1020,12 +1020,12 @@ try {
       continue;
     }
 
-    // `select = :many` (#335): a plain click replaces the picks with one, Ctrl-click adds and
-    // removes one (Linux Chromium, so Ctrl rather than Cmd), a click on empty plot space clears
-    // them, and Escape on the focused figure clears them too. Each step checks the printed
-    // `@bind` value, host.value's `{items}`, and how many picks are drawn.
-    // A grid with `select = :many` (#335): a click picks one cell, Ctrl-click flips one, a click
-    // on the axis off the grid clears it, and so does Escape. Each step checks the printed
+    // `select = :many` (#335, #358): a click adds a pick or takes it out, with or without Ctrl
+    // (Linux Chromium, so Ctrl rather than Cmd), a click on empty plot space clears them, and
+    // Escape on the focused figure clears them too. Each step checks the printed `@bind` value,
+    // host.value's `{items}`, and how many picks are drawn.
+    // A grid with `select = :many` (#335, #358): a click flips one cell, with or without Ctrl, a
+    // click on the axis off the grid clears it, and so does Escape. Each step checks the printed
     // `GridSelection` count, host.value's `{runs}`, and the drawing: one fill path over the
     // cells and one edge path around their outline (an inner side would be a 5th subpath for
     // two cells side by side), and no hover on a selected cell.
@@ -1056,7 +1056,7 @@ try {
         return t;
       };
       let t = await step("click-picks-one", v0, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click"), 1, [1, 1, 1], 2);
-      t = await step("ctrl-click-adds", t, () => dispatchAt(key, at(2, 1).x, at(2, 1).y, "click", { ctrlKey: true }), 2, [1, 1, 2], 2);
+      t = await step("click-adds", t, () => dispatchAt(key, at(2, 1).x, at(2, 1).y, "click"), 2, [1, 1, 2], 2);
       const p = await selPaths();
       if ((p.fill?.match(/M/g) ?? []).length !== 1) throw new Error(`${key}: fill path ${p.fill}, want one rect for the two cells`);
       if ((p.edge?.match(/M/g) ?? []).length !== 4) throw new Error(`${key}: edge path ${p.edge}, want the outline only (4 sides)`);
@@ -1067,8 +1067,8 @@ try {
       if (!hov.show) throw new Error(`${key}: hovering a selected cell hid its tooltip`);
       passed.push(`${key}/no-hover-on-selected`);
       t = await step("ctrl-click-adds-row", t, () => dispatchAt(key, at(0, 2).x, at(0, 2).y, "click", { ctrlKey: true }), 3, [1, 1, 2, 2, 0, 1], 2);
-      t = await step("ctrl-click-removes", t, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click", { ctrlKey: true }), 2, [1, 2, 1, 2, 0, 1], 2);
-      t = await step("click-replaces", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 1, [0, 3, 1], 2);
+      t = await step("click-removes", t, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click"), 2, [1, 2, 1, 2, 0, 1], 2);
+      t = await step("click-adds-keeps-others", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 3, [0, 3, 1, 1, 2, 1, 2, 0, 1], 2);
       // The axis runs to y = 4; the grid stops at 3.
       const off = { x: at(1, 2).x, y: g.yedges[3] - (g.yedges[2] - g.yedges[3]) / 2 };
       t = await step("empty-click-clears", t, () => dispatchAt(key, off.x, off.y, "click"), 0, [], 0);
@@ -1082,7 +1082,8 @@ try {
         surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true, cancelable: true }));
         return null;
       }, key), 0, [], 0);
-      // A marquee takes the cells the box touches; Ctrl from a held cell takes them out (#335).
+      // A marquee adds the cells the box touches, and one from a held cell takes them out,
+      // with or without Ctrl (#335, #358).
       const gdrag = async (from, to, mod = {}) => {
         await dispatchAt(key, from.x, from.y, "pointerdown", mod);
         await dispatchAt(key, (from.x + to.x) / 2, (from.y + to.y) / 2, "pointermove", mod);
@@ -1090,7 +1091,9 @@ try {
         return dispatchAt(key, to.x, to.y, "pointerup", mod);
       };
       t = await step("marquee-takes-touched-cells", t, () => gdrag(at(1, 0), at(2, 1)), 4, [0, 1, 2, 1, 1, 2], 2);
-      t = await step("ctrl-marquee-from-held-removes", t, () => gdrag(at(1, 0), at(2, 0), { ctrlKey: true }), 2, [1, 1, 2], 2);
+      t = await step("marquee-from-held-removes", t, () => gdrag(at(1, 0), at(2, 0)), 2, [1, 1, 2], 2);
+      t = await step("marquee-adds-to-held", t, () => gdrag(at(3, 0), at(3, 1)), 4, [0, 3, 1, 1, 1, 3], 2);
+      t = await step("ctrl-marquee-from-held-removes", t, () => gdrag(at(3, 0), at(3, 1), { ctrlKey: true }), 2, [1, 1, 2], 2);
       await dispatchAt(key, 1, 1, "pointermove");
       console.error(`OK  ${key} — ${t.slice(0, 160)}`);
       continue;
@@ -1098,13 +1101,13 @@ try {
 
     // The same grid started with `selected=` (#356): before any gesture, the printed value holds
     // the two seeded cells, host.value's `{runs}` names them, and they draw as one outlined area
-    // (one fill rect, a 4-sided edge). Ctrl-click then takes a seeded cell out and puts it back,
-    // and a plain click replaces both, as on a grid that started empty.
+    // (one fill rect, a 4-sided edge). Ctrl-click then takes a seeded cell out, a plain click puts
+    // it back, and a plain click elsewhere adds to the seeds, as on a grid that started empty.
     // The same grid cut into regions (#359), rows along x: row 0 is 1 1 2 0, row 1 is 1 3 2 0,
     // row 2 is 3 3 2 2 (0 = no region). Hover outlines the whole region with the hover edge,
     // keeps one highlight while the pointer moves inside it, and names it; a click picks the
-    // whole region, Ctrl-click adds or drops one, a cell in no region is picked alone, and a
-    // box inside one cell takes that cell's whole region. The value counts the whole regions.
+    // whole region, a click with or without Ctrl adds or drops one, a cell in no region is picked
+    // alone, and a box inside one cell adds that cell's whole region. The value counts the whole regions.
     if (spec.mode === "many_grid_regions") {
       const g = layer.geometry;
       if (!layer.many) throw new Error(`${key}: layer ${layer.id} ships no many flag`);
@@ -1137,9 +1140,9 @@ try {
       const hs = await dispatchAt(key, at(0, 1).x, at(0, 1).y, "pointermove");
       if (hs.hi.fill || hs.hi.edge || hs.hi.plain) throw new Error(`${key}: hovering a selected region drew ${JSON.stringify(hs.hi)}`);
       passed.push(`${key}/no-hover-on-selected-region`);
-      t = await step("ctrl-click-adds-region", t, () => dispatchAt(key, at(2, 2).x, at(2, 2).y, "click", { ctrlKey: true }), 7, 2, [0, 0, 3, 1, 0, 1, 1, 2, 1, 2, 2, 2]);
+      t = await step("click-adds-region", t, () => dispatchAt(key, at(2, 2).x, at(2, 2).y, "click"), 7, 2, [0, 0, 3, 1, 0, 1, 1, 2, 1, 2, 2, 2]);
       t = await step("ctrl-click-drops-region", t, () => dispatchAt(key, at(1, 0).x, at(1, 0).y, "click", { ctrlKey: true }), 4, 1, [0, 2, 1, 1, 2, 1, 2, 2, 2]);
-      t = await step("click-cell-in-no-region", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 1, 0, [0, 3, 1]);
+      t = await step("click-cell-in-no-region", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 5, 1, [0, 2, 2, 1, 2, 1, 2, 2, 2]);
       // A box well inside cell (1, 1), of region 3, takes the whole region.
       const c = at(1, 1), dx = (g.xedges[2] - g.xedges[1]) / 4, dy = (g.yedges[2] - g.yedges[1]) / 4;
       const gdrag = async (from, to) => {
@@ -1148,7 +1151,7 @@ try {
         await dispatchAt(key, to.x, to.y, "pointermove");
         return dispatchAt(key, to.x, to.y, "pointerup");
       };
-      t = await step("box-takes-touched-region", t, () => gdrag({ x: c.x - dx, y: c.y - dy }, { x: c.x + dx, y: c.y + dy }), 3, 1, [1, 1, 1, 2, 0, 2]);
+      t = await step("box-takes-touched-region", t, () => gdrag({ x: c.x - dx, y: c.y - dy }, { x: c.x + dx, y: c.y + dy }), 8, 2, [0, 2, 2, 1, 1, 2, 2, 0, 4]);
       await dispatchAt(key, 1, 1, "pointermove");
       console.error(`OK  ${key} — ${t.slice(0, 160)}`);
       continue;
@@ -1184,8 +1187,8 @@ try {
         return t;
       };
       let t = await step("ctrl-click-removes-seed", v0, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click", { ctrlKey: true }), 1, [1, 2, 1]);
-      t = await step("ctrl-click-adds-back", t, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click", { ctrlKey: true }), 2, [1, 1, 2]);
-      t = await step("click-replaces-seeds", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 1, [0, 3, 1]);
+      t = await step("click-adds-back", t, () => dispatchAt(key, at(1, 1).x, at(1, 1).y, "click"), 2, [1, 1, 2]);
+      t = await step("click-adds-to-seeds", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 3, [0, 3, 1, 1, 1, 2]);
       await dispatchAt(key, 1, 1, "pointermove");
       console.error(`OK  ${key} — ${t.slice(0, 160)}`);
       continue;
@@ -1213,9 +1216,10 @@ try {
       };
       // A closed pick draws 2 shapes (fill + edge), as in the composite case.
       let t = await step("click-picks-one", v0, () => dispatchAt(key, p[0].x, p[0].y, "click"), [1], 2);
-      t = await step("ctrl-click-adds", t, () => dispatchAt(key, p[2].x, p[2].y, "click", { ctrlKey: true }), [1, 3], 4);
+      t = await step("click-adds", t, () => dispatchAt(key, p[2].x, p[2].y, "click"), [1, 3], 4);
       t = await step("ctrl-click-removes", t, () => dispatchAt(key, p[0].x, p[0].y, "click", { ctrlKey: true }), [3], 2);
-      t = await step("click-replaces", t, () => dispatchAt(key, p[1].x, p[1].y, "click"), [2], 2);
+      t = await step("click-adds-keeps-others", t, () => dispatchAt(key, p[1].x, p[1].y, "click"), [3, 2], 4);
+      t = await step("click-removes", t, () => dispatchAt(key, p[2].x, p[2].y, "click"), [2], 2);
       t = await step("empty-click-clears", t, () => dispatchAt(key, (p[0].x + p[1].x) / 2, p[2].y, "click"), [], 0);
       t = await step("click-again", t, () => dispatchAt(key, p[1].x, p[1].y, "click"), [2], 2);
       t = await step("escape-clears", t, () => page.evaluate((k) => {
@@ -1232,9 +1236,9 @@ try {
       continue;
     }
 
-    // Marquee and legend picks under `select = :many` (#335). Left axis (no view): a plain
-    // drag picks the marks inside, Ctrl-drag adds, and a Ctrl-drag starting on a picked mark
-    // takes out what it covers; a legend click picks every mark of `a`. Right axis (pan view):
+    // Marquee and legend picks under `select = :many` (#335, #358). Left axis (no view): a
+    // drag adds the marks inside, with or without Ctrl, and one starting on a picked mark takes
+    // out what it covers; a legend click picks every mark of `a`. Right axis (pan view):
     // Alt-drag picks, a plain drag pans and picks nothing. Mid-drag the box is the ROI outline
     // recipe (1px chrome, no fill); on release it is gone. Each step checks host.value, the
     // printed `@bind` value, and how many picks are drawn.
@@ -1298,7 +1302,8 @@ try {
       // a closed pick draws 2 shapes (fill + edge)
       await step("drag-picks-inside", () => drag({ x: pa[0].x - pad, y: pa[1].y - pad }, { x: pa[1].x + pad, y: pa[0].y + pad }, {}, true), { a: [0, 1], b: [] }, 4);
       await step("ctrl-drag-adds", () => drag({ x: pa[2].x - pad, y: pa[2].y - pad }, { x: pa[2].x + pad, y: pa[2].y + pad }, { ctrlKey: true }, true), { a: [0, 1, 2], b: [] }, 6);
-      await step("ctrl-drag-on-picked-removes", () => drag({ x: pa[1].x, y: pa[1].y }, { x: pa[2].x + pad, y: pa[2].y + pad }, { ctrlKey: true }, true), { a: [0], b: [] }, 2);
+      await step("drag-on-picked-removes", () => drag({ x: pa[1].x, y: pa[1].y }, { x: pa[2].x + pad, y: pa[2].y + pad }, {}, true), { a: [0], b: [] }, 2);
+      await step("drag-adds", () => drag({ x: pa[2].x - pad, y: pa[2].y - pad }, { x: pa[2].x + pad, y: pa[2].y + pad }, {}, true), { a: [0, 2], b: [] }, 4);
       const e = hitPoint(leg, leg.links.findIndex((ls) => ls.includes("a")));
       await step("legend-click-picks-plot", () => dispatchAt(key, e.x, e.y, "click"), { a: [0, 1, 2], b: [] }, null);
       // The entry's own field decides: clicked again it turns off and its marks go with it.

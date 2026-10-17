@@ -5240,25 +5240,26 @@ describe("select = :many and clearing picks (#335)", () => {
         s.dispatchEvent(new MouseEvent("click", { clientX: x, clientY: y, bubbles: true, ...mod }))
     const val = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
 
-    it("a plain click replaces the picks, Ctrl-click adds and removes one", () => {
+    it("a plain click adds a pick or takes it out, and Ctrl-click does the same (#358)", () => {
         const { host, script } = setup()
         mount(script, many())
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
         click(surface, 100, 100)
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
-        click(surface, 300, 200, { ctrlKey: true })
+        click(surface, 300, 200) // a plain click on another mark adds it, keeping the first
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }] })
         expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
-        click(surface, 100, 100, { ctrlKey: true })
+        click(surface, 100, 100) // a plain click on a held mark takes only that one out
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }] })
-        click(surface, 100, 100)
+        click(surface, 100, 100, { ctrlKey: true })
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }, { layer: "pts", index: 0 }] })
+        click(surface, 300, 200, { ctrlKey: true })
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
-        // A plain click on the only pick takes it back.
         click(surface, 100, 100)
         expect(val(host).pts).toEqual({ items: [] })
     })
 
-    it("on a line, each pick is a point; Ctrl-click adds and removes points, and a restored value rings them", () => {
+    it("on a line, each pick is a point; a click adds and removes points, and a restored value rings them", () => {
         const m: Manifest = {
             ...many(),
             fields: ["fit"],
@@ -5273,10 +5274,10 @@ describe("select = :many and clearing picks (#335)", () => {
         const rings = () => [...shadow.querySelectorAll("svg.masque-plain circle.masque-ring-inner")].map((c) => c.getAttribute("cx"))
         click(surface, 110, 200) // nearest point 0
         expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 0 }] })
-        click(surface, 490, 200, { ctrlKey: true }) // adds point 2
+        click(surface, 490, 200) // adds point 2
         expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 0 }, { layer: "fit", index: 0, sample: 2 }] })
         expect(rings().sort()).toEqual(["1000", "200"])
-        click(surface, 110, 200, { ctrlKey: true }) // takes point 0 out, keeps the same line's point 2
+        click(surface, 110, 200) // takes point 0 out, keeps the same line's point 2
         expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 2 }] })
         expect(rings()).toEqual(["1000"])
 
@@ -5316,7 +5317,7 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host)).toEqual({ pts: { items: [] }, one: null })
     })
 
-    it("Ctrl+Enter on a focused mark adds it, as Ctrl-click does", () => {
+    it("Enter on a focused mark adds it or takes it out, with or without Ctrl", () => {
         const { host, script } = setup()
         const m = many()
         m.layers = [m.layers[0]]; m.fields = ["pts"]; m.initial = { pts: { items: [] } }
@@ -5326,10 +5327,10 @@ describe("select = :many and clearing picks (#335)", () => {
         const key = (k: string, mod: KeyboardEventInit = {}) =>
             surface.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...mod }))
         key("Home"); key("Enter")
-        key("ArrowRight"); key("Enter", { ctrlKey: true })
+        key("ArrowRight"); key("Enter")
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }] })
-        key("Enter")
-        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }] })
+        key("Enter", { ctrlKey: true })
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
     })
 
     it("a click on a hover-only mark, or a Cmd/Ctrl-click that misses, keeps the picks", () => {
@@ -5399,7 +5400,7 @@ describe("select = :many and clearing picks (#335)", () => {
         key("Home") // focus on pts[0]
         click(surface, 300, 200) // the mouse picks pts[1]
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }] })
-        key("Enter") // on the focused mark, now pts[1]: the only pick, so it clears
+        key("Enter") // on the focused mark, now pts[1]: held, so it comes out
         expect(val(host).pts).toEqual({ items: [] })
     })
 
@@ -5422,13 +5423,13 @@ describe("select = :many and clearing picks (#335)", () => {
         mount(script, m)
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
         click(surface, 550, 50)
-        click(surface, 550, 100, { ctrlKey: true })
+        click(surface, 550, 100)
         expect(val(host).legend).toEqual({ items: [{ layer: "legend", index: 0 }, { layer: "legend", index: 1 }] })
-        click(surface, 550, 50, { ctrlKey: true })
+        click(surface, 550, 50)
         expect(val(host).legend).toEqual({ items: [{ layer: "legend", index: 1 }] })
     })
 
-    it("a restored value draws every pick and Ctrl-click builds on it", () => {
+    it("a restored value draws every pick and a click builds on it", () => {
         const { host, script } = setup()
         const m = many()
         m.initial = { pts: { items: [{ layer: "pts", index: 1 }] }, one: null }
@@ -5474,7 +5475,7 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         return { host, shadow, surface: shadow.querySelector(".surface") as HTMLElement }
     }
 
-    it("a drag on a plot with no view picks the marks inside, replacing, and the box goes on release", () => {
+    it("a drag on a plot with no view adds the marks inside, and the box goes on release", () => {
         const { host, shadow, surface } = mounted(many())
         let n = 0
         host.addEventListener("input", () => { n++ })
@@ -5491,18 +5492,21 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         expect(n).toBe(1)
         expect(val(host).pts).toEqual(items(0, 1))
         expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
-        // A second plain marquee replaces.
+        // A second plain marquee adds to the picks (#358).
         drag(surface, [450, 250], [550, 350])
-        expect(val(host).pts).toEqual(items(2))
+        expect(val(host).pts).toEqual(items(0, 1, 2))
     })
 
-    it("Ctrl-marquee adds; one that starts on a picked mark takes out what it covers", () => {
+    it("a marquee, with or without Ctrl, adds; one that starts on a picked mark takes out what it covers", () => {
         const { host, surface } = mounted(many())
         drag(surface, [50, 50], [150, 150])
         expect(val(host).pts).toEqual(items(0))
         drag(surface, [250, 150], [550, 350], { ctrlKey: true })
         expect(val(host).pts).toEqual(items(0, 1, 2))
         // Starts on point 1 (image 600,400), which is picked: subtracts points 1 and 2.
+        drag(surface, [300, 200], [550, 350])
+        expect(val(host).pts).toEqual(items(0))
+        drag(surface, [250, 150], [550, 350])
         drag(surface, [300, 200], [550, 350], { ctrlKey: true })
         expect(val(host).pts).toEqual(items(0))
     })
@@ -5537,7 +5541,7 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         host.addEventListener("input", () => { n++ })
         ptr(surface, "pointerdown", 250, 150)
         ptr(surface, "pointermove", 550, 350)
-        expect(selChildren(shadow).length).toBe(4)
+        expect(selChildren(shadow).length).toBe(6) // the preview adds points 1 and 2 to point 0
         ptr(surface, "pointercancel", 550, 350)
         expect(n).toBe(0)
         expect(val(host).pts).toEqual(items(0))
@@ -5609,7 +5613,7 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         expect(val(host).poly).toEqual({ items: [] })
         drag(surface, [440, 40], [560, 160]) // image (880,80)-(1120,320)
         expect(val(host).poly).toEqual({ items: [{ layer: "poly", index: 0 }] })
-        expect(val(host).bars).toEqual({ items: [] })
+        expect(val(host).bars).toEqual({ items: [{ layer: "bars", index: 0 }, { layer: "bars", index: 1 }] }) // kept
     })
 
     // Two entries: (1100,100) → pts and (1100,150) → other, in a legend whose own field is `legendMany` or one pick.
@@ -5632,7 +5636,7 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         expect(val(host).legend).toEqual({ layer: "legend", index: 0 })
         click(surface, 550, 50) // the entry turns off and its marks go
         expect(val(host)).toMatchObject({ pts: items(), legend: null })
-        click(surface, 300, 200) // a plain click on a mark replaces, as always
+        click(surface, 300, 200) // a plain click on a mark adds it
         expect(val(host).pts).toEqual(items(1))
         click(surface, 550, 50, { ctrlKey: true })
         expect(val(host)).toMatchObject({ pts: items(1, 0, 2), legend: { layer: "legend", index: 0 } })
@@ -5648,11 +5652,11 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         expect(val(a.host).pts).toEqual(items(0, 1, 2))
         click(a.surface, 550, 50)
         expect(val(a.host)).toMatchObject({ pts: items(0, 1, 2), legend: { layer: "legend", index: 0 } })
-        // B: entry on, one mark clicked, entry again: the entry turns off and so do its marks.
+        // B: entry on, one mark clicked out, entry again: the entry turns off and so do its marks.
         const b = mounted(withLegend())
         click(b.surface, 550, 50)
         click(b.surface, 100, 100)
-        expect(val(b.host).pts).toEqual(items(0))
+        expect(val(b.host).pts).toEqual(items(1, 2))
         click(b.surface, 550, 50)
         expect(val(b.host)).toMatchObject({ pts: items(), legend: null })
     })
@@ -5811,23 +5815,21 @@ describe("a grid with select = :many holds a cell mask (#335)", () => {
         s.dispatchEvent(new MouseEvent("click", { clientX: (300 * i + 150) / 2, clientY: (200 * j + 100) / 2, bubbles: true, ...mod }))
     const val = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
 
-    it("a click picks one cell, Ctrl-click flips one, and the value is row runs", () => {
+    it("a click flips one cell, with or without Ctrl, and the value is row runs (#358)", () => {
         const { host, script } = setup()
         mount(script, grid())
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
         cell(surface, 1, 1)
         expect(val(host).region).toEqual({ runs: [1, 1, 1] })
-        cell(surface, 2, 1, { ctrlKey: true })
+        cell(surface, 2, 1)
         expect(val(host).region).toEqual({ runs: [1, 1, 2] })
         cell(surface, 0, 2, { ctrlKey: true })
         expect(val(host).region).toEqual({ runs: [1, 1, 2, 2, 0, 1] })
-        cell(surface, 1, 1, { ctrlKey: true })
+        cell(surface, 1, 1)
         expect(val(host).region).toEqual({ runs: [1, 2, 1, 2, 0, 1] })
-        cell(surface, 3, 0)
-        expect(val(host).region).toEqual({ runs: [0, 3, 1] })
-        // A plain click on the only selected cell clears the field.
-        cell(surface, 3, 0)
+        cell(surface, 2, 1, { ctrlKey: true })
+        cell(surface, 0, 2)
         expect(val(host).region).toEqual({ runs: [] })
         expect(selChildren(shadow).length).toBe(0)
     })
@@ -6270,19 +6272,19 @@ describe("a grid with regions picks and outlines whole regions (#359)", () => {
         return { host, shadow, surface: shadow.querySelector(".surface") as HTMLElement }
     }
 
-    it("a click picks the cell's whole region, Ctrl-click adds or drops one, and a cell in none acts alone", () => {
+    it("a click adds or drops the cell's whole region, with or without Ctrl, and a cell in none acts alone", () => {
         const { host, surface } = mounted(grid())
         cell(surface, 0, 0)
         expect(val(host).cells).toEqual({ runs: [0, 0, 2, 1, 0, 1] }) // region 1
-        cell(surface, 2, 2, { ctrlKey: true })
+        cell(surface, 2, 2)
         expect(val(host).cells).toEqual({ runs: [0, 0, 3, 1, 0, 1, 1, 2, 1, 2, 2, 2] }) // + region 2
         cell(surface, 1, 0, { ctrlKey: true })
         expect(val(host).cells).toEqual({ runs: [0, 2, 1, 1, 2, 1, 2, 2, 2] }) // − region 1
         cell(surface, 3, 0)
-        expect(val(host).cells).toEqual({ runs: [0, 3, 1] }) // a cell in no region, alone
+        expect(val(host).cells).toEqual({ runs: [0, 2, 2, 1, 2, 1, 2, 2, 2] }) // + a cell in no region, alone
     })
 
-    it("a plain click on the only selected region clears the field", () => {
+    it("a click on any cell of a selected region takes the whole region out", () => {
         const { host, surface } = mounted(grid())
         cell(surface, 1, 1)
         expect(val(host).cells).toEqual({ runs: [1, 1, 1, 2, 0, 2] }) // region 3

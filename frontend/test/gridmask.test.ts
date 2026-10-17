@@ -63,20 +63,19 @@ describe("grid masks (#335)", () => {
         expect(maskHit(L, emptyMask(L))).toBeNull()
     })
 
-    it("marquee: replace, add and subtract", () => {
+    it("marquee: add and subtract", () => {
         const L = layer()
         // Cells (0..1, 0..1): x 0..20, y 30..10 px (row 0 at the bottom).
         let m = emptyMask(L)
-        m[11] = 1
-        m = gridMarqueeMask(L, m, { x: 1, y: 11, w: 18, h: 18 }, "replace")
+        m = gridMarqueeMask(L, m, { x: 1, y: 11, w: 18, h: 18 }, "add")
         expect(encodeMask(L, m)).toEqual({ runs: [0, 0, 2, 1, 0, 2] })
         m = gridMarqueeMask(L, m, { x: 21, y: 11, w: 8, h: 18 }, "add")
         expect(encodeMask(L, m)).toEqual({ runs: [0, 0, 3, 1, 0, 3] })
         m = gridMarqueeMask(L, m, { x: 1, y: 21, w: 28, h: 8 }, "subtract")
         expect(encodeMask(L, m)).toEqual({ runs: [1, 0, 3] })
-        // A replacing box off the grid empties it.
-        m = gridMarqueeMask(L, m, { x: 100, y: 100, w: 5, h: 5 }, "replace")
-        expect(encodeMask(L, m)).toEqual({ runs: [] })
+        // A box off the grid leaves the selection as it was.
+        m = gridMarqueeMask(L, m, { x: 100, y: 100, w: 5, h: 5 }, "add")
+        expect(encodeMask(L, m)).toEqual({ runs: [1, 0, 3] })
     })
 
     it("marquee: each move starts again from the gesture's base, so the drag previews live", () => {

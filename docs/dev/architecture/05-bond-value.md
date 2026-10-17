@@ -91,9 +91,9 @@ of row j from column i0) or, once the runs pass 1 KB and packed bits are shorter
 returns a `GridSelection` with a `BitMatrix` shaped like `values`. A value that doesn't fit
 the grid raises `ArgumentError`. The browser holds the mask as one byte per cell
 (`frontend/src/gridmask.ts`) and draws it as one hit: a fill path of the runs and an edge path of
-the cell sides that border an unselected cell. A plain click replaces
-the items with its one pick (or empties them when that pick was the only one), Cmd/Ctrl-click
-and Cmd/Ctrl+Enter toggle one, and `clearPicks` empties every pick field on the clicked axes
+the cell sides that border an unselected cell. A click or Enter toggles one pick, with or
+without Cmd/Ctrl (#358: a plain click used to replace the items, which threw selections away
+by accident), and `clearPicks` empties every pick field on the clicked axes
 (an empty click) or the whole figure (Escape), sending one value; brush targets and controls
 are left alone. An empty click is one with no `click` hit and no `hover` hit, without
 Cmd/Ctrl; `axesAt` takes every non-colorbar axis whose viewport holds the point (twins and an
@@ -102,14 +102,15 @@ layer's transform).
 Two more tools edit `many` fields, and add nothing to the wire. A marquee (`drag/marquee.ts`)
 starts on a plot area with a `many` field: a plain drag where no view takes the drag, or
 Alt-drag over a view. It holds no value of its own; on release it sets every `many` field on
-that axis to the elements whose centre is inside the box (replace), adds them (Cmd/Ctrl), or
-removes them (Cmd/Ctrl starting on a held element), sending one value. On a line that takes
+that axis by adding the elements whose centre is inside the box, or removing them when the
+press lands on a held element, with or without Cmd/Ctrl (#358), sending one value. On a line that takes
 points each sample inside is a pick (`picksInBox`); on a grid, `applyGridMarquee` sets the
 cells the box overlaps, recomputed from the press-time mask on every move. A press that moves less
 than `MARQUEE_MIN_CSS` client px stays a click; Escape or a pointercancel restores the picks
 held at the press. A legend click also edits each linked `many` field (`legendPicks`), decided
 by the entry's own field so the two never disagree: an entry the click turns on replaces the
-picks with its marks (Cmd/Ctrl adds them), and one it turns off takes them out (`legendEdit`).
+picks with its marks (Cmd/Ctrl, or a legend whose own field is `many`, adds them), and one it
+turns off takes them out (`legendEdit`).
 Pluto overwrites `initial_value` with `transform_value` of the value `mount.ts` seeds, so the
 two must agree. Subtract 1 only when writing the manifest; add 1 when reading the wire. Grid
 window keys on the wire are `i0,i1,j0,j1` (0-based inclusive); Julia stores `i1,i2,j1,j2`. An

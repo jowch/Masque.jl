@@ -138,7 +138,7 @@ export type Drag =
         // content px; `rect_` is null until the press moves MARQUEE_MIN_CSS from (`cx0_`, `cy0_`),
         // the press in client px, so a click with a little jitter stays a click at any zoom.
         // `before_` is each target's selection at the press, which a cancel puts back.
-        kind: "marquee"; axis_: string; targets_: HitLayer[]; mode_: "replace" | "add" | "subtract"
+        kind: "marquee"; axis_: string; targets_: HitLayer[]; mode_: "add" | "subtract"
         x0_: number; y0_: number; cx0_: number; cy0_: number; box_: { x: number; y: number; w: number; h: number }
         rect_: SVGRectElement | null; before_: Map<string, FieldSelection | undefined>; pointerId_: number
     }

@@ -563,15 +563,15 @@ kind_sweep_meta() = [
         "controlStart" => 3,
     ),
     Dict(
-        # `select = :many` (#335): a click replaces, Ctrl-click adds and removes, a click on
-        # empty space and Escape clear. The driver's "many" block drives it.
+        # `select = :many` (#335, #358): a click adds or removes a pick, with or without Ctrl,
+        # and a click on empty space and Escape clear. The driver's "many" block drives it.
         "key" => "many", "layerId" => "scatter", "layerKind" => "circles",
         "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "many",
     ),
     Dict(
         # Marquee and legend picks under `select = :many` (#335). Left axis: no view, so a
-        # plain drag draws the box; Ctrl-drag adds, and one starting on a picked mark takes out.
+        # plain drag draws the box and adds, and one starting on a picked mark takes out.
         # Its legend entry picks every mark of `a`. Right axis: a pan view, so Alt-drag draws
         # the box and a plain drag pans. The driver's "marquee" block drives it.
         "key" => "marquee", "layerId" => "a", "layerKind" => "circles",
@@ -579,7 +579,7 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "marquee", "field" => "*",
     ),
     Dict(
-        # A grid with `select = :many` (#335): a click picks one cell, Ctrl-click flips one,
+        # A grid with `select = :many` (#335, #358): a click flips one cell, with or without Ctrl,
         # the cells draw as one outlined area, and a click off the grid and Escape clear it.
         # The driver's "many_grid" block drives it.
         "key" => "many_grid", "layerId" => "region", "layerKind" => "grid",
@@ -588,7 +588,7 @@ kind_sweep_meta() = [
     ),
     Dict(
         # The same grid started with `selected=` (#356): it mounts with cells (2, 2) and
-        # (3, 2) drawn and in the value, and Ctrl-click takes one out like any other cell.
+        # (3, 2) drawn and in the value, and a click takes one out like any other cell.
         # The driver's "many_grid_seeded" block drives it.
         "key" => "many_grid_seeded", "layerId" => "region", "layerKind" => "grid",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
@@ -596,7 +596,7 @@ kind_sweep_meta() = [
     ),
     Dict(
         # The same grid cut into regions (#359): hover outlines a whole region and names it, a
-        # click or Ctrl-click picks or drops a whole region, a cell in no region acts alone, and
+        # click picks or drops a whole region, a cell in no region acts alone, and
         # a box takes every region it touches. The driver's "many_grid_regions" block drives it.
         "key" => "many_grid_regions", "layerId" => "region", "layerKind" => "grid",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,

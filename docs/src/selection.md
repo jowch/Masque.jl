@@ -41,10 +41,11 @@ cities = interactables(s; id = :cities, payloads = rows, select = :many)
 ```
 
 `sel.cities` is then a `Vector{ElementEvent}`, empty to start. A click
-still replaces the selection with the one city, and a Cmd-click (on a
-Mac) or Ctrl-click (elsewhere) adds a city or takes it out again, so
-`[c.city for c in sel.cities]` lists the cities picked, in the order
-they were picked. A legend entry and an
+on a city adds it to the selection, and a click on a selected city takes
+it out again, so `[c.city for c in sel.cities]` lists the cities picked,
+in the order they were picked. A click never throws the other picks
+away; to start over, click an empty part of the plot or press Escape.
+Cmd-click (on a Mac) and Ctrl-click (elsewhere) do the same as a click. A legend entry and an
 [`AxisInteractable`](@ref) take `select = :many` the same way and give a
 vector of their events; a colorbar's pick is one value, so it raises an
 `ArgumentError`. A heatmap with `select = :many` holds a set of cells,
@@ -53,16 +54,15 @@ as [Select several cells](@ref) shows.
 To select every mark in an area, drag across it: a box follows the
 pointer, and when you let go the marks whose centre is inside it become
 the selection. On a line, that is its data points inside the box; on a
-heatmap, the cells the box touches. Cmd-drag or Ctrl-drag adds them to the selection
-instead, and one that starts on a selected mark takes the marks it
-covers out. On a plot you can pan or orbit, a plain drag still moves
+heatmap, the cells the box touches. Each box adds to what you already
+picked, and a box that starts on a selected mark takes the marks it
+covers out instead. On a plot you can pan or orbit, a plain drag still moves
 the view, so hold Alt (Option on a Mac) to draw the box; Alt-drag works
 on every plot, and on a 3D plot it counts marks hidden behind others
 too. Escape while dragging drops the box and keeps the selection you
 had. On a touch screen a finger drag scrolls the page, so the box is
 drawn with a mouse or pen. Clicking a legend entry selects every mark
-of its plot, Cmd-click or Ctrl-click adds them to the selection, and
-clicking a selected entry again takes them out.
+of its plot, and clicking a selected entry again takes them out.
 
 To keep a box on the plot that the reader can move and resize, use an
 [`ROIInteractable`](@ref) with `selects`, as [Brush a region](@ref)
