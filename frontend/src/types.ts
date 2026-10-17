@@ -187,7 +187,7 @@ export interface HitLayer {
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
     brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds
-    many?: true // a `select = :many` field: it holds { items: [...] }, and Cmd/Ctrl-click toggles one in or out
+    many?: true // a `select = :many` field: it holds { items: [...] }, and a click toggles one in or out
     // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | control | none
     bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "control" | "none"
     selects?: string   // id of the target layer this ROI selects; absent → bounds-ROI (no multi-select)

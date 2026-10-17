@@ -160,8 +160,9 @@ function isMacContextClick(e: { button: number; ctrlKey: boolean }): boolean {
     return e.button === 0 && e.ctrlKey && isApplePlatform()
 }
 
-// The click that adds a pick to a `many` field, or takes one out: Cmd on Apple platforms, where
-// Ctrl-click is the context menu, and Ctrl elsewhere.
+// The modified click: Cmd on Apple platforms, where Ctrl-click is the context menu, and Ctrl
+// elsewhere. On a `many` field it does what a plain click does; it adds a legend entry's marks
+// to a linked `many` plot, and a modified click on empty space keeps the picks.
 export function isToggleClick(e: { metaKey: boolean; ctrlKey: boolean }): boolean {
     return isApplePlatform() ? e.metaKey : e.ctrlKey
 }
@@ -197,11 +198,10 @@ function passContextToBase(surface: HTMLElement, pointerId: number): void {
     timer = window.setTimeout(restore, 1000)
 }
 
-// Cmd/Ctrl-marquee adds to the picks, or takes out what it covers when it starts on a mark or
-// a grid cell that is already picked (as in Finder). Without the key it replaces them. One mode
-// covers every field the box edits, so marks and cells always agree.
-function marqueeMode(manifest: Manifest, state: OverlayState, e: PointerEvent, under: Hit | null, targets: HitLayer[], p: { x: number; y: number }): marquee.MarqueeMode {
-    if (!isToggleClick(e)) return "replace"
+// A marquee adds to the picks, or takes out what it covers when it starts on a mark or a grid
+// cell that is already picked (as Cmd-drag does in Finder), with or without Cmd/Ctrl (#358). One
+// mode covers every field the box edits, so marks and cells always agree.
+function marqueeMode(manifest: Manifest, state: OverlayState, under: Hit | null, targets: HitLayer[], p: { x: number; y: number }): marquee.MarqueeMode {
     if (under === null || !targets.includes(under.layer)) return "add"
     const sel = state.sel_.get(under.layer.id)
     // On a line that takes points, the pick under the press is its nearest data point.
@@ -252,7 +252,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         // A press on a legend inside the axis is a press on the legend.
         const under = targets.length ? hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", photoClip(ctx.manifest_, state.photo_, state.photoViewId_)) : null
         if (axis !== null && targets.length && !under?.layer.links) {
-            state.drag_ = marquee.begin(state, axis, targets, marqueeMode(ctx.manifest_, state, e, under, targets, content), content.x, content.y, { x: e.clientX, y: e.clientY }, e.pointerId)
+            state.drag_ = marquee.begin(state, axis, targets, marqueeMode(ctx.manifest_, state, under, targets, content), content.x, content.y, { x: e.clientX, y: e.clientY }, e.pointerId)
             tryCapture(ctx.surface_, e.pointerId)
             e.preventDefault()
             return
@@ -435,7 +435,7 @@ export function abortMarquee(ctx: OverlayCtx, state: OverlayState): boolean {
 // identical bond value for a keyboard-focused hit — same highlight draw, same payload
 // resolution, same "input" event.
 export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number, toggle = false): void {
-    if (hit.layer.many) { commitManyClick(ctx, state, hit, px, py, toggle); return }
+    if (hit.layer.many) { commitManyClick(ctx, state, hit, px, py); return }
     // A line picks the data point nearest the click, the one hover reads out. A click with no
     // sample to name (the nearest one is off screen) commits nothing, and returns before
     // drawHover: the pointer is already over the line, so its hover outline is already drawn.
@@ -487,8 +487,9 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
 
 // A legend click is also a tool on the plots its entry stands for. The entry's own field decides
 // the gesture once, so the legend and its plots never disagree: an entry the click turns on
-// gives each linked plot whose field holds several picks the entry's marks (Cmd/Ctrl adds them),
-// and an entry it turns off takes them out (`legendEdit`). Returns the fields it changed.
+// gives each linked plot whose field holds several picks the entry's marks (Cmd/Ctrl, or an
+// entry whose own field holds several picks, adds them), and an entry it turns off takes them
+// out (`legendEdit`). Returns the fields it changed.
 function legendPicks(ctx: OverlayCtx, state: OverlayState, hit: Hit, on: boolean, toggle: boolean): Record<string, unknown> {
     const out: Record<string, unknown> = {}
     if (!hit.layer.links?.length) return out
@@ -516,16 +517,16 @@ function syncFocus(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
     }
 }
 
-// A click on a `many` field: a plain click makes the mark the only pick, or clears the field
-// when it already is; Cmd/Ctrl-click adds it, or takes it out when it is held. An axis spot is
-// never "held": each click is a new spot.
 // The data point a click on line `hit` names: the one its readout shows, else the nearest.
 function lineSample(manifest: Manifest, hit: Hit, px: number, py: number): number | undefined {
     return (hit.pt_ ?? lineReadout(hit.layer, hit.index, px, py, manifest.transforms[hit.layer.axis]))?.[0]
 }
 
-function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number, toggle: boolean): void {
-    if (hit.layer.kind === "grid") { commitGridClick(ctx, state, hit, toggle); return }
+// A click on a `many` field adds the mark, or takes it out when it is held, with or without
+// Cmd/Ctrl, so a stray click never throws the other picks away (#358). An axis spot is never
+// "held": each click is a new spot.
+function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number): void {
+    if (hit.layer.kind === "grid") { commitGridClick(ctx, state, hit); return }
     const field = hit.layer.id
     const items = state.sel_.get(field)?.items_ ?? []
     const element = SELECTED_KINDS.has(hit.layer.kind)
@@ -535,10 +536,8 @@ function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: num
     const at = element ? items.findIndex((it) => it.index === hit.index && it.sample === sample) : -1
     const pick: FieldPick = sample !== undefined ? { layer: field, index: hit.index, sample } :
         element ? { layer: field, index: hit.index } : { layer: field, index: hit.index, payload: resolvePayload(hit, ctx.manifest_, px, py) }
-    const next = toggle ?
-        (at >= 0 ? items.filter((_, k) => k !== at) : [...items, pick]) :
-        (at >= 0 && items.length === 1 ? [] : [pick])
-    const linked = legendPicks(ctx, state, hit, next.some((it) => it.index === hit.index), toggle)
+    const next = at >= 0 ? items.filter((_, k) => k !== at) : [...items, pick]
+    const linked = legendPicks(ctx, state, hit, next.some((it) => it.index === hit.index), true)
     state.sel_.set(field, { hits_: manyHits(ctx.manifest_, next), source_: null, items_: next })
     renderSelection(ctx, state)
     drawHover(ctx, state, hit)
@@ -546,21 +545,14 @@ function commitManyClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: num
     ctx.commit_({ ...linked, [field]: { items: next } })
 }
 
-// The same gestures on a `many` grid, cell by cell: a plain click makes the cell the only one
-// selected (or clears the field when it already is), Cmd/Ctrl-click flips it. A cell in a
-// region (`regions=`) stands for the whole region.
-function commitGridClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, toggle: boolean): void {
+// The same gesture on a `many` grid, cell by cell: a click flips the cell. A cell in a region
+// (`regions=`) stands for the whole region.
+function commitGridClick(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
     const mask = gridMaskOf(state, hit.layer)
     const id = regionOf(hit.layer, hit.index)
     const cells = id === 0 ? [hit.index] : regionCells(hit.layer, id)
     const held = mask[hit.index] === 1
-    if (toggle) {
-        for (const k of cells) mask[k] = held ? 0 : 1
-    } else {
-        const only = held && maskCount(mask) === cells.length && cells.every((k) => mask[k] === 1)
-        mask.fill(0)
-        if (!only) for (const k of cells) mask[k] = 1
-    }
+    for (const k of cells) mask[k] = held ? 0 : 1
     setGridMask(ctx, state, hit.layer, mask)
     drawHover(ctx, state, hit)
 }
@@ -584,16 +576,16 @@ function showGridMask(ctx: OverlayCtx, state: OverlayState, layer: HitLayer, mas
 }
 
 // A marquee over a `many` grid, `box` in the layer's image px (as computeSelection takes it).
-// `mode` is the marquee's, decided once at the press for every field: "replace" takes the cells
-// the box overlaps, "add" adds them, "subtract" (Cmd/Ctrl from a held pick, as in Finder) takes
-// them out. `before` is the field's selection at the press. Each call starts again from
-// `before` and never reads the live mask, so the marquee calls it on every move to preview and
-// once more on release; cancel restores `before` itself. A box that misses the grid replaces
-// with nothing. Redraws the selection and returns the field's new envelope; the caller commits
-// it with the release's other fields, so one release sends one value.
+// `mode` is the marquee's, decided once at the press for every field: "add" adds the cells the
+// box overlaps, "subtract" (a press on a held pick, as in Finder) takes them out. `before` is
+// the field's selection at the press. Each call starts again from `before` and never reads the
+// live mask, so the marquee calls it on every move to preview and once more on release; cancel
+// restores `before` itself. A box that misses the grid leaves `before` as it was. Redraws the
+// selection and returns the field's new envelope; the caller commits it with the release's
+// other fields, so one release sends one value.
 export function applyGridMarquee(
     ctx: OverlayCtx, state: OverlayState, layer: HitLayer,
-    box: { x: number; y: number; w: number; h: number }, mode: "replace" | "add" | "subtract", before: FieldSelection | undefined,
+    box: { x: number; y: number; w: number; h: number }, mode: "add" | "subtract", before: FieldSelection | undefined,
 ): MaskEnvelope {
     const base = before?.mask_
     const from = base && base.length === emptyMask(layer).length ? base.slice() : emptyMask(layer)
@@ -602,10 +594,9 @@ export function applyGridMarquee(
 
 // applyGridMarquee's new mask, written into `mask` (the gesture's base) and returned.
 export function gridMarqueeMask(
-    layer: HitLayer, mask: GridMask, box: { x: number; y: number; w: number; h: number }, mode: "replace" | "add" | "subtract",
+    layer: HitLayer, mask: GridMask, box: { x: number; y: number; w: number; h: number }, mode: "add" | "subtract",
 ): GridMask {
     const gg = layer.geometry as GridGeometry
-    if (mode === "replace") mask.fill(0)
     const ci = cellRange(gg.xedges, box.x, box.x + box.w), cj = cellRange(gg.yedges, box.y, box.y + box.h)
     if (!ci || !cj) return mask
     if (!hasRegions(layer)) {
@@ -619,8 +610,7 @@ export function gridMarqueeMask(
     return mask
 }
 
-// Whether the field holds the cell under image px `pt`: a Cmd/Ctrl marquee pressed there
-// subtracts.
+// Whether the field holds the cell under image px `pt`: a marquee pressed there subtracts.
 export function gridCellHeld(state: OverlayState, layer: HitLayer, pt: { x: number; y: number }): boolean {
     const k = gridCellAt(layer.geometry as GridGeometry, pt.x, pt.y)
     return k !== null && state.sel_.get(layer.id)?.mask_?.[k] === 1

@@ -44,9 +44,11 @@ hm = heatmap!(ax, img)
 @bind sel masque(fig, (region = interactables(hm; select = :many),))
 ```
 
-`sel.region` is a [`GridSelection`](@ref), empty to start. A click
-selects one cell, and a Cmd-click (on a Mac) or Ctrl-click (elsewhere)
-adds a cell or takes it out. `img[sel.region]` gives the values of the
+`sel.region` is a [`GridSelection`](@ref), empty to start. A click on a
+cell adds it to the selection and a click on a selected cell takes it
+out, so the selection grows one click at a time; a click off the image
+or Escape clears it, and a box adds every cell it touches, as
+[Select several marks](@ref) shows. `img[sel.region]` gives the values of the
 selected cells, `findall(sel.region)` their positions in `img`, and
 `sel.region.mask` a matrix the size of `img` that is `true` where a cell
 is selected, so a selection of any shape is one value to index with.
@@ -61,7 +63,7 @@ those cells:
 ```
 
 The cells start highlighted, `sel.region` holds them before anyone
-clicks, and a Cmd-click or Ctrl-click takes one out like any other.
+clicks, and a click takes one out like any other.
 `selected` also takes a `GridSelection` or the positions `findall` gives,
 and a matrix of a different size from `img` raises an `ArgumentError`.
 
@@ -78,8 +80,8 @@ labels = label_components(mask)   # ImageMorphology: 0 for the background, 1, 2,
 @bind sel masque(fig, (objects = interactables(hm; select = :many, regions = labels),))
 ```
 
-A click selects one region, a Cmd-click or Ctrl-click adds a region or
-takes it out, and a box selects every region it touches. `sel.objects`
+A click adds a region or takes it out, and a box adds every region it
+touches. `sel.objects`
 is the same [`GridSelection`](@ref) as before, so `sel.objects.mask` is
 every selected cell, and `sel.objects.regions` lists the ids of the
 regions it holds whole. A cell whose id is `0` belongs to no region and

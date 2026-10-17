@@ -128,7 +128,7 @@ bake it; hover/click or drag only.
 | Lines | `:lines` | ring (one `<path>` through the whole polyline) | tip, click `@bind` (one element; Julia index `1`), persist, ring recipe, hover on that same selected path draws no highlight |
 | Series | `:lines` | ring on series 1 | tip per series, click the second series (`@bind` Julia index `2`), hover stroke traces that whole path (edge-only, no fill shape) |
 | LineSegments | `:segments` | ring | tip, click `@bind`, persist, hover edge-only (no fill shape) |
-| Heatmap / Image (`select = :many`) | `:grid` | mask: one fill over the held cells, 2px outline edge only | click picks one cell, Ctrl-click toggles, `@bind` is a `GridSelection`, outline traces the held block, hover on a held cell draws nothing |
+| Heatmap / Image (`select = :many`) | `:grid` | mask: one fill over the held cells, 2px outline edge only | a click toggles one cell (with or without Ctrl), other cells stay, `@bind` is a `GridSelection`, outline traces the held block, hover on a held cell draws nothing |
 | Heatmap / Image | `:grid` | **unsupported** | cell tip `(i,j)=value`, click `@bind`, dodge fill brightens the cell's interior (screenshot, on a bright-enough cell; grid hover is a closed "rect" geom_) |
 | BarPlot | `:rects` | wash | tip, click `@bind`, persist, dodge fill brightens the bar's interior (screenshot) |
 | Poly | `:polygons` | wash | tip, click `@bind`, persist, dodge fill brightens the polygon's interior (screenshot) |

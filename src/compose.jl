@@ -17,9 +17,9 @@ plot is drawn when `translate!`, `scale!`, or `rotate!` moved it, and returns no
 plot drawn outside data space (`space = :relative`, `:pixel`, `:clip`).
 
 `select = :many` lets a reader hold several of the plot's marks at once: its `@bind` field is
-then a `Vector{ElementEvent}`, empty to start, and Cmd-click (Ctrl-click off a Mac) adds or
-removes a mark. It applies to every layer the plot builds, so a `stem!` gives a `NamedTuple`
-of two vectors, `(points = …, stems = …)`. On a heatmap or image the field is a
+then a `Vector{ElementEvent}`, empty to start, and a click adds a mark or takes it out. It
+applies to every layer the plot builds, so a `stem!` gives a `NamedTuple` of two vectors,
+`(points = …, stems = …)`. On a heatmap or image the field is a
 [`GridSelection`](@ref) instead, a mask of the selected cells; surface cells don't take
 `:many` yet. The default, `:one`, holds one mark or `nothing`.
 

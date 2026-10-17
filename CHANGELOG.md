@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** on a plot built with `select = :many`, a click adds the mark or cell to the
+  selection, or takes it out when it is already selected, so a stray click no longer throws
+  the rest of the selection away. It used to replace the selection with the one mark, and
+  only Cmd-click or Ctrl-click added to it; now both do the same. The same goes for a whole
+  region of a grid built with `regions`, for Enter on a focused mark, and for a legend entry
+  whose legend holds several picks. A box drawn by dragging adds what it covers, or takes it
+  out when the drag starts on a selected mark, where a plain drag used to replace the
+  selection. To start over, click an empty part of the plot or press Escape, as before
+  (#358).
+
 ## [0.3.1] - 2026-10-16
 
 ### Added
