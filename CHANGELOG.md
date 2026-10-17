@@ -17,7 +17,7 @@ All notable changes to this project are documented here. The format is based on
 ### Changed
 - On a Documenter page, a CairoMakie widget shows as a plain picture unless the build sets
   `example_size_threshold = nothing`: Documenter prefers a picture to an output larger than
-  8 KB, and every widget is (#373).
+  8 KB, and every widget is. The build log warns when it does (#373).
 
 ## [0.3.1] - 2026-10-16
 

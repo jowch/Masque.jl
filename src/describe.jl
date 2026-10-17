@@ -101,10 +101,22 @@ function _tooltip_text(d)
         fs = unique(String[seg["f"] for seg in d["template"] if seg isa AbstractDict && haskey(seg, "f")])
         return isempty(fs) ? "text" : join(fs, ", ")
     end
-    ks = _payload_keys(get(d, "payloads", ()))
-    # A line's readout and a grid cell add their own fields, as `_layer_dict` checks templates.
-    haskey(d, "points") && union!(ks, (:x, :y, :i))
-    d["kind"] == "grid" && union!(ks, (:i, :j, :value))
+    payloads = get(d, "payloads", ())
+    ks = _payload_keys(payloads)
+    g = d["geometry"]
+    # Fields the default table adds (frontend/src/hover.ts): a line's nearest sample (its `i`
+    # only in a template), a grid cell's value, and its position when it has no payload.
+    haskey(d, "points") && union!(ks, (:x, :y))
+    if d["kind"] == "grid"
+        push!(ks, :value)
+        all(isnothing, payloads) && union!(ks, (:i, :j))
+    elseif d["kind"] == "surface" && !haskey(g, "suspended")
+        union!(ks, (:i, :j, :x, :y, :z))
+        haskey(g, "value") && push!(ks, :value)
+    elseif d["kind"] == "slice"
+        push!(ks, g["orientation"] == "v" ? :x : :y)
+        union!(ks, Symbol(s["id"]) for s in g["series"])
+    end
     return join(sort!(string.(collect(ks))), ", ")
 end
 

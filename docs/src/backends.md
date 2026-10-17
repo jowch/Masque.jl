@@ -143,9 +143,10 @@ matches your installed Masque, so hover needs an internet connection;
 offline, the page shows the plain figures. Each widget adds its image
 to the page. Documenter shows a picture in place of any output past
 8 KB, which every widget is, so set `example_size_threshold = nothing`
-to keep the hover. Documenter also warns about a page past 100 KB and
+to keep the hover. Documenter then writes every large output into its
+page, plain figures too, and it warns about a page past 100 KB and
 stops the build at 200 KB, so a page with several large figures goes in
-`size_threshold_ignore`:
+`size_threshold_ignore`, whether or not it has a widget:
 
 ```julia
 makedocs(;

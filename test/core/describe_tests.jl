@@ -22,7 +22,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     @test startswith(lines_[1], "MasqueWidget, 1000×600 px, 2 layers")
     @test occursin("ax1 \"Growth\":", text)
     @test occursin("samples (scatter): 4 points; click, hover; tooltip: index, x, y", text)
-    @test occursin("lines: 1 line; hover; tooltip: i, index, x, y", text)
+    @test occursin("lines: 1 line; hover; tooltip: index, x, y", text)
     @test !occursin("ax2", text)                   # an axis with no layers is left out
     @test occursin("value: ", text) && occursin("ElementEvent(:scatter, 2", text)
     @test length(lines_) <= 6 && length(text) < 1000
@@ -47,6 +47,15 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
     @test occursin("2×3 cells; click, hover; tooltip: i, j, value", text4)
     @test occursin("\nfigure:\n  sl: slider; change", text4)
     @test occursin("sl = 1", text4)
+
+    # The default table's own fields, as the overlay draws them.
+    tt = Masque._tooltip_text
+    gridgeom = Dict{String, Any}("ncols" => 2, "nrows" => 1)
+    @test tt(Dict{String, Any}("kind" => "grid", "geometry" => gridgeom, "payloads" => [(; name = "a"), (; name = "b")])) == "name, value"
+    @test tt(Dict{String, Any}("kind" => "grid", "geometry" => gridgeom, "payloads" => [])) == "i, j, value"
+    slicegeom = Dict{String, Any}("orientation" => "v", "series" => [Dict("id" => "temp"), Dict("id" => "rain")])
+    @test tt(Dict{String, Any}("kind" => "slice", "geometry" => slicegeom, "payloads" => [])) == "rain, temp, x"
+    @test tt(Dict{String, Any}("kind" => "surface", "geometry" => Dict{String, Any}(), "payloads" => [])) == "i, j, x, y, z"
 
     # A widget built by hand has no picture to hand back.
     bare = Masque.MasqueWidget("", Dict{String, Any}(), 100)
