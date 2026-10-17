@@ -43,6 +43,20 @@ running the cell again. Change your plots with Makie's `update!`:
 While the reader drags the slider, the curve follows it. To redraw only
 when they let go, build the slider with `update_while_dragging = false`.
 
+```@raw html
+<video id="masque-controls-clip" title="Dragging the frequency slider while the curve follows it, then switching the toggle to a dotted line, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-controls-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "controls.mp4";
+})();
+</script>
+```
+
 Masque also sets the block's own value before it calls your function, so
 `freq.value[]` agrees with `state.freq`, and code written for GLMakie with
 `on(freq.value)` or `@lift` keeps working.

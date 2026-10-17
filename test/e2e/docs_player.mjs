@@ -458,19 +458,22 @@ try {
     console.log(`E2E OK [docs player] — box-select: ${moves.length} pointer drags each swapped to their own recording`);
   }
 
-  // A widget shown by a Documenter `@example` block, with no Pluto (#298): two on one page,
-  // so a second widget's script must not collide with the first's. Hovering a point with the
-  // real pointer shows its tooltip, and the page logs no errors.
+  // Widgets shown by Documenter `@example` blocks, with no Pluto (#298): two CairoMakie and
+  // one WGLMakie on one page, so no widget's script may collide with another's. Every one
+  // mounts, the WGLMakie one draws its canvas, hovering a point with the real pointer shows
+  // its tooltip, and the page logs no errors.
   {
     const p = existsSync(join(root, "backends", "index.html")) ? "/backends/" : "/backends.html";
     const before = consoleLog.length;
     await page.goto(`http://127.0.0.1:${server.address().port}${p}`, { waitUntil: "load" });
     await page.waitForFunction(() => {
       const hosts = [...document.querySelectorAll(".ip-host")];
-      return hosts.length === 2 && hosts.every((h) => [...h.querySelectorAll("*")].some((el) => el.shadowRoot?.querySelector(".surface")));
-    }, null, { timeout: 20000 }).catch(async () => {
-      const n = await page.evaluate(() => document.querySelectorAll(".ip-host").length);
-      throw new Error(`@example widgets: expected 2 mounted overlays, found ${n} hosts | ${consoleLog.slice(before).join(" | ")}`);
+      const mounted = (h) => [...h.querySelectorAll("*")].some((el) => el.shadowRoot?.querySelector(".surface"));
+      return hosts.length === 3 && hosts.every(mounted) && !!hosts[2].querySelector("canvas");
+    }, null, { timeout: 60000 }).catch(async () => {
+      const st = await page.evaluate(() => [...document.querySelectorAll(".ip-host")].map((h) =>
+        `surface=${[...h.querySelectorAll("*")].some((el) => el.shadowRoot?.querySelector(".surface"))} canvas=${!!h.querySelector("canvas")} text=${JSON.stringify(h.innerText.trim().slice(0, 80))}`));
+      throw new Error(`@example widgets: expected 3 mounted overlays (the third a WGLMakie canvas), found ${st.length} hosts [${st.join("; ")}] | ${consoleLog.slice(before).join(" | ")}`);
     });
     const host = page.locator(".ip-host").first();
     await host.scrollIntoViewIfNeeded();
@@ -498,7 +501,7 @@ try {
     if (!tip) throw new Error("@example widget: hovering the first point showed no tooltip");
     const errs = consoleLog.slice(before).filter((l) => l.startsWith("pageerror:") || (l.startsWith("error:") && !(l.includes("Failed to load resource") && l.includes("404"))));
     if (errs.length) throw new Error(`@example widgets logged errors: ${errs.join(" | ")}`);
-    console.log(`E2E OK [docs @example] — 2 widgets mounted without Pluto, hover tooltip ${JSON.stringify(tip)}`);
+    console.log(`E2E OK [docs @example] — 3 widgets mounted without Pluto (one WGLMakie), hover tooltip ${JSON.stringify(tip)}`);
 
     // The classic Jupyter Notebook inserts output HTML inertly and runs each script from
     // `<head>` (jQuery's globalEval). The widget must still find its own host and mount.

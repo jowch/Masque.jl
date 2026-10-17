@@ -165,6 +165,19 @@ or if the published script differs from your copy, each figure shows a
 note in its box saying it couldn't load. To put a figure in a document
 that must stay small or read offline, use `backend = :cairo` there.
 
+Hover the points below, and click one to highlight it. This one is
+drawn by WGLMakie in your browser:
+
+```@example outside-pluto
+using WGLMakie
+
+fig3 = Figure(size = (420, 320))
+ax3 = Axis3(fig3[1, 1])
+t = range(0, 4π; length = 40)
+scatter!(ax3, cos.(t), sin.(t), t ./ 4π; color = t, markersize = 14)
+masque(fig3; backend = :webgl)
+```
+
 A click highlights a mark there too, but nothing reads the choice: the
 `@bind` value and dragging the view with a [`ViewInteractable`](@ref)
 need a running Pluto notebook. A display that doesn't run the page's
