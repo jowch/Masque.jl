@@ -17,6 +17,11 @@ All notable changes to this project are documented here. The format is based on
   selection. To start over, click an empty part of the plot or press Escape, as before
   (#358).
 
+### Fixed
+- While you pan or zoom a view, a selected or hovered mark on an axis tied to it by
+  `linkaxes!` keeps its ring, which slides with that axis's data. A ring on any other axis
+  stays where it is. Both used to disappear until the new frame arrived (#368).
+
 ## [0.3.1] - 2026-10-16
 
 ### Added

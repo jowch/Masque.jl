@@ -94,6 +94,19 @@ export interface HiGroups {
     plain_: SVGGElement
 }
 
+// One role's groups (g.hi, g.sel, or g.link) on every axis (#368). Each axis has its own home in
+// each svg, so a live photograph moves and clips one axis's marks without touching another's.
+// `at_` makes an axis's home on first use; `all_` is every home made so far. Screen-fixed
+// chrome has one home whatever the axis (`oneHome`).
+export interface HiSet {
+    at_(axis: string): HiGroups
+    all_(): HiGroups[]
+}
+
+export function oneHome(groups: HiGroups): HiSet {
+    return { at_: () => groups, all_: () => [groups] }
+}
+
 export interface ROIBox {
     rect_: SVGRectElement
     handles_: SVGRectElement[]
@@ -154,13 +167,13 @@ export interface OverlayCtx {
     base_: HTMLElement
     surface_: HTMLElement
     tip_: HTMLElement
-    hiGroup_: HiGroups
-    selGroup_: HiGroups
+    hiGroup_: HiSet
+    selGroup_: HiSet
     // Legend, colorbar, and axis rings. Siblings of the photograph clip, so a live matrix
     // neither slides nor clips them. Linked data marks stay in linkGroup_.
-    hiFixed_: HiGroups
-    selFixed_: HiGroups
-    linkGroup_: HiGroups // transient legend-linked highlights (g.link), z-ordered between sel and hi
+    hiFixed_: HiSet
+    selFixed_: HiSet
+    linkGroup_: HiSet // transient legend-linked highlights (g.link), z-ordered between sel and hi
     thresholdLines_: Map<string, SVGLineElement>
     roiBoxes_: Map<string, ROIBox>
     chrome_: SVGGElement // svg.masque-plain's group that slides with the photograph: ROI boxes, threshold lines, the marquee
