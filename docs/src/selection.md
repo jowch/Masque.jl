@@ -66,6 +66,20 @@ of its plot in place of the ones you picked, Cmd-click or Ctrl-click
 adds them instead, and clicking a selected entry again takes them out.
 On a legend built with `select = :many`, a click adds them.
 
+```@raw html
+<video id="masque-selection-many-clip" title="Clicking three cities, clicking one again to take it out, dragging a box that adds two more, then clicking empty space to clear, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-selection-many-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "selection-many.mp4";
+})();
+</script>
+```
+
 To keep a box on the plot that the reader can move and resize, use an
 [`ROIInteractable`](@ref) with `selects`, as [Brush a region](@ref)
 shows.

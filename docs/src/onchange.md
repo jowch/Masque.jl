@@ -36,6 +36,20 @@ Click a few points: the red
 line moves to fit the points you picked. `w.pts` holds the same picks for
 other cells.
 
+```@raw html
+<video id="masque-onchange-clip" title="Clicking points one at a time while the red line refits to them, then clicking one again to take it out, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-onchange-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "onchange.mp4";
+})();
+</script>
+```
+
 `state` has one field for each plot you can pick from and each control,
 with the same names and values as the `@bind` value. The function runs once
 when the cell runs, before the figure first shows, and then after every

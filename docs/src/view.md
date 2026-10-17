@@ -55,6 +55,20 @@ Axes you tie together with Makie's `linkaxes!`, `linkxaxes!`, or
 directions they share. Only the axes you want to drag from need a
 `ViewInteractable`.
 
+```@raw html
+<video id="masque-linkaxes-clip" title="Dragging the left of two linked axes to pan it while the right one pans with it, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-linkaxes-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "view-linkaxes.mp4";
+})();
+</script>
+```
+
 If the same axis has a threshold line or a brushing box, a plain drag
 moves the line or box, and Shift+drag pans.
 
@@ -132,6 +146,20 @@ end
 
 ```julia
 @bind pick masque(fig, orbit)
+```
+
+```@raw html
+<video id="masque-linkcameras-clip" title="Dragging the left of two Axis3 panels while the right one turns with it, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-linkcameras-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "view-linkcameras.mp4";
+})();
+</script>
 ```
 
 Give each panel its own `ViewInteractable` to drag any of them. Zoom and
