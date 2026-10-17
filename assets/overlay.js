@@ -72,10 +72,10 @@
    by keyboard.ts's focusTo) \u2014 right after Tab, and always on a widget with nothing to arrow
    through (grid, axis, threshold, ROI, view, slice) \u2014 the surface draws an inset chrome outline
    in place of the user-agent rectangle. Once the ring is up it is the indicator and the outline
-   goes. :focus-visible, not :focus, so a pointer click draws neither. An outline, not a
-   box-shadow, so forced colours still paint it, in Highlight. A press focuses the surface from
-   script, which Chromium treats as keyboard focus; pointer-focus (bond.ts's onDown) keeps the
-   outline off until a key is pressed. */
+   goes. An outline, not a box-shadow, so forced colours still paint it, in Highlight. A press
+   focuses the surface from script (#380), which Chromium counts as :focus-visible, so a click
+   would draw the outline too; pointer-focus (set by bond.ts's onDown, cleared on a key or on
+   focusout) keeps it off until a key is pressed. */
 .surface:focus-visible:not(.kbd-ring) { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: -2px; }
 .surface.kbd-ring:focus-visible { outline: none; }
 .surface.pointer-focus:focus-visible { outline: none; }

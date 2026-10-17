@@ -2,7 +2,8 @@
 
 Press Tab to focus a plot, or click it, then use the arrow keys to move
 between its marks and Enter or Space to select one. A screen reader
-announces each mark as you move to it. A `masque` widget needs no extra setup for this.
+announces each mark as you move to it. A `masque` widget needs no extra
+setup for this.
 
 ## Keys
 
