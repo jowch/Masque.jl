@@ -109,6 +109,18 @@ end
     @test JSON3.write(w.manifest) isa String
 end
 
+@testset "text form, and no PNG (#373)" begin
+    fig = Figure(; size = (400, 300))
+    ax = Axis(fig[1, 1]; title = "Drawn in the browser")
+    scatter!(ax, 1:3, 1:3)
+    w = masque(fig; backend = :webgl)
+    @test !showable(MIME"image/png"(), w)
+    text = repr(MIME"text/plain"(), w)
+    @test startswith(text, "WebGLWidget, ")
+    @test occursin("ax1 \"Drawn in the browser\":\n  scatter: 3 points", text)
+    @test startswith(repr(w), "WebGLWidget(")
+end
+
 @testset "LScene is refused on :webgl, the same as :cairo (#172)" begin
     fu = Figure(; size = (400, 300)); LScene(fu[1, 1])
     err = (@test_throws ArgumentError Masque.context(Masque._resolve_backend(:webgl), fu, 2.0, 700)).value

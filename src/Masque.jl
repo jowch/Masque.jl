@@ -94,6 +94,7 @@ include("fields.jl")
 include("events.jl")
 include("bond.jl")
 include("render.jl")
+include("describe.jl")
 include("hints.jl")
 include("link.jl")
 

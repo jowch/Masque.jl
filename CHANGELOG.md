@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A CairoMakie widget has a PNG form, `show(io, MIME"image/png"(), w)`, so a tool that reads a
+  notebook without a browser, such as an AI agent, can see the figure. Pluto still shows the
+  live figure. Printed in the REPL, a widget now gives a short summary instead of its fields:
+  each axis with its title, each layer with what it draws, the gestures it takes and its
+  tooltip fields, and the `@bind` value it starts with. A WGLMakie widget has the summary but
+  no PNG, since the browser draws it (#373).
+
+### Changed
+- On a Documenter page, a CairoMakie widget shows as a plain picture unless the build sets
+  `example_size_threshold = nothing`: Documenter prefers a picture to an output larger than
+  8 KB, and every widget is (#373).
+
 ## [0.3.1] - 2026-10-16
 
 ### Added
