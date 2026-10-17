@@ -160,8 +160,9 @@ function isMacContextClick(e: { button: number; ctrlKey: boolean }): boolean {
     return e.button === 0 && e.ctrlKey && isApplePlatform()
 }
 
-// The click that adds a pick to a `many` field, or takes one out: Cmd on Apple platforms, where
-// Ctrl-click is the context menu, and Ctrl elsewhere.
+// The modified click: Cmd on Apple platforms, where Ctrl-click is the context menu, and Ctrl
+// elsewhere. On a `many` field it does what a plain click does; it adds a legend entry's marks
+// to a linked `many` plot, and a modified click on empty space keeps the picks.
 export function isToggleClick(e: { metaKey: boolean; ctrlKey: boolean }): boolean {
     return isApplePlatform() ? e.metaKey : e.ctrlKey
 }
@@ -487,7 +488,8 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
 // A legend click is also a tool on the plots its entry stands for. The entry's own field decides
 // the gesture once, so the legend and its plots never disagree: an entry the click turns on
 // gives each linked plot whose field holds several picks the entry's marks (Cmd/Ctrl, or an
-// entry whose own field holds several picks, adds them), and an entry it turns off takes them out (`legendEdit`). Returns the fields it changed.
+// entry whose own field holds several picks, adds them), and an entry it turns off takes them
+// out (`legendEdit`). Returns the fields it changed.
 function legendPicks(ctx: OverlayCtx, state: OverlayState, hit: Hit, on: boolean, toggle: boolean): Record<string, unknown> {
     const out: Record<string, unknown> = {}
     if (!hit.layer.links?.length) return out
@@ -575,11 +577,12 @@ function showGridMask(ctx: OverlayCtx, state: OverlayState, layer: HitLayer, mas
 
 // A marquee over a `many` grid, `box` in the layer's image px (as computeSelection takes it).
 // `mode` is the marquee's, decided once at the press for every field: "add" adds the cells the
-// box overlaps, "subtract" (a press on a held pick, as in Finder) takes them out. `before` is the field's selection at the press. Each call starts again from
-// `before` and never reads the live mask, so the marquee calls it on every move to preview and
-// once more on release; cancel restores `before` itself. A box that misses the grid leaves
-// `before` as it was. Redraws the selection and returns the field's new envelope; the caller commits
-// it with the release's other fields, so one release sends one value.
+// box overlaps, "subtract" (a press on a held pick, as in Finder) takes them out. `before` is
+// the field's selection at the press. Each call starts again from `before` and never reads the
+// live mask, so the marquee calls it on every move to preview and once more on release; cancel
+// restores `before` itself. A box that misses the grid leaves `before` as it was. Redraws the
+// selection and returns the field's new envelope; the caller commits it with the release's
+// other fields, so one release sends one value.
 export function applyGridMarquee(
     ctx: OverlayCtx, state: OverlayState, layer: HitLayer,
     box: { x: number; y: number; w: number; h: number }, mode: "add" | "subtract", before: FieldSelection | undefined,
@@ -607,8 +610,7 @@ export function gridMarqueeMask(
     return mask
 }
 
-// Whether the field holds the cell under image px `pt`: a Cmd/Ctrl marquee pressed there
-// subtracts.
+// Whether the field holds the cell under image px `pt`: a marquee pressed there subtracts.
 export function gridCellHeld(state: OverlayState, layer: HitLayer, pt: { x: number; y: number }): boolean {
     const k = gridCellAt(layer.geometry as GridGeometry, pt.x, pt.y)
     return k !== null && state.sel_.get(layer.id)?.mask_?.[k] === 1
