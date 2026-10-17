@@ -16,10 +16,10 @@ import { buildControls, CONTROLS_STYLE } from "./controls"
 import { DEFAULT_SIGDIGITS } from "./template"
 import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
-import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, MOTION_MS, NOTE_MS } from "./state"
-import type { HiGroups, OverlayCtx } from "./state"
+import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, oneHome, MOTION_MS, NOTE_MS } from "./state"
+import type { HiGroups, HiSet, OverlayCtx } from "./state"
 import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
-import { matrixLimits } from "./geometry"
+import { axisFrame, layoutSpaceLayer, linkedMove, matrixLimits } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
@@ -332,31 +332,70 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const fillSvg = makeOverlaySvg("masque-fill")
     const edgeSvg = makeOverlaySvg("masque-edge")
     const plainSvg = makeOverlaySvg("masque-plain")
-    // The photographic matrix is applied to the inner group. The outer group clips that
-    // drawing to the axis viewport, so tick labels and the axis frame stay put. The tooltip
-    // is not inside either group.
-    const fillClip = makeGroup(fillSvg, "masque-clip")
-    const edgeClip = makeGroup(edgeSvg, "masque-clip")
+    // Data-mark highlights live in one home per (svg, role, axis):
+    // g.masque-clip[data-axis] > g.masque-photo > g.sel|g.link|g.hi. A live photograph sets each
+    // axis's inner transform and outer clip (`paintAxis`), so a linked axis's ring slides with
+    // its own data and an unlinked axis's stays put (#368). Every axis's g.sel comes before any
+    // g.link, and every g.link before any g.hi, in each svg, so g.hi always paints over
+    // g.link/g.sel whichever svg(s) any of the three lands in. A comment marks where each
+    // role's homes end, so a home made later still lands in order. The tooltip is in none of them.
+    const overlaySvgs = [fillSvg, edgeSvg, plainSvg]
+    const svgKinds = ["fill", "edge", "plain"]
+    const roles = ["sel", "link", "hi"] as const
+    const roleEnds = overlaySvgs.map((svg) => roles.map((r) => svg.appendChild(document.createComment(r))))
+    // Every axis home made so far, with its clip and photo groups per svg, for `paintAxis`.
+    const axisHomes = new Map<string, { clips: Array<[SVGGElement, string]>; photos: SVGGElement[] }>()
+    let paintAxis: (axis: string, m?: PhotoMatrix) => void = () => {}
+    const homeSet = (role: (typeof roles)[number]): HiSet => {
+        const made = new Map<string, HiGroups>()
+        return {
+            at_(axis) {
+                let groups = made.get(axis)
+                if (groups) return groups
+                let home = axisHomes.get(axis)
+                if (!home) {
+                    home = { clips: [], photos: [] }
+                    axisHomes.set(axis, home)
+                }
+                const n = [...axisHomes.keys()].indexOf(axis)
+                const leaves = overlaySvgs.map((svg, i) => {
+                    const clip = document.createElementNS(SVG_NS, "g")
+                    clip.setAttribute("class", "masque-clip")
+                    clip.dataset.axis = axis
+                    svg.insertBefore(clip, roleEnds[i][roles.indexOf(role)])
+                    const photo = makeGroup(clip, "masque-photo")
+                    home.clips.push([clip, `masque-clip-${svgKinds[i]}-${n}`])
+                    home.photos.push(photo)
+                    return makeGroup(photo, role)
+                })
+                groups = { fill_: leaves[0], edge_: leaves[1], plain_: leaves[2] }
+                made.set(axis, groups)
+                paintAxis(axis)
+                return groups
+            },
+            all_: () => [...made.values()],
+        }
+    }
+    const selGroup = homeSet("sel")
+    const linkGroup = homeSet("link")
+    const hiGroup = homeSet("hi")
+    // Every axis with data marks gets its homes now, in manifest order, so the DOM does not
+    // depend on which mark was picked first. An axis a later frame brings is made on first use.
+    for (const l of manifest.layers) {
+        if (layoutSpaceLayer(l)) continue
+        for (const set of [selGroup, linkGroup, hiGroup]) set.at_(l.axis)
+    }
+    // ROI boxes, threshold lines, the marquee and the readout dots slide with the pan axis's
+    // photograph, clipped to its viewport, above every highlight.
     const plainClip = makeGroup(plainSvg, "masque-clip")
-    const fillPhoto = makeGroup(fillClip, "masque-photo")
-    const edgePhoto = makeGroup(edgeClip, "masque-photo")
     const plainPhoto = makeGroup(plainClip, "masque-photo")
-    const clipGroups = [fillClip, edgeClip, plainClip]
-    const photoGroups = [fillPhoto, edgePhoto, plainPhoto]
-    // persistent box-selection highlights (g.sel, z-below link) then transient legend-linked
-    // highlights (g.link, z-above sel) then transient hover highlights (g.hi, z-above sel/link) —
-    // same append order in every svg, so g.hi always paints over g.link/g.sel whichever svg(s)
-    // any of the three lands in.
-    const selGroup: HiGroups = { fill_: makeGroup(fillPhoto, "sel"), edge_: makeGroup(edgePhoto, "sel"), plain_: makeGroup(plainPhoto, "sel") }
-    const linkGroup: HiGroups = { fill_: makeGroup(fillPhoto, "link"), edge_: makeGroup(edgePhoto, "link"), plain_: makeGroup(plainPhoto, "link") }
-    const hiGroup: HiGroups = { fill_: makeGroup(fillPhoto, "hi"), edge_: makeGroup(edgePhoto, "hi"), plain_: makeGroup(plainPhoto, "hi") }
     // Screen-fixed chrome paints above the clip and is not transformed. A legend or colorbar
     // ring outside the axis viewport would otherwise vanish for the whole preview.
     const fillFixed = makeGroup(fillSvg, "masque-fixed")
     const edgeFixed = makeGroup(edgeSvg, "masque-fixed")
     const plainFixed = makeGroup(plainSvg, "masque-fixed")
-    const selFixed: HiGroups = { fill_: makeGroup(fillFixed, "sel"), edge_: makeGroup(edgeFixed, "sel"), plain_: makeGroup(plainFixed, "sel") }
-    const hiFixed: HiGroups = { fill_: makeGroup(fillFixed, "hi"), edge_: makeGroup(edgeFixed, "hi"), plain_: makeGroup(plainFixed, "hi") }
+    const selFixed = oneHome({ fill_: makeGroup(fillFixed, "sel"), edge_: makeGroup(edgeFixed, "sel"), plain_: makeGroup(plainFixed, "sel") })
+    const hiFixed = oneHome({ fill_: makeGroup(fillFixed, "hi"), edge_: makeGroup(edgeFixed, "hi"), plain_: makeGroup(plainFixed, "hi") })
     const surface = document.createElement("div")
     surface.className = "surface"
     // touch-action: block native scroll/pinch on the surface ONLY when this manifest has a drag
@@ -887,7 +926,33 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // One window per axis whose data slides: the pan view's, then each axis linked to it (#363).
     interface DataWindow { clip: HTMLDivElement; copy: HTMLImageElement | HTMLCanvasElement; gen: number }
     let windows: DataWindow[] = []
-    const clipIds = ["masque-clip-fill", "masque-clip-edge", "masque-clip-plain"]
+    // The chrome group's clip, and each axis's in each svg (`masque-clip-<svg>-<n>`).
+    const setClip = (g: SVGGElement, cid: string, rect: [number, number, number, number] | null) => {
+        if (!rect) { g.removeAttribute("clip-path"); return }
+        const svg = g.ownerSVGElement
+        if (!svg) return
+        let cp = svg.querySelector(`#${cid}`) as SVGClipPathElement | null
+        if (!cp) {
+            cp = document.createElementNS(SVG_NS, "clipPath")
+            cp.id = cid
+            cp.appendChild(document.createElementNS(SVG_NS, "rect"))
+            svg.insertBefore(cp, svg.firstChild)
+        }
+        const r = cp.firstElementChild as SVGRectElement
+        r.setAttribute("x", String(rect[0]))
+        r.setAttribute("y", String(rect[1]))
+        r.setAttribute("width", String(rect[2]))
+        r.setAttribute("height", String(rect[3]))
+        g.setAttribute("clip-path", `url(#${cid})`)
+    }
+    paintAxis = (axis, m = state.photo_) => {
+        const home = axisHomes.get(axis)
+        if (!home) return
+        const f = axisFrame(ctx.manifest_, m, state.photoViewId_, axis)
+        const t = f ? `translate(${f.tx} ${f.ty}) scale(${f.sx === f.sy ? f.sx : `${f.sx} ${f.sy}`})` : null
+        home.photos.forEach((g) => { if (t) g.setAttribute("transform", t); else g.removeAttribute("transform") })
+        for (const [g, cid] of home.clips) setClip(g, cid, f ? f.clip : null)
+    }
     const photoViewport = (): ViewGeometry | null => {
         const id = state.photoViewId_
         const layer = (id ? ctx.manifest_.layers.find((l) => l.id === id) : undefined)
@@ -903,7 +968,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     const clearDataClip = () => {
         dropWindows(0)
-        for (const g of clipGroups) g.removeAttribute("clip-path")
+        plainClip.removeAttribute("clip-path")
     }
     const makeWindow = (cls: string): DataWindow => {
         const clip = document.createElement("div")
@@ -921,14 +986,6 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         clip.appendChild(copy)
         host.insertBefore(clip, shadowHost)
         return { clip, copy, gen: -1 }
-    }
-    // A linked axis shares one dimension or both with the pan axis, so a data value the matrix
-    // moves from p to s*p + t on the pan axis moves from q to s*q + t' on the linked one, with
-    // t' = q0*(1 - s) + r*(t + p0*(s - 1)). A dimension it doesn't share stays put.
-    const linkedMove = (m: PhotoMatrix, d: [number, number, number] | undefined, t: number): [number, number] => {
-        if (!d) return [1, 0]
-        const [p0, q0, r] = d
-        return [m.s, q0 * (1 - m.s) + r * (t + p0 * (m.s - 1))]
     }
     paintPhoto = (m) => {
         paintMatrix(m)
@@ -949,11 +1006,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.base_.style.transform = ""
         ctx.base_.style.transformOrigin = ""
         const view = id ? null : photoViewport()
-        const svgT = `translate(${m.tx} ${m.ty}) scale(${m.s})`
-        for (const g of photoGroups) {
-            if (id || !view) g.removeAttribute("transform")
-            else g.setAttribute("transform", svgT)
-        }
+        if (id || !view) plainPhoto.removeAttribute("transform")
+        else plainPhoto.setAttribute("transform", `translate(${m.tx} ${m.ty}) scale(${m.s})`)
+        for (const axis of axisHomes.keys()) paintAxis(axis, m)
         // Only data pixels slide (#171). Each copy is cropped to its clip rect, inside the spine
         // stroke, and the crop moves with it, so the chrome outside the axis box never enters
         // the window. The window, the same rect, is painted with the empty plot's colour, so
@@ -1008,24 +1063,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 const [lsy, lty] = linkedMove(m, link.y, m.ty)
                 paintWindow(windows[i + 1], link.clip, link.fill, { sx: lsx, sy: lsy, tx: ltx, ty: lty })
             })
-            clipGroups.forEach((g, i) => {
-                const svg = g.ownerSVGElement
-                if (!svg) return
-                const cid = clipIds[i]
-                let cp = svg.querySelector(`#${cid}`) as SVGClipPathElement | null
-                if (!cp) {
-                    cp = document.createElementNS(SVG_NS, "clipPath")
-                    cp.id = cid
-                    cp.appendChild(document.createElementNS(SVG_NS, "rect"))
-                    svg.insertBefore(cp, svg.firstChild)
-                }
-                const rect = cp.firstElementChild as SVGRectElement
-                rect.setAttribute("x", String(cx))
-                rect.setAttribute("y", String(cy))
-                rect.setAttribute("width", String(cw))
-                rect.setAttribute("height", String(ch))
-                g.setAttribute("clip-path", `url(#${cid})`)
-            })
+            setClip(plainClip, "masque-clip-plain", [cx, cy, cw, ch])
         }
         host.dataset.masquePhoto = id ? "" : `${m.s},${m.tx},${m.ty}`
         if (id) syncOverlayToBase()

@@ -1,6 +1,6 @@
 import { pathData, polygonRings, ringsPathData, screenFixedLayer } from "./geometry"
 import { hitKey, prefersReducedMotion, selectedHits, MOTION_MS } from "./state"
-import type { HiGroups, OverlayCtx, OverlayState } from "./state"
+import type { HiGroups, HiSet, OverlayCtx, OverlayState } from "./state"
 import { regionCells } from "./regions"
 import type { Hit, HitLayer, LayerStyle } from "./types"
 
@@ -182,34 +182,44 @@ function maskElements(g: [string, string, string], stroke: string | undefined, m
 }
 
 // --- highlight/selection DOM-lifecycle: keyed by OverlayState.hiKey_ / selKeys_ ---
-// Every function below takes ALL THREE groups (fill_/edge_/plain_) since a single
-// hover/selection can land in one or two of them, and a redraw or clear must not leave a stale
-// element behind in a group it isn't using this time (e.g. a hover moving off an explicit-stroke
-// mark onto a plain one switches which svg(s) hold the live element).
+// Every function below takes a whole HiSet: all three groups (fill_/edge_/plain_) on every
+// axis, since a single hover/selection can land in one or two of them, and a redraw or clear
+// must not leave a stale element behind in a group it isn't using this time (e.g. a hover moving
+// off an explicit-stroke mark onto a plain one switches which svg(s) hold the live element). A
+// mark lands in its own axis's home, so it slides and clips with that axis (#368).
 
 // Fade-out is hover-only (leave / miss). selects-ROI remounts g.sel every drag
 // frame — a leave class there would wash the box-select on every pointer tick.
-function hiNodes(groups: HiGroups): SVGGElement[] {
-    return [groups.fill_, groups.edge_, groups.plain_]
+function hiNodes(set: HiSet): SVGGElement[] {
+    return set.all_().flatMap((g) => [g.fill_, g.edge_, g.plain_])
 }
 
-function firstHiChild(groups: HiGroups): ChildNode | null {
-    return groups.fill_.firstChild ?? groups.edge_.firstChild ?? groups.plain_.firstChild
+function firstHiChild(set: HiSet): Element | null {
+    for (const g of hiNodes(set)) if (g.firstElementChild) return g.firstElementChild
+    return null
+}
+
+function emptyAll(set: HiSet): void {
+    for (const g of hiNodes(set)) while (g.firstChild) g.removeChild(g.firstChild)
+}
+
+function placeMade(groups: HiGroups, made: HiResult, enter: boolean): void {
+    for (const [el, g] of [[made.fill, groups.fill_], [made.edge, groups.edge_], [made.plain, groups.plain_]] as const) {
+        if (!el) continue
+        if (enter) el.classList.add("masque-enter")
+        g.appendChild(el)
+    }
 }
 
 // `also` is the other hover home (data vs screen-fixed). A ring only lives in one of them,
 // and a clear has to drop both or the one you left keeps painting.
-export function clearHiImmediate(state: OverlayState, hiGroups: HiGroups, also?: HiGroups): void {
+export function clearHiImmediate(state: OverlayState, hiGroups: HiSet, also?: HiSet): void {
     if (state.hiLeaveTimer_ != null) { clearTimeout(state.hiLeaveTimer_); state.hiLeaveTimer_ = null }
     state.hiKey_ = null
-    for (const groups of also ? [hiGroups, also] : [hiGroups]) {
-        for (const hiGroup of hiNodes(groups)) {
-            while (hiGroup.firstChild) hiGroup.removeChild(hiGroup.firstChild)
-        }
-    }
+    for (const groups of also ? [hiGroups, also] : [hiGroups]) emptyAll(groups)
 }
 
-export function clearHi(state: OverlayState, hiGroups: HiGroups, fade = false, also?: HiGroups): void {
+export function clearHi(state: OverlayState, hiGroups: HiSet, fade = false, also?: HiSet): void {
     const sets = also ? [hiGroups, also] : [hiGroups]
     const cur = firstHiChild(hiGroups) ?? (also ? firstHiChild(also) : null)
     if (!fade || !cur || prefersReducedMotion()) {
@@ -230,19 +240,13 @@ export function clearHi(state: OverlayState, hiGroups: HiGroups, fade = false, a
     if (state.hiLeaveTimer_ != null) clearTimeout(state.hiLeaveTimer_)
     state.hiLeaveTimer_ = setTimeout(() => {
         state.hiLeaveTimer_ = null
-        for (const groups of sets) {
-            for (const hiGroup of hiNodes(groups)) {
-                while (hiGroup.firstChild) hiGroup.removeChild(hiGroup.firstChild)
-            }
-        }
+        for (const groups of sets) emptyAll(groups)
         if (state.hiKey_ === fadingKey) state.hiKey_ = null
     }, MOTION_MS)
 }
 
-export function clearSel(selGroups: HiGroups): void {
-    for (const selGroup of [selGroups.fill_, selGroups.edge_, selGroups.plain_]) {
-        while (selGroup.firstChild) selGroup.removeChild(selGroup.firstChild)
-    }
+export function clearSel(selGroups: HiSet): void {
+    emptyAll(selGroups)
 }
 
 // Hovering an already-selected mark draws no hover chrome at all: both layers are opaque, so a
@@ -253,17 +257,15 @@ export function clearSel(selGroups: HiGroups): void {
 // selection, including one mid-leave (clearHi keeps hiKey_ until those nodes are gone) — is
 // reconciled by drawSelection below, which clears the stale hiGroups the moment the key
 // becomes selected.
-export function drawHi(state: OverlayState, hiGroups: HiGroups, hit: Hit, also?: HiGroups): void {
+export function drawHi(state: OverlayState, hiGroups: HiSet, hit: Hit, also?: HiSet): void {
     const key = hitKey(hit)
     if (state.selKeys_.has(key) || maskHolds(state, key, hit.layer)) { clearHiImmediate(state, hiGroups, also); return }
-    const cur = hiGroups.fill_.firstElementChild ?? hiGroups.edge_.firstElementChild ?? hiGroups.plain_.firstElementChild
+    const cur = firstHiChild(hiGroups)
     if (key === state.hiKey_ && cur && !cur.classList.contains("masque-leave")) return
     clearHiImmediate(state, hiGroups, also)
     const made = makeHiElement(hit, "hover")
     if (!made) return
-    if (made.fill) { made.fill.classList.add("masque-enter"); hiGroups.fill_.appendChild(made.fill) }
-    if (made.edge) { made.edge.classList.add("masque-enter"); hiGroups.edge_.appendChild(made.edge) }
-    if (made.plain) { made.plain.classList.add("masque-enter"); hiGroups.plain_.appendChild(made.plain) }
+    placeMade(hiGroups.at_(hit.layer.axis), made, true)
     state.hiKey_ = key
 }
 
@@ -283,22 +285,20 @@ export function clearHover(ctx: OverlayCtx, state: OverlayState, fade = false): 
 // over a whole hit array instead of one element, and over all three fill_/edge_/plain_ groups
 // like drawHi/drawSelection above.
 
-export function clearLinkImmediate(state: OverlayState, linkGroups: HiGroups): void {
+export function clearLinkImmediate(state: OverlayState, linkGroups: HiSet): void {
     if (state.linkLeaveTimer_ != null) { clearTimeout(state.linkLeaveTimer_); state.linkLeaveTimer_ = null }
     state.linkKey_ = null
-    for (const linkGroup of [linkGroups.fill_, linkGroups.edge_, linkGroups.plain_]) {
-        while (linkGroup.firstChild) linkGroup.removeChild(linkGroup.firstChild)
-    }
+    emptyAll(linkGroups)
 }
 
-export function clearLink(state: OverlayState, linkGroups: HiGroups, fade = false): void {
-    const cur = linkGroups.fill_.firstChild ?? linkGroups.edge_.firstChild ?? linkGroups.plain_.firstChild
+export function clearLink(state: OverlayState, linkGroups: HiSet, fade = false): void {
+    const cur = firstHiChild(linkGroups)
     if (!fade || !cur || prefersReducedMotion()) {
         clearLinkImmediate(state, linkGroups)
         return
     }
     state.linkKey_ = null
-    for (const linkGroup of [linkGroups.fill_, linkGroups.edge_, linkGroups.plain_]) {
+    for (const linkGroup of hiNodes(linkGroups)) {
         for (const el of [...linkGroup.children]) {
             el.classList.remove("masque-enter")
             el.classList.add("masque-leave")
@@ -307,9 +307,7 @@ export function clearLink(state: OverlayState, linkGroups: HiGroups, fade = fals
     if (state.linkLeaveTimer_ != null) clearTimeout(state.linkLeaveTimer_)
     state.linkLeaveTimer_ = setTimeout(() => {
         state.linkLeaveTimer_ = null
-        for (const linkGroup of [linkGroups.fill_, linkGroups.edge_, linkGroups.plain_]) {
-            while (linkGroup.firstChild) linkGroup.removeChild(linkGroup.firstChild)
-        }
+        emptyAll(linkGroups)
     }, MOTION_MS)
 }
 
@@ -317,8 +315,8 @@ export function clearLink(state: OverlayState, linkGroups: HiGroups, fade = fals
 // A different key replaces the whole set immediately (no leave-fade in between) — cheap since
 // this only ever swaps between two legend entries' worth of selected-recipe elements — and the
 // new set enters with the usual fade-in.
-export function drawLink(state: OverlayState, linkGroups: HiGroups, key: string, hits: Hit[]): void {
-    const cur = linkGroups.fill_.firstElementChild ?? linkGroups.edge_.firstElementChild ?? linkGroups.plain_.firstElementChild
+export function drawLink(state: OverlayState, linkGroups: HiSet, key: string, hits: Hit[]): void {
+    const cur = firstHiChild(linkGroups)
     if (key === state.linkKey_ && cur && !cur.classList.contains("masque-leave")) return
     clearLinkImmediate(state, linkGroups)
     // A hit already pinned in g.sel would double the fill/stroke opacity if drawn again here
@@ -326,27 +324,20 @@ export function drawLink(state: OverlayState, linkGroups: HiGroups, key: string,
     for (const h of hits) {
         if (state.selKeys_.has(hitKey(h))) continue
         const made = makeHiElement(h, "selected")
-        if (!made) continue
-        if (made.fill) { made.fill.classList.add("masque-enter"); linkGroups.fill_.appendChild(made.fill) }
-        if (made.edge) { made.edge.classList.add("masque-enter"); linkGroups.edge_.appendChild(made.edge) }
-        if (made.plain) { made.plain.classList.add("masque-enter"); linkGroups.plain_.appendChild(made.plain) }
+        if (made) placeMade(linkGroups.at_(h.layer.axis), made, true)
     }
     state.linkKey_ = key
 }
 
-function placeSel(selGroups: HiGroups, hits: Hit[], entering: Set<string>): void {
+function placeSel(selGroups: HiSet, hits: Hit[], entering: Set<string>): void {
     clearSel(selGroups)
     for (const h of hits) {
         const made = makeHiElement(h, "selected")
-        if (!made) continue
-        const enter = entering.has(hitKey(h))
-        if (made.fill) { if (enter) made.fill.classList.add("masque-enter"); selGroups.fill_.appendChild(made.fill) }
-        if (made.edge) { if (enter) made.edge.classList.add("masque-enter"); selGroups.edge_.appendChild(made.edge) }
-        if (made.plain) { if (enter) made.plain.classList.add("masque-enter"); selGroups.plain_.appendChild(made.plain) }
+        if (made) placeMade(selGroups.at_(h.layer.axis), made, entering.has(hitKey(h)))
     }
 }
 
-export function drawSelection(state: OverlayState, selGroups: HiGroups, hits: Hit[], hiGroups: HiGroups): void {
+export function drawSelection(state: OverlayState, selGroups: HiSet, hits: Hit[], hiGroups: HiSet): void {
     const next = new Set(hits.map(hitKey))
     const entering = new Set<string>()
     for (const k of next) if (!state.selKeys_.has(k)) entering.add(k)

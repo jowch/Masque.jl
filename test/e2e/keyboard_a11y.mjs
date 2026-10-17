@@ -274,10 +274,10 @@ try {
       const hosts = [...document.querySelectorAll(".ip-host")];
       const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      const groups = ["svg.masque-fill", "svg.masque-edge", "svg.masque-plain"].map((sel) => sr.querySelector(sel)?.querySelector("g.link"));
-      const populated = groups.find((g) => g && g.children.length > 0);
+      const groups = ["svg.masque-fill", "svg.masque-edge", "svg.masque-plain"].flatMap((sel) => [...sr.querySelectorAll(`${sel} g.masque-photo > g.link`)]);
+      const populated = groups.find((g) => g.children.length > 0);
       return {
-        count: groups.reduce((n, g) => n + (g?.children.length ?? 0), 0),
+        count: groups.reduce((n, g) => n + g.children.length, 0),
         leaving: populated ? populated.firstElementChild.classList.contains("masque-leave") : null,
       };
     }, k);

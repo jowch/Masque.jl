@@ -332,7 +332,7 @@ try {
     const bb = baseEl.getBoundingClientRect();
     const hb = host.getBoundingClientRect();
     const sbFill = svgFill.getBoundingClientRect(), sbEdge = svgEdge.getBoundingClientRect(), sbPlain = svgPlain.getBoundingClientRect();
-    const kidsOf = (svg, layerName) => [...(svg?.querySelector("g.sel")?.children ?? [])].map((el) => {
+    const kidsOf = (svg, layerName) => [...(svg?.querySelectorAll("g.masque-photo > g.sel") ?? [])].flatMap((g) => [...g.children]).map((el) => {
       if (el.tagName.toLowerCase() === "g") {
         return {
           layer: layerName, kind: "ring",
@@ -1717,7 +1717,21 @@ try {
           });
           surface.dispatchEvent(ev);
           const base = host.querySelector("img, canvas");
+          // #368: each axis's selection home, with the matrix and clip the preview gave it.
+          const homes = [...sr.querySelectorAll("svg.masque-edge g.masque-clip[data-axis]")]
+            .filter((c) => c.querySelector(":scope > g.masque-photo > g.sel"))
+            .map((c) => {
+              const id = /url\(#(.+)\)/.exec(c.getAttribute("clip-path") ?? "")?.[1];
+              const r = id ? sr.getElementById(id)?.firstElementChild : null;
+              return {
+                axis: c.dataset.axis,
+                transform: c.firstElementChild.getAttribute("transform"),
+                clip: r ? ["x", "y", "width", "height"].map((a) => Number(r.getAttribute(a))) : null,
+                picks: c.querySelectorAll("g.sel > *").length,
+              };
+            });
           return {
+            homes,
             photo: host.dataset.masquePhoto || "",
             clip: !!host.querySelector(".masque-data-clip"),
             windows: host.querySelectorAll(".masque-data-clip").length,
@@ -1731,6 +1745,19 @@ try {
         // #363: each linked axis's data slides in a window of its own.
         if (zoom.windows !== 1 + links.length) {
           throw new Error(`${key}-wheel: expected ${1 + links.length} sliding windows, got ${zoom.windows}`);
+        }
+        // #368: a pick on a linked axis keeps its ring through the preview, moved by that axis's
+        // own matrix and clipped to that axis's window, not the pan axis's.
+        for (const l of links) {
+          const home = zoom.homes.find((h) => h.axis === l.axis);
+          const sameClip = home?.clip && home.clip.every((v, i) => Math.abs(v - l.clip[i]) < 1e-6);
+          if (!home || !home.transform || !sameClip || home.picks < 1) {
+            throw new Error(`${key}-wheel: linked axis ${l.axis}'s ring is not on its own matrix and window: ${JSON.stringify(zoom.homes)}`);
+          }
+        }
+        if (links.length) {
+          passed.push(`${key}/linked-ring`);
+          console.error(`OK  ${key}/linked-ring — ${JSON.stringify(zoom.homes)}`);
         }
         let photo = zoom.photo;
         let zoomStamp = stampAfter;
@@ -2529,7 +2556,7 @@ try {
         const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const svgFill = sr.querySelector("svg.masque-fill"), svgEdge = sr.querySelector("svg.masque-edge"), svgPlain = sr.querySelector("svg.masque-plain");
-        const kidsOf = (svg, layerName) => [...(svg?.querySelector("g.link")?.children ?? [])].map((el) => {
+        const kidsOf = (svg, layerName) => [...(svg?.querySelectorAll("g.masque-photo > g.link") ?? [])].flatMap((g) => [...g.children]).map((el) => {
           if (el.tagName.toLowerCase() === "g") {
             return {
               layer: layerName, kind: "ring",
@@ -2566,12 +2593,11 @@ try {
         // Element count: a closed target draws fill+edge PAIRS (count once via fill), an open
         // target draws a single plain ring per element — same convention as layerElementCount.
         const count = kFill.filter((x) => x.kind === "closed").length + kPlain.filter((x) => x.kind === "ring").length;
-        const sel = (svgFill?.querySelector("g.sel")?.children.length ?? 0)
-          + (svgEdge?.querySelector("g.sel")?.children.length ?? 0)
-          + (svgPlain?.querySelector("g.sel")?.children.length ?? 0);
+        const sel = [svgFill, svgEdge, svgPlain]
+          .reduce((n, svg) => n + (svg?.querySelectorAll("g.masque-photo > g.sel > *").length ?? 0), 0);
         const firstPopulated = [svgFill, svgEdge, svgPlain]
-          .map((svg) => svg?.querySelector("g.link"))
-          .find((g) => g && g.children.length > 0);
+          .flatMap((svg) => [...(svg?.querySelectorAll("g.masque-photo > g.link") ?? [])])
+          .find((g) => g.children.length > 0);
         const leaving = firstPopulated ? firstPopulated.firstElementChild.classList.contains("masque-leave") : null;
         return { count, kids, sel, leaving };
       }, k);

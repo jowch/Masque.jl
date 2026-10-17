@@ -20,7 +20,7 @@ import { withFields } from "./fields"
 import { mapPoint, unmapPoint } from "../src/photo"
 import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
-import { createOverlayState, MOTION_MS, type HiGroups } from "../src/state"
+import { createOverlayState, oneHome, MOTION_MS, type HiGroups, type HiSet } from "../src/state"
 import type { ControlGeometry, GridGeometry, Hit, HitLayer, Manifest, ViewGeometry } from "../src/types"
 
 // build a light-DOM host (img + script) like the Julia widget emits, with layout mocked
@@ -810,14 +810,14 @@ describe("hover leave key while a selection is drawn", () => {
         id: "pts", kind: "circles", geometry: [], payloads: [], axis: "ax1", events: ["hover", "click"],
     }
     const hit = (index: number): Hit => ({ layer, index, geom_: ["circle", 10 + index, 10, 5] })
-    const groups = (): HiGroups => {
+    const groups = (): HiGroups & HiSet => {
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
         const fill_ = document.createElementNS("http://www.w3.org/2000/svg", "g")
         const edge_ = document.createElementNS("http://www.w3.org/2000/svg", "g")
         const plain_ = document.createElementNS("http://www.w3.org/2000/svg", "g")
         svg.append(fill_, edge_, plain_)
         document.body.append(svg)
-        return { fill_, edge_, plain_ }
+        return { fill_, edge_, plain_, ...oneHome({ fill_, edge_, plain_ }) }
     }
     const count = (g: HiGroups) => g.fill_.children.length + g.edge_.children.length + g.plain_.children.length
 
@@ -4229,7 +4229,6 @@ describe("photographic pan / wheel zoom", () => {
         expect(shadowHost.style.width).toBe("600px")
         const photo = shadow.querySelector("svg.masque-plain g.masque-photo") as SVGGElement
         expect(photo.getAttribute("transform")).toContain("scale(")
-        expect(photo.querySelector("g.sel")).toBeTruthy()
         const tip = shadow.querySelector(".masque-tip") as HTMLElement
         expect(tip.closest("g.masque-photo")).toBeNull()
         expect(tip.textContent).toContain("x:[")
@@ -4352,6 +4351,67 @@ describe("photographic pan / wheel zoom", () => {
         await Promise.resolve()
         if (host.dataset.masquePhoto) img.dispatchEvent(new Event("load"))
         expect(host.querySelector(".masque-data-clip")).toBeNull()
+    })
+
+    it("a pick's ring slides and clips with its own axis: pan, linked, or neither (#368)", async () => {
+        const { host, img, script } = setup()
+        const m = viewManifest("pan")
+        m.transforms.ax1.viewport = [100, 80, 500, 640]
+        const g = m.layers[0].geometry as ViewGeometry
+        g.x = 100; g.y = 80; g.w = 500; g.h = 640
+        g.clip = [104, 84, 492, 632]
+        g.links = [{ axis: "ax2", clip: [704, 84, 242, 632], x: [100, 700, 0.5] }]
+        const pts = (id: string, axis: string, x: number): HitLayer => ({
+            id, kind: "circles", geometry: [x, 400, 20], payloads: [{ i: 0 }], axis, events: ["click", "hover"],
+        })
+        m.layers.push(pts("p1", "ax1", 300), pts("p2", "ax2", 800), pts("p3", "ax3", 1100))
+        m.fields = ["p1", "p2", "p3"]
+        m.initial = { p1: { layer: "p1", index: 0 }, p2: { layer: "p2", index: 0 }, p3: { layer: "p3", index: 0 } }
+        let release: (r: { png: Uint8Array; manifest: Manifest }) => void = () => {}
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, m, undefined, requestFrame)
+        img.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        host.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        const shadow = shadowOf(host)
+        const home = (axis: string) => shadow.querySelector(`svg.masque-edge g.masque-clip[data-axis="${axis}"]`) as SVGGElement
+        for (const axis of ["ax1", "ax2", "ax3"]) expect(home(axis).querySelector("g.sel circle")).toBeTruthy()
+        wheelAt(shadow.querySelector(".surface") as HTMLElement, -120)
+        const [s, tx, ty] = host.dataset.masquePhoto!.split(",").map(Number)
+        const clipRect = (clip: SVGGElement) => {
+            const id = /url\(#(.+)\)/.exec(clip.getAttribute("clip-path")!)![1]
+            const r = shadow.getElementById(id)!.firstElementChild as SVGRectElement
+            return ["x", "y", "width", "height"].map((k) => Number(r.getAttribute(k)))
+        }
+        const transform = (axis: string) => home(axis).firstElementChild!.getAttribute("transform")
+        // the pan axis's ring moves with the matrix, inside the pan window
+        expect(transform("ax1")).toBe(`translate(${tx} ${ty}) scale(${s})`)
+        expect(clipRect(home("ax1"))).toEqual([104, 84, 492, 632])
+        // the linked axis's ring moves on x only, like its data copy, inside its own window
+        const mt = /translate\(([-\d.e]+) ([-\d.e]+)\) scale\(([-\d.e]+) ([-\d.e]+)\)/.exec(transform("ax2")!)!
+        expect(Number(mt[1])).toBeCloseTo(700 * (1 - s) + 0.5 * (tx + 100 * (s - 1)), 6)
+        expect(Number(mt[2])).toBe(0)
+        expect(Number(mt[3])).toBeCloseTo(s, 6)
+        expect(Number(mt[4])).toBe(1)
+        expect(clipRect(home("ax2"))).toEqual([704, 84, 242, 632])
+        // an unlinked axis's ring stays where its data stays, unclipped
+        expect(transform("ax3")).toBeNull()
+        expect(home("ax3").getAttribute("clip-path")).toBeNull()
+        // every axis's g.sel paints below every axis's g.link, and that below every g.hi
+        for (const svg of shadow.querySelectorAll("svg")) {
+            const order = [...svg.querySelectorAll("g.masque-photo > g.sel, g.masque-photo > g.link, g.masque-photo > g.hi")].map((el) => el.getAttribute("class"))
+            expect(order).toEqual(["sel", "sel", "sel", "link", "link", "link", "hi", "hi", "hi"])
+        }
+        await Promise.resolve()
+        release({ png: new Uint8Array([1, 2, 3]), manifest: m })
+        await Promise.resolve()
+        await Promise.resolve()
+        if (host.dataset.masquePhoto) img.dispatchEvent(new Event("load"))
+        for (const axis of ["ax1", "ax2", "ax3"]) {
+            expect(transform(axis)).toBeNull()
+            expect(home(axis).getAttribute("clip-path")).toBeNull()
+        }
     })
 
     it("an orbit without limits ignores the wheel, and a wheel during a drag does nothing", async () => {
