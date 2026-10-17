@@ -1,4 +1,4 @@
-import { anchorFor, computeAnchoredPlacement, hitTestAt, photoClip, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layoutSpaceLayer } from "./geometry"
+import { anchorFor, computeAnchoredPlacement, hitTestAt, photoClip, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layoutSpaceLayer, axisFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
 import { renderTemplate, renderAutoTable, esc, fmtNum, withReadout } from "./template"
 import { drawHover, clearHover, drawLink, clearLink, markColorFor } from "./highlight"
@@ -8,7 +8,7 @@ import { surfaceFields } from "./surface"
 import { cancel as cancelMarquee } from "./drag/marquee"
 import { hasRegions, regionOf } from "./regions"
 import { fmt, cssAnchor, hitKey, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
-import { contentPoint, isIdentity, mapPoint, type PhotoMatrix } from "./photo"
+import { contentPoint } from "./photo"
 import type { OverlayCtx, OverlayState } from "./state"
 import type { Hit, HitLayer, Manifest, SliceGeometry, ThresholdGeometry } from "./types"
 
@@ -243,12 +243,11 @@ export function applyTipHtml(ctx: OverlayCtx, state: OverlayState, html: string,
 
 // `anchor` is in the hit's own space (content pixels for a data mark, layout pixels for
 // screen-fixed chrome). The tooltip is placed on the untransformed base, so a slid mark's
-// anchor is mapped back to the layout point where the mark is drawn.
-export function layoutAnchor(photo: PhotoMatrix, hit: Hit, anchor: Anchor): Anchor {
-    if (layoutSpaceLayer(hit.layer) || isIdentity(photo)) return anchor
-    const c = mapPoint(photo, { x: anchor.x, y: anchor.y })
-    const top = mapPoint(photo, { x: anchor.x, y: anchor.top })
-    return { x: c.x, y: c.y, top: top.y }
+// anchor is mapped back to the layout point where its own axis draws it (#368).
+export function layoutAnchor(ctx: OverlayCtx, state: OverlayState, hit: Hit, anchor: Anchor): Anchor {
+    const f = layoutSpaceLayer(hit.layer) ? null : axisFrame(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer.axis)
+    if (!f) return anchor
+    return { x: f.sx * anchor.x + f.tx, y: f.sy * anchor.y + f.ty, top: f.sy * anchor.top + f.ty }
 }
 
 export function showTip(ctx: OverlayCtx, state: OverlayState, hit: Hit, x: number, y: number, e: MouseEvent): void {
@@ -260,7 +259,7 @@ export function showTip(ctx: OverlayCtx, state: OverlayState, hit: Hit, x: numbe
         placeTip(ctx, state, p.x, p.y)
         return
     }
-    const placed = layoutAnchor(state.photo_, hit, anchorFor(hit, { x, y }))
+    const placed = layoutAnchor(ctx, state, hit, anchorFor(hit, { x, y }))
     placeAnchored(ctx, state, cssAnchor(ctx.base_, ctx.manifest_, placed))
 }
 
@@ -269,7 +268,7 @@ export function showTip(ctx: OverlayCtx, state: OverlayState, hit: Hit, x: numbe
 export function syncFocusTip(ctx: OverlayCtx, state: OverlayState): void {
     const hit = state.focusHit_
     if (!hit || state.focusTipCss_ === null) return
-    const placed = layoutAnchor(state.photo_, hit, anchorFor(hit, null))
+    const placed = layoutAnchor(ctx, state, hit, anchorFor(hit, null))
     const css = cssAnchor(ctx.base_, ctx.manifest_, placed)
     state.focusTipCss_ = css
     placeAnchored(ctx, state, css)

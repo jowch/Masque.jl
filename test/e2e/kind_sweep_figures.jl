@@ -426,7 +426,8 @@ kind_sweep_meta() = [
     ),
     Dict(
         # Two axes tied by `linkaxes!`, a view on the left one (#363): the pan moves both, and
-        # the preview slides the right axis's data in a window of its own.
+        # the preview slides the right axis's data in a window of its own, with the ring of the
+        # pick on it (#368).
         "key" => "view_linked", "layerId" => "view", "layerKind" => "view",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
@@ -1221,9 +1222,13 @@ function build_kind_sweep()
         a1 = Axis(fig[1, 1]; title = "view-linked")
         a2 = Axis(fig[1, 2]; title = "linked")
         sc = scatter!(a1, first.(pts), last.(pts); markersize = 14, color = :gray)
-        scatter!(a2, first.(pts), last.(pts); markersize = 14, color = :orange)
+        sc2 = scatter!(a2, first.(pts), last.(pts); markersize = 14, color = :orange)
         linkaxes!(a1, a2)
-        masque(fig, interactables(sc; id = :pts), ViewInteractable(a1; id = :view))
+        # A pick on the linked axis: its ring slides and clips with that axis's data (#368).
+        masque(
+            fig, interactables(sc; id = :pts), interactables(sc2; id = :linked), ViewInteractable(a1; id = :view);
+            selected = Dict(:linked => [4]),
+        )
     end
 
     view3d = let
