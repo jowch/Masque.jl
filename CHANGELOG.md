@@ -21,6 +21,10 @@ All notable changes to this project are documented here. The format is based on
 - While you pan or zoom a view, a selected or hovered mark on an axis tied to it by
   `linkaxes!` keeps its ring, which slides with that axis's data. A ring on any other axis
   stays where it is. Both used to disappear until the new frame arrived (#368).
+- A click on a figure gives it keyboard focus, so Escape clears the selection and the arrow
+  keys work. A click on a `select = :many` plot, or anywhere on a plot you can pan, orbit, or
+  drag a line or box on, used to leave the figure unfocused, and Escape did nothing until you
+  pressed Tab. The click does not scroll the page (#380).
 
 ## [0.3.1] - 2026-10-16
 
