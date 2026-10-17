@@ -122,7 +122,7 @@ try {
     const bb = baseEl.getBoundingClientRect();
     const hb = host.getBoundingClientRect();
     const sbFill = svgFill.getBoundingClientRect(), sbEdge = svgEdge.getBoundingClientRect(), sbPlain = svgPlain.getBoundingClientRect();
-    const kidsOf = (svg, layerName) => [...(svg?.querySelector("g.sel")?.children ?? [])].map((el) => {
+    const kidsOf = (svg, layerName) => [...(svg?.querySelectorAll("g.masque-photo > g.sel") ?? [])].flatMap((g) => [...g.children]).map((el) => {
       if (el.tagName.toLowerCase() === "g") {
         return {
           layer: layerName, kind: "ring",
@@ -407,9 +407,7 @@ try {
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
     let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-    return (sr.querySelector("svg.masque-fill g.sel")?.children.length ?? 0)
-      + (sr.querySelector("svg.masque-edge g.sel")?.children.length ?? 0)
-      + (sr.querySelector("svg.masque-plain g.sel")?.children.length ?? 0);
+    return sr.querySelectorAll("svg g.masque-photo > g.sel > *").length;
   });
   if (selAfterLeave < 1) throw new Error(`g.sel dropped on unhover: sel=${selAfterLeave}`);
   passed.push("remount-fade");

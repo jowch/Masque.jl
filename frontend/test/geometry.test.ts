@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
-    anchorFor, computeAnchoredPlacement, photoClip, lineReadout, samplePoint,
+    anchorFor, axisFrame, computeAnchoredPlacement, photoClip, lineReadout, samplePoint,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
 import { begin as beginView, tip as viewTip, limitsTip, view3Base, rememberView3, seedView3Homes, zoom3 } from "../src/drag/view"
@@ -831,6 +831,31 @@ describe("photoClip", () => {
     it("falls back to the viewport without a clip, and is null at identity", () => {
         expect(photoClip(view(), { s: 1, tx: 5, ty: 0 }, "v")).toEqual({ x: 40, y: 30, w: 300, h: 200 })
         expect(photoClip(view([42, 32, 296, 196]), { s: 1, tx: 0, ty: 0 }, "v")).toBeNull()
+    })
+})
+
+describe("axisFrame (#368)", () => {
+    const m = {
+        width: 400, height: 300, transforms: {},
+        layers: [{
+            id: "v", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: {
+                x: 40, y: 30, w: 150, h: 200, mode: "pan", clip: [42, 32, 146, 196],
+                links: [{ axis: "ax2", clip: [222, 32, 146, 196], y: [100, 120, 2] }],
+            },
+        }],
+    } as unknown as Manifest
+    const photo = { s: 2, tx: -50, ty: -80 }
+    it("moves the pan axis by the matrix, in the pan window", () => {
+        expect(axisFrame(m, photo, "v", "ax1")).toEqual({ sx: 2, sy: 2, tx: -50, ty: -80, clip: [42, 32, 146, 196] })
+    })
+    it("moves a linked axis on the dimension it shares, in its own window", () => {
+        // y: q0*(1 - s) + r*(t + p0*(s - 1)) = 120*(-1) + 2*(-80 + 100) = -80
+        expect(axisFrame(m, photo, "v", "ax2")).toEqual({ sx: 1, sy: 2, tx: 0, ty: -80, clip: [222, 32, 146, 196] })
+    })
+    it("leaves any other axis put, and every axis at identity", () => {
+        expect(axisFrame(m, photo, "v", "ax3")).toBeNull()
+        expect(axisFrame(m, { s: 1, tx: 0, ty: 0 }, "v", "ax1")).toBeNull()
     })
 })
 

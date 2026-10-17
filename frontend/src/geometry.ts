@@ -756,6 +756,43 @@ export function photoClip(manifest: Manifest, photo: PhotoMatrix, viewId: string
     return { x: g.x, y: g.y, w: g.w, h: g.h }
 }
 
+// How the live photograph moves one axis's marks (#368): the pan axis by the matrix itself, an
+// axis tied to it by `linkaxes!` by the matrix carried over to its own scale (#363), each
+// clipped to its own preview window. Any other axis stays put, unclipped: `null`, as for
+// every axis when no photograph is live.
+export interface AxisFrame {
+    sx: number
+    sy: number
+    tx: number
+    ty: number
+    clip: [number, number, number, number]
+}
+
+export function axisFrame(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, axis: string): AxisFrame | null {
+    if (isIdentity(photo)) return null
+    const named = viewId ? manifest.layers.find((l) => l.id === viewId) : undefined
+    const layer = named && named.kind === "view" ? named
+        : manifest.layers.find((l) => l.kind === "view" && (l.geometry as ViewGeometry).mode === "pan")
+    if (!layer || layer.kind !== "view") return null
+    const g = layer.geometry as ViewGeometry
+    if (g.mode === "orbit" || !(g.w > 0) || !(g.h > 0)) return null
+    if (layer.axis === axis) return { sx: photo.s, sy: photo.s, tx: photo.tx, ty: photo.ty, clip: g.clip ?? [g.x, g.y, g.w, g.h] }
+    const link = g.links?.find((l) => l.axis === axis)
+    if (!link) return null
+    const [sx, tx] = linkedMove(photo, link.x, photo.tx)
+    const [sy, ty] = linkedMove(photo, link.y, photo.ty)
+    return { sx, sy, tx, ty, clip: link.clip }
+}
+
+// A linked axis shares one dimension or both with the pan axis, so a data value the matrix
+// moves from p to s*p + t on the pan axis moves from q to s*q + t' on the linked one, with
+// t' = q0*(1 - s) + r*(t + p0*(s - 1)). A dimension it doesn't share stays put.
+export function linkedMove(m: PhotoMatrix, d: [number, number, number] | undefined, t: number): [number, number] {
+    if (!d) return [1, 0]
+    const [p0, q0, r] = d
+    return [m.s, q0 * (1 - m.s) + r * (t + p0 * (m.s - 1))]
+}
+
 function insideClip(clip: { x: number; y: number; w: number; h: number }, x: number, y: number): boolean {
     return x >= clip.x && x <= clip.x + clip.w && y >= clip.y && y <= clip.y + clip.h
 }
