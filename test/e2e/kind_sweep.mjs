@@ -426,11 +426,11 @@ try {
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
       const surface = sr.querySelector(".surface");
-      return { scrollY: window.scrollY, focused: sr.activeElement === surface, focusVisible: surface.matches(":focus-visible") };
+      return { scrollY: window.scrollY, focused: sr.activeElement === surface, outline: getComputedStyle(surface).outlineStyle };
     }, key);
     if (after.scrollY !== at.scrollY) throw new Error(`${key}: a mouse click scrolled the page from ${at.scrollY} to ${after.scrollY}`);
     if (!after.focused) throw new Error(`${key}: a mouse click left the figure without keyboard focus, so Escape cannot clear (#380)`);
-    if (after.focusVisible) throw new Error(`${key}: a mouse click drew the keyboard focus outline`);
+    if (after.outline !== "none") throw new Error(`${key}: a mouse click drew the keyboard focus outline (${after.outline})`);
     return null;
   };
 

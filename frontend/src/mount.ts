@@ -23,6 +23,9 @@ import { matrixLimits } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
+// Keys held for a Cmd/Ctrl/Shift/Alt-click; pressing one is not keyboard use.
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta"])
+
 // Single source for the two highlight tint strengths (mount.ts's STYLE reads both; the e2e
 // drivers assert these exact computed fillOpacity values) — hover tints lightly, selection more
 // strongly, so the two states stay visually distinct in the same derived colour.
@@ -104,9 +107,12 @@ const STYLE = `
    through (grid, axis, threshold, ROI, view, slice) — the surface draws an inset chrome outline
    in place of the user-agent rectangle. Once the ring is up it is the indicator and the outline
    goes. :focus-visible, not :focus, so a pointer click draws neither. An outline, not a
-   box-shadow, so forced colours still paint it, in Highlight. */
+   box-shadow, so forced colours still paint it, in Highlight. A press focuses the surface from
+   script, which Chromium treats as keyboard focus; pointer-focus (bond.ts's onDown) keeps the
+   outline off until a key is pressed. */
 .surface:focus-visible:not(.kbd-ring) { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: -2px; }
 .surface.kbd-ring:focus-visible { outline: none; }
+.surface.pointer-focus:focus-visible { outline: none; }
 /* Drag-layer tab stops (#169): invisible boxes over the line, the box, or the viewport. They
    take keys only, never the pointer. The focus outline is the stop's whole indicator: outside
    the line and the box, inset on the viewport like the surface's. */
@@ -1086,13 +1092,20 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         releaseChrome(kind)
     }
     const click = (e: MouseEvent) => onClick(ctx, state, e)
-    const keydown = (e: KeyboardEvent) => handleKeydown(ctx, state, e)
+    const keydown = (e: KeyboardEvent) => {
+        // A key, not a modifier held for Cmd/Ctrl-click, shows where keys go (pointer-focus).
+        if (!MODIFIER_KEYS.has(e.key)) surface.classList.remove("pointer-focus")
+        handleKeydown(ctx, state, e)
+    }
     // DOM focus leaving the surface — Tab-away, a click landing elsewhere on the page, or the
     // notebook cell itself losing focus — must clear keyboard focus the same way Escape does.
     // Without this, focusIdx/focusHit/kbd-ring/the live region's last text all stay pinned to
     // whatever was last focused, and hover.ts's restoreFocus keeps re-drawing that stale ring
     // on every later pointer miss even though nothing is keyboard-focused anymore.
-    const focusout = () => focusTo(ctx, state, null)
+    const focusout = () => {
+        surface.classList.remove("pointer-focus")
+        focusTo(ctx, state, null)
+    }
 
     const onWheel = (e: WheelEvent) => {
         if (state.drag_) return
