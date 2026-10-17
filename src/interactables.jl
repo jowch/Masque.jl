@@ -976,7 +976,7 @@ end
 
 A binned grid, such as a heatmap or image. Produces one `:grid` [`HitLayer`](@ref). A click
 commits a [`GridCellEvent`](@ref) with the cell's `(i, j)` and value. With `select = :many`
-the reader picks any set of cells (click, Cmd/Ctrl-click), and the field holds a
+the reader picks any set of cells, a click adding or removing one, and the field holds a
 [`GridSelection`](@ref). With `regions`, the cells of one region are hovered and picked
 together.
 
@@ -1001,8 +1001,8 @@ together.
   holds a [`GridSelection`](@ref), every selected cell as a mask.
 - `regions` — optional integer matrix the same shape as `values`, a region id for each cell:
   the objects of a label image, or the fragments of a picture. Cells that share an id act as
-  one: hover outlines the whole region, a click (or Cmd/Ctrl-click) on a `select = :many` grid
-  picks or drops all of it, and a box takes every region it touches. A `GridCellEvent` carries
+  one: hover outlines the whole region, a click on a `select = :many` grid picks or drops all
+  of it, and a box takes every region it touches. A `GridCellEvent` carries
   the clicked cell's `region`, and a `GridSelection` lists the regions it holds whole in
   `regions`. A cell whose id is `0` belongs to no region and acts alone. The default tooltip of
   a region cell is `region id`, and a `masque"..."` template can use `region`. Default `nothing`.

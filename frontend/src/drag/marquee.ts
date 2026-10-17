@@ -11,7 +11,7 @@ import type { HitLayer } from "../types"
 // holds no value of its own. The box is drawn with the ROI outline recipe and is gone on release.
 
 type Marquee = Extract<Drag, { kind: "marquee" }>
-export type MarqueeMode = "replace" | "add" | "subtract"
+export type MarqueeMode = "add" | "subtract"
 
 // The plot a marquee pressed among `axes` (axesAt's list) draws in: the innermost one, so a box
 // started in an inset stays in the inset. Null when there is none.
@@ -54,7 +54,6 @@ function picksOf(sel: FieldSelection | undefined): FieldPick[] {
 function nextPicks(ctx: OverlayCtx, d: Marquee, t: HitLayer): FieldPick[] {
     const inside = picksInBox(ctx.manifest_, t, d.box_)
     const held = picksOf(d.before_.get(t.id))
-    if (d.mode_ === "replace") return inside
     const ins = new Set(inside.map(pickKey))
     if (d.mode_ === "subtract") return held.filter((it) => !ins.has(pickKey(it)))
     const have = new Set(held.map(pickKey))
