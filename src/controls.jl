@@ -207,11 +207,13 @@ function _check_unnamed_blocks(fig, interactables)
     left = [b for b in _figure_blocks(fig) if !(b in named)]
     isempty(left) && return nothing
     kinds = join(unique(string(nameof(typeof(b))) for b in left), ", ")
+    what = length(left) == 1 ? "a block that masque wasn't given ($(kinds)), which would" :
+        "blocks that masque wasn't given ($(kinds)), which would"
+    each = length(left) == 1 ? "Name it" : "Name each one"
     throw(
         ArgumentError(
-            "masque: this figure has blocks that masque wasn't given ($(kinds)), which would " *
-                "look live and do nothing. Name each one to make it a control, " *
-                "`masque(fig, (name = block,))`, or take it out of the figure",
+            "masque: this figure has $what look live and do nothing. $each to make it a " *
+                "control, `masque(fig, (name = block,))`, or take it out of the figure",
         ),
     )
 end
