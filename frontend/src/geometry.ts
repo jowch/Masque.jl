@@ -742,6 +742,15 @@ export function hitTest(manifest: Manifest, px: number, py: number, event: strin
 // one), or null when the photograph is identity. Data outside that rectangle is not on screen.
 // `viewId` is the pan view that owns the live matrix.
 export function photoClip(manifest: Manifest, photo: PhotoMatrix, viewId: string | null): { x: number; y: number; w: number; h: number } | null {
+    const layer = panView(manifest, photo, viewId)
+    if (!layer) return null
+    const [x, y, w, h] = axisFrame(manifest, photo, viewId, layer.axis)!.clip
+    return { x, y, w, h }
+}
+
+// The view layer a live photograph belongs to: the named one, else the first pan view. Null at
+// identity, for an orbit, or for a view with no area.
+function panView(manifest: Manifest, photo: PhotoMatrix, viewId: string | null): HitLayer | null {
     if (isIdentity(photo)) return null
     const named = viewId ? manifest.layers.find((l) => l.id === viewId) : undefined
     const layer = named && named.kind === "view" ? named
@@ -749,11 +758,7 @@ export function photoClip(manifest: Manifest, photo: PhotoMatrix, viewId: string
     if (!layer || layer.kind !== "view") return null
     const g = layer.geometry as ViewGeometry
     if (g.mode === "orbit" || !(g.w > 0) || !(g.h > 0)) return null
-    if (g.clip) {
-        const [x, y, w, h] = g.clip
-        return { x, y, w, h }
-    }
-    return { x: g.x, y: g.y, w: g.w, h: g.h }
+    return layer
 }
 
 // How the live photograph moves one axis's marks (#368): the pan axis by the matrix itself, an
@@ -769,13 +774,9 @@ export interface AxisFrame {
 }
 
 export function axisFrame(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, axis: string): AxisFrame | null {
-    if (isIdentity(photo)) return null
-    const named = viewId ? manifest.layers.find((l) => l.id === viewId) : undefined
-    const layer = named && named.kind === "view" ? named
-        : manifest.layers.find((l) => l.kind === "view" && (l.geometry as ViewGeometry).mode === "pan")
-    if (!layer || layer.kind !== "view") return null
+    const layer = panView(manifest, photo, viewId)
+    if (!layer) return null
     const g = layer.geometry as ViewGeometry
-    if (g.mode === "orbit" || !(g.w > 0) || !(g.h > 0)) return null
     if (layer.axis === axis) return { sx: photo.s, sy: photo.s, tx: photo.tx, ty: photo.ty, clip: g.clip ?? [g.x, g.y, g.w, g.h] }
     const link = g.links?.find((l) => l.axis === axis)
     if (!link) return null
