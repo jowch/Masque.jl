@@ -268,18 +268,29 @@ struct WebGLWidget
     px_per_unit::Float64
     render_frame::Union{Nothing, Function}
     owners::Dict{String, Masque.LayerOwner}
+    titles::Vector{Pair{String, String}}   # axis id => title, for the text form
 end
 function WebGLWidget(scene, manifest, display_css, width, height, px_per_unit, render_frame = nothing)
     return WebGLWidget(
         scene, manifest, display_css, width, height, px_per_unit, render_frame,
-        Dict{String, Masque.LayerOwner}(),
+        Dict{String, Masque.LayerOwner}(), Pair{String, String}[],
     )
 end
 function Masque.with_owners(w::WebGLWidget, owners::Dict{String, Masque.LayerOwner})
     return WebGLWidget(
-        w.scene, w.manifest, w.display_css, w.width, w.height, w.px_per_unit, w.render_frame, owners,
+        w.scene, w.manifest, w.display_css, w.width, w.height, w.px_per_unit, w.render_frame, owners, w.titles,
     )
 end
+function Masque.with_titles(w::WebGLWidget, titles)
+    return WebGLWidget(
+        w.scene, w.manifest, w.display_css, w.width, w.height, w.px_per_unit, w.render_frame, w.owners, titles,
+    )
+end
+
+# The figure is drawn in the browser, so there is no picture to hand back: `image/png` is not
+# showable. The text form is the same as a CairoMakie widget's.
+Base.show(io::IO, w::WebGLWidget) = Masque._show_compact(io, "WebGLWidget", w.manifest)
+Base.show(io::IO, ::MIME"text/plain", w::WebGLWidget) = Masque._describe(io, "WebGLWidget", w)
 
 Masque.make_widget(b::WebGLBackend, result::WebGLResult, manifest, display_css, fig, interactables, ppu, max_width) =
     WebGLWidget(

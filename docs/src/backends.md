@@ -141,12 +141,18 @@ masque(fig2)
 The page loads Masque's script once from jsDelivr, the version that
 matches your installed Masque, so hover needs an internet connection;
 offline, the page shows the plain figures. Each widget adds its image
-to the page. Documenter warns about a page past 100 KB and stops the
-build at 200 KB, so a page with several large figures goes in
-`size_threshold_ignore`:
+to the page. Documenter shows a picture in place of any output past
+8 KB, which every widget is, so set `example_size_threshold = nothing`
+to keep the hover. Documenter then writes every large output into its
+page, plain figures too, and it warns about a page past 100 KB and
+stops the build at 200 KB, so a page with several large figures goes in
+`size_threshold_ignore`, whether or not it has a widget:
 
 ```julia
-makedocs(; format = Documenter.HTML(; size_threshold_ignore = ["plots.md"]), ...)
+makedocs(;
+    format = Documenter.HTML(; example_size_threshold = nothing, size_threshold_ignore = ["plots.md"]),
+    ...,
+)
 ```
 
 A WGLMakie widget works there too: the page draws the figure on the
@@ -164,3 +170,11 @@ A click highlights a mark there too, but nothing reads the choice: the
 need a running Pluto notebook. A display that doesn't run the page's
 scripts shows the plain CairoMakie figure, or an empty box for
 WGLMakie.
+
+A tool that reads a notebook without a browser, such as an AI agent,
+can ask a CairoMakie widget for its figure as a PNG,
+`show(io, MIME"image/png"(), w)`. A WGLMakie widget has no PNG, since
+the reader's browser draws it; render the figure with CairoMakie for
+one. Both print a short text summary in the REPL: each axis with its
+title, each layer with what it draws and its tooltip fields, and the
+`@bind` value the widget starts with.
