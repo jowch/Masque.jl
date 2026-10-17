@@ -17,6 +17,12 @@ All notable changes to this project are documented here. The format is based on
   selection. To start over, click an empty part of the plot or press Escape, as before
   (#358).
 
+### Fixed
+- A click on a figure gives it keyboard focus, so Escape clears the selection and the arrow
+  keys start from there. A click on a `select = :many` plot, or anywhere on a plot you can
+  pan, orbit, or drag a line or box on, used to leave the figure unfocused, and Escape did
+  nothing until you pressed Tab. The click does not scroll the page (#380).
+
 ## [0.3.1] - 2026-10-16
 
 ### Added

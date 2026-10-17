@@ -5404,6 +5404,26 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host).pts).toEqual({ items: [] })
     })
 
+    it("a press focuses the surface, so Escape clears picks made by mouse (#380)", () => {
+        const { host, script } = setup()
+        mount(script, many())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const press = (x: number, y: number, button = 0) => {
+            const opts = { clientX: x, clientY: y, button, bubbles: true, cancelable: true }
+            surface.dispatchEvent(new PointerEvent("pointerdown", opts))
+            surface.dispatchEvent(new PointerEvent("pointerup", opts))
+            if (button === 0) click(surface, x, y)
+        }
+        press(100, 100, 2) // a right-click leaves focus where it was
+        expect(shadow.activeElement).toBeNull()
+        press(100, 100) // the press starts a marquee, whose preventDefault cancels native focus
+        expect(shadow.activeElement).toBe(surface)
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }))
+        expect(val(host).pts).toEqual({ items: [] })
+    })
+
     it("a restored pick that names no element is dropped", () => {
         const { host, script } = setup()
         const m = many()
