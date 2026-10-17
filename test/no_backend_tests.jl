@@ -96,7 +96,8 @@ end
 @testset "deprecations warn without --depwarn=yes (#269)" begin
     code = """
     using Masque, Test
-    @noinline site() = Masque._deprecate("`old` is deprecated; use `new`.", :site)
+    @noinline old() = Masque._deprecate("`old` is deprecated; use `new`.", :old)
+    @noinline site() = old()
     @test_logs (:warn, r"use `new`") (site(); site(); site())
     """
     julia(flag, code) = `$(Base.julia_cmd()) $flag --startup-file=no --project=$(Base.active_project()) -e $code`
@@ -104,7 +105,7 @@ end
     # `--depwarn=error` still turns the warning into an error.
     code = """
     using Masque, Test
-    @test_throws ErrorException Masque._deprecate("`old` is deprecated; use `new`.", :site)
+    @test_throws ErrorException Masque._deprecate("`old` is deprecated; use `new`.", :old)
     """
     @test success(pipeline(julia("--depwarn=error", code); stdout, stderr))
     # Every deprecation goes through `_deprecate`, which forces the warning.
