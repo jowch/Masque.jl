@@ -1223,7 +1223,9 @@ function build_kind_sweep()
         a2 = Axis(fig[1, 2]; title = "linked")
         a3 = Axis(fig[1, 3]; title = "unlinked")
         sc = scatter!(a1, first.(pts), last.(pts); markersize = 14, color = :gray)
-        sc2 = scatter!(a2, first.(pts), last.(pts); markersize = 14, color = :orange)
+        # The pick is the middle point, which stays in view through the drag and wheel zoom.
+        pts2 = [pts; (3.0, 4.0)]
+        sc2 = scatter!(a2, first.(pts2), last.(pts2); markersize = 14, color = :orange)
         sc3 = scatter!(a3, first.(pts), last.(pts); markersize = 14, color = :teal)
         linkaxes!(a1, a2)
         # A pick on the linked axis: its ring slides and clips with that axis's data (#368).
@@ -1232,7 +1234,7 @@ function build_kind_sweep()
         masque(
             fig, interactables(sc; id = :pts), interactables(sc2; id = :linked), interactables(sc3; id = :unlinked),
             ViewInteractable(a1; id = :view);
-            selected = Dict(:linked => [4]),
+            selected = Dict(:linked => [5]),
         )
     end
 

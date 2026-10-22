@@ -1686,11 +1686,15 @@ try {
       }
 
       if (layer.geometry && layer.geometry.mode === "pan") {
-        // #379: a data layer on a linked axis, and one on an axis the pan doesn't move.
+        // #379: a mark on each axis off the pan axis. The drag above moved a linked axis's
+        // marks off this page's manifest, so there the probe is its pick's ring, which the
+        // overlay draws where that axis now has the mark; an unlinked axis's first mark has not
+        // moved since the page was built.
         const viewAxis = layer.axis;
         const linkedAxes = links.map((l) => l.axis);
-        const unlinked = layers.find((l) => l.kind === "circles" && l.axis !== viewAxis && !linkedAxes.includes(l.axis));
-        const zoom = await page.evaluate(async ([k, ix, iy, other]) => {
+        const offAxis = layers.filter((l) => l.kind === "circles" && l.axis !== viewAxis && !linkedAxes.includes(l.axis))
+          .map((l) => ({ axis: l.axis, x: l.geometry[0], y: l.geometry[1] }));
+        const zoom = await page.evaluate(async ([k, ix, iy, marks]) => {
           const span = document.querySelector(`#coords_${k}`);
           const hosts = [...document.querySelectorAll(".ip-host")];
           const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -1706,6 +1710,13 @@ try {
           });
           surface.dispatchEvent(ev);
           const base = host.querySelector("img, canvas");
+          // Read before the hovers below, which wait on animation frames.
+          const engaged = {
+            photo: host.dataset.masquePhoto || "",
+            clip: !!host.querySelector(".masque-data-clip"),
+            windows: host.querySelectorAll(".masque-data-clip").length,
+            baseTransform: base?.style.transform || "",
+          };
           // #368: each axis's selection home, with the matrix and clip the preview gave it.
           const homes = [...sr.querySelectorAll("svg.masque-edge g.masque-clip[data-axis]")]
             .filter((c) => c.querySelector(":scope > g.masque-photo > g.sel"))
@@ -1719,35 +1730,39 @@ try {
                 picks: c.querySelectorAll("g.sel > *").length,
               };
             });
-          // #379: hover mid-preview finds a mark where its own axis draws it. A linked axis's
-          // pick ring has slid with that axis; an unlinked axis's marks have not moved.
-          const hovered = (axis) => !!sr.querySelector(`svg g.masque-clip[data-axis="${axis}"] g.hi > *`);
-          const hoverAt = (x, y) => surface.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: x, clientY: y }));
+          // #379: hover mid-preview finds a mark where its own axis draws it. A pick shows its
+          // tooltip and draws no hover ring (hover-on-selected), any other mark draws one.
+          const tip = () => {
+            const el = sr.querySelector(".masque-tip");
+            return el?.classList.contains("show") ? el.textContent : null;
+          };
+          const hoverAt = async (x, y) => {
+            surface.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: x, clientY: y }));
+            // the next move is coalesced to an animation frame
+            await new Promise((res) => requestAnimationFrame(() => res()));
+          };
           const midHover = [];
           for (const c of sr.querySelectorAll("svg.masque-edge g.masque-clip[data-axis]")) {
             const ring = c.querySelector(":scope > g.masque-photo > g.sel > *");
-            if (!ring || !c.firstElementChild.getAttribute("transform") || c.dataset.axis === undefined) continue;
+            const moved = !!c.firstElementChild.getAttribute("transform");
+            if (!ring || !moved) continue;
             const r = ring.getBoundingClientRect();
-            hoverAt(r.left + r.width / 2, r.top + r.height / 2);
-            midHover.push({ axis: c.dataset.axis, hit: hovered(c.dataset.axis), live: !!host.dataset.masquePhoto });
-            // the next move is coalesced to an animation frame
-            await new Promise((res) => requestAnimationFrame(() => res()));
+            await hoverAt(r.left + r.width / 2, r.top + r.height / 2);
+            const t = tip();
+            midHover.push({ axis: c.dataset.axis, pick: true, hit: !!t && t.startsWith("index"), tip: t, live: !!host.dataset.masquePhoto });
           }
-          if (other) {
-            const g = other.geometry;
-            hoverAt(b.left + g[0] * s, b.top + g[1] * s);
-            midHover.push({ axis: other.axis, hit: hovered(other.axis), live: !!host.dataset.masquePhoto, unlinked: true });
+          for (const mk of marks) {
+            await hoverAt(b.left + mk.x * s, b.top + mk.y * s);
+            const hit = !!sr.querySelector(`svg g.masque-clip[data-axis="${mk.axis}"] g.hi > *`);
+            midHover.push({ axis: mk.axis, pick: false, hit, tip: tip(), live: !!host.dataset.masquePhoto });
           }
           return {
             homes,
             midHover,
-            photo: host.dataset.masquePhoto || "",
-            clip: !!host.querySelector(".masque-data-clip"),
-            windows: host.querySelectorAll(".masque-data-clip").length,
-            baseTransform: base?.style.transform || "",
+            ...engaged,
             prevented: ev.defaultPrevented,
           };
-        }, [key, p.x, p.y, unlinked ?? null]);
+        }, [key, p.x, p.y, offAxis]);
         if (!zoom.prevented || !zoom.photo || !zoom.clip || zoom.baseTransform) {
           throw new Error(`${key}-wheel: photographic zoom did not engage (${JSON.stringify(zoom)})`);
         }
@@ -1759,22 +1774,23 @@ try {
         // own matrix and clipped to that axis's window, not the pan axis's.
         for (const l of links) {
           const home = zoom.homes.find((h) => h.axis === l.axis);
-          const sameClip = home?.clip && home.clip.every((v, i) => Math.abs(v - l.clip[i]) < 1e-6);
+          // The page shows the clip as Float32 in its shortest form (515.90247); the overlay
+          // holds the full value (515.9024658…).
+          const sameClip = home?.clip && home.clip.every((v, i) => Math.abs(v - l.clip[i]) < 1e-3);
           if (!home || !home.transform || !sameClip || home.picks < 1) {
-            throw new Error(`${key}-wheel: linked axis ${l.axis}'s ring is not on its own matrix and window: ${JSON.stringify(zoom.homes)}`);
+            throw new Error(`${key}-wheel: linked axis ${l.axis}'s ring is not on its own matrix and window ${JSON.stringify(l.clip)}: ${JSON.stringify(zoom.homes)}`);
           }
         }
-        // #379: every mid-preview hover above ran while the matrix was still live, and hit.
-        const linkedHovers = zoom.midHover.filter((h) => linkedAxes.includes(h.axis));
-        const expectHovers = links.length + (unlinked ? 1 : 0);
-        if (zoom.midHover.length < expectHovers || linkedHovers.length < links.length || zoom.midHover.some((h) => !h.live)) {
-          throw new Error(`${key}-wheel: the mid-preview hover did not run while the preview was live: ${JSON.stringify(zoom.midHover)}`);
+        // #379: every mid-preview hover above ran while the matrix was still live, on each
+        // linked axis's pick and each unlinked axis's mark.
+        const probed = (axis) => zoom.midHover.some((h) => h.axis === axis);
+        if (zoom.midHover.some((h) => !h.live) || !linkedAxes.every(probed) || !offAxis.every((m) => probed(m.axis))) {
+          throw new Error(`${key}-wheel: the mid-preview hover did not run on a live preview: ${JSON.stringify(zoom.midHover)}`);
         }
-        const missed = zoom.midHover.filter((h) => !h.hit && (h.unlinked || linkedAxes.includes(h.axis)));
-        if (missed.length) {
+        if (zoom.midHover.some((h) => !h.hit)) {
           throw new Error(`${key}-wheel: hover mid-preview missed a mark where its own axis draws it: ${JSON.stringify(zoom.midHover)}`);
         }
-        if (expectHovers) {
+        if (zoom.midHover.length) {
           passed.push(`${key}/preview-hover`);
           console.error(`OK  ${key}/preview-hover — ${JSON.stringify(zoom.midHover)}`);
         }
