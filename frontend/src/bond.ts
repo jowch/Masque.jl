@@ -162,7 +162,7 @@ function isMacContextClick(e: { button: number; ctrlKey: boolean }): boolean {
 
 // The modified click: Cmd on Apple platforms, where Ctrl-click is the context menu, and Ctrl
 // elsewhere. On a `many` field it does what a plain click does; it adds a legend entry's marks
-// to a linked `many` plot, and a modified click on empty space keeps the picks.
+// to a linked `many` plot, and a modified click on empty space keeps a one-pick field's pick.
 export function isToggleClick(e: { metaKey: boolean; ctrlKey: boolean }): boolean {
     return isApplePlatform() ? e.metaKey : e.ctrlKey
 }
@@ -223,6 +223,13 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         if (e.button === 2 || isMacContextClick(e)) passContextToBase(ctx.surface_, e.pointerId)
         return
     }
+    // A press focuses the surface, so Escape and the arrows work after a click (#380). The
+    // browser would do this itself, but the preventDefault calls below (marquee, pan, drags)
+    // cancel it. preventScroll: a click on a plot half off-screen must not jump the page.
+    // Chromium counts a focus() from script as keyboard focus and draws the focus outline,
+    // so pointer-focus hides it until a key is pressed (mount.ts).
+    ctx.surface_.classList.add("pointer-focus")
+    ctx.surface_.focus({ preventScroll: true })
     const { layout, content } = pointerSpace(ctx, state, e)
     // Shift+drag forces view (arbitration vs box-select / ROI / threshold).
     if (e.shiftKey) {
@@ -623,13 +630,15 @@ function gridCellAt(gg: GridGeometry, x: number, y: number): number | null {
 }
 
 // Clears the picks of every click field on `axes` (every axis when it is null), leaving the
-// controls and a box's target alone. A field that already holds nothing sends nothing.
-export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] | null): void {
+// controls and a box's target alone, and the `many` fields too unless `many` is set. A field
+// that already holds nothing sends nothing.
+export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] | null, many: boolean): void {
     const cur = ctx.value_()
     const updates: Record<string, unknown> = {}
     for (const layer of ctx.manifest_.layers) {
         if (layer.brush || !layer.events.includes("click") || !(layer.id in cur)) continue
         if (axes !== null && !axes.includes(layer.axis)) continue
+        if (layer.many && !many) continue
         const v = cur[layer.id] as { items?: unknown[]; runs?: unknown[]; bits?: string } | null
         if (v === null || v === undefined) continue
         if (layer.many && layer.kind === "grid") {
@@ -673,13 +682,14 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     const { layout, content } = pointerSpace(ctx, state, e)
     const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))
     if (!hit) {
-        // A click on an empty part of a plot clears the picks of the plots there. A mark that
-        // only shows a tooltip isn't empty space, and a Cmd/Ctrl-click that misses keeps the
-        // picks, as a modified miss does in a file browser.
+        // A click on an empty part of a plot clears the one-pick fields there; a `many` field
+        // keeps its picks, since a near miss among many small marks is the likeliest slip and
+        // Escape clears them (#384). A mark that only shows a tooltip isn't empty space, and a
+        // Cmd/Ctrl-click that misses keeps the picks, as a modified miss does in a file browser.
         if (isToggleClick(e)) return
         if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))) return
         const axes = axesAt(ctx, layout.x, layout.y)
-        if (axes.length > 0) clearPicks(ctx, state, axes)
+        if (axes.length > 0) clearPicks(ctx, state, axes, false)
         return
     }
     const sample = layoutSpaceLayer(hit.layer) ? layout : content
