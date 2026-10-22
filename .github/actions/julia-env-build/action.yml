@@ -1,0 +1,83 @@
+name: Build the shared Julia env
+description: >
+  Resolve the shared test env (scripts/cloud-warm.sh, the same env cloud dev sessions use) once,
+  precompile it when this exact manifest has no cache yet, and save the depot under a key named
+  by the Julia version and the manifest's hash. The test jobs restore that key with
+  ./.github/actions/julia-env, so the Makie stack is compiled once per run, not once per job.
+inputs:
+  version:
+    description: Julia version to set up ('1.10', '1', ...)
+    required: true
+outputs:
+  key:
+    description: Cache key of the precompiled depot + env
+    value: ${{ steps.key.outputs.key }}
+  julia-version:
+    description: Exact Julia version, so the test jobs run the same build
+    value: ${{ steps.julia.outputs.julia-version }}
+runs:
+  using: composite
+  steps:
+    - id: julia
+      uses: julia-actions/setup-julia@v2
+      with:
+        version: ${{ inputs.version }}
+    - shell: bash
+      run: echo "MASQUE_DEV_ENV=$RUNNER_TEMP/masque-dev" >> "$GITHUB_ENV"
+    # Start from the newest depot for this Julia build, so a dependency release only recompiles
+    # what it touches.
+    - uses: actions/cache/restore@v4
+      with:
+        path: |
+          ~/.julia/artifacts
+          ~/.julia/compiled
+          ~/.julia/packages
+          ~/.julia/registries
+          ~/.julia/scratchspaces
+          ${{ runner.temp }}/masque-dev
+        key: julia-env-v1-${{ runner.os }}-${{ steps.julia.outputs.julia-version }}-none
+        restore-keys: julia-env-v1-${{ runner.os }}-${{ steps.julia.outputs.julia-version }}-
+    # Resolve from scratch, like Pkg.test() did: the restored manifest would otherwise pin
+    # yesterday's versions, and CI should meet new dependency releases as they come out.
+    - name: Resolve and download the env
+      shell: bash
+      run: |
+        rm -rf "$MASQUE_DEV_ENV"
+        scripts/cloud-warm.sh julia-fetch
+    - id: key
+      shell: bash
+      run: |
+        hash=$(sha256sum "$MASQUE_DEV_ENV/Manifest.toml" | cut -c1-16)
+        echo "key=julia-env-v1-${{ runner.os }}-${{ steps.julia.outputs.julia-version }}-$hash" >> "$GITHUB_OUTPUT"
+    - id: lookup
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ~/.julia/artifacts
+          ~/.julia/compiled
+          ~/.julia/packages
+          ~/.julia/registries
+          ~/.julia/scratchspaces
+          ${{ runner.temp }}/masque-dev
+        key: ${{ steps.key.outputs.key }}
+        lookup-only: true
+    # JULIA_CPU_TARGET=generic: runners differ in CPU, and a native pkgimage built on one is
+    # rejected and rebuilt on another. Generic images load everywhere; the test jobs themselves
+    # run native.
+    - name: Precompile
+      if: steps.lookup.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        JULIA_CPU_TARGET: generic
+      run: julia --project="$MASQUE_DEV_ENV" -e 'using Pkg; Pkg.precompile()'
+    - if: steps.lookup.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          ~/.julia/artifacts
+          ~/.julia/compiled
+          ~/.julia/packages
+          ~/.julia/registries
+          ~/.julia/scratchspaces
+          ${{ runner.temp }}/masque-dev
+        key: ${{ steps.key.outputs.key }}

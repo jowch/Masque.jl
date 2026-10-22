@@ -23,10 +23,15 @@ end
 # `using WGLMakie`. Pkg.develop/activate disables Pluto's own pkg management.
 begin
     import Pkg
-    Pkg.activate(; temp = true)
-    Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "..")))   # test/e2e -> package root
-    Pkg.add("WGLMakie")
-    Pkg.instantiate()
+    dev = get(ENV, "MASQUE_DEV_ENV", "")   # CI and cloud: the shared, precompiled env
+    if !isempty(dev)
+        Pkg.activate(dev)
+    else
+        Pkg.activate(; temp = true)
+        Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "..")))   # test/e2e -> package root
+        Pkg.add("WGLMakie")
+        Pkg.instantiate()
+    end
     using Masque
     using WGLMakie
 end
