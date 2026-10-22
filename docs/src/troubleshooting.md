@@ -330,13 +330,14 @@ an error that names the replacement:
 
 ### Upgrading code written for Masque 0.3
 
-Masque 0.4 changes two things a 0.3 notebook can notice, besides the
+Masque 0.4 changes three things a 0.3 notebook can notice, besides the
 `tooltip_*` keywords above:
 
 - On a plot built with `select = :many`, a plain click adds the mark to
   the selection, or takes it out when it is already selected, where it
-  used to replace the selection. A box drawn by dragging adds too. To
-  start over, click an empty part of the plot or press Escape. See
+  used to replace the selection. A box drawn by dragging adds too. A
+  click on an empty part of the plot keeps the selection, where it used
+  to clear it; to start over, press Escape. See
   [Select several marks](@ref).
 - A `Slider`, `Toggle`, `Checkbox`, `IntervalSlider` or `Menu` laid out
   in the figure but left out of the `masque` call raises an
