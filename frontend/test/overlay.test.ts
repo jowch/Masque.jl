@@ -17,6 +17,7 @@ function mount(...args: Parameters<typeof mountOverlay>): ReturnType<typeof moun
     return mounted
 }
 import { withFields } from "./fields"
+import { fadeDraws, fadeKept, fadeLone } from "./fadekeys"
 import { mapPoint, unmapPoint } from "../src/photo"
 import { clearHi, drawHi, drawSelection } from "../src/highlight"
 import { handleCornerRadius, handleDrawHalf } from "../src/drag/roi"
@@ -564,7 +565,7 @@ describe("mount", () => {
         expect(value()).toEqual({ pts: null, roi: null, legend: null })
         clickLegend()
         expect(value()).toEqual({ pts: null, roi: null, legend: { layer: "legend", index: 0 } })
-        expect(selChildren(shadow).length).toBe(6) // the legend's series: 3 points × (fill + edge)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1", "pts:2"]) // the legend's series
         // release the box without moving: it brushes pts 0 and 1, and the legend keeps its pick
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
@@ -572,13 +573,13 @@ describe("mount", () => {
         expect(value().pts).toEqual({ items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }] })
         expect(value().legend).toEqual({ layer: "legend", index: 0 })
         expect(value().roi).toMatchObject({ layer: "roi", index: 0 })
-        // the union, each mark once: points 0 and 1 are held by both fields but drawn once
-        expect(selChildren(shadow).length).toBe(6)
+        // the union, each mark once: points 0 and 1 are held by both fields but kept once
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1", "pts:2"])
         // a second legend click takes the legend's pick back; the brush stays
         clickLegend()
         expect(value().legend).toBeNull()
         expect(value().pts).toEqual({ items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }] })
-        expect(selChildren(shadow).length).toBe(4)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"])
     })
 
     it("box-select over points emits a Vector envelope of contained points + highlights them", () => {
@@ -607,8 +608,9 @@ describe("mount", () => {
         expect(roi).toMatchObject({ layer: "roi", index: 0 })
         expect((roi as { payload: { xmin: number; xmax: number } }).payload.xmin).toBeCloseTo(10 * 200 / 1200)
         expect((roi as { payload: { xmin: number; xmax: number } }).payload.xmax).toBeCloseTo(10 * 600 / 1200)
-        // two persistent selection highlights drawn, each split into a fill + an edge shape
-        expect(selChildren(shadow).length).toBe(4)
+        // two persistent picks, kept by the fade; the third point fades
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"])
+        expect(selChildren(shadow).length).toBe(0)
     })
 
     it("box-select with nothing enclosed emits an empty items envelope", () => {
@@ -642,7 +644,7 @@ describe("mount", () => {
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 475, clientY: 375, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 475, clientY: 375, bubbles: true }))
         expect(committed!.items.map((e) => e.index)).toEqual([0, 1, 2])
-        expect(selChildren(shadow).length).toBe(6) // 3 points × (fill shape + edge shape)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1", "pts:2"])
     })
 
     it("box-select containing a single point emits a one-element envelope", () => {
@@ -657,15 +659,12 @@ describe("mount", () => {
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 125, clientY: 125, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 125, clientY: 125, bubbles: true }))
         expect(committed!.items.map((e) => e.index)).toEqual([0])
-        expect(selChildren(shadow).length).toBe(2) // 1 point × (fill shape + edge shape)
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
     })
 
-    it("a selects-ROI sweep over a keyboard-focused mark clears the stale hover/focus ring (forward ordering)", () => {
-        // Reverse of "keyboard-focusing an already-selected element..." (keyboard.test.ts): here
-        // the ring is drawn FIRST (keyboard focus), then the mark enters selKeys_ mid-sweep via a
-        // selects-ROI drag, not via drawHi's own already-selected guard. Without drawSelection's
-        // reconciliation, the stale 1.5px hover/focus edge would stay live on top of the 2px
-        // selected wash until the next pointermove self-heals it.
+    it("a selects-ROI sweep over a keyboard-focused mark keeps the focus ring: the fade draws no stroke for it to thin", () => {
+        // A closed mark's pick is drawn by the fade (fade.ts), not by a 2px selected stroke, so
+        // the stale-ring reconciliation (#97) has nothing to protect here and the focus ring stays.
         const { host, script } = setup()
         mount(script, boxSelectManifest())
         const shadow = shadowOf(host)
@@ -674,29 +673,19 @@ describe("mount", () => {
         // ArrowRight focuses pts[0] (image 300,300) — manifest order puts "pts" before the
         // drag-only "roi" layer, which isn't in the focus list at all.
         surface.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }))
-        expect(hiChildren(shadow).length).toBeGreaterThan(0)
-        // grab the ROI box interior (image 400,400 = client 200,200) and release without moving —
-        // encloses points 0 and 1 (see "box-select over points..." above), sweeping over the
-        // still-focused pts[0] mid-drag.
+        const ring = hiChildren(shadow).length
+        expect(ring).toBeGreaterThan(0)
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
-        // mid-sweep (before pointerup): the reconciliation runs on `move`, not only at `end`.
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
-        expect(hiChildren(shadow).length).toBe(0)
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
-        // All three g.hi groups (fill/edge/plain) are empty; g.sel holds the wash for pts[0..1].
-        expect(hiChildren(shadow).length).toBe(0)
-        expect(selChildren(shadow).length).toBe(4) // 2 points × (fill shape + edge shape)
-        // A miss restores keyboard focus's cached state (hover.ts's restoreFocus), but drawHi's
-        // own already-selected guard keeps it a no-op while pts[0] stays selected.
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"])
+        expect(selChildren(shadow).length).toBe(0)
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 5, clientY: 5, bubbles: true }))
-        expect(hiChildren(shadow).length).toBe(0)
-        expect(selChildren(shadow).length).toBe(4)
+        expect(hiChildren(shadow).length).toBe(ring) // the miss restores the focus ring
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"])
     })
 
-    it("a selects-ROI drag onto a mark mid-leave clears the fading hover ring", async () => {
-        // The test above keeps a keyboard-focus ring live, so hiKey_ is still set when the box
-        // arrives. #97 is the other window: the pointer has already left the mark, clearHi has
-        // started the fade, and the box then claims that mark before MOTION_MS.
+    it("a selects-ROI drag onto a mark keeps it as a pick through the box's moves", async () => {
         const { host, script } = setup()
         mount(script, boxSelectManifest())
         const shadow = shadowOf(host)
@@ -707,22 +696,15 @@ describe("mount", () => {
         at(450, 350, "pointermove")
         await flushFrame()
         expect(hiChildren(shadow).length).toBe(2)
-        // Onto the ROI interior. The drag-hit branch starts the leave; the ring stays up.
+        // Onto the ROI interior. The drag-hit branch starts the hover ring's leave.
         at(200, 200, "pointermove")
-        const leaving = hiChildren(shadow)
-        expect(leaving.length).toBe(2)
-        expect(leaving.every((el) => el.classList.contains("masque-leave"))).toBe(true)
         // Grab the box and move it over pts[2]. The first drag move applies synchronously.
         at(200, 200, "pointerdown")
         at(450, 300, "pointermove")
-        expect(hiChildren(shadow).length).toBe(0)
-        expect(selChildren(shadow).length).toBe(2) // pts[2] × (fill + edge)
+        expect(fadeKept(shadow)).toEqual(["pts:2"])
         await new Promise((r) => setTimeout(r, MOTION_MS + 40))
-        // After the fade window, g.hi is still empty and the selected pair is still drawn.
-        // The leave callback only removes g.hi children, so this wait does not show that the
-        // timer was cancelled. The re-hover test below is the one that keeps a replacement ring.
-        expect(hiChildren(shadow).length).toBe(0)
-        expect(selChildren(shadow).length).toBe(2)
+        expect(hiChildren(shadow).length).toBe(0) // the hover ring left with the pointer
+        expect(fadeKept(shadow)).toEqual(["pts:2"])
     })
 
     // Factory so each test gets a fresh geometry object — drag mutates geometry in-place.
@@ -1565,18 +1547,16 @@ describe("tooltips (mount/showTip)", () => {
         }
         mount(script, selManifest)
         const shadow = shadowOf(host)
-        const sel = edgeSelGroup(shadow) // plain circles, no style.stroke → fill+edge split, wash lives on edge
-        expect(sel.children.length).toBe(2)                 // BOTH fields' picks, not just the last
+        expect(fadeKept(shadow)).toEqual(["pts:0", "more:0"]) // BOTH fields' picks, not just the last
         const surface = shadow.querySelector(".surface") as HTMLElement
-        // (300,200) is index 0, already selected — no hover chrome is drawn for it (skip-when-
-        // selected). Then empty space, which would fade g.hi if anything were there.
+        // (300,200) is index 0, a pick, then empty space, which fades g.hi out.
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 10, clientY: 10, bubbles: true }))
         await new Promise<void>((r) => requestAnimationFrame(() => r()))
-        expect(sel.children.length).toBe(2)                 // pre-selection survived the hovers
+        expect(fadeKept(shadow)).toEqual(["pts:0", "more:0"]) // the picks survived the hovers
         const leaving = edgeHiGroup(shadow).firstElementChild
         expect(leaving === null || leaving.classList.contains("masque-leave")).toBe(true)
-        expect(sel.querySelector("circle")!.classList.contains("masque-wash")).toBe(true)
+        expect(selChildren(shadow).length).toBe(0)
     })
 
     it("a starting pick on segments draws a ring (open-kind fallback)", () => {
@@ -1663,8 +1643,9 @@ describe("tooltips (mount/showTip)", () => {
             ...(start === undefined ? {} : { initial: { pts: { layer: "pts", index: start } } }),
         })
         const hostValue = (host: HTMLElement) => host as unknown as { value: unknown }
+        // The kept picks of "pts", by their centre x.
         const selectedCx = (host: HTMLElement) =>
-            [...edgeSelGroup(shadowOf(host)).querySelectorAll("circle")].map((c) => c.getAttribute("cx"))
+            fadeKept(shadowOf(host)).filter((k) => k.startsWith("pts:")).map((k) => String([300, 600, 900][Number(k.slice(4))]))
 
         it("redraws the selection from a restored click, without sending it back", () => {
             const { host, script } = setup()
@@ -1699,10 +1680,10 @@ describe("tooltips (mount/showTip)", () => {
         it("an equal value is a no-op, so the seed's drawing is kept", () => {
             const { host, script } = setup()
             mount(script, three(0))
-            const before = edgeSelGroup(shadowOf(host)).firstElementChild
-            expect(before).not.toBeNull()
+            const before = fadeDraws(shadowOf(host))
+            expect(before).toBeGreaterThan(0)
             hostValue(host).value = { pts: { layer: "pts", index: 0 } }
-            expect(edgeSelGroup(shadowOf(host)).firstElementChild).toBe(before)
+            expect(fadeDraws(shadowOf(host))).toBe(before)
         })
 
         it("after a click, a late write of an older value leaves the click's highlight", () => {
@@ -1776,15 +1757,14 @@ describe("tooltips (mount/showTip)", () => {
             host.addEventListener("input", () => { fired = true })
             hostValue(host).value = { pts: { layer: "pts", index: 2 }, bars: { layer: "bars", index: 1 } }
             expect(selectedCx(host)).toEqual(["900"])
-            const rects = [...edgeSelGroup(shadowOf(host)).querySelectorAll("rect")]
-            expect(rects.map((r) => r.getAttribute("y"))).toEqual(["140"])
+            expect(fadeKept(shadowOf(host))).toContain("bars:1")
             expect(fired).toBe(false)
             // a click on the restored bar takes back that field alone
             const surface = shadowOf(host).querySelector(".surface") as HTMLElement
             surface.dispatchEvent(new MouseEvent("click", { clientX: 500, clientY: 75, bubbles: true }))
             expect(hostValue(host).value).toEqual({ pts: { layer: "pts", index: 2 }, bars: null })
             expect(selectedCx(host)).toEqual(["900"])
-            expect(edgeSelGroup(shadowOf(host)).querySelectorAll("rect").length).toBe(0)
+            expect(fadeKept(shadowOf(host)).filter((k) => k.startsWith("bars:"))).toEqual([])
         })
 
         it("a page that wraps host.value after mount still sees every click", () => {
@@ -1834,13 +1814,12 @@ describe("tooltips (mount/showTip)", () => {
         const { host, script } = setup()
         mount(script, m)
         const shadow = shadowOf(host)
-        const sel = edgeSelGroup(shadow) // plain circles, no style.stroke → fill+edge split, one edge shape per selected point
-        expect(sel.children.length).toBe(1)  // hydration alone (index 2)
+        expect(fadeKept(shadow)).toEqual(["pts:2"]) // hydration alone (index 2)
         const surface = shadow.querySelector(".surface") as HTMLElement
         // commit current ROI enclosure (points 0 and 1) — replaces the index-2 hydration outright
         surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 200, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 200, clientY: 200, bubbles: true }))
-        expect(sel.children.length).toBe(2)  // points 0 and 1 only — index 2 is gone
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"]) // index 2 is gone
     })
 
     it("a selects-ROI whose target `bind` left out neither fills nor highlights it", () => {
@@ -2366,7 +2345,7 @@ describe("tooltips (mount/showTip)", () => {
 
         // Real click on index 1 (image px 900,400 -> CSS 450,200 at this fixture's 2x scale).
         surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 200, bubbles: true }))
-        expect(selChildren(shadow).length).toBe(2) // closed-shape selection draws BOTH fill+edge halves
+        expect(fadeKept(shadow)).toEqual(["pts:1"])
 
         let fired = false
         host.addEventListener("input", () => { fired = true })
@@ -2376,12 +2355,10 @@ describe("tooltips (mount/showTip)", () => {
         await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
         host.querySelector("img")!.dispatchEvent(new Event("load"))
 
-        expect(selChildren(shadow).length).toBe(2) // selection survived the manifest swap (still fill+edge)
-        // The ring is drawn at index 1's NEW position (cx=700) — not its stale pre-swap position
-        // (900), and not index 0's new position (0), which is what a selected= re-hydration bug
-        // would show instead.
-        const drawn = selChildren(shadow).find((el) => el.tagName.toLowerCase() === "circle")
-        expect(drawn?.getAttribute("cx")).toBe("700")
+        // The pick survived the manifest swap as index 1 — not index 0, which is what a selected=
+        // re-hydration bug would show instead — and is drawn from the new frame's geometry.
+        expect(fadeKept(shadow)).toEqual(["pts:1"])
+        expect(fadeDraws(shadow)).toBeGreaterThan(1)
         expect(fired).toBe(false) // §12.3: the DRAG itself still commits nothing, even once a frame has landed
     })
 })
@@ -2465,7 +2442,7 @@ describe("overlay visual polish", () => {
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 135, clientY: 125, bubbles: true }))
     })
 
-    it("an explicit layer hoverstyle stroke sets --masque-hi-stroke verbatim, unwrapped (no blend)", () => {
+    it("a pick on a layer with an explicit hoverstyle stroke is drawn by the fade, not g.sel", () => {
         const { host, script } = setup()
         mount(script, {
             width: 1200, height: 800, scaling: 2, transforms: {},
@@ -2477,14 +2454,9 @@ describe("overlay visual polish", () => {
             fields: ["pts"],
             initial: { pts: { layer: "pts", index: 0 } },
         })
-        // An explicit style.stroke → the unblended plain path: bare circle in svg.masque-plain,
-        // no fill/edge svgs involved.
-        const el = plainSelGroup(shadowOf(host)).firstElementChild as SVGElement
-        expect(el.tagName.toLowerCase()).toBe("circle")
-        expect(el.classList.contains("masque-wash")).toBe(true)
-        expect(el.style.getPropertyValue("--masque-hi-stroke")).toBe("#123456")
-        expect(fillSelGroup(shadowOf(host)).children.length).toBe(0) // nothing landed on the fill side
-        expect(edgeSelGroup(shadowOf(host)).children.length).toBe(0) // nothing landed on the edge side
+        expect(fadeKept(shadowOf(host))).toEqual(["pts:0"])
+        expect(fadeLone(shadowOf(host))).toEqual(["pts:0"]) // outlined in the explicit stroke: no colors
+        expect(selChildren(shadowOf(host)).length).toBe(0)
     })
 
     it("a plain mark with no colors and no style still gets a hover highlight, split across fill+edge", () => {
@@ -2563,7 +2535,7 @@ describe("overlay visual polish", () => {
         expect(fillHiGroup(shadowOf(host)).children.length).toBe(0) // no fill shape for an open mark
     })
 
-    it("hovering an already-selected mark draws no hover highlight, but still shows its tooltip", async () => {
+    it("hovering a picked closed mark draws the hover highlight over it, and its tooltip", async () => {
         const { host, script } = setup()
         mount(script, {
             width: 1200, height: 800, scaling: 2, transforms: {},
@@ -2576,51 +2548,37 @@ describe("overlay visual polish", () => {
         })
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        // the selected wash is already drawn at mount
-        expect(edgeSelGroup(shadow).children.length).toBe(1)
-        // circle centre is image (300,200); display scale 1200/600=2 -> client (150,100)
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
+        // circle centre is image (300,200); display scale 1200/600=2 -> client (150,100). The pick
+        // has no selected stroke for a hover stroke to thin, so the hover recipe draws as usual.
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 150, clientY: 100, bubbles: true }))
         await flushFrame()
-        // no hover chrome anywhere — a 1.5px hover stroke over the 2px selected stroke would
-        // thin the highlight, not add to it
-        expect(hiChildren(shadow).length).toBe(0)
-        // the selected wash is unaffected
-        expect(edgeSelGroup(shadow).children.length).toBe(1)
-        // the tooltip still shows — only the highlight is skipped
+        expect(fillHiGroup(shadow).children.length).toBe(1)
+        expect(edgeHiGroup(shadow).children.length).toBe(1)
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
         const tip = shadow.querySelector(".masque-tip") as HTMLElement
         expect(tip.classList.contains("show")).toBe(true)
     })
 
-    it("selected closed geometry splits too: wash class + 2px stroke on the edge shape, geometry r exactly on both (edge outline, not a halo)", () => {
+    it("a picked closed mark draws nothing in g.sel: the fade keeps it, and outlines it when it is alone", () => {
         const { host, script } = setup()
         mount(script, {
             width: 1200, height: 800, scaling: 2, transforms: {},
             layers: [{
-                id: "pts", kind: "circles", geometry: [300, 200, 20],
-                payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"],
+                // 0 and 1 are 10px apart (closer than one radius): neither is lone. 2 is far off.
+                id: "pts", kind: "circles", geometry: [300, 200, 20, 350, 200, 20, 900, 600, 20, 600, 400, 20],
+                payloads: [{ i: 0 }, { i: 1 }, { i: 2 }, { i: 3 }], axis: "ax1", events: ["click", "hover"], many: true,
             }],
             fields: ["pts"],
-            initial: { pts: { layer: "pts", index: 0 } },
+            initial: { pts: { items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }, { layer: "pts", index: 2 }] } },
         })
-        const fillEl = fillSelGroup(shadowOf(host)).firstElementChild as SVGElement
-        const edgeEl = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
-        expect(fillEl.tagName.toLowerCase()).toBe("circle")
-        expect(fillEl.classList.contains("masque-fillshape")).toBe(true)
-        expect(fillEl.getAttribute("fill")).toBeNull()
-        expect(fillEl.getAttribute("r")).toBe("20")
-
-        expect(edgeEl.tagName.toLowerCase()).toBe("circle")
-        expect(edgeEl.classList.contains("masque-hi")).toBe(true)
-        expect(edgeEl.classList.contains("masque-wash")).toBe(true)
-        expect(edgeEl.getAttribute("fill")).toBeNull()
-        expect(edgeEl.getAttribute("stroke")).toBeNull()
-        expect(edgeEl.getAttribute("stroke-width")).toBeNull() // the stylesheet's --masque-selected-width
-        expect(getComputedStyle(edgeEl).strokeWidth).toBe("2")
-        expect(edgeEl.getAttribute("stroke-opacity")).toBeNull()
-        // outline sits ON the mark's own edge now, not a halo outside it (was r + 2)
-        expect(edgeEl.getAttribute("r")).toBe("20")
-        expect(edgeEl.getAttribute("cx")).toBe("300")
-        expect(edgeEl.getAttribute("cy")).toBe("200")
+        const shadow = shadowOf(host)
+        expect(selChildren(shadow).length).toBe(0)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1", "pts:2"])
+        expect(fadeLone(shadow)).toEqual(["pts:2"])
+        const wrap = shadow.querySelector(".masque-fade") as HTMLElement
+        expect(wrap.dataset.faded).toBe("1") // pts:3
+        expect(wrap.dataset.axis).toBe("ax1")
     })
 
     it("hover outline uses the geometry r exactly, concentric with the marker", () => {
@@ -2660,9 +2618,8 @@ describe("overlay visual polish", () => {
         expect(overlay.style.height).toBe("320px")
         expect(overlay.style.left).toBe("0px")
         expect(overlay.style.top).toBe("0px")
-        const sel = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement // plain circle, no style.stroke → fill+edge split
-        expect(sel.getAttribute("cx")).toBe("100")
-        expect(sel.getAttribute("cy")).toBe("100")
+        // The fade's canvases fill the overlay box, so they sit on the base too.
+        expect(fadeKept(shadowOf(host))).toEqual(["pts:0"])
     })
 
     it("remount with a new initial paints g.sel for the new index (click → bond → selected=)", () => {
@@ -2677,17 +2634,13 @@ describe("overlay visual polish", () => {
         let resolve!: () => void
         const inval = new Promise<void>((r) => { resolve = r })
         mount(script, m([0]), inval)
-        expect((edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement).getAttribute("cx")).toBe("300")
+        expect(fadeKept(shadowOf(host))).toEqual(["pts:0"])
         resolve()
         return inval.then(() => Promise.resolve()).then(() => {
             const script2 = document.createElement("script")
             host.append(script2)
             mount(script2, m([1]))
-            const el = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
-            expect(el.getAttribute("cx")).toBe("600")
-            expect(el.getAttribute("cy")).toBe("400")
-            expect(el.classList.contains("masque-wash")).toBe(true)
-            expect(el.getAttribute("r")).toBe("20")
+            expect(fadeKept(shadowOf(host))).toEqual(["pts:1"])
         })
     })
 
@@ -3318,7 +3271,7 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         expect(surface.classList.contains("cur-ns")).toBe(false)
     })
 
-    it("a starting pick on a rects layer pre-highlights the right rect (hitLayerByIndex rects branch)", () => {
+    it("a starting pick on a rects layer keeps the right rect (hitLayerByIndex rects branch)", () => {
         const { host, script } = setup()
         mount(script, {
             width: 1200, height: 800, scaling: 2, transforms: {},
@@ -3327,21 +3280,13 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             fields: ["bars"],
             initial: { bars: { layer: "bars", index: 1 } },
         })
-        const edgeEl = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement // no style.stroke → fill+edge split
-        expect(edgeEl.tagName.toLowerCase()).toBe("rect")
-        expect(edgeEl.getAttribute("x")).toBe("280") // cx(300) - w/2(20)
-        expect(edgeEl.getAttribute("y")).toBe("90")  // cy(100) - h/2(10)
-        expect(edgeEl.getAttribute("width")).toBe("40")
-        expect(edgeEl.getAttribute("height")).toBe("20")
-        // An element-indexed rects selection keeps its stroke (edge shape) — only the grid
-        // cell-block union rect from an ROI's `selects` (a distinct "rectfill" geom tag) is
-        // fill-only, with no edge shape at all.
-        expect(edgeEl.classList.contains("masque-hi")).toBe(true)
-        expect(edgeEl.classList.contains("masque-nostroke")).toBe(false)
-        expect(fillSelGroup(shadowOf(host)).firstElementChild).toBeTruthy() // fill shape also present
+        // The fade keeps bar 1 and fades bar 0; nothing is drawn in g.sel.
+        expect(fadeKept(shadowOf(host))).toEqual(["bars:1"])
+        expect((shadowOf(host).querySelector(".masque-fade") as HTMLElement).dataset.faded).toBe("1")
+        expect(selChildren(shadowOf(host)).length).toBe(0)
     })
 
-    it("a starting pick on a polygons layer draws a polygon wash (hitLayerByIndex + makeHiElement poly branch)", () => {
+    it("a starting pick on a polygons layer is kept by the fade (hitLayerByIndex poly branch)", () => {
         const { host, script } = setup()
         mount(script, {
             width: 1200, height: 800, scaling: 2, transforms: {},
@@ -3350,13 +3295,11 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             fields: ["polys"],
             initial: { polys: { layer: "polys", index: 0 } },
         })
-        const el = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement // no style.stroke → fill+edge split
-        expect(el.tagName.toLowerCase()).toBe("polygon")
-        expect(el.getAttribute("points")).toBe("0,0 10,0 10,10 0,10")
-        expect(el.classList.contains("masque-wash")).toBe(true) // closed kind → wash, not a ring
+        expect(fadeKept(shadowOf(host))).toEqual(["polys:0"])
+        expect(selChildren(shadowOf(host)).length).toBe(0)
     })
 
-    it("a starting pick on a polygon with a hole draws an even-odd path, not a filled polygon", () => {
+    it("hovering a polygon with a hole draws an even-odd path, not a filled polygon", () => {
         const { host, script } = setup()
         const outer = [0, 0, 40, 0, 40, 40, 0, 40]
         const hole = [10, 10, 30, 10, 30, 30, 10, 30]
@@ -3364,17 +3307,18 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             width: 1200, height: 800, scaling: 2, transforms: {},
             layers: [{ id: "polys", kind: "polygons", geometry: [[outer, hole]],
                 payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"] }],
-            fields: ["polys"],
-            initial: { polys: { layer: "polys", index: 0 } },
         })
-        const edge = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
-        const fill = fillSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        // image (5, 5), inside the outer ring and outside the hole -> client (2.5, 2.5)
+        ;(shadowOf(host).querySelector(".surface") as HTMLElement)
+            .dispatchEvent(new PointerEvent("pointermove", { clientX: 2.5, clientY: 2.5, bubbles: true }))
+        const edge = edgeHiGroup(shadowOf(host)).firstElementChild as SVGElement
+        const fill = fillHiGroup(shadowOf(host)).firstElementChild as SVGElement
         for (const el of [edge, fill]) {
             expect(el.tagName.toLowerCase()).toBe("path")
             expect(el.getAttribute("fill-rule")).toBe("evenodd")
             expect(el.getAttribute("d")).toBe("M0 0L40 0L40 40L0 40ZM10 10L30 10L30 30L10 30Z")
         }
-        expect(edge.classList.contains("masque-wash")).toBe(true)
+        expect(edge.classList.contains("masque-hover")).toBe(true)
         expect(fill.classList.contains("masque-fillshape")).toBe(true)
     })
 
@@ -3423,17 +3367,16 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
 })
 
 describe("click-echo (#103)", () => {
-    it("clicking an element-indexed mark draws the selected recipe in g.sel; g.hi stays empty", () => {
+    it("clicking an element-indexed closed mark keeps it in the fade; nothing in g.sel, the hover stays", () => {
         const { host, script } = setup()
         mount(script, manifest) // module-level `manifest`: one circle at image (600,400), click+hover
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
         surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
-        const edge = edgeSelGroup(shadow).firstElementChild as SVGElement
-        expect(edge.classList.contains("masque-wash")).toBe(true)
-        const fill = fillSelGroup(shadow).firstElementChild as SVGElement
-        expect(fill.classList.contains("masque-fillshape")).toBe(true)
-        expect(hiChildren(shadow).length).toBe(0)
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
+        expect(selChildren(shadow).length).toBe(0)
+        expect(hiChildren(shadow).length).toBe(2) // the hover fill + edge, still under the pointer
     })
 
     it("click mark A then click mark B leaves only B echoed (last pick wins), replacing the field's starting pick", () => {
@@ -3450,15 +3393,13 @@ describe("click-echo (#103)", () => {
         mount(script, m)
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        expect(edgeSelGroup(shadow).children.length).toBe(1) // hydration (index 2) alone
+        expect(fadeKept(shadow)).toEqual(["pts:2"]) // hydration (index 2) alone
         // click index 0: image (200,200) -> client (100,100) — replaces the hydration outright
         surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 100, bubbles: true }))
-        let cxs = [...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))
-        expect(cxs).toEqual(["200"]) // echo(0) alone, index 2's hydration is gone
+        expect(fadeKept(shadow)).toEqual(["pts:0"]) // echo(0) alone, index 2's hydration is gone
         // click index 1: image (600,400) -> client (300,200) — replaces the echo in turn
         surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
-        cxs = [...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))
-        expect(cxs).toEqual(["600"]) // echo(1) alone
+        expect(fadeKept(shadow)).toEqual(["pts:1"]) // echo(1) alone
     })
 
     it("mount hydration is replaced, not merged: a click after a starting pick leaves only the clicked hit", () => {
@@ -3475,11 +3416,10 @@ describe("click-echo (#103)", () => {
         mount(script, m)
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["900"]) // index 2, from initial
+        expect(fadeKept(shadow)).toEqual(["pts:2"]) // index 2, from initial
         // click index 0: image (200,200) -> client (100,100)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 100, bubbles: true }))
-        expect(edgeSelGroup(shadow).children.length).toBe(1)
-        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["200"]) // ONLY index 0
+        expect(fadeKept(shadow)).toEqual(["pts:0"]) // ONLY index 0
     })
 
     it("clicking an :axis region leaves a hydrated selection untouched (does not participate in the selection model)", () => {
@@ -3502,16 +3442,16 @@ describe("click-echo (#103)", () => {
         mount(script, m)
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["300"]) // hydrated index 0
+        expect(fadeKept(shadow)).toEqual(["pts:0"]) // hydrated index 0
         // Empty plot area, away from either mark, inside the axis viewport: image (500,500) -> client (250,250)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 250, clientY: 250, bubbles: true }))
         const v = (host as unknown as { value: Record<string, { layer: string } | null> }).value
         expect(v.axis!.layer).toBe("axis") // confirm the click actually hit :axis
         expect(v.pts).toEqual({ layer: "pts", index: 0 }) // the point's field keeps its pick
-        expect([...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx"))).toEqual(["300"]) // untouched
+        expect(fadeKept(shadow)).toEqual(["pts:0"]) // untouched
     })
 
-    it("clicking a mark then re-hovering it later never draws hover chrome (drawHi's selKeys_ guard)", async () => {
+    it("clicking a closed mark then re-hovering it later draws the hover chrome over the pick", async () => {
         const { host, script } = setup()
         mount(script, manifest)
         const shadow = shadowOf(host)
@@ -3521,9 +3461,26 @@ describe("click-echo (#103)", () => {
         await flushFrame()
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true })) // hover it again
         await flushFrame()
-        expect(fillHiGroup(shadow).children.length).toBe(0)
-        expect(edgeHiGroup(shadow).children.length).toBe(0)
-        expect(plainHiGroup(shadow).children.length).toBe(0)
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
+        expect(fillHiGroup(shadow).children.length).toBe(1)
+        expect(edgeHiGroup(shadow).children.length).toBe(1)
+    })
+
+    it("a picked open mark still draws no hover chrome over its selected ring (drawHi's selKeys_ guard)", async () => {
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{ id: "segs", kind: "segments", geometry: [100, 100, 400, 200],
+                payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"] }],
+            fields: ["segs"],
+            initial: { segs: { layer: "segs", index: 0 } },
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect(plainSelGroup(shadow).children.length).toBe(1) // the selected ring
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 125, clientY: 75, bubbles: true }))
+        await flushFrame()
+        expect(hiChildren(shadow).length).toBe(0)
     })
 
     it("clicking a legend entry pins every element of its linked target layer, not the swatch", () => {
@@ -3541,10 +3498,8 @@ describe("click-echo (#103)", () => {
         const surface = shadow.querySelector(".surface") as HTMLElement
         // legend rect image [80,120]x[90,110] -> client center (50,50)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
-        // "pts" has 2 circles, each closed hit splitting into fill + edge -> 2 * 2 = 4
-        expect(selChildren(shadow).length).toBe(4)
-        const cxs = [...edgeSelGroup(shadow).children].map((el) => el.getAttribute("cx")).sort()
-        expect(cxs).toEqual(["600", "620"]) // the linked circles, not the legend swatch (which has no cx)
+        // the linked circles, not the legend swatch
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"])
     })
 
     it("clicking the selected legend entry again clears its series and sends null", () => {
@@ -3565,15 +3520,15 @@ describe("click-echo (#103)", () => {
         host.addEventListener("input", () => { inputs++ })
         // legend rect image [80,120]x[90,110] -> client center (50,50)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
-        expect(selChildren(shadow).length).toBe(4)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"])
         expect(value()).toEqual({ pts: null, legend: { layer: "legend", index: 0 } })
         surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
-        expect(selChildren(shadow).length).toBe(0)
+        expect(fadeKept(shadow)).toEqual([])
         expect(value()).toEqual({ pts: null, legend: null })
         expect(inputs).toBe(2)
         // a third click selects it again
         surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
-        expect(selChildren(shadow).length).toBe(4)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"])
         expect(value()).toEqual({ pts: null, legend: { layer: "legend", index: 0 } })
     })
 
@@ -3593,10 +3548,10 @@ describe("click-echo (#103)", () => {
         click(300) // pts[0]
         click(500) // pts[1]: a different point replaces the selection, it does not clear it
         expect(value()).toEqual({ pts: { layer: "pts", index: 1 } })
-        expect(selChildren(shadow).length).toBe(2)
+        expect(fadeKept(shadow)).toEqual(["pts:1"])
         click(500)
         expect(value()).toEqual({ pts: null })
-        expect(selChildren(shadow).length).toBe(0)
+        expect(fadeKept(shadow)).toEqual([])
     })
 
     it("clicking the point the field started at clears it", () => {
@@ -3612,9 +3567,9 @@ describe("click-echo (#103)", () => {
         mount(script, m)
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        expect(selChildren(shadow).length).toBe(2)
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
         surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true }))
-        expect(selChildren(shadow).length).toBe(0)
+        expect(fadeKept(shadow)).toEqual([])
         expect((host as unknown as { value: unknown }).value).toEqual({ pts: null })
     })
 
@@ -3632,11 +3587,11 @@ describe("click-echo (#103)", () => {
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
         surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true })) // click pts: echoed
-        expect(selChildren(shadow).length).toBe(2) // fill + edge
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
         // legend rect image [80,120]x[90,110] -> client center (50,50)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
         // the legend is its own field: its pick holds no marks, and the point's pick stays
-        expect(selChildren(shadow).length).toBe(2)
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
         expect((host as unknown as { value: unknown }).value).toEqual({
             pts: { layer: "pts", index: 0 },
             legend: { layer: "legend", index: 0 },
@@ -3659,12 +3614,13 @@ describe("click-echo (#103)", () => {
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
         surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true })) // click pts: echoed
-        expect(selChildren(shadow).length).toBe(2)
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
         // grid cell far from the circle: image (300,600) -> client (150,300)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 150, clientY: 300, bubbles: true }))
-        // the grid is its own field, so the pts echo stays and the cell joins it — a normal closed
-        // "rect" wash (not the box-select "rectfill" union), so it still splits into fill + edge.
-        expect(selChildren(shadow).length).toBe(4)
+        // the grid is its own field, so the pts echo stays and the cell joins it — a grid cell
+        // keeps the SVG region recipe (fill + edge), not the fade.
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
+        expect(selChildren(shadow).length).toBe(2)
         const v = (host as unknown as { value: Record<string, unknown> }).value
         expect(v.pts).toEqual({ layer: "pts", index: 0 })
         expect(v.g).toMatchObject({ layer: "g" })
@@ -3695,7 +3651,7 @@ describe("host.value seeded at mount from initial (bond hydration, not just g.se
         }
         mount(script, one)
         expect((host as unknown as { value: unknown }).value).toEqual({ pts: { layer: "pts", index: 1 } })
-        expect([...edgeSelGroup(shadowOf(host)).children].map((el) => el.getAttribute("cx"))).toEqual(["600"])
+        expect(fadeKept(shadowOf(host))).toEqual(["pts:1"])
     })
 
     it("a brush target seeds {items}, including an explicit empty brush", () => {
@@ -3718,7 +3674,7 @@ describe("host.value seeded at mount from initial (bond hydration, not just g.se
                 ],
             },
         })
-        expect([...edgeSelGroup(shadowOf(host)).children].map((el) => el.getAttribute("cx"))).toEqual(["300", "900"])
+        expect(fadeKept(shadowOf(host))).toEqual(["pts:0", "pts:2"])
         const { host: host2, script: script2 } = setup()
         mount(script2, { ...brushed, initial: { pts: { items: [] } } })
         expect((host2 as unknown as { value: unknown }).value).toEqual({ pts: { items: [] } })
@@ -3759,7 +3715,7 @@ describe("host.value seeded at mount from initial (bond hydration, not just g.se
             threshold: { layer: "threshold", index: 0, payload: 0.5 },
             pts: { layer: "pts", index: 1 },
         })
-        expect([...edgeSelGroup(shadowOf(host)).children].map((el) => el.getAttribute("cx"))).toEqual(["600"])
+        expect(fadeKept(shadowOf(host))).toEqual(["pts:1"])
     })
 
     it("a box over marks seeds its bounds and its target's {items}; another field's pick also draws", () => {
@@ -3785,7 +3741,7 @@ describe("host.value seeded at mount from initial (bond hydration, not just g.se
             pts: { items: [{ layer: "pts", index: 1 }] },
             other: { layer: "other", index: 0 },
         })
-        expect([...new Set(selChildren(shadowOf(host)).map((el) => el.getAttribute("cx")))].sort()).toEqual(["600", "900"])
+        expect(new Set(fadeKept(shadowOf(host)))).toEqual(new Set(["pts:1", "other:0"]))
     })
 
     it("a box over a grid seeds and draws the cell block its starting bounds hold", () => {
@@ -3826,9 +3782,7 @@ describe("host.value seeded at mount from initial (bond hydration, not just g.se
         }
         mount(script, twoLayer)
         expect((host as unknown as { value: unknown }).value).toEqual({ a: { layer: "a", index: 1 }, b: { layer: "b", index: 0 } })
-        const edge = edgeSelGroup(shadowOf(host))
-        expect(edge.querySelector("circle")!.getAttribute("cx")).toBe("200")
-        expect(edge.querySelectorAll("rect").length).toBe(1)
+        expect(new Set(fadeKept(shadowOf(host)))).toEqual(new Set(["a:1", "b:0"]))
     })
 })
 
@@ -3864,15 +3818,12 @@ describe("composite bond value: one field per layer", () => {
         ])
         // each commit writes a fresh object, so Pluto sees a change
         expect(seen[0]).not.toBe(seen[1])
-        // both highlights are drawn: the circle and the rect
-        const edge = edgeSelGroup(shadowOf(host))
-        expect(edge.querySelector("circle")!.getAttribute("cx")).toBe("600")
-        expect(edge.querySelectorAll("rect").length).toBe(1)
+        // both picks are kept: the circle and the rect
+        expect(new Set(fadeKept(shadowOf(host)))).toEqual(new Set(["pts:1", "bars:0"]))
         // a new pick on A replaces A only; B keeps its value
         surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 100, bubbles: true }))
         expect(valueOf(host)).toEqual({ pts: { layer: "pts", index: 0 }, bars: { layer: "bars", index: 0 } })
-        expect(edge.querySelector("circle")!.getAttribute("cx")).toBe("200")
-        expect(edge.querySelectorAll("rect").length).toBe(1)
+        expect(new Set(fadeKept(shadowOf(host)))).toEqual(new Set(["pts:0", "bars:0"]))
     })
 
     it("a click on a layer that is not a field commits nothing and sends no input event", () => {
@@ -4376,7 +4327,10 @@ describe("photographic pan / wheel zoom", () => {
             ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
         const shadow = shadowOf(host)
         const home = (axis: string) => shadow.querySelector(`svg.masque-edge g.masque-clip[data-axis="${axis}"]`) as SVGGElement
-        for (const axis of ["ax1", "ax2", "ax3"]) expect(home(axis).querySelector("g.sel circle")).toBeTruthy()
+        // Each axis's pick is kept on that axis's own fade canvases.
+        const fade = (axis: string) => shadow.querySelector(`.masque-fade[data-axis="${axis}"]`) as HTMLElement
+        for (const axis of ["ax1", "ax2", "ax3"]) expect(fadeKept(shadow)).toContain(`p${axis.slice(2)}:0`)
+        const canvasT = (axis: string) => (fade(axis).firstElementChild as HTMLElement).style.transform
         wheelAt(shadow.querySelector(".surface") as HTMLElement, -120)
         const [s, tx, ty] = host.dataset.masquePhoto!.split(",").map(Number)
         const clipRect = (clip: SVGGElement) => {
@@ -4398,6 +4352,12 @@ describe("photographic pan / wheel zoom", () => {
         // an unlinked axis's ring stays where its data stays, unclipped
         expect(transform("ax3")).toBeNull()
         expect(home("ax3").getAttribute("clip-path")).toBeNull()
+        // the fade canvases move and clip the same way, in percent of the overlay box
+        expect(canvasT("ax1")).toBe(`translate(${(tx / 1200) * 100}%, ${(ty / 800) * 100}%) scale(${s}, ${s})`)
+        expect(fade("ax1").style.clipPath).toBe(`inset(${(84 / 800) * 100}% ${((1200 - 104 - 492) / 1200) * 100}% ${((800 - 84 - 632) / 800) * 100}% ${(104 / 1200) * 100}%)`)
+        expect(canvasT("ax2")).toMatch(/scale\([-\d.e]+, 1\)$/)
+        expect(canvasT("ax3")).toBe("")
+        expect(fade("ax3").style.clipPath).toBe("")
         // every axis's g.sel paints below every axis's g.link, and that below every g.hi
         for (const svg of shadow.querySelectorAll("svg")) {
             const order = [...svg.querySelectorAll("g.masque-photo > g.sel, g.masque-photo > g.link, g.masque-photo > g.hi")].map((el) => el.getAttribute("class"))
@@ -4411,6 +4371,7 @@ describe("photographic pan / wheel zoom", () => {
         for (const axis of ["ax1", "ax2", "ax3"]) {
             expect(transform(axis)).toBeNull()
             expect(home(axis).getAttribute("clip-path")).toBeNull()
+            expect(canvasT(axis)).toBe("")
         }
     })
 
@@ -5000,9 +4961,9 @@ describe("photographic pan / wheel zoom", () => {
         expect((host as unknown as { value: unknown }).value).toEqual({ pts: null, cb: null })
         clickAt(screen.x, screen.y)
         expect((host as unknown as { value: unknown }).value).toEqual({ pts: { layer: "pts", index: 0 }, cb: null })
-        const wash = shadow.querySelector("g.sel .masque-hi")
-        expect(wash?.closest("g.masque-photo")).toBeTruthy()
-        expect(wash?.closest("g.masque-fixed")).toBeNull()
+        // the pick is kept on ax1's fade canvases, which move with the photograph
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
+        expect((shadow.querySelector('.masque-fade[data-axis="ax1"] canvas') as HTMLElement).style.transform).toContain("scale(")
         clickAt(50, 640)
         expect((host as unknown as { value: { cb: { layer: string } } }).value.cb.layer).toBe("cb")
         surface.dispatchEvent(new PointerEvent("pointermove", {
@@ -5183,13 +5144,16 @@ describe("chrome metrics are custom properties (#180)", () => {
 
     it("a property on the shadow host changes that metric and leaves the rest at the recipe", () => {
         const { host, script } = setup()
-        const picked = { fields: ["pts"], initial: { pts: { layer: "pts", index: 0 } } }
-        mount(script, { ...manifest, ...picked })
+        // A grid cell's pick keeps the SVG recipe, which the selected metrics style.
+        const grid: HitLayer = { id: "g", kind: "grid", axis: "ax1", events: ["click", "hover"], payloads: [],
+            geometry: { xedges: [0, 600, 1200], yedges: [0, 400, 800], ncols: 2, nrows: 2 } }
+        const picked = { fields: ["g"], initial: { g: { layer: "g", index: 0 } } }
+        mount(script, { ...manifest, layers: [grid], ...picked })
         const shadow = shadowOf(host)
         shadowHostOf(host).style.setProperty("--masque-selected-width", "5")
         const edge = edgeSelGroup(shadow).firstElementChild as SVGElement
         expect(getComputedStyle(edge).strokeWidth).toBe("5")
-        const plain = { ...manifest, ...picked, layers: [{ ...manifest.layers[0], style: { stroke: "#123456", width: 2 } }] }
+        const plain = { ...manifest, ...picked, layers: [{ ...grid, style: { stroke: "#123456", width: 2 } }] }
         const { host: host2, script: script2 } = setup()
         mount(script2, plain)
         shadowHostOf(host2).style.setProperty("--masque-selected-fill-opacity", "0.5")
@@ -5308,7 +5272,7 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
         click(surface, 300, 200) // a plain click on another mark adds it, keeping the first
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }, { layer: "pts", index: 1 }] })
-        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
+        expect(fadeKept(shadowOf(host)).length).toBeGreaterThan(0)
         click(surface, 100, 100) // a plain click on a held mark takes only that one out
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }] })
         click(surface, 100, 100, { ctrlKey: true })
@@ -5362,7 +5326,7 @@ describe("select = :many and clearing picks (#335)", () => {
         click(surface, 400, 50)
         expect(n).toBe(1)
         expect(val(host)).toEqual({ pts: { items: [{ layer: "pts", index: 0 }] }, one: null })
-        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
+        expect(fadeKept(shadowOf(host)).length).toBeGreaterThan(0)
         n = 0
         click(surface, 400, 50) // the one-pick field is empty now: nothing to send
         expect(n).toBe(0)
@@ -5529,7 +5493,7 @@ describe("select = :many and clearing picks (#335)", () => {
         m.initial = { pts: { items: [{ layer: "pts", index: 1 }] }, one: null }
         mount(script, m)
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
-        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
+        expect(fadeKept(shadowOf(host)).length).toBeGreaterThan(0)
         click(surface, 100, 100, { ctrlKey: true })
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }, { layer: "pts", index: 0 }] })
     })
@@ -5580,7 +5544,7 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         expect(box.classList.contains("masque-roi")).toBe(true)
         expect([box.getAttribute("x"), box.getAttribute("y"), box.getAttribute("width"), box.getAttribute("height")]).toEqual(["100", "100", "600", "400"])
         expect(n).toBe(0) // nothing commits mid-drag
-        expect(selChildren(shadow).length).toBe(4) // the preview: two points × (fill + edge)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"]) // the preview
         ptr(surface, "pointerup", 350, 250)
         click(surface, 350, 250)
         expect(n).toBe(1)
@@ -5635,11 +5599,11 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         host.addEventListener("input", () => { n++ })
         ptr(surface, "pointerdown", 250, 150)
         ptr(surface, "pointermove", 550, 350)
-        expect(selChildren(shadow).length).toBe(6) // the preview adds points 1 and 2 to point 0
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1", "pts:2"]) // the preview adds points 1 and 2 to point 0
         ptr(surface, "pointercancel", 550, 350)
         expect(n).toBe(0)
         expect(val(host).pts).toEqual(items(0))
-        expect(selChildren(shadow).length).toBe(2)
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
         expect(shadow.querySelector("rect.masque-marquee")).toBeNull()
     })
 
@@ -5657,7 +5621,8 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         ptr(surface, "pointerdown", 50, 50)
         ptr(surface, "pointermove", 150, 150)
         expect(n).toBe(0)
-        expect(selChildren(shadow).length).toBeGreaterThan(2) // the cell previews with the mark
+        expect(fadeKept(shadow)).toEqual(["pts:0"]) // the mark previews in the fade
+        expect(selChildren(shadow).length).toBe(2) // and the cell with the SVG region recipe
         ptr(surface, "pointerup", 150, 150)
         click(surface, 150, 150)
         expect(n).toBe(1)
@@ -5822,7 +5787,7 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         click(surface, 550, 350)
         expect(n).toBe(0)
         expect(val(host).pts).toEqual(items(0))
-        expect(selChildren(shadow).length).toBe(2)
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
     })
 
     it("Alt-drag over an orbit view draws the box; a plain drag orbits", () => {

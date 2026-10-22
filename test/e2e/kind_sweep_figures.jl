@@ -11,9 +11,11 @@
 #
 # `selectedIndex`/`tip` are the BAKED-selected element (where `selected` isn't `nothing`) — used
 # for the persisted-wash / selected-survives-unhover checks. `hoverIndex`/`hoverTip` are a
-# DIFFERENT element for the standard hover-recipe check: hovering an already-selected mark draws
-# no highlight (see CLAUDE.md), so a kind with a baked selection needs its own, distinct hover
-# target to exercise the normal recipe at all. The one-element `lines` row is the exception:
+# DIFFERENT element for the standard hover-recipe check: hovering an already-selected line,
+# grid cell or region draws no highlight (see the checklist's visual language), so a kind with a
+# baked selection needs its own, distinct hover target to exercise the normal recipe at all. (A
+# closed mark's pick is drawn by the fade and does take the hover recipe; its spec keeps the
+# separate target anyway.) The one-element `lines` row is the exception:
 # hover and the baked selection are the same mark, so that hover draws no highlight; the
 # `series` row (three whole lines, hover a different one) is what exercises the `:lines`
 # hover stroke. Where nothing is baked, `hoverIndex`/`hoverTip` just repeat
@@ -25,9 +27,9 @@
 # kind_sweep.mjs resolves a mark colour from the manifest's own `colors` field instead) is a
 # `"rgb(r,g,b)"` ground-truth BAKED from an actual CairoMakie raster: build the same figure,
 # `masque()` it, read the tinted element's centre off the manifest geometry the same way
-# kind_sweep.mjs's `hitPoint` does (barplot's `tintIndex`/`clickIndex` 0 -> `rects` centre;
-# heatmap's `tintIndex` 11 -> the `grid` cell midpoint from `xedges`/`yedges`; poly's `clickIndex`
-# 1 -> the 2nd ring's centroid, i.e. the GOLDENROD ring, not orchid), then
+# kind_sweep.mjs's `hitPoint` does (barplot's `selectedIndex` 1 -> `rects` centre, every bar the
+# same grey; heatmap's `tintIndex` 11 -> the `grid` cell midpoint from `xedges`/`yedges`; poly's
+# `selectedIndex` 1 -> the 2nd ring's centroid, i.e. the GOLDENROD ring, not orchid), then
 # `Makie.colorbuffer(fig; px_per_unit = manifest["scaling"])` and sample a 3×3 median at that
 # point (`test/testutils.jl`'s `drawn_near` convention: `img[round(cy), round(cx)]`, already
 # image-px/top-left-origin/y-down, no flip). Deriving this at NOTEBOOK LOAD isn't an option: the
@@ -114,10 +116,11 @@ kind_sweep_meta() = [
     ),
     Dict(
         "key" => "poly", "layerId" => "poly", "layerKind" => "polygons",
-        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
-        "tip" => "ring1", "hoverIndex" => 1, "hoverTip" => "ring2",
-        # clickIndex 1 is the 2nd ring — goldenrod (0.55 alpha over the axis background), not
-        # orchid (that's ring 0 / selectedIndex).
+        "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "ring2", "hoverIndex" => 0, "hoverTip" => "ring1",
+        # selectedIndex 1 is the 2nd ring — goldenrod (0.55 alpha over the axis background), not
+        # orchid (ring 0). The tint check hovers the pick, which keeps its own colour while
+        # the unpicked ring fades (#394).
         "tintColor" => "rgb(235,206,132)", "mode" => "element",
     ),
     Dict(
@@ -759,7 +762,7 @@ function build_kind_sweep()
                 ax, rings; id = :poly,
                 payloads = [(; shape = "ring1"), (; shape = "ring2")],
             );
-            selected = Dict(:poly => [1]),
+            selected = Dict(:poly => [2]),
             auto = false,
         )
     end

@@ -49,6 +49,16 @@ try {
     reducedMotion: "no-preference",
   });
   page = await context.newPage();
+  // The fade's picks in a widget's shadow root (#394), every axis together; see fade.ts.
+  await page.addInitScript(() => {
+    window.fadeOf = (sr) => {
+      const out = { picked: [], kept: [], lone: [] };
+      for (const w of sr?.querySelectorAll(".masque-fade") ?? []) {
+        for (const k of Object.keys(out)) out[k].push(...(w.masqueFade?.[k] ?? []));
+      }
+      return out;
+    };
+  });
   page.on("pageerror", (e) => {
     const shim = SHIM_LEAK.test(e.message);
     const benign = shim && ALLOWED.some((re) => re.test(e.message));
@@ -174,7 +184,11 @@ try {
       kids,
       css: sr.querySelector("style")?.textContent || "",
       hi: count("g.hi"),
-      sel: count("g.sel"),
+      // A pick on a closed kind is drawn by the fade (a canvas per axis), not in g.sel. It
+      // counts as the two shapes (fill and edge) a pick drawn in g.sel has, so a count below
+      // means the same for every kind; `picked`/`kept`/`lone` are the fade's own keys.
+      sel: count("g.sel") + 2 * fadeOf(sr).picked.length,
+      ...fadeOf(sr),
     };
   }, key);
 
@@ -221,7 +235,8 @@ try {
       bg: cs?.backgroundColor, color: cs?.color,
       radius: cs?.borderTopLeftRadius, caret: t ? getComputedStyle(t, "::before").display : null,
       hi: { fill: capture(svgFill, "fill"), edge: capture(svgEdge, "edge"), plain: capture(svgPlain, "plain") },
-      sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel"),
+      sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel") + 2 * fadeOf(sr).picked.length,
+      ...fadeOf(sr),
     };
   }, [key, x, y]);
 
@@ -236,6 +251,46 @@ try {
       }
     }
   };
+  // A screenshot of a widget's figure, overlay included, as RGBA pixels. `perImg` is screenshot
+  // px per image px; `mean(x, y, r)` averages the RGB inside radius r around image px (x, y).
+  const screenOf = async (key) => {
+    const box = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const r = host.querySelector("img, canvas").getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height, s: r.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+    }, key);
+    const png = await page.screenshot({ clip: { x: box.left, y: box.top, width: box.width, height: box.height } });
+    const shot = await page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const cx = c.getContext("2d");
+      cx.drawImage(img, 0, 0);
+      return { w: img.width, h: img.height, data: Array.from(cx.getImageData(0, 0, img.width, img.height).data) };
+    }, png.toString("base64"));
+    // Screenshot px -> image px: CSS px per screenshot px, then image px per CSS px.
+    shot.perImg = shot.w / box.width * box.s;
+    shot.mean = (x, y, r) => {
+      const sum = [0, 0, 0];
+      let n = 0;
+      for (let j = Math.floor((y - r) * shot.perImg); j <= (y + r) * shot.perImg; j++) {
+        for (let i = Math.floor((x - r) * shot.perImg); i <= (x + r) * shot.perImg; i++) {
+          if (i < 0 || j < 0 || i >= shot.w || j >= shot.h || Math.hypot(i / shot.perImg - x, j / shot.perImg - y) > r) continue;
+          const o = 4 * (j * shot.w + i);
+          for (let c = 0; c < 3; c++) sum[c] += shot.data[o + c];
+          n++;
+        }
+      }
+      return sum.map((v) => v / Math.max(n, 1));
+    };
+    return shot;
+  };
+
   const scatter = await inspect("scatter");
   pin(scatter, "scatter");
   passed.push(`base-${scatter.baseTag}`);
@@ -245,24 +300,34 @@ try {
   assertNoTeal(scatter.css, "overlay-css");
   assertNoTeal(scatter.kids, "scatter/sel");
 
-  const wash = {
-    fill: scatter.kids.find((k) => k.layer === "fill" && k.kind === "closed"),
-    edge: scatter.kids.find((k) => k.layer === "edge" && k.kind === "closed"),
-    plain: scatter.kids.find((k) => k.layer === "plain" && k.kind === "closed"),
-  };
-  assertWash(wash, "scatter", false);
-  passed.push("selected-wash");
-
+  // The selected look on a closed mark (#394): the pick keeps its own pixels, the plot's other
+  // marks fade toward the figure background, and a pick with no other pick near it is outlined.
+  // Read off the screen: the pick's interior still reads its own colour, an unpicked marker's
+  // interior has moved most of the way toward the background.
   const pts = (await layersOf("scatter")).find((l) => l.kind === "circles");
-  // `rGeom` is whatever geometry the manifest shipped, not a fixed literal — the scatter
-  // notebook's markersize=22 built from the Scatter plot object, so this is the marker's drawn
-  // radius, ≈0.3525·22·2 (px_per_unit) ≈ 15.5 image px, not the old markersize/2. Fill and edge
-  // shapes are identical geometry — check both.
   const rGeom = pts.geometry[5]; // selectedIndex 1 → r at 3*1+2
-  for (const shape of [wash.fill, wash.edge].filter(Boolean)) {
-    assertCircleR(shape.r, rGeom, `scatter/selected-${shape.layer}`);
-  }
-  passed.push("circle-r");
+  const assertFade = async (key, m, layer, dark) => {
+    const want = `${layer.id}:1`;
+    if (!m.picked.includes(want) || !m.lone.includes(want)) {
+      throw new Error(`${key}/fade: want ${want} picked and outlined, got ${JSON.stringify({ picked: m.picked, lone: m.lone })}`);
+    }
+    if (m.kids.some((k) => k.kind === "closed")) throw new Error(`${key}/fade: the pick is also washed in g.sel`);
+    const g = layer.geometry;
+    const shot = await screenOf(key);
+    const at = (k) => shot.mean(g[3 * k], g[3 * k + 1], 0.4 * g[3 * k + 2]);
+    const raw = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(layer.colors ?? "");
+    if (!raw) throw new Error(`${key}/fade: no single colour in the manifest (${JSON.stringify(layer.colors)})`);
+    const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    // The fade goes toward the plot area: scatter_dark's axis is gray20 on a gray12 figure.
+    const own = lum(raw.slice(1).map(Number)), bg = dark ? lum([51, 51, 51]) : 255;
+    const picked = lum(at(1)), unpicked = lum(at(0));
+    if (Math.abs(picked - own) > 20) throw new Error(`${key}/fade: the pick reads ${picked.toFixed(0)}, want its own colour ${own.toFixed(0)}`);
+    if (Math.abs(unpicked - bg) > 0.5 * Math.abs(own - bg)) {
+      throw new Error(`${key}/fade: an unpicked marker reads ${unpicked.toFixed(0)}, want it over halfway from its colour ${own.toFixed(0)} to the background ${bg.toFixed(0)}`);
+    }
+  };
+  await assertFade("scatter", scatter, pts, false);
+  passed.push("selected-fade");
 
   // Flush-radius pixel test (Cairo only — the base is an <img>; a WGL <canvas> readback isn't
   // reliable across GPU/driver combos, so this only proves the recipe where it can be proven).
@@ -309,15 +374,10 @@ try {
 
   const dark = await inspect("scatter_dark");
   pin(dark, "scatter_dark");
-  const dwash = {
-    fill: dark.kids.find((k) => k.layer === "fill" && k.kind === "closed"),
-    edge: dark.kids.find((k) => k.layer === "edge" && k.kind === "closed"),
-    plain: dark.kids.find((k) => k.layer === "plain" && k.kind === "closed"),
-  };
-  assertWash(dwash, "scatter_dark", true);
+  await assertFade("scatter_dark", dark, (await layersOf("scatter_dark")).find((l) => l.kind === "circles"), true);
   assertNoAlertRed(dark.kids, "scatter_dark");
   assertNoTeal(dark.kids, "scatter_dark");
-  passed.push("dark-figure-wash");
+  passed.push("dark-figure-fade");
 
   // Element 0 ("alpha"), NOT the baked-selected element 1 ("beta"): hovering an already-selected
   // mark is a no-op (no highlight — see CLAUDE.md/kind_sweep.mjs's dedicated
@@ -637,27 +697,8 @@ try {
     const inside = (s, x, y) => circles ? Math.hypot(x - s.x, y - s.y) < 0.8 * s.r
       : Math.abs(x - s.x) < s.w / 2 && Math.abs(y - s.y) < s.h / 2;
     const a = shape(top), b = shape(under);
-    const box = await page.evaluate((k) => {
-      const span = document.querySelector(`#coords_${k}`);
-      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
-      host.scrollIntoView({ block: "center" });
-      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      const r = host.querySelector("img, canvas").getBoundingClientRect();
-      return { left: r.left, top: r.top, width: r.width, height: r.height, s: r.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
-    }, key);
-    const png = await page.screenshot({ clip: { x: box.left, y: box.top, width: box.width, height: box.height } });
-    const shot = await page.evaluate(async (b64) => {
-      const img = new Image();
-      img.src = `data:image/png;base64,${b64}`;
-      await img.decode();
-      const c = document.createElement("canvas");
-      c.width = img.width; c.height = img.height;
-      const cx = c.getContext("2d");
-      cx.drawImage(img, 0, 0);
-      return { w: img.width, h: img.height, data: Array.from(cx.getImageData(0, 0, img.width, img.height).data) };
-    }, png.toString("base64"));
-    // Screenshot px -> image px: CSS px per screenshot px, then image px per CSS px.
-    const perImg = shot.w / box.width * box.s;
+    const shot = await screenOf(key);
+    const perImg = shot.perImg;
     let blue = 0, red = 0;
     for (let j = 0; j < shot.h; j++) {
       for (let i = 0; i < shot.w; i++) {

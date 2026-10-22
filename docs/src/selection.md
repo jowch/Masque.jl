@@ -1,8 +1,8 @@
 # Selection
 
-Clicking a mark selects it. The mark stays highlighted, and its plot's
-field in the `@bind` value holds it until another click on that plot
-replaces it. Click the mark again to clear the selection. You can also start
+Clicking a mark selects it. The mark keeps its color while the rest of
+its plot fades, and its plot's field in the `@bind` value holds it until
+another click on that plot replaces it. Click the mark again to clear the selection. You can also start
 with a mark selected, or keep a selection when the figure is rebuilt.
 
 The examples on this page use a scatter of cities, with each city's
@@ -21,13 +21,19 @@ The `id` names the field, so the selected city is `sel.cities`.
 city's [`ElementEvent`](@ref). Clicking another city replaces it,
 because a plot holds one selection. Clicking the selected city again,
 clicking empty space inside the axis, or pressing Escape clears it: the
-highlight goes and `sel.cities` is `nothing` again.
+plot is back to full color and `sel.cities` is `nothing` again.
 
 Each plot keeps its own selection, so in a figure with two scatters,
 clicking a point in one leaves the other's field as it was. A click on
 empty space clears only the plots in the axis you clicked, and Escape
 clears every plot in the figure. A click on a line or another mark that
 only shows a tooltip is not empty space, so it keeps the selection.
+
+A selected point, bar, or shape with no other selected mark near it
+also gets a thin outline in a shade of its own color, so a few
+picks stay easy to find in a crowded plot. A selected line gets a ring
+instead, and a heatmap cell an outline. To fade the other marks more or
+less, set `unpicked_opacity` in [Overlay styling](@ref).
 
 ## Select several marks
 

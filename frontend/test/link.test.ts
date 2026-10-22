@@ -1,11 +1,14 @@
 // @vitest-environment happy-dom
 // Legend `links`: hovering/focusing a HitLayer element whose `links[index]` names other layers
-// draws the selected recipe (wash/ring) for every element of those layers into a dedicated
-// g.link group, distinct from g.sel (the persistent picks of the bond's fields) and g.hi (the single hover ring).
+// previews them as picked. Closed marks preview through the fade (fade.ts): the linked marks
+// are kept and the legend's other series fade. Any other linked mark gets the selected recipe
+// (a ring) in a dedicated g.link group, distinct from g.sel (the persistent picks of the bond's
+// fields) and g.hi (the single hover ring).
 import { describe, it, expect } from "vitest"
 import { mount } from "../src/overlay"
 import type { Manifest } from "../src/types"
 import { withFields } from "./fields"
+import { fadeKept } from "./fadekeys"
 
 function setup(manifest: Manifest) {
     const host = document.createElement("div")
@@ -26,79 +29,78 @@ const move = (surface: HTMLElement, clientX: number, clientY: number) =>
     surface.dispatchEvent(new PointerEvent("pointermove", { clientX, clientY, bubbles: true }))
 
 const linkGroupSize = (shadow: ShadowRoot) => shadow.querySelectorAll("g.link > *").length
+const faded = (shadow: ShadowRoot) => Number((shadow.querySelector(".masque-fade") as HTMLElement | null)?.dataset.faded ?? 0)
 
 describe("legend links: hover", () => {
     // legend rect 0 (links to "pts"): image [80,120]x[90,110] -> client center (50,50)
     // legend rect 1 (links: []):      image [80,120]x[130,150] -> client center (50,70)
+    // legend rect 2 (links to "qts"): image [80,120]x[170,190] -> client center (50,90)
     const manifest: Manifest = {
         width: 1200, height: 800, scaling: 2, transforms: {},
         layers: [
             {
                 id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"],
-                geometry: [100, 100, 40, 20, 100, 140, 40, 20],
-                payloads: [{ name: "a" }, { name: "b" }],
-                links: [["pts"], []],
+                geometry: [100, 100, 40, 20, 100, 140, 40, 20, 100, 180, 40, 20],
+                payloads: [{ name: "a" }, { name: "b" }, { name: "c" }],
+                links: [["pts"], [], ["qts"]],
             },
             {
-                id: "pts", kind: "circles", axis: "ax1", events: ["hover"],
+                id: "pts", kind: "circles", axis: "ax2", events: ["hover"],
                 geometry: [600, 400, 20, 620, 420, 20, 640, 440, 20],
                 payloads: [{}, {}, {}],
+            },
+            {
+                id: "qts", kind: "circles", axis: "ax2", events: ["hover"],
+                geometry: [900, 600, 20],
+                payloads: [{}],
             },
         ],
     }
 
-    it("hovering a linked legend element draws the selected recipe for every element of the target layer", () => {
+    it("hovering a linked legend element keeps its series and fades the legend's other series", () => {
         const { surface, shadow } = setup(manifest)
         move(surface, 50, 50)
-        // "pts" has 3 circles; each closed hit splits into a fill element (svg.masque-fill's
-        // g.link) and an edge element (svg.masque-edge's g.link) — 3 * 2 = 6.
-        expect(linkGroupSize(shadow)).toBe(6)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1", "pts:2"])
+        expect(faded(shadow)).toBe(1) // qts:0
+        expect(linkGroupSize(shadow)).toBe(0) // closed marks draw no SVG recipe
     })
 
-    it("hovering a non-linked legend element (links: []) draws nothing in the link group", () => {
+    it("hovering a non-linked legend element (links: []) previews nothing", () => {
         const { surface, shadow } = setup(manifest)
         move(surface, 50, 70)
+        expect(fadeKept(shadow)).toEqual([])
         expect(linkGroupSize(shadow)).toBe(0)
     })
 
-    it("moving off any element clears the link group after the fade", async () => {
+    it("moving between entries swaps the preview, and moving off ends it", async () => {
         const { surface, shadow } = setup(manifest)
         move(surface, 50, 50)
-        expect(linkGroupSize(shadow)).toBe(6)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1", "pts:2"])
+        await new Promise((r) => requestAnimationFrame(r)) // pointermoves coalesce per frame
+        move(surface, 50, 90)
+        await new Promise((r) => requestAnimationFrame(r))
+        expect(fadeKept(shadow)).toEqual(["qts:0"])
+        expect(faded(shadow)).toBe(3)
         surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
-        // immediately after leave: fading out (masque-leave), not yet removed
-        const stillThere = shadow.querySelectorAll("g.link > *")
-        expect(stillThere.length).toBe(6)
-        for (const el of stillThere) expect(el.classList.contains("masque-leave")).toBe(true)
-        await new Promise((r) => setTimeout(r, 150))
-        expect(linkGroupSize(shadow)).toBe(0)
+        expect(fadeKept(shadow)).toEqual([])
     })
 
-    it("g.sel (a field's starting pick) is untouched by legend hover", () => {
+    it("a field's starting pick is kept through a legend hover and after it", () => {
         const selManifest: Manifest = {
             ...manifest,
-            layers: [
-                manifest.layers[0],
-                manifest.layers[1],
-                {
-                    id: "other", kind: "circles", axis: "ax1", events: ["hover"],
-                    geometry: [900, 700, 15],
-                    payloads: [{}],
-                },
-            ],
-            fields: ["other"],
-            initial: { other: { layer: "other", index: 0 } },
+            fields: ["qts"],
+            initial: { qts: { layer: "qts", index: 0 } },
         }
         const { surface, shadow } = setup(selManifest)
-        // "other"'s one selected circle also splits into fill + edge — g.sel across all three
-        // svgs holds 2 elements for a single selected closed hit.
-        expect(shadow.querySelectorAll("g.sel > *").length).toBe(2)
-        move(surface, 50, 50) // hover the linked legend entry
-        expect(linkGroupSize(shadow)).toBe(6)
-        expect(shadow.querySelectorAll("g.sel > *").length).toBe(2) // untouched
+        expect(fadeKept(shadow)).toEqual(["qts:0"])
+        move(surface, 50, 50) // hover the entry linking to "pts"
+        expect(new Set(fadeKept(shadow))).toEqual(new Set(["qts:0", "pts:0", "pts:1", "pts:2"]))
+        surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
+        expect(fadeKept(shadow)).toEqual(["qts:0"])
+        expect(shadow.querySelectorAll("g.sel > *").length).toBe(0)
     })
 
-    it("hovering a legend entry whose linked target is already fully pinned in g.sel draws nothing new in g.link", () => {
+    it("a legend pick fades the legend's other series; hovering the picked entry changes nothing", () => {
         const pinnedManifest: Manifest = {
             ...manifest,
             // The legend's pick of entry 0 holds its whole series: all three "pts" circles.
@@ -106,8 +108,11 @@ describe("legend links: hover", () => {
             initial: { legend: { layer: "legend", index: 0 } },
         }
         const { surface, shadow } = setup(pinnedManifest)
-        expect(shadow.querySelectorAll("g.sel > *").length).toBe(6) // 3 circles × fill + edge
-        move(surface, 50, 50) // hover the legend entry linking to "pts" — every target hit is already selKeys_
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1", "pts:2"])
+        expect(faded(shadow)).toBe(1)
+        move(surface, 50, 50)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1", "pts:2"])
+        expect(faded(shadow)).toBe(1)
         expect(linkGroupSize(shadow)).toBe(0)
     })
 })
@@ -149,22 +154,23 @@ describe("legend links: keyboard focus", () => {
     const down = (surface: HTMLElement, key: string) =>
         surface.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }))
 
-    it("keyboard-focusing a linked legend element shows the same linked highlight as hover", () => {
+    it("keyboard-focusing a linked legend element shows the same linked preview as hover", () => {
         const { surface, shadow } = setup(manifest)
         surface.focus()
         down(surface, "ArrowRight") // -> legend[0], the only focusable element
-        // "pts" has 2 circles, each splitting into fill + edge — 2 * 2 = 4.
-        expect(linkGroupSize(shadow)).toBe(4)
+        // The legend's only series has nothing else to fade, so it takes the selected recipe.
+        expect(fadeKept(shadow)).toEqual([])
+        expect(shadow.querySelectorAll("svg.masque-fill g.link > circle").length).toBe(2)
     })
 
-    it("blurring/moving focus away clears the linked highlight (after the fade)", async () => {
+    it("blurring/moving focus away ends the linked preview", () => {
         const { surface, shadow } = setup(manifest)
         surface.focus()
         down(surface, "ArrowRight")
-        expect(linkGroupSize(shadow)).toBe(4)
+        expect(shadow.querySelectorAll("svg.masque-fill g.link > circle").length).toBe(2)
         down(surface, "Escape")
-        await new Promise((r) => setTimeout(r, 150))
-        expect(linkGroupSize(shadow)).toBe(0)
+        const left = [...shadow.querySelectorAll("g.link > *")]
+        expect(left.every((el) => el.classList.contains("masque-leave"))).toBe(true)
     })
 })
 
@@ -193,19 +199,17 @@ describe("legend links: fan-out across kinds", () => {
         ],
     }
 
-    it("draws linked elements from both a circles and a polyline target layer", () => {
+    it("previews linked elements from both a circles and a polyline target layer", () => {
         const { surface, shadow } = setup(manifest)
         move(surface, 50, 50)
-        // 2 circles, each closed and splitting into a fill <circle> (svg.masque-fill's g.link)
-        // and an edge <circle> (svg.masque-edge's g.link) = 4 <circle> elements. 2 polyline
-        // segments (a 3-vertex polyline is 2 segments); an open kind (segments/polyline) in
-        // "selected" mode is unblended — a ring (highlight.ts's makeRing) in svg.masque-plain's
-        // g.link only, a <g> wrapping two <line>s rather than a bare <line>, so each still
-        // counts as one top-level g.link child = 2 <g> elements. Total 4 + 2 = 6.
-        expect(linkGroupSize(shadow)).toBe(6)
+        // The 2 circles are the legend's only closed series, so nothing else fades and they take
+        // the selected recipe: a fill and an edge circle each. 2 polyline segments (a 3-vertex
+        // polyline is 2 segments); an open kind (segments/polyline) in "selected" mode is
+        // unblended — a ring (highlight.ts's makeRing) in svg.masque-plain's g.link only, a <g>
+        // wrapping two <line>s, so each counts as one top-level g.link child = 2 <g> elements.
+        expect(fadeKept(shadow)).toEqual([])
         const tags = [...shadow.querySelectorAll("g.link > *")].map((el) => el.tagName.toLowerCase())
-        expect(tags.filter((t) => t === "circle").length).toBe(4)
-        expect(tags.filter((t) => t === "g").length).toBe(2)
+        expect(tags).toEqual(["circle", "circle", "circle", "circle", "g", "g"])
     })
 })
 
