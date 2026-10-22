@@ -113,7 +113,8 @@ jobs:
     # THROUGH-Pluto `@bind` E2E: a live headless Pluto kernel + real Chromium. Isolated as its
     # own job (heaviest, and the one most exposed to Pluto-version churn) so it reads cleanly
     # and is trivial to drop if it ever proves flaky. Runs on Pluto 1 (the default everywhere) and
-    # on the 0.20 series, the one remaining 0.20 check while users move over. The Pluto 1 leg keeps
+    # on the 0.20 series. That leg is the one remaining 0.20 check, and it only covers the WebGL
+    # `@bind` round-trip, not the kind sweep or Cairo. Drop it at 0.5.0. The Pluto 1 leg keeps
     # the job's original name, so a ruleset that requires it still finds it.
     name: ${{ matrix.pluto == '1' && 'WGLMakie bind E2E (Pluto)' || format('WGLMakie bind E2E (Pluto {0})', matrix.pluto) }}
     runs-on: ubuntu-latest
