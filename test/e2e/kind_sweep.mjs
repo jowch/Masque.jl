@@ -1694,7 +1694,7 @@ try {
         const linkedAxes = links.map((l) => l.axis);
         const offAxis = layers.filter((l) => l.kind === "circles" && l.axis !== viewAxis && !linkedAxes.includes(l.axis))
           .map((l) => ({ axis: l.axis, x: l.geometry[0], y: l.geometry[1] }));
-        const zoom = await page.evaluate(async ([k, ix, iy, marks, pickTip]) => {
+        const zoom = await page.evaluate(([k, ix, iy, marks, pickTip]) => {
           const span = document.querySelector(`#coords_${k}`);
           const hosts = [...document.querySelectorAll(".ip-host")];
           const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -1710,7 +1710,6 @@ try {
           });
           surface.dispatchEvent(ev);
           const base = host.querySelector("img, canvas");
-          // Read before the hovers below, which wait on animation frames.
           const engaged = {
             photo: host.dataset.masquePhoto || "",
             clip: !!host.querySelector(".masque-data-clip"),
@@ -1736,10 +1735,12 @@ try {
             const el = sr.querySelector(".masque-tip");
             return el?.classList.contains("show") ? el.textContent : null;
           };
-          const hoverAt = async (x, y) => {
+          // Synchronous, so the preview is still live when each probe is read (a WebGL frame
+          // can land within two animation frames). A move right after another is coalesced
+          // to an animation frame; leaving the surface first drops that wait.
+          const hoverAt = (x, y) => {
+            surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: false }));
             surface.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: x, clientY: y }));
-            // the next move is coalesced to an animation frame
-            await new Promise((res) => requestAnimationFrame(() => res()));
           };
           const midHover = [];
           for (const c of sr.querySelectorAll("svg.masque-edge g.masque-clip[data-axis]")) {
@@ -1747,12 +1748,12 @@ try {
             const moved = !!c.firstElementChild.getAttribute("transform");
             if (!ring || !moved) continue;
             const r = ring.getBoundingClientRect();
-            await hoverAt(r.left + r.width / 2, r.top + r.height / 2);
+            hoverAt(r.left + r.width / 2, r.top + r.height / 2);
             const t = tip();
             midHover.push({ axis: c.dataset.axis, pick: true, hit: !!t && t.startsWith(pickTip), tip: t, live: !!host.dataset.masquePhoto });
           }
           for (const mk of marks) {
-            await hoverAt(b.left + mk.x * s, b.top + mk.y * s);
+            hoverAt(b.left + mk.x * s, b.top + mk.y * s);
             const hit = !!sr.querySelector(`svg g.masque-clip[data-axis="${mk.axis}"] g.hi > *`);
             midHover.push({ axis: mk.axis, pick: false, hit, tip: tip(), live: !!host.dataset.masquePhoto });
           }
