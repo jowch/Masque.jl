@@ -7,9 +7,8 @@ of this page labels points into classes.
 
 ## Name each part
 
-Pass the plots, each wrapped in `interactables`, and the controls you
-want in the value as a named tuple, and each name becomes a field that
-keeps its own pick:
+Name each plot and each control in one named tuple. The example below
+has two plots:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -27,10 +26,10 @@ field out of the value.
 
 ## Let picks add up
 
-A plot passed with `select = :many` holds a list of picks instead of one:
-a click adds a point, a click on a picked point takes it out, and a box
-dragged over several points adds them all. To start over, the reader
-presses Escape. [Select several marks](@ref) has the details.
+A widget that builds something up, such as a set of labeled points,
+needs every click to add to what the reader has already picked rather
+than replace it. Pass the plot with `select = :many`, as
+[Select several marks](@ref) describes:
 
 ```julia
 @bind w masque(fig, (pts = interactables(sc; select = :many),))
@@ -61,11 +60,8 @@ running again; [Update the figure](@ref) shows how. The function gets
 the widget's current state, the same fields as `w`. When it needs to
 remember something between changes, such as which class each point was
 given, keep it in a `Dict` or a `Ref` created in another cell, and change
-it inside the function.
-
-Running the `masque` cell again builds a new widget, which starts with
-no picks, and `onchange` runs once with that state. The controls keep
-the values the reader chose.
+it inside the function. What happens to that state when the cell runs
+again is in [Keep the labels when the cell runs again](@ref).
 
 ## Example: label points into classes
 
@@ -154,13 +150,21 @@ label off, whatever class the menu shows, so to move a point to another
 class, click it once to take it out and again with the new class chosen.
 Changing the menu doesn't relabel anything; it only sets the class of the
 next points picked. And starting over, as described in
-[Select several marks](@ref), takes every label off.
+[Select several marks](@ref), takes every label off, so before the reader
+starts over, copy the labels they want to keep into a new cell:
+
+```julia
+saved = copy(labels)
+```
+
+That cell doesn't use `w`, so it keeps the copy while the reader goes on
+labeling.
 
 ## Keep the labels when the cell runs again
 
 When the `masque` cell runs again, for example because you edited it,
 the new widget starts with no picks, and its first `onchange` run clears
-`labels`. To pick up where the reader left off, start the widget with
+`labels`. The menu keeps the class the reader chose. To pick up where the reader left off, start the widget with
 the labeled points already picked. Add `selected` to the `masque` call:
 
 ```julia

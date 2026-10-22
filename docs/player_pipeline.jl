@@ -77,9 +77,10 @@ end
 The docs players' snapshot lookup, shared by the static player (`emit_player`) and the
 Pluto export (`PLUTO_EXPORT_SIM_JS`). `lookup(table, v)` returns the snapshot for the value
 the overlay posted, or `null`. The harvest records every click and every brush release
-(`discrete_states`, `brush_states`) one field at a time. When the reader has changed two
-fields, `lookup` shows the snapshot of the latest change alone, so a miss means the recording
-and the overlay disagree.
+(`discrete_states`, `brush_states`) one field at a time, and with `pairs = true` also each
+click on one field with each click on another. When the reader has changed two fields and
+no pair was recorded, `lookup` shows the snapshot of the latest change alone, so a miss
+means the recording and the overlay disagree.
 """
 const PLAYER_LOOKUP_JS = raw"""
 function layerIndexKey(layer, index) {
@@ -332,7 +333,9 @@ Idle first, then every click from [`discrete_states`](@ref) and every brush rele
 [`brush_states`](@ref), then the TOML's hand-listed `[[player.states]]` (axis, threshold,
 and bounds positions only). A hand-listed click or brush fails: the harvest already records
 it. Each state changes one field: its `value` is the widget's starting value with that
-field's envelope in place, and its `key` is that envelope's [`snapshot_key`](@ref).
+field's envelope in place, and its `key` is that envelope's [`snapshot_key`](@ref). With
+`pairs = true` the TOML also gets every click on one field with every click on a later field,
+keyed as the two keys joined by `+`.
 """
 function player_states(player::AbstractDict, manifest::AbstractDict)
     out = NamedTuple{(:key, :value), Tuple{String, Any}}[(; key = "null", value = nothing)]
