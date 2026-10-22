@@ -345,6 +345,22 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
         push!(seen, k)
         push!(out, (; key = k, value = whole(string(v["layer"]), v)))
     end
+    # `pairs = true`: a reader who clicks one plot and then another holds two picks, so
+    # record every click on one field with every click on another, keyed the way `keyOf`
+    # joins the changed fields (in `keyed` order) with "+".
+    if get(player, "pairs", false) === true
+        keyed = player_keying(manifest)["keyed"]
+        ds = discrete_states(manifest)
+        for a in ds, b in ds
+            ia = findfirst(==(string(a["layer"])), keyed)
+            ib = findfirst(==(string(b["layer"])), keyed)
+            (isnothing(ia) || isnothing(ib) || ia >= ib) && continue
+            k = snapshot_key(a) * "+" * snapshot_key(b)
+            k in seen && continue
+            push!(seen, k)
+            push!(out, (; key = k, value = merge(init, Dict{String, Any}(keyed[ia] => a, keyed[ib] => b))))
+        end
+    end
     for L in manifest["layers"]
         haskey(L, "brush") || continue
         for v in _brush_states(manifest, L)

@@ -153,6 +153,33 @@ const CLIPS = {
       await c.settle(1800);
     },
   },
+  "classes": {
+    notebook: "classes_notebook.jl", nn: 9,
+    async run(c) {
+      // Label three points good, switch the menu to bad and box the upper group, label a
+      // stray point unsure, then click a good point again to take its label off.
+      for (const k of [0, 2, 5]) {
+        await c.glide(c.circle("pts", k), 700);
+        await c.click(c.circle("pts", k));
+        await c.settle(800);
+      }
+      await c.choose("class", 1);
+      const from = c.data("pts", 4.8, 7.8);
+      const to = c.data("pts", 6.9, 5.1);
+      await c.glide(from, 900);
+      await c.page.mouse.down();
+      await c.glide(to, 1500, 40);
+      await c.page.mouse.up();
+      await c.settle(1400);
+      await c.choose("class", 2);
+      await c.glide(c.circle("pts", 16), 900);
+      await c.click(c.circle("pts", 16));
+      await c.settle(1200);
+      await c.glide(c.circle("pts", 2), 900);
+      await c.click(c.circle("pts", 2));
+      await c.settle(1800);
+    },
+  },
   "grid-brush": {
     notebook: "grid_brush_notebook.jl", nn: 7,
     async run(c) {
@@ -300,6 +327,14 @@ try {
       const n = layerOf(id).geometry.n;
       const knob = Math.min(b.w, b.h);
       return { x: b.x + knob / 2 + (i / Math.max(1, n - 1)) * (b.w - knob), y: b.y + b.h / 2 };
+    },
+    // Move to a menu and choose option k (0-based). A headless page doesn't draw the open
+    // list, so the clip shows the menu's label change.
+    async choose(id, k) {
+      await c.glide(c.control(id), 900);
+      await sleep(300);
+      await page.locator(`[data-masque-control="${id}"] select`).selectOption(String(k));
+      await sleep(1200);
     },
     roiRect: () => page.evaluate((id) => {
       const host = document.getElementById(id).querySelector(".ip-host");
