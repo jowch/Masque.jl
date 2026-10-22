@@ -602,6 +602,13 @@ try {
     }
     throw new Error(`${what}: ${sel} never changed from ${JSON.stringify(before)}`);
   };
+  // The reverse: after `act`, `sel` still reads `before` once a round trip would have landed.
+  const waitSame = async (sel, before, what, ms = 1500) => {
+    await new Promise((r) => setTimeout(r, ms));
+    const t = await textOf(sel);
+    if (t !== before) throw new Error(`${what}: ${sel} changed from ${JSON.stringify(before)} to ${JSON.stringify(t)}`);
+    return t;
+  };
 
   const expectBase = backend === "webgl" ? "canvas" : "img";
 
@@ -1021,11 +1028,11 @@ try {
     }
 
     // `select = :many` (#335, #358): a click adds a pick or takes it out, with or without Ctrl
-    // (Linux Chromium, so Ctrl rather than Cmd), a click on empty plot space clears them, and
-    // Escape on the focused figure clears them too. Each step checks the printed `@bind` value,
+    // (Linux Chromium, so Ctrl rather than Cmd), a click on empty plot space keeps them (#384),
+    // and Escape on the focused figure clears them. Each step checks the printed `@bind` value,
     // host.value's `{items}`, and how many picks are drawn.
     // A grid with `select = :many` (#335, #358): a click flips one cell, with or without Ctrl, a
-    // click on the axis off the grid clears it, and so does Escape. Each step checks the printed
+    // click on the axis off the grid keeps the cells (#384), and Escape clears them. Each step checks the printed
     // `GridSelection` count, host.value's `{runs}`, and the drawing: one fill path over the
     // cells and one edge path around their outline (an inner side would be a 5th subpath for
     // two cells side by side), and no hover on a selected cell.
@@ -1071,8 +1078,16 @@ try {
       t = await step("click-adds-keeps-others", t, () => dispatchAt(key, at(3, 0).x, at(3, 0).y, "click"), 3, [0, 3, 1, 1, 2, 1, 2, 0, 1], 2);
       // The axis runs to y = 4; the grid stops at 3.
       const off = { x: at(1, 2).x, y: g.yedges[3] - (g.yedges[2] - g.yedges[3]) / 2 };
-      t = await step("empty-click-clears", t, () => dispatchAt(key, off.x, off.y, "click"), 0, [], 0);
-      t = await step("click-again", t, () => dispatchAt(key, at(0, 0).x, at(0, 0).y, "click"), 1, [0, 0, 1], 2);
+      {
+        const r = await dispatchAt(key, off.x, off.y, "click");
+        const want = [0, 3, 1, 1, 2, 1, 2, 0, 1];
+        const runs = (await inspect(key)).bondAll?.region?.runs;
+        if (JSON.stringify(runs) !== JSON.stringify(want)) throw new Error(`${key}/empty-click-keeps: host.value runs ${JSON.stringify(runs)}, want ${JSON.stringify(want)}`);
+        if (r.sel !== 2) throw new Error(`${key}/empty-click-keeps: g.sel=${r.sel}, want the cells still drawn (2)`);
+        t = await waitSame(`#bond_${key}`, t, `${key}/empty-click-keeps`);
+        passed.push(`${key}/empty-click-keeps`);
+      }
+      t = await step("click-again", t, () => dispatchAt(key, at(0, 0).x, at(0, 0).y, "click"), 4, [0, 0, 1, 0, 3, 1, 1, 2, 1, 2, 0, 1], 2);
       t = await step("escape-clears", t, () => page.evaluate((k) => {
         const span = document.querySelector(`#coords_${k}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -1220,8 +1235,15 @@ try {
       t = await step("ctrl-click-removes", t, () => dispatchAt(key, p[0].x, p[0].y, "click", { ctrlKey: true }), [3], 2);
       t = await step("click-adds-keeps-others", t, () => dispatchAt(key, p[1].x, p[1].y, "click"), [3, 2], 4);
       t = await step("click-removes", t, () => dispatchAt(key, p[2].x, p[2].y, "click"), [2], 2);
-      t = await step("empty-click-clears", t, () => dispatchAt(key, (p[0].x + p[1].x) / 2, p[2].y, "click"), [], 0);
-      t = await step("click-again", t, () => dispatchAt(key, p[1].x, p[1].y, "click"), [2], 2);
+      {
+        const r = await dispatchAt(key, (p[0].x + p[1].x) / 2, p[2].y, "click");
+        const it = await items();
+        if (JSON.stringify(it) !== JSON.stringify([1])) throw new Error(`${key}/empty-click-keeps: host.value items ${JSON.stringify(it)}, want [1]`);
+        if (r.sel !== 2) throw new Error(`${key}/empty-click-keeps: g.sel=${r.sel}, want the pick still drawn (2)`);
+        t = await waitSame(`#bond_${key}`, t, `${key}/empty-click-keeps`);
+        passed.push(`${key}/empty-click-keeps`);
+      }
+      t = await step("click-again", t, () => dispatchAt(key, p[0].x, p[0].y, "click"), [2, 1], 4);
       t = await step("escape-clears", t, () => page.evaluate((k) => {
         const span = document.querySelector(`#coords_${k}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);

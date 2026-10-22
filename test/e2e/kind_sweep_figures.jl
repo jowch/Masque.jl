@@ -565,7 +565,8 @@ kind_sweep_meta() = [
     ),
     Dict(
         # `select = :many` (#335, #358): a click adds or removes a pick, with or without Ctrl,
-        # and a click on empty space and Escape clear. The driver's "many" block drives it.
+        # a click on empty space keeps the picks (#384), and Escape clears them. The driver's
+        # "many" block drives it.
         "key" => "many", "layerId" => "scatter", "layerKind" => "circles",
         "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "many",
@@ -581,7 +582,8 @@ kind_sweep_meta() = [
     ),
     Dict(
         # A grid with `select = :many` (#335, #358): a click flips one cell, with or without Ctrl,
-        # the cells draw as one outlined area, and a click off the grid and Escape clear it.
+        # the cells draw as one outlined area, a click off the grid keeps it (#384), and Escape
+        # clears it.
         # The driver's "many_grid" block drives it.
         "key" => "many_grid", "layerId" => "region", "layerKind" => "grid",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
