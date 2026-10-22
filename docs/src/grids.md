@@ -47,7 +47,7 @@ hm = heatmap!(ax, img)
 `sel.region` is a [`GridSelection`](@ref), empty to start. A click on a
 cell adds it to the selection and a click on a selected cell takes it
 out, so the selection grows one click at a time; a click off the image
-or Escape clears it, and a box adds every cell it touches, as
+keeps it, Escape clears it, and a box adds every cell it touches, as
 [Select several marks](@ref) shows. `img[sel.region]` gives the values of the
 selected cells, `findall(sel.region)` their positions in `img`, and
 `sel.region.mask` a matrix the size of `img` that is `true` where a cell
