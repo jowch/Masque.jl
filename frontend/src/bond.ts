@@ -223,6 +223,13 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         if (e.button === 2 || isMacContextClick(e)) passContextToBase(ctx.surface_, e.pointerId)
         return
     }
+    // A press focuses the surface, so Escape and the arrows work after a click (#380). The
+    // browser would do this itself, but the preventDefault calls below (marquee, pan, drags)
+    // cancel it. preventScroll: a click on a plot half off-screen must not jump the page.
+    // Chromium counts a focus() from script as keyboard focus and draws the focus outline,
+    // so pointer-focus hides it until a key is pressed (mount.ts).
+    ctx.surface_.classList.add("pointer-focus")
+    ctx.surface_.focus({ preventScroll: true })
     const { layout, content } = pointerSpace(ctx, state, e)
     // Shift+drag forces view (arbitration vs box-select / ROI / threshold).
     if (e.shiftKey) {

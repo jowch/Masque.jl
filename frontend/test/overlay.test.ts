@@ -5467,6 +5467,37 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host).pts).toEqual({ items: [] })
     })
 
+    it("a press focuses the surface, so Escape clears picks made by mouse (#380)", () => {
+        const { host, script } = setup()
+        mount(script, many())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const press = (x: number, y: number, button = 0) => {
+            const opts = { clientX: x, clientY: y, button, bubbles: true, cancelable: true }
+            surface.dispatchEvent(new PointerEvent("pointerdown", opts))
+            surface.dispatchEvent(new PointerEvent("pointerup", opts))
+            if (button === 0) click(surface, x, y)
+        }
+        press(100, 100, 2) // a right-click leaves focus where it was
+        expect(shadow.activeElement).toBeNull()
+        press(100, 100) // the press starts a marquee, whose preventDefault cancels native focus
+        expect(shadow.activeElement).toBe(surface)
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
+        // The focus outline stays off after a press: a held modifier keeps it off, a key turns it on.
+        expect(surface.classList.contains("pointer-focus")).toBe(true)
+        const key = (k: string) => surface.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }))
+        key("Control")
+        expect(surface.classList.contains("pointer-focus")).toBe(true)
+        key("ArrowRight")
+        expect(surface.classList.contains("pointer-focus")).toBe(false)
+        press(600, 600) // empty space in the axis: a marquee press that clears nothing until release
+        expect(surface.classList.contains("pointer-focus")).toBe(true)
+        key("Escape")
+        expect(val(host).pts).toEqual({ items: [] })
+        expect(shadow.activeElement).toBeNull()
+        expect(surface.classList.contains("pointer-focus")).toBe(false)
+    })
+
     it("a restored pick that names no element is dropped", () => {
         const { host, script } = setup()
         const m = many()
