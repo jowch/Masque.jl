@@ -44,7 +44,8 @@ cities = interactables(s; id = :cities, payloads = rows, select = :many)
 on a city adds it to the selection, and a click on a selected city takes
 it out again, so `[c.city for c in sel.cities]` lists the cities picked,
 in the order they were picked. A click never throws the other picks
-away; to start over, click an empty part of the plot or press Escape.
+away, and a click on empty space keeps them too, since a near miss is
+easy among many small marks; to start over, press Escape.
 Cmd-click (on a Mac) and Ctrl-click (elsewhere) do the same as a click. A legend entry and an
 [`AxisInteractable`](@ref) take `select = :many` the same way and give a
 vector of their events; a colorbar's pick is one value, so it raises an
@@ -67,7 +68,7 @@ adds them instead, and clicking a selected entry again takes them out.
 On a legend built with `select = :many`, a click adds them.
 
 ```@raw html
-<video id="masque-selection-many-clip" title="Clicking three cities, clicking one again to take it out, dragging a box that adds two more, then clicking empty space to clear, with CairoMakie"
+<video id="masque-selection-many-clip" title="Clicking three cities, clicking one again to take it out, then dragging a box that adds two more, with CairoMakie"
        controls muted loop playsinline autoplay
        style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
 <script>

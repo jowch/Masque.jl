@@ -22,8 +22,9 @@ All notable changes to this project are documented here. The format is based on
   region of a grid built with `regions`, for Enter on a focused mark, and for a legend entry
   whose legend holds several picks. A box drawn by dragging adds what it covers, or takes it
   out when the drag starts on a selected mark, where a plain drag used to replace the
-  selection. To start over, click an empty part of the plot or press Escape, as before
-  (#358).
+  selection. A click on an empty part of the plot now keeps the selection too; to start
+  over, press Escape. A plot with the default `select = :one` still clears its pick on an
+  empty click (#358, #384).
 - On a Documenter page, a CairoMakie widget shows as a plain picture unless the build sets
   `example_size_threshold = nothing`: Documenter prefers a picture to an output larger than
   8 KB, and every widget is. The build log warns when it does (#373).

@@ -93,9 +93,11 @@ the grid raises `ArgumentError`. The browser holds the mask as one byte per cell
 (`frontend/src/gridmask.ts`) and draws it as one hit: a fill path of the runs and an edge path of
 the cell sides that border an unselected cell. A click or Enter toggles one pick, with or
 without Cmd/Ctrl (#358: a plain click used to replace the items, which threw selections away
-by accident), and `clearPicks` empties every pick field on the clicked axes
-(an empty click) or the whole figure (Escape), sending one value; brush targets and controls
-are left alone. An empty click is one with no `click` hit and no `hover` hit, without
+by accident), and `clearPicks` empties the one-pick fields on the clicked axes (an empty
+click) or every pick field in the figure (Escape), sending one value; brush targets and
+controls are left alone. An empty click keeps the `many` fields (#384): among many small
+marks a near miss is the likeliest slip, and it used to throw a whole selection away. An
+empty click is one with no `click` hit and no `hover` hit, without
 Cmd/Ctrl; `axesAt` takes every non-colorbar axis whose viewport holds the point (twins and an
 inset's parent alike), and none when the point is inside a legend's box (a `bond: "legend"`
 layer's transform).
