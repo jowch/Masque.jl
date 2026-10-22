@@ -1502,17 +1502,22 @@ try {
       const moved = old[1];
       const rOld = await dispatchAt(key, moved.x, moved.y, "pointermove");
       const rect = await hostRect();
-      // A grid finer than the marker's hit radius, stopping at the first hit away from the old spot.
+      // A grid finer than the marker's hit radius over the right panel, stopping at the first hit
+      // away from the old spot. Probed nearest-first: an orbit moves the point a short way, and
+      // each probe waits a frame, so a top-left-first scan took 3.5–5 min on WebGL.
       const hits = [];
       const step = Math.max(4, Math.floor(moved.r));
+      const grid = [];
+      for (let y = 4; y < rect.h; y += step) {
+        for (let x = rect.w / 2 + 4; x < rect.w; x += step) grid.push({ x, y, d: Math.hypot(x - moved.x, y - moved.y) });
+      }
+      grid.sort((a, b) => a.d - b.d);
       let far = null;
-      for (let y = 4; y < rect.h && !far; y += step) {
-        for (let x = rect.w / 2 + 4; x < rect.w; x += step) {
-          const r = await dispatchAt(key, x, y, "pointermove");
-          if (!r.show || !/\bx 4\b.*\by 4\b.*\bz 4\b/.test(r.text ?? "")) continue;
-          hits.push({ x, y });
-          if (Math.hypot(x - moved.x, y - moved.y) > moved.r + 6) { far = { x, y, text: r.text }; break; }
-        }
+      for (const { x, y, d } of grid) {
+        const r = await dispatchAt(key, x, y, "pointermove");
+        if (!r.show || !/\bx 4\b.*\by 4\b.*\bz 4\b/.test(r.text ?? "")) continue;
+        hits.push({ x, y });
+        if (d > moved.r + 6) { far = { x, y, text: r.text }; break; }
       }
       if (!far) throw new Error(`${key}: the follower's corner point answers nowhere new after the orbit (old spot show=${rOld.show}; ${hits.length} hits near the old spot)`);
       passed.push(`${key}/follower-hits-moved`);
