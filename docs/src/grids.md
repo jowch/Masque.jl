@@ -53,6 +53,20 @@ selected cells, `findall(sel.region)` their positions in `img`, and
 `sel.region.mask` a matrix the size of `img` that is `true` where a cell
 is selected, so a selection of any shape is one value to index with.
 
+```@raw html
+<video id="masque-grid-many-clip" title="Clicking three heatmap cells, clicking one again to take it out, then dragging a box over a block, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-grid-many-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "grid-many.mp4";
+})();
+</script>
+```
+
 To start with cells already selected, such as a selection you saved
 earlier, pass `selected` a matrix the size of `img` that is `true` at
 those cells:
@@ -87,6 +101,20 @@ every selected cell, and `sel.objects.regions` lists the ids of the
 regions it holds whole. A cell whose id is `0` belongs to no region and
 is picked on its own, so the background stays as fine-grained as
 before.
+
+```@raw html
+<video id="masque-grid-regions-clip" title="Hovering and clicking objects in a segmented image, clicking a background cell, then clicking the first object again to take it out, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-grid-regions-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "grid-regions.mp4";
+})();
+</script>
+```
 
 Many small regions on a large image make the figure slower to load.
 Crop to the part being edited before cutting it into patches.
@@ -165,6 +193,20 @@ it with the block under the box then. `win.i1:win.i2` is the range of
 the matrix's first index, drawn along x, and `win.j1:win.j2` the range
 of its second index, drawn along y, so `z[win]` is
 `z[win.i1:win.i2, win.j1:win.j2]`, that block of the matrix.
+
+```@raw html
+<video id="masque-grid-brush-clip" title="Dragging the box across a heatmap, then pulling its corner out, while the readout names the block of cells, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-grid-brush-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "grid-brush.mp4";
+})();
+</script>
+```
 
 A box that misses the grid still gives a `GridWindowEvent`, with empty
 ranges (`win.i1:win.i2` is `1:0`), so `z[win]` is an empty matrix

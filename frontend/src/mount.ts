@@ -466,7 +466,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     })
     host.appendChild(shadowHost)
     // --masque-fig-bg drives the CSS-only tooltip theme (mount.ts's STYLE, lch(from …)); set
-    // before tipStyle below so an explicit tooltip_bg/tooltip_color kwarg (--masque-tip-bg/
+    // before tipStyle below so an explicit tooltipstyle bg/color (--masque-tip-bg/
     // --masque-tip-color) still wins outright — they're independent custom properties consumed
     // together via nested var() fallbacks, not a write-order race.
     if (manifest.background) shadowHost.style.setProperty("--masque-fig-bg", manifest.background)

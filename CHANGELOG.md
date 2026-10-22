@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A CairoMakie widget has a PNG form, `show(io, MIME"image/png"(), w)`, so a tool that reads a
+  notebook without a browser, such as an AI agent, can see the figure. Pluto still shows the
+  live figure. Printed in the REPL, a widget now gives a short summary instead of its fields:
+  each axis with its title, each layer with what it draws, the gestures it takes and its
+  tooltip fields, and the `@bind` value it starts with. A WGLMakie widget has the summary but
+  no PNG, since the browser draws it (#373).
+
 ### Changed
 - **Breaking:** on a plot built with `select = :many`, a click adds the mark or cell to the
   selection, or takes it out when it is already selected, so a stray click no longer throws
@@ -16,6 +24,9 @@ All notable changes to this project are documented here. The format is based on
   out when the drag starts on a selected mark, where a plain drag used to replace the
   selection. To start over, click an empty part of the plot or press Escape, as before
   (#358).
+- On a Documenter page, a CairoMakie widget shows as a plain picture unless the build sets
+  `example_size_threshold = nothing`: Documenter prefers a picture to an output larger than
+  8 KB, and every widget is. The build log warns when it does (#373).
 
 ### Fixed
 - While you pan or zoom a view, a selected or hovered mark on an axis tied to it by
@@ -25,6 +36,19 @@ All notable changes to this project are documented here. The format is based on
   keys work. A click on a `select = :many` plot, or anywhere on a plot you can pan, orbit, or
   drag a line or box on, used to leave the figure unfocused, and Escape did nothing until you
   pressed Tab. The click does not scroll the page (#380).
+
+### Removed
+- **Breaking:** the keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,
+  `tooltip_font_size`, `tooltip_radius`, and `tooltip_caret`, deprecated in 0.3, are gone.
+  Passing one raises a `MethodError` whose message names the `tooltipstyle` form, such as
+  `tooltipstyle = (; bg = …)`. `tooltip_sigdigits` stays (#374).
+- **Breaking:** a `Slider`, `Toggle`, `Checkbox`, `IntervalSlider` or `Menu` laid out in the
+  figure but not named in the `masque` call is an `ArgumentError`, where 0.3.1 warned. Name
+  it, `masque(fig, (name = block,))`, or take it out of the figure. A `SliderGrid` stays a
+  picture (#374).
+- The error messages that named the 0.3 replacement for a form removed in 0.3, such as
+  `RectInteractable(ax; grid = …)` or `auto_interactables`, are gone. The calls raise the same
+  errors as before, without the hint; the 0.3.0 entry below lists the replacements (#374).
 
 ## [0.3.1] - 2026-10-16
 

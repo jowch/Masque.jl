@@ -71,23 +71,6 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test_throws "must be a NamedTuple" Masque.tip_style_dict(Dict(:bg => :red))
     end
 
-    @testset "deprecated tooltip_* keywords" begin
-        flat(; kw...) = merge(
-            (; bg = nothing, color = nothing, accent = nothing, font = nothing, font_size = nothing, radius = nothing, caret = nothing),
-            (; kw...),
-        )
-        # The warning logs once per call site, so later calls run with it silenced.
-        quiet(f) = Base.CoreLogging.with_logger(f, Base.CoreLogging.NullLogger())
-        @test Masque._merge_tooltip_kwargs(nothing, flat()) === nothing           # none given → no warning
-        @test Masque._merge_tooltip_kwargs((; bg = :red), flat()) == (; bg = :red)
-        m = @test_deprecated r"`tooltip_bg = …`, `tooltip_caret = …` are deprecated; use `tooltipstyle = \(; bg = …, caret = …\)`. Removed in 0.4" Masque._merge_tooltip_kwargs(
-            nothing, flat(; bg = :red, caret = false),
-        )
-        @test m == (; bg = :red, caret = false)
-        @test quiet(() -> Masque._merge_tooltip_kwargs((; color = :blue), flat(; radius = 3))) == (; color = :blue, radius = 3)
-        @test_throws "both set" quiet(() -> Masque._merge_tooltip_kwargs((; bg = :blue), flat(; bg = :red)))
-    end
-
     @testset "overlaystyle" begin
         @test isempty(Masque.overlay_style_dict(nothing))                      # unset → empty
         @test isempty(Masque.overlay_style_dict((;)))
@@ -176,10 +159,6 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test masque(tfig; tooltip_sigdigits = 7).manifest["tipDigits"] == 7     # zero-config path too
         tstyle = masque(tfig; tooltipstyle = (; bg = :red, caret = false)).manifest["tipStyle"]
         @test tstyle == Dict("--masque-tip-bg" => "rgb(255,0,0)", "--masque-tip-caret" => "none")
-        old = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
-            masque(tfig; tooltip_bg = :red, tooltip_caret = false).manifest["tipStyle"]
-        end
-        @test old == tstyle                                                       # deprecated form, same result
         for bad in (0, 18, 2.5, "3", nothing, true)
             @test_throws ArgumentError masque(
                 tfig, PointInteractable(tax, pts2); tooltip_sigdigits = bad, auto = false
