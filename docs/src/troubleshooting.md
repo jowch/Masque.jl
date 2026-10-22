@@ -330,7 +330,7 @@ an error that names the replacement:
 
 ### Upgrading code written for Masque 0.3
 
-Masque 0.4 changes three things a 0.3 notebook can notice, besides the
+Masque 0.4 changes two things a 0.3 notebook can notice, besides the
 `tooltip_*` keywords above:
 
 - On a plot built with `select = :many`, a plain click adds the mark to
