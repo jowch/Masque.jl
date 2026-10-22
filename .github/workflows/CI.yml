@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+    # ready_for_review: a draft runs only lint until it is marked ready. labeled: adding `full-ci`
+    # to a draft runs the full suite on it (see the `changes` job).
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
 
 # needed for the bundle commit-back on main (CI is the sole author of
 # assets/overlay.js and assets/masque-webgl.js)
@@ -21,10 +24,16 @@ concurrency:
 
 jobs:
   changes:
-    # A PR that only touches prose (docs/src, docs/dev, *.md) skips the Julia, sweep and
-    # fixture jobs; the Documentation workflow still builds and checks the docs. The skip is a
-    # job-level `if`, so a required check that skips counts as passed (a workflow-level
-    # `paths:` filter would leave it pending and block the merge). Pushes to main run everything.
+    # Decides whether the Julia, sweep and fixture jobs run. They skip when
+    # - the PR is a draft without the `full-ci` label: CI runs once the work is ready
+    #   (marking it ready for review runs it), and a thread that needs full CI on a draft adds
+    #   the label;
+    # - the PR only touches prose (docs/src, docs/dev, *.md); the Documentation workflow still
+    #   builds and checks the docs.
+    # The skip is a job-level `if`, so a required check that skips counts as passed (a
+    # workflow-level `paths:` filter would leave it pending and block the merge). The PR is read
+    # fresh, so every run on the same PR state decides the same way, whichever event started it.
+    # Pushes to main run everything.
     name: Changed files
     runs-on: ubuntu-latest
     permissions:
@@ -41,10 +50,15 @@ jobs:
               core.setOutput("code", "true")
               return
             }
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner: context.repo.owner, repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number, per_page: 100,
-            })
+            const pull = { owner: context.repo.owner, repo: context.repo.repo, pull_number: context.payload.pull_request.number }
+            const { data: pr } = await github.rest.pulls.get(pull)
+            const labels = pr.labels.map((l) => l.name)
+            if (pr.draft && !labels.includes("full-ci")) {
+              core.notice("Draft PR: the Julia, sweep and fixture jobs run once it is marked ready for review, or with the `full-ci` label.")
+              core.setOutput("code", "false")
+              return
+            }
+            const files = await github.paginate(github.rest.pulls.listFiles, { ...pull, per_page: 100 })
             const prose = (p) => /^docs\/(src|dev)\//.test(p) || /\.md$/.test(p)
             const code = files.filter((f) => !prose(f.filename) || (f.previous_filename && !prose(f.previous_filename)))
             core.info(`${files.length} changed file(s), ${code.length} outside docs/src, docs/dev and *.md`)

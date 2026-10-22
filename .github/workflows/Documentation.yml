@@ -6,6 +6,7 @@ on:
       - main
     tags: '*'
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
 
 concurrency:
   group: documentation-${{ github.ref }}
@@ -13,6 +14,9 @@ concurrency:
 
 jobs:
   build:
+    # Like CI's heavy jobs, a draft PR builds the docs once it is marked ready for review, or
+    # with the `full-ci` label.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft || contains(github.event.pull_request.labels.*.name, 'full-ci')
     # These permissions are needed to:
     # - Deploy the documentation: https://documenter.juliadocs.org/stable/man/hosting/#Permissions
     # - Delete old caches: https://github.com/julia-actions/cache#usage

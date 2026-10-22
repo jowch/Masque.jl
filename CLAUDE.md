@@ -17,6 +17,9 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
   Notebooks and e2e scripts that CI runs activate `MASQUE_DEV_ENV` when it is set; a new one
   must too, or it rebuilds the Makie stack in its own temp env. PRs touching only
   `docs/src`, `docs/dev` or `*.md` skip the Julia jobs (the "Changed files" job).
+- **CI runs when a PR is ready.** A draft PR runs only the lint job; the Julia, sweep, fixture
+  and docs jobs run once it is marked ready for review. When a draft needs full CI anyway (say,
+  to show a reviewer a green run), add the `full-ci` label; every push after that runs it.
 - Upstream canary (`.github/workflows/UpstreamCanary.yml`, nightly + manual, advisory): runs
   `test/makie_compat_tests.jl` and `test/wgl_compat_tests.jl` against Makie master via
   `test/upstream/canary.jl` (usage at its top). A red run's annotation says whether resolution,
