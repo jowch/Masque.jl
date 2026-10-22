@@ -164,8 +164,9 @@ labeling.
 
 When the `masque` cell runs again, for example because you edited it,
 the new widget starts with no picks, and its first `onchange` run clears
-`labels`. The menu keeps the class the reader chose. To pick up where the reader left off, start the widget with
-the labeled points already picked. Add `selected` to the `masque` call:
+`labels`. The menu keeps the class the reader chose. To pick up where the
+reader left off, start the widget with the labeled points already
+picked. Add `selected` to the `masque` call:
 
 ```julia
 @bind w masque(fig, (class = class, pts = interactables(sc; select = :many));

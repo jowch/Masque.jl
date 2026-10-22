@@ -334,8 +334,8 @@ Idle first, then every click from [`discrete_states`](@ref) and every brush rele
 and bounds positions only). A hand-listed click or brush fails: the harvest already records
 it. Each state changes one field: its `value` is the widget's starting value with that
 field's envelope in place, and its `key` is that envelope's [`snapshot_key`](@ref). With
-`pairs = true` the TOML also gets every click on one field with every click on a later field,
-keyed as the two keys joined by `+`.
+`pairs = true` in the TOML, it also returns every click on one field with every click on a
+later field, keyed as the two keys joined by `+`.
 """
 function player_states(player::AbstractDict, manifest::AbstractDict)
     out = NamedTuple{(:key, :value), Tuple{String, Any}}[(; key = "null", value = nothing)]
