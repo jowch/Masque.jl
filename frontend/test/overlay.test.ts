@@ -6330,6 +6330,34 @@ describe("onchange (#334)", () => {
     }
     const flush = () => new Promise((r) => setTimeout(r, 0))
 
+    it("a frame whose marks changed resets the undo history, even for a field with no picks (#386)", async () => {
+        const m = withThree(threePoints())
+        const { host, img, script } = setup()
+        const one = onchangeManifest() // one point now: pts index 2 is gone
+        let calls = 0
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => {
+            calls += 1
+            return calls === 1 ? { png: new Uint8Array([1]), manifest: withThree(threePoints()) } : { png: new Uint8Array([2]), manifest: one, clear: ["pts"] }
+        })
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.focus()
+        const key = (k: string, mod: KeyboardEventInit = {}) => {
+            const e = new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...mod })
+            surface.dispatchEvent(e)
+            return e
+        }
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true })) // point 2
+        await flush()
+        img.dispatchEvent(new Event("load"))
+        key("Escape") // clears it: pts is null when the next frame names it
+        await flush()
+        img.dispatchEvent(new Event("load"))
+        expect(requestFrame).toHaveBeenCalledTimes(2)
+        expect(key("z", { ctrlKey: true }).defaultPrevented).toBe(false)
+        expect(val(host).pts ?? null).toBeNull()
+    })
+
     it("Enter and Escape reach onchange, and the focus stays on its mark across the frame", async () => {
         const m = withThree(threePoints())
         const { host, img, script } = setup()

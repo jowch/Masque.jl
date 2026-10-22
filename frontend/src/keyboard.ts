@@ -196,7 +196,7 @@ export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardE
     if (hist) {
         if (state.drag_ || !stepPicks(ctx, state, hist)) return
         e.preventDefault(); e.stopPropagation()
-        scheduleAnnounce(ctx, state, hist === "undo" ? "Undid a change to the picks" : "Redid a change to the picks")
+        scheduleAnnounce(ctx, state, hist === "undo" ? "Undid a change to the selection" : "Redid a change to the selection")
         return
     }
     const n = ctx.focusable_.length

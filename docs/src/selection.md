@@ -37,13 +37,14 @@ it does once you click it or Tab to it. Each press steps back one
 change, and `sel` changes once, as it does for a click. Shift-Cmd-Z or
 Shift-Ctrl-Z steps forward again, and so does Ctrl-Y off a Mac. Undo
 covers the selection only, not sliders, menus, or the view, and it
-starts over when the cell runs again. Cells that use `sel` respond to
-an undo as they do to a click, so anything your own code keeps from
-earlier picks, such as a label stored for each picked mark, comes back
-only if that code still holds it when the pick returns. After you click the figure,
-Cmd-Z or Ctrl-Z undoes its selection rather than your last edit to the
-code, so click into the code first to undo an edit there. With nothing
-to undo, the key does what it would anywhere else on the page.
+starts over when the cell runs again or when an `onchange` redraw
+changes a plot's marks. Cells that use `sel` respond to an undo as they
+do to a click, so anything your own code keeps from earlier picks, such
+as a label stored for each picked mark, comes back only if that code
+still holds it when the pick returns. After you click the figure, Cmd-Z
+or Ctrl-Z undoes its selection rather than your last edit to the code,
+so click into the code first to undo an edit there. With nothing to
+undo, the key does what it would anywhere else on the page.
 
 ## Select several marks
 

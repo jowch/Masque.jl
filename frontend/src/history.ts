@@ -30,10 +30,19 @@ export function fieldSelection(manifest: Manifest, f: string, v: unknown): Field
 }
 
 // Called by commit_ with the fields about to be set and the value they replace. A user's
-// gesture becomes a step and drops the redo steps. A quiet commit came from Julia (a frame
-// that cleared picks whose marks changed), so the steps may name marks that are gone: the
+// gesture becomes a step and drops the redo steps. A quiet commit that names a pick field came
+// from Julia (a frame whose marks changed), so the steps may name marks that are gone: the
 // history starts again.
 export function recordPicks(manifest: Manifest, state: OverlayState, cur: Record<string, unknown>, updates: [string, unknown][], quiet: boolean): void {
+    // Julia clears every field whose marks changed, picked or not, so an empty field it names
+    // resets the history too: its steps index the old marks.
+    if (quiet) {
+        if (updates.some(([k]) => isPickField(manifest, k))) {
+            state.undo_ = []
+            state.redo_ = []
+        }
+        return
+    }
     const before: Record<string, unknown> = {}
     let any = false
     for (const [k, v] of updates) {
@@ -42,18 +51,14 @@ export function recordPicks(manifest: Manifest, state: OverlayState, cur: Record
         any = true
     }
     if (!any) return
-    if (quiet) {
-        state.undo_ = []
-        state.redo_ = []
-        return
-    }
     state.undo_.push(before)
     if (state.undo_.length > HISTORY_LIMIT) state.undo_.shift()
     state.redo_ = []
 }
 
-// Undoes (or redoes) one step: redraws the picks it names and commits them, once. Returns
-// false, changing nothing, when there is no step that way.
+// Undoes (or redoes) one step: redraws the picks it names and commits what they resolve to,
+// once, so the drawing and the value agree. Returns false, changing nothing, when there is no
+// step that way.
 export function stepPicks(ctx: OverlayCtx, state: OverlayState, dir: "undo" | "redo"): boolean {
     const from = dir === "undo" ? state.undo_ : state.redo_
     const to = dir === "undo" ? state.redo_ : state.undo_
@@ -61,15 +66,18 @@ export function stepPicks(ctx: OverlayCtx, state: OverlayState, dir: "undo" | "r
     if (!step) return false
     const cur = ctx.value_()
     const back: Record<string, unknown> = {}
+    const updates: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(step)) {
-        back[k] = cur[k] ?? null
         const sel = fieldSelection(ctx.manifest_, k, v)
-        if (sel) state.sel_.set(k, sel)
-        else state.sel_.delete(k)
+        if (!sel) continue // names nothing this manifest has: leave the field as it is
+        back[k] = cur[k] ?? null
+        state.sel_.set(k, sel)
+        updates[k] = sel.items_ ? { items: sel.items_ } : v
     }
+    if (Object.keys(updates).length === 0) return false
     to.push(back)
     renderSelection(ctx, state)
-    ctx.commit_(step, false, true)
+    ctx.commit_(updates, false, true)
     return true
 }
 
