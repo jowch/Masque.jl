@@ -402,16 +402,23 @@ try {
     }
     passed.push("focus-outline-cleared-on-escape");
 
-    // A pointer click focuses the surface (onDown only preventDefaults a drag) but is not
-    // :focus-visible, so no outline. ElementHandle.click scrolls the surface into view first; a
+    // A pointer click focuses the surface (onDown calls focus(), #380) but draws no outline.
+    // Chromium counts that focus() as :focus-visible, so the check is the computed outline, which
+    // pointer-focus turns off. ElementHandle.click scrolls the surface into view first; a
     // raw page.mouse.click at its box can land off-screen and focus nothing, which would pass
     // this check for the wrong reason.
     await (await surfaceHandle("heatmap")).click();
     s = await state("heatmap");
-    if (!s.focused || s.focusVisible || s.outline.style !== "none") {
+    if (!s.focused || s.outline.style !== "none") {
       throw new Error(`heatmap: a pointer click drew a focus outline ${JSON.stringify(s)}`);
     }
     passed.push("focus-outline-not-on-click");
+    // A key pressed after the click shows the outline: the keys now go to this plot.
+    await page.keyboard.press("ArrowRight");
+    s = await state("heatmap");
+    if (!s.focused || s.outline.style === "none") throw new Error(`heatmap: a key after a click drew no focus outline ${JSON.stringify(s)}`);
+    passed.push("focus-outline-on-key-after-click");
+    await page.keyboard.press("Escape");
   }
 
 

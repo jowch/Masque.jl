@@ -406,6 +406,34 @@ try {
   // layer dict every other kind gets by from `layersOf`.
   const transformsOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#axes_${k}`).textContent), key);
 
+  // A real mouse click at image px (x, y), through Chromium's own input path rather than a
+  // synthetic event, so the browser's focus handling runs as it would for a user (#380). The
+  // plot is scrolled into view first; the click itself must not scroll the page or draw the
+  // keyboard focus ring. Returns the surface's focus state after the click.
+  const mouseClickAt = async (key, x, y) => {
+    const at = await page.evaluate(([k, ix, iy]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      return { x: b.left + ix * s, y: b.top + iy * s, scrollY: window.scrollY };
+    }, [key, x, y]);
+    await page.mouse.click(at.x, at.y);
+    const after = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const surface = sr.querySelector(".surface");
+      return { scrollY: window.scrollY, focused: sr.activeElement === surface, outline: getComputedStyle(surface).outlineStyle };
+    }, key);
+    if (after.scrollY !== at.scrollY) throw new Error(`${key}: a mouse click scrolled the page from ${at.scrollY} to ${after.scrollY}`);
+    if (!after.focused) throw new Error(`${key}: a mouse click left the figure without keyboard focus, so Escape cannot clear (#380)`);
+    if (after.outline !== "none") throw new Error(`${key}: a mouse click drew the keyboard focus outline (${after.outline})`);
+    return null;
+  };
+
   const dispatchAt = async (key, x, y, type, mod = {}) => page.evaluate(async ([k, ix, iy, typ, md]) => {
     const span = document.querySelector(`#coords_${k}`);
     const hosts = [...document.querySelectorAll(".ip-host")];
@@ -1072,16 +1100,10 @@ try {
       // The axis runs to y = 4; the grid stops at 3.
       const off = { x: at(1, 2).x, y: g.yedges[3] - (g.yedges[2] - g.yedges[3]) / 2 };
       t = await step("empty-click-clears", t, () => dispatchAt(key, off.x, off.y, "click"), 0, [], 0);
-      t = await step("click-again", t, () => dispatchAt(key, at(0, 0).x, at(0, 0).y, "click"), 1, [0, 0, 1], 2);
-      t = await step("escape-clears", t, () => page.evaluate((k) => {
-        const span = document.querySelector(`#coords_${k}`);
-        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
-        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-        const surface = sr.querySelector(".surface");
-        surface.focus();
-        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true, cancelable: true }));
-        return null;
-      }, key), 0, [], 0);
+      // A real mouse click, then a real Escape with no focus() in between: the click itself
+      // must give the figure focus (#380).
+      t = await step("mouse-click-again", t, () => mouseClickAt(key, at(0, 0).x, at(0, 0).y), 1, [0, 0, 1], 2);
+      t = await step("escape-after-click-clears", t, () => page.keyboard.press("Escape"), 0, [], 0);
       // A marquee adds the cells the box touches, and one from a held cell takes them out,
       // with or without Ctrl (#335, #358).
       const gdrag = async (from, to, mod = {}) => {
@@ -1221,16 +1243,9 @@ try {
       t = await step("click-adds-keeps-others", t, () => dispatchAt(key, p[1].x, p[1].y, "click"), [3, 2], 4);
       t = await step("click-removes", t, () => dispatchAt(key, p[2].x, p[2].y, "click"), [2], 2);
       t = await step("empty-click-clears", t, () => dispatchAt(key, (p[0].x + p[1].x) / 2, p[2].y, "click"), [], 0);
-      t = await step("click-again", t, () => dispatchAt(key, p[1].x, p[1].y, "click"), [2], 2);
-      t = await step("escape-clears", t, () => page.evaluate((k) => {
-        const span = document.querySelector(`#coords_${k}`);
-        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
-        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-        const surface = sr.querySelector(".surface");
-        surface.focus();
-        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true, cancelable: true }));
-        return null;
-      }, key), [], 0);
+      // A real mouse click, then a real Escape with no focus() in between (#380).
+      t = await step("mouse-click-again", t, () => mouseClickAt(key, p[1].x, p[1].y), [2], 2);
+      t = await step("escape-after-click-clears", t, () => page.keyboard.press("Escape"), [], 0);
       await dispatchAt(key, 1, 1, "pointermove");
       console.error(`OK  ${key} — ${t.slice(0, 160)}`);
       continue;
