@@ -31,8 +31,10 @@ forced-colours mode also uses. That covers the moment after Tab and before the f
 every widget with nothing to arrow through: a heatmap or image, an axis or colorbar readout, a
 threshold, ROI, view, or slice. The `kbd-ring` class (added by `keyboard.ts`'s `focusTo`, removed
 when focus clears) switches it off once a mark ring is showing, so the two never stack. It is an
-`outline`, not a `box-shadow`, because forced colours drop shadows, and it keys on
-`:focus-visible`, not `:focus`, so a pointer click focuses the surface without drawing it.
+`outline`, not a `box-shadow`, because forced colours drop shadows. A press focuses the surface
+from script (`bond.ts`'s `onDown`, #380), which Chromium counts as `:focus-visible`, so the press
+also adds a `pointer-focus` class that switches the outline off; any key but a modifier, or focus
+leaving, removes it. A pointer click therefore focuses the surface without drawing the outline.
 `keyboard_a11y.mjs` asserts the computed outline on both backends.
 
 **Announcements** go to a visually-hidden `aria-live="polite" aria-atomic="true"` `<div>` inside
