@@ -32,6 +32,10 @@ All notable changes to this project are documented here. The format is based on
 - While you pan or zoom a view, a selected or hovered mark on an axis tied to it by
   `linkaxes!` keeps its ring, which slides with that axis's data. A ring on any other axis
   stays where it is. Both used to disappear until the new frame arrived (#368).
+- While a pan or zoom preview is showing, hovering or clicking a mark on an axis tied to the
+  view by `linkaxes!`, or on any other axis, finds the mark where it is drawn. A mark on
+  another axis couldn't be hovered or clicked until the new frame arrived, and a linked axis
+  with a different scale answered at the wrong point (#379).
 
 ### Removed
 - **Breaking:** the keywords `tooltip_bg`, `tooltip_color`, `tooltip_accent`, `tooltip_font`,

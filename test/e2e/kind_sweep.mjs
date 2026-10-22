@@ -1686,7 +1686,11 @@ try {
       }
 
       if (layer.geometry && layer.geometry.mode === "pan") {
-        const zoom = await page.evaluate(([k, ix, iy]) => {
+        // #379: a data layer on a linked axis, and one on an axis the pan doesn't move.
+        const viewAxis = layer.axis;
+        const linkedAxes = links.map((l) => l.axis);
+        const unlinked = layers.find((l) => l.kind === "circles" && l.axis !== viewAxis && !linkedAxes.includes(l.axis));
+        const zoom = await page.evaluate(async ([k, ix, iy, other]) => {
           const span = document.querySelector(`#coords_${k}`);
           const hosts = [...document.querySelectorAll(".ip-host")];
           const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -1715,15 +1719,35 @@ try {
                 picks: c.querySelectorAll("g.sel > *").length,
               };
             });
+          // #379: hover mid-preview finds a mark where its own axis draws it. A linked axis's
+          // pick ring has slid with that axis; an unlinked axis's marks have not moved.
+          const hovered = (axis) => !!sr.querySelector(`svg g.masque-clip[data-axis="${axis}"] g.hi > *`);
+          const hoverAt = (x, y) => surface.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: x, clientY: y }));
+          const midHover = [];
+          for (const c of sr.querySelectorAll("svg.masque-edge g.masque-clip[data-axis]")) {
+            const ring = c.querySelector(":scope > g.masque-photo > g.sel > *");
+            if (!ring || !c.firstElementChild.getAttribute("transform") || c.dataset.axis === undefined) continue;
+            const r = ring.getBoundingClientRect();
+            hoverAt(r.left + r.width / 2, r.top + r.height / 2);
+            midHover.push({ axis: c.dataset.axis, hit: hovered(c.dataset.axis), live: !!host.dataset.masquePhoto });
+            // the next move is coalesced to an animation frame
+            await new Promise((res) => requestAnimationFrame(() => res()));
+          }
+          if (other) {
+            const g = other.geometry;
+            hoverAt(b.left + g[0] * s, b.top + g[1] * s);
+            midHover.push({ axis: other.axis, hit: hovered(other.axis), live: !!host.dataset.masquePhoto, unlinked: true });
+          }
           return {
             homes,
+            midHover,
             photo: host.dataset.masquePhoto || "",
             clip: !!host.querySelector(".masque-data-clip"),
             windows: host.querySelectorAll(".masque-data-clip").length,
             baseTransform: base?.style.transform || "",
             prevented: ev.defaultPrevented,
           };
-        }, [key, p.x, p.y]);
+        }, [key, p.x, p.y, unlinked ?? null]);
         if (!zoom.prevented || !zoom.photo || !zoom.clip || zoom.baseTransform) {
           throw new Error(`${key}-wheel: photographic zoom did not engage (${JSON.stringify(zoom)})`);
         }
@@ -1739,6 +1763,20 @@ try {
           if (!home || !home.transform || !sameClip || home.picks < 1) {
             throw new Error(`${key}-wheel: linked axis ${l.axis}'s ring is not on its own matrix and window: ${JSON.stringify(zoom.homes)}`);
           }
+        }
+        // #379: every mid-preview hover above ran while the matrix was still live, and hit.
+        const linkedHovers = zoom.midHover.filter((h) => linkedAxes.includes(h.axis));
+        const expectHovers = links.length + (unlinked ? 1 : 0);
+        if (zoom.midHover.length < expectHovers || linkedHovers.length < links.length || zoom.midHover.some((h) => !h.live)) {
+          throw new Error(`${key}-wheel: the mid-preview hover did not run while the preview was live: ${JSON.stringify(zoom.midHover)}`);
+        }
+        const missed = zoom.midHover.filter((h) => !h.hit && (h.unlinked || linkedAxes.includes(h.axis)));
+        if (missed.length) {
+          throw new Error(`${key}-wheel: hover mid-preview missed a mark where its own axis draws it: ${JSON.stringify(zoom.midHover)}`);
+        }
+        if (expectHovers) {
+          passed.push(`${key}/preview-hover`);
+          console.error(`OK  ${key}/preview-hover — ${JSON.stringify(zoom.midHover)}`);
         }
         if (links.length) {
           passed.push(`${key}/linked-ring`);
