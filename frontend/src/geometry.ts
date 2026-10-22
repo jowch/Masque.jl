@@ -788,7 +788,7 @@ export function linkedMove(m: PhotoMatrix, d: [number, number, number] | undefin
 // view rectangle and screen-fixed chrome, which stay in layout pixels; the pan axis's for a
 // threshold line or an ROI box, which slide in one group with the pan axis's photograph; and
 // its own axis's for every data mark, as `paintAxis` draws its rings (#368).
-function layerFrame(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, layer: HitLayer): AxisFrame | null {
+export function layerFrame(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, layer: HitLayer): AxisFrame | null {
     if (layoutSpaceLayer(layer)) return null
     if (layer.kind === "threshold" || layer.kind === "roi") {
         const pan = panView(manifest, photo, viewId)

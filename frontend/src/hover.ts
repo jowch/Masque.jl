@@ -1,4 +1,4 @@
-import { anchorFor, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layoutSpaceLayer, axisFrame } from "./geometry"
+import { anchorFor, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
 import { renderTemplate, renderAutoTable, esc, fmtNum, withReadout } from "./template"
 import { drawHover, clearHover, drawLink, clearLink, markColorFor } from "./highlight"
@@ -243,9 +243,9 @@ export function applyTipHtml(ctx: OverlayCtx, state: OverlayState, html: string,
 
 // `anchor` is in the hit's own space (content pixels for a data mark, layout pixels for
 // screen-fixed chrome). The tooltip is placed on the untransformed base, so a slid mark's
-// anchor is mapped back to the layout point where its own axis draws it (#368).
+// anchor is mapped back to the layout point where it is drawn (#368, #379).
 export function layoutAnchor(ctx: OverlayCtx, state: OverlayState, hit: Hit, anchor: Anchor): Anchor {
-    const f = layoutSpaceLayer(hit.layer) ? null : axisFrame(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer.axis)
+    const f = layerFrame(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer)
     if (!f) return anchor
     return { x: f.sx * anchor.x + f.tx, y: f.sy * anchor.y + f.ty, top: f.sy * anchor.top + f.ty }
 }

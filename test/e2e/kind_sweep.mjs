@@ -1694,7 +1694,7 @@ try {
         const linkedAxes = links.map((l) => l.axis);
         const offAxis = layers.filter((l) => l.kind === "circles" && l.axis !== viewAxis && !linkedAxes.includes(l.axis))
           .map((l) => ({ axis: l.axis, x: l.geometry[0], y: l.geometry[1] }));
-        const zoom = await page.evaluate(async ([k, ix, iy, marks]) => {
+        const zoom = await page.evaluate(async ([k, ix, iy, marks, pickTip]) => {
           const span = document.querySelector(`#coords_${k}`);
           const hosts = [...document.querySelectorAll(".ip-host")];
           const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -1749,7 +1749,7 @@ try {
             const r = ring.getBoundingClientRect();
             await hoverAt(r.left + r.width / 2, r.top + r.height / 2);
             const t = tip();
-            midHover.push({ axis: c.dataset.axis, pick: true, hit: !!t && t.startsWith("index"), tip: t, live: !!host.dataset.masquePhoto });
+            midHover.push({ axis: c.dataset.axis, pick: true, hit: !!t && t.startsWith(pickTip), tip: t, live: !!host.dataset.masquePhoto });
           }
           for (const mk of marks) {
             await hoverAt(b.left + mk.x * s, b.top + mk.y * s);
@@ -1762,7 +1762,7 @@ try {
             ...engaged,
             prevented: ev.defaultPrevented,
           };
-        }, [key, p.x, p.y, offAxis]);
+        }, [key, p.x, p.y, offAxis, spec.previewPickTip ?? "index"]);
         if (!zoom.prevented || !zoom.photo || !zoom.clip || zoom.baseTransform) {
           throw new Error(`${key}-wheel: photographic zoom did not engage (${JSON.stringify(zoom)})`);
         }

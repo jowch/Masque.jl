@@ -431,6 +431,8 @@ kind_sweep_meta() = [
         "key" => "view_linked", "layerId" => "view", "layerKind" => "view",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        # The linked axis's pick, hovered mid-preview, shows its own tooltip (#379).
+        "previewPickTip" => "index5x3y4",
     ),
     Dict(
         # Axis3 view (#321): drag orbits, the wheel zooms the limits about their center, and
