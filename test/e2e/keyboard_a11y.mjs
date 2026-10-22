@@ -155,6 +155,35 @@ try {
     throw new Error(`elementCount: unhandled kind ${layer.kind}`);
   };
 
+  // #386 helpers. The widget host (`.ip-host`) gets each committed value as an "input" event;
+  // a key the overlay does not take bubbles on to the page, where a listener records it.
+  const hostOf = (k) => {
+    const span = document.querySelector(`#coords_${k}`);
+    return [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+  };
+  const countInputs = (key) => page.evaluate(([k, src]) => {
+    const host = (0, eval)(src)(k);
+    host.__masqueInputs = 0;
+    if (!host.__masqueCounting) { host.addEventListener("input", () => { host.__masqueInputs++ }); host.__masqueCounting = true; }
+    window.__masqueThrough = [];
+    if (!window.__masqueKeyLog) {
+      document.addEventListener("keydown", (e) => { if (/^[zy]$/i.test(e.key) && (e.ctrlKey || e.metaKey)) window.__masqueThrough.push({ key: e.key, prevented: e.defaultPrevented }) });
+      window.__masqueKeyLog = true;
+    }
+  }, [key, hostOf.toString()]);
+  const inputCount = (key) => page.evaluate(([k, src]) => (0, eval)(src)(k).__masqueInputs, [key, hostOf.toString()]);
+  const passedThrough = () => page.evaluate(() => window.__masqueThrough);
+  const selCount = (key) => page.evaluate(([k, src]) => {
+    let sr = null; (0, eval)(src)(k).querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+    return sr.querySelectorAll("g.sel > *").length;
+  }, [key, hostOf.toString()]);
+  const waitOut = async (key, before, what) => {
+    let t = before;
+    for (let i = 0; i < 50 && t === before; i++) { await page.waitForTimeout(100); t = await textOf(`#out_${key}`); }
+    if (t === before) throw new Error(`${key}: ${what} never changed #out_${key}`);
+    return t;
+  };
+
   for (const key of ["scatter", "barplot", "poly"]) {
     const layers = await layersOf(key);
     const layer = layers[0];
@@ -211,10 +240,38 @@ try {
     }
     passed.push(`${key}/enter-bind`);
 
+    // #386: Escape clears the pick and keeps focus, so Cmd/Ctrl+Z brings it back, one value per
+    // step; a second Escape leaves. The undo key passes through when there is nothing to take.
+    await countInputs(key);
     await page.keyboard.press("Escape");
     s = await state(key);
-    if (s.focused) throw new Error(`${key}: Escape did not blur the surface`);
+    if (!s.focused) throw new Error(`${key}: Escape that cleared a pick left the surface`);
     if (s.ring && !s.ring.leaving) throw new Error(`${key}: Escape left a non-fading ring`);
+    const cleared = await waitOut(key, after, "escape");
+    if (new RegExp(`:${layer.id},`).test(cleared)) throw new Error(`${key}: Escape left a pick: ${cleared.slice(0, 200)}`);
+    passed.push(`${key}/escape-clears-keeps-focus`);
+    await page.keyboard.press("ControlOrMeta+z");
+    let undone = await waitOut(key, cleared, "undo");
+    if (undone !== after) throw new Error(`${key}: Cmd/Ctrl+Z gave ${undone.slice(0, 200)}, want the pick back: ${after.slice(0, 200)}`);
+    if ((await selCount(key)) === 0) throw new Error(`${key}: Cmd/Ctrl+Z restored the value but drew no selection`);
+    await page.keyboard.press("ControlOrMeta+Shift+z");
+    const redone = await waitOut(key, undone, "redo");
+    if (redone !== cleared) throw new Error(`${key}: Shift+Cmd/Ctrl+Z gave ${redone.slice(0, 200)}, want ${cleared.slice(0, 200)}`);
+    if ((await passedThrough()).length) throw new Error(`${key}: a handled undo/redo reached the page`);
+    await page.keyboard.press("ControlOrMeta+Shift+z"); // nothing left to redo
+    const through = await passedThrough();
+    if (through.length !== 1 || through[0].prevented) throw new Error(`${key}: a redo with no step was not passed through untouched: ${JSON.stringify(through)}`);
+    await page.keyboard.press("ControlOrMeta+z");
+    undone = await waitOut(key, redone, "undo-again");
+    if (undone !== after) throw new Error(`${key}: second Cmd/Ctrl+Z did not bring the pick back`);
+    const inputs = await inputCount(key);
+    if (inputs !== 4) throw new Error(`${key}: Escape, undo, redo, undo sent ${inputs} values, want 4`);
+    passed.push(`${key}/undo-redo`);
+    await page.keyboard.press("Escape");
+    await waitOut(key, undone, "escape-again");
+    await page.keyboard.press("Escape");
+    s = await state(key);
+    if (s.focused) throw new Error(`${key}: Escape with nothing picked did not blur the surface`);
     passed.push(`${key}/escape`);
   }
 

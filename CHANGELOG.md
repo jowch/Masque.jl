@@ -13,6 +13,12 @@ All notable changes to this project are documented here. The format is based on
   each axis with its title, each layer with what it draws, the gestures it takes and its
   tooltip fields, and the `@bind` value it starts with. A WGLMakie widget has the summary but
   no PNG, since the browser draws it (#373).
+- With a figure focused, Cmd-Z (on a Mac) or Ctrl-Z (elsewhere) undoes the last change to the
+  selection, whether a click, a box, a legend click, or Escape made it, and Shift-Cmd-Z,
+  Shift-Ctrl-Z, or Ctrl-Y redoes it. Each step changes the `@bind` value once. Undo covers the
+  selection only, and with nothing to undo the key reaches the page as before. Escape that
+  clears a selection now keeps the figure focused, so an undo can follow, and a second Escape
+  leaves the figure (#386).
 
 ### Changed
 - **Breaking:** on a plot built with `select = :many`, a click adds the mark or cell to the
