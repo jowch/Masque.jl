@@ -18,8 +18,8 @@ import type { Hit, HitLayer, Manifest } from "./types"
 
 export const FADE_KINDS = new Set(["circles", "rects", "polygons"])
 
-// Image px a faded mark's cover reaches past its edge (antialiasing, a thin outline), and a
-// pick's punch-out past its own.
+// Image px a mark's cover, and a pick's punch-out of it, reach past the mark's edge
+// (antialiasing, a thin outline). How much two circles must overlap for one to cover the other.
 const PAD_DIM = 1.5
 const PAD_KEEP = 0.5
 // A pick is lone when no other pick lies within this many of its radii of its edge: centres 3
@@ -80,6 +80,15 @@ function paintOrder(layer: HitLayer): number[] {
     return out
 }
 
+// A layer's drawn elements bottom first, gaps left out, kept per layer: a layer's geometry never
+// changes (a new figure is a new manifest).
+const drawnCache = new WeakMap<HitLayer, number[]>()
+function drawnOrder(layer: HitLayer): number[] {
+    let ks = drawnCache.get(layer)
+    if (!ks) drawnCache.set(layer, (ks = paintOrder(layer).filter((k) => !isGapElement(layer, k))))
+    return ks
+}
+
 // The colour faded marks go toward: the axis's empty plot area, which is the figure's
 // background unless the axis has its own.
 const plotFill = (m: Manifest, axis: string): string => m.transforms[axis]?.fill ?? m.background ?? "#ffffff"
@@ -96,7 +105,7 @@ export function fadesSome(hits: Hit[], scope: HitLayer[]): boolean {
     }
     for (const layer of scope) {
         const ks = kept.get(layer)
-        for (const k of paintOrder(layer)) if (!ks?.has(k) && !isGapElement(layer, k)) return true
+        for (const k of drawnOrder(layer)) if (!ks?.has(k)) return true
     }
     return false
 }
@@ -282,36 +291,49 @@ export function createFade(host: FadeHost): Fade {
         return c.palette[c.index[k]] ?? null
     }
 
-    // The picks an unpicked mark drawn after them covers: only those are repainted, so a pick
-    // nothing covers keeps the image's pixels (its stroke, its marker shape).
-    const coveredPicks = (layer: HitLayer, kept: Set<number>): number[] => {
-        if (layer.kind !== "circles" || !layer.colors) return []
+    // A circles layer's drawn marks in a grid of cells two radii wide, with each mark's place in
+    // the paint order, built once per layer for coveredPicks.
+    const gridCache = new WeakMap<HitLayer, { cell: number; z: Map<number, number>; grid: Map<number, number[]> }>()
+    const cellKey = (cx: number, cy: number): number => cx * 1048576 + cy
+    const circleGrid = (layer: HitLayer) => {
+        let c = gridCache.get(layer)
+        if (c) return c
         const g = layer.geometry as number[]
-        const order = paintOrder(layer)
+        const order = drawnOrder(layer)
         const z = new Map<number, number>()
         order.forEach((k, i) => z.set(k, i))
         let rmax = 0
         for (const k of order) rmax = Math.max(rmax, g[3 * k + 2] || 0)
         const cell = Math.max(1, 2 * rmax)
-        const grid = new Map<string, number[]>()
+        const grid = new Map<number, number[]>()
         for (const k of order) {
-            if (kept.has(k) || isGapElement(layer, k)) continue
-            const key = `${Math.floor(g[3 * k] / cell)},${Math.floor(g[3 * k + 1] / cell)}`
+            const key = cellKey(Math.floor(g[3 * k] / cell), Math.floor(g[3 * k + 1] / cell))
             const list = grid.get(key)
             if (list) list.push(k)
             else grid.set(key, [k])
         }
+        gridCache.set(layer, (c = { cell, z, grid }))
+        return c
+    }
+
+    // The picks an unpicked mark drawn after them covers: only those are repainted, so a pick
+    // nothing covers keeps the image's pixels (its stroke, its marker shape).
+    const coveredPicks = (layer: HitLayer, kept: Set<number>): number[] => {
+        if (layer.kind !== "circles" || !layer.colors) return []
+        const g = layer.geometry as number[]
+        const { cell, z, grid } = circleGrid(layer)
         const out: number[] = []
         for (const k of kept) {
             const zk = z.get(k)
-            if (zk === undefined || isGapElement(layer, k)) continue
+            if (zk === undefined) continue
             const x = g[3 * k], y = g[3 * k + 1], r = g[3 * k + 2]
             const cx = Math.floor(x / cell), cy = Math.floor(y / cell)
             let hit = false
             for (let a = -1; a <= 1 && !hit; a++) {
                 for (let b = -1; b <= 1 && !hit; b++) {
-                    for (const j of grid.get(`${cx + a},${cy + b}`) ?? []) {
-                        if ((z.get(j) ?? -1) > zk && Math.hypot(g[3 * j] - x, g[3 * j + 1] - y) < r + g[3 * j + 2] - PAD_KEEP) { hit = true; break }
+                    for (const j of grid.get(cellKey(cx + a, cy + b)) ?? []) {
+                        if (kept.has(j) || (z.get(j) ?? -1) <= zk) continue
+                        if (Math.hypot(g[3 * j] - x, g[3 * j + 1] - y) < r + g[3 * j + 2] - PAD_KEEP) { hit = true; break }
                     }
                 }
             }
@@ -388,6 +410,32 @@ export function createFade(host: FadeHost): Fade {
         if (cv.height !== m.height) cv.height = m.height
     }
 
+    // Each axis's cover of every drawn mark of a set of layers in the plot area's colour, drawn
+    // once and copied onto the dim canvas on each redraw, so a click costs the picks it punches
+    // out, not the plot's marks. The last two sets are kept per axis (a legend's preview and the
+    // selection); a new manifest starts over.
+    let coverManifest: Manifest | null = null
+    const covers = new Map<string, Array<{ key: string; cv: HTMLCanvasElement }>>()
+    const coverOf = (axis: string, layers: HitLayer[], m: Manifest, bg: string): HTMLCanvasElement | null => {
+        if (coverManifest !== m) {
+            covers.clear()
+            coverManifest = m
+        }
+        const key = `${m.width}x${m.height} ${bg} ${layers.map((l) => l.id).join(",")}`
+        const list = covers.get(axis) ?? []
+        const hit = list.find((e) => e.key === key)
+        if (hit) return hit.cv
+        const cv = document.createElement("canvas")
+        cv.width = m.width
+        cv.height = m.height
+        const c = cv.getContext("2d")
+        if (!c) return null
+        c.fillStyle = bg
+        for (const layer of layers) fillShapes(c, layer, drawnOrder(layer), PAD_DIM)
+        covers.set(axis, [{ key, cv }, ...list].slice(0, 2))
+        return cv
+    }
+
     const drawAxis = (axis: string, kept: Map<HitLayer, Set<number>>): void => {
         const h = home(axis)
         const m = host.manifest_()
@@ -398,7 +446,9 @@ export function createFade(host: FadeHost): Fade {
         let faded = 0, nkept = 0, raised = 0
         for (const [layer, ks] of kept) {
             nkept += ks.size
-            for (const k of paintOrder(layer)) if (!ks.has(k) && !isGapElement(layer, k)) faded++
+            let drawnKept = 0
+            for (const k of ks) if (!isGapElement(layer, k)) drawnKept++
+            faded += drawnOrder(layer).length - drawnKept
         }
         const lone = lonePicks(kept)
         const dc = h.dim.getContext("2d")
@@ -406,11 +456,11 @@ export function createFade(host: FadeHost): Fade {
         if (dc && tc) {
             dc.clearRect(0, 0, h.dim.width, h.dim.height)
             dc.globalCompositeOperation = "source-over"
-            dc.fillStyle = bg
-            for (const [layer, ks] of kept) fillShapes(dc, layer, paintOrder(layer).filter((k) => !ks.has(k)), PAD_DIM)
+            const cover = coverOf(axis, [...kept.keys()], m, bg)
+            if (cover) dc.drawImage(cover, 0, 0)
             dc.globalCompositeOperation = "destination-out"
             dc.fillStyle = "#000000"
-            for (const [layer, ks] of kept) fillShapes(dc, layer, ks, PAD_KEEP)
+            for (const [layer, ks] of kept) fillShapes(dc, layer, ks, PAD_DIM)
             dc.globalCompositeOperation = "source-over"
 
             tc.clearRect(0, 0, h.top.width, h.top.height)
@@ -497,7 +547,7 @@ export function createFade(host: FadeHost): Fade {
                 const b = boxOf(layer, k)
                 if (b && b[0] <= box[2] && b[2] >= box[0] && b[1] <= box[3] && b[3] >= box[1]) near.push(k)
             }
-            if (near.length) fillShapes(c, layer, near, PAD_KEEP)
+            if (near.length) fillShapes(c, layer, near, PAD_DIM)
         }
         c.globalCompositeOperation = "source-over"
     }
