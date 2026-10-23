@@ -98,11 +98,12 @@ html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latt
   background: hsl(0deg 0% 12%);
 }
 
-/* The Home loops are recorded at 2x, so their natural size is twice the size they are meant
-   to show at. */
+/* The Home loops are recorded at 2x (1168-1456 px), so cap them at 720 px wide.
+   `height: auto` keeps the video's width/height attributes from stretching it. */
 .content img[src*="assets/home/"],
 .content video.masque-loop {
   display: block;
   width: 100%;
+  height: auto;
   max-width: 720px;
 }

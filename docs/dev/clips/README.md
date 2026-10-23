@@ -29,7 +29,8 @@ The Home page's four loops have their own recorders: see `docs/dev/home-gifs/REA
 ## Formats
 
 Every clip is recorded at `deviceScaleFactor: 2` and kept at that size, so a Retina screen
-shows the UI text sharp; the page shows it at half size (`max-width: 640px`).
+shows the UI text sharp. Pages show a guide clip at most 640 px wide and a Home loop at most
+720 px.
 
 - **MP4** for the guide clips (15–25 s), which a reader pauses and replays, and for the short
   loops where the whole figure moves (the two `view-*` loops, Home's orbit). `assemble_mp4.sh`
@@ -52,12 +53,15 @@ node cluster_clip.mjs http://127.0.0.1:1240 "$PWD/../../docs/dev/clips/cluster_n
 # the guide clips: docs_clip.mjs <url> <notebook> <frames-dir> <clip>
 node docs_clip.mjs http://127.0.0.1:1240 "$PWD/../../docs/dev/clips/grid_many_notebook.jl" /tmp/grid-many grid-many
 ../../docs/dev/clips/assemble_mp4.sh /tmp/grid-many ../../docs/src/assets/grid-many.mp4
+node docs_clip.mjs http://127.0.0.1:1240 "$PWD/../../docs/dev/clips/view_pan_notebook.jl" /tmp/view-pan view-pan
+../../docs/dev/clips/assemble_mp4.sh /tmp/view-pan ../../docs/src/assets/view-pan.mp4 40
 ```
 
 `cluster_clip.mjs` drags the box three times (set it down on the upper cluster, move it to the
 lower one, pull a corner in to half of it) and waits after each release until Julia has
 redrawn the histogram, so every histogram in the clip is a real recomputation.
-`assemble_mp4.sh` keeps the captured pacing.
+`assemble_mp4.sh` keeps the captured pacing; its optional third argument sets how long the
+last frame holds (1500 ms, or 40 for the `view-*` loops, which end where they start).
 
 `docs_clip.mjs` aims from the widget's manifest, which each guide notebook writes into a
 hidden cell, and after each move it waits until Julia has redrawn the figure or the readout

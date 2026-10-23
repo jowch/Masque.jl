@@ -21,8 +21,9 @@ Click a mark to send it to your notebook. See [Click marks](@ref) and
 ## [Pan and orbit](@id home-pan-orbit)
 
 ```@raw html
-<video class="masque-loop" src="assets/home/orbit.mp4" muted loop playsinline autoplay
-       title="Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera"></video>
+<video class="masque-loop" src="assets/home/orbit.mp4" width="1456" height="828"
+       muted loop playsinline autoplay
+       aria-label="Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera"></video>
 ```
 
 Drag a 2D axis to pan, or an `Axis3` to orbit, and scroll to zoom
