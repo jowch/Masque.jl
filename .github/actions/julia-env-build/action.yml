@@ -25,7 +25,8 @@ runs:
     - shell: bash
       run: echo "MASQUE_DEV_ENV=$RUNNER_TEMP/masque-dev" >> "$GITHUB_ENV"
     # Start from the newest depot for this Julia build, so a dependency release only recompiles
-    # what it touches.
+    # what it touches. Old package versions pile up in the depot this way (366 MB in Oct 2026);
+    # when it grows too big, bump `v1` in every key below to start from an empty depot once.
     - uses: actions/cache/restore@v4
       with:
         path: |

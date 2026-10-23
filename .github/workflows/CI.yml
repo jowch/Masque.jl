@@ -4,9 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    # ready_for_review: a draft runs only lint until it is marked ready. labeled: adding `full-ci`
-    # to a draft runs the full suite on it (see the `changes` job).
-    types: [opened, synchronize, reopened, ready_for_review, labeled]
+    # ready_for_review: a draft runs only lint until it is marked ready. No `labeled`: with
+    # cancel-in-progress, any label added to a ready PR (`breaking`, the add/remove trick that
+    # re-runs Release gate) would cancel and restart a full run. A draft labelled `full-ci` runs
+    # the full suite from its next push, or from a re-run of this workflow (see `changes`).
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # needed for the bundle commit-back on main (CI is the sole author of
 # assets/overlay.js and assets/masque-webgl.js)
@@ -30,10 +32,10 @@ jobs:
     #   the label;
     # - the PR only touches prose (docs/src, docs/dev, *.md); the Documentation workflow still
     #   builds and checks the docs.
-    # The skip is a job-level `if`, so a required check that skips counts as passed (a
-    # workflow-level `paths:` filter would leave it pending and block the merge). The PR is read
-    # fresh, so every run on the same PR state decides the same way, whichever event started it.
-    # Pushes to main run everything.
+    # The skip is a job-level `if`, and the `CI result` job below turns the whole run into one
+    # check, so a skip never leaves a required check pending. The PR is read fresh, so every run
+    # on the same PR state decides the same way, whichever event started it, and a re-run sees a
+    # label added since. Pushes to main run everything.
     name: Changed files
     runs-on: ubuntu-latest
     permissions:
@@ -413,3 +415,22 @@ jobs:
             git pull --rebase origin main   # serialize with a second push landing on main mid-run
             git push
           fi
+
+  ci-result:
+    # The one check the ruleset requires for this workflow (with Release gate). A skipped matrix
+    # job never expands, so it reports under its unexpanded name (`Julia ${{ matrix.version }}`)
+    # and a required `Julia 1` would wait forever on a docs-only or draft PR. This job always
+    # runs, passes when every job passed or skipped, and keeps job renames out of the ruleset.
+    name: CI result
+    if: always()
+    needs: [changes, setup, setup-lts, julia, webgl-bind-e2e, kind-sweep, examples, lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed or skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) exit 1 ;;
+          esac

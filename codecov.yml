@@ -25,10 +25,10 @@ coverage:
         target: auto
         threshold: 1%
 
-# No job in CI.yml filters by changed paths — every flag uploads on every PR — so this
-# isn't path-filter resilience. It only matters if a job fails/is cancelled before its
-# upload step: without it, a dropped flag on one commit can read as a coverage cliff on
-# the next rather than "no new data this run."
+# Draft and docs-only PRs skip the Julia jobs, and a failed or cancelled job skips its upload.
+# Carryforward keeps the last upload of a flag that didn't report, so the number reads as "no
+# new data this run", not a coverage cliff. The flip side: a retired flag carries forward
+# forever. Delete it in Codecov when its job goes.
 flag_management:
   default_rules:
     carryforward: true
