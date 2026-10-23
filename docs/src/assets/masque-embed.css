@@ -97,3 +97,12 @@ html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latt
 html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-gallery-card img {
   background: hsl(0deg 0% 12%);
 }
+
+/* The Home loops are recorded at 2x, so their natural size is twice the size they are meant
+   to show at. */
+.content img[src*="assets/home/"],
+.content video.masque-loop {
+  display: block;
+  width: 100%;
+  max-width: 720px;
+}

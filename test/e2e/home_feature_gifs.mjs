@@ -1,4 +1,4 @@
-// Record Home feature GIFs from harvested docs players (static overlay HTML).
+// Record the Home feature loops from harvested docs players (static overlay HTML).
 // Run from test/e2e. Docs must already be served at BASE:
 //
 //   node home_feature_gifs.mjs http://localhost:8765 <scenario> <frames-dir>
@@ -44,7 +44,6 @@ function hitPoint(layer, index) {
 
 const browser = await chromium.launch({
   headless: true,
-  channel: "chrome",
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
 });
 
@@ -180,7 +179,7 @@ try {
 
   const timeline = async () => {
     if (scenario === "hover") {
-      const layer = layers.find((l) => l.id === "stars");
+      const layer = layers.find((l) => l.kind === "circles");
       const pts = [0, 5, 7].map((i) => hitPoint(layer, i));
       const css = await Promise.all(pts.map((p) => toCss(p.x, p.y)));
       await sleep(350);

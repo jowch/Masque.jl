@@ -6,28 +6,31 @@ notebook can respond. [Ready to get started?](getting-started.md)
 
 ## [Tooltips](@id home-tooltips)
 
-![Hovering over a star shows its name, spectral type, and distance](assets/home/hover.gif)
+![Hovering over a star shows its name, spectral type, and distance](assets/home/hover.webp)
 
 Hover over a point, bar, heatmap cell, or polygon to see its data in a
 tooltip. You choose what the tooltip says. See [Tooltips](@ref).
 
 ## Select marks
 
-![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.gif)
+![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.webp)
 
 Click a mark to send it to your notebook. See [Click marks](@ref) and
 [Selection](@ref).
 
 ## [Pan and orbit](@id home-pan-orbit)
 
-![Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera](assets/home/orbit.gif)
+```@raw html
+<video class="masque-loop" src="assets/home/orbit.mp4" muted loop playsinline autoplay
+       title="Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera"></video>
+```
 
 Drag a 2D axis to pan, or an `Axis3` to orbit, and scroll to zoom
 either. See [Pan and orbit](@ref).
 
 ## Highlight from the legend
 
-![Clicking a species in the legend keeps that class and fades the others](assets/home/legend.gif)
+![Clicking a species in the legend keeps that class and fades the others](assets/home/legend.webp)
 
 Click a legend entry to highlight the traces it labels, and a cell that
 uses the selection can fade the others, as in this example. See

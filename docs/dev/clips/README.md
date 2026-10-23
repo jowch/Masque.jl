@@ -21,6 +21,24 @@ be a player, so their page shows a clip of the live notebook instead:
 | `docs/src/assets/grid-many.mp4` | Inspect a grid › Select several cells | `grid_many_notebook.jl` | `test/e2e/docs_clip.mjs grid-many` |
 | `docs/src/assets/grid-regions.mp4` | Inspect a grid › Pick whole regions | `grid_regions_notebook.jl` | `test/e2e/docs_clip.mjs grid-regions` |
 | `docs/src/assets/grid-brush.mp4` | Inspect a grid › Brush a block of cells | `grid_brush_notebook.jl` | `test/e2e/docs_clip.mjs grid-brush` |
+| `docs/src/assets/view-pan.mp4` | Pan and orbit (top) | `view_pan_notebook.jl` | `test/e2e/docs_clip.mjs view-pan` |
+| `docs/src/assets/view-orbit.mp4` | Pan and orbit › Orbit an `Axis3` | `view_orbit_notebook.jl` | `test/e2e/docs_clip.mjs view-orbit` |
+
+The Home page's four loops have their own recorders: see `docs/dev/home-gifs/README.md`.
+
+## Formats
+
+Every clip is recorded at `deviceScaleFactor: 2` and kept at that size, so a Retina screen
+shows the UI text sharp; the page shows it at half size (`max-width: 640px`).
+
+- **MP4** for the guide clips (15–25 s), which a reader pauses and replays, and for the short
+  loops where the whole figure moves (the two `view-*` loops, Home's orbit). `assemble_mp4.sh`
+  writes H.264 at CRF 22 with `-tune animation`.
+- **Lossless animated WebP** for the Home loops where only the overlay changes (hover, click,
+  legend): sharper than a GIF and shown with a plain markdown image. `assemble_webp.py` writes
+  them with libwebp's animation encoder through Pillow, which stores only what changed between
+  frames. Where the whole figure moves, lossless WebP is 5–18× the MP4 (view-pan: 2.8 MB
+  against 155 KB), and ffmpeg's own WebP encoder, which stores whole frames, is worse still.
 
 Re-record from `test/e2e`, with a Pluto server whose notebooks can load this checkout
 (`serve.jl` with `MASQUE_DEV_ENV` set to a warmed env, see `CLAUDE.md`) and `ffmpeg` on
@@ -39,7 +57,7 @@ node docs_clip.mjs http://127.0.0.1:1240 "$PWD/../../docs/dev/clips/grid_many_no
 `cluster_clip.mjs` drags the box three times (set it down on the upper cluster, move it to the
 lower one, pull a corner in to half of it) and waits after each release until Julia has
 redrawn the histogram, so every histogram in the clip is a real recomputation.
-`assemble_mp4.sh` keeps the captured pacing and writes H.264 at 720 px wide.
+`assemble_mp4.sh` keeps the captured pacing.
 
 `docs_clip.mjs` aims from the widget's manifest, which each guide notebook writes into a
 hidden cell, and after each move it waits until Julia has redrawn the figure or the readout

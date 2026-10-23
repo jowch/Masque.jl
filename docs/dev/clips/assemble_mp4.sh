@@ -1,7 +1,9 @@
 #!/bin/bash
 # Assemble a docs clip (MP4, H.264) from the frames + timestamps.json that a recorder such as
 # test/e2e/cluster_clip.mjs writes. Frames keep their captured pacing: a pause in the clip is
-# Julia recomputing the cell, which is the point of showing a live notebook.
+# Julia recomputing the cell, which is the point of showing a live notebook. The clip keeps the
+# recorder's 2x width, so a Retina screen shows the UI text sharp; -tune animation suits the
+# flat colors and still frames of a screen recording.
 #
 #   docs/dev/clips/assemble_mp4.sh <frames-dir> <out.mp4>
 set -euo pipefail
@@ -25,6 +27,6 @@ print(f"{len(ts)} frames over {ts[-1]['t'] / 1000:.1f}s")
 PYEOF
 
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$CONCAT" \
-  -vf "fps=30,scale=720:-2:flags=lanczos,format=yuv420p" \
-  -c:v libx264 -preset slow -crf 24 -movflags +faststart -an "$OUT"
+  -vf "fps=30,crop=trunc(iw/2)*2:trunc(ih/2)*2:0:0,format=yuv420p" \
+  -c:v libx264 -preset slow -tune animation -crf 22 -movflags +faststart -an "$OUT"
 ls -la "$OUT"

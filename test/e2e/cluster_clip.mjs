@@ -35,7 +35,7 @@ let failed = null;
 try {
   const context = await browser.newContext({
     locale: "en-US", timezoneId: "UTC",
-    viewport: { width: 900, height: 1100 }, deviceScaleFactor: 1.5,
+    viewport: { width: 900, height: 1100 }, deviceScaleFactor: 2,
   });
   const page = await context.newPage();
   page.on("pageerror", (e) => console.error("PAGEERROR:", e.message));
