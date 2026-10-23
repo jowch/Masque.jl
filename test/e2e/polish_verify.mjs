@@ -538,17 +538,9 @@ try {
     const circles = layer.kind === "circles";
     if (sel !== null) {
       if (circles) {
-        const w = {
-          fill: m.kids.find((k) => k.layer === "fill" && k.kind === "closed"),
-          edge: m.kids.find((k) => k.layer === "edge" && k.kind === "closed"),
-          plain: m.kids.find((k) => k.layer === "plain" && k.kind === "closed"),
-        };
-        assertWash(w, key, false);
-        for (const shape of [w.fill, w.edge].filter(Boolean)) {
-          assertCircleR(shape.r, g[3 * sel + 2], `${key}/selected-${shape.layer}`);
-          if (Math.abs(Number(shape.cx) - g[3 * sel]) > 0.6 || Math.abs(Number(shape.cy) - g[3 * sel + 1]) > 0.6) {
-            throw new Error(`${key}: selected wash off the mark (${shape.cx},${shape.cy}) vs (${g[3 * sel]},${g[3 * sel + 1]})`);
-          }
+        // The pick is drawn by the fade (#394): kept on its axis's canvases, nothing in g.sel.
+        if (!m.picked.includes(`${layer.id}:${sel}`) || m.kids.some((k) => k.kind === "closed")) {
+          throw new Error(`${key}: selected mark ${sel} not drawn by the fade ${JSON.stringify({ picked: m.picked, kids: m.kids })}`);
         }
       } else {
         const r = m.kids.find((k) => k.kind === "ring");
