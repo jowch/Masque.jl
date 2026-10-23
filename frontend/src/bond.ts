@@ -149,7 +149,7 @@ function queueDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEven
 }
 
 // ctrl-click is a context menu on Apple platforms only.
-function isApplePlatform(): boolean {
+export function isApplePlatform(): boolean {
     const nav = navigator as Navigator & { userAgentData?: { platform?: string } }
     const platform = nav.userAgentData?.platform
     if (platform) return platform === "macOS" || platform === "iOS"
@@ -631,8 +631,8 @@ function gridCellAt(gg: GridGeometry, x: number, y: number): number | null {
 
 // Clears the picks of every click field on `axes` (every axis when it is null), leaving the
 // controls and a box's target alone, and the `many` fields too unless `many` is set. A field
-// that already holds nothing sends nothing.
-export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] | null, many: boolean): void {
+// that already holds nothing sends nothing. Returns whether any field had picks to clear.
+export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] | null, many: boolean): boolean {
     const cur = ctx.value_()
     const updates: Record<string, unknown> = {}
     for (const layer of ctx.manifest_.layers) {
@@ -652,9 +652,10 @@ export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] 
         state.sel_.set(layer.id, layer.many ? { hits_: [], source_: null, items_: [] } : { hits_: [], source_: null })
         updates[layer.id] = layer.many ? { items: [] } : null
     }
-    if (Object.keys(updates).length === 0) return
+    if (Object.keys(updates).length === 0) return false
     renderSelection(ctx, state)
     ctx.commit_(updates)
+    return true
 }
 
 // The plot axes under image px (x, y): every axis whose plot area holds the point, so twin

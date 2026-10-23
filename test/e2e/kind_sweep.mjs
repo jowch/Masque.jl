@@ -1119,6 +1119,9 @@ try {
       // must give the figure focus (#380).
       t = await step("mouse-click-again", t, () => mouseClickAt(key, at(0, 0).x, at(0, 0).y), 4, [0, 0, 1, 0, 3, 1, 1, 2, 1, 2, 0, 1], 2);
       t = await step("escape-after-click-clears", t, () => page.keyboard.press("Escape"), 0, [], 0);
+      // Ctrl+Z on the focused figure brings back what Escape cleared (#386).
+      t = await step("undo-after-escape", t, () => page.keyboard.press("ControlOrMeta+z"), 4, [0, 0, 1, 0, 3, 1, 1, 2, 1, 2, 0, 1], 2);
+      t = await step("redo", t, () => page.keyboard.press("ControlOrMeta+Shift+z"), 0, [], 0);
       // A marquee adds the cells the box touches, and one from a held cell takes them out,
       // with or without Ctrl (#335, #358).
       const gdrag = async (from, to, mod = {}) => {
@@ -1268,6 +1271,8 @@ try {
       // A real mouse click, then a real Escape with no focus() in between (#380).
       t = await step("mouse-click-again", t, () => mouseClickAt(key, p[0].x, p[0].y), [2, 1], 4);
       t = await step("escape-after-click-clears", t, () => page.keyboard.press("Escape"), [], 0);
+      t = await step("undo-after-escape", t, () => page.keyboard.press("ControlOrMeta+z"), [2, 1], 4);
+      t = await step("redo", t, () => page.keyboard.press("ControlOrMeta+Shift+z"), [], 0);
       await dispatchAt(key, 1, 1, "pointermove");
       console.error(`OK  ${key} — ${t.slice(0, 160)}`);
       continue;

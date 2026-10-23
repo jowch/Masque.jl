@@ -15,7 +15,9 @@ setup for this.
 | Page Down / Page Up | First mark of the next / previous layer |
 | Shift + → / Shift + ← | On a line, the next / previous data point. The tooltip moves to it, and Enter selects it |
 | Enter / Space | Select the focused mark: its plot's field in the `@bind` value becomes what a click on it gives. On a plot with `select = :many`, add the mark to the selection or take it out |
-| Escape | Clear every selection, then the focus, and leave the plot |
+| Cmd-Z / Ctrl-Z | Undo the last change to the selection. See [Undo a change](@ref) |
+| Shift-Cmd-Z / Shift-Ctrl-Z, Ctrl-Y | Redo it |
+| Escape | Clear every selection and the focus. With nothing selected, leave the plot |
 
 Arrow keys and Home / End stop at the first and last mark rather than
 wrapping around.

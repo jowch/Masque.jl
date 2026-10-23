@@ -29,6 +29,23 @@ empty space clears only the plots in the axis you clicked, and Escape
 clears every plot in the figure. A click on a line or another mark that
 only shows a tooltip is not empty space, so it keeps the selection.
 
+## Undo a change
+
+To get back a selection that a click, a box, or Escape took away, press
+Cmd-Z (on a Mac) or Ctrl-Z (elsewhere) while the figure has focus, which
+it does once you click it or Tab to it. Each press steps back one
+change, and `sel` changes once, as it does for a click. Shift-Cmd-Z or
+Shift-Ctrl-Z steps forward again, and so does Ctrl-Y off a Mac. Undo
+covers the selection only, not sliders, menus, or the view, and it
+starts over when the cell runs again or when an `onchange` redraw
+changes a plot's marks. Cells that use `sel` respond to an undo as they
+do to a click, so anything your own code keeps from earlier picks, such
+as a label stored for each picked mark, comes back only if that code
+still holds it when the pick returns. After you click the figure, Cmd-Z
+or Ctrl-Z undoes its selection rather than your last edit to the code,
+so click into the code first to undo an edit there. With nothing to
+undo, the key does what it would anywhere else on the page.
+
 ## Select several marks
 
 A click selects one mark of a plot and replaces that plot's previous
