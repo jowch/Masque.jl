@@ -2676,7 +2676,7 @@ try {
           .flatMap((svg) => [...(svg?.querySelectorAll("g.masque-photo > g.link") ?? [])])
           .find((g) => g.children.length > 0);
         const leaving = firstPopulated ? firstPopulated.firstElementChild.classList.contains("masque-leave") : null;
-        return { count, kids, sel, leaving };
+        return { count, kids, sel, leaving, kept: f.kept };
       }, k);
 
       for (const c of spec.links.cases) {
@@ -2754,10 +2754,8 @@ try {
             const ln = ringKid?.lines?.[0];
             return !!ln && Math.abs(Number(ln.x1) - hp0.x1) <= 1.2 && Math.abs(Number(ln.y1) - hp0.y1) <= 1.2;
           }
-          if (tl0.kind === "circles") {
-            const circleKid = li.kids.find((kk) => kk.kind === "closed" && (kk.layer === "fill" || kk.layer === "edge"));
-            return !!circleKid && Math.abs(Number(circleKid.cx) - hp0.x) <= 0.6 && Math.abs(Number(circleKid.cy) - hp0.y) <= 0.6;
-          }
+          // A closed target is previewed by the fade (#394), kept.
+          if (tl0.kind === "circles") return li.kept.includes(`${tl0.id}:${idx0}`);
           return false;
         };
         await page.evaluate((k) => {
@@ -2804,22 +2802,15 @@ try {
         if (li.sel !== afterLeave.sel) throw new Error(`${key}/links[${c.index}]: g.sel changed during legend hover (${li.sel})`);
 
         if (tl0.kind === "circles") {
-          const wash = {
-            fill: li.kids.find((kk) => kk.layer === "fill" && kk.kind === "closed"),
-            edge: li.kids.find((kk) => kk.layer === "edge" && kk.kind === "closed"),
-            plain: li.kids.find((kk) => kk.layer === "plain" && kk.kind === "closed"),
-          };
-          assertWash(wash, `${key}/links[${c.index}]/wash`, wantDark);
-          const circleKid = wash.fill || wash.edge;
-          if (!circleKid) throw new Error(`${key}/links[${c.index}]: no circle in g.link`);
-          if (Math.abs(Number(circleKid.cx) - hp0.x) > 0.6 || Math.abs(Number(circleKid.cy) - hp0.y) > 0.6) {
-            throw new Error(`${key}/links[${c.index}]: link circle off-mark ${JSON.stringify(circleKid)} vs ${JSON.stringify(hp0)}`);
-          }
-          assertCircleR(circleKid.r, hp0.r, `${key}/links[${c.index}]/circle-r`);
-          await new Promise((r) => setTimeout(r, 200)); // let the 80-120ms enter fade settle
+          // The legend's only closed series ("pts") fades nothing, as a click on it would
+          // (#394): no wash in g.link, and the mark keeps its own pixels.
+          if (li.kids.some((kk) => kk.kind === "closed")) throw new Error(`${key}/links[${c.index}]: a closed series drew in g.link ${JSON.stringify(li.kids)}`);
+          await new Promise((r) => setTimeout(r, 200));
           const lumAfter = meanLuminance(PNG.sync.read(await stableClipShot(key, hp0.x, hp0.y)));
-          assertTintApplied(lumBefore, lumAfter, `${key}/links[${c.index}]/tint-applied`);
-          passed.push(`${key}/links[${c.index}]/tint-applied`);
+          if (Math.abs(lumAfter - lumBefore) > 8) {
+            throw new Error(`${key}/links[${c.index}]/kept: the mark's luminance moved ${lumBefore.toFixed(1)} -> ${lumAfter.toFixed(1)} on a preview that fades nothing`);
+          }
+          passed.push(`${key}/links[${c.index}]/kept`);
         } else if (tl0.kind === "polyline" || tl0.kind === "segments") {
           const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
           if (!ringKid) throw new Error(`${key}/links[${c.index}]: no ring in g.link`);
@@ -2841,6 +2832,9 @@ try {
       // contract as g.hi. #99 round 2: reads the durable log (group: "link") the same way the
       // g.hi remount-fade check above does, via the shared assertLeaveFade(entries, where,
       // group) — see transient_log.mjs / visual_assert.mjs.
+      // A closed series previewed by the fade leaves g.link empty (#394): then only the
+      // preview's end is checked.
+      const linkHeld = (await linkInspect(key)).kids.length > 0;
       const linkFadeCursor = await logCursor(page, key);
       await page.evaluate((k) => {
         const span = document.querySelector(`#coords_${k}`);
@@ -2849,10 +2843,12 @@ try {
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
       }, key);
-      const linkFadeEntries = await pollLog(page, key, linkFadeCursor, (es) => (
-        es.some((e) => e.group === "link" && e.type === "remove") || es.some((e) => e.type === "hostRemount")
-      ));
-      assertLeaveFade(linkFadeEntries, `${key}/links`, "link");
+      if (linkHeld) {
+        const linkFadeEntries = await pollLog(page, key, linkFadeCursor, (es) => (
+          es.some((e) => e.group === "link" && e.type === "remove") || es.some((e) => e.type === "hostRemount")
+        ));
+        assertLeaveFade(linkFadeEntries, `${key}/links`, "link");
+      }
       let afterLinkLeave = await linkInspect(key);
       for (let a = 0; a < 8 && afterLinkLeave.count !== 0; a++) {
         await new Promise((r) => setTimeout(r, 25));
