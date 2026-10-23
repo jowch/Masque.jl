@@ -4,6 +4,9 @@ Use CairoMakie for a figure you build once and explore. Use WGLMakie
 when the figure animates or redraws often. `masque`, `@bind`, and every
 interactable work the same on both.
 
+To show a widget in a static HTML export, in Documenter, or on another
+web page, see [Publish outside Pluto](@ref).
+
 ## Choose a backend
 
 Load a backend before you call `masque`: with only `CairoMakie`
@@ -107,6 +110,3 @@ While you drag with a [`ViewInteractable`](@ref), Julia redraws the
 view: on CairoMakie each step is a new PNG, and on WGLMakie the canvas
 already on the page updates. Either way, dragging the view needs a
 running notebook. See [Pan, zoom and orbit](@ref).
-
-To show a widget in a static HTML export, in Documenter, or on another web
-page, see [Publish outside Pluto](@ref).

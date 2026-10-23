@@ -33,7 +33,7 @@ With `onchange`, the figure redraws as the reader moves a control,
 without running the cell again. See [Sliders, toggles and menus](@ref)
 and [Update the figure](@ref).
 
-## [Pan and orbit](@id home-pan-orbit)
+## [Pan, zoom and orbit](@id home-pan-orbit)
 
 ![Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera](assets/home/orbit.gif)
 
@@ -48,7 +48,7 @@ Click a legend entry to highlight the traces it labels, and a cell that
 uses the selection can fade the others, as in this example. See
 [Legend](@ref).
 
-## Static exports
+## [Publish outside Pluto](@id home-publish)
 
 Tooltips and highlights keep working in a static HTML export of your
 notebook, like the figure below: hover over a borough to try it. See
