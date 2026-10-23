@@ -1119,6 +1119,9 @@ try {
       // must give the figure focus (#380).
       t = await step("mouse-click-again", t, () => mouseClickAt(key, at(0, 0).x, at(0, 0).y), 4, [0, 0, 1, 0, 3, 1, 1, 2, 1, 2, 0, 1], 2);
       t = await step("escape-after-click-clears", t, () => page.keyboard.press("Escape"), 0, [], 0);
+      // Ctrl+Z on the focused figure brings back what Escape cleared (#386).
+      t = await step("undo-after-escape", t, () => page.keyboard.press("ControlOrMeta+z"), 4, [0, 0, 1, 0, 3, 1, 1, 2, 1, 2, 0, 1], 2);
+      t = await step("redo", t, () => page.keyboard.press("ControlOrMeta+Shift+z"), 0, [], 0);
       // A marquee adds the cells the box touches, and one from a held cell takes them out,
       // with or without Ctrl (#335, #358).
       const gdrag = async (from, to, mod = {}) => {
@@ -1268,6 +1271,8 @@ try {
       // A real mouse click, then a real Escape with no focus() in between (#380).
       t = await step("mouse-click-again", t, () => mouseClickAt(key, p[0].x, p[0].y), [2, 1], 4);
       t = await step("escape-after-click-clears", t, () => page.keyboard.press("Escape"), [], 0);
+      t = await step("undo-after-escape", t, () => page.keyboard.press("ControlOrMeta+z"), [2, 1], 4);
+      t = await step("redo", t, () => page.keyboard.press("ControlOrMeta+Shift+z"), [], 0);
       await dispatchAt(key, 1, 1, "pointermove");
       console.error(`OK  ${key} — ${t.slice(0, 160)}`);
       continue;
@@ -1728,7 +1733,15 @@ try {
       }
 
       if (layer.geometry && layer.geometry.mode === "pan") {
-        const zoom = await page.evaluate(([k, ix, iy]) => {
+        // #379: a mark on each axis off the pan axis. The drag above moved a linked axis's
+        // marks off this page's manifest, so there the probe is its pick's ring, which the
+        // overlay draws where that axis now has the mark; an unlinked axis's first mark has not
+        // moved since the page was built.
+        const viewAxis = layer.axis;
+        const linkedAxes = links.map((l) => l.axis);
+        const offAxis = layers.filter((l) => l.kind === "circles" && l.axis !== viewAxis && !linkedAxes.includes(l.axis))
+          .map((l) => ({ axis: l.axis, x: l.geometry[0], y: l.geometry[1] }));
+        const zoom = await page.evaluate(([k, ix, iy, marks, pickTip]) => {
           const span = document.querySelector(`#coords_${k}`);
           const hosts = [...document.querySelectorAll(".ip-host")];
           const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -1744,6 +1757,12 @@ try {
           });
           surface.dispatchEvent(ev);
           const base = host.querySelector("img, canvas");
+          const engaged = {
+            photo: host.dataset.masquePhoto || "",
+            clip: !!host.querySelector(".masque-data-clip"),
+            windows: host.querySelectorAll(".masque-data-clip").length,
+            baseTransform: base?.style.transform || "",
+          };
           // #368: each axis's selection home, with the matrix and clip the preview gave it.
           const homes = [...sr.querySelectorAll("svg.masque-edge g.masque-clip[data-axis]")]
             .filter((c) => c.querySelector(":scope > g.masque-photo > g.sel"))
@@ -1757,15 +1776,41 @@ try {
                 picks: c.querySelectorAll("g.sel > *").length,
               };
             });
+          // #379: hover mid-preview finds a mark where its own axis draws it. A pick shows its
+          // tooltip and draws no hover ring (hover-on-selected), any other mark draws one.
+          const tip = () => {
+            const el = sr.querySelector(".masque-tip");
+            return el?.classList.contains("show") ? el.textContent : null;
+          };
+          // Synchronous, so the preview is still live when each probe is read (a WebGL frame
+          // can land within two animation frames). A move right after another is coalesced
+          // to an animation frame; leaving the surface first drops that wait.
+          const hoverAt = (x, y) => {
+            surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: false }));
+            surface.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: x, clientY: y }));
+          };
+          const midHover = [];
+          for (const c of sr.querySelectorAll("svg.masque-edge g.masque-clip[data-axis]")) {
+            const ring = c.querySelector(":scope > g.masque-photo > g.sel > *");
+            const moved = !!c.firstElementChild.getAttribute("transform");
+            if (!ring || !moved) continue;
+            const r = ring.getBoundingClientRect();
+            hoverAt(r.left + r.width / 2, r.top + r.height / 2);
+            const t = tip();
+            midHover.push({ axis: c.dataset.axis, pick: true, hit: !!t && t.startsWith(pickTip), tip: t, live: !!host.dataset.masquePhoto });
+          }
+          for (const mk of marks) {
+            hoverAt(b.left + mk.x * s, b.top + mk.y * s);
+            const hit = !!sr.querySelector(`svg g.masque-clip[data-axis="${mk.axis}"] g.hi > *`);
+            midHover.push({ axis: mk.axis, pick: false, hit, tip: tip(), live: !!host.dataset.masquePhoto });
+          }
           return {
             homes,
-            photo: host.dataset.masquePhoto || "",
-            clip: !!host.querySelector(".masque-data-clip"),
-            windows: host.querySelectorAll(".masque-data-clip").length,
-            baseTransform: base?.style.transform || "",
+            midHover,
+            ...engaged,
             prevented: ev.defaultPrevented,
           };
-        }, [key, p.x, p.y]);
+        }, [key, p.x, p.y, offAxis, spec.previewPickTip ?? "index"]);
         if (!zoom.prevented || !zoom.photo || !zoom.clip || zoom.baseTransform) {
           throw new Error(`${key}-wheel: photographic zoom did not engage (${JSON.stringify(zoom)})`);
         }
@@ -1777,10 +1822,25 @@ try {
         // own matrix and clipped to that axis's window, not the pan axis's.
         for (const l of links) {
           const home = zoom.homes.find((h) => h.axis === l.axis);
-          const sameClip = home?.clip && home.clip.every((v, i) => Math.abs(v - l.clip[i]) < 1e-6);
+          // The page shows the clip as Float32 in its shortest form (515.90247); the overlay
+          // holds the full value (515.9024658…).
+          const sameClip = home?.clip && home.clip.every((v, i) => Math.abs(v - l.clip[i]) < 1e-3);
           if (!home || !home.transform || !sameClip || home.picks < 1) {
-            throw new Error(`${key}-wheel: linked axis ${l.axis}'s ring is not on its own matrix and window: ${JSON.stringify(zoom.homes)}`);
+            throw new Error(`${key}-wheel: linked axis ${l.axis}'s ring is not on its own matrix and window ${JSON.stringify(l.clip)}: ${JSON.stringify(zoom.homes)}`);
           }
+        }
+        // #379: every mid-preview hover above ran while the matrix was still live, on each
+        // linked axis's pick and each unlinked axis's mark.
+        const probed = (axis) => zoom.midHover.some((h) => h.axis === axis);
+        if (zoom.midHover.some((h) => !h.live) || !linkedAxes.every(probed) || !offAxis.every((m) => probed(m.axis))) {
+          throw new Error(`${key}-wheel: the mid-preview hover did not run on a live preview: ${JSON.stringify(zoom.midHover)}`);
+        }
+        if (zoom.midHover.some((h) => !h.hit)) {
+          throw new Error(`${key}-wheel: hover mid-preview missed a mark where its own axis draws it: ${JSON.stringify(zoom.midHover)}`);
+        }
+        if (zoom.midHover.length) {
+          passed.push(`${key}/preview-hover`);
+          console.error(`OK  ${key}/preview-hover — ${JSON.stringify(zoom.midHover)}`);
         }
         if (links.length) {
           passed.push(`${key}/linked-ring`);

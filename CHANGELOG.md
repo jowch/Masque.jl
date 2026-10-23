@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- With a figure focused, Cmd-Z (on a Mac) or Ctrl-Z (elsewhere) undoes the last change to the
+  selection, whether a click, a box, a legend click, or Escape made it, and Shift-Cmd-Z,
+  Shift-Ctrl-Z, or Ctrl-Y redoes it. Each step changes the `@bind` value once. Undo covers the
+  selection only, and with nothing to undo the key reaches the page as before. Escape that
+  clears a selection now keeps the figure focused, so an undo can follow, and a second Escape
+  leaves the figure (#386).
+
+### Fixed
+- While a pan or zoom preview is showing, hovering or clicking a mark on an axis tied to the
+  view by `linkaxes!`, or on any other axis, finds the mark where it is drawn. A mark on
+  another axis couldn't be hovered or clicked until the new frame arrived, and a linked axis
+  with a different scale answered at the wrong point (#379).
+
 ## [0.4.0] - 2026-10-22
 
 ### Added

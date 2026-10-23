@@ -194,8 +194,9 @@ export interface OverlayCtx {
     // (mount.ts): a write through it is Pluto restoring the kernel's value, which redraws the
     // selection. With `onchange` the fields are the widget's state: every one is sent to Julia
     // over the gesture channel, and only `bind`'s reach the bond. `quiet` skips that send (a
-    // frame's own clearing of picks).
-    commit_: (fields: Record<string, unknown>, quiet?: boolean) => void
+    // frame's own clearing of picks). A commit that changes picks is a step for undo
+    // (history.ts); `step` marks an undo or redo itself, which is not recorded again.
+    commit_: (fields: Record<string, unknown>, quiet?: boolean, step?: boolean) => void
     // The state now: every field's envelope.
     value_: () => Record<string, unknown>
 }
@@ -265,6 +266,10 @@ export interface OverlayState {
     // The view id that made the latest Axis3 zoom or pan request. Another id's remembered
     // limits are stale once `linkcameras!(...; limits = true)` lets this one move them (#362).
     view3Last_: string | null
+    // Undo and redo for picks (history.ts): each step is the pick fields one commit changed,
+    // as they were before it. Newest last.
+    undo_: Record<string, unknown>[]
+    redo_: Record<string, unknown>[]
 }
 
 export function createOverlayState(): OverlayState {
@@ -303,6 +308,8 @@ export function createOverlayState(): OverlayState {
         keyView_: false,
         view3_: new Map(),
         view3Last_: null,
+        undo_: [],
+        redo_: [],
     }
 }
 

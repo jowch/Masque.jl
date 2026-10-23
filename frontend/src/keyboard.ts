@@ -7,6 +7,7 @@ import { hitLayerByIndex, isGapElement, layerNElements } from "./selection"
 import { drawHover, clearHover, clearLink } from "./highlight"
 import { showTipAt, hideTip, updateLinkForHit, layoutAnchor } from "./hover"
 import { abortMarquee, clearPicks, commitClick, isToggleClick } from "./bond"
+import { historyKey, stepPicks } from "./history"
 import { plainTextForHit } from "./template"
 import { cssAnchor } from "./state"
 import { anchorFor, lineReadout, samplePoint } from "./geometry"
@@ -181,13 +182,23 @@ function adjacentLayerStart(starts: number[], cur: number, dir: 1 | -1): number 
 
 // Handles ArrowRight/Down (next), ArrowLeft/Up (previous), Shift+ArrowRight/Left (next/previous
 // data point on a focused line), Home/End, PageDown/Up (next/previous layer), Enter/Space
-// (dispatch the click bond for the focused element), and Escape (clear every pick, then the
-// focus, and blur). Everything else — Tab above all, so the browser's own focus order still works — passes
+// (dispatch the click bond for the focused element), Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z or Ctrl+Y
+// (undo or redo a change to the picks, history.ts), and Escape (clear every pick and the focus;
+// with no picks to clear, also blur). Everything else — Tab above all, so the browser's own focus order still works — passes
 // through untouched. Gated on the surface actually having DOM focus (not just this listener
 // being attached to it): a keydown dispatched programmatically at the surface without focus, or
 // arriving after a click moved focus elsewhere, must not steer the overlay.
 export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardEvent): void {
     if (ctx.shadowRoot_.activeElement !== ctx.surface_) return
+    // Taken only when there is a step to take: otherwise the key goes on to the page, so a
+    // focused figure never swallows an undo meant for something else. Not mid-drag.
+    const hist = historyKey(e)
+    if (hist) {
+        if (state.drag_ || !stepPicks(ctx, state, hist)) return
+        e.preventDefault(); e.stopPropagation()
+        scheduleAnnounce(ctx, state, hist === "undo" ? "Undid a change to the selection" : "Redid a change to the selection")
+        return
+    }
     const n = ctx.focusable_.length
     if (n === 0 && e.key !== "Escape") return
     const cur = state.focusIdx_
@@ -242,7 +253,9 @@ export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardE
         case "Escape":
             e.preventDefault(); e.stopPropagation()
             if (abortMarquee(ctx, state)) return // a box in flight: Escape drops just the box
-            clearPicks(ctx, state, null, true)
+            // Escape that clears picks keeps focus, so Cmd/Ctrl+Z right after brings them back.
+            // With nothing to clear, it leaves the figure.
+            if (clearPicks(ctx, state, null, true)) { focusTo(ctx, state, null); return }
             focusTo(ctx, state, null)
             ctx.surface_.blur()
             return
