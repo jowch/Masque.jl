@@ -1,5 +1,5 @@
 // All coordinates here are image pixels.
-import { contentPoint, isIdentity, type PhotoMatrix } from "./photo"
+import { isIdentity, type PhotoMatrix } from "./photo"
 import { hitSurface, surfaceVertex } from "./surface"
 import { withRegion } from "./regions"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Kind, Manifest, PolarFrame, ThresholdGeometry, ROIGeometry, ViewGeometry, SliceGeometry, Limits3 } from "./types"
@@ -738,16 +738,6 @@ export function hitTest(manifest: Manifest, px: number, py: number, event: strin
     return null
 }
 
-// The pan view's window `paintPhoto` clips to (its `clip` rect, inside the spines, when it has
-// one), or null when the photograph is identity. Data outside that rectangle is not on screen.
-// `viewId` is the pan view that owns the live matrix.
-export function photoClip(manifest: Manifest, photo: PhotoMatrix, viewId: string | null): { x: number; y: number; w: number; h: number } | null {
-    const layer = panView(manifest, photo, viewId)
-    if (!layer) return null
-    const [x, y, w, h] = axisFrame(manifest, photo, viewId, layer.axis)!.clip
-    return { x, y, w, h }
-}
-
 // The view layer a live photograph belongs to: the named one, else the first pan view. Null at
 // identity, for an orbit, or for a view with no area.
 function panView(manifest: Manifest, photo: PhotoMatrix, viewId: string | null): HitLayer | null {
@@ -794,26 +784,48 @@ export function linkedMove(m: PhotoMatrix, d: [number, number, number] | undefin
     return [m.s, q0 * (1 - m.s) + r * (t + p0 * (m.s - 1))]
 }
 
-function insideClip(clip: { x: number; y: number; w: number; h: number }, x: number, y: number): boolean {
-    return x >= clip.x && x <= clip.x + clip.w && y >= clip.y && y <= clip.y + clip.h
+// The frame a layer's marks are drawn with while a photograph is live (#379): none for the
+// view rectangle and screen-fixed chrome, which stay in layout pixels; the pan axis's for a
+// threshold line or an ROI box, which slide in one group with the pan axis's photograph; and
+// its own axis's for every data mark, as `paintAxis` draws its rings (#368).
+export function layerFrame(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, layer: HitLayer): AxisFrame | null {
+    if (layoutSpaceLayer(layer)) return null
+    if (layer.kind === "threshold" || layer.kind === "roi") {
+        const pan = panView(manifest, photo, viewId)
+        return pan ? axisFrame(manifest, photo, viewId, pan.axis) : null
+    }
+    return axisFrame(manifest, photo, viewId, layer.axis)
 }
 
-// `(x, y)` is a layout point on the untransformed base. Data-space layers are tested at the
-// content pixel under that point while a photograph is live. The view rectangle and
-// screen-fixed chrome stay in layout pixels. A layout point outside `clip` does not hit
-// data the photograph has clipped away.
+// The point on `layer`'s marks under the layout point `p`: the inverse of the frame they are
+// drawn with, or `p` itself when they don't move.
+export function layerPoint(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, layer: HitLayer, p: { x: number; y: number }): { x: number; y: number } {
+    const f = layerFrame(manifest, photo, viewId, layer)
+    return f ? frameInverse(f, p.x, p.y) : p
+}
+
+function frameInverse(f: AxisFrame, x: number, y: number): { x: number; y: number } {
+    return { x: (x - f.tx) / (f.sx > 0 ? f.sx : 1), y: (y - f.ty) / (f.sy > 0 ? f.sy : 1) }
+}
+
+function insideFrame(f: AxisFrame, x: number, y: number): boolean {
+    const [cx, cy, cw, ch] = f.clip
+    return x >= cx && x <= cx + cw && y >= cy && y <= cy + ch
+}
+
+// `(x, y)` is a layout point on the untransformed base. While a photograph is live, each
+// layer is tested where it is drawn (#379): through its own frame (`layerFrame`), and not
+// at all outside that frame's clip; a layer that doesn't move, at the layout point. `viewId`
+// is the pan view that owns the live matrix.
 export function hitTestAt(
-    manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string,
-    clip: { x: number; y: number; w: number; h: number } | null = null,
+    manifest: Manifest, x: number, y: number, photo: PhotoMatrix, event: string, viewId: string | null = null,
 ): Hit | null {
-    const content = contentPoint(photo, { x, y })
-    const outside = clip != null && !insideClip(clip, x, y)
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
-        const layoutSpace = layoutSpaceLayer(layer)
-        if (!layoutSpace && outside) continue
+        const f = layerFrame(manifest, photo, viewId, layer)
+        if (f && !insideFrame(f, x, y)) continue
         if (yieldsToOtherAxis(manifest, layer, x, y, event)) continue
-        const p = layoutSpace ? { x, y } : content
+        const p = f ? frameInverse(f, x, y) : { x, y }
         const h = hitLayer(layer, p.x, p.y, manifest.transforms[layer.axis])
         if (h) return { layer, ...h }
     }

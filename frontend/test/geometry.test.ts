@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
-    anchorFor, axisFrame, computeAnchoredPlacement, photoClip, lineReadout, samplePoint,
+    anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, lineReadout, samplePoint,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
 import { begin as beginView, tip as viewTip, limitsTip, view3Base, rememberView3, seedView3Homes, zoom3 } from "../src/drag/view"
@@ -548,10 +548,8 @@ describe("hitLayer + hitTest", () => {
                     geometry: { x: 0, y: 0, w: 800, h: 400, mode: "pan" } },
             ],
         }
-        const clip = { x: 0, y: 0, w: 800, h: 400 }
-        expect(hitTestAt(m, 840, 100, photo, "click", clip)?.layer.id).toBe("cb")
-        expect(hitTestAt(m, 400, 100, photo, "click", clip)?.layer.id).toBe("cells")
-        expect(hitTestAt(m, 840, 100, photo, "click")?.layer.id).toBe("cells")
+        expect(hitTestAt(m, 840, 100, photo, "click", "view")?.layer.id).toBe("cb")
+        expect(hitTestAt(m, 400, 100, photo, "click", "view")?.layer.id).toBe("cells")
     })
     it("resolvePayload returns the element payload", () => {
         const m: Manifest = { width: 400, height: 400, scaling: 2, transforms: {}, layers: [circles] }
@@ -816,24 +814,6 @@ describe("Axis3 zoom base across linked views (#362)", () => {
     })
 })
 
-describe("photoClip", () => {
-    const view = (clip?: [number, number, number, number]): Manifest => ({
-        width: 400, height: 300, transforms: {},
-        layers: [{
-            id: "v", kind: "view", axis: "ax1", events: ["drag"], hover: [], tooltips: false,
-            geometry: { x: 40, y: 30, w: 300, h: 200, mode: "pan", ...(clip ? { clip } : {}) },
-        }],
-    } as unknown as Manifest)
-    it("is the pan view's clip rect, inside the spines, while the photo is live (#171)", () => {
-        expect(photoClip(view([42, 32, 296, 196]), { s: 1, tx: 5, ty: 0 }, "v"))
-            .toEqual({ x: 42, y: 32, w: 296, h: 196 })
-    })
-    it("falls back to the viewport without a clip, and is null at identity", () => {
-        expect(photoClip(view(), { s: 1, tx: 5, ty: 0 }, "v")).toEqual({ x: 40, y: 30, w: 300, h: 200 })
-        expect(photoClip(view([42, 32, 296, 196]), { s: 1, tx: 0, ty: 0 }, "v")).toBeNull()
-    })
-})
-
 describe("axisFrame (#368)", () => {
     const m = {
         width: 400, height: 300, transforms: {},
@@ -856,6 +836,43 @@ describe("axisFrame (#368)", () => {
     it("leaves any other axis put, and every axis at identity", () => {
         expect(axisFrame(m, photo, "v", "ax3")).toBeNull()
         expect(axisFrame(m, { s: 1, tx: 0, ty: 0 }, "v", "ax1")).toBeNull()
+    })
+})
+
+describe("hitTestAt through each axis's own frame (#379)", () => {
+    // Same frames as the axisFrame tests: ax1 pans by the matrix, ax2 is linked on y at twice
+    // the pan axis's px per data unit (y' = 2y - 80, x unmoved), ax3 is not linked.
+    const view: HitLayer = {
+        id: "v", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+        geometry: {
+            x: 40, y: 30, w: 150, h: 200, mode: "pan", clip: [42, 32, 146, 196],
+            links: [{ axis: "ax2", clip: [222, 32, 146, 196], y: [100, 120, 2] }],
+        },
+    } as unknown as HitLayer
+    const dot = (id: string, axis: string, x: number, y: number): HitLayer =>
+        ({ id, kind: "circles", axis, events: ["click", "hover"], payloads: [{ id }], geometry: [x, y, 5] }) as HitLayer
+    const m = (...layers: HitLayer[]): Manifest => ({ width: 400, height: 300, transforms: {}, layers: [...layers, view] }) as unknown as Manifest
+    const photo = { s: 2, tx: -50, ty: -80 }
+    it("hits a linked axis's mark where its own frame draws it", () => {
+        const man = m(dot("a", "ax1", 175, 100), dot("b", "ax2", 300, 100))
+        // b is drawn at (300, 2*100 - 80). The pan matrix would test (175, 100), a's content point.
+        expect(hitTestAt(man, 300, 120, photo, "hover", "v")?.layer.id).toBe("b")
+        expect(layerPoint(man, photo, "v", man.layers[1], { x: 300, y: 120 })).toEqual({ x: 300, y: 100 })
+    })
+    it("skips a linked axis's mark outside its own window", () => {
+        // Drawn at y = 240, below the linked window's bottom edge (228).
+        expect(hitTestAt(m(dot("b", "ax2", 300, 160)), 300, 240, photo, "click", "v")).toBeNull()
+    })
+    it("hits an unlinked axis's mark where it sits, outside the pan window", () => {
+        const man = m(dot("c", "ax3", 100, 270))
+        expect(hitTestAt(man, 100, 270, photo, "click", "v")?.layer.id).toBe("c")
+        expect(layerPoint(man, photo, "v", man.layers[0], { x: 100, y: 270 })).toEqual({ x: 100, y: 270 })
+    })
+    it("tests a threshold line through the pan axis's frame, which draws it", () => {
+        const thr = { id: "thr", kind: "threshold", axis: "ax2", events: ["drag"], payloads: [],
+            geometry: { orientation: "v", pos: 60, span: [40, 130] } } as unknown as HitLayer
+        // Content x = 60 is drawn at 2*60 - 50 = 70.
+        expect(hitTestAt(m(thr), 70, 100, photo, "drag", "v")?.layer.id).toBe("thr")
     })
 })
 

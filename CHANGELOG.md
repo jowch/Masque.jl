@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- While a pan or zoom preview is showing, hovering or clicking a mark on an axis tied to the
+  view by `linkaxes!`, or on any other axis, finds the mark where it is drawn. A mark on
+  another axis couldn't be hovered or clicked until the new frame arrived, and a linked axis
+  with a different scale answered at the wrong point (#379).
+
 ## [0.4.0] - 2026-10-22
 
 ### Added
