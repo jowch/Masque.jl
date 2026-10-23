@@ -4352,10 +4352,15 @@ describe("photographic pan / wheel zoom", () => {
         // an unlinked axis's ring stays where its data stays, unclipped
         expect(transform("ax3")).toBeNull()
         expect(home("ax3").getAttribute("clip-path")).toBeNull()
-        // the fade canvases move and clip the same way, in percent of the overlay box
-        expect(canvasT("ax1")).toBe(`translate(${(tx / 1200) * 100}%, ${(ty / 800) * 100}%) scale(${s}, ${s})`)
+        // the fade canvases move and clip the same way. ax1's cover only its viewport, so the
+        // matrix is taken about the canvas's corner, in percent of the canvas.
+        const c1 = fade("ax1").firstElementChild as HTMLElement
+        expect([c1.style.left, c1.style.top, c1.style.width, c1.style.height])
+            .toEqual([`${(100 / 1200) * 100}%`, "10%", `${(500 / 1200) * 100}%`, "80%"])
+        expect(canvasT("ax1")).toBe(`translate(${((s * 100 + tx - 100) / 500) * 100}%, ${((s * 80 + ty - 80) / 640) * 100}%) scale(${s}, ${s})`)
         expect(fade("ax1").style.clipPath).toBe(`inset(${(84 / 800) * 100}% ${((1200 - 104 - 492) / 1200) * 100}% ${((800 - 84 - 632) / 800) * 100}% ${(104 / 1200) * 100}%)`)
         expect(canvasT("ax2")).toMatch(/scale\([-\d.e]+, 1\)$/)
+        // ax3 has no transform: its canvases cover the whole image, unclipped
         expect(canvasT("ax3")).toBe("")
         expect(fade("ax3").style.clipPath).toBe("")
         // every axis's g.sel paints below every axis's g.link, and that below every g.hi
