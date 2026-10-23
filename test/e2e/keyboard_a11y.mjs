@@ -319,9 +319,8 @@ try {
     await surface.focus();
     for (let i = 0; i <= target; i++) await page.keyboard.press("ArrowRight");
     const li = await linkGCount(key);
-    // "pts" is the legend's only closed series, so there is nothing for the fade to fade and it
-    // takes the selected recipe in g.link; a legend with other closed series previews through
-    // the fade instead (#394).
+    // A closed series is previewed by the fade, kept (#394); "pts" is the legend's only closed
+    // series, so nothing fades, as on a click. Linked lines would draw in g.link.
     if (li.count === 0 && li.preview === 0) throw new Error(`${key}: keyboard focus on the "pts" legend row previewed nothing (${JSON.stringify(li)})`);
     passed.push("legend/keyboard-focus-draws-link");
 
