@@ -21,6 +21,7 @@ be a player, so their page shows a clip of the live notebook instead:
 | `docs/src/assets/grid-many.mp4` | Heatmaps and images › Select several cells | `grid_many_notebook.jl` | `test/e2e/docs_clip.mjs grid-many` |
 | `docs/src/assets/grid-regions.mp4` | Heatmaps and images › Pick whole regions | `grid_regions_notebook.jl` | `test/e2e/docs_clip.mjs grid-regions` |
 | `docs/src/assets/grid-brush.mp4` | Heatmaps and images › Brush a block of cells | `grid_brush_notebook.jl` | `test/e2e/docs_clip.mjs grid-brush` |
+| `docs/src/assets/widgets-classes.mp4` | Build a widget › Example: label points into classes | `classes_notebook.jl` | `test/e2e/docs_clip.mjs classes` |
 
 Re-record from `test/e2e`, with a Pluto server whose notebooks can load this checkout
 (`serve.jl` with `MASQUE_DEV_ENV` set to a warmed env, see `CLAUDE.md`) and `ffmpeg` on

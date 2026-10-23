@@ -63,6 +63,7 @@ makedocs(;
                 "Legend" => "legend.md",
             ],
             "Build a widget" => [
+                "Build a widget" => "widgets.md",
                 "Sliders, toggles and menus" => "controls.md",
                 "Update the figure" => "onchange.md",
                 "Linked views" => "linked-views.md",

@@ -19,7 +19,7 @@ Click a mark to send it to your notebook. With `select = :many`, each
 click adds a mark, and dragging a box picks every mark inside it. See
 [What each mark returns](@ref) and [Selection](@ref).
 
-## Build a widget
+## [Build a widget](@id home-widgets)
 
 ```@raw html
 <video title="Dragging a frequency slider while the curve follows it, then switching a toggle to a dotted line"
@@ -30,8 +30,8 @@ click adds a mark, and dragging a box picks every mark inside it. See
 Lay out a Makie slider, toggle, or menu in the figure, and it works in
 the notebook next to the marks you can pick, all in one `@bind` value.
 With `onchange`, the figure redraws as the reader moves a control,
-without running the cell again. See [Sliders, toggles and menus](@ref)
-and [Update the figure](@ref).
+without running the cell again. [Build a widget](@ref) walks through
+one that labels points into classes.
 
 ## [Pan, zoom and orbit](@id home-pan-orbit)
 
