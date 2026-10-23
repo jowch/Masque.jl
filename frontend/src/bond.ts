@@ -1,4 +1,4 @@
-import { findBin, hitTestAt, layoutSpaceLayer, lineReadout, matrixLimits, photoClip, resolvePayload } from "./geometry"
+import { findBin, hitTestAt, layerPoint, lineReadout, matrixLimits, resolvePayload } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { hideCross } from "./cross"
@@ -235,7 +235,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     if (e.shiftKey) {
         const viewLayer = ctx.manifest_.layers.find((l) => {
             if (l.kind !== "view" || !l.events.includes("drag")) return false
-            return hitTestAt({ ...ctx.manifest_, layers: [l] }, layout.x, layout.y, state.photo_, "drag", photoClip(ctx.manifest_, state.photo_, state.photoViewId_)) !== null
+            return hitTestAt({ ...ctx.manifest_, layers: [l] }, layout.x, layout.y, state.photo_, "drag", state.photoViewId_) !== null
         })
         if (viewLayer) {
             const g = viewLayer.geometry as ViewGeometry
@@ -250,14 +250,14 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
             return
         }
     }
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_)
     // A marquee: a drag on a plot with no view, or Alt-drag on any plot, where a field holds
     // several picks. A threshold line or an ROI box under the press still takes the drag.
     if (!hit || (hit.layer.kind === "view" && e.altKey)) {
         const axis = marquee.marqueeAxis(ctx, axesAt(ctx, layout.x, layout.y))
         const targets = axis === null ? [] : marquee.marqueeTargets(ctx, axis)
         // A press on a legend inside the axis is a press on the legend.
-        const under = targets.length ? hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", photoClip(ctx.manifest_, state.photo_, state.photoViewId_)) : null
+        const under = targets.length ? hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_) : null
         if (axis !== null && targets.length && !under?.layer.links) {
             state.drag_ = marquee.begin(state, axis, targets, marqueeMode(ctx.manifest_, state, under, targets, content), content.x, content.y, { x: e.clientX, y: e.clientY }, e.pointerId)
             tryCapture(ctx.surface_, e.pointerId)
@@ -680,20 +680,20 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
     if (state.justDragged_) { state.justDragged_ = false; return }
     // Chromium still dispatches click after a Mac ctrl-click.
     if (isMacContextClick(e)) return
-    const { layout, content } = pointerSpace(ctx, state, e)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))
+    const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_)
     if (!hit) {
         // A click on an empty part of a plot clears the one-pick fields there; a `many` field
         // keeps its picks, since a near miss among many small marks is the likeliest slip and
         // Escape clears them (#384). A mark that only shows a tooltip isn't empty space, and a
         // Cmd/Ctrl-click that misses keeps the picks, as a modified miss does in a file browser.
         if (isToggleClick(e)) return
-        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", photoClip(ctx.manifest_, state.photo_, state.photoViewId_))) return
+        if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_)) return
         const axes = axesAt(ctx, layout.x, layout.y)
         if (axes.length > 0) clearPicks(ctx, state, axes, false)
         return
     }
-    const sample = layoutSpaceLayer(hit.layer) ? layout : content
+    const sample = layerPoint(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer, layout)
     commitClick(ctx, state, hit, sample.x, sample.y, isToggleClick(e))
 }
 

@@ -4353,6 +4353,48 @@ describe("photographic pan / wheel zoom", () => {
         expect(host.querySelector(".masque-data-clip")).toBeNull()
     })
 
+    it("hover and click find a linked or unlinked axis's mark where it is drawn mid-preview (#379)", async () => {
+        const { host, img, script } = setup()
+        const m = viewManifest("pan")
+        m.transforms.ax1.viewport = [100, 80, 500, 640]
+        const g = m.layers[0].geometry as ViewGeometry
+        g.x = 100; g.y = 80; g.w = 500; g.h = 640
+        g.clip = [104, 84, 492, 632]
+        g.links = [{ axis: "ax2", clip: [704, 84, 242, 632], x: [100, 700, 0.5] }]
+        const pts = (id: string, axis: string, x: number): HitLayer => ({
+            id, kind: "circles", geometry: [x, 400, 20], payloads: [{ i: 0 }], axis, events: ["click", "hover"],
+        })
+        m.layers.push(pts("p2", "ax2", 800), pts("p3", "ax3", 1100))
+        m.fields = ["p2", "p3"]
+        let release: (r: { png: Uint8Array; manifest: Manifest }) => void = () => {}
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, m, undefined, requestFrame)
+        img.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        host.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        const [s, tx] = host.dataset.masquePhoto!.split(",").map(Number)
+        expect(s).not.toBe(1)
+        // p2 is drawn where its own axis's frame puts it, not where the pan matrix would
+        const x2 = s * 800 + 700 * (1 - s) + 0.5 * (tx + 100 * (s - 1))
+        expect(Math.abs(x2 - 800)).toBeGreaterThan(5)
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: x2 / 2, clientY: 200, bubbles: true }))
+        expect(shadow.querySelector(`svg g.masque-clip[data-axis="ax2"] g.hi circle`)).toBeTruthy()
+        surface.dispatchEvent(new MouseEvent("click", { clientX: x2 / 2, clientY: 200, bubbles: true }))
+        expect((host as unknown as { value: Record<string, unknown> }).value.p2).toEqual({ layer: "p2", index: 0 })
+        // p3's axis doesn't move: it is hit where it always was, outside the pan window
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 550, clientY: 200, bubbles: true }))
+        expect((host as unknown as { value: Record<string, unknown> }).value.p3).toEqual({ layer: "p3", index: 0 })
+        await Promise.resolve()
+        release({ png: new Uint8Array([1, 2, 3]), manifest: m })
+        await Promise.resolve()
+        await Promise.resolve()
+        if (host.dataset.masquePhoto) img.dispatchEvent(new Event("load"))
+    })
+
     it("a pick's ring slides and clips with its own axis: pan, linked, or neither (#368)", async () => {
         const { host, img, script } = setup()
         const m = viewManifest("pan")

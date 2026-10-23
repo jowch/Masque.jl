@@ -7,18 +7,28 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- A CairoMakie widget has a PNG form, `show(io, MIME"image/png"(), w)`, so a tool that reads a
-  notebook without a browser, such as an AI agent, can see the figure. Pluto still shows the
-  live figure. Printed in the REPL, a widget now gives a short summary instead of its fields:
-  each axis with its title, each layer with what it draws, the gestures it takes and its
-  tooltip fields, and the `@bind` value it starts with. A WGLMakie widget has the summary but
-  no PNG, since the browser draws it (#373).
 - With a figure focused, Cmd-Z (on a Mac) or Ctrl-Z (elsewhere) undoes the last change to the
   selection, whether a click, a box, a legend click, or Escape made it, and Shift-Cmd-Z,
   Shift-Ctrl-Z, or Ctrl-Y redoes it. Each step changes the `@bind` value once. Undo covers the
   selection only, and with nothing to undo the key reaches the page as before. Escape that
   clears a selection now keeps the figure focused, so an undo can follow, and a second Escape
   leaves the figure (#386).
+
+### Fixed
+- While a pan or zoom preview is showing, hovering or clicking a mark on an axis tied to the
+  view by `linkaxes!`, or on any other axis, finds the mark where it is drawn. A mark on
+  another axis couldn't be hovered or clicked until the new frame arrived, and a linked axis
+  with a different scale answered at the wrong point (#379).
+
+## [0.4.0] - 2026-10-22
+
+### Added
+- A CairoMakie widget has a PNG form, `show(io, MIME"image/png"(), w)`, so a tool that reads a
+  notebook without a browser, such as an AI agent, can see the figure. Pluto still shows the
+  live figure. Printed in the REPL, a widget now gives a short summary instead of its fields:
+  each axis with its title, each layer with what it draws, the gestures it takes and its
+  tooltip fields, and the `@bind` value it starts with. A WGLMakie widget has the summary but
+  no PNG, since the browser draws it (#373).
 
 ### Changed
 - **Breaking:** on a plot built with `select = :many`, a click adds the mark or cell to the
@@ -584,7 +594,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/jowch/Masque.jl/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/jowch/Masque.jl/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jowch/Masque.jl/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/jowch/Masque.jl/compare/v0.2.1...v0.2.2
