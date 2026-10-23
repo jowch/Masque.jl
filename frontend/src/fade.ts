@@ -1,4 +1,4 @@
-import { isLightBackground, parseRGB } from "./color"
+import { isLightBackground, layerColor, parseRGB } from "./color"
 import { layoutSpaceLayer, polygonRings } from "./geometry"
 import type { AxisFrame } from "./geometry"
 import { isGapElement, layerNElements } from "./selection"
@@ -19,8 +19,9 @@ import type { Hit, HitLayer, Manifest } from "./types"
 
 export const FADE_KINDS = new Set(["circles", "rects", "polygons"])
 
-// Image px a mark's cover, and a pick's punch-out of it, reach past the mark's edge
-// (antialiasing, a thin outline). How much two circles must overlap for one to cover the other.
+// Image px a mark's cover reaches past its edge (antialiasing, a thin outline), and a pick's
+// punch-out of the cover, which stays small so a neighbour's covered edge stays faded. How much
+// two circles must overlap for one to cover the other is PAD_KEEP too.
 const PAD_DIM = 1.5
 const PAD_KEEP = 0.5
 // A pick is lone when no other pick lies within this many of its radii of its edge: centres 3
@@ -94,23 +95,6 @@ function drawnOrder(layer: HitLayer): number[] {
 // background unless the axis has its own.
 const plotFill = (m: Manifest, axis: string): string => m.transforms[axis]?.fill ?? m.background ?? "#ffffff"
 
-// Whether keeping `hits` fades any mark of `scope`. When it fades none (a legend's only closed
-// series, every mark of a plot picked), the fade would show nothing, so those hits take the
-// SVG selected recipe instead.
-export function fadesSome(hits: Hit[], scope: HitLayer[]): boolean {
-    const kept = new Map<HitLayer, Set<number>>()
-    for (const h of hits) {
-        let s = kept.get(h.layer)
-        if (!s) kept.set(h.layer, (s = new Set()))
-        s.add(h.index)
-    }
-    for (const layer of scope) {
-        const ks = kept.get(layer)
-        for (const k of drawnOrder(layer)) if (!ks?.has(k)) return true
-    }
-    return false
-}
-
 export interface FadeHost {
     root_: HTMLElement // the shadow-root container the axis canvases go in, below every svg
     style_: HTMLElement // the shadow host, for the chrome grey the stylesheet resolves
@@ -140,6 +124,19 @@ export type FadeEl = HTMLDivElement & { masqueFade?: { kept: string[]; picked: s
 
 interface AxisHome { wrap: HTMLDivElement; dim: HTMLCanvasElement; top: HTMLCanvasElement }
 type Box = [number, number, number, number] // x0, y0, x1, y1
+// The image-px rectangle an axis's canvases cover, x, y, w, h: its viewport, whole pixels.
+type Extent = [number, number, number, number]
+
+// An axis's canvases cover only its viewport, since the backend draws nothing of its plots
+// outside it; a figure of many axes then holds no full-figure canvas per axis. An axis with no
+// transform covers the whole image.
+function extentOf(m: Manifest, axis: string): Extent {
+    const v = m.transforms[axis]?.viewport
+    if (!v) return [0, 0, m.width, m.height]
+    const x0 = Math.max(0, Math.floor(v[0])), y0 = Math.max(0, Math.floor(v[1]))
+    const x1 = Math.min(m.width, Math.ceil(v[0] + v[2])), y1 = Math.min(m.height, Math.ceil(v[1] + v[3]))
+    return [x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0)]
+}
 
 export function createFade(host: FadeHost): Fade {
     const homes = new Map<string, AxisHome>()
@@ -186,16 +183,25 @@ export function createFade(host: FadeHost): Fade {
         const h = homes.get(axis)
         if (!h) return
         const m = host.manifest_()
-        if (!f) {
-            h.wrap.style.clipPath = ""
-            for (const c of [h.dim, h.top]) c.style.transform = ""
-            return
-        }
-        const [x, y, w, hh] = f.clip
         const pct = (v: number, of: number) => `${(v / of) * 100}%`
-        h.wrap.style.clipPath = `inset(${pct(y, m.height)} ${pct(m.width - x - w, m.width)} ${pct(m.height - y - hh, m.height)} ${pct(x, m.width)})`
-        const t = `translate(${pct(f.tx, m.width)}, ${pct(f.ty, m.height)}) scale(${f.sx}, ${f.sy})`
-        for (const c of [h.dim, h.top]) c.style.transform = t
+        // At rest the canvases are clipped to the axis, as the backend clips its plot: a mark
+        // past the limits keeps its projected position in the manifest but is never drawn.
+        const clip = f ? f.clip : m.transforms[axis]?.viewport
+        if (clip) {
+            const [x, y, w, hh] = clip
+            h.wrap.style.clipPath = `inset(${pct(y, m.height)} ${pct(m.width - x - w, m.width)} ${pct(m.height - y - hh, m.height)} ${pct(x, m.width)})`
+        } else h.wrap.style.clipPath = ""
+        // The photograph maps image point p to s*p + t. A canvas whose corner sits at v moves
+        // by s*v + t - v and scales by s about that corner (transform-origin 0 0).
+        const [ex, ey, ew, eh] = extentOf(m, axis)
+        const t = f ? `translate(${pct(f.sx * ex + f.tx - ex, ew)}, ${pct(f.sy * ey + f.ty - ey, eh)}) scale(${f.sx}, ${f.sy})` : ""
+        for (const c of [h.dim, h.top]) {
+            c.style.left = pct(ex, m.width)
+            c.style.top = pct(ey, m.height)
+            c.style.width = pct(ew, m.width)
+            c.style.height = pct(eh, m.height)
+            c.style.transform = t
+        }
     }
 
     // Element k's bounding box, or null when it is not drawn.
@@ -283,13 +289,6 @@ export function createFade(host: FadeHost): Fade {
         }
         colourCache.set(css, rgb)
         return rgb
-    }
-
-    const colourOf = (layer: HitLayer, k: number): string | null => {
-        const c = layer.colors
-        if (!c) return null
-        if (typeof c === "string") return c
-        return c.palette[c.index[k]] ?? null
     }
 
     // A circles layer's drawn marks in a grid of cells two radii wide, with each mark's place in
@@ -406,15 +405,28 @@ export function createFade(host: FadeHost): Fade {
         c.stroke()
     }
 
-    const sizeCanvas = (cv: HTMLCanvasElement, m: Manifest): void => {
-        if (cv.width !== m.width) cv.width = m.width
-        if (cv.height !== m.height) cv.height = m.height
+    // Sizes a canvas to an extent and returns its context, drawing in image px.
+    const sized = (cv: HTMLCanvasElement, e: Extent): CanvasRenderingContext2D | null => {
+        if (cv.width !== e[2]) cv.width = e[2]
+        if (cv.height !== e[3]) cv.height = e[3]
+        const c = cv.getContext("2d")
+        c?.setTransform(1, 0, 0, 1, -e[0], -e[1])
+        return c
     }
 
     // Each axis's cover of every drawn mark of a set of layers in the plot area's colour, drawn
     // once and copied onto the dim canvas on each redraw, so a click costs the picks it punches
     // out, not the plot's marks. The last two sets are kept per axis (a legend's preview and the
     // selection); a new manifest starts over.
+    // Keyed by layer object, not id: a frame brings new layers under the same ids, and a cover
+    // drawn from the old geometry must not be found for the new.
+    const serials = new WeakMap<HitLayer, number>()
+    const serial = (l: HitLayer): number => {
+        let n = serials.get(l)
+        if (n === undefined) serials.set(l, (n = nextSerial++))
+        return n
+    }
+    let nextSerial = 0
     let coverManifest: Manifest | null = null
     const covers = new Map<string, Array<{ key: string; cv: HTMLCanvasElement }>>()
     const coverOf = (axis: string, layers: HitLayer[], m: Manifest, bg: string): HTMLCanvasElement | null => {
@@ -422,14 +434,13 @@ export function createFade(host: FadeHost): Fade {
             covers.clear()
             coverManifest = m
         }
-        const key = `${m.width}x${m.height} ${bg} ${layers.map((l) => l.id).join(",")}`
+        const e = extentOf(m, axis)
+        const key = `${e.join(",")} ${bg} ${layers.map(serial).join(",")}`
         const list = covers.get(axis) ?? []
         const hit = list.find((e) => e.key === key)
         if (hit) return hit.cv
         const cv = document.createElement("canvas")
-        cv.width = m.width
-        cv.height = m.height
-        const c = cv.getContext("2d")
+        const c = sized(cv, e)
         if (!c) return null
         c.fillStyle = bg
         for (const layer of layers) fillShapes(c, layer, drawnOrder(layer), PAD_DIM)
@@ -441,8 +452,8 @@ export function createFade(host: FadeHost): Fade {
         const h = home(axis)
         const m = host.manifest_()
         h.wrap.style.display = ""
-        sizeCanvas(h.dim, m)
-        sizeCanvas(h.top, m)
+        place(axis, host.frame_(axis))
+        const e = extentOf(m, axis)
         const bg = plotFill(m, axis)
         let faded = 0, nkept = 0, raised = 0
         const outlines: string[] = []
@@ -453,23 +464,23 @@ export function createFade(host: FadeHost): Fade {
             faded += drawnOrder(layer).length - drawnKept
         }
         const lone = lonePicks(kept)
-        const dc = h.dim.getContext("2d")
-        const tc = h.top.getContext("2d")
+        const dc = sized(h.dim, e)
+        const tc = sized(h.top, e)
         if (dc && tc) {
-            dc.clearRect(0, 0, h.dim.width, h.dim.height)
+            dc.clearRect(e[0], e[1], e[2], e[3])
             dc.globalCompositeOperation = "source-over"
             const cover = coverOf(axis, [...kept.keys()], m, bg)
-            if (cover) dc.drawImage(cover, 0, 0)
+            if (cover) dc.drawImage(cover, e[0], e[1])
             dc.globalCompositeOperation = "destination-out"
             dc.fillStyle = "#000000"
-            for (const [layer, ks] of kept) fillShapes(dc, layer, ks, PAD_DIM)
+            for (const [layer, ks] of kept) fillShapes(dc, layer, ks, PAD_KEEP)
             dc.globalCompositeOperation = "source-over"
 
-            tc.clearRect(0, 0, h.top.width, h.top.height)
+            tc.clearRect(e[0], e[1], e[2], e[3])
             for (const [layer, ks] of kept) {
                 const g = layer.geometry as number[]
                 for (const k of coveredPicks(layer, ks)) {
-                    const css = colourOf(layer, k)
+                    const css = layerColor(layer, k)
                     if (!css) continue
                     tc.fillStyle = css
                     tc.beginPath()
@@ -488,7 +499,7 @@ export function createFade(host: FadeHost): Fade {
             // hoverstyle stroke) wins over the mark's own shade.
             const figure = m.overlayStyle?.["--masque-chrome"]
             for (const p of lone) {
-                const css = colourOf(p.layer, p.k)
+                const css = layerColor(p.layer, p.k)
                 const rgb = css ? rgbOf(tc, css) : null
                 const ink = p.layer.style?.stroke ?? figure
                     ?? (rgb ? `rgb(${rgb.map((v) => Math.round(v + (toward - v) * OUTLINE_MIX)).join(",")})` : chrome)
@@ -521,7 +532,8 @@ export function createFade(host: FadeHost): Fade {
         const h = homes.get(axis)
         if (!h) return
         h.wrap.style.display = "none"
-        for (const cv of [h.dim, h.top]) cv.getContext("2d")?.clearRect(0, 0, cv.width, cv.height)
+        // Emptied, not cleared: a canvas holds its memory until it is sized down.
+        for (const cv of [h.dim, h.top]) cv.width = cv.height = 0
         for (const k of ["layers", "fill", "faded", "kept", "lone", "raised", "lift"]) delete h.wrap.dataset[k]
         ;(h.wrap as FadeEl).masqueFade = { kept: [], picked: [], lone: [], draws: (h.wrap as FadeEl).masqueFade?.draws ?? 0 }
     }
@@ -554,7 +566,7 @@ export function createFade(host: FadeHost): Fade {
                 const b = boxOf(layer, k)
                 if (b && b[0] <= box[2] && b[2] >= box[0] && b[1] <= box[3] && b[3] >= box[1]) near.push(k)
             }
-            if (near.length) fillShapes(c, layer, near, PAD_DIM)
+            if (near.length) fillShapes(c, layer, near, PAD_KEEP)
         }
         c.globalCompositeOperation = "source-over"
     }

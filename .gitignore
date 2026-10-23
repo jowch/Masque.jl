@@ -30,5 +30,6 @@ npm-debug.log*
 /pluto-makie-interactive-plots.md
 .playwright-mcp/
 *.png
-# Gallery card screenshots are tracked; other PNGs stay local.
+# Gallery card screenshots and the selection look's before/after are tracked; other PNGs stay local.
 !docs/src/assets/gallery/*.png
+!docs/src/assets/selection-look-*.png

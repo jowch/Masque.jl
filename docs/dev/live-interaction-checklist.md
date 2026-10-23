@@ -51,7 +51,8 @@ Selected closed marks (circles, rects, polygons; #394, option E of the selection
 once a plot holds a pick (one or many, from the first pick), its unpicked marks fade toward the
 plot area's colour (the axis background over the figure's; the manifest's transform `fill`, else
 `background`) and the picks keep the image's own pixels. Nothing goes in `g.sel`: each axis
-has a `div.masque-fade[data-axis]` under the three svgs with two canvases in image px. The
+has a `div.masque-fade[data-axis]` under the three svgs with two canvases in image px, each
+covering only the axis viewport and clipped to it (a mark past the limits is never drawn). The
 `canvas.masque-dim` covers every unpicked mark of the plot (grown 1.5 image px) in that colour,
 punches the picks back out (grown 0.5), and shows at CSS opacity
 `1 - --masque-unpicked-opacity` (default 0.2 left showing; overlaystyle `unpicked_opacity`). The
@@ -60,11 +61,16 @@ after it covers (a pick nothing covers keeps its stroke and marker shape), and d
 outline on a lone pick: one with no other pick whose box is within one of its own radii (two
 equal circles: centres 3 radii apart). The outline is the layer's `hoverstyle` stroke or the figure's
 overlaystyle `color` when one is set, else the mark's colour moved 45% toward black on a light
-plot area or white on a dark one, else (no `colors`) the chrome grey. Other plots in the axis, grid lines and text are untouched; a legend's
-pick fades every series that legend names. Hover is unchanged and draws over a pick like any
+plot area or white on a dark one, else (no `colors`) the chrome grey. Other plots in the axis,
+grid lines and text keep their look, except where a faded mark's cover lies over them; a legend's
+pick fades every series that legend names. Known gaps: only a covered circle pick is repainted
+(a picked bar or polygon under a later unpicked one stays faded where they overlap), and a
+non-circular scatter marker (`:rect`, `:diamond`) is covered and punched as a circle. Hover is unchanged and draws over a pick like any
 mark (the pick has no stroke for it to thin); hovering or focusing a faded mark lifts its fade
 while it is hovered. A legend entry's hover previews its series the same way (kept, the legend's
-other series faded); its linked lines keep the ring in `g.link`. The canvases move and clip with
+other series faded; a legend with one closed series fades nothing, as a click on it does); its
+linked lines keep the ring in `g.link`. A plot with every mark picked fades nothing either, and
+only lone picks show their outline. The canvases move and clip with
 a live photograph like the axis's svg homes. **Hovering a mark drawn with an SVG selected
 recipe (a line's ring, a grid cell, a region) still draws no highlight**: a 1.5px hover stroke
 over the 2px selected stroke would read as weaker, not stronger; the tooltip and `@bind` still

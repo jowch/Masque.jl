@@ -2,7 +2,8 @@ import { pathData, polygonRings, ringsPathData, screenFixedLayer } from "./geome
 import { hitKey, prefersReducedMotion, selectedHits, MOTION_MS } from "./state"
 import type { HiGroups, HiSet, OverlayCtx, OverlayState } from "./state"
 import { regionCells } from "./regions"
-import { fadeLook, fadesSome, previewScope, selectionScope } from "./fade"
+import { fadeLook, previewScope, selectionScope } from "./fade"
+import { layerColor } from "./color"
 import type { Hit, HitLayer, LayerStyle } from "./types"
 
 export const SVG_NS = "http://www.w3.org/2000/svg"
@@ -17,10 +18,7 @@ type HiMode = "hover" | "selected"
 // out-of-range index (a payload/colors length mismatch) degrades to no accent rather than
 // throwing.
 export function markColorFor(hit: Hit): string | null {
-    const c = hit.layer.colors
-    if (!c) return null
-    if (typeof c === "string") return c
-    return c.palette[c.index[hit.index]] ?? null
+    return layerColor(hit.layer, hit.index)
 }
 
 // An explicit per-layer hoverstyle stroke from Julia (wins outright, used verbatim). Shared by
@@ -334,17 +332,14 @@ export function drawLink(state: OverlayState, linkGroups: HiSet, key: string, hi
 }
 
 // A legend entry's hover or focus: its linked closed marks are previewed by fading the legend's
-// other series (fade.ts), and any other linked mark gets the selected recipe in g.link. With no
-// other series to fade (a legend's only closed series), the closed marks take that recipe too,
-// so the hover still shows them.
+// other series (fade.ts), and any other linked mark gets the selected recipe in g.link. A legend
+// whose only closed series is the hovered one fades nothing, as a click on it does.
 export function drawLegendLink(ctx: OverlayCtx, state: OverlayState, legend: Hit, hits: Hit[]): void {
-    const scope = previewScope(ctx.manifest_, legend.layer)
     const closed = hits.filter(fadeLook)
-    const faded = fadesSome(closed, scope) ? closed : []
-    const svg = faded.length ? hits.filter((h) => !fadeLook(h)) : hits
+    const svg = hits.filter((h) => !fadeLook(h))
     if (svg.length) drawLink(state, ctx.linkGroup_, hitKey(legend), svg)
     else clearLinkImmediate(state, ctx.linkGroup_)
-    ctx.fade_.preview_(hitKey(legend), faded.length ? faded : null, scope)
+    ctx.fade_.preview_(hitKey(legend), closed.length ? closed : null, previewScope(ctx.manifest_, legend.layer))
 }
 
 export function clearLegendLink(ctx: OverlayCtx, state: OverlayState, fade = false): void {
@@ -376,9 +371,8 @@ export function drawSelection(state: OverlayState, selGroups: HiSet, hits: Hit[]
 // The single funnel to g.sel — every writer of state.sel_ calls this after assigning it.
 // Screen-fixed hits (a legend entry) land outside the photograph clip. Linked data marks stay in.
 // A closed data mark's pick goes to fade.ts, which fades the rest of its plot; everything else
-// is drawn in g.sel. Every mark of a plot picked fades nothing and looks unpicked: switching
-// those picks to another look would restyle them all on the last click (the legend entry or
-// the value still shows them).
+// is drawn in g.sel. Every mark of a plot picked fades nothing, and only a lone pick's outline
+// marks it: switching those picks to another look would restyle them all on the last click.
 export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
     const data: Hit[] = []
     const fixed: Hit[] = []

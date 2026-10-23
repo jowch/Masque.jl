@@ -3,17 +3,17 @@
 // a pick an unpicked mark covers is repainted, and a lone pick is outlined. happy-dom has no 2D
 // canvas, so these read what the fade records on each axis's wrapper, not the pixels; the e2e
 // drivers check the pixels.
-import { afterEach, describe, it, expect } from "vitest"
+import { afterEach, describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
-import { fadesSome } from "../src/fade"
 import type { Manifest } from "../src/types"
 import { withFields } from "./fields"
 import { fadeKept, fadeLone } from "./fadekeys"
+import type { FadeEl } from "../src/fade"
 
 const cleanups: Array<() => void> = []
 afterEach(() => { while (cleanups.length) cleanups.pop()!() })
 
-function setup(manifest: Manifest) {
+function setup(manifest: Manifest, requestFrame?: Parameters<typeof mount>[3]) {
     const host = document.createElement("div")
     const img = document.createElement("img")
     img.getBoundingClientRect = () =>
@@ -21,12 +21,12 @@ function setup(manifest: Manifest) {
     const script = document.createElement("script")
     host.append(img, script)
     document.body.append(host)
-    cleanups.push(mount(script, withFields(manifest)).cleanup)
+    cleanups.push(mount(script, withFields(manifest), undefined, requestFrame).cleanup)
     const shadowHost = host.lastElementChild as HTMLElement
     const shadow = shadowHost.shadowRoot!
     const surface = shadow.querySelector(".surface") as HTMLElement
     const wrap = (axis = "ax1") => shadow.querySelector(`.masque-fade[data-axis="${axis}"]`) as HTMLElement | null
-    return { host, shadowHost, shadow, surface, wrap }
+    return { host, img, shadowHost, shadow, surface, wrap }
 }
 
 const move = (surface: HTMLElement, x: number, y: number) =>
@@ -138,19 +138,6 @@ describe("the fade (closed-mark selected look)", () => {
         expect(shadow.querySelectorAll("g.sel > *").length).toBe(3) // the cell's fill + edge, the segment's ring
     })
 
-    it("knows when keeping some marks fades nothing: every drawn mark of the scope kept", () => {
-        const a = { id: "a", kind: "circles", axis: "ax1", events: [], payloads: [{}, {}, {}],
-            geometry: [10, 10, 5, 30, 10, 5, 50, 10, 5], order: [2, 0] } as Manifest["layers"][number]
-        const b = { id: "b", kind: "circles", axis: "ax1", events: [], payloads: [{}],
-            geometry: [90, 10, 5] } as Manifest["layers"][number]
-        const hit = (layer: typeof a, index: number) => ({ layer, index, geom_: ["circle"] }) as never
-        expect(fadesSome([hit(a, 0)], [a])).toBe(true)
-        // Element 1 is not drawn (`order` leaves it out), so keeping 0 and 2 keeps all of a.
-        expect(fadesSome([hit(a, 0), hit(a, 2)], [a])).toBe(false)
-        expect(fadesSome([hit(a, 0), hit(a, 2)], [a, b])).toBe(true)
-        expect(fadesSome([], [])).toBe(false)
-    })
-
     it("fades toward the axis's own plot area colour when it has one, else the figure's", () => {
         const m = pts([0])
         m.background = "rgb(31,31,31)"
@@ -160,5 +147,78 @@ describe("the fade (closed-mark selected look)", () => {
         m2.transforms = { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
             viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false, fill: "rgb(51,51,51)" } }
         expect(setup(m2).wrap()?.dataset.fill).toBe("rgb(51,51,51)")
+    })
+    it("clips the canvases to the axis at rest: a mark past the limits is not drawn", () => {
+        const m = pts([2])
+        m.transforms = { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+            viewport: [120, 80, 600, 400], xreversed: false, yreversed: false } }
+        expect(setup(m).wrap()!.style.clipPath).toBe("inset(10% 40% 40% 10%)")
+    })
+
+    it("keeps the plot area colour and the overlay colour through a pan frame", async () => {
+        const transforms = (fill?: string): Manifest["transforms"] => ({ ax1: { xlims: [0, 10], ylims: [0, 10],
+            xscale: "identity", yscale: "identity", viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false,
+            ...(fill ? { fill } : {}) } })
+        const view = { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } } as Manifest["layers"][number]
+        const m = pts([2])
+        m.transforms = transforms("rgb(51,51,51)")
+        m.layers.push(view)
+        m.background = "rgb(31,31,31)"
+        m.overlayStyle = { "--masque-chrome": "#ff8800" }
+        // A frame's manifest: new geometry, the axis's own fill, no figure-level styles.
+        const next = pts([])
+        next.transforms = transforms("rgb(51,51,51)")
+        next.layers.push(view)
+        delete next.initial
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]), manifest: withFields(next) }))
+        const { img, surface, wrap } = setup(m, requestFrame)
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -120, ctrlKey: true })
+        Object.defineProperty(ev, "clientX", { value: 300 })
+        Object.defineProperty(ev, "clientY", { value: 200 })
+        surface.dispatchEvent(ev)
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+        img.dispatchEvent(new Event("load"))
+        expect(requestFrame).toHaveBeenCalled()
+        expect(wrap()!.dataset.fill).toBe("rgb(51,51,51)")
+        expect((wrap() as FadeEl).masqueFade!.draws).toBeGreaterThan(1)
+        expect(next.background).toBe("rgb(31,31,31)")
+        expect(next.overlayStyle).toEqual({ "--masque-chrome": "#ff8800" })
+    })
+})
+
+describe("the lone pick's outline colour", () => {
+    // happy-dom has no 2D canvas: a stand-in context records nothing, so drawAxis runs its
+    // canvas path and records each outline's colour.
+    const realGetContext = HTMLCanvasElement.prototype.getContext
+    afterEach(() => { HTMLCanvasElement.prototype.getContext = realGetContext })
+    const stub = () => {
+        const noop = () => {}
+        HTMLCanvasElement.prototype.getContext = function () {
+            return new Proxy({ fillStyle: "#000000", strokeStyle: "#000000", lineWidth: 1, globalCompositeOperation: "source-over" }, {
+                get: (t, k) => (k in t ? (t as Record<string | symbol, unknown>)[k] : noop),
+            })
+        } as unknown as typeof realGetContext
+    }
+    const outlines = (shadow: ShadowRoot) =>
+        ([...shadow.querySelectorAll(".masque-fade")] as FadeEl[]).flatMap((w) => w.masqueFade?.outlines ?? [])
+
+    it("is the mark's own colour moved 45% toward black on a light plot area, toward white on a dark one", () => {
+        stub()
+        expect(outlines(setup(pts([3], { colors: "#3366cc" })).shadow)).toEqual(["rgb(28,56,112)"])
+        const dark = pts([3], { colors: "#3366cc" })
+        dark.background = "rgb(20,20,20)"
+        expect(outlines(setup(dark).shadow)).toEqual(["rgb(143,171,227)"])
+    })
+
+    it("is the layer's hoverstyle stroke, else the overlay colour, else the chrome grey with no mark colour", () => {
+        stub()
+        expect(outlines(setup(pts([3], { colors: "#3366cc", style: { stroke: "#00aa00", width: 1.5 } })).shadow)).toEqual(["#00aa00"])
+        const fig = pts([3], { colors: "#3366cc" })
+        fig.overlayStyle = { "--masque-chrome": "#ff8800" }
+        expect(outlines(setup(fig).shadow)).toEqual(["#ff8800"])
+        expect(outlines(setup(pts([3])).shadow)).toEqual(["#7a7a7a"])
     })
 })

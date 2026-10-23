@@ -867,6 +867,29 @@ function build_kind_sweep()
         )
     end
 
+    # The fade on a dark plot area through a pan (#394): a gray20 axis on a gray12 figure, a
+    # narrow axis with marks past its limits on the right, and one pick. The unpicked marks fade
+    # toward gray20 before and after a pan, and nothing is drawn outside the axis. Not in
+    # kind_sweep_meta(); polish_verify.mjs checks it.
+    fade_pan = let
+        xs = [1.0, 2.0, 3.0, 4.0, 6.0, 7.0]
+        ys = [1.0, 3.0, 2.0, 4.0, 2.5, 2.5]
+        fig = Figure(size = (480, 260); backgroundcolor = :gray12)
+        ax = Axis(
+            fig[1, 1];
+            title = "fade-pan", width = 220, limits = (0, 5, 0, 5), backgroundcolor = :gray20,
+            titlecolor = :gray90, xticklabelcolor = :gray80, yticklabelcolor = :gray80,
+        )
+        sc = scatter!(ax, xs, ys; color = :gray, markersize = 22)
+        masque(
+            fig,
+            PointInteractable(ax, sc; id = :fade_pan, payloads = [(; label = "p$i") for i in eachindex(xs)]),
+            ViewInteractable(ax; id = :view);
+            selected = Dict(:fade_pan => [1]),
+            auto = false,
+        )
+    end
+
     scatter_sizes = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "scatter-sizes")
@@ -1494,7 +1517,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view3d, view3d_linked, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )

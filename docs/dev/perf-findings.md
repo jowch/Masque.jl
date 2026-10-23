@@ -299,6 +299,7 @@ Chromium against a live Pluto kernel on the warmed env; one click dispatched on 
 `sync` is the handler and `total` runs until two frames later. Medians of 12, measured
 2026-10-23 on the cloud container: the old look at `f181c12` (a dodge fill and a 2 px edge per
 pick, as SVG), the new look on the #394 branch (one canvas per axis), back to back.
+`bench/selection_look/click.mjs` reproduces the table (how to run it is at its top).
 
 | Case | `:cairo` old | `:cairo` new | `:webgl` old | `:webgl` new |
 |------|---:|---:|---:|---:|

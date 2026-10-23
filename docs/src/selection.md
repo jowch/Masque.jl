@@ -2,8 +2,9 @@
 
 Clicking a mark selects it. The mark keeps its color while the rest of
 its plot fades, and its plot's field in the `@bind` value holds it until
-another click on that plot replaces it. Click the mark again to clear the selection. You can also start
-with a mark selected, or keep a selection when the figure is rebuilt.
+another click on that plot replaces it. Click the mark again to clear
+the selection. You can also start with a mark selected, or keep a
+selection when the figure is rebuilt.
 
 The examples on this page use a scatter of cities, with each city's
 name in its payload's `city` field:

@@ -1234,7 +1234,7 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
         ctx = context(backend, fig, ppu, max_width)
         manifest = build_manifest(
             interactables, ctx; suspend_surfaces = get(input, "settle", false) !== true, with_initial = false,
-            owners_out,
+            background = fig.scene.backgroundcolor[], owners_out,
         )
         result = _with_blocks_hidden(() -> render(backend, fig, render_ppu), interactables)
         frame = _gesture_frame(result)

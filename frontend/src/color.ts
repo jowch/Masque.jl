@@ -1,5 +1,14 @@
 // Figure colours: the background's light/dark side, shared by mount.ts (chrome greys) and
-// fade.ts (the faded marks and the pick outlines).
+// fade.ts (the faded marks and the pick outlines), and a mark's own colour.
+import type { HitLayer } from "./types"
+
+// Element k's own colour from the layer's `colors`, or null when Julia sent none.
+export function layerColor(layer: HitLayer, k: number): string | null {
+    const c = layer.colors
+    if (!c) return null
+    if (typeof c === "string") return c
+    return c.palette[c.index[k]] ?? null
+}
 
 // Parses the handful of CSS colour syntaxes build_manifest's `background` kwarg actually emits
 // (#rrggbb/#rgb, rgb()/rgba()) — not a general CSS colour parser (no named colours, hsl(), etc.);

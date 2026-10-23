@@ -158,19 +158,18 @@ describe("legend links: keyboard focus", () => {
         const { surface, shadow } = setup(manifest)
         surface.focus()
         down(surface, "ArrowRight") // -> legend[0], the only focusable element
-        // The legend's only series has nothing else to fade, so it takes the selected recipe.
-        expect(fadeKept(shadow)).toEqual([])
-        expect(shadow.querySelectorAll("svg.masque-fill g.link > circle").length).toBe(2)
+        // The legend's only series goes to the fade, kept; nothing else fades, and g.link is empty.
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"])
+        expect(shadow.querySelectorAll("g.link > *").length).toBe(0)
     })
 
     it("blurring/moving focus away ends the linked preview", () => {
         const { surface, shadow } = setup(manifest)
         surface.focus()
         down(surface, "ArrowRight")
-        expect(shadow.querySelectorAll("svg.masque-fill g.link > circle").length).toBe(2)
+        expect(fadeKept(shadow)).toEqual(["pts:0", "pts:1"])
         down(surface, "Escape")
-        const left = [...shadow.querySelectorAll("g.link > *")]
-        expect(left.every((el) => el.classList.contains("masque-leave"))).toBe(true)
+        expect(fadeKept(shadow)).toEqual([])
     })
 })
 
@@ -202,14 +201,15 @@ describe("legend links: fan-out across kinds", () => {
     it("previews linked elements from both a circles and a polyline target layer", () => {
         const { surface, shadow } = setup(manifest)
         move(surface, 50, 50)
-        // The 2 circles are the legend's only closed series, so nothing else fades and they take
-        // the selected recipe: a fill and an edge circle each. 2 polyline segments (a 3-vertex
+        // The 2 circles go to the fade, kept; they are the legend's only closed series, so
+        // nothing fades and nothing is drawn on them in g.link. 2 polyline segments (a 3-vertex
         // polyline is 2 segments); an open kind (segments/polyline) in "selected" mode is
         // unblended — a ring (highlight.ts's makeRing) in svg.masque-plain's g.link only, a <g>
         // wrapping two <line>s, so each counts as one top-level g.link child = 2 <g> elements.
-        expect(fadeKept(shadow)).toEqual([])
+        expect(fadeKept(shadow)).toEqual(["circ:0", "circ:1"])
+        expect(shadow.querySelector('.masque-fade[data-axis="ax1"]')!.getAttribute("data-faded")).toBe("0")
         const tags = [...shadow.querySelectorAll("g.link > *")].map((el) => el.tagName.toLowerCase())
-        expect(tags).toEqual(["circle", "circle", "circle", "circle", "g", "g"])
+        expect(tags).toEqual(["g", "g"])
     })
 })
 

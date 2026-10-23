@@ -100,7 +100,7 @@ try {
         scatter: !!document.querySelector("#coords_scatter"),
         lines: !!document.querySelector("#coords_lines"),
         dark: !!document.querySelector("#coords_scatter_dark"),
-        styled: !!document.querySelector("#coords_scatter_styled"),
+        styled: !!document.querySelector("#coords_scatter_styled") && !!document.querySelector("#coords_fade_pan"),
         errText: [...document.querySelectorAll("pluto-cell.errored")].map((c) => c.innerText).slice(0, 1).join(""),
       };
     });
@@ -520,6 +520,81 @@ try {
     throw new Error(`scatter_styled: tooltip ${JSON.stringify({ show: sTip.show, bg: sTip.bg, color: sTip.color, radius: sTip.radius, caret: sTip.caret })} (want bg rgb(20, 30, 60), color rgb(240, 240, 200), radius 9px, no caret)`);
   }
   passed.push("tooltipstyle");
+
+  // The fade on a dark plot area, through a pan (#394). fade_pan is a gray20 axis on a gray12
+  // figure with one pick and two marks past the axis's right limit. Before and after a pan, the
+  // fade goes toward gray20 (a frame's manifest once lost the figure's colours and faded toward
+  // white), and nothing is drawn outside the axis (the canvases once painted the marks the
+  // backend clips).
+  {
+    const key = "fade_pan";
+    const FIG = [31, 31, 31];
+    const view = (await layersOf(key)).find((l) => l.id === "view").geometry;
+    const pts = (await layersOf(key)).find((l) => l.kind === "circles").geometry;
+    const fadeState = () => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const w = sr.querySelector(".masque-fade");
+      const stamp = host.dataset.masqueGestureFrame ? JSON.parse(host.dataset.masqueGestureFrame) : null;
+      return { fill: w?.dataset.fill ?? null, faded: w?.dataset.faded ?? null, draws: w?.masqueFade?.draws ?? 0, stamp, photo: host.dataset.masquePhoto || "" };
+    }, key);
+    // Every screenshot pixel in the image-px box [x0, x1] x [y0, y1] passes `ok`; the first that
+    // fails, else null.
+    const firstBad = (shot, [x0, y0, x1, y1], ok) => {
+      for (let j = Math.ceil(y0 * shot.perImg); j < y1 * shot.perImg; j++) {
+        for (let i = Math.ceil(x0 * shot.perImg); i < x1 * shot.perImg; i++) {
+          const o = 4 * (j * shot.w + i), px = shot.data.slice(o, o + 3);
+          if (!ok(px)) return { x: i / shot.perImg, y: j / shot.perImg, px };
+        }
+      }
+      return null;
+    };
+    const inset = 4;
+    const insideAxis = [view.x + inset, view.y + inset, view.x + view.w - inset, view.y + view.h - inset];
+    const checkShot = async (when) => {
+      const shot = await screenOf(key);
+      const right = [view.x + view.w + inset, view.y + inset, shot.w / shot.perImg - 2, view.y + view.h - inset];
+      const out = firstBad(shot, right, (px) => px.every((v, c) => Math.abs(v - FIG[c]) <= 6));
+      if (out) throw new Error(`${key}/${when}: a pixel right of the axis at ${JSON.stringify(out)} is not the figure background ${FIG}`);
+      const white = firstBad(shot, insideAxis, (px) => px.some((v) => v <= 200));
+      if (white) throw new Error(`${key}/${when}: a pixel inside the dark axis at ${JSON.stringify(white)} is near white`);
+      return shot;
+    };
+    const st0 = await fadeState();
+    if (st0.fill?.replace(/\s/g, "") !== "rgb(51,51,51)") throw new Error(`${key}: the fade's fill ${st0.fill} (want the axis's rgb(51,51,51))`);
+    const shot0 = await checkShot("rest");
+    // Element 2 is in the limits and unpicked: gray marks faded 80% toward gray20 read about 66.
+    const m2 = shot0.mean(pts[6], pts[7], 0.5 * pts[8]);
+    if (m2.some((v) => v > 100)) throw new Error(`${key}/rest: unpicked mark 2 reads ${m2.map(Math.round)} (want faded toward gray20, about 66)`);
+    passed.push(`${key}/rest`);
+
+    const box = await page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      return { left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+    }, key);
+    const cx = box.left + (view.x + view.w / 2) * box.s, cy = box.top + (view.y + view.h / 2) * box.s;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    for (let i = 1; i <= 6; i++) await page.mouse.move(cx + 5 * i, cy + 2 * i);
+    await page.mouse.up();
+    let st = null;
+    for (let i = 0; i < (backend === "webgl" ? 50 : 25); i++) {
+      await new Promise((r) => setTimeout(r, backend === "webgl" ? 300 : 200));
+      st = await fadeState();
+      if (st.stamp && st.stamp.n > (st0.stamp?.n ?? 0) && st.stamp.settle === true && !st.photo && st.draws > st0.draws) break;
+      st = null;
+    }
+    if (!st) throw new Error(`${key}: no settled pan frame redrew the fade (${JSON.stringify(await fadeState())})`);
+    if (st.fill?.replace(/\s/g, "") !== "rgb(51,51,51)") throw new Error(`${key}/pan: the fade's fill after the pan is ${st.fill} (want rgb(51,51,51))`);
+    await new Promise((r) => setTimeout(r, 300));
+    await checkShot("pan");
+    passed.push(`${key}/pan`);
+  }
 
   // Axis3 kinds (#301): the baked selection and a hover on another mark sit on the projected
   // mark. `overlap3d` hovers the front marker of a pair: the highlight must take the marker's

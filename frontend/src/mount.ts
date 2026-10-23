@@ -729,6 +729,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     function revealFrame(input: Record<string, unknown>, r: FrameResponse): void {
         const newManifest = r.manifest as Manifest | undefined
         if (!newManifest) return
+        // A frame's manifest describes the new geometry only. The figure's colour and the
+        // overlay and tooltip styles were set at mount; the fade and the outlines read them here.
+        newManifest.background ??= ctx.manifest_.background
+        newManifest.overlayStyle ??= ctx.manifest_.overlayStyle
+        newManifest.tipStyle ??= ctx.manifest_.tipStyle
         const onchangeFrame = input.onchange === true
         // An in-drag \`onchange\` frame trails the pointer by a round trip. Its lines and boxes
         // would pull the control back to where it was then, so the ones on screen stay, with
