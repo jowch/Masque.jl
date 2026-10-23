@@ -4,10 +4,12 @@
 # (curl localhost:PORT -> 200; do NOT grep the log, Pluto doesn't reliably flush its banner).
 #
 #   julia test/e2e/serve.jl [port]
+#
+# PLUTO_VERSION picks the Pluto series (default "1"); CI also runs the bind round-trip on "0.20".
 
 import Pkg
 Pkg.activate(; temp = true)
-Pkg.add(name = "Pluto", version = "0.20")
+Pkg.add(name = "Pluto", version = get(ENV, "PLUTO_VERSION", "1"))
 using Pluto
 
 # Julia's stdout/stderr redirection to a file (`> pluto.log 2>&1` in CI) is buffered and, observed

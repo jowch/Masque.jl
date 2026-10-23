@@ -5347,7 +5347,7 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(r).toEqual(["600"]) // a point the line doesn't have is dropped
     })
 
-    it("a click on an empty part of the plot clears its picks; a miss with none sends nothing", () => {
+    it("a click on an empty part of the plot clears a one-pick field and keeps the many picks (#384)", () => {
         const { host, script } = setup()
         mount(script, many())
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
@@ -5361,8 +5361,11 @@ describe("select = :many and clearing picks (#335)", () => {
         n = 0
         click(surface, 400, 50)
         expect(n).toBe(1)
-        expect(val(host)).toEqual({ pts: { items: [] }, one: null })
-        expect(selChildren(shadowOf(host)).length).toBe(0)
+        expect(val(host)).toEqual({ pts: { items: [{ layer: "pts", index: 0 }] }, one: null })
+        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
+        n = 0
+        click(surface, 400, 50) // the one-pick field is empty now: nothing to send
+        expect(n).toBe(0)
     })
 
     it("Escape clears every pick", () => {
@@ -5404,11 +5407,11 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
         click(surface, 400, 50, { ctrlKey: true }) // a modified miss
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
-        click(surface, 400, 50)
-        expect(val(host).pts).toEqual({ items: [] })
+        click(surface, 400, 50) // a plain miss keeps them too (#384)
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
     })
 
-    it("an empty click clears every axis under it, and none inside a legend's box", () => {
+    it("an empty click clears the one-pick fields of every axis under it, and none inside a legend's box", () => {
         const { host, script } = setup()
         const m = many()
         const full = m.transforms.ax1
@@ -5426,8 +5429,8 @@ describe("select = :many and clearing picks (#335)", () => {
         click(surface, 425, 25) // legend padding
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
         expect(val(host).one).toEqual({ layer: "one", index: 0 })
-        click(surface, 200, 350) // plot area: both twins clear, the legend keeps its pick
-        expect(val(host)).toEqual({ pts: { items: [] }, one: null, legend: { layer: "legend", index: 0 } })
+        click(surface, 200, 350) // plot area: the twin's one-pick field clears, `many` and the legend keep theirs
+        expect(val(host)).toEqual({ pts: { items: [{ layer: "pts", index: 0 }] }, one: null, legend: { layer: "legend", index: 0 } })
     })
 
     it("Escape and an empty click leave a threshold and a box's target alone", () => {
@@ -6011,7 +6014,7 @@ describe("a grid with select = :many holds a cell mask (#335)", () => {
         expect(val(host).region).toEqual({ runs: [0, 0, 1] })
     })
 
-    it("a click on an empty part of the axis and Escape clear it; a restored value draws", () => {
+    it("a click on an empty part of the axis keeps it, Escape clears it; a restored value draws", () => {
         const { host, script } = setup()
         mount(script, grid({ runs: [0, 0, 2] }))
         const shadow = shadowOf(host)
@@ -6021,8 +6024,7 @@ describe("a grid with select = :many holds a cell mask (#335)", () => {
         expect(val(host).region).toEqual({ runs: [0, 0, 2, 2, 2, 1] })
         // y = 700 image px is inside the axis, below the grid.
         surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 350, bubbles: true }))
-        expect(val(host).region).toEqual({ runs: [] })
-        expect(selChildren(shadow).length).toBe(0)
+        expect(val(host).region).toEqual({ runs: [0, 0, 2, 2, 2, 1] })
         cell(surface, 1, 1)
         surface.focus()
         surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))

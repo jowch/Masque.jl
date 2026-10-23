@@ -242,7 +242,7 @@ export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardE
         case "Escape":
             e.preventDefault(); e.stopPropagation()
             if (abortMarquee(ctx, state)) return // a box in flight: Escape drops just the box
-            clearPicks(ctx, state, null)
+            clearPicks(ctx, state, null, true)
             focusTo(ctx, state, null)
             ctx.surface_.blur()
             return

@@ -328,6 +328,23 @@ an error that names the replacement:
 
 `tooltip_sigdigits` stays a keyword of its own. See [Tooltip styling](@ref).
 
+### Upgrading code written for Masque 0.3
+
+Masque 0.4 changes two things a 0.3 notebook can notice, besides the
+`tooltip_*` keywords above:
+
+- On a plot built with `select = :many`, a plain click adds the mark to
+  the selection, or takes it out when it is already selected, where it
+  used to replace the selection. A box drawn by dragging adds too. A
+  click on an empty part of the plot keeps the selection, where it used
+  to clear it; to start over, press Escape. See
+  [Select several marks](@ref).
+- A `Slider`, `Toggle`, `Checkbox`, `IntervalSlider` or `Menu` laid out
+  in the figure but left out of the `masque` call raises an
+  `ArgumentError`, where 0.3.1 warned. Name it, as in
+  `masque(fig, (freq = sl,))`, or take it out of the figure. See
+  [Name every control](@ref).
+
 ### Upgrading code that reads the `@bind` value
 
 In Masque 0.3, the `@bind` value is a named tuple with one field for
@@ -424,8 +441,9 @@ Check, in order:
 1. Does any cell use the variable? With `@bind pick masque(...)` and no
    cell that uses `pick`, a click changes nothing you can see.
 2. Did you click empty space? A click that misses every mark clears
-   the selection of the plots in that axis, and does nothing when none
-   of them holds a pick.
+   the selection of the plots in that axis built with the default
+   `select = :one`, and does nothing when none of them holds a pick. On a plot built with
+   `select = :many` it does nothing; press Escape to clear.
 3. Is the mark you clicked interactive? `masque(fig)` skips an
    unsupported plot type with a warning in the notebook log, not an
    error, so its marks do not respond, as with a

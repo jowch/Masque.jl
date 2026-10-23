@@ -90,8 +90,7 @@ const CLIPS = {
   "selection-many": {
     notebook: "selection_many_notebook.jl", nn: 4,
     async run(c) {
-      // Click three cities, click one again to take it out, drag a box over two more, then
-      // clear with a click on empty space.
+      // Click three cities, click one again to take it out, then drag a box over two more.
       for (const k of [0, 2, 3]) {
         await c.glide(c.circle("cities", k), 800);
         await c.click(c.circle("cities", k));
@@ -107,11 +106,7 @@ const CLIPS = {
       await c.page.mouse.down();
       await c.glide(to, 1600, 40);
       await c.page.mouse.up();
-      await c.settle(1500);
-      const empty = c.data("cities", 100, -10);
-      await c.glide(empty, 900);
-      await c.click(empty);
-      await c.settle(1600);
+      await c.settle(2000);
     },
   },
   "grid-many": {

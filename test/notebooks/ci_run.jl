@@ -202,7 +202,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     import Pkg
     Pkg.activate(; temp = true)
-    Pkg.add(name = "Pluto", version = "0.20")   # pin major; the notebooks declare v0.20.x
+    Pkg.add(name = "Pluto", version = "1")   # pin major
     using Pluto
 
     # Julia's stdout is block-buffered when CI redirects it (see test/e2e/serve.jl).
