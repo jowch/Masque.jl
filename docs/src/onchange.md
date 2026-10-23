@@ -116,5 +116,5 @@ full error to the cell's log.
 stays as it was last drawn, while clicks, the threshold, and the `@bind`
 value still work.
 
-Next: [Pan and orbit](@ref) moves the view the same way, and the two work
+Next: [Pan, zoom and orbit](@ref) moves the view the same way, and the two work
 together on one figure.

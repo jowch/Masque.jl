@@ -1,4 +1,4 @@
-# Sliders and toggles
+# Sliders, toggles and menus
 
 Lay out Makie's own `Slider`, `Toggle`, `Checkbox`, `IntervalSlider` or
 `Menu` in the figure, name it in `masque`, and the reader can use it in the

@@ -1,4 +1,4 @@
-# Concepts
+# How Masque works
 
 Masque adds tooltips and selection to a Makie figure you have already
 made: hovering a mark shows its data, and clicking a mark, or dragging a
@@ -115,7 +115,7 @@ starts with the marks inside the box. To start with marks selected, see
 
 Hovering a line shows its tooltip, but a click on it changes nothing,
 not even the other picks, until you name the line in `bind`, as below.
-A click then picks the point you plotted nearest it; see [Click marks](@ref).
+A click then picks the point you plotted nearest it; see [What each mark returns](@ref).
 
 ### Choose the fields with `bind`
 
@@ -147,23 +147,6 @@ after `fig` names interactables the same way, so
 `masque(fig, (cutoff = ThresholdInteractable(ax; value = 0.5),))` gives
 `sel.cutoff`. Giving one plot two different names raises an
 `ArgumentError`.
-
-## Static exports and this site
-
-A static HTML export of your notebook keeps tooltips and highlights, and
-you can still select marks and drag boxes. Cells that use the `@bind`
-value keep the values they had when you exported, because no Julia is
-running to update them, and panning does nothing. PlutoSliderServer
-cannot precompute a `masque` widget's values either, because it does
-not know which values the widget can take.
-
-The interactive examples on this site replay results recorded from real
-notebooks, and the **Simulating `@bind`** badge marks them. Hovering
-works as it does in Pluto, and a click shows the result recorded for it.
-A few interactions, such as a large brush or a pan, are shown as video
-clips instead. A click on an axis or a colorbar position is not
-recorded, so to see what those clicks return, run the example in your
-own notebook.
 
 Next: [Tooltips](@ref) to change what a tooltip says, or
 [Selection](@ref) for what a click selects and how to keep it.

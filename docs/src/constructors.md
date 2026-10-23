@@ -74,13 +74,13 @@ its own, define a method of [`interactables`](@ref) for its type; see
 
 | Constructor | Signature | Its field holds | Guide |
 |---|---|---|---|
-| [`PointInteractable`](@ref) | `(ax, points; radius, radius3d, id=:points)` or `(ax, p::Scatter)` | [`ElementEvent`](@ref): `index`, `x`, `y`[, `z`] | [Getting started](@ref), [Click marks](@ref) |
-| [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, unit=:segment, tol=6, id=:segments)` | [`ElementEvent`](@ref): `segment_index`, or `index` with `unit = :line` | [Click marks](@ref) |
-| [`RectInteractable`](@ref) | `(ax, rects; clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot)` | [`ElementEvent`](@ref): `index`; bars give `low`, `high`, `value` | [Click marks](@ref) |
-| [`GridInteractable`](@ref) | `(ax, xedges, yedges, values; id=:cells)` or `(ax, p::Union{Heatmap,Image})` | [`GridCellEvent`](@ref): `i`, `j`, `value`; with `select = :many`, a [`GridSelection`](@ref) | [Inspect a grid](@ref) |
+| [`PointInteractable`](@ref) | `(ax, points; radius, radius3d, id=:points)` or `(ax, p::Scatter)` | [`ElementEvent`](@ref): `index`, `x`, `y`[, `z`] | [Getting started](@ref), [What each mark returns](@ref) |
+| [`SegmentInteractable`](@ref) | `(ax, vertices; mode=:polyline, unit=:segment, tol=6, id=:segments)` | [`ElementEvent`](@ref): `segment_index`, or `index` with `unit = :line` | [What each mark returns](@ref) |
+| [`RectInteractable`](@ref) | `(ax, rects; clamp_to_viewport=false, id=:rects)` or `(ax, p::BarPlot)` | [`ElementEvent`](@ref): `index`; bars give `low`, `high`, `value` | [What each mark returns](@ref) |
+| [`GridInteractable`](@ref) | `(ax, xedges, yedges, values; id=:cells)` or `(ax, p::Union{Heatmap,Image})` | [`GridCellEvent`](@ref): `i`, `j`, `value`; with `select = :many`, a [`GridSelection`](@ref) | [Heatmaps and images](@ref) |
 | [`SurfaceInteractable`](@ref) | `(ax, x, y, z; value, id=:surface)` or `(ax, p::Surface)` | [`GridCellEvent`](@ref): `i`, `j`, `value` (the point's `z`) | [Supported plots and axes](@ref) |
-| [`PolygonInteractable`](@ref) | `(ax, rings; holes=nothing, id=:polygons)` or `(ax, p::Poly)` | [`ElementEvent`](@ref): `index` | [Click marks](@ref) |
-| [`TextInteractable`](@ref) | `(ax, p::Text; id=:text)` | [`ElementEvent`](@ref): `text`, `index`, `x`, `y` | [Click marks](@ref) |
+| [`PolygonInteractable`](@ref) | `(ax, rings; holes=nothing, id=:polygons)` or `(ax, p::Poly)` | [`ElementEvent`](@ref): `index` | [What each mark returns](@ref) |
+| [`TextInteractable`](@ref) | `(ax, p::Text; id=:text)` | [`ElementEvent`](@ref): `text`, `index`, `x`, `y` | [What each mark returns](@ref) |
 
 For a scatter, pass the plot, so the highlight matches the drawn
 marker. If you pass positions instead and Masque can't find a scatter
@@ -137,7 +137,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | [`ThresholdInteractable`](@ref) | `(ax; orientation=:horizontal, value, id=:threshold)` | [`ThresholdEvent`](@ref): `value`, starting at `value` | [Read coordinates](@ref) |
 | [`LegendInteractable`](@ref) | `(leg; targets=nothing, tooltip=nothing, id=:legend)` | [`LegendEvent`](@ref): `label`, `group`, `targets` | [Legend](@ref) |
 | [`ROIInteractable`](@ref) | `(ax; bounds, selects=nothing, id=:roi)` | [`BoundsEvent`](@ref), starting at `bounds`; with `selects`, the target's field holds the marks or cells inside | [Brush a region](@ref) |
-| [`ViewInteractable`](@ref) | `(ax; id=:view)` | no field | [Pan and orbit](@ref) |
+| [`ViewInteractable`](@ref) | `(ax; id=:view)` | no field | [Pan, zoom and orbit](@ref) |
 | [`SliceInteractable`](@ref) | `(plots)`, `(ax, plots)`, or `(ax; series, orientation=:vertical, crosshair=true, covers, tooltip)` | no field; hover only | [Slice across series](@ref) |
 
 A threshold's `value` and a box's `bounds` also accept the event they

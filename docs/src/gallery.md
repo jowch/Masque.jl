@@ -2,7 +2,7 @@
 
 Each example is a small notebook you can copy, with its code below it.
 Hover over a figure, click a mark, or drag a box, and the cells below it
-respond. [Static exports and this site](@ref) says how the examples
+respond. [Examples on this site](@ref this-site) says how the examples
 work without Julia running.
 
 ## Analyses

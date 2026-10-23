@@ -40,7 +40,7 @@ makedocs(;
         assets = ["assets/masque-embed.css", "assets/masque-embed.js"],
         # The docs build from a checkout, so each `@example` widget on this page carries the
         # overlay script as well as its PNG (docs/dev/perf-findings.md, "Outside Pluto").
-        size_threshold_ignore = ["backends.md"],
+        size_threshold_ignore = ["publish.md"],
         # A Cairo widget also has a PNG form, which Documenter shows in place of HTML past this
         # size, so without it the page would show plain pictures.
         example_size_threshold = nothing,
@@ -48,23 +48,30 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Getting started" => "getting-started.md",
-        "Concepts" => "concepts.md",
-        "Current design and rough edges" => "design.md",
+        "How Masque works" => "concepts.md",
         "Guides" => [
-            "Click marks" => "marks.md",
-            "Tooltips" => "tooltips.md",
-            "Inspect a grid" => "grids.md",
-            "Selection" => "selection.md",
-            "Brush a region" => "roi.md",
-            "Legend" => "legend.md",
-            "Read coordinates" => "readouts.md",
-            "Slice across series" => "slice.md",
-            "Pan and orbit" => "view.md",
-            "Update the figure" => "onchange.md",
-            "Sliders and toggles" => "controls.md",
-            "Linked views" => "linked-views.md",
-            "Custom hits" => "custom.md",
-            "Your own plot types" => "recipes.md",
+            "Show data on hover" => [
+                "Tooltips" => "tooltips.md",
+                "Read coordinates" => "readouts.md",
+                "Slice across series" => "slice.md",
+            ],
+            "Send picks to your notebook" => [
+                "What each mark returns" => "marks.md",
+                "Selection" => "selection.md",
+                "Brush a region" => "roi.md",
+                "Heatmaps and images" => "grids.md",
+                "Legend" => "legend.md",
+            ],
+            "Build a widget" => [
+                "Sliders, toggles and menus" => "controls.md",
+                "Update the figure" => "onchange.md",
+                "Linked views" => "linked-views.md",
+            ],
+            "Pan, zoom and orbit" => "view.md",
+            "Extend Masque" => [
+                "Your own plot types" => "recipes.md",
+                "Custom hits" => "custom.md",
+            ],
         ],
         "Examples" => [
             "Examples" => "gallery.md",
@@ -84,9 +91,12 @@ makedocs(;
             "Constructors" => "constructors.md",
             "API" => "api.md",
             "Backends" => "backends.md",
+            "Publish outside Pluto" => "publish.md",
             "Keyboard and screen readers" => "accessibility.md",
             "Performance" => "performance.md",
+            "Current design and rough edges" => "design.md",
             "Troubleshooting" => "troubleshooting.md",
+            "Upgrading" => "upgrading.md",
         ],
         "Contributing" => "contributing.md",
     ],
