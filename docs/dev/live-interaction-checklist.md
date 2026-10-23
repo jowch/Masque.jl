@@ -58,9 +58,9 @@ punches the picks back out (grown 0.5), and shows at CSS opacity
 `canvas.masque-top` repaints, in the mark's own `colors`, only a pick that an unpicked mark drawn
 after it covers (a pick nothing covers keeps its stroke and marker shape), and draws a 1 CSS px
 outline on a lone pick: one with no other pick whose box is within one of its own radii (two
-equal circles: centres 3 radii apart). The outline is the mark's colour moved 45% toward black on
-a light plot area or white on a dark one; with no `colors` it is the layer's `hoverstyle` stroke,
-else the chrome grey. Other plots in the axis, grid lines and text are untouched; a legend's
+equal circles: centres 3 radii apart). The outline is the layer's `hoverstyle` stroke or the figure's
+overlaystyle `color` when one is set, else the mark's colour moved 45% toward black on a light
+plot area or white on a dark one, else (no `colors`) the chrome grey. Other plots in the axis, grid lines and text are untouched; a legend's
 pick fades every series that legend names. Hover is unchanged and draws over a pick like any
 mark (the pick has no stroke for it to thin); hovering or focusing a faded mark lifts its fade
 while it is hovered. A legend entry's hover previews its series the same way (kept, the legend's

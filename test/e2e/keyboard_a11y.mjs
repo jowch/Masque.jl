@@ -43,7 +43,7 @@ try {
   // The fade's picks in a widget's shadow root (#394), every axis together; see fade.ts.
   await page.addInitScript(() => {
     window.fadeOf = (sr) => {
-      const out = { picked: [], kept: [], lone: [] };
+      const out = { picked: [], kept: [], lone: [], outlines: [] };
       for (const w of sr?.querySelectorAll(".masque-fade") ?? []) {
         for (const k of Object.keys(out)) out[k].push(...(w.masqueFade?.[k] ?? []));
       }
@@ -319,8 +319,10 @@ try {
     await surface.focus();
     for (let i = 0; i <= target; i++) await page.keyboard.press("ArrowRight");
     const li = await linkGCount(key);
-    // "pts" is a scatter, so the fade previews it rather than g.link.
-    if (li.preview === 0) throw new Error(`${key}: keyboard focus on the "pts" legend row previewed nothing (${JSON.stringify(li)})`);
+    // "pts" is the legend's only closed series, so there is nothing for the fade to fade and it
+    // takes the selected recipe in g.link; a legend with other closed series previews through
+    // the fade instead (#394).
+    if (li.count === 0 && li.preview === 0) throw new Error(`${key}: keyboard focus on the "pts" legend row previewed nothing (${JSON.stringify(li)})`);
     passed.push("legend/keyboard-focus-draws-link");
 
     // Default legend has no visual card. The live region still names the entry ("pts" is row
@@ -335,8 +337,10 @@ try {
 
     await page.keyboard.press("Escape");
     const afterEsc = await linkGCount(key);
-    if (afterEsc.preview !== 0) throw new Error(`${key}: Escape left the legend preview drawn (${JSON.stringify(afterEsc)})`);
-    passed.push("legend/keyboard-escape-clears-preview");
+    if (afterEsc.preview !== 0) throw new Error(`${key}: Escape left the fade's legend preview drawn (${JSON.stringify(afterEsc)})`);
+    if (li.count > 0 && afterEsc.count === 0) throw new Error(`${key}: Escape cleared g.link instantly (no remount fade)`);
+    if (afterEsc.count > 0 && !afterEsc.leaving) throw new Error(`${key}: Escape did not apply masque-leave to g.link`);
+    passed.push("legend/keyboard-escape-fades-link");
 
     // #304: a plot's Makie `label` names its layer, and the live region announces that name
     // before the position. Every plot here has one, so End's mark (the last focusable layer's

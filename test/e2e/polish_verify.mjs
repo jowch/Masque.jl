@@ -52,7 +52,7 @@ try {
   // The fade's picks in a widget's shadow root (#394), every axis together; see fade.ts.
   await page.addInitScript(() => {
     window.fadeOf = (sr) => {
-      const out = { picked: [], kept: [], lone: [] };
+      const out = { picked: [], kept: [], lone: [], outlines: [] };
       for (const w of sr?.querySelectorAll(".masque-fade") ?? []) {
         for (const k of Object.keys(out)) out[k].push(...(w.masqueFade?.[k] ?? []));
       }
@@ -467,7 +467,7 @@ try {
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
     let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-    return sr.querySelectorAll("svg g.masque-photo > g.sel > *").length;
+    return sr.querySelectorAll("svg g.masque-photo > g.sel > *").length + 2 * fadeOf(sr).picked.length;
   });
   if (selAfterLeave < 1) throw new Error(`g.sel dropped on unhover: sel=${selAfterLeave}`);
   passed.push("remount-fade");
@@ -493,16 +493,13 @@ try {
   passed.push("dark-figure-hover");
 
   // overlaystyle (#181): the figure sets color, hover_width 3 and selected_width 4. The baked
-  // selection's edge and a hover's edge both take that colour; the dodge fill half is unchanged.
+  // pick, alone on its plot, is outlined in that colour (#394), and a hover's edge takes it too;
+  // the dodge fill half is unchanged.
   const STYLED = "rgb(0, 102, 204)";
   const styled = await inspect("scatter_styled");
   pin(styled, "scatter_styled");
-  const sEdge = styled.kids.find((k) => k.layer === "edge" && k.kind === "closed");
-  if (!sEdge || sEdge.stroke !== STYLED || sEdge.width !== "4") {
-    throw new Error(`scatter_styled: selected edge ${JSON.stringify(sEdge)} (want stroke ${STYLED}, width 4)`);
-  }
-  if (!styled.kids.some((k) => k.layer === "fill" && k.kind === "closed")) {
-    throw new Error("scatter_styled: selected dodge fill missing");
+  if (styled.lone.length !== 1 || styled.outlines[0]?.replace(/\s/g, "") !== STYLED.replace(/\s/g, "")) {
+    throw new Error(`scatter_styled: the lone pick's outline ${JSON.stringify({ lone: styled.lone, outlines: styled.outlines })} (want ${STYLED})`);
   }
   const stPts = (await layersOf("scatter_styled")).find((l) => l.kind === "circles");
   let sTip = null;

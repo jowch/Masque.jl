@@ -222,7 +222,7 @@ try {
   // The fade's picks in a widget's shadow root (#394), every axis together; see fade.ts.
   await page.addInitScript(() => {
     window.fadeOf = (sr) => {
-      const out = { picked: [], kept: [], lone: [] };
+      const out = { picked: [], kept: [], lone: [], outlines: [] };
       for (const w of sr?.querySelectorAll(".masque-fade") ?? []) {
         for (const k of Object.keys(out)) out[k].push(...(w.masqueFade?.[k] ?? []));
       }
@@ -1767,8 +1767,17 @@ try {
                 picks: c.querySelectorAll("g.sel > *").length,
               };
             });
+          // A closed mark's pick is on its axis's fade canvases (#394), moved and clipped with
+          // the same preview.
+          const fades = [...sr.querySelectorAll(".masque-fade[data-axis]")].map((w) => ({
+            axis: w.dataset.axis,
+            transform: w.querySelector("canvas")?.style.transform ?? "",
+            clip: w.style.clipPath,
+            picks: w.masqueFade?.picked.length ?? 0,
+          }));
           return {
             homes,
+            fades,
             photo: host.dataset.masquePhoto || "",
             clip: !!host.querySelector(".masque-data-clip"),
             windows: host.querySelectorAll(".masque-data-clip").length,
@@ -1785,11 +1794,15 @@ try {
         }
         // #368: a pick on a linked axis keeps its ring through the preview, moved by that axis's
         // own matrix and clipped to that axis's window, not the pan axis's.
+        // A fade-drawn pick: its axis's canvases take the same scale as that axis's svg home.
+        const scaleOf = (t) => Number(/scale\(([-\d.e]+)/.exec(t ?? "")?.[1]);
         for (const l of links) {
           const home = zoom.homes.find((h) => h.axis === l.axis);
           const sameClip = home?.clip && home.clip.every((v, i) => Math.abs(v - l.clip[i]) < 1e-6);
-          if (!home || !home.transform || !sameClip || home.picks < 1) {
-            throw new Error(`${key}-wheel: linked axis ${l.axis}'s ring is not on its own matrix and window: ${JSON.stringify(zoom.homes)}`);
+          const fade = zoom.fades.find((f) => f.axis === l.axis);
+          const fadeOk = fade && fade.picks >= 1 && fade.clip && Math.abs(scaleOf(fade.transform) - scaleOf(home?.transform)) < 1e-3;
+          if (!home || !home.transform || !sameClip || (home.picks < 1 && !fadeOk)) {
+            throw new Error(`${key}-wheel: linked axis ${l.axis}'s ring is not on its own matrix and window: ${JSON.stringify({ homes: zoom.homes, fades: zoom.fades })}`);
           }
         }
         if (links.length) {
@@ -2292,8 +2305,7 @@ try {
         passed.push(`${key}/unpicked-faded`);
       }
       passed.push(`${key}/selected-fade`);
-    }
-    if (spec.selected === "wash" && !selFaded) {
+    } else if (spec.selected === "wash") {
       const wash = {
         fill: m.kids.find((k) => k.layer === "fill" && k.kind === "closed"),
         edge: m.kids.find((k) => k.layer === "edge" && k.kind === "closed"),
@@ -3034,9 +3046,11 @@ try {
       // exactly the clicked hit's own recipe (2 shapes — fill+edge — for a closed kind, 1 ring
       // for an open one), independent of whatever `selected=` hydration was there before — a
       // spec that bakes a `selected=` index no longer "grows" g.sel on click, it's simply reset.
-      // A picked point keeps its line's hover outline under the pointer; any other pick is
-      // the hovered mark itself, which draws no hover chrome once selected.
-      const wantHi = clickSample === null ? 0 : 1;
+      // A picked point keeps its line's hover outline under the pointer; a closed mark's pick
+      // is drawn by the fade and keeps its hover fill and edge (#394); any other pick is the
+      // hovered mark itself, which draws no hover chrome once selected.
+      const fadePick = echo.picked.includes(`${layer.id}:${clickIdx}`);
+      const wantHi = fadePick ? 2 : clickSample === null ? 0 : 1;
       if (echo.hi !== wantHi) throw new Error(`${key}/click-echo: g.hi=${echo.hi} over the echo, expected ${wantHi}`);
       const expectSel = closedHover ? 2 : 1;
       if (echo.sel !== expectSel) {

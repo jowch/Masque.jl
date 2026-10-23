@@ -12,8 +12,9 @@ import type { Hit, HitLayer, Manifest } from "./types"
 // The picks keep the image's own pixels. On the top canvas, a pick an unpicked mark drawn after
 // it covers is repainted in its own colour, and a pick with no other pick near it gets a 1px
 // outline in a shade of its own colour, so a few picks in a dense plot can still be found while
-// a crowd of picks reads by its colour alone; a mark whose colour is unknown is outlined in its
-// layer's hoverstyle stroke, or the chrome grey. Lines, picked points on a line, grid cells and
+// a crowd of picks reads by its colour alone. An explicit overlay colour (the layer's hoverstyle
+// stroke, the figure's overlaystyle `color`) outlines instead, and a mark whose colour is unknown
+// is outlined in the chrome grey. Lines, picked points on a line, grid cells and
 // regions keep their SVG recipes (highlight.ts).
 
 export const FADE_KINDS = new Set(["circles", "rects", "polygons"])
@@ -133,9 +134,9 @@ export interface Fade {
 }
 
 // An axis's wrapper, with the keys (`layer:index`) of the marks it keeps (the selection and
-// any legend preview), of the selection's picks alone, and of the picks it outlines. `draws`
-// counts the redraws.
-export type FadeEl = HTMLDivElement & { masqueFade?: { kept: string[]; picked: string[]; lone: string[]; draws: number } }
+// any legend preview), of the selection's picks alone, and of the picks it outlines, with each
+// outline's colour where the canvas draws. `draws` counts the redraws.
+export type FadeEl = HTMLDivElement & { masqueFade?: { kept: string[]; picked: string[]; lone: string[]; outlines?: string[]; draws: number } }
 
 interface AxisHome { wrap: HTMLDivElement; dim: HTMLCanvasElement; top: HTMLCanvasElement }
 type Box = [number, number, number, number] // x0, y0, x1, y1
@@ -444,6 +445,7 @@ export function createFade(host: FadeHost): Fade {
         sizeCanvas(h.top, m)
         const bg = plotFill(m, axis)
         let faded = 0, nkept = 0, raised = 0
+        const outlines: string[] = []
         for (const [layer, ks] of kept) {
             nkept += ks.size
             let drawnKept = 0
@@ -482,12 +484,16 @@ export function createFade(host: FadeHost): Fade {
             const lw = host.cssScale_()
             lastScale = lw
             tc.lineWidth = lw
+            // A colour the figure or the layer sets for the overlay (overlaystyle `color`, a
+            // hoverstyle stroke) wins over the mark's own shade.
+            const figure = m.overlayStyle?.["--masque-chrome"]
             for (const p of lone) {
                 const css = colourOf(p.layer, p.k)
                 const rgb = css ? rgbOf(tc, css) : null
-                tc.strokeStyle = rgb
-                    ? `rgb(${rgb.map((v) => Math.round(v + (toward - v) * OUTLINE_MIX)).join(",")})`
-                    : p.layer.style?.stroke ?? chrome
+                const ink = p.layer.style?.stroke ?? figure
+                    ?? (rgb ? `rgb(${rgb.map((v) => Math.round(v + (toward - v) * OUTLINE_MIX)).join(",")})` : chrome)
+                tc.strokeStyle = ink
+                outlines.push(ink)
                 strokeShape(tc, p.layer, p.k, p.box, lw)
             }
         } else {
@@ -499,6 +505,7 @@ export function createFade(host: FadeHost): Fade {
             kept: [...kept].flatMap(([layer, ks]) => [...ks].map((k) => `${layer.id}:${k}`)),
             picked: [...kept.keys()].flatMap((layer) => [...(selKept.get(layer) ?? [])].map((k) => `${layer.id}:${k}`)),
             lone: lone.map((p) => `${p.layer.id}:${p.k}`),
+            outlines,
             draws: ((h.wrap as FadeEl).masqueFade?.draws ?? 0) + 1,
         }
         h.wrap.dataset.layers = [...kept.keys()].map((l) => l.id).join(",")

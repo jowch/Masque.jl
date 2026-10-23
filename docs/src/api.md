@@ -139,7 +139,7 @@ pixels, and opacities run from 0 to 1. Colors take the same forms as in
 
 | Key | Default | Changes | Custom property |
 |---|---|---|---|
-| `color` | `#7a7a7a` on a light figure, `#c8c8c8` on a dark one | highlight, selection, ROI, and threshold stroke | `--masque-chrome` |
+| `color` | `#7a7a7a` on a light figure, `#c8c8c8` on a dark one | highlight, selection, ROI, and threshold stroke; when set, also the outline of a selected point, bar, or shape that has no selected neighbour, which otherwise takes a shade of the mark's own color | `--masque-chrome` |
 | `dodge_fill` | `#141414` | how strongly a highlight brightens the mark; lighter is stronger | `--masque-hi-fill` |
 | `hover_width` | `1.5` | outline of the hovered mark | `--masque-hover-width` |
 | `unpicked_opacity` | `0.2` | how much of a plot's unpicked points, bars, or shapes still shows once it holds picks; `1` turns the fading off | `--masque-unpicked-opacity` |
