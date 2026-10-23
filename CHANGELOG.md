@@ -17,12 +17,14 @@ All notable changes to this project are documented here. The format is based on
   its plot has a pick, from 0 to 1 (default 0.2) (#394).
 
 ### Changed
-- A pick on a scatter, bar, polygon, text or violin plot keeps its own colour and the plot's
-  other marks fade, instead of a grey wash over the pick. A pick with no other pick next to
-  it gets a thin outline in a shade of its own colour, so it stands out among faded marks.
+- A pick on a scatter, bar, polygon, text or violin plot keeps its own color and the plot's
+  other marks fade, instead of a grey highlight over the pick. A pick with no other pick next
+  to it gets a thin outline in a shade of its own color, so it stands out among faded marks.
   The fade also shows a legend entry's series while you hover it. With thousands of picks the
-  plot now reads at a glance where the wash covered it. Lines keep their ring, and heatmap
-  cells and regions their outline (#394).
+  plot now reads at a glance where the highlights covered it
+  ([before](docs/src/assets/selection-look-before.png),
+  [after](docs/src/assets/selection-look-after.png)), and a click on such a plot redraws
+  faster. Lines keep their ring, and heatmap cells and regions their outline (#394).
 - **Breaking:** on a plot built with `select = :many`, a click adds the mark or cell to the
   selection, or takes it out when it is already selected, so a stray click no longer throws
   the rest of the selection away. It used to replace the selection with the one mark, and

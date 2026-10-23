@@ -35,6 +35,8 @@ picks stay easy to find in a crowded plot. A selected line gets a ring
 instead, and a heatmap cell an outline. To fade the other marks more or
 less, set `unpicked_opacity` in [Overlay styling](@ref).
 
+![Two scatters of eight clusters with half of each cluster's points selected: the selected points keep their cluster colors, the rest are faint, and the few selected points on the edges are outlined](assets/selection-look-after.png)
+
 ## Select several marks
 
 A click selects one mark of a plot and replaces that plot's previous
