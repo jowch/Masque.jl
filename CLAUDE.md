@@ -135,6 +135,8 @@ text and the bond payload → it gets a live check on every backend × the kinds
 - A fresh per-notebook env re-resolves + precompiles the Makie stack (~6 min first open).
   The kind-sweep/contourf notebooks skip this when `MASQUE_DEV_ENV` points at a warmed env.
 - To test the local package: `Pkg.develop(path=...)` in a notebook cell (disables Pluto's pkg mgmt).
+- Tests run on Pluto 1. `test/e2e/serve.jl` installs the series named by `PLUTO_VERSION`
+  (default `1`); `PLUTO_VERSION=0.20 julia test/e2e/serve.jl 1234` reproduces CI's 0.20 bind leg.
 - Headless: `Pluto.run(; port=1234, launch_browser=false, require_secret_for_open_links=false, require_secret_for_access=false)`; open `localhost:1234/open?path=…`; click "Run notebook code" to exit Safe preview; export HTML via `localhost:1234/notebookexport?id=…`.
 - **Readiness: poll the port (`curl localhost:1234` → 200), not the log** — Pluto doesn't reliably flush its "Go to…" line, so a log-grep readiness loop hangs on a server that's actually up.
 - **Selected/highlight is overlay-drawn, so the PNG is byte-identical across clicks** — don't detect interaction by watching `img.src`; assert the overlay/tooltip/`@bind` value instead (bake state into the figure only if you specifically need the PNG to differ).

@@ -112,9 +112,16 @@ jobs:
   webgl-bind-e2e:
     # THROUGH-Pluto `@bind` E2E: a live headless Pluto kernel + real Chromium. Isolated as its
     # own job (heaviest, and the one most exposed to Pluto-version churn) so it reads cleanly
-    # and is trivial to drop if it ever proves flaky.
-    name: WGLMakie bind E2E (Pluto)
+    # and is trivial to drop if it ever proves flaky. Runs on Pluto 1 (the default everywhere) and
+    # on the 0.20 series. That leg is the one remaining 0.20 check, and it only covers the WebGL
+    # `@bind` round-trip, not the kind sweep or Cairo. Drop it at 0.5.0. The Pluto 1 leg keeps
+    # the job's original name, so a ruleset that requires it still finds it.
+    name: ${{ matrix.pluto == '1' && 'WGLMakie bind E2E (Pluto)' || format('WGLMakie bind E2E (Pluto {0})', matrix.pluto) }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pluto: ['1', '0.20']
     # Worst case inside "Through-Pluto bind round-trip": 25min mount + 2×5min PLUTO_MS attempts
     # ≈ 35min, plus the port-readiness loop (≤4min) and setup steps before it — 45min leaves
     # headroom so a legitimate cold-cache run doesn't race the job-level timeout (which would
@@ -138,6 +145,8 @@ jobs:
         run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
       - name: Through-Pluto bind round-trip
         working-directory: test/e2e
+        env:
+          PLUTO_VERSION: ${{ matrix.pluto }}
         run: |
           julia serve.jl 1234 > pluto.log 2>&1 &
           SERVER=$!
@@ -161,7 +170,7 @@ jobs:
         if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: bind-e2e-failure
+          name: bind-e2e-failure-pluto-${{ matrix.pluto }}
           path: |
             ${{ runner.temp }}/bind-e2e-artifacts/
             test/e2e/pluto.log

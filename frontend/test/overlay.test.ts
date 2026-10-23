@@ -5389,7 +5389,7 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(r).toEqual(["600"]) // a point the line doesn't have is dropped
     })
 
-    it("a click on an empty part of the plot clears its picks; a miss with none sends nothing", () => {
+    it("a click on an empty part of the plot clears a one-pick field and keeps the many picks (#384)", () => {
         const { host, script } = setup()
         mount(script, many())
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
@@ -5403,8 +5403,11 @@ describe("select = :many and clearing picks (#335)", () => {
         n = 0
         click(surface, 400, 50)
         expect(n).toBe(1)
-        expect(val(host)).toEqual({ pts: { items: [] }, one: null })
-        expect(selChildren(shadowOf(host)).length).toBe(0)
+        expect(val(host)).toEqual({ pts: { items: [{ layer: "pts", index: 0 }] }, one: null })
+        expect(selChildren(shadowOf(host)).length).toBeGreaterThan(0)
+        n = 0
+        click(surface, 400, 50) // the one-pick field is empty now: nothing to send
+        expect(n).toBe(0)
     })
 
     it("Escape clears every pick", () => {
@@ -5446,11 +5449,11 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
         click(surface, 400, 50, { ctrlKey: true }) // a modified miss
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
-        click(surface, 400, 50)
-        expect(val(host).pts).toEqual({ items: [] })
+        click(surface, 400, 50) // a plain miss keeps them too (#384)
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
     })
 
-    it("an empty click clears every axis under it, and none inside a legend's box", () => {
+    it("an empty click clears the one-pick fields of every axis under it, and none inside a legend's box", () => {
         const { host, script } = setup()
         const m = many()
         const full = m.transforms.ax1
@@ -5468,8 +5471,8 @@ describe("select = :many and clearing picks (#335)", () => {
         click(surface, 425, 25) // legend padding
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
         expect(val(host).one).toEqual({ layer: "one", index: 0 })
-        click(surface, 200, 350) // plot area: both twins clear, the legend keeps its pick
-        expect(val(host)).toEqual({ pts: { items: [] }, one: null, legend: { layer: "legend", index: 0 } })
+        click(surface, 200, 350) // plot area: the twin's one-pick field clears, `many` and the legend keep theirs
+        expect(val(host)).toEqual({ pts: { items: [{ layer: "pts", index: 0 }] }, one: null, legend: { layer: "legend", index: 0 } })
     })
 
     it("Escape and an empty click leave a threshold and a box's target alone", () => {
@@ -5504,6 +5507,37 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 1 }] })
         key("Enter") // on the focused mark, now pts[1]: held, so it comes out
         expect(val(host).pts).toEqual({ items: [] })
+    })
+
+    it("a press focuses the surface, so Escape clears picks made by mouse (#380)", () => {
+        const { host, script } = setup()
+        mount(script, many())
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const press = (x: number, y: number, button = 0) => {
+            const opts = { clientX: x, clientY: y, button, bubbles: true, cancelable: true }
+            surface.dispatchEvent(new PointerEvent("pointerdown", opts))
+            surface.dispatchEvent(new PointerEvent("pointerup", opts))
+            if (button === 0) click(surface, x, y)
+        }
+        press(100, 100, 2) // a right-click leaves focus where it was
+        expect(shadow.activeElement).toBeNull()
+        press(100, 100) // the press starts a marquee, whose preventDefault cancels native focus
+        expect(shadow.activeElement).toBe(surface)
+        expect(val(host).pts).toEqual({ items: [{ layer: "pts", index: 0 }] })
+        // The focus outline stays off after a press: a held modifier keeps it off, a key turns it on.
+        expect(surface.classList.contains("pointer-focus")).toBe(true)
+        const key = (k: string) => surface.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }))
+        key("Control")
+        expect(surface.classList.contains("pointer-focus")).toBe(true)
+        key("ArrowRight")
+        expect(surface.classList.contains("pointer-focus")).toBe(false)
+        press(600, 600) // empty space in the axis: a marquee press that clears nothing until release
+        expect(surface.classList.contains("pointer-focus")).toBe(true)
+        key("Escape")
+        expect(val(host).pts).toEqual({ items: [] })
+        expect(shadow.activeElement).toBeNull()
+        expect(surface.classList.contains("pointer-focus")).toBe(false)
     })
 
     it("a restored pick that names no element is dropped", () => {
@@ -6022,7 +6056,7 @@ describe("a grid with select = :many holds a cell mask (#335)", () => {
         expect(val(host).region).toEqual({ runs: [0, 0, 1] })
     })
 
-    it("a click on an empty part of the axis and Escape clear it; a restored value draws", () => {
+    it("a click on an empty part of the axis keeps it, Escape clears it; a restored value draws", () => {
         const { host, script } = setup()
         mount(script, grid({ runs: [0, 0, 2] }))
         const shadow = shadowOf(host)
@@ -6032,8 +6066,7 @@ describe("a grid with select = :many holds a cell mask (#335)", () => {
         expect(val(host).region).toEqual({ runs: [0, 0, 2, 2, 2, 1] })
         // y = 700 image px is inside the axis, below the grid.
         surface.dispatchEvent(new MouseEvent("click", { clientX: 100, clientY: 350, bubbles: true }))
-        expect(val(host).region).toEqual({ runs: [] })
-        expect(selChildren(shadow).length).toBe(0)
+        expect(val(host).region).toEqual({ runs: [0, 0, 2, 2, 2, 1] })
         cell(surface, 1, 1)
         surface.focus()
         surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
