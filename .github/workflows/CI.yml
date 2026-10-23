@@ -97,40 +97,51 @@ jobs:
           version: '1.10'
 
   julia:
-    # Julia 1 runs Core, then the no-backend group. Julia 1.10 runs Core, then the
-    # WebGL extension group. Each group is its own `julia` process: the no-backend group must
-    # never load CairoMakie or WGLMakie, and the WebGL group needs WGLMakie loaded.
+    # Julia 1 runs Core, the no-backend group and the WebGL extension group, with coverage.
+    # Julia 1.10 runs Core and the WebGL group (the compat floor for the WGLMakie/Bonito
+    # coupling guard) without coverage: before 1.11, any `--code-coverage` makes Julia skip
+    # every package image and compile the whole Makie stack in-process (~6 min per process).
+    # Each group is its own `julia` process: the no-backend group must never load CairoMakie
+    # or WGLMakie, and the WebGL group needs WGLMakie loaded.
     name: Julia ${{ matrix.version }}
     needs: [setup, setup-lts]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        version: ['1.10', '1']
+        include:
+          - version: '1.10'
+            coverage: ''
+          - version: '1'
+            coverage: --code-coverage=@${{ github.workspace }}
+    env:
+      COVERAGE: ${{ matrix.coverage }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/julia-env
         with:
           julia-version: ${{ matrix.version == '1.10' && needs.setup-lts.outputs.julia-version || needs.setup.outputs.julia-version }}
           key: ${{ matrix.version == '1.10' && needs.setup-lts.outputs.key || needs.setup.outputs.key }}
-      # Coverage tracks this checkout only (`@path`), so the restored dependency images still
-      # load; nothing is recompiled for it.
+      # On Julia 1, coverage tracks this checkout only (`@path`), so the restored dependency
+      # images still load; nothing is recompiled for it.
       - name: Core tests
         env:
           GROUP: Core
-        run: julia --color=yes --code-coverage=@"$GITHUB_WORKSPACE" --project="$MASQUE_DEV_ENV" test/runtests.jl
+        run: julia --color=yes $COVERAGE --project="$MASQUE_DEV_ENV" test/runtests.jl
       - name: No-backend error path
         if: matrix.version == '1' && !cancelled()
         env:
           GROUP: NoBackend
-        run: julia --color=yes --code-coverage=@"$GITHUB_WORKSPACE" --project="$MASQUE_DEV_ENV" test/runtests.jl
+        run: julia --color=yes $COVERAGE --project="$MASQUE_DEV_ENV" test/runtests.jl
       - name: WGLMakie extension
-        if: matrix.version == '1.10' && !cancelled()
+        if: ${{ !cancelled() }}
         env:
           GROUP: WebGL
-        run: julia --color=yes --code-coverage=@"$GITHUB_WORKSPACE" --project="$MASQUE_DEV_ENV" test/runtests.jl
+        run: julia --color=yes $COVERAGE --project="$MASQUE_DEV_ENV" test/runtests.jl
       - uses: julia-actions/julia-processcoverage@v1
+        if: matrix.version == '1'
       - uses: codecov/codecov-action@v5
+        if: matrix.version == '1'
         with:
           files: lcov.info
           flags: julia-${{ matrix.version }}
