@@ -6,15 +6,7 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-10-22
-
 ### Added
-- A CairoMakie widget has a PNG form, `show(io, MIME"image/png"(), w)`, so a tool that reads a
-  notebook without a browser, such as an AI agent, can see the figure. Pluto still shows the
-  live figure. Printed in the REPL, a widget now gives a short summary instead of its fields:
-  each axis with its title, each layer with what it draws, the gestures it takes and its
-  tooltip fields, and the `@bind` value it starts with. A WGLMakie widget has the summary but
-  no PNG, since the browser draws it (#373).
 - `overlaystyle` takes `unpicked_opacity`, how much of an unpicked mark still shows once
   its plot has a pick, from 0 to 1 (default 0.2) (#394).
 
@@ -27,6 +19,18 @@ All notable changes to this project are documented here. The format is based on
   ([before](docs/src/assets/selection-look-before.png),
   [after](docs/src/assets/selection-look-after.png)), and a click on such a plot redraws
   faster. Lines keep their ring, and heatmap cells and regions their outline (#394).
+
+## [0.4.0] - 2026-10-22
+
+### Added
+- A CairoMakie widget has a PNG form, `show(io, MIME"image/png"(), w)`, so a tool that reads a
+  notebook without a browser, such as an AI agent, can see the figure. Pluto still shows the
+  live figure. Printed in the REPL, a widget now gives a short summary instead of its fields:
+  each axis with its title, each layer with what it draws, the gestures it takes and its
+  tooltip fields, and the `@bind` value it starts with. A WGLMakie widget has the summary but
+  no PNG, since the browser draws it (#373).
+
+### Changed
 - **Breaking:** on a plot built with `select = :many`, a click adds the mark or cell to the
   selection, or takes it out when it is already selected, so a stray click no longer throws
   the rest of the selection away. It used to replace the selection with the one mark, and
