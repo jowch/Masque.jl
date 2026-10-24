@@ -15,6 +15,14 @@ A click or a box feeds the next step of an analysis.
   <img alt="A scatter of two clusters with a box and a comparison histogram" src="assets/gallery/cluster.png">
   <span>Compare a cluster</span>
 </a>
+<a class="masque-gallery-card" data-page="threshold">
+  <img alt="A picture of bright cells with the ones above a cutoff in red, beside its brightness histogram and the cutoff line" src="assets/gallery/threshold.png">
+  <span>Threshold a mask</span>
+</a>
+<a class="masque-gallery-card" data-page="segmentation">
+  <img alt="A picture of bright cells, with three objects that are cells stuck together outlined as picked" src="assets/gallery/segmentation.png">
+  <span>Annotate a segmentation</span>
+</a>
 <a class="masque-gallery-card" data-page="heatmap-trace">
   <img alt="A heatmap of daily temperature by station, with one cell picked and its tooltip showing" src="assets/gallery/heatmap-trace.png">
   <span>From a heatmap cell to its trace</span>

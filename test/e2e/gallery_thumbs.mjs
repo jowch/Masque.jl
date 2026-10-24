@@ -4,7 +4,7 @@
 //
 //   node gallery_thumbs.mjs https://jowch.github.io/Masque.jl/dev ../../docs/src/assets/gallery
 //
-// The "Compare a cluster" card is a frame of its clip instead: see
+// The cards of the clip examples are frames of their clips instead: see
 // docs/dev/gallery-thumbs/README.md.
 import { chromium } from "playwright";
 import { PNG } from "pngjs";

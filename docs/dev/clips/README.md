@@ -14,6 +14,8 @@ be a player, so their page shows a clip of the live notebook instead:
 | Clip | Page | Notebook | Recorder |
 |---|---|---|---|
 | `docs/src/assets/example-cluster.mp4` | Examples › Compare a cluster | `cluster_notebook.jl` | `test/e2e/cluster_clip.mjs` |
+| `docs/src/assets/example-threshold.mp4` | Examples › Threshold a mask | `threshold_notebook.jl` | `test/e2e/docs_clip.mjs threshold` |
+| `docs/src/assets/example-segmentation.mp4` | Examples › Annotate a segmentation | `segmentation_notebook.jl` | `test/e2e/docs_clip.mjs segmentation` |
 | `docs/src/assets/onchange.mp4` | Update the figure | `onchange_notebook.jl` | `test/e2e/docs_clip.mjs onchange` |
 | `docs/src/assets/view-linkaxes.mp4` | Pan, zoom and orbit › Pan and zoom a 2D axis | `linkaxes_notebook.jl` | `test/e2e/docs_clip.mjs linkaxes` |
 | `docs/src/assets/view-linkcameras.mp4` | Pan, zoom and orbit › Turn several panels together | `linkcameras_notebook.jl` | `test/e2e/docs_clip.mjs linkcameras` |
