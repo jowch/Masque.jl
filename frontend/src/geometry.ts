@@ -751,10 +751,9 @@ function panView(manifest: Manifest, photo: PhotoMatrix, viewId: string | null):
     return layer
 }
 
-// How the live photograph moves one axis's marks (#368): the pan axis by the matrix itself, an
-// axis tied to it by `linkaxes!` by the matrix carried over to its own scale (#363), each
-// clipped to its own preview window. Any other axis stays put, unclipped: `null`, as for
-// every axis when no photograph is live.
+// How the live photograph moves one axis's marks (#368, #391): the frame of the preview
+// window its pixels are in (`previewWindows`), clipped to that window. An axis outside every
+// window stays put, unclipped: `null`, as for every axis when no photograph is live.
 export interface AxisFrame {
     sx: number
     sy: number
@@ -763,16 +762,67 @@ export interface AxisFrame {
     clip: [number, number, number, number]
 }
 
-export function axisFrame(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, axis: string): AxisFrame | null {
+// One window of the live preview: a copy of the picture cropped to `clip` and moved by the
+// frame. `axis` is the axis the window is for: the pan axis (`pan`), or one tied to it by
+// `linkaxes!` (#363).
+export interface PreviewWindow extends AxisFrame {
+    axis: string
+    pan: boolean
+    fill?: string
+}
+
+const area = (r: [number, number, number, number]): number => Math.max(0, r[2]) * Math.max(0, r[3])
+
+function contains(r: [number, number, number, number], x: number, y: number): boolean {
+    return x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3]
+}
+
+// The windows a live photograph slides, bottom first. A larger window goes under a smaller
+// one, so an inset linked to the pan axis shows its own move over the pan axis's. The pan
+// window counts as 5% smaller than it is, so it goes over a window of about its own size: a
+// twin axis in the same cell shares the pan axis's pixels, and the axis being panned decides
+// how they move. The mount paints these windows, and `axisFrame` reads them, so a mark and
+// the pixels under it always move together.
+export function previewWindows(manifest: Manifest, photo: PhotoMatrix, viewId: string | null): PreviewWindow[] {
     const layer = panView(manifest, photo, viewId)
-    if (!layer) return null
+    if (!layer) return []
     const g = layer.geometry as ViewGeometry
-    if (layer.axis === axis) return { sx: photo.s, sy: photo.s, tx: photo.tx, ty: photo.ty, clip: g.clip ?? [g.x, g.y, g.w, g.h] }
-    const link = g.links?.find((l) => l.axis === axis)
-    if (!link) return null
-    const [sx, tx] = linkedMove(photo, link.x, photo.tx)
-    const [sy, ty] = linkedMove(photo, link.y, photo.ty)
-    return { sx, sy, tx, ty, clip: link.clip }
+    const out: PreviewWindow[] = [{
+        axis: layer.axis, pan: true, sx: photo.s, sy: photo.s, tx: photo.tx, ty: photo.ty,
+        clip: g.clip ?? [g.x, g.y, g.w, g.h], fill: g.fill,
+    }]
+    for (const link of g.links ?? []) {
+        const [sx, tx] = linkedMove(photo, link.x, photo.tx)
+        const [sy, ty] = linkedMove(photo, link.y, photo.ty)
+        out.push({ axis: link.axis, pan: false, sx, sy, tx, ty, clip: link.clip, fill: link.fill })
+    }
+    const key = (w: PreviewWindow): number => area(w.clip) * (w.pan ? 0.95 : 1)
+    return out.sort((a, b) => key(b) - key(a))
+}
+
+// An axis's pixels are in the topmost window that holds the centre of its viewport and is at
+// least half its size: a twin axis or an unlinked inset inside the pan window slides with
+// the pan axis's photograph, and an axis is not moved by an inset drawn over its middle.
+// Without a viewport (hand-built manifests), an axis is in its own window, if it has one.
+export function axisFrame(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, axis: string): AxisFrame | null {
+    const windows = previewWindows(manifest, photo, viewId)
+    if (!windows.length) return null
+    const vp = manifest.transforms[axis]?.viewport
+    const holds = vp
+        ? (win: PreviewWindow) => contains(win.clip, vp[0] + vp[2] / 2, vp[1] + vp[3] / 2) && area(win.clip) >= 0.5 * area(vp)
+        : (win: PreviewWindow) => win.axis === axis
+    for (let i = windows.length - 1; i >= 0; i--) {
+        const w = windows[i]
+        if (holds(w)) return { sx: w.sx, sy: w.sy, tx: w.tx, ty: w.ty, clip: w.clip }
+    }
+    return null
+}
+
+// The point on `axis`'s marks under the layout point `p`: the inverse of the frame its pixels
+// move by, or `p` itself when they don't move.
+export function axisPoint(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, axis: string, p: { x: number; y: number }): { x: number; y: number } {
+    const f = axisFrame(manifest, photo, viewId, axis)
+    return f ? frameInverse(f, p.x, p.y) : p
 }
 
 // A linked axis shares one dimension or both with the pan axis, so a data value the matrix
@@ -785,16 +835,11 @@ export function linkedMove(m: PhotoMatrix, d: [number, number, number] | undefin
 }
 
 // The frame a layer's marks are drawn with while a photograph is live (#379): none for the
-// view rectangle and screen-fixed chrome, which stay in layout pixels; the pan axis's for a
-// threshold line or an ROI box, which slide in one group with the pan axis's photograph; and
-// its own axis's for every data mark, as `paintAxis` draws its rings (#368).
+// view rectangle and screen-fixed chrome, which stay in layout pixels, and its own axis's for
+// every other layer, data marks (as `paintAxis` draws their rings, #368) and threshold lines
+// and ROI boxes alike (#391).
 export function layerFrame(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, layer: HitLayer): AxisFrame | null {
-    if (layoutSpaceLayer(layer)) return null
-    if (layer.kind === "threshold" || layer.kind === "roi") {
-        const pan = panView(manifest, photo, viewId)
-        return pan ? axisFrame(manifest, photo, viewId, pan.axis) : null
-    }
-    return axisFrame(manifest, photo, viewId, layer.axis)
+    return layoutSpaceLayer(layer) ? null : axisFrame(manifest, photo, viewId, layer.axis)
 }
 
 // The point on `layer`'s marks under the layout point `p`: the inverse of the frame they are

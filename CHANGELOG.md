@@ -31,6 +31,11 @@ All notable changes to this project are documented here. The format is based on
   view by `linkaxes!`, or on any other axis, finds the mark where it is drawn. A mark on
   another axis couldn't be hovered or clicked until the new frame arrived, and a linked axis
   with a different scale answered at the wrong point (#379).
+- While a pan or zoom preview is showing, a second axis drawn over the one you pan, such as a
+  twin y axis in the same cell or an inset, keeps its selection rings, threshold lines, ROI
+  boxes and slice readout on its own marks, and hover, click and drags find them there. A
+  threshold line, ROI box or box selection on an axis tied by `linkaxes!` moves with that
+  axis instead of with the one you pan (#391).
 
 ## [0.4.0] - 2026-10-22
 

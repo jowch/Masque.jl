@@ -438,6 +438,16 @@ kind_sweep_meta() = [
         "previewPickTip" => "index5x3y4",
     ),
     Dict(
+        # A view on an axis that shares its cell with an unlinked twin and an inset (#391).
+        # Their pixels are inside the pan's sliding copy, so mid-preview their picks' rings,
+        # the twin's threshold line, hover and hit-testing move with the pan axis's photograph.
+        "key" => "view_twin", "layerId" => "view", "layerKind" => "view",
+        "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "drag",
+        # Layers whose axis moves with the pan axis mid-preview.
+        "previewWithPan" => ["twin", "twinline", "inset"],
+    ),
+    Dict(
         # Axis3 view (#321): drag orbits, the wheel zooms the limits about their center, and
         # Shift+drag pans them. After the zoom the corner points sit outside the limits and stop
         # hitting; the middle one still hits, and so does the part of a line that crosses them.
@@ -1268,6 +1278,30 @@ function build_kind_sweep()
         )
     end
 
+    view_twin = let
+        fig = Figure(size = (480, 300))
+        a1 = Axis(fig[1, 1]; title = "view-twin", limits = (0, 8, 0, 8))
+        # A twin y axis in the same cell, not linked, drawn over a1 without hiding it.
+        a2 = Axis(fig[1, 1]; yaxisposition = :right, limits = (0, 8, 0, 80), backgroundcolor = :transparent)
+        hidexdecorations!(a2)
+        # An inset in the top-right corner, drawn over a1 as in Makie's inset example.
+        a3 = Axis(
+            fig[1, 1]; width = Relative(0.32), height = Relative(0.32), halign = 0.95, valign = 0.92,
+            limits = (0, 4, 0, 4), backgroundcolor = :white, title = "inset",
+        )
+        translate!(a3.blockscene, 0, 0, 150)
+        pts = [(1.0, 1.0), (1.0, 7.0), (3.0, 2.0)]
+        sc = scatter!(a1, first.(pts), last.(pts); markersize = 14, color = :gray)
+        sc2 = scatter!(a2, [2.0, 6.0], [60.0, 20.0]; markersize = 14, color = :orange)
+        sc3 = scatter!(a3, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]; markersize = 12, color = :teal)
+        masque(
+            fig, interactables(sc; id = :pts), interactables(sc2; id = :twin),
+            ThresholdInteractable(a2; orientation = :vertical, value = 6.8, id = :twinline),
+            interactables(sc3; id = :inset), ViewInteractable(a1; id = :view);
+            selected = Dict(:twin => [1], :inset => [2]),
+        )
+    end
+
     view3d = let
         pts = Makie.Point3f[(0, 0, 0), (4, 4, 4), (2, 2, 2)]
         fig = Figure(size = (480, 320))
@@ -1527,7 +1561,7 @@ function build_kind_sweep()
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, arrows3d, arrows3d_shared, scatterlines3d,
-        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view3d, view3d_linked, legend, series_legend,
+        scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view3d, view3d_linked, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end

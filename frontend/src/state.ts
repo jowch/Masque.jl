@@ -179,7 +179,9 @@ export interface OverlayCtx {
     fade_: Fade
     thresholdLines_: Map<string, SVGLineElement>
     roiBoxes_: Map<string, ROIBox>
-    chrome_: SVGGElement // svg.masque-plain's group that slides with the photograph: ROI boxes, threshold lines, the marquee
+    // svg.masque-plain's chrome group for an axis, which moves with that axis's pixels (#391):
+    // its ROI boxes, threshold lines, marquee and slice readout dots
+    chromeAt_: (axis: string) => SVGGElement
     shadowRoot_: ShadowRoot // for `shadowRoot.activeElement === surface` focus gating (keyboard.ts)
     focusable_: FocusRef[] // flat, manifest-order list of element-indexed hits — keyboard.ts's nav domain
     layerStarts_: number[] // computeLayerStarts(focusable), cached once — PageUp/PageDown's layer-jump index

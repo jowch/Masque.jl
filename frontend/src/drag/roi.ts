@@ -62,13 +62,15 @@ export function roiBounds(box: ROIBox): { xmin: number; xmax: number; ymin: numb
     return { xmin: Math.min(ax, bx), xmax: Math.max(ax, bx), ymin: Math.min(ay, by), ymax: Math.max(ay, by) }
 }
 
-export function buildROIBoxes(manifest: Manifest, svg: SVGElement, base: HTMLElement): Map<string, ROIBox> {
+// Each box goes in `parentFor(axis)`, the chrome group of the axis it belongs to.
+export function buildROIBoxes(manifest: Manifest, parentFor: (axis: string) => SVGElement, base: HTMLElement): Map<string, ROIBox> {
     const roiBoxes = new Map<string, ROIBox>()
     const rect0 = base.getBoundingClientRect()
     const draw = handleDrawHalf(manifest.width, rect0.width, manifest.scaling)
     for (const layer of manifest.layers) {
         if (layer.kind !== "roi") continue
         const rg = layer.geometry as ROIGeometry
+        const svg = parentFor(layer.axis)
         const st = layer.style ?? DEFAULT_STYLE
         const rect = document.createElementNS(SVG_NS, "rect")
         rect.classList.add("masque-hi", "masque-roi")

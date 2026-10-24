@@ -1,4 +1,4 @@
-import { findBin, hitTestAt, layerPoint, lineReadout, matrixLimits, resolvePayload } from "./geometry"
+import { axisPoint, findBin, hitTestAt, layerPoint, lineReadout, matrixLimits, resolvePayload } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
 import { hideCross } from "./cross"
@@ -12,7 +12,7 @@ import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
 import * as viewDrag from "./drag/view"
 import * as marquee from "./drag/marquee"
-import { contentPoint, panTo, unmapPoint } from "./photo"
+import { panTo, unmapPoint } from "./photo"
 import type { AxisTransform, GridGeometry, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
 
 // setPointerCapture throws InvalidPointerId if the UA doesn't consider this pointerId active
@@ -70,9 +70,19 @@ export function settleCurrentPan(ctx: OverlayCtx, state: OverlayState, d: Extrac
 // Takes the drag explicitly rather than reading `state.drag_` — onUp/onCancel null that out
 // before this can run (see the reentrancy note there), so a stale read here would apply to a
 // gesture that's already been discarded.
-function pointerSpace(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): { layout: { x: number; y: number }; content: { x: number; y: number } } {
+// `content(axis)` is the point on that axis's pixels under the pointer: the layout point
+// carried back through the frame the live photograph moves the axis by (#391).
+function pointerSpace(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): {
+    layout: { x: number; y: number }; content: (axis: string) => { x: number; y: number }
+} {
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
-    return { layout, content: contentPoint(state.photo_, layout) }
+    return { layout, content: (axis) => axisPoint(ctx.manifest_, state.photo_, state.photoViewId_, axis, layout) }
+}
+
+// The axis a marquee, threshold or ROI drag draws on.
+function dragAxis(ctx: OverlayCtx, d: Exclude<Drag, { kind: "view" }>): string {
+    if (d.kind === "marquee") return d.axis_
+    return ctx.manifest_.layers.find((l) => l.id === d.id_)?.axis ?? ""
 }
 
 // A control moving under `onchange` redraws the figure as it goes, unless it was built with
@@ -88,7 +98,9 @@ function requestState(ctx: OverlayCtx, fields: Record<string, unknown>): void {
 }
 
 function applyDrag(ctx: OverlayCtx, state: OverlayState, d: Drag, e: PointerEvent): void {
-    const { layout, content } = pointerSpace(ctx, state, e)
+    const space = pointerSpace(ctx, state, e)
+    const layout = space.layout
+    const content = d.kind === "view" ? layout : space.content(dragAxis(ctx, d))
     let text: string
     if (d.kind === "marquee") {
         const readout = marquee.move(ctx, state, d, content, { x: e.clientX, y: e.clientY })
@@ -259,7 +271,8 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
         // A press on a legend inside the axis is a press on the legend.
         const under = targets.length ? hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_) : null
         if (axis !== null && targets.length && !under?.layer.links) {
-            state.drag_ = marquee.begin(state, axis, targets, marqueeMode(ctx.manifest_, state, under, targets, content), content.x, content.y, { x: e.clientX, y: e.clientY }, e.pointerId)
+            const p = content(axis)
+            state.drag_ = marquee.begin(state, axis, targets, marqueeMode(ctx.manifest_, state, under, targets, p), p.x, p.y, { x: e.clientX, y: e.clientY }, e.pointerId)
             tryCapture(ctx.surface_, e.pointerId)
             e.preventDefault()
             return
@@ -273,15 +286,16 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
     } else if (hit.layer.kind === "roi" && hit.roiPart_) {
         const box = ctx.roiBoxes_.get(hit.layer.id)
         if (!box) return
+        const p = content(hit.layer.axis)
         if (hit.roiPart_.move) {
-            state.drag_ = roiDrag.begin(hit.layer.id, box, { move: true }, content.x - box.g_.x, content.y - box.g_.y, e.pointerId)
+            state.drag_ = roiDrag.begin(hit.layer.id, box, { move: true }, p.x - box.g_.x, p.y - box.g_.y, e.pointerId)
         } else if (hit.roiPart_.edge) {
             const edge = hit.roiPart_.edge
             // ax/ay carry the ONE fixed opposite edge for this drag (the other axis is untouched
             // by move()'s edge branch) — same "precompute the fixed reference point" convention
             // as the corner branch below, just one axis at a time.
-            const ax = edge === "w" ? box.g_.x + box.g_.w : edge === "e" ? box.g_.x : content.x
-            const ay = edge === "n" ? box.g_.y + box.g_.h : edge === "s" ? box.g_.y : content.y
+            const ax = edge === "w" ? box.g_.x + box.g_.w : edge === "e" ? box.g_.x : p.x
+            const ay = edge === "n" ? box.g_.y + box.g_.h : edge === "s" ? box.g_.y : p.y
             state.drag_ = roiDrag.begin(hit.layer.id, box, { edge }, ax, ay, e.pointerId)
         } else {
             const k = hit.roiPart_.corner as number
@@ -330,7 +344,7 @@ export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): voi
     applyDrag(ctx, state, d, e)
     const { layout, content } = pointerSpace(ctx, state, e)
     if (d.kind === "threshold") {
-        ctx.commit_({ [d.id_]: thresholdDrag.end(d, content) })
+        ctx.commit_({ [d.id_]: thresholdDrag.end(d, content(dragAxis(ctx, d))) })
     } else if (d.kind === "view") {
         // §12.3: a view gesture commits nothing — no bond write, no "input" event.
         // Settle is gated on whether a request actually went out during this drag
