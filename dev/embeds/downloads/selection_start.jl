@@ -24,11 +24,6 @@ md"""
 Tokyo starts selected, and clicking another city replaces the selection.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
-md"""
-Plot the cities and attach each city's name as its payload.
-"""
-
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000102
 begin
     lon = [139.7, 77.2, 3.4, -77.0]
@@ -43,16 +38,11 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000103
 md"""
-`selected = 1` starts the widget with the first city selected, so `sel.cities` already holds its event. The `id` you gave the scatter names that field.
+`id = :cities` names the scatter's field, so the selected city is `sel.cities`.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000104
 @bind sel masque(fig, cities; selected = 1)
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
-md"""
-This cell shows the selected city from the start, and responds when you click another.
-"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000106
 isnothing(sel.cities) ? "click a city" : "$(sel.cities.city) selected"
@@ -67,10 +57,8 @@ Masque = "82b01fb5-7eeb-4559-83ea-8d75f85d4328"
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
 # ╟─a1b2c3d4-0001-4000-8000-000000000100
-# ╟─a1b2c3d4-0001-4000-8000-000000000101
 # ╠═a1b2c3d4-0001-4000-8000-000000000102
 # ╟─a1b2c3d4-0001-4000-8000-000000000103
 # ╠═a1b2c3d4-0001-4000-8000-000000000104
-# ╟─a1b2c3d4-0001-4000-8000-000000000105
 # ╠═a1b2c3d4-0001-4000-8000-000000000106
 # ╟─00000000-0000-0000-0000-000000000001

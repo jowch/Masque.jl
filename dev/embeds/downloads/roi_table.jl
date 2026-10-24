@@ -24,11 +24,6 @@ md"""
 Drag the box over some stations, and the last cell lists the ones inside.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
-md"""
-Create the scatter the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. Passing the scatter to `interactables` with the station rows as `payloads` puts each station's name and group in its tooltip. `ROIInteractable` adds a box, and `selects = s` makes it collect the scatter's points inside it.
-"""
-
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
 begin
     samples = [
@@ -55,18 +50,8 @@ begin
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
-md"""
-`bind = s` makes `picks` the scatter's value, which the box fills. `@bind picks` saves the stations inside the box when you release it, so `picks` stays the same while you drag.
-"""
-
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
 @bind picks masque(fig, pts, roi; bind = s)
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
-md"""
-`picks` lists the stations inside the box, or is empty if there are none. It starts with the ones inside the starting box and changes when you release it. `samples[picks]` is their rows, and this cell shows them as a table.
-"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
 if isempty(picks)
@@ -90,10 +75,7 @@ Masque = "82b01fb5-7eeb-4559-83ea-8d75f85d4328"
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
 # ╟─a1b2c3d4-0001-4000-8000-000000000009
-# ╟─a1b2c3d4-0001-4000-8000-000000000010
 # ╠═a1b2c3d4-0001-4000-8000-000000000002
-# ╟─a1b2c3d4-0001-4000-8000-000000000011
 # ╠═a1b2c3d4-0001-4000-8000-000000000003
-# ╟─a1b2c3d4-0001-4000-8000-000000000012
 # ╠═a1b2c3d4-0001-4000-8000-000000000004
 # ╟─00000000-0000-0000-0000-000000000001
