@@ -188,6 +188,8 @@ function adjacentLayerStart(starts: number[], cur: number, dir: 1 | -1): number 
 // through untouched. Gated on the surface actually having DOM focus (not just this listener
 // being attached to it): a keydown dispatched programmatically at the surface without focus, or
 // arriving after a click moved focus elsewhere, must not steer the overlay.
+const NAV_KEYS: ReadonlySet<string> = new Set(["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"])
+
 export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardEvent): void {
     if (ctx.shadowRoot_.activeElement !== ctx.surface_) return
     // Taken only when there is a step to take: otherwise the key goes on to the page, so a
@@ -202,6 +204,10 @@ export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardE
     const n = ctx.focusable_.length
     if (n === 0 && e.key !== "Escape") return
     const cur = state.focusIdx_
+    // Cmd or Ctrl or Alt with an arrow, Home, End or a page key is the browser's (Back on
+    // Cmd+Left or Alt+Left, line ends, tab switching): the focus ring moves on bare and
+    // Shift chords only (#404).
+    if ((e.metaKey || e.ctrlKey || e.altKey) && NAV_KEYS.has(e.key)) return
     if (e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft") && stepSample(ctx, state, e.key === "ArrowRight" ? 1 : -1)) {
         e.preventDefault(); e.stopPropagation()
         return
