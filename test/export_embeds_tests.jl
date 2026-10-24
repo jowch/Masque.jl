@@ -297,6 +297,52 @@ end
     end
 end
 
+@testset "a box released where it started is the starting state" begin
+    item(ymin) = Dict{String, Any}("layer" => "img", "index" => 0, "payload" => Dict{String, Any}("i0" => 2, "i1" => 4, "j0" => 1, "j1" => 3, "ymin" => ymin))
+    start = Dict{String, Any}("items" => Any[item(1.0)])
+    keying = Dict{String, Any}("initial" => Dict{String, Any}("img" => start), "keyed" => ["img"], "controls" => String[])
+    # Its edges come back a float digit off, its cells the same.
+    @test state_key(keying, Dict("img" => Dict{String, Any}("items" => Any[item(0.9999998)]))) == "null"
+    node = Sys.which("node")
+    if node === nothing
+        @test_skip "node not installed"
+    else
+        js = PLAYER_LOOKUP_JS * """
+            const t = Object.assign($(json_write(keying)), {keys: {"null": 0}, snaps: ["idle"]});
+            process.stdout.write(String(lookup(t, {img: $(json_write(Dict("items" => Any[item(0.9999998)])))})));
+            """
+        @test read(`$node -e $js`, String) == "idle"
+    end
+end
+
+@testset "a state file that lands late never covers a newer value" begin
+    node = Sys.which("node")
+    if node === nothing
+        @test_skip "node not installed"
+    else
+        js = PLAYER_LOOKUP_JS * raw"""
+            const pending = {};
+            const load = (f) => new Promise((ok, fail) => { pending[f] = {ok, fail}; });
+            const log = [];
+            const show = latestOnly(load, (s) => log.push("apply " + s), (on) => log.push("miss " + on));
+            console.warn = () => {};
+            (async () => {
+              show("a.json"); show(null);          // A still loading, then a value never recorded
+              pending["a.json"].ok("A");
+              show("b.json"); show("c.json");      // B, then C before B lands
+              pending["c.json"].ok("C"); pending["b.json"].ok("B");
+              await new Promise((r) => setTimeout(r, 10));
+              show("d.json"); pending["d.json"].fail(new Error("404"));
+              await new Promise((r) => setTimeout(r, 10));
+              process.stdout.write(log.join(","));
+            })();
+            """
+        # A's cells never cover the miss, B's never cover C's, and a file that fails to load says so.
+        @test read(`$node -e $js`, String) ==
+            "miss false,miss true,miss false,miss false,apply C,miss false,miss true"
+    end
+end
+
 @testset "home quickstart is the 3-point Pluto export" begin
     path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_quickstart.jl")
     player = parse_player_toml(path)
@@ -529,10 +575,12 @@ include(joinpath(@__DIR__, "..", "docs", "player_fallback.jl"))
         endswith(f, ".jl") || continue
         s = read(f, String)
         occursin("pluto_html = true", s) || continue
-        bond = fallback_player(s)["bond"]
+        player = fallback_player(s)
+        bond = player["bond"]
         t = only(fallback_markdown(f).content)
         @test any(b -> b isa Markdown.Code && occursin("@bind $bond", b.code), t.content)
-        @test any(b -> b isa Markdown.Paragraph, t.content)
+        # A notebook in segments has its prose on the page, between the parts.
+        haskey(player, "segments") || @test any(b -> b isa Markdown.Paragraph, t.content)
         n += 1
     end
     @test n >= 23
@@ -573,4 +621,121 @@ end
         @test any(b -> b isa Markdown.Paragraph && any(x -> x isa Markdown.Image, b.content), twin.content) == has_bind
     end
     @test_throws ErrorException fallback_markdown(nb; segment = "nope")
+end
+
+@testset "player controls: every setting recorded, keyed the way the page keys it" begin
+    ctl(id, g) = Dict{String, Any}("id" => id, "kind" => "control", "events" => ["change"], "bond" => "control", "geometry" => g)
+    env(id, p) = Dict{String, Any}("layer" => id, "index" => 0, "payload" => p)
+    manifest = Dict{String, Any}(
+        "fields" => ["freq", "dots"],
+        "layers" => Any[
+            ctl("freq", Dict{String, Any}("control" => "slider", "n" => 9, "value" => 0)),
+            ctl("dots", Dict{String, Any}("control" => "toggle", "value" => false)),
+        ],
+        "initial" => Dict{String, Any}("freq" => env("freq", 0), "dots" => env("dots", false)),
+    )
+    states = control_states(manifest)
+    @test length(states) == 18
+    keying = player_keying(manifest)
+    @test keying["controls"] == ["freq", "dots"]
+    @test state_key(keying, manifest["initial"]) == "null"
+    @test state_key(keying, merge(manifest["initial"], Dict("freq" => env("freq", 3)))) == "freq=3"
+    @test state_key(keying, merge(manifest["initial"], Dict("freq" => env("freq", 3), "dots" => env("dots", true)))) == "freq=3+dots=true"
+    rows = player_states(Dict{String, Any}(), manifest)
+    @test length(rows) == 18  # idle plus 17 settings; a control is never cleared
+    @test !any(r -> startswith(r.key, "null@"), rows)
+    @test allunique(r.key for r in rows)
+
+    # An interval slider records each ordered pair of stops, a menu each option.
+    two = Dict{String, Any}(
+        "fields" => ["span", "pick"],
+        "layers" => Any[
+            ctl("span", Dict{String, Any}("control" => "intervalslider", "n" => 3, "value" => [0, 2])),
+            ctl("pick", Dict{String, Any}("control" => "menu", "n" => 2, "value" => 0)),
+        ],
+        "initial" => Dict{String, Any}("span" => env("span", [0, 2]), "pick" => env("pick", 0)),
+    )
+    @test length(control_states(two)) == 6 * 2
+    @test state_key(player_keying(two), merge(two["initial"], Dict("span" => env("span", [1, 2])))) == "span=[1,2]"
+    big = deepcopy(manifest)
+    big["layers"][1]["geometry"]["n"] = CONTROL_STATES_MAX
+    @test_throws ErrorException control_states(big)
+
+    node = Sys.which("node")
+    if node === nothing
+        @test_skip "node not installed"
+    else
+        # The page computes the same key from the value the overlay posts, for every setting.
+        table = merge(keying, Dict{String, Any}("keys" => Dict(r.key => 0 for r in rows), "snaps" => ["x"]))
+        values = [something(r.value, manifest["initial"]) for r in rows]
+        js = PLAYER_LOOKUP_JS * "const t = " * json_write(table) * "; const vs = " * json_write(values) * raw""";
+            process.stdout.write(vs.map((v) => keyOf(t, v)).join("\n"));
+            """
+        @test split(read(`$node -e $js`, String), "\n") == [r.key for r in rows]
+        # With a control moved, a value the harvest skipped is a miss: no snapshot taken at
+        # other settings stands in for it.
+        js2 = PLAYER_LOOKUP_JS * raw"""
+            const env = (l, p) => ({layer: l, index: 0, payload: p});
+            const t = {initial: {f: env("f", 0), a: null}, keyed: ["f", "a"], controls: ["f"],
+                       keys: {"null": 0, "a:0": 1, "f=1": 2}, snaps: ["idle", "A0", "F1"]};
+            const A = {layer: "a", index: 0};
+            const got = [lookup(t, {f: env("f", 0), a: A}), lookup(t, {f: env("f", 1), a: A})];
+            process.stdout.write(got.map(String).join(","));
+            """
+        @test read(`$node -e $js2`, String) == "A0,null"
+    end
+end
+
+@testset "the downloaded notebook drops the player TOML and the manifest" begin
+    nb = joinpath(@__DIR__, "..", "docs", "src", "embeds", "controls_wave.jl")
+    src = read(nb, String)
+    out = download_notebook(src)
+    @test startswith(out, "### A Pluto.jl notebook ###")
+    @test !occursin("PLUTO_PLAYER_TOML_CONTENTS", out)
+    @test !occursin("PLUTO_MANIFEST_TOML_CONTENTS", out)
+    @test !occursin("e1be0000-0000-4000-8000-000000000001", out)
+    @test !occursin("00000000-0000-0000-0000-000000000002", out)
+    @test occursin("PLUTO_PROJECT_TOML_CONTENTS", out)
+    @test occursin("@bind w2 masque(\n    fig, (freq = freq, dots = dots);", out)
+    @test occursin("# ╠═a1b2c3d4-0002-4000-8000-000000000004\n", out)
+    @test download_notebook(out) == out
+end
+
+@testset "players load the overlay script, pictures and states from shared files" begin
+    dir = mktempdir()
+    overlay = "(()=>{window.Masque={mount(){}}})();"
+    png = UInt8[0x89, 0x50, 0x4e, 0x47, 0x01, 0x02]
+    pic = "data:image/png;base64," * base64encode(png)
+    html = """<div class="ip-host"><img src="$pic"><script>$overlay
+    window.Masque.mount(currentScript)</script></div>"""
+    out = externalize_html(html, dir; overlay)
+    @test !occursin(overlay, out)
+    @test !occursin("data:image", out)
+    m = match(r"src=\"(shared/[0-9a-f]{20}\.png)\"", out)
+    @test m !== nothing
+    @test read(joinpath(dir, m.captures[1])) == png
+    # The same picture in another state or player is the same file.
+    @test externalize_html(html, dir; overlay) == out
+    @test length(readdir(joinpath(dir, "shared"))) == 1
+
+    idle = Dict{String, Any}("cells" => Dict{String, Any}("c" => Dict{String, Any}("mime" => "text/html", "body" => html)))
+    tree = Dict{String, Any}("mime" => "application/vnd.pluto.tree+object", "body" => Dict{String, Any}("type" => "Tuple"))
+    other = Dict{String, Any}("cells" => Dict{String, Any}("c" => tree))
+    table = Dict{String, Any}("snaps" => Any[idle, other], "keys" => Dict("null" => 0, "pts:0" => 1), "keyed" => ["pts"])
+    shipped = externalize_table(table, dir; overlay)
+    @test shipped["keys"] == table["keys"] && shipped["keyed"] == table["keyed"]
+    @test all(f -> occursin(r"^shared/[0-9a-f]{20}\.json$", f), shipped["snaps"])
+    state(i) = _JSON.parse(read(joinpath(dir, shipped["snaps"][i]), String))["cells"]["c"]["body"]
+    @test state(1) == out
+    @test state(2)["type"] == "Tuple"
+
+    # A static player's state: cell HTML in a vector, and the remounted picture.
+    other_png = UInt8[0x89, 0x50, 0x4e, 0x47, 0x03, 0x04]
+    snap = Dict{String, Any}("cells" => Any[html, "<p>plain</p>"], "png" => "data:image/png;base64," * base64encode(other_png))
+    static = externalize_table(Dict{String, Any}("snaps" => Any[snap], "keys" => Dict("null" => 0)), dir; overlay)
+    shipped_snap = _JSON.parse(read(joinpath(dir, static["snaps"][1]), String))
+    @test occursin(r"^shared/[0-9a-f]{20}\.png$", shipped_snap["png"])
+    @test read(joinpath(dir, shipped_snap["png"])) == other_png
+    @test shipped_snap["cells"] == [out, "<p>plain</p>"]
+    @test !any(c -> occursin(overlay, c) || occursin("data:image", c), shipped_snap["cells"])
 end

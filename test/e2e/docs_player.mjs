@@ -6,7 +6,10 @@
 // or if an overlay click does not update that readout. Then, with jsDelivr blocked, the
 // iframe must give way to its text twin (docs/player_fallback.jl): the `details` after it
 // opens with the notebook's code, and the search index carries that code. The Brush a
-// region page shows one notebook in two segments, which must share its value. The Backends
+// region page shows one notebook in two segments, which must share its value. On the Sliders
+// and toggles page, the slider and the toggle redraw the figure from harvested `onchange`
+// frames, and the notebook downloads. Players load the overlay script, pictures and state
+// tables from shared files. The Backends
 // page's two `@example` widgets, shown without Pluto, must hover to a tooltip, mount when
 // their script runs from `<head>`, and show their figure with scripts off.
 //
@@ -31,6 +34,7 @@ const MIME = {
   ".js": "application/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".json": "application/json",
   ".woff2": "font/woff2",
   ".woff": "font/woff",
 };
@@ -248,6 +252,8 @@ try {
   const page = await context.newPage();
   page.on("console", (msg) => consoleLog.push(`${msg.type()}: ${msg.text()}`));
   page.on("pageerror", (err) => consoleLog.push(`pageerror: ${err.message}`));
+  const sharedFetched = [];
+  page.on("request", (req) => { if (req.url().includes("/embeds/shared/")) sharedFetched.push(req.url()); });
   page.on("requestfailed", (req) => {
     const u = req.url();
     if (!u.includes("jsdelivr") && !u.includes("frontend-dist")) return;
@@ -310,6 +316,22 @@ try {
     if (!text.includes(want)) {
       throw new Error(`listed click (aimed ${i}, hit ${got.index}) did not swap the readout; got ${JSON.stringify(text)}`);
     }
+  }
+
+  // The player carries none of its overlay script, pictures or state tables: it loads them from
+  // `embeds/shared/`, each state's cells when the reader reaches it.
+  const shipped = await frame.evaluate(() => ({
+    overlay: [...document.querySelectorAll("head script[src]")].some((s) => /^shared\/[0-9a-f]{20}\.js$/.test(s.getAttribute("src"))),
+    img: document.querySelector(".ip-host img")?.getAttribute("src") || "",
+    inlineScript: Math.max(0, ...[...document.querySelectorAll("pluto-output script")].map((s) => s.textContent.length)),
+    snaps: window.masquePlayer.table.snaps,
+  }));
+  const isShared = (f, ext) => new RegExp(`^shared/[0-9a-f]{20}\\.${ext}$`).test(f);
+  if (!shipped.overlay || !isShared(shipped.img, "png") || shipped.inlineScript > 20000 || !shipped.snaps.every((f) => isShared(f, "json"))) {
+    throw new Error(`the quick start still inlines its assets: ${JSON.stringify({ ...shipped, snaps: shipped.snaps.slice(0, 3) })}`);
+  }
+  if (!sharedFetched.some((u) => /\/embeds\/shared\/[0-9a-f]{20}\.json$/.test(u))) {
+    throw new Error("the quick start's clicks fetched no state file");
   }
 
   const twinClosed = await page.evaluate(() => {
@@ -490,7 +512,7 @@ try {
     const shown = (frame) => frame.evaluate(() => ({
       want: window.masqueSegment,
       visible: [...document.querySelectorAll("pluto-notebook pluto-cell")].filter((c) => c.offsetParent !== null).map((c) => c.id),
-      chip: !!document.querySelector(".masque-sim-chip") && getComputedStyle(document.querySelector(".masque-sim-chip")).display !== "none",
+      chip: !!document.querySelector(".masque-sim-chip") && document.querySelector(".masque-sim-chip").getClientRects().length > 0,
     }));
     for (const [name, frame, chip] of [["figure", fig, true], ["table", table, false]]) {
       const st = await shown(frame);
@@ -530,6 +552,82 @@ try {
     if (after === before) throw new Error("roi_table: dragging the box in the figure segment did not swap the table segment");
     page.off("console", onConsole);
     console.log("E2E OK [docs player] — segments: roi_table's two iframes each show their own cells, and a drag in one swapped the table in the other");
+  }
+
+  // `onchange` replayed from harvested frames (docs/pluto_html_export.jl): on the Sliders and
+  // toggles page, a key step on the slider and a click on the toggle each redraw the figure
+  // from that setting's frame, and the value cell in the other iframe follows. The download
+  // link sits with the widget and serves the notebook, and nothing says "not computed".
+  {
+    const p = existsSync(join(root, "controls", "index.html")) ? "/controls/" : "/controls.html";
+    const frameReqs = [];
+    const onReq = (r) => { if (/controls_wave\.frames\//.test(r.url())) frameReqs.push(r.url()); };
+    page.on("request", onReq);
+    await page.goto(`http://127.0.0.1:${server.address().port}${p}`, { waitUntil: "domcontentloaded" });
+    const segEl = (name) => page.locator(`iframe[data-masque-embed="controls_wave"][data-masque-segment="${name}"]`);
+    for (const name of ["widget", "value"]) {
+      await segEl(name).waitFor({ state: "attached", timeout: 20000 });
+      await segEl(name).evaluate((f) => {
+        f.loading = "eager";
+        const s = f.getAttribute("src");
+        if (s) f.src = s;
+      });
+    }
+    await segEl("widget").evaluate((f) => f.scrollIntoView({ block: "start" }));
+    const w = await waitMounted(segEl("widget"), 40000);
+    let v = null;
+    for (const deadline = Date.now() + 40000; Date.now() < deadline && !v;) {
+      const f = await (await segEl("value").elementHandle())?.contentFrame();
+      const ok = f && await f.evaluate(() => typeof window.editor_state_set === "function" && !!document.querySelector("pluto-cell pluto-output")).catch(() => false);
+      if (ok) v = f; else await sleep(250);
+    }
+    if (!v) throw new Error("controls_wave value segment never loaded its notebook");
+    if (frameReqs.length) throw new Error(`controls_wave fetched frames before any control moved: ${frameReqs[0]}`);
+    const valueText = () => v.evaluate(() => [...document.querySelectorAll("pluto-output")].filter((o) => o.offsetParent !== null).map((o) => o.innerText.replace(/\s+/g, " ").trim()).join(" | "));
+    const picture = () => w.evaluate(() => document.querySelector(".ip-host img").src.slice(0, 40));
+    const missShown = (frame) => frame.evaluate(() => { const m = document.querySelector(".masque-miss"); return !!m && !m.hidden; });
+    const waitFor = async (what, read, pred, ms = 8000) => {
+      let got = await read();
+      for (const deadline = Date.now() + ms; Date.now() < deadline && !pred(got);) {
+        await sleep(100);
+        got = await read();
+      }
+      if (!pred(got)) throw new Error(`controls_wave: ${what} (got ${JSON.stringify(got)})`);
+      return got;
+    };
+    const v0 = await waitFor("starting value", valueText, (t) => /1\.0/.test(t) && /false/.test(t));
+    const p0 = await picture();
+    const slider = w.locator('[data-masque-control="freq"] input');
+    await slider.focus();
+    await page.keyboard.press("ArrowRight");
+    await waitFor("the slider's frame never replaced the picture", picture, (s) => s !== p0 && s.startsWith("blob:"));
+    await waitFor("the value cell never followed the slider", valueText, (t) => t !== v0 && /1\.5/.test(t));
+    // The slider keeps the keyboard once its frame has landed, so the next step moves it on.
+    const p1a = await picture();
+    await page.keyboard.press("ArrowRight");
+    await waitFor("a second key step after the frame landed did nothing", picture, (s) => s !== p1a);
+    const v1 = await waitFor("the value cell never followed the second step", valueText, (t) => /2\.0/.test(t));
+    const p1 = await picture();
+    await w.locator('[data-masque-control="dots"] input').click();
+    await waitFor("the toggle's frame never replaced the picture", picture, (s) => s !== p1);
+    await waitFor("the value cell never followed the toggle", valueText, (t) => t !== v1 && /true/.test(t));
+    const note = await w.evaluate(() => document.querySelector(".ip-host").dataset.masqueOnchangeError || null);
+    if (note) throw new Error(`controls_wave: the overlay says ${JSON.stringify(note)}`);
+    if (await missShown(w) || await missShown(v)) throw new Error("controls_wave: a recorded setting shows the not-computed note");
+    if (frameReqs.length < 2) throw new Error(`controls_wave fetched ${frameReqs.length} frame files`);
+    const bar = (frame) => frame.evaluate(() => {
+      const a = document.querySelector(".masque-download");
+      return { shown: !!a && a.getClientRects().length > 0, href: a ? a.href : null };
+    });
+    const [wb, vb] = [await bar(w), await bar(v)];
+    if (!wb.shown || vb.shown) throw new Error(`controls_wave: download link shown in widget part ${wb.shown}, value part ${vb.shown}`);
+    const dl = await page.request.get(wb.href);
+    const body = await dl.text();
+    if (!dl.ok() || !body.startsWith("### A Pluto.jl notebook ###") || body.includes("PLUTO_MANIFEST_TOML_CONTENTS") || body.includes("PLUTO_PLAYER_TOML_CONTENTS")) {
+      throw new Error(`controls_wave: the download (${dl.status()}) is not the notebook without its manifest and player TOML`);
+    }
+    page.off("request", onReq);
+    console.log(`E2E OK [docs player] — onchange replay: the slider and the toggle redrew controls_wave from ${frameReqs.length} fetched frame files, the value part followed, and the download is the notebook`);
   }
 
   // Widgets shown by Documenter `@example` blocks, with no Pluto (#298): two CairoMakie and

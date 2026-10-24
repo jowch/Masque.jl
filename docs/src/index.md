@@ -23,9 +23,9 @@ Ctrl-Z (Cmd-Z on a Mac) takes back the last change. See
 ## [Build a widget](@id home-widgets)
 
 ```@raw html
-<video title="Dragging a frequency slider while the curve follows it, then switching a toggle to a dotted line"
-       src="assets/controls.mp4" controls muted loop playsinline autoplay
-       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<div class="masque-embed-wrap">
+<iframe id="masque-home-controls" data-masque-embed="controls_wave" data-masque-segment="widget" title="A sine curve with a frequency slider and a dotted-line toggle. Moving either redraws the curve." style="width:100%;height:620px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
 ```
 
 Lay out a Makie slider, toggle, or menu in the figure, and it works in

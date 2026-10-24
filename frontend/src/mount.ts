@@ -490,6 +490,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     let lastMove: PointerEvent | null = null
     const onchangeSettle = (): Record<string, unknown> => ({ onchange: true, state: currentState(), settle: true })
     const rawChannel = createGestureChannel(requestFrame ?? null, applyFrame, () => { clearPhoto() })
+    // A docs player answers `onchange` from frames it harvested at build time, where a live
+    // kernel would (docs/pluto_html_export.jl). View gestures still have no kernel there.
+    const replay = (window as unknown as { masqueReplayFrame?: RenderFrame }).masqueReplayFrame
+    const replayChannel = replay && manifest.onchange ? createGestureChannel(replay, applyFrame, undefined, true) : null
+    const route = (onchange: boolean): GestureChannel => (onchange && replayChannel) || rawChannel
     // A request's matrix is relative to the frame on screen when it was built. The channel runs
     // one round trip at a time, so a request can be built while an earlier one is still in
     // flight and land after that earlier frame has replaced the base (a wheel settle queued
@@ -500,14 +505,15 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const adoptedMatrices = new Map<number, PhotoMatrix>()
     const builtAt = new WeakMap<Record<string, unknown>, number>()
     const channel: GestureChannel = {
-        request(input) { builtAt.set(input, photoFrames); rawChannel.request(input) },
+        request(input) { builtAt.set(input, photoFrames); route(input.onchange === true).request(input) },
         settle(input, slot) {
+            const ch = route(slot === "onchange")
             // A built-when-sent input is relative to the frame on screen when it is sent.
-            if (typeof input === "function") return rawChannel.settle(() => { const o = input(); builtAt.set(o, photoFrames); return o }, slot)
+            if (typeof input === "function") return ch.settle(() => { const o = input(); builtAt.set(o, photoFrames); return o }, slot)
             builtAt.set(input, photoFrames)
-            return rawChannel.settle(input, slot)
+            return ch.settle(input, slot)
         },
-        dispose() { rawChannel.dispose() },
+        dispose() { rawChannel.dispose(); replayChannel?.dispose() },
     }
 
     const fade = createFade({

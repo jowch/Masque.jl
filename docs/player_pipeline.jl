@@ -1,6 +1,8 @@
 # String pipeline for the cell-series player. No Pluto — Core tests include this
 # file; harvest (`export_embeds.jl`) includes it too.
 
+using Base64
+using SHA
 using TOML
 
 include("player_segments.jl")
@@ -64,13 +66,70 @@ function _item_key(it)
     return string(k, "@", Int(p["i0"]), "-", Int(p["i1"]), "/", Int(p["j0"]), "-", Int(p["j1"]))
 end
 
-# The starting value and the fields a player keys on, from the widget's manifest.
+# The starting value and the fields a player keys on, from the widget's manifest. A control's
+# envelope is always index 0, so it keys on its payload (`controls`).
 function player_keying(manifest::AbstractDict)
     boxes = Set(string(l["id"]) for l in manifest["layers"] if get(l, "selects", nothing) !== nothing)
     return Dict{String, Any}(
         "initial" => jsonable(get(manifest, "initial", Dict{String, Any}())),
         "keyed" => String[string(f) for f in get(manifest, "fields", Any[]) if !(string(f) in boxes)],
+        "controls" => String[string(l["id"]) for l in manifest["layers"] if string(l["kind"]) == "control"],
     )
+end
+
+# The key `keyOf` in `PLAYER_LOOKUP_JS` gives a whole value: each field that differs from the
+# starting value, in `keyed` order, joined by `+`.
+function state_key(keying::AbstractDict, v::AbstractDict)
+    init = keying["initial"]
+    parts = String[]
+    key(f, x) = x === nothing ? "null@" * f : f in keying["controls"] ? f * "=" * json_write(x["payload"]) : snapshot_key(x)
+    for f in keying["keyed"]
+        cur = jsonable(get(v, f, nothing))
+        start = get(init, f, nothing)
+        (cur == start || key(f, cur) == key(f, start)) && continue
+        push!(parts, key(f, cur))
+    end
+    return isempty(parts) ? "null" : join(parts, "+")
+end
+
+# Most control settings a player records: each is one notebook run and one redrawn figure at
+# build time.
+const CONTROL_STATES_MAX = 200
+
+"""
+    control_states(manifest) -> Vector{Dict{String, Any}}
+
+Every combination of the widget's controls, each as the starting value with the controls
+set: a `Slider` or `Menu` at each of its stops, an `IntervalSlider` at each pair of stops, a
+`Toggle` or `Checkbox` off and on. Picks keep their starting value. More than
+`CONTROL_STATES_MAX` fails the harvest: fewer stops (a coarser `range`), or a clip.
+"""
+function control_states(manifest::AbstractDict)
+    init = Dict{String, Any}(string(k) => v for (k, v) in get(manifest, "initial", Dict{String, Any}()))
+    ids = String[]
+    choices = Vector{Vector{Any}}()
+    for L in manifest["layers"]
+        string(L["kind"]) == "control" || continue
+        g = L["geometry"]
+        c = string(_field(g, "control"))
+        n = c in ("slider", "intervalslider", "menu") ? Int(_field(g, "n")) : 0
+        vals = c in ("toggle", "checkbox") ? Any[false, true] :
+            c in ("slider", "menu") ? Any[0:(n - 1)...] :
+            c == "intervalslider" ? Any[[i, j] for i in 0:(n - 1) for j in i:(n - 1)] :
+            error("control :$(L["id"]) is a $c, which the player cannot list")
+        push!(ids, string(L["id"]))
+        push!(choices, vals)
+    end
+    isempty(ids) && return Dict{String, Any}[]
+    total = prod(length, choices)
+    total > CONTROL_STATES_MAX && error(
+        "the widget's controls have $total settings, more than the player records ($CONTROL_STATES_MAX): " *
+            "give a slider fewer stops, or show this interaction as a recorded clip"
+    )
+    return [
+        merge(init, Dict{String, Any}(id => Dict{String, Any}("layer" => id, "index" => 0, "payload" => p) for (id, p) in zip(ids, combo)))
+            for combo in Iterators.product(choices...)
+    ]
 end
 
 """
@@ -80,9 +139,11 @@ The docs players' snapshot lookup, shared by the static player (`emit_player`) a
 Pluto export (`PLUTO_EXPORT_SIM_JS`). `lookup(table, v)` returns the snapshot for the value
 the overlay posted, or `null`. The harvest records every click and every brush release
 (`discrete_states`, `brush_states`) one field at a time, and with `pairs = true` also each
-click on one field with each click on another. When the reader has changed two fields and
-no pair was recorded, `lookup` shows the snapshot of the latest change alone, so a miss
-means the recording and the overlay disagree.
+click on one field with each click on another, and every setting of the widget's controls
+(`control_states`). When the reader has changed two fields and no pair was recorded,
+`lookup` shows the snapshot of the latest change alone, unless a control has moved: then
+it is a miss, and the player says the setting wasn't computed. Both players also load
+each state's file with `jsonFiles()` and show only the latest value with `latestOnly`.
 """
 const PLAYER_LOOKUP_JS = raw"""
 function layerIndexKey(layer, index) {
@@ -112,20 +173,28 @@ function stable(x) {
   if (Array.isArray(x)) return "[" + x.map(stable).join(",") + "]";
   return "{" + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(x[k]); }).join(",") + "}";
 }
+// A field keys the same as its starting value when it shows the same thing: a box released
+// where it started keeps its cells though its edges differ in the last float digit.
 function changed(table, v) {
   const out = [];
   const init = table.initial || {};
   (table.keyed || []).forEach(function (f) {
     const cur = v[f] === undefined ? null : v[f];
-    if (stable(cur) !== stable(init[f])) out.push([f, cur]);
+    const start = init[f] === undefined ? null : init[f];
+    if (stable(cur) !== stable(start) && fieldKey(table, f, cur) !== fieldKey(table, f, start)) out.push([f, cur]);
   });
   return out;
+}
+function fieldKey(table, f, cur) {
+  if (cur == null) return "null@" + f;
+  if ((table.controls || []).indexOf(f) !== -1) return f + "=" + JSON.stringify(cur.payload);
+  return envKey(cur);
 }
 function keyOf(table, v) {
   if (v == null) return "null";
   const d = changed(table, v);
   if (!d.length) return "null";
-  return d.map(function (p) { return p[1] == null ? "null@" + p[0] : envKey(p[1]); }).join("+");
+  return d.map(function (p) { return fieldKey(table, p[0], p[1]); }).join("+");
 }
 function keysFor(table, v) {
   const keys = [keyOf(table, v)];
@@ -145,13 +214,48 @@ function find(table, keys) {
   }
   return null;
 }
+// Fetches each state file once and keeps it; a failed fetch is tried again next time.
+function jsonFiles() {
+  const loaded = new Map();
+  return function (file) {
+    if (!loaded.has(file)) {
+      loaded.set(file, fetch(file).then(function (r) {
+        if (!r.ok) throw new Error(file + ": " + r.status);
+        return r.json();
+      }).catch(function (e) {
+        loaded.delete(file);
+        throw e;
+      }));
+    }
+    return loaded.get(file);
+  };
+}
+// Shows each value's cells once its file loads, unless the reader reached a newer value first,
+// a miss included: a slow file never lands over a newer value's cells or its note.
+function latestOnly(load, apply, miss) {
+  let latest = 0;
+  return function (file) {
+    const n = ++latest;
+    miss(!file);
+    if (!file) return;
+    load(file).then(function (snap) {
+      if (n === latest) apply(snap);
+    }, function (e) {
+      console.warn("masque player: snapshot", e);
+      if (n === latest) miss(true);
+    });
+  };
+}
 // A reader who clicks one plot and then another changes two fields, a value the harvest never
 // recorded. Show the latest change on its own: the field that differs from the last value.
 function lookup(table, v) {
   const prev = table.last_;
   table.last_ = v;
   let hit = find(table, keysFor(table, v));
-  if (!hit && v != null && prev != null) {
+  // A moved control changes what every other field's snapshot would show, so a value the
+  // harvest skipped stays a miss rather than showing a snapshot taken at other settings.
+  const controlMoved = v != null && changed(table, v).some(function (p) { return (table.controls || []).indexOf(p[0]) !== -1; });
+  if (!hit && v != null && prev != null && !controlMoved) {
     const moved = (table.keyed || []).filter(function (f) { return stable(v[f]) !== stable(prev[f]); });
     if (moved.length === 0) return table.shown_ || null;
     if (moved.length === 1) {
@@ -337,7 +441,8 @@ and bounds positions only). A hand-listed click or brush fails: the harvest alre
 it. Each state changes one field: its `value` is the widget's starting value with that
 field's envelope in place, and its `key` is that envelope's [`snapshot_key`](@ref). With
 `pairs = true` in the TOML, it also returns every click on one field with every click on a
-later field, keyed as the two keys joined by `+`.
+later field, keyed as the two keys joined by `+`. Every setting of the widget's controls
+([`control_states`](@ref)) follows, keyed by `state_key` on the controls that moved.
 """
 function player_states(player::AbstractDict, manifest::AbstractDict)
     out = NamedTuple{(:key, :value), Tuple{String, Any}}[(; key = "null", value = nothing)]
@@ -375,14 +480,23 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
             push!(out, (; key = k, value = whole(string(L["id"]), v)))
         end
     end
-    # A pick `selected=` seeds can be clicked off: record that field cleared.
+    # A pick `selected=` seeds can be clicked off: record that field cleared. A control always
+    # holds a value.
     for L in manifest["layers"]
         f = string(L["id"])
-        (haskey(L, "brush") || string(get(L, "bond", "none")) in _CONTINUOUS_BONDS) && continue
+        (haskey(L, "brush") || string(get(L, "bond", "none")) in (_CONTINUOUS_BONDS..., "control")) && continue
         get(init, f, nothing) === nothing && continue
         k = "null@" * f
         push!(seen, k)
         push!(out, (; key = k, value = whole(f, nothing)))
+    end
+    # Every setting of the controls, keyed on the controls that moved.
+    keying = player_keying(manifest)
+    for v in control_states(manifest)
+        k = state_key(keying, v)
+        k in seen && continue
+        push!(seen, k)
+        push!(out, (; key = k, value = v))
     end
     clicks = copy(seen)
     for row in get(player, "states", Any[])
@@ -450,13 +564,32 @@ function snapshot_table(keyed; manifest = nothing)
             push!(snaps, snap)
             length(snaps) - 1
         end
-        keys[k] = i
+        # A value that keys the same as an earlier one (a control moved back to its start keys
+        # "null") would show that one's cells anyway: the first stays.
+        haskey(keys, k) || (keys[k] = i)
     end
     idle = sizeof(json_write(jsonable(first(snaps))))
     extra = sizeof(json_write(jsonable(snaps))) - idle + sizeof(json_write(keys))
     table = Dict{String, Any}("snaps" => snaps, "keys" => keys)
     manifest === nothing || merge!(table, player_keying(manifest))
     return table, extra
+end
+
+# The notebook a reader downloads: the embed without the player's TOML cell and without its
+# package manifest, which points Masque at this checkout. Pluto resolves the registered
+# packages instead.
+function download_notebook(src::AbstractString)
+    out = src
+    for marker in ("PLUTO_PLAYER_TOML_CONTENTS", "PLUTO_MANIFEST_TOML_CONTENTS")
+        m = match(Regex("# ╔═╡ ([0-9a-f-]{36})\\n$marker = \"\"\".*?\"\"\"\\n\\n", "s"), out)
+        m === nothing && continue
+        id = m.captures[1]
+        out = replace(out, m.match => ""; count = 1)
+        out = replace(out, Regex("# (╟─|╠═)$id\\n") => ""; count = 1)
+    end
+    occursin("PLUTO_PLAYER_TOML_CONTENTS", out) && error("download copy still has the player TOML")
+    occursin("PLUTO_MANIFEST_TOML_CONTENTS", out) && error("download copy still has the manifest")
+    return out
 end
 
 function html_escape(s::AbstractString)
@@ -697,4 +830,51 @@ function inject_manifest_snapshots(html::AbstractString, snapshots)
     # script element that sequence ends the tag, so escape every `<`.
     payload = replace(json_write(obj), "<" => "\\u003c")
     return html[1:(j0 - 1)] * payload * html[(j1 + 1):end]
+end
+
+# Files every Pluto-export player loads instead of carrying its own copy: the overlay script,
+# each picture, and each recorded state's cells. Named by content, so a file two states or two
+# players share is written and downloaded once, and the browser caches it across pages.
+const SHARED_DIR = "shared"
+
+function write_shared(dir::AbstractString, bytes::AbstractVector{UInt8}, ext::AbstractString)
+    name = bytes2hex(sha1(bytes))[1:20] * ext
+    path = joinpath(dir, SHARED_DIR, name)
+    isfile(path) || (mkpath(dirname(path)); write(path, bytes))
+    return SHARED_DIR * "/" * name
+end
+
+const DATA_IMAGE_RE = r"data:image/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)"
+
+# A cell's HTML without the overlay script (the page loads it once) and with each inlined
+# picture written to `shared/` and named by its path there, relative to the player's page.
+function externalize_html(html::AbstractString, dir::AbstractString; overlay::AbstractString)
+    html = replace(html, overlay => "")
+    return replace(
+        html, DATA_IMAGE_RE => function (m)
+            mm = match(DATA_IMAGE_RE, m)
+            ext = mm.captures[1] == "jpeg" ? ".jpg" : "." * mm.captures[1]
+            return write_shared(dir, base64decode(mm.captures[2]), ext)
+        end
+    )
+end
+
+# Every string in a recorded state (a Pluto cell payload, a static player's cell HTML, a
+# remounted picture), with the overlay script and pictures moved out as in `externalize_html`.
+# Every string, not only HTML bodies, on purpose: Pluto tree leaves hold rich HTML too, and a
+# cell printing a `data:image` URL as text is not something the docs embeds do.
+externalize_strings(x::AbstractString, dir; overlay) = externalize_html(x, dir; overlay)
+externalize_strings(x::AbstractDict, dir; overlay) =
+    Dict{String, Any}(string(k) => externalize_strings(v, dir; overlay) for (k, v) in x)
+externalize_strings(x::AbstractVector, dir; overlay) = Any[externalize_strings(v, dir; overlay) for v in x]
+externalize_strings(x, dir; overlay) = x
+
+# The table a page ships: each state's cells become a file under `shared/`, fetched when the
+# reader reaches that state, and `snaps` lists those files.
+function externalize_table(table::AbstractDict, dir::AbstractString; overlay::AbstractString)
+    snaps = String[
+        write_shared(dir, Vector{UInt8}(json_write(jsonable(externalize_strings(s, dir; overlay)))), ".json")
+            for s in table["snaps"]
+    ]
+    return merge(table, Dict{String, Any}("snaps" => snaps))
 end
