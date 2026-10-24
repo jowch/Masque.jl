@@ -254,6 +254,15 @@ try {
   // A screenshot of a widget's figure, overlay included, as RGBA pixels. `perImg` is screenshot
   // px per image px; `mean(x, y, r)` averages the RGB inside radius r around image px (x, y).
   const screenOf = async (key) => {
+    // WGLMakie repaints a canvas scrolled into view on a later frame, so a screenshot taken
+    // straight after the scroll can catch it blank.
+    await page.evaluate(async (k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      host.scrollIntoView({ block: "center" });
+      for (let i = 0; i < 3; i++) await new Promise((r) => requestAnimationFrame(r));
+    }, key);
+    if (backend === "webgl") await new Promise((r) => setTimeout(r, 250));
     const box = await page.evaluate((k) => {
       const span = document.querySelector(`#coords_${k}`);
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
