@@ -315,6 +315,34 @@ end
     end
 end
 
+@testset "a state file that lands late never covers a newer value" begin
+    node = Sys.which("node")
+    if node === nothing
+        @test_skip "node not installed"
+    else
+        js = PLAYER_LOOKUP_JS * raw"""
+            const pending = {};
+            const load = (f) => new Promise((ok, fail) => { pending[f] = {ok, fail}; });
+            const log = [];
+            const show = latestOnly(load, (s) => log.push("apply " + s), (on) => log.push("miss " + on));
+            console.warn = () => {};
+            (async () => {
+              show("a.json"); show(null);          // A still loading, then a value never recorded
+              pending["a.json"].ok("A");
+              show("b.json"); show("c.json");      // B, then C before B lands
+              pending["c.json"].ok("C"); pending["b.json"].ok("B");
+              await new Promise((r) => setTimeout(r, 10));
+              show("d.json"); pending["d.json"].fail(new Error("404"));
+              await new Promise((r) => setTimeout(r, 10));
+              process.stdout.write(log.join(","));
+            })();
+            """
+        # A's cells never cover the miss, B's never cover C's, and a file that fails to load says so.
+        @test read(`$node -e $js`, String) ==
+            "miss false,miss true,miss false,miss false,apply C,miss false,miss true"
+    end
+end
+
 @testset "home quickstart is the 3-point Pluto export" begin
     path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_quickstart.jl")
     player = parse_player_toml(path)

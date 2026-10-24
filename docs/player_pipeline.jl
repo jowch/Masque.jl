@@ -213,6 +213,22 @@ function find(table, keys) {
   }
   return null;
 }
+// Shows each value's cells once its file loads, unless the reader reached a newer value first,
+// a miss included: a slow file never lands over a newer value's cells or its note.
+function latestOnly(load, apply, miss) {
+  let latest = 0;
+  return function (file) {
+    const n = ++latest;
+    miss(!file);
+    if (!file) return;
+    load(file).then(function (snap) {
+      if (n === latest) apply(snap);
+    }, function (e) {
+      console.warn("masque player: snapshot", e);
+      if (n === latest) miss(true);
+    });
+  };
+}
 // A reader who clicks one plot and then another changes two fields, a value the harvest never
 // recorded. Show the latest change on its own: the field that differs from the last value.
 function lookup(table, v) {
@@ -531,7 +547,9 @@ function snapshot_table(keyed; manifest = nothing)
             push!(snaps, snap)
             length(snaps) - 1
         end
-        keys[k] = i
+        # A value that keys the same as an earlier one (a control moved back to its start keys
+        # "null") would show that one's cells anyway: the first stays.
+        haskey(keys, k) || (keys[k] = i)
     end
     idle = sizeof(json_write(jsonable(first(snaps))))
     extra = sizeof(json_write(jsonable(snaps))) - idle + sizeof(json_write(keys))

@@ -341,22 +341,12 @@ const PLUTO_EXPORT_SIM_JS = raw"""
     }
     return loaded.get(file);
   }
-  let latest = 0;
+  const show = latestOnly(load, apply, showMiss);
   function patch(v) {
     if (!window.editor_state_set) return;
     const file = lookup(TABLE, v);
-    showMiss(!file);
-    if (!file) {
-      console.warn("masque player: no snapshot for", keyOf(TABLE, v));
-      return;
-    }
-    const n = ++latest;
-    load(file).then(function (snap) {
-      // A newer value got here first: its cells stay.
-      if (n === latest) apply(snap);
-    }, function (e) {
-      console.warn("masque player: snapshot", e);
-    });
+    if (!file) console.warn("masque player: no snapshot for", keyOf(TABLE, v));
+    show(file);
   }
   function apply(snap) {
     const t = nextStamp();
