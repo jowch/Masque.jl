@@ -2,10 +2,10 @@ import { axisPoint, findBin, hitTestAt, layerPoint, lineReadout, matrixLimits, r
 import { drawHover, renderSelection } from "./highlight"
 import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent, updateLinkForHit } from "./hover"
 import { hideCross } from "./cross"
-import { cellRange, elementPicks, legendEdit, linePointHit, linkedIndices, manyHits, pickKey, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
+import { cellRange, elementPicks, legendEdit, linePointHit, linkedIndices, manyHits, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
 import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
 import { hasRegions, regionCells, regionOf, setRegionsOf } from "./regions"
-import { clickRows, groupEnvelope, groupOf, groupSelection, rowOf, rowsOfMarks } from "./linked"
+import { clickRows, groupEnvelope, groupOf, groupSelection, legendEntryHeld, rowOf, rowsOfMarks } from "./linked"
 import type { GridMask, MaskEnvelope } from "./gridmask"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "./state"
@@ -486,7 +486,7 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     // Escape or a mark taken out never leave it stale.
     const own = !ctx.manifest_.fields || ctx.manifest_.fields.includes(field)
     const src = state.sel_.get(field)?.source_ ?? null
-    const off = next !== null && (own ? src !== null && src.index === hit.index && src.sample === sample : entryHeld(ctx, state, hit))
+    const off = next !== null && (own ? src !== null && src.index === hit.index && src.sample === sample : legendEntryHeld(ctx.manifest_, state.sel_, hit.layer, hit.index))
     const source = sample === undefined ? { layer: field, index: hit.index } : { layer: field, index: hit.index, sample }
     const linked = legendPicks(ctx, state, hit, next !== null && !off, toggle)
     if (next !== null) {
@@ -522,25 +522,6 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
 // gives each linked plot whose field holds several picks the entry's marks (Cmd/Ctrl, or an
 // entry whose own field holds several picks, adds them), and an entry it turns off takes them
 // out (`legendEdit`). Returns the fields it changed.
-// Whether the plots' fields hold every mark a legend entry names that its click would pick.
-function entryHeld(ctx: OverlayCtx, state: OverlayState, hit: Hit): boolean {
-    let any = false
-    for (const [layer, picked] of linkedIndices(ctx.manifest_, hit.layer, hit.index)) {
-        if (!layer.events.includes("click")) continue
-        const g = groupOf(ctx.manifest_, layer)
-        if (g) {
-            if (!g.many) continue
-            const held = new Set(state.sel_.get(g.id)?.rows_ ?? [])
-            for (const r of rowsOfMarks(g, layer, picked)) { any = true; if (!held.has(r)) return false }
-            continue
-        }
-        if (!layer.many || layer.brush) continue
-        const held = new Set((state.sel_.get(layer.id)?.items_ ?? []).map(pickKey))
-        for (const it of elementPicks(ctx.manifest_, layer, picked)) { any = true; if (!held.has(pickKey(it))) return false }
-    }
-    return any
-}
-
 function legendPicks(ctx: OverlayCtx, state: OverlayState, hit: Hit, on: boolean, toggle: boolean): Record<string, unknown> {
     const out: Record<string, unknown> = {}
     if (!hit.layer.links?.length) return out

@@ -2,6 +2,7 @@ import { isLightBackground, layerColor, parseRGB } from "./color"
 import { layoutSpaceLayer, polygonRings } from "./geometry"
 import type { AxisFrame } from "./geometry"
 import { isGapElement, layerNElements } from "./selection"
+import { legendEntryHeld } from "./linked"
 import type { FieldSelection } from "./state"
 import type { Hit, HitLayer, Manifest } from "./types"
 
@@ -72,11 +73,10 @@ export function selectionScope(manifest: Manifest, sel: Map<string, FieldSelecti
         for (const h of s.hits_) if (fadeLook(h)) out.add(h.layer)
     }
     // A legend outside the bind value holds no picks of its own, so its series fade together
-    // while any of them holds a pick, as a bound legend's pick fades them.
+    // while its plots hold every mark of one of its entries, as a bound legend's pick fades them.
     for (const legend of manifest.layers) {
         if (!legend.links?.length || !manifest.fields || manifest.fields.includes(legend.id)) continue
-        const series = legendLayers(manifest, legend)
-        if (series.some((l) => out.has(l))) for (const l of series) out.add(l)
+        if (legend.links.some((_, k) => legendEntryHeld(manifest, sel, legend, k))) for (const l of legendLayers(manifest, legend)) out.add(l)
     }
     return [...out]
 }

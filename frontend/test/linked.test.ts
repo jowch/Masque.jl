@@ -229,10 +229,14 @@ describe("linked selections (#346)", () => {
                 L("a", 300, ["click", "hover"], true), L("b", 600, ["hover"], false)],
             fields: ["a"], initial: { a: { items: [] } } }
         const { host, shadow, surface } = setup(m)
+        const fading = () => [...shadow.querySelectorAll(".masque-fade")].flatMap((w) => ((w as HTMLElement).dataset.layers ?? "").split(",").filter(Boolean)).sort()
+        // A mark's own pick fades its plot alone: no entry is held.
+        click(surface, 50, 150)
+        expect((host as unknown as { value: Record<string, unknown> }).value.a).toEqual({ items: [{ layer: "a", index: 0 }] })
+        expect(fading()).toEqual(["a"])
         click(surface, 250, 30)
         expect((host as unknown as { value: Record<string, unknown> }).value.a).toEqual({ items: [{ layer: "a", index: 0 }, { layer: "a", index: 1 }] })
-        const fading = [...shadow.querySelectorAll(".masque-fade")].flatMap((w) => ((w as HTMLElement).dataset.layers ?? "").split(",").filter(Boolean))
-        expect(fading.sort()).toEqual(["a", "b"])
+        expect(fading()).toEqual(["a", "b"])
     })
 
     it("undo puts the group's rows back", () => {
