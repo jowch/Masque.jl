@@ -81,8 +81,8 @@ const STYLE = `
    in place of the user-agent rectangle. Once the ring is up it is the indicator and the outline
    goes. An outline, not a box-shadow, so forced colours still paint it, in Highlight. A press
    focuses the surface from script (#380), which Chromium counts as :focus-visible, so a click
-   would draw the outline too; pointer-focus (set by bond.ts's onDown, cleared on a key or on
-   focusout) keeps it off until a key is pressed. */
+   would draw the outline too; pointer-focus (set by bond.ts's onDown, cleared on a key that is
+   not a Cmd/Ctrl chord, or on focusout) keeps it off until a key is pressed. */
 .surface:focus-visible:not(.kbd-ring) { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: -2px; }
 .surface.kbd-ring:focus-visible { outline: none; }
 .surface.pointer-focus:focus-visible { outline: none; }
@@ -1132,8 +1132,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     const click = (e: MouseEvent) => onClick(ctx, state, e)
     const keydown = (e: KeyboardEvent) => {
-        // A key, not a modifier held for Cmd/Ctrl-click, shows where keys go (pointer-focus).
-        if (!MODIFIER_KEYS.has(e.key)) surface.classList.remove("pointer-focus")
+        // A key shows where keys go (pointer-focus). Not a modifier held for Cmd/Ctrl-click, and
+        // not a Cmd/Ctrl chord: undo after a click (#386) or a browser shortcut is not
+        // keyboard navigation, so it leaves a mouse user's figure without the outline.
+        if (!MODIFIER_KEYS.has(e.key) && !e.ctrlKey && !e.metaKey) surface.classList.remove("pointer-focus")
         handleKeydown(ctx, state, e)
     }
     // DOM focus leaving the surface — Tab-away, a click landing elsewhere on the page, or the
