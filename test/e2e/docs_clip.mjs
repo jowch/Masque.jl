@@ -155,6 +155,48 @@ const CLIPS = {
       await c.settle(1800);
     },
   },
+  "threshold": {
+    notebook: "threshold_notebook.jl", nn: 13,
+    async run(c) {
+      // Drag the cutoff down until the background leaks in, up until cells drop out, then
+      // settle between the two.
+      const L = c.mf.layers.find((l) => l.id === "cutoff");
+      const t = c.mf.transforms[String(L.axis)];
+      const [vx, vy, vw, vh] = t.viewport;
+      const at = (v) => c.px(vx + ((v - t.xlims[0]) / (t.xlims[1] - t.xlims[0])) * vw, vy + vh * 0.45);
+      let from = 0.4;
+      for (const [to, ms] of [[0.27, 1600], [0.85, 2600], [0.5, 1800]]) {
+        await c.glide(at(from), 700);
+        await c.page.mouse.down();
+        await c.glide(at(to), ms, 50);
+        await c.page.mouse.up();
+        await c.settle(1300);
+        from = to;
+      }
+    },
+  },
+  "segmentation": {
+    notebook: "segmentation_notebook.jl", nn: 14,
+    async run(c) {
+      // Leave out the three objects that are cells stuck together, with one wrong click undone
+      // on the way. `spots` holds one pixel of each object (cell 5).
+      const at = (k) => c.gridCell("objects", ...c.mf.spots[k - 1]);
+      await c.glide(at(4), 900);
+      await sleep(800);
+      for (const k of [4, 5, 9]) {
+        if (k !== 4) await c.glide(at(k), 900);
+        await c.click(at(k));
+        await c.settle(1100);
+      }
+      await c.keycap("Ctrl Z");
+      await c.page.keyboard.press("Control+z");
+      await c.settle(1300);
+      await c.keycap(null);
+      await c.glide(at(6), 900);
+      await c.click(at(6));
+      await c.settle(1800);
+    },
+  },
   "classes": {
     notebook: "classes_notebook.jl", nn: 9,
     async run(c) {

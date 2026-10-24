@@ -88,7 +88,7 @@ begin
     fig2 = Figure(size = (640, 280))
     ax_img = Axis(fig2[1, 1]; aspect = DataAspect())
     heatmap!(ax_img, img; colormap = :grays)
-    maskplot = heatmap!(ax_img, img .> 0.5; colormap = [(:red, 0), (:red, 0.5)])
+    maskplot = heatmap!(ax_img, img .> 0.5; colormap = [(:red, 0), (:red, 0.5)], colorrange = (0, 1))
     ax_hist = Axis(fig2[1, 2]; xlabel = "value")
     hist!(ax_hist, vec(img))
     cutoff = ThresholdInteractable(ax_hist; orientation = :vertical, value = 0.5)

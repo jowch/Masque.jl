@@ -80,6 +80,8 @@ makedocs(;
         "Examples" => [
             "Examples" => "gallery.md",
             "Compare a cluster" => "gallery/cluster.md",
+            "Threshold a mask" => "gallery/threshold.md",
+            "Annotate a segmentation" => "gallery/segmentation.md",
             "From a heatmap cell to its trace" => "gallery/heatmap-trace.md",
             "Selection round-trip" => "gallery/selection.md",
             "Box-select scatter" => "gallery/boxselect.md",
