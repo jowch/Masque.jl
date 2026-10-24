@@ -18,12 +18,17 @@ end
 # ╔═╡ 60000000-0000-0000-0000-000000000001
 begin
     import Pkg
-    Pkg.activate(; temp = true)
-    # Add before developing: JSON3 caps Parsers at 2.x, and downgrading the Parsers that
-    # the develop resolved fails the precompile on a fresh depot ("Unknown package: Parsers").
-    Pkg.add(["WGLMakie", "JSON3"])
-    Pkg.develop(path = joinpath(@__DIR__, "..", ".."))
-    Pkg.instantiate()
+    dev = get(ENV, "MASQUE_DEV_ENV", "")   # CI and cloud: the shared, precompiled env
+    if !isempty(dev)
+        Pkg.activate(dev)
+    else
+        Pkg.activate(; temp = true)
+        # Add before developing: JSON3 caps Parsers at 2.x, and downgrading the Parsers that
+        # the develop resolved fails the precompile on a fresh depot ("Unknown package: Parsers").
+        Pkg.add(["WGLMakie", "JSON3"])
+        Pkg.develop(path = joinpath(@__DIR__, "..", ".."))
+        Pkg.instantiate()
+    end
     using Masque
     using WGLMakie
 end

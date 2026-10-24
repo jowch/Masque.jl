@@ -1,0 +1,31 @@
+name: Use the shared Julia env
+description: >
+  Set up the exact Julia build a setup job used and restore its precompiled depot and env
+  (./.github/actions/julia-env-build), then point MASQUE_DEV_ENV at it. Tests, notebooks and e2e
+  scripts all run against that env.
+inputs:
+  julia-version:
+    description: Exact Julia version from the setup job
+    required: true
+  key:
+    description: Cache key from the setup job
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: julia-actions/setup-julia@v2
+      with:
+        version: ${{ inputs.julia-version }}
+    - uses: actions/cache/restore@v4
+      with:
+        path: |
+          ~/.julia/artifacts
+          ~/.julia/compiled
+          ~/.julia/packages
+          ~/.julia/registries
+          ~/.julia/scratchspaces
+          ${{ runner.temp }}/masque-dev
+        key: ${{ inputs.key }}
+        fail-on-cache-miss: true
+    - shell: bash
+      run: echo "MASQUE_DEV_ENV=$RUNNER_TEMP/masque-dev" >> "$GITHUB_ENV"

@@ -22,10 +22,15 @@ end
 # registered release.
 begin
     import Pkg
-    Pkg.activate(; temp = true)
-    Pkg.develop(path = joinpath(@__DIR__, "..", ".."))   # test/notebooks/ -> package root
-    Pkg.add(["CairoMakie", "PlutoUI"])
-    Pkg.instantiate()
+    dev = get(ENV, "MASQUE_DEV_ENV", "")   # CI and cloud: the shared, precompiled env
+    if !isempty(dev)
+        Pkg.activate(dev)
+    else
+        Pkg.activate(; temp = true)
+        Pkg.develop(path = joinpath(@__DIR__, "..", ".."))   # test/notebooks/ -> package root
+        Pkg.add(["CairoMakie", "PlutoUI"])
+        Pkg.instantiate()
+    end
     using Masque
     using CairoMakie
     using PlutoUI

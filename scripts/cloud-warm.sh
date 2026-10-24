@@ -5,12 +5,12 @@
 #   scripts/cloud-warm.sh [julia] [julia-fetch] [frontend] [e2e]     (no args = julia)
 #
 #   julia     Shared dev env at $MASQUE_DEV_ENV: Masque (dev'd from this checkout)
-#             + every [deps]/[extras] package in Project.toml + Pluto 1, precompiled
+#             + every [deps]/[extras] package in Project.toml + Pluto 1 + PlutoUI, precompiled
 #             (~11 min cold, ~8.5 after the setup script's julia-fetch). One env serves both the
-#             unit tests (`julia --project="$MASQUE_DEV_ENV" test/runtests.jl`) and the kind-sweep
-#             notebooks, which read MASQUE_DEV_ENV. Unlike CI's kind-sweep step (CairoMakie,
-#             WGLMakie, JSON3 only), every dep is a direct dep here, because the test files
-#             `using` [extras] and indirect deps (Makie, FileIO, …) that `using` can't see.
+#             unit tests (`julia --project="$MASQUE_DEV_ENV" test/runtests.jl`) and the Pluto
+#             notebooks and e2e scripts, which read MASQUE_DEV_ENV. CI's setup jobs build the same
+#             env with this script. Every dep is a direct dep, because the test files `using`
+#             [extras] and indirect deps (Makie, FileIO, …) that `using` can't see.
 #   julia-fetch  The same env resolved and downloaded, not precompiled (~2.5 min). The cloud
 #             environment's setup script runs it, because the cloud snapshots the setup's
 #             files for later sessions only when the whole script ends within ~5 min, and
@@ -53,6 +53,8 @@ for target in "$@"; do
                 # Pluto pinned to the 1.x series test/e2e/serve.jl installs, so that server
                 # reuses this precompile cache whenever it resolves the same versions.
                 Pkg.add(Pkg.PackageSpec(name = "Pluto", version = "1"))
+                # The fixture notebook test/notebooks/view_manip.jl uses PlutoUI.
+                Pkg.add("PlutoUI")
                 ARGS[2] == "julia" && Pkg.precompile()
             ' "$REPO" "$target"
             echo "$target env ready: $DEV_ENV"

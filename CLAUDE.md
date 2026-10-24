@@ -10,8 +10,20 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
   JSON3, …) are `[extras]`, invisible to the package env — it only "works" when your default
   `@v1.x` env happens to stack them in. Keep the `:-` default: an unset variable would make it
   `--project=`, which silently means `@v1.x`. `scripts/cloud-warm.sh julia` builds that env.
-  CI runs `Pkg.test()`, which builds its own fresh env (~6 min precompile cold, may resolve
-  newer deps than `$MASQUE_DEV_ENV`) — use it to reproduce a CI-only failure, not day to day.
+  CI runs this same command against the same env: a `Setup` job per Julia version resolves it
+  fresh with `cloud-warm.sh julia-fetch`, precompiles it once (cached by manifest hash), and
+  every Julia, sweep and fixture job restores it (`.github/actions/julia-env*`). A CI-only
+  failure is usually a newer dep: rebuild your env with `rm -rf "$MASQUE_DEV_ENV"` first.
+  Notebooks and e2e scripts that CI runs activate `MASQUE_DEV_ENV` when it is set; a new one
+  must too, or it rebuilds the Makie stack in its own temp env. PRs touching only
+  `docs/src`, `docs/dev` or `*.md` skip the Julia jobs (the "Changed files" job).
+- **CI runs when a PR is ready.** A draft PR runs only the lint job; the Julia, sweep, fixture
+  and docs jobs run once it is marked ready for review. When a draft needs full CI anyway (say,
+  to show a reviewer a green run), add the `full-ci` label, then push or re-run CI from the
+  Checks tab; every push after that runs it. Adding a label never starts a run by itself.
+  Branch protection requires `CI result` (one job that fails if any CI job failed) and
+  `Release gate`, not the individual jobs: a skipped matrix job reports under an unexpanded
+  name, so requiring `Julia 1` would block docs-only PRs.
 - Upstream canary (`.github/workflows/UpstreamCanary.yml`, nightly + manual, advisory): runs
   `test/makie_compat_tests.jl` and `test/wgl_compat_tests.jl` against Makie master via
   `test/upstream/canary.jl` (usage at its top). A red run's annotation says whether resolution,
