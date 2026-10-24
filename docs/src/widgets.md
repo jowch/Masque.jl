@@ -7,12 +7,12 @@ of this page labels points into classes.
 
 ## Name each part
 
-Name each plot and each control in one named tuple. The example below
-has two plots:
+Name each plot and each control in one named tuple, and the names
+become the fields of the value. The example below has two plots:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-widgets-value" data-masque-embed="widgets_value" title="A scatter of samples and a bar chart of batches. Click a point and a bar, and the readout names both." style="width:100%;height:1180px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-widgets-value" data-masque-embed="widgets_value" title="A scatter of samples and a bar chart of batches. Click a point and a bar, and the readout names both." style="width:100%;height:780px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
