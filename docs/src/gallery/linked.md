@@ -1,14 +1,14 @@
 # Filter one plot from another
 
 Pick cars on one plot and see the same cars on another. In this clip,
-a box over the heaviest cars marks them on both panels, and the right
+a box over the heavy, thirsty cars marks them on both panels, and the right
 panel shows they are also the most powerful and the quickest. A
 Ctrl-click on the "Japan" legend entry adds every Japanese car, and
-Ctrl-Z takes them back out. The cell under the figure counts the cars
+Ctrl-Z (Cmd-Z on a Mac) takes them back out. The cell under the figure counts the cars
 picked and averages them.
 
 ```@raw html
-<video id="masque-linked-clip" title="Dragging a box over the heaviest cars on a weight and mpg scatter, which marks the same cars on a horsepower and acceleration scatter, then Ctrl-clicking a legend entry to add the Japanese cars and pressing Ctrl-Z to take them out, with CairoMakie"
+<video id="masque-linked-clip" title="Dragging a box over the heavy, thirsty cars on a weight and mpg scatter, which marks the same cars on a horsepower and acceleration scatter, then Ctrl-clicking a legend entry to add the Japanese cars and pressing Ctrl-Z to take them out, with CairoMakie"
        controls muted loop playsinline autoplay
        style="width:100%;max-width:720px;height:auto;border:0;background:transparent;"></video>
 <script>
