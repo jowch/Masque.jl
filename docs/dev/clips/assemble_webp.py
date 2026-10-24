@@ -2,10 +2,12 @@
 """Assemble a short docs loop (lossless animated WebP) from the frames + timestamps.json that a
 recorder such as test/e2e/docs_clip.mjs or home_feature_gifs.mjs writes.
 
-    python3 docs/dev/clips/assemble_webp.py <frames-dir> <out.webp> [--length-ms N]
+    python3 docs/dev/clips/assemble_webp.py <frames-dir> <out.webp> [--length-ms N] [--max-hold-ms N]
 
 Frames keep their captured pacing, or with --length-ms are rescaled onto a fixed length (the
-Home loops, whose live capture varies with machine load). Frames keep the recorder's 2x size.
+Home loops, whose live capture varies with machine load). --max-hold-ms shortens every still
+stretch to at most N ms (the README loop, which waits on Julia after each move). Frames keep
+the recorder's 2x size.
 
 This uses libwebp's animation encoder through Pillow, which stores only the part of each frame
 that changed. ffmpeg's libwebp encoder stores whole frames and makes files 20x larger.
@@ -20,6 +22,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("frames_dir")
 ap.add_argument("out")
 ap.add_argument("--length-ms", type=float, default=None)
+ap.add_argument("--max-hold-ms", type=int, default=None)
 args = ap.parse_args()
 
 ts = json.load(open(os.path.join(args.frames_dir, "timestamps.json")))
@@ -44,6 +47,10 @@ for f, d in zip(ts, durations):
         kept.append(f)
         kept_d.append(d)
         prev = data
+
+# Cap each still stretch, so a long wait for Julia doesn't stall a loop.
+if args.max_hold_ms:
+    kept_d = [min(d, args.max_hold_ms) for d in kept_d]
 
 first = load(kept[0])
 first.save(

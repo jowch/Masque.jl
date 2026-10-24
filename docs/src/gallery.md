@@ -16,7 +16,7 @@ A click or a box feeds the next step of an analysis.
   <span>Compare a cluster</span>
 </a>
 <a class="masque-gallery-card" data-page="heatmap-trace">
-  <img alt="A heatmap of daily temperature by station" src="assets/gallery/heatmap-trace.png">
+  <img alt="A heatmap of daily temperature by station, with one cell picked and its tooltip showing" src="assets/gallery/heatmap-trace.png">
   <span>From a heatmap cell to its trace</span>
 </a>
 <a class="masque-gallery-card" data-page="selection">
@@ -42,15 +42,15 @@ of plot.
 ```@raw html
 <div class="masque-gallery">
 <a class="masque-gallery-card" data-page="bars">
-  <img alt="Histogram, waterfall, crossbar, and bars with spans" src="assets/gallery/bars.png">
+  <img alt="Histogram, waterfall, crossbar, and bars with spans, with one histogram bar picked and its tooltip showing" src="assets/gallery/bars.png">
   <span>Bars and areas</span>
 </a>
 <a class="masque-gallery-card" data-page="polygons">
-  <img alt="Band, density, contour, violin, Voronoi, and box plots" src="assets/gallery/polygons.png">
+  <img alt="Band, density, contour, violin, Voronoi, and box plots, with one Voronoi cell picked" src="assets/gallery/polygons.png">
   <span>Polygons</span>
 </a>
 <a class="masque-gallery-card" data-page="text">
-  <img alt="Scatter points with Alpha, Beta, Gamma, a tilted label, and an annotation" src="assets/gallery/text.png">
+  <img alt="Scatter points with Alpha, Beta, Gamma, a tilted label, and an annotation, with Beta picked" src="assets/gallery/text.png">
   <span>Text labels</span>
 </a>
 </div>

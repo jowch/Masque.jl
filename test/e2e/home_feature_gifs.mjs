@@ -3,14 +3,14 @@
 //
 //   node home_feature_gifs.mjs http://localhost:8765 <scenario> <frames-dir>
 //
-// Scenarios: hover | click | legend
+// Scenarios: hover | legend
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const [base, scenario, framesDir] = process.argv.slice(2);
 if (!base || !scenario || !framesDir) {
-  console.error("usage: node home_feature_gifs.mjs <base-url> <hover|click|legend> <frames-dir>");
+  console.error("usage: node home_feature_gifs.mjs <base-url> <hover|legend> <frames-dir>");
   process.exit(2);
 }
 mkdirSync(framesDir, { recursive: true });
@@ -19,7 +19,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const SPECS = {
   hover: { path: "/embeds/home_hover_stars.html", showOut: false },
-  click: { path: "/embeds/getting_started.html", showOut: true },
   legend: { path: "/embeds/home_legend_classes.html", showOut: true },
 };
 
@@ -193,34 +192,6 @@ try {
       }
       await moveTo({ x: clip.x + 24, y: clip.y + 24 }, 400);
       await sleep(600);
-    } else if (scenario === "click") {
-      const layer = layers.find((l) => l.id === "cities");
-      const a = hitPoint(layer, 0);
-      const b = hitPoint(layer, 3);
-      const [ptA, ptB] = await Promise.all([toCss(a.x, a.y), toCss(b.x, b.y)]);
-      await sleep(350);
-      await moveTo(ptA, 400);
-      await sleep(150);
-      const t = await tip();
-      if (!t.show || !/tokyo/i.test(t.text)) throw new Error(`click hover: ${JSON.stringify(t)}`);
-      await sleep(600);
-      await moveTo(ptB, 450);
-      await sleep(150);
-      const before = await outText();
-      await page.mouse.down();
-      await sleep(40);
-      await page.mouse.up();
-      let after = before;
-      for (let i = 0; i < 40; i++) {
-        after = await outText();
-        if (after !== before && /são paulo|sao paulo/i.test(after)) break;
-        await sleep(80);
-      }
-      if (!/são paulo|sao paulo/i.test(after)) {
-        throw new Error(`click: readout did not update — before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
-      }
-      console.error(`OK  click: ${after}`);
-      await sleep(1100);
     } else if (scenario === "legend") {
       const legend = layers.find((l) => l.id === "legend");
       const a = hitPoint(legend, 0);
