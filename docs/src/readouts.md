@@ -34,7 +34,7 @@ or `pick.ycat`. On a numeric axis, that field is `nothing`.
 
 The example above shows only the tooltip, because this site does not
 record clicks on a position ([Examples on this site](@ref this-site)). In
-your notebook, a click sets `sel.axis`.
+your notebook, a click sets `pick`.
 
 On a `PolarAxis`, the readout is the angle and radius under the
 pointer, in the same order as your data: `pick.x` is the angle in
