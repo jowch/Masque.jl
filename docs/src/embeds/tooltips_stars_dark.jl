@@ -36,6 +36,10 @@ begin
         (name = "Spica", type = "B1V", teff = 22400, lum = 12100.0, dist = 250.0),
         (name = "Pollux", type = "K0III", teff = 4666, lum = 32.7, dist = 33.8),
     ]
+    spectral = Dict(
+        'B' => "#6baed6", 'A' => "#9ecae1", 'F' => "#e6c84f",
+        'G' => "#f2b134", 'K' => "#f08a3c", 'M' => "#d94801",
+    )
     info = [(; name = s.name, type = s.type, dist = s.dist) for s in stars]
     nothing
 end
@@ -49,7 +53,7 @@ function hr_diagram()
     )
     sc = scatter!(
         ax, [s.teff for s in stars], log10.([s.lum for s in stars]);
-        color = [s.teff for s in stars], colormap = :RdYlBu, markersize = 16,
+        color = [spectral[s.type[1]] for s in stars], markersize = 16,
     )
     return fig, sc
 end;

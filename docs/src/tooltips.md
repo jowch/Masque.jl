@@ -3,7 +3,7 @@
 Hover over a mark and a tooltip appears above it with the mark's data.
 For each interactable, you choose the default table, your own template,
 or no tooltip. The chart below plots twelve bright stars by temperature
-and brightness, and each star's tooltip gives its name in bold, its
+and luminosity, and each star's tooltip gives its name in bold, its
 type, and its distance:
 
 ```@raw html
@@ -24,7 +24,7 @@ chart:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-stars-data" data-masque-embed="tooltips_stars" data-masque-segment="data" title="The star catalogue and the function that draws the chart." style="width:100%;height:720px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-stars-data" data-masque-embed="tooltips_stars" data-masque-segment="data" title="The star catalogue and the function that draws the chart." style="width:100%;height:790px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -33,7 +33,8 @@ Main.masque_fallback("tooltips_stars"; segment = "data")
 ```
 
 Pass the payloads without `tooltip`, and the tooltip is a small table
-of their fields, followed by the star's `x` and `y`:
+of their fields, followed by the star's `x` and `y`
+([How Masque works](@ref) says how the two combine):
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -46,7 +47,7 @@ Main.masque_fallback("tooltips_stars_default")
 ```
 
 Without `payloads`, a scatter's tooltip shows the point's `index`, `x`,
-and `y` ([How Masque works](@ref) says how the two combine). On a categorical or
+and `y`. On a categorical or
 date axis, `x` and `y` in the tooltip and in the clicked mark's event
 are text: the
 category's label, such as `"b"`, or the date or time you plotted, such
@@ -92,7 +93,10 @@ A `$(field)` can only name a payload field, not an expression such as
 `$(dist / 3.26)`, so to show a computed value, put it in the payload:
 
 ```julia
-info = [(; name = s.name, parsecs = round(s.dist / 3.26; digits = 1)) for s in stars]
+info = [
+    (name = "Sirius", parsecs = round(8.6 / 3.26; digits = 1)),
+    (name = "Vega", parsecs = round(25.0 / 3.26; digits = 1)),
+]
 ```
 
 To turn tooltips off, pass `tooltip = false`. The hover highlight and
@@ -157,7 +161,7 @@ When Masque knows a mark's color, its tooltip gets a 3px border in that
 color. The color comes from:
 
 - `scatter!`'s `color=`, for the layer `masque` builds for a scatter,
-  as in both examples on this page, or when you pass the `Scatter`
+  as in every example on this page, or when you pass the `Scatter`
   itself to [`PointInteractable`](@ref)
 - the `colors=` keyword, when you pass positions instead of the plot
 - a legend entry's swatch
