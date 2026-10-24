@@ -236,7 +236,7 @@ const PLUTO_EXPORT_SEGMENT_JS = raw"""
 """
 
 # What a player says when the reader reaches a value the harvest didn't record.
-const NOT_COMPUTED = "This setting wasn't computed for the docs. Download the notebook to try it."
+const NOT_COMPUTED = "This wasn't computed for the docs. Download the notebook to try it."
 
 # The snapshot table, and the stand-in for the kernel's `onchange` channel. It runs in
 # `<head>`, before Pluto mounts the widget, which reads `window.masqueReplayFrame` once. Each
@@ -509,6 +509,9 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
     widget = masque_widget_cell(cells, bond)
     manifest = widget_manifest(widget)
     onchange = get(manifest, "onchange", false) === true
+    # With `bind =` the bond takes only the named fields, but each recorded row is a whole value.
+    onchange && haskey(manifest, "bind") && Set(string.(manifest["bind"])) != Set(string.(get(manifest, "fields", Any[]))) &&
+        error("$(basename(path)): a player can't record an `onchange` widget whose `bind =` names only some of its fields")
     stem = splitext(outpath)[1]
     frames_dir = stem * ".frames"
     rm(frames_dir; recursive = true, force = true)

@@ -6,7 +6,7 @@ be a player, so their page shows a clip of the live notebook instead:
 
 - the example redraws the figure in a way the player can't list ahead: picks that add up
   under `onchange`, a linked camera or pan. A player does replay `onchange` for every setting
-  of the widget's controls, and for each single click (`control_states`);
+  of the widget's controls (`control_states`) and for each single click (`discrete_states`);
 - it holds several picks at once (`select = :many`), and a player records one change at a
   time;
 - its brush has more distinct boxes than `BRUSH_STATES_MAX`.

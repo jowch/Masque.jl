@@ -549,6 +549,7 @@ function download_notebook(src::AbstractString)
         out = replace(out, Regex("# (╟─|╠═)$id\\n") => ""; count = 1)
     end
     occursin("PLUTO_PLAYER_TOML_CONTENTS", out) && error("download copy still has the player TOML")
+    occursin("PLUTO_MANIFEST_TOML_CONTENTS", out) && error("download copy still has the manifest")
     return out
 end
 
