@@ -119,6 +119,11 @@ applied in Float64 first; points widen to `Point3` so the same closure projects 
 The `AxisTransform` is the *same information* expressed declaratively, so JS can invert pixels→data
 for `AxisInteractable` and for live hover-coordinate readout (the drag/Tier-0 enabler).
 
+The manifest's transform for an axis also carries `fill`, the axis's own background colour, when
+it differs from the figure's `background` (`build_manifest` adds it whenever it is given a
+`background`, mount and gesture frames alike). It is not part of the Julia struct; the selected
+look fades unpicked marks toward it (see the checklist's visual language).
+
 **Axis kinds.** `context()` builds a transform for every `Axis` (`:ax1`, `:ax2`, … in `fig.content`
 order), `Axis3`, and `PolarAxis`. `Axis3` (`is3d`) carries a real
 viewport but placeholder lims, because a pixel on a 3D axis is a ray. The interactables that invert

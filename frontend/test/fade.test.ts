@@ -1,0 +1,224 @@
+// @vitest-environment happy-dom
+// The closed-mark selected look (fade.ts, #394): once a plot holds picks, its unpicked marks fade,
+// a pick an unpicked mark covers is repainted, and a lone pick is outlined. happy-dom has no 2D
+// canvas, so these read what the fade records on each axis's wrapper, not the pixels; the e2e
+// drivers check the pixels.
+import { afterEach, describe, it, expect, vi } from "vitest"
+import { mount } from "../src/overlay"
+import type { Manifest } from "../src/types"
+import { withFields } from "./fields"
+import { fadeKept, fadeLone } from "./fadekeys"
+import type { FadeEl } from "../src/fade"
+
+const cleanups: Array<() => void> = []
+afterEach(() => { while (cleanups.length) cleanups.pop()!() })
+
+function setup(manifest: Manifest, requestFrame?: Parameters<typeof mount>[3]) {
+    const host = document.createElement("div")
+    const img = document.createElement("img")
+    img.getBoundingClientRect = () =>
+        ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+    const script = document.createElement("script")
+    host.append(img, script)
+    document.body.append(host)
+    cleanups.push(mount(script, withFields(manifest), undefined, requestFrame).cleanup)
+    const shadowHost = host.lastElementChild as HTMLElement
+    const shadow = shadowHost.shadowRoot!
+    const surface = shadow.querySelector(".surface") as HTMLElement
+    const wrap = (axis = "ax1") => shadow.querySelector(`.masque-fade[data-axis="${axis}"]`) as HTMLElement | null
+    return { host, img, shadowHost, shadow, surface, wrap }
+}
+
+const move = (surface: HTMLElement, x: number, y: number) =>
+    surface.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, bubbles: true }))
+const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
+
+// image px; client px are half. 0 and 1 overlap (1 is drawn on top of 0); 2 and 3 stand apart.
+const pts = (initial: number[], extra: Partial<Manifest["layers"][number]> = {}): Manifest => ({
+    width: 1200, height: 800, scaling: 2, transforms: {},
+    layers: [
+        { id: "pts", kind: "circles", geometry: [200, 200, 20, 220, 200, 20, 600, 400, 20, 1000, 600, 20],
+            payloads: [{}, {}, {}, {}], axis: "ax1", events: ["click", "hover"], many: true, ...extra },
+        { id: "other", kind: "circles", geometry: [900, 100, 20], payloads: [{}], axis: "ax1", events: ["hover"] },
+    ],
+    fields: ["pts"],
+    initial: { pts: { items: initial.map((index) => ({ layer: "pts", index })) } },
+})
+
+describe("the fade (closed-mark selected look)", () => {
+    it("draws nothing until a plot holds picks", () => {
+        const { wrap } = setup(pts([]))
+        expect(wrap()).toBeNull()
+    })
+
+    it("fades only the plot that holds picks: another plot on the axis is untouched", () => {
+        const { wrap } = setup(pts([2]))
+        expect(wrap()!.dataset.layers).toBe("pts")
+        expect(wrap()!.dataset.kept).toBe("1")
+        expect(wrap()!.dataset.faded).toBe("3")
+    })
+
+    it("hides the canvases again when the last pick goes", () => {
+        const { surface, wrap } = setup(pts([2]))
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 200, bubbles: true })) // takes out pts 2
+        expect(wrap()!.style.display).toBe("none")
+        expect(wrap()!.dataset.kept).toBeUndefined()
+    })
+
+    it("outlines a pick only when no other pick is near it", () => {
+        const { shadow } = setup(pts([0, 1, 3]))
+        expect(fadeLone(shadow)).toEqual(["pts:3"])
+    })
+
+    it("outlines bars by the same rule: neighbours within one half-width are a crowd", () => {
+        const { shadow } = setup({
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{ id: "bars", kind: "rects", geometry: [100, 400, 40, 200, 150, 400, 40, 200, 400, 400, 40, 200],
+                payloads: [{}, {}, {}], axis: "ax1", events: ["click", "hover"], many: true }],
+            fields: ["bars"],
+            initial: { bars: { items: [0, 1, 2].map((index) => ({ layer: "bars", index })) } },
+        })
+        expect(fadeLone(shadow)).toEqual(["bars:2"]) // 0 and 1 are 10px apart; 2 stands alone
+    })
+
+    it("repaints a pick only when an unpicked mark drawn after it covers it, and only with a known colour", () => {
+        // 1 is drawn after 0 and overlaps it: picking 0 alone needs a repaint, picking 1 doesn't.
+        expect(setup(pts([0], { colors: "#ff0000" })).wrap()!.dataset.raised).toBe("1")
+        expect(setup(pts([1], { colors: "#ff0000" })).wrap()!.dataset.raised).toBe("0")
+        expect(setup(pts([0])).wrap()!.dataset.raised).toBe("0") // no colour: left as the image draws it
+        // `order` lists the top mark first: with 0 on top, picking 0 needs no repaint.
+        expect(setup(pts([0], { colors: "#ff0000", order: [0, 1, 2, 3] })).wrap()!.dataset.raised).toBe("0")
+    })
+
+    it("lifts the fade off a hovered unpicked mark, and puts it back when the pointer leaves", async () => {
+        const { surface, wrap } = setup(pts([2]))
+        move(surface, 500, 300) // pts 3, unpicked
+        expect(wrap()!.dataset.lift).toBe("pts:3")
+        await frame()
+        move(surface, 300, 200) // pts 2, a pick: nothing to lift
+        expect(wrap()!.dataset.lift).toBeUndefined()
+        await frame()
+        move(surface, 500, 300)
+        expect(wrap()!.dataset.lift).toBe("pts:3")
+        surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
+        expect(wrap()!.dataset.lift).toBeUndefined()
+    })
+
+    it("keeps a lift through a redraw while the mark stays hovered and unpicked", async () => {
+        const { surface, wrap, shadow, host } = setup(pts([2]))
+        move(surface, 500, 300)
+        expect(wrap()!.dataset.lift).toBe("pts:3")
+        // A restored value redraws the selection while the pointer stays put.
+        ;(host as unknown as { value: unknown }).value = { pts: { items: [{ layer: "pts", index: 0 }] } }
+        expect(fadeKept(shadow)).toEqual(["pts:0"])
+        expect(wrap()!.dataset.lift).toBe("pts:3")
+    })
+
+    it("sets the fade strength from the unpicked_opacity overlaystyle key", () => {
+        const { shadowHost } = setup({ ...pts([2]), overlayStyle: { "--masque-unpicked-opacity": "0.5" } })
+        expect(shadowHost.style.getPropertyValue("--masque-unpicked-opacity")).toBe("0.5")
+        const css = shadowHost.shadowRoot!.querySelector("style")!.textContent!
+        expect(css).toContain("opacity: calc(1 - var(--masque-unpicked-opacity, 0.2))")
+    })
+
+    it("keeps grid cells and lines on their SVG recipes", () => {
+        const { shadow, wrap } = setup({
+            width: 1200, height: 800, scaling: 2,
+            transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false } },
+            layers: [
+                { id: "g", kind: "grid", axis: "ax1", events: ["click", "hover"], payloads: [],
+                    geometry: { xedges: [0, 600, 1200], yedges: [0, 400, 800], ncols: 2, nrows: 2 } },
+                { id: "segs", kind: "segments", geometry: [100, 100, 400, 200], payloads: [{}], axis: "ax1", events: ["click", "hover"] },
+            ],
+            fields: ["g", "segs"],
+            initial: { g: { layer: "g", index: 0 }, segs: { layer: "segs", index: 0 } },
+        })
+        expect(wrap()).toBeNull()
+        expect(shadow.querySelectorAll("g.sel > *").length).toBe(3) // the cell's fill + edge, the segment's ring
+    })
+
+    it("fades toward the axis's own plot area colour when it has one, else the figure's", () => {
+        const m = pts([0])
+        m.background = "rgb(31,31,31)"
+        expect(setup(m).wrap()?.dataset.fill).toBe("rgb(31,31,31)")
+        const m2 = pts([0])
+        m2.background = "rgb(31,31,31)"
+        m2.transforms = { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false, fill: "rgb(51,51,51)" } }
+        expect(setup(m2).wrap()?.dataset.fill).toBe("rgb(51,51,51)")
+    })
+    it("clips the canvases to the axis at rest: a mark past the limits is not drawn", () => {
+        const m = pts([2])
+        m.transforms = { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+            viewport: [120, 80, 600, 400], xreversed: false, yreversed: false } }
+        expect(setup(m).wrap()!.style.clipPath).toBe("inset(10% 40% 40% 10%)")
+    })
+
+    it("keeps the plot area colour and the overlay colour through a pan frame", async () => {
+        const transforms = (fill?: string): Manifest["transforms"] => ({ ax1: { xlims: [0, 10], ylims: [0, 10],
+            xscale: "identity", yscale: "identity", viewport: [0, 0, 1200, 800], xreversed: false, yreversed: false,
+            ...(fill ? { fill } : {}) } })
+        const view = { id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { x: 0, y: 0, w: 1200, h: 800, mode: "pan" } } as Manifest["layers"][number]
+        const m = pts([2])
+        m.transforms = transforms("rgb(51,51,51)")
+        m.layers.push(view)
+        m.background = "rgb(31,31,31)"
+        m.overlayStyle = { "--masque-chrome": "#ff8800" }
+        // A frame's manifest: new geometry, the axis's own fill, no figure-level styles.
+        const next = pts([])
+        next.transforms = transforms("rgb(51,51,51)")
+        next.layers.push(view)
+        delete next.initial
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1]), manifest: withFields(next) }))
+        const { img, surface, wrap } = setup(m, requestFrame)
+        const ev = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -120, ctrlKey: true })
+        Object.defineProperty(ev, "clientX", { value: 300 })
+        Object.defineProperty(ev, "clientY", { value: 200 })
+        surface.dispatchEvent(ev)
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+        img.dispatchEvent(new Event("load"))
+        expect(requestFrame).toHaveBeenCalled()
+        expect(wrap()!.dataset.fill).toBe("rgb(51,51,51)")
+        expect((wrap() as FadeEl).masqueFade!.draws).toBeGreaterThan(1)
+        expect(next.background).toBe("rgb(31,31,31)")
+        expect(next.overlayStyle).toEqual({ "--masque-chrome": "#ff8800" })
+    })
+})
+
+describe("the lone pick's outline colour", () => {
+    // happy-dom has no 2D canvas: a stand-in context records nothing, so drawAxis runs its
+    // canvas path and records each outline's colour.
+    const realGetContext = HTMLCanvasElement.prototype.getContext
+    afterEach(() => { HTMLCanvasElement.prototype.getContext = realGetContext })
+    const stub = () => {
+        const noop = () => {}
+        HTMLCanvasElement.prototype.getContext = function () {
+            return new Proxy({ fillStyle: "#000000", strokeStyle: "#000000", lineWidth: 1, globalCompositeOperation: "source-over" }, {
+                get: (t, k) => (k in t ? (t as Record<string | symbol, unknown>)[k] : noop),
+            })
+        } as unknown as typeof realGetContext
+    }
+    const outlines = (shadow: ShadowRoot) =>
+        ([...shadow.querySelectorAll(".masque-fade")] as FadeEl[]).flatMap((w) => w.masqueFade?.outlines ?? [])
+
+    it("is the mark's own colour moved 45% toward black on a light plot area, toward white on a dark one", () => {
+        stub()
+        expect(outlines(setup(pts([3], { colors: "#3366cc" })).shadow)).toEqual(["rgb(28,56,112)"])
+        const dark = pts([3], { colors: "#3366cc" })
+        dark.background = "rgb(20,20,20)"
+        expect(outlines(setup(dark).shadow)).toEqual(["rgb(143,171,227)"])
+    })
+
+    it("is the layer's hoverstyle stroke, else the overlay colour, else the chrome grey with no mark colour", () => {
+        stub()
+        expect(outlines(setup(pts([3], { colors: "#3366cc", style: { stroke: "#00aa00", width: 1.5 } })).shadow)).toEqual(["#00aa00"])
+        const fig = pts([3], { colors: "#3366cc" })
+        fig.overlayStyle = { "--masque-chrome": "#ff8800" }
+        expect(outlines(setup(fig).shadow)).toEqual(["#ff8800"])
+        expect(outlines(setup(pts([3])).shadow)).toEqual(["#7a7a7a"])
+    })
+})

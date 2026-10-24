@@ -4,7 +4,7 @@
 // one visual language for "this element is what you're on" whether you got there by mouse or
 // keyboard — see hover.ts's restoreFocus for how the two stay in sync on a pointer miss.
 import { hitLayerByIndex, isGapElement, layerNElements } from "./selection"
-import { drawHover, clearHover, clearLink } from "./highlight"
+import { drawHover, clearHover, clearLegendLink } from "./highlight"
 import { showTipAt, hideTip, updateLinkForHit, layoutAnchor } from "./hover"
 import { abortMarquee, clearPicks, commitClick, isToggleClick } from "./bond"
 import { historyKey, stepPicks } from "./history"
@@ -79,7 +79,7 @@ export function focusTo(ctx: OverlayCtx, state: OverlayState, i: number | null):
         state.focusTipCss_ = null
         ctx.surface_.classList.remove("kbd-ring")
         clearHover(ctx, state, true)
-        clearLink(state, ctx.linkGroup_, true)
+        clearLegendLink(ctx, state, true)
         hideTip(ctx, state)
         scheduleAnnounce(ctx, state, "")
         return

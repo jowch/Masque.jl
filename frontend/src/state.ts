@@ -1,6 +1,7 @@
 import type { GridMask } from "./gridmask"
 import type { Anchor } from "./geometry"
 import type { CrossEls } from "./cross"
+import type { Fade } from "./fade"
 import type { GestureChannel } from "./gesture"
 import { IDENTITY, type PhotoMatrix } from "./photo"
 import type { AxisTransform, FocusRef, Hit, HitLayer, Limits3, Manifest, ThresholdGeometry, ViewGeometry } from "./types"
@@ -174,6 +175,8 @@ export interface OverlayCtx {
     hiFixed_: HiSet
     selFixed_: HiSet
     linkGroup_: HiSet // transient legend-linked highlights (g.link), z-ordered between sel and hi
+    // The closed-mark selected look (fade.ts): picks keep their colour, the rest of their plot fades.
+    fade_: Fade
     thresholdLines_: Map<string, SVGLineElement>
     roiBoxes_: Map<string, ROIBox>
     chrome_: SVGGElement // svg.masque-plain's group that slides with the photograph: ROI boxes, threshold lines, the marquee
@@ -207,6 +210,8 @@ export interface OverlayState {
     // Hover chrome still in g.hi, live or mid-leave. Null once those nodes are gone.
     // drawSelection reads it to drop a ring whose key just entered the selection (#97).
     hiKey_: string | null
+    // The selected hits g.sel draws. A closed mark's pick is drawn by fade.ts instead and is not
+    // here, so hovering it still draws the hover chrome.
     selKeys_: Set<string>
     // The selection, one entry per field (a layer id), drawn together. Seeded at mount from the
     // manifest's `initial` value. Written by two gestures, each REPLACING its own field's entry

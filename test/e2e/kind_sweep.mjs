@@ -219,6 +219,16 @@ try {
     reducedMotion: "no-preference",
   });
   page = await context.newPage();
+  // The fade's picks in a widget's shadow root (#394), every axis together; see fade.ts.
+  await page.addInitScript(() => {
+    window.fadeOf = (sr) => {
+      const out = { picked: [], kept: [], lone: [], outlines: [] };
+      for (const w of sr?.querySelectorAll(".masque-fade") ?? []) {
+        for (const k of Object.keys(out)) out[k].push(...(w.masqueFade?.[k] ?? []));
+      }
+      return out;
+    };
+  });
   page.on("pageerror", (e) => {
     const shim = SHIM_LEAK.test(e.message);
     const benign = shim && ALLOWED.some((re) => re.test(e.message));
@@ -387,7 +397,11 @@ try {
       svgEdge: { w: sbEdge.width, h: sbEdge.height, x: sbEdge.x, y: sbEdge.y },
       svgPlain: { w: sbPlain.width, h: sbPlain.height, x: sbPlain.x, y: sbPlain.y },
       kids,
-      sel: count("g.sel"),
+      // A pick on a closed kind is drawn by the fade (a canvas per axis), not in g.sel. It
+      // counts as the two shapes (fill and edge) a pick drawn in g.sel has, so a count below
+      // means the same for every kind; `picked`/`kept`/`lone` are the fade's own keys.
+      sel: count("g.sel") + 2 * fadeOf(sr).picked.length,
+      ...fadeOf(sr),
       hi: count("g.hi"),
       // The overlay's own bond value, read before any kernel round-trip.
       bondAll: host.value ?? null,
@@ -491,7 +505,8 @@ try {
       show: tip?.classList.contains("show"),
       text: (tip?.innerText || "").replace(/\s+/g, " ").trim(),
       hi: { fill: capture(svgFill, "fill"), edge: capture(svgEdge, "edge"), plain: capture(svgPlain, "plain") },
-      sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel"),
+      sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel") + 2 * fadeOf(sr).picked.length,
+      ...fadeOf(sr),
       cross: sr.querySelector(".masque-cross")?.classList.contains("is-on") ?? false,
     };
   }, [key, x, y, type, mod]);
@@ -1776,6 +1791,15 @@ try {
                 picks: c.querySelectorAll("g.sel > *").length,
               };
             });
+          // A closed mark's pick is on its axis's fade canvases (#394), moved and clipped with
+          // the same preview.
+          const fadeWraps = [...sr.querySelectorAll(".masque-fade[data-axis]")];
+          const fades = fadeWraps.map((w) => ({
+            axis: w.dataset.axis,
+            transform: w.querySelector("canvas")?.style.transform ?? "",
+            clip: w.style.clipPath,
+            picks: w.masqueFade?.picked.length ?? 0,
+          }));
           // #379: hover mid-preview finds a mark where its own axis draws it. A pick shows its
           // tooltip and draws no hover ring (hover-on-selected), any other mark draws one.
           const tip = () => {
@@ -1799,6 +1823,19 @@ try {
             const t = tip();
             midHover.push({ axis: c.dataset.axis, pick: true, hit: !!t && t.startsWith(pickTip), tip: t, live: !!host.dataset.masquePhoto });
           }
+          // A fade-drawn pick: its centre on the moved canvas, which covers the axis viewport
+          // from its own corner (left/top in percent of the image).
+          for (const w of fadeWraps) {
+            const cv = w.querySelector("canvas");
+            const at = w.masqueFade?.pickedAt ?? [];
+            if (!cv || !cv.style.transform || !at.length) continue;
+            const r = cv.getBoundingClientRect();
+            const ex = (parseFloat(cv.style.left) / 100) * vb.width, ey = (parseFloat(cv.style.top) / 100) * vb.height;
+            const [px, py] = at[0];
+            hoverAt(r.left + ((px - ex) * r.width) / cv.width, r.top + ((py - ey) * r.height) / cv.height);
+            const t = tip();
+            midHover.push({ axis: w.dataset.axis, pick: true, hit: !!t && t.startsWith(pickTip), tip: t, live: !!host.dataset.masquePhoto });
+          }
           for (const mk of marks) {
             hoverAt(b.left + mk.x * s, b.top + mk.y * s);
             const hit = !!sr.querySelector(`svg g.masque-clip[data-axis="${mk.axis}"] g.hi > *`);
@@ -1806,6 +1843,7 @@ try {
           }
           return {
             homes,
+            fades,
             midHover,
             ...engaged,
             prevented: ev.defaultPrevented,
@@ -1820,13 +1858,17 @@ try {
         }
         // #368: a pick on a linked axis keeps its ring through the preview, moved by that axis's
         // own matrix and clipped to that axis's window, not the pan axis's.
+        // A fade-drawn pick: its axis's canvases take the same scale as that axis's svg home.
+        const scaleOf = (t) => Number(/scale\(([-\d.e]+)/.exec(t ?? "")?.[1]);
         for (const l of links) {
           const home = zoom.homes.find((h) => h.axis === l.axis);
           // The page shows the clip as Float32 in its shortest form (515.90247); the overlay
           // holds the full value (515.9024658…).
           const sameClip = home?.clip && home.clip.every((v, i) => Math.abs(v - l.clip[i]) < 1e-3);
-          if (!home || !home.transform || !sameClip || home.picks < 1) {
-            throw new Error(`${key}-wheel: linked axis ${l.axis}'s ring is not on its own matrix and window ${JSON.stringify(l.clip)}: ${JSON.stringify(zoom.homes)}`);
+          const fade = zoom.fades.find((f) => f.axis === l.axis);
+          const fadeOk = fade && fade.picks >= 1 && fade.clip && Math.abs(scaleOf(fade.transform) - scaleOf(home?.transform)) < 1e-3;
+          if (!home || !home.transform || !sameClip || (home.picks < 1 && !fadeOk)) {
+            throw new Error(`${key}-wheel: linked axis ${l.axis}'s ring is not on its own matrix and window ${JSON.stringify(l.clip)}: ${JSON.stringify({ homes: zoom.homes, fades: zoom.fades })}`);
           }
         }
         // #379: every mid-preview hover above ran while the matrix was still live, on each
@@ -2322,7 +2364,27 @@ try {
       continue;
     }
 
-    if (spec.selected === "wash") {
+    // A closed data mark's pick is drawn by the fade (#394): the rest of its plot fades, the
+    // pick keeps its own pixels. Layout-space marks still take the wash in g.sel.
+    const selFaded = spec.selected === "wash" && m.picked.includes(`${layer.id}:${spec.selectedIndex}`);
+    if (selFaded) {
+      if (m.kids.some((k) => k.kind === "closed")) {
+        throw new Error(`${key}: the fade's pick is also washed in g.sel ${JSON.stringify(m.kids)}`);
+      }
+      // An unpicked mark of a one-colour layer (`colors` a single colour) now reads fainter: its
+      // pixels moved toward the plot area's colour from the colour it is drawn in.
+      const rawLum = rawColorLuminance(layer.colors);
+      if (TINT_CHECK_KEYS.has(key) && rawLum !== null) {
+        const cp = hitPoint(layer, spec.clickIndex);
+        const lum = meanLuminance(PNG.sync.read(await stableClipShot(key, cp.x, cp.y)));
+        const toward = wantDark ? rawLum - lum : lum - rawLum;
+        if (toward < 15) {
+          throw new Error(`${key}/unpicked-faded: unpicked mark luminance ${lum.toFixed(1)} vs its colour ${rawLum.toFixed(1)}, want it ≥15 closer to the ${wantDark ? "dark" : "light"} plot area`);
+        }
+        passed.push(`${key}/unpicked-faded`);
+      }
+      passed.push(`${key}/selected-fade`);
+    } else if (spec.selected === "wash") {
       const wash = {
         fill: m.kids.find((k) => k.layer === "fill" && k.kind === "closed"),
         edge: m.kids.find((k) => k.layer === "edge" && k.kind === "closed"),
@@ -2440,7 +2502,9 @@ try {
     // where `selected` is null, `selectedIndex` is already clean).
     const doTintCheck = TINT_CHECK_KEYS.has(key);
     if (doTintCheck) {
-      const tintIndex = spec.tintIndex ?? (spec.selected ? spec.clickIndex : spec.selectedIndex);
+      // A faded unpicked mark is not drawn in its own colour, so a fade-drawn spec tints its pick,
+      // which keeps its pixels and takes the hover recipe like any other mark.
+      const tintIndex = spec.tintIndex ?? (selFaded ? spec.selectedIndex : spec.selected ? spec.clickIndex : spec.selectedIndex);
       const tintPt = hitPoint(layer, tintIndex);
       const expectColor = expectedColorFor(layer.colors, spec.tintColor);
       const expectLum = rawColorLuminance(expectColor);
@@ -2497,7 +2561,8 @@ try {
     // is what exercises the hover stroke.
     const closedHover = layer.kind !== "polyline" && layer.kind !== "segments" && layer.kind !== "lines";
     // A picked point is not its line: hovering the line still outlines it.
-    const hoverIsSelected = !!(spec.selected && spec.selected !== "point" && hoverIndex === spec.selectedIndex);
+    // A fade-drawn pick has no selected stroke, so hovering it draws the hover recipe.
+    const hoverIsSelected = !!(spec.selected && spec.selected !== "point" && !selFaded && hoverIndex === spec.selectedIndex);
     if (hoverIsSelected) {
       assertNoHighlight(tip.hi, `${key}/hover-on-selected`);
       if (tip.sel < 1) throw new Error(`${key}: g.sel gone while hovering the selected mark`);
@@ -2679,14 +2744,18 @@ try {
         const kids = [...kFill, ...kEdge, ...kPlain];
         // Element count: a closed target draws fill+edge PAIRS (count once via fill), an open
         // target draws a single plain ring per element — same convention as layerElementCount.
-        const count = kFill.filter((x) => x.kind === "closed").length + kPlain.filter((x) => x.kind === "ring").length;
+        // A closed series beside another closed series is previewed by the fade (#394), not in
+        // g.link: its marks kept beyond the picks count one each.
+        const f = fadeOf(sr);
+        const count = kFill.filter((x) => x.kind === "closed").length + kPlain.filter((x) => x.kind === "ring").length
+          + f.kept.length - f.picked.length;
         const sel = [svgFill, svgEdge, svgPlain]
-          .reduce((n, svg) => n + (svg?.querySelectorAll("g.masque-photo > g.sel > *").length ?? 0), 0);
+          .reduce((n, svg) => n + (svg?.querySelectorAll("g.masque-photo > g.sel > *").length ?? 0), 0) + 2 * f.picked.length;
         const firstPopulated = [svgFill, svgEdge, svgPlain]
           .flatMap((svg) => [...(svg?.querySelectorAll("g.masque-photo > g.link") ?? [])])
           .find((g) => g.children.length > 0);
         const leaving = firstPopulated ? firstPopulated.firstElementChild.classList.contains("masque-leave") : null;
-        return { count, kids, sel, leaving };
+        return { count, kids, sel, leaving, kept: f.kept };
       }, k);
 
       for (const c of spec.links.cases) {
@@ -2764,10 +2833,8 @@ try {
             const ln = ringKid?.lines?.[0];
             return !!ln && Math.abs(Number(ln.x1) - hp0.x1) <= 1.2 && Math.abs(Number(ln.y1) - hp0.y1) <= 1.2;
           }
-          if (tl0.kind === "circles") {
-            const circleKid = li.kids.find((kk) => kk.kind === "closed" && (kk.layer === "fill" || kk.layer === "edge"));
-            return !!circleKid && Math.abs(Number(circleKid.cx) - hp0.x) <= 0.6 && Math.abs(Number(circleKid.cy) - hp0.y) <= 0.6;
-          }
+          // A closed target is previewed by the fade (#394), kept.
+          if (tl0.kind === "circles") return li.kept.includes(`${tl0.id}:${idx0}`);
           return false;
         };
         await page.evaluate((k) => {
@@ -2814,22 +2881,15 @@ try {
         if (li.sel !== afterLeave.sel) throw new Error(`${key}/links[${c.index}]: g.sel changed during legend hover (${li.sel})`);
 
         if (tl0.kind === "circles") {
-          const wash = {
-            fill: li.kids.find((kk) => kk.layer === "fill" && kk.kind === "closed"),
-            edge: li.kids.find((kk) => kk.layer === "edge" && kk.kind === "closed"),
-            plain: li.kids.find((kk) => kk.layer === "plain" && kk.kind === "closed"),
-          };
-          assertWash(wash, `${key}/links[${c.index}]/wash`, wantDark);
-          const circleKid = wash.fill || wash.edge;
-          if (!circleKid) throw new Error(`${key}/links[${c.index}]: no circle in g.link`);
-          if (Math.abs(Number(circleKid.cx) - hp0.x) > 0.6 || Math.abs(Number(circleKid.cy) - hp0.y) > 0.6) {
-            throw new Error(`${key}/links[${c.index}]: link circle off-mark ${JSON.stringify(circleKid)} vs ${JSON.stringify(hp0)}`);
-          }
-          assertCircleR(circleKid.r, hp0.r, `${key}/links[${c.index}]/circle-r`);
-          await new Promise((r) => setTimeout(r, 200)); // let the 80-120ms enter fade settle
+          // The legend's only closed series ("pts") fades nothing, as a click on it would
+          // (#394): no wash in g.link, and the mark keeps its own pixels.
+          if (li.kids.some((kk) => kk.kind === "closed")) throw new Error(`${key}/links[${c.index}]: a closed series drew in g.link ${JSON.stringify(li.kids)}`);
+          await new Promise((r) => setTimeout(r, 200));
           const lumAfter = meanLuminance(PNG.sync.read(await stableClipShot(key, hp0.x, hp0.y)));
-          assertTintApplied(lumBefore, lumAfter, `${key}/links[${c.index}]/tint-applied`);
-          passed.push(`${key}/links[${c.index}]/tint-applied`);
+          if (Math.abs(lumAfter - lumBefore) > 8) {
+            throw new Error(`${key}/links[${c.index}]/kept: the mark's luminance moved ${lumBefore.toFixed(1)} -> ${lumAfter.toFixed(1)} on a preview that fades nothing`);
+          }
+          passed.push(`${key}/links[${c.index}]/kept`);
         } else if (tl0.kind === "polyline" || tl0.kind === "segments") {
           const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
           if (!ringKid) throw new Error(`${key}/links[${c.index}]: no ring in g.link`);
@@ -2851,6 +2911,9 @@ try {
       // contract as g.hi. #99 round 2: reads the durable log (group: "link") the same way the
       // g.hi remount-fade check above does, via the shared assertLeaveFade(entries, where,
       // group) — see transient_log.mjs / visual_assert.mjs.
+      // A closed series previewed by the fade leaves g.link empty (#394): then only the
+      // preview's end is checked.
+      const linkHeld = (await linkInspect(key)).kids.length > 0;
       const linkFadeCursor = await logCursor(page, key);
       await page.evaluate((k) => {
         const span = document.querySelector(`#coords_${k}`);
@@ -2859,10 +2922,12 @@ try {
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
       }, key);
-      const linkFadeEntries = await pollLog(page, key, linkFadeCursor, (es) => (
-        es.some((e) => e.group === "link" && e.type === "remove") || es.some((e) => e.type === "hostRemount")
-      ));
-      assertLeaveFade(linkFadeEntries, `${key}/links`, "link");
+      if (linkHeld) {
+        const linkFadeEntries = await pollLog(page, key, linkFadeCursor, (es) => (
+          es.some((e) => e.group === "link" && e.type === "remove") || es.some((e) => e.type === "hostRemount")
+        ));
+        assertLeaveFade(linkFadeEntries, `${key}/links`, "link");
+      }
       let afterLinkLeave = await linkInspect(key);
       for (let a = 0; a < 8 && afterLinkLeave.count !== 0; a++) {
         await new Promise((r) => setTimeout(r, 25));
@@ -3056,9 +3121,11 @@ try {
       // exactly the clicked hit's own recipe (2 shapes — fill+edge — for a closed kind, 1 ring
       // for an open one), independent of whatever `selected=` hydration was there before — a
       // spec that bakes a `selected=` index no longer "grows" g.sel on click, it's simply reset.
-      // A picked point keeps its line's hover outline under the pointer; any other pick is
-      // the hovered mark itself, which draws no hover chrome once selected.
-      const wantHi = clickSample === null ? 0 : 1;
+      // A picked point keeps its line's hover outline under the pointer; a closed mark's pick
+      // is drawn by the fade and keeps its hover fill and edge (#394); any other pick is the
+      // hovered mark itself, which draws no hover chrome once selected.
+      const fadePick = echo.picked.includes(`${layer.id}:${clickIdx}`);
+      const wantHi = fadePick ? 2 : clickSample === null ? 0 : 1;
       if (echo.hi !== wantHi) throw new Error(`${key}/click-echo: g.hi=${echo.hi} over the echo, expected ${wantHi}`);
       const expectSel = closedHover ? 2 : 1;
       if (echo.sel !== expectSel) {
@@ -3244,11 +3311,9 @@ try {
     }
   }
 
-  // Hover-on-selected is a no-op: hovering scatter's CURRENTLY-selected element must draw NO
-  // highlight at all (fill and edge both empty) — the mark keeps its opaque selected wash
-  // instead, since a 1.5px hover stroke over the 2px selected stroke would read as *weaker*, not
-  // stronger. The tooltip and `@bind` still work for that hit; only the highlight is skipped.
-  // Under the hydration model, scatter's earlier click-echo (above) REPLACED its baked
+  // Hover on a pick (#394): scatter's CURRENTLY-selected element is drawn by the fade (its own
+  // pixels, the rest of the plot faded), with no selected stroke, so hovering it draws the
+  // usual hover recipe, and the pick stays held. Under the hydration model, scatter's earlier click-echo (above) REPLACED its baked
   // `selected=` (spec.selectedIndex, "beta") with the clicked index — so this must target
   // `scatterClickIdx`, the element that IS selected now, not the no-longer-selected bake.
   {
@@ -3267,7 +3332,7 @@ try {
       : idx === spec.selectedIndex ? spec.tip
       : null;
     if (expectTip == null) {
-      throw new Error(`scatter/hover-on-selected: clickIndex collided and landed on index ${idx} — no known tooltip text to assert`);
+      throw new Error(`scatter/hover-on-pick: clickIndex collided and landed on index ${idx} — no known tooltip text to assert`);
     }
     const tipOk = (t) => !!(t && t.show && new RegExp(expectTip, "i").test(t.text));
     const selPt = hitPoint(layer, idx);
@@ -3277,10 +3342,10 @@ try {
       if (tipOk(noop)) break;
       await new Promise((r) => setTimeout(r, 200));
     }
-    if (!tipOk(noop)) throw new Error(`scatter/hover-on-selected: tooltip ${JSON.stringify(noop)}`);
-    assertNoHighlight(noop.hi, "scatter/hover-on-selected");
-    if (noop.sel < 1) throw new Error("scatter/hover-on-selected: g.sel missing while hovering the selected mark");
-    passed.push("scatter/hover-on-selected-noop");
+    if (!tipOk(noop)) throw new Error(`scatter/hover-on-pick: tooltip ${JSON.stringify(noop)}`);
+    assertHoverRecipe(noop.hi, "scatter/hover-on-pick", true, false);
+    if (noop.sel < 1) throw new Error("scatter/hover-on-pick: the pick dropped while hovering it");
+    passed.push("scatter/hover-on-pick");
     await page.evaluate(() => {
       const span = document.querySelector("#coords_scatter");
       const hosts = [...document.querySelectorAll(".ip-host")];

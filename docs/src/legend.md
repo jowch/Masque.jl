@@ -1,7 +1,8 @@
 # Legend
 
-Hover a legend entry to highlight the lines or points it labels, and
-click it to send that series to your notebook. `masque(fig)` makes every
+Hover a legend entry to pick out the lines or points it labels (the
+legend's other series fade), and click it to send that series to your
+notebook. `masque(fig)` makes every
 `Legend` and `axislegend` interactive and links each entry to the plots
 it describes.
 
@@ -17,7 +18,7 @@ Main.masque_fallback("legend_lines")
 
 ## What a click returns
 
-Clicking an entry keeps its series highlighted and sets the legend's
+Clicking an entry keeps its series picked out and sets the legend's
 field, `sel.legend`, to a [`LegendEvent`](@ref). The examples on this
 page pass `bind = :legend`, so the value, `pick`, is the event itself:
 
