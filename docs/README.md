@@ -30,6 +30,11 @@ says it wasn't computed. Every player links a copy of its notebook, `embeds/down
 without the player TOML and the manifest that points Masque at this checkout.
 `docs/src/controls.md` is the example.
 
+A Pluto-export player carries none of its overlay script, pictures or recorded cells. Harvest
+writes each to `embeds/shared/`, named by its content, so a file two players or two states
+share is one download the browser caches across pages. The page loads the overlay script from
+`<head>` and fetches a state's cells the first time the reader reaches it.
+
 Each Pluto-export player is followed by its text twin: a `details` block built from the same
 notebook by an `@eval Main.masque_fallback("<name>")` cell (`docs/player_fallback.jl`), so
 search indexes the tutorial code and a reader still gets it when Pluto's frontend cannot load

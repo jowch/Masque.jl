@@ -8,7 +8,8 @@
 // opens with the notebook's code, and the search index carries that code. The Brush a
 // region page shows one notebook in two segments, which must share its value. On the Sliders
 // and toggles page, the slider and the toggle redraw the figure from harvested `onchange`
-// frames, and the notebook downloads. The Backends
+// frames, and the notebook downloads. Players load the overlay script, pictures and state
+// tables from shared files. The Backends
 // page's two `@example` widgets, shown without Pluto, must hover to a tooltip, mount when
 // their script runs from `<head>`, and show their figure with scripts off.
 //
@@ -33,6 +34,7 @@ const MIME = {
   ".js": "application/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".json": "application/json",
   ".woff2": "font/woff2",
   ".woff": "font/woff",
 };
@@ -250,6 +252,8 @@ try {
   const page = await context.newPage();
   page.on("console", (msg) => consoleLog.push(`${msg.type()}: ${msg.text()}`));
   page.on("pageerror", (err) => consoleLog.push(`pageerror: ${err.message}`));
+  const sharedFetched = [];
+  page.on("request", (req) => { if (req.url().includes("/embeds/shared/")) sharedFetched.push(req.url()); });
   page.on("requestfailed", (req) => {
     const u = req.url();
     if (!u.includes("jsdelivr") && !u.includes("frontend-dist")) return;
@@ -312,6 +316,22 @@ try {
     if (!text.includes(want)) {
       throw new Error(`listed click (aimed ${i}, hit ${got.index}) did not swap the readout; got ${JSON.stringify(text)}`);
     }
+  }
+
+  // The player carries none of its overlay script, pictures or state tables: it loads them from
+  // `embeds/shared/`, each state's cells when the reader reaches it.
+  const shipped = await frame.evaluate(() => ({
+    overlay: [...document.querySelectorAll("head script[src]")].some((s) => /^shared\/[0-9a-f]{20}\.js$/.test(s.getAttribute("src"))),
+    img: document.querySelector(".ip-host img")?.getAttribute("src") || "",
+    inlineScript: Math.max(0, ...[...document.querySelectorAll("pluto-output script")].map((s) => s.textContent.length)),
+    snaps: window.masquePlayer.table.snaps,
+  }));
+  const isShared = (f, ext) => new RegExp(`^shared/[0-9a-f]{20}\\.${ext}$`).test(f);
+  if (!shipped.overlay || !isShared(shipped.img, "png") || shipped.inlineScript > 20000 || !shipped.snaps.every((f) => isShared(f, "json"))) {
+    throw new Error(`the quick start still inlines its assets: ${JSON.stringify({ ...shipped, snaps: shipped.snaps.slice(0, 3) })}`);
+  }
+  if (!sharedFetched.some((u) => /\/embeds\/shared\/[0-9a-f]{20}\.json$/.test(u))) {
+    throw new Error("the quick start's clicks fetched no state file");
   }
 
   const twinClosed = await page.evaluate(() => {
