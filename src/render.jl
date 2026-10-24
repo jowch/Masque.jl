@@ -364,6 +364,14 @@ function _parse_link_spec(tid_str, by_id)
     haskey(by_id, base) || return nothing
     return (base, parse(Int, m.captures[2]))
 end
+# Whether a link spec (`"id"` or `"id:k"`) names a plot whose picks a legend click edits.
+function _link_reaches_pick(spec, by_id)
+    m = match(r"^(.*):\d+$", spec)
+    id = Symbol(m === nothing || haskey(by_id, Symbol(spec)) ? spec : m.captures[1])
+    haskey(by_id, id) || return false
+    d = by_id[id][2]
+    return haskey(d, "group") || get(d, "many", false) === true
+end
 function _validate_links(layer_owners, layers)
     by_id = Dict(l["id"] => l for l in layers)
     kinds = Dict(l["id"] => Symbol(l["kind"]) for l in layers)
@@ -504,6 +512,7 @@ function build_manifest(
     # A layer outside the bind value takes no clicks, and keeps hover (its tooltip). A box's
     # target takes none either: the box chooses its elements. A linked plot's clicks edit its
     # group's field.
+    clicks = Dict(L.id => "click" in d["events"] for (_, L, d) in built)
     for (i, L, d) in built
         haskey(d, "group") && continue
         L.id in fields && roles[L.id] === :pick || filter!(!=("click"), d["events"])
@@ -513,6 +522,13 @@ function build_manifest(
         # A `select = :many` field holds a vector of picks, `{items: [...]}` on the wire, or on a
         # grid a cell mask, `{runs}` or `{bits}`.
         roles[L.id] === :pick && "click" in d["events"] && select_mode(i) === :many && (d["many"] = true)
+    end
+    # A legend's click picks its entry's marks, so a legend outside the bind value keeps it
+    # while a link reaches a plot whose picks are bound: a `select = :many` plot or a linked
+    # group's plot.
+    for (_, L, d) in built
+        haskey(d, "links") && clicks[L.id] && !("click" in d["events"]) || continue
+        any(ids -> any(s -> _link_reaches_pick(s, by_id), ids), d["links"]) && push!(d["events"], "click")
     end
     # With `onchange`, hiding a plot is how a figure shows it only sometimes: a hidden plot
     # takes no hover and no clicks, and keeps its field, with nothing to pick.

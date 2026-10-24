@@ -1432,11 +1432,26 @@ try {
         if (!leg) throw new Error(`${key}: no legend layer`);
         await hoverPartners("hover-outlines-keyed-partner", "A", 1, { circles: [["every", 2]] });
         await leave("leave-clears-partners", 1, 1);
+        // The case binds only `cells`, so the legend sits outside the bind value and keeps its click.
+        if (!leg.events.includes("click")) throw new Error(`${key}: the legend takes no click under bind = :cells`);
+        passed.push(`${key}/legend-keeps-click-under-bind`);
         await step("click-picks-cell", click("A", 0), [0], ["A:0", "every:3"]);
+        // B holds none of the picks and still fades: every plot of the group fades.
+        const fading = await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          return [...sr.querySelectorAll(".masque-fade")].flatMap((w) => (w.dataset.layers ? w.dataset.layers.split(",") : []));
+        }, key);
+        if (!fading.includes("B")) throw new Error(`${key}: fading ${JSON.stringify(fading)} leaves out B, a member with no picks`);
+        passed.push(`${key}/unpicked-member-fades`);
         await step("click-other-panel-adds", click("every", 0), [0, 3], ["A:0", "every:3", "B:1", "every:0"]);
         const entry = (j) => () => { const p = hitPoint(leg, j); return dispatchAt(key, p.x, p.y, "click"); };
         const ia = leg.links.findIndex((ls) => ls.includes("A"));
         await step("legend-picks-cluster", entry(ia), [0, 1], ["A:0", "A:1", "every:3", "every:2"]);
+        // The legend sits outside the bind value: after an undo, the same entry picks again.
+        await step("undo-legend-pick", () => page.keyboard.press("ControlOrMeta+z"), [0, 3], ["A:0", "every:3", "B:1", "every:0"]);
+        await step("legend-picks-after-undo", entry(ia), [0, 1], ["A:0", "A:1", "every:3", "every:2"]);
         await step("legend-again-takes-out", entry(ia), [], []);
         await step("click-picks-again", click("B", 0), [2], ["B:0", "every:1"]);
         await step("ctrl-legend-adds", () => { const p = hitPoint(leg, ia); return dispatchAt(key, p.x, p.y, "click", { ctrlKey: true }); }, [2, 0, 1],

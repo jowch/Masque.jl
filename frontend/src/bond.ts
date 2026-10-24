@@ -5,7 +5,7 @@ import { hideCross } from "./cross"
 import { cellRange, elementPicks, legendEdit, linePointHit, linkedIndices, manyHits, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
 import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
 import { hasRegions, regionCells, regionOf, setRegionsOf } from "./regions"
-import { clickRows, groupEnvelope, groupOf, groupSelection, rowOf, rowsOfMarks } from "./linked"
+import { clickRows, groupEnvelope, groupOf, groupSelection, legendEntryHeld, rowOf, rowsOfMarks } from "./linked"
 import type { GridMask, MaskEnvelope } from "./gridmask"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "./state"
@@ -481,12 +481,16 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     // A second click on the element that made the field's pick takes it back: the highlight
     // clears and the field returns to `null`, its value before any click. Other fields keep theirs.
     const field = hit.layer.id
+    // A legend outside the bind value keeps no selection of its own: its plots' fields hold
+    // the picks, and its entry counts as picked while they hold every mark it names, so undo,
+    // Escape or a mark taken out never leave it stale.
+    const own = !ctx.manifest_.fields || ctx.manifest_.fields.includes(field)
     const src = state.sel_.get(field)?.source_ ?? null
-    const off = next !== null && src !== null && src.index === hit.index && src.sample === sample
+    const off = next !== null && (own ? src !== null && src.index === hit.index && src.sample === sample : legendEntryHeld(ctx.manifest_, state.sel_, hit.layer, hit.index))
     const source = sample === undefined ? { layer: field, index: hit.index } : { layer: field, index: hit.index, sample }
     const linked = legendPicks(ctx, state, hit, next !== null && !off, toggle)
     if (next !== null) {
-        state.sel_.set(field, off ? { hits_: [], source_: null } : { hits_: next, source_: source })
+        if (own) state.sel_.set(field, off ? { hits_: [], source_: null } : { hits_: next, source_: source })
         renderSelection(ctx, state)
     }
     drawHover(ctx, state, hit)

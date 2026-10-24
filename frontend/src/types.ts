@@ -190,6 +190,7 @@ export interface HitLayer {
     brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds
     many?: true // a `select = :many` field: it holds { items: [...] }, and a click toggles one in or out
     group?: string // the `linked(...)` group this layer is a member of: its clicks edit the group's field
+    hidden?: true // `onchange` hid this plot: it takes no hover and no clicks, and draws no picks
     // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | control | none
     bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "control" | "none"
     selects?: string   // id of the target layer this ROI selects; absent → bounds-ROI (no multi-select)

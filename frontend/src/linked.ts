@@ -1,4 +1,4 @@
-import { hitLayerByIndex, isGapElement, layerNElements } from "./selection"
+import { elementPicks, hitLayerByIndex, isGapElement, layerNElements, linkedIndices, pickKey } from "./selection"
 import type { FieldSelection } from "./state"
 import type { Hit, HitLayer, LinkGroup, Manifest } from "./types"
 
@@ -140,4 +140,24 @@ export function partnerHits(manifest: Manifest, g: LinkGroup, hit: Hit, held: nu
         }
     }
     return out
+}
+
+// Whether the plots' fields hold every mark a legend entry names that its click would pick: how
+// a legend outside the bind value, which keeps no selection of its own, knows its entry is held.
+export function legendEntryHeld(manifest: Manifest, sel: Map<string, FieldSelection>, legend: HitLayer, index: number): boolean {
+    let any = false
+    for (const [layer, picked] of linkedIndices(manifest, legend, index)) {
+        if (!layer.events.includes("click")) continue
+        const g = groupOf(manifest, layer)
+        if (g) {
+            if (!g.many) continue
+            const held = new Set(sel.get(g.id)?.rows_ ?? [])
+            for (const r of rowsOfMarks(g, layer, picked)) { any = true; if (!held.has(r)) return false }
+            continue
+        }
+        if (!layer.many || layer.brush) continue
+        const held = new Set((sel.get(layer.id)?.items_ ?? []).map(pickKey))
+        for (const it of elementPicks(manifest, layer, picked)) { any = true; if (!held.has(pickKey(it))) return false }
+    }
+    return any
 }

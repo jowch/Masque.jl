@@ -187,6 +187,31 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         counts = Masque._pick_counts(w.manifest)
         @test haskey(counts, "cells")
     end
+    @testset "a legend outside the bind value keeps its click when it reaches a bound pick" begin
+        fig = Figure(size = (600, 300))
+        au, ap = Axis(fig[1, 1]), Axis(fig[1, 2])
+        pts = []
+        for sub in groupby(df, :cluster)
+            push!(pts, interactables(scatter!(au, sub.u, sub.u; label = "c$(sub.cluster[1])"); payloads = sub))
+            push!(pts, interactables(scatter!(ap, sub.p, sub.p); payloads = sub))
+        end
+        axislegend(au)
+        legend_events(w) = only(d for d in w.manifest["layers"] if haskey(d, "links"))["events"]
+        w = masque(fig, pts..., (cells = linked(au, ap; key = :cell_id, select = :many),); bind = :cells)
+        @test w.manifest["fields"] == ["cells"]
+        @test "click" in legend_events(w)
+        # A plain `select = :many` plot, bound alone.
+        fig2 = Figure()
+        ax = Axis(fig2[1, 1])
+        s1 = scatter!(ax, 1:3, 1:3; label = "a")
+        s2 = scatter!(ax, 1:3, 3:-1:1; label = "b")
+        axislegend(ax)
+        w = masque(fig2, (a = interactables(s1; select = :many), b = interactables(s2; select = :many)); bind = :a)
+        @test "click" in legend_events(w)
+        # A legend that reaches only `:one` picks picks nothing, so it keeps no click.
+        w = masque(fig2, (a = interactables(s1), b = interactables(s2)); bind = :a)
+        @test !("click" in legend_events(w))
+    end
     @testset "review #417: other fields' selected=, an empty start, names, bind by name" begin
         fig, a1, _, su, sp = two_panels()
         b = barplot!(a1, 1:3, [1, 2, 3])

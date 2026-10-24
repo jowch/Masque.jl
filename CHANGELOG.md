@@ -16,6 +16,8 @@ All notable changes to this project are documented here. The format is based on
   `interactables(plot; key = vector)` gives a plot keys of its own (#346).
 
 ### Fixed
+- A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
+  out, as in `bind = :picked`. Before, the click did nothing.
 - On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down
   now goes to the browser, so Cmd-Left (Back on a Mac) and Alt-Left (Back elsewhere) work.
   A bare arrow or Shift with an arrow still moves through the marks (#404).
