@@ -202,6 +202,39 @@ describe("linked selections (#346)", () => {
         expect(val()).toEqual({ rows: [0, 2] })
     })
 
+    it("a legend outside the bind value picks again after undo", () => {
+        const m = panels({ many: true })
+        m.layers.unshift({ id: "legend", kind: "rects", geometry: [500, 60, 80, 40], payloads: [{ label: "a" }], axis: "ax1",
+            events: ["click", "hover"], links: [["a:1", "a:3"]], bond: "legend" })
+        m.initial = { cells: { rows: [] } }
+        const { surface, val } = setup(m)
+        click(surface, 250, 30)
+        expect(val()).toEqual({ rows: [0, 2] })
+        surface.focus()
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true }))
+        expect(val()).toEqual({ rows: [] })
+        click(surface, 250, 30)
+        expect(val()).toEqual({ rows: [0, 2] })
+        click(surface, 250, 30) // every mark it names is held, so it takes them out
+        expect(val()).toEqual({ rows: [] })
+    })
+
+    it("a legend outside the bind value fades its other series on a plain select = :many pick", () => {
+        const L = (id: string, y: number, events: string[], many: boolean): HitLayer =>
+            ({ id, kind: "circles", geometry: [100, y, 20, 300, y, 20], payloads: [{}, {}], axis: "ax1", events, ...(many ? { many: true } : {}) })
+        const m: Manifest = { width: 1200, height: 800, scaling: 2, transforms: { ax1: tf(0) },
+            layers: [
+                { id: "legend", kind: "rects", geometry: [500, 60, 80, 40, 500, 160, 80, 40], payloads: [{ label: "a" }, { label: "b" }], axis: "ax1",
+                    events: ["click", "hover"], links: [["a"], ["b"]], bond: "legend" },
+                L("a", 300, ["click", "hover"], true), L("b", 600, ["hover"], false)],
+            fields: ["a"], initial: { a: { items: [] } } }
+        const { host, shadow, surface } = setup(m)
+        click(surface, 250, 30)
+        expect((host as unknown as { value: Record<string, unknown> }).value.a).toEqual({ items: [{ layer: "a", index: 0 }, { layer: "a", index: 1 }] })
+        const fading = [...shadow.querySelectorAll(".masque-fade")].flatMap((w) => ((w as HTMLElement).dataset.layers ?? "").split(",").filter(Boolean))
+        expect(fading.sort()).toEqual(["a", "b"])
+    })
+
     it("undo puts the group's rows back", () => {
         const { surface, shadow, val } = setup(panels({ many: true }))
         click(surface, 50, 50)

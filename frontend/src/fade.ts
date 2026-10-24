@@ -67,9 +67,16 @@ export function selectionScope(manifest: Manifest, sel: Map<string, FieldSelecti
         const group = s.rows_ ? manifest.groups?.find((g) => g.id === field) : undefined
         for (const id of group?.members ?? []) {
             const l = manifest.layers.find((x) => x.id === id)
-            if (fadeLayer(l) && l.events.includes("click")) out.add(l)
+            if (fadeLayer(l) && !l.hidden) out.add(l)
         }
         for (const h of s.hits_) if (fadeLook(h)) out.add(h.layer)
+    }
+    // A legend outside the bind value holds no picks of its own, so its series fade together
+    // while any of them holds a pick, as a bound legend's pick fades them.
+    for (const legend of manifest.layers) {
+        if (!legend.links?.length || !manifest.fields || manifest.fields.includes(legend.id)) continue
+        const series = legendLayers(manifest, legend)
+        if (series.some((l) => out.has(l))) for (const l of series) out.add(l)
     }
     return [...out]
 }
