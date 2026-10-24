@@ -8,7 +8,8 @@
 //   node docs_clip.mjs <pluto-url> <notebook-abs-path> <frames-dir> <clip>
 //
 // then docs/dev/clips/assemble_mp4.sh <frames-dir> docs/src/assets/<clip>.mp4. <clip> is a
-// key of CLIPS below; its notebook is docs/dev/clips/<notebook> in the same table.
+// key of CLIPS below; its notebook is docs/dev/clips/<notebook> in the same table. The
+// `readme` clip is the exception, a WebP from its own notebook: see docs/dev/readme-demo/README.md.
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
