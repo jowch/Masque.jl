@@ -328,19 +328,7 @@ const PLUTO_EXPORT_SIM_JS = raw"""
     return stamp;
   }
   // Each state's cells are a file the page fetches the first time the reader reaches it.
-  const loaded = new Map();
-  function load(file) {
-    if (!loaded.has(file)) {
-      loaded.set(file, fetch(file).then(function (r) {
-        if (!r.ok) throw new Error(file + ": " + r.status);
-        return r.json();
-      }).catch(function (e) {
-        loaded.delete(file);
-        throw e;
-      }));
-    }
-    return loaded.get(file);
-  }
+  const load = jsonFiles();
   const show = latestOnly(load, apply, showMiss);
   function patch(v) {
     if (!window.editor_state_set) return;

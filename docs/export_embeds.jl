@@ -561,8 +561,17 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
     snapshots, extra = snapshot_table(keyed; manifest = widget_manifest(widget))
     check_budget(path, n_states, length(snapshots["snaps"]), extra)
 
-    widget_html = inject_manifest_snapshots(something(idle_html), snapshots)
-    down_html = join(idle_down, "\n")
+    # The page loads the overlay script, its pictures and each state's cells from `shared/`
+    # beside the players, as the Pluto-export players do (`externalize_html`).
+    embeds = dirname(outpath)
+    overlay = read(joinpath(@__DIR__, "..", "assets", "overlay.js"), String)
+    occursin(overlay, something(idle_html, "")) ||
+        error("$(basename(path)): the widget's cell doesn't carry this checkout's overlay script")
+    snapshots = externalize_table(snapshots, embeds; overlay)
+    overlay_src = write_shared(embeds, Vector{UInt8}(overlay), ".js")
+    shared(h) = externalize_html(h, embeds; overlay)
+    widget_html = shared(inject_manifest_snapshots(something(idle_html), snapshots))
+    down_html = shared(join(idle_down, "\n"))
     bond_name = html_escape(string(bond))
     title = html_escape(get(player, "title", "Masque embed"))
     player_css = pluto_player_css()
@@ -586,7 +595,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         """
     end
     notebook_inner = if show_code
-        show_code_cells_html(cells, widget, src_state.record.htmls, widget_html)
+        show_code_cells_html(cells, widget, Dict(k => shared(v) for (k, v) in src_state.record.htmls), widget_html)
     else
         """
         <pluto-cell>
@@ -608,6 +617,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>$title</title>
+      <script src="$(html_escape(overlay_src))"></script>
       $BOOT_PLUTO_DARK_JS
       <style>
     $player_css
@@ -631,7 +641,7 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
         window.frameElement.style.height = Math.max(1, Math.ceil(bottom)) + "px";
       }
       const host = document.querySelector(".ip-host");
-      const idlePng = (host && host.querySelector("img") && host.querySelector("img").src) || "";
+      const idlePng = (host && host.querySelector("img") && host.querySelector("img").getAttribute("src")) || "";
       // innerHTML does not run scripts. A swapped cell can be another widget, so
       // rebuild each inline script or the selected highlight never mounts.
       function setCellHtml(el, html) {
@@ -646,19 +656,11 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
           old.replaceWith(s);
         });
       }
-      function applyFromHost(host) {
-        const man = host && host.masqueManifest;
-        const snaps = man && man.snapshots;
-        if (!snaps) return false;
-        const snap = lookup(snaps, host.value);
-        if (!snap) {
-          if (host.value != null) console.warn("masque player: no snapshot for", keyOf(snaps, host.value));
-          return false;
-        }
+      function apply(snap) {
         const img = host.querySelector("img");
         if (img) {
           const next = snap.png || idlePng;
-          if (next && img.src !== next) img.src = next;
+          if (next && img.getAttribute("src") !== next) img.src = next;
         }
         const out = document.getElementById("masque-out");
         if (out && Array.isArray(snap.cells)) setCellHtml(out, snap.cells.join("\\n"));
@@ -668,7 +670,18 @@ function emit_player(path, outpath, player, cells, states, bond::Symbol)
             if (el) setCellHtml(el, snap.cells[id]);
           });
         }
-        return true;
+        sizeFrame();
+      }
+      // Each state's cells (and a remounted picture) are a file fetched when the reader gets there.
+      const show = latestOnly(jsonFiles(), apply, function () {});
+      function applyFromHost(host) {
+        const man = host && host.masqueManifest;
+        const snaps = man && man.snapshots;
+        if (!snaps) return false;
+        const file = lookup(snaps, host.value);
+        if (!file && host.value != null) console.warn("masque player: no snapshot for", keyOf(snaps, host.value));
+        show(file);
+        return !!file;
       }
       if (host) {
         let cur = host.value;

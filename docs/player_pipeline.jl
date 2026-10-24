@@ -213,6 +213,22 @@ function find(table, keys) {
   }
   return null;
 }
+// Fetches each state file once and keeps it; a failed fetch is tried again next time.
+function jsonFiles() {
+  const loaded = new Map();
+  return function (file) {
+    if (!loaded.has(file)) {
+      loaded.set(file, fetch(file).then(function (r) {
+        if (!r.ok) throw new Error(file + ": " + r.status);
+        return r.json();
+      }).catch(function (e) {
+        loaded.delete(file);
+        throw e;
+      }));
+    }
+    return loaded.get(file);
+  };
+}
 // Shows each value's cells once its file loads, unless the reader reached a newer value first,
 // a miss included: a slow file never lands over a newer value's cells or its note.
 function latestOnly(load, apply, miss) {
@@ -842,23 +858,19 @@ function externalize_html(html::AbstractString, dir::AbstractString; overlay::Ab
     )
 end
 
-# One recorded state's cells (`snapshot_table`'s `snaps` entry), pictures and overlay script
-# moved out as in `externalize_html`.
-function externalize_snap(snap::AbstractDict, dir::AbstractString; overlay::AbstractString)
-    cells = Dict{String, Any}()
-    for (id, payload) in snap["cells"]
-        body = payload["body"]
-        cells[id] = payload["mime"] == "text/html" && body isa AbstractString ?
-            merge(payload, Dict{String, Any}("body" => externalize_html(body, dir; overlay))) : payload
-    end
-    return merge(snap, Dict{String, Any}("cells" => cells))
-end
+# Every string in a recorded state (a Pluto cell payload, a static player's cell HTML, a
+# remounted picture), with the overlay script and pictures moved out as in `externalize_html`.
+externalize_strings(x::AbstractString, dir; overlay) = externalize_html(x, dir; overlay)
+externalize_strings(x::AbstractDict, dir; overlay) =
+    Dict{String, Any}(string(k) => externalize_strings(v, dir; overlay) for (k, v) in x)
+externalize_strings(x::AbstractVector, dir; overlay) = Any[externalize_strings(v, dir; overlay) for v in x]
+externalize_strings(x, dir; overlay) = x
 
 # The table a page ships: each state's cells become a file under `shared/`, fetched when the
 # reader reaches that state, and `snaps` lists those files.
 function externalize_table(table::AbstractDict, dir::AbstractString; overlay::AbstractString)
     snaps = String[
-        write_shared(dir, Vector{UInt8}(json_write(jsonable(externalize_snap(s, dir; overlay)))), ".json")
+        write_shared(dir, Vector{UInt8}(json_write(jsonable(externalize_strings(s, dir; overlay)))), ".json")
             for s in table["snaps"]
     ]
     return merge(table, Dict{String, Any}("snaps" => snaps))
