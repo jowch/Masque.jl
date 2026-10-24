@@ -454,6 +454,7 @@ end
     html = """<img src="data:image/png;base64,QUJDRA==" alt="fig">"""
     @test png_data_url(html) == "data:image/png;base64,QUJDRA=="
     @test png_data_url("<p>no image</p>") === nothing
+    @test png_data_url("<img src=\"data:image/png;base64, QUJDRA==\">") == "data:image/png;base64,QUJDRA=="
 end
 
 @testset "inject_manifest_snapshots keeps a remounted png on the snapshot" begin

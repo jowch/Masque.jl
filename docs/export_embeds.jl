@@ -54,7 +54,7 @@ function cell_output_html(c::Pluto.Cell)
 end
 
 function png_bytes_from_html(html::AbstractString)
-    m = match(r"data:image/png;base64,([A-Za-z0-9+/=]+)", html)
+    m = match(r"data:image/png;base64,\s*([A-Za-z0-9+/=]+)", html)
     m === nothing && return 0
     # 4 base64 chars → 3 bytes, ignore padding
     return (sizeof(m.captures[1]) * 3) ÷ 4

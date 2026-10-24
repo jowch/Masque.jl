@@ -7,38 +7,21 @@ that `x`. Use it to compare
 several series at the same position, such as spectra at one wavelength
 or traces at one time.
 
-Move the pointer across the spectra below:
-
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-slice-player" data-masque-embed="slice_spectra" title="Three absorbance spectra. Hover to read each spectrum at the wavelength under the pointer." style="width:100%;height:1400px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-slice-player" data-masque-embed="slice_spectra" data-masque-segment="widget" title="Three absorbance spectra. Hover to read each spectrum at the wavelength under the pointer." style="width:100%;height:950px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
 ```@eval
-Main.masque_fallback("slice_spectra")
+Main.masque_fallback("slice_spectra"; segment = "widget")
 ```
 
 ## Add a slice
 
 `masque(fig)` never adds a slice on its own, so pass your line plots to
-a [`SliceInteractable`](@ref) yourself:
-
-```julia
-begin
-    xs = 0:0.1:10
-    fig = Figure()
-    ax = Axis(fig[1, 1])
-    a = lines!(ax, xs, sin.(xs); label = "sine")
-    b = lines!(ax, xs, cos.(xs); label = "cosine")
-    probe = SliceInteractable([a, b])
-    nothing
-end
-```
-
-```julia
-masque(fig, probe)
-```
+a [`SliceInteractable`](@ref) yourself, as the `@bind` cell above does
+with the three spectra.
 
 Each line's `label` names its row in the tooltip when the label starts
 with a letter and holds only letters, digits, and underscores, such as
@@ -77,33 +60,28 @@ part of your data and work with it.
 ## Keep a position
 
 To keep the `x` you are reading, add an [`AxisInteractable`](@ref) to
-the same widget. Hovering still shows the slice's tooltip, and a click
-saves the position:
-
-```julia
-@bind at masque(
-    fig,
-    SliceInteractable([a, b]);
-    auto = false,
-    bind = AxisInteractable(ax),
-)
-```
-
-`bind = AxisInteractable(ax)` adds the readout and makes `at` its
-value, and `auto = false`
+the same widget, as `readout` in the example above. Hovering still
+shows the slice's tooltip, and a click saves the position.
+`bind = readout` makes `at` the readout's value, and `auto = false`
 leaves out what `masque(fig)` would add for the lines and their legend,
-so only the slice and the readout respond to the pointer. `at` is
-`nothing` until the first click. After that, `at.x` is the `x` you clicked, and a later cell can
-read your data there:
+so only the slice and the readout respond to the pointer.
 
-```julia
-if isnothing(at)
-    "click a position"
-else
-    i = argmin(abs.(xs .- at.x))
-    (; x = xs[i], sine = sin(xs[i]), cosine = cos(xs[i]))
-end
+`at` is `nothing` until the first click. After that, `at.x` is the
+wavelength you clicked, and a later cell can read your data there:
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-slice-value" data-masque-embed="slice_spectra" data-masque-segment="value" title="A cell that reads each spectrum at the clicked wavelength." style="width:100%;height:240px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
 ```
+
+```@eval
+Main.masque_fallback("slice_spectra"; segment = "value")
+```
+
+This site doesn't record clicks on a position
+([Examples on this site](@ref this-site)), so here the cell stays as it
+starts.
 
 ## What it reads
 
