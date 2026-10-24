@@ -205,6 +205,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `fields`, `initial` | once per manifest (#335) | ~10–20 B per field: its id twice, plus its start (`null` for a pick; a box's four bounds) |
 | `brush` | the target of a `selects` box | ~15 B |
 | `many` | each `select = :many` layer (#335) | 13 B (`payload_envelope.jl` §K) |
+| `groups`, `group` | once per `linked(...)` group, and a tag on each member layer (#346) | under 0.1 KB by position; with `key`, `rows` adds one small integer per mark (`payload_envelope.jl` §M) |
 | `regions` | each grid layer given `regions = R` (#359) | `[id, n, …]` runs over the row-major cells, one pair per region edge crossed along a row (`payload_envelope.jl` §L) |
 
 Re-running `payload_envelope.jl` for the composite bind value (#335, 2026-10-10) moved no
@@ -249,6 +250,15 @@ it costs time in proportion to the cell count. Measured in Node 22 on the 4-core
 43 ms at 2048×2048 and 157 ms at 4096×4096, with the value at 3.1, 14.4 and 30.0 KB (runs) and
 the outline path at 5.4, 24.2 and 50.6 KB. Up to about 2048×2048 a click stays within a few
 frames; a photo-sized image past that pauses visibly on each click.
+
+`bench/payload_envelope.jl` §M (#346, 2026-10-24, at `108344d`) measures a `linked(...)` group
+over two 10 000-point scatters. By position it adds 0.1 KB to the 756.2 KB of two `:many`
+fields. Keyed by a payload `id`, it ships each mark's row, 58.1 KB for the 20 000 marks (about
+3 B a mark), on top of the payloads the keys come from (813.1 KB → 871.4 KB). The value is
+`{rows: [...]}`, 3 B a row at 5 000 rows (14.4 KB), against about 23 B a pick for `{items}`.
+Julia rebuilds the key table from the payloads on each decode, so a keyed value costs about
+11 ms whatever its size (one run on the 4-core cloud container); a group by position decodes in
+microseconds.
 
 A `:view` layer is one viewport bbox plus a mode and two angles, the same order as an ROI layer.
 
@@ -312,6 +322,14 @@ the WGLMakie canvas in software each frame; the overlay's share is the `sync` co
 look draws the cover of every mark of a plot once and, per click, copies it and punches out the
 picks, so its cost follows the picks: a first version that redrew every mark on each click took
 124 / 531 ms on `:cairo` at 100 000 marks.
+
+The same script times a `linked(...)` group (#346) over the same two panels, 5 000 rows held
+(2026-10-24, same container, sync / total): a click that adds or takes out one row in both
+panels is 44 / 96 ms on `:cairo` and 49 / 1 973 ms on `:webgl`, the same as two separate
+`:many` fields in the same run (43 / 128 ms and 43 / 1 957 ms), and hovering a mark to outline
+its partner is 2 / 29 ms and 2 / 1 886 ms. A linked click redraws the picks of both panels,
+which the two separate fields' click doesn't, and still costs no more, because the fade's
+cover is drawn once and the picks are punched out of it.
 
 ## Stress — where it stops being render-bound
 

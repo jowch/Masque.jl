@@ -1351,6 +1351,8 @@ try {
         if (!okRows) throw new Error(`${key}/${what}: host.value rows ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
         const wantT = prefix + wantOut(anyOrder ? got : rows);
         if (t !== wantT) throw new Error(`${key}/${what}: @bind value ${JSON.stringify(t)}, want ${JSON.stringify(wantT)}`);
+        // Off the marks first: hovering a legend entry previews its marks in the fade too.
+        await dispatchAt(key, 1, 1, "pointermove");
         const k = await keptNow();
         if (!sameSet(k, kept)) throw new Error(`${key}/${what}: drawn picked ${JSON.stringify(k)}, want ${JSON.stringify(kept.slice().sort())}`);
         passed.push(`${key}/${what}`);
