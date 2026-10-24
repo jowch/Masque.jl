@@ -120,8 +120,9 @@ turns its members (plots, requests, axes) into layer ids once the call is built,
 `build_manifest` writes `groups[]` (`{id, members, n, many?, rows?}`) and tags each member
 layer with `group`. Its members have no field of their own and keep their `click` event.
 `rows` maps a member layer to each mark's 0-based row; with no `key` a row is the mark's
-position and `rows` is left out. The keys never ship: `_group_table` rebuilds the table from
-the payloads when a value decodes, so the wire is `{row: k}` or null under `:one` and
+position and `rows` is left out. Payload keys don't ship again, and a member's own keys
+(`interactables(plot; key = v)`) ship as `keys`, which the overlay never reads: `_group_table`
+rebuilds the table from them when a value decodes, so the wire is `{row: k}` or null under `:one` and
 `{rows: [k, …]}` under `:many`, and the Julia value is the key (or 1-based position), or a
 `Vector` of them. In the browser, the group's `sel_` entry holds `rows_` and the hits of every
 mark of those rows, so the fade and the selected look need nothing new; a click

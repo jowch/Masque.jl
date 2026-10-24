@@ -331,6 +331,14 @@ its partner is 2 / 29 ms and 2 / 1 886 ms. A linked click redraws the picks of b
 which the two separate fields' click doesn't, and still costs no more, because the fade's
 cover is drawn once and the picks are punched out of it.
 
+That holds for closed marks only. Segments, the one linkable kind still drawn as SVG, redraw
+every held shape on each click. Timed in review of #417 with the same script and 5 000 rows
+held per panel: a linked click is 127 / 281 ms on `:cairo` and 204 / 2 100 ms on `:webgl`,
+two separate `:many` segment fields 163 / 509 and 143 / 2 053 ms, and one 61 / 178 and
+67 / 1 753 ms. The same review timed the round trip that #346's spike put at 6 to 7 s for
+about 2 500 marks: a legend click that picks one cluster of a keyed group (1 229 rows) reaches
+the value cell in about 0.1 s on `:cairo`, as fast as the unlinked legend's 2 458 events.
+
 ## Stress — where it stops being render-bound
 
 **Live round trip against payload.** Same method as above with a heavier downstream cell:

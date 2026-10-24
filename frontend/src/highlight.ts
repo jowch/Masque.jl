@@ -347,7 +347,7 @@ export function drawLegendLink(ctx: OverlayCtx, state: OverlayState, legend: Hit
 // its group, get the hover outline in g.link and lose their fade, as the hovered mark does.
 export function drawPartners(ctx: OverlayCtx, state: OverlayState, hit: Hit, partners: Hit[]): void {
     if (partners.length) drawLink(state, ctx.linkGroup_, `p:${hitKey(hit)}`, partners, "hover")
-    else clearLinkImmediate(state, ctx.linkGroup_)
+    else clearLink(state, ctx.linkGroup_, true)
     ctx.fade_.preview_(null, null, [])
     ctx.fade_.lift_(hit, partners)
 }

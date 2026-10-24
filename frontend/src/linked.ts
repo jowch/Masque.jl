@@ -5,8 +5,8 @@ import type { Hit, HitLayer, LinkGroup, Manifest } from "./types"
 // --- linked selections (#346): several plots of the same rows share one field ---
 // A group's field holds rows. A row is a mark's position, or, with a key, the index Julia gave
 // that key (`rows`, per member layer and mark). A pick on any member edits the group's rows,
-// and every mark of a held row, in every member, is drawn as selected. The keys themselves
-// stay in Julia, which turns the rows into the `@bind` value.
+// and every mark of a held row, in every member, is drawn as selected. Julia turns the rows
+// into the `@bind` value; the overlay never reads a key.
 
 // Above this many marks of one row on one axis, a hover outlines none of them there: a row
 // keyed by cluster can stand for thousands of marks, and a click still shows them all.
@@ -35,7 +35,8 @@ function marksIndex(manifest: Manifest, g: LinkGroup): Map<number, [HitLayer, nu
     index = new Map()
     for (const id of g.members) {
         const layer = manifest.layers.find((l) => l.id === id)
-        if (!layer) continue
+        // A member `onchange` hides takes no clicks and draws nothing, as an unlinked plot does.
+        if (!layer || !layer.events.includes("click")) continue
         const n = layerNElements(layer)
         for (let k = 0; k < n; k++) {
             if (isGapElement(layer, k)) continue
@@ -118,10 +119,11 @@ export function rowsOfMarks(g: LinkGroup, layer: HitLayer, indices: number[]): n
 }
 
 // The marks a hover on `hit` outlines besides it: the other marks of its row, on every axis
-// where the row has at most PARTNER_CAP of them.
-export function partnerHits(manifest: Manifest, g: LinkGroup, hit: Hit): Hit[] {
+// where the row has at most PARTNER_CAP of them. A held row's marks are drawn selected, and
+// get no outline, as the hovered mark gets none.
+export function partnerHits(manifest: Manifest, g: LinkGroup, hit: Hit, held: number[] = []): Hit[] {
     const r = rowOf(g, hit.layer, hit.index)
-    if (r === undefined) return []
+    if (r === undefined || held.includes(r)) return []
     const byAxis = new Map<string, [HitLayer, number][]>()
     for (const m of marksIndex(manifest, g).get(r) ?? []) {
         if (m[0] === hit.layer && m[1] === hit.index) continue

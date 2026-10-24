@@ -179,8 +179,9 @@ function _check_stray_keys(args)
     for a in args
         a isa _PlotRequest && haskey(a.kwargs, :key) && throw(
             ArgumentError(
-                "interactables: `key` gives the rows of a plot in `linked(...)`; $(_link_label(a)) " *
-                    "is in none. Pass it to `linked`, as `linked(interactables(plot; key = …), …)`",
+                "interactables: `key` gives the rows of a plot listed in `linked(...)`; $(_link_label(a)) " *
+                    "is listed in none. Pass it to `linked`, as `linked(interactables(plot; key = …), …)`. " *
+                    "A plot that joins through its axis takes its keys from `linked(...; key = :field)`",
             ),
         )
     end
@@ -230,6 +231,12 @@ function _link_layers(groups::Vector{_LinkGroup}, by_id)
     out = Pair{_LinkGroup, Vector{Vector{Symbol}}}[]
     owner = Dict{Symbol, Symbol}()
     for g in groups
+        haskey(by_id, g.name) && throw(
+            ArgumentError(
+                "linked: the group is named :$(g.name), which is also a layer's id; give the group or " *
+                    "the plot another name",
+            ),
+        )
         kept = Vector{Symbol}[]
         for (k, ids) in enumerate(g.members)
             ok = Symbol[id for id in ids if haskey(by_id, id) && first(by_id[id]).kind in _LINK_KINDS]
@@ -379,8 +386,9 @@ function _link_table(g::_LinkGroup, kept, by_id)
 end
 
 # What a group ships: its id, its member layers, whether it holds many rows, its row count,
-# and, with a key, each member layer's 0-based row per mark. The keys themselves stay in
-# Julia: a payload field is in the payloads already, and `_group_table` reads it back.
+# and, with a key, each member layer's 0-based row per mark. Payload keys don't ship again:
+# they are in the payloads, and `_group_table` reads them back. A member's own keys
+# (`interactables(plot; key = v)`) ship as `keys`, which only Julia reads.
 function _group_dict(g::_LinkGroup, kept, table, rows)
     d = Dict{String, Any}(
         "id" => string(g.name), "members" => String[string(id) for ids in kept for id in ids], "n" => length(table),
@@ -452,6 +460,7 @@ end
 function _group_seed(manifest_group, table, name, v)
     many = get(manifest_group, "many", false) === true
     n = Int(manifest_group["n"])
+    many || v !== nothing || return nothing
     vals = if many
         v isa AbstractVector || v isa Tuple || throw(
             ArgumentError("selected: :$name holds several rows, so it starts from a vector of them; got $(repr(v))"),

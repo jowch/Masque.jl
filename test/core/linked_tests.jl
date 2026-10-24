@@ -134,7 +134,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test commit(w, "clusters", Dict("row" => 2)).clusters == 3
         @test occursin("its `key` has 2", msg(() -> masque(fig, (c = linked(interactables(s; key = [1, 2]), interactables(bars; key = 1:3)),))))
         # `key` outside a group.
-        @test occursin("is in none", msg(() -> masque(fig, interactables(s; key = df.cluster))))
+        @test occursin("is listed in none", msg(() -> masque(fig, interactables(s; key = df.cluster))))
     end
 
     @testset "labels that follow their points, on one axis" begin
@@ -186,5 +186,26 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test w.manifest["fields"] == ["cells"]
         counts = Masque._pick_counts(w.manifest)
         @test haskey(counts, "cells")
+    end
+    @testset "review #417: other fields' selected=, an empty start, names, bind by name" begin
+        fig, a1, _, su, sp = two_panels()
+        b = barplot!(a1, 1:3, [1, 2, 3])
+        # selected= for another field, with a group in the call.
+        w = masque(fig, (cells = linked(su, sp), bars = interactables(b)); selected = (bars = 2,))
+        @test Masque.initial_bond(w).bars.index == 2
+        @test Masque.initial_bond(w).cells === nothing
+        w = masque(fig, (cells = linked(su, sp; select = :many), bars = interactables(b)); selected = (bars = 2, cells = [3]))
+        @test Masque.initial_bond(w).cells == [3]
+        # A `:one` group started empty.
+        @test Masque.initial_bond(masque(fig, (cells = linked(su, sp),); selected = (cells = nothing,))).cells === nothing
+        # A group named like a layer.
+        @test occursin("also a layer's id", msg(() -> masque(fig, linked(su, sp; id = :scatter))))
+        # bind by name keeps the group's field.
+        w = masque(fig, (cells = linked(su, sp),), interactables(b); bind = (:cells,))
+        @test w.manifest["fields"] == ["cells"]
+        @test commit(w, "cells", Dict("row" => 1)).cells == 2
+        @test Masque.bondtype(linked(su, sp)) === Any
+        # A plot's own keys go on a plot listed in the group, not one that joins through its axis.
+        @test occursin("joins through its axis", msg(() -> masque(fig, interactables(su; key = 1:5), (c = linked(a1, sp),))))
     end
 end

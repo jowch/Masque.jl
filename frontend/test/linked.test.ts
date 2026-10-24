@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // Linked selections (#346): plots of one `linked(...)` group share one field of rows. A pick in
 // any of them edits the rows, and every mark of a held row, in every plot, is drawn selected.
-import { afterEach, describe, it, expect } from "vitest"
+import { afterEach, describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
 import { PARTNER_CAP } from "../src/linked"
 import type { Manifest, HitLayer, LinkGroup } from "../src/types"
@@ -177,5 +177,89 @@ describe("linked selections (#346)", () => {
         surface.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true }))
         expect(val()).toEqual({ rows: [0] })
         expect(fadeKept(shadow).sort()).toEqual(["a:0", "b:0"])
+    })
+
+    it("a member `onchange` hid draws no picks and no partners", async () => {
+        const m = panels({ many: true })
+        m.layers[1] = { ...m.layers[1], events: [], hidden: true } as HitLayer
+        const { surface, shadow, val } = setup(m)
+        click(surface, 50, 50) // a:0
+        expect(val()).toEqual({ rows: [0] })
+        expect(fadeKept(shadow)).toEqual(["a:0"])
+        ptr(surface, "pointermove", 150, 150) // a:1
+        await frame()
+        expect(linkCentres(shadow)).toEqual([])
+    })
+
+    it("a held row's partners lose the hover outline, as the hovered mark does", async () => {
+        const { surface, shadow } = setup(panels({ many: true }))
+        ptr(surface, "pointermove", 50, 50) // a:0
+        await frame()
+        expect(linkCentres(shadow)).toEqual(["1100,700"])
+        click(surface, 50, 50)
+        await frame()
+        const left = [...shadow.querySelectorAll("svg.masque-edge g.link circle")]
+        expect(left.every((c) => c.classList.contains("masque-leave"))).toBe(true)
+    })
+
+    it("moving to a mark without partners fades the partners out", async () => {
+        const m = panels({ rows: { a: [0, 1, 2], b: [0, 0, 1] } }) // row 2 is only in a
+        const { surface, shadow } = setup(m)
+        ptr(surface, "pointermove", 50, 50) // a:0, partners b:0 and b:1
+        await frame()
+        expect(linkCentres(shadow).length).toBe(2)
+        ptr(surface, "pointermove", 250, 250) // a:2, none
+        await frame()
+        const left = [...shadow.querySelectorAll("svg.masque-edge g.link circle")]
+        expect(left.length).toBe(2)
+        expect(left.every((c) => c.classList.contains("masque-leave"))).toBe(true)
+    })
+
+    it("Enter on a focused member mark picks its row in both panels", () => {
+        const { surface, shadow, val } = setup(panels({ many: true }))
+        surface.focus()
+        const down = (key: string) => surface.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }))
+        down("ArrowRight")
+        down("Enter")
+        expect(val()).toEqual({ rows: [0] })
+        expect(fadeKept(shadow).sort()).toEqual(["a:0", "b:0"])
+    })
+
+    it("a legend entry with Cmd/Ctrl adds its rows, and clicked again takes them out", () => {
+        const m = panels({ many: true })
+        m.layers.unshift({ id: "legend", kind: "rects", geometry: [500, 60, 80, 40], payloads: [{ label: "a" }], axis: "ax1",
+            events: ["click", "hover"], links: [["a:2"]], bond: "legend" })
+        m.fields = ["legend", "cells"]
+        m.initial = { legend: null, cells: { rows: [] } }
+        const { host, surface } = setup(m)
+        const v = () => (host as unknown as { value: Record<string, unknown> }).value.cells
+        click(surface, 50, 50) // row 0
+        click(surface, 250, 30, { ctrlKey: true })
+        expect(v()).toEqual({ rows: [0, 1] })
+        click(surface, 250, 30)
+        expect(v()).toEqual({ rows: [0] })
+    })
+
+    it("an onchange frame that hides a member keeps the rows and drops that member's marks", async () => {
+        const m = panels({ many: true }, { onchange: true })
+        const hidden = panels({ many: true }, { onchange: true })
+        hidden.layers[1] = { ...hidden.layers[1], events: [], hidden: true } as HitLayer
+        const host = document.createElement("div")
+        const img = document.createElement("img")
+        img.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        const script = document.createElement("script")
+        host.append(img, script)
+        document.body.append(host)
+        const requestFrame = vi.fn(async () => ({ png: new Uint8Array([1, 2, 3]), manifest: hidden }))
+        cleanups.push(mount(script, m, undefined, requestFrame).cleanup)
+        const shadow = (host.lastElementChild as HTMLElement).shadowRoot!
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        click(surface, 50, 50) // a:0
+        await new Promise((r) => setTimeout(r, 0))
+        expect(requestFrame).toHaveBeenCalled()
+        img.dispatchEvent(new Event("load"))
+        expect((host as unknown as { value: Record<string, unknown> }).value.cells).toEqual({ rows: [0] })
+        expect(fadeKept(shadow)).toEqual(["a:0"])
     })
 })

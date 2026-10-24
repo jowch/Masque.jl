@@ -20,6 +20,8 @@ The type of one commit from this interactable, the value its field holds. Defaul
 [`ElementEvent`](@ref).
 """
 bondtype(::AbstractInteractable) = ElementEvent
+# Rows: positions or keys, one or a vector of them.
+bondtype(::LinkedInteractable) = Any
 bondtype(::ViewInteractable) = Nothing
 bondtype(::GridInteractable) = GridCellEvent
 bondtype(::SurfaceInteractable) = GridCellEvent
@@ -788,9 +790,11 @@ function _field_seeds(built, fields, roles, binding, selected)
     selected = _under_bare_head(binding, fields, selected)
     layer_ids = Symbol[L.id for (_, L, _) in built]
     by_id = Dict(L.id => L for (_, L, _) in built)
-    grids = Symbol[f for f in fields if roles[f] === :pick && by_id[f].kind === :grid && _is_many(built, f)]
+    # A `linked(...)` group's field has no role or layer: `_take_group_seeds!` seeded it.
+    role(f) = get(roles, f, nothing)
+    grids = Symbol[f for f in fields if role(f) === :pick && by_id[f].kind === :grid && _is_many(built, f)]
     seedable = Symbol[
-        f for f in fields if roles[f] in (:pick, :brush) && (by_id[f].kind in _SELECTED_KINDS || f in grids)
+        f for f in fields if role(f) in (:pick, :brush) && (by_id[f].kind in _SELECTED_KINDS || f in grids)
     ]
     # A key `bind` left out names a field, so it gets the field list, not the layer list.
     if binding.refs !== nothing && (selected isa NamedTuple || selected isa AbstractDict)

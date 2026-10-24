@@ -292,7 +292,7 @@ export function showTipAt(ctx: OverlayCtx, state: OverlayState, hit: Hit, x: num
 // and keyboard drive the same g.link lifecycle drawHi/clearHi already give g.hi.
 export function updateLinkForHit(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
     const g = groupOf(ctx.manifest_, hit.layer)
-    if (g) { drawPartners(ctx, state, hit, partnerHits(ctx.manifest_, g, hit)); return }
+    if (g) { drawPartners(ctx, state, hit, partnerHits(ctx.manifest_, g, hit, state.sel_.get(g.id)?.rows_)); return }
     const hits = linkedHits(ctx.manifest_, hit.layer, hit.index)
     if (hits.length) drawLegendLink(ctx, state, hit, hits)
     else clearLegendLink(ctx, state, true)

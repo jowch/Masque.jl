@@ -75,6 +75,10 @@ its `visible` attribute. A hidden plot shows no tooltip and takes no clicks.
 If a plot ends up with a different number of marks, for example a scatter
 that shows only the points above a threshold, or you hide it, the points
 picked on it are cleared, and the `@bind` value changes with them.
+Hiding a plot of a [`linked`](@ref) group keeps the group's rows, which
+stay selected on its other plots. The group's rows are cleared when its
+plots' rows change: a different number of marks or, with `key`, the keys
+in a different order.
 
 ## Keep a field out of the value
 
