@@ -1,4 +1,4 @@
-// Record Home orbit.gif from a live Pluto notebook: fake cursor + real pointer
+// Record the Home orbit loop from a live Pluto notebook: fake cursor + real pointer
 // drag on ViewInteractable (CairoMakie streams frames over with_js_link).
 // Overlay-only harvest cannot do this. Run from test/e2e:
 //
@@ -85,7 +85,6 @@ function paintCursor(pngPath, cssX, cssY, clip) {
 
 const browser = await chromium.launch({
   headless: true,
-  channel: "chrome",
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
 });
 
@@ -223,7 +222,7 @@ try {
     return host?.dataset.masqueGestureFrame ?? null;
   });
 
-  // Park on the knot before recording so the GIF is the drag, not the approach.
+  // Park on the knot before recording so the loop is the drag, not the approach.
   await page.mouse.move(start.x, start.y);
   await sleep(200);
   let cur = { ...start };

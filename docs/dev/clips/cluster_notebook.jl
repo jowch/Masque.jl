@@ -48,8 +48,8 @@ begin
     s = scatter!(ax, xs, ys; color = zs, colormap = :viridis, markersize = 9)
 
     samples = [(sample = i, x = xs[i], y = ys[i], z = zs[i]) for i in 1:150]
-    pts = PointInteractable(
-        ax, s;
+    pts = interactables(
+        s;
         id = :pts,
         payloads = samples,
         tooltip = masque"sample $(sample)<br>x $(x:.2f), y $(y:.2f), z $(z:.2f)",
@@ -59,7 +59,7 @@ begin
 end
 
 # ╔═╡ a1420001-0001-4000-8000-000000000003
-@bind picks masque(fig, [pts, roi])
+@bind picks masque(fig, pts, roi; bind = s)
 
 # ╔═╡ a1420001-0001-4000-8000-000000000004
 begin
