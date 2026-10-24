@@ -78,7 +78,7 @@ try {
 
   await page.addStyleTag({
     content: `
-      .masque-sim-chip { display: none !important; }
+      .masque-sim-chip, .masque-bar { display: none !important; }
       ${spec.showOut ? "" : "#masque-out, pluto-cell:has(#masque-out) { display: none !important; }"}
       body { background: white !important; padding: 8px 0 !important; }
       pluto-cell { margin: 0 !important; }

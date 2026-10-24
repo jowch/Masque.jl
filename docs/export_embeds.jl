@@ -1,6 +1,7 @@
 import Pkg
 using Base64
 using Pluto
+using SHA
 using TOML
 using UUIDs
 

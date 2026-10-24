@@ -16,6 +16,10 @@ function pluto_snapshot_body(c::Pluto.Cell)
         return Dict{String, Any}("mime" => mime, "body" => String(body)), 0
     elseif body === nothing
         return Dict{String, Any}("mime" => mime, "body" => nothing), 0
+    elseif body isa AbstractDict
+        # Pluto's own tree (a tuple, a named tuple, a struct): its frontend draws the same
+        # nested table from it as in the live notebook.
+        return Dict{String, Any}("mime" => mime, "body" => jsonable(body)), 0
     else
         return Dict{String, Any}("mime" => "text/plain", "body" => repr(body)), 0
     end
@@ -85,11 +89,18 @@ pluto-editor.disable_ui > main {
 html, body {
   background: var(--main-bg-color);
 }
-.masque-sim-chip {
+.masque-bar {
   position: fixed;
   top: 8px;
   right: 8px;
   z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.masque-download,
+.masque-sim-chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -106,6 +117,27 @@ html, body {
   cursor: help;
   user-select: none;
 }
+.masque-download {
+  cursor: pointer;
+  text-decoration: none;
+}
+.masque-download:hover,
+.masque-download:focus-visible {
+  border-color: color-mix(in srgb, var(--pluto-output-color) 55%, transparent);
+}
+.masque-miss {
+  margin: 0 8px 10px 25px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 28%, transparent);
+  background: var(--pluto-output-bg-color, var(--main-bg-color));
+  color: var(--pluto-output-color);
+  font-family: var(--lato-ui-font-stack, system-ui, sans-serif);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+.masque-miss[hidden] { display: none; }
+.masque-miss a { color: inherit; }
 .masque-sim-chip-icon { width: 13px; height: 13px; flex: 0 0 auto; }
 .masque-sim-chip-label code {
   font-family: var(--julia-mono-font-stack, ui-monospace, monospace);
@@ -179,8 +211,8 @@ $PARENT_IS_DOC_DARK_JS
 """
 
 # `#segment=<name>` in the URL shows only that segment's cells (`player_segments.jl`). It
-# runs in `<head>`, before Pluto draws a cell, so a hidden cell never shows. The sim chip
-# stays with the widget.
+# runs in `<head>`, before Pluto draws a cell, so a hidden cell never shows. The chip and the
+# download link stay with the widget.
 const PLUTO_EXPORT_SEGMENT_JS = raw"""
 <script>
 (function () {
@@ -195,7 +227,7 @@ const PLUTO_EXPORT_SEGMENT_JS = raw"""
   window.masqueSegment = ids;
   var css = "pluto-cell" + ids.map(function (id) { return ':not([id="' + id + '"])'; }).join("") +
     " { display: none !important; }";
-  if (ids.indexOf("@@WIDGET@@") === -1) css += " .masque-sim-chip { display: none !important; }";
+  if (ids.indexOf("@@WIDGET@@") === -1) css += " .masque-bar { display: none !important; }";
   var style = document.createElement("style");
   style.textContent = css;
   document.head.appendChild(style);
@@ -203,16 +235,72 @@ const PLUTO_EXPORT_SEGMENT_JS = raw"""
 </script>
 """
 
+# What a player says when the reader reaches a value the harvest didn't record.
+const NOT_COMPUTED = "This setting wasn't computed for the docs. Download the notebook to try it."
+
+# The snapshot table, and the stand-in for the kernel's `onchange` channel. It runs in
+# `<head>`, before Pluto mounts the widget, which reads `window.masqueReplayFrame` once. Each
+# frame is two files, fetched when the reader reaches its state: the picture and its manifest.
+const PLUTO_EXPORT_REPLAY_JS = raw"""
+<script>
+window.masquePlayer = { table: @@SNAPS@@ };
+(function () {
+  const TABLE = window.masquePlayer.table;
+  const FRAMES = TABLE.frames;
+  if (!FRAMES) return;
+  @@LOOKUP@@
+  const cache = new Map();
+  function get(url, read) {
+    if (!cache.has(url)) {
+      cache.set(url, fetch(url).then(function (r) {
+        if (!r.ok) throw new Error(url + ": " + r.status);
+        return r[read]();
+      }).catch(function (e) {
+        cache.delete(url);
+        throw e;
+      }));
+    }
+    return cache.get(url);
+  }
+  window.masqueReplayFrame = function (input) {
+    if (!input || input.onchange !== true) return Promise.resolve({});
+    const keys = keysFor(TABLE, input.state);
+    let hit = null;
+    for (let i = 0; i < keys.length && !hit; i++) {
+      if (Object.prototype.hasOwnProperty.call(FRAMES.keys, keys[i])) hit = FRAMES.keys[keys[i]];
+    }
+    if (!hit) return Promise.resolve({ error: "@@NOT_COMPUTED@@" });
+    return Promise.all([get(FRAMES.dir + hit[0] + ".png", "arrayBuffer"), get(FRAMES.dir + hit[1] + ".json", "json")])
+      .then(function (r) { return Object.assign({}, r[1], { png: new Uint8Array(r[0]) }); })
+      .catch(function (e) {
+        console.warn("masque player: frame", e);
+        return { error: "@@NOT_COMPUTED@@" };
+      });
+  };
+})();
+</script>
+"""
+
 const PLUTO_EXPORT_SIM_JS = raw"""
 <script>
 {
-  const TABLE = @@SNAPS@@;
+  const TABLE = window.masquePlayer.table;
   const WIDGET_ID = "@@WIDGET@@";
   @@LOOKUP@@
+  // A value the harvest didn't record leaves the cells as they were, and says so in each part
+  // that shows one of those cells. The widget's own part has the overlay's note for its picture.
+  const miss = window.masqueSegment && !window.masqueSegment.some(function (id) { return id !== WIDGET_ID; })
+    ? null : document.querySelector(".masque-miss");
+  function showMiss(on) {
+    if (!miss || miss.hidden === !on) return;
+    miss.hidden = !on;
+    sizeFrame();
+  }
   function sizeFrame() {
     if (!window.frameElement) return;
     const nb = document.querySelector("pluto-notebook");
-    const bottom = nb ? nb.getBoundingClientRect().bottom : document.documentElement.scrollHeight;
+    let bottom = nb ? nb.getBoundingClientRect().bottom : document.documentElement.scrollHeight;
+    if (miss && !miss.hidden) bottom = Math.max(bottom, miss.getBoundingClientRect().bottom);
     window.frameElement.style.height = Math.max(1, Math.ceil(bottom + 8)) + "px";
   }
   // The segments of one notebook share its value: the iframe showing the widget posts each
@@ -242,6 +330,7 @@ const PLUTO_EXPORT_SIM_JS = raw"""
   function patch(v) {
     if (!window.editor_state_set) return;
     const snap = lookup(TABLE, v);
+    showMiss(!snap);
     if (!snap) {
       console.warn("masque player: no snapshot for", keyOf(TABLE, v));
       return;
@@ -310,34 +399,49 @@ const PLUTO_EXPORT_SIM_JS = raw"""
 </script>
 """
 
+# The download link and the chip, top right in the part that shows the widget, and the note
+# a missed value shows.
+function player_bar_html(; show_chip::Bool, download = nothing)
+    link = download === nothing ? "" : """
+        <a class="masque-download" href="$(html_escape(download.href))" download="$(html_escape(download.name))">Download notebook</a>
+        """
+    chip = show_chip ? SIM_CHIP_HTML : ""
+    note = download === nothing ? NOT_COMPUTED :
+        replace(NOT_COMPUTED, "Download the notebook" => """<a href="$(html_escape(download.href))" download="$(html_escape(download.name))">Download the notebook</a>""")
+    bar = isempty(link) && isempty(chip) ? "" : "<div class=\"masque-bar\">\n$link$chip</div>"
+    return bar * "\n<div class=\"masque-miss\" role=\"status\" hidden>$note</div>"
+end
+
 function postprocess_pluto_export(
         html::AbstractString; snapshots, widget_id::AbstractString, show_chip::Bool,
-        segments::AbstractDict = Dict{String, Vector{String}}(),
+        segments::AbstractDict = Dict{String, Vector{String}}(), download = nothing,
     )
     html = replace_js_assignment(html, "pluto_notebookfile", "undefined")
     html = replace_js_assignment(html, "pluto_binder_url", "undefined")
     occursin("window.pluto_notebookfile = undefined;", html) || error("notebook file assignment was not cleared")
     occursin("data:text/julia", html) && error("notebook file base64 still in the export")
     theme = pluto_theme_css()
-    chip = show_chip ? SIM_CHIP_HTML : ""
     payload = replace(json_write(snapshots), "<" => "\\u003c")
-    sim = replace(
-        PLUTO_EXPORT_SIM_JS, "@@SNAPS@@" => payload, "@@WIDGET@@" => widget_id, "@@LOOKUP@@" => PLAYER_LOOKUP_JS,
-    )
     occursin("</script>", payload) && error("snapshot JSON still contains a script close tag")
+    replay = replace(
+        PLUTO_EXPORT_REPLAY_JS, "@@SNAPS@@" => payload, "@@LOOKUP@@" => PLAYER_LOOKUP_JS, "@@NOT_COMPUTED@@" => NOT_COMPUTED,
+    )
+    sim = replace(PLUTO_EXPORT_SIM_JS, "@@WIDGET@@" => widget_id, "@@LOOKUP@@" => PLAYER_LOOKUP_JS)
     segment_js = isempty(segments) ? "" :
         replace(PLUTO_EXPORT_SEGMENT_JS, "@@SEGMENTS@@" => json_write(segments), "@@WIDGET@@" => widget_id)
     head = """
     <!-- masque-pluto-export -->
     $PLUTO_EXPORT_THEME_BOOT
     $segment_js
+    $replay
     <style>
     $theme
     $PLUTO_EXPORT_CSS
     </style>
     """
     html = replace(html, "<head>" => "<head>\n" * head, count = 1)
-    return replace(html, "</body>" => chip * "\n" * sim * "\n</body>", count = 1)
+    bar = player_bar_html(; show_chip, download)
+    return replace(html, "</body>" => bar * "\n" * sim * "\n</body>", count = 1)
 end
 
 # Idle figure and plain-text readouts for the player's text twin (`player_fallback.jl`):
@@ -370,10 +474,47 @@ function write_fallback_assets(outpath::AbstractString, idle, widget_id::Abstrac
     return doc
 end
 
+# The widget's own `onchange` callback, the one the live notebook's channel calls, run in the
+# notebook's workspace with `state` as the browser would send it. The picture is always the
+# settled one: a player shows no in-drag frames at lower resolution.
+function harvest_frame(session, nb, widget, state)
+    id = widget.cell_id
+    r = Pluto.WorkspaceManager.eval_fetch_in_workspace(
+        (session, nb), :(
+            let f = PlutoRunner.cell_results[$id].element.render_frame
+                Dict{String, Any}(string(k) => v for (k, v) in pairs(f(Dict{String, Any}("onchange" => true, "settle" => true, "state" => $state))))
+            end
+        )
+    )
+    haskey(r, "error") && error("onchange failed at $(json_write(state)): $(r["error"])")
+    haskey(r, "png") || error("onchange replay needs a CairoMakie picture; this frame has $(sort!(collect(keys(r))))")
+    return r
+end
+
+# One frame as two content-named files in `dir`: the picture, and the rest of the response.
+# Identical pictures or manifests across states are written once. `clear` is left out: it says
+# which picks the previous picture's frame dropped, and a replayed frame has no previous one.
+function write_frame(dir, frame)
+    png = Vector{UInt8}(frame["png"])
+    meta = json_write(jsonable(Dict{String, Any}(k => v for (k, v) in frame if !(k in ("png", "clear")))))
+    names = (bytes2hex(sha1(png))[1:20], bytes2hex(sha1(meta))[1:20])
+    isfile(joinpath(dir, names[1] * ".png")) || write(joinpath(dir, names[1] * ".png"), png)
+    isfile(joinpath(dir, names[2] * ".json")) || write(joinpath(dir, names[2] * ".json"), meta)
+    return String[names...]
+end
+
 function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Symbol, rows)
     get(player, "show_code", false) === true || error("pluto_html player needs show_code in $(basename(path))")
     segments = player_segments(player)
     widget = masque_widget_cell(cells, bond)
+    manifest = widget_manifest(widget)
+    onchange = get(manifest, "onchange", false) === true
+    stem = splitext(outpath)[1]
+    frames_dir = stem * ".frames"
+    rm(frames_dir; recursive = true, force = true)
+    onchange && mkpath(frames_dir)
+    frames = Dict{String, Vector{String}}()
+    start = Dict{String, Any}(string(k) => v for (k, v) in get(manifest, "initial", Dict{String, Any}()))
     states = NamedTuple[]
     n_inlined_total = 0
     png_b = 0
@@ -381,6 +522,7 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
     for (; key, value) in rows
         value === nothing || set_bond!(session, nb, bond, value)
         assert_no_errors(nb, path)
+        onchange && (frames[key] = write_frame(frames_dir, harvest_frame(session, nb, widget, something(value, start))))
         cells_now = snapshot_cells(nb, player, bond)
         widget_now = masque_widget_cell(cells_now, bond)
         payloads = Dict{String, Any}()
@@ -402,8 +544,12 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
         push!(states, (; key, payloads, htmls, n_inlined))
     end
     first(states).key == "null" || error("first player state must be idle in $(basename(path))")
-    snapshots, extra = snapshot_table([st.key => Dict("cells" => st.payloads) for st in states]; manifest = widget_manifest(widget))
+    snapshots, extra = snapshot_table([st.key => Dict("cells" => st.payloads) for st in states]; manifest)
     check_budget(path, length(states), length(snapshots["snaps"]), extra)
+    onchange && (snapshots["frames"] = Dict{String, Any}("dir" => basename(frames_dir) * "/", "keys" => frames))
+    # The frames redrew the figure and moved its controls. Back to the starting picture through
+    # the same callback, so the export shows it and the controls start where the manifest says.
+    onchange && harvest_frame(session, nb, widget, start)
     # Back to the widget's starting value by re-running its cell, not to `nothing`: a selecting
     # box starts at the points inside it (#330), so its notebook need not handle `nothing`.
     delete!(nb.bonds, bond)
@@ -417,15 +563,21 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
         push!(nb.cell_order, UUID(id))
     end
     raw = Pluto.generate_html(nb; disable_ui = true)
+    name = splitext(basename(outpath))[1]
+    # Beside the players, not among them: `find_embed_notebooks` would harvest it.
+    download = (; href = "downloads/" * name * ".jl", name = name * ".jl")
     html = postprocess_pluto_export(
         raw;
         snapshots,
         widget_id = string(widget.cell_id),
         show_chip = get(player, "chip", true) !== false,
         segments,
+        download,
     )
     mkpath(dirname(outpath))
     write(outpath, html)
+    mkpath(joinpath(dirname(outpath), "downloads"))
+    write(joinpath(dirname(outpath), download.href), download_notebook(read(path, String)))
     player_bytes = filesize(outpath)
     idle = first(states)
     write_fallback_assets(outpath, idle, string(widget.cell_id))

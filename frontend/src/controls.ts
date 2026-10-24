@@ -148,7 +148,9 @@ function fillTrack(t: HTMLElement, g: ControlGeometry, lo: number, hi: number, k
 
 // What a control is built from, apart from its box and value: when this changes, it is built again.
 function shape(g: ControlGeometry): string {
-    return JSON.stringify([g.control, g.n, g.horizontal, g.range, g.labels, g.settleOnly])
+    // A range arrives as a typed array off the kernel and as a plain one from a docs player's
+    // JSON frame; the same range is the same shape either way.
+    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly])
 }
 
 // The knob index under a pointer at (x, y) on a slider's box.

@@ -6331,6 +6331,47 @@ describe("onchange (#334)", () => {
         expect(img.src).not.toBe(src0)
     })
 
+    it("on a static page a docs player's replay answers onchange; view gestures stay without a kernel", async () => {
+        const w = window as unknown as { pluto_disable_ui?: boolean; masqueReplayFrame?: unknown }
+        const m = onchangeManifest()
+        const replay = vi.fn(async (_input: Record<string, unknown>) => ({ error: "This setting wasn't computed for the docs." }))
+        const requestFrame = vi.fn(frame(m))
+        w.pluto_disable_ui = true
+        w.masqueReplayFrame = replay
+        try {
+            const { host, script } = setup()
+            mount(script, m, undefined, requestFrame)
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true }))
+            await new Promise((r) => setTimeout(r, 0))
+            expect(replay).toHaveBeenCalledTimes(1)
+            expect(replay.mock.calls[0][0]).toMatchObject({ onchange: true, settle: true, state: { pts: { layer: "pts", index: 0 } } })
+            expect(requestFrame).not.toHaveBeenCalled()
+            const note = shadowOf(host).querySelector(".masque-note") as HTMLElement
+            expect(note.textContent).toBe("This setting wasn't computed for the docs.")
+        } finally {
+            delete w.pluto_disable_ui
+            delete w.masqueReplayFrame
+        }
+    })
+
+    it("without onchange a replay on the page is not used", async () => {
+        const w = window as unknown as { masqueReplayFrame?: unknown }
+        const m = onchangeManifest({ onchange: undefined, bind: undefined })
+        const replay = vi.fn(async () => ({}))
+        w.masqueReplayFrame = replay
+        try {
+            const { host, script } = setup()
+            mount(script, m, undefined, vi.fn(frame(m)))
+            const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+            surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true }))
+            await new Promise((r) => setTimeout(r, 0))
+            expect(replay).not.toHaveBeenCalled()
+        } finally {
+            delete w.masqueReplayFrame
+        }
+    })
+
     it("a frame that clears a field drops its picks without another onchange round", async () => {
         const m = onchangeManifest({ bind: ["thr", "pts"] })
         const { host, img, script } = setup()
@@ -6741,6 +6782,23 @@ describe("block controls (#345)", () => {
         expect(val(host)).toEqual({ deg: { layer: "deg", index: 0, payload: 4 } })
         const last = requestFrame.mock.calls[requestFrame.mock.calls.length - 1][0] as Record<string, unknown>
         expect(last).toMatchObject({ onchange: true, settle: true, state: { deg: { payload: 4 } } })
+    })
+
+    it("a frame whose range is a plain array keeps the control it replaces the picture under", async () => {
+        // A kernel frame decodes the range as a typed array; a docs player's JSON frame doesn't.
+        const m = controlsManifest({ onchange: true }, { range: new Float64Array([0, 0.5]) })
+        const next = controlsManifest({ onchange: true }, { value: 4 })
+        const { host, script } = setup()
+        mount(script, m, undefined, vi.fn(frame(next)))
+        const range = ctl(host, "deg").querySelector("input") as HTMLInputElement
+        range.focus()
+        range.value = "4"
+        range.dispatchEvent(new Event("change", { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        host.querySelector("img")!.dispatchEvent(new Event("load"))
+        expect(host.dataset.masqueGestureFrame).toBeDefined()
+        expect(ctl(host, "deg").querySelector("input")).toBe(range)
+        expect(range.isConnected).toBe(true)
     })
 
     it("update_while_dragging = false waits for the release", async () => {

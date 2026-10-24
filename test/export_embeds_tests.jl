@@ -529,10 +529,12 @@ include(joinpath(@__DIR__, "..", "docs", "player_fallback.jl"))
         endswith(f, ".jl") || continue
         s = read(f, String)
         occursin("pluto_html = true", s) || continue
-        bond = fallback_player(s)["bond"]
+        player = fallback_player(s)
+        bond = player["bond"]
         t = only(fallback_markdown(f).content)
         @test any(b -> b isa Markdown.Code && occursin("@bind $bond", b.code), t.content)
-        @test any(b -> b isa Markdown.Paragraph, t.content)
+        # A notebook in segments has its prose on the page, between the parts.
+        haskey(player, "segments") || @test any(b -> b isa Markdown.Paragraph, t.content)
         n += 1
     end
     @test n >= 23
@@ -573,4 +575,82 @@ end
         @test any(b -> b isa Markdown.Paragraph && any(x -> x isa Markdown.Image, b.content), twin.content) == has_bind
     end
     @test_throws ErrorException fallback_markdown(nb; segment = "nope")
+end
+
+@testset "player controls: every setting recorded, keyed the way the page keys it" begin
+    ctl(id, g) = Dict{String, Any}("id" => id, "kind" => "control", "events" => ["change"], "bond" => "control", "geometry" => g)
+    env(id, p) = Dict{String, Any}("layer" => id, "index" => 0, "payload" => p)
+    manifest = Dict{String, Any}(
+        "fields" => ["freq", "dots"],
+        "layers" => Any[
+            ctl("freq", Dict{String, Any}("control" => "slider", "n" => 9, "value" => 0)),
+            ctl("dots", Dict{String, Any}("control" => "toggle", "value" => false)),
+        ],
+        "initial" => Dict{String, Any}("freq" => env("freq", 0), "dots" => env("dots", false)),
+    )
+    states = control_states(manifest)
+    @test length(states) == 18
+    keying = player_keying(manifest)
+    @test keying["controls"] == ["freq", "dots"]
+    @test state_key(keying, manifest["initial"]) == "null"
+    @test state_key(keying, merge(manifest["initial"], Dict("freq" => env("freq", 3)))) == "freq=3"
+    @test state_key(keying, merge(manifest["initial"], Dict("freq" => env("freq", 3), "dots" => env("dots", true)))) == "freq=3+dots=true"
+    rows = player_states(Dict{String, Any}(), manifest)
+    @test length(rows) == 18  # idle plus 17 settings; a control is never cleared
+    @test !any(r -> startswith(r.key, "null@"), rows)
+    @test allunique(r.key for r in rows)
+
+    # An interval slider records each ordered pair of stops, a menu each option.
+    two = Dict{String, Any}(
+        "fields" => ["span", "pick"],
+        "layers" => Any[
+            ctl("span", Dict{String, Any}("control" => "intervalslider", "n" => 3, "value" => [0, 2])),
+            ctl("pick", Dict{String, Any}("control" => "menu", "n" => 2, "value" => 0)),
+        ],
+        "initial" => Dict{String, Any}("span" => env("span", [0, 2]), "pick" => env("pick", 0)),
+    )
+    @test length(control_states(two)) == 6 * 2
+    @test state_key(player_keying(two), merge(two["initial"], Dict("span" => env("span", [1, 2])))) == "span=[1,2]"
+    big = deepcopy(manifest)
+    big["layers"][1]["geometry"]["n"] = CONTROL_STATES_MAX
+    @test_throws ErrorException control_states(big)
+
+    node = Sys.which("node")
+    if node === nothing
+        @test_skip "node not installed"
+    else
+        # The page computes the same key from the value the overlay posts, for every setting.
+        table = merge(keying, Dict{String, Any}("keys" => Dict(r.key => 0 for r in rows), "snaps" => ["x"]))
+        values = [something(r.value, manifest["initial"]) for r in rows]
+        js = PLAYER_LOOKUP_JS * "const t = " * json_write(table) * "; const vs = " * json_write(values) * raw""";
+            process.stdout.write(vs.map((v) => keyOf(t, v)).join("\n"));
+            """
+        @test split(read(`$node -e $js`, String), "\n") == [r.key for r in rows]
+        # With a control moved, a value the harvest skipped is a miss: no snapshot taken at
+        # other settings stands in for it.
+        js2 = PLAYER_LOOKUP_JS * raw"""
+            const env = (l, p) => ({layer: l, index: 0, payload: p});
+            const t = {initial: {f: env("f", 0), a: null}, keyed: ["f", "a"], controls: ["f"],
+                       keys: {"null": 0, "a:0": 1, "f=1": 2}, snaps: ["idle", "A0", "F1"]};
+            const A = {layer: "a", index: 0};
+            const got = [lookup(t, {f: env("f", 0), a: A}), lookup(t, {f: env("f", 1), a: A})];
+            process.stdout.write(got.map(String).join(","));
+            """
+        @test read(`$node -e $js2`, String) == "A0,null"
+    end
+end
+
+@testset "the downloaded notebook drops the player TOML and the manifest" begin
+    nb = joinpath(@__DIR__, "..", "docs", "src", "embeds", "controls_wave.jl")
+    src = read(nb, String)
+    out = download_notebook(src)
+    @test startswith(out, "### A Pluto.jl notebook ###")
+    @test !occursin("PLUTO_PLAYER_TOML_CONTENTS", out)
+    @test !occursin("PLUTO_MANIFEST_TOML_CONTENTS", out)
+    @test !occursin("e1be0000-0000-4000-8000-000000000001", out)
+    @test !occursin("00000000-0000-0000-0000-000000000002", out)
+    @test occursin("PLUTO_PROJECT_TOML_CONTENTS", out)
+    @test occursin("@bind w2 masque(fig", out)
+    @test occursin("# ╠═a1b2c3d4-0002-4000-8000-000000000004\n", out)
+    @test download_notebook(out) == out
 end

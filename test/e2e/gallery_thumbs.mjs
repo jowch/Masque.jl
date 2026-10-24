@@ -42,7 +42,7 @@ try {
   page.on("pageerror", (e) => { failed = true; console.error("PAGEERROR:", e.message); });
   for (const card of CARDS) {
     await page.goto(`${base.replace(/\/$/, "")}/embeds/${card.embed}.html`, { waitUntil: "load" });
-    await page.addStyleTag({ content: ".masque-sim-chip { display: none !important; }" });
+    await page.addStyleTag({ content: ".masque-sim-chip, .masque-bar { display: none !important; }" });
     await sleep(1500);
     const pics = page.locator(".ip-host img, .ip-host canvas");
     for (const [kind, h, fx, fy] of card.moves) {

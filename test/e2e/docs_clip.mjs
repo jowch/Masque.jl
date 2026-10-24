@@ -22,25 +22,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Each clip: the notebook's cell-id prefix (`c1d500NN`, cells 3 = widget, 4 = readout,
 // 5 = the hidden manifest the recorder aims from) and the moves it makes.
 const CLIPS = {
-  "controls": {
-    notebook: "controls_notebook.jl", nn: 1,
-    async run(c) {
-      // Drag the frequency up and back while the curve follows, then flip the toggle.
-      await c.glide(c.slider("freq", 0), 700);
-      await c.page.mouse.down();
-      await c.glide(c.slider("freq", 6), 2600, 60);
-      await c.page.mouse.up();
-      await c.settle(1200);
-      await c.glide(c.control("dots"), 900);
-      await c.click(c.control("dots"));
-      await c.settle(1400);
-      await c.glide(c.slider("freq", 6), 900);
-      await c.page.mouse.down();
-      await c.glide(c.slider("freq", 3), 1800, 45);
-      await c.page.mouse.up();
-      await c.settle(1800);
-    },
-  },
   "onchange": {
     notebook: "onchange_notebook.jl", nn: 2,
     async run(c) {
