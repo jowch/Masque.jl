@@ -518,7 +518,7 @@ end
 
     guides = [
         "marks_bars", "legend_lines", "roi_table",
-        "tooltips_template", "tooltips_dark", "grids_heatmap", "readouts_axis",
+        "tooltips_stars", "tooltips_stars_default", "tooltips_stars_dark", "grids_heatmap", "readouts_axis",
         "custom_regions", "recipes_dumbbell", "linked_click", "linked_legend_wash",
         "selection_start", "slice_spectra", "widgets_value", "explore_3d",
     ]

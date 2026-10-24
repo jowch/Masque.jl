@@ -16,54 +16,61 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ a1b2c3d4-0012-4000-8000-000000000001
+
+# ╔═╡ c0e1a001-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
-# ╔═╡ a1b2c3d4-0012-4000-8000-000000000009
+# ╔═╡ c0e1a001-0001-4000-8000-000000000020
 md"""
-Hover over a point, and the tooltip is dark because the figure is. Click a point, and the last cell names it.
+Hover over a star to see its name, type and distance. Click one and the last cell names it.
 """
 
-# ╔═╡ a1b2c3d4-0012-4000-8000-000000000002
+# ╔═╡ c0e1a001-0001-4000-8000-000000000005
 begin
-    points = [
-        (label = "alpha", x = 1.0, y = 1.0),
-        (label = "beta", x = 2.0, y = 2.0),
-        (label = "gamma", x = 3.0, y = 1.2),
-    ]
-    fig = Figure(size = (560, 360); backgroundcolor = :gray12)
-    ax = Axis(
-        fig[1, 1];
-        backgroundcolor = :gray20,
-        xtickcolor = :gray80,
-        ytickcolor = :gray80,
-        xticklabelcolor = :gray80,
-        yticklabelcolor = :gray80,
-        xlabelcolor = :gray80,
-        ylabelcolor = :gray80,
-        bottomspinecolor = :gray70,
-        leftspinecolor = :gray70,
-        rightspinecolor = :gray70,
-        topspinecolor = :gray70,
-    )
-    s = scatter!(
-        ax, [p.x for p in points], [p.y for p in points];
-        color = ["#e6194b", "#3cb44b", "#4363d8"],
-        markersize = 22,
-    )
-    pts = interactables(s; payloads = points)
+    fig2, sc2 = hr_diagram()
+    tips = interactables(sc2; payloads = info, tooltip = masque"<b>$(name)</b><br>$(type)<br>$(dist) light years")
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0012-4000-8000-000000000003
-@bind pick masque(fig, pts; bind = s)
+# ╔═╡ c0e1a001-0001-4000-8000-000000000006
+@bind pick masque(fig2, tips; bind = sc2)
 
-# ╔═╡ a1b2c3d4-0012-4000-8000-000000000004
-if isnothing(pick)
-    "hover a point, or click one"
-else
-    "$(pick.label) selected"
+# ╔═╡ c0e1a001-0001-4000-8000-000000000007
+isnothing(pick) ? "click a star" : "$(pick.name) is $(pick.dist) light years away"
+
+# ╔═╡ c0e1a001-0001-4000-8000-000000000002
+begin
+    stars = [
+        (name = "Sirius", type = "A1V", teff = 9940, lum = 25.4, dist = 8.6),
+        (name = "Canopus", type = "A9II", teff = 7280, lum = 10700.0, dist = 310.0),
+        (name = "Arcturus", type = "K1.5III", teff = 4286, lum = 170.0, dist = 36.7),
+        (name = "Vega", type = "A0V", teff = 9602, lum = 40.0, dist = 25.0),
+        (name = "Capella", type = "G8III", teff = 4970, lum = 78.7, dist = 42.9),
+        (name = "Rigel", type = "B8Ia", teff = 12100, lum = 1.2e5, dist = 860.0),
+        (name = "Procyon", type = "F5IV", teff = 6530, lum = 6.9, dist = 11.5),
+        (name = "Betelgeuse", type = "M1Ia", teff = 3600, lum = 9.0e4, dist = 548.0),
+        (name = "Altair", type = "A7V", teff = 7765, lum = 10.6, dist = 16.7),
+        (name = "Aldebaran", type = "K5III", teff = 3910, lum = 439.0, dist = 65.3),
+        (name = "Spica", type = "B1V", teff = 22400, lum = 12100.0, dist = 250.0),
+        (name = "Pollux", type = "K0III", teff = 4666, lum = 32.7, dist = 33.8),
+    ]
+    info = [(; name = s.name, type = s.type, dist = s.dist) for s in stars]
+    nothing
 end
+
+# ╔═╡ c0e1a001-0001-4000-8000-000000000003
+function hr_diagram()
+    fig = Figure(size = (560, 360))
+    ax = Axis(
+        fig[1, 1]; xreversed = true, xticks = 4000:4000:20000, xtickformat = "{:.0f}",
+        xlabel = "surface temperature (K)", ylabel = "log₁₀ luminosity (Sun = 0)",
+    )
+    sc = scatter!(
+        ax, [s.teff for s in stars], log10.([s.lum for s in stars]);
+        color = [s.teff for s in stars], colormap = :RdYlBu, markersize = 16,
+    )
+    return fig, sc
+end;
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
@@ -72,12 +79,11 @@ bond = "pick"
 show_code = true
 pluto_html = true
 
-cells = [
-  "a1b2c3d4-0012-4000-8000-000000000009",
-  "a1b2c3d4-0012-4000-8000-000000000002",
-  "a1b2c3d4-0012-4000-8000-000000000003",
-  "a1b2c3d4-0012-4000-8000-000000000004",
-]
+cells = ["c0e1a001-0001-4000-8000-000000000020", "c0e1a001-0001-4000-8000-000000000005", "c0e1a001-0001-4000-8000-000000000006", "c0e1a001-0001-4000-8000-000000000007", "c0e1a001-0001-4000-8000-000000000002", "c0e1a001-0001-4000-8000-000000000003"]
+
+[player.segments]
+widget = ["c0e1a001-0001-4000-8000-000000000020", "c0e1a001-0001-4000-8000-000000000005", "c0e1a001-0001-4000-8000-000000000006", "c0e1a001-0001-4000-8000-000000000007"]
+data = ["c0e1a001-0001-4000-8000-000000000002", "c0e1a001-0001-4000-8000-000000000003"]
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1724,11 +1730,13 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1b2c3d4-0012-4000-8000-000000000001
-# ╟─a1b2c3d4-0012-4000-8000-000000000009
-# ╠═a1b2c3d4-0012-4000-8000-000000000002
-# ╠═a1b2c3d4-0012-4000-8000-000000000003
-# ╠═a1b2c3d4-0012-4000-8000-000000000004
+# ╠═c0e1a001-0001-4000-8000-000000000001
+# ╟─c0e1a001-0001-4000-8000-000000000020
+# ╠═c0e1a001-0001-4000-8000-000000000005
+# ╠═c0e1a001-0001-4000-8000-000000000006
+# ╠═c0e1a001-0001-4000-8000-000000000007
+# ╠═c0e1a001-0001-4000-8000-000000000002
+# ╠═c0e1a001-0001-4000-8000-000000000003
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

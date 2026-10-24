@@ -2,28 +2,51 @@
 
 Hover over a mark and a tooltip appears above it with the mark's data.
 For each interactable, you choose the default table, your own template,
-or no tooltip.
-
-In this notebook, each city's tooltip uses a template: the name in bold,
-the population with thousands separators, and a border in the marker's
-color.
+or no tooltip. The chart below plots twelve bright stars by temperature
+and brightness, and each star's tooltip gives its name in bold, its
+type, and its distance:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-template" data-masque-embed="tooltips_template" title="Four-city scatter. Hover a city to see its tooltip." style="width:100%;height:1020px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-stars" data-masque-embed="tooltips_stars" data-masque-segment="widget" title="Twelve stars by temperature and luminosity. Hover a star to see its tooltip." style="width:100%;height:760px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
 ```@eval
-Main.masque_fallback("tooltips_template")
+Main.masque_fallback("tooltips_stars"; segment = "widget")
 ```
 
 ## The default tooltip
 
-Without `tooltip`, the tooltip is a small table of the payload's
-fields: for a scatter, the point's `index`, `x`, and `y`, and when you
-pass `payloads`, your fields followed by `x` and `y` (see
-[How Masque works](@ref) for how the two combine). On a categorical or
+Start with the data each tooltip should show. Here each star gets a
+payload with its name, type and distance, and `hr_diagram` draws the
+chart:
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-tt-stars-data" data-masque-embed="tooltips_stars" data-masque-segment="data" title="The star catalogue and the function that draws the chart." style="width:100%;height:720px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("tooltips_stars"; segment = "data")
+```
+
+Pass the payloads without `tooltip`, and the tooltip is a small table
+of their fields, followed by the star's `x` and `y`:
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-tt-default" data-masque-embed="tooltips_stars_default" title="The star chart with the default tooltip. Hover a star to see its fields." style="width:100%;height:520px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("tooltips_stars_default")
+```
+
+Without `payloads`, a scatter's tooltip shows the point's `index`, `x`,
+and `y` ([How Masque works](@ref) says how the two combine). On a categorical or
 date axis, `x` and `y` in the tooltip and in the clicked mark's event
 are text: the
 category's label, such as `"b"`, or the date or time you plotted, such
@@ -53,15 +76,10 @@ shows the series values at the pointer instead of a payload.
 
 ## Write a template
 
-A template is a `masque"..."` string. Each `$(field)` is replaced by that
-field's value for the mark under the pointer:
-
-```julia
-interactables(s;
-    payloads = cities,
-    tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
-)
-```
+A template is a `masque"..."` string, passed as `tooltip`, like the one
+in the figure cell at the top of this page. Each `$(field)` is replaced
+by that field's value for the star under the pointer, and the rest is
+shown as written:
 
 | In the template | Becomes |
 |---|---|
@@ -71,13 +89,10 @@ interactables(s;
 | anything else | copied into the tooltip as HTML, so `<b>` and `<br>` work |
 
 A `$(field)` can only name a payload field, not an expression such as
-`$(pop / area)`, so to show a computed value, put it in the payload:
+`$(dist / 3.26)`, so to show a computed value, put it in the payload:
 
 ```julia
-cities = [
-    (city = "Lyon", density = round(522_250 / 47.9)),
-    (city = "Nice", density = round(342_669 / 71.9)),
-]
+info = [(; name = s.name, parsecs = round(s.dist / 3.26; digits = 1)) for s in stars]
 ```
 
 To turn tooltips off, pass `tooltip = false`. The hover highlight and
@@ -123,16 +138,17 @@ without a single mark show their tooltip at the pointer.
 
 A dark figure gets a dark tooltip, even on a light page, because the
 tooltip follows the figure's `backgroundcolor` rather than the browser
-or system setting:
+or system setting. This is the same chart drawn with Makie's
+`theme_dark()`:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-dark" data-masque-embed="tooltips_dark" title="Scatter on a dark figure. Hover a point to see a dark tooltip." style="width:100%;height:1200px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-dark" data-masque-embed="tooltips_stars_dark" title="The star chart on a dark figure. Hover a star to see a dark tooltip." style="width:100%;height:580px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
 ```@eval
-Main.masque_fallback("tooltips_dark")
+Main.masque_fallback("tooltips_stars_dark")
 ```
 
 ## Accent color
