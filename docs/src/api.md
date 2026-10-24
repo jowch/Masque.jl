@@ -139,12 +139,13 @@ pixels, and opacities run from 0 to 1. Colors take the same forms as in
 
 | Key | Default | Changes | Custom property |
 |---|---|---|---|
-| `color` | `#7a7a7a` on a light figure, `#c8c8c8` on a dark one | highlight, selection, ROI, and threshold stroke | `--masque-chrome` |
+| `color` | `#7a7a7a` on a light figure, `#c8c8c8` on a dark one | highlight, selection, ROI, and threshold stroke; when set, also the outline of a selected point, bar, or shape that has no selected neighbour, which otherwise takes a shade of the mark's own color | `--masque-chrome` |
 | `dodge_fill` | `#141414` | how strongly a highlight brightens the mark; lighter is stronger | `--masque-hi-fill` |
 | `hover_width` | `1.5` | outline of the hovered mark | `--masque-hover-width` |
-| `selected_width` | `2` | outline of a selected point, bar, or shape; a selected line uses the ring below | `--masque-selected-width` |
+| `unpicked_opacity` | `0.2` | how much of a plot's unpicked points, bars, or shapes still shows once it holds picks; `1` turns the fading off | `--masque-unpicked-opacity` |
+| `selected_width` | `2` | outline of a selected heatmap cell or region; a selected line uses the ring below | `--masque-selected-width` |
 | `hover_fill_opacity` | `0.18` | fill of a hovered mark with a `hoverstyle` stroke | `--masque-hover-fill-opacity` |
-| `selected_fill_opacity` | `0.35` | fill of a selected mark with a `hoverstyle` stroke | `--masque-selected-fill-opacity` |
+| `selected_fill_opacity` | `0.35` | fill of a selected heatmap cell with a `hoverstyle` stroke | `--masque-selected-fill-opacity` |
 | `ring_width` | `2` | ring around a selected line | `--masque-ring-width` |
 | `ring_halo_width` | `4` | soft band around that ring | `--masque-ring-halo-width` |
 | `ring_halo_opacity` | `0.25` | that band's opacity | `--masque-ring-halo-opacity` |

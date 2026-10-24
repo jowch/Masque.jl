@@ -154,6 +154,7 @@ export interface AxisTransform {
     is3d?: boolean // lims are degenerate; Julia validate() rejects inversion consumers on is3d, so invertAxis is never reached with one
     ispolar?: boolean // lims are the viewport's Cartesian window; `polar` turns that point into (θ, r)
     polar?: PolarFrame | null // PolarAxis only; mirrors Julia's PolarFrame (src/backend.jl)
+    fill?: string // the empty plot area's colour, when it is not the figure's `background`
 }
 
 // The resolved Makie.Polar fields of one PolarAxis. invertAxis maps a pixel to the Cartesian

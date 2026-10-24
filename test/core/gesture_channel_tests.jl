@@ -73,6 +73,25 @@ end
         @test ax.limits[][1] ≈ new_xmin atol = 1.0e-6
     end
 
+    @testset "a frame's manifest keeps the figure's and the axis's colours (#394)" begin
+        fig = Figure(size = (600, 400); backgroundcolor = :gray12)
+        ax = Axis(fig[1, 1]; backgroundcolor = :gray20)
+        pts = [(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)]
+        scatter!(ax, first.(pts), last.(pts))
+        w = masque(fig, [ViewInteractable(ax), PointInteractable(ax, pts)]; auto = false)
+        aid = only(k for (k, t) in w.manifest["transforms"] if t["is3d"] == false)
+        t0 = w.manifest["transforms"][aid]
+        resp = w.render_frame(
+            Dict(
+                "id" => "view", "xmin" => t0["xlims"][1] + 0.5, "xmax" => t0["xlims"][2] + 0.5,
+                "ymin" => t0["ylims"][1], "ymax" => t0["ylims"][2], "settle" => true,
+            ),
+        )
+        m2 = resp["manifest"]
+        @test m2["background"] == w.manifest["background"] == Masque._css_color(:gray12)
+        @test m2["transforms"][aid]["fill"] == t0["fill"] == Masque._css_color(:gray20)
+    end
+
     @testset "a pan moves the axes linked to it (#363)" begin
         _xlims(ax) = (fl = ax.finallimits[]; (fl.origin[1], fl.origin[1] + fl.widths[1]))
         _ylims(ax) = (fl = ax.finallimits[]; (fl.origin[2], fl.origin[2] + fl.widths[2]))

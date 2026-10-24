@@ -1,13 +1,13 @@
-import { anchorFor, computeAnchoredPlacement, hitTestAt, photoClip, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layoutSpaceLayer, axisFrame } from "./geometry"
+import { anchorFor, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
 import { renderTemplate, renderAutoTable, esc, fmtNum, withReadout } from "./template"
-import { drawHover, clearHover, drawLink, clearLink, markColorFor } from "./highlight"
+import { drawHover, clearHover, drawLegendLink, clearLegendLink, markColorFor } from "./highlight"
 import { hideCross, syncCross } from "./cross"
 import { linkedHits } from "./selection"
 import { surfaceFields } from "./surface"
 import { cancel as cancelMarquee } from "./drag/marquee"
 import { hasRegions, regionOf } from "./regions"
-import { fmt, cssAnchor, hitKey, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
+import { fmt, cssAnchor, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
 import { contentPoint } from "./photo"
 import type { OverlayCtx, OverlayState } from "./state"
 import type { Hit, HitLayer, Manifest, SliceGeometry, ThresholdGeometry } from "./types"
@@ -243,9 +243,9 @@ export function applyTipHtml(ctx: OverlayCtx, state: OverlayState, html: string,
 
 // `anchor` is in the hit's own space (content pixels for a data mark, layout pixels for
 // screen-fixed chrome). The tooltip is placed on the untransformed base, so a slid mark's
-// anchor is mapped back to the layout point where its own axis draws it (#368).
+// anchor is mapped back to the layout point where it is drawn (#368, #379).
 export function layoutAnchor(ctx: OverlayCtx, state: OverlayState, hit: Hit, anchor: Anchor): Anchor {
-    const f = layoutSpaceLayer(hit.layer) ? null : axisFrame(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer.axis)
+    const f = layerFrame(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer)
     if (!f) return anchor
     return { x: f.sx * anchor.x + f.tx, y: f.sy * anchor.y + f.ty, top: f.sy * anchor.top + f.ty }
 }
@@ -285,15 +285,15 @@ export function showTipAt(ctx: OverlayCtx, state: OverlayState, hit: Hit, x: num
     return html
 }
 
-// A legend entry's linked highlight (HitLayer.links): draw the selected recipe for each
-// linked spec (every element of a named layer, or the one element an `id:k` pin names),
-// or clear g.link when it links to nothing (absent, or an empty links[index]). Shared by
+// A legend entry's linked highlight (HitLayer.links): preview each linked spec (every element
+// of a named layer, or the one element an `id:k` pin names) as highlight.ts's drawLegendLink
+// draws it, or clear it when the entry links to nothing (absent, or an empty links[index]). Shared by
 // applyMove's hover-hit branch, restoreFocus (below), and keyboard.ts's focusTo, so pointer
 // and keyboard drive the same g.link lifecycle drawHi/clearHi already give g.hi.
 export function updateLinkForHit(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
     const hits = linkedHits(ctx.manifest_, hit.layer, hit.index)
-    if (hits.length) drawLink(state, ctx.linkGroup_, hitKey(hit), hits)
-    else clearLink(state, ctx.linkGroup_, true)
+    if (hits.length) drawLegendLink(ctx, state, hit, hits)
+    else clearLegendLink(ctx, state, true)
 }
 
 // Redraw the keyboard-focus ring/tooltip from state's cache (set by keyboard.ts's focusTo) in
@@ -357,18 +357,17 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     if (state.drag_) return
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
     const content = contentPoint(state.photo_, layout)
-    const clip = photoClip(ctx.manifest_, state.photo_, state.photoViewId_)
-    const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", clip)
+    const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_)
     // A full-viewport :view hit must not suppress element hover. A threshold/ROI drag-hover
     // still does, and it takes the resize cursor — the cross stays off.
     if (dragHit && dragHit.layer.kind !== "view") {
-        if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLink(state, ctx.linkGroup_, true); hideTip(ctx, state) }
+        if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLegendLink(ctx, state, true); hideTip(ctx, state) }
         setDragHoverChrome(ctx, state, dragHit); ctx.surface_.classList.remove("hot")
         hideCross(ctx, state)
         return
     }
     setDragHoverChrome(ctx, state, null)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", clip)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_)
     // The axis frame does not slide, so the viewport and the hair are layout pixels.
     // The sample is the content pixel under the cursor, so the value follows the slid series.
     const vp = viewportUnder(ctx.manifest_, layout.x, layout.y)
@@ -419,7 +418,7 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     if (sliceTip && sliceLayer && sampled) {
         // A covered polygon's wash would sit under the cross; the sample tooltip replaces it.
         clearHover(ctx, state, true)
-        clearLink(state, ctx.linkGroup_, true)
+        clearLegendLink(ctx, state, true)
         const geom = sliceLayer.geometry as SliceGeometry
         const payload: Record<string, number> = {}
         payload[geom.orientation === "v" ? "x" : "y"] = sampled.probe
@@ -436,20 +435,20 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
 
     if (covered && hit) {
         clearHover(ctx, state, true)
-        clearLink(state, ctx.linkGroup_, true)
-        const sample = layoutSpaceLayer(hit.layer) ? layout : content
+        clearLegendLink(ctx, state, true)
+        const sample = layerPoint(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer, layout)
         showTip(ctx, state, hit, sample.x, sample.y, e)
         return
     }
 
     if (hit) {
         drawHover(ctx, state, hit)
-        const sample = layoutSpaceLayer(hit.layer) ? layout : content
+        const sample = layerPoint(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer, layout)
         showTip(ctx, state, hit, sample.x, sample.y, e)
         updateLinkForHit(ctx, state, hit)
     } else if (!restoreFocus(ctx, state)) {
         clearHover(ctx, state, true)
-        clearLink(state, ctx.linkGroup_, true)
+        clearLegendLink(ctx, state, true)
         hideTip(ctx, state)
     }
 }
@@ -469,7 +468,7 @@ export function onMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): voi
 
 export function onLeave(ctx: OverlayCtx, state: OverlayState): void {
     cancelPendingMove(state)
-    if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLink(state, ctx.linkGroup_, true); hideTip(ctx, state) }
+    if (!restoreFocus(ctx, state)) { clearHover(ctx, state, true); clearLegendLink(ctx, state, true); hideTip(ctx, state) }
     ctx.surface_.classList.remove("hot")
     hideCross(ctx, state)
     setDragHoverChrome(ctx, state, null)

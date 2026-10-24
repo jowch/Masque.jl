@@ -4,8 +4,8 @@
 # WebGL kitchen sink, view sliders and drag, polar points on WGLMakie).
 #
 # Run locally:  julia test/notebooks/ci_run.jl
-# Each notebook manages its own env (Pkg.develop the package + add whichever Makie
-# backend it needs), so this runner only needs Pluto itself.
+# Each notebook activates MASQUE_DEV_ENV when set, else builds its own env (Pkg.develop the
+# package + add whichever Makie backend it needs), so this runner only needs Pluto itself.
 #
 # Pluto captures a cell's stdout until that cell finishes, and `SessionActions.open`
 # blocks until the notebook settles. A cold CairoMakie or WGLMakie precompile is
@@ -201,8 +201,13 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     import Pkg
-    Pkg.activate(; temp = true)
-    Pkg.add(name = "Pluto", version = "1")   # pin major
+    dev = get(ENV, "MASQUE_DEV_ENV", "")   # CI: the shared env, which holds Pluto 1
+    if !isempty(dev)
+        Pkg.activate(dev)
+    else
+        Pkg.activate(; temp = true)
+        Pkg.add(name = "Pluto", version = "1")   # pin major
+    end
     using Pluto
 
     # Julia's stdout is block-buffered when CI redirects it (see test/e2e/serve.jl).

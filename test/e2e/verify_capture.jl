@@ -24,10 +24,15 @@
 # WGLMakie is a weak dep of Masque, so a bare `--project=.` can't `using WGLMakie` — same
 # temp-env dance as make_page.jl / test/notebooks/webgl_demo.jl.
 import Pkg
-Pkg.activate(; temp = true)
-Pkg.add(["WGLMakie", "JSON3", "AbstractPlutoDingetjes"])   # before the develop, so Parsers is not downgraded (JSON3 caps it at 2.x)
-Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "..")))   # test/e2e -> package root
-Pkg.instantiate()
+dev = get(ENV, "MASQUE_DEV_ENV", "")   # CI and cloud: the shared, precompiled env
+if !isempty(dev)
+    Pkg.activate(dev)
+else
+    Pkg.activate(; temp = true)
+    Pkg.add(["WGLMakie", "JSON3", "AbstractPlutoDingetjes"])   # before the develop, so Parsers is not downgraded (JSON3 caps it at 2.x)
+    Pkg.develop(path = normpath(joinpath(@__DIR__, "..", "..")))   # test/e2e -> package root
+    Pkg.instantiate()
+end
 
 using Masque
 using WGLMakie

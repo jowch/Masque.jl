@@ -111,6 +111,7 @@ const _OVERLAY_STYLE_KEYS = (
     selected_fill_opacity = ("--masque-selected-fill-opacity", :opacity),
     ring_halo_opacity = ("--masque-ring-halo-opacity", :opacity),
     cross_opacity = ("--masque-cross-opacity", :opacity),
+    unpicked_opacity = ("--masque-unpicked-opacity", :opacity),
 )
 
 function _overlay_style_value(k, kind, v)
@@ -538,6 +539,16 @@ function build_manifest(
     (overlay_style === nothing || isempty(overlay_style)) || (m["overlayStyle"] = overlay_style)
     tip_digits == _DEFAULT_SIGDIGITS || (m["tipDigits"] = tip_digits)
     background === nothing || (m["background"] = _css_color(background))
+    # An axis whose empty plot area is not the figure's colour ships that colour as `fill`: the
+    # selected look fades unpicked marks toward it (#394).
+    if background !== nothing
+        for (ax, id) in ctx.ids
+            t = get(m["transforms"], string(id), nothing)
+            (t === nothing || !(ax isa Makie.Block) || !hasproperty(ax, :backgroundcolor)) && continue
+            fill = _css_color(_axis_fill(ax))
+            fill == m["background"] || (t["fill"] = fill)
+        end
+    end
     if owners_out !== nothing
         owners = Dict{String, LayerOwner}()
         for (i, L, _) in built
@@ -1223,7 +1234,7 @@ function _render_gesture_frame(input, backend, fig, interactables, ppu, max_widt
         ctx = context(backend, fig, ppu, max_width)
         manifest = build_manifest(
             interactables, ctx; suspend_surfaces = get(input, "settle", false) !== true, with_initial = false,
-            owners_out,
+            background = fig.scene.backgroundcolor[], owners_out,
         )
         result = _with_blocks_hidden(() -> render(backend, fig, render_ppu), interactables)
         frame = _gesture_frame(result)
