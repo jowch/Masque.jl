@@ -6,6 +6,10 @@
 #   julia test/e2e/serve.jl [port]
 #
 # PLUTO_VERSION picks the Pluto series (default "1"); CI also runs the bind round-trip on "0.20".
+#
+# It also serves the kind sweep. MASQUE_PLUTO_IN_PROCESS=1 (CI's kind-sweep step) runs notebooks
+# in this process; leave it unset for local live verification
+# (docs/dev/live-interaction-checklist.md), so notebooks run in a worker as they do for users.
 
 import Pkg
 # MASQUE_DEV_ENV already holds Pluto 1, precompiled (CI's setup job, scripts/cloud-warm.sh), so
@@ -31,10 +35,20 @@ using Pluto
 end
 
 port = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 1234
+# MASQUE_PLUTO_IN_PROCESS=1 runs notebooks inside this server process instead of a worker
+# process. CI's kind sweep sets it: the three drivers each reopen the notebook, and a worker
+# reloads the whole Makie stack every time (2.5–5 min on WebGL). The cost is fidelity: users
+# run notebooks in a worker, so a bug that only shows across the process boundary (worker
+# startup, serialization of published values) would pass here. The bind E2E and fixture jobs
+# still run notebooks in a worker. Process-global state and compiled code also carry over
+# between the drivers' openings, so only the first driver meets a cold process: a failure that
+# shows only when a driver runs first (say, the deferred view warm-up) won't reproduce here.
+in_process = get(ENV, "MASQUE_PLUTO_IN_PROCESS", "") == "1"
 Pluto.run(;
     port,
     launch_browser = false,
     require_secret_for_open_links = false,
     require_secret_for_access = false,
     disable_writing_notebook_files = true,   # never mutate the committed notebook on open
+    workspace_use_distributed = !in_process,
 )

@@ -28,7 +28,15 @@ coverage:
 # Draft and docs-only PRs skip the Julia jobs, and a failed or cancelled job skips its upload.
 # Carryforward keeps the last upload of a flag that didn't report, so the number reads as "no
 # new data this run", not a coverage cliff. The flip side: a retired flag carries forward
-# forever. Delete it in Codecov when its job goes.
+# forever, so a job that goes lists its flag below with carryforward off.
 flag_management:
   default_rules:
     carryforward: true
+  # Retired with the shared-setup CI (#392): Julia 1 now uploads all Julia coverage.
+  individual_flags:
+    - name: julia-1.10
+      carryforward: false
+    - name: no-backend
+      carryforward: false
+    - name: webgl
+      carryforward: false
