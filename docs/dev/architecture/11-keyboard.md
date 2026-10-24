@@ -20,7 +20,8 @@ Ctrl+Z undoes one change to the picks and Shift+Cmd/Ctrl+Z or Ctrl+Y (not Apple)
 (`history.ts`); they are handled only when there is a step to take and no drag in flight, so
 otherwise the chord reaches Pluto and the browser. The navigation keys move focus bare or with
 Shift only: with Cmd, Ctrl or Alt they are the browser's (Back is Cmd+← on macOS and Alt+←
-elsewhere, #404). Every handled key calls
+elsewhere, #404). A focused ROI stop is the exception: it keeps Alt+arrows for resizing
+(`dragkeys.ts`), so Alt+← there resizes rather than going Back. Every handled key calls
 `preventDefault`/`stopPropagation`; everything else, notably Tab, passes through untouched — the
 surface must never become a keyboard trap.
 

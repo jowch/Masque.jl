@@ -180,15 +180,18 @@ function adjacentLayerStart(starts: number[], cur: number, dir: 1 | -1): number 
     return starts[0]
 }
 
+// Navigation keys taken only bare or with Shift: with Cmd, Ctrl or Alt they are the browser's
+// (Back is Cmd+Left on macOS and Alt+Left elsewhere, #404).
+const NAV_KEYS: ReadonlySet<string> = new Set(["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"])
+
 // Handles ArrowRight/Down (next), ArrowLeft/Up (previous), Shift+ArrowRight/Left (next/previous
-// data point on a focused line), Home/End, PageDown/Up (next/previous layer), Enter/Space
+// data point on a focused line), Home/End, PageDown/Up (next/previous layer), all bare or with Shift, Enter/Space
 // (dispatch the click bond for the focused element), Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z or Ctrl+Y
 // (undo or redo a change to the picks, history.ts), and Escape (clear every pick and the focus;
 // with no picks to clear, also blur). Everything else — Tab above all, so the browser's own focus order still works — passes
 // through untouched. Gated on the surface actually having DOM focus (not just this listener
 // being attached to it): a keydown dispatched programmatically at the surface without focus, or
 // arriving after a click moved focus elsewhere, must not steer the overlay.
-const NAV_KEYS: ReadonlySet<string> = new Set(["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"])
 
 export function handleKeydown(ctx: OverlayCtx, state: OverlayState, e: KeyboardEvent): void {
     if (ctx.shadowRoot_.activeElement !== ctx.surface_) return
