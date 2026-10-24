@@ -16,7 +16,7 @@ sets the readout's field, `sel.axis`, to an [`AxisEvent`](@ref) with
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-readouts-player" data-masque-embed="readouts_axis" title="Sine plot. Hover to see the coordinates under the pointer." style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-readouts-player" data-masque-embed="readouts_axis" title="Sine plot. Hover to see the coordinates under the pointer." style="width:100%;height:640px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

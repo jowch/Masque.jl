@@ -10,7 +10,7 @@ color.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-template" data-masque-embed="tooltips_template" title="Four-city scatter. Hover a city to see its tooltip." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-template" data-masque-embed="tooltips_template" title="Four-city scatter. Hover a city to see its tooltip." style="width:100%;height:1000px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -122,16 +122,12 @@ without a single mark show their tooltip at the pointer.
 ## Dark figures
 
 A dark figure gets a dark tooltip, even on a light page, because the
-tooltip follows the figure's background rather than the browser or
-system setting:
-
-```julia
-fig = Figure(size = (560, 360); backgroundcolor = :gray12)
-```
+tooltip follows the figure's `backgroundcolor` rather than the browser
+or system setting:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-dark" data-masque-embed="tooltips_dark" title="Scatter on a dark figure. Hover a point to see a dark tooltip." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-dark" data-masque-embed="tooltips_dark" title="Scatter on a dark figure. Hover a point to see a dark tooltip." style="width:100%;height:1200px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

@@ -20,12 +20,7 @@ using Masque, CairoMakie
 
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000009
 md"""
-Move the pointer across the plot. A vertical line follows it, a dot marks where it crosses each spectrum, and the tooltip lists each spectrum's absorbance at that wavelength.
-"""
-
-# ╔═╡ 5c1ce000-0001-4000-8000-000000000010
-md"""
-Plot each spectrum with its own `lines!` call. A `label` that starts with a letter and holds only letters, digits, and underscores names that spectrum's row in the tooltip.
+Move the pointer across the plot, and the tooltip lists each spectrum's absorbance at that wavelength.
 """
 
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000002
@@ -46,13 +41,6 @@ begin
     nothing
 end
 
-# ╔═╡ 5c1ce000-0001-4000-8000-000000000011
-md"""
-Pass all three plots to one `SliceInteractable`, because `masque(fig)` does not add one on its own. The slice only shows values, so to keep a wavelength, add an `AxisInteractable` as well, and `bind = readout` makes `at` its value. `auto = false` leaves out what `masque(fig)` would add for the lines and the legend, so only the slice and the readout respond to the pointer.
-
-In your own notebook, a click saves the position in `at`. This page does not record clicks, so only the hover works here.
-"""
-
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000003
 @bind at masque(
     fig,
@@ -61,11 +49,6 @@ In your own notebook, a click saves the position in `at`. This page does not rec
     auto = false,
     bind = readout,
 )
-
-# ╔═╡ 5c1ce000-0001-4000-8000-000000000012
-md"""
-`at` starts as `nothing`. After a click, `at.x` is the wavelength you clicked, and this cell reads each spectrum at the nearest measured wavelength.
-"""
 
 # ╔═╡ 5c1ce000-0001-4000-8000-000000000004
 if isnothing(at)
@@ -85,11 +68,18 @@ chip = false
 
 cells = [
   "5c1ce000-0001-4000-8000-000000000009",
-  "5c1ce000-0001-4000-8000-000000000010",
   "5c1ce000-0001-4000-8000-000000000002",
-  "5c1ce000-0001-4000-8000-000000000011",
   "5c1ce000-0001-4000-8000-000000000003",
-  "5c1ce000-0001-4000-8000-000000000012",
+  "5c1ce000-0001-4000-8000-000000000004",
+]
+
+[player.segments]
+widget = [
+  "5c1ce000-0001-4000-8000-000000000009",
+  "5c1ce000-0001-4000-8000-000000000002",
+  "5c1ce000-0001-4000-8000-000000000003",
+]
+value = [
   "5c1ce000-0001-4000-8000-000000000004",
 ]
 """
@@ -1740,11 +1730,8 @@ version = "4.1.0+0"
 # ╔═╡ Cell order:
 # ╠═5c1ce000-0001-4000-8000-000000000001
 # ╟─5c1ce000-0001-4000-8000-000000000009
-# ╟─5c1ce000-0001-4000-8000-000000000010
 # ╠═5c1ce000-0001-4000-8000-000000000002
-# ╟─5c1ce000-0001-4000-8000-000000000011
 # ╠═5c1ce000-0001-4000-8000-000000000003
-# ╟─5c1ce000-0001-4000-8000-000000000012
 # ╠═5c1ce000-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
