@@ -185,7 +185,8 @@ try {
   const passedThrough = () => page.evaluate(() => window.__masqueThrough);
   const selCount = (key) => page.evaluate(([k, src]) => {
     let sr = null; (0, eval)(src)(k).querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-    return sr.querySelectorAll("g.sel > *").length;
+    // A closed mark's pick is drawn by the fade (#394).
+    return sr.querySelectorAll("g.sel > *").length + fadeOf(sr).picked.length;
   }, [key, hostOf.toString()]);
   const waitOut = async (key, before, what) => {
     let t = before;
