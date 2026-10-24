@@ -744,8 +744,8 @@ end
 # that remount the figure (e.g. a `@bind` cell that changes `alpha`) carry a
 # different URL; the player swaps `img.src` so the PNG matches the snapshot.
 function png_data_url(html::AbstractString)
-    m = match(r"data:image/png;base64,[A-Za-z0-9+/=]+", html)
-    return m === nothing ? nothing : m.match
+    m = match(r"data:image/png;base64,\s*([A-Za-z0-9+/=]+)", html)
+    return m === nothing ? nothing : "data:image/png;base64," * m.captures[1]
 end
 
 function rewrite_published_to_js(html::AbstractString, published::AbstractDict)

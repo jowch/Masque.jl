@@ -461,7 +461,7 @@ end
 function write_fallback_assets(outpath::AbstractString, idle, widget_id::AbstractString)
     stem = splitext(outpath)[1]
     doc = Dict{String, Any}()
-    m = match(r"data:image/png;base64,([A-Za-z0-9+/=]+)", get(idle.htmls, widget_id, ""))
+    m = match(r"data:image/png;base64,\s*([A-Za-z0-9+/=]+)", get(idle.htmls, widget_id, ""))
     if m === nothing
         rm(stem * ".png"; force = true)
     else

@@ -115,8 +115,8 @@ shows.
 
 To start with a mark selected, pass its position in the data you
 plotted as `selected=`. These are the same numbers `pick.index` gives,
-so `selected = 1` is the first city. It starts highlighted and its
-field starts as its event, so other cells have something to show before
+so `selected = 1` is the first city. It starts highlighted and
+`sel.cities` starts as its event, so other cells have something to show before
 anyone clicks. Click another city to replace it:
 
 ```@raw html
