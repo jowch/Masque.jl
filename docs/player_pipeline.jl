@@ -142,7 +142,8 @@ the overlay posted, or `null`. The harvest records every click and every brush r
 click on one field with each click on another, and every setting of the widget's controls
 (`control_states`). When the reader has changed two fields and no pair was recorded,
 `lookup` shows the snapshot of the latest change alone, unless a control has moved: then
-it is a miss, and the player says the setting wasn't computed.
+it is a miss, and the player says the setting wasn't computed. Both players also load
+each state's file with `jsonFiles()` and show only the latest value with `latestOnly`.
 """
 const PLAYER_LOOKUP_JS = raw"""
 function layerIndexKey(layer, index) {
@@ -860,6 +861,8 @@ end
 
 # Every string in a recorded state (a Pluto cell payload, a static player's cell HTML, a
 # remounted picture), with the overlay script and pictures moved out as in `externalize_html`.
+# Every string, not only HTML bodies, on purpose: Pluto tree leaves hold rich HTML too, and a
+# cell printing a `data:image` URL as text is not something the docs embeds do.
 externalize_strings(x::AbstractString, dir; overlay) = externalize_html(x, dir; overlay)
 externalize_strings(x::AbstractDict, dir; overlay) =
     Dict{String, Any}(string(k) => externalize_strings(v, dir; overlay) for (k, v) in x)
