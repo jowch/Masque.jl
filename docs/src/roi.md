@@ -5,16 +5,29 @@ covers: the points inside it, a block of heatmap cells, or the box's own
 coordinates. Cells that use the value respond when you release the box,
 not while you drag it.
 
-Drag the box over the stations below. The table lists the ones inside:
+Drag the box over the stations below:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-roi-table" data-masque-embed="roi_table" title="Stations scatter with a box. Drag the box and the table lists the stations inside." style="width:100%;height:1400px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-roi-table" data-masque-embed="roi_table" data-masque-segment="figure" title="Stations scatter with a box. Drag the box to pick the stations inside." style="width:100%;height:1000px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
 ```@eval
-Main.masque_fallback("roi_table")
+Main.masque_fallback("roi_table"; segment = "figure")
+```
+
+When you release the box, a cell that uses `picks` responds. This one
+lists the stations inside:
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-roi-table-rows" data-masque-embed="roi_table" data-masque-segment="table" title="A table of the stations inside the box above." style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("roi_table"; segment = "table")
 ```
 
 ## Pick the points inside a box

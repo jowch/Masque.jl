@@ -14,6 +14,13 @@ Identical snapshots are stored once, and a player over 2 MiB of snapshots fails 
 build: give the notebook fewer marks or a coarser grid. Set `MASQUE_SKIP_EMBED_EXPORT=true` to reuse players already in
 `docs/src/embeds/` when iterating on prose.
 
+A page can show one notebook in several parts with prose between them. The player TOML names
+each part under `[player.segments]` as `name = [cell ids]`, a subset of `cells` with no cell in
+two parts, and each part goes in its own iframe with `data-masque-segment="<name>"` and its own
+text twin, `Main.masque_fallback("<name>"; segment = "<part>")`. The parts share the
+notebook's `@bind` value: a click in the part showing the widget updates the cells in the
+others. `docs/src/roi.md` is the example.
+
 Each Pluto-export player is followed by its text twin: a `details` block built from the same
 notebook by an `@eval Main.masque_fallback("<name>")` cell (`docs/player_fallback.jl`), so
 search indexes the tutorial code and a reader still gets it when Pluto's frontend cannot load

@@ -8,6 +8,10 @@
 // LOAD_GRACE_MS of the iframe's load event, or the iframe never loads within
 // HANG_MS of scrolling into view, the iframe is hidden and the twin opens. A player that
 // renders within GIVE_UP_MS of loading swaps back.
+//
+// `data-masque-segment="<name>"` shows one segment of the notebook (`docs/player_segments.jl`).
+// The iframes of one notebook share its value: the one showing the widget posts each value
+// here, and this passes it to the others, and to one that loads later.
 (function () {
   "use strict";
   var LOAD_GRACE_MS = 8000;
@@ -101,8 +105,38 @@
     });
 
     var base = typeof documenterBaseURL === "string" ? documenterBaseURL : ".";
-    el.src = base + "/embeds/" + el.getAttribute("data-masque-embed") + ".html";
+    var segment = el.getAttribute("data-masque-segment");
+    el.src = base + "/embeds/" + el.getAttribute("data-masque-embed") + ".html" +
+      (segment ? "#segment=" + encodeURIComponent(segment) : "");
   }
+
+  // Embed name => the last value its widget posted, as { value }.
+  var latest = {};
+
+  function players() {
+    return Array.prototype.slice.call(document.querySelectorAll("iframe[data-masque-embed]"));
+  }
+
+  function relay(el, value) {
+    if (el.contentWindow) el.contentWindow.postMessage({ masque: "bond-relay", value: value }, "*");
+  }
+
+  window.addEventListener("message", function (e) {
+    var d = e.data;
+    if (!d || (d.masque !== "bond" && d.masque !== "ready")) return;
+    var all = players();
+    var from = all.filter(function (el) { return el.contentWindow === e.source; })[0];
+    if (!from) return;
+    var name = from.getAttribute("data-masque-embed");
+    if (d.masque === "ready") {
+      if (latest[name]) relay(from, latest[name].value);
+      return;
+    }
+    latest[name] = { value: d.value };
+    all.forEach(function (el) {
+      if (el !== from && el.getAttribute("data-masque-embed") === name) relay(el, d.value);
+    });
+  });
 
   function mountAll() {
     document.querySelectorAll("iframe[data-masque-embed]").forEach(mount);

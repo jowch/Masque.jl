@@ -31,6 +31,7 @@ function notebook_cell_code(src::AbstractString)
 end
 
 include("bind_cell.jl")
+include("player_segments.jl")
 
 # The string inside a cell that is only `md"..."` / `md"""..."""`, else `nothing`.
 function markdown_cell_text(code::AbstractString)
@@ -53,22 +54,31 @@ function fallback_player(src::AbstractString)
 end
 
 """
-    fallback_markdown(nbpath; image = nothing, outputs = Dict()) -> Markdown.MD
+    fallback_markdown(nbpath; image = nothing, outputs = Dict(), segment = nothing) -> Markdown.MD
 
-One `details` admonition holding the player's `cells` in order. `image` is a URL placed
-after the `@bind` cell; `outputs` maps a cell id to its idle plain-text output.
+One `details` admonition holding the player's `cells` in order, or only the cells of one
+`segment` (`player_segments.jl`). `image` is a URL placed after the `@bind` cell; `outputs`
+maps a cell id to its idle plain-text output.
 """
 function fallback_markdown(
         nbpath::AbstractString;
         image::Union{Nothing, AbstractString} = nothing,
         outputs::AbstractDict = Dict{String, String}(),
+        segment::Union{Nothing, AbstractString} = nothing,
     )
     src = read(nbpath, String)
     player = fallback_player(src)
     haskey(player, "cells") || error("player in $(basename(nbpath)) lists no cells")
+    ids = if segment === nothing
+        player["cells"]
+    else
+        segs = player_segments(player)
+        haskey(segs, segment) || error("player in $(basename(nbpath)) has no segment $(repr(segment))")
+        segs[segment]
+    end
     code = notebook_cell_code(src)
     blocks = Any[]
-    for id in player["cells"]
+    for id in ids
         haskey(code, id) || error("player cell $id is not in $(basename(nbpath))")
         c = code[id]
         text = markdown_cell_text(c)

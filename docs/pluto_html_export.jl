@@ -178,6 +178,31 @@ $PARENT_IS_DOC_DARK_JS
 </script>
 """
 
+# `#segment=<name>` in the URL shows only that segment's cells (`player_segments.jl`). It
+# runs in `<head>`, before Pluto draws a cell, so a hidden cell never shows. The sim chip
+# stays with the widget.
+const PLUTO_EXPORT_SEGMENT_JS = raw"""
+<script>
+(function () {
+  var SEGMENTS = @@SEGMENTS@@;
+  var m = /[#&]segment=([a-z0-9_-]+)/.exec(location.hash);
+  if (!m) return;
+  var ids = SEGMENTS[m[1]];
+  if (!ids) {
+    console.warn("masque player: no segment", m[1]);
+    return;
+  }
+  window.masqueSegment = ids;
+  var css = "pluto-cell" + ids.map(function (id) { return ':not([id="' + id + '"])'; }).join("") +
+    " { display: none !important; }";
+  if (ids.indexOf("@@WIDGET@@") === -1) css += " .masque-sim-chip { display: none !important; }";
+  var style = document.createElement("style");
+  style.textContent = css;
+  document.head.appendChild(style);
+})();
+</script>
+"""
+
 const PLUTO_EXPORT_SIM_JS = raw"""
 <script>
 {
@@ -190,6 +215,25 @@ const PLUTO_EXPORT_SIM_JS = raw"""
     const bottom = nb ? nb.getBoundingClientRect().bottom : document.documentElement.scrollHeight;
     window.frameElement.style.height = Math.max(1, Math.ceil(bottom + 8)) + "px";
   }
+  // The segments of one notebook share its value: the iframe showing the widget posts each
+  // value to the page, and the page passes it to the notebook's other iframes
+  // (`assets/masque-embed.js`), which patch their own cells.
+  const framed = window.parent && window.parent !== window;
+  const showsWidget = !window.masqueSegment || window.masqueSegment.indexOf(WIDGET_ID) !== -1;
+  function announce(v) {
+    if (framed && showsWidget) window.parent.postMessage({ masque: "bond", value: v }, "*");
+  }
+  let pending;
+  let hasPending = false;
+  window.addEventListener("message", function (e) {
+    const d = e.data;
+    if (e.source !== window.parent || !d || d.masque !== "bond-relay") return;
+    if (armed) patch(d.value);
+    else {
+      pending = d.value;
+      hasPending = true;
+    }
+  });
   let stamp = Date.now();
   function nextStamp() {
     stamp = Math.max(Date.now(), stamp + 1);
@@ -237,12 +281,19 @@ const PLUTO_EXPORT_SIM_JS = raw"""
       set: function (v) {
         cur = v;
         patch(v);
+        announce(v);
       },
     });
-    host.addEventListener("input", function () { patch(host.value); });
+    host.addEventListener("input", function () {
+      patch(host.value);
+      announce(host.value);
+    });
     // A widget built with `selected=` starts with a value; the export shows the idle
     // (`nothing`) outputs, so swap in that value's snapshot now.
     if (cur != null) patch(cur);
+    if (hasPending) patch(pending);
+    // Ask the page for a value another segment set before this one loaded.
+    if (framed) window.parent.postMessage({ masque: "ready" }, "*");
     return true;
   }
   function boot() {
@@ -259,7 +310,10 @@ const PLUTO_EXPORT_SIM_JS = raw"""
 </script>
 """
 
-function postprocess_pluto_export(html::AbstractString; snapshots, widget_id::AbstractString, show_chip::Bool)
+function postprocess_pluto_export(
+        html::AbstractString; snapshots, widget_id::AbstractString, show_chip::Bool,
+        segments::AbstractDict = Dict{String, Vector{String}}(),
+    )
     html = replace_js_assignment(html, "pluto_notebookfile", "undefined")
     html = replace_js_assignment(html, "pluto_binder_url", "undefined")
     occursin("window.pluto_notebookfile = undefined;", html) || error("notebook file assignment was not cleared")
@@ -271,9 +325,12 @@ function postprocess_pluto_export(html::AbstractString; snapshots, widget_id::Ab
         PLUTO_EXPORT_SIM_JS, "@@SNAPS@@" => payload, "@@WIDGET@@" => widget_id, "@@LOOKUP@@" => PLAYER_LOOKUP_JS,
     )
     occursin("</script>", payload) && error("snapshot JSON still contains a script close tag")
+    segment_js = isempty(segments) ? "" :
+        replace(PLUTO_EXPORT_SEGMENT_JS, "@@SEGMENTS@@" => json_write(segments), "@@WIDGET@@" => widget_id)
     head = """
     <!-- masque-pluto-export -->
     $PLUTO_EXPORT_THEME_BOOT
+    $segment_js
     <style>
     $theme
     $PLUTO_EXPORT_CSS
@@ -315,6 +372,7 @@ end
 
 function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Symbol, rows)
     get(player, "show_code", false) === true || error("pluto_html player needs show_code in $(basename(path))")
+    segments = player_segments(player)
     widget = masque_widget_cell(cells, bond)
     states = NamedTuple[]
     n_inlined_total = 0
@@ -364,6 +422,7 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
         snapshots,
         widget_id = string(widget.cell_id),
         show_chip = get(player, "chip", true) !== false,
+        segments,
     )
     mkpath(dirname(outpath))
     write(outpath, html)
