@@ -66,7 +66,7 @@ your notebook gets their value:
 | To get | Use | You | Your notebook gets |
 |---|---|---|---|
 | The value of each line you pass it, at the pointer | [`SliceInteractable`](@ref) | hover | nothing |
-| Which line you clicked | `masque(fig)`, with the line in `bind` | click a line | that line ([Click marks](@ref)) |
+| Which line you clicked | `masque(fig)`, with the line in `bind` | click a line | that line ([What each mark returns](@ref)) |
 | The coordinates you clicked | [`AxisInteractable`](@ref) | click | `x` and `y` ([Read coordinates](@ref)) |
 | A cutoff | [`ThresholdInteractable`](@ref) | drag a line | its position ([Read coordinates](@ref)) |
 | A range of `x` and `y`, or the points in it | [`ROIInteractable`](@ref) | drag a box | the box or the points inside ([Brush a region](@ref)) |

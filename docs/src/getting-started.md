@@ -93,7 +93,7 @@ sets `pick.name`. Your fields are added to the point's own `x` and
 `y`, so you don't copy the coordinates into each entry.
 
 The notebook below does the same with three points, recorded from a real
-notebook (see [Static exports and this site](@ref)).
+notebook (see [Examples on this site](@ref this-site)).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -107,9 +107,9 @@ Main.masque_fallback("home_quickstart")
 
 ## Where to go next
 
-- [Concepts](@ref): how hover, clicks, payloads, and `@bind` fit together
+- [How Masque works](@ref): how hover, clicks, payloads, and `@bind` fit together
 - [Tooltips](@ref): templates, number formatting, and dark figures
-- [Click marks](@ref): bars, polygons, lines, and polar points
+- [What each mark returns](@ref): bars, polygons, lines, and polar points
 - [Brush a region](@ref): drag a box and get the points inside it
 - [Selection](@ref): start with a mark selected, or keep one across a rebuild
 - [Linked views](@ref): update another plot or a table from a click

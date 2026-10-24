@@ -1,4 +1,4 @@
-# Pan and orbit
+# Pan, zoom and orbit
 
 Add a [`ViewInteractable`](@ref) to an axis to look closer: drag a 2D
 plot to pan it, scroll to zoom, or drag an `Axis3` to turn it. Moving

@@ -13,17 +13,17 @@ be a player, so their page shows a clip of the live notebook instead:
 | Clip | Page | Notebook | Recorder |
 |---|---|---|---|
 | `docs/src/assets/example-cluster.mp4` | Examples › Compare a cluster | `cluster_notebook.jl` | `test/e2e/cluster_clip.mjs` |
-| `docs/src/assets/controls.mp4` | Sliders and toggles | `controls_notebook.jl` | `test/e2e/docs_clip.mjs controls` |
+| `docs/src/assets/controls.mp4` | Sliders, toggles and menus | `controls_notebook.jl` | `test/e2e/docs_clip.mjs controls` |
 | `docs/src/assets/onchange.mp4` | Update the figure | `onchange_notebook.jl` | `test/e2e/docs_clip.mjs onchange` |
-| `docs/src/assets/view-linkaxes.mp4` | Pan and orbit › Pan and zoom a 2D axis | `linkaxes_notebook.jl` | `test/e2e/docs_clip.mjs linkaxes` |
-| `docs/src/assets/view-linkcameras.mp4` | Pan and orbit › Turn several panels together | `linkcameras_notebook.jl` | `test/e2e/docs_clip.mjs linkcameras` |
+| `docs/src/assets/view-linkaxes.mp4` | Pan, zoom and orbit › Pan and zoom a 2D axis | `linkaxes_notebook.jl` | `test/e2e/docs_clip.mjs linkaxes` |
+| `docs/src/assets/view-linkcameras.mp4` | Pan, zoom and orbit › Turn several panels together | `linkcameras_notebook.jl` | `test/e2e/docs_clip.mjs linkcameras` |
 | `docs/src/assets/selection-many.mp4` | Selection › Select several marks | `selection_many_notebook.jl` | `test/e2e/docs_clip.mjs selection-many` |
-| `docs/src/assets/grid-many.mp4` | Inspect a grid › Select several cells | `grid_many_notebook.jl` | `test/e2e/docs_clip.mjs grid-many` |
-| `docs/src/assets/grid-regions.mp4` | Inspect a grid › Pick whole regions | `grid_regions_notebook.jl` | `test/e2e/docs_clip.mjs grid-regions` |
+| `docs/src/assets/grid-many.mp4` | Heatmaps and images › Select several cells | `grid_many_notebook.jl` | `test/e2e/docs_clip.mjs grid-many` |
+| `docs/src/assets/grid-regions.mp4` | Heatmaps and images › Pick whole regions | `grid_regions_notebook.jl` | `test/e2e/docs_clip.mjs grid-regions` |
+| `docs/src/assets/grid-brush.mp4` | Heatmaps and images › Brush a block of cells | `grid_brush_notebook.jl` | `test/e2e/docs_clip.mjs grid-brush` |
 | `docs/src/assets/widgets-classes.mp4` | Build a widget › Example: label points into classes | `classes_notebook.jl` | `test/e2e/docs_clip.mjs classes` |
-| `docs/src/assets/grid-brush.mp4` | Inspect a grid › Brush a block of cells | `grid_brush_notebook.jl` | `test/e2e/docs_clip.mjs grid-brush` |
-| `docs/src/assets/view-pan.mp4` | Pan and orbit (top) | `view_pan_notebook.jl` | `test/e2e/docs_clip.mjs view-pan` |
-| `docs/src/assets/view-orbit.mp4` | Pan and orbit › Orbit an `Axis3` | `view_orbit_notebook.jl` | `test/e2e/docs_clip.mjs view-orbit` |
+| `docs/src/assets/view-pan.mp4` | Pan, zoom and orbit (top) | `view_pan_notebook.jl` | `test/e2e/docs_clip.mjs view-pan` |
+| `docs/src/assets/view-orbit.mp4` | Pan, zoom and orbit › Orbit an `Axis3` | `view_orbit_notebook.jl` | `test/e2e/docs_clip.mjs view-orbit` |
 
 The Home page's four loops have their own recorders: see `docs/dev/home-gifs/README.md`.
 
