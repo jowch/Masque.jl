@@ -40,6 +40,16 @@ try {
     reducedMotion: "no-preference",
   });
   page = await context.newPage();
+  // The fade's picks in a widget's shadow root (#394), every axis together; see fade.ts.
+  await page.addInitScript(() => {
+    window.fadeOf = (sr) => {
+      const out = { picked: [], kept: [], lone: [], outlines: [] };
+      for (const w of sr?.querySelectorAll(".masque-fade") ?? []) {
+        for (const k of Object.keys(out)) out[k].push(...(w.masqueFade?.[k] ?? []));
+      }
+      return out;
+    };
+  });
   page.on("pageerror", (e) => {
     const shim = SHIM_LEAK.test(e.message);
     const benign = shim && ALLOWED.some((re) => re.test(e.message));
@@ -155,12 +165,42 @@ try {
     throw new Error(`elementCount: unhandled kind ${layer.kind}`);
   };
 
+  // #386 helpers. The widget host (`.ip-host`) gets each committed value as an "input" event;
+  // a key the overlay does not take bubbles on to the page, where a listener records it.
+  const hostOf = (k) => {
+    const span = document.querySelector(`#coords_${k}`);
+    return [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+  };
+  const countInputs = (key) => page.evaluate(([k, src]) => {
+    const host = (0, eval)(src)(k);
+    host.__masqueInputs = 0;
+    if (!host.__masqueCounting) { host.addEventListener("input", () => { host.__masqueInputs++ }); host.__masqueCounting = true; }
+    window.__masqueThrough = [];
+    if (!window.__masqueKeyLog) {
+      document.addEventListener("keydown", (e) => { if (/^[zy]$/i.test(e.key) && (e.ctrlKey || e.metaKey)) window.__masqueThrough.push({ key: e.key, prevented: e.defaultPrevented }) });
+      window.__masqueKeyLog = true;
+    }
+  }, [key, hostOf.toString()]);
+  const inputCount = (key) => page.evaluate(([k, src]) => (0, eval)(src)(k).__masqueInputs, [key, hostOf.toString()]);
+  const passedThrough = () => page.evaluate(() => window.__masqueThrough);
+  const selCount = (key) => page.evaluate(([k, src]) => {
+    let sr = null; (0, eval)(src)(k).querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+    // A closed mark's pick is drawn by the fade (#394).
+    return sr.querySelectorAll("g.sel > *").length + fadeOf(sr).picked.length;
+  }, [key, hostOf.toString()]);
+  const waitOut = async (key, before, what) => {
+    let t = before;
+    for (let i = 0; i < 50 && t === before; i++) { await page.waitForTimeout(100); t = await textOf(`#out_${key}`); }
+    if (t === before) throw new Error(`${key}: ${what} never changed #out_${key}`);
+    return t;
+  };
+
   for (const key of ["scatter", "barplot", "poly"]) {
     const layers = await layersOf(key);
     const layer = layers[0];
     const n = elementCount(layer);
     const surface = await surfaceHandle(key);
-    // The baked-`selected` index for this layer (poly bakes 0; scatter/barplot bake 1), or null
+    // The baked-`selected` index for this layer (scatter, barplot and poly bake 1), or null
     // when nothing is baked — see kind_sweep_figures.jl's meta.
     const spec = meta.find((m) => m.key === key);
     const bakedSelected = spec?.selected ? spec.selectedIndex : null;
@@ -211,10 +251,38 @@ try {
     }
     passed.push(`${key}/enter-bind`);
 
+    // #386: Escape clears the pick and keeps focus, so Cmd/Ctrl+Z brings it back, one value per
+    // step; a second Escape leaves. The undo key passes through when there is nothing to take.
+    await countInputs(key);
     await page.keyboard.press("Escape");
     s = await state(key);
-    if (s.focused) throw new Error(`${key}: Escape did not blur the surface`);
+    if (!s.focused) throw new Error(`${key}: Escape that cleared a pick left the surface`);
     if (s.ring && !s.ring.leaving) throw new Error(`${key}: Escape left a non-fading ring`);
+    const cleared = await waitOut(key, after, "escape");
+    if (new RegExp(`:${layer.id},`).test(cleared)) throw new Error(`${key}: Escape left a pick: ${cleared.slice(0, 200)}`);
+    passed.push(`${key}/escape-clears-keeps-focus`);
+    await page.keyboard.press("ControlOrMeta+z");
+    let undone = await waitOut(key, cleared, "undo");
+    if (undone !== after) throw new Error(`${key}: Cmd/Ctrl+Z gave ${undone.slice(0, 200)}, want the pick back: ${after.slice(0, 200)}`);
+    if ((await selCount(key)) === 0) throw new Error(`${key}: Cmd/Ctrl+Z restored the value but drew no selection`);
+    await page.keyboard.press("ControlOrMeta+Shift+z");
+    const redone = await waitOut(key, undone, "redo");
+    if (redone !== cleared) throw new Error(`${key}: Shift+Cmd/Ctrl+Z gave ${redone.slice(0, 200)}, want ${cleared.slice(0, 200)}`);
+    if ((await passedThrough()).length) throw new Error(`${key}: a handled undo/redo reached the page`);
+    await page.keyboard.press("ControlOrMeta+Shift+z"); // nothing left to redo
+    const through = await passedThrough();
+    if (through.length !== 1 || through[0].prevented) throw new Error(`${key}: a redo with no step was not passed through untouched: ${JSON.stringify(through)}`);
+    await page.keyboard.press("ControlOrMeta+z");
+    undone = await waitOut(key, redone, "undo-again");
+    if (undone !== after) throw new Error(`${key}: second Cmd/Ctrl+Z did not bring the pick back`);
+    const inputs = await inputCount(key);
+    if (inputs !== 4) throw new Error(`${key}: Escape, undo, redo, undo sent ${inputs} values, want 4`);
+    passed.push(`${key}/undo-redo`);
+    await page.keyboard.press("Escape");
+    await waitOut(key, undone, "escape-again");
+    await page.keyboard.press("Escape");
+    s = await state(key);
+    if (s.focused) throw new Error(`${key}: Escape with nothing picked did not blur the surface`);
     passed.push(`${key}/escape`);
   }
 
@@ -276,8 +344,11 @@ try {
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
       const groups = ["svg.masque-fill", "svg.masque-edge", "svg.masque-plain"].flatMap((sel) => [...sr.querySelectorAll(`${sel} g.masque-photo > g.link`)]);
       const populated = groups.find((g) => g.children.length > 0);
+      // A closed series is previewed by the fade (#394): its marks kept beyond the picks.
+      const f = fadeOf(sr);
       return {
         count: groups.reduce((n, g) => n + g.children.length, 0),
+        preview: f.kept.length - f.picked.length,
         leaving: populated ? populated.firstElementChild.classList.contains("masque-leave") : null,
       };
     }, k);
@@ -306,7 +377,9 @@ try {
     await surface.focus();
     for (let i = 0; i <= target; i++) await page.keyboard.press("ArrowRight");
     const li = await linkGCount(key);
-    if (li.count === 0) throw new Error(`${key}: keyboard focus on a legend row drew no g.link content`);
+    // A closed series is previewed by the fade, kept (#394); "pts" is the legend's only closed
+    // series, so nothing fades, as on a click. Linked lines would draw in g.link.
+    if (li.count === 0 && li.preview === 0) throw new Error(`${key}: keyboard focus on the "pts" legend row previewed nothing (${JSON.stringify(li)})`);
     passed.push("legend/keyboard-focus-draws-link");
 
     // Default legend has no visual card. The live region still names the entry ("pts" is row
@@ -321,8 +394,9 @@ try {
 
     await page.keyboard.press("Escape");
     const afterEsc = await linkGCount(key);
-    if (afterEsc.count === 0) throw new Error(`${key}: Escape cleared g.link instantly (no remount fade)`);
-    if (!afterEsc.leaving) throw new Error(`${key}: Escape did not apply masque-leave to g.link`);
+    if (afterEsc.preview !== 0) throw new Error(`${key}: Escape left the fade's legend preview drawn (${JSON.stringify(afterEsc)})`);
+    if (li.count > 0 && afterEsc.count === 0) throw new Error(`${key}: Escape cleared g.link instantly (no remount fade)`);
+    if (afterEsc.count > 0 && !afterEsc.leaving) throw new Error(`${key}: Escape did not apply masque-leave to g.link`);
     passed.push("legend/keyboard-escape-fades-link");
 
     // #304: a plot's Makie `label` names its layer, and the live region announces that name

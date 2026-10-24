@@ -1,9 +1,10 @@
 # Selection
 
-Clicking a mark selects it. The mark stays highlighted, and its plot's
-field in the `@bind` value holds it until another click on that plot
-replaces it. Click the mark again to clear the selection. You can also start
-with a mark selected, or keep a selection when the figure is rebuilt.
+Clicking a mark selects it. The mark keeps its color while the rest of
+its plot fades, and its plot's field in the `@bind` value holds it until
+another click on that plot replaces it. Click the mark again to clear
+the selection. You can also start with a mark selected, or keep a
+selection when the figure is rebuilt.
 
 The examples on this page use a scatter of cities, with each city's
 name in its payload's `city` field:
@@ -21,13 +22,38 @@ The `id` names the field, so the selected city is `sel.cities`.
 city's [`ElementEvent`](@ref). Clicking another city replaces it,
 because a plot holds one selection. Clicking the selected city again,
 clicking empty space inside the axis, or pressing Escape clears it: the
-highlight goes and `sel.cities` is `nothing` again.
+plot is back to full color and `sel.cities` is `nothing` again.
 
 Each plot keeps its own selection, so in a figure with two scatters,
 clicking a point in one leaves the other's field as it was. A click on
 empty space clears only the plots in the axis you clicked, and Escape
 clears every plot in the figure. A click on a line or another mark that
 only shows a tooltip is not empty space, so it keeps the selection.
+
+A selected point, bar, or shape with no other selected mark near it
+also gets a thin outline in a shade of its own color, so a few
+picks stay easy to find in a crowded plot. A selected line gets a ring
+instead, and a heatmap cell an outline. To fade the other marks more or
+less, set `unpicked_opacity` in [Overlay styling](@ref).
+
+![Two scatters of eight clusters with half of each cluster's points selected: the selected points keep their cluster colors, the rest are faint, and the few selected points on the edges are outlined](assets/selection-look-after.png)
+
+## Undo a change
+
+To get back a selection that a click, a box, or Escape took away, press
+Cmd-Z (on a Mac) or Ctrl-Z (elsewhere) while the figure has focus, which
+it does once you click it or Tab to it. Each press steps back one
+change, and `sel` changes once, as it does for a click. Shift-Cmd-Z or
+Shift-Ctrl-Z steps forward again, and so does Ctrl-Y off a Mac. Undo
+covers the selection only, not sliders, menus, or the view, and it
+starts over when the cell runs again or when an `onchange` redraw
+changes a plot's marks. Cells that use `sel` respond to an undo as they
+do to a click, so anything your own code keeps from earlier picks, such
+as a label stored for each picked mark, comes back only if that code
+still holds it when the pick returns. After you click the figure, Cmd-Z
+or Ctrl-Z undoes its selection rather than your last edit to the code,
+so click into the code first to undo an edit there. With nothing to
+undo, the key does what it would anywhere else on the page.
 
 ## Select several marks
 

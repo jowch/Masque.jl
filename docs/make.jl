@@ -61,6 +61,7 @@ makedocs(;
             "Slice across series" => "slice.md",
             "Pan and orbit" => "view.md",
             "Update the figure" => "onchange.md",
+            "Build a widget" => "widgets.md",
             "Sliders and toggles" => "controls.md",
             "Linked views" => "linked-views.md",
             "Custom hits" => "custom.md",

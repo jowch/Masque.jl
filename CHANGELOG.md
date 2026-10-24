@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `overlaystyle` takes `unpicked_opacity`, how much of an unpicked mark still shows once
+  its plot has a pick, from 0 to 1 (default 0.2) (#394).
+- With a figure focused, Cmd-Z (on a Mac) or Ctrl-Z (elsewhere) undoes the last change to the
+  selection, whether a click, a box, a legend click, or Escape made it, and Shift-Cmd-Z,
+  Shift-Ctrl-Z, or Ctrl-Y redoes it. Each step changes the `@bind` value once. Undo covers the
+  selection only, and with nothing to undo the key reaches the page as before. Escape that
+  clears a selection now keeps the figure focused, so an undo can follow, and a second Escape
+  leaves the figure (#386).
+
+### Changed
+- A pick on a scatter, bar, polygon, text or violin plot keeps its own color and the plot's
+  other marks fade, instead of a grey highlight over the pick. A pick with no other pick next
+  to it gets a thin outline in a shade of its own color, so it stands out among faded marks.
+  The fade also shows a legend entry's series while you hover it. With thousands of picks the
+  plot now reads at a glance where the highlights covered it
+  ([before](docs/src/assets/selection-look-before.png),
+  [after](docs/src/assets/selection-look-after.png)), and a click on such a plot redraws
+  faster. Lines keep their ring, and heatmap cells and regions their outline (#394).
+
+### Fixed
+- While a pan or zoom preview is showing, hovering or clicking a mark on an axis tied to the
+  view by `linkaxes!`, or on any other axis, finds the mark where it is drawn. A mark on
+  another axis couldn't be hovered or clicked until the new frame arrived, and a linked axis
+  with a different scale answered at the wrong point (#379).
+
 ## [0.4.0] - 2026-10-22
 
 ### Added

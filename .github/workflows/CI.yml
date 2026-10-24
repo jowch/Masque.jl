@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+    # ready_for_review: a draft runs only lint until it is marked ready. No `labeled`: with
+    # cancel-in-progress, any label added to a ready PR (`breaking`, the add/remove trick that
+    # re-runs Release gate) would cancel and restart a full run. A draft labelled `full-ci` runs
+    # the full suite from its next push, or from a re-run of this workflow (see `changes`).
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # needed for the bundle commit-back on main (CI is the sole author of
 # assets/overlay.js and assets/masque-webgl.js)
@@ -14,106 +19,144 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# How the Julia jobs share work: `setup` and `setup-lts` each resolve the shared test env once
+# (scripts/cloud-warm.sh, the env cloud dev sessions use) and precompile it only when no cache
+# holds that exact manifest yet. Every other Julia job restores that depot and runs against
+# MASQUE_DEV_ENV, so the Makie stack compiles once per Julia version, not once per job.
+
 jobs:
+  changes:
+    # Decides whether the Julia, sweep and fixture jobs run. They skip when
+    # - the PR is a draft without the `full-ci` label: CI runs once the work is ready
+    #   (marking it ready for review runs it), and a thread that needs full CI on a draft adds
+    #   the label;
+    # - the PR only touches prose (docs/src, docs/dev, *.md); the Documentation workflow still
+    #   builds and checks the docs.
+    # The skip is a job-level `if`, and the `CI result` job below turns the whole run into one
+    # check, so a skip never leaves a required check pending. The PR is read fresh, so every run
+    # on the same PR state decides the same way, whichever event started it, and a re-run sees a
+    # label added since. Pushes to main run everything.
+    name: Changed files
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.files.outputs.code }}
+    steps:
+      - id: files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName !== "pull_request") {
+              core.setOutput("code", "true")
+              return
+            }
+            const pull = { owner: context.repo.owner, repo: context.repo.repo, pull_number: context.payload.pull_request.number }
+            const { data: pr } = await github.rest.pulls.get(pull)
+            const labels = pr.labels.map((l) => l.name)
+            if (pr.draft && !labels.includes("full-ci")) {
+              core.notice("Draft PR: the Julia, sweep and fixture jobs run once it is marked ready for review, or with the `full-ci` label.")
+              core.setOutput("code", "false")
+              return
+            }
+            const files = await github.paginate(github.rest.pulls.listFiles, { ...pull, per_page: 100 })
+            const prose = (p) => /^docs\/(src|dev)\//.test(p) || /\.md$/.test(p)
+            const code = files.filter((f) => !prose(f.filename) || (f.previous_filename && !prose(f.previous_filename)))
+            core.info(`${files.length} changed file(s), ${code.length} outside docs/src, docs/dev and *.md`)
+            for (const f of code.slice(0, 20)) core.info(`  ${f.filename}`)
+            core.setOutput("code", code.length > 0 ? "true" : "false")
+
+  setup:
+    name: Setup (Julia 1)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      key: ${{ steps.env.outputs.key }}
+      julia-version: ${{ steps.env.outputs.julia-version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: env
+        uses: ./.github/actions/julia-env-build
+        with:
+          version: '1'
+
+  setup-lts:
+    # Julia 1.10 is the compat floor.
+    name: Setup (Julia 1.10)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      key: ${{ steps.env.outputs.key }}
+      julia-version: ${{ steps.env.outputs.julia-version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: env
+        uses: ./.github/actions/julia-env-build
+        with:
+          version: '1.10'
+
   julia:
+    # Julia 1 runs Core, the no-backend group and the WebGL extension group, with coverage.
+    # Julia 1.10 runs Core and the WebGL group (the compat floor for the WGLMakie/Bonito
+    # coupling guard) without coverage: before 1.11, any `--code-coverage` makes Julia skip
+    # every package image and compile the whole Makie stack in-process (~6 min per process).
+    # Each group is its own `julia` process: the no-backend group must never load CairoMakie
+    # or WGLMakie, and the WebGL group needs WGLMakie loaded.
     name: Julia ${{ matrix.version }}
+    needs: [setup, setup-lts]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        version: ['1.10', '1']
+        include:
+          - version: '1.10'
+            coverage: ''
+          - version: '1'
+            coverage: --code-coverage=@${{ github.workspace }}
+    env:
+      COVERAGE: ${{ matrix.coverage }}
     steps:
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
+      - uses: ./.github/actions/julia-env
         with:
-          version: ${{ matrix.version }}
-      - uses: julia-actions/cache@v2
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
+          julia-version: ${{ matrix.version == '1.10' && needs.setup-lts.outputs.julia-version || needs.setup.outputs.julia-version }}
+          key: ${{ matrix.version == '1.10' && needs.setup-lts.outputs.key || needs.setup.outputs.key }}
+      # On Julia 1, coverage tracks this checkout only (`@path`), so the restored dependency
+      # images still load; nothing is recompiled for it.
+      - name: Core tests
         env:
           GROUP: Core
+        run: julia --color=yes $COVERAGE --project="$MASQUE_DEV_ENV" test/runtests.jl
+      - name: No-backend error path
+        if: matrix.version == '1' && !cancelled()
+        env:
+          GROUP: NoBackend
+        run: julia --color=yes $COVERAGE --project="$MASQUE_DEV_ENV" test/runtests.jl
+      - name: WGLMakie extension
+        if: ${{ !cancelled() }}
+        env:
+          GROUP: WebGL
+        run: julia --color=yes $COVERAGE --project="$MASQUE_DEV_ENV" test/runtests.jl
       - uses: julia-actions/julia-processcoverage@v1
+        if: matrix.version == '1'
       - uses: codecov/codecov-action@v5
+        if: matrix.version == '1'
         with:
           files: lcov.info
           flags: julia-${{ matrix.version }}
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
-  no-backend:
-    # Masque core with NEITHER backend extension loaded — the "load a renderer" error path.
-    # Own job: it must run in a process that never `using`s CairoMakie/WGLMakie, so it can't
-    # share a job with `julia` (Core) or `webgl` without risking load order flakiness.
-    name: No-backend error path
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
-        with:
-          version: '1'
-      - uses: julia-actions/cache@v2
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
-        env:
-          GROUP: NoBackend
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v5
-        with:
-          files: lcov.info
-          flags: no-backend
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-  webgl:
-    # The :webgl extension isn't covered by the `julia` job (GROUP=Core loads CairoMakie
-    # only). Run its suite — incl. the WGLMakie/Bonito version-coupling guard and the
-    # both-loaded Cairo default — so a dependency bump that moves the wire format fails the
-    # gate here instead of only on a manual local run. Pinned to 1.10, the compat floor
-    # Task 4 verified.
-    name: WGLMakie extension
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
-        with:
-          version: '1.10'
-      - uses: julia-actions/cache@v2
-      - name: Instantiate + test WGLMakie extension
-        run: |
-          julia --project=. -e 'using Pkg; Pkg.instantiate()'
-          GROUP=WebGL julia --project=. -e 'using Pkg; Pkg.test(; coverage=true)'
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v5
-        with:
-          files: lcov.info
-          flags: webgl
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-      # Real-browser `@bind` round-trip: generate the self-contained widget page, then click
-      # scatter marker 0 in headless Chromium and assert the overlay emits the right bond
-      # value. Covers the browser half the Julia unit tests can't reach.
-      - name: Generate :webgl E2E page
-        run: julia --project=. test/e2e/make_page.jl "$RUNNER_TEMP/e2e"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install Playwright + Chromium
-        working-directory: test/e2e
-        run: |
-          npm install
-          npx playwright install --with-deps chromium
-      - name: Run real-browser bind E2E
-        working-directory: test/e2e
-        run: node click.mjs "$RUNNER_TEMP/e2e"
-      - name: Verify browser-emitted value through transform_value
-        run: julia --project=. test/e2e/verify_capture.jl "$RUNNER_TEMP/e2e"
-
   webgl-bind-e2e:
-    # THROUGH-Pluto `@bind` E2E: a live headless Pluto kernel + real Chromium. Isolated as its
-    # own job (heaviest, and the one most exposed to Pluto-version churn) so it reads cleanly
-    # and is trivial to drop if it ever proves flaky.
-    name: WGLMakie bind E2E (Pluto)
+    # THROUGH-Pluto `@bind` E2E on the Pluto 0.20 series: a live headless Pluto kernel + real
+    # Chromium. The one remaining 0.20 check; it covers the WebGL `@bind` round-trip only, not
+    # the kind sweep or Cairo. Drop it at 0.5.0. On Pluto 1 the WebGL kind sweep already clicks
+    # every kind and reads the bound value back through Pluto.
+    name: WGLMakie bind E2E (Pluto 0.20)
+    needs: setup-lts
     runs-on: ubuntu-latest
     # Worst case inside "Through-Pluto bind round-trip": 25min mount + 2×5min PLUTO_MS attempts
     # ≈ 35min, plus the port-readiness loop (≤4min) and setup steps before it — 45min leaves
@@ -122,22 +165,28 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
+      - uses: ./.github/actions/julia-env
         with:
-          version: '1.10'
-      - uses: julia-actions/cache@v2
+          julia-version: ${{ needs.setup-lts.outputs.julia-version }}
+          key: ${{ needs.setup-lts.outputs.key }}
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('test/e2e/package.json') }}
       - name: Install Playwright + Chromium
         working-directory: test/e2e
         run: |
           npm install
           npx playwright install --with-deps chromium
-      - name: Pre-warm env (precompile into the cached depot)
-        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
       - name: Through-Pluto bind round-trip
         working-directory: test/e2e
+        env:
+          # serve.jl puts this series in its own env; the notebook runs on MASQUE_DEV_ENV.
+          PLUTO_VERSION: '0.20'
         run: |
           julia serve.jl 1234 > pluto.log 2>&1 &
           SERVER=$!
@@ -161,7 +210,7 @@ jobs:
         if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: bind-e2e-failure
+          name: bind-e2e-failure-pluto-0.20
           path: |
             ${{ runner.temp }}/bind-e2e-artifacts/
             test/e2e/pluto.log
@@ -173,6 +222,7 @@ jobs:
     # kind_sweep.mjs + polish_verify.mjs + keyboard_a11y.mjs on both backends — runs on every PR
     # and gates the merge. It ran advisorily until 60 consecutive CI runs showed no failure.
     name: Kind sweep (${{ matrix.backend }})
+    needs: setup-lts
     runs-on: ubuntu-latest
     # kind_sweep.mjs's own mount deadline is 25min, polish_verify.mjs's is 15min, keyboard_a11y.mjs's
     # is also 25min — well over an hour of driver budget alone before checkout/playwright-install/
@@ -185,13 +235,12 @@ jobs:
         backend: [cairo, webgl]
     steps:
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
+      # Julia 1.10, the compat floor, same as the WebGL extension tests — a flake here should be
+      # attributable to the sweep, not to running a different Julia than the rest of the WGL gate.
+      - uses: ./.github/actions/julia-env
         with:
-          # Pinned to 1.10, same compat floor as `webgl`/`webgl-bind-e2e` — a flake here should
-          # be attributable to the sweep, not to running a different Julia than the rest of the
-          # WGL gate.
-          version: '1.10'
-      - uses: julia-actions/cache@v2
+          julia-version: ${{ needs.setup-lts.outputs.julia-version }}
+          key: ${{ needs.setup-lts.outputs.key }}
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -205,16 +254,15 @@ jobs:
         run: |
           npm install
           npx playwright install --with-deps chromium
-      - name: Instantiate shared dev env (Masque + both Makies)
+      # A self-contained :webgl widget page (no Pluto): click scatter marker 0 in Chromium, assert
+      # the overlay emits the right bond value, then feed that exact emission through
+      # transform_value.
+      - name: WebGL widget page click
+        if: matrix.backend == 'webgl'
         run: |
-          mkdir -p "$RUNNER_TEMP/masque-dev"
-          julia --project="$RUNNER_TEMP/masque-dev" -e '
-            using Pkg
-            Pkg.add(["CairoMakie", "WGLMakie", "JSON3"])   # before the develop, so Parsers is not downgraded (JSON3 caps it at 2.x)
-            Pkg.develop(path=pwd())
-            Pkg.instantiate()
-          '
-          echo "MASQUE_DEV_ENV=$RUNNER_TEMP/masque-dev" >> "$GITHUB_ENV"
+          julia --color=yes test/e2e/make_page.jl "$RUNNER_TEMP/e2e"
+          (cd test/e2e && node click.mjs "$RUNNER_TEMP/e2e")
+          julia --color=yes test/e2e/verify_capture.jl "$RUNNER_TEMP/e2e"
       # A WebGL widget outside Pluto fetches WGLMakie's script from Makie's release tag; the
       # driver serves the installed copy at those URLs (#300).
       - name: WebGL page outside Pluto
@@ -270,57 +318,84 @@ jobs:
 
   examples:
     name: Fixture notebooks
+    needs: setup
     runs-on: ubuntu-latest
-    # Each notebook devs the package + adds a Makie backend into a temp env (full
-    # Makie precompile on a cold cache). ci_run.jl heartbeats during that silent
-    # stretch and fails the notebook at MASQUE_NOTEBOOK_TIMEOUT_S. This job
-    # timeout is only the backstop.
+    # ci_run.jl heartbeats while a notebook runs and fails it at MASQUE_NOTEBOOK_TIMEOUT_S.
+    # This job timeout is only the backstop.
     timeout-minutes: 40
     env:
       MASQUE_NOTEBOOK_TIMEOUT_S: "1200"
     steps:
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
+      - uses: ./.github/actions/julia-env
         with:
-          version: '1'
-      - uses: julia-actions/cache@v2
+          julia-version: ${{ needs.setup.outputs.julia-version }}
+          key: ${{ needs.setup.outputs.key }}
       # Deadline and heartbeat, no Pluto. Catches a waiter regression before the
       # notebooks themselves run.
       - name: Fixture runner wait loop
         run: julia test/notebooks/ci_run_tests.jl
-      # Runs every Pluto notebook under test/notebooks headlessly; fails if any
-      # cell errors, so a fixture can never silently drift out of sync with the API.
+      # Runs every Pluto notebook under test/notebooks headlessly; fails if any cell errors,
+      # so a fixture can never silently drift out of sync with the API.
       - name: Run fixture notebooks headlessly
         run: julia --color=yes test/notebooks/ci_run.jl
 
-  frontend:
-    name: Frontend (TS) + bundle
+  lint:
+    # Formatting, the frontend gate and the docs link check: each takes under a minute, so they
+    # share one runner. `!cancelled()` runs each gate even when an earlier one failed, so one red
+    # run reports all of them.
+    name: Lint (Runic, frontend, docs links)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - name: Runic formatting
+        uses: fredrikekre/runic-action@v1
+        with:
+          version: '1'
       - uses: actions/setup-node@v4
+        if: ${{ !cancelled() }}
         with:
           node-version: '20'
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run test:coverage
+      # docs/dev/check_docs_links.mjs verifies every link into docs/dev/ (file existence +
+      # heading anchor). No npm dependency (the slugger is vendored in the script).
+      - name: Docs links
+        if: ${{ !cancelled() }}
+        run: node docs/dev/check_docs_links.mjs
+      - name: Frontend install
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: npm ci
+      - name: Frontend lint
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: npm run lint
+      - name: Frontend typecheck
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Frontend tests
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: npm run test:coverage
       - uses: codecov/codecov-action@v5
+        if: ${{ !cancelled() }}
         with:
           files: frontend/coverage/lcov.info
           flags: frontend
           disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
-      - run: npm run build
+      - name: Frontend build
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: npm run build
 
       # PRs (incl. forks, which can't push): fail if either committed bundle is stale.
       - name: Verify committed bundles are up to date
         if: github.event_name == 'pull_request'
-        working-directory: .
         run: |
           if ! git diff --quiet -- assets/overlay.js assets/masque-webgl.js; then
             echo "::error::frontend assets are out of date — run 'cd frontend && npm run build' and commit."
@@ -331,7 +406,6 @@ jobs:
       # Push to main: CI owns both bundles — commit whichever rebuilt so main is never stale.
       - name: Commit rebuilt bundles
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        working-directory: .
         run: |
           if ! git diff --quiet -- assets/overlay.js assets/masque-webgl.js; then
             git config user.name "github-actions[bot]"
@@ -342,29 +416,21 @@ jobs:
             git push
           fi
 
-  docs-links:
-    # docs/dev/check_docs_links.mjs verifies every link into docs/dev/ (file existence +
-    # heading anchor), both from within docs/dev/ itself and from any other docs/**/*.md file
-    # that points in. No npm dependency (the slugger is vendored in the script), so no
-    # `npm install` step — checkout + node is enough. Deterministic and network-free: a broken
-    # link fails the check like any other gate.
-    name: Docs links
+  ci-result:
+    # The one check the ruleset requires for this workflow (with Release gate). A skipped matrix
+    # job never expands, so it reports under its unexpanded name (`Julia ${{ matrix.version }}`)
+    # and a required `Julia 1` would wait forever on a docs-only or draft PR. This job always
+    # runs, passes when every job passed or skipped, and keeps job renames out of the ruleset.
+    name: CI result
+    if: always()
+    needs: [changes, setup, setup-lts, julia, webgl-bind-e2e, kind-sweep, examples, lint]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: node docs/dev/check_docs_links.mjs
-
-  format:
-    name: Runic formatting
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
-        with:
-          version: '1'
-      - uses: fredrikekre/runic-action@v1
-        with:
-          version: '1'
+      - name: Every job passed or skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) exit 1 ;;
+          esac

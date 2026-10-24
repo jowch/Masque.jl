@@ -125,6 +125,21 @@ end
     @test_throws r"one position only" player_states(two, man)
 end
 
+@testset "player_states with pairs records a click on each of two fields" begin
+    man = Dict{String, Any}(
+        "fields" => Any["pts", "bars"],
+        "layers" => Any[
+            Dict{String, Any}("id" => "pts", "kind" => "circles", "events" => ["click"], "bond" => "element", "payloads" => Any[1, 2]),
+            Dict{String, Any}("id" => "bars", "kind" => "rects", "events" => ["click"], "bond" => "element", "payloads" => Any[1]),
+        ],
+    )
+    rows = player_states(Dict{String, Any}("pairs" => true), man)
+    @test [r.key for r in rows] == ["null", "pts:0", "pts:1", "bars:0", "pts:0+bars:0", "pts:1+bars:0"]
+    both = rows[end].value
+    @test both["pts"]["index"] == 1 && both["bars"]["index"] == 0
+    @test length(player_states(Dict{String, Any}(), man)) == 4
+end
+
 @testset "a grid brush keys on its cell window" begin
     win(i0, i1, j0, j1) = Dict{String, Any}(
         "items" => Any[
@@ -454,7 +469,7 @@ end
         "marks_bars", "marks_poly", "marks_polar", "legend_lines", "roi_table",
         "tooltips_template", "tooltips_dark", "grids_heatmap", "readouts_axis",
         "custom_regions", "recipes_dumbbell", "linked_click", "linked_legend_wash",
-        "marks_lines", "selection_start", "legend_fade", "slice_spectra",
+        "marks_lines", "selection_start", "legend_fade", "slice_spectra", "widgets_value",
     ]
     for name in guides
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))

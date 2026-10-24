@@ -212,6 +212,16 @@ HTML(
         "<span id=\"coords_scatter_styled\" style=\"display:none\">$(JSON3.write(sweep.scatter_styled.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-0000000000e5
+@bind ev_fade_pan sweep.fade_pan
+
+# ╔═╡ d1000000-0000-0000-0000-0000000000e6
+HTML(
+    "<span id=\"out_fade_pan\">FADE_PAN=$(sweep_field("fade_pan", ev_fade_pan))</span>" *
+        "<span id=\"bond_fade_pan\" style=\"display:none\">$(repr(ev_fade_pan))</span>" *
+        "<span id=\"coords_fade_pan\" style=\"display:none\">$(JSON3.write(sweep.fade_pan.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000072
 @bind ev_poly_shapes sweep.poly_shapes
 
@@ -817,6 +827,8 @@ HTML(
 # ╟─d1000000-0000-0000-0000-000000000069
 # ╠═d1000000-0000-0000-0000-000000000070
 # ╟─d1000000-0000-0000-0000-000000000071
+# ╠═d1000000-0000-0000-0000-0000000000e5
+# ╟─d1000000-0000-0000-0000-0000000000e6
 # ╠═d1000000-0000-0000-0000-000000000072
 # ╟─d1000000-0000-0000-0000-000000000073
 # ╠═d1000000-0000-0000-0000-000000000026
