@@ -5545,6 +5545,17 @@ describe("select = :many and clearing picks (#335)", () => {
         const key = (k: string) => surface.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }))
         key("Control")
         expect(surface.classList.contains("pointer-focus")).toBe(true)
+        // Undo and redo are chords, not navigation: they keep the outline off on either platform.
+        const chord = (k: string, mods: KeyboardEventInit) => surface.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...mods }))
+        chord("z", { ctrlKey: true })
+        expect(surface.classList.contains("pointer-focus")).toBe(true)
+        chord("z", { metaKey: true })
+        expect(surface.classList.contains("pointer-focus")).toBe(true)
+        chord("Z", { ctrlKey: true, shiftKey: true })
+        expect(surface.classList.contains("pointer-focus")).toBe(true)
+        chord("y", { ctrlKey: true })
+        expect(surface.classList.contains("pointer-focus")).toBe(true)
+        expect(shadow.activeElement).toBe(surface)
         key("ArrowRight")
         expect(surface.classList.contains("pointer-focus")).toBe(false)
         press(600, 600) // empty space in the axis: a marquee press that clears nothing until release
