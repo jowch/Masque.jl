@@ -12,11 +12,12 @@ colorbar a readout for you. For the other two, pass an
 With an [`AxisInteractable`](@ref), a tooltip follows the pointer
 anywhere on the axis and shows the data coordinates under it. A click
 sets the readout's field, `sel.axis`, to an [`AxisEvent`](@ref) with
-`x` and `y`. The examples on this page call that event `pick`:
+`x` and `y`. With `bind = ints`, where `ints` is the readout, `pick`
+is that event:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-readouts-player" data-masque-embed="readouts_axis" title="Sine plot. Hover to see the coordinates under the pointer." style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-readouts-player" data-masque-embed="readouts_axis" title="Sine plot. Hover to see the coordinates under the pointer." style="width:100%;height:640px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -33,7 +34,7 @@ or `pick.ycat`. On a numeric axis, that field is `nothing`.
 
 The example above shows only the tooltip, because this site does not
 record clicks on a position ([Examples on this site](@ref this-site)). In
-your notebook, a click sets `sel.axis`.
+your notebook, a click sets `pick`.
 
 On a `PolarAxis`, the readout is the angle and radius under the
 pointer, in the same order as your data: `pick.x` is the angle in

@@ -10,7 +10,7 @@ list the samples in the same order.
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-gal-selection" data-masque-embed="gallery_selection" title="Selection round-trip" style="width:100%;height:780px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-gal-selection" data-masque-embed="gallery_selection" title="Selection round-trip" style="width:100%;height:1340px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -20,10 +20,12 @@ Main.masque_fallback("gallery_selection")
 
 ## Variations
 
-- This example keeps only the last click. To collect indices across
-  clicks, create a `Ref` in a cell that does not use `pick`, so it is
-  not reset, add each click to it, and pass the collected indices as
-  `selected=` on the second widget.
+- This example keeps only the last click. To collect several, pass both
+  scatters with `select = :many`, as in
+  `masque(fig_l, interactables(s_left; select = :many); bind = s_left)`.
+  Then `pick` lists every picked point, and the second widget takes
+  them as
+  `masque(fig_r, interactables(s_right; select = :many); selected = [p.index for p in pick])`.
 - A slider that rebuilds the figure drops the highlight unless you pass
   the indices again.
 - Passing a widget's own value back into the same `masque` call does

@@ -16,55 +16,49 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
+
+# ╔═╡ b3d00001-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
+# ╔═╡ b3d00001-0001-4000-8000-000000000020
 md"""
-Click a polygon, and the last cell names it.
+Hover the surface to read its height, or a station to see its name, then click a station.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
-md"""
-Create the polygons the way you normally would, and `masque` makes each polygon clickable.
-"""
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
+# ╔═╡ b3d00001-0001-4000-8000-000000000002
 begin
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; aspect = DataAspect())
-    p = poly!(
-        ax,
-        [
-            Point2f[(0.0, 0.0), (1.0, 0.0), (0.5, 0.85)],
-            Point2f[(1.6, 0.0), (2.6, 0.0), (2.6, 1.0), (1.6, 1.0)],
-            Point2f[(0.1, 1.2), (1.1, 1.2), (0.9, 2.0), (0.3, 2.0)],
-        ];
-        color = [:steelblue, :tomato, :seagreen],
-    )
+    hill(x, y) = 900 + 600 * exp(-((x - 1)^2 + (y - 0.5)^2)) + 400 * exp(-((x + 1.2)^2 + (y + 1)^2) / 0.8)
+    xs = range(-3, 3; length = 25)
+    ys = range(-3, 3; length = 25)
+    stations = [
+        (; name = "Ridge", x = 1.0, y = 0.5),
+        (; name = "Saddle", x = 0.0, y = -0.3),
+        (; name = "East peak", x = -1.2, y = -1.0),
+        (; name = "Valley", x = -2.2, y = 2.0),
+        (; name = "Plateau", x = 2.4, y = -2.0),
+    ]
+    elevation = [round(Int, hill(s.x, s.y)) for s in stations]
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
-md"""
-`bind = p` makes `pick` the clicked polygon itself. `@bind pick` saves a click in `pick`, while hovering only highlights the polygon and leaves `pick` as it was.
-"""
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind pick masque(fig; bind = p)
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
-md"""
-`pick` starts as `nothing`, and this cell responds when you click a polygon. After a click, `pick.index` is the polygon's position in the order you plotted them.
-"""
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if isnothing(pick)
-    "click a polygon"
-else
-    names = ["triangle", "square", "trapezoid"]
-    "$(names[pick.index]) selected"
+# ╔═╡ b3d00001-0001-4000-8000-000000000003
+begin
+    fig = Figure(size = (560, 460))
+    ax = Axis3(fig[1, 1]; azimuth = 0.9, elevation = 0.45, xlabel = "east (km)", ylabel = "north (km)", zlabel = "height (m)")
+    surface!(ax, xs, ys, [hill(x, y) for x in xs, y in ys]; colormap = :terrain, alpha = 0.9)
+    sc = scatter!(
+        ax, [s.x for s in stations], [s.y for s in stations], elevation;
+        color = :black, markersize = 14,
+    )
+    sites = interactables(sc; payloads = [(; name = s.name, height = h) for (s, h) in zip(stations, elevation)])
+    nothing
 end
+
+# ╔═╡ b3d00001-0001-4000-8000-000000000004
+@bind pick masque(fig, sites; bind = sc)
+
+# ╔═╡ b3d00001-0001-4000-8000-000000000005
+isnothing(pick) ? "click a station" : "$(pick.name): $(pick.height) m"
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
@@ -73,15 +67,7 @@ bond = "pick"
 show_code = true
 pluto_html = true
 
-cells = [
-  "a1b2c3d4-0001-4000-8000-000000000009",
-  "a1b2c3d4-0001-4000-8000-000000000010",
-  "a1b2c3d4-0001-4000-8000-000000000002",
-  "a1b2c3d4-0001-4000-8000-000000000011",
-  "a1b2c3d4-0001-4000-8000-000000000003",
-  "a1b2c3d4-0001-4000-8000-000000000012",
-  "a1b2c3d4-0001-4000-8000-000000000004",
-]
+cells = ["b3d00001-0001-4000-8000-000000000020", "b3d00001-0001-4000-8000-000000000002", "b3d00001-0001-4000-8000-000000000003", "b3d00001-0001-4000-8000-000000000004", "b3d00001-0001-4000-8000-000000000005"]
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1728,14 +1714,12 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1b2c3d4-0001-4000-8000-000000000001
-# ╟─a1b2c3d4-0001-4000-8000-000000000009
-# ╟─a1b2c3d4-0001-4000-8000-000000000010
-# ╠═a1b2c3d4-0001-4000-8000-000000000002
-# ╟─a1b2c3d4-0001-4000-8000-000000000011
-# ╠═a1b2c3d4-0001-4000-8000-000000000003
-# ╟─a1b2c3d4-0001-4000-8000-000000000012
-# ╠═a1b2c3d4-0001-4000-8000-000000000004
+# ╠═b3d00001-0001-4000-8000-000000000001
+# ╟─b3d00001-0001-4000-8000-000000000020
+# ╠═b3d00001-0001-4000-8000-000000000002
+# ╠═b3d00001-0001-4000-8000-000000000003
+# ╠═b3d00001-0001-4000-8000-000000000004
+# ╠═b3d00001-0001-4000-8000-000000000005
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

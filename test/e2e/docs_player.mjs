@@ -1,6 +1,6 @@
 // Playwright against the quick start Pluto export on the Documenter page, then the image
 // and box-select brush players, which must record every box a reader can draw.
-// The iframe is #masque-gs-quickstart (home_quickstart.html). Listed clicks
+// The iframe is #masque-gs-quickstart (home_quickstart.html, its value segment). Listed clicks
 // swap the readout cell through the export's editor_state_set snapshots.
 // Fails if the overlay never mounts, if host.value does not key a snapshot,
 // or if an overlay click does not update that readout. Then, with jsDelivr blocked, the
@@ -40,9 +40,10 @@ const MIME = {
 };
 
 const POINTS = [
-  { name: "one", y: "1.0" },
-  { name: "two", y: "4.0" },
-  { name: "three", y: "9.0" },
+  { name: "one", y: "2.0" },
+  { name: "two", y: "1.0" },
+  { name: "three", y: "4.0" },
+  { name: "four", y: "3.0" },
 ];
 
 function gettingStartedPath() {
@@ -554,6 +555,68 @@ try {
     console.log("E2E OK [docs player] — segments: roi_table's two iframes each show their own cells, and a drag in one swapped the table in the other");
   }
 
+  // A segment whose picture swaps: on the Legend entries page, clicking legend entry "a" in
+  // the widget segment must change the figure in the fade segment. That figure is a CairoMakie
+  // cell, whose `data:image/png;base64, …` (with a space) the export moves to a shared file.
+  {
+    const p = existsSync(join(root, "legend", "index.html")) ? "/legend/" : "/legend.html";
+    await page.goto(`http://127.0.0.1:${server.address().port}${p}`, { waitUntil: "domcontentloaded" });
+    const segEl = (name) => page.locator(`iframe[data-masque-embed="legend_lines"][data-masque-segment="${name}"]`);
+    for (const name of ["widget", "fade"]) {
+      await segEl(name).waitFor({ state: "attached", timeout: 20000 });
+      await segEl(name).evaluate((f) => {
+        f.loading = "eager";
+        const s = f.getAttribute("src");
+        if (s) f.src = s;
+      });
+    }
+    await segEl("widget").evaluate((f) => f.scrollIntoView({ block: "start" }));
+    const widget = await waitMounted(segEl("widget"), 40000);
+    let fade = null;
+    for (const deadline = Date.now() + 40000; Date.now() < deadline && !fade;) {
+      const f = await (await segEl("fade").elementHandle())?.contentFrame();
+      const ok = f && await f.evaluate(() => typeof window.editor_state_set === "function" && !!document.querySelector("pluto-output img")).catch(() => false);
+      if (ok) fade = f; else await sleep(250);
+    }
+    if (!fade) throw new Error("legend_lines fade segment never showed its figure");
+    const fadeSrc = () => fade.evaluate(() => [...document.querySelectorAll("pluto-output img")].filter((i) => i.offsetParent !== null).map((i) => i.src).join(" "));
+    const before = await fadeSrc();
+    if (!before.includes("/embeds/shared/")) throw new Error(`legend_lines fade figure is not a shared picture: ${before.slice(0, 120)}`);
+    await widget.evaluate(() => {
+      const host = document.querySelector(".ip-host");
+      let man = host.masqueManifest;
+      if (!man || !man.layers) {
+        const pubs = (window.editor_state && window.editor_state.notebook && window.editor_state.notebook.published_objects) || {};
+        for (const v of Object.values(pubs)) {
+          const obj = typeof v === "string" ? JSON.parse(v) : v;
+          if (obj && obj.layers) { man = obj; break; }
+        }
+      }
+      if (!man || !man.layers) throw new Error("legend_lines manifest missing");
+      const layer = man.layers.find((l) => l.id.startsWith("legend"));
+      if (!layer) throw new Error("no legend layer on the legend_lines manifest");
+      let sr = null;
+      host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const surface = sr && sr.querySelector(".surface");
+      const r = host.querySelector("img").getBoundingClientRect();
+      const scale = r.width / man.width;
+      const o = {
+        bubbles: true, composed: true, cancelable: true,
+        clientX: r.x + layer.geometry[0] * scale, clientY: r.y + layer.geometry[1] * scale,
+        pointerId: 1, pointerType: "mouse", isPrimary: true,
+      };
+      surface.dispatchEvent(new PointerEvent("pointermove", o));
+      surface.dispatchEvent(new MouseEvent("click", o));
+    });
+    let after = before;
+    for (const deadline = Date.now() + 8000; Date.now() < deadline && after === before;) {
+      await sleep(100);
+      after = await fadeSrc();
+    }
+    if (after === before) throw new Error("legend_lines: clicking a legend entry did not swap the fade segment's picture");
+    console.log("E2E OK [docs player] — segments: a legend click in legend_lines' widget swapped the fade segment's picture");
+  }
+
   // `onchange` replayed from harvested frames (docs/pluto_html_export.jl): on the Sliders and
   // toggles page, a key step on the slider and a click on the toggle each redraw the figure
   // from that setting's frame, and the value cell in the other iframe follows. The download
@@ -729,8 +792,13 @@ try {
       img: img ? img.naturalWidth : -1,
     };
   });
-  if (!twin.text.includes("interactables(s; payloads = points)") || !twin.text.includes("@bind sel masque(fig, pts)")) {
-    throw new Error(`text twin is missing the quick start code: ${JSON.stringify(twin.text.slice(0, 300))}`);
+  // The page shows the notebook in two segments: the figure cell, then the value's cells.
+  const figureTwin = await page2.evaluate(() => {
+    const d = document.getElementById("masque-gs-figure").closest(".masque-embed-wrap").nextElementSibling;
+    return d && d.matches("details") ? d.textContent : "";
+  });
+  if (!figureTwin.includes("interactables(s; payloads = points)") || !twin.text.includes("@bind sel masque(fig, pts)")) {
+    throw new Error(`text twins are missing the quick start code: ${JSON.stringify([figureTwin.slice(0, 200), twin.text.slice(0, 200)])}`);
   }
   if (!twin.text.includes("click a point")) throw new Error("text twin is missing the idle readout");
   if (!(twin.img > 0)) throw new Error(`text twin's idle figure did not load (naturalWidth ${twin.img})`);

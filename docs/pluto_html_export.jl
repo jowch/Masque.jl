@@ -86,6 +86,11 @@ pluto-editor.disable_ui > main {
   padding-top: 10px !important;
   padding-bottom: 14px !important;
 }
+/* The bar sits top right over the first cell: start the cells below it. */
+body:has(.masque-bar) pluto-editor > main,
+body:has(.masque-bar) pluto-editor.disable_ui > main {
+  padding-top: 40px !important;
+}
 html, body {
   background: var(--main-bg-color);
 }
@@ -227,7 +232,10 @@ const PLUTO_EXPORT_SEGMENT_JS = raw"""
   window.masqueSegment = ids;
   var css = "pluto-cell" + ids.map(function (id) { return ':not([id="' + id + '"])'; }).join("") +
     " { display: none !important; }";
-  if (ids.indexOf("@@WIDGET@@") === -1) css += " .masque-bar { display: none !important; }";
+  if (ids.indexOf("@@WIDGET@@") === -1) {
+    css += " .masque-bar { display: none !important; }" +
+      " body:has(.masque-bar) pluto-editor > main, body:has(.masque-bar) pluto-editor.disable_ui > main { padding-top: 10px !important; }";
+  }
   var style = document.createElement("style");
   style.textContent = css;
   document.head.appendChild(style);
@@ -453,7 +461,7 @@ end
 function write_fallback_assets(outpath::AbstractString, idle, widget_id::AbstractString)
     stem = splitext(outpath)[1]
     doc = Dict{String, Any}()
-    m = match(r"data:image/png;base64,([A-Za-z0-9+/=]+)", get(idle.htmls, widget_id, ""))
+    m = match(r"data:image/png;base64,\s*([A-Za-z0-9+/=]+)", get(idle.htmls, widget_id, ""))
     if m === nothing
         rm(stem * ".png"; force = true)
     else

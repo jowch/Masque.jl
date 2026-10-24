@@ -24,11 +24,6 @@ md"""
 Hover over a row to see its values, then click it. The last cell shows how much the row changed.
 """
 
-# ╔═╡ c5d1e7a0-0001-4000-8000-000000000010
-md"""
-The recipe draws each row as a bar from `before` to `after`, with a dot at each end.
-"""
-
 # ╔═╡ c5d1e7a0-0001-4000-8000-000000000002
 begin
     @recipe Dumbbell (before, after) begin
@@ -53,11 +48,6 @@ begin
     end
 end
 
-# ╔═╡ c5d1e7a0-0001-4000-8000-000000000011
-md"""
-This method makes each row one mark. It passes the recipe's bars, `p.plots[1]`, so a row responds along its whole drawn width, and gives each row a payload with its values.
-"""
-
 # ╔═╡ c5d1e7a0-0001-4000-8000-000000000003
 function Masque.interactables(ax, p::Dumbbell; payloads = nothing, kwargs...)
     before, after = p.before[], p.after[]
@@ -77,18 +67,8 @@ begin
     nothing
 end
 
-# ╔═╡ c5d1e7a0-0001-4000-8000-000000000012
-md"""
-`masque(fig)` uses the method for the `dumbbell!` plot, `bind = d` makes `pick` the clicked row itself, and `@bind pick` saves a click in `pick`.
-"""
-
 # ╔═╡ c5d1e7a0-0001-4000-8000-000000000005
 @bind pick masque(fig; bind = d)
-
-# ╔═╡ c5d1e7a0-0001-4000-8000-000000000013
-md"""
-`pick` starts as `nothing`. After a click, `pick.change` is the clicked row's change.
-"""
 
 # ╔═╡ c5d1e7a0-0001-4000-8000-000000000006
 if isnothing(pick)
@@ -106,14 +86,24 @@ pluto_html = true
 
 cells = [
   "c5d1e7a0-0001-4000-8000-000000000009",
-  "c5d1e7a0-0001-4000-8000-000000000010",
   "c5d1e7a0-0001-4000-8000-000000000002",
-  "c5d1e7a0-0001-4000-8000-000000000011",
   "c5d1e7a0-0001-4000-8000-000000000003",
   "c5d1e7a0-0001-4000-8000-000000000004",
-  "c5d1e7a0-0001-4000-8000-000000000012",
   "c5d1e7a0-0001-4000-8000-000000000005",
-  "c5d1e7a0-0001-4000-8000-000000000013",
+  "c5d1e7a0-0001-4000-8000-000000000006",
+]
+
+[player.segments]
+recipe = [
+  "c5d1e7a0-0001-4000-8000-000000000002",
+]
+method = [
+  "c5d1e7a0-0001-4000-8000-000000000003",
+]
+widget = [
+  "c5d1e7a0-0001-4000-8000-000000000009",
+  "c5d1e7a0-0001-4000-8000-000000000004",
+  "c5d1e7a0-0001-4000-8000-000000000005",
   "c5d1e7a0-0001-4000-8000-000000000006",
 ]
 """
@@ -1764,14 +1754,10 @@ version = "4.1.0+0"
 # ╔═╡ Cell order:
 # ╠═c5d1e7a0-0001-4000-8000-000000000001
 # ╟─c5d1e7a0-0001-4000-8000-000000000009
-# ╟─c5d1e7a0-0001-4000-8000-000000000010
 # ╠═c5d1e7a0-0001-4000-8000-000000000002
-# ╟─c5d1e7a0-0001-4000-8000-000000000011
 # ╠═c5d1e7a0-0001-4000-8000-000000000003
 # ╠═c5d1e7a0-0001-4000-8000-000000000004
-# ╟─c5d1e7a0-0001-4000-8000-000000000012
 # ╠═c5d1e7a0-0001-4000-8000-000000000005
-# ╟─c5d1e7a0-0001-4000-8000-000000000013
 # ╠═c5d1e7a0-0001-4000-8000-000000000006
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

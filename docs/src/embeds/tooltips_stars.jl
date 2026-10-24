@@ -16,48 +16,65 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
+
+# ╔═╡ c0e1a001-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
+# ╔═╡ c0e1a001-0001-4000-8000-000000000020
 md"""
-Click a point on the polar axis, and the last cell reads its direction and radius.
+Hover over a star to see its name, type and distance. Click one and the last cell names it.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
-md"""
-Scatter the points on a `PolarAxis` the way you normally would, and `masque` makes each point clickable.
-"""
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
+# ╔═╡ c0e1a001-0001-4000-8000-000000000005
 begin
-    fig = Figure(size = (480, 400))
-    ax = PolarAxis(fig[1, 1])
-    pts = Point2f[(0.0, 1.0), (π / 2, 2.0), (π, 1.5), (3π / 2, 2.5)]
-    s = scatter!(ax, pts; markersize = 18)
+    fig2, sc2 = hr_diagram()
+    tips = interactables(sc2; payloads = info, tooltip = masque"<b>$(name)</b><br>$(type)<br>$(dist) light years")
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
-md"""
-`bind = s` makes `pick` the clicked point itself, and `@bind pick` saves a click in `pick`: `pick.x` is the angle and `pick.y` is the radius.
-"""
+# ╔═╡ c0e1a001-0001-4000-8000-000000000006
+@bind pick masque(fig2, tips; bind = sc2)
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind pick masque(fig; bind = s)
+# ╔═╡ c0e1a001-0001-4000-8000-000000000007
+isnothing(pick) ? "click a star" : "$(pick.name) is a $(pick.type) star"
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
-md"""
-`pick` starts as `nothing`, and this cell responds when you click a point.
-"""
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if isnothing(pick)
-    "click a point"
-else
-    dirs = ["east", "north", "west", "south"]
-    "$(dirs[pick.index]): r = $(pick.y)"
+# ╔═╡ c0e1a001-0001-4000-8000-000000000002
+begin
+    stars = [
+        (name = "Sirius", type = "A1V", teff = 9940, lum = 25.4, dist = 8.6),
+        (name = "Canopus", type = "A9II", teff = 7280, lum = 10700.0, dist = 310.0),
+        (name = "Arcturus", type = "K1.5III", teff = 4286, lum = 170.0, dist = 36.7),
+        (name = "Vega", type = "A0V", teff = 9602, lum = 40.0, dist = 25.0),
+        (name = "Capella", type = "G8III", teff = 4970, lum = 78.7, dist = 42.9),
+        (name = "Rigel", type = "B8Ia", teff = 12100, lum = 1.2e5, dist = 860.0),
+        (name = "Procyon", type = "F5IV", teff = 6530, lum = 6.9, dist = 11.5),
+        (name = "Betelgeuse", type = "M1Ia", teff = 3600, lum = 9.0e4, dist = 548.0),
+        (name = "Altair", type = "A7V", teff = 7765, lum = 10.6, dist = 16.7),
+        (name = "Aldebaran", type = "K5III", teff = 3910, lum = 439.0, dist = 65.3),
+        (name = "Spica", type = "B1V", teff = 22400, lum = 12100.0, dist = 250.0),
+        (name = "Pollux", type = "K0III", teff = 4666, lum = 32.7, dist = 33.8),
+    ]
+    spectral = Dict(
+        'B' => "#6baed6", 'A' => "#9ecae1", 'F' => "#e6c84f",
+        'G' => "#f2b134", 'K' => "#f08a3c", 'M' => "#d94801",
+    )
+    info = [(; name = s.name, type = s.type, dist = s.dist) for s in stars]
+    nothing
 end
+
+# ╔═╡ c0e1a001-0001-4000-8000-000000000003
+function hr_diagram()
+    fig = Figure(size = (560, 360))
+    ax = Axis(
+        fig[1, 1]; xreversed = true, xticks = 4000:4000:20000, xtickformat = "{:.0f}",
+        xlabel = "surface temperature (K)", ylabel = "log₁₀ luminosity (Sun = 0)",
+    )
+    sc = scatter!(
+        ax, [s.teff for s in stars], log10.([s.lum for s in stars]);
+        color = [spectral[s.type[1]] for s in stars], markersize = 16,
+    )
+    return fig, sc
+end;
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
@@ -66,15 +83,11 @@ bond = "pick"
 show_code = true
 pluto_html = true
 
-cells = [
-  "a1b2c3d4-0001-4000-8000-000000000009",
-  "a1b2c3d4-0001-4000-8000-000000000010",
-  "a1b2c3d4-0001-4000-8000-000000000002",
-  "a1b2c3d4-0001-4000-8000-000000000011",
-  "a1b2c3d4-0001-4000-8000-000000000003",
-  "a1b2c3d4-0001-4000-8000-000000000012",
-  "a1b2c3d4-0001-4000-8000-000000000004",
-]
+cells = ["c0e1a001-0001-4000-8000-000000000020", "c0e1a001-0001-4000-8000-000000000005", "c0e1a001-0001-4000-8000-000000000006", "c0e1a001-0001-4000-8000-000000000007", "c0e1a001-0001-4000-8000-000000000002", "c0e1a001-0001-4000-8000-000000000003"]
+
+[player.segments]
+widget = ["c0e1a001-0001-4000-8000-000000000020", "c0e1a001-0001-4000-8000-000000000005", "c0e1a001-0001-4000-8000-000000000006", "c0e1a001-0001-4000-8000-000000000007"]
+data = ["c0e1a001-0001-4000-8000-000000000002", "c0e1a001-0001-4000-8000-000000000003"]
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1721,14 +1734,13 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1b2c3d4-0001-4000-8000-000000000001
-# ╟─a1b2c3d4-0001-4000-8000-000000000009
-# ╟─a1b2c3d4-0001-4000-8000-000000000010
-# ╠═a1b2c3d4-0001-4000-8000-000000000002
-# ╟─a1b2c3d4-0001-4000-8000-000000000011
-# ╠═a1b2c3d4-0001-4000-8000-000000000003
-# ╟─a1b2c3d4-0001-4000-8000-000000000012
-# ╠═a1b2c3d4-0001-4000-8000-000000000004
+# ╠═c0e1a001-0001-4000-8000-000000000001
+# ╟─c0e1a001-0001-4000-8000-000000000020
+# ╠═c0e1a001-0001-4000-8000-000000000005
+# ╠═c0e1a001-0001-4000-8000-000000000006
+# ╠═c0e1a001-0001-4000-8000-000000000007
+# ╠═c0e1a001-0001-4000-8000-000000000002
+# ╠═c0e1a001-0001-4000-8000-000000000003
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

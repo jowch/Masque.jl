@@ -16,48 +16,58 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
+
+# ╔═╡ c0e1a002-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000100
-md"""
-Click a line, and the last cell names the point you clicked.
-"""
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000101
-md"""
-Plot both curves with one `series!` call, so each curve is one mark of the same plot.
-"""
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000102
+# ╔═╡ c0e1a002-0001-4000-8000-000000000002
 begin
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1])
-    xs = 0:0.5:10
-    sr = series!(ax, xs, [sin.(xs) cos.(xs)]'; labels = ["sine", "cosine"])
+    stars = [
+        (name = "Sirius", type = "A1V", teff = 9940, lum = 25.4, dist = 8.6),
+        (name = "Canopus", type = "A9II", teff = 7280, lum = 10700.0, dist = 310.0),
+        (name = "Arcturus", type = "K1.5III", teff = 4286, lum = 170.0, dist = 36.7),
+        (name = "Vega", type = "A0V", teff = 9602, lum = 40.0, dist = 25.0),
+        (name = "Capella", type = "G8III", teff = 4970, lum = 78.7, dist = 42.9),
+        (name = "Rigel", type = "B8Ia", teff = 12100, lum = 1.2e5, dist = 860.0),
+        (name = "Procyon", type = "F5IV", teff = 6530, lum = 6.9, dist = 11.5),
+        (name = "Betelgeuse", type = "M1Ia", teff = 3600, lum = 9.0e4, dist = 548.0),
+        (name = "Altair", type = "A7V", teff = 7765, lum = 10.6, dist = 16.7),
+        (name = "Aldebaran", type = "K5III", teff = 3910, lum = 439.0, dist = 65.3),
+        (name = "Spica", type = "B1V", teff = 22400, lum = 12100.0, dist = 250.0),
+        (name = "Pollux", type = "K0III", teff = 4666, lum = 32.7, dist = 33.8),
+    ]
+    spectral = Dict(
+        'B' => "#6baed6", 'A' => "#9ecae1", 'F' => "#e6c84f",
+        'G' => "#f2b134", 'K' => "#f08a3c", 'M' => "#d94801",
+    )
+    info = [(; name = s.name, type = s.type, dist = s.dist) for s in stars]
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000103
+# ╔═╡ c0e1a002-0001-4000-8000-000000000003
+function hr_diagram()
+    fig = Figure(size = (560, 360))
+    ax = Axis(
+        fig[1, 1]; xreversed = true, xticks = 4000:4000:20000, xtickformat = "{:.0f}",
+        xlabel = "surface temperature (K)", ylabel = "log₁₀ luminosity (Sun = 0)",
+    )
+    sc = scatter!(
+        ax, [s.teff for s in stars], log10.([s.lum for s in stars]);
+        color = [spectral[s.type[1]] for s in stars], markersize = 16,
+    )
+    return fig, sc
+end;
+
+# ╔═╡ c0e1a002-0001-4000-8000-000000000020
 md"""
-A line only shows its tooltip until you name it in `bind`. `bind = sr` makes the curves clickable, and `@bind pick` saves the point you clicked in `pick`.
+Hover over a star to see its fields.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000104
-@bind pick masque(fig; bind = sr)
+# ╔═╡ c0e1a002-0001-4000-8000-000000000004
+fig, sc = hr_diagram();
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000105
-md"""
-`pick` starts as `nothing`, and this cell responds when you click a curve. A click picks the point nearest it: `pick.line` is `1` for the first curve and `2` for the second, `pick.index` is the point's position in `xs`, and `pick.x` and `pick.y` are the point.
-"""
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000106
-if isnothing(pick)
-    "click a line"
-else
-    names = ["sine", "cosine"]
-    "you clicked the $(names[pick.line]) line at x = $(pick.x)"
-end
+# ╔═╡ c0e1a002-0001-4000-8000-000000000005
+@bind pick masque(fig, interactables(sc; payloads = info))
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
@@ -66,15 +76,7 @@ bond = "pick"
 show_code = true
 pluto_html = true
 
-cells = [
-  "a1b2c3d4-0001-4000-8000-000000000100",
-  "a1b2c3d4-0001-4000-8000-000000000101",
-  "a1b2c3d4-0001-4000-8000-000000000102",
-  "a1b2c3d4-0001-4000-8000-000000000103",
-  "a1b2c3d4-0001-4000-8000-000000000104",
-  "a1b2c3d4-0001-4000-8000-000000000105",
-  "a1b2c3d4-0001-4000-8000-000000000106",
-]
+cells = ["c0e1a002-0001-4000-8000-000000000020", "c0e1a002-0001-4000-8000-000000000005"]
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1721,14 +1723,12 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1b2c3d4-0001-4000-8000-000000000001
-# ╟─a1b2c3d4-0001-4000-8000-000000000100
-# ╟─a1b2c3d4-0001-4000-8000-000000000101
-# ╠═a1b2c3d4-0001-4000-8000-000000000102
-# ╟─a1b2c3d4-0001-4000-8000-000000000103
-# ╠═a1b2c3d4-0001-4000-8000-000000000104
-# ╟─a1b2c3d4-0001-4000-8000-000000000105
-# ╠═a1b2c3d4-0001-4000-8000-000000000106
+# ╠═c0e1a002-0001-4000-8000-000000000001
+# ╠═c0e1a002-0001-4000-8000-000000000002
+# ╠═c0e1a002-0001-4000-8000-000000000003
+# ╟─c0e1a002-0001-4000-8000-000000000020
+# ╠═c0e1a002-0001-4000-8000-000000000004
+# ╠═c0e1a002-0001-4000-8000-000000000005
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
