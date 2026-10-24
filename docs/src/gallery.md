@@ -23,6 +23,10 @@ A click or a box feeds the next step of an analysis.
   <img alt="A picture of bright cells, with three objects that are cells stuck together outlined as picked" src="assets/gallery/segmentation.png">
   <span>Annotate a segmentation</span>
 </a>
+<a class="masque-gallery-card" data-page="linked">
+  <img alt="Two scatters of the same cars, with the heaviest cars picked on both" src="assets/gallery/linked.png">
+  <span>Filter one plot from another</span>
+</a>
 <a class="masque-gallery-card" data-page="heatmap-trace">
   <img alt="A heatmap of daily temperature by station, with one cell picked and its tooltip showing" src="assets/gallery/heatmap-trace.png">
   <span>From a heatmap cell to its trace</span>
