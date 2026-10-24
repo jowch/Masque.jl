@@ -21,7 +21,7 @@ clicked:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-marks-bars" data-masque-embed="marks_bars" title="Stacked bars of sales by quarter. Click a segment and the readout names it." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-marks-bars" data-masque-embed="marks_bars" title="Stacked bars of sales by quarter. Click a segment and the readout names it." style="width:100%;height:1000px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -39,11 +39,12 @@ these fields:
 | `barplot!`, `waterfall!` | `value`, `low`, `high` |
 | `hist!` | `value` (the bin's height, a count with `normalization = :none`), `low`, `high` |
 | `crossbar!` | `midpoint`, `low`, `high` |
-| `poly!`, bands, densities, violins, Voronoi cells | `index` only: the polygon's position in the order you plotted them |
+| `poly!`, bands, densities, Voronoi cells | `index` only: the polygon's position in the order you plotted them |
+| `violin!` | `x`, the violin's category |
 | `contourf!` | `low` and `high` of the level |
-| `hexbin!` | the hexagon's center and its `count` |
-| `scatter!`, `lines!`, `linesegments!` on a `PolarAxis` | `x` is the angle and `y` the radius, in the order you passed them |
-| `lines!`, `series!`, `stairs!` | the plotted point nearest the click, once the line is in `bind` (see Lines below) |
+| `hexbin!` | `x` and `y`, the hexagon's center, and `count` |
+| `scatter!` on a `PolarAxis` | `x` is the angle and `y` the radius, in the order you passed them |
+| `lines!`, `series!`, `stairs!`, on any axis including a `PolarAxis` | the plotted point nearest the click, once the line is in `bind` (see Lines below) |
 
 Heatmaps have their own page: [Heatmaps and images](@ref).
 
