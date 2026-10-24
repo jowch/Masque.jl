@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-24
+
 ### Added
 - `overlaystyle` takes `unpicked_opacity`, how much of an unpicked mark still shows once
   its plot has a pick, from 0 to 1 (default 0.2) (#394).
@@ -608,7 +610,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/jowch/Masque.jl/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/jowch/Masque.jl/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/jowch/Masque.jl/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jowch/Masque.jl/compare/v0.2.2...v0.3.0
