@@ -1905,11 +1905,18 @@ try {
         // #391: a twin or inset axis's picks and chrome move by the pan axis's own matrix, and
         // a hover on its slid threshold line finds the line.
         if (withPan.length) {
-          const homesOf = (axis) => [...zoom.homes.filter((h) => h.axis === axis && h.picks > 0), ...zoom.chrome.filter((c) => c.axis === axis)];
+          // A scatter pick is on the axis's fade canvases (#394), which take the pan's scale too.
+          const homesOf = (axis) => [...zoom.homes.filter((h) => h.axis === axis), ...zoom.chrome.filter((c) => c.axis === axis)];
+          const panScale = scaleOf(zoom.panTransform);
           const bad = withPan.filter((axis) => {
             const hs = homesOf(axis);
-            return !zoom.panTransform || !hs.length || hs.some((h) => h.transform !== zoom.panTransform);
+            const fs = zoom.fades.filter((f) => f.axis === axis && f.picks > 0);
+            return !zoom.panTransform || !hs.length || hs.some((h) => h.transform !== zoom.panTransform) ||
+              fs.some((f) => Math.abs(scaleOf(f.transform) - panScale) > 1e-3);
           });
+          // Each such axis has a pick, probed above where the pan draws it.
+          const unprobed = withPan.filter((axis) => !zoom.midHover.some((h) => h.axis === axis && h.pick));
+          if (unprobed.length) throw new Error(`${key}-wheel: no mid-preview pick probe on ${JSON.stringify(unprobed)}: ${JSON.stringify(zoom.midHover)}`);
           const lines = zoom.chrome.filter((c) => withPan.includes(c.axis) && c.lines > 0);
           if (bad.length || !lines.length || lines.some((c) => c.hovered.length !== c.lines || !c.hovered.every(Boolean))) {
             throw new Error(`${key}-wheel: an axis inside the pan window did not move with it: ${JSON.stringify({ withPan, pan: zoom.panTransform, homes: zoom.homes, chrome: zoom.chrome })}`);
