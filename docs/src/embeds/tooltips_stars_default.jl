@@ -16,43 +16,58 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ a1b2c3d4-0011-4000-8000-000000000001
+
+# ╔═╡ c0e1a002-0001-4000-8000-000000000001
 using Masque, CairoMakie
 
-# ╔═╡ a1b2c3d4-0011-4000-8000-000000000009
-md"""
-Hover over a city to see its name and population. Click one and the last cell names it.
-"""
-
-# ╔═╡ a1b2c3d4-0011-4000-8000-000000000002
+# ╔═╡ c0e1a002-0001-4000-8000-000000000002
 begin
-    cities = [
-        (city = "Tokyo", pop = 37_400_000, x = 1.0, y = 1.0),
-        (city = "Delhi", pop = 32_900_000, x = 2.0, y = 4.0),
-        (city = "Shanghai", pop = 28_500_000, x = 3.0, y = 9.0),
-        (city = "São Paulo", pop = 22_400_000, x = 4.0, y = 16.0),
+    stars = [
+        (name = "Sirius", type = "A1V", teff = 9940, lum = 25.4, dist = 8.6),
+        (name = "Canopus", type = "A9II", teff = 7280, lum = 10700.0, dist = 310.0),
+        (name = "Arcturus", type = "K1.5III", teff = 4286, lum = 170.0, dist = 36.7),
+        (name = "Vega", type = "A0V", teff = 9602, lum = 40.0, dist = 25.0),
+        (name = "Capella", type = "G8III", teff = 4970, lum = 78.7, dist = 42.9),
+        (name = "Rigel", type = "B8Ia", teff = 12100, lum = 1.2e5, dist = 860.0),
+        (name = "Procyon", type = "F5IV", teff = 6530, lum = 6.9, dist = 11.5),
+        (name = "Betelgeuse", type = "M1Ia", teff = 3600, lum = 9.0e4, dist = 548.0),
+        (name = "Altair", type = "A7V", teff = 7765, lum = 10.6, dist = 16.7),
+        (name = "Aldebaran", type = "K5III", teff = 3910, lum = 439.0, dist = 65.3),
+        (name = "Spica", type = "B1V", teff = 22400, lum = 12100.0, dist = 250.0),
+        (name = "Pollux", type = "K0III", teff = 4666, lum = 32.7, dist = 33.8),
     ]
-    palette = ["#e6194b", "#3cb44b", "#4363d8", "#f58231"]
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; xlabel = "x", ylabel = "y")
-    s = scatter!(ax, [1.0, 2.0, 3.0, 4.0], [1.0, 4.0, 9.0, 16.0]; color = palette, markersize = 20)
-    tips = interactables(
-        s;
-        payloads = cities,
-        tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
+    spectral = Dict(
+        'B' => "#6baed6", 'A' => "#9ecae1", 'F' => "#e6c84f",
+        'G' => "#f2b134", 'K' => "#f08a3c", 'M' => "#d94801",
     )
+    info = [(; name = s.name, type = s.type, dist = s.dist) for s in stars]
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0011-4000-8000-000000000003
-@bind pick masque(fig, tips; bind = s)
+# ╔═╡ c0e1a002-0001-4000-8000-000000000003
+function hr_diagram()
+    fig = Figure(size = (560, 360))
+    ax = Axis(
+        fig[1, 1]; xreversed = true, xticks = 4000:4000:20000, xtickformat = "{:.0f}",
+        xlabel = "surface temperature (K)", ylabel = "log₁₀ luminosity (Sun = 0)",
+    )
+    sc = scatter!(
+        ax, [s.teff for s in stars], log10.([s.lum for s in stars]);
+        color = [spectral[s.type[1]] for s in stars], markersize = 16,
+    )
+    return fig, sc
+end;
 
-# ╔═╡ a1b2c3d4-0011-4000-8000-000000000004
-if isnothing(pick)
-    "hover a city, or click one"
-else
-    "$(pick.city) selected"
-end
+# ╔═╡ c0e1a002-0001-4000-8000-000000000020
+md"""
+Hover over a star to see its fields.
+"""
+
+# ╔═╡ c0e1a002-0001-4000-8000-000000000004
+fig, sc = hr_diagram();
+
+# ╔═╡ c0e1a002-0001-4000-8000-000000000005
+@bind pick masque(fig, interactables(sc; payloads = info))
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
@@ -61,12 +76,7 @@ bond = "pick"
 show_code = true
 pluto_html = true
 
-cells = [
-  "a1b2c3d4-0011-4000-8000-000000000009",
-  "a1b2c3d4-0011-4000-8000-000000000002",
-  "a1b2c3d4-0011-4000-8000-000000000003",
-  "a1b2c3d4-0011-4000-8000-000000000004",
-]
+cells = ["c0e1a002-0001-4000-8000-000000000020", "c0e1a002-0001-4000-8000-000000000005"]
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1713,11 +1723,12 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1b2c3d4-0011-4000-8000-000000000001
-# ╟─a1b2c3d4-0011-4000-8000-000000000009
-# ╠═a1b2c3d4-0011-4000-8000-000000000002
-# ╠═a1b2c3d4-0011-4000-8000-000000000003
-# ╠═a1b2c3d4-0011-4000-8000-000000000004
+# ╠═c0e1a002-0001-4000-8000-000000000001
+# ╠═c0e1a002-0001-4000-8000-000000000002
+# ╠═c0e1a002-0001-4000-8000-000000000003
+# ╟─c0e1a002-0001-4000-8000-000000000020
+# ╠═c0e1a002-0001-4000-8000-000000000004
+# ╠═c0e1a002-0001-4000-8000-000000000005
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
