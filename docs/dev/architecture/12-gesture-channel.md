@@ -172,7 +172,15 @@ the rest of the figure stay where they are; a copy of those pixels, clipped to t
 `clip` rect (the viewport inset past the spine, below), carries the matrix, and so does the data
 `g` inside each overlay svg. A data-space hit uses the content pixel under the cursor, and only
 when that cursor is inside the same `clip` rect. A layout point outside it does not hit data the
-preview has hidden. The view rectangle stays in layout pixels, and legend, colorbar,
+preview has hidden. An axis tied to the pan axis by `linkaxes!` slides in a window of its own,
+by the matrix carried over to its scale on the dimensions it shares (#363). Every overlay mark
+of an axis (selection rings and fades, hover, threshold lines, ROI boxes, the marquee, slice
+readout dots) moves by the frame of the window that axis's pixels are in, and is hit-tested
+through it (#368, #379, #391): `previewWindows` (`frontend/src/geometry.ts`) is the one list the
+mount paints and `axisFrame` reads. A twin axis in the same cell or an unlinked inset sits in
+the pan window, so it moves with the pan axis; an axis outside every window stays put. Anything
+drawn later on another axis (linked highlights) takes its frame from `axisFrame` too. The view
+rectangle stays in layout pixels, and legend, colorbar,
 and axis chrome are siblings of that clip so a ring outside the viewport is not cut off. The
 matrix comes off in the turn
 the sent frame is actually visible — the image `load` on `:cairo`, the scene swap on `:webgl` —

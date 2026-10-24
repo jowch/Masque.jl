@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
-    anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, lineReadout, samplePoint,
+    anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, previewWindows, lineReadout, samplePoint,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
 import { begin as beginView, tip as viewTip, limitsTip, view3Base, rememberView3, seedView3Homes, zoom3 } from "../src/drag/view"
@@ -868,11 +868,69 @@ describe("hitTestAt through each axis's own frame (#379)", () => {
         expect(hitTestAt(man, 100, 270, photo, "click", "v")?.layer.id).toBe("c")
         expect(layerPoint(man, photo, "v", man.layers[0], { x: 100, y: 270 })).toEqual({ x: 100, y: 270 })
     })
-    it("tests a threshold line through the pan axis's frame, which draws it", () => {
+    it("tests a threshold line through its own axis's frame, which draws it (#391)", () => {
         const thr = { id: "thr", kind: "threshold", axis: "ax2", events: ["drag"], payloads: [],
-            geometry: { orientation: "v", pos: 60, span: [40, 130] } } as unknown as HitLayer
-        // Content x = 60 is drawn at 2*60 - 50 = 70.
-        expect(hitTestAt(m(thr), 70, 100, photo, "drag", "v")?.layer.id).toBe("thr")
+            geometry: { orientation: "v", pos: 300, span: [40, 130] } } as unknown as HitLayer
+        // ax2 moves y only: content (300, 100) is drawn at (300, 120). The pan matrix would
+        // draw the line at x = 2*300 - 50 = 550, outside every window.
+        expect(hitTestAt(m(thr), 300, 120, photo, "drag", "v")?.layer.id).toBe("thr")
+        expect(hitTestAt(m(thr), 550, 120, photo, "drag", "v")?.layer.id).not.toBe("thr")
+    })
+})
+
+describe("axisFrame follows the window an axis's pixels are in (#391)", () => {
+    const T = (viewport: [number, number, number, number]) =>
+        ({ xlims: [0, 1], ylims: [0, 1], xscale: "identity", yscale: "identity", viewport, xreversed: false, yreversed: false })
+    const photo = { s: 2, tx: -50, ty: -80 }
+    const panClip: [number, number, number, number] = [42, 32, 146, 196]
+    const man = (links: unknown[], transforms: Record<string, unknown>): Manifest => ({
+        width: 400, height: 300, transforms: { ax1: T([40, 30, 150, 200]), ...transforms },
+        layers: [{ id: "v", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { x: 40, y: 30, w: 150, h: 200, mode: "pan", clip: panClip, links } }],
+    }) as unknown as Manifest
+    const pan = { sx: 2, sy: 2, tx: -50, ty: -80, clip: panClip }
+
+    it("moves an unlinked twin axis in the same cell with the pan axis's pixels", () => {
+        const m = man([], { twin: T([40, 30, 150, 200]) })
+        expect(axisFrame(m, photo, "v", "twin")).toEqual(pan)
+    })
+    it("moves an unlinked inset inside the pan window with the pan axis's pixels", () => {
+        const m = man([], { inset: T([120, 40, 60, 60]) })
+        expect(axisFrame(m, photo, "v", "inset")).toEqual(pan)
+        const thr = { id: "thr", kind: "threshold", axis: "inset", events: ["drag"], payloads: [],
+            geometry: { orientation: "v", pos: 150, span: [50, 90] } } as unknown as HitLayer
+        m.layers.unshift(thr)
+        // Drawn where the pan matrix puts it: x = 2*150 - 50 = 250 is outside the pan window,
+        // so it is not hit there, and not at 150 where the stale manifest has it either.
+        expect(hitTestAt(m, 150, 60, photo, "drag", "v")?.layer.id).not.toBe("thr")
+        expect(layerPoint(m, photo, "v", thr, { x: 150, y: 60 })).toEqual({ x: 100, y: 70 })
+    })
+    it("puts the pan window over a twin linked on one dimension, so both axes move with the pan", () => {
+        const links = [{ axis: "twin", clip: panClip, x: [40, 40, 1] }]
+        const m = man(links, { twin: T([40, 30, 150, 200]) })
+        expect(previewWindows(m, photo, "v").map((w) => w.axis)).toEqual(["twin", "ax1"])
+        expect(axisFrame(m, photo, "v", "twin")).toEqual(pan)
+        expect(axisFrame(m, photo, "v", "ax1")).toEqual(pan)
+    })
+    it("puts a linked inset's own window over the pan window, and leaves the pan axis on its own", () => {
+        const insetClip: [number, number, number, number] = [92, 102, 56, 56]
+        const links = [{ axis: "inset", clip: insetClip, x: [100, 120, 0.5], y: [100, 130, 0.5] }]
+        const m = man(links, { inset: T([90, 100, 60, 60]) })
+        expect(previewWindows(m, photo, "v").map((w) => w.axis)).toEqual(["ax1", "inset"])
+        expect(axisFrame(m, photo, "v", "inset")?.clip).toEqual(insetClip)
+        // The inset covers the pan axis's centre but is too small to hold its pixels.
+        expect(axisFrame(m, photo, "v", "ax1")).toEqual(pan)
+    })
+    it("keeps the pan axis on the pan window under a linked inset of over half its size", () => {
+        const insetClip: [number, number, number, number] = [42, 32, 120, 196]
+        const links = [{ axis: "inset", clip: insetClip, x: [100, 120, 0.5], y: [100, 130, 0.5] }]
+        const m = man(links, { inset: T([40, 30, 124, 200]) })
+        expect(previewWindows(m, photo, "v").map((w) => w.axis)).toEqual(["ax1", "inset"])
+        expect(axisFrame(m, photo, "v", "ax1")).toEqual(pan)
+    })
+    it("leaves an axis outside every window put", () => {
+        const m = man([], { side: T([220, 30, 150, 200]) })
+        expect(axisFrame(m, photo, "v", "side")).toBeNull()
     })
 })
 

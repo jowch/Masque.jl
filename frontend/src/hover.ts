@@ -1,4 +1,4 @@
-import { anchorFor, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
+import { anchorFor, axisPoint, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
 import { renderTemplate, renderAutoTable, esc, fmtNum, withReadout } from "./template"
 import { drawHover, clearHover, drawLegendLink, clearLegendLink, markColorFor } from "./highlight"
@@ -8,7 +8,6 @@ import { surfaceFields } from "./surface"
 import { cancel as cancelMarquee } from "./drag/marquee"
 import { hasRegions, regionOf } from "./regions"
 import { fmt, cssAnchor, layoutImagePx, prefersReducedMotion, MOTION_MS, cancelPendingMove, cancelPendingDrag } from "./state"
-import { contentPoint } from "./photo"
 import type { OverlayCtx, OverlayState } from "./state"
 import type { Hit, HitLayer, Manifest, SliceGeometry, ThresholdGeometry } from "./types"
 
@@ -356,7 +355,6 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     // reached with drag === null, but keep the guard as defense-in-depth.
     if (state.drag_) return
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
-    const content = contentPoint(state.photo_, layout)
     const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_)
     // A full-viewport :view hit must not suppress element hover. A threshold/ROI drag-hover
     // still does, and it takes the resize cursor — the cross stays off.
@@ -369,11 +367,13 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     setDragHoverChrome(ctx, state, null)
     const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_)
     // The axis frame does not slide, so the viewport and the hair are layout pixels.
-    // The sample is the content pixel under the cursor, so the value follows the slid series.
+    // The sample is the point on the slice axis's pixels under the cursor, so the value
+    // follows its slid series.
     const vp = viewportUnder(ctx.manifest_, layout.x, layout.y)
     const sliceLayer = vp ? sliceOnAxis(ctx.manifest_, vp.id) : null
     let sampled: { probe: number; samples: SliceSample[] } | null = null
     if (sliceLayer && vp) {
+        const content = axisPoint(ctx.manifest_, state.photo_, state.photoViewId_, vp.id, layout)
         const inv = invertAxis(vp.t, content.x, content.y)
         if (typeof inv.x === "number" && typeof inv.y === "number") {
             sampled = sampleSlice(sliceLayer.geometry as SliceGeometry, vp.t, inv.x, inv.y)
@@ -404,7 +404,7 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
             : []
         const vertical = geom?.orientation !== "h"
         syncCross(
-            ctx, state, true, layout.x, vy, layout.x, vy + vh, vx, layout.y, vx + vw, layout.y, dots,
+            ctx, state, true, vp.id, layout.x, vy, layout.x, vy + vh, vx, layout.y, vx + vw, layout.y, dots,
             { v: hairOn && vertical, h: hairOn && !vertical },
         )
     } else {
