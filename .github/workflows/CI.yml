@@ -151,12 +151,17 @@ jobs:
           fail_ci_if_error: false
 
   webgl-bind-e2e:
-    # THROUGH-Pluto `@bind` E2E on the Pluto 0.20 series: a live headless Pluto kernel + real
-    # Chromium. The one remaining 0.20 check; it covers the WebGL `@bind` round-trip only, not
-    # the kind sweep or Cairo. Drop it at 0.5.0. On Pluto 1 the WebGL kind sweep already clicks
-    # every kind and reads the bound value back through Pluto.
-    name: WGLMakie bind E2E (Pluto 0.20)
+    # THROUGH-Pluto `@bind` E2E: a live headless Pluto kernel + real Chromium, with the notebook
+    # in a worker process, as users run it. The kind sweep runs its notebooks in the server
+    # process (see test/e2e/serve.jl), so the Pluto 1 leg is CI's one check that published data
+    # crosses the worker boundary to the page and a bound value comes back. The 0.20 leg is the
+    # one remaining 0.20 check; drop it at 0.5.0. Both cover the WebGL round-trip only.
+    name: WGLMakie bind E2E (Pluto ${{ matrix.pluto }})
     needs: setup-lts
+    strategy:
+      fail-fast: false
+      matrix:
+        pluto: ['1', '0.20']
     runs-on: ubuntu-latest
     # Worst case inside "Through-Pluto bind round-trip": 25min mount + 2×5min PLUTO_MS attempts
     # ≈ 35min, plus the port-readiness loop (≤4min) and setup steps before it — 45min leaves
@@ -185,9 +190,11 @@ jobs:
       - name: Through-Pluto bind round-trip
         working-directory: test/e2e
         env:
-          # serve.jl puts this series in its own env; the notebook runs on MASQUE_DEV_ENV.
-          PLUTO_VERSION: '0.20'
+          PLUTO: ${{ matrix.pluto }}
         run: |
+          # Pluto 1 runs from MASQUE_DEV_ENV. Another series gets its own env from serve.jl,
+          # which reads PLUTO_VERSION; the notebook runs on MASQUE_DEV_ENV either way.
+          [ "$PLUTO" = "1" ] || export PLUTO_VERSION="$PLUTO"
           julia serve.jl 1234 > pluto.log 2>&1 &
           SERVER=$!
           trap 'kill $SERVER 2>/dev/null || true' EXIT
@@ -210,7 +217,7 @@ jobs:
         if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: bind-e2e-failure-pluto-0.20
+          name: bind-e2e-failure-pluto-${{ matrix.pluto }}
           path: |
             ${{ runner.temp }}/bind-e2e-artifacts/
             test/e2e/pluto.log
