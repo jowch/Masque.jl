@@ -10,8 +10,20 @@ plots in Pluto. Browser layer is TypeScript in `frontend/`, bundled by esbuild t
   JSON3, …) are `[extras]`, invisible to the package env — it only "works" when your default
   `@v1.x` env happens to stack them in. Keep the `:-` default: an unset variable would make it
   `--project=`, which silently means `@v1.x`. `scripts/cloud-warm.sh julia` builds that env.
-  CI runs `Pkg.test()`, which builds its own fresh env (~6 min precompile cold, may resolve
-  newer deps than `$MASQUE_DEV_ENV`) — use it to reproduce a CI-only failure, not day to day.
+  CI runs this same command against the same env: a `Setup` job per Julia version resolves it
+  fresh with `cloud-warm.sh julia-fetch`, precompiles it once (cached by manifest hash), and
+  every Julia, sweep and fixture job restores it (`.github/actions/julia-env*`). A CI-only
+  failure is usually a newer dep: rebuild your env with `rm -rf "$MASQUE_DEV_ENV"` first.
+  Notebooks and e2e scripts that CI runs activate `MASQUE_DEV_ENV` when it is set; a new one
+  must too, or it rebuilds the Makie stack in its own temp env. PRs touching only
+  `docs/src`, `docs/dev` or `*.md` skip the Julia jobs (the "Changed files" job).
+- **CI runs when a PR is ready.** A draft PR runs only the lint job; the Julia, sweep, fixture
+  and docs jobs run once it is marked ready for review. When a draft needs full CI anyway (say,
+  to show a reviewer a green run), add the `full-ci` label, then push or re-run CI from the
+  Checks tab; every push after that runs it. Adding a label never starts a run by itself.
+  Branch protection requires `CI result` (one job that fails if any CI job failed) and
+  `Release gate`, not the individual jobs: a skipped matrix job reports under an unexpanded
+  name, so requiring `Julia 1` would block docs-only PRs.
 - Upstream canary (`.github/workflows/UpstreamCanary.yml`, nightly + manual, advisory): runs
   `test/makie_compat_tests.jl` and `test/wgl_compat_tests.jl` against Makie master via
   `test/upstream/canary.jl` (usage at its top). A red run's annotation says whether resolution,
@@ -135,6 +147,8 @@ text and the bond payload → it gets a live check on every backend × the kinds
 - A fresh per-notebook env re-resolves + precompiles the Makie stack (~6 min first open).
   The kind-sweep/contourf notebooks skip this when `MASQUE_DEV_ENV` points at a warmed env.
 - To test the local package: `Pkg.develop(path=...)` in a notebook cell (disables Pluto's pkg mgmt).
+- Tests run on Pluto 1. `test/e2e/serve.jl` installs the series named by `PLUTO_VERSION`
+  (default `1`); `PLUTO_VERSION=0.20 julia test/e2e/serve.jl 1234` reproduces CI's 0.20 bind leg.
 - Headless: `Pluto.run(; port=1234, launch_browser=false, require_secret_for_open_links=false, require_secret_for_access=false)`; open `localhost:1234/open?path=…`; click "Run notebook code" to exit Safe preview; export HTML via `localhost:1234/notebookexport?id=…`.
 - **Readiness: poll the port (`curl localhost:1234` → 200), not the log** — Pluto doesn't reliably flush its "Go to…" line, so a log-grep readiness loop hangs on a server that's actually up.
 - **Selected/highlight is overlay-drawn, so the PNG is byte-identical across clicks** — don't detect interaction by watching `img.src`; assert the overlay/tooltip/`@bind` value instead (bake state into the figure only if you specifically need the PNG to differ).

@@ -1,11 +1,12 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
-import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, selectionForValue, surfaceSelection } from "./selection"
+import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfaceSelection } from "./selection"
 import { emptyMask, maskHit } from "./gridmask"
 import { applyMove, onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
-import { onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
+import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import { buildDragStops } from "./dragkeys"
+import { fieldSelection, recordPicks } from "./history"
 import type { DragStops } from "./dragkeys"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
@@ -403,7 +404,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     kbdHint.id = "masque-kbd-hint"
     kbdHint.className = "sr-only"
     kbdHint.textContent = "Use arrow keys to move between elements, Page Up or Page Down to jump between layers, " +
-        "Enter to select, Escape to leave."
+        `Enter to select, ${isApplePlatform() ? "Command" : "Control"} Z to undo, Escape to clear or leave.`
 
     // aria-live="polite", not the tooltip: aria-hidden toggling on the tooltip isn't an
     // announcement path for assistive tech, only a visibility one. Created empty and populated
@@ -530,11 +531,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // (the docs player does, to swap its snapshots) and must see every commit. The value is
         // a fresh object each time, so Pluto sees a change.
         value_: currentState,
-        commit_: (updates, quiet = false) => {
+        commit_: (updates, quiet = false, step = false) => {
             const isField = new Set(ctx.manifest_.fields ?? fields)
             const kept = Object.entries(updates).filter(([k]) => isField.has(k))
             if (!kept.length) return
             const next: Record<string, unknown> = currentState()
+            if (!step) recordPicks(ctx.manifest_, state, next, kept, quiet)
             for (const [k, v] of kept) next[k] = v
             stateValue = next
             const bond = toBond(next)
@@ -563,8 +565,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const restoreSelection = (v: Record<string, unknown>) => {
         for (const f of fields) {
             if (!(f in v)) continue // a state field the bond doesn't carry keeps its own
-            const sel = selectionForValue(ctx.manifest_, v[f] ?? null, f)
-            if (sel) state.sel_.set(f, sel.mask ? { hits_: sel.hits, source_: null, mask_: sel.mask } : sel.items ? { hits_: sel.hits, source_: null, items_: sel.items } : { hits_: sel.hits, source_: sel.source })
+            const sel = fieldSelection(ctx.manifest_, f, v[f])
+            if (sel) state.sel_.set(f, sel)
         }
     }
     restoreSelection(hostValue)

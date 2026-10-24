@@ -77,4 +77,5 @@ asks which one you mean; write `Makie.Slider` instead.
 In a static HTML export the controls still set the `@bind` value; only
 `onchange` needs a running notebook.
 
-Next: [Update the figure](@ref) has more on what `onchange` can change.
+Next: [Update the figure](@ref) has more on what `onchange` can change, and
+[Build a widget](@ref) uses a menu to choose the class a click gives a point.

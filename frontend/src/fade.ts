@@ -120,7 +120,7 @@ export interface Fade {
 // An axis's wrapper, with the keys (`layer:index`) of the marks it keeps (the selection and
 // any legend preview), of the selection's picks alone, and of the picks it outlines, with each
 // outline's colour where the canvas draws. `draws` counts the redraws.
-export type FadeEl = HTMLDivElement & { masqueFade?: { kept: string[]; picked: string[]; lone: string[]; outlines?: string[]; draws: number } }
+export type FadeEl = HTMLDivElement & { masqueFade?: { kept: string[]; picked: string[]; pickedAt?: number[][]; lone: string[]; outlines?: string[]; draws: number } }
 
 interface AxisHome { wrap: HTMLDivElement; dim: HTMLCanvasElement; top: HTMLCanvasElement }
 type Box = [number, number, number, number] // x0, y0, x1, y1
@@ -515,6 +515,11 @@ export function createFade(host: FadeHost): Fade {
         ;(h.wrap as FadeEl).masqueFade = {
             kept: [...kept].flatMap(([layer, ks]) => [...ks].map((k) => `${layer.id}:${k}`)),
             picked: [...kept.keys()].flatMap((layer) => [...(selKept.get(layer) ?? [])].map((k) => `${layer.id}:${k}`)),
+            // Each pick's centre in image px, before any photograph moves the canvases.
+            pickedAt: [...kept.keys()].flatMap((layer) => [...(selKept.get(layer) ?? [])].flatMap((k) => {
+                const b = boxOf(layer, k)
+                return b ? [[(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]] : []
+            })),
             lone: lone.map((p) => `${p.layer.id}:${p.k}`),
             outlines,
             draws: ((h.wrap as FadeEl).masqueFade?.draws ?? 0) + 1,

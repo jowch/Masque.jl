@@ -4304,6 +4304,48 @@ describe("photographic pan / wheel zoom", () => {
         expect(host.querySelector(".masque-data-clip")).toBeNull()
     })
 
+    it("hover and click find a linked or unlinked axis's mark where it is drawn mid-preview (#379)", async () => {
+        const { host, img, script } = setup()
+        const m = viewManifest("pan")
+        m.transforms.ax1.viewport = [100, 80, 500, 640]
+        const g = m.layers[0].geometry as ViewGeometry
+        g.x = 100; g.y = 80; g.w = 500; g.h = 640
+        g.clip = [104, 84, 492, 632]
+        g.links = [{ axis: "ax2", clip: [704, 84, 242, 632], x: [100, 700, 0.5] }]
+        const pts = (id: string, axis: string, x: number): HitLayer => ({
+            id, kind: "circles", geometry: [x, 400, 20], payloads: [{ i: 0 }], axis, events: ["click", "hover"],
+        })
+        m.layers.push(pts("p2", "ax2", 800), pts("p3", "ax3", 1100))
+        m.fields = ["p2", "p3"]
+        let release: (r: { png: Uint8Array; manifest: Manifest }) => void = () => {}
+        const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
+        mount(script, m, undefined, requestFrame)
+        img.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        host.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        wheelAt(surface, -120)
+        const [s, tx] = host.dataset.masquePhoto!.split(",").map(Number)
+        expect(s).not.toBe(1)
+        // p2 is drawn where its own axis's frame puts it, not where the pan matrix would
+        const x2 = s * 800 + 700 * (1 - s) + 0.5 * (tx + 100 * (s - 1))
+        expect(Math.abs(x2 - 800)).toBeGreaterThan(5)
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: x2 / 2, clientY: 200, bubbles: true }))
+        expect(shadow.querySelector(`svg g.masque-clip[data-axis="ax2"] g.hi circle`)).toBeTruthy()
+        surface.dispatchEvent(new MouseEvent("click", { clientX: x2 / 2, clientY: 200, bubbles: true }))
+        expect((host as unknown as { value: Record<string, unknown> }).value.p2).toEqual({ layer: "p2", index: 0 })
+        // p3's axis doesn't move: it is hit where it always was, outside the pan window
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 550, clientY: 200, bubbles: true }))
+        expect((host as unknown as { value: Record<string, unknown> }).value.p3).toEqual({ layer: "p3", index: 0 })
+        await Promise.resolve()
+        release({ png: new Uint8Array([1, 2, 3]), manifest: m })
+        await Promise.resolve()
+        await Promise.resolve()
+        if (host.dataset.masquePhoto) img.dispatchEvent(new Event("load"))
+    })
+
     it("a pick's ring slides and clips with its own axis: pan, linked, or neither (#368)", async () => {
         const { host, img, script } = setup()
         const m = viewManifest("pan")
@@ -5463,8 +5505,11 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(surface.classList.contains("pointer-focus")).toBe(true)
         key("Escape")
         expect(val(host).pts).toEqual({ items: [] })
-        expect(shadow.activeElement).toBeNull()
+        // Escape that clears picks keeps focus, so an undo can follow (#386); the next one leaves.
+        expect(shadow.activeElement).toBe(surface)
         expect(surface.classList.contains("pointer-focus")).toBe(false)
+        key("Escape")
+        expect(shadow.activeElement).toBeNull()
     })
 
     it("a restored pick that names no element is dropped", () => {
@@ -5863,6 +5908,165 @@ describe("marquee and legend picks under select = :many (#335)", () => {
     })
 })
 
+describe("undo and redo for picks (#386)", () => {
+    // Points at image (200,200), (600,400), (1000,600) in a `many` field; client px are half.
+    // A one-pick field, a 2×2 `many` grid, and a slider round it out.
+    const tf = { xlims: [0, 10] as [number, number], ylims: [0, 10] as [number, number], xscale: "identity", yscale: "identity",
+        viewport: [0, 0, 1200, 800] as [number, number, number, number], xreversed: false, yreversed: false }
+    const manifest = (): Manifest => ({
+        width: 1200, height: 800, scaling: 2,
+        transforms: { ax1: tf },
+        fields: ["pts", "one", "img"],
+        initial: { pts: { items: [] }, one: null, img: { runs: [] } },
+        layers: [
+            { id: "pts", kind: "circles", geometry: [200, 200, 20, 600, 400, 20, 1000, 600, 20], payloads: [{}, {}, {}], axis: "ax1", events: ["click", "hover"], many: true },
+            { id: "one", kind: "rects", geometry: [1100, 100, 40, 40], payloads: [{}], axis: "ax1", events: ["click", "hover"] },
+            { id: "img", kind: "grid", axis: "ax1", events: ["click"], many: true, payloads: [],
+                geometry: { xedges: [0, 600, 1200], yedges: [0, 400, 800], ncols: 2, nrows: 2 } as unknown as HitLayer["geometry"] },
+        ],
+    })
+    const val = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
+    const items = (...ks: number[]) => ({ items: ks.map((index) => ({ layer: "pts", index })) })
+    const ptr = (s: HTMLElement, type: string, x: number, y: number, mod: PointerEventInit = {}) =>
+        s.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, cancelable: true, ...mod }))
+    const click = (s: HTMLElement, x: number, y: number, mod: MouseEventInit = {}) =>
+        s.dispatchEvent(new MouseEvent("click", { clientX: x, clientY: y, bubbles: true, ...mod }))
+    const drag = (s: HTMLElement, from: [number, number], to: [number, number]) => {
+        ptr(s, "pointerdown", from[0], from[1])
+        ptr(s, "pointermove", (from[0] + to[0]) / 2, (from[1] + to[1]) / 2)
+        ptr(s, "pointermove", to[0], to[1])
+        ptr(s, "pointerup", to[0], to[1])
+        click(s, to[0], to[1])
+    }
+    // The test platform is not Apple's, so the modifier is Ctrl.
+    const key = (s: HTMLElement, k: string, mod: KeyboardEventInit = {}): KeyboardEvent => {
+        const e = new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, composed: true, ...mod })
+        s.dispatchEvent(e)
+        return e
+    }
+    const undo = (s: HTMLElement) => key(s, "z", { ctrlKey: true })
+    const redo = (s: HTMLElement) => key(s, "Z", { ctrlKey: true, shiftKey: true })
+    const mounted = (m: Manifest = manifest()) => {
+        const { host, script } = setup()
+        mount(script, m)
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        let n = 0
+        host.addEventListener("input", () => { n++ })
+        return { host, shadow, surface, inputs: () => n }
+    }
+
+    it("Ctrl+Z steps back through clicks and Escape, one value each; Shift+Ctrl+Z and Ctrl+Y step forward", () => {
+        const { host, shadow, surface, inputs } = mounted()
+        surface.focus()
+        click(surface, 100, 100)
+        click(surface, 300, 200)
+        click(surface, 550, 50) // the one-pick field
+        expect(val(host)).toEqual({ pts: items(0, 1), one: { layer: "one", index: 0 }, img: { runs: [] } })
+        key(surface, "Escape")
+        expect(val(host)).toEqual({ pts: items(), one: null, img: { runs: [] } })
+        expect(shadow.activeElement).toBe(surface) // Escape that cleared picks keeps focus
+        expect(selChildren(shadow).length).toBe(0)
+        expect(fadeKept(shadow)).toEqual([])
+        const before = inputs()
+        const e = undo(surface)
+        expect(e.defaultPrevented).toBe(true)
+        expect(inputs()).toBe(before + 1)
+        expect(val(host)).toEqual({ pts: items(0, 1), one: { layer: "one", index: 0 }, img: { runs: [] } })
+        // The points and the bar are drawn by the fade (#394).
+        expect(fadeKept(shadow).sort()).toEqual(["one:0", "pts:0", "pts:1"])
+        undo(surface)
+        expect(val(host)).toEqual({ pts: items(0, 1), one: null, img: { runs: [] } })
+        undo(surface)
+        expect(val(host).pts).toEqual(items(0))
+        redo(surface)
+        expect(val(host).pts).toEqual(items(0, 1))
+        key(surface, "y", { ctrlKey: true })
+        expect(val(host).one).toEqual({ layer: "one", index: 0 })
+        expect(inputs()).toBe(before + 5)
+        // The redone pick toggles off as a fresh click on it would.
+        click(surface, 550, 50)
+        expect(val(host).one).toBeNull()
+    })
+
+    it("passes the key through when there is nothing to undo or redo, or the figure is not focused", () => {
+        const { host, surface, inputs } = mounted()
+        surface.focus()
+        expect(undo(surface).defaultPrevented).toBe(false)
+        expect(redo(surface).defaultPrevented).toBe(false)
+        click(surface, 100, 100)
+        surface.blur()
+        expect(undo(surface).defaultPrevented).toBe(false)
+        expect(val(host).pts).toEqual(items(0))
+        surface.focus()
+        expect(key(surface, "z").defaultPrevented).toBe(false) // a plain z is not undo
+        expect(key(surface, "z", { ctrlKey: true, altKey: true }).defaultPrevented).toBe(false)
+        expect(key(surface, "z", { metaKey: true }).defaultPrevented).toBe(false) // Cmd is Apple's
+        expect(val(host).pts).toEqual(items(0))
+        const n = inputs()
+        expect(undo(surface).defaultPrevented).toBe(true)
+        expect(inputs()).toBe(n + 1)
+        expect(redo(surface).defaultPrevented).toBe(true)
+        expect(redo(surface).defaultPrevented).toBe(false) // nothing left to redo
+    })
+
+    it("a new pick after an undo drops the redo steps", () => {
+        const { host, surface } = mounted()
+        surface.focus()
+        click(surface, 100, 100)
+        click(surface, 300, 200)
+        undo(surface)
+        click(surface, 500, 300)
+        expect(val(host).pts).toEqual(items(0, 2))
+        expect(redo(surface).defaultPrevented).toBe(false)
+        undo(surface)
+        expect(val(host).pts).toEqual(items(0))
+    })
+
+    it("a marquee is one step, and a grid's cells come back with its marks", () => {
+        const { host, surface, inputs } = mounted()
+        surface.focus()
+        drag(surface, [50, 50], [150, 150]) // point 0 and cell (0,0)
+        expect(val(host)).toEqual({ pts: items(0), one: null, img: { runs: [0, 0, 1] } })
+        drag(surface, [60, 60], [150, 150]) // starts on a held cell: takes both out
+        expect(val(host)).toEqual({ pts: items(), one: null, img: { runs: [] } })
+        const n = inputs()
+        undo(surface)
+        expect(inputs()).toBe(n + 1)
+        expect(val(host)).toEqual({ pts: items(0), one: null, img: { runs: [0, 0, 1] } })
+        undo(surface)
+        expect(val(host)).toEqual({ pts: items(), one: null, img: { runs: [] } })
+        // The restored mask is the one a click edits next.
+        redo(surface)
+        click(surface, 450, 350) // cell (1,1)
+        expect(val(host).img).toEqual({ runs: [0, 0, 1, 1, 1, 1] })
+    })
+
+    it("keeps the latest steps once the history is full", () => {
+        const { host, surface } = mounted()
+        surface.focus()
+        for (let k = 0; k < 60; k++) { click(surface, 100, 100) } // 60 toggles of point 0
+        for (let k = 0; k < 60; k++) { click(surface, 300, 200) }
+        let steps = 0
+        while (undo(surface).defaultPrevented) steps++
+        expect(steps).toBe(100)
+        expect(val(host).pts).toEqual(items()) // 100 steps back is after 20 toggles of 0, an even number
+    })
+
+    it("an undo pressed mid-drag waits for the drag to end", () => {
+        const { host, surface } = mounted()
+        surface.focus()
+        click(surface, 100, 100)
+        ptr(surface, "pointerdown", 400, 300)
+        ptr(surface, "pointermove", 500, 350)
+        expect(undo(surface).defaultPrevented).toBe(false)
+        ptr(surface, "pointercancel", 500, 350)
+        expect(val(host).pts).toEqual(items(0))
+        expect(undo(surface).defaultPrevented).toBe(true)
+        expect(val(host).pts).toEqual(items())
+    })
+})
+
 describe("a grid with select = :many holds a cell mask (#335)", () => {
     // A 4×3 grid filling the axis: cell (i, j) spans x 300i..300(i+1), y 200j..200(j+1) image px.
     const grid = (initial: unknown = { runs: [] }): Manifest => ({
@@ -6139,6 +6343,34 @@ describe("onchange (#334)", () => {
         return m
     }
     const flush = () => new Promise((r) => setTimeout(r, 0))
+
+    it("a frame whose marks changed resets the undo history, even for a field with no picks (#386)", async () => {
+        const m = withThree(threePoints())
+        const { host, img, script } = setup()
+        const one = onchangeManifest() // one point now: pts index 2 is gone
+        let calls = 0
+        const requestFrame = vi.fn(async (_input: Record<string, unknown>) => {
+            calls += 1
+            return calls === 1 ? { png: new Uint8Array([1]), manifest: withThree(threePoints()) } : { png: new Uint8Array([2]), manifest: one, clear: ["pts"] }
+        })
+        mount(script, m, undefined, requestFrame)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        surface.focus()
+        const key = (k: string, mod: KeyboardEventInit = {}) => {
+            const e = new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...mod })
+            surface.dispatchEvent(e)
+            return e
+        }
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 450, clientY: 100, bubbles: true })) // point 2
+        await flush()
+        img.dispatchEvent(new Event("load"))
+        key("Escape") // clears it: pts is null when the next frame names it
+        await flush()
+        img.dispatchEvent(new Event("load"))
+        expect(requestFrame).toHaveBeenCalledTimes(2)
+        expect(key("z", { ctrlKey: true }).defaultPrevented).toBe(false)
+        expect(val(host).pts ?? null).toBeNull()
+    })
 
     it("Enter and Escape reach onchange, and the focus stays on its mark across the frame", async () => {
         const m = withThree(threePoints())

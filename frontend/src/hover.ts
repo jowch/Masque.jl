@@ -1,4 +1,4 @@
-import { anchorFor, computeAnchoredPlacement, hitTestAt, photoClip, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layoutSpaceLayer, axisFrame } from "./geometry"
+import { anchorFor, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
 import { renderTemplate, renderAutoTable, esc, fmtNum, withReadout } from "./template"
 import { drawHover, clearHover, drawLegendLink, clearLegendLink, markColorFor } from "./highlight"
@@ -243,9 +243,9 @@ export function applyTipHtml(ctx: OverlayCtx, state: OverlayState, html: string,
 
 // `anchor` is in the hit's own space (content pixels for a data mark, layout pixels for
 // screen-fixed chrome). The tooltip is placed on the untransformed base, so a slid mark's
-// anchor is mapped back to the layout point where its own axis draws it (#368).
+// anchor is mapped back to the layout point where it is drawn (#368, #379).
 export function layoutAnchor(ctx: OverlayCtx, state: OverlayState, hit: Hit, anchor: Anchor): Anchor {
-    const f = layoutSpaceLayer(hit.layer) ? null : axisFrame(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer.axis)
+    const f = layerFrame(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer)
     if (!f) return anchor
     return { x: f.sx * anchor.x + f.tx, y: f.sy * anchor.y + f.ty, top: f.sy * anchor.top + f.ty }
 }
@@ -357,8 +357,7 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     if (state.drag_) return
     const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
     const content = contentPoint(state.photo_, layout)
-    const clip = photoClip(ctx.manifest_, state.photo_, state.photoViewId_)
-    const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", clip)
+    const dragHit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "drag", state.photoViewId_)
     // A full-viewport :view hit must not suppress element hover. A threshold/ROI drag-hover
     // still does, and it takes the resize cursor — the cross stays off.
     if (dragHit && dragHit.layer.kind !== "view") {
@@ -368,7 +367,7 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
         return
     }
     setDragHoverChrome(ctx, state, null)
-    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", clip)
+    const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_)
     // The axis frame does not slide, so the viewport and the hair are layout pixels.
     // The sample is the content pixel under the cursor, so the value follows the slid series.
     const vp = viewportUnder(ctx.manifest_, layout.x, layout.y)
@@ -437,14 +436,14 @@ export function applyMove(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): 
     if (covered && hit) {
         clearHover(ctx, state, true)
         clearLegendLink(ctx, state, true)
-        const sample = layoutSpaceLayer(hit.layer) ? layout : content
+        const sample = layerPoint(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer, layout)
         showTip(ctx, state, hit, sample.x, sample.y, e)
         return
     }
 
     if (hit) {
         drawHover(ctx, state, hit)
-        const sample = layoutSpaceLayer(hit.layer) ? layout : content
+        const sample = layerPoint(ctx.manifest_, state.photo_, state.photoViewId_, hit.layer, layout)
         showTip(ctx, state, hit, sample.x, sample.y, e)
         updateLinkForHit(ctx, state, hit)
     } else if (!restoreFocus(ctx, state)) {

@@ -14,9 +14,21 @@ time). `:axis`/`:threshold`/`:roi`/`:view` are continuous or drag-only, not elem
 Keys (handled only while the surface has DOM focus): →/↓ next, ←/↑ previous (both clamp at the
 ends, they don't wrap), Home/End first/last, PageDown/PageUp next/previous layer, Enter/Space
 dispatch the identical `commitClick` bond payload a mouse click on the same element would (only
-if the layer's `events` includes `:click`), Escape clears focus and blurs. Every handled key
-calls `preventDefault`/`stopPropagation`; everything else, notably Tab, passes through untouched
-— the surface must never become a keyboard trap.
+if the layer's `events` includes `:click`), Escape clears every pick and the focus, and blurs
+only when there were no picks to clear (so Cmd/Ctrl+Z can follow it, #386). Cmd+Z (Apple) or
+Ctrl+Z undoes one change to the picks and Shift+Cmd/Ctrl+Z or Ctrl+Y (not Apple) redoes it
+(`history.ts`); they are handled only when there is a step to take and no drag in flight, so
+otherwise the chord reaches Pluto and the browser. Every handled key calls
+`preventDefault`/`stopPropagation`; everything else, notably Tab, passes through untouched — the
+surface must never become a keyboard trap.
+
+The pick history is recorded in `ctx.commit_`: a non-quiet commit that changes a pick field (a
+click field that is not a box, the fields `clearPicks` clears) pushes those fields' previous
+envelopes as one step, so a marquee release or a legend click that edits several fields is one
+step, and drops the redo steps. A step replays by rebuilding each field's selection from its
+envelope (`selectionForValue`) and committing once. A quiet commit that changes picks (a frame
+clearing picks whose marks changed) resets the history, since its steps may name marks that are
+gone. It keeps 100 steps, lives on `OverlayState`, and so starts empty at each mount.
 
 The focus ring reuses the existing hover highlight (`highlight.ts`'s `drawHi`/`makeHiElement`,
 mode `"hover"`) — no new visual recipe. Pointer hover and keyboard focus share one ring: a
