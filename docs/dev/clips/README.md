@@ -4,8 +4,9 @@ A docs player records every state a reader can reach: every click, and every box
 `selects` brush can draw (`brush_states` in `docs/player_pipeline.jl`). Some examples can't
 be a player, so their page shows a clip of the live notebook instead:
 
-- the example redraws the figure (a control, `onchange`, a linked camera or pan), and the
-  docs site has no Julia to redraw it;
+- the example redraws the figure in a way the player can't list ahead: picks that add up
+  under `onchange`, a linked camera or pan. A player does replay `onchange` for every setting
+  of the widget's controls (`control_states`) and for each single click (`discrete_states`);
 - it holds several picks at once (`select = :many`), and a player records one change at a
   time;
 - its brush has more distinct boxes than `BRUSH_STATES_MAX`.
@@ -13,7 +14,6 @@ be a player, so their page shows a clip of the live notebook instead:
 | Clip | Page | Notebook | Recorder |
 |---|---|---|---|
 | `docs/src/assets/example-cluster.mp4` | Examples › Compare a cluster | `cluster_notebook.jl` | `test/e2e/cluster_clip.mjs` |
-| `docs/src/assets/controls.mp4` | Sliders, toggles and menus | `controls_notebook.jl` | `test/e2e/docs_clip.mjs controls` |
 | `docs/src/assets/onchange.mp4` | Update the figure | `onchange_notebook.jl` | `test/e2e/docs_clip.mjs onchange` |
 | `docs/src/assets/view-linkaxes.mp4` | Pan, zoom and orbit › Pan and zoom a 2D axis | `linkaxes_notebook.jl` | `test/e2e/docs_clip.mjs linkaxes` |
 | `docs/src/assets/view-linkcameras.mp4` | Pan, zoom and orbit › Turn several panels together | `linkcameras_notebook.jl` | `test/e2e/docs_clip.mjs linkcameras` |

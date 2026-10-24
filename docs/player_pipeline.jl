@@ -64,13 +64,71 @@ function _item_key(it)
     return string(k, "@", Int(p["i0"]), "-", Int(p["i1"]), "/", Int(p["j0"]), "-", Int(p["j1"]))
 end
 
-# The starting value and the fields a player keys on, from the widget's manifest.
+# The starting value and the fields a player keys on, from the widget's manifest. A control's
+# envelope is always index 0, so it keys on its payload (`controls`).
 function player_keying(manifest::AbstractDict)
     boxes = Set(string(l["id"]) for l in manifest["layers"] if get(l, "selects", nothing) !== nothing)
     return Dict{String, Any}(
         "initial" => jsonable(get(manifest, "initial", Dict{String, Any}())),
         "keyed" => String[string(f) for f in get(manifest, "fields", Any[]) if !(string(f) in boxes)],
+        "controls" => String[string(l["id"]) for l in manifest["layers"] if string(l["kind"]) == "control"],
     )
+end
+
+# The key `keyOf` in `PLAYER_LOOKUP_JS` gives a whole value: each field that differs from the
+# starting value, in `keyed` order, joined by `+`.
+function state_key(keying::AbstractDict, v::AbstractDict)
+    init = keying["initial"]
+    parts = String[]
+    for f in keying["keyed"]
+        cur = jsonable(get(v, f, nothing))
+        cur == get(init, f, nothing) && continue
+        push!(
+            parts, cur === nothing ? "null@" * f :
+                f in keying["controls"] ? f * "=" * json_write(cur["payload"]) : snapshot_key(cur)
+        )
+    end
+    return isempty(parts) ? "null" : join(parts, "+")
+end
+
+# Most control settings a player records: each is one notebook run and one redrawn figure at
+# build time.
+const CONTROL_STATES_MAX = 200
+
+"""
+    control_states(manifest) -> Vector{Dict{String, Any}}
+
+Every combination of the widget's controls, each as the starting value with the controls
+set: a `Slider` or `Menu` at each of its stops, an `IntervalSlider` at each pair of stops, a
+`Toggle` or `Checkbox` off and on. Picks keep their starting value. More than
+`CONTROL_STATES_MAX` fails the harvest: fewer stops (a coarser `range`), or a clip.
+"""
+function control_states(manifest::AbstractDict)
+    init = Dict{String, Any}(string(k) => v for (k, v) in get(manifest, "initial", Dict{String, Any}()))
+    ids = String[]
+    choices = Vector{Vector{Any}}()
+    for L in manifest["layers"]
+        string(L["kind"]) == "control" || continue
+        g = L["geometry"]
+        c = string(_field(g, "control"))
+        n = c in ("slider", "intervalslider", "menu") ? Int(_field(g, "n")) : 0
+        vals = c in ("toggle", "checkbox") ? Any[false, true] :
+            c in ("slider", "menu") ? Any[0:(n - 1)...] :
+            c == "intervalslider" ? Any[[i, j] for i in 0:(n - 1) for j in i:(n - 1)] :
+            error("control :$(L["id"]) is a $c, which the player cannot list")
+        push!(ids, string(L["id"]))
+        push!(choices, vals)
+    end
+    isempty(ids) && return Dict{String, Any}[]
+    total = prod(length, choices)
+    total > CONTROL_STATES_MAX && error(
+        "the widget's controls have $total settings, more than the player records ($CONTROL_STATES_MAX): " *
+            "give a slider fewer stops, or show this interaction as a recorded clip"
+    )
+    return [
+        merge(init, Dict{String, Any}(id => Dict{String, Any}("layer" => id, "index" => 0, "payload" => p) for (id, p) in zip(ids, combo)))
+            for combo in Iterators.product(choices...)
+    ]
 end
 
 """
@@ -80,9 +138,10 @@ The docs players' snapshot lookup, shared by the static player (`emit_player`) a
 Pluto export (`PLUTO_EXPORT_SIM_JS`). `lookup(table, v)` returns the snapshot for the value
 the overlay posted, or `null`. The harvest records every click and every brush release
 (`discrete_states`, `brush_states`) one field at a time, and with `pairs = true` also each
-click on one field with each click on another. When the reader has changed two fields and
-no pair was recorded, `lookup` shows the snapshot of the latest change alone, so a miss
-means the recording and the overlay disagree.
+click on one field with each click on another, and every setting of the widget's controls
+(`control_states`). When the reader has changed two fields and no pair was recorded,
+`lookup` shows the snapshot of the latest change alone, unless a control has moved: then
+it is a miss, and the player says the setting wasn't computed.
 """
 const PLAYER_LOOKUP_JS = raw"""
 function layerIndexKey(layer, index) {
@@ -121,11 +180,16 @@ function changed(table, v) {
   });
   return out;
 }
+function fieldKey(table, f, cur) {
+  if (cur == null) return "null@" + f;
+  if ((table.controls || []).indexOf(f) !== -1) return f + "=" + JSON.stringify(cur.payload);
+  return envKey(cur);
+}
 function keyOf(table, v) {
   if (v == null) return "null";
   const d = changed(table, v);
   if (!d.length) return "null";
-  return d.map(function (p) { return p[1] == null ? "null@" + p[0] : envKey(p[1]); }).join("+");
+  return d.map(function (p) { return fieldKey(table, p[0], p[1]); }).join("+");
 }
 function keysFor(table, v) {
   const keys = [keyOf(table, v)];
@@ -151,7 +215,10 @@ function lookup(table, v) {
   const prev = table.last_;
   table.last_ = v;
   let hit = find(table, keysFor(table, v));
-  if (!hit && v != null && prev != null) {
+  // A moved control changes what every other field's snapshot would show, so a value the
+  // harvest skipped stays a miss rather than showing a snapshot taken at other settings.
+  const controlMoved = v != null && changed(table, v).some(function (p) { return (table.controls || []).indexOf(p[0]) !== -1; });
+  if (!hit && v != null && prev != null && !controlMoved) {
     const moved = (table.keyed || []).filter(function (f) { return stable(v[f]) !== stable(prev[f]); });
     if (moved.length === 0) return table.shown_ || null;
     if (moved.length === 1) {
@@ -337,7 +404,8 @@ and bounds positions only). A hand-listed click or brush fails: the harvest alre
 it. Each state changes one field: its `value` is the widget's starting value with that
 field's envelope in place, and its `key` is that envelope's [`snapshot_key`](@ref). With
 `pairs = true` in the TOML, it also returns every click on one field with every click on a
-later field, keyed as the two keys joined by `+`.
+later field, keyed as the two keys joined by `+`. Every setting of the widget's controls
+([`control_states`](@ref)) follows, keyed by `state_key` on the controls that moved.
 """
 function player_states(player::AbstractDict, manifest::AbstractDict)
     out = NamedTuple{(:key, :value), Tuple{String, Any}}[(; key = "null", value = nothing)]
@@ -375,14 +443,23 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
             push!(out, (; key = k, value = whole(string(L["id"]), v)))
         end
     end
-    # A pick `selected=` seeds can be clicked off: record that field cleared.
+    # A pick `selected=` seeds can be clicked off: record that field cleared. A control always
+    # holds a value.
     for L in manifest["layers"]
         f = string(L["id"])
-        (haskey(L, "brush") || string(get(L, "bond", "none")) in _CONTINUOUS_BONDS) && continue
+        (haskey(L, "brush") || string(get(L, "bond", "none")) in (_CONTINUOUS_BONDS..., "control")) && continue
         get(init, f, nothing) === nothing && continue
         k = "null@" * f
         push!(seen, k)
         push!(out, (; key = k, value = whole(f, nothing)))
+    end
+    # Every setting of the controls, keyed on the controls that moved.
+    keying = player_keying(manifest)
+    for v in control_states(manifest)
+        k = state_key(keying, v)
+        k in seen && continue
+        push!(seen, k)
+        push!(out, (; key = k, value = v))
     end
     clicks = copy(seen)
     for row in get(player, "states", Any[])
@@ -457,6 +534,23 @@ function snapshot_table(keyed; manifest = nothing)
     table = Dict{String, Any}("snaps" => snaps, "keys" => keys)
     manifest === nothing || merge!(table, player_keying(manifest))
     return table, extra
+end
+
+# The notebook a reader downloads: the embed without the player's TOML cell and without its
+# package manifest, which points Masque at this checkout. Pluto resolves the registered
+# packages instead.
+function download_notebook(src::AbstractString)
+    out = src
+    for marker in ("PLUTO_PLAYER_TOML_CONTENTS", "PLUTO_MANIFEST_TOML_CONTENTS")
+        m = match(Regex("# ╔═╡ ([0-9a-f-]{36})\\n$marker = \"\"\".*?\"\"\"\\n\\n", "s"), out)
+        m === nothing && continue
+        id = m.captures[1]
+        out = replace(out, m.match => ""; count = 1)
+        out = replace(out, Regex("# (╟─|╠═)$id\\n") => ""; count = 1)
+    end
+    occursin("PLUTO_PLAYER_TOML_CONTENTS", out) && error("download copy still has the player TOML")
+    occursin("PLUTO_MANIFEST_TOML_CONTENTS", out) && error("download copy still has the manifest")
+    return out
 end
 
 function html_escape(s::AbstractString)

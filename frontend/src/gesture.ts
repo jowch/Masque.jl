@@ -59,8 +59,10 @@ export function createGestureChannel(
     render: RenderFrame | null,
     onFrame: (input: Record<string, unknown>, response: FrameResponse) => void,
     onDead?: () => void,
+    // A docs player's harvested frames (`window.masqueReplayFrame`) answer on a static page.
+    replayed = false,
 ): GestureChannel {
-    if (!render || uiDisabled()) return noopChannel
+    if (!render || (uiDisabled() && !replayed)) return noopChannel
     let lock: Promise<void> = Promise.resolve()
     let latest: Record<string, unknown> | null = null // a newer position overwrites an older one still queued
     // Queued terminal requests, one per slot ("view" unless the caller names another). Kept

@@ -33,28 +33,31 @@ layout put them. Moving one changes `w` when you let go, so cells that use
 ## Redraw the figure as the reader moves a control
 
 With [`onchange`](onchange.md), the figure follows the controls without
-running the cell again. Change your plots with Makie's `update!`:
+running the cell again. Change your plots with Makie's `update!`, then
+move the slider or switch the toggle:
 
-```julia
-@bind w2 masque(fig, (freq = freq, dots = dots);
-    onchange = state -> update!(wave, xs, sin.(state.freq .* xs); linestyle = state.dots ? :dot : :solid))
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-controls-wave" data-masque-embed="controls_wave" data-masque-segment="widget" title="A sine curve with a frequency slider and a dotted-line toggle. Moving either redraws the curve." style="width:100%;height:620px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("controls_wave"; segment = "widget")
 ```
 
 While the reader drags the slider, the curve follows it. To redraw only
 when they let go, build the slider with `update_while_dragging = false`.
+Cells that use `w2` see the setting once the reader lets go:
 
 ```@raw html
-<video id="masque-controls-clip" title="Dragging the frequency slider while the curve follows it, then switching the toggle to a dotted line, with CairoMakie"
-       controls muted loop playsinline autoplay
-       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
-<script>
-(function () {
-  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
-  var el = document.getElementById("masque-controls-clip");
-  if (!el) return;
-  el.src = (pretty ? "../assets/" : "assets/") + "controls.mp4";
-})();
-</script>
+<div class="masque-embed-wrap">
+<iframe id="masque-controls-wave-value" data-masque-embed="controls_wave" data-masque-segment="value" title="A cell showing the slider's and the toggle's values." style="width:100%;height:120px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("controls_wave"; segment = "value")
 ```
 
 Masque also sets the block's own value before it calls your function, so
