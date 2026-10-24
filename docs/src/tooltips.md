@@ -23,7 +23,7 @@ Main.masque_fallback("tooltips_template")
 Without `tooltip`, the tooltip is a small table of the payload's
 fields: for a scatter, the point's `index`, `x`, and `y`, and when you
 pass `payloads`, your fields followed by `x` and `y` (see
-[Concepts](@ref) for how the two combine). On a categorical or
+[How Masque works](@ref) for how the two combine). On a categorical or
 date axis, `x` and `y` in the tooltip and in the clicked mark's event
 are text: the
 category's label, such as `"b"`, or the date or time you plotted, such
@@ -34,7 +34,7 @@ adds `x` and `y` of the point you plotted nearest the pointer along the
 line. In a template you can also use `i`, that point's position in the
 line's data, so `$(i)` is `3` over `xs[3], ys[3]`. A click on a line
 picks that point once you name the line in `bind`; see
-[Click marks](@ref). A line on an `Axis3` shows only its payload.
+[What each mark returns](@ref). A line on an `Axis3` shows only its payload.
 
 Numbers show up to four significant figures, so `0.30000000000000004`
 reads `0.3` and `2.71828` reads `2.718`. Whole numbers show in full. To

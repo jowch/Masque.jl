@@ -22,7 +22,7 @@ zoom in. Do those in Julia from the `@bind` value. For example,
 [Legend](@ref) fades the other series when you click a legend entry.
 
 A pan or orbit stays where you left it until the figure is created
-again. Double-clicking does not reset it. See [Pan and orbit](@ref).
+again. Double-clicking does not reset it. See [Pan, zoom and orbit](@ref).
 
 Each widget knows only its own figure. To have a click in one plot
 highlight the same observation in another, connect the two in Pluto
@@ -78,7 +78,7 @@ mark can be blocked by a farther one created after it.
 
 - In a static HTML export, tooltips and highlights still work, but other
   cells do not respond to a click and the view does not pan or orbit. See
-  [Static exports and this site](@ref).
+  [Static HTML export](@ref static-exports).
 - The keyboard does not reach heatmap or image cells. See
   [Keyboard and screen readers](@ref accessibility-limitations).
 - Some plot types are skipped on `Axis3` and `PolarAxis`, a `surface!`

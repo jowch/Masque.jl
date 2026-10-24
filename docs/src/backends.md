@@ -4,6 +4,9 @@ Use CairoMakie for a figure you build once and explore. Use WGLMakie
 when the figure animates or redraws often. `masque`, `@bind`, and every
 interactable work the same on both.
 
+To show a widget in a static HTML export, in Documenter, or on another
+web page, see [Publish outside Pluto](@ref).
+
 ## Choose a backend
 
 Load a backend before you call `masque`: with only `CairoMakie`
@@ -106,88 +109,4 @@ them all live, use CairoMakie for the plots that do not need to move.
 While you drag with a [`ViewInteractable`](@ref), Julia redraws the
 view: on CairoMakie each step is a new PNG, and on WGLMakie the canvas
 already on the page updates. Either way, dragging the view needs a
-running notebook. See [Pan and orbit](@ref).
-
-## Export static HTML
-
-A static HTML export keeps its tooltips and highlights on both
-backends: it contains the PNG, or on WGLMakie the scene, which the
-reader's GPU draws without Julia. For what stops working, see
-[Static exports and this site](@ref).
-
-## [Outside Pluto](@id outside-pluto)
-
-A CairoMakie widget keeps its tooltips and highlights outside Pluto, in
-Documenter or in an HTML page you write with
-`show(io, MIME"text/html"(), w)`. Hover the two plots below; this page
-built them with Documenter, without Pluto.
-
-```@example outside-pluto
-using CairoMakie, Masque
-
-fig = Figure(size = (400, 260))
-ax = Axis(fig[1, 1])
-scatter!(ax, [1, 2, 3, 4], [1, 4, 9, 16]; markersize = 16)
-masque(fig)
-```
-
-```@example outside-pluto
-fig2 = Figure(size = (400, 260))
-ax2 = Axis(fig2[1, 1])
-lines!(ax2, 0:0.1:6, sin.(0:0.1:6))
-masque(fig2)
-```
-
-The page loads Masque's script once from jsDelivr, the version that
-matches your installed Masque, so hover needs an internet connection;
-offline, the page shows the plain figures. Each widget adds its image
-to the page. Documenter shows a picture in place of any output past
-8 KB, which every widget is, so set `example_size_threshold = nothing`
-to keep the hover. Documenter then writes every large output into its
-page, plain figures too, and it warns about a page past 100 KB and
-stops the build at 200 KB, so a page with several large figures goes in
-`size_threshold_ignore`, whether or not it has a widget:
-
-```julia
-makedocs(;
-    format = Documenter.HTML(; example_size_threshold = nothing, size_threshold_ignore = ["plots.md"]),
-    ...,
-)
-```
-
-A WGLMakie widget works there too: the page draws the figure on the
-reader's GPU and loads WGLMakie's script, about 1 MB, once from
-jsDelivr, from the release of your installed Makie and checked against
-your copy. Each WGLMakie figure writes its whole scene into the page,
-which on its own is more than Documenter's 200 KB limit, so every page
-with a WGLMakie figure goes in `size_threshold_ignore`. Read offline,
-or if the published script differs from your copy, each figure shows a
-note in its box saying it couldn't load. To put a figure in a document
-that must stay small or read offline, use `backend = :cairo` there.
-
-Hover the points below, and click one to highlight it. This one is
-drawn by WGLMakie in your browser:
-
-```@example outside-pluto
-using WGLMakie
-
-fig3 = Figure(size = (420, 320))
-ax3 = Axis3(fig3[1, 1])
-t = range(0, 4π; length = 40)
-scatter!(ax3, cos.(t), sin.(t), t ./ 4π; color = t, markersize = 14)
-masque(fig3; backend = :webgl)
-```
-
-A click highlights a mark there too, but nothing reads the choice: the
-`@bind` value and dragging the view with a [`ViewInteractable`](@ref)
-need a running Pluto notebook. A display that doesn't run the page's
-scripts shows the plain CairoMakie figure, or an empty box for
-WGLMakie.
-
-A tool that reads a notebook without a browser, such as an AI agent,
-can ask a CairoMakie widget for its figure as a PNG,
-`show(io, MIME"image/png"(), w)`. A WGLMakie widget has no PNG, since
-the reader's browser draws it; render the figure with CairoMakie for
-one. Both print a short text summary in the REPL: each axis with its
-title, each layer with what it draws and its tooltip fields, and the
-`@bind` value the widget starts with.
+running notebook. See [Pan, zoom and orbit](@ref).

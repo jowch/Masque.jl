@@ -1,4 +1,4 @@
-# Inspect a grid
+# Heatmaps and images
 
 Hover a heatmap or image cell and the tooltip reads `(i,j) = value`.
 Click it and your notebook gets the cell's indices and value.

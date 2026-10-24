@@ -31,5 +31,5 @@ Main.masque_fallback("gallery_boxselect")
 
 `selects` must name a point or grid layer; `selects = :bars` raises
 `ArgumentError`. With a [`ViewInteractable`](@ref) on the same axis,
-Shift+drag pans instead of moving the box; see [Pan and orbit](@ref).
+Shift+drag pans instead of moving the box; see [Pan, zoom and orbit](@ref).
 For the axes a box works on, see [Supported plots and axes](@ref).

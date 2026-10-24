@@ -128,4 +128,4 @@ the box, in the field of the plot it selects from. With that list as
 [Brush a region](@ref) shows how.
 
 For what each click, release, and drag sets in the value, see
-[Concepts](@ref).
+[How Masque works](@ref).
