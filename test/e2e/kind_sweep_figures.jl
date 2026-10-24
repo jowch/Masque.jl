@@ -642,8 +642,8 @@ kind_sweep_meta() = [
     Dict(
         # Linked selections by key (#346): one scatter per cluster on the left, with a legend,
         # and one scatter of every cell on the right, in another order. The value is cell ids.
-        # A legend entry picks its cluster's cells in both panels. The driver's "linked_keys"
-        # block drives it.
+        # A legend entry picks its cluster's cells in both panels, with only `cells` bound, and a
+        # pick in A fades B too. The driver's "linked_keys" block drives it.
         "key" => "linked_keys", "layerId" => "every", "layerKind" => "circles",
         "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "linked_keys", "field" => "cells",
@@ -1581,7 +1581,8 @@ function build_kind_sweep()
         axislegend(a1; position = :rt)
         # The right panel draws c4, c3, c2, c1, left to right.
         every = interactables(scatter!(a2, [2.0, 4.0, 6.0, 8.0], [5.0, 5.0, 5.0, 5.0]; markersize = 20, color = :gray); id = :every, payloads = reverse(cells))
-        masque(fig, (cells = linked(A, B, every; key = :id, select = :many),))
+        # Bound alone, so the legend sits outside the bind value and still picks.
+        masque(fig, (cells = linked(A, B, every; key = :id, select = :many),); bind = :cells)
     end
 
     linked_one = let

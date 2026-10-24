@@ -3,7 +3,8 @@
 // any of them edits the rows, and every mark of a held row, in every plot, is drawn selected.
 import { afterEach, describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
-import { PARTNER_CAP } from "../src/linked"
+import { PARTNER_CAP, groupSelection } from "../src/linked"
+import { selectionScope } from "../src/fade"
 import type { Manifest, HitLayer, LinkGroup } from "../src/types"
 import { fadeKept } from "./fadekeys"
 
@@ -167,6 +168,38 @@ describe("linked selections (#346)", () => {
         const v = (host as unknown as { value: Record<string, unknown> }).value
         expect(v.cells).toEqual({ rows: [0, 2] })
         expect(fadeKept(shadow).sort()).toEqual(["a:0", "a:2", "b:0", "b:2"])
+    })
+
+    it("a group's picks fade every plot of the group, also one that holds none of them", () => {
+        // `c` shares `a`'s axis and draws only row 3, which isn't picked; `d` is a member `onchange` hid.
+        const m = panels({ many: true, n: 4, members: ["a", "b", "c", "d"], rows: { a: [0, 1, 2], b: [0, 1, 2], c: [3], d: [3] } })
+        m.layers.push({ id: "c", kind: "circles", geometry: [550, 100, 20], payloads: [{}], axis: "ax1", events: ["click", "hover"], group: "cells" },
+            { id: "d", kind: "circles", geometry: [560, 120, 20], payloads: [{}], axis: "ax1", events: [], hidden: true, group: "cells" } as HitLayer)
+        const scope = selectionScope(m, new Map([["cells", groupSelection(m, m.groups![0], [0])]]))
+        expect(scope.map((l) => l.id).sort()).toEqual(["a", "b", "c"])
+        expect(selectionScope(m, new Map([["cells", groupSelection(m, m.groups![0], [])]]))).toEqual([])
+    })
+
+    it("a legend outside the bind value still picks a bound group's rows", () => {
+        const m = panels({ many: true })
+        m.layers.unshift({ id: "legend", kind: "rects", geometry: [500, 60, 80, 40], payloads: [{ label: "a" }], axis: "ax1",
+            events: ["click", "hover"], links: [["a:1", "a:3"]], bond: "legend" })
+        m.initial = { cells: { rows: [] } }
+        const { host, shadow, surface, val } = setup(m)
+        click(surface, 250, 30)
+        expect((host as unknown as { value: Record<string, unknown> }).value).toEqual({ cells: { rows: [0, 2] } })
+        expect(fadeKept(shadow).sort()).toEqual(["a:0", "a:2", "b:0", "b:2"])
+        // A mark taken out leaves the panels, the legend drawing none of its own.
+        click(surface, 50, 50)
+        expect(val()).toEqual({ rows: [2] })
+        expect(fadeKept(shadow).sort()).toEqual(["a:2", "b:2"])
+        // Escape clears it all, and the entry picks again on the next click.
+        surface.focus()
+        surface.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+        expect(val()).toEqual({ rows: [] })
+        expect(fadeKept(shadow)).toEqual([])
+        click(surface, 250, 30)
+        expect(val()).toEqual({ rows: [0, 2] })
     })
 
     it("undo puts the group's rows back", () => {

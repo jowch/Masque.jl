@@ -62,6 +62,13 @@ export function selectionScope(manifest: Manifest, sel: Map<string, FieldSelecti
         if (!s.hits_.length) continue
         const own = manifest.layers.find((l) => l.id === field)
         if (own?.links?.length) for (const l of legendLayers(manifest, own)) out.add(l)
+        // A linked group's picks fade every plot of the group, also one that holds none of them
+        // (#346), as a legend's pick fades its other series. A plot `onchange` hid stays out.
+        const group = s.rows_ ? manifest.groups?.find((g) => g.id === field) : undefined
+        for (const id of group?.members ?? []) {
+            const l = manifest.layers.find((x) => x.id === id)
+            if (fadeLayer(l) && l.events.includes("click")) out.add(l)
+        }
         for (const h of s.hits_) if (fadeLook(h)) out.add(h.layer)
     }
     return [...out]

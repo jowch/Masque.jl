@@ -485,8 +485,11 @@ export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: 
     const off = next !== null && src !== null && src.index === hit.index && src.sample === sample
     const source = sample === undefined ? { layer: field, index: hit.index } : { layer: field, index: hit.index, sample }
     const linked = legendPicks(ctx, state, hit, next !== null && !off, toggle)
+    // A legend outside the bind value draws no picks of its own (its plots' fields draw them),
+    // and keeps only which entry it picked, so a second click takes that entry out.
+    const own = !ctx.manifest_.fields || ctx.manifest_.fields.includes(field)
     if (next !== null) {
-        state.sel_.set(field, off ? { hits_: [], source_: null } : { hits_: next, source_: source })
+        state.sel_.set(field, off ? { hits_: [], source_: null } : { hits_: own ? next : [], source_: source })
         renderSelection(ctx, state)
     }
     drawHover(ctx, state, hit)
@@ -715,6 +718,8 @@ export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] 
         state.sel_.set(g.id, groupSelection(ctx.manifest_, g, []))
         updates[g.id] = groupEnvelope(g, [])
     }
+    // A legend outside the bind value forgets the entry it picked once its picks are cleared.
+    if (Object.keys(updates).length) for (const l of ctx.manifest_.layers) if (l.links?.length && !(l.id in cur)) state.sel_.delete(l.id)
     if (Object.keys(updates).length === 0) return false
     renderSelection(ctx, state)
     ctx.commit_(updates)
