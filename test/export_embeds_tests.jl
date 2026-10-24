@@ -728,4 +728,14 @@ end
     state(i) = _JSON.parse(read(joinpath(dir, shipped["snaps"][i]), String))["cells"]["c"]["body"]
     @test state(1) == out
     @test state(2)["type"] == "Tuple"
+
+    # A static player's state: cell HTML in a vector, and the remounted picture.
+    other_png = UInt8[0x89, 0x50, 0x4e, 0x47, 0x03, 0x04]
+    snap = Dict{String, Any}("cells" => Any[html, "<p>plain</p>"], "png" => "data:image/png;base64," * base64encode(other_png))
+    static = externalize_table(Dict{String, Any}("snaps" => Any[snap], "keys" => Dict("null" => 0)), dir; overlay)
+    shipped_snap = _JSON.parse(read(joinpath(dir, static["snaps"][1]), String))
+    @test occursin(r"^shared/[0-9a-f]{20}\.png$", shipped_snap["png"])
+    @test read(joinpath(dir, shipped_snap["png"])) == other_png
+    @test shipped_snap["cells"] == [out, "<p>plain</p>"]
+    @test !any(c -> occursin(overlay, c) || occursin("data:image", c), shipped_snap["cells"])
 end
