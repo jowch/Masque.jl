@@ -1,6 +1,6 @@
 // Playwright against the quick start Pluto export on the Documenter page, then the image
 // and box-select brush players, which must record every box a reader can draw.
-// The iframe is #masque-gs-quickstart (home_quickstart.html). Listed clicks
+// The iframe is #masque-gs-quickstart (home_quickstart.html, its value segment). Listed clicks
 // swap the readout cell through the export's editor_state_set snapshots.
 // Fails if the overlay never mounts, if host.value does not key a snapshot,
 // or if an overlay click does not update that readout. Then, with jsDelivr blocked, the
@@ -40,9 +40,10 @@ const MIME = {
 };
 
 const POINTS = [
-  { name: "one", y: "1.0" },
-  { name: "two", y: "4.0" },
-  { name: "three", y: "9.0" },
+  { name: "one", y: "2.0" },
+  { name: "two", y: "1.0" },
+  { name: "three", y: "4.0" },
+  { name: "four", y: "3.0" },
 ];
 
 function gettingStartedPath() {
@@ -729,8 +730,13 @@ try {
       img: img ? img.naturalWidth : -1,
     };
   });
-  if (!twin.text.includes("interactables(s; payloads = points)") || !twin.text.includes("@bind sel masque(fig, pts)")) {
-    throw new Error(`text twin is missing the quick start code: ${JSON.stringify(twin.text.slice(0, 300))}`);
+  // The page shows the notebook in two segments: the figure cell, then the value's cells.
+  const figureTwin = await page2.evaluate(() => {
+    const d = document.getElementById("masque-gs-figure").closest(".masque-embed-wrap").nextElementSibling;
+    return d && d.matches("details") ? d.textContent : "";
+  });
+  if (!figureTwin.includes("interactables(s; payloads = points)") || !twin.text.includes("@bind sel masque(fig, pts)")) {
+    throw new Error(`text twins are missing the quick start code: ${JSON.stringify([figureTwin.slice(0, 200), twin.text.slice(0, 200)])}`);
   }
   if (!twin.text.includes("click a point")) throw new Error("text twin is missing the idle readout");
   if (!(twin.img > 0)) throw new Error(`text twin's idle figure did not load (naturalWidth ${twin.img})`);

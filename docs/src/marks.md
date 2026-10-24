@@ -7,27 +7,21 @@ mark's position in your data, and fields that depend on the kind of
 mark. Heatmap cells, legend entries, and colorbars give their own event
 types; see [How Masque works](@ref).
 
-The examples on this page pass the plot as `bind`, so the value, `pick`,
-is the clicked mark's event itself rather than a named tuple of fields:
-
-```julia
-b = barplot!(ax, 1:4, [2.0, 3.0, 1.5, 2.5])
-@bind pick masque(fig; bind = b)
-```
-
-[Plot-object defaults](@ref) lists the fields each plot type reports,
-and [Supported plots and axes](@ref) lists which plots work on which
-axes.
+The example on this page passes the plot as `bind`, so `pick` is the
+clicked mark's event itself rather than a named tuple of fields (see
+[What the `@bind` value holds](@ref)). [Plot-object defaults](@ref)
+lists the fields each plot type reports, and
+[Supported plots and axes](@ref) lists which plots work on which axes.
 
 ## Bars
 
 A bar reports its `value`, which is its height, and its `low` and `high`
 ends, so in a stacked or dodged bar plot you can tell which segment was
-clicked. In this example, a click shows the quarter and the value:
+clicked:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-marks-bars" data-masque-embed="marks_bars" title="Four-bar plot. Click a bar and the readout names its value." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-marks-bars" data-masque-embed="marks_bars" title="Stacked bars of sales by quarter. Click a segment and the readout names it." style="width:100%;height:1000px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -35,35 +29,28 @@ clicked. In this example, a click shows the quarter and the value:
 Main.masque_fallback("marks_bars")
 ```
 
-Other bar-like plots report these fields:
+## What other plots return
+
+A click on any of these plots gives an `ElementEvent` with `index` and
+these fields:
 
 | Plot | Fields |
 |---|---|
-| `barplot!` | `value`, `low`, `high` |
+| `barplot!`, `waterfall!` | `value`, `low`, `high` |
 | `hist!` | `value` (the bin's height, a count with `normalization = :none`), `low`, `high` |
-| `waterfall!` | `value`, `low`, `high` |
 | `crossbar!` | `midpoint`, `low`, `high` |
+| `poly!`, bands, densities, Voronoi cells | `index` only: the polygon's position in the order you plotted them |
+| `violin!` | `x`, the violin's category |
+| `contourf!` | `low` and `high` of the level |
+| `hexbin!` | `x` and `y`, the hexagon's center, and `count` |
+| `scatter!` on a `PolarAxis` | `x` is the angle and `y` the radius, in the order you passed them |
+| `lines!`, `series!`, `stairs!`, on any axis including a `PolarAxis` | the plotted point nearest the click, once the line is in `bind` (see Lines below) |
 
 Heatmaps have their own page: [Heatmaps and images](@ref).
 
-## Polygons
-
-Each polygon in a `poly!` is one mark, and its `index` is its position
-in the order you plotted them. The example below uses that index to look
-up the clicked polygon's name:
-
-```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-marks-poly" data-masque-embed="marks_poly" title="Three polygons. Click one and the readout names it." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
-</div>
-```
-
-```@eval
-Main.masque_fallback("marks_poly")
-```
-
-To get the name back with the click instead, pass the polygon plot `p`
-to [`interactables`](@ref) with `payloads`. Then `pick.name` is the
+A polygon reports only its position, so look up anything else by
+`pick.index`, or pass the polygon plot `p` to [`interactables`](@ref)
+with `payloads` to get it back with the click. Then `pick.name` is the
 clicked polygon's name:
 
 ```julia
@@ -72,10 +59,6 @@ regions = interactables(p;
 )
 @bind pick masque(fig, regions; bind = p)
 ```
-
-Bands, densities, filled contours, violins, Voronoi cells, and hexbin
-hexagons are polygons too. A filled contour also reports the `low` and
-`high` of its level, and a hexagon reports its center and its `count`.
 
 ## Lines
 
@@ -89,22 +72,10 @@ too. With `select = :many`, each click adds a point. A line on an
 To read every line at the same `x`, use a [`SliceInteractable`](@ref)
 instead.
 
-In the example below, one `series!` call draws both curves, and
-`bind = sr` makes it clickable, so `pick.line` says which curve you
-clicked:
-
-```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-marks-lines" data-masque-embed="marks_lines" title="Two lines. Click one and the readout names it." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
-</div>
-```
-
-```@eval
-Main.masque_fallback("marks_lines")
-```
-
-To click lines from separate `lines!` calls, name each one in `bind`,
-and each gets its own field:
+When one `series!` call draws several curves, passing that plot as
+`bind` makes them clickable, and `pick.line` says which curve you
+clicked. To click lines from separate `lines!` calls, name each one in
+`bind`, and each gets its own field:
 
 ```julia
 begin
@@ -122,30 +93,15 @@ end
 ```
 
 Then `sel.sine` and `sel.cosine` each hold `nothing` or the point
-clicked on that line. The same works for `stairs!`. A `scatterlines!` plot's
-points take clicks without `bind`, as `sel.scatterlines.points`, and its
-line does not. To make a line
-clickable while keeping every other plot's field, pass
-`interactables(l1)` after the figure instead of naming it in `bind`.
+clicked on that line. The same works for `stairs!`. A `scatterlines!`
+plot's points take clicks without `bind`, as `sel.scatterlines.points`,
+and its line does not. To make a line clickable while keeping every
+other plot's field, pass `interactables(l1)` after the figure instead of
+naming it in `bind`.
 
 Plots made of separate pieces make each piece its own mark and take
 clicks without `bind`: `linesegments!`, error bars, range bars,
 `hlines!`, and `vlines!`.
 
-## Points on a polar axis
-
-Scatters, lines, and segments work on a `PolarAxis`. A point's `x` is
-its angle and its `y` is its radius, in the order you passed them:
-
-```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-marks-polar" data-masque-embed="marks_polar" title="Four polar points. Click one and the readout reads its radius." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
-</div>
-```
-
-```@eval
-Main.masque_fallback("marks_polar")
-```
-
-[Supported plots and axes](@ref) lists the other plots a polar axis
+[Supported plots and axes](@ref) lists the other plots a `PolarAxis`
 supports.

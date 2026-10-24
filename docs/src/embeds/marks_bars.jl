@@ -21,45 +21,40 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
 md"""
-Click a bar, and the last cell reads its value.
-"""
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
-md"""
-Create the bar plot the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. `masque` makes each bar clickable.
+Click any segment of a stack, and the last cell names it.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
 begin
+    quarter = [1, 1, 2, 2, 3, 3, 4, 4]
+    product = [1, 2, 1, 2, 1, 2, 1, 2]
+    sales = [2.0, 1.0, 3.0, 1.5, 1.5, 2.0, 2.5, 0.5]
+    products = ["Hardware", "Services"]
     fig = Figure(size = (560, 360))
     ax = Axis(
         fig[1, 1];
         xlabel = "Quarter",
-        ylabel = "Value",
+        ylabel = "Sales",
         xticks = (1:4, ["Q1", "Q2", "Q3", "Q4"]),
     )
-    b = barplot!(ax, 1:4, [2.0, 3.0, 1.5, 2.5])
+    colors = [:steelblue, :darkorange]
+    b = barplot!(ax, quarter, sales; stack = product, color = colors[product])
     nothing
 end
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
-md"""
-`bind = b` makes `pick` the clicked bar itself. `@bind pick` saves a click in `pick`, while hovering only highlights the bar and leaves `pick` as it was.
-"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
 @bind pick masque(fig; bind = b)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
 md"""
-`pick` starts as `nothing`, and this cell responds when you click a bar. After a click, `pick.value` is the bar's height and `pick.index` is its position in your data.
+`pick.low` and `pick.high` place the segment within its bar, and `pick.index` is its position in your data.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
 if isnothing(pick)
-    "click a bar"
+    "click a segment"
 else
-    "Q$(pick.index): value $(pick.value)"
+    "Q$(quarter[pick.index]) $(products[product[pick.index]]): $(pick.low) to $(pick.high)"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
@@ -71,9 +66,7 @@ pluto_html = true
 
 cells = [
   "a1b2c3d4-0001-4000-8000-000000000009",
-  "a1b2c3d4-0001-4000-8000-000000000010",
   "a1b2c3d4-0001-4000-8000-000000000002",
-  "a1b2c3d4-0001-4000-8000-000000000011",
   "a1b2c3d4-0001-4000-8000-000000000003",
   "a1b2c3d4-0001-4000-8000-000000000012",
   "a1b2c3d4-0001-4000-8000-000000000004",
@@ -1726,9 +1719,7 @@ version = "4.1.0+0"
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
 # ╟─a1b2c3d4-0001-4000-8000-000000000009
-# ╟─a1b2c3d4-0001-4000-8000-000000000010
 # ╠═a1b2c3d4-0001-4000-8000-000000000002
-# ╟─a1b2c3d4-0001-4000-8000-000000000011
 # ╠═a1b2c3d4-0001-4000-8000-000000000003
 # ╟─a1b2c3d4-0001-4000-8000-000000000012
 # ╠═a1b2c3d4-0001-4000-8000-000000000004

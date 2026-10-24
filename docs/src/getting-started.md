@@ -43,8 +43,9 @@ Pass the figure to `masque` and bind the result to a variable:
 
 `sel` has one field for each plot you can click, named after the plot,
 so this figure's scatter is `sel.scatter`. Hover over a point to see its
-`index`, `x`, and `y`. Clicking a point stores it in `sel.scatter`, and
-cells that use `sel` respond to the change:
+`index`, `x`, and `y`; hovering leaves `sel` as it was. Clicking a point
+stores it in `sel.scatter`, and cells that use `sel` respond to the
+change:
 
 ```julia
 pick = sel.scatter
@@ -69,41 +70,33 @@ The default tooltip shows coordinates. To add your own fields, pass the
 scatter to [`interactables`](@ref) with one `payloads` entry per point.
 Replace the figure cell with this one:
 
-```julia
-begin
-    xs = [1.0, 2.0, 3.0, 4.0]
-    ys = [2.0, 1.0, 4.0, 3.0]
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1])
-    s = scatter!(ax, xs, ys; markersize = 16)
-    points = [(name = "one",), (name = "two",), (name = "three",), (name = "four",)]
-    pts = interactables(s; payloads = points)
-    nothing
-end
-```
-
-and pass `pts` to `masque` in the `@bind` cell:
-
-```julia
-@bind sel masque(fig, pts)
-```
-
-Hovering a point now shows its `name`, `x`, and `y`, and clicking it
-sets `pick.name`. Your fields are added to the point's own `x` and
-`y`, so you don't copy the coordinates into each entry.
-
-The notebook below does the same with three points, recorded from a real
-notebook (see [Examples on this site](@ref this-site)).
-
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-gs-quickstart" data-masque-embed="home_quickstart" title="Three-point scatter. Click a point and the readout names it." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no"></iframe>
+<iframe id="masque-gs-figure" data-masque-embed="home_quickstart" data-masque-segment="figure" title="The figure cell: a four-point scatter with a name for each point." style="width:100%;height:360px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
 ```@eval
-Main.masque_fallback("home_quickstart")
+Main.masque_fallback("home_quickstart"; segment = "figure")
 ```
+
+and pass `pts` to `masque` in the `@bind` cell:
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-gs-quickstart" data-masque-embed="home_quickstart" data-masque-segment="value" title="Four-point scatter. Click a point and the readout names it." style="width:100%;height:760px;border:0;background:transparent;overflow:hidden;" scrolling="no"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("home_quickstart"; segment = "value")
+```
+
+Hovering a point now shows its `name`, `x`, and `y`, and clicking it
+sets `sel.scatter.name`. Your fields are added to the point's own `x`
+and `y`, so you don't copy the coordinates into each entry. These cells
+were recorded from a real notebook (see
+[Examples on this site](@ref this-site)).
 
 ## Where to go next
 
