@@ -36,8 +36,10 @@ All notable changes to this project are documented here. The format is based on
 - While a pan or zoom preview is showing, a second axis drawn over the one you pan, such as a
   twin y axis in the same cell or an inset, keeps its selection rings, threshold lines, ROI
   boxes and slice readout on its own marks, and hover, click and drags find them there. A
-  threshold line, ROI box or box selection on an axis tied by `linkaxes!` moves with that
-  axis instead of with the one you pan (#391).
+  threshold line, ROI box or box selection on an axis tied by `linkaxes!` in a cell of its
+  own moves with that axis instead of with the one you pan. On a twin tied by `linkxaxes!`,
+  the axis you pan now follows the pointer up and down as well as across; the twin's marks
+  move the same way until the new frame arrives (#391).
 
 ## [0.4.0] - 2026-10-22
 

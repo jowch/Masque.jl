@@ -802,11 +802,15 @@ export function previewWindows(manifest: Manifest, photo: PhotoMatrix, viewId: s
 
 // An axis's pixels are in the topmost window that holds the centre of its viewport and is at
 // least half its size: a twin axis or an unlinked inset inside the pan window slides with
-// the pan axis's photograph, and an axis is not moved by an inset drawn over its middle.
+// the pan axis's photograph, and an axis is not moved by an inset drawn over its middle. The
+// pan axis always takes the pan window.
 // Without a viewport (hand-built manifests), an axis is in its own window, if it has one.
 export function axisFrame(manifest: Manifest, photo: PhotoMatrix, viewId: string | null, axis: string): AxisFrame | null {
     const windows = previewWindows(manifest, photo, viewId)
     if (!windows.length) return null
+    // The pan axis's own marks move by the matrix itself, whatever window is drawn over its middle.
+    const pan = windows.find((win) => win.pan)
+    if (pan && pan.axis === axis) return { sx: pan.sx, sy: pan.sy, tx: pan.tx, ty: pan.ty, clip: pan.clip }
     const vp = manifest.transforms[axis]?.viewport
     const holds = vp
         ? (win: PreviewWindow) => contains(win.clip, vp[0] + vp[2] / 2, vp[1] + vp[3] / 2) && area(win.clip) >= 0.5 * area(vp)

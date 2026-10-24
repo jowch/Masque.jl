@@ -1738,7 +1738,10 @@ try {
       for (const l of links) {
         const lim = cam[`linked:${l.axis}`];
         const close = (a, b) => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b));
-        if (!Array.isArray(lim) || !close(lim[0], cam.xmin) || !close(lim[1], cam.xmax) || !close(lim[2], cam.ymin) || !close(lim[3], cam.ymax)) {
+        // Only a shared dimension follows: a `linkxaxes!` twin keeps its own y.
+        const xOk = !l.x || (close(lim?.[0], cam.xmin) && close(lim?.[1], cam.xmax));
+        const yOk = !l.y || (close(lim?.[2], cam.ymin) && close(lim?.[3], cam.ymax));
+        if (!Array.isArray(lim) || !xOk || !yOk) {
           throw new Error(`${key}-drag: linked axis ${l.axis} did not follow the pan: ${stampAfter}`);
         }
       }
@@ -1918,7 +1921,9 @@ try {
           const unprobed = withPan.filter((axis) => !zoom.midHover.some((h) => h.axis === axis && h.pick));
           if (unprobed.length) throw new Error(`${key}-wheel: no mid-preview pick probe on ${JSON.stringify(unprobed)}: ${JSON.stringify(zoom.midHover)}`);
           const lines = zoom.chrome.filter((c) => withPan.includes(c.axis) && c.lines > 0);
-          if (bad.length || !lines.length || lines.some((c) => c.hovered.length !== c.lines || !c.hovered.every(Boolean))) {
+          // A threshold layer named in previewWithPan must be drawn and hover-tested.
+          const wantLines = (spec.previewWithPan ?? []).some((id) => layers.find((l) => l.id === id)?.kind === "threshold");
+          if (bad.length || (wantLines && !lines.length) || lines.some((c) => c.hovered.length !== c.lines || !c.hovered.every(Boolean))) {
             throw new Error(`${key}-wheel: an axis inside the pan window did not move with it: ${JSON.stringify({ withPan, pan: zoom.panTransform, homes: zoom.homes, chrome: zoom.chrome })}`);
           }
           passed.push(`${key}/preview-with-pan`);

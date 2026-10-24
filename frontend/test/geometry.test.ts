@@ -921,6 +921,13 @@ describe("axisFrame follows the window an axis's pixels are in (#391)", () => {
         // The inset covers the pan axis's centre but is too small to hold its pixels.
         expect(axisFrame(m, photo, "v", "ax1")).toEqual(pan)
     })
+    it("keeps the pan axis on the pan window under a linked inset of over half its size", () => {
+        const insetClip: [number, number, number, number] = [42, 32, 120, 196]
+        const links = [{ axis: "inset", clip: insetClip, x: [100, 120, 0.5], y: [100, 130, 0.5] }]
+        const m = man(links, { inset: T([40, 30, 124, 200]) })
+        expect(previewWindows(m, photo, "v").map((w) => w.axis)).toEqual(["ax1", "inset"])
+        expect(axisFrame(m, photo, "v", "ax1")).toEqual(pan)
+    })
     it("leaves an axis outside every window put", () => {
         const m = man([], { side: T([220, 30, 150, 200]) })
         expect(axisFrame(m, photo, "v", "side")).toBeNull()
