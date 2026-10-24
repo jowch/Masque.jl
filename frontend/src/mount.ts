@@ -1112,9 +1112,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const click = (e: MouseEvent) => onClick(ctx, state, e)
     const keydown = (e: KeyboardEvent) => {
         // A key shows where keys go (pointer-focus). Not a modifier held for Cmd/Ctrl-click, and
-        // not a Cmd/Ctrl chord: undo after a click (#386) or a browser shortcut is not
+        // not a Cmd/Ctrl/Alt chord: undo after a click (#386) or a browser shortcut is not
         // keyboard navigation, so it leaves a mouse user's figure without the outline.
-        if (!MODIFIER_KEYS.has(e.key) && !e.ctrlKey && !e.metaKey) surface.classList.remove("pointer-focus")
+        if (!MODIFIER_KEYS.has(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) surface.classList.remove("pointer-focus")
         handleKeydown(ctx, state, e)
     }
     // DOM focus leaving the surface — Tab-away, a click landing elsewhere on the page, or the

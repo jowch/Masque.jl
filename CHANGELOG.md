@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Fixed
+- On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down
+  now goes to the browser, so Cmd-Left (Back on a Mac) and Alt-Left (Back elsewhere) work.
+  A bare arrow or Shift with an arrow still moves through the marks (#404).
 - While a pan or zoom preview is showing, a second axis drawn over the one you pan, such as a
   twin y axis in the same cell or an inset, keeps its selection rings, threshold lines, ROI
   boxes and slice readout on its own marks, and hover, click and drags find them there. A

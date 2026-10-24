@@ -76,6 +76,24 @@ describe("keyboard navigation", () => {
         expect(ring()).toBeTruthy()
     })
 
+    it("leaves Cmd, Ctrl and Alt navigation chords to the browser (#404)", () => {
+        const { surface, shadow } = setup(manifest)
+        surface.focus()
+        down(surface, "ArrowRight") // -> a[0]
+        const ring = () => shadow.querySelector(".hi > *")?.outerHTML ?? null
+        const at = ring()
+        for (const mod of ["metaKey", "ctrlKey", "altKey"] as const) {
+            for (const key of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]) {
+                const e = new KeyboardEvent("keydown", { key, [mod]: true, bubbles: true, cancelable: true })
+                surface.dispatchEvent(e)
+                expect(e.defaultPrevented, `${mod}+${key}`).toBe(false)
+            }
+        }
+        expect(ring()).toBe(at)
+        // A bare arrow still moves the ring.
+        expect(down(surface, "ArrowRight").defaultPrevented).toBe(true)
+    })
+
     it("PageDown jumps to the next layer's first element", () => {
         const { surface, host } = setup(manifest)
         surface.focus()

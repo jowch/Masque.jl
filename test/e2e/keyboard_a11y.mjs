@@ -225,6 +225,30 @@ try {
     if (!s.tipShown) throw new Error(`${key}: ArrowRight showed no tooltip`);
     passed.push(`${key}/arrow-ring+tip`);
 
+    // #404: Cmd, Ctrl and Alt with an arrow (Back is Cmd+Left on macOS, Alt+Left elsewhere)
+    // are the browser's. Dispatched, not pressed, so the page does not actually go back.
+    const chords = await surface.evaluate((el) => {
+      const tipText = () => el.getRootNode().querySelector(".masque-tip")?.textContent ?? "";
+      const before = tipText();
+      // Pluto takes some of these chords for itself once they leave the figure; stop them at the
+      // figure's host so the check doesn't move notebook focus away from the surface.
+      const host = el.getRootNode().host;
+      const stop = (e) => e.stopPropagation();
+      host.addEventListener("keydown", stop);
+      const out = [];
+      for (const mod of ["metaKey", "ctrlKey", "altKey"]) {
+        for (const k of ["ArrowLeft", "ArrowRight", "Home", "End"]) {
+          const e = new KeyboardEvent("keydown", { key: k, [mod]: true, bubbles: true, cancelable: true, composed: true });
+          el.dispatchEvent(e);
+          if (e.defaultPrevented) out.push(`${mod}+${k}`);
+        }
+      }
+      host.removeEventListener("keydown", stop);
+      return { prevented: out, moved: tipText() !== before, focused: el.getRootNode().activeElement === el };
+    });
+    if (chords.prevented.length || chords.moved || !chords.focused) throw new Error(`${key}: a modified navigation chord was taken from the browser: ${JSON.stringify(chords)}`);
+    passed.push(`${key}/modified-arrows-pass-through`);
+
     const liveRe = new RegExp(`element ${landed + 1} of ${n}`);
     s = await waitForLiveRegion(key, liveRe);
     if (!liveRe.test(s.liveText)) throw new Error(`${key}: live region text unexpected (timed out waiting for a match): ${JSON.stringify(s.liveText)}`);
