@@ -26,7 +26,7 @@ Click a point in the xy plot, and the same sample is selected in the xz plot. Ho
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000010
 md"""
-Plot the same samples, in the same order, in two figures. The xy figure stores the click in `pick`, and `bind = s_xy` makes `pick` the clicked point itself.
+Plot the same samples, in the same order, in two figures.
 """
 
 # ╔═╡ a1b2c3d4-00a1-4000-8000-000000000002

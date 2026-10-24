@@ -25,11 +25,6 @@ md"""
 Click a point on the left, and the plot on the right highlights the same sample, plotted against `z`.
 """
 
-# ╔═╡ a1410002-0001-4000-8000-000000000010
-md"""
-Create the scatter and store the click with `@bind pick`. `bind = s_left` makes `pick` the clicked point itself.
-"""
-
 # ╔═╡ a1410002-0001-4000-8000-000000000002
 begin
     xs = [1.0, 2.0, 3.0, 4.0, 5.0]
@@ -83,7 +78,6 @@ Masque = "82b01fb5-7eeb-4559-83ea-8d75f85d4328"
 # ╔═╡ Cell order:
 # ╠═a1410002-0001-4000-8000-000000000001
 # ╟─a1410002-0001-4000-8000-000000000009
-# ╟─a1410002-0001-4000-8000-000000000010
 # ╠═a1410002-0001-4000-8000-000000000002
 # ╠═a1410002-0001-4000-8000-000000000003
 # ╟─a1410002-0001-4000-8000-000000000011

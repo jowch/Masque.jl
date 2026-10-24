@@ -24,11 +24,6 @@ md"""
 Hover over a region to see its name, then click it. The last cell shows the name of the region you clicked.
 """
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
-md"""
-`regions` adds a circle, a rectangle, and a triangle on top of the image, and `payloads` gives each one a name.
-"""
-
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
 begin
     fig = Figure(size = (560, 360))
@@ -50,16 +45,11 @@ end
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
 md"""
-`auto = false` leaves out the image's own cells, so only the regions respond. `@bind sel` saves a click in `sel`, while hovering only shows the tooltip and leaves `sel` as it was.
+`auto = false` leaves out the image's own cells, so only the regions respond.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
 @bind sel masque(fig, hits; auto = false)
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
-md"""
-`sel.cells` has one part for each kind of shape: `sel.cells.circles` for the circle, `sel.cells.rects` for the rectangle, and `sel.cells.polygons` for the triangle. Each starts as `nothing`, and this cell responds when you click a region. After a click, the part's `name` is the region's name.
-"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
 begin
@@ -79,11 +69,9 @@ pluto_html = true
 
 cells = [
   "a1b2c3d4-0001-4000-8000-000000000009",
-  "a1b2c3d4-0001-4000-8000-000000000010",
   "a1b2c3d4-0001-4000-8000-000000000002",
   "a1b2c3d4-0001-4000-8000-000000000011",
   "a1b2c3d4-0001-4000-8000-000000000003",
-  "a1b2c3d4-0001-4000-8000-000000000012",
   "a1b2c3d4-0001-4000-8000-000000000004",
 ]
 """
@@ -1734,11 +1722,9 @@ version = "4.1.0+0"
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
 # ╟─a1b2c3d4-0001-4000-8000-000000000009
-# ╟─a1b2c3d4-0001-4000-8000-000000000010
 # ╠═a1b2c3d4-0001-4000-8000-000000000002
 # ╟─a1b2c3d4-0001-4000-8000-000000000011
 # ╠═a1b2c3d4-0001-4000-8000-000000000003
-# ╟─a1b2c3d4-0001-4000-8000-000000000012
 # ╠═a1b2c3d4-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

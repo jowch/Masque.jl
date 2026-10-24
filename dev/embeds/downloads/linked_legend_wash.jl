@@ -43,11 +43,6 @@ begin
     nothing
 end
 
-# ╔═╡ a1b2c3d4-00b1-4000-8000-000000000011
-md"""
-In your own notebook, `@bind pick` saves a click on an entry in `pick`, and `bind = :legend` makes `pick` the legend's value, but this page does not show it.
-"""
-
 # ╔═╡ a1b2c3d4-00b1-4000-8000-000000000003
 @bind pick masque(fig; bind = :legend)
 
@@ -63,7 +58,6 @@ Masque = "82b01fb5-7eeb-4559-83ea-8d75f85d4328"
 # ╟─a1b2c3d4-00b1-4000-8000-000000000009
 # ╟─a1b2c3d4-00b1-4000-8000-000000000010
 # ╠═a1b2c3d4-00b1-4000-8000-000000000002
-# ╟─a1b2c3d4-00b1-4000-8000-000000000011
 # ╠═a1b2c3d4-00b1-4000-8000-000000000003
 # ╟═e1be0000-0000-4000-8000-000000000001
 # ╟═00000000-0000-0000-0000-000000000001
