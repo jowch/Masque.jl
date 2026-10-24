@@ -721,6 +721,7 @@ function harvest_one(session, path::AbstractString, outdir::AbstractString; reta
     player = parse_player_toml(path)
     haskey(player, "bond") || error("player TOML missing bond in $path")
     bond = Symbol(player["bond"])
+    player_segments(player)
     file_hash_before = hash(read(path))
     assert_embed_masque_path_relative(path)
 
