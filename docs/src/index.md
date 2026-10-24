@@ -13,10 +13,11 @@ tooltip. You choose what the tooltip says. See [Tooltips](@ref).
 
 ## Select marks
 
-![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.webp)
+![Clicking Lagos, São Paulo and Tokyo on a map of cities, dragging a box over Europe to add its cities, then pressing Ctrl-Z to take the box back, while the cell below lists the picked cities](assets/demo.webp)
 
 Click a mark to send it to your notebook. With `select = :many`, each
-click adds a mark, and dragging a box picks every mark inside it. See
+click adds a mark, and dragging a box picks every mark inside it.
+Ctrl-Z (Cmd-Z on a Mac) takes back the last change. See
 [What each mark returns](@ref) and [Selection](@ref).
 
 ## [Build a widget](@id home-widgets)

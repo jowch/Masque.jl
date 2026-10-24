@@ -1,15 +1,16 @@
 # Home feature loops
 
-Source for `docs/src/assets/home/{hover,click,legend}.webp` (lossless animated WebP) and
+Source for `docs/src/assets/home/{hover,legend}.webp` (lossless animated WebP) and
 `orbit.mp4`, recorded at 2× (see `docs/dev/clips/README.md` § Formats).
 
-Hover, click, and legend are Playwright recordings against a
+Hover and legend are Playwright recordings against a
 harvested docs player (static overlay HTML), not a live Pluto kernel.
 Orbit is a live Pluto drag: `ViewInteractable` streams PNG frames over
 `with_js_link`, which is dead on a static overlay-only harvest. The
 recorder opens `orbit_notebook.jl` and drives a pointer drag with a
 visible cursor. The static-export Home section is a harvested embed,
-not a loop.
+not a loop. The "Select marks" loop is the README's `demo.webp`, recorded from a live
+notebook: see `docs/dev/readme-demo/README.md`.
 
 Prerequisites: a docs build served at `http://localhost:8765/`
 (`python3 -m http.server` from `docs/build`, or the deployed
@@ -25,7 +26,7 @@ MASQUE_DEV_ENV=~/.julia/environments/masque-dev \
 docs/dev/home-gifs/record-all.sh http://localhost:8765
 ```
 
-`record-all.sh` records hover/click/legend from the docs server
+`record-all.sh` records hover/legend from the docs server
 and orbit from `MASQUE_ORBIT_PLUTO` (default `http://localhost:1240`).
 
 Or one overlay scenario from `test/e2e`:
@@ -49,6 +50,5 @@ pacing. The frames keep their 2× size.
 | Loop | Player / source | Motion |
 |---|---|---|
 | `hover.webp` | `home_hover_stars.html` | Pointer over Sirius, Rigel, Betelgeuse; tooltips |
-| `click.webp` | `getting_started.html` | Hover Tokyo, click São Paulo; readout |
 | `legend.webp` | `home_legend_classes.html` | Hover Adelie, click Gentoo; fade + readout |
 | `orbit.mp4` | live Pluto `orbit_notebook.jl` | Cursor-drag orbit of a trefoil-knot tube |

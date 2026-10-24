@@ -25,7 +25,8 @@ be a player, so their page shows a clip of the live notebook instead:
 | `docs/src/assets/view-pan.mp4` | Pan, zoom and orbit (top) | `view_pan_notebook.jl` | `test/e2e/docs_clip.mjs view-pan` |
 | `docs/src/assets/view-orbit.mp4` | Pan, zoom and orbit › Orbit an `Axis3` | `view_orbit_notebook.jl` | `test/e2e/docs_clip.mjs view-orbit` |
 
-The Home page's four loops have their own recorders: see `docs/dev/home-gifs/README.md`.
+The Home page's four loops have their own recorders: see `docs/dev/home-gifs/README.md`. The
+README loop is `docs_clip.mjs readme`: see `docs/dev/readme-demo/README.md`.
 
 ## Formats
 

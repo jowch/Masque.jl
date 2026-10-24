@@ -1,25 +1,23 @@
-# README demo GIF
+# README demo
 
-Source for `docs/src/assets/demo.gif`: a real Pluto session, driven by Playwright, showing
-hover tooltips, a click, and the `@bind` round-trip on a CairoMakie scatter.
+Source for `docs/src/assets/demo.webp`, the loop at the top of the README: a real Pluto
+session on CairoMakie, recorded at 2× by `test/e2e/docs_clip.mjs readme`. The pointer hovers
+over Tokyo, clicks Lagos, São Paulo and Tokyo, drags a box over Europe, and presses Ctrl-Z to
+take the box back; the cell below lists the picked cities after each step.
 
-Prerequisites: Julia with Pluto in the default env, the `masque-dev` env (or let the
-notebook build a temp env), Playwright installed in `test/e2e` (`npm install` there), and
-`ffmpeg`, `ffprobe`, and `python3` on PATH for the assembly step.
+It is a lossless animated WebP rather than an MP4 because GitHub shows a WebP in a README
+`<img>` but does not play a video stored in the repository (`docs/dev/clips/README.md`
+§ Formats has the size trade-off).
 
-1. Start Pluto with the dev env (see `test/e2e/serve.jl` for the same flags):
-   ```sh
-   MASQUE_DEV_ENV=~/.julia/environments/masque-dev \
-     julia -e 'using Pluto; Pluto.run(; port=1250, launch_browser=false, require_secret_for_open_links=false, require_secret_for_access=false, disable_writing_notebook_files=true)'
-   ```
-   Poll `curl localhost:1250` for 200; don't grep the log.
-2. Record frames (from `test/e2e`, where Playwright is installed):
-   ```sh
-   node readme_demo_gif.mjs http://localhost:1250 "$PWD/../../docs/dev/readme-demo/notebook.jl" /tmp/demo-frames
-   ```
-   The script opens a throwaway copy of the notebook so Pluto starts a fresh kernel; reusing
-   the same path would inherit the previous run's `@bind` value.
-3. Assemble:
-   ```sh
-   docs/dev/readme-demo/assemble.sh /tmp/demo-frames docs/src/assets/demo.gif
-   ```
+Re-record from `test/e2e`, with a Pluto server whose notebooks can load this checkout
+(`serve.jl` with `MASQUE_DEV_ENV` set to a warmed env, see `CLAUDE.md`):
+
+```sh
+MASQUE_DEV_ENV=~/.julia/environments/masque-dev julia serve.jl 1240 &
+# poll curl http://localhost:1240 → 200
+node docs_clip.mjs http://127.0.0.1:1240 "$PWD/../../docs/dev/readme-demo/notebook.jl" /tmp/readme-demo readme
+python3 ../../docs/dev/clips/assemble_webp.py /tmp/readme-demo ../../docs/src/assets/demo.webp --length-ms 17000 --max-hold-ms 1200
+```
+
+The capture runs about 22 s, most of it waiting for Julia after each move; `--length-ms` and
+`--max-hold-ms` bring the loop to about 17 s with no still stretch over 1.2 s.
