@@ -13,29 +13,14 @@ A dumbbell chart draws one bar per row from a value before to a value
 after, with a dot at each end. This recipe draws the bars with
 `linesegments!` and the dots with two `scatter!` calls:
 
-```julia
-begin
-    @recipe Dumbbell (before, after) begin
-        color = :gray70
-        linewidth = 6
-        beforecolor = :steelblue
-        aftercolor = :firebrick
-        markersize = 14
-    end
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-recipes-recipe" data-masque-embed="recipes_dumbbell" data-masque-segment="recipe" title="The Dumbbell recipe." style="width:100%;height:500px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
 
-    function Makie.plot!(p::Dumbbell)
-        map!(p.attributes, [:before, :after], [:bars, :starts, :ends]) do before, after
-            starts = [Point2f(x, k) for (k, x) in enumerate(before)]
-            ends = [Point2f(x, k) for (k, x) in enumerate(after)]
-            bars = [q for k in eachindex(starts) for q in (starts[k], ends[k])]
-            return (bars, starts, ends)
-        end
-        linesegments!(p, p.bars; color = p.color, linewidth = p.linewidth)
-        scatter!(p, p.starts; color = p.beforecolor, markersize = p.markersize)
-        scatter!(p, p.ends; color = p.aftercolor, markersize = p.markersize)
-        return p
-    end
-end
+```@eval
+Main.masque_fallback("recipes_dumbbell"; segment = "recipe")
 ```
 
 Without a method of its own, each bar and each dot is a separate mark,
@@ -43,16 +28,14 @@ and a click reports which bar or dot it was rather than the row's
 values. To make each row one mark that reports
 its values, add this method:
 
-```julia
-function Masque.interactables(ax, p::Dumbbell; payloads = nothing, kwargs...)
-    before, after = p.before[], p.after[]
-    rows = [
-        (; row = k, before = before[k], after = after[k], change = after[k] - before[k])
-            for k in eachindex(before)
-    ]
-    bars = p.plots[1]
-    return interactables(ax, bars; payloads = something(payloads, rows), kwargs...)
-end
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-recipes-method" data-masque-embed="recipes_dumbbell" data-masque-segment="method" title="The interactables method for the Dumbbell recipe." style="width:100%;height:260px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("recipes_dumbbell"; segment = "method")
 ```
 
 Now hovering a row anywhere along its bar shows its values. With
@@ -61,12 +44,12 @@ to that row, so `pick.change` is how much the row changed:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-recipes-dumbbell" data-masque-embed="recipes_dumbbell" title="A dumbbell chart of three rows. Hover or click a row." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-recipes-dumbbell" data-masque-embed="recipes_dumbbell" data-masque-segment="widget" title="A dumbbell chart of three rows. Hover or click a row." style="width:100%;height:730px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
 ```@eval
-Main.masque_fallback("recipes_dumbbell")
+Main.masque_fallback("recipes_dumbbell"; segment = "widget")
 ```
 
 In a notebook, put the recipe and the method in their own cells, so

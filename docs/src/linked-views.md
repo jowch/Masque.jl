@@ -10,7 +10,7 @@ the xz plot:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-lv-click" data-masque-embed="linked_click" title="Two scatter plots. Click a point in the xy plot to select the same sample in the xz plot." style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-lv-click" data-masque-embed="linked_click" title="Two scatter plots. Click a point in the xy plot to select the same sample in the xz plot." style="width:100%;height:1150px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -110,7 +110,7 @@ See [Legend](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-lv-legend-wash" data-masque-embed="linked_legend_wash" title="Two scatter panels with a legend. Hover an entry to highlight its series on both." style="width:100%;height:1100px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-lv-legend-wash" data-masque-embed="linked_legend_wash" title="Two scatter panels with a legend. Hover an entry to highlight its series on both." style="width:100%;height:720px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

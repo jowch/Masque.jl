@@ -24,7 +24,7 @@ shows its payload in the tooltip. A click returns an
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-custom-regions" data-masque-embed="custom_regions" title="Three named regions over an image. Hover or click one." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-custom-regions" data-masque-embed="custom_regions" title="Three named regions over an image. Hover or click one." style="width:100%;height:1060px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
