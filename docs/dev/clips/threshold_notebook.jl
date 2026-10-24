@@ -50,7 +50,7 @@ begin
     ax_img = Axis(fig[1, 1]; aspect = DataAspect(), title = "cells above the cutoff in red")
     hidedecorations!(ax_img)
     heatmap!(ax_img, img; colormap = :grays)
-    maskplot = heatmap!(ax_img, img .> 0.4; colormap = [(:red, 0), (:red, 0.55)])
+    maskplot = heatmap!(ax_img, img .> 0.4; colormap = [(:red, 0), (:red, 0.55)], colorrange = (0, 1))
     ax_hist = Axis(fig[1, 2]; xlabel = "brightness", ylabel = "pixels", yscale = log10, title = "drag the cutoff")
     hist!(ax_hist, vec(img); bins = 60, color = :gray60, fillto = 0.5)
     ylims!(ax_hist, 0.8, 5000)

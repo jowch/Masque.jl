@@ -85,7 +85,7 @@ let
     kept = setdiff(1:n, out)
     Base.Text(
         "left out: $(isempty(out) ? "none" : join(out, ", "))\n" *
-            "$(length(kept)) of $n objects kept, mean area $(round(Int, sum(areas[kept]) / length(kept))) pixels"
+            (isempty(kept) ? "no objects kept" : "$(length(kept)) of $n objects kept, mean area $(round(Int, sum(areas[kept]) / length(kept))) pixels")
     )
 end
 

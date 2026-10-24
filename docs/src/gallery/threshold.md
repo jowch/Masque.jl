@@ -47,7 +47,7 @@ begin
     ax_img = Axis(fig[1, 1]; aspect = DataAspect(), title = "cells above the cutoff in red")
     hidedecorations!(ax_img)
     heatmap!(ax_img, img; colormap = :grays)
-    maskplot = heatmap!(ax_img, img .> 0.4; colormap = [(:red, 0), (:red, 0.55)])
+    maskplot = heatmap!(ax_img, img .> 0.4; colormap = [(:red, 0), (:red, 0.55)], colorrange = (0, 1))
 
     ax_hist = Axis(fig[1, 2]; xlabel = "brightness", ylabel = "pixels",
         yscale = log10, title = "drag the cutoff")
@@ -67,13 +67,14 @@ end
 Finally, use the cutoff in another cell:
 
 ```julia
-"$(round(100 * count(>(level.value), img) / length(img); digits = 1))% of the picture is above $(round(level.value; digits = 2))"
+Base.Text("$(round(100 * count(>(level.value), img) / length(img); digits = 1))% of the picture is above $(round(level.value; digits = 2))")
 ```
 
 ## How it works
 
 The mask is a second heatmap of `true` and `false`, coloured clear
-for `false` and see-through red for `true`. `onchange` gives it new
+for `false` and see-through red for `true`. `colorrange = (0, 1)` keeps
+`false` clear even when no pixel passes. `onchange` gives it new
 data with `maskplot[1] = …`, so the picture redraws while the cell
 keeps the line where you left it. [Update the figure](@ref) has the
 rules for what `onchange` may change.

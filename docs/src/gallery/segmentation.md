@@ -1,8 +1,8 @@
 # Annotate a segmentation
 
 Click the objects that a segmentation got wrong to leave them out of a
-count. In this clip, the picture has ten objects, and three of them are
-cells stuck together. A click on each one outlines it, and the cell under
+count. In this clip, the picture has ten objects, and three of them look
+like cells stuck together. A click on each one outlines it, and the cell under
 the figure lists the objects left out and the mean area of the rest. One
 click lands on a good cell by mistake, and Ctrl-Z takes it back.
 
@@ -93,7 +93,7 @@ let
     kept = setdiff(1:n, out)
     Base.Text(
         "left out: $(isempty(out) ? "none" : join(out, ", "))\n" *
-            "$(length(kept)) of $n objects kept, mean area $(round(Int, sum(areas[kept]) / length(kept))) pixels"
+            (isempty(kept) ? "no objects kept" : "$(length(kept)) of $n objects kept, mean area $(round(Int, sum(areas[kept]) / length(kept))) pixels")
     )
 end
 ```
@@ -107,9 +107,9 @@ objects before you count. `sel.objects.regions` lists the ids of the
 objects picked, the same numbers as in `labels`, so `areas[k]` and
 `labels .== k` reach each one. [Pick whole regions](@ref) has the rest.
 
-Undo works because the picks add up: with the figure focused, Ctrl-Z
-(Cmd-Z on a Mac) takes back the last click, and the next cell runs
-again. See [Undo a change](@ref).
+A wrong click is easy to take back: with the figure focused, Ctrl-Z
+(Cmd-Z on a Mac) undoes the last change to the picks, and the next cell
+runs again. See [Undo a change](@ref).
 
 ## Variations
 
@@ -123,5 +123,5 @@ again. See [Undo a change](@ref).
   [Build a widget](@ref) does for classes.
 
 Next, see [Heatmaps and images](@ref) for more on grids, and
-[Threshold a mask](@ref) for choosing the cutoff that made these
-objects.
+[Threshold a mask](@ref) for choosing a cutoff like the one that made
+these objects.
