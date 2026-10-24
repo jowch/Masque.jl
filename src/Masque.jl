@@ -90,6 +90,7 @@ include("interactables.jl")
 include("introspect.jl")
 include("compose.jl")
 include("controls.jl")
+include("linked.jl")
 include("fields.jl")
 include("events.jl")
 include("bond.jl")
@@ -103,8 +104,8 @@ export AbstractInteractable, AbstractSelector, HitLayer, InteractionContext, Axi
 export PointInteractable, SegmentInteractable, RectInteractable, GridInteractable, PolygonInteractable,
     AxisInteractable, ColorbarInteractable, LegendInteractable, RegionInteractable, FunctionInteractable,
     ThresholdInteractable, ROIInteractable, TextInteractable, ViewInteractable, SliceInteractable,
-    SurfaceInteractable
-export masque, interactables, data_to_image_px, hitlayers, bondtype, transform_bond, linkcameras!
+    SurfaceInteractable, LinkedInteractable
+export masque, interactables, linked, data_to_image_px, hitlayers, bondtype, transform_bond, linkcameras!
 export InteractionEvent, ElementEvent, LegendEvent, GridCellEvent, GridWindowEvent, GridSelection,
     AxisEvent, ThresholdEvent, ColorbarEvent, BoundsEvent
 export Markup, @masque_str

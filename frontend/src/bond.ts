@@ -1,10 +1,11 @@
 import { axisPoint, findBin, hitTestAt, layerPoint, lineReadout, matrixLimits, resolvePayload } from "./geometry"
 import { drawHover, renderSelection } from "./highlight"
-import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent } from "./hover"
+import { onMove, hideTip, setTipText, setTipVisible, tipOffset, placeTip, setDragHoverChrome, setMarkAccent, updateLinkForHit } from "./hover"
 import { hideCross } from "./cross"
 import { cellRange, elementPicks, legendEdit, linePointHit, linkedIndices, manyHits, picksPoints, selectionFor, SELECTED_KINDS } from "./selection"
 import { emptyMask, encodeMask, maskCount, maskHit, setBlock } from "./gridmask"
 import { hasRegions, regionCells, regionOf, setRegionsOf } from "./regions"
+import { clickRows, groupEnvelope, groupOf, groupSelection, rowOf, rowsOfMarks } from "./linked"
 import type { GridMask, MaskEnvelope } from "./gridmask"
 import { layoutImagePx, cancelPendingMove, cancelPendingDrag } from "./state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "./state"
@@ -215,6 +216,11 @@ function passContextToBase(surface: HTMLElement, pointerId: number): void {
 // mode covers every field the box edits, so marks and cells always agree.
 function marqueeMode(manifest: Manifest, state: OverlayState, under: Hit | null, targets: HitLayer[], p: { x: number; y: number }): marquee.MarqueeMode {
     if (under === null || !targets.includes(under.layer)) return "add"
+    const g = groupOf(manifest, under.layer)
+    if (g) {
+        const r = rowOf(g, under.layer, under.index)
+        return r !== undefined && (state.sel_.get(g.id)?.rows_ ?? []).includes(r) ? "subtract" : "add"
+    }
     const sel = state.sel_.get(under.layer.id)
     // On a line that takes points, the pick under the press is its nearest data point.
     const sample = picksPoints(under.layer) ? lineSample(manifest, under, p.x, p.y) : undefined
@@ -456,6 +462,7 @@ export function abortMarquee(ctx: OverlayCtx, state: OverlayState): boolean {
 // identical bond value for a keyboard-focused hit — same highlight draw, same payload
 // resolution, same "input" event.
 export function commitClick(ctx: OverlayCtx, state: OverlayState, hit: Hit, px: number, py: number, toggle = false): void {
+    if (hit.layer.group !== undefined) { commitGroupClick(ctx, state, hit); return }
     if (hit.layer.many) { commitManyClick(ctx, state, hit, px, py); return }
     // A line picks the data point nearest the click, the one hover reads out. A click with no
     // sample to name (the nearest one is off screen) commits nothing, and returns before
@@ -515,14 +522,48 @@ function legendPicks(ctx: OverlayCtx, state: OverlayState, hit: Hit, on: boolean
     const out: Record<string, unknown> = {}
     if (!hit.layer.links?.length) return out
     const fields = ctx.manifest_.fields
+    // A linked plot's marks stand for rows of its group, edited once for all its plots.
+    const groupRows = new Map<string, number[]>()
     for (const [layer, picked] of linkedIndices(ctx.manifest_, hit.layer, hit.index)) {
+        const g = groupOf(ctx.manifest_, layer)
+        if (g) {
+            if (!g.many || !layer.events.includes("click")) continue
+            const rows = groupRows.get(g.id) ?? []
+            for (const r of rowsOfMarks(g, layer, picked)) if (!rows.includes(r)) rows.push(r)
+            groupRows.set(g.id, rows)
+            continue
+        }
         if (!layer.many || layer.brush || !layer.events.includes("click")) continue
         if (fields && !fields.includes(layer.id)) continue
         const items = legendEdit(state.sel_.get(layer.id)?.items_ ?? [], elementPicks(ctx.manifest_, layer, picked), on, toggle)
         state.sel_.set(layer.id, { hits_: manyHits(ctx.manifest_, items), source_: null, items_: items })
         out[layer.id] = { items }
     }
+    for (const [id, picked] of groupRows) {
+        const g = ctx.manifest_.groups!.find((x) => x.id === id)!
+        if (fields && !fields.includes(id)) continue
+        const cur = state.sel_.get(id)?.rows_ ?? []
+        const want = new Set(picked)
+        const rows = !on ? cur.filter((r) => !want.has(r)) : !toggle ? picked : [...cur, ...picked.filter((r) => !cur.includes(r))]
+        state.sel_.set(id, groupSelection(ctx.manifest_, g, rows))
+        out[id] = groupEnvelope(g, rows)
+    }
     return out
+}
+
+// A click on a linked plot's mark edits its group's rows (linked.ts's clickRows): the mark's
+// row joins or leaves the group's selection, and every plot of the group shows it.
+function commitGroupClick(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
+    const g = groupOf(ctx.manifest_, hit.layer)
+    const row = g ? rowOf(g, hit.layer, hit.index) : undefined
+    if (!g || row === undefined) return
+    const rows = clickRows(g, state.sel_.get(g.id)?.rows_ ?? [], row)
+    state.sel_.set(g.id, groupSelection(ctx.manifest_, g, rows))
+    renderSelection(ctx, state)
+    drawHover(ctx, state, hit)
+    updateLinkForHit(ctx, state, hit)
+    syncFocus(ctx, state, hit)
+    ctx.commit_({ [g.id]: groupEnvelope(g, rows) })
 }
 
 function syncFocus(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
@@ -665,6 +706,14 @@ export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] 
         if (layer.many && !v.items?.length) continue
         state.sel_.set(layer.id, layer.many ? { hits_: [], source_: null, items_: [] } : { hits_: [], source_: null })
         updates[layer.id] = layer.many ? { items: [] } : null
+    }
+    // A group clears where any of its plots is, as its highlight is on all of them.
+    for (const g of ctx.manifest_.groups ?? []) {
+        if (!(g.id in cur) || (g.many && !many)) continue
+        if (axes !== null && !ctx.manifest_.layers.some((l) => l.group === g.id && axes.includes(l.axis))) continue
+        if (!(state.sel_.get(g.id)?.rows_ ?? []).length) continue
+        state.sel_.set(g.id, groupSelection(ctx.manifest_, g, []))
+        updates[g.id] = groupEnvelope(g, [])
     }
     if (Object.keys(updates).length === 0) return false
     renderSelection(ctx, state)

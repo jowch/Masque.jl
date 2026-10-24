@@ -39,6 +39,7 @@ TextInteractable
 ThresholdInteractable
 ROIInteractable
 ViewInteractable
+LinkedInteractable
 SliceInteractable
 RegionInteractable
 FunctionInteractable
@@ -47,6 +48,7 @@ FunctionInteractable
 ## Linking views
 
 ```@docs
+linked
 linkcameras!
 ```
 

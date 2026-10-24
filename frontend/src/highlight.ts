@@ -274,7 +274,8 @@ export function drawHi(state: OverlayState, hiGroups: HiSet, hit: Hit, also?: Hi
 export function drawHover(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
     const fixed = screenFixedLayer(hit.layer)
     drawHi(state, fixed ? ctx.hiFixed_ : ctx.hiGroup_, hit, fixed ? ctx.hiGroup_ : ctx.hiFixed_)
-    ctx.fade_.lift_(hit)
+    // A linked mark is lifted with its partners (drawPartners), which follow every drawHover.
+    if (hit.layer.group === undefined) ctx.fade_.lift_(hit)
 }
 
 export function clearHover(ctx: OverlayCtx, state: OverlayState, fade = false): void {
@@ -317,7 +318,7 @@ export function clearLink(state: OverlayState, linkGroups: HiSet, fade = false):
 // A different key replaces the whole set immediately (no leave-fade in between) — cheap since
 // this only ever swaps between two legend entries' worth of selected-recipe elements — and the
 // new set enters with the usual fade-in.
-export function drawLink(state: OverlayState, linkGroups: HiSet, key: string, hits: Hit[]): void {
+export function drawLink(state: OverlayState, linkGroups: HiSet, key: string, hits: Hit[], mode: HiMode = "selected"): void {
     const cur = firstHiChild(linkGroups)
     if (key === state.linkKey_ && cur && !cur.classList.contains("masque-leave")) return
     clearLinkImmediate(state, linkGroups)
@@ -325,7 +326,7 @@ export function drawLink(state: OverlayState, linkGroups: HiSet, key: string, hi
     // (same reasoning as drawHi's guard).
     for (const h of hits) {
         if (state.selKeys_.has(hitKey(h))) continue
-        const made = makeHiElement(h, "selected")
+        const made = makeHiElement(h, mode)
         if (made) placeMade(linkGroups.at_(h.layer.axis), made, true)
     }
     state.linkKey_ = key
@@ -340,6 +341,15 @@ export function drawLegendLink(ctx: OverlayCtx, state: OverlayState, legend: Hit
     if (svg.length) drawLink(state, ctx.linkGroup_, hitKey(legend), svg)
     else clearLinkImmediate(state, ctx.linkGroup_)
     ctx.fade_.preview_(hitKey(legend), closed.length ? closed : null, previewScope(ctx.manifest_, legend.layer))
+}
+
+// A linked plot's hovered or focused mark (#346): the other marks of its row, in every plot of
+// its group, get the hover outline in g.link and lose their fade, as the hovered mark does.
+export function drawPartners(ctx: OverlayCtx, state: OverlayState, hit: Hit, partners: Hit[]): void {
+    if (partners.length) drawLink(state, ctx.linkGroup_, `p:${hitKey(hit)}`, partners, "hover")
+    else clearLinkImmediate(state, ctx.linkGroup_)
+    ctx.fade_.preview_(null, null, [])
+    ctx.fade_.lift_(hit, partners)
 }
 
 export function clearLegendLink(ctx: OverlayCtx, state: OverlayState, fade = false): void {

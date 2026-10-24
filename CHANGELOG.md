@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `linked(plots...)` makes plots that draw the same rows one selection: clicking a mark in
+  any of them selects its row in all of them, and hovering a mark outlines the same row on the
+  others. The `@bind` field holds the row's position, or with `key = :id` the `id` of its
+  payload, so plots that order or split the rows differently still pair up, and an axis
+  stands for every plot on it. With `select = :many` the field holds several rows, and a box
+  or a legend entry picks many at once. `selected=` takes the rows, and
+  `interactables(plot; key = vector)` gives a plot keys of its own (#346).
+
 ### Fixed
 - On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down
   now goes to the browser, so Cmd-Left (Back on a Mac) and Alt-Left (Back elsewhere) work.

@@ -376,4 +376,33 @@ let
     end
 end
 
+println("\n=== M. linked(...) — one group of plots, its rows, and the value ===")
+# A `linked(...)` group (#346) adds one `groups` entry and a `group` tag per member layer. By
+# position it ships no rows; with `key` each member ships each mark's row, about one small
+# integer per mark. The value is `{rows: [...]}`, one 0-based row per pick, and Julia turns it
+# into the keys by rebuilding the key table from the payloads.
+let n = 10_000
+    f = Figure(size = (700, 340)); a1, a2 = Axis(f[1, 1]), Axis(f[1, 2])
+    x, y = rand(n), rand(n)
+    s1 = scatter!(a1, x, y; markersize = 4); s2 = scatter!(a2, y, x; markersize = 4)
+    ids = [(; id = "cell$i") for i in 1:n]
+    two = masque(f, (u = interactables(s1; select = :many), p = interactables(s2; select = :many)))
+    pos = masque(f, (cells = linked(s1, s2; select = :many),))
+    plain_ids = masque(f, (u = interactables(s1; select = :many, payloads = ids), p = interactables(s2; select = :many, payloads = reverse(ids))))
+    keyed = masque(f, (cells = linked(interactables(s1; payloads = ids), interactables(s2; payloads = reverse(ids)); key = :id, select = :many),))
+    g = only(keyed.manifest["groups"])
+    @printf("  two :many scatters of %d:     manifest %8.1f KB\n", n, mp(two.manifest) / 1024)
+    @printf("  the same, linked by position:  manifest %8.1f KB\n", mp(pos.manifest) / 1024)
+    @printf("  two :many scatters with ids:   manifest %8.1f KB\n", mp(plain_ids.manifest) / 1024)
+    @printf("  the same, linked by id:        manifest %8.1f KB  (rows %.1f KB)\n", mp(keyed.manifest) / 1024, mp(g["rows"]) / 1024)
+    mount = Dict{String, Any}(Masque.mount_envelope(keyed.manifest))
+    for k in (1, 100, 5_000)
+        v = Dict{String, Any}("cells" => Dict("rows" => collect(0:(k - 1))))
+        env = merge(mount, v)
+        Masque.bond_from_js(keyed, env)
+        t = @elapsed Masque.bond_from_js(keyed, env)
+        @printf("  value, %5d rows:  %7.1f KB  (%.1f B/row);  Julia decode by id %6.1f ms\n", k, mp(v) / 1024, mp(v) / k, 1000t)
+    end
+end
+
 println()

@@ -558,6 +558,8 @@ function _many_value(manifest, owners, d, env)
 end
 
 function _field_value(manifest, owners, field::AbstractString, env)
+    g = _manifest_group(manifest, field)
+    g === nothing || return _group_value(manifest, g, env)
     d = _manifest_layer(manifest, field)
     haskey(d, "brush") && return _brush_value(manifest, owners, d, env)
     get(d, "many", false) === true && return _many_value(manifest, owners, d, env)
@@ -840,13 +842,18 @@ for a point on a line), `{items: [...]}` for a `select = :many` field (`{runs: [
 on a grid, empty unless `selected=` seeds it), a control's start, and the elements a box's
 starting bounds hold for its target.
 """
-function _initial_value(built, fields, roles, binding, selected, ctx, layers)
+function _initial_value(built, fields, roles, binding, selected, ctx, layers, groups = Any[], tables = Dict{Symbol, Any}())
+    gseeds = Dict{Symbol, Any}()
+    selected = _take_group_seeds!(gseeds, selected, binding, fields, groups, tables)
     seeds = _field_seeds(built, fields, roles, binding, selected)
     by_id = Dict(L.id => i for (i, L, _) in built)
     by_layer = Dict(L.id => L for (_, L, _) in built)
     out = Dict{String, Any}()
+    group = Dict(Symbol(g["id"]) => g for g in groups)
     for f in fields
-        out[string(f)] = if roles[f] === :control
+        out[string(f)] = if haskey(group, f)
+            get(gseeds, f, get(group[f], "many", false) === true ? Dict{String, Any}("rows" => Int[]) : nothing)
+        elseif roles[f] === :control
             initial_envelope(by_id[f], ctx, layers)
         elseif roles[f] === :brush
             _brush_start(f, built, get(seeds, f, nothing), layers)

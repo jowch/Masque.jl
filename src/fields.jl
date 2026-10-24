@@ -7,11 +7,14 @@
 # all count (`RegionInteractable` builds `region.circles` and `region.rects`). `refs === nothing` binds
 # every layer that can commit. `bare` unwraps a value of one field. `defaults` are the ids of
 # the defaults left in the call: a default line takes no clicks unless `bind` names it.
+# `links` are the call's `linked(...)` groups: each is one field, and its plots have none.
 struct _Binding
     refs::Union{Nothing, Vector{Pair{String, Vector{Symbol}}}}
     bare::Bool
     defaults::Set{Symbol}
+    links::Vector{_LinkGroup}
 end
+_Binding(refs, bare, defaults) = _Binding(refs, bare, defaults, _LinkGroup[])
 _Binding() = _Binding(nothing, false, Set{Symbol}())
 
 # The interactables of one call with its binding. It is a vector, so a backend's `make_widget`
@@ -61,6 +64,8 @@ end
 _named_key(r::_PlotRequest) = r.plot
 _named_key(i::BlockControl) = i.block
 _named_key(x) = x
+
+_describe(g::LinkedInteractable) = "a `linked(...)` group"
 
 _describe(p::Makie.AbstractPlot) = "the `$(Makie.plotkey(p))` plot"
 _describe(r::_PlotRequest) = _describe(r.plot)
@@ -176,6 +181,8 @@ function _bind_call(fig, xs, bind; auto::Bool)
         end
     end
 
+    links = _take_links!(args, names)
+
     renamed = IdDict{Any, Any}()
     named = AbstractInteractable[]
     fixed = Base.IdSet{Any}()
@@ -188,13 +195,18 @@ function _bind_call(fig, xs, bind; auto::Bool)
     end
     given_names = Set{Symbol}(values(names))
     built = _collecting_skips(() -> _assemble_all(fig, named; auto, named = fixed, names = given_names))
+    groups = _resolve_links(links, built, renamed)
+    group_name = IdDict{Any, Symbol}(g => name for (g, name, _, _) in links)
     resolved = if refs === nothing
         nothing
     else
-        Pair{String, Vector{Symbol}}[_resolve_ref(r, built, renamed) for r in refs]
+        Pair{String, Vector{Symbol}}[
+            r isa LinkedInteractable ? ":$(group_name[r])" => Symbol[group_name[r]] : _resolve_ref(r, built, renamed)
+                for r in refs
+        ]
     end
     hidden = Set{Symbol}(id for (p, ids) in built.plotmap if !_shown(p) for id in ids)
-    return _Plan(built.ints, _Binding(resolved, bare, built.defaults), nothing, nothing, Ref{Any}(nothing), hidden)
+    return _Plan(built.ints, _Binding(resolved, bare, built.defaults, groups), nothing, nothing, Ref{Any}(nothing), hidden)
 end
 
 _shown(p) = try
@@ -251,7 +263,7 @@ The ids of the layers that are fields of the bind value, in order, and every lay
 `built` is `build_manifest`'s `(interactable, HitLayer, dict)` list. Layers outside `fields`
 take no clicks.
 """
-function _fields(binding::_Binding, built, brushed)
+function _fields(binding::_Binding, built, brushed, linked = Dict{Symbol, Symbol}())
     roles = Dict{Symbol, Any}()
     owner = Dict{Symbol, Symbol}()
     order = Symbol[]
@@ -261,12 +273,28 @@ function _fields(binding::_Binding, built, brushed)
         push!(order, L.id)
     end
     candidate(id) = roles[id] !== nothing
+    groups = Set{Symbol}(g.name for g in binding.links)
     if binding.refs === nothing
         hover_only(id) = owner[id] in binding.defaults && _layer_kind(built, id) in _LINE_KINDS
-        return Symbol[id for id in order if candidate(id) && !hover_only(id)], roles
+        out = Symbol[]
+        for id in order
+            # A group's field takes the place of its first plot.
+            g = get(linked, id, nothing)
+            if g !== nothing
+                g in out || push!(out, g)
+            elseif candidate(id) && !hover_only(id)
+                push!(out, id)
+            end
+        end
+        return out, roles
     end
     fields = Symbol[]
     for (label, ids) in binding.refs
+        if length(ids) == 1 && only(ids) in groups && !haskey(roles, only(ids))
+            only(ids) in fields && throw(ArgumentError("bind: :$(only(ids)) is listed twice"))
+            push!(fields, only(ids))
+            continue
+        end
         layers = Symbol[]
         for r in ids
             if haskey(roles, r)
@@ -283,6 +311,12 @@ function _fields(binding::_Binding, built, brushed)
             ),
         )
         for id in layers
+            g = get(linked, id, nothing)
+            g === nothing || throw(
+                ArgumentError(
+                    "bind: :$id is in `linked(...)` :$g, whose field is :$g; a linked plot has no field of its own",
+                ),
+            )
             candidate(id) || throw(
                 ArgumentError(
                     "bind: :$id takes no value: it is a view, a slice, or a layer without `:click` in its `events`",
@@ -301,10 +335,15 @@ end
 The fields `onchange` receives: every layer that would be a field with no `bind`, and every
 field `bind` keeps (a bound line), in layer order. `fields` are the bind's own.
 """
-function _state_fields(binding::_Binding, built, brushed, fields, roles)
-    all_fields, _ = _fields(_Binding(nothing, false, binding.defaults), built, brushed)
+function _state_fields(binding::_Binding, built, brushed, fields, roles, linked = Dict{Symbol, Symbol}())
+    all_fields, _ = _fields(_Binding(nothing, false, binding.defaults, binding.links), built, brushed, linked)
     keep = Set{Symbol}(all_fields) ∪ Set{Symbol}(fields)
-    return Symbol[L.id for (_, L, _) in built if L.id in keep]
+    out = Symbol[]
+    for (_, L, _) in built
+        id = get(linked, L.id, L.id)
+        id in keep && !(id in out) && push!(out, id)
+    end
+    return out
 end
 
 _layer_kind(built, id) = first(L.kind for (_, L, _) in built if L.id === id)

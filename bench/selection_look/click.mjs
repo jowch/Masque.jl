@@ -1,4 +1,4 @@
-// Per-click cost of the selected look at 5 000 picks (#394); the numbers in
+// Per-click cost of the selected look at 5 000 picks (#394), and of a linked group (#346); the numbers in
 // docs/dev/perf-findings.md ("Re-drawing a selection") come from this script.
 //
 // Run Pluto headless on the warmed env (CLAUDE.md, "Pluto integration testing"), with
@@ -25,7 +25,7 @@ for (;;) {
       err: [...document.querySelectorAll("pluto-cell.errored")].map((c) => c.innerText).join("\n").slice(0, 2000), c: !!document.querySelector("#coords") };
   });
   if (s.err) { console.error("cell error:\n" + s.err); process.exit(1); }
-  if (s.surf >= 3 && s.busy === 0 && s.c) break;
+  if (s.surf >= 4 && s.busy === 0 && s.c) break;
   if (Date.now() - t0 > 1800000) { console.error("timeout", s); process.exit(1); }
   await page.waitForTimeout(3000);
 }
@@ -69,7 +69,11 @@ await series("click_5k_of_100k", () => timed(2, C.big[0], C.big[1], "click"));
 // Hover on the legend's first entry, which previews one cluster (~1 250 marks per panel), then
 // off it, in turn.
 await series("legend_hover", async (i) => i % 2 ? timed(1, 2, 2, "hover") : timed(1, C.legend[0], C.legend[1], "hover"));
+// The linked group (#346): the same two panels, 5k rows held. A click adds or takes out one row
+// in both panels; a hover outlines the mark's partner in the other panel, then moves off.
+await series("linked_click", () => timed(3, C.linked[0], C.linked[1], "click"));
+await series("linked_hover", async (i) => i % 2 ? timed(3, 2, 2, "hover") : timed(3, C.linked_hover[0], C.linked_hover[1], "hover"));
 out.errors = errors;
 if (outFile) writeFileSync(outFile, JSON.stringify(out, null, 1));
-console.log(JSON.stringify({ click10k: out.click_5k_of_10k, click100k: out.click_5k_of_100k, legend: out.legend_hover }, (k, v) => k === "runs" ? undefined : v));
+console.log(JSON.stringify({ click10k: out.click_5k_of_10k, click100k: out.click_5k_of_100k, legend: out.legend_hover, linkedClick: out.linked_click, linkedHover: out.linked_hover }, (k, v) => k === "runs" ? undefined : v));
 await browser.close();

@@ -1293,6 +1293,168 @@ try {
       continue;
     }
 
+    // Linked selections (#346). Every plot of a `linked(...)` group is one field of rows: a
+    // pick in any plot edits the rows, and every mark of a held row, in every plot, is drawn
+    // picked (the fade's `kept`). Hovering a mark outlines its partners with the hover recipe
+    // in g.link and lifts their fade. Each step checks host.value's rows, the printed `@bind`
+    // value, and the marks drawn picked.
+    if (spec.mode === "linked_pos" || spec.mode === "linked_keys" || spec.mode === "linked_one") {
+      const field = spec.field;
+      const out = `#out_${key}`;
+      const prefix = `${key.toUpperCase()}=`;
+      const byId = Object.fromEntries(layers.map((l) => [l.id, l]));
+      const members = layers.filter((l) => l.group === field);
+      if (members.length < 2) throw new Error(`${key}: ${members.length} layers carry group ${field}, want 2 or more`);
+      for (const l of members) {
+        if (!l.events.includes("click")) throw new Error(`${key}: member ${l.id} takes no click`);
+        if (l.many) throw new Error(`${key}: member ${l.id} ships its own many flag`);
+      }
+      passed.push(`${key}/members-carry-group`);
+      const at = (id, i) => hitPoint(byId[id], i);
+      const rowsNow = async () => {
+        const v = (await inspect(key)).bondAll?.[field];
+        return v === null || v === undefined ? null : (v.rows ?? (v.row === undefined ? null : [v.row]));
+      };
+      const keptNow = async () => (await inspect(key)).kept.slice().sort();
+      const look = () => page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const live = (sel) => [...sr.querySelectorAll(sel)].filter((e) => !e.classList.contains("masque-leave"));
+        const circles = live("svg.masque-edge g.link circle").map((c) => {
+          const cs = getComputedStyle(c);
+          return { cx: Number(c.getAttribute("cx")), cy: Number(c.getAttribute("cy")), stroke: cs.stroke, width: parseFloat(cs.strokeWidth) };
+        });
+        const fills = live("svg.masque-fill g.link > *").length;
+        const rects = live("svg.masque-edge g.link rect").length;
+        const lift = [...sr.querySelectorAll(".masque-fade")].flatMap((w) => (w.dataset.lift ? w.dataset.lift.split(" ") : []));
+        return { circles, fills, rects, lift: lift.sort() };
+      }, key);
+      const wantOut = (rows) => {
+        if (spec.mode === "linked_one") return rows.length ? String(rows[0] + 1) : "nothing";
+        if (spec.mode === "linked_keys") return rows.length ? `[${rows.map((r) => `"c${r + 1}"`).join(", ")}]` : "String[]";
+        return rows.length ? `[${rows.map((r) => r + 1).join(", ")}]` : "Int64[]";
+      };
+      const sameSet = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+      let t = await textOf(out);
+      const empty = spec.mode === "linked_one" ? null : [];
+      if (t !== prefix + wantOut([])) throw new Error(`${key}: mount value ${JSON.stringify(t)}, want ${prefix + wantOut([])}`);
+      if (JSON.stringify(await rowsNow()) !== JSON.stringify(empty)) throw new Error(`${key}: host.value at mount ${JSON.stringify(await rowsNow())}`);
+      passed.push(`${key}/empty-at-mount`);
+      // `rows` in pick order, unless `anyOrder` (a box adds the marks it covers in layer order).
+      const step = async (what, act, rows, kept, anyOrder = false) => {
+        await act();
+        t = await waitChange(out, t, `${key}/${what}`);
+        const got = await rowsNow();
+        const want = spec.mode === "linked_one" && !rows.length ? null : rows;
+        const okRows = anyOrder ? got && sameSet(got, rows) : JSON.stringify(got) === JSON.stringify(want);
+        if (!okRows) throw new Error(`${key}/${what}: host.value rows ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+        const wantT = prefix + wantOut(anyOrder ? got : rows);
+        if (t !== wantT) throw new Error(`${key}/${what}: @bind value ${JSON.stringify(t)}, want ${JSON.stringify(wantT)}`);
+        const k = await keptNow();
+        if (!sameSet(k, kept)) throw new Error(`${key}/${what}: drawn picked ${JSON.stringify(k)}, want ${JSON.stringify(kept.slice().sort())}`);
+        passed.push(`${key}/${what}`);
+      };
+      const hoverPartners = async (what, id, i, want) => {
+        const p = at(id, i);
+        await dispatchAt(key, p.x, p.y, "pointermove");
+        await new Promise((r) => setTimeout(r, 100));
+        const lk = await look();
+        const centres = lk.circles.map((c) => `${Math.round(c.cx)},${Math.round(c.cy)}`).sort();
+        const wantC = want.circles.map(([pid, j]) => { const q = at(pid, j); return `${Math.round(q.x)},${Math.round(q.y)}`; }).sort();
+        if (JSON.stringify(centres) !== JSON.stringify(wantC)) throw new Error(`${key}/${what}: partner circles at ${JSON.stringify(centres)}, want ${JSON.stringify(wantC)}`);
+        if (lk.rects !== (want.rects ?? 0)) throw new Error(`${key}/${what}: ${lk.rects} partner rects, want ${want.rects ?? 0}`);
+        // The hover recipe: a fill half in svg.masque-fill and a 1px-class chrome edge.
+        if (lk.fills !== lk.circles.length + lk.rects) throw new Error(`${key}/${what}: ${lk.fills} fill halves for ${lk.circles.length + lk.rects} partners`);
+        for (const c of lk.circles) if (!(c.width > 0) || c.stroke === "none") throw new Error(`${key}/${what}: partner edge ${JSON.stringify(c)}`);
+        if (want.lift) {
+          const wl = [`${id}:${i}`, ...want.lift].sort();
+          if (!sameSet(lk.lift, wl)) throw new Error(`${key}/${what}: fade lifts ${JSON.stringify(lk.lift)}, want ${JSON.stringify(wl)}`);
+        }
+        passed.push(`${key}/${what}`);
+      };
+      const leave = async (what, x, y) => {
+        await dispatchAt(key, x, y, "pointermove");
+        await new Promise((r) => setTimeout(r, 100));
+        const lk = await look();
+        if (lk.circles.length || lk.rects) throw new Error(`${key}/${what}: partners still drawn after leaving ${JSON.stringify(lk)}`);
+        if (lk.lift.length) throw new Error(`${key}/${what}: fade still lifts ${JSON.stringify(lk.lift)} after leaving`);
+        passed.push(`${key}/${what}`);
+      };
+      const click = (id, i, mod = {}) => () => { const p = at(id, i); return dispatchAt(key, p.x, p.y, "click", mod); };
+      const pad = 30;
+      const boxDrag = async (pts, mod = {}) => {
+        const x0 = Math.min(...pts.map((p) => p.x)) - pad, y0 = Math.min(...pts.map((p) => p.y)) - pad;
+        const x1 = Math.max(...pts.map((p) => p.x)) + pad, y1 = Math.max(...pts.map((p) => p.y)) + pad;
+        await dispatchAt(key, x0, y0, "pointermove", mod);
+        await dispatchAt(key, x0, y0, "pointerdown", mod);
+        await dispatchAt(key, (x0 + x1) / 2, (y0 + y1) / 2, "pointermove", mod);
+        await dispatchAt(key, x1, y1, "pointermove", mod);
+        await dispatchAt(key, x1, y1, "pointerup", mod);
+      };
+
+      if (spec.mode === "linked_pos") {
+        // Row k is mark k of u, p and labels. u and labels share the left axis, p is on the right.
+        await hoverPartners("hover-outlines-partners", "u", 0, { circles: [["p", 0]], rects: 1 });
+        await leave("leave-clears-partners", 1, 1);
+        await step("click-picks-row-everywhere", click("u", 0), [0], ["u:0", "p:0", "labels:0"]);
+        await step("click-other-panel-adds", click("p", 2), [0, 2], ["u:0", "p:0", "labels:0", "u:2", "p:2", "labels:2"]);
+        await step("click-label-takes-out", click("labels", 0), [2], ["u:2", "p:2", "labels:2"]);
+        // A faded mark's partners lose their fade while it is hovered.
+        await hoverPartners("hover-lifts-partner-fade", "p", 1, { circles: [["u", 1]], rects: 1, lift: ["u:1", "labels:1"] });
+        await leave("leave-restores-fade", 1, 1);
+        await step("box-in-right-panel-adds", () => boxDrag([at("p", 0), at("p", 1)]), [2, 0, 1],
+          ["u:0", "p:0", "labels:0", "u:1", "p:1", "labels:1", "u:2", "p:2", "labels:2"], true);
+        {
+          const e = { x: (at("u", 0).x + at("u", 1).x) / 2, y: at("u", 0).y };
+          await mouseClickAt(key, e.x, e.y);
+          t = await waitSame(out, t, `${key}/empty-click-keeps`);
+          passed.push(`${key}/empty-click-keeps`);
+        }
+        await step("escape-clears", () => page.keyboard.press("Escape"), [], []);
+        await step("undo-puts-rows-back", () => page.keyboard.press("ControlOrMeta+z"), [2, 0, 1],
+          ["u:0", "p:0", "labels:0", "u:1", "p:1", "labels:1", "u:2", "p:2", "labels:2"], true);
+        // A box that starts on a held mark takes out the rows it covers.
+        await step("box-on-held-takes-out", async () => {
+          const a = at("u", 1), b = at("u", 0);
+          await dispatchAt(key, a.x, a.y, "pointermove");
+          await dispatchAt(key, a.x, a.y, "pointerdown");
+          await dispatchAt(key, (a.x + b.x) / 2 - pad, (a.y + b.y) / 2 + pad, "pointermove");
+          await dispatchAt(key, b.x - pad, b.y + pad, "pointermove");
+          await dispatchAt(key, b.x - pad, b.y + pad, "pointerup");
+        }, [2], ["u:2", "p:2", "labels:2"], true);
+        await step("escape-clears-again", () => page.keyboard.press("Escape"), [], []);
+      } else if (spec.mode === "linked_keys") {
+        // Row k is cell c(k+1): A holds c1, c2; B holds c3, c4; `every` draws c4, c3, c2, c1.
+        const leg = byId.legend;
+        if (!leg) throw new Error(`${key}: no legend layer`);
+        await hoverPartners("hover-outlines-keyed-partner", "A", 1, { circles: [["every", 2]] });
+        await leave("leave-clears-partners", 1, 1);
+        await step("click-picks-cell", click("A", 0), [0], ["A:0", "every:3"]);
+        await step("click-other-panel-adds", click("every", 0), [0, 3], ["A:0", "every:3", "B:1", "every:0"]);
+        const entry = (j) => () => { const p = hitPoint(leg, j); return dispatchAt(key, p.x, p.y, "click"); };
+        const ia = leg.links.findIndex((ls) => ls.includes("A"));
+        await step("legend-picks-cluster", entry(ia), [0, 1], ["A:0", "A:1", "every:3", "every:2"]);
+        await step("legend-again-takes-out", entry(ia), [], []);
+        await step("click-picks-again", click("B", 0), [2], ["B:0", "every:1"]);
+        await step("ctrl-legend-adds", () => { const p = hitPoint(leg, ia); return dispatchAt(key, p.x, p.y, "click", { ctrlKey: true }); }, [2, 0, 1],
+          ["B:0", "every:1", "A:0", "A:1", "every:3", "every:2"]);
+        await step("box-adds-cells", () => boxDrag([at("every", 0)]), [2, 0, 1, 3],
+          ["A:0", "A:1", "B:0", "B:1", "every:0", "every:1", "every:2", "every:3"], true);
+        await mouseClickAt(key, (at("A", 0).x + at("A", 1).x) / 2, at("A", 0).y - 60);
+        await step("escape-clears", () => page.keyboard.press("Escape"), [], []);
+      } else {
+        await step("click-picks-row-in-both", click("u", 0), [0], ["u:0", "p:0"]);
+        await step("click-partner-lets-go", click("p", 0), [], []);
+        await step("click-other-row", click("p", 1), [1], ["u:1", "p:1"]);
+        await step("click-replaces", click("u", 2), [2], ["u:2", "p:2"]);
+        await step("empty-click-clears", () => dispatchAt(key, (at("p", 0).x + at("p", 1).x) / 2, at("p", 1).y + 60, "click"), [], []);
+      }
+      await dispatchAt(key, 1, 1, "pointermove");
+      console.error(`OK  ${key} — ${t.slice(0, 160)}`);
+      continue;
+    }
+
     // Marquee and legend picks under `select = :many` (#335, #358). Left axis (no view): a
     // drag adds the marks inside, with or without Ctrl, and one starting on a picked mark takes
     // out what it covers; a legend click picks every mark of `a`. Right axis (pan view):

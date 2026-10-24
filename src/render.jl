@@ -482,15 +482,30 @@ function build_manifest(
     for (i, L, d) in built
         d["bond"] = bond_stamp(i, L)
     end
-    fields, roles = _fields(binding, built, brushed)
+    by_id = Dict(L.id => (L, d) for (_, L, d) in built)
+    link_layers, linked = _link_layers(binding.links, by_id)
+    fields, roles = _fields(binding, built, brushed, linked)
     # With `onchange`, every field of the state takes its gestures, bound or not; the bind
     # value is the `bind` subset of it.
     stateful = _onchange(plan) !== nothing
     bound = fields
-    stateful && (fields = _state_fields(binding, built, brushed, fields, roles))
+    stateful && (fields = _state_fields(binding, built, brushed, fields, roles, linked))
+    groups = Any[]
+    tables = Dict{Symbol, Any}()
+    for (g, kept) in link_layers
+        g.name in fields || continue
+        table, rows = _link_table(g, kept, by_id)
+        tables[g.name] = g.key === nothing && isempty(g.keys) ? nothing : table
+        push!(groups, _group_dict(g, kept, table, rows))
+        for ids in kept, id in ids
+            by_id[id][2]["group"] = string(g.name)
+        end
+    end
     # A layer outside the bind value takes no clicks, and keeps hover (its tooltip). A box's
-    # target takes none either: the box chooses its elements.
+    # target takes none either: the box chooses its elements. A linked plot's clicks edit its
+    # group's field.
     for (i, L, d) in built
+        haskey(d, "group") && continue
         L.id in fields && roles[L.id] === :pick || filter!(!=("click"), d["events"])
         if roles[L.id] === :brush
             d["brush"] = L.kind === :grid ? "grid" : "elements"
@@ -509,7 +524,7 @@ function build_manifest(
             d["hidden"] = true
         end
     end
-    initial = with_initial ? _initial_value(built, fields, roles, binding, selected, ctx, layers) : nothing
+    initial = with_initial ? _initial_value(built, fields, roles, binding, selected, ctx, layers, groups, tables) : nothing
     # Precedence for the frontend's first-match-in-manifest-order `hitTest` (geometry.ts):
     # `LegendInteractable` layers sort FIRST (a legend drawn over plot geometry must win the
     # pixels under it, or it's unhoverable), `:view` layers sort LAST (catch-all viewport hits
@@ -529,6 +544,7 @@ function build_manifest(
         "transforms" => Dict(string(id) => _transform_dict(t) for (id, t) in ctx.transforms),
     )
     m["fields"] = String[string(f) for f in fields]
+    isempty(groups) || (m["groups"] = groups)
     if stateful
         m["onchange"] = true
         m["bind"] = String[string(f) for f in bound]
@@ -1067,6 +1083,10 @@ end
 function _pick_counts(manifest)
     counts = Dict{String, Int}()
     fields = Set{String}(get(manifest, "fields", String[]))
+    # A group's rows are positions in its key table: a table that changed clears its picks.
+    for g in get(manifest, "groups", ())
+        counts[g["id"]] = reinterpret(Int, hash((g["n"], _group_table(manifest, g))))
+    end
     for d in manifest["layers"]
         d["id"] in fields && get(d, "bond", nothing) ∉ ("threshold", "bounds", "control") || continue
         # A hidden plot has no marks to pick: hiding it clears its picks.

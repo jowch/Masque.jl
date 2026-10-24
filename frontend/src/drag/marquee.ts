@@ -1,10 +1,11 @@
 import { SVG_NS, renderSelection } from "../highlight"
 import { applyGridMarquee } from "../bond"
 import { maskCount } from "../gridmask"
-import { manyHits, pickKey, picksInBox } from "../selection"
+import { indicesInBox, manyHits, pickKey, picksInBox } from "../selection"
+import { groupEnvelope, groupOf, groupSelection, rowsOfMarks } from "../linked"
 import { clampX, clampY, MARQUEE_MIN_CSS } from "../state"
 import type { Drag, FieldPick, FieldSelection, OverlayCtx, OverlayState } from "../state"
-import type { HitLayer } from "../types"
+import type { HitLayer, LinkGroup } from "../types"
 
 // --- marquee: drag a box over a plot to pick the marks inside (#335) ---
 // It edits the picks of every `select = :many` field on that axis, the way a click does, and
@@ -28,10 +29,22 @@ export function marqueeTargets(ctx: OverlayCtx, axis: string): HitLayer[] {
     const vp = tfs[axis].viewport
     const same = (id: string | undefined) => id !== undefined && tfs[id] !== undefined && !tfs[id].valueaxis &&
         tfs[id].viewport.every((v, k) => v === vp[k])
+    // A linked plot is edited through its group, which holds many when the plot can't.
+    const many = (l: HitLayer) => l.group !== undefined ? groupOf(ctx.manifest_, l)?.many === true : l.many === true
     return ctx.manifest_.layers.filter((l) =>
-        same(l.axis) && l.many === true && !l.brush && l.events.includes("click") &&
-        (!fields || fields.includes(l.id)),
+        same(l.axis) && many(l) && !l.brush && l.events.includes("click") &&
+        (!fields || fields.includes(l.group ?? l.id)),
     )
+}
+
+// The groups among a marquee's targets, each once.
+function targetGroups(ctx: OverlayCtx, targets: HitLayer[]): LinkGroup[] {
+    const out: LinkGroup[] = []
+    for (const t of targets) {
+        const g = groupOf(ctx.manifest_, t)
+        if (g && !out.includes(g)) out.push(g)
+    }
+    return out
 }
 
 export function begin(
@@ -39,7 +52,10 @@ export function begin(
     x: number, y: number, client: { x: number; y: number }, pointerId: number,
 ): Drag {
     const before = new Map<string, FieldSelection | undefined>()
-    for (const t of targets) before.set(t.id, state.sel_.get(t.id))
+    for (const t of targets) {
+        const id = t.group ?? t.id
+        before.set(id, state.sel_.get(id) ?? (t.group !== undefined ? { hits_: [], source_: null, rows_: [] } : undefined))
+    }
     return {
         kind: "marquee", axis_: axis, targets_: targets, mode_: mode, x0_: x, y0_: y, cx0_: client.x, cy0_: client.y,
         box_: { x, y, w: 0, h: 0 }, rect_: null, before_: before, pointerId_: pointerId,
@@ -62,6 +78,20 @@ function nextPicks(ctx: OverlayCtx, d: Marquee, t: HitLayer): FieldPick[] {
 
 function setPicks(ctx: OverlayCtx, state: OverlayState, t: HitLayer, items: FieldPick[]): void {
     state.sel_.set(t.id, { hits_: manyHits(ctx.manifest_, items), source_: null, items_: items })
+}
+
+// What group `g` holds with the box where it is now: its rows at the press, with the rows of
+// every mark of its plots in the box added, or taken out.
+function nextRows(d: Marquee, g: LinkGroup): number[] {
+    const inside: number[] = []
+    for (const t of d.targets_) {
+        if (t.group !== g.id) continue
+        for (const r of rowsOfMarks(g, t, indicesInBox(t, d.box_))) if (!inside.includes(r)) inside.push(r)
+    }
+    const held = d.before_.get(g.id)?.rows_ ?? []
+    const ins = new Set(inside)
+    if (d.mode_ === "subtract") return held.filter((r) => !ins.has(r))
+    return [...held, ...inside.filter((r) => !held.includes(r))]
 }
 
 // A press that hasn't moved MARQUEE_MIN_CSS yet is still a click.
@@ -90,7 +120,13 @@ export function move(
     d.rect_.setAttribute("x", String(d.box_.x)); d.rect_.setAttribute("y", String(d.box_.y))
     d.rect_.setAttribute("width", String(d.box_.w)); d.rect_.setAttribute("height", String(d.box_.h))
     let n = 0
+    for (const g of targetGroups(ctx, d.targets_)) {
+        const rows = nextRows(d, g)
+        state.sel_.set(g.id, groupSelection(ctx.manifest_, g, rows))
+        n += rows.length
+    }
     for (const tl of d.targets_) {
+        if (tl.group !== undefined) continue
         if (tl.kind === "grid") {
             // A grid's cells are a mask: recomputed from the press-time mask on every move.
             applyGridMarquee(ctx, state, tl, d.box_, d.mode_, d.before_.get(tl.id))
@@ -110,7 +146,14 @@ export function move(
 export function end(ctx: OverlayCtx, state: OverlayState, d: Marquee): Record<string, unknown> {
     remove(d)
     const out: Record<string, unknown> = {}
+    for (const g of targetGroups(ctx, d.targets_)) {
+        const rows = nextRows(d, g)
+        state.sel_.set(g.id, groupSelection(ctx.manifest_, g, rows))
+        const was = d.before_.get(g.id)?.rows_ ?? []
+        if (was.length !== rows.length || was.some((r, k) => r !== rows[k])) out[g.id] = groupEnvelope(g, rows)
+    }
     for (const t of d.targets_) {
+        if (t.group !== undefined) continue
         if (t.kind === "grid") {
             const env = applyGridMarquee(ctx, state, t, d.box_, d.mode_, d.before_.get(t.id))
             if (!sameMask(d.before_.get(t.id), state.sel_.get(t.id))) out[t.id] = env

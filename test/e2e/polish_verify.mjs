@@ -605,6 +605,80 @@ try {
     passed.push(`${key}/pan`);
   }
 
+  // Linked selections (#346): a pick in the left panel is drawn picked in both panels, and the
+  // rest of each panel fades. Hovering an unpicked mark in the right panel outlines its partner
+  // on the left with the same hover recipe as the hovered mark (dodge fill half, chrome edge)
+  // and lifts the partner's fade with the hovered mark's, so on screen the two read alike.
+  {
+    const key = "linked_pos";
+    const layers = await layersOf(key);
+    const u = layers.find((l) => l.id === "u").geometry, p = layers.find((l) => l.id === "p").geometry;
+    const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const sendAt = (x, y, type) => page.evaluate(([k, ix, iy, typ]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const o = { bubbles: true, composed: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, pointerId: 1, pointerType: "mouse", isPrimary: true };
+      const surface = sr.querySelector(".surface");
+      surface.dispatchEvent(new PointerEvent("pointermove", o));
+      if (typ === "click") {
+        surface.dispatchEvent(new PointerEvent("pointerdown", o));
+        surface.dispatchEvent(new PointerEvent("pointerup", o));
+        surface.dispatchEvent(new MouseEvent("click", o));
+      }
+    }, [key, x, y, type]);
+    const partners = () => page.evaluate((k) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const style = (svg, sel) => {
+        const el = [...sr.querySelectorAll(`svg.${svg} ${sel} circle`)].find((e) => !e.classList.contains("masque-leave"));
+        if (!el) return null;
+        const cs = getComputedStyle(el);
+        return { fill: cs.fill, stroke: cs.stroke, width: parseFloat(cs.strokeWidth), blend: getComputedStyle(sr.querySelector(`svg.${svg}`)).mixBlendMode, cx: Number(el.getAttribute("cx")) };
+      };
+      return { fill: style("masque-fill", "g.link"), edge: style("masque-edge", "g.link"), hiFill: style("masque-fill", "g.hi"), hiEdge: style("masque-edge", "g.hi") };
+    }, key);
+    const dist = (a, b) => Math.abs(lum(a) - lum(b));
+
+    await sendAt(u[0], u[1], "click");
+    await new Promise((r) => setTimeout(r, 300));
+    const m = await inspect(key);
+    if (JSON.stringify(m.kept.slice().sort()) !== JSON.stringify(["labels:0", "p:0", "u:0"])) throw new Error(`${key}: drawn picked ${JSON.stringify(m.kept)}, want row 0 in both panels`);
+    let shot = await screenOf(key);
+    const at = (g, k) => shot.mean(g[3 * k], g[3 * k + 1], 0.4 * g[3 * k + 2]);
+    const own = lum([128, 128, 128]);
+    for (const [name, g] of [["left", u], ["right", p]]) {
+      const pk = lum(at(g, 0)), un = lum(at(g, 1));
+      if (Math.abs(pk - own) > 20) throw new Error(`${key}/${name}: the pick reads ${pk.toFixed(0)}, want its gray ${own.toFixed(0)}`);
+      if (Math.abs(un - 255) > 0.5 * Math.abs(own - 255)) throw new Error(`${key}/${name}: an unpicked mark reads ${un.toFixed(0)}, want it over halfway to white`);
+    }
+    passed.push(`${key}/fade-both-panels`);
+
+    await sendAt(p[3], p[4], "pointermove"); // p:1, row 1, unpicked
+    await new Promise((r) => setTimeout(r, 400));
+    const pr = await partners();
+    if (!pr.fill || !pr.edge || !pr.hiFill || !pr.hiEdge) throw new Error(`${key}: hover or partner missing ${JSON.stringify(pr)}`);
+    if (Math.round(pr.edge.cx) !== Math.round(u[3])) throw new Error(`${key}: the partner sits at x ${pr.edge.cx}, want u:1's ${u[3]}`);
+    for (const f of ["fill", "blend"]) if (pr.fill[f] !== pr.hiFill[f]) throw new Error(`${key}: partner fill half ${f} ${pr.fill[f]}, the hover's is ${pr.hiFill[f]}`);
+    for (const f of ["stroke", "width", "blend"]) if (pr.edge[f] !== pr.hiEdge[f]) throw new Error(`${key}: partner edge ${f} ${pr.edge[f]}, the hover's is ${pr.hiEdge[f]}`);
+    if (pr.fill.blend !== "color-dodge") throw new Error(`${key}: partner fill half blends ${pr.fill.blend}, want color-dodge`);
+    shot = await screenOf(key);
+    const hovered = at(p, 1), partner = at(u, 1);
+    if (dist(hovered, partner) > 15) throw new Error(`${key}: the partner reads ${lum(partner).toFixed(0)}, the hovered mark ${lum(hovered).toFixed(0)}`);
+    passed.push(`${key}/partner-hover-recipe`);
+
+    await sendAt(1, 1, "pointermove");
+    await new Promise((r) => setTimeout(r, 600));
+    shot = await screenOf(key);
+    if (Math.abs(lum(at(u, 1)) - 255) > 0.5 * Math.abs(own - 255)) throw new Error(`${key}: after leaving, u:1 reads ${lum(at(u, 1)).toFixed(0)}, want faded again`);
+    passed.push(`${key}/partner-leave-fades`);
+    await sendAt(u[0], u[1], "click");
+    await sendAt(1, 1, "pointermove");
+  }
+
   // Axis3 kinds (#301): the baked selection and a hover on another mark sit on the projected
   // mark. `overlap3d` hovers the front marker of a pair: the highlight must take the marker's
   // circle, not the sphere's behind it.

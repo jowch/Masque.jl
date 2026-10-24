@@ -109,8 +109,9 @@ export interface Fade {
     // A legend entry's hover preview (`key` names the entry), drawn with the selection. The
     // same key again changes nothing; null ends it.
     preview_(key: string | null, hits: Hit[] | null, scope: HitLayer[]): void
-    // Hovering or focusing a faded mark shows it at full strength while it is hovered.
-    lift_(hit: Hit | null): void
+    // Hovering or focusing a faded mark shows it at full strength while it is hovered, with
+    // the partners a linked mark's hover outlines.
+    lift_(hit: Hit | null, partners?: Hit[]): void
     // Moves and clips an axis's canvases with a live photograph.
     place_(axis: string, f: AxisFrame | null): void
     // Redraws what is shown (the display size changed, so a 1px outline is a different width).
@@ -147,7 +148,7 @@ export function createFade(host: FadeHost): Fade {
     let preKey: string | null = null
     // What is drawn now, by axis: each faded layer with the elements it keeps.
     let drawn = new Map<string, Map<HitLayer, Set<number>>>()
-    let lifted: { layer: HitLayer; index: number } | null = null
+    let lifted: { layer: HitLayer; index: number }[] = []
     let lastScale = 0
 
     const keptBy = (hits: Hit[]): Map<HitLayer, Set<number>> => {
@@ -556,8 +557,8 @@ export function createFade(host: FadeHost): Fade {
         for (const [axis, kept] of next) drawAxis(axis, kept)
         drawn = next
         const was = lifted
-        lifted = null
-        if (was) lift(was)
+        lifted = []
+        lift(was)
     }
 
     // The elements the axis keeps whose box meets `box`, punched back out after a lifted mark's
@@ -576,10 +577,11 @@ export function createFade(host: FadeHost): Fade {
         c.globalCompositeOperation = "source-over"
     }
 
-    function lift(next: { layer: HitLayer; index: number } | null): void {
-        if (lifted && next && lifted.layer === next.layer && lifted.index === next.index) return
-        if (lifted) {
-            const { layer, index } = lifted
+    // Lifts the fade off `next` (a hovered mark, and the partners of a linked one), putting back
+    // the cover of the marks lifted before.
+    function lift(next: { layer: HitLayer; index: number }[]): void {
+        if (next.length === lifted.length && next.every((m, k) => lifted[k].layer === m.layer && lifted[k].index === m.index)) return
+        for (const { layer, index } of lifted) {
             const h = homes.get(layer.axis)
             const c = h?.dim.getContext("2d")
             const box = boxOf(layer, index)
@@ -590,22 +592,24 @@ export function createFade(host: FadeHost): Fade {
                 repunch(c, layer.axis, [box[0] - PAD_DIM, box[1] - PAD_DIM, box[2] + PAD_DIM, box[3] + PAD_DIM])
             }
             if (h) delete h.wrap.dataset.lift
-            lifted = null
         }
-        if (!next) return
-        const ks = drawn.get(next.layer.axis)?.get(next.layer)
-        if (!ks || ks.has(next.index) || isGapElement(next.layer, next.index)) return
-        const h = homes.get(next.layer.axis)
-        if (!h) return
-        const c = h.dim.getContext("2d")
-        if (c) {
-            c.globalCompositeOperation = "destination-out"
-            c.fillStyle = "#000000"
-            fillShapes(c, next.layer, [next.index], PAD_DIM)
-            c.globalCompositeOperation = "source-over"
+        lifted = []
+        for (const m of next) {
+            const ks = drawn.get(m.layer.axis)?.get(m.layer)
+            if (!ks || ks.has(m.index) || isGapElement(m.layer, m.index)) continue
+            const h = homes.get(m.layer.axis)
+            if (!h) continue
+            const c = h.dim.getContext("2d")
+            if (c) {
+                c.globalCompositeOperation = "destination-out"
+                c.fillStyle = "#000000"
+                fillShapes(c, m.layer, [m.index], PAD_DIM)
+                c.globalCompositeOperation = "source-over"
+            }
+            const key = `${m.layer.id}:${m.index}`
+            h.wrap.dataset.lift = h.wrap.dataset.lift ? `${h.wrap.dataset.lift} ${key}` : key
+            lifted.push(m)
         }
-        h.wrap.dataset.lift = `${next.layer.id}:${next.index}`
-        lifted = next
     }
 
     return {
@@ -621,8 +625,9 @@ export function createFade(host: FadeHost): Fade {
             preScope = hits ? scope : []
             redraw()
         },
-        lift_(hit) {
-            lift(hit && fadeLook(hit) ? { layer: hit.layer, index: hit.index } : null)
+        lift_(hit, partners = []) {
+            const marks = hit ? [hit, ...partners] : []
+            lift(marks.filter(fadeLook).map((h) => ({ layer: h.layer, index: h.index })))
         },
         place_: place,
         refresh_() {

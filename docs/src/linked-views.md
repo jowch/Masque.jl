@@ -84,21 +84,61 @@ that `scatter!` returned as `bind`:
 ```
 
 Each panel keeps its own selection: clicking a point in the xy panel
-sets `sel.xy` and leaves `sel.xz` as it was. Hovering or clicking a
-point highlights it only on its own panel, even when another panel plots
-the same row of your data.
+sets `sel.xy` and leaves `sel.xz` as it was. When the panels plot the
+same rows of your data, link them so that a click selects the row in
+both, as the next section shows.
 
-To highlight the same row on both panels, select it on both plots from
-a value `i` set in another cell, such as a slider. The value cannot come
-from this widget's own `sel`, for the reason given in
-[Selection](@ref):
+## Select the same rows on every panel
+
+When two plots draw the same rows, such as one sample per point in an
+xy and an xz panel, pass them to [`linked`](@ref). Clicking a point in
+either panel selects that row in both, and hovering a point outlines
+the same row on the other panel:
 
 ```julia
-masque(fig; selected = (scatter = i, scatter_2 = i))
+@bind row masque(fig; bind = linked(p_xy, p_xz))
 ```
 
-To have a click in one panel select the same row in the other, put each
-panel in its own figure, as in the example at the top of this page.
+`row` is the position of the clicked point in the data you plotted, so
+`df[row, :]` is its sample, or `nothing` before the first click. To
+pick several rows, pass `select = :many`: each click adds a row or
+takes it out, dragging a box over points adds every row inside, and
+`rows` is a `Vector` in the order you picked them.
+
+```julia
+@bind rows masque(fig; bind = linked(p_xy, p_xz; select = :many))
+```
+
+When the panels plot your rows in different orders, or one panel draws
+them as one plot per group, give the rows a key. With `key = :id`, a
+row is the `id` of a point's payload, and every panel that has a point
+with that `id` marks it. Pass an axis to link every plot on it:
+
+```julia
+begin
+    fig = Figure(size = (640, 300))
+    by_group, all_samples = Axis(fig[1, 1]), Axis(fig[1, 2])
+    a = scatter!(by_group, [1, 2], [1, 2]; label = "A")
+    b = scatter!(by_group, [3, 4], [1, 2]; label = "B")
+    s = scatter!(all_samples, [4, 3, 2, 1], [1, 1, 1, 1])
+    axislegend(by_group)
+    parts = [
+        interactables(a; payloads = [(id = "s1",), (id = "s2",)]),
+        interactables(b; payloads = [(id = "s3",), (id = "s4",)]),
+        interactables(s; payloads = [(id = "s4",), (id = "s3",), (id = "s2",), (id = "s1",)]),
+    ]
+    nothing
+end
+```
+
+```julia
+@bind w masque(fig, parts..., (samples = linked(by_group, all_samples; key = :id, select = :many),))
+```
+
+`w.samples` holds the ids, such as `["s2", "s4"]`, and clicking the
+legend entry "A" picks `s1` and `s2` on both panels. To start with rows
+selected, pass them as `selected = (samples = ["s1"],)`, by key, or by
+position when the group has no key.
 
 ## Highlight a series across panels
 

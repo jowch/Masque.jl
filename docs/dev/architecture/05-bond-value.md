@@ -113,6 +113,21 @@ restores the picks held at the press. A legend click also edits each linked `man
 by the entry's own field so the two never disagree: an entry the click turns on replaces the
 picks with its marks (Cmd/Ctrl, or a legend whose own field is `many`, adds them), and one it
 turns off takes them out (`legendEdit`).
+A `linked(...)` group (#346, `src/linked.jl`, `frontend/src/linked.ts`) is one field whose
+value is rows, not marks. Fields are layer ids everywhere else, so the group is a field with
+no layer of its own: `_take_links!` pulls it out of the call before renaming, `_resolve_links`
+turns its members (plots, requests, axes) into layer ids once the call is built, and
+`build_manifest` writes `groups[]` (`{id, members, n, many?, rows?}`) and tags each member
+layer with `group`. Its members have no field of their own and keep their `click` event.
+`rows` maps a member layer to each mark's 0-based row; with no `key` a row is the mark's
+position and `rows` is left out. The keys never ship: `_group_table` rebuilds the table from
+the payloads when a value decodes, so the wire is `{row: k}` or null under `:one` and
+`{rows: [k, …]}` under `:many`, and the Julia value is the key (or 1-based position), or a
+`Vector` of them. In the browser, the group's `sel_` entry holds `rows_` and the hits of every
+mark of those rows, so the fade and the selected look need nothing new; a click
+(`commitGroupClick`), a box, a legend entry, Escape, undo, and a frame's re-keying edit the
+rows. Hovering a member mark draws its partners in `g.link` with the hover recipe and lifts
+their fade, up to `PARTNER_CAP` marks per axis.
 Pluto overwrites `initial_value` with `transform_value` of the value `mount.ts` seeds, so the
 two must agree. Subtract 1 only when writing the manifest; add 1 when reading the wire. Grid
 window keys on the wire are `i0,i1,j0,j1` (0-based inclusive); Julia stores `i1,i2,j1,j2`. An

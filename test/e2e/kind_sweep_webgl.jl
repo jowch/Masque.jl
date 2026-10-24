@@ -758,6 +758,36 @@ HTML(
         "<span id=\"coords_many_grid_regions\" style=\"display:none\">$(JSON3.write(sweep.many_grid_regions.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-000000000176
+@bind ev_linked_pos sweep.linked_pos
+
+# ╔═╡ d1000000-0000-0000-0000-000000000177
+HTML(
+    "<span id=\"out_linked_pos\">LINKED_POS=$(sweep_field("linked_pos", ev_linked_pos))</span>" *
+        "<span id=\"bond_linked_pos\" style=\"display:none\">$(repr(ev_linked_pos))</span>" *
+        "<span id=\"coords_linked_pos\" style=\"display:none\">$(JSON3.write(sweep.linked_pos.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000178
+@bind ev_linked_keys sweep.linked_keys
+
+# ╔═╡ d1000000-0000-0000-0000-000000000179
+HTML(
+    "<span id=\"out_linked_keys\">LINKED_KEYS=$(sweep_field("linked_keys", ev_linked_keys))</span>" *
+        "<span id=\"bond_linked_keys\" style=\"display:none\">$(repr(ev_linked_keys))</span>" *
+        "<span id=\"coords_linked_keys\" style=\"display:none\">$(JSON3.write(sweep.linked_keys.manifest["layers"]))</span>",
+)
+
+# ╔═╡ d1000000-0000-0000-0000-000000000180
+@bind ev_linked_one sweep.linked_one
+
+# ╔═╡ d1000000-0000-0000-0000-000000000181
+HTML(
+    "<span id=\"out_linked_one\">LINKED_ONE=$(sweep_field("linked_one", ev_linked_one))</span>" *
+        "<span id=\"bond_linked_one\" style=\"display:none\">$(repr(ev_linked_one))</span>" *
+        "<span id=\"coords_linked_one\" style=\"display:none\">$(JSON3.write(sweep.linked_one.manifest["layers"]))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000050
 @bind ev_slice_lines sweep.slice_lines
 
@@ -955,6 +985,12 @@ HTML(
 # ╠═d1000000-0000-0000-0000-000000000143
 # ╠═d1000000-0000-0000-0000-000000000144
 # ╠═d1000000-0000-0000-0000-000000000145
+# ╠═d1000000-0000-0000-0000-000000000176
+# ╠═d1000000-0000-0000-0000-000000000177
+# ╠═d1000000-0000-0000-0000-000000000178
+# ╠═d1000000-0000-0000-0000-000000000179
+# ╠═d1000000-0000-0000-0000-000000000180
+# ╠═d1000000-0000-0000-0000-000000000181
 # ╠═d1000000-0000-0000-0000-000000000050
 # ╠═d1000000-0000-0000-0000-000000000051
 # ╠═d1000000-0000-0000-0000-000000000052

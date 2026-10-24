@@ -3,7 +3,8 @@ module MasqueDataFramesExt
 using Masque
 using DataFrames
 
-function Masque.expand_payloads(df::DataFrame, n, who)
+# A `SubDataFrame` too: `groupby(df, :cluster)` hands one per group, for one plot each.
+function Masque.expand_payloads(df::AbstractDataFrame, n, who)
     nrow(df) == n || throw(ArgumentError("$who: payloads has $(nrow(df)) rows, expected $n"))
     return collect(Any, eachrow(df))
 end

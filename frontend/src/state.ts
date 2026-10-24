@@ -325,7 +325,8 @@ export function createOverlayState(): OverlayState {
 export type FieldPick = { layer: string; index: number; sample?: number; payload?: unknown }
 // `items_` is set on a `many` field: every pick it holds, in the order they were made. A `many`
 // grid holds `mask_` instead (gridmask.ts), and `hits_` is its one outline hit.
-export type FieldSelection = { hits_: Hit[]; source_: { layer: string; index: number; sample?: number } | null; items_?: FieldPick[]; mask_?: GridMask }
+// `rows_` is set on a `linked(...)` group's field (linked.ts): the rows it holds, in pick order.
+export type FieldSelection = { hits_: Hit[]; source_: { layer: string; index: number; sample?: number } | null; items_?: FieldPick[]; mask_?: GridMask; rows_?: number[] }
 
 // Every field's selected hits, in one list: what g.sel draws. A mark two fields both hold (a
 // legend pick's series and a box's brush) is drawn once, or its wash would stack.
