@@ -1,6 +1,8 @@
 # String pipeline for the cell-series player. No Pluto — Core tests include this
 # file; harvest (`export_embeds.jl`) includes it too.
 
+using Base64
+using SHA
 using TOML
 
 include("player_segments.jl")
@@ -80,13 +82,12 @@ end
 function state_key(keying::AbstractDict, v::AbstractDict)
     init = keying["initial"]
     parts = String[]
+    key(f, x) = x === nothing ? "null@" * f : f in keying["controls"] ? f * "=" * json_write(x["payload"]) : snapshot_key(x)
     for f in keying["keyed"]
         cur = jsonable(get(v, f, nothing))
-        cur == get(init, f, nothing) && continue
-        push!(
-            parts, cur === nothing ? "null@" * f :
-                f in keying["controls"] ? f * "=" * json_write(cur["payload"]) : snapshot_key(cur)
-        )
+        start = get(init, f, nothing)
+        (cur == start || key(f, cur) == key(f, start)) && continue
+        push!(parts, key(f, cur))
     end
     return isempty(parts) ? "null" : join(parts, "+")
 end
@@ -171,12 +172,15 @@ function stable(x) {
   if (Array.isArray(x)) return "[" + x.map(stable).join(",") + "]";
   return "{" + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(x[k]); }).join(",") + "}";
 }
+// A field keys the same as its starting value when it shows the same thing: a box released
+// where it started keeps its cells though its edges differ in the last float digit.
 function changed(table, v) {
   const out = [];
   const init = table.initial || {};
   (table.keyed || []).forEach(function (f) {
     const cur = v[f] === undefined ? null : v[f];
-    if (stable(cur) !== stable(init[f])) out.push([f, cur]);
+    const start = init[f] === undefined ? null : init[f];
+    if (stable(cur) !== stable(start) && fieldKey(table, f, cur) !== fieldKey(table, f, start)) out.push([f, cur]);
   });
   return out;
 }
@@ -791,4 +795,53 @@ function inject_manifest_snapshots(html::AbstractString, snapshots)
     # script element that sequence ends the tag, so escape every `<`.
     payload = replace(json_write(obj), "<" => "\\u003c")
     return html[1:(j0 - 1)] * payload * html[(j1 + 1):end]
+end
+
+# Files every Pluto-export player loads instead of carrying its own copy: the overlay script,
+# each picture, and each recorded state's cells. Named by content, so a file two states or two
+# players share is written and downloaded once, and the browser caches it across pages.
+const SHARED_DIR = "shared"
+
+function write_shared(dir::AbstractString, bytes::AbstractVector{UInt8}, ext::AbstractString)
+    name = bytes2hex(sha1(bytes))[1:20] * ext
+    path = joinpath(dir, SHARED_DIR, name)
+    isfile(path) || (mkpath(dirname(path)); write(path, bytes))
+    return SHARED_DIR * "/" * name
+end
+
+const DATA_IMAGE_RE = r"data:image/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)"
+
+# A cell's HTML without the overlay script (the page loads it once) and with each inlined
+# picture written to `shared/` and named by its path there, relative to the player's page.
+function externalize_html(html::AbstractString, dir::AbstractString; overlay::AbstractString)
+    html = replace(html, overlay => "")
+    return replace(
+        html, DATA_IMAGE_RE => function (m)
+            mm = match(DATA_IMAGE_RE, m)
+            ext = mm.captures[1] == "jpeg" ? ".jpg" : "." * mm.captures[1]
+            return write_shared(dir, base64decode(mm.captures[2]), ext)
+        end
+    )
+end
+
+# One recorded state's cells (`snapshot_table`'s `snaps` entry), pictures and overlay script
+# moved out as in `externalize_html`.
+function externalize_snap(snap::AbstractDict, dir::AbstractString; overlay::AbstractString)
+    cells = Dict{String, Any}()
+    for (id, payload) in snap["cells"]
+        body = payload["body"]
+        cells[id] = payload["mime"] == "text/html" && body isa AbstractString ?
+            merge(payload, Dict{String, Any}("body" => externalize_html(body, dir; overlay))) : payload
+    end
+    return merge(snap, Dict{String, Any}("cells" => cells))
+end
+
+# The table a page ships: each state's cells become a file under `shared/`, fetched when the
+# reader reaches that state, and `snaps` lists those files.
+function externalize_table(table::AbstractDict, dir::AbstractString; overlay::AbstractString)
+    snaps = String[
+        write_shared(dir, Vector{UInt8}(json_write(jsonable(externalize_snap(s, dir; overlay)))), ".json")
+            for s in table["snaps"]
+    ]
+    return merge(table, Dict{String, Any}("snaps" => snaps))
 end

@@ -327,14 +327,38 @@ const PLUTO_EXPORT_SIM_JS = raw"""
     stamp = Math.max(Date.now(), stamp + 1);
     return stamp;
   }
+  // Each state's cells are a file the page fetches the first time the reader reaches it.
+  const loaded = new Map();
+  function load(file) {
+    if (!loaded.has(file)) {
+      loaded.set(file, fetch(file).then(function (r) {
+        if (!r.ok) throw new Error(file + ": " + r.status);
+        return r.json();
+      }).catch(function (e) {
+        loaded.delete(file);
+        throw e;
+      }));
+    }
+    return loaded.get(file);
+  }
+  let latest = 0;
   function patch(v) {
     if (!window.editor_state_set) return;
-    const snap = lookup(TABLE, v);
-    showMiss(!snap);
-    if (!snap) {
+    const file = lookup(TABLE, v);
+    showMiss(!file);
+    if (!file) {
       console.warn("masque player: no snapshot for", keyOf(TABLE, v));
       return;
     }
+    const n = ++latest;
+    load(file).then(function (snap) {
+      // A newer value got here first: its cells stay.
+      if (n === latest) apply(snap);
+    }, function (e) {
+      console.warn("masque player: snapshot", e);
+    });
+  }
+  function apply(snap) {
     const t = nextStamp();
     window.editor_state_set(function (state) {
       const nb = state.notebook;
@@ -414,7 +438,7 @@ end
 
 function postprocess_pluto_export(
         html::AbstractString; snapshots, widget_id::AbstractString, show_chip::Bool,
-        segments::AbstractDict = Dict{String, Vector{String}}(), download = nothing,
+        segments::AbstractDict = Dict{String, Vector{String}}(), download = nothing, overlay_src = nothing,
     )
     html = replace_js_assignment(html, "pluto_notebookfile", "undefined")
     html = replace_js_assignment(html, "pluto_binder_url", "undefined")
@@ -431,6 +455,7 @@ function postprocess_pluto_export(
         replace(PLUTO_EXPORT_SEGMENT_JS, "@@SEGMENTS@@" => json_write(segments), "@@WIDGET@@" => widget_id)
     head = """
     <!-- masque-pluto-export -->
+    $(overlay_src === nothing ? "" : "<script src=\"$(html_escape(overlay_src))\"></script>")
     $PLUTO_EXPORT_THEME_BOOT
     $segment_js
     $replay
@@ -477,6 +502,13 @@ end
 # The widget's own `onchange` callback, the one the live notebook's channel calls, run in the
 # notebook's workspace with `state` as the browser would send it. The picture is always the
 # settled one: a player shows no in-drag frames at lower resolution.
+# A cell output with another body, the rest as it was.
+function with_body(o::Pluto.CellOutput, body)
+    names = fieldnames(Pluto.CellOutput)
+    fields = NamedTuple{names}(Tuple(getfield(o, n) for n in names))
+    return Pluto.CellOutput(; merge(fields, (; body))...)
+end
+
 function harvest_frame(session, nb, widget, state)
     id = widget.cell_id
     r = Pluto.WorkspaceManager.eval_fetch_in_workspace(
@@ -565,6 +597,19 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
     for id in player["cells"]
         push!(nb.cell_order, UUID(id))
     end
+    # Every player loads the overlay script, its pictures and its states' cells from `shared/`
+    # beside the players (`externalize_html`), so the page carries none of them inline.
+    embeds = dirname(outpath)
+    overlay = read(joinpath(@__DIR__, "..", "assets", "overlay.js"), String)
+    widget.output.body isa String && occursin(overlay, widget.output.body) ||
+        error("$(basename(path)): the widget's cell doesn't carry this checkout's overlay script")
+    for c in values(nb.cells_dict)
+        o = c.output
+        string(o.mime) == "text/html" && o.body isa String || continue
+        c.output = with_body(o, externalize_html(o.body, embeds; overlay))
+    end
+    snapshots = externalize_table(snapshots, embeds; overlay)
+    overlay_src = write_shared(embeds, Vector{UInt8}(overlay), ".js")
     raw = Pluto.generate_html(nb; disable_ui = true)
     name = splitext(basename(outpath))[1]
     # Beside the players, not among them: `find_embed_notebooks` would harvest it.
@@ -576,6 +621,7 @@ function emit_pluto_notebook(session, nb, path, outpath, player, cells, bond::Sy
         show_chip = get(player, "chip", true) !== false,
         segments,
         download,
+        overlay_src,
     )
     mkpath(dirname(outpath))
     write(outpath, html)

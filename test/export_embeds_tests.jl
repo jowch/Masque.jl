@@ -297,6 +297,24 @@ end
     end
 end
 
+@testset "a box released where it started is the starting state" begin
+    item(ymin) = Dict{String, Any}("layer" => "img", "index" => 0, "payload" => Dict{String, Any}("i0" => 2, "i1" => 4, "j0" => 1, "j1" => 3, "ymin" => ymin))
+    start = Dict{String, Any}("items" => Any[item(1.0)])
+    keying = Dict{String, Any}("initial" => Dict{String, Any}("img" => start), "keyed" => ["img"], "controls" => String[])
+    # Its edges come back a float digit off, its cells the same.
+    @test state_key(keying, Dict("img" => Dict{String, Any}("items" => Any[item(0.9999998)]))) == "null"
+    node = Sys.which("node")
+    if node === nothing
+        @test_skip "node not installed"
+    else
+        js = PLAYER_LOOKUP_JS * """
+            const t = Object.assign($(json_write(keying)), {keys: {"null": 0}, snaps: ["idle"]});
+            process.stdout.write(String(lookup(t, {img: $(json_write(Dict("items" => Any[item(0.9999998)])))})));
+            """
+        @test read(`$node -e $js`, String) == "idle"
+    end
+end
+
 @testset "home quickstart is the 3-point Pluto export" begin
     path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_quickstart.jl")
     player = parse_player_toml(path)
@@ -653,4 +671,33 @@ end
     @test occursin("@bind w2 masque(\n    fig, (freq = freq, dots = dots);", out)
     @test occursin("# ╠═a1b2c3d4-0002-4000-8000-000000000004\n", out)
     @test download_notebook(out) == out
+end
+
+@testset "players load the overlay script, pictures and states from shared files" begin
+    dir = mktempdir()
+    overlay = "(()=>{window.Masque={mount(){}}})();"
+    png = UInt8[0x89, 0x50, 0x4e, 0x47, 0x01, 0x02]
+    pic = "data:image/png;base64," * base64encode(png)
+    html = """<div class="ip-host"><img src="$pic"><script>$overlay
+    window.Masque.mount(currentScript)</script></div>"""
+    out = externalize_html(html, dir; overlay)
+    @test !occursin(overlay, out)
+    @test !occursin("data:image", out)
+    m = match(r"src=\"(shared/[0-9a-f]{20}\.png)\"", out)
+    @test m !== nothing
+    @test read(joinpath(dir, m.captures[1])) == png
+    # The same picture in another state or player is the same file.
+    @test externalize_html(html, dir; overlay) == out
+    @test length(readdir(joinpath(dir, "shared"))) == 1
+
+    idle = Dict{String, Any}("cells" => Dict{String, Any}("c" => Dict{String, Any}("mime" => "text/html", "body" => html)))
+    tree = Dict{String, Any}("mime" => "application/vnd.pluto.tree+object", "body" => Dict{String, Any}("type" => "Tuple"))
+    other = Dict{String, Any}("cells" => Dict{String, Any}("c" => tree))
+    table = Dict{String, Any}("snaps" => Any[idle, other], "keys" => Dict("null" => 0, "pts:0" => 1), "keyed" => ["pts"])
+    shipped = externalize_table(table, dir; overlay)
+    @test shipped["keys"] == table["keys"] && shipped["keyed"] == table["keyed"]
+    @test all(f -> occursin(r"^shared/[0-9a-f]{20}\.json$", f), shipped["snaps"])
+    state(i) = _JSON.parse(read(joinpath(dir, shipped["snaps"][i]), String))["cells"]["c"]["body"]
+    @test state(1) == out
+    @test state(2)["type"] == "Tuple"
 end
