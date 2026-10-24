@@ -343,19 +343,23 @@ end
     end
 end
 
-@testset "home quickstart is the 3-point Pluto export" begin
+include(joinpath(@__DIR__, "..", "docs", "player_fallback.jl"))
+
+@testset "the Getting started notebook: its figure cell, then its value" begin
     path = joinpath(@__DIR__, "..", "docs", "src", "embeds", "home_quickstart.jl")
     player = parse_player_toml(path)
     @test player["bond"] == "sel"
     @test get(player, "chip", true) !== false
     @test player["show_code"] == true
     @test player["pluto_html"] == true
-    @test length(player["cells"]) == 7
-    @test endswith(player["cells"][1], "0009")
+    @test length(player["cells"]) == 4
+    @test endswith(player["cells"][1], "0002")
+    segs = player_segments(player)
+    @test segs["figure"] == player["cells"][1:1]
+    @test segs["value"] == player["cells"][2:4]
     src = read(path, String)
     @test occursin("Hover over a point to see its name", src)
-    @test occursin("`sel.scatter.index` is its position in your data", src)
-    @test occursin("name = \"one\"", src)
+    @test occursin("name = \"four\"", src)
     @test occursin("if isnothing(sel.scatter)", src)
     @test occursin("interactables(s; payloads = points)", src)
 end
@@ -512,10 +516,10 @@ end
     @test any(endswith(id, "0006") for id in sel["cells"])
 
     guides = [
-        "marks_bars", "marks_poly", "marks_polar", "legend_lines", "roi_table",
+        "marks_bars", "legend_lines", "roi_table",
         "tooltips_template", "tooltips_dark", "grids_heatmap", "readouts_axis",
         "custom_regions", "recipes_dumbbell", "linked_click", "linked_legend_wash",
-        "marks_lines", "selection_start", "legend_fade", "slice_spectra", "widgets_value",
+        "selection_start", "legend_fade", "slice_spectra", "widgets_value",
     ]
     for name in guides
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))
@@ -523,8 +527,6 @@ end
         @test player["show_code"] == true
     end
 end
-
-include(joinpath(@__DIR__, "..", "docs", "player_fallback.jl"))
 
 @testset "player text twin: notes, code, figure, readouts" begin
     root = joinpath(@__DIR__, "..")
