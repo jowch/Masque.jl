@@ -11,9 +11,9 @@ the deployed site once `main` shows what you want:
 node gallery_thumbs.mjs https://jowch.github.io/Masque.jl/dev ../../docs/src/assets/gallery
 ```
 
-"Compare a cluster", "Threshold a mask" and "Annotate a segmentation" have no player, since
-they need Julia running, so each picture is the last frame of its clip
-(`docs/dev/clips/README.md`), cropped to the figures:
+The clip examples have no player, since they need Julia running or keep several picks, so
+each picture is the last frame of its clip (`docs/dev/clips/README.md`), cropped to the
+figures:
 
 ```sh
 ffmpeg -sseof -0.3 -i docs/src/assets/example-cluster.mp4 -frames:v 1 /tmp/cluster.png
@@ -22,4 +22,6 @@ ffmpeg -sseof -0.3 -i docs/src/assets/example-threshold.mp4 -frames:v 1 /tmp/thr
 python3 -c "from PIL import Image; Image.open('/tmp/threshold.png').convert('RGB').crop((60, 50, 1390, 575)).save('docs/src/assets/gallery/threshold.png', optimize=True)"
 ffmpeg -sseof -0.3 -i docs/src/assets/example-segmentation.mp4 -frames:v 1 /tmp/segmentation.png
 python3 -c "from PIL import Image; Image.open('/tmp/segmentation.png').convert('RGB').crop((70, 50, 1140, 760)).save('docs/src/assets/gallery/segmentation.png', optimize=True)"
+ffmpeg -sseof -0.3 -i docs/src/assets/example-linked.mp4 -frames:v 1 /tmp/linked.png
+python3 -c "from PIL import Image; Image.open('/tmp/linked.png').convert('RGB').crop((60, 40, 1400, 620)).save('docs/src/assets/gallery/linked.png', optimize=True)"
 ```

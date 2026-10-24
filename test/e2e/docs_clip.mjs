@@ -197,6 +197,41 @@ const CLIPS = {
       await c.settle(1800);
     },
   },
+  "linked": {
+    notebook: "linked_notebook.jl", nn: 15,
+    async run(c) {
+      // Hover a car (its partner lights up on the right), box the heavy cars, add Japan's from
+      // the legend, then undo that.
+      await c.glide(c.circle("scatter", 4), 900);
+      await sleep(1200);
+      const from = c.data("scatter", 3580, 17.5);
+      const to = c.data("scatter", 4420, 9.2);
+      await c.glide(from, 900);
+      await c.page.mouse.down();
+      await c.glide(to, 1700, 40);
+      await c.page.mouse.up();
+      await c.settle(1600);
+      // The legend's entries, as rects (x, y, w, h); Japan is the lowest.
+      const g = c.mf.layers.find((l) => l.id === "legend").geometry;
+      const rects = [0, 1, 2].map((k) => g.slice(4 * k, 4 * k + 4)).sort((p, q) => p[1] - q[1]);
+      const [x, y, w, h] = rects[2];
+      const japan = c.px(x + w / 2, y + h / 2);
+      await c.glide(japan, 1000);
+      await sleep(500);
+      // Ctrl-click adds the entry's cars; a plain click would replace the box's.
+      await c.keycap("Ctrl click");
+      await c.page.keyboard.down("Control");
+      await c.click(japan);
+      await c.page.keyboard.up("Control");
+      await c.settle(1600);
+      await c.keycap(null);
+      await c.keycap("Ctrl Z");
+      await c.page.keyboard.press("Control+z");
+      await c.settle(1500);
+      await c.keycap(null);
+      await sleep(800);
+    },
+  },
   "classes": {
     notebook: "classes_notebook.jl", nn: 9,
     async run(c) {
