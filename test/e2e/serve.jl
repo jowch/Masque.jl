@@ -31,10 +31,18 @@ using Pluto
 end
 
 port = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 1234
+# MASQUE_PLUTO_IN_PROCESS=1 runs notebooks inside this server process instead of a worker
+# process. CI's kind sweep sets it: the three drivers each reopen the notebook, and a worker
+# reloads the whole Makie stack every time (2.5–5 min on WebGL). The cost is fidelity: users
+# run notebooks in a worker, so a bug that only shows across the process boundary (worker
+# startup, serialization of published values) would pass here. The bind E2E and fixture jobs
+# still run notebooks in a worker.
+in_process = get(ENV, "MASQUE_PLUTO_IN_PROCESS", "") == "1"
 Pluto.run(;
     port,
     launch_browser = false,
     require_secret_for_open_links = false,
     require_secret_for_access = false,
     disable_writing_notebook_files = true,   # never mutate the committed notebook on open
+    workspace_use_distributed = !in_process,
 )

@@ -115,7 +115,7 @@ jobs:
           - version: '1.10'
             coverage: ''
           - version: '1'
-            coverage: --code-coverage=@${{ github.workspace }}
+            coverage: --code-coverage=@
     env:
       COVERAGE: ${{ matrix.coverage }}
     steps:
@@ -124,8 +124,8 @@ jobs:
         with:
           julia-version: ${{ matrix.version == '1.10' && needs.setup-lts.outputs.julia-version || needs.setup.outputs.julia-version }}
           key: ${{ matrix.version == '1.10' && needs.setup-lts.outputs.key || needs.setup.outputs.key }}
-      # On Julia 1, coverage tracks this checkout only (`@path`), so the restored dependency
-      # images still load; nothing is recompiled for it.
+      # On Julia 1, coverage tracks the working directory only (a bare `@`, which is this
+      # checkout), so the restored dependency images still load; nothing is recompiled for it.
       - name: Core tests
         env:
           GROUP: Core
@@ -276,6 +276,8 @@ jobs:
           # Carried over from the local playbook (docs/dev/live-interaction-checklist.md) for
           # parity; GitHub-hosted runners have no sysimage wrapper, so this is a no-op here.
           JULIA_NOSYSIMAGE: ${{ matrix.backend == 'webgl' && '1' || '' }}
+          # Notebooks run in the Pluto server process, not a worker; see test/e2e/serve.jl.
+          MASQUE_PLUTO_IN_PROCESS: '1'
         run: |
           NOTEBOOK="$GITHUB_WORKSPACE/test/e2e/kind_sweep_${{ matrix.backend }}.jl"
           ARTIFACTS="$RUNNER_TEMP/kind-sweep-artifacts"
