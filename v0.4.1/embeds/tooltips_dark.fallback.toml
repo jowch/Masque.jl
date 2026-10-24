@@ -1,0 +1,4 @@
+image = "tooltips_dark.png"
+
+[outputs]
+a1b2c3d4-0012-4000-8000-000000000004 = "hover a point, or click one"
