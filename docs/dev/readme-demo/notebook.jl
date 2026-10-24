@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.28
+# v1.0.3
 
 using Markdown
 using InteractiveUtils
@@ -16,7 +16,7 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ d1000000-0000-0000-0000-000000000001
+# ╔═╡ c1d50012-0001-4000-8000-000000000001
 begin
     import Pkg
     dev = get(ENV, "MASQUE_DEV_ENV", "")
@@ -24,8 +24,8 @@ begin
         Pkg.activate(dev)
     else
         Pkg.activate(; temp = true)
-        Pkg.develop(path = joinpath(@__DIR__, "..", "..", ".."))
         Pkg.add(["CairoMakie", "JSON3"])
+        Pkg.develop(path = joinpath(@__DIR__, "..", "..", ".."))
         Pkg.instantiate()
     end
     using Masque
@@ -33,51 +33,68 @@ begin
     import JSON3
 end
 
-# ╔═╡ d1000000-0000-0000-0000-000000000002
+# ╔═╡ c1d50012-0001-4000-8000-000000000002
 begin
-    cities_data = [
-        (city = "Tokyo", pop_m = 37.4, pop = 37_400_000, gdp = 1600),
-        (city = "Delhi", pop_m = 32.9, pop = 32_900_000, gdp = 370),
-        (city = "Shanghai", pop_m = 28.5, pop = 28_500_000, gdp = 780),
-        (city = "São Paulo", pop_m = 22.4, pop = 22_400_000, gdp = 430),
-        (city = "Mexico City", pop_m = 22.1, pop = 22_100_000, gdp = 411),
-        (city = "Cairo", pop_m = 21.3, pop = 21_300_000, gdp = 165),
-        (city = "Mumbai", pop_m = 20.7, pop = 20_700_000, gdp = 310),
-        (city = "Beijing", pop_m = 21.5, pop = 21_500_000, gdp = 700),
+    data = [
+        ("Tokyo", 139.7, 35.7, 37.4, "Asia"), ("Delhi", 77.2, 28.6, 32.9, "Asia"),
+        ("Shanghai", 121.5, 31.2, 29.2, "Asia"), ("Mumbai", 72.9, 19.1, 21.3, "Asia"),
+        ("Beijing", 116.4, 39.9, 21.8, "Asia"), ("Jakarta", 106.8, -6.2, 11.2, "Asia"),
+        ("Manila", 121.0, 14.6, 14.7, "Asia"), ("Sydney", 151.2, -33.9, 5.3, "Oceania"),
+        ("Cairo", 31.2, 30.0, 22.2, "Africa"), ("Lagos", 3.4, 6.5, 15.9, "Africa"),
+        ("Kinshasa", 15.3, -4.3, 16.3, "Africa"), ("Johannesburg", 28.0, -26.2, 6.2, "Africa"),
+        ("London", -0.1, 51.5, 9.6, "Europe"), ("Paris", 2.4, 48.9, 11.1, "Europe"),
+        ("Madrid", -3.7, 40.4, 6.8, "Europe"), ("Berlin", 13.4, 52.5, 3.6, "Europe"),
+        ("Rome", 12.5, 41.9, 4.3, "Europe"), ("Moscow", 37.6, 55.8, 12.7, "Europe"),
+        ("Istanbul", 29.0, 41.0, 15.8, "Europe"), ("New York", -74.0, 40.7, 18.9, "Americas"),
+        ("Los Angeles", -118.2, 34.1, 12.5, "Americas"), ("Mexico City", -99.1, 19.4, 22.3, "Americas"),
+        ("Lima", -77.0, -12.0, 11.0, "Americas"), ("São Paulo", -46.6, -23.5, 22.6, "Americas"),
+        ("Buenos Aires", -58.4, -34.6, 15.5, "Americas"),
     ]
-    city_colors = [
-        "#e6194b", "#3cb44b", "#4363d8", "#f58231",
-        "#911eb4", "#0e9aa7", "#f032e6", "#9a8b00",
-    ]
-    xs = Float64[c.pop_m for c in cities_data]
-    ys = Float64[c.gdp for c in cities_data]
+    rows = [(; city, pop) for (city, _, _, pop, _) in data]
+    regions = ["Asia", "Oceania", "Africa", "Europe", "Americas"]
+    colors = [Makie.wong_colors()[findfirst(==(r), regions)] for (_, _, _, _, r) in data]
 
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; xlabel = "Population (millions)", ylabel = "GDP (US\$bn)")
-    markersize = 18
-    s = scatter!(ax, xs, ys; color = city_colors, markersize)
-    # Passing the scatter gives each tooltip a border in that city's color.
-    cities = PointInteractable(
-        ax, s;
-        id = :cities,
-        payloads = [(; city = c.city, pop = c.pop) for c in cities_data],
-        tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
+    fig = Figure(size = (600, 330))
+    ax = Axis(fig[1, 1]; xlabel = "Longitude", ylabel = "Latitude")
+    s = scatter!(
+        ax, [d[2] for d in data], [d[3] for d in data];
+        color = colors, markersize = [8 + 2.2sqrt(d[4]) for d in data],
+    )
+    limits!(ax, -135, 165, -45, 65)
+    cities = interactables(
+        s; id = :cities, payloads = rows, select = :many,
+        tooltip = masque"<b>$(city)</b><br>$(pop) million people",
     )
     nothing
 end
 
-# ╔═╡ d1000000-0000-0000-0000-000000000003
-@bind pick masque(fig, cities)
+# ╔═╡ c1d50012-0001-4000-8000-000000000003
+@bind sel masque(fig, cities)
 
-# ╔═╡ d1000000-0000-0000-0000-000000000004
-isnothing(pick) ? md"*Hover over a city, then click one.*" : md"**$(pick.city)** selected, index $(pick.index)"
+# ╔═╡ c1d50012-0001-4000-8000-000000000004
+if isempty(sel.cities)
+    md"*Hover over a city, click a few, or drag a box.*"
+else
+    n = length(sel.cities)
+    names = [c.city for c in sel.cities]
+    picked = n <= 3 ? join(names, ", ") : join(names[1:3], ", ") * " and $(n - 3) more"
+    total = round(sum(c.pop for c in sel.cities); digits = 1)
+    count = n == 1 ? "1 city" : "$(n) cities"
+    md"**$(count)**, $(total) million people: $(picked)"
+end
 
-# ╔═╡ d1000000-0000-0000-0000-000000000005
-HTML("<span id=\"coords\" style=\"display:none\">$(JSON3.write(masque(fig, cities).manifest["layers"]))</span>")
+# ╔═╡ c1d50012-0001-4000-8000-000000000005
+let wid = masque(fig, cities)
+    HTML(
+        "<span id=\"clip_manifest\" style=\"display:none\">" *
+            JSON3.write((; width = wid.manifest["width"], height = wid.manifest["height"], layers = wid.manifest["layers"], transforms = wid.manifest["transforms"])) *
+            "</span>"
+    )
+end
 
 # ╔═╡ Cell order:
-# ╟─d1000000-0000-0000-0000-000000000001
-# ╟─d1000000-0000-0000-0000-000000000002
-# ╠═d1000000-0000-0000-0000-000000000003
-# ╟─d1000000-0000-0000-0000-000000000004
-# ╟─d1000000-0000-0000-0000-000000000005
+# ╟─c1d50012-0001-4000-8000-000000000001
+# ╟─c1d50012-0001-4000-8000-000000000002
+# ╠═c1d50012-0001-4000-8000-000000000003
+# ╟─c1d50012-0001-4000-8000-000000000004
+# ╟─c1d50012-0001-4000-8000-000000000005

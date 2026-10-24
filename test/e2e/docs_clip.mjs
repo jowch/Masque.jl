@@ -8,7 +8,8 @@
 //   node docs_clip.mjs <pluto-url> <notebook-abs-path> <frames-dir> <clip>
 //
 // then docs/dev/clips/assemble_mp4.sh <frames-dir> docs/src/assets/<clip>.mp4. <clip> is a
-// key of CLIPS below; its notebook is docs/dev/clips/<notebook> in the same table.
+// key of CLIPS below; its notebook is docs/dev/clips/<notebook> in the same table. The
+// `readme` clip is the exception, a WebP from its own notebook: see docs/dev/readme-demo/README.md.
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
@@ -107,6 +108,31 @@ const CLIPS = {
       await c.glide(to, 1600, 40);
       await c.page.mouse.up();
       await c.settle(2000);
+    },
+  },
+  "readme": {
+    notebook: "../readme-demo/notebook.jl", nn: 12, code: true,
+    async run(c) {
+      // The README loop: hover for a tooltip, click three cities, box Europe, undo the box.
+      await c.glide(c.circle("cities", 0), 800);
+      await sleep(1000);
+      for (const k of [9, 23, 0]) {
+        await c.glide(c.circle("cities", k), 650);
+        await sleep(150);
+        await c.click(c.circle("cities", k));
+        await c.settle(500);
+      }
+      const from = c.data("cities", -16, 62);
+      const to = c.data("cities", 46, 35);
+      await c.glide(from, 700);
+      await c.page.mouse.down();
+      await c.glide(to, 1300, 36);
+      await c.page.mouse.up();
+      await c.settle(1100);
+      await c.keycap("Ctrl Z");
+      await c.page.keyboard.press("Control+z");
+      await c.settle(1500);
+      await c.keycap(null);
     },
   },
   "grid-many": {
@@ -274,7 +300,7 @@ try {
   await page.addStyleTag({ content: `
     header, footer, pluto-helpbox, nav { display: none !important; }
     ${shown.map((id) => `pluto-cell:not(#${id})`).join("")} { display: none !important; }
-    pluto-cell > pluto-input, pluto-shoulder, .add_cell_commands, .foldcode, .runcell, .cell_folder,
+    ${spec.code ? `pluto-cell:not(#${ID_WIDGET}) > pluto-input` : "pluto-cell > pluto-input"}, pluto-shoulder, .add_cell_commands, .foldcode, .runcell, .cell_folder,
     .add_cell, .addcell, .runtime, pluto-input-container > button, pluto-runarea { display: none !important; }
     html, body, main, pluto-notebook, pluto-output, pluto-cell { background: white !important; }
     html, body { overflow: hidden !important; }
@@ -368,6 +394,19 @@ try {
       return { x: q.x, y: q.y, w: q.width, h: q.height };
     }, ID_WIDGET),
   };
+
+  // A keystroke badge in the clip's corner: a key press shows nothing on screen by itself.
+  c.keycap = (label) => page.evaluate(([label, x, y]) => {
+    document.getElementById("__keycap")?.remove();
+    if (!label) return;
+    const el = document.createElement("div");
+    el.id = "__keycap";
+    el.textContent = label;
+    el.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:2147483647;padding:3px 9px;` +
+      "font:600 13px system-ui,sans-serif;color:#333;background:#f4f4f4;border:1px solid #bbb;" +
+      "border-bottom-width:3px;border-radius:6px;";
+    document.body.appendChild(el);
+  }, [label, clip.x + clip.width - 86, clip.y + 18]);
 
   // What Julia changes: the figure's frame and the readout's text.
   const signature = () => page.evaluate((ids) => ids.map((id) => {

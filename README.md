@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/src/assets/demo.gif" width="720" alt="A CairoMakie scatter in Pluto: hovering over a point shows a tooltip, clicking it selects the point and updates the bound value in the following cell">
+  <img src="docs/src/assets/demo.webp" width="720" alt="A CairoMakie map of world cities in Pluto: hovering over Tokyo shows its population, clicking Lagos, São Paulo and Tokyo picks them while the other cities fade, dragging a box over Europe adds its seven cities, and Ctrl-Z takes the box back; the cell below lists the picked cities each time">
 </p>
 
 Masque adds a thin JavaScript overlay to Makie figures in a Pluto notebook.
@@ -22,8 +22,11 @@ Hovering over a plot element shows a tooltip, and clicking it selects the
 element and sends it to Julia through `@bind`. The figure itself is
 rendered by CairoMakie or WGLMakie as usual.
 
-- Points, lines, heatmap cells, bars, polygons, and text, on 2D, polar, and 3D axes.
-- Drag gestures: region of interest, threshold line, pan.
+- Points, lines, heatmap cells, bars, polygons, text, and legend entries, on 2D, polar, and 3D axes.
+- Pick one mark or many: click, or drag a box, and Ctrl-Z undoes a pick.
+- Makie sliders, toggles, and menus laid out in the figure work in the notebook, and the
+  figure can redraw as the reader moves them.
+- Drag gestures: region of interest, threshold line, pan, and orbit.
 - Tooltips and selection still work in a static HTML export of the notebook.
 
 You can customize tooltips and interactions.

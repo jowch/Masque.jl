@@ -4,8 +4,8 @@ using Pluto
 using TOML
 using UUIDs
 
-# Homebrew cell-series player harvest. Getting-started embed is the README GIF demo
-# (`docs/dev/readme-demo/notebook.jl`): nbpkg-on, in-process against docs/Project.toml.
+# Homebrew cell-series player harvest. Embeds keep nbpkg on and run in-process against
+# docs/Project.toml.
 # Every click the overlay can post is recorded (`player_states`), so a player reads like
 # live `@bind`. Drags are continuous: the TOML lists a few, and the rest stay overlay-only.
 

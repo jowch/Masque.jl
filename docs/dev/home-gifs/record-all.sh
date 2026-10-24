@@ -10,7 +10,7 @@ OUT="$ROOT/docs/src/assets/home"
 ASSEMBLE="$ROOT/docs/dev/clips/assemble_webp.py"
 mkdir -p "$OUT"
 cd "$E2E"
-for s in hover click legend; do
+for s in hover legend; do
   frames="/tmp/home-gifs/$s"
   rm -rf "$frames"
   node "$E2E/home_feature_gifs.mjs" "$BASE" "$s" "$frames"
