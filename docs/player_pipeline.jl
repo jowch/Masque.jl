@@ -844,7 +844,8 @@ function write_shared(dir::AbstractString, bytes::AbstractVector{UInt8}, ext::Ab
     return SHARED_DIR * "/" * name
 end
 
-const DATA_IMAGE_RE = r"data:image/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)"
+# CairoMakie's own `text/html` output puts a space after the comma.
+const DATA_IMAGE_RE = r"data:image/(png|jpeg|gif|webp);base64,\s*([A-Za-z0-9+/=]+)"
 
 # A cell's HTML without the overlay script (the page loads it once) and with each inlined
 # picture written to `shared/` and named by its path there, relative to the player's page.

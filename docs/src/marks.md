@@ -44,7 +44,7 @@ these fields:
 | `contourf!` | `low` and `high` of the level |
 | `hexbin!` | `x` and `y`, the hexagon's center, and `count` |
 | `scatter!` on a `PolarAxis` | `x` is the angle and `y` the radius, in the order you passed them |
-| `lines!`, `series!`, `stairs!`, on any axis including a `PolarAxis` | the plotted point nearest the click, once the line is in `bind` (see Lines below) |
+| `lines!`, `series!`, `stairs!`, on an `Axis` or a `PolarAxis` | the plotted point nearest the click, once the line is in `bind` (see Lines below) |
 
 Heatmaps have their own page: [Heatmaps and images](@ref).
 

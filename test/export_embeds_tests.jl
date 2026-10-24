@@ -519,7 +519,7 @@ end
         "marks_bars", "legend_lines", "roi_table",
         "tooltips_template", "tooltips_dark", "grids_heatmap", "readouts_axis",
         "custom_regions", "recipes_dumbbell", "linked_click", "linked_legend_wash",
-        "selection_start", "legend_fade", "slice_spectra", "widgets_value",
+        "selection_start", "slice_spectra", "widgets_value",
     ]
     for name in guides
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))
@@ -716,6 +716,9 @@ end
     m = match(r"src=\"(shared/[0-9a-f]{20}\.png)\"", out)
     @test m !== nothing
     @test read(joinpath(dir, m.captures[1])) == png
+    # A figure a cell returns (CairoMakie's `text/html`) has a space after the comma.
+    fig_html = "<img width=560 src=\"data:image/png;base64, " * base64encode(png) * "\">"
+    @test externalize_html(fig_html, dir; overlay) == "<img width=560 src=\"" * m.captures[1] * "\">"
     # The same picture in another state or player is the same file.
     @test externalize_html(html, dir; overlay) == out
     @test length(readdir(joinpath(dir, "shared"))) == 1

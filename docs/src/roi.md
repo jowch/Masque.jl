@@ -9,7 +9,7 @@ Drag the box over the stations below:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-roi-table" data-masque-embed="roi_table" data-masque-segment="figure" title="Stations scatter with a box. Drag the box to pick the stations inside." style="width:100%;height:1000px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-roi-table" data-masque-embed="roi_table" data-masque-segment="figure" title="Stations scatter with a box. Drag the box to pick the stations inside." style="width:100%;height:900px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -35,19 +35,8 @@ Main.masque_fallback("roi_table"; segment = "table")
 An [`ROIInteractable`](@ref) adds the box, and `selects` names the plot
 whose points it collects. To give each point its row of data, pass the
 scatter to [`interactables`](@ref) with `payloads`, and pass both to the
-same `masque` call:
-
-```julia
-pts = interactables(s; payloads = samples)
-roi = ROIInteractable(ax; bounds = (4.0, 6.5, 3.8, 6.5), selects = s)
-```
-
-```julia
-@bind picks masque(fig, pts, roi; bind = s)
-```
-
-`bounds` is where the box starts, as `(xmin, xmax, ymin, ymax)` in data
-coordinates.
+same `masque` call, as the figure cell above does. `bounds` is where the
+box starts, as `(xmin, xmax, ymin, ymax)` in data coordinates.
 
 `bind = s` makes `picks` the scatter's field: the points inside the box,
 as one [`ElementEvent`](@ref) per point, holding that point's payload

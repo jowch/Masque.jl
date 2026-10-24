@@ -86,6 +86,11 @@ pluto-editor.disable_ui > main {
   padding-top: 10px !important;
   padding-bottom: 14px !important;
 }
+/* The bar sits top right over the first cell: start the cells below it. */
+body:has(.masque-bar) pluto-editor > main,
+body:has(.masque-bar) pluto-editor.disable_ui > main {
+  padding-top: 40px !important;
+}
 html, body {
   background: var(--main-bg-color);
 }
@@ -227,7 +232,10 @@ const PLUTO_EXPORT_SEGMENT_JS = raw"""
   window.masqueSegment = ids;
   var css = "pluto-cell" + ids.map(function (id) { return ':not([id="' + id + '"])'; }).join("") +
     " { display: none !important; }";
-  if (ids.indexOf("@@WIDGET@@") === -1) css += " .masque-bar { display: none !important; }";
+  if (ids.indexOf("@@WIDGET@@") === -1) {
+    css += " .masque-bar { display: none !important; }" +
+      " body:has(.masque-bar) pluto-editor > main, body:has(.masque-bar) pluto-editor.disable_ui > main { padding-top: 10px !important; }";
+  }
   var style = document.createElement("style");
   style.textContent = css;
   document.head.appendChild(style);
