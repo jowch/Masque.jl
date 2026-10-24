@@ -487,6 +487,11 @@ try {
       throw new Error(`heatmap: a pointer click drew a focus outline ${JSON.stringify(s)}`);
     }
     passed.push("focus-outline-not-on-click");
+    // Undo after a click is a chord, not navigation: still no outline.
+    await page.keyboard.press("ControlOrMeta+z");
+    s = await state("heatmap");
+    if (!s.focused || s.outline.style !== "none") throw new Error(`heatmap: undo after a click drew a focus outline ${JSON.stringify(s)}`);
+    passed.push("focus-outline-not-on-undo");
     // A key pressed after the click shows the outline: the keys now go to this plot.
     await page.keyboard.press("ArrowRight");
     s = await state("heatmap");
