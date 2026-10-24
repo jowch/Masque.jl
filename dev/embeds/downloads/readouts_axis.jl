@@ -24,11 +24,6 @@ md"""
 Move the pointer across the axis, and the tooltip follows it and shows the data coordinates `(x, y)`.
 """
 
-# ╔═╡ b18a0001-0001-4000-8000-000000000010
-md"""
-Create the line plot the way you normally would, and add an `AxisInteractable` for its axis, because `masque(fig)` does not add one on its own.
-"""
-
 # ╔═╡ b18a0001-0001-4000-8000-000000000002
 begin
     xs = range(0, 2π; length = 80)
@@ -38,11 +33,6 @@ begin
     ints = AxisInteractable(ax)
     nothing
 end
-
-# ╔═╡ b18a0001-0001-4000-8000-000000000011
-md"""
-In your own notebook, `@bind pick` saves a click in `pick`, and `bind = ints` makes `pick` the readout's value, with its position in `pick.x` and `pick.y`. This page does not record clicks, so only the tooltip works here.
-"""
 
 # ╔═╡ b18a0001-0001-4000-8000-000000000003
 @bind pick masque(fig, ints; auto = false, bind = ints)
@@ -57,8 +47,6 @@ Masque = "82b01fb5-7eeb-4559-83ea-8d75f85d4328"
 # ╔═╡ Cell order:
 # ╠═b18a0001-0001-4000-8000-000000000001
 # ╟─b18a0001-0001-4000-8000-000000000009
-# ╟─b18a0001-0001-4000-8000-000000000010
 # ╠═b18a0001-0001-4000-8000-000000000002
-# ╟─b18a0001-0001-4000-8000-000000000011
 # ╠═b18a0001-0001-4000-8000-000000000003
 # ╟─00000000-0000-0000-0000-000000000001

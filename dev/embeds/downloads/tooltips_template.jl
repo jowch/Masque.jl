@@ -24,11 +24,6 @@ md"""
 Hover over a city to see its name and population. Click one and the last cell names it.
 """
 
-# ╔═╡ a1b2c3d4-0011-4000-8000-000000000010
-md"""
-Scatter the cities the way you normally would. The tooltip template shows each point's `city` and `pop`, and the tooltip's border uses the marker's color.
-"""
-
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000002
 begin
     cities = [
@@ -49,18 +44,8 @@ begin
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0011-4000-8000-000000000011
-md"""
-`bind = s` makes `pick` the clicked city itself. `@bind pick` saves a click in `pick`, while hovering only shows the tooltip and leaves `pick` as it was.
-"""
-
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000003
 @bind pick masque(fig, tips; bind = s)
-
-# ╔═╡ a1b2c3d4-0011-4000-8000-000000000012
-md"""
-`pick` starts as `nothing`, and this cell responds when you click a city.
-"""
 
 # ╔═╡ a1b2c3d4-0011-4000-8000-000000000004
 if isnothing(pick)
@@ -79,10 +64,7 @@ Masque = "82b01fb5-7eeb-4559-83ea-8d75f85d4328"
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0011-4000-8000-000000000001
 # ╟─a1b2c3d4-0011-4000-8000-000000000009
-# ╟─a1b2c3d4-0011-4000-8000-000000000010
 # ╠═a1b2c3d4-0011-4000-8000-000000000002
-# ╟─a1b2c3d4-0011-4000-8000-000000000011
 # ╠═a1b2c3d4-0011-4000-8000-000000000003
-# ╟─a1b2c3d4-0011-4000-8000-000000000012
 # ╠═a1b2c3d4-0011-4000-8000-000000000004
 # ╟─00000000-0000-0000-0000-000000000001
