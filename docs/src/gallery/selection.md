@@ -24,7 +24,8 @@ Main.masque_fallback("gallery_selection")
   scatters with `select = :many`, as in
   `masque(fig_l, interactables(s_left; select = :many); bind = s_left)`.
   Then `pick` lists every picked point, and the second widget takes
-  `selected = [p.index for p in pick]`.
+  them as
+  `masque(fig_r, interactables(s_right; select = :many); selected = [p.index for p in pick])`.
 - A slider that rebuilds the figure drops the highlight unless you pass
   the indices again.
 - Passing a widget's own value back into the same `masque` call does

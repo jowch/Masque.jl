@@ -105,7 +105,7 @@ panel in its own figure, as in the example at the top of this page.
 Hovering a legend entry picks out every mark of its series, on every
 axis where the series appears. Clicking an entry sets `sel.legend` to
 a [`LegendEvent`](@ref), which another cell can use to filter your
-data.
+data. With `bind = :legend`, as in the example, `pick` is that event.
 See [Legend](@ref).
 
 ```@raw html
