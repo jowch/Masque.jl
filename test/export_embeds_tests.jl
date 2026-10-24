@@ -650,7 +650,7 @@ end
     @test !occursin("e1be0000-0000-4000-8000-000000000001", out)
     @test !occursin("00000000-0000-0000-0000-000000000002", out)
     @test occursin("PLUTO_PROJECT_TOML_CONTENTS", out)
-    @test occursin("@bind w2 masque(fig", out)
+    @test occursin("@bind w2 masque(\n    fig, (freq = freq, dots = dots);", out)
     @test occursin("# ╠═a1b2c3d4-0002-4000-8000-000000000004\n", out)
     @test download_notebook(out) == out
 end
