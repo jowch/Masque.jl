@@ -24,11 +24,6 @@ md"""
 Click a cell, and the last cell shows its indices and value.
 """
 
-# ╔═╡ b15a0001-0001-4000-8000-000000000010
-md"""
-Create the heatmap the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. `masque` makes each cell clickable.
-"""
-
 # ╔═╡ b15a0001-0001-4000-8000-000000000002
 begin
     z = [
@@ -43,18 +38,8 @@ begin
     nothing
 end
 
-# ╔═╡ b15a0001-0001-4000-8000-000000000011
-md"""
-`bind = p` makes `pick` the clicked cell itself. `@bind pick` saves a click in `pick`, while hovering over a cell only shows its value and leaves `pick` as it was.
-"""
-
 # ╔═╡ b15a0001-0001-4000-8000-000000000003
 @bind pick masque(fig; bind = p)
-
-# ╔═╡ b15a0001-0001-4000-8000-000000000012
-md"""
-`pick` starts as `nothing`, and this cell responds when you click the heatmap. After a click, `pick.i` and `pick.j` are the cell's indices in `z`, so `z[pick]` is the clicked cell's value. Makie draws `z`'s first index along x, so `pick.i` counts across and `pick.j` counts up.
-"""
 
 # ╔═╡ b15a0001-0001-4000-8000-000000000004
 if isnothing(pick)
@@ -72,11 +57,8 @@ pluto_html = true
 
 cells = [
   "b15a0001-0001-4000-8000-000000000009",
-  "b15a0001-0001-4000-8000-000000000010",
   "b15a0001-0001-4000-8000-000000000002",
-  "b15a0001-0001-4000-8000-000000000011",
   "b15a0001-0001-4000-8000-000000000003",
-  "b15a0001-0001-4000-8000-000000000012",
   "b15a0001-0001-4000-8000-000000000004",
 ]
 """
@@ -1727,11 +1709,8 @@ version = "4.1.0+0"
 # ╔═╡ Cell order:
 # ╠═b15a0001-0001-4000-8000-000000000001
 # ╟─b15a0001-0001-4000-8000-000000000009
-# ╟─b15a0001-0001-4000-8000-000000000010
 # ╠═b15a0001-0001-4000-8000-000000000002
-# ╟─b15a0001-0001-4000-8000-000000000011
 # ╠═b15a0001-0001-4000-8000-000000000003
-# ╟─b15a0001-0001-4000-8000-000000000012
 # ╠═b15a0001-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001

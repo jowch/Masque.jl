@@ -115,19 +115,13 @@ shows.
 
 To start with a mark selected, pass its position in the data you
 plotted as `selected=`. These are the same numbers `pick.index` gives,
-so `selected = 1` is the first city:
-
-```julia
-@bind sel masque(fig, cities; selected = 1)
-```
-
-The first city starts highlighted and `sel.cities` starts as its event, so
-other cells have something to show before anyone clicks. Click another
-city to replace it:
+so `selected = 1` is the first city. It starts highlighted and its
+field starts as its event, so other cells have something to show before
+anyone clicks. Click another city to replace it:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-selection-start" data-masque-embed="selection_start" title="Four cities with Tokyo selected. Click another and the readout names it." style="width:100%;height:1280px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-selection-start" data-masque-embed="selection_start" title="Four cities with Tokyo selected. Click another and the readout names it." style="width:100%;height:820px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

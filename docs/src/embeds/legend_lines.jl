@@ -21,12 +21,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000009
 md"""
-Click a legend entry, and the last cell names that series while its line stays highlighted.
-"""
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000010
-md"""
-Create two labeled lines and an `axislegend` the way you normally would, and end the cell with `nothing` so Pluto doesn't show the figure twice. `masque` links each legend entry to its line.
+Click a legend entry, and the last cell names that series while its line stays highlighted. Click it again to clear it.
 """
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
@@ -40,24 +35,26 @@ begin
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000011
-md"""
-`bind = :legend` makes `pick` the legend's value, and `@bind pick` saves a click on a legend entry in `pick`, while hovering over an entry only highlights its line and leaves `pick` as it was.
-"""
-
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
 @bind pick masque(fig; bind = :legend)
-
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000012
-md"""
-`pick` starts as `nothing`, and this cell responds when you click a legend entry. A click makes `pick` a `LegendEvent`, and `pick.label` is the entry's text. Clicking the same entry again sets `pick` back to `nothing`.
-"""
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
 if pick isa LegendEvent
     "$(pick.label) selected"
 else
     "click a legend entry"
+end
+
+# ╔═╡ a1b2c3d4-0001-4000-8000-000000000005
+begin
+    focus = pick isa LegendEvent ? pick.label : nothing
+    fig2 = Figure(size = (560, 360))
+    ax2 = Axis(fig2[1, 1])
+    for (label, f) in (("a", sin), ("b", cos))
+        faded = !isnothing(focus) && label != focus
+        lines!(ax2, xs, f.(xs); label, alpha = faded ? 0.2 : 1.0)
+    end
+    fig2
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
@@ -69,12 +66,21 @@ pluto_html = true
 
 cells = [
   "a1b2c3d4-0001-4000-8000-000000000009",
-  "a1b2c3d4-0001-4000-8000-000000000010",
   "a1b2c3d4-0001-4000-8000-000000000002",
-  "a1b2c3d4-0001-4000-8000-000000000011",
   "a1b2c3d4-0001-4000-8000-000000000003",
-  "a1b2c3d4-0001-4000-8000-000000000012",
   "a1b2c3d4-0001-4000-8000-000000000004",
+  "a1b2c3d4-0001-4000-8000-000000000005",
+]
+
+[player.segments]
+widget = [
+  "a1b2c3d4-0001-4000-8000-000000000009",
+  "a1b2c3d4-0001-4000-8000-000000000002",
+  "a1b2c3d4-0001-4000-8000-000000000003",
+  "a1b2c3d4-0001-4000-8000-000000000004",
+]
+fade = [
+  "a1b2c3d4-0001-4000-8000-000000000005",
 ]
 """
 
@@ -1724,12 +1730,10 @@ version = "4.1.0+0"
 # ╔═╡ Cell order:
 # ╠═a1b2c3d4-0001-4000-8000-000000000001
 # ╟─a1b2c3d4-0001-4000-8000-000000000009
-# ╟─a1b2c3d4-0001-4000-8000-000000000010
 # ╠═a1b2c3d4-0001-4000-8000-000000000002
-# ╟─a1b2c3d4-0001-4000-8000-000000000011
 # ╠═a1b2c3d4-0001-4000-8000-000000000003
-# ╟─a1b2c3d4-0001-4000-8000-000000000012
 # ╠═a1b2c3d4-0001-4000-8000-000000000004
+# ╠═a1b2c3d4-0001-4000-8000-000000000005
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
