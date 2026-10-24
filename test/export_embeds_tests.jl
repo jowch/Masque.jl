@@ -547,11 +547,12 @@ end
     ids = ["a", "b", "c", "d"]
     base = Dict{String, Any}("pluto_html" => true, "cells" => ids)
     @test isempty(player_segments(base))
-    segs = player_segments(merge(base, Dict("segments" => Dict("top" => ["b", "a"], "rest" => ["d"]))))
-    @test segs == Dict("top" => ["a", "b"], "rest" => ["d"])  # the player's order, not the TOML's
+    segs = player_segments(merge(base, Dict("segments" => Dict("top" => ["b", "a"], "rest" => ["d", "c"]))))
+    @test segs == Dict("top" => ["a", "b"], "rest" => ["c", "d"])  # the player's order, not the TOML's
     seg(s) = player_segments(merge(base, Dict("segments" => s)))
     @test_throws ErrorException seg(Dict("top" => ["a", "x"]))            # not a player cell
     @test_throws ErrorException seg(Dict("top" => ["a"], "two" => ["a"]))  # one cell, two segments
+    @test_throws ErrorException seg(Dict("top" => ["a", "b", "c"]))       # d is in no segment
     @test_throws ErrorException seg(Dict("top" => String[]))
     @test_throws ErrorException seg(Dict("Top" => ["a"]))                  # goes in a URL hash
     @test_throws ErrorException seg(["a"])

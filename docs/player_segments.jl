@@ -25,5 +25,8 @@ function player_segments(player::AbstractDict)
         end
         out[name] = [id for id in cells if id in ids]
     end
+    # A cell in no part would vanish from the page and from every text twin without a word.
+    missing = filter(id -> !haskey(owner, id), cells)
+    isempty(missing) || error("cells $(join(missing, ", ")) are in no segment: add them to one, or drop them from cells")
     return out
 end

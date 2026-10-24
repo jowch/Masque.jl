@@ -15,8 +15,8 @@ build: give the notebook fewer marks or a coarser grid. Set `MASQUE_SKIP_EMBED_E
 `docs/src/embeds/` when iterating on prose.
 
 A page can show one notebook in several parts with prose between them. The player TOML names
-each part under `[player.segments]` as `name = [cell ids]`, a subset of `cells` with no cell in
-two parts, and each part goes in its own iframe with `data-masque-segment="<name>"` and its own
+each part under `[player.segments]` as `name = [cell ids]`, covering every cell in `cells`
+once, and each part goes in its own iframe with `data-masque-segment="<name>"` and its own
 text twin, `Main.masque_fallback("<name>"; segment = "<part>")`. The parts share the
 notebook's `@bind` value: a click in the part showing the widget updates the cells in the
 others. `docs/src/roi.md` is the example.
