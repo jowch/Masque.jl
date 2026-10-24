@@ -82,7 +82,7 @@ export function move(
         const rect = document.createElementNS(SVG_NS, "rect")
         rect.classList.add("masque-hi", "masque-roi", "masque-marquee")
         rect.setAttribute("vector-effect", "non-scaling-stroke")
-        ctx.chrome_.appendChild(rect)
+        ctx.chromeAt_(d.axis_).appendChild(rect)
         d.rect_ = rect
     }
     const x0 = clampX(t, d.x0_), y0 = clampY(t, d.y0_)

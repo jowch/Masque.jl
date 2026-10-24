@@ -583,6 +583,26 @@ HTML(
         "<span id=\"coords_view_linked\" style=\"display:none\">$(JSON3.write(sweep.view_linked.manifest["layers"]))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-000000000172
+@bind ev_view_twin sweep.view_twin
+
+# ╔═╡ c1000000-0000-0000-0000-000000000173
+HTML(
+    "<span id=\"out_view_twin\">VIEW_TWIN=$(sweep_field("view_twin", ev_view_twin))</span>" *
+        "<span id=\"bond_view_twin\" style=\"display:none\">$(repr(ev_view_twin))</span>" *
+        "<span id=\"coords_view_twin\" style=\"display:none\">$(JSON3.write(sweep.view_twin.manifest["layers"]))</span>",
+)
+
+# ╔═╡ c1000000-0000-0000-0000-000000000174
+@bind ev_view_twin_linked sweep.view_twin_linked
+
+# ╔═╡ c1000000-0000-0000-0000-000000000175
+HTML(
+    "<span id=\"out_view_twin_linked\">VIEW_TWIN_LINKED=$(sweep_field("view_twin_linked", ev_view_twin_linked))</span>" *
+        "<span id=\"bond_view_twin_linked\" style=\"display:none\">$(repr(ev_view_twin_linked))</span>" *
+        "<span id=\"coords_view_twin_linked\" style=\"display:none\">$(JSON3.write(sweep.view_twin_linked.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000115
 @bind ev_view3d sweep.view3d
 
@@ -900,6 +920,10 @@ HTML(
 # ╠═c1000000-0000-0000-0000-000000000035
 # ╠═c1000000-0000-0000-0000-000000000146
 # ╠═c1000000-0000-0000-0000-000000000147
+# ╠═c1000000-0000-0000-0000-000000000172
+# ╠═c1000000-0000-0000-0000-000000000173
+# ╠═c1000000-0000-0000-0000-000000000174
+# ╠═c1000000-0000-0000-0000-000000000175
 # ╠═c1000000-0000-0000-0000-000000000115
 # ╠═c1000000-0000-0000-0000-000000000116
 # ╠═c1000000-0000-0000-0000-000000000152

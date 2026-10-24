@@ -1,7 +1,7 @@
 // The overlay guide for a SliceInteractable: one hairline (vertical or horizontal) across the
 // axis viewport under the pointer, plus a filled dot per sampled series. The hair stays on
 // svg.masque-plain, in layout pixels, because the axis frame does not move. The dots are
-// parented in the photograph group so they ride the slid series. The hair is a
+// parented in the slice axis's chrome group so they ride its slid series (#391). The hair is a
 // figure-background halo under a quieter stroke. Opacity fades only when the guide turns on
 // or off, not on each move. Plots without a slice draw nothing.
 import { SVG_NS } from "./highlight"
@@ -25,7 +25,7 @@ export interface CrossDot {
     color?: string
 }
 
-export function buildCross(svg: SVGSVGElement, dotsParent: SVGElement): CrossEls {
+export function buildCross(svg: SVGSVGElement): CrossEls {
     const g = document.createElementNS(SVG_NS, "g")
     g.setAttribute("class", "masque-cross")
     const line = (cls: string): SVGLineElement => {
@@ -43,7 +43,7 @@ export function buildCross(svg: SVGSVGElement, dotsParent: SVGElement): CrossEls
     svg.appendChild(g)
     const dots = document.createElementNS(SVG_NS, "g")
     dots.setAttribute("class", "masque-cross")
-    dotsParent.appendChild(dots)
+    svg.appendChild(dots)
     return { g_: g, vHalo_: vHalo, hHalo_: hHalo, vHair_: vHair, hHair_: hHair, dots_: dots }
 }
 
@@ -76,8 +76,17 @@ function arm(lines: SVGLineElement[], on: boolean, x1: number, y1: number, x2: n
     }
 }
 
+// The dots go last in `axis`'s chrome group, over its threshold lines and ROI boxes, and move
+// with that axis's pixels.
+function placeCrossDots(ctx: OverlayCtx, axis: string): void {
+    const home = ctx.chromeAt_(axis)
+    const dots = ctx.cross_.dots_
+    if (home.lastElementChild !== dots) home.appendChild(dots)
+}
+
+// `axis` is the slice's axis, which the dots are drawn on.
 export function syncCross(
-    ctx: OverlayCtx, state: OverlayState, show: boolean,
+    ctx: OverlayCtx, state: OverlayState, show: boolean, axis: string,
     vx0: number, vy0: number, vx1: number, vy1: number,
     hx0: number, hy0: number, hx1: number, hy1: number,
     dots: CrossDot[],
@@ -91,6 +100,7 @@ export function syncCross(
     const c = ctx.cross_
     arm([c.vHalo_, c.vHair_], arms.v, vx0, vy0, vx1, vy1)
     arm([c.hHalo_, c.hHair_], arms.h, hx0, hy0, hx1, hy1)
+    placeCrossDots(ctx, axis)
     const dotsG = c.dots_
     while (dotsG.children.length > dots.length) dotsG.removeChild(dotsG.lastElementChild!)
     for (let i = 0; i < dots.length; i++) {

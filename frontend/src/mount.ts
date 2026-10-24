@@ -22,7 +22,7 @@ import { createFade } from "./fade"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, oneHome, MOTION_MS, NOTE_MS } from "./state"
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
 import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
-import { axisFrame, layoutSpaceLayer, linkedMove, matrixLimits } from "./geometry"
+import { axisFrame, layoutSpaceLayer, matrixLimits, previewWindows } from "./geometry"
 import { IDENTITY, isIdentity, mapPoint, residual, unmapPoint, wheelScale, zoomAt, WHEEL_IDLE_MS } from "./photo"
 import type { PhotoMatrix } from "./photo"
 
@@ -315,11 +315,14 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // axis's inner transform and outer clip (`paintAxis`), so a linked axis's ring slides with
     // its own data and an unlinked axis's stays put (#368). Every axis's g.sel comes before any
     // g.link, and every g.link before any g.hi, in each svg, so g.hi always paints over
-    // g.link/g.sel whichever svg(s) any of the three lands in. A comment marks where each
-    // role's homes end, so a home made later still lands in order. The tooltip is in none of them.
+    // g.link/g.sel whichever svg(s) any of the three lands in. Last come g.chrome: ROI boxes,
+    // threshold lines, the marquee and the slice readout dots, in svg.masque-plain's home of
+    // the axis they belong to, so they move with that axis's pixels (#391). A comment marks
+    // where each role's homes end, so a home made later still lands in order. The tooltip is
+    // in none of them.
     const overlaySvgs = [fillSvg, edgeSvg, plainSvg]
     const svgKinds = ["fill", "edge", "plain"]
-    const roles = ["sel", "link", "hi"] as const
+    const roles = ["sel", "link", "hi", "chrome"] as const
     const roleEnds = overlaySvgs.map((svg) => roles.map((r) => svg.appendChild(document.createComment(r))))
     // Every axis home made so far, with its clip and photo groups per svg, for `paintAxis`.
     const axisHomes = new Map<string, { clips: Array<[SVGGElement, string]>; photos: SVGGElement[] }>()
@@ -357,16 +360,14 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const selGroup = homeSet("sel")
     const linkGroup = homeSet("link")
     const hiGroup = homeSet("hi")
+    const chromeGroup = homeSet("chrome")
+    const chromeAt = (axis: string): SVGGElement => chromeGroup.at_(axis).plain_
     // Every axis with data marks gets its homes now, in manifest order, so the DOM does not
     // depend on which mark was picked first. An axis a later frame brings is made on first use.
     for (const l of manifest.layers) {
         if (layoutSpaceLayer(l)) continue
-        for (const set of [selGroup, linkGroup, hiGroup]) set.at_(l.axis)
+        for (const set of [selGroup, linkGroup, hiGroup, chromeGroup]) set.at_(l.axis)
     }
-    // ROI boxes, threshold lines, the marquee and the readout dots slide with the pan axis's
-    // photograph, clipped to its viewport, above every highlight.
-    const plainClip = makeGroup(plainSvg, "masque-clip")
-    const plainPhoto = makeGroup(plainClip, "masque-photo")
     // Screen-fixed chrome paints above the clip and is not transformed. A legend or colorbar
     // ring outside the axis viewport would otherwise vanish for the whole preview.
     const fillFixed = makeGroup(fillSvg, "masque-fixed")
@@ -463,11 +464,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // Per-layer hoverstyle values sit inline on their own elements and still win there.
     if (manifest.overlayStyle) for (const [k, v] of Object.entries(manifest.overlayStyle)) shadowHost.style.setProperty(k, v)
 
-    // Threshold lines and ROI boxes slide with the photograph. The hair stays on the plain svg,
-    // after the clip, so the first <line> in the shadow is still a threshold line.
-    const thresholdLines = thresholdDrag.buildThresholdLines(manifest, plainPhoto)
-    const roiBoxes = roiDrag.buildROIBoxes(manifest, plainPhoto, base)
-    const cross = buildCross(plainSvg, plainPhoto)
+    // Threshold lines and ROI boxes move with their own axis's pixels. The hair stays on the
+    // plain svg, after every home, so the first <line> in the shadow is still a threshold line.
+    const thresholdLines = thresholdDrag.buildThresholdLines(manifest, chromeAt)
+    const roiBoxes = roiDrag.buildROIBoxes(manifest, chromeAt, base)
+    const cross = buildCross(plainSvg)
     const focusable = buildFocusable(manifest)
     const layerStarts = computeLayerStarts(focusable)
 
@@ -522,7 +523,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     const ctx: OverlayCtx = {
         manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
         hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup, fade_: fade,
-        thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, chrome_: plainPhoto,
+        thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, chromeAt_: chromeAt,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
         cross_: cross,
         gesture_: channel,
@@ -649,9 +650,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             box.rect_.remove()
             for (const hdl of box.handles_) hdl.remove()
         }
-        ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(man, plainPhoto)
-        ctx.roiBoxes_ = roiDrag.buildROIBoxes(man, plainPhoto, ctx.base_)
-        plainPhoto.appendChild(ctx.cross_.dots_)
+        ctx.thresholdLines_ = thresholdDrag.buildThresholdLines(man, chromeAt)
+        ctx.roiBoxes_ = roiDrag.buildROIBoxes(man, chromeAt, ctx.base_)
     }
 
     function flushPendingChrome(): void {
@@ -764,10 +764,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.manifest_ = newManifest
         controls.update_(newManifest, onchangeFrame && input.state && typeof input.state === "object" ? input.state as Record<string, unknown> : null)
         // Drop a cross that described the previous frame. The hair stays on the plain svg;
-        // the dots stay in the photo group, above the chrome just rebuilt there.
+        // the next readout puts the dots back over the chrome just rebuilt (`placeCrossDots`).
         hideCross(ctx, state)
         plainSvg.appendChild(ctx.cross_.g_)
-        plainPhoto.appendChild(ctx.cross_.dots_)
         ctx.focusable_ = buildFocusable(newManifest)
         ctx.layerStarts_ = computeLayerStarts(ctx.focusable_)
 
@@ -922,8 +921,8 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     }
     // The axis frame (spines, ticks, labels) stays on the untransformed base. A copy of the
     // same pixels, clipped to the pan view's viewport, carries the matrix, so only the data
-    // inside the axes slides.
-    // One window per axis whose data slides: the pan view's, then each axis linked to it (#363).
+    // inside the axes slides. One window per axis whose data slides: the pan view's and each
+    // axis linked to it (#363), stacked as `previewWindows` orders them.
     interface DataWindow { clip: HTMLDivElement; copy: HTMLImageElement | HTMLCanvasElement; gen: number }
     let windows: DataWindow[] = []
     // The chrome group's clip, and each axis's in each svg (`masque-clip-<svg>-<n>`).
@@ -954,26 +953,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         for (const [g, cid] of home.clips) setClip(g, cid, f ? f.clip : null)
         ctx.fade_.place_(axis, f)
     }
-    const photoViewport = (): ViewGeometry | null => {
-        const id = state.photoViewId_
-        const layer = (id ? ctx.manifest_.layers.find((l) => l.id === id) : undefined)
-            ?? ctx.manifest_.layers.find((l) => l.kind === "view" && (l.geometry as ViewGeometry).mode === "pan")
-        if (!layer || layer.kind !== "view") return null
-        const g = layer.geometry as ViewGeometry
-        if (!(g.w > 0) || !(g.h > 0)) return null
-        return g
-    }
     const dropWindows = (keep: number) => {
         for (const w of windows.slice(keep)) w.clip.remove()
         windows = windows.slice(0, keep)
     }
-    const clearDataClip = () => {
-        dropWindows(0)
-        plainClip.removeAttribute("clip-path")
-    }
-    const makeWindow = (cls: string): DataWindow => {
+    const makeWindow = (): DataWindow => {
         const clip = document.createElement("div")
-        clip.className = cls
         clip.style.position = "absolute"
         clip.style.overflow = "hidden"
         clip.style.pointerEvents = "none"
@@ -1006,9 +991,6 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // frame draws that frame back where it was.
         ctx.base_.style.transform = ""
         ctx.base_.style.transformOrigin = ""
-        const view = id ? null : photoViewport()
-        if (id || !view) plainPhoto.removeAttribute("transform")
-        else plainPhoto.setAttribute("transform", `translate(${m.tx} ${m.ty}) scale(${m.s})`)
         for (const axis of axisHomes.keys()) paintAxis(axis, m)
         // Only data pixels slide (#171). Each copy is cropped to its clip rect, inside the spine
         // stroke, and the crop moves with it, so the chrome outside the axis box never enters
@@ -1049,23 +1031,14 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                 }
             }
         }
-        if (!view) {
-            clearDataClip()
-        } else {
-            const links = view.links ?? []
-            dropWindows(1 + links.length)
-            while (windows.length < 1 + links.length) {
-                windows.push(makeWindow(windows.length === 0 ? "masque-data-clip" : "masque-data-clip masque-link-clip"))
-            }
-            const [cx, cy, cw, ch] = view.clip ?? [view.x, view.y, view.w, view.h]
-            paintWindow(windows[0], [cx, cy, cw, ch], view.fill, { sx: m.s, sy: m.s, tx: m.tx, ty: m.ty })
-            links.forEach((link, i) => {
-                const [lsx, ltx] = linkedMove(m, link.x, m.tx)
-                const [lsy, lty] = linkedMove(m, link.y, m.ty)
-                paintWindow(windows[i + 1], link.clip, link.fill, { sx: lsx, sy: lsy, tx: ltx, ty: lty })
-            })
-            setClip(plainClip, "masque-clip-plain", [cx, cy, cw, ch])
-        }
+        // Bottom first, as `axisFrame` reads them, so each mark moves with the pixels it sits on.
+        const shown = id ? [] : previewWindows(ctx.manifest_, m, state.photoViewId_)
+        dropWindows(shown.length)
+        while (windows.length < shown.length) windows.push(makeWindow())
+        shown.forEach((w, i) => {
+            windows[i].clip.className = w.pan ? "masque-data-clip" : "masque-data-clip masque-link-clip"
+            paintWindow(windows[i], w.clip, w.fill, w)
+        })
         host.dataset.masquePhoto = id ? "" : `${m.s},${m.tx},${m.ty}`
         if (id) syncOverlayToBase()
         syncFocusTip(ctx, state)

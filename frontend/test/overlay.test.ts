@@ -4150,6 +4150,14 @@ describe("photographic pan / wheel zoom", () => {
         layers: [{ id: "view", kind: "view", axis: "ax1", events: ["drag"], payloads: [],
             geometry: { x: 0, y: 0, w: 1200, h: 800, mode } }],
     })
+    // A threshold line on ax1, so the axis has a chrome group for the photograph to move.
+    const withLine = (m: Manifest): Manifest => {
+        m.layers.push({ id: "thr", kind: "threshold", axis: "ax1", events: ["drag"], payloads: [],
+            geometry: { orientation: "v", pos: 1150, span: [10, 20] } } as unknown as HitLayer)
+        return m
+    }
+    const chromePhoto = (shadow: ShadowRoot) =>
+        shadow.querySelector(`svg.masque-plain g.masque-clip[data-axis="ax1"] > g.masque-photo:has(> g.chrome)`) as SVGGElement
     const wheelAt = (surface: HTMLElement, deltaY: number) => {
         // happy-dom's WheelEvent init ignores clientX/clientY. A real browser sets both.
         const ev = new WheelEvent("wheel", {
@@ -4165,7 +4173,7 @@ describe("photographic pan / wheel zoom", () => {
         const { host, img, script } = setup()
         let release: (r: { png: Uint8Array; manifest: Manifest }) => void = () => {}
         const requestFrame = vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>((r) => { release = r }))
-        mount(script, viewManifest("pan"), undefined, requestFrame)
+        mount(script, withLine(viewManifest("pan")), undefined, requestFrame)
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
         const shadowHost = host.lastElementChild as HTMLElement
@@ -4178,7 +4186,7 @@ describe("photographic pan / wheel zoom", () => {
         expect(host.querySelector(".masque-data-clip")).toBeTruthy()
         expect(host.dataset.masquePhoto).not.toBe("")
         expect(shadowHost.style.width).toBe("600px")
-        const photo = shadow.querySelector("svg.masque-plain g.masque-photo") as SVGGElement
+        const photo = chromePhoto(shadow)
         expect(photo.getAttribute("transform")).toContain("scale(")
         const tip = shadow.querySelector(".masque-tip") as HTMLElement
         expect(tip.closest("g.masque-photo")).toBeNull()
@@ -4197,7 +4205,7 @@ describe("photographic pan / wheel zoom", () => {
 
     it("a wheel zoom leaves the axis frame unscaled and clips the data to the viewport", () => {
         const { host, img, script } = setup()
-        const m = viewManifest("pan")
+        const m = withLine(viewManifest("pan"))
         m.transforms.ax1.viewport = [100, 80, 1000, 640]
         const g = m.layers[0].geometry as { x: number; y: number; w: number; h: number }
         g.x = 100; g.y = 80; g.w = 1000; g.h = 640
@@ -4218,16 +4226,16 @@ describe("photographic pan / wheel zoom", () => {
         expect(clip.style.height).toBe("320px")
         const copy = clip.firstElementChild as HTMLElement
         expect(copy.style.transform).toContain("scale(")
-        const clipped = shadowOf(host).querySelector("svg.masque-plain g.masque-clip") as SVGGElement
-        expect(clipped.getAttribute("clip-path")).toBe("url(#masque-clip-plain)")
-        const rect = shadowOf(host).querySelector("#masque-clip-plain rect") as SVGRectElement
+        const clipped = shadowOf(host).querySelector(`svg.masque-plain g.masque-clip[data-axis="ax1"]`) as SVGGElement
+        expect(clipped.getAttribute("clip-path")).toBe("url(#masque-clip-plain-0)")
+        const rect = shadowOf(host).querySelector("#masque-clip-plain-0 rect") as SVGRectElement
         expect(rect.getAttribute("width")).toBe("1000")
         expect(rect.getAttribute("height")).toBe("640")
     })
 
     it("the sliding copy carries only data pixels, over a blank-plot window, when the view carries a clip (#171)", () => {
         const { host, img, script } = setup()
-        const m = viewManifest("pan")
+        const m = withLine(viewManifest("pan"))
         m.transforms.ax1.viewport = [100, 80, 1000, 640]
         const g = m.layers[0].geometry as { x: number; y: number; w: number; h: number; clip?: number[]; fill?: string }
         g.x = 100; g.y = 80; g.w = 1000; g.h = 640
@@ -4254,7 +4262,7 @@ describe("photographic pan / wheel zoom", () => {
         expect(copy.style.getPropertyValue("clip-path")).toBe("inset(42px 52px 42px 52px)")
         // and the window behind it shows blank plot, not the unmoved picture underneath
         expect(clip.style.background).toContain("rgb(250, 250, 250)")
-        const rect = shadowOf(host).querySelector("#masque-clip-plain rect") as SVGRectElement
+        const rect = shadowOf(host).querySelector("#masque-clip-plain-0 rect") as SVGRectElement
         expect([rect.getAttribute("x"), rect.getAttribute("y"), rect.getAttribute("width"), rect.getAttribute("height")])
             .toEqual(["104", "84", "992", "632"])
     })
@@ -4302,6 +4310,44 @@ describe("photographic pan / wheel zoom", () => {
         await Promise.resolve()
         if (host.dataset.masquePhoto) img.dispatchEvent(new Event("load"))
         expect(host.querySelector(".masque-data-clip")).toBeNull()
+    })
+
+    it("a linked or unlinked axis's threshold line moves with its own axis's pixels mid-preview (#391)", () => {
+        const { host, img, script } = setup()
+        const m = viewManifest("pan")
+        m.transforms.ax1.viewport = [100, 80, 500, 640]
+        m.transforms.ax2 = { ...m.transforms.ax1, viewport: [700, 80, 250, 640] }
+        m.transforms.ax3 = { ...m.transforms.ax1, viewport: [1000, 80, 150, 640] }
+        const g = m.layers[0].geometry as ViewGeometry
+        g.x = 100; g.y = 80; g.w = 500; g.h = 640
+        g.clip = [104, 84, 492, 632]
+        g.links = [{ axis: "ax2", clip: [704, 84, 242, 632], x: [100, 700, 0.5] }]
+        const line = (id: string, axis: string, pos: number): HitLayer => ({
+            id, kind: "threshold", axis, events: ["drag"], payloads: [],
+            geometry: { orientation: "v", pos, span: [100, 700] },
+        } as unknown as HitLayer)
+        m.layers.push(line("t1", "ax1", 300), line("t2", "ax2", 800), line("t3", "ax3", 1100))
+        mount(script, m, undefined, vi.fn(() => new Promise<{ png: Uint8Array; manifest: Manifest }>(() => {})))
+        img.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        host.getBoundingClientRect = () =>
+            ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400, x: 0, y: 0, toJSON() {} }) as DOMRect
+        const shadow = shadowOf(host)
+        wheelAt(shadow.querySelector(".surface") as HTMLElement, -120)
+        const [s, tx, ty] = host.dataset.masquePhoto!.split(",").map(Number)
+        const home = (id: string) => {
+            const el = [...shadow.querySelectorAll("line.masque-threshold-line")]
+                .find((l) => l.closest(`g.masque-clip[data-axis="${id}"]`))
+            return el?.closest("g.masque-photo") as SVGGElement | undefined
+        }
+        expect(home("ax1")?.getAttribute("transform")).toBe(`translate(${tx} ${ty}) scale(${s})`)
+        // ax2 shares x only, at half the pan axis's px per data unit, in its own window.
+        const t2 = 700 * (1 - s) + 0.5 * (tx + 100 * (s - 1))
+        expect(home("ax2")?.getAttribute("transform")).toBe(`translate(${t2} 0) scale(${s} 1)`)
+        expect(home("ax2")?.parentElement?.getAttribute("clip-path")).toMatch(/^url\(#masque-clip-plain-\d+\)$/)
+        // ax3 is in no window: its line stays put and unclipped.
+        expect(home("ax3")?.getAttribute("transform")).toBeNull()
+        expect(home("ax3")?.parentElement?.getAttribute("clip-path")).toBeNull()
     })
 
     it("hover and click find a linked or unlinked axis's mark where it is drawn mid-preview (#379)", async () => {

@@ -1738,7 +1738,10 @@ try {
       for (const l of links) {
         const lim = cam[`linked:${l.axis}`];
         const close = (a, b) => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b));
-        if (!Array.isArray(lim) || !close(lim[0], cam.xmin) || !close(lim[1], cam.xmax) || !close(lim[2], cam.ymin) || !close(lim[3], cam.ymax)) {
+        // Only a shared dimension follows: a `linkxaxes!` twin keeps its own y.
+        const xOk = !l.x || (close(lim?.[0], cam.xmin) && close(lim?.[1], cam.xmax));
+        const yOk = !l.y || (close(lim?.[2], cam.ymin) && close(lim?.[3], cam.ymax));
+        if (!Array.isArray(lim) || !xOk || !yOk) {
           throw new Error(`${key}-drag: linked axis ${l.axis} did not follow the pan: ${stampAfter}`);
         }
       }
@@ -1754,9 +1757,13 @@ try {
         // moved since the page was built.
         const viewAxis = layer.axis;
         const linkedAxes = links.map((l) => l.axis);
-        const offAxis = layers.filter((l) => l.kind === "circles" && l.axis !== viewAxis && !linkedAxes.includes(l.axis))
+        // #391: axes whose pixels sit in the pan's sliding copy (a twin in the same cell, an
+        // inset) move with the pan axis, so their marks are probed by their picks' rings.
+        const withPan = [...new Set((spec.previewWithPan ?? []).map((id) => layers.find((l) => l.id === id)?.axis))];
+        if (withPan.some((a) => !a)) throw new Error(`${key}: previewWithPan names a layer not on the page: ${JSON.stringify(spec.previewWithPan)}`);
+        const offAxis = layers.filter((l) => l.kind === "circles" && l.axis !== viewAxis && !linkedAxes.includes(l.axis) && !withPan.includes(l.axis))
           .map((l) => ({ axis: l.axis, x: l.geometry[0], y: l.geometry[1] }));
-        const zoom = await page.evaluate(([k, ix, iy, marks, pickTip]) => {
+        const zoom = await page.evaluate(([k, ix, iy, marks, pickTip, panAxis]) => {
           const span = document.querySelector(`#coords_${k}`);
           const hosts = [...document.querySelectorAll(".ip-host")];
           const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -1841,14 +1848,32 @@ try {
             const hit = !!sr.querySelector(`svg g.masque-clip[data-axis="${mk.axis}"] g.hi > *`);
             midHover.push({ axis: mk.axis, pick: false, hit, tip: tip(), live: !!host.dataset.masquePhoto });
           }
+          // #391: each axis's threshold lines and ROI boxes, in that axis's chrome group, with
+          // the matrix the preview gave it; and a hover on each moved line, where it is drawn.
+          const chrome = [...sr.querySelectorAll("svg.masque-plain g.masque-clip[data-axis]")]
+            .filter((c) => c.querySelector(":scope > g.masque-photo > g.chrome > *"))
+            .map((c) => {
+              const g = c.querySelector(":scope > g.masque-photo:has(> g.chrome)");
+              const lines = [...g.querySelectorAll("line.masque-threshold-line")];
+              const moved = !!g.getAttribute("transform");
+              const hovered = moved ? lines.map((ln) => {
+                const r = ln.getBoundingClientRect();
+                hoverAt(r.left + r.width / 2, r.top + r.height / 2);
+                return ln.classList.contains("hovered") && !!host.dataset.masquePhoto;
+              }) : [];
+              return { axis: c.dataset.axis, transform: g.getAttribute("transform"), lines: lines.length, hovered };
+            });
+          const panHome = homes.find((h) => h.axis === panAxis);
           return {
             homes,
             fades,
             midHover,
+            chrome,
+            panTransform: panHome?.transform ?? null,
             ...engaged,
             prevented: ev.defaultPrevented,
           };
-        }, [key, p.x, p.y, offAxis, spec.previewPickTip ?? "index"]);
+        }, [key, p.x, p.y, offAxis, spec.previewPickTip ?? "index", viewAxis]);
         if (!zoom.prevented || !zoom.photo || !zoom.clip || zoom.baseTransform) {
           throw new Error(`${key}-wheel: photographic zoom did not engage (${JSON.stringify(zoom)})`);
         }
@@ -1879,6 +1904,30 @@ try {
         }
         if (zoom.midHover.some((h) => !h.hit)) {
           throw new Error(`${key}-wheel: hover mid-preview missed a mark where its own axis draws it: ${JSON.stringify(zoom.midHover)}`);
+        }
+        // #391: a twin or inset axis's picks and chrome move by the pan axis's own matrix, and
+        // a hover on its slid threshold line finds the line.
+        if (withPan.length) {
+          // A scatter pick is on the axis's fade canvases (#394), which take the pan's scale too.
+          const homesOf = (axis) => [...zoom.homes.filter((h) => h.axis === axis), ...zoom.chrome.filter((c) => c.axis === axis)];
+          const panScale = scaleOf(zoom.panTransform);
+          const bad = withPan.filter((axis) => {
+            const hs = homesOf(axis);
+            const fs = zoom.fades.filter((f) => f.axis === axis && f.picks > 0);
+            return !zoom.panTransform || !hs.length || hs.some((h) => h.transform !== zoom.panTransform) ||
+              fs.some((f) => Math.abs(scaleOf(f.transform) - panScale) > 1e-3);
+          });
+          // Each such axis has a pick, probed above where the pan draws it.
+          const unprobed = withPan.filter((axis) => !zoom.midHover.some((h) => h.axis === axis && h.pick));
+          if (unprobed.length) throw new Error(`${key}-wheel: no mid-preview pick probe on ${JSON.stringify(unprobed)}: ${JSON.stringify(zoom.midHover)}`);
+          const lines = zoom.chrome.filter((c) => withPan.includes(c.axis) && c.lines > 0);
+          // A threshold layer named in previewWithPan must be drawn and hover-tested.
+          const wantLines = (spec.previewWithPan ?? []).some((id) => layers.find((l) => l.id === id)?.kind === "threshold");
+          if (bad.length || (wantLines && !lines.length) || lines.some((c) => c.hovered.length !== c.lines || !c.hovered.every(Boolean))) {
+            throw new Error(`${key}-wheel: an axis inside the pan window did not move with it: ${JSON.stringify({ withPan, pan: zoom.panTransform, homes: zoom.homes, chrome: zoom.chrome })}`);
+          }
+          passed.push(`${key}/preview-with-pan`);
+          console.error(`OK  ${key}/preview-with-pan — ${JSON.stringify(zoom.chrome)}`);
         }
         if (zoom.midHover.length) {
           passed.push(`${key}/preview-hover`);

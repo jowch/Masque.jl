@@ -12,7 +12,8 @@ export function setLine(line: SVGLineElement, tg: ThresholdGeometry, pos: number
     line.setAttribute("x2", String(x2)); line.setAttribute("y2", String(y2))
 }
 
-export function buildThresholdLines(manifest: Manifest, svg: SVGElement): Map<string, SVGLineElement> {
+// Each line goes in `parentFor(axis)`, the chrome group of the axis it belongs to.
+export function buildThresholdLines(manifest: Manifest, parentFor: (axis: string) => SVGElement): Map<string, SVGLineElement> {
     const thresholdLines = new Map<string, SVGLineElement>()
     for (const layer of manifest.layers) {
         if (layer.kind !== "threshold") continue
@@ -29,7 +30,7 @@ export function buildThresholdLines(manifest: Manifest, svg: SVGElement): Map<st
         line.classList.add("masque-threshold-line")
         line.style.setProperty("--masque-line-w", String(st.width))
         line.setAttribute("vector-effect", "non-scaling-stroke")
-        svg.appendChild(line) // sibling of hiGroup → never hover-cleared
+        parentFor(layer.axis).appendChild(line) // outside every g.hi → never hover-cleared
         thresholdLines.set(layer.id, line)
     }
     return thresholdLines
