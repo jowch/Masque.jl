@@ -36,6 +36,7 @@ include("core/text_axis3_tests.jl")
 include("core/draw_order_tests.jl")
 include("core/hints_tests.jl")
 include("core/describe_tests.jl")
+include("core/linked_tests.jl")
 
 include("docstrings_tests.jl")
 include("export_embeds_tests.jl")

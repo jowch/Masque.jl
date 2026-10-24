@@ -20,6 +20,8 @@ The type of one commit from this interactable, the value its field holds. Defaul
 [`ElementEvent`](@ref).
 """
 bondtype(::AbstractInteractable) = ElementEvent
+# Rows: positions or keys, one or a vector of them.
+bondtype(::LinkedInteractable) = Any
 bondtype(::ViewInteractable) = Nothing
 bondtype(::GridInteractable) = GridCellEvent
 bondtype(::SurfaceInteractable) = GridCellEvent
@@ -558,6 +560,8 @@ function _many_value(manifest, owners, d, env)
 end
 
 function _field_value(manifest, owners, field::AbstractString, env)
+    g = _manifest_group(manifest, field)
+    g === nothing || return _group_value(manifest, g, env)
     d = _manifest_layer(manifest, field)
     haskey(d, "brush") && return _brush_value(manifest, owners, d, env)
     get(d, "many", false) === true && return _many_value(manifest, owners, d, env)
@@ -786,9 +790,11 @@ function _field_seeds(built, fields, roles, binding, selected)
     selected = _under_bare_head(binding, fields, selected)
     layer_ids = Symbol[L.id for (_, L, _) in built]
     by_id = Dict(L.id => L for (_, L, _) in built)
-    grids = Symbol[f for f in fields if roles[f] === :pick && by_id[f].kind === :grid && _is_many(built, f)]
+    # A `linked(...)` group's field has no role or layer: `_take_group_seeds!` seeded it.
+    role(f) = get(roles, f, nothing)
+    grids = Symbol[f for f in fields if role(f) === :pick && by_id[f].kind === :grid && _is_many(built, f)]
     seedable = Symbol[
-        f for f in fields if roles[f] in (:pick, :brush) && (by_id[f].kind in _SELECTED_KINDS || f in grids)
+        f for f in fields if role(f) in (:pick, :brush) && (by_id[f].kind in _SELECTED_KINDS || f in grids)
     ]
     # A key `bind` left out names a field, so it gets the field list, not the layer list.
     if binding.refs !== nothing && (selected isa NamedTuple || selected isa AbstractDict)
@@ -840,13 +846,18 @@ for a point on a line), `{items: [...]}` for a `select = :many` field (`{runs: [
 on a grid, empty unless `selected=` seeds it), a control's start, and the elements a box's
 starting bounds hold for its target.
 """
-function _initial_value(built, fields, roles, binding, selected, ctx, layers)
+function _initial_value(built, fields, roles, binding, selected, ctx, layers, groups = Any[], tables = Dict{Symbol, Any}())
+    gseeds = Dict{Symbol, Any}()
+    selected = _take_group_seeds!(gseeds, selected, binding, fields, groups, tables)
     seeds = _field_seeds(built, fields, roles, binding, selected)
     by_id = Dict(L.id => i for (i, L, _) in built)
     by_layer = Dict(L.id => L for (_, L, _) in built)
     out = Dict{String, Any}()
+    group = Dict(Symbol(g["id"]) => g for g in groups)
     for f in fields
-        out[string(f)] = if roles[f] === :control
+        out[string(f)] = if haskey(group, f)
+            get(gseeds, f, get(group[f], "many", false) === true ? Dict{String, Any}("rows" => Int[]) : nothing)
+        elseif roles[f] === :control
             initial_envelope(by_id[f], ctx, layers)
         elseif roles[f] === :brush
             _brush_start(f, built, get(seeds, f, nothing), layers)

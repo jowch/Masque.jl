@@ -32,6 +32,7 @@ begin
     W_brush = look_brush(D)
     W_legend = look_legend(D)
     W_big = look_big()
+    W_linked = look_linked(D)
     nothing
 end
 
@@ -44,8 +45,11 @@ end
 # ╔═╡ b5000000-0000-0000-0000-000000000006
 @bind v_big W_big
 
+# ╔═╡ b5000000-0000-0000-0000-000000000008
+@bind v_linked W_linked
+
 # ╔═╡ b5000000-0000-0000-0000-000000000007
-HTML("<pre id=\"coords\">" * JSON3.write(look_coords(W_brush, W_legend, W_big)) * "</pre>")
+HTML("<pre id=\"coords\">" * JSON3.write(look_coords(W_brush, W_legend, W_big, W_linked)) * "</pre>")
 
 # ╔═╡ Cell order:
 # ╠═b5000000-0000-0000-0000-000000000001
@@ -54,4 +58,5 @@ HTML("<pre id=\"coords\">" * JSON3.write(look_coords(W_brush, W_legend, W_big)) 
 # ╠═b5000000-0000-0000-0000-000000000004
 # ╠═b5000000-0000-0000-0000-000000000005
 # ╠═b5000000-0000-0000-0000-000000000006
+# ╠═b5000000-0000-0000-0000-000000000008
 # ╠═b5000000-0000-0000-0000-000000000007

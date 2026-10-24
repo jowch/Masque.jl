@@ -190,6 +190,26 @@ start = findfirst(name -> name == last_city[], city_names)
 If the city is no longer in the data, `findfirst` returns `nothing` and
 no city starts selected.
 
+When each point's payload has a name like this, a [`linked`](@ref) group
+with `key` saves the lookup: its value is the name itself, and `selected=`
+takes a name. Store the name as it comes:
+
+```julia
+if !isnothing(sel.cities)
+    last_city[] = sel.cities
+end
+```
+
+Then pass it back, or `nothing` when the city is no longer in the data:
+
+```julia
+start = last_city[] in city_names ? last_city[] : nothing
+```
+
+```julia
+@bind sel masque(fig, (cities = linked(cities; key = :city),); selected = (cities = start,))
+```
+
 Passing the widget its own value, `selected = sel.cities`, does not work:
 Pluto refuses the cell with a **Cyclic references** error. Between
 rebuilds you do not need it, because the widget keeps its highlight.

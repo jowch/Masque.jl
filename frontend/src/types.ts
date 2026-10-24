@@ -189,6 +189,7 @@ export interface HitLayer {
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
     brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds
     many?: true // a `select = :many` field: it holds { items: [...] }, and a click toggles one in or out
+    group?: string // the `linked(...)` group this layer is a member of: its clicks edit the group's field
     // Bond stamp the Julia side reads back: element | legend | gridcell | axis | colorbar | threshold | bounds | control | none
     bond?: "element" | "legend" | "gridcell" | "axis" | "colorbar" | "threshold" | "bounds" | "control" | "none"
     selects?: string   // id of the target layer this ROI selects; absent → bounds-ROI (no multi-select)
@@ -222,6 +223,19 @@ export interface HitLayer {
     // click or a box's bounds hold { layer, index, payload }.
 }
 
+// A `linked(...)` group (Julia's `_group_dict`): one field, the rows its members share.
+// `rows` maps each member layer to its marks' 0-based rows; absent, a row is a mark's
+// position. `key`/`keys` are what Julia reads the keys back from, unused here.
+export interface LinkGroup {
+    id: string
+    members: string[]
+    n: number // rows
+    many?: true // holds { rows: [...] }; otherwise { row } or null
+    rows?: Record<string, number[]>
+    key?: string
+    keys?: Record<string, unknown[]>
+}
+
 export interface Manifest {
     width: number
     height: number
@@ -235,6 +249,7 @@ export interface Manifest {
     // The layer ids whose commits make the `@bind` value, one field each. Every other layer
     // takes no clicks. The browser sends `{field: envelope}` for all of them on every commit.
     fields?: string[]
+    groups?: LinkGroup[] // the `linked(...)` fields among `fields`
     // True when `bind` named one object of one field: Julia unwraps that field's value. The
     // browser ignores it and sends `{field: envelope}` either way.
     bare?: boolean

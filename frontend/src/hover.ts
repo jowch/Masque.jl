@@ -1,7 +1,8 @@
 import { anchorFor, axisPoint, computeAnchoredPlacement, hitTestAt, layerPoint, resolvePayload, invertAxis, sampleSlice, viewportUnder, CURSOR_FOLLOWING_KINDS, ANCHOR_GAP, layerFrame } from "./geometry"
 import type { Anchor, SliceSample } from "./geometry"
 import { renderTemplate, renderAutoTable, esc, fmtNum, withReadout } from "./template"
-import { drawHover, clearHover, drawLegendLink, clearLegendLink, markColorFor } from "./highlight"
+import { drawHover, clearHover, drawLegendLink, drawPartners, clearLegendLink, markColorFor } from "./highlight"
+import { groupOf, partnerHits } from "./linked"
 import { hideCross, syncCross } from "./cross"
 import { linkedHits } from "./selection"
 import { surfaceFields } from "./surface"
@@ -290,6 +291,8 @@ export function showTipAt(ctx: OverlayCtx, state: OverlayState, hit: Hit, x: num
 // applyMove's hover-hit branch, restoreFocus (below), and keyboard.ts's focusTo, so pointer
 // and keyboard drive the same g.link lifecycle drawHi/clearHi already give g.hi.
 export function updateLinkForHit(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
+    const g = groupOf(ctx.manifest_, hit.layer)
+    if (g) { drawPartners(ctx, state, hit, partnerHits(ctx.manifest_, g, hit, state.sel_.get(g.id)?.rows_)); return }
     const hits = linkedHits(ctx.manifest_, hit.layer, hit.index)
     if (hits.length) drawLegendLink(ctx, state, hit, hits)
     else clearLegendLink(ctx, state, true)

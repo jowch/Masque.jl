@@ -7,6 +7,7 @@ import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onPoin
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
 import { buildDragStops } from "./dragkeys"
 import { fieldSelection, recordPicks } from "./history"
+import { groupById, groupEnvelope, groupSelection } from "./linked"
 import type { DragStops } from "./dragkeys"
 import * as thresholdDrag from "./drag/threshold"
 import * as roiDrag from "./drag/roi"
@@ -805,6 +806,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         // since (#102 tripwire #3, the #107 regression shape). `selKeys_` is already id-keyed and gets
         // rebuilt by `renderSelection` itself, so only `sel_` needs re-keying here.
         for (const [f, sel] of state.sel_) {
+            // A group's rows stay; their marks are this frame's.
+            const g = sel.rows_ ? groupById(newManifest, f) : undefined
+            if (g) {
+                state.sel_.set(f, groupSelection(newManifest, g, sel.rows_!.filter((r) => r < g.n)))
+                continue
+            }
             if (sel.mask_) {
                 // A grid's mask outlines against the new frame's cell edges. A frame comes from a
                 // view gesture, which never touches the bond (§12.3) and never changes the cell
@@ -876,6 +883,12 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     function clearFields(man: Manifest, ids: string[]): void {
         const updates: Record<string, unknown> = {}
         for (const f of ids) {
+            const g = groupById(man, f)
+            if (g) {
+                state.sel_.delete(f)
+                updates[f] = groupEnvelope(g, [])
+                continue
+            }
             const layer = man.layers.find((l) => l.id === f)
             if (!layer) continue
             state.sel_.delete(f)

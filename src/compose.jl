@@ -169,6 +169,9 @@ the default with the same id.
 `interactables(i)` returns `[i]`, so lists of plots and interactables mix freely;
 `interactables(i; select = :many)` returns it holding several picks.
 
+In a [`linked`](@ref) group, `key = vector` gives the plot's marks their keys, one per mark in
+the order of the plot's data.
+
 # Examples
 ```julia
 s = scatter!(ax, xs, ys)

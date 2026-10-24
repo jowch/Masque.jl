@@ -7,6 +7,7 @@
 import { renderSelection } from "./highlight"
 import { sameValue, selectionForValue } from "./selection"
 import { isApplePlatform } from "./bond"
+import { envelopeRows, groupById, groupEnvelope, groupSelection } from "./linked"
 import type { Manifest } from "./types"
 import type { FieldSelection, OverlayCtx, OverlayState } from "./state"
 
@@ -15,6 +16,7 @@ export const HISTORY_LIMIT = 100
 
 // A field a click picks into: what clearPicks clears. A box's target is the box's own field.
 export function isPickField(manifest: Manifest, id: string): boolean {
+    if (groupById(manifest, id)) return true
     const layer = manifest.layers.find((l) => l.id === id)
     return !!layer && !layer.brush && layer.events.includes("click")
 }
@@ -22,6 +24,11 @@ export function isPickField(manifest: Manifest, id: string): boolean {
 // The selection to hold and draw for field `f` at value `v`, or null when `v` names nothing
 // the manifest has.
 export function fieldSelection(manifest: Manifest, f: string, v: unknown): FieldSelection | null {
+    const g = groupById(manifest, f)
+    if (g) {
+        const rows = envelopeRows(g, v)
+        return rows ? groupSelection(manifest, g, rows) : null
+    }
     const sel = selectionForValue(manifest, v ?? null, f)
     if (!sel) return null
     return sel.mask ? { hits_: sel.hits, source_: null, mask_: sel.mask } :
@@ -72,7 +79,8 @@ export function stepPicks(ctx: OverlayCtx, state: OverlayState, dir: "undo" | "r
         if (!sel) continue // names nothing this manifest has: leave the field as it is
         back[k] = cur[k] ?? null
         state.sel_.set(k, sel)
-        updates[k] = sel.items_ ? { items: sel.items_ } : v
+        const g = sel.rows_ ? groupById(ctx.manifest_, k) : undefined
+        updates[k] = g ? groupEnvelope(g, sel.rows_!) : sel.items_ ? { items: sel.items_ } : v
     }
     if (Object.keys(updates).length === 0) return false
     to.push(back)

@@ -630,6 +630,32 @@ kind_sweep_meta() = [
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "many_grid_regions",
     ),
     Dict(
+        # Linked selections by position (#346): two panels draw the same three rows, row k at
+        # mark k, with a label per row in the left panel. A click in either panel picks the
+        # row everywhere, hover outlines its partners, a box in one panel picks the rows of
+        # the marks inside, an empty click keeps, Escape clears, and undo puts the rows back.
+        # The driver's "linked_pos" block drives it.
+        "key" => "linked_pos", "layerId" => "u", "layerKind" => "circles",
+        "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "linked_pos", "field" => "cells",
+    ),
+    Dict(
+        # Linked selections by key (#346): one scatter per cluster on the left, with a legend,
+        # and one scatter of every cell on the right, in another order. The value is cell ids.
+        # A legend entry picks its cluster's cells in both panels. The driver's "linked_keys"
+        # block drives it.
+        "key" => "linked_keys", "layerId" => "every", "layerKind" => "circles",
+        "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "linked_keys", "field" => "cells",
+    ),
+    Dict(
+        # A `select = :one` group (#346): a click picks one row in both panels, a click on its
+        # partner lets it go, and an empty click clears. The driver's "linked_one" block drives it.
+        "key" => "linked_one", "layerId" => "u", "layerKind" => "circles",
+        "selected" => nothing, "circle" => true, "selectedIndex" => 0, "clickIndex" => 0,
+        "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "linked_one", "field" => "cell",
+    ),
+    Dict(
         "key" => "slice_lines", "layerId" => "slice", "layerKind" => "slice",
         "selected" => nothing, "circle" => false, "selectedIndex" => 0, "clickIndex" => 0,
         "tip" => "", "hoverIndex" => 0, "hoverTip" => "", "mode" => "slice",
@@ -1532,6 +1558,41 @@ function build_kind_sweep()
         masque(fig, (region = interactables(hm; select = :many, regions = R),))
     end
 
+    # Row k sits at mark k in both panels: left to right on the left, right to left on the right.
+    linked_pos = let
+        fig = Figure(size = (560, 260))
+        a1 = Axis(fig[1, 1]; title = "linked left", limits = (0, 10, 0, 10))
+        a2 = Axis(fig[1, 2]; title = "linked right", limits = (0, 10, 0, 10))
+        u = scatter!(a1, [2.0, 5.0, 8.0], [2.0, 5.0, 2.0]; markersize = 20, color = :gray)
+        labels = text!(a1, [2.0, 5.0, 8.0], [3.0, 6.0, 3.0]; text = ["r1", "r2", "r3"], align = (:center, :bottom), fontsize = 14)
+        p = scatter!(a2, [8.0, 5.0, 2.0], [8.0, 5.0, 8.0]; markersize = 20, color = :gray)
+        masque(
+            fig, (cells = linked(interactables(u; id = :u), interactables(p; id = :p), interactables(labels; id = :labels); select = :many),),
+        )
+    end
+
+    linked_keys = let
+        fig = Figure(size = (560, 260))
+        a1 = Axis(fig[1, 1]; title = "by cluster", limits = (0, 10, 0, 10))
+        a2 = Axis(fig[1, 2]; title = "all cells", limits = (0, 10, 0, 10))
+        cells = [(; id = "c$i", cluster = i <= 2 ? "A" : "B") for i in 1:4]
+        A = interactables(scatter!(a1, [2.0, 4.0], [2.0, 2.0]; markersize = 20, color = :gray, label = "A"); id = :A, payloads = cells[1:2])
+        B = interactables(scatter!(a1, [6.0, 8.0], [5.0, 5.0]; markersize = 20, color = :gray, label = "B"); id = :B, payloads = cells[3:4])
+        axislegend(a1; position = :rt)
+        # The right panel draws c4, c3, c2, c1, left to right.
+        every = interactables(scatter!(a2, [2.0, 4.0, 6.0, 8.0], [5.0, 5.0, 5.0, 5.0]; markersize = 20, color = :gray); id = :every, payloads = reverse(cells))
+        masque(fig, (cells = linked(A, B, every; key = :id, select = :many),))
+    end
+
+    linked_one = let
+        fig = Figure(size = (560, 260))
+        a1 = Axis(fig[1, 1]; title = "linked one left", limits = (0, 10, 0, 10))
+        a2 = Axis(fig[1, 2]; title = "linked one right", limits = (0, 10, 0, 10))
+        u = scatter!(a1, [2.0, 5.0, 8.0], [2.0, 5.0, 2.0]; markersize = 20, color = :gray)
+        p = scatter!(a2, [8.0, 5.0, 2.0], [8.0, 5.0, 8.0]; markersize = 20, color = :gray)
+        masque(fig, (cell = linked(interactables(u; id = :u), interactables(p; id = :p)),))
+    end
+
     slice_lines = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "slice lines", limits = (0, 4, 0, 4))
@@ -1586,7 +1647,7 @@ function build_kind_sweep()
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
         polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
-        legend_overlap, legend_template, axis, composite, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, marquee, slice_lines, slice_density, slice_auto, slice_gap,
+        legend_overlap, legend_template, axis, composite, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )
 end
 
