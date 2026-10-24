@@ -520,7 +520,7 @@ end
         "marks_bars", "legend_lines", "roi_table",
         "tooltips_template", "tooltips_dark", "grids_heatmap", "readouts_axis",
         "custom_regions", "recipes_dumbbell", "linked_click", "linked_legend_wash",
-        "selection_start", "slice_spectra", "widgets_value",
+        "selection_start", "slice_spectra", "widgets_value", "explore_3d",
     ]
     for name in guides
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))

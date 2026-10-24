@@ -68,7 +68,10 @@ makedocs(;
                 "Update the figure" => "onchange.md",
                 "Linked views" => "linked-views.md",
             ],
-            "Pan, zoom and orbit" => "view.md",
+            "Move around a figure" => [
+                "Explore a 3D figure" => "explore-3d.md",
+                "Pan, zoom and orbit" => "view.md",
+            ],
             "Extend Masque" => [
                 "Your own plot types" => "recipes.md",
                 "Custom hits" => "custom.md",
