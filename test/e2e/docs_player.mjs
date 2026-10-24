@@ -5,7 +5,8 @@
 // Fails if the overlay never mounts, if host.value does not key a snapshot,
 // or if an overlay click does not update that readout. Then, with jsDelivr blocked, the
 // iframe must give way to its text twin (docs/player_fallback.jl): the `details` after it
-// opens with the notebook's code, and the search index carries that code. The Backends
+// opens with the notebook's code, and the search index carries that code. The Brush a
+// region page shows one notebook in two segments, which must share its value. The Backends
 // page's two `@example` widgets, shown without Pluto, must hover to a tooltip, mount when
 // their script runs from `<head>`, and show their figure with scripts off.
 //
@@ -456,6 +457,79 @@ try {
     await dragChecks(bs, "gallery_boxselect", moves, (items) => `a dragged box enclosing ${items.length} points`);
     bs.done();
     console.log(`E2E OK [docs player] — box-select: ${moves.length} pointer drags each swapped to their own recording`);
+  }
+
+  // A notebook shown in two segments with prose between them (docs/player_segments.jl): the
+  // Brush a region page's figure and table are one roi_table export in two iframes. Each
+  // shows only its own cells, the sim chip stays with the widget, and dragging the box in
+  // the figure's iframe swaps the table in the other one.
+  {
+    const p = existsSync(join(root, "roi", "index.html")) ? "/roi/" : "/roi.html";
+    const misses = [];
+    const onConsole = (m) => { if (/no snapshot for|no segment/.test(m.text())) misses.push(m.text()); };
+    page.on("console", onConsole);
+    await page.goto(`http://127.0.0.1:${server.address().port}${p}`, { waitUntil: "domcontentloaded" });
+    const segEl = (name) => page.locator(`iframe[data-masque-embed="roi_table"][data-masque-segment="${name}"]`);
+    for (const name of ["figure", "table"]) {
+      await segEl(name).waitFor({ state: "attached", timeout: 20000 });
+      await segEl(name).evaluate((f) => {
+        f.loading = "eager";
+        const s = f.getAttribute("src");
+        if (s) f.src = s;
+      });
+    }
+    await segEl("figure").evaluate((f) => f.scrollIntoView({ block: "start" }));
+    const fig = await waitMounted(segEl("figure"), 40000);
+    let table = null;
+    for (const deadline = Date.now() + 40000; Date.now() < deadline && !table;) {
+      const f = await (await segEl("table").elementHandle())?.contentFrame();
+      const ok = f && await f.evaluate(() => typeof window.editor_state_set === "function" && !!document.querySelector("pluto-cell")).catch(() => false);
+      if (ok) table = f; else await sleep(250);
+    }
+    if (!table) throw new Error("roi_table table segment never loaded its notebook");
+    const shown = (frame) => frame.evaluate(() => ({
+      want: window.masqueSegment,
+      visible: [...document.querySelectorAll("pluto-notebook pluto-cell")].filter((c) => c.offsetParent !== null).map((c) => c.id),
+      chip: !!document.querySelector(".masque-sim-chip") && getComputedStyle(document.querySelector(".masque-sim-chip")).display !== "none",
+    }));
+    for (const [name, frame, chip] of [["figure", fig, true], ["table", table, false]]) {
+      const st = await shown(frame);
+      if (!st.want || JSON.stringify(st.visible) !== JSON.stringify(st.want)) {
+        throw new Error(`roi_table ${name} segment shows cells ${JSON.stringify(st.visible)}, wants ${JSON.stringify(st.want)}`);
+      }
+      if (st.chip !== chip) throw new Error(`roi_table ${name} segment: sim chip ${st.chip ? "shown" : "hidden"}`);
+    }
+    const tableOut = () => table.evaluate(() => [...document.querySelectorAll("pluto-output")].filter((o) => o.offsetParent !== null).map((o) => o.innerText).join("\u0000"));
+    const boxCentre = () => fig.evaluate(() => {
+      const host = document.querySelector(".ip-host");
+      let sr = null; host.querySelectorAll("*").forEach((n) => { if (n.shadowRoot) sr = n.shadowRoot; });
+      const rs = [...sr.querySelectorAll("svg.masque-plain rect")].map((n) => n.getBoundingClientRect()).filter((q) => q.width > 20 && q.height > 20);
+      rs.sort((a, b) => b.width * b.height - a.width * a.height);
+      return { x: rs[0].x + rs[0].width / 2, y: rs[0].y + rs[0].height / 2 };
+    });
+    const before = await tableOut();
+    const vh = page.viewportSize().height;
+    const top = (await segEl("figure").boundingBox()).y + (await boxCentre()).y;
+    if (top < 100 || top > vh - 100) {
+      await page.evaluate((d) => window.scrollBy(0, d), top - vh / 2);
+      await sleep(200);
+    }
+    const fb = await segEl("figure").boundingBox();
+    const c = await boxCentre();
+    const [x, y] = [fb.x + c.x, fb.y + c.y];
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    for (let k = 1; k <= 10; k++) await page.mouse.move(x - 4 * k, y + 3 * k);
+    await page.mouse.up();
+    let after = before;
+    for (const deadline = Date.now() + 8000; Date.now() < deadline && after === before;) {
+      if (misses.length) throw new Error(`roi_table segments: ${misses[0]}`);
+      await sleep(100);
+      after = await tableOut();
+    }
+    if (after === before) throw new Error("roi_table: dragging the box in the figure segment did not swap the table segment");
+    page.off("console", onConsole);
+    console.log("E2E OK [docs player] — segments: roi_table's two iframes each show their own cells, and a drag in one swapped the table in the other");
   }
 
   // Widgets shown by Documenter `@example` blocks, with no Pluto (#298): two CairoMakie and

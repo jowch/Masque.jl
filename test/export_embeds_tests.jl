@@ -542,3 +542,35 @@ include(joinpath(@__DIR__, "..", "docs", "player_fallback.jl"))
     @test embeds_href("a.png"; build = "/b", pretty = false, cwd = "/b/gallery") == "../embeds/a.png"
     @test embeds_href("a.png"; build = "/b", pretty = false, cwd = "/b") == "embeds/a.png"
 end
+
+@testset "player segments: named cell ranges of one notebook" begin
+    ids = ["a", "b", "c", "d"]
+    base = Dict{String, Any}("pluto_html" => true, "cells" => ids)
+    @test isempty(player_segments(base))
+    segs = player_segments(merge(base, Dict("segments" => Dict("top" => ["b", "a"], "rest" => ["d", "c"]))))
+    @test segs == Dict("top" => ["a", "b"], "rest" => ["c", "d"])  # the player's order, not the TOML's
+    seg(s) = player_segments(merge(base, Dict("segments" => s)))
+    @test_throws ErrorException seg(Dict("top" => ["a", "x"]))            # not a player cell
+    @test_throws ErrorException seg(Dict("top" => ["a"], "two" => ["a"]))  # one cell, two segments
+    @test_throws ErrorException seg(Dict("top" => ["a", "b", "c"]))       # d is in no segment
+    @test_throws ErrorException seg(Dict("top" => String[]))
+    @test_throws ErrorException seg(Dict("Top" => ["a"]))                  # goes in a URL hash
+    @test_throws ErrorException seg(["a"])
+    @test_throws ErrorException player_segments(Dict("cells" => ids, "segments" => Dict("top" => ["a"])))
+
+    # Each segment's text twin holds only its own cells, and the figure goes with the widget.
+    nb = joinpath(@__DIR__, "..", "docs", "src", "embeds", "roi_table.jl")
+    src = read(nb, String)
+    player = fallback_player(src)
+    segs = player_segments(player)
+    @test sort(collect(keys(segs))) == ["figure", "table"]
+    cells = notebook_cell_code(src)
+    for (name, seg_ids) in segs
+        twin = only(fallback_markdown(nb; image = "x.png", segment = name).content)
+        code = [b.code for b in twin.content if b isa Markdown.Code && b.language == "julia"]
+        @test code == [cells[id] for id in seg_ids if markdown_cell_text(cells[id]) === nothing]
+        has_bind = any(id -> is_bind_cell(cells[id], player["bond"]), seg_ids)
+        @test any(b -> b isa Markdown.Paragraph && any(x -> x isa Markdown.Image, b.content), twin.content) == has_bind
+    end
+    @test_throws ErrorException fallback_markdown(nb; segment = "nope")
+end

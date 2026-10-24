@@ -3,6 +3,8 @@
 
 using TOML
 
+include("player_segments.jl")
+
 # JSON3 1.14.3 calls Parsers.typeparser / neededdigits (Parsers 2). Documenter's
 # JSON.jl 1.9 loads Parsers 3 into this process, and Julia can only bind one
 # Parsers per UUID, so harvest writes through JSON.jl instead.
