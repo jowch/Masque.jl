@@ -12,7 +12,8 @@ colorbar a readout for you. For the other two, pass an
 With an [`AxisInteractable`](@ref), a tooltip follows the pointer
 anywhere on the axis and shows the data coordinates under it. A click
 sets the readout's field, `sel.axis`, to an [`AxisEvent`](@ref) with
-`x` and `y`. The examples on this page call that event `pick`:
+`x` and `y`. With `bind = ints`, where `ints` is the readout, `pick`
+is that event:
 
 ```@raw html
 <div class="masque-embed-wrap">
