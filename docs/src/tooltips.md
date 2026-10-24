@@ -37,7 +37,7 @@ of their fields, followed by the star's `x` and `y`:
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-default" data-masque-embed="tooltips_stars_default" title="The star chart with the default tooltip. Hover a star to see its fields." style="width:100%;height:520px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-default" data-masque-embed="tooltips_stars_default" title="The star chart with the default tooltip. Hover a star to see its fields." style="width:100%;height:570px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
@@ -143,7 +143,7 @@ or system setting. This is the same chart drawn with Makie's
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-tt-dark" data-masque-embed="tooltips_stars_dark" title="The star chart on a dark figure. Hover a star to see a dark tooltip." style="width:100%;height:580px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-tt-dark" data-masque-embed="tooltips_stars_dark" title="The star chart on a dark figure. Hover a star to see a dark tooltip." style="width:100%;height:630px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 
