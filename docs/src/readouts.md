@@ -32,7 +32,7 @@ category under the pointer, and a click returns the category's position
 or `pick.ycat`. On a numeric axis, that field is `nothing`.
 
 The example above shows only the tooltip, because this site does not
-record clicks on a position ([Static exports and this site](@ref)). In
+record clicks on a position ([Examples on this site](@ref this-site)). In
 your notebook, a click sets `sel.axis`.
 
 On a `PolarAxis`, the readout is the angle and radius under the

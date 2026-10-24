@@ -116,6 +116,5 @@ full error to the cell's log.
 stays as it was last drawn, while clicks, the threshold, and the `@bind`
 value still work.
 
-Next: [Build a widget](@ref) puts picks, controls and `onchange` together
-and keeps labels between changes, and [Pan and orbit](@ref) moves the view
-the same way.
+Next: [Linked views](@ref) uses the value in other cells to drive more
+plots, and [Pan, zoom and orbit](@ref) moves the view the same way.

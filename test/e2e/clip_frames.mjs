@@ -51,7 +51,7 @@ export function paintCursor(pngPath, cssX, cssY, clip) {
   const hy = (cssY - clip.y) * sy;
   const scale = (28 / 16) * sx;
   const pts = CURSOR.map(([x, y]) => [hx + (x - 1) * scale, hy + (y - 1) * scale]);
-  const halo = 2.4;
+  const halo = 1.6 * sx;
   for (let k = 0; k < 12; k++) {
     const a = (k / 12) * Math.PI * 2;
     const dx = Math.cos(a) * halo;

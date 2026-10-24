@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
 import type { Manifest } from "../src/types"
 import { withFields } from "./fields"
+import { fadeKept } from "./fadekeys"
 
 function setup(manifest: Manifest) {
     const host = document.createElement("div")
@@ -111,10 +112,11 @@ describe("keyboard navigation", () => {
         down(surface, "ArrowRight") // a[0]
         down(surface, "Enter")
         expect((host as unknown as { value: Record<string, unknown> }).value.a).toMatchObject({ layer: "a", index: 0 })
-        const echo = shadow.querySelector("g.sel > *") as SVGCircleElement
-        expect(echo).toBeTruthy()
-        expect(echo.getAttribute("cx")).toBe("100") // a[0]'s cx
-        expect(shadow.querySelector("g.hi > *")).toBeFalsy()
+        // A closed mark's pick is drawn by the fade (the rest of its plot fades), not in g.sel,
+        // and the focus ring stays on it.
+        expect(fadeKept(shadow)).toEqual(["a:0"])
+        expect(shadow.querySelector("g.sel > *")).toBeFalsy()
+        expect(shadow.querySelector("g.hi > *")).toBeTruthy()
     })
 
     it("Escape clears the ring (fade-out, same as a hover miss) and blurs the surface", () => {
@@ -184,7 +186,7 @@ describe("keyboard navigation", () => {
         expect(shadow.querySelectorAll(".hi > *").length).toBe(2)
     })
 
-    it("keyboard-focusing an already-selected element shows its tooltip with no extra hover ring", () => {
+    it("keyboard-focusing a picked closed mark shows its focus ring and tooltip", () => {
         const selManifest: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
             layers: [
@@ -197,9 +199,10 @@ describe("keyboard navigation", () => {
         const { surface, shadow } = setup(selManifest)
         surface.focus()
         down(surface, "ArrowRight") // focus a[0], the selected element
-        // drawHi (highlight.ts) skips a hover/focus ring for a key already in selKeys_ — only
-        // the pre-existing selected wash should be in g.hi/g.sel, nothing drawn into g.hi.
-        expect(shadow.querySelectorAll("g.hi > *").length).toBe(0)
+        // The pick is drawn by the fade, which has no stroke for a ring to thin, so the focus
+        // ring draws over it as over any mark.
+        expect(fadeKept(shadow)).toEqual(["a:0"])
+        expect(shadow.querySelectorAll("g.hi > *").length).toBeGreaterThan(0)
         const tip = shadow.querySelector(".masque-tip") as HTMLElement
         expect(tip.classList.contains("show")).toBe(true)
     })
@@ -428,13 +431,11 @@ describe("keyboard navigation", () => {
         // mouse-click a[1]: circle at image (300,100), display scale 1200/600=2 -> client (150,50)
         surface.dispatchEvent(new MouseEvent("click", { clientX: 150, clientY: 50, bubbles: true }))
         expect((host as unknown as { value: Record<string, unknown> }).value.a).toMatchObject({ layer: "a", index: 1 })
-        const echo = shadow.querySelector("g.sel > *") as SVGCircleElement
-        expect(echo).toBeTruthy()
-        expect(echo.getAttribute("cx")).toBe("300") // a[1]'s cx, not a[0]'s (100)
-        expect(shadow.querySelector("g.hi > *")).toBeFalsy()
+        expect(fadeKept(shadow)).toEqual(["a:1"]) // a[1], not a[0]
+        // The focus moved to the clicked mark: its ring, not a[0]'s, is the one in g.hi.
+        expect((shadow.querySelector("g.hi > *") as SVGCircleElement).getAttribute("cx")).toBe("300")
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 5, clientY: 5, bubbles: true }))
-        expect(shadow.querySelector("g.hi > *")).toBeFalsy()
-        expect((shadow.querySelector("g.sel > *") as SVGCircleElement).getAttribute("cx")).toBe("300")
+        expect(fadeKept(shadow)).toEqual(["a:1"])
     })
 
     it("a pure-mouse click (no prior keyboard focus) pins the click-echo in g.sel, not a fading g.hi ring (#103)", async () => {
@@ -447,13 +448,13 @@ describe("keyboard navigation", () => {
         await flushFrame() // let onMove's rAF coalescing settle before the next pointermove
         surface.dispatchEvent(new MouseEvent("click", { clientX: 50, clientY: 50, bubbles: true }))
         expect((host as unknown as { value: Record<string, unknown> }).value.a).toMatchObject({ layer: "a", index: 0 })
-        expect(shadow.querySelector("g.hi > *")).toBeFalsy()
-        expect(shadow.querySelector("g.sel > *")).toBeTruthy()
+        expect(fadeKept(shadow)).toEqual(["a:0"])
         // move to empty canvas — the echo is persistent selection state, not a hover ring: it
-        // must survive the miss unfaded, and g.hi must stay empty throughout.
+        // must survive the miss, and the hover ring fades out with no focus to restore.
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 5, clientY: 5, bubbles: true }))
         await flushFrame()
-        expect(shadow.querySelector("g.sel > *")).toBeTruthy()
+        await new Promise((r) => setTimeout(r, 150))
+        expect(fadeKept(shadow)).toEqual(["a:0"])
         expect(shadow.querySelector("g.hi > *")).toBeFalsy()
     })
 

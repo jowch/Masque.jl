@@ -175,6 +175,31 @@ const CLIPS = {
       await c.settle(1800);
     },
   },
+  // The two short loops on Pan and orbit show only the figure. The pointer rests on the `grab`
+  // point (a fraction of the figure) and every drag ends there on the view it started from, so
+  // the last frame matches the first and the clip loops cleanly.
+  "view-pan": {
+    notebook: "view_pan_notebook.jl", nn: 10, figure: true, grab: [0.45, 0.5],
+    async run(c) {
+      // Pan the points to the right and back.
+      const a = { ...c.rest };
+      await c.page.mouse.down();
+      await c.glide({ x: a.x + 110, y: a.y - 25 }, 900, 30);
+      await c.glide(a, 900, 30);
+      await c.page.mouse.up();
+    },
+  },
+  "view-orbit": {
+    notebook: "view_orbit_notebook.jl", nn: 11, figure: true, grab: [0.5, 0.55],
+    async run(c) {
+      // Turn the camera one way and back.
+      const a = { ...c.rest };
+      await c.page.mouse.down();
+      await c.glide({ x: a.x + 120, y: a.y + 30 }, 1000, 30);
+      await c.glide(a, 1000, 30);
+      await c.page.mouse.up();
+    },
+  },
   "grid-brush": {
     notebook: "grid_brush_notebook.jl", nn: 7,
     async run(c) {
@@ -215,7 +240,7 @@ let stopCapture = () => {};
 try {
   const context = await browser.newContext({
     locale: "en-US", timezoneId: "UTC",
-    viewport: { width: 900, height: 1100 }, deviceScaleFactor: 1.5,
+    viewport: { width: 900, height: 1100 }, deviceScaleFactor: 2,
   });
   const page = await context.newPage();
   page.on("pageerror", (e) => console.error("PAGEERROR:", e.message));
@@ -260,13 +285,16 @@ try {
   await page.evaluate((id) => document.getElementById(id)?.scrollIntoView({ block: "start" }), ID_WIDGET);
   await sleep(600);
 
-  const clip = await page.evaluate((ids) => {
-    const rs = ids.map((id) => document.getElementById(id).getBoundingClientRect());
-    const m = 12;
+  // A clip shows the widget's cell and the readout's; a `figure` clip shows only the figure.
+  const clip = await page.evaluate(([ids, figure]) => {
+    const rs = figure
+      ? [document.getElementById(ids[0]).querySelector(".ip-host img, .ip-host canvas").getBoundingClientRect()]
+      : ids.map((id) => document.getElementById(id).getBoundingClientRect());
+    const m = figure ? 0 : 12;
     const left = Math.min(...rs.map((r) => r.left)) - m, top = Math.min(...rs.map((r) => r.top)) - m;
     const right = Math.max(...rs.map((r) => r.right)) + m, bottom = Math.max(...rs.map((r) => r.bottom)) + m;
     return { x: Math.max(0, Math.round(left)), y: Math.max(0, Math.round(top)), width: Math.round(right - left), height: Math.round(bottom - top) };
-  }, shown);
+  }, [shown, !!spec.figure]);
   console.error(`clip: ${JSON.stringify(clip)}`);
 
   const mf = await page.evaluate(() => JSON.parse(document.getElementById("clip_manifest").textContent));
@@ -350,7 +378,10 @@ try {
 
   const frames = [];
   const t0 = Date.now();
-  const rest = { x: clip.x + clip.width - 30, y: clip.y + clip.height - 20 };
+  const rest = spec.grab
+    ? px(mf.width * spec.grab[0], mf.height * spec.grab[1])
+    : { x: clip.x + clip.width - 30, y: clip.y + clip.height - 20 };
+  c.rest = rest;
   let cur = { ...rest };
   let done = false;
   stopCapture = () => { done = true; };
@@ -394,11 +425,17 @@ try {
   };
 
   await page.mouse.move(cur.x, cur.y);
-  await sleep(900);
-  await spec.run(c);
-  // End off the figure, so the last frames show no hover.
-  await c.glide(rest, 700);
-  await sleep(1200);
+  if (spec.grab) {
+    await sleep(500);
+    await spec.run(c);
+    await sleep(500);
+  } else {
+    await sleep(900);
+    await spec.run(c);
+    // End off the figure, so the last frames show no hover.
+    await c.glide(rest, 700);
+    await sleep(1200);
+  }
 
   done = true;
   await capture;

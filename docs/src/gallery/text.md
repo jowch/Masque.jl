@@ -28,4 +28,4 @@ and a little larger than the text. A label placed in screen space rather
 than data space does not respond; `masque(fig)` skips it with a
 `@warn`.
 
-Next, [Click marks](@ref) covers clicking other kinds of mark.
+Next, [What each mark returns](@ref) covers clicking other kinds of mark.

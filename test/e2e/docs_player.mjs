@@ -463,7 +463,7 @@ try {
   // mounts, the WGLMakie one draws its canvas, hovering a point with the real pointer shows
   // its tooltip, and the page logs no errors.
   {
-    const p = existsSync(join(root, "backends", "index.html")) ? "/backends/" : "/backends.html";
+    const p = existsSync(join(root, "publish", "index.html")) ? "/publish/" : "/publish.html";
     const before = consoleLog.length;
     await page.goto(`http://127.0.0.1:${server.address().port}${p}`, { waitUntil: "load" });
     await page.waitForFunction(() => {

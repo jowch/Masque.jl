@@ -4,7 +4,7 @@ Hover over a region to see its payload. `masque(fig)` alone makes these
 filled areas respond: `band!`, `density!`, `contourf!`, `violin!`,
 `voronoiplot!`, and `boxplot!`.
 
-For a `poly!` you made from rings, see [Click marks](@ref).
+For a `poly!` you made from rings, see [What each mark returns](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">

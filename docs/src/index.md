@@ -6,38 +6,57 @@ notebook can respond. [Ready to get started?](getting-started.md)
 
 ## [Tooltips](@id home-tooltips)
 
-![Hovering over a star shows its name, spectral type, and distance](assets/home/hover.gif)
+![Hovering over a star shows its name, spectral type, and distance](assets/home/hover.webp)
 
 Hover over a point, bar, heatmap cell, or polygon to see its data in a
 tooltip. You choose what the tooltip says. See [Tooltips](@ref).
 
 ## Select marks
 
-![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.gif)
+![Clicking São Paulo on a cities scatter updates the bound pick cell to that city](assets/home/click.webp)
 
-Click a mark to send it to your notebook. See [Click marks](@ref) and
-[Selection](@ref).
+Click a mark to send it to your notebook. With `select = :many`, each
+click adds a mark, and dragging a box picks every mark inside it. See
+[What each mark returns](@ref) and [Selection](@ref).
 
-## [Pan and orbit](@id home-pan-orbit)
+## [Build a widget](@id home-widgets)
 
-![Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera](assets/home/orbit.gif)
+```@raw html
+<video title="Dragging a frequency slider while the curve follows it, then switching a toggle to a dotted line"
+       src="assets/controls.mp4" controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+```
+
+Lay out a Makie slider, toggle, or menu in the figure, and it works in
+the notebook next to the marks you can pick, all in one `@bind` value.
+With `onchange`, the figure redraws as the reader moves a control,
+without running the cell again. [Build a widget](@ref) walks through
+one that labels points into classes.
+
+## [Pan, zoom and orbit](@id home-pan-orbit)
+
+```@raw html
+<video class="masque-loop" src="assets/home/orbit.mp4" width="1456" height="828"
+       muted loop playsinline autoplay
+       aria-label="Dragging the pointer on an Axis3 trefoil knot in a Pluto cell orbits the camera"></video>
+```
 
 Drag a 2D axis to pan, or an `Axis3` to orbit, and scroll to zoom
-either. See [Pan and orbit](@ref).
+either. See [Pan, zoom and orbit](@ref).
 
 ## Highlight from the legend
 
-![Clicking a species in the legend keeps that class and fades the others](assets/home/legend.gif)
+![Clicking a species in the legend keeps that class and fades the others](assets/home/legend.webp)
 
 Click a legend entry to highlight the traces it labels, and a cell that
 uses the selection can fade the others, as in this example. See
 [Legend](@ref).
 
-## Static exports
+## [Publish outside Pluto](@id home-publish)
 
 Tooltips and highlights keep working in a static HTML export of your
 notebook, like the figure below: hover over a borough to try it. See
-[Static exports and this site](@ref).
+[Publish outside Pluto](@ref).
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -50,17 +69,5 @@ notebook, like the figure below: hover over a borough to try it. See
 Masque works with CairoMakie and WGLMakie. See [Backends](@ref) to
 choose between them.
 
-## Where to go next
-
-- [Getting started](@ref): install Masque and make a figure interactive
-- [Concepts](@ref): how hover, clicks, payloads, and `@bind` fit together
-- [Constructors](@ref): every interactable, its constructor, and its
-  default fields
-- [Selection](@ref): react to clicks, link plots, and keep a highlight
-- [Legend](@ref): highlight the traces a legend entry labels
-- [Tooltips](@ref): templates and styling
-- [Custom hits](@ref): `RegionInteractable` and `FunctionInteractable`
-- [Backends](@ref): CairoMakie or WGLMakie, and when to use each
-- [Troubleshooting](@ref): common errors and their causes
-- [Examples](@ref): worked examples, one page per plot type
-- [API](@ref): full docstrings
+Next: [Getting started](@ref) installs Masque and makes a first figure
+interactive.

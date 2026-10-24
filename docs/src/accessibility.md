@@ -121,4 +121,4 @@ work; please file an issue with your browser and screen-reader
 versions.
 
 For the rest of what a click or Enter sends to your notebook, see
-[Concepts](@ref).
+[How Masque works](@ref).

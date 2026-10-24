@@ -17,6 +17,8 @@ import { buildControls, CONTROLS_STYLE } from "./controls"
 import { DEFAULT_SIGDIGITS } from "./template"
 import type { GestureChannel } from "./gesture"
 import type { FrameResponse, RenderFrame } from "./gesture"
+import { isLightBackground } from "./color"
+import { createFade } from "./fade"
 import { createOverlayState, cancelPendingMove, cancelPendingDrag, layoutImagePx, oneHome, MOTION_MS, NOTE_MS } from "./state"
 import type { HiGroups, HiSet, OverlayCtx } from "./state"
 import type { Hit, Limits3, Manifest, ViewGeometry } from "./types"
@@ -32,6 +34,8 @@ const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta"])
 // strongly, so the two states stay visually distinct in the same derived colour.
 const HOVER_FILL_OPACITY = 0.18
 const SELECTED_FILL_OPACITY = 0.35
+// How much of a plot's unpicked marks still shows once it holds picks (fade.ts).
+const UNPICKED_OPACITY = 0.2
 
 // Fill/edge split highlight (highlight.ts's makeHiElement, the default for every layer without
 // an explicit hoverstyle stroke). The fill BRIGHTENS (color-dodge, source #141414 — measured
@@ -47,38 +51,6 @@ const HI_STYLE = {
     // selected mark.
     light: { chrome: "#7a7a7a", fillSrc: "#141414", cross: "#b0b0b0" },
     dark: { chrome: "#c8c8c8", fillSrc: "#141414", cross: "#929292" },
-}
-
-// Parses the handful of CSS colour syntaxes build_manifest's `background` kwarg actually emits
-// (#rrggbb/#rgb, rgb()/rgba()) — not a general CSS colour parser (no named colours, hsl(), etc.);
-// an unparseable or absent string falls through to "light" below anyway.
-function parseRGB(css: string): [number, number, number] | null {
-    const hex6 = css.match(/^#([0-9a-f]{6})$/i)
-    if (hex6) { const n = parseInt(hex6[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255] }
-    const hex3 = css.match(/^#([0-9a-f]{3})$/i)
-    if (hex3) { const [r, g, b] = [...hex3[1]].map((c) => parseInt(c + c, 16)); return [r, g, b] }
-    const rgb = css.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i)
-    if (rgb) return [parseFloat(rgb[1]), parseFloat(rgb[2]), parseFloat(rgb[3])]
-    return null
-}
-
-// Same light/dark pivot as --masque-ink below: 49.44 is the lch lightness of middle grey
-// (#808080), the exact threshold the CSS lch(from --masque-fig-bg …) clamp already pivots on for
-// the tooltip theme. --masque-chrome is one of two fixed greys written once at mount (it isn't a
-// live lch(from …) derivation like the tooltip vars), so this mirrors that CSS math in JS:
-// sRGB → relative luminance → CIE L*. A plain WCAG relative-luminance cutoff (Y > 0.5) pivots
-// at a different point than lch lightness and would disagree with the tooltip theme on some
-// backgrounds — matching the constant keeps the two derivations in lockstep.
-function isLightBackground(css: string | undefined): boolean {
-    const rgb = css ? parseRGB(css) : null
-    if (!rgb) return true // unparseable/absent → light, matching --masque-fig-bg's own #ffffff default
-    const [r, g, b] = rgb.map((c) => {
-        const s = c / 255
-        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
-    })
-    const y = 0.2126 * r + 0.7152 * g + 0.0722 * b
-    const lStar = y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y
-    return lStar > 49.44
 }
 
 const STYLE = `
@@ -205,6 +177,11 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: non
 @supports not (mix-blend-mode: color-dodge) {
   svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-chrome); fill-opacity: var(--masque-noblend-fill-opacity, 0.18); }
 }
+/* The closed-mark selected look (fade.ts): the dim canvas covers a plot's unpicked marks in the
+   plot area's colour, and its opacity leaves --masque-unpicked-opacity of them showing. */
+.masque-fades, .masque-fade { position: absolute; inset: 0; pointer-events: none; }
+.masque-fade canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; }
+.masque-fade canvas.masque-dim { opacity: calc(1 - var(--masque-unpicked-opacity, ${UNPICKED_OPACITY})); }
 .masque-tip { position: absolute; opacity: 0; pointer-events: none; z-index: 10;
        padding: var(--masque-tip-padding, 8px 12px); border-radius: var(--masque-tip-radius, 4px);
        background: var(--masque-tip-bg-resolved); color: var(--masque-tip-color-resolved);
@@ -454,7 +431,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         }, NOTE_MS)
     }
 
-    shadow.append(style, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, note)
+    // The closed-mark selected look's canvases (fade.ts), one pair per axis, under every svg so
+    // the hover fill dodges over them.
+    const fadeRoot = document.createElement("div")
+    fadeRoot.className = "masque-fades"
+    shadow.append(style, fadeRoot, fillSvg, edgeSvg, plainSvg, surface, tip, kbdHint, liveRegion, note)
     // Named Makie blocks, drawn as HTML over the empty boxes Julia left for them. A release
     // commits like any field; a slider moving under `onchange` redraws as it goes.
     const controls = buildControls(shadow, manifest, {
@@ -528,9 +509,19 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         dispose() { rawChannel.dispose() },
     }
 
+    const fade = createFade({
+        root_: fadeRoot,
+        style_: shadowHost,
+        manifest_: () => ctx.manifest_,
+        frame_: (axis) => axisFrame(ctx.manifest_, state.photo_, state.photoViewId_, axis),
+        cssScale_: () => {
+            const w = ctx.base_.getBoundingClientRect().width
+            return w > 0 ? ctx.manifest_.width / w : ctx.manifest_.scaling || 1
+        },
+    })
     const ctx: OverlayCtx = {
         manifest_: manifest, tipDigits_: manifest.tipDigits ?? DEFAULT_SIGDIGITS, host_: host, base_: base, surface_: surface, tip_: tip, hiGroup_: hiGroup, selGroup_: selGroup,
-        hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup,
+        hiFixed_: hiFixed, selFixed_: selFixed, linkGroup_: linkGroup, fade_: fade,
         thresholdLines_: thresholdLines, roiBoxes_: roiBoxes, chrome_: plainPhoto,
         shadowRoot_: shadow, focusable_: focusable, layerStarts_: layerStarts, liveRegion_: liveRegion,
         cross_: cross,
@@ -740,6 +731,11 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     function revealFrame(input: Record<string, unknown>, r: FrameResponse): void {
         const newManifest = r.manifest as Manifest | undefined
         if (!newManifest) return
+        // A frame's manifest describes the new geometry only. The figure's colour and the
+        // overlay and tooltip styles were set at mount; the fade and the outlines read them here.
+        newManifest.background ??= ctx.manifest_.background
+        newManifest.overlayStyle ??= ctx.manifest_.overlayStyle
+        newManifest.tipStyle ??= ctx.manifest_.tipStyle
         const onchangeFrame = input.onchange === true
         // An in-drag \`onchange\` frame trails the pointer by a round trip. Its lines and boxes
         // would pull the control back to where it was then, so the ones on screen stay, with
@@ -793,6 +789,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         ctx.surface_.classList.remove("kbd-ring")
         clearHiImmediate(state, ctx.hiGroup_, ctx.hiFixed_)
         clearLinkImmediate(state, ctx.linkGroup_)
+        ctx.fade_.preview_(null, null, [])
         // A frame that lands mid-pan, mid-wheel, or mid-key would wipe the readout the gesture is
         // still showing. Pointer-up, the wheel idle timer, and the key's settle frame hide it.
         if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideTip(ctx, state)
@@ -920,6 +917,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         shadowHost.style.width = `${br.width}px`
         shadowHost.style.height = `${br.height}px`
         roiDrag.syncHandleDraw(ctx.roiBoxes_, ctx.manifest_.width, br.width, ctx.manifest_.scaling)
+        ctx.fade_.refresh_()
         state.surfaceSized_ = false
     }
     // The axis frame (spines, ticks, labels) stays on the untransformed base. A copy of the
@@ -954,6 +952,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         const t = f ? `translate(${f.tx} ${f.ty}) scale(${f.sx === f.sy ? f.sx : `${f.sx} ${f.sy}`})` : null
         home.photos.forEach((g) => { if (t) g.setAttribute("transform", t); else g.removeAttribute("transform") })
         for (const [g, cid] of home.clips) setClip(g, cid, f ? f.clip : null)
+        ctx.fade_.place_(axis, f)
     }
     const photoViewport = (): ViewGeometry | null => {
         const id = state.photoViewId_

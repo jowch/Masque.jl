@@ -40,6 +40,16 @@ try {
     reducedMotion: "no-preference",
   });
   page = await context.newPage();
+  // The fade's picks in a widget's shadow root (#394), every axis together; see fade.ts.
+  await page.addInitScript(() => {
+    window.fadeOf = (sr) => {
+      const out = { picked: [], kept: [], lone: [], outlines: [] };
+      for (const w of sr?.querySelectorAll(".masque-fade") ?? []) {
+        for (const k of Object.keys(out)) out[k].push(...(w.masqueFade?.[k] ?? []));
+      }
+      return out;
+    };
+  });
   page.on("pageerror", (e) => {
     const shim = SHIM_LEAK.test(e.message);
     const benign = shim && ALLOWED.some((re) => re.test(e.message));
@@ -175,7 +185,8 @@ try {
   const passedThrough = () => page.evaluate(() => window.__masqueThrough);
   const selCount = (key) => page.evaluate(([k, src]) => {
     let sr = null; (0, eval)(src)(k).querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-    return sr.querySelectorAll("g.sel > *").length;
+    // A closed mark's pick is drawn by the fade (#394).
+    return sr.querySelectorAll("g.sel > *").length + fadeOf(sr).picked.length;
   }, [key, hostOf.toString()]);
   const waitOut = async (key, before, what) => {
     let t = before;
@@ -189,7 +200,7 @@ try {
     const layer = layers[0];
     const n = elementCount(layer);
     const surface = await surfaceHandle(key);
-    // The baked-`selected` index for this layer (poly bakes 0; scatter/barplot bake 1), or null
+    // The baked-`selected` index for this layer (scatter, barplot and poly bake 1), or null
     // when nothing is baked — see kind_sweep_figures.jl's meta.
     const spec = meta.find((m) => m.key === key);
     const bakedSelected = spec?.selected ? spec.selectedIndex : null;
@@ -333,8 +344,11 @@ try {
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
       const groups = ["svg.masque-fill", "svg.masque-edge", "svg.masque-plain"].flatMap((sel) => [...sr.querySelectorAll(`${sel} g.masque-photo > g.link`)]);
       const populated = groups.find((g) => g.children.length > 0);
+      // A closed series is previewed by the fade (#394): its marks kept beyond the picks.
+      const f = fadeOf(sr);
       return {
         count: groups.reduce((n, g) => n + g.children.length, 0),
+        preview: f.kept.length - f.picked.length,
         leaving: populated ? populated.firstElementChild.classList.contains("masque-leave") : null,
       };
     }, k);
@@ -363,7 +377,9 @@ try {
     await surface.focus();
     for (let i = 0; i <= target; i++) await page.keyboard.press("ArrowRight");
     const li = await linkGCount(key);
-    if (li.count === 0) throw new Error(`${key}: keyboard focus on a legend row drew no g.link content`);
+    // A closed series is previewed by the fade, kept (#394); "pts" is the legend's only closed
+    // series, so nothing fades, as on a click. Linked lines would draw in g.link.
+    if (li.count === 0 && li.preview === 0) throw new Error(`${key}: keyboard focus on the "pts" legend row previewed nothing (${JSON.stringify(li)})`);
     passed.push("legend/keyboard-focus-draws-link");
 
     // Default legend has no visual card. The live region still names the entry ("pts" is row
@@ -378,8 +394,9 @@ try {
 
     await page.keyboard.press("Escape");
     const afterEsc = await linkGCount(key);
-    if (afterEsc.count === 0) throw new Error(`${key}: Escape cleared g.link instantly (no remount fade)`);
-    if (!afterEsc.leaving) throw new Error(`${key}: Escape did not apply masque-leave to g.link`);
+    if (afterEsc.preview !== 0) throw new Error(`${key}: Escape left the fade's legend preview drawn (${JSON.stringify(afterEsc)})`);
+    if (li.count > 0 && afterEsc.count === 0) throw new Error(`${key}: Escape cleared g.link instantly (no remount fade)`);
+    if (afterEsc.count > 0 && !afterEsc.leaving) throw new Error(`${key}: Escape did not apply masque-leave to g.link`);
     passed.push("legend/keyboard-escape-fades-link");
 
     // #304: a plot's Makie `label` names its layer, and the live region announces that name

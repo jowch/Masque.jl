@@ -1,11 +1,11 @@
-# Click marks
+# What each mark returns
 
 You can click any plot `masque(fig)` recognizes, not just scatters.
 Clicking a point, bar, polygon, or text label sets that plot's field in
 the `@bind` value to an [`ElementEvent`](@ref), which holds `index`, the
 mark's position in your data, and fields that depend on the kind of
 mark. Heatmap cells, legend entries, and colorbars give their own event
-types; see [Concepts](@ref).
+types; see [How Masque works](@ref).
 
 The examples on this page pass the plot as `bind`, so the value, `pick`,
 is the clicked mark's event itself rather than a named tuple of fields:
@@ -44,7 +44,7 @@ Other bar-like plots report these fields:
 | `waterfall!` | `value`, `low`, `high` |
 | `crossbar!` | `midpoint`, `low`, `high` |
 
-Heatmaps have their own page: [Inspect a grid](@ref).
+Heatmaps have their own page: [Heatmaps and images](@ref).
 
 ## Polygons
 

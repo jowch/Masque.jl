@@ -292,6 +292,27 @@ and paint: render time, not the browser, is the bottleneck. Localhost only, so n
 latency. Re-highlighting a selection is cheaper still, since the overlay draws it with no round
 trip.
 
+### Re-drawing a selection (#394)
+
+The overlay's half of a click on a plot that holds many picks, with no round trip. Headless
+Chromium against a live Pluto kernel on the warmed env; one click dispatched on the surface,
+`sync` is the handler and `total` runs until two frames later. Medians of 12, measured
+2026-10-23 on the cloud container: the old look at `f181c12` (a dodge fill and a 2 px edge per
+pick, as SVG), the new look on the #394 branch (one canvas per axis), back to back.
+`bench/selection_look/click.mjs` reproduces the table (how to run it is at its top).
+
+| Case | `:cairo` old | `:cairo` new | `:webgl` old | `:webgl` new |
+|------|---:|---:|---:|---:|
+| click, 5 000 picks of 10 000 marks per panel, 2 panels | 105 / 277 ms | 33 / 114 ms | 113 / 2 177 ms | 43 / 1 965 ms |
+| click, 5 000 picks of 100 000 marks | 53 / 126 ms | 40 / 80 ms | 60 / 1 997 ms | 41 / 1 897 ms |
+| legend hover over one of 8 clusters (~1 250 marks a panel), on and off | 19 / 380 ms | 8 / 32 ms | 28 / 2 259 ms | 14 / 1 935 ms |
+
+(`sync` / `total`.) The `:webgl` totals sit near 2 s in every row because headless Chromium draws
+the WGLMakie canvas in software each frame; the overlay's share is the `sync` column. The new
+look draws the cover of every mark of a plot once and, per click, copies it and punches out the
+picks, so its cost follows the picks: a first version that redrew every mark on each click took
+124 / 531 ms on `:cairo` at 100 000 marks.
+
 ## Stress — where it stops being render-bound
 
 **Live round trip against payload.** Same method as above with a heavier downstream cell:

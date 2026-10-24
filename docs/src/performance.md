@@ -26,7 +26,7 @@ Heatmaps do not grow with the data this way: when a grid's cells are
 smaller than one screen pixel on its axis, Masque sends one value per
 screen pixel instead of the whole matrix, so a very large heatmap costs
 about the same as one that just fills the plot (see
-[Inspect a grid](@ref)).
+[Heatmaps and images](@ref)).
 
 ## What happens on each interaction
 

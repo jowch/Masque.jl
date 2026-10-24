@@ -80,6 +80,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test d["--masque-ring-halo-opacity"] == "0.5"
         @test d["--masque-handle-fill"] == "rgb(0,0,0)"                        # string → checked CSS
         @test length(d) == 4                                                   # unset keys omitted
+        @test Masque.overlay_style_dict((; unpicked_opacity = 0.4))["--masque-unpicked-opacity"] == "0.4"
+        @test_throws "opacity from 0 to 1" Masque.overlay_style_dict((; unpicked_opacity = 1.5))
         # Every key maps to its own --masque-* property.
         props = [first(v) for v in values(Masque._OVERLAY_STYLE_KEYS)]
         @test allunique(props) && all(startswith("--masque-"), props)
@@ -200,5 +202,13 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         dax = Axis(dfig[1, 1])
         dw = masque(dfig, PointInteractable(dax, pts2); auto = false)
         @test dw.manifest["background"] == Masque._css_color(:gray12)
+        # The plot area's own colour ships only where it differs from the figure's (#394). An
+        # Axis is white by default, whatever the figure.
+        @test !haskey(only(values(w.manifest["transforms"])), "fill")
+        @test only(values(dw.manifest["transforms"]))["fill"] == "rgb(255,255,255)"
+        afig = Figure(size = (200, 150); backgroundcolor = :gray12)
+        aax = Axis(afig[1, 1]; backgroundcolor = :gray20)
+        aw = masque(afig, PointInteractable(aax, pts2); auto = false)
+        @test only(values(aw.manifest["transforms"]))["fill"] == Masque._css_color(:gray20)
     end
 end

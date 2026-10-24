@@ -1,4 +1,4 @@
-# Sliders and toggles
+# Sliders, toggles and menus
 
 Lay out Makie's own `Slider`, `Toggle`, `Checkbox`, `IntervalSlider` or
 `Menu` in the figure, name it in `masque`, and the reader can use it in the
@@ -77,5 +77,4 @@ asks which one you mean; write `Makie.Slider` instead.
 In a static HTML export the controls still set the `@bind` value; only
 `onchange` needs a running notebook.
 
-Next: [Update the figure](@ref) has more on what `onchange` can change, and
-[Build a widget](@ref) uses a menu to choose the class a click gives a point.
+Next: [Update the figure](@ref) has more on what `onchange` can change.

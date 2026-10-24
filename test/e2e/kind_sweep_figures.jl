@@ -11,9 +11,11 @@
 #
 # `selectedIndex`/`tip` are the BAKED-selected element (where `selected` isn't `nothing`) — used
 # for the persisted-wash / selected-survives-unhover checks. `hoverIndex`/`hoverTip` are a
-# DIFFERENT element for the standard hover-recipe check: hovering an already-selected mark draws
-# no highlight (see CLAUDE.md), so a kind with a baked selection needs its own, distinct hover
-# target to exercise the normal recipe at all. The one-element `lines` row is the exception:
+# DIFFERENT element for the standard hover-recipe check: hovering an already-selected line,
+# grid cell or region draws no highlight (see the checklist's visual language), so a kind with a
+# baked selection needs its own, distinct hover target to exercise the normal recipe at all. (A
+# closed mark's pick is drawn by the fade and does take the hover recipe; its spec keeps the
+# separate target anyway.) The one-element `lines` row is the exception:
 # hover and the baked selection are the same mark, so that hover draws no highlight; the
 # `series` row (three whole lines, hover a different one) is what exercises the `:lines`
 # hover stroke. Where nothing is baked, `hoverIndex`/`hoverTip` just repeat
@@ -25,9 +27,9 @@
 # kind_sweep.mjs resolves a mark colour from the manifest's own `colors` field instead) is a
 # `"rgb(r,g,b)"` ground-truth BAKED from an actual CairoMakie raster: build the same figure,
 # `masque()` it, read the tinted element's centre off the manifest geometry the same way
-# kind_sweep.mjs's `hitPoint` does (barplot's `tintIndex`/`clickIndex` 0 -> `rects` centre;
-# heatmap's `tintIndex` 11 -> the `grid` cell midpoint from `xedges`/`yedges`; poly's `clickIndex`
-# 1 -> the 2nd ring's centroid, i.e. the GOLDENROD ring, not orchid), then
+# kind_sweep.mjs's `hitPoint` does (barplot's `selectedIndex` 1 -> `rects` centre, every bar the
+# same grey; heatmap's `tintIndex` 11 -> the `grid` cell midpoint from `xedges`/`yedges`; poly's
+# `selectedIndex` 1 -> the 2nd ring's centroid, i.e. the GOLDENROD ring, not orchid), then
 # `Makie.colorbuffer(fig; px_per_unit = manifest["scaling"])` and sample a 3×3 median at that
 # point (`test/testutils.jl`'s `drawn_near` convention: `img[round(cy), round(cx)]`, already
 # image-px/top-left-origin/y-down, no flip). Deriving this at NOTEBOOK LOAD isn't an option: the
@@ -114,10 +116,11 @@ kind_sweep_meta() = [
     ),
     Dict(
         "key" => "poly", "layerId" => "poly", "layerKind" => "polygons",
-        "selected" => "wash", "circle" => false, "selectedIndex" => 0, "clickIndex" => 1,
-        "tip" => "ring1", "hoverIndex" => 1, "hoverTip" => "ring2",
-        # clickIndex 1 is the 2nd ring — goldenrod (0.55 alpha over the axis background), not
-        # orchid (that's ring 0 / selectedIndex).
+        "selected" => "wash", "circle" => false, "selectedIndex" => 1, "clickIndex" => 0,
+        "tip" => "ring2", "hoverIndex" => 0, "hoverTip" => "ring1",
+        # selectedIndex 1 is the 2nd ring — goldenrod (0.55 alpha over the axis background), not
+        # orchid (ring 0). The tint check hovers the pick, which keeps its own colour while
+        # the unpicked ring fades (#394).
         "tintColor" => "rgb(235,206,132)", "mode" => "element",
     ),
     Dict(
@@ -761,7 +764,7 @@ function build_kind_sweep()
                 ax, rings; id = :poly,
                 payloads = [(; shape = "ring1"), (; shape = "ring2")],
             );
-            selected = Dict(:poly => [1]),
+            selected = Dict(:poly => [2]),
             auto = false,
         )
     end
@@ -863,6 +866,29 @@ function build_kind_sweep()
             auto = false,
             overlaystyle = (; color = "rgb(0, 102, 204)", hover_width = 3, selected_width = 4),
             tooltipstyle = (; bg = "rgb(20, 30, 60)", color = "rgb(240, 240, 200)", radius = 9, caret = false),
+        )
+    end
+
+    # The fade on a dark plot area through a pan (#394): a gray20 axis on a gray12 figure, a
+    # narrow axis with marks past its limits on the right, and one pick. The unpicked marks fade
+    # toward gray20 before and after a pan, and nothing is drawn outside the axis. Not in
+    # kind_sweep_meta(); polish_verify.mjs checks it.
+    fade_pan = let
+        xs = [1.0, 2.0, 3.0, 4.0, 6.0, 7.0]
+        ys = [1.0, 3.0, 2.0, 4.0, 2.5, 2.5]
+        fig = Figure(size = (480, 260); backgroundcolor = :gray12)
+        ax = Axis(
+            fig[1, 1];
+            title = "fade-pan", width = 220, limits = (0, 5, 0, 5), backgroundcolor = :gray20,
+            titlecolor = :gray90, xticklabelcolor = :gray80, yticklabelcolor = :gray80,
+        )
+        sc = scatter!(ax, xs, ys; color = :gray, markersize = 22)
+        masque(
+            fig,
+            PointInteractable(ax, sc; id = :fade_pan, payloads = [(; label = "p$i") for i in eachindex(xs)]),
+            ViewInteractable(ax; id = :view);
+            selected = Dict(:fade_pan => [1]),
+            auto = false,
         )
     end
 
@@ -1500,7 +1526,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, arrows3d, arrows3d_shared, scatterlines3d,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view3d, view3d_linked, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )

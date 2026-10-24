@@ -50,7 +50,7 @@ class = Menu(fig[2, 1]; options = ["good", "bad", "unsure"])
 ```
 
 `w.class` is then the option chosen, and changing it leaves the picks as
-they were. [Sliders and toggles](@ref) lists the controls you can use.
+they were. [Sliders, toggles and menus](@ref) lists the controls you can use.
 
 ## Change the figure and keep state
 
@@ -180,5 +180,5 @@ picked. Add `selected` to the `masque` call:
 Every labeled point starts picked, so the first `onchange` run keeps
 its label. Running the `labels` cell again starts over with no labels.
 
-Next: [Linked views](@ref) uses the value in other cells to drive more
-plots.
+Next: [Sliders, toggles and menus](@ref) lists every control, and
+[Update the figure](@ref) has more on what `onchange` can change.

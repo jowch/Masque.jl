@@ -35,5 +35,5 @@ measurements.
   `selects` names the grid; the value is a [`GridWindowEvent`](@ref),
   and `A[win]` is that block of the matrix.
 
-Next, [Inspect a grid](@ref) covers hovering over and clicking cells in
+Next, [Heatmaps and images](@ref) covers hovering over and clicking cells in
 detail.

@@ -102,7 +102,7 @@ panel in its own figure, as in the example at the top of this page.
 
 ## Highlight a series across panels
 
-Hovering a legend entry highlights every mark of its series, on every
+Hovering a legend entry picks out every mark of its series, on every
 axis where the series appears. Clicking an entry sets `sel.legend` to
 a [`LegendEvent`](@ref), which another cell can use to filter your
 data.
@@ -128,4 +128,4 @@ the box, in the field of the plot it selects from. With that list as
 [Brush a region](@ref) shows how.
 
 For what each click, release, and drag sets in the value, see
-[Concepts](@ref).
+[How Masque works](@ref).
