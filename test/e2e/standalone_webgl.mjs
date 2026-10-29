@@ -73,7 +73,7 @@ async function hoverFirstPoint(p) {
     tip = await host.evaluate((h) => {
       let sr = null; h.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
       const t = sr && sr.querySelector(".masque-tip");
-      return t && t.offsetParent !== null ? t.innerText.trim() : "";
+      return t && t.classList.contains("show") ? t.innerText.trim() : "";
     });
   }
   return tip;

@@ -54,12 +54,9 @@ point in the order you plotted them:
 pts = interactables(s; payloads = df)
 ```
 
-Then `df[picks, :]` is the rows inside the box. To show an empty table
-with the same columns when the box is empty, use `df[1:0, :]`:
-
-```julia
-isempty(picks) ? df[1:0, :] : df[picks, :]
-```
+Then `df[picks, :]` is the rows inside the box.
+[Use selections in other cells](@ref) shows what else the points can
+index, and how to show a table while the box is empty.
 
 Only the box sets `picks`: hovering a point still shows its tooltip, but
 clicking it does not change `picks`. Without `bind`, the value is a

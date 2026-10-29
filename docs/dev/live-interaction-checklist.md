@@ -81,7 +81,10 @@ Tooltip theme is derived from the FIGURE's own background (CSS relative-colour s
 light/dark toggle** — so a dark Makie figure gets a dark tooltip on a light page; the OS media
 query is only the fallback for browsers without relative-colour support. The tooltip is anchored
 ABOVE the hovered mark (not the cursor) with a 10px gap and the caret on the anchor; it flips
-below on a top-clip, and shifts + moves the caret (`--masque-caret-x`) on a side-clip. A
+below on a top-clip, and shifts + moves the caret (`--masque-caret-x`) on a side-clip. The clip
+edge is the browser window, not the figure: the tooltip is a top-layer popover, so a box near the
+figure's edge extends onto the page (Jonathan 2026-10-29). Without the Popover API it falls back
+to the figure's edge. A
 resolvable per-element `colors` (today `scatter!`'s `color=`) adds a 3px tooltip accent border
 in that colour (`--masque-mark-border`); the text stays neutral.
 

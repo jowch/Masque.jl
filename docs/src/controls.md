@@ -23,9 +23,9 @@ layout put them. Moving one changes `w` when you let go, so cells that use
 
 ## Redraw the figure from a control
 
-With [`onchange`](onchange.md), the figure follows the controls without
-running the cell again. Change your plots with Makie's `update!`, then
-move the slider or switch the toggle:
+An `onchange` function, from [Update the figure](@ref), can read the
+controls too, so the figure follows them without the cell running again.
+Move the slider or switch the toggle:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -70,10 +70,17 @@ one worked before `masque` could draw it. Its value labels use the grid's
 own `format` for sliders of up to 101 values (20 for an interval slider);
 past that, the browser writes the plain value.
 
+A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
+doesn't run yet: a click flips the box, and `masque` warns when a named
+checkbox has one.
+
 With WGLMakie loaded, `Slider` also names a slider from Bonito, so Julia
 asks which one you mean; write `Makie.Slider` instead.
 
 In a static HTML export the controls still set the `@bind` value; only
 `onchange` needs a running notebook.
 
-Next: [Update the figure](@ref) has more on what `onchange` can change.
+## Where to go next
+
+[Label points into classes](@ref) uses a menu, a selection and `onchange`
+together in one widget.

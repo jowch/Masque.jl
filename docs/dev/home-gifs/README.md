@@ -47,6 +47,11 @@ node home_orbit_gif.mjs http://localhost:1240 \
 `--length-ms 8000` rescales each overlay capture to 8 s; the orbit loop keeps its captured
 pacing. The frames keep their 2× size.
 
+Before the recorded drag, `home_orbit_gif.mjs` orbits there and back once unrecorded and
+reruns the figure cell, so the loop shows a kernel that has already compiled the orbit's
+redraw (see the warm-up section of `docs/dev/clips/README.md`). The overlay loops need no
+warm-up: a docs player has no kernel.
+
 | Loop | Player / source | Motion |
 |---|---|---|
 | `hover.webp` | `home_hover_stars.html` | Pointer over Sirius, Rigel, Betelgeuse; tooltips |

@@ -209,6 +209,9 @@ export interface OverlayCtx {
 export interface OverlayState {
     drag_: Drag | null
     justDragged_: boolean
+    // The last primary pointerup, in client px. Chromium rounds a click's clientX/Y to whole
+    // px but not a pointer event's, so onClick reads this to commit the value hover showed (#448).
+    lastUp_: { x: number, y: number } | null
     // Hover chrome still in g.hi, live or mid-leave. Null once those nodes are gone.
     // drawSelection reads it to drop a ring whose key just entered the selection (#97).
     hiKey_: string | null
@@ -243,6 +246,8 @@ export interface OverlayState {
     surfaceW_: number
     surfaceH_: number
     surfaceSized_: boolean
+    // hover.ts's last placeTip/placeAnchored call, re-run by replaceTip on scroll and resize.
+    tipPlace_: (() => void) | null
     // Keyboard focus (keyboard.ts). focusIdx indexes OverlayCtx.focusable; focusHit/focusTipHtml/
     // focusTipCss are hover.ts's cache to redraw the ring/tooltip after a pointer miss clears
     // g.hi — see restoreFocus in hover.ts — without hover.ts importing keyboard.ts (no cycle).
@@ -283,6 +288,7 @@ export function createOverlayState(): OverlayState {
     return {
         drag_: null,
         justDragged_: false,
+        lastUp_: null,
         hiKey_: null,
         selKeys_: new Set(),
         sel_: new Map(),
@@ -301,6 +307,7 @@ export function createOverlayState(): OverlayState {
         surfaceW_: 0,
         surfaceH_: 0,
         surfaceSized_: false,
+        tipPlace_: null,
         focusIdx_: null,
         focusHit_: null,
         focusTipHtml_: null,

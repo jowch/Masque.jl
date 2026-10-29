@@ -106,7 +106,7 @@ export interface ControlGeometry {
     markOff?: string
     markSize?: number       // the checkmark's size; its path is in units of it, y up
     mark?: string           // an SVG path; absent, a plain tick
-    next?: [boolean, boolean] // `onchange`: the state a click gives from unchecked, and from checked
+    markChar?: string       // a character drawn as the checkmark instead of a path
     // SliderGrid: each slider, in image px like the grid's own box, with its value label.
     // `name` is the slider's own label, read to screen readers.
     sliders?: (ControlGeometry & { name?: string; valueLabel?: ValueLabel })[]

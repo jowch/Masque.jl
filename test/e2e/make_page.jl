@@ -43,7 +43,7 @@ inner = sprint(
     show, MIME"text/html"(),
     _WGLExt._widget_html(
         w;
-        scene_expr = JavaScript(JSON3.write(w.scene)),
+        scene_expr = JavaScript(JSON3.write(w.scene; allow_inf = true)),
         manifest_expr = JavaScript(JSON3.write(w.manifest)),
         bundle_js = JavaScript(JSON3.write(_WGLExt._bundle_text())),
         shim_js = JavaScript(JSON3.write(_WGLExt._shim_text())),
@@ -77,7 +77,7 @@ inner3 = sprint(
     show, MIME"text/html"(),
     _WGLExt._widget_html(
         w3;
-        scene_expr = JavaScript(JSON3.write(w3.scene)),
+        scene_expr = JavaScript(JSON3.write(w3.scene; allow_inf = true)),
         manifest_expr = JavaScript(JSON3.write(w3.manifest)),
         bundle_js = JavaScript(JSON3.write(_WGLExt._bundle_text())),
         shim_js = JavaScript(JSON3.write(_WGLExt._shim_text())),
@@ -116,7 +116,7 @@ innerp = sprint(
     show, MIME"text/html"(),
     _WGLExt._widget_html(
         wp;
-        scene_expr = JavaScript(JSON3.write(wp.scene)),
+        scene_expr = JavaScript(JSON3.write(wp.scene; allow_inf = true)),
         manifest_expr = JavaScript(JSON3.write(wp.manifest)),
         bundle_js = JavaScript(JSON3.write(_WGLExt._bundle_text())),
         shim_js = JavaScript(JSON3.write(_WGLExt._shim_text())),

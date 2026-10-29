@@ -53,7 +53,7 @@ change, and `sel` changes once, as it does for a click. Shift-Cmd-Z or
 Shift-Ctrl-Z steps forward again, and so does Ctrl-Y off a Mac. Undo
 covers the selection only, not sliders, menus, or the view, and it
 starts over when the cell runs again or when an `onchange` redraw
-changes a plot's marks. Cells that use `sel` respond to an undo as they
+([Update the figure](@ref)) changes a plot's marks. Cells that use `sel` respond to an undo as they
 do to a click, so anything your own code keeps from earlier picks, such
 as a label stored for each picked mark, comes back only if that code
 still holds it when the pick returns. After you click the figure, Cmd-Z
@@ -204,28 +204,13 @@ start = findfirst(name -> name == last_city[], city_names)
 If the city is no longer in the data, `findfirst` returns `nothing` and
 no city starts selected.
 
-When each point's payload has a name like this, a [`linked`](@ref) group
-with `key` saves the lookup: its value is the name itself, and `selected=`
-takes a name. Store the name as it comes:
-
-```julia
-if !isnothing(sel.cities)
-    last_city[] = sel.cities
-end
-```
-
-Then pass it back, or `nothing` when the city is no longer in the data:
-
-```julia
-start = last_city[] in city_names ? last_city[] : nothing
-```
-
-```julia
-@bind sel masque(fig, (cities = linked(cities; key = :city),); selected = (cities = start,))
-```
+With a [`linked`](@ref) group and `key`, the value is the name itself,
+so you can skip the lookup; see
+[Keep a keyed selection when the figure rebuilds](@ref).
 
 Passing the widget its own value, `selected = sel.cities`, does not work:
 Pluto refuses the cell with a **Cyclic references** error. Between
 rebuilds you do not need it, because the widget keeps its highlight.
 
-To select a mark from another widget's click, see [Linked views](@ref).
+To use a click in other cells, see
+[Use selections in other cells](@ref).

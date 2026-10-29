@@ -92,29 +92,39 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["duration"] == 0.3
     end
 
-    @testset "a checkbox ships Makie's square, checkmark and onchange rule (#428)" begin
+    @testset "a checkbox ships Makie's square and checkmark, and leaves its onchange alone (#428)" begin
         fig = Figure(); Axis(fig[1, 1])
         plain = Checkbox(fig[2, 1])
         odd = Checkbox(
             fig[3, 1]; size = 20, roundness = 1, checkboxstrokewidth = 2, checkmark = :circle, checkmarksize = 0.5,
-            checkboxcolor_unchecked = :yellow, checkmarkcolor_unchecked = :gray, onchange = _ -> true,
+            checkboxcolor_unchecked = :yellow, checkmarkcolor_unchecked = :gray,
         )
-        w = masque(fig, (plain = plain, odd = odd))
+        w = @test_logs masque(fig, (plain = plain, odd = odd))
         s = w.manifest["scaling"]
         g = _layer(w.manifest, "plain")["geometry"]
         @test g["size"] ≈ 11s && g["radius"] ≈ 0.15 * 11 / 2 * s && g["stroke"] ≈ 1.5s
         @test g["markSize"] ≈ 11 * 0.85 * s
         @test startswith(g["mark"], "M") && endswith(g["mark"], "Z")
-        @test !haskey(g, "next")                      # Makie's default `!` needs no rule
         g = _layer(w.manifest, "odd")["geometry"]
         @test g["size"] ≈ 20s && g["radius"] ≈ 10s && g["stroke"] ≈ 2s && g["markSize"] ≈ 10s
         @test g["off"] == Masque._css_color(Makie.to_color(:yellow))
         @test g["markOff"] == Masque._css_color(Makie.to_color(:gray))
         @test startswith(g["mark"], "M")              # `:circle` resolves to Makie's path
-        @test g["next"] == [true, true]
-        # A checkmark that isn't a path (a Char) leaves the browser's plain tick.
+        # A character checkmark ships as the character.
         fig = Figure(); Axis(fig[1, 1]); cb = Checkbox(fig[2, 1]; checkmark = 'x')
-        @test !haskey(_layer(masque(fig, (cb = cb,)).manifest, "cb")["geometry"], "mark")
+        g = _layer(masque(fig, (cb = cb,)).manifest, "cb")["geometry"]
+        @test g["markChar"] == "x" && !haskey(g, "mark")
+        # A radio rule: its side effects untick the other boxes. Drawing the widget runs none of
+        # it, and masque says once that a click flips the box instead (#457).
+        fig = Figure(); Axis(fig[1, 1])
+        rs = [Checkbox(fig[2, i]; checked = i == 1) for i in 1:3]
+        calls = Ref(0)
+        for r in rs
+            r.onchange[] = v -> (calls[] += 1; foreach(o -> o === r || (o.checked[] = false), rs); true)
+        end
+        w = @test_logs (:warn, r"checkbox :r1 has its own `onchange`.*#457"s) match_mode = :any masque(fig, (r1 = rs[1], r2 = rs[2], r3 = rs[3]))
+        @test calls[] == 0 && [r.checked[] for r in rs] == [true, false, false]
+        @test Masque.initial_bond(w) == (r1 = true, r2 = false, r3 = false)
     end
 
     @testset "named through bind, and a bare bind" begin
