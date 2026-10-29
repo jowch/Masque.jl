@@ -83,6 +83,13 @@ function hitlayers(i::BlockControl, ctx)
         opts = collect(b.options[])
         g["n"] = length(opts)
         g["labels"] = String[Makie.optionlabel(o) for o in opts]
+        # What the closed menu shows: Makie's prompt before a choice, in its font size, text
+        # colour and box colour, with the label `textpadding[1]` in from the left.
+        g["prompt"] = string(b.prompt[])
+        g["fontsize"] = Float64(b.fontsize[]) * ctx.scaling
+        g["padding"] = Float64(b.textpadding[][1]) * ctx.scaling
+        g["text"] = _css_color(b.textcolor[])
+        g["off"] = _css_color(b.selection_cell_color_inactive[])
     elseif b isa Makie.Toggle
         g["color"] = _css_color(b.buttoncolor[])
         g["fill"] = _css_color(b.framecolor_active[])

@@ -6804,6 +6804,42 @@ describe("block controls (#345)", () => {
         expect(val(host).show).toEqual({ layer: "show", index: 0, payload: true })
     })
 
+    it("a menu shows Makie's prompt before a choice, in its font size and colours (#429)", () => {
+        const m = controlsManifest()
+        Object.assign(m.layers[3].geometry as object, { value: -1, prompt: "Pick a colour", fontsize: 32, padding: 16, text: "rgb(9,9,9)", off: "rgb(200,200,200)" })
+        m.initial!.pick = { layer: "pick", index: 0, payload: -1 }
+        const { host, script } = setup()
+        mount(script, m)
+        const box = ctl(host, "pick")
+        const select = box.querySelector("select") as HTMLSelectElement
+        expect(select.options[0].textContent).toBe("Pick a colour")
+        expect(select.options[0].disabled).toBe(true)
+        expect(select.value).toBe("-1")
+        expect(box.style.getPropertyValue("--fs")).toBe(`${(100 * 32) / 200}cqw`)
+        expect(box.style.getPropertyValue("--pad")).toBe(`${(100 * 16) / 200}cqw`)
+        expect(box.style.getPropertyValue("--masque-ctl-text")).toBe("rgb(9,9,9)")
+        expect(box.style.getPropertyValue("--masque-ctl-off")).toBe("rgb(200,200,200)")
+    })
+
+    it("a menu restyled in onchange takes its new text colour and size (#429)", async () => {
+        const m = controlsManifest({ onchange: true })
+        Object.assign(m.layers[3].geometry as object, { fontsize: 32, padding: 16, text: "rgb(9,9,9)", off: "rgb(200,200,200)" })
+        const after = controlsManifest({ onchange: true })
+        Object.assign(after.layers[3].geometry as object, { fontsize: 20, padding: 16, text: "rgb(0,128,0)", off: "rgb(1,1,1)" })
+        after.layers[1].geometry = { ...(after.layers[1].geometry as ControlGeometry), value: false }
+        const { host, img, script } = setup()
+        mount(script, m, undefined, vi.fn(frame(after)))
+        const toggle = ctl(host, "show").querySelector("input") as HTMLInputElement
+        toggle.checked = false
+        toggle.dispatchEvent(new Event("change", { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        img.dispatchEvent(new Event("load"))
+        const box = ctl(host, "pick")
+        expect(box.style.getPropertyValue("--masque-ctl-text")).toBe("rgb(0,128,0)")
+        expect(box.style.getPropertyValue("--fs")).toBe(`${(100 * 20) / 200}cqw`)
+        expect(box.style.getPropertyValue("--masque-ctl-off")).toBe("rgb(1,1,1)")
+    })
+
     it("a release commits the field; moving alone doesn't", () => {
         const m = controlsManifest()
         const { host, script } = setup()
