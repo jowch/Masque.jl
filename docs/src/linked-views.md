@@ -5,23 +5,9 @@ use the variable respond to the change. So linking a scatter to a detail
 plot, a table, or a model fit is ordinary Pluto code: use the value in
 another cell to create a plot or compute a result.
 
-Click a point in the xy plot below, and the same sample is selected in
-the xz plot:
-
-```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-lv-click" data-masque-embed="linked_click" title="Two scatter plots. Click a point in the xy plot to select the same sample in the xz plot." style="width:100%;height:1150px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
-</div>
-```
-
-```@eval
-Main.masque_fallback("linked_click")
-```
-
-The xz plot follows clicks, not hovering: hovering a point highlights
-it only on the plot under the pointer. To highlight a whole series on
-every plot as you hover, use a legend, as shown in
-[Highlight a series across panels](@ref).
+To have plots that draw the same rows select them together, link them
+with [`linked`](@ref), as in
+[Select the same rows on every panel](@ref).
 
 ## Drive a second plot from a click
 
@@ -56,8 +42,8 @@ The detail cell uses `pick`, so it responds to each click but not to
 hovering. The same `pick.id` could filter a `DataFrame` or choose the
 data for a fit. The detail figure can be a Masque widget too.
 
-To show the clicked point as selected in a second widget, pass it as
-that widget's `selected=`. [Selection round-trip](@ref) shows how.
+To mark the clicked point in another plot of the same rows, put both
+plots in one figure and link them, as the next sections show.
 
 ## Several axes in one figure
 

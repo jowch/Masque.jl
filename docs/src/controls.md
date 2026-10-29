@@ -38,7 +38,7 @@ Main.masque_fallback("controls_wave"; segment = "widget")
 
 While the reader drags the slider, the curve follows it. To redraw only
 when they let go, build the slider with `update_while_dragging = false`.
-Cells that use `w2` see the setting once the reader lets go:
+Cells that use `w` see the setting once the reader lets go:
 
 ```@raw html
 <div class="masque-embed-wrap">

@@ -418,8 +418,8 @@ try {
 
   {
     const img = await openPlayer("image", "gallery_image");
-    // `bind = :img`: the value's one field is the grid's, holding the box's window.
-    const win = (i0, i1, j0, j1) => ({ img: { items: [{ layer: "img", index: 0, payload: { i0, i1, j0, j1, xmin: 0, xmax: 1, ymin: 0, ymax: 1 } }] } });
+    // `bind = img`: the value's one field is the image's, holding the box's window.
+    const win = (i0, i1, j0, j1) => ({ cells: { items: [{ layer: "cells", index: 0, payload: { i0, i1, j0, j1, xmin: 0, xmax: 1, ymin: 0, ymax: 1 } }] } });
     const windows = [[0, 7, 0, 5], [3, 3, 2, 2], [1, 4, 0, 3], [6, 7, 4, 5]];
     for (const [i0, i1, j0, j1] of windows) {
       const before = await img.outputs();
