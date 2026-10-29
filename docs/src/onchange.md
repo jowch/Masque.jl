@@ -33,8 +33,8 @@ end
 ```
 
 Click a few points: the red line moves to fit the points you selected.
-With `select = :many`, each click adds a point to the selection, as
-[Select several marks](@ref) describes, and `w.pts` holds the same points
+Each click adds a point, as in
+[Add each click to the selection](@ref), and `w.pts` holds the same points
 for other cells.
 
 ```@raw html

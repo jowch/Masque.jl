@@ -212,5 +212,5 @@ Passing the widget its own value, `selected = sel.cities`, does not work:
 Pluto refuses the cell with a **Cyclic references** error. Between
 rebuilds you do not need it, because the widget keeps its highlight.
 
-To select a mark from another widget's click, see
+To use a click in other cells, see
 [Use selections in other cells](@ref).

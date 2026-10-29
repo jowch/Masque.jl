@@ -44,8 +44,8 @@ field out of the value.
 ## Add each click to the selection
 
 A widget that builds something up, such as a set of labeled points,
-needs every click to add to what the reader has already picked rather
-than replace it. Pass the plot with `select = :many`, as
+needs every click to add to what the reader has already selected
+rather than replace it. Pass the plot with `select = :many`, as
 [Select several marks](@ref) describes:
 
 ```julia
@@ -57,7 +57,7 @@ than replace it. Pass the plot with `select = :many`, as
 A widget often needs a setting next to the plot, such as which class a
 click assigns or how strongly to smooth a curve. If the `masque` cell
 reads a slider or menu from another cell, changing it runs the `masque`
-cell again, and the reader loses every pick. To keep the picks, lay out
+cell again, and the reader loses the selection. To keep it, lay out
 Makie's own `Menu`, `Slider` or `Toggle` in the figure and name it in the
 same named tuple:
 
@@ -66,10 +66,12 @@ class = Menu(fig[2, 1]; options = ["good", "bad", "unsure"])
 @bind w masque(fig, (class = class, pts = interactables(sc; select = :many)))
 ```
 
-`w.class` is then the option chosen, and changing it leaves the picks as
-they were. [Sliders, toggles and menus](@ref) lists the controls you can use.
+`w.class` is then the option chosen, and changing it leaves the selection as
+it was. [Sliders, toggles and menus](@ref) lists the controls you can use.
 
 ## Where to go next
 
 [Update the figure](@ref) changes the plots each time the reader clicks
-or moves a control, without running the cell again.
+or moves a control, without running the cell again. After it,
+[Sliders, toggles and menus](@ref) lists the controls, and
+[Label points into classes](@ref) builds the widget in the clip above.

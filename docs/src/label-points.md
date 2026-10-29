@@ -39,7 +39,7 @@ labels = Dict{Int, String}()
 
 Each time the selection or the menu changes,
 `onchange` gives every newly selected point the class shown in the menu,
-takes the label off a point that is no longer picked, and colors the
+takes the label off a point that is no longer selected, and colors the
 points:
 
 ```julia
@@ -89,13 +89,13 @@ end
 
 ## Change a label or start over
 
-The `@bind` value holds the points picked, not their classes, so the
-function works the classes out by comparing the picks with the labels it
+The `@bind` value holds the selected points, not their classes, so the
+function works the classes out by comparing the selection with the labels it
 kept. That has three consequences. A click on a labeled point takes its
 label off, whatever class the menu shows, so to move a point to another
 class, click it once to take it out and again with the new class chosen.
 Changing the menu doesn't relabel anything; it only sets the class of the
-next points picked. And starting over, as described in
+next points selected. And starting over, as described in
 [Select several marks](@ref), takes every label off, so before the reader
 starts over, copy the labels they want to keep into a new cell:
 
@@ -109,10 +109,10 @@ labeling.
 ## Keep the labels when the cell runs again
 
 When the `masque` cell runs again, for example because you edited it,
-the new widget starts with no picks, and its first `onchange` run clears
-`labels`. The menu keeps the class the reader chose. To pick up where the
+the new widget starts with nothing selected, and its first `onchange` run clears
+`labels`. The menu keeps the class the reader chose. To carry on where the
 reader left off, start the widget with the labeled points already
-picked. Add `selected` to the `masque` call, as
+selected. Add `selected` to the `masque` call, as
 [Start with a mark selected](@ref) describes:
 
 ```julia
@@ -124,7 +124,7 @@ picked. Add `selected` to the `masque` call, as
 )
 ```
 
-Every labeled point starts picked, so the first `onchange` run keeps
+Every labeled point starts selected, so the first `onchange` run keeps
 its label. Running the `labels` cell again starts over with no labels.
 
 ## Where to go next
