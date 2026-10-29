@@ -77,19 +77,14 @@ When one `series!` call draws several curves, passing that plot as
 clicked. To click lines from separate `lines!` calls, name each one in
 `bind`, and each gets its own field:
 
-```julia
-begin
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1])
-    xs = 0:0.1:10
-    l1 = lines!(ax, xs, sin.(xs))
-    l2 = lines!(ax, xs, cos.(xs))
-    nothing
-end
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-marks-lines" data-masque-embed="marks_lines" title="A sine and a cosine. Click either line to pick its nearest point." style="width:100%;height:820px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
 ```
 
-```julia
-@bind sel masque(fig; bind = (sine = l1, cosine = l2))
+```@eval
+Main.masque_fallback("marks_lines")
 ```
 
 Then `sel.sine` and `sel.cosine` each hold `nothing` or the point

@@ -55,11 +55,13 @@ Dragging then turns the camera, and the stations keep their tooltips and
 clicks at every angle. [Pan, zoom and orbit](@ref) has the zoom and pan
 controls, and how to turn several panels together with `linkcameras!`.
 
+The example at the top of this page does not turn: each turn has Julia
+draw the figure again, and this site has no Julia running behind it
+(see [Pan and orbit preview](@ref)). To try turning it, download the
+notebook, add the `orbit` line, and pass `orbit` to `masque` as above.
+
 ## Limitations
 
-- The example on this page can't turn, since a turn needs Julia to
-  draw the figure again; see [Pan and orbit preview](@ref). To try it,
-  download the notebook and add the two lines above.
 - A surface responds only on an `Axis3`. On a 2D `Axis`, draw the same
   matrix with `heatmap` to read its values; see [Heatmaps and images](@ref).
 - A sphere from `meshscatter` stops responding once its center leaves
@@ -71,5 +73,5 @@ controls, and how to turn several panels together with `linkcameras!`.
 - [Pan, zoom and orbit](@ref) for every way to move the view.
 - [Supported plots and axes](@ref) for which 3D plots respond.
 - [Selection](@ref) to keep several stations at once.
-- The [Selection round-trip](@ref) and [Compare a cluster](@ref)
-  examples, which take picks from one figure into another.
+- The [Filter one plot from another](@ref) and [Compare a cluster](@ref)
+  examples, which use the picks on one plot in another.

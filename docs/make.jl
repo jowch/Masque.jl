@@ -84,7 +84,6 @@ makedocs(;
             "Annotate a segmentation" => "gallery/segmentation.md",
             "Filter one plot from another" => "gallery/linked.md",
             "From a heatmap cell to its trace" => "gallery/heatmap-trace.md",
-            "Selection round-trip" => "gallery/selection.md",
             "Box-select scatter" => "gallery/boxselect.md",
             "Image ROI" => "gallery/image.md",
             "Plot types" => [

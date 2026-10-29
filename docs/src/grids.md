@@ -133,12 +133,14 @@ cell's `i` and `j`, or a matrix the same size as the one you plotted.
 The tooltip then lists the payload's fields and the cell's value, and a
 template can use them next to `i`, `j`, and `value`:
 
-```julia
-names = ["F17", "I24", "K31"]
-p = heatmap!(ax, 1:3, 1:3, contacts)
-@bind pick masque(fig, interactables(p;
-    payloads = (i, j) -> (; x = names[i], y = names[j]),
-    tooltip = masque"($(x), $(y)) = $(value)"); bind = p)
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-grids-labels" data-masque-embed="grids_labels" title="A 3 by 3 contact map. Hover a cell to see its two names and value, or click it." style="width:100%;height:760px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("grids_labels")
 ```
 
 Name the fields after the axes, because `i` runs along x and `j` along
@@ -160,8 +162,14 @@ edges and the values to [`GridInteractable`](@ref). Each edge vector must be mon
 the values form a matrix of size
 `(length(xedges) - 1, length(yedges) - 1)`:
 
-```julia
-cells = GridInteractable(ax, 0.5:1:4.5, 0.5:1:3.5, z; id = :cells)
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-grids-edges" data-masque-embed="grids_edges" title="A 4 by 3 grid of values drawn as an image. Hover or click a cell to read its value." style="width:100%;height:760px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("grids_edges")
 ```
 
 ## Large grids
