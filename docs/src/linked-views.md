@@ -15,40 +15,27 @@ Give each payload a key that identifies its row, such as an id or a
 name, and use the key in other cells. Here, clicking a city on a map
 plots that city's series:
 
-```julia
-begin
-    cities = [
-        (id = "tok", name = "Tokyo", lon = 139.7, lat = 35.7),
-        (id = "del", name = "Delhi", lon = 77.2, lat = 28.6),
-        (id = "sha", name = "Shanghai", lon = 121.5, lat = 31.2),
-    ]
-    series = Dict(
-        "tok" => [3.1, 3.4, 3.2, 3.6],
-        "del" => [2.2, 2.5, 2.9, 3.0],
-        "sha" => [2.0, 2.4, 2.3, 2.7],
-    )
-    fig = Figure(size = (560, 320))
-    ax = Axis(fig[1, 1]; xlabel = "longitude", ylabel = "latitude")
-    s = scatter!(ax, [139.7, 77.2, 121.5], [35.7, 28.6, 31.2]; markersize = 16)
-    pts = interactables(s; payloads = cities)
-    nothing
-end
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-lv-city" data-masque-embed="linked_city" data-masque-segment="widget" title="A map of three cities. Click a city to plot its series in the next cell." style="width:100%;height:760px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
 ```
 
-```julia
-@bind pick masque(fig, pts; bind = s)
+```@eval
+Main.masque_fallback("linked_city"; segment = "widget")
 ```
 
 `bind = s` makes `pick` the clicked city itself, or `nothing` before
 the first click.
 
-```julia
-begin
-    detail = Figure(size = (560, 240))
-    dax = Axis(detail[1, 1]; title = isnothing(pick) ? "click a city" : pick.name)
-    isnothing(pick) || lines!(dax, series[pick.id])
-    detail
-end
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-lv-city-detail" data-masque-embed="linked_city" data-masque-segment="detail" title="The detail cell: the clicked city's series." style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("linked_city"; segment = "detail")
 ```
 
 The detail cell uses `pick`, so it responds to each click but not to
@@ -81,8 +68,14 @@ xy and an xz panel, pass them to [`linked`](@ref). Clicking a point in
 either panel selects that row in both, and hovering a point outlines
 the same row on the other panel:
 
-```julia
-@bind row masque(fig; bind = linked(p_xy, p_xz))
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-lv-rows" data-masque-embed="linked_rows" title="Two panels of the same four samples. Click a point in either panel to select that sample in both." style="width:100%;height:760px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("linked_rows")
 ```
 
 `row` is the position of the clicked point in the data you plotted, so
