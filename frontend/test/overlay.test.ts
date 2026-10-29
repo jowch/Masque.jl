@@ -1480,6 +1480,47 @@ describe("tooltips (mount/showTip)", () => {
         expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("5.0")
     })
 
+    it("a readout click commits the value its tooltip shows, not the click's rounded position (#448)", () => {
+        // Chromium reports pointer events at fractional client px but rounds a click's to whole
+        // px, so the click lands half a px from the pointerup it follows.
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, tipDigits: 4,
+            transforms: {
+                cb1: { xlims: [0, 1], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                    viewport: [200, 100, 24, 400], xreversed: false, yreversed: false, valueaxis: "y" },
+                ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                    viewport: [400, 100, 400, 400], xreversed: false, yreversed: false },
+            },
+            layers: [
+                { id: "cb", kind: "axis", bond: "colorbar", geometry: [200, 100, 24, 400], payloads: [], axis: "cb1", events: ["click", "hover"] },
+                { id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["click", "hover"] },
+            ],
+        }, undefined, vi.fn(async () => ({})))
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        const press = (x: number, y: number) => {
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, bubbles: true }))
+            const shown = tip.innerHTML
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: x, clientY: y, button: 0, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: x, clientY: y, button: 0, bubbles: true }))
+            surface.dispatchEvent(new MouseEvent("click", { clientX: Math.round(x), clientY: Math.round(y), bubbles: true }))
+            return shown
+        }
+        const value = () => (host as unknown as { value: Record<string, { payload: Record<string, number> }> }).value
+        // client y 150.3 -> image y 300.6 -> 10 - 200.6/40 = 4.985; the rounded 150 would be 5.000
+        expect(press(110, 150.3)).toBe("4.985")
+        expect(value().cb.payload.value).toBeCloseTo(4.985, 6)
+        // client (300.4, 150.3) -> image (600.8, 300.6) -> x = 200.8/40 = 5.02, y = 4.985
+        expect(press(300.4, 150.3)).toContain("5.02")
+        expect(value().axis.payload.x).toBeCloseTo(5.02, 6)
+        expect(value().axis.payload.y).toBeCloseTo(4.985, 6)
+        // A click with no pointerup under it (a script's .click()) keeps its own position.
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 110, clientY: 200, bubbles: true }))
+        expect(value().cb.payload.value).toBeCloseTo(2.5, 6)
+    })
+
     it("cursor-following tooltip offset uses the surface's real rect, not the raw event offset, when one is available", () => {
         // tipOffset falls back to e.offsetX/e.offsetY only when the surface's own
         // getBoundingClientRect is degenerate (width/height 0, as happy-dom defaults to) — with

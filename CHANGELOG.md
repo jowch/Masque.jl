@@ -16,6 +16,8 @@ All notable changes to this project are documented here. The format is based on
   `interactables(plot; key = vector)` gives a plot keys of its own (#346).
 
 ### Fixed
+- A click on a colorbar or an axis readout now gives the value its tooltip shows. Before,
+  it could be off by up to half a pixel, such as `9.525` against a tooltip's `9.500` (#448).
 - A figure with a Makie `Button`, `Textbox` or `SliderGrid` now warns that masque shows it as
   a picture, so it won't respond to a click. Before, it looked live and did nothing (#426).
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
