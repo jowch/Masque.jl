@@ -105,6 +105,6 @@ were recorded from a real notebook (see
 - [What each mark returns](@ref): bars, polygons, lines, and polar points
 - [Brush a region](@ref): drag a box and get the points inside it
 - [Selection](@ref): start with a mark selected, or keep one across a rebuild
-- [Linked views](@ref): update another plot or a table from a click
+- [Use selections in other cells](@ref): update another plot or a table from a click
 - [Examples](@ref): worked examples to copy
 - [Backends](@ref): CairoMakie or WGLMakie
