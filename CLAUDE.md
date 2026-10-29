@@ -129,12 +129,15 @@ text and the bond payload → it gets a live check on every backend × the kinds
   slows both.
 - **Playwright is pinned to the image's Chromium.** The image preinstalls one Chromium build in
   `$PLAYWRIGHT_BROWSERS_PATH` (`/opt/pw-browsers`), and `test/e2e/package.json` pins the
-  Playwright release whose build matches it (1.56.1 ↔ build 1194), so `cloud-warm.sh e2e`
-  downloads nothing. On a mismatch the script says so and falls back to a download, which
-  works only from Playwright releases that know the `cdn.playwright.dev` mirror (1.56 does;
-  1.49's three azureedge/microsoft hosts are all blocked by the network policy). To re-match:
-  find the release whose `playwright-core/browsers.json` names the image's build (`npm pack
-  playwright-core@<v>`), bump the pin, re-run both e2e drivers.
+  Playwright release whose build matches it (1.63.0 ↔ build 1243, Chrome 153), so
+  `cloud-warm.sh e2e` downloads nothing. The image's build moves when the image is rebuilt
+  (it went 1194 → 1243 in October 2026), and then `chromium.launch()` fails with
+  "Executable doesn't exist". `cloud-warm.sh e2e` names both builds and falls back to a
+  download from `cdn.playwright.dev`, which the network policy allows (Playwright 1.49's
+  azureedge/microsoft hosts are blocked). To re-match: `ls /opt/pw-browsers`, find the
+  release whose `playwright-core/browsers.json` names that build (`npm pack
+  playwright-core@<v>`), bump the pin, re-run both e2e drivers. CI downloads the pinned
+  build itself, so a bump needs no CI change.
 - That one warmed env lives at `$MASQUE_DEV_ENV`, defaulting to
   `~/.julia/environments/masque-dev` when the variable is unset (the script and the test
   command both fall back to it). It serves the unit tests and, when `MASQUE_DEV_ENV` is set in
