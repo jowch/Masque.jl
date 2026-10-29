@@ -90,7 +90,7 @@ export const CONTROLS_STYLE = `
 .masque-control:hover .masque-toggle-knob { scale: 1.15; }
 .masque-toggle:focus-visible ~ .masque-toggle-track { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 .masque-check { width: 100cqmin; height: 100cqmin; accent-color: var(--masque-ctl); cursor: pointer; }
-.masque-select { width: 100%; height: 100%; font-family: system-ui, sans-serif; border: none; border-radius: 0; cursor: pointer;
+.masque-control .masque-select { width: 100%; height: 100%; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; border: none; border-radius: 0; cursor: pointer;
   font-size: var(--fs, 50cqh); padding: 0 0 0 var(--pad, 0.5em); background: var(--masque-ctl-off, #f0f0f0); color: var(--masque-ctl-text, #000000); }
 @media (prefers-reduced-motion: reduce) { .masque-toggle-track, .masque-toggle-knob { transition: none; } }
 `
