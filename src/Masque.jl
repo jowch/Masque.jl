@@ -98,6 +98,7 @@ include("render.jl")
 include("describe.jl")
 include("hints.jl")
 include("link.jl")
+include("precompile.jl")
 
 export AbstractBackend
 export AbstractInteractable, AbstractSelector, HitLayer, InteractionContext, AxisTransform

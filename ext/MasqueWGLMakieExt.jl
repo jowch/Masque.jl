@@ -3,6 +3,7 @@ module MasqueWGLMakieExt
 using Masque: Masque, AbstractBackend, InteractionContext, build_manifest, InteractionEvent
 using WGLMakie
 import Makie
+import PrecompileTools
 import Makie: Observable, Point2f
 import AbstractPlutoDingetjes as APD
 using HypertextLiteral: @htl, JavaScript
@@ -514,5 +515,7 @@ end
 # ---- bond plumbing: identical contract to MasqueWidget (same overlay, same events) ----
 APD.Bonds.initial_value(w::WebGLWidget) = Masque.initial_bond(w)
 APD.Bonds.transform_value(w::WebGLWidget, js) = Masque.bond_from_js(w, js)
+
+PrecompileTools.@compile_workload Masque._precompile_workload(:webgl)
 
 end # module MasqueWGLMakieExt
