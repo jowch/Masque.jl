@@ -73,17 +73,28 @@ export const CONTROLS_STYLE = `
 /* A plain slider's fill starts at the bar's own rounded end. */
 .masque-track.from0.h .masque-fill { left: 0; width: calc(50cqmin + var(--b) * var(--span)); border-radius: 100cqmin 0 0 100cqmin; }
 .masque-track.from0.v .masque-fill { bottom: 0; height: calc(50cqmin + var(--b) * var(--span)); border-radius: 0 0 100cqmin 100cqmin; }
-/* Toggle: a pill with a knob, as Makie draws it. */
-.masque-toggle { -webkit-appearance: none; appearance: none; cursor: pointer; position: relative; margin: 0;
-  width: 100%; height: 100%; border-radius: 100cqmin; background: var(--masque-ctl-off, #f0f0f0); transition: background 0.15s; }
-.masque-toggle::after { content: ""; position: absolute; top: 15%; left: 7.5cqh; height: 70%; aspect-ratio: 1;
-  border-radius: 50%; background: var(--masque-ctl); transition: left 0.15s; }
-.masque-toggle:checked { background: var(--masque-ctl-fill, color-mix(in srgb, var(--masque-ctl) 50%, #ffffff)); }
-.masque-toggle:checked::after { left: calc(100% - 77.5cqh); }
+/* Toggle, as Makie draws it: a rounded track turned by the block's orientation and a round knob
+   that slides between the box's ends. Lengths are in --u, one image px as a share of the box.
+   The <input> sits on top, invisible, and takes the pointer and keys. */
+.masque-toggle { -webkit-appearance: none; appearance: none; position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; opacity: 0; cursor: pointer; }
+/* Makie eases the slide and the colour with sineio(), and its knob grows by 15% under the
+   pointer at once. */
+.masque-toggle-track, .masque-toggle-knob { position: absolute; pointer-events: none; --sineio: cubic-bezier(0.37, 0, 0.63, 1); }
+.masque-toggle-track { left: calc(var(--u) * var(--x)); top: calc(var(--u) * var(--y)); width: calc(var(--u) * var(--len));
+  height: calc(var(--u) * var(--th)); border-radius: calc(var(--u) * var(--th) * 0.499); rotate: var(--turn);
+  transform-origin: calc(var(--u) * var(--th) / 2) calc(var(--u) * var(--th) / 2);
+  background: var(--masque-ctl-off, #f0f0f0); transition: background var(--dur, 0.15s) var(--sineio); }
+.masque-toggle:checked ~ .masque-toggle-track { background: var(--masque-ctl-fill, color-mix(in srgb, var(--masque-ctl) 50%, #ffffff)); }
+.masque-toggle-knob { left: calc(var(--u) * var(--x)); top: calc(var(--u) * var(--y)); width: calc(var(--u) * var(--d));
+  height: calc(var(--u) * var(--d)); border-radius: 50%; background: var(--masque-ctl); translate: -50% -50%;
+  transition: left var(--dur, 0.15s) var(--sineio), top var(--dur, 0.15s) var(--sineio); }
+.masque-control:hover .masque-toggle-knob { scale: 1.15; }
+.masque-toggle:focus-visible ~ .masque-toggle-track { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 .masque-check { width: 100cqmin; height: 100cqmin; accent-color: var(--masque-ctl); cursor: pointer; }
 .masque-select { width: 100%; height: 100%; font-family: system-ui, sans-serif; font-size: 50cqh; padding: 0 0.5em; border: none; border-radius: 0;
   background: #f0f0f0; color: #000000; cursor: pointer; }
-@media (prefers-reduced-motion: reduce) { .masque-toggle, .masque-toggle::after { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .masque-toggle-track, .masque-toggle-knob { transition: none; } }
 `
 
 function envelope(id: string, payload: unknown): ControlEnvelope {
@@ -146,11 +157,39 @@ function fillTrack(t: HTMLElement, g: ControlGeometry, lo: number, hi: number, k
     t.querySelectorAll<HTMLElement>(".masque-knob").forEach((el, i) => el.style.setProperty("--k", String(knobs[i] / last)))
 }
 
+// Makie's toggle track and knob, placed from the block's geometry (src/controls.jl). Without
+// it (an older manifest), a horizontal pill that fills the box.
+function toggleParts(g: ControlGeometry, el: HTMLInputElement): { parts_: HTMLElement[]; show_: () => void } {
+    const t = document.createElement("div")
+    t.className = "masque-toggle-track"
+    const k = document.createElement("div")
+    k.className = "masque-toggle-knob"
+    const [tx, ty, len, th] = g.track ?? [g.h / 2, g.h / 2, g.w, g.h]
+    const set = (part: HTMLElement, vars: Record<string, number | string>) => {
+        for (const [name, v] of Object.entries(vars)) part.style.setProperty(`--${name}`, String(v))
+    }
+    // Lengths are image px; --u, one image px as a share of the box's width, scales them with
+    // the figure. Makie's track runs from (-th/2, -th/2) to (len - th/2, th/2) about (tx, ty),
+    // turned by theta; screen y points down, so the turn is clockwise here.
+    set(t, { u: `${100 / g.w}cqw`, x: tx - th / 2, y: ty - th / 2, len, th, turn: `${-(g.theta ?? 0)}rad` })
+    set(k, { u: `${100 / g.w}cqw`, d: g.knob ?? th * 0.67 })
+    if (g.duration !== undefined) for (const part of [t, k]) part.style.setProperty("--dur", `${g.duration}s`)
+    const off = g.knobOff ?? [th / 2, th / 2]
+    const on = g.knobOn ?? [g.w - th / 2, th / 2]
+    const show = () => {
+        const [x, y] = el.checked ? on : off
+        set(k, { x, y })
+    }
+    show()
+    el.addEventListener("change", show)
+    return { parts_: [t, k], show_: show }
+}
+
 // What a control is built from, apart from its box and value: when this changes, it is built again.
 function shape(g: ControlGeometry): string {
     // A range arrives as a typed array off the kernel and as a plain one from a docs player's
     // JSON frame; the same range is the same shape either way.
-    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly])
+    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration])
 }
 
 // The knob index under a pointer at (x, y) on a slider's box.
@@ -255,9 +294,11 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             el.setAttribute("aria-label", label)
             el.addEventListener("change", () => hooks.commit_(id, envelope(id, el.checked)))
             box.append(el)
+            const tp = g.control === "toggle" ? toggleParts(g, el) : null
+            if (tp) box.append(...tp.parts_)
             return {
                 layer_: layer, shape_: shape(g), box_: box, get_: () => el.checked,
-                set_: (p) => { if (typeof p === "boolean") el.checked = p },
+                set_: (p) => { if (typeof p === "boolean") { el.checked = p; tp?.show_() } },
             }
         }
         case "menu": {

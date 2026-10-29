@@ -87,10 +87,39 @@ function hitlayers(i::BlockControl, ctx)
         g["color"] = _css_color(b.buttoncolor[])
         g["fill"] = _css_color(b.framecolor_active[])
         g["off"] = _css_color(b.framecolor_inactive[])
+        _toggle_geometry!(g, b, ctx)
     elseif b isa Makie.Checkbox
         g["color"] = _css_color(b.checkboxcolor_checked[])
     end
     return [HitLayer(i.id, :control, g, Any[], Symbol(""), events(i), string(i.id))]
+end
+
+# Makie's toggle (Makie/src/makielayout/blocks/toggle.jl): a rounded track `length` long and
+# `markersize` thick, turned by `orientation` and pinned to the box's corner on its start side,
+# and a knob `markersize·(1 - rimfraction)` across that slides between the box's two ends.
+# Points are image px from the box's top-left corner; `theta` turns counterclockwise.
+function _toggle_geometry!(g, b::Makie.Toggle, ctx)
+    or = b.orientation[]
+    theta = or === :horizontal ? 0.0 : or === :vertical ? pi / 2 : Float64(or)
+    ms = Float64(b.markersize[]); len = Float64(b.length[])
+    bb = _block_bbox(b)
+    o = bb.origin; w = bb.widths
+    s = ctx.scaling
+    local_px(x, y) = Float64[(x - o[1]) * s, (o[2] + w[2] - y) * s]
+    sy, sx = sincos(theta)
+    tx = sx > 0 ? o[1] + ms / 2 : o[1] + w[1] - ms / 2
+    ty = sy > 0 ? o[2] + ms / 2 : o[2] + w[2] - ms / 2
+    knob(active) = begin
+        y, x = (active ? -1 : 1) .* (sy, sx)
+        local_px(x > 0 ? o[1] + ms / 2 : o[1] + w[1] - ms / 2, y > 0 ? o[2] + ms / 2 : o[2] + w[2] - ms / 2)
+    end
+    g["theta"] = theta
+    g["track"] = vcat(local_px(tx, ty), len * s, ms * s)
+    g["knobOff"] = knob(false)
+    g["knobOn"] = knob(true)
+    g["knob"] = ms * (1 - Float64(b.rimfraction[])) * s
+    g["duration"] = Float64(b.toggleduration[])
+    return g
 end
 
 initial_envelope(i::BlockControl, ctx, layers) =
@@ -199,10 +228,14 @@ end
 # The blocks of `fig` drawn as controls, in layout order, nested layouts included.
 _figure_blocks(fig) = Any[c for c in fig.content if c isa _CONTROL_BLOCKS]
 
+# Makie's input blocks that masque doesn't draw as controls yet: they stay pictures (#426).
+const _PICTURE_BLOCKS = Union{Makie.Button, Makie.Textbox, Makie.SliderGrid}
+
 # A block in the figure that this call doesn't name would look live and do nothing, so it is an
-# error (a warning in 0.3.1). A `SliderGrid`'s sliders aren't in `fig.content`, so the grid
-# stays a picture.
+# error (a warning in 0.3.1). A block masque can't draw yet looks just as live, so it is a
+# warning. A `SliderGrid`'s sliders aren't in `fig.content`, so only the grid itself counts.
 function _check_unnamed_blocks(fig, interactables)
+    _warn_picture_blocks(fig)
     named = Base.IdSet{Any}(i.block for i in interactables if i isa BlockControl)
     left = [b for b in _figure_blocks(fig) if !(b in named)]
     isempty(left) && return nothing
@@ -216,4 +249,20 @@ function _check_unnamed_blocks(fig, interactables)
                 "control, `masque(fig, (name = block,))`, or take it out of the figure",
         ),
     )
+end
+
+function _warn_picture_blocks(fig)
+    left = Any[c for c in fig.content if c isa _PICTURE_BLOCKS]
+    isempty(left) && return nothing
+    kinds = unique(string(nameof(typeof(b))) for b in left)
+    names = ["a " * k for k in kinds]
+    list = length(names) == 1 ? only(names) : join(names[1:(end - 1)], ", ") * " and " * names[end]
+    instead = String[]
+    any(b -> b isa Makie.SliderGrid, left) &&
+        push!(instead, "For a grid of sliders, lay out separate Makie `Slider`s, which masque makes live.")
+    any(b -> b isa Union{Makie.Button, Makie.Textbox}, left) &&
+        push!(instead, "For a button or a text box, use a control outside the figure, such as PlutoUI's Button or TextField.")
+    @warn "masque: this figure has $(list), which masque shows as a picture for now, so the " *
+        "reader can click it and nothing happens. $(join(instead, " "))"
+    return nothing
 end

@@ -69,6 +69,29 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["h"] ≈ bb.widths[2] * s
     end
 
+    @testset "a toggle ships Makie's track and knob, turned by its orientation (#427)" begin
+        fig = Figure(size = (300, 300))
+        Axis(fig[1, 1])
+        flat = Toggle(fig[2, 1]; active = true)
+        tall = Toggle(fig[1, 2]; orientation = :vertical, length = 40, markersize = 20, rimfraction = 0.25, toggleduration = 0.3)
+        w = masque(fig, (flat = flat, tall = tall))
+        s = w.manifest["scaling"]
+        g = _layer(w.manifest, "flat")["geometry"]
+        @test g["theta"] == 0
+        # Makie's default: a 32-long, 18-thick track, the knob off at the left end, on at the right.
+        @test g["track"] ≈ [9s, 9s, 32s, 18s]
+        @test g["knobOff"] ≈ [9s, 9s] && g["knobOn"] ≈ [g["w"] - 9s, 9s]
+        @test g["knob"] ≈ 18 * (1 - 0.33) * s
+        g = _layer(w.manifest, "tall")["geometry"]
+        @test g["theta"] ≈ pi / 2
+        @test g["w"] ≈ 20s && g["h"] ≈ 40s
+        # Vertical: the track starts at the bottom; the knob is off at the bottom, on at the top.
+        @test g["track"] ≈ [10s, 30s, 40s, 20s]
+        @test g["knobOff"] ≈ [10s, 30s] && g["knobOn"] ≈ [10s, 10s]
+        @test g["knob"] ≈ 15s
+        @test g["duration"] == 0.3
+    end
+
     @testset "named through bind, and a bare bind" begin
         (; fig, sc, sl) = _controls_fixture((:sl,))
         w = masque(fig; bind = (degree = sl, pts = sc))
@@ -107,10 +130,22 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test_logs masque(fig, (degree = sl,))
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
         @test_logs masque(fig)
-        # A `SliderGrid` is a picture, sliders included, so it isn't an error.
+    end
+
+    @testset "a block masque shows as a picture is a warning naming its kind (#426)" begin
+        # A `SliderGrid`, `Button` or `Textbox` would look live and do nothing too, but figures
+        # with one worked before, so it warns instead of failing.
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
         SliderGrid(fig[2, 1], (label = "a", range = 1:3))
-        @test_logs masque(fig)
+        Button(fig[3, 1]; label = "Go")
+        Textbox(fig[4, 1])
+        @test_logs (:warn, r"has a SliderGrid, a Button and a Textbox, which masque shows as a picture.*separate Makie `Slider`s.*PlutoUI's Button"s) masque(fig)
+        fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
+        Button(fig[2, 1])
+        @test_logs (:warn, r"has a Button, which.*PlutoUI's Button") masque(fig)
+        fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
+        SliderGrid(fig[2, 1], (label = "a", range = 1:3))
+        @test_logs (:warn, r"^(?!.*PlutoUI).*separate Makie `Slider`s"s) masque(fig)
     end
 
     @testset "the picture leaves the block's box empty, and the figure keeps its drawing" begin
