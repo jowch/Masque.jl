@@ -1,4 +1,4 @@
-# Custom hits
+# Custom shapes
 
 You can make parts of a figure respond to hover and click where Makie
 drew no mark, such as regions of interest on a microscope image, zones
@@ -63,7 +63,7 @@ are just `sel.cells`. To have
 one selection across every region, make them all the same kind, such as
 polygons.
 
-## Compute hit geometry
+## Compute the shapes yourself
 
 For other shapes, such as line segments, you build the layers yourself
 with a [`FunctionInteractable`](@ref). It takes a function that
@@ -130,7 +130,7 @@ edges, so build them with [`GridInteractable`](@ref) instead.
 In the kinds above, a layer's `payloads` has one entry per element, and a click
 returns an [`ElementEvent`](@ref) with that entry's fields.
 
-## A custom interactable
+## Return your own type from a click
 
 To make a click return a struct of your own, subtype
 [`AbstractInteractable`](@ref) and implement three methods:

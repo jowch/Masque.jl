@@ -5,72 +5,45 @@ use the variable respond to the change. So linking a scatter to a detail
 plot, a table, or a model fit is ordinary Pluto code: use the value in
 another cell to create a plot or compute a result.
 
-Click a point in the xy plot below, and the same sample is selected in
-the xz plot:
+To have plots that draw the same rows select them together, link them
+with [`linked`](@ref), as in
+[Select the same rows on every panel](@ref).
 
-```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-lv-click" data-masque-embed="linked_click" title="Two scatter plots. Click a point in the xy plot to select the same sample in the xz plot." style="width:100%;height:1150px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
-</div>
-```
-
-```@eval
-Main.masque_fallback("linked_click")
-```
-
-The xz plot follows clicks, not hovering: hovering a point highlights
-it only on the plot under the pointer. To highlight a whole series on
-every plot as you hover, use a legend, as shown in
-[Highlight a series across panels](@ref).
-
-## Drive a second plot from a click
+## Update another plot from a click
 
 Give each payload a key that identifies its row, such as an id or a
 name, and use the key in other cells. Here, clicking a city on a map
 plots that city's series:
 
-```julia
-begin
-    cities = [
-        (id = "tok", name = "Tokyo", lon = 139.7, lat = 35.7),
-        (id = "del", name = "Delhi", lon = 77.2, lat = 28.6),
-        (id = "sha", name = "Shanghai", lon = 121.5, lat = 31.2),
-    ]
-    series = Dict(
-        "tok" => [3.1, 3.4, 3.2, 3.6],
-        "del" => [2.2, 2.5, 2.9, 3.0],
-        "sha" => [2.0, 2.4, 2.3, 2.7],
-    )
-    fig = Figure(size = (560, 320))
-    ax = Axis(fig[1, 1]; xlabel = "longitude", ylabel = "latitude")
-    s = scatter!(ax, [139.7, 77.2, 121.5], [35.7, 28.6, 31.2]; markersize = 16)
-    pts = interactables(s; payloads = cities)
-    nothing
-end
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-lv-city" data-masque-embed="linked_city" data-masque-segment="widget" title="A map of three cities. Click a city to plot its series in the next cell." style="width:100%;height:760px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
 ```
 
-```julia
-@bind pick masque(fig, pts; bind = s)
+```@eval
+Main.masque_fallback("linked_city"; segment = "widget")
 ```
 
 `bind = s` makes `pick` the clicked city itself, or `nothing` before
 the first click.
 
-```julia
-begin
-    detail = Figure(size = (560, 240))
-    dax = Axis(detail[1, 1]; title = isnothing(pick) ? "click a city" : pick.name)
-    isnothing(pick) || lines!(dax, series[pick.id])
-    detail
-end
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-lv-city-detail" data-masque-embed="linked_city" data-masque-segment="detail" title="The detail cell: the clicked city's series." style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("linked_city"; segment = "detail")
 ```
 
 The detail cell uses `pick`, so it responds to each click but not to
 hovering. The same `pick.id` could filter a `DataFrame` or choose the
 data for a fit. The detail figure can be a Masque widget too.
 
-To show the clicked point as selected in a second widget, pass it as
-that widget's `selected=`. [Selection round-trip](@ref) shows how.
+To mark the clicked point in another plot of the same rows, put both
+plots in one figure and link them, as the next sections show.
 
 ## Several axes in one figure
 
@@ -95,8 +68,14 @@ xy and an xz panel, pass them to [`linked`](@ref). Clicking a point in
 either panel selects that row in both, and hovering a point outlines
 the same row on the other panel:
 
-```julia
-@bind row masque(fig; bind = linked(p_xy, p_xz))
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-lv-rows" data-masque-embed="linked_rows" title="Two panels of the same four samples. Click a point in either panel to select that sample in both." style="width:100%;height:760px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("linked_rows")
 ```
 
 `row` is the position of the clicked point in the data you plotted, so
@@ -158,7 +137,7 @@ See [Legend](@ref).
 Main.masque_fallback("linked_legend_wash")
 ```
 
-## Filter a table from a region
+## Filter a table with a box
 
 To select many points at once, drag a box. When you release an
 [`ROIInteractable`](@ref) with `selects`, it returns every point inside

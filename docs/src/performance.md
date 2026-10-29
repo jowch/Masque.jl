@@ -2,7 +2,7 @@
 
 On a large dataset, what grows is the number of interactive marks and
 the size of each payload, so trim those first (see
-[Keeping large figures fast](@ref)). The measured sizes and timings are
+[Keep large figures fast](@ref)). The measured sizes and timings are
 in the maintainers'
 [performance findings](https://github.com/jowch/Masque.jl/blob/main/docs/dev/perf-findings.md).
 
@@ -46,7 +46,7 @@ you click another plot or release a box. To keep it from running, pass
 `bind` the fields that cell needs, so the value holds only those; see
 [What the `@bind` value holds](@ref).
 
-## Keeping large figures fast
+## Keep large figures fast
 
 Every payload field is sent with every mark, so keep payloads to the
 fields you show. Keep the data you need later in Julia, and look it up

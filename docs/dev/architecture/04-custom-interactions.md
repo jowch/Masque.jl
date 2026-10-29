@@ -3,7 +3,7 @@
 The convergent lesson from Bokeh / Plotly / Vega-Lite / Observable Plot: **linkage is payload-based,
 and the user should never write JavaScript.** A user's custom interaction produces `HitLayer`s like
 everything else. The three tiers, with worked examples, are on the user site's
-[Custom hits](../../src/custom.md) page:
+[Custom shapes](../../src/custom.md) page:
 
 - **A — declarative regions** (`RegionInteractable`): circles, rectangles, and polygons in data
   space (a circle's radius is in logical pixels, times `ctx.scaling`), one payload each. The framework owns how they react.

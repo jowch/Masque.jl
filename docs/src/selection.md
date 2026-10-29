@@ -16,7 +16,7 @@ cities = interactables(s; id = :cities, payloads = rows)
 
 The `id` names the field, so the selected city is `sel.cities`.
 
-## What replaces a selection
+## Replace or clear a selection
 
 `sel.cities` starts as `nothing`, and clicking a city makes it that
 city's [`ElementEvent`](@ref). Clicking another city replaces it,
@@ -24,19 +24,25 @@ because a plot holds one selection. Clicking the selected city again,
 clicking empty space inside the axis, or pressing Escape clears it: the
 plot is back to full color and `sel.cities` is `nothing` again.
 
+```@raw html
+<video id="masque-selection-replace-clip" title="Clicking Tokyo, then Lagos, which replaces it, clicking Lagos again to clear it, then picking Lima and clearing it with a click on empty space, and picking Delhi and clearing it with Escape, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-selection-replace-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "selection-replace.mp4";
+})();
+</script>
+```
+
 Each plot keeps its own selection, so in a figure with two scatters,
 clicking a point in one leaves the other's field as it was. A click on
 empty space clears only the plots in the axis you clicked, and Escape
 clears every plot in the figure. A click on a line or another mark that
 only shows a tooltip is not empty space, so it keeps the selection.
-
-A selected point, bar, or shape with no other selected mark near it
-also gets a thin outline in a shade of its own color, so a few
-picks stay easy to find in a crowded plot. A selected line gets a ring
-instead, and a heatmap cell an outline. To fade the other marks more or
-less, set `unpicked_opacity` in [Overlay styling](@ref).
-
-![Two scatters of eight clusters with half of each cluster's points selected: the selected points keep their cluster colors, the rest are faint, and the few selected points on the edges are outlined](assets/selection-look-after.png)
 
 ## Undo a change
 
@@ -107,6 +113,14 @@ On a legend built with `select = :many`, a click adds them.
 </script>
 ```
 
+A selected point, bar, or shape with no other selected mark near it
+also gets a thin outline in a shade of its own color, so a few
+picks stay easy to find in a crowded plot. A selected line gets a ring
+instead, and a heatmap cell an outline. To fade the other marks more or
+less, set `unpicked_opacity` in [Overlay styling](@ref).
+
+![Two scatters of eight clusters with half of each cluster's points selected: the selected points keep their cluster colors, the rest are faint, and the few selected points on the edges are outlined](assets/selection-look-after.png)
+
 To keep a box on the plot that the reader can move and resize, use an
 [`ROIInteractable`](@ref) with `selects`, as [Brush a region](@ref)
 shows.
@@ -146,11 +160,11 @@ start selected, and so can the cells of a heatmap built with
 boxes, thresholds, and the view cannot. A
 box or a threshold line starts where its `bounds` or `value` puts it,
 so to start one somewhere else, set those instead; see
-[Read the box itself](@ref) and [Drag a threshold](@ref).
+[Read the box's bounds](@ref) and [Drag a threshold](@ref).
 
 A [`RegionInteractable`](@ref) with several kinds of shape makes one
 part per kind, so name the part in `selected=`, as in
-`selected = (cells = (circles = [1],),)` for the id `:cells`. See [Custom hits](@ref).
+`selected = (cells = (circles = [1],),)` for the id `:cells`. See [Custom shapes](@ref).
 
 ## Keep a selection when the figure rebuilds
 
