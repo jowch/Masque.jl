@@ -6,7 +6,7 @@ and the fix. For constructor signatures, see
 
 ## Most common
 
-- No Makie backend loaded: see
+- `masque(fig) needs a rendering backend loaded`: see
   [No Makie backend loaded](@ref).
 - `type NamedTuple has no field index`: see
   [`sel.index` has no field](@ref troubleshooting-no-field).
@@ -40,7 +40,7 @@ name other than `:cairo` and `:webgl`.
 `:cairo`), or leave `backend=` out to use whichever is loaded. See
 [Choose a backend](@ref).
 
-### `tooltip = true`
+### `tooltip = true` is rejected
 
 **Error prefix:** `tooltip = true is not meaningful`
 
@@ -226,7 +226,7 @@ wrong place.
 `scatterlines!`, and `series!` plots work. Use a Cartesian `Axis` for
 the rest. See [Supported plots and axes](@ref).
 
-### ROI or View pan on a categorical 2D axis
+### A box, slice, or pan on a categorical axis
 
 **Error prefix:** `bounds need continuous axes` /
 `pan needs continuous numeric axes` /
@@ -386,7 +386,7 @@ browser turns that value into the text `[object Object]`.
 before it goes into `payloads`, or reference a pre-formatted string
 field with `masque"$(that_field)"`.
 
-### Panning doesn't change the `@bind` value
+### Panning or orbiting doesn't change the `@bind` value
 
 **Cause:** dragging with `ViewInteractable` changes the view, not the
 `@bind` value.
