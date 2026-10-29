@@ -39,14 +39,62 @@ then `:myplot_2` for a second `myplot!`, and each other layer adds its own name 
 function interactables(ax, p::Makie.AbstractPlot; id = nothing, select = nothing, kwargs...)
     select === nothing || return _with_select(interactables(ax, p; id, kwargs...), select)
     base = _plotbase(p)
-    base === nothing && throw(
-        ArgumentError(
-            "interactables: Masque has no default for $(Makie.plotkey(p)). `masque(fig)` builds a " *
-                "recipe's layers from the plots it draws; to give it its own, define " *
-                "`Masque.interactables(ax, p::YourPlotType; kwargs...)`",
-        ),
-    )
+    if base === nothing
+        parts = ax === nothing ? Makie.AbstractPlot[] : _recipe_parts(ax, p)
+        isempty(parts) && throw(
+            ArgumentError(
+                "interactables: Masque has no default for $(Makie.plotkey(p)). `masque(fig)` builds a " *
+                    "recipe's layers from the plots it draws; to give it its own, define " *
+                    "`Masque.interactables(ax, p::YourPlotType; kwargs...)`",
+            ),
+        )
+        # The part drawn last comes first, as in the defaults.
+        built = AbstractInteractable[]
+        for (c, pid) in Iterators.reverse(collect(zip(parts, _part_ids(ax, parts, id))))
+            append!(built, _drawn(_plot_interactables(ax, c; id = pid, kwargs...)))
+        end
+        isempty(built) && throw(_draws_nothing(ax, p))
+        return built
+    end
     return _construct(ax, p, something(id, base); kwargs...)
+end
+
+# A part's layers, or none when they all draw nothing: such a part takes no id, as in the
+# defaults (`_install_known!`).
+_drawn(built) = all(i -> _nverts(i) == 0, built) ? AbstractInteractable[] : built
+
+# A recipe whose parts all build no layer, such as `bracket!`, whose text is in pixel space.
+_draws_nothing(ax, p) = ArgumentError(
+    "interactables($(Makie.plotkey(p))): the plot draws nothing Masque builds a layer for " *
+        "on $(_axis_place(ax))",
+)
+
+# The ids of a recipe's parts. Without `id`, each takes its own plot's name, numbered when one
+# repeats (`:lines`, `:lines_2`). With `id`, one part takes it and several become its parts
+# (`id.lines`, `id.text`).
+function _part_ids(ax, parts, id)
+    id !== nothing && length(parts) == 1 && return Symbol[id]
+    seen = Dict{Symbol, Int}()
+    return map(parts) do c
+        b = _base(ax, c)
+        n = seen[b] = get(seen, b, 0) + 1
+        own = n == 1 ? b : Symbol(b, :_, n)
+        id === nothing ? own : _part_id(id, own)
+    end
+end
+
+# `interactables(recipe)` as one request per part, the part drawn last first. Without `id`,
+# each part replaces the layer `masque(fig)` built for it and keeps its id; with `id`, the
+# parts are named after it.
+function _part_requests(ax, r)
+    parts = _recipe_parts(ax, r.plot)
+    isempty(parts) && throw(_draws_nothing(ax, r.plot))
+    id = get(r.kwargs, :id, nothing)
+    id === nothing && return _PlotRequest[_PlotRequest(c, r.kwargs) for c in Iterators.reverse(parts)]
+    return _PlotRequest[
+        _PlotRequest(c, merge(r.kwargs, (; id = pid)))
+            for (c, pid) in Iterators.reverse(collect(zip(parts, _part_ids(ax, parts, id))))
+    ]
 end
 
 # `interactables(ax, p; id, kwargs...)` as `masque` calls it. A recipe's own method need not
@@ -166,6 +214,17 @@ default id counts across the figure. To inspect or edit the built interactables,
 `interactables(ax, plot)` instead; those are added like any other interactable, or replace
 the default with the same id.
 
+A recipe Masque has no default for, such as `contour!` or `rainclouds!`, gives the layers
+`masque(fig)` builds from the plots it draws, under the same ids: `contour!` gives `:lines`.
+With `id`, a recipe that draws one such plot takes it as its layer id, and one that draws
+several names them as its parts, `rain.violin` and `rain.scatter`. Each part takes the
+keywords you pass, so `payloads` fits only a recipe that draws one such plot. A recipe that
+draws none, or only ones that give no layer (`bracket!`'s text in pixel space), raises
+`ArgumentError`.
+
+The defaults stay unless you leave them out: to overlay only the plots you pass, add
+`auto = false`, as in `masque(fig, interactables(c), ViewInteractable(ax); auto = false)`.
+
 `interactables(i)` returns `[i]`, so lists of plots and interactables mix freely;
 `interactables(i; select = :many)` returns it holding several picks.
 
@@ -180,8 +239,7 @@ masque(fig, interactables(s; select = :many))   # w.scatter is a Vector{ElementE
 ```
 """
 function interactables(p::Makie.AbstractPlot; kwargs...)
-    if _plotbase(p) === nothing &&
-            !any(A -> _has_custom_for(A, p), (Makie.Axis, Makie.Axis3, Makie.PolarAxis))
+    if !_buildable(p) && !_draws_buildable(p)
         # Fails the same way the axis-aware method would, but here, at the caller's own line.
         interactables(nothing, p)
     end
@@ -211,6 +269,10 @@ function _with_select(i::AbstractInteractable, select)
     _check_select(T, select)
     return T((f === :select ? select : getfield(i, f) for f in fieldnames(T))...)
 end
+_buildable(p) = _plotbase(p) !== nothing ||
+    any(A -> _has_custom_for(A, p), (Makie.Axis, Makie.Axis3, Makie.PolarAxis))
+# A recipe Masque has no default for, drawing a plot it does: `contour!` draws `lines!`.
+_draws_buildable(p) = any(c -> _buildable(c) || _draws_buildable(c), _child_plots(p))
 function _has_custom_for(A, p)
     m = which(interactables, Tuple{A, typeof(p)})
     return m.sig != Tuple{typeof(interactables), Any, Makie.AbstractPlot}
@@ -296,6 +358,27 @@ end
 
 _claimed(id, taken) = any(t -> _head(t) === id, taken)
 
+# Each `interactables(recipe)` for a recipe Masque has no default for, replaced by one request
+# per part (see `_part_requests`). Returns the new list, its `fixed` flags, and each recipe
+# with the plots of its parts.
+function _expand_recipes(fig, given, fixed)
+    out = AbstractInteractable[]
+    keep = Bool[]
+    recipes = Tuple{Any, Vector{Any}}[]
+    for (g, f) in zip(given, fixed)
+        if g isa _PlotRequest && (ax = _plot_axis(fig, g.plot); !_known(ax, g.plot))
+            rs = _part_requests(ax, g)
+            append!(out, rs)
+            append!(keep, fill(f, length(rs)))
+            push!(recipes, (g.plot, Any[r.plot for r in rs]))
+        else
+            push!(out, g)
+            push!(keep, f)
+        end
+    end
+    return out, BitVector(keep), recipes
+end
+
 # The ids constructors give when the caller passes none. A list rather than a flag on each
 # interactable, so an explicit `id = :view` counts too: it is the same name.
 # `test/compose_tests.jl` checks it against every constructor's default.
@@ -368,6 +451,8 @@ function _assemble_all(fig, xs; auto::Bool, named = Base.IdSet{Any}(), names = S
     flat = _flatten_args!(AbstractInteractable[], collect(Any, xs))
     fixed = BitVector([g in named for g in flat])
     given = AbstractInteractable[_resolve_slice_axis(fig, g) for g in flat]
+    given, fixed, recipes = _expand_recipes(fig, given, fixed)
+    parts = Base.IdSet{Any}(c for (_, cs) in recipes for c in cs)
     if auto
         _reject_unsupported_axes(fig)
         d = _defaults(fig; replaced = Base.IdSet{Any}(g.plot for g in given if g isa _PlotRequest))
@@ -419,7 +504,13 @@ function _assemble_all(fig, xs; auto::Bool, named = Base.IdSet{Any}(), names = S
         id === nothing || push!(taken, id)
     end
     for (k, r, ax) in fresh
-        built = _build_fresh(r, ax, taken)
+        # A recipe's part that draws nothing takes no id, as in the defaults. One the defaults
+        # already left out is not built again, which would warn on it a second time.
+        built = if r.plot in parts
+            auto && !haskey(installed, r.plot) ? AbstractInteractable[] : _drawn(_build_fresh(r, ax, taken))
+        else
+            _build_fresh(r, ax, taken)
+        end
         groups[k] = built
         ids = Symbol[_layer_id(b) for b in built]
         union!(taken, ids)
@@ -455,6 +546,13 @@ function _assemble_all(fig, xs; auto::Bool, named = Base.IdSet{Any}(), names = S
         push!(seen, id)
     end
 
+    # A recipe names all its parts' layers, as `bind = recipe` does. Before its parts, which
+    # then take back their own.
+    for (p, cs) in Iterators.reverse(recipes)
+        ids = Symbol[id for (q, qids) in built_from if any(c -> c === q, cs) for id in qids]
+        isempty(ids) && throw(_draws_nothing(_plot_axis(fig, p), p))
+        pushfirst!(built_from, (p, ids))
+    end
     if !isempty(built_from)
         plotmap = copy(plotmap)
         for (p, ids) in built_from

@@ -876,7 +876,7 @@ try {
 
       // Each control sits on its block's box.
       const s0 = await screenOf();
-      for (const id of ["level", "show", "span", "fine", "pick"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall"]) {
         const g = geo(id);
         if (layers.find((l) => l.id === id)?.kind !== "control") throw new Error(`${key}: no control layer ${id}`);
         const bb = await page.locator(`[data-masque-control="${id}"]`).boundingBox();
@@ -895,7 +895,7 @@ try {
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         sr.querySelector(".masque-controls").style.visibility = "hidden";
       }, key);
-      for (const id of ["level", "show", "span", "fine", "pick"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall"]) {
         const g = geo(id);
         const png = PNG.sync.read(await page.screenshot({ clip: { x: s0.left + g.x * s0.sc + 1, y: s0.top + g.y * s0.sc + 1, width: Math.max(1, g.w * s0.sc - 2), height: Math.max(1, g.h * s0.sc - 2) } }));
         let ink = 0;
@@ -933,10 +933,34 @@ try {
       await expectLevel(10, "drag");
       passed.push(`${key}/slider-drag`);
 
-      // The toggle hides the line.
+      // The toggle hides the line, and its knob slides to Makie's off end (#427).
+      const knobAt = async (want, what) => {
+        const g = geo("show"), sc = (await screenOf()).sc;
+        const bb = await page.locator(`[data-masque-control="show"]`).boundingBox();
+        for (let i = 0; i < 20; i++) {
+          const kb = await ctl("show", ".masque-toggle-knob").boundingBox();
+          // The knob grows by 15% under the pointer, around its centre.
+          const cx = kb.x + kb.width / 2 - bb.x, cy = kb.y + kb.height / 2 - bb.y;
+          if (Math.abs(cx - want[0] * sc) <= 2 && Math.abs(cy - want[1] * sc) <= 2) return;
+          if (i === 19) throw new Error(`${key}/${what}: toggle knob centre (${cx}, ${cy}), want ${JSON.stringify(want.map((c) => c * sc))} (${JSON.stringify(g)})`);
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      };
+      await knobAt(geo("show").knobOn, "toggle-knob-on");
+      // The vertical toggle's track is turned upright and fills its box, so a slip in the
+      // turn or its origin shows here (#427).
+      {
+        const bb = await page.locator(`[data-masque-control="tall"]`).boundingBox();
+        const tb = await ctl("tall", ".masque-toggle-track").boundingBox();
+        if (!(tb.height > 1.5 * tb.width) || Math.abs(tb.x - bb.x) > 2 || Math.abs(tb.y - bb.y) > 2 || Math.abs(tb.width - bb.width) > 2 || Math.abs(tb.height - bb.height) > 2) {
+          throw new Error(`${key}/toggle-vertical: track ${JSON.stringify(tb)}, want upright and filling ${JSON.stringify(bb)}`);
+        }
+        passed.push(`${key}/toggle-vertical`);
+      }
       await ctl("show").click();
       v = await bondHas(/show = false,/, v, "toggle");
       await expectLevel(null, "toggle");
+      await knobAt(geo("show").knobOff, "toggle-knob-off");
       passed.push(`${key}/toggle`);
 
       // The interval slider's high knob, the checkbox and the menu change only their own field.

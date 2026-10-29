@@ -38,11 +38,7 @@ jobs:
           using Pkg
           Pkg.develop(PackageSpec(path=pwd()))
           Pkg.instantiate()
-      - name: Build and deploy
-        run: julia --color=yes --project=docs docs/make.jl
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+      # Before the build: it measures each player's height in Chromium before deploying.
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -51,6 +47,12 @@ jobs:
         run: |
           npm install
           npx playwright install --with-deps chromium
+      - name: Build and deploy
+        run: julia --color=yes --project=docs docs/make.jl
+        env:
+          MASQUE_MEASURE_PLAYERS: 'true'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
       - name: Playwright docs player
         working-directory: test/e2e
         run: node docs_player.mjs "$GITHUB_WORKSPACE/docs/build"
