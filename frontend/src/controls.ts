@@ -25,6 +25,8 @@ interface ControlEl {
     box_: HTMLElement
     get_: () => unknown
     set_: (payload: unknown) => void
+    // A new frame's colours for a control drawn here (a checkbox), without building it again.
+    restyle_?: (g: ControlGeometry) => void
 }
 
 export interface Controls {
@@ -91,7 +93,13 @@ export const CONTROLS_STYLE = `
   transition: left var(--dur, 0.15s) var(--sineio), top var(--dur, 0.15s) var(--sineio); }
 .masque-control:hover .masque-toggle-knob { scale: 1.15; }
 .masque-toggle:focus-visible ~ .masque-toggle-track { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
-.masque-check { width: 100cqmin; height: 100cqmin; accent-color: var(--masque-ctl); cursor: pointer; }
+/* Checkbox, as Makie draws it: an SVG square and checkmark under an invisible <input>. */
+.masque-check { -webkit-appearance: none; appearance: none; position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; opacity: 0; cursor: pointer; }
+.masque-check-art { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.masque-check-art .mark { visibility: hidden; }
+.masque-check:checked ~ .masque-check-art .mark, .masque-control:hover .masque-check-art .mark { visibility: visible; }
+.masque-check:focus-visible ~ .masque-check-art .box { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 .masque-control .masque-select { width: 100%; height: 100%; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; border: none; border-radius: 0; cursor: pointer;
   font-size: var(--fs, 50cqh); padding: 0 0 0 var(--pad, 0.5em); background: var(--masque-ctl-off, #f0f0f0); color: var(--masque-ctl-text, #000000); }
 @media (prefers-reduced-motion: reduce) { .masque-toggle-track, .masque-toggle-knob { transition: none; } }
@@ -162,6 +170,45 @@ function fillTrack(t: HTMLElement, g: ControlGeometry, lo: number, hi: number, k
     t.querySelectorAll<HTMLElement>(".masque-knob").forEach((el, i) => el.style.setProperty("--k", String(knobs[i] / last)))
 }
 
+const SVG = "http://www.w3.org/2000/svg"
+
+// Makie's checkbox square and checkmark, from the block's geometry (src/controls.jl). Without it
+// (an older manifest), a square filling the box's shorter side and a plain tick.
+function checkArt(g: ControlGeometry, el: HTMLInputElement): { svg_: SVGSVGElement; show_: () => void; restyle_: (g: ControlGeometry) => void } {
+    const svg = document.createElementNS(SVG, "svg")
+    svg.setAttribute("class", "masque-check-art")
+    svg.setAttribute("viewBox", `0 0 ${g.w} ${g.h}`)
+    const size = g.size ?? Math.min(g.w, g.h)
+    const rect = document.createElementNS(SVG, "rect")
+    rect.setAttribute("class", "box")
+    rect.setAttribute("x", String((g.w - size) / 2))
+    rect.setAttribute("y", String((g.h - size) / 2))
+    rect.setAttribute("width", String(size))
+    rect.setAttribute("height", String(size))
+    rect.setAttribute("rx", String(g.radius ?? 0))
+    rect.setAttribute("stroke-width", String(g.stroke ?? 0))
+    const mark = document.createElementNS(SVG, "path")
+    mark.setAttribute("class", "mark")
+    const m = g.markSize ?? size * 0.85
+    // The path is in marker units with y up; screen y points down.
+    mark.setAttribute("transform", `translate(${g.w / 2} ${g.h / 2}) scale(${m} ${-m})`)
+    mark.setAttribute("d", g.mark ?? "M-0.4 0L-0.12 -0.3L0.4 0.35")
+    if (!g.mark) {
+        mark.setAttribute("fill", "none")
+        mark.setAttribute("stroke-width", "0.12")
+    }
+    svg.append(rect, mark)
+    let c = g
+    const show = () => {
+        const on = el.checked
+        rect.setAttribute("fill", (on ? c.color : c.off) ?? (on ? "#4e7fb4" : "#ffffff"))
+        rect.setAttribute("stroke", (on ? c.strokeOn : c.strokeOff) ?? "#4e7fb4")
+        mark.setAttribute(g.mark ? "fill" : "stroke", (on ? c.markOn : c.markOff) ?? (on ? "#ffffff" : "transparent"))
+    }
+    show()
+    return { svg_: svg, show_: show, restyle_: (g2) => { c = g2; show() } }
+}
+
 // Makie's toggle track and knob, placed from the block's geometry (src/controls.jl). Without
 // it (an older manifest), a horizontal pill that fills the box.
 function toggleParts(g: ControlGeometry, el: HTMLInputElement): { parts_: HTMLElement[]; show_: () => void } {
@@ -194,7 +241,7 @@ function toggleParts(g: ControlGeometry, el: HTMLInputElement): { parts_: HTMLEl
 function shape(g: ControlGeometry): string {
     // A range arrives as a typed array off the kernel and as a plain one from a docs player's
     // JSON frame; the same range is the same shape either way.
-    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt])
+    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt, g.size, g.radius, g.stroke, g.mark, g.markSize, g.next])
 }
 
 // The knob index under a pointer at (x, y) on a slider's box.
@@ -297,13 +344,27 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             if (g.control === "toggle") el.setAttribute("role", "switch")
             el.checked = g.value === true
             el.setAttribute("aria-label", label)
-            el.addEventListener("change", () => hooks.commit_(id, envelope(id, el.checked)))
+            // Makie's checkbox sets itself to `onchange(checked)`: the browser flips the input,
+            // and the rule says where it lands. A click that leaves it as it was commits nothing.
+            let was = el.checked
+            el.addEventListener("change", () => {
+                if (g.next) el.checked = g.next[was ? 1 : 0]
+                const now = el.checked
+                art?.show_()
+                tp?.show_()
+                if (now === was) return
+                was = now
+                hooks.commit_(id, envelope(id, now))
+            })
             box.append(el)
             const tp = g.control === "toggle" ? toggleParts(g, el) : null
             if (tp) box.append(...tp.parts_)
+            const art = g.control === "checkbox" ? checkArt(g, el) : null
+            if (art) box.append(art.svg_)
             return {
                 layer_: layer, shape_: shape(g), box_: box, get_: () => el.checked,
-                set_: (p) => { if (typeof p === "boolean") { el.checked = p; tp?.show_() } },
+                set_: (p) => { if (typeof p === "boolean") { el.checked = was = p; tp?.show_(); art?.show_() } },
+                restyle_: art?.restyle_,
             }
         }
         case "menu": {
@@ -374,6 +435,7 @@ export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manife
                 if (sentValue === undefined || held === l.id) {
                     c.layer_ = l
                     place(c.box_, g, m)
+                    c.restyle_?.(g)
                     continue
                 }
                 if (shape(g) !== c.shape_) {
@@ -385,6 +447,7 @@ export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manife
                 } else {
                     c.layer_ = l
                     place(c.box_, g, m)
+                    c.restyle_?.(g)
                 }
                 // The author moved the block: the control and the field follow. Otherwise the
                 // frame echoes what was sent, and the control keeps what the reader has now.

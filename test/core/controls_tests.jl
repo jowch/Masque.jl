@@ -92,6 +92,31 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["duration"] == 0.3
     end
 
+    @testset "a checkbox ships Makie's square, checkmark and onchange rule (#428)" begin
+        fig = Figure(); Axis(fig[1, 1])
+        plain = Checkbox(fig[2, 1])
+        odd = Checkbox(
+            fig[3, 1]; size = 20, roundness = 1, checkboxstrokewidth = 2, checkmark = :circle, checkmarksize = 0.5,
+            checkboxcolor_unchecked = :yellow, checkmarkcolor_unchecked = :gray, onchange = _ -> true,
+        )
+        w = masque(fig, (plain = plain, odd = odd))
+        s = w.manifest["scaling"]
+        g = _layer(w.manifest, "plain")["geometry"]
+        @test g["size"] ≈ 11s && g["radius"] ≈ 0.15 * 11 / 2 * s && g["stroke"] ≈ 1.5s
+        @test g["markSize"] ≈ 11 * 0.85 * s
+        @test startswith(g["mark"], "M") && endswith(g["mark"], "Z")
+        @test !haskey(g, "next")                      # Makie's default `!` needs no rule
+        g = _layer(w.manifest, "odd")["geometry"]
+        @test g["size"] ≈ 20s && g["radius"] ≈ 10s && g["stroke"] ≈ 2s && g["markSize"] ≈ 10s
+        @test g["off"] == Masque._css_color(Makie.to_color(:yellow))
+        @test g["markOff"] == Masque._css_color(Makie.to_color(:gray))
+        @test startswith(g["mark"], "M")              # `:circle` resolves to Makie's path
+        @test g["next"] == [true, true]
+        # A checkmark that isn't a path (a Char) leaves the browser's plain tick.
+        fig = Figure(); Axis(fig[1, 1]); cb = Checkbox(fig[2, 1]; checkmark = 'x')
+        @test !haskey(_layer(masque(fig, (cb = cb,)).manifest, "cb")["geometry"], "mark")
+    end
+
     @testset "named through bind, and a bare bind" begin
         (; fig, sc, sl) = _controls_fixture((:sl,))
         w = masque(fig; bind = (degree = sl, pts = sc))

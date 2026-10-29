@@ -96,9 +96,42 @@ function hitlayers(i::BlockControl, ctx)
         g["off"] = _css_color(b.framecolor_inactive[])
         _toggle_geometry!(g, b, ctx)
     elseif b isa Makie.Checkbox
-        g["color"] = _css_color(b.checkboxcolor_checked[])
+        _checkbox_geometry!(g, b, ctx)
     end
     return [HitLayer(i.id, :control, g, Any[], Symbol(""), events(i), string(i.id))]
+end
+
+# Makie's checkbox (Makie/src/makielayout/blocks/checkbox.jl): a rounded square `size` across in
+# the middle of the box, filled and stroked in its checked or unchecked colours, and a checkmark
+# `size·checkmarksize` across that shows when checked, or in its unchecked colour under the
+# pointer. A click sets `checked` to `onchange(checked)`; both answers ship, so the browser
+# follows the same rule. Lengths are image px.
+function _checkbox_geometry!(g, b::Makie.Checkbox, ctx)
+    s = ctx.scaling
+    sz = Float64(b.size[])
+    g["size"] = sz * s
+    g["radius"] = Float64(b.roundness[]) * sz / 2 * s
+    g["stroke"] = Float64(b.checkboxstrokewidth[]) * s
+    g["color"] = _css_color(b.checkboxcolor_checked[])
+    g["off"] = _css_color(b.checkboxcolor_unchecked[])
+    g["strokeOn"] = _css_color(b.checkboxstrokecolor_checked[])
+    g["strokeOff"] = _css_color(b.checkboxstrokecolor_unchecked[])
+    g["markOn"] = _css_color(b.checkmarkcolor_checked[])
+    g["markOff"] = _css_color(b.checkmarkcolor_unchecked[])
+    g["markSize"] = sz * Float64(b.checkmarksize[]) * s
+    path = _marker_svg_path(b.checkmark[])
+    path === nothing || (g["mark"] = path)
+    next = Bool[]
+    for v in (false, true)
+        n = try
+            b.onchange[](v)
+        catch
+            !v
+        end
+        push!(next, n isa Bool ? n : !v)
+    end
+    next == [true, false] || (g["next"] = next)
+    return g
 end
 
 # Makie's toggle (Makie/src/makielayout/blocks/toggle.jl): a rounded track `length` long and

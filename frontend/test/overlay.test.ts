@@ -6840,6 +6840,40 @@ describe("block controls (#345)", () => {
         expect(box.style.getPropertyValue("--masque-ctl-off")).toBe("rgb(1,1,1)")
     })
 
+    it("a checkbox draws Makie's square and checkmark, and follows its onchange rule (#428)", () => {
+        const m = controlsManifest()
+        // `onchange = _ -> true`: a click turns it on, and a click on a ticked box does nothing.
+        m.layers.push({ id: "fine", kind: "control", axis: "", events: ["change"], payloads: [], label: "fine",
+            geometry: { control: "checkbox", x: 950, y: 700, w: 40, h: 30, value: false, size: 22, radius: 1.65, stroke: 3,
+                color: "rgb(1,1,1)", off: "rgb(2,2,2)", strokeOn: "rgb(3,3,3)", strokeOff: "rgb(4,4,4)",
+                markOn: "rgb(5,5,5)", markOff: "rgb(6,6,6)", markSize: 18.7, mark: "M0 0L1 1Z", next: [true, true] } })
+        m.fields = [...(m.fields ?? []), "fine"]
+        m.initial!.fine = { layer: "fine", index: 0, payload: false }
+        const { host, script } = setup()
+        mount(script, m)
+        const box = ctl(host, "fine")
+        const rect = box.querySelector("svg rect") as SVGRectElement
+        const mark = box.querySelector("svg path") as SVGPathElement
+        expect([rect.getAttribute("x"), rect.getAttribute("y"), rect.getAttribute("width"), rect.getAttribute("rx")]).toEqual(["9", "4", "22", "1.65"])
+        expect([rect.getAttribute("fill"), rect.getAttribute("stroke"), rect.getAttribute("stroke-width")]).toEqual(["rgb(2,2,2)", "rgb(4,4,4)", "3"])
+        expect(mark.getAttribute("d")).toBe("M0 0L1 1Z")
+        expect(mark.getAttribute("transform")).toBe("translate(20 15) scale(18.7 -18.7)")
+        expect(mark.getAttribute("fill")).toBe("rgb(6,6,6)")
+        const input = box.querySelector("input") as HTMLInputElement
+        input.checked = true
+        input.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).fine).toEqual({ layer: "fine", index: 0, payload: true })
+        expect([rect.getAttribute("fill"), rect.getAttribute("stroke"), mark.getAttribute("fill")]).toEqual(["rgb(1,1,1)", "rgb(3,3,3)", "rgb(5,5,5)"])
+        // The browser unticks it; the rule ticks it again, and the field doesn't change.
+        let inputs = 0
+        host.addEventListener("input", () => { inputs += 1 })
+        input.checked = false
+        input.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(input.checked).toBe(true)
+        expect(inputs).toBe(0)
+        expect(val(host).fine).toEqual({ layer: "fine", index: 0, payload: true })
+    })
+
     it("a release commits the field; moving alone doesn't", () => {
         const m = controlsManifest()
         const { host, script } = setup()

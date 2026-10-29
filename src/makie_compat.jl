@@ -418,6 +418,36 @@ function _block_scene(b)
     return sc
 end
 
+# A scatter marker as an SVG path in marker units (a markersize-1 marker spans about -0.5..0.5,
+# y up), or `nothing` for a marker that isn't a path (a `Char`, an image). A symbol such as
+# `:circle` resolves through Makie's own marker table. Arcs become cubic curves, as Makie does
+# for FreeType.
+function _marker_svg_path(marker)
+    bp = try
+        m = marker isa Symbol ? Makie.default_marker_map()[marker] : marker
+        m isa Makie.BezierPath || return nothing
+        Makie.replace_nonfreetype_commands(m)
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return nothing
+    end
+    f(x) = string(round(x; digits = 4))
+    io = IOBuffer()
+    for c in bp.commands
+        if c isa Makie.MoveTo
+            print(io, "M", f(c.p[1]), " ", f(c.p[2]))
+        elseif c isa Makie.LineTo
+            print(io, "L", f(c.p[1]), " ", f(c.p[2]))
+        elseif c isa Makie.CurveTo
+            print(io, "C", f(c.c1[1]), " ", f(c.c1[2]), " ", f(c.c2[1]), " ", f(c.c2[2]), " ", f(c.p[1]), " ", f(c.p[2]))
+        else
+            return nothing
+        end
+    end
+    print(io, "Z")
+    return String(take!(io))
+end
+
 # Wraps `sl.selected_index`, the 1-based index into `sl.range[]` that `sl.value` follows.
 # `set_close_to!` is public but snaps by value, which can't tell repeated range values apart.
 function _slider_index(sl)
