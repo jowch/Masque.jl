@@ -31,10 +31,6 @@ A click or a box feeds the next step of an analysis.
   <img alt="A heatmap of daily temperature by station, with one cell picked and its tooltip showing" src="assets/gallery/heatmap-trace.png">
   <span>From a heatmap cell to its trace</span>
 </a>
-<a class="masque-gallery-card" data-page="selection">
-  <img alt="Two scatters; the right figure highlights the mark clicked on the left" src="assets/gallery/selection.png">
-  <span>Selection round-trip</span>
-</a>
 <a class="masque-gallery-card" data-page="boxselect">
   <img alt="A two-group scatter with a selection box" src="assets/gallery/boxselect.png">
   <span>Box-select scatter</span>

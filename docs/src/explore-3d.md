@@ -71,5 +71,5 @@ controls, and how to turn several panels together with `linkcameras!`.
 - [Pan, zoom and orbit](@ref) for every way to move the view.
 - [Supported plots and axes](@ref) for which 3D plots respond.
 - [Selection](@ref) to keep several stations at once.
-- The [Selection round-trip](@ref) and [Compare a cluster](@ref)
+- The [Filter one plot from another](@ref) and [Compare a cluster](@ref)
   examples, which take picks from one figure into another.

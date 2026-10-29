@@ -42,33 +42,21 @@ begin
         (name = "Chinstrap", cx = 48.8, cy = 18.4, sx = 2.6, sy = 0.95, seed = 23, color = "#3d5a80"),
         (name = "Gentoo", cx = 47.5, cy = 15.0, sx = 2.4, sy = 0.85, seed = 41, color = "#2a9d8f"),
     ]
-    nothing
-end
-
-# ╔═╡ c0e10002-0001-4000-8000-000000000003
-@bind sel begin
-    selected = try
-        String(getfield(sel, :payload).label)
-    catch
-        nothing
-    end
     fig = Figure(size = (560, 360))
     ax = Axis(fig[1, 1]; xlabel = "Bill length (mm)", ylabel = "Bill depth (mm)")
     for cls in classes
         xs, ys = cluster(cls.cx, cls.cy, cls.sx, cls.sy, 28, cls.seed)
-        α = isnothing(selected) || selected == cls.name ? 1.0 : 0.14
-        scatter!(ax, xs, ys; color = (cls.color, α), label = cls.name, markersize = 11)
+        scatter!(ax, xs, ys; color = cls.color, label = cls.name, markersize = 11)
     end
     axislegend(ax)
-    masque(fig; bind = :legend)
+    nothing
 end
 
+# ╔═╡ c0e10002-0001-4000-8000-000000000003
+@bind sel masque(fig; bind = :legend)
+
 # ╔═╡ c0e10002-0001-4000-8000-000000000004
-if sel isa Masque.LegendEvent
-    md"**$(getfield(sel, :payload).label)**"
-else
-    md"*Click a species in the legend.*"
-end
+isnothing(sel) ? md"*Click a species in the legend.*" : md"**$(sel.label)**"
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
