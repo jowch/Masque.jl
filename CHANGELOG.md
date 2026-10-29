@@ -21,7 +21,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 - On `backend = :webgl`, a line with gaps, such as a `contour!` or a `lines!` with `NaN`
-  points, breaks at each gap. Before, each gap drew a straight line to the axis origin (#439).
+  points, breaks at each gap, and so does a zero on a log axis. Before, each gap drew a straight
+  line to the axis origin (#439).
 - A figure with a Makie `Button`, `Textbox` or `SliderGrid` now warns that masque shows it as
   a picture, so it won't respond to a click. Before, it looked live and did nothing (#426).
 - A Makie `Toggle` named in `masque` is drawn the way Makie draws it: a vertical or angled

@@ -111,11 +111,12 @@ end
 # serialize_scene leaves live Observables and raw arrays; the browser shim expects each tagged
 # so it can rebuild the structures WGLMakie's own deserialize reads:
 #   Observable -> {__obs__: v}   1-D buffer -> {__t__, d}   N-D array -> {array, size}
-# Symbols -> strings, closures -> dropped. Non-finite floats pass through: a NaN in a position
-# buffer is how a line breaks (a contour's levels, a gapped `lines!`), and as 0 it would draw a
-# stroke to the origin (#439). Every axis scene's decorations carry NaN too, so a strict JSON
-# writer can't take any scene. Both transports carry it: published_to_js packs the bytes, and
-# `_scene_js` writes them as base64.
+# Symbols -> strings, closures -> dropped. NaN passes through: in a position buffer it is how a
+# line breaks (a contour's levels, a gapped `lines!`), and as 0 it would draw a stroke to the
+# origin (#439). Every axis scene's decorations carry NaN too, so a strict JSON writer can't
+# take any scene. Both transports carry it: published_to_js packs the bytes, and `_scene_js`
+# writes them as base64. Inf in a buffer becomes NaN: a zero on a log axis transforms to -Inf,
+# which Cairo treats as a break and WGLMakie's line shader does not.
 function _plain(x)
     if x isa Observable
         return Dict{String, Any}("__obs__" => _plain(x[]))
@@ -138,7 +139,9 @@ function _plain(x)
         T === UInt8 && return Dict{String, Any}("__t__" => "u8", "d" => Vector{UInt8}(x))
         # Everything else -> Float32 (WebGL is f32-only); lossy for Int64/Float64 beyond ~7 digits,
         # fine for plot coordinates.
-        return Dict{String, Any}("__t__" => "f32", "d" => Vector{Float32}(x))
+        d = Vector{Float32}(x)
+        replace!(v -> isinf(v) ? NaN32 : v, d)
+        return Dict{String, Any}("__t__" => "f32", "d" => d)
     elseif x isa AbstractVector
         return Any[_plain(v) for v in x]
     else

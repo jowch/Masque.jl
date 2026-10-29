@@ -68,6 +68,13 @@ end
     lines!(Axis(fig[1, 1]), [1.0, 2.0, NaN, 3.0, 4.0], [1.0, 2.0, NaN, 2.0, 1.0])
     @test has_nan(fig)
 
+    # A zero on a log axis transforms to -Inf; it breaks the line, as in Cairo.
+    fig = Figure(; size = (300, 200))
+    lines!(Axis(fig[1, 1]; yscale = log10), 1:6, [1.0, 2.0, 0.0, 4.0, 8.0, 16.0])
+    bufs = f32s(masque(fig; backend = :webgl).scene)
+    @test any(d -> any(isnan, d), bufs)
+    @test !any(d -> any(isinf, d), bufs)
+
     # The page outside Pluto carries the bytes, NaN included. This guards the transport; it
     # passed before the fix too.
     d = Float32[1, NaN, 2]
