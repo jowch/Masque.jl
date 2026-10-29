@@ -48,7 +48,7 @@ begin
         xs, ys = cluster(cls.cx, cls.cy, cls.sx, cls.sy, 28, cls.seed)
         scatter!(ax, xs, ys; color = cls.color, label = cls.name, markersize = 11)
     end
-    axislegend(ax)
+    axislegend(ax; position = :lb)
     nothing
 end
 

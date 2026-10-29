@@ -72,4 +72,4 @@ controls, and how to turn several panels together with `linkcameras!`.
 - [Supported plots and axes](@ref) for which 3D plots respond.
 - [Selection](@ref) to keep several stations at once.
 - The [Filter one plot from another](@ref) and [Compare a cluster](@ref)
-  examples, which take picks from one figure into another.
+  examples, which use the picks on one plot in another.
