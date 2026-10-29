@@ -2827,6 +2827,24 @@ describe("overlay visual polish", () => {
         expect(tip.style.left).toBe("200px")
     })
 
+    it("without the Popover API the tooltip stays in the figure and never asks for :popover-open", () => {
+        const { host, script } = setup()
+        mount(script, manifest)
+        const shadow = shadowOf(host)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect(tip.hasAttribute("popover")).toBe(false)
+        // An older browser rejects the selector outright.
+        const matches = tip.matches.bind(tip)
+        tip.matches = (sel: string) => {
+            if (sel.includes(":popover-open")) throw new SyntaxError(sel)
+            return matches(sel)
+        }
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+        expect(tip.classList.contains("show")).toBe(true)
+        expect(tip.style.left).not.toBe("")
+    })
+
     it("with the Popover API the tooltip leaves the figure and follows it on scroll", () => {
         // A stand-in for the browser's top layer: happy-dom has no Popover API.
         const proto = HTMLElement.prototype as unknown as { showPopover?: () => void }
@@ -2861,6 +2879,14 @@ describe("overlay visual polish", () => {
             expect(tip.style.top).toBe("220px") // 310 - 10 - 80
             top = 250
             window.dispatchEvent(new Event("scroll"))
+            expect(tip.style.top).toBe("170px")
+            // Scrolled out of the window, the box hides instead of pinning to the window's top.
+            top = -500
+            window.dispatchEvent(new Event("scroll"))
+            expect(tip.style.visibility).toBe("hidden")
+            top = 250
+            window.dispatchEvent(new Event("scroll"))
+            expect(tip.style.visibility).toBe("")
             expect(tip.style.top).toBe("170px")
         } finally {
             if (had) proto.showPopover = had

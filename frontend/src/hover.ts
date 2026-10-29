@@ -121,7 +121,7 @@ export function openTip(tip: HTMLElement): void {
     try { tip.showPopover() } catch { /* already open, or not in a document */ }
 }
 
-interface TipFrame { dx: number; dy: number; w: number; h: number }
+interface TipFrame { dx: number; dy: number; w: number; h: number; escaped: boolean }
 
 // The box the placement math keeps the tooltip inside, and where its origin sits relative to
 // the surface: the surface itself, or the window for an escaped tooltip.
@@ -130,16 +130,25 @@ function tipFrame(ctx: OverlayCtx, state: OverlayState): TipFrame {
         state.tipW_ = ctx.tip_.offsetWidth; state.tipH_ = ctx.tip_.offsetHeight
         state.tipSized_ = state.tipW_ > 0 && state.tipH_ > 0
     }
-    if (ctx.tip_.matches("[popover]:popover-open")) {
+    // hasAttribute first: a browser without the Popover API throws on `:popover-open`.
+    if (ctx.tip_.hasAttribute("popover") && ctx.tip_.matches(":popover-open")) {
         const r = ctx.surface_.getBoundingClientRect()
         const doc = document.documentElement
-        return { dx: r.left, dy: r.top, w: doc.clientWidth, h: doc.clientHeight }
+        return { dx: r.left, dy: r.top, w: doc.clientWidth, h: doc.clientHeight, escaped: true }
     }
     if (!state.surfaceSized_) {
         state.surfaceW_ = ctx.surface_.clientWidth; state.surfaceH_ = ctx.surface_.clientHeight
         state.surfaceSized_ = state.surfaceW_ > 0 && state.surfaceH_ > 0
     }
-    return { dx: 0, dy: 0, w: state.surfaceW_, h: state.surfaceH_ }
+    return { dx: 0, dy: 0, w: state.surfaceW_, h: state.surfaceH_, escaped: false }
+}
+
+// An escaped box whose point (window px) has scrolled out of the window is hidden rather than
+// clamped: clamped, it would stay pinned to the window's edge with its mark gone.
+function offWindow(ctx: OverlayCtx, f: TipFrame, x: number, y: number): boolean {
+    const off = f.escaped && (x < 0 || y < 0 || x > f.w || y > f.h)
+    ctx.tip_.style.visibility = off ? "hidden" : ""
+    return off
 }
 
 // Re-run the last placement after the page scrolls or the figure moves: an escaped box is in
@@ -165,6 +174,7 @@ export function placeTip(ctx: OverlayCtx, state: OverlayState, ox: number, oy: n
         ctx.tip_.style.setProperty("--masque-caret-x", `${CARET_INSET}px`)
         return
     }
+    if (offWindow(ctx, f, x, y)) return
     let top = y + TIP_OFFSET
     const flipY = top + th > hh - TIP_GAP
     if (flipY) { top = y - th - TIP_OFFSET; ctx.tip_.classList.add("flip-y") }
@@ -182,7 +192,7 @@ export function placeAnchored(ctx: OverlayCtx, state: OverlayState, anchor: Anch
     state.tipPlace_ = () => placeAnchored(ctx, state, anchor)
     const f = tipFrame(ctx, state)
     const tw = state.tipW_, th = state.tipH_, sw = f.w, sh = f.h
-    const a = f.dx || f.dy ? { x: anchor.x + f.dx, y: anchor.y + f.dy, top: anchor.top + f.dy } : anchor
+    const a = f.escaped ? { x: anchor.x + f.dx, y: anchor.y + f.dy, top: anchor.top + f.dy } : anchor
     if (tw <= 0 || th <= 0 || sw <= 0 || sh <= 0) {
         ctx.tip_.style.left = `${a.x}px`
         ctx.tip_.style.top = `${Math.max(0, a.top - ANCHOR_GAP)}px`
@@ -190,6 +200,7 @@ export function placeAnchored(ctx: OverlayCtx, state: OverlayState, anchor: Anch
         ctx.tip_.classList.remove("flip-y")
         return
     }
+    if (offWindow(ctx, f, a.x, a.y)) return
     const p = computeAnchoredPlacement(a, tw, th, sw, sh)
     ctx.tip_.style.left = `${p.left}px`
     ctx.tip_.style.top = `${p.top}px`

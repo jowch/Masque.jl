@@ -756,7 +756,7 @@ try {
       tip = await host.evaluate((h) => {
         let sr = null; h.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const t = sr && sr.querySelector(".masque-tip");
-        return t && getComputedStyle(t).display !== "none" && t.offsetParent !== null ? t.innerText.trim() : "";
+        return t && t.classList.contains("show") ? t.innerText.trim() : "";
       });
     }
     if (!tip) throw new Error("@example widget: hovering the first point showed no tooltip");
