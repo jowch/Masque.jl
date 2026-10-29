@@ -111,6 +111,13 @@ makedocs(;
     warnonly = false,
 )
 
+# Reserve each player's height at every column width, so pages don't move as players load
+# (test/e2e/measure_players.mjs, which needs its npm install). The docs job sets
+# MASQUE_MEASURE_PLAYERS; a local build keeps the iframe heights in the Markdown.
+if get(ENV, "MASQUE_MEASURE_PLAYERS", "") == "true"
+    run(Cmd(`node measure_players.mjs $DOCS_BUILD`; dir = joinpath(@__DIR__, "..", "test", "e2e")))
+end
+
 deploydocs(;
     repo = "github.com/jowch/Masque.jl",
     devbranch = "main",
