@@ -169,7 +169,7 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         SliderGrid(fig[2, 1], (label = "a", range = 1:3))
         @test_logs (:warn, r"a SliderGrid that masque wasn't given.*Name it to make it live"s) masque(fig)
         Button(fig[3, 1])
-        @test_logs (:warn, r"a SliderGrid and a Button that masque wasn't given"s) masque(fig)
+        @test_logs (:warn, r"a SliderGrid and a Button that masque wasn't given, so they show as pictures.*Name each one"s) masque(fig)
     end
 
     @testset "a slider grid is a field holding a tuple of its slider values (#430)" begin

@@ -387,8 +387,11 @@ function _warn_unnamed_later(fig, named)
     kinds = unique(string(nameof(typeof(b))) for b in left)
     names = ["a " * k for k in kinds]
     list = length(names) == 1 ? only(names) : join(names[1:(end - 1)], ", ") * " and " * names[end]
-    @warn "masque: this figure has $(list) that masque wasn't given, so it shows as a picture " *
-        "and the reader can use it and nothing happens. Name it to make it live, " *
-        "`masque(fig, (name = block,))`, or take it out of the figure."
+    one = length(left) == 1
+    @warn "masque: this figure has $(list) that masque wasn't given, so " *
+        (one ? "it shows as a picture and the reader can use it" : "they show as pictures and the reader can use them") *
+        " and nothing happens. " *
+        (one ? "Name it to make it live" : "Name each one to make it live") *
+        ", `masque(fig, (name = block,))`, or take it out of the figure."
     return nothing
 end

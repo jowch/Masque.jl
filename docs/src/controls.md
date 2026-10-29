@@ -65,8 +65,9 @@ out of the figure.
 Text boxes are pictures for now, and `masque` warns when the figure has
 one, since the reader could click it and nothing would happen. A
 `SliderGrid` works like the other blocks: its field holds a tuple of its
-sliders' values. A `Button`'s field counts its clicks, and code that
-listens to the button's `clicks` runs on each one.
+sliders' values. A `Button`'s field counts its clicks. With `onchange`,
+Masque sets the button's `clicks` before calling your function, so code
+listening to it with `on(b.clicks)` runs too.
 
 With WGLMakie loaded, `Slider` and `Button` also name controls from
 Bonito, so Julia asks which one you mean; write `Makie.Slider` and

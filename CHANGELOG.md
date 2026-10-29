@@ -11,8 +11,9 @@ All notable changes to this project are documented here. The format is based on
   sliders' values, in order, and each value label follows its slider, written with the grid's
   own `format`. A grid that `masque` isn't given warns, as before (#430).
 - A Makie `Button` named in `masque` works in the notebook, drawn as Makie draws it, with its
-  hover and pressed colours. Its field counts the clicks, and code listening to the button's
-  `clicks` runs on each one. A button that `masque` isn't given warns, as before (#431).
+  hover and pressed colours. Its field counts the clicks. With `onchange`, each click also sets
+  the button's `clicks`, so code listening to it runs. A button that `masque` isn't given warns,
+  as before (#431).
 - `linked(plots...)` makes plots that draw the same rows one selection: clicking a mark in
   any of them selects its row in all of them, and hovering a mark outlines the same row on the
   others. The `@bind` field holds the row's position, or with `key = :id` the `id` of its

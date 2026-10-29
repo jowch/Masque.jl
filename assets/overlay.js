@@ -62,15 +62,15 @@
 .masque-check:focus-visible ~ .masque-check-art .box { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 /* Button, as Makie draws it: a rounded box with its label in the middle, in one colour pair at
    rest, another under the pointer and a third while pressed. Makie centres the outline on the
-   box's edge and clips it to the box, so it is drawn half inside and half out, and the box
-   clips it. */
-.masque-ctl-button { overflow: hidden; }
+   box's edge and clips it to the box: --sw is half its width, drawn inside and out, and the
+   button clips itself to its box. The focus ring goes on the box, outside that clip. */
 .masque-control .masque-button { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: none; cursor: pointer;
   font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; white-space: nowrap;
   border-radius: var(--r, 0); box-shadow: 0 0 0 var(--sw, 0) var(--sc, transparent), inset 0 0 0 var(--sw, 0) var(--sc, transparent);
-  background: var(--b0); color: var(--t0); }
+  clip-path: inset(0); outline: none; background: var(--b0); color: var(--t0); }
 .masque-control .masque-button:hover { background: var(--b1); color: var(--t1); }
 .masque-control .masque-button:active { background: var(--b2); color: var(--t2); }
+.masque-control:has(.masque-button:focus-visible) { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 .masque-vlabel { position: absolute; display: flex; align-items: center; justify-content: flex-end; white-space: nowrap;
   pointer-events: none; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; }
 .masque-control .masque-select { width: 100%; height: 100%; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; border: none; border-radius: 0; cursor: pointer;
