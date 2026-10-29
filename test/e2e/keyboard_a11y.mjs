@@ -93,6 +93,43 @@ try {
   if (!ready) throw new Error(`${backend} timed out waiting for kind-sweep widgets`);
   console.error(`phase: widgets mounted (${backend})`);
 
+  // The Enter and Escape checks below give a value 4-5 s to come back. Two things that are not
+  // under test can hold it longer than that, so wait them out before timing a round trip.
+  //
+  // Julia: a view's discarded compile-ahead frames (`_kick_view_warmup!`, src/render.jl) run
+  // after the cell that showed it. CI runs the notebook in the Pluto server process
+  // (serve.jl), where that cell is the whole notebook run, so every warmup starts once the
+  // last cell is done and they run back to back on the server's one thread: 0.5-5 s locally,
+  // longer on CI. A value sent then waits for them (#436). The server answers /ping on that
+  // same thread, so a few prompt replies in a row mean they are done. With a worker process
+  // (local runs) /ping always answers at once and this costs nothing.
+  //
+  // Browser: focusing a figure scrolls it into view, and on :webgl the context pool
+  // (frontend/src/wgl-shim.ts) then snapshots the plots that left the viewport and starts the
+  // ones that entered: about 3 s of main-thread work on SwiftShader, which delays the value's
+  // message just the same. The pool is idle once no swap is queued (`timer`): a swap itself runs synchronously.
+  const settle = async (what) => {
+    const t0 = Date.now();
+    for (let prompt = 0; prompt < 3;) {
+      if (Date.now() - t0 > 60000) throw new Error(`${what}: the Pluto server stayed busy for 60 s`);
+      const t = Date.now();
+      await fetch(`${base}/ping`);
+      prompt = Date.now() - t < 250 ? prompt + 1 : 0;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    for (let idle = 0; idle < 2;) {
+      if (Date.now() - t0 > 60000) throw new Error(`${what}: the WebGL context pool never went idle`);
+      const quiet = await page.evaluate(async () => {
+        // Two frames, so an IntersectionObserver record from a scroll has been delivered.
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const p = window.__MasqueWGL?.contextPool;
+        return !p || !p.timer;
+      });
+      idle = quiet ? idle + 1 : 0;
+    }
+  };
+  await settle("startup");
+
   const meta = await page.evaluate(() => JSON.parse(document.querySelector("#kind_meta").textContent));
   const layersOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#coords_${k}`).textContent), key);
   const textOf = (sel) => page.evaluate((q) => document.querySelector(q)?.innerText ?? "", sel);
@@ -206,6 +243,7 @@ try {
     const bakedSelected = spec?.selected ? spec.selectedIndex : null;
 
     await surface.focus();
+    await settle(key);
     let s = await state(key);
     if (!s.focused) throw new Error(`${key}: surface.focus() did not set DOM focus (tabindex missing?)`);
     passed.push(`${key}/focusable`);
@@ -317,6 +355,7 @@ try {
     const key = "series";
     const surface = await surfaceHandle(key);
     await surface.focus();
+    await settle(key);
     await page.keyboard.press("ArrowRight"); // the first line
     for (let i = 0; i < 30; i++) await page.keyboard.press("Shift+ArrowLeft"); // its first point
     await page.keyboard.press("Shift+ArrowRight");
