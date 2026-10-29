@@ -26,6 +26,9 @@ All notable changes to this project are documented here. The format is based on
   (before Safari 17 and Firefox 125) it stays inside the figure as before.
 
 ### Fixed
+- On `backend = :webgl`, a line with gaps, such as a `contour!` or a `lines!` with `NaN`
+  points, breaks at each gap, and so does a zero on a log axis. Before, each gap drew a straight
+  line to the axis origin (#439).
 - A click on a colorbar or an axis readout now gives the value its tooltip shows. Before,
   it could be off by up to half a pixel, such as `9.525` against a tooltip's `9.500` (#448).
 - A figure with a Makie `Button`, `Textbox` or `SliderGrid` now warns that masque shows it as
