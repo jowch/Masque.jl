@@ -119,7 +119,7 @@ html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latt
 }
 .masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-header {
   background: transparent;
-  color: #888;
+  color: #767676;
   font-size: 0.8em;
   font-weight: 400;
   padding: 0.2em 0;
@@ -135,7 +135,10 @@ html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latt
   content: "▾";
 }
 .masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-header:hover {
-  color: #4363d8;
+  text-decoration: underline;
+}
+html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latte) .masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-header {
+  color: #a0a0a0;
 }
 .masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-header .admonition-anchor {
   display: none;
