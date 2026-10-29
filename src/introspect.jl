@@ -1547,6 +1547,22 @@ function _walk_unknown!(d, ax, parent)
     return (built = built_any, warned = warned_any)
 end
 
+# The plots `_walk_unknown!` builds layers from under `parent`, a recipe Masque has no default
+# for, so `interactables(recipe)` builds the same ones. A part the axis can't take is left
+# out without a note: the defaults note it once already.
+function _recipe_parts(ax, parent, out = Makie.AbstractPlot[])
+    for c in _child_plots(parent)
+        hasproperty(c, :visible) && c.visible[] == false && continue
+        if !_known(ax, c) || c isa Makie.Text && c.text[] isa AbstractVector && isempty(c.text[])
+            _recipe_parts(ax, c, out)
+        elseif !_walk_refuses(c) && (_has_custom(ax, c) || !_quiet_skip(ax, c))
+            push!(out, c)
+        end
+    end
+    return out
+end
+_quiet_skip(ax, p) = task_local_storage(() -> _skip_for_axis(ax, p), _SKIPS, String[])
+
 # A `wireframe!` of the grid a `surface!` on the same `Axis3` draws is decoration: its edges
 # sit a few pixels apart over the whole surface, so as a layer it would answer nearly every
 # hover with an edge instead of a data point, hidden side included (`BoxPlot`'s whiskers are

@@ -83,14 +83,50 @@ function hitlayers(i::BlockControl, ctx)
         opts = collect(b.options[])
         g["n"] = length(opts)
         g["labels"] = String[Makie.optionlabel(o) for o in opts]
+        # What the closed menu shows: Makie's prompt before a choice, in its font size, text
+        # colour and box colour, with the label `textpadding[1]` in from the left.
+        g["prompt"] = string(b.prompt[])
+        g["fontsize"] = Float64(b.fontsize[]) * ctx.scaling
+        g["padding"] = Float64(b.textpadding[][1]) * ctx.scaling
+        g["text"] = _css_color(b.textcolor[])
+        g["off"] = _css_color(b.selection_cell_color_inactive[])
     elseif b isa Makie.Toggle
         g["color"] = _css_color(b.buttoncolor[])
         g["fill"] = _css_color(b.framecolor_active[])
         g["off"] = _css_color(b.framecolor_inactive[])
+        _toggle_geometry!(g, b, ctx)
     elseif b isa Makie.Checkbox
         g["color"] = _css_color(b.checkboxcolor_checked[])
     end
     return [HitLayer(i.id, :control, g, Any[], Symbol(""), events(i), string(i.id))]
+end
+
+# Makie's toggle (Makie/src/makielayout/blocks/toggle.jl): a rounded track `length` long and
+# `markersize` thick, turned by `orientation` and pinned to the box's corner on its start side,
+# and a knob `markersize·(1 - rimfraction)` across that slides between the box's two ends.
+# Points are image px from the box's top-left corner; `theta` turns counterclockwise.
+function _toggle_geometry!(g, b::Makie.Toggle, ctx)
+    or = b.orientation[]
+    theta = or === :horizontal ? 0.0 : or === :vertical ? pi / 2 : Float64(or)
+    ms = Float64(b.markersize[]); len = Float64(b.length[])
+    bb = _block_bbox(b)
+    o = bb.origin; w = bb.widths
+    s = ctx.scaling
+    local_px(x, y) = Float64[(x - o[1]) * s, (o[2] + w[2] - y) * s]
+    sy, sx = sincos(theta)
+    tx = sx > 0 ? o[1] + ms / 2 : o[1] + w[1] - ms / 2
+    ty = sy > 0 ? o[2] + ms / 2 : o[2] + w[2] - ms / 2
+    knob(active) = begin
+        y, x = (active ? -1 : 1) .* (sy, sx)
+        local_px(x > 0 ? o[1] + ms / 2 : o[1] + w[1] - ms / 2, y > 0 ? o[2] + ms / 2 : o[2] + w[2] - ms / 2)
+    end
+    g["theta"] = theta
+    g["track"] = vcat(local_px(tx, ty), len * s, ms * s)
+    g["knobOff"] = knob(false)
+    g["knobOn"] = knob(true)
+    g["knob"] = ms * (1 - Float64(b.rimfraction[])) * s
+    g["duration"] = Float64(b.toggleduration[])
+    return g
 end
 
 initial_envelope(i::BlockControl, ctx, layers) =

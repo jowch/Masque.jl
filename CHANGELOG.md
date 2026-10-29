@@ -14,12 +14,23 @@ All notable changes to this project are documented here. The format is based on
   stands for every plot on it. With `select = :many` the field holds several rows, and a box
   or a legend entry picks many at once. `selected=` takes the rows, and
   `interactables(plot; key = vector)` gives a plot keys of its own (#346).
+- `interactables(plot)` works on a recipe Masque builds from the plots it draws, such as
+  `contour!`, `tricontourf!` or `rainclouds!`. It returns the layers `masque(fig)` gives the
+  recipe, under the same ids, so `masque(fig, interactables(c), ViewInteractable(ax);
+  auto = false)` keeps a contour and adds a pan. Before, it raised an error.
 
 ### Fixed
 - A click on a colorbar or an axis readout now gives the value its tooltip shows. Before,
   it could be off by up to half a pixel, such as `9.525` against a tooltip's `9.500` (#448).
 - A figure with a Makie `Button`, `Textbox` or `SliderGrid` now warns that masque shows it as
   a picture, so it won't respond to a click. Before, it looked live and did nothing (#426).
+- A Makie `Toggle` named in `masque` is drawn the way Makie draws it: a vertical or angled
+  toggle (`orientation`) stands the right way, and `length`, `markersize`, `rimfraction` and
+  `toggleduration` carry over. Before, every toggle was a horizontal pill stretched over its
+  box (#427).
+- A Makie `Menu` named in `masque` shows its own `prompt` before a choice, instead of
+  "Select…", and its `fontsize`, `textcolor`, `textpadding` and
+  `selection_cell_color_inactive` carry over to the closed menu (#429).
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
   out, as in `bind = :picked`. Before, the click did nothing.
 - On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down
