@@ -1,49 +1,8 @@
 # Linked views
 
-A click in a Masque widget updates its `@bind` variable, and cells that
-use the variable respond to the change. So linking a scatter to a detail
-plot, a table, or a model fit is ordinary Pluto code: use the value in
-another cell to create a plot or compute a result.
-
-To have plots that draw the same rows select them together, link them
-with [`linked`](@ref), as in
-[Select the same rows on every panel](@ref).
-
-## Update another plot from a click
-
-Give each payload a key that identifies its row, such as an id or a
-name, and use the key in other cells. Here, clicking a city on a map
-plots that city's series:
-
-```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-lv-city" data-masque-embed="linked_city" data-masque-segment="widget" title="A map of three cities. Click a city to plot its series in the next cell." style="width:100%;height:760px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
-</div>
-```
-
-```@eval
-Main.masque_fallback("linked_city"; segment = "widget")
-```
-
-`bind = s` makes `pick` the clicked city itself, or `nothing` before
-the first click.
-
-```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-lv-city-detail" data-masque-embed="linked_city" data-masque-segment="detail" title="The detail cell: the clicked city's series." style="width:100%;height:420px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
-</div>
-```
-
-```@eval
-Main.masque_fallback("linked_city"; segment = "detail")
-```
-
-The detail cell uses `pick`, so it responds to each click but not to
-hovering. The same `pick.id` could filter a `DataFrame` or choose the
-data for a fit. The detail figure can be a Masque widget too.
-
-To mark the clicked point in another plot of the same rows, put both
-plots in one figure and link them, as the next sections show.
+Panels that plot the same rows of your data can share one selection, so
+a click on a point in one panel selects that row on every panel. Both
+panels go in one figure, with one `masque` call.
 
 ## Several axes in one figure
 
@@ -119,32 +78,31 @@ legend entry "A" picks `s1` and `s2` on both panels. To start with rows
 selected, pass them as `selected = (samples = ["s1"],)`, by key, or by
 position when the group has no key.
 
-## Highlight a series across panels
+## Keep a keyed selection when the figure rebuilds
 
-Hovering a legend entry picks out every mark of its series, on every
-axis where the series appears. Clicking an entry sets `sel.legend` to
-a [`LegendEvent`](@ref), which another cell can use to filter your
-data. With `bind = :legend`, as in the example, `pick` is that event.
-See [Legend](@ref).
+[Keep a selection when the figure rebuilds](@ref) on the Selection page
+stores the name of the selected city and looks up its
+position after the rebuild. A `linked` group with `key` saves that
+lookup: its value is the name itself, and `selected=`
+takes a name. Store the name as it comes:
 
-```@raw html
-<div class="masque-embed-wrap">
-<iframe id="masque-lv-legend-wash" data-masque-embed="linked_legend_wash" title="Two scatter panels with a legend. Hover an entry to highlight its series on both." style="width:100%;height:720px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
-</div>
+```julia
+if !isnothing(sel.cities)
+    last_city[] = sel.cities
+end
 ```
 
-```@eval
-Main.masque_fallback("linked_legend_wash")
+Then pass it back, or `nothing` when the city is no longer in the data:
+
+```julia
+start = last_city[] in city_names ? last_city[] : nothing
 ```
 
-## Filter a table with a box
+```julia
+@bind sel masque(fig, (cities = linked(cities; key = :city),); selected = (cities = start,))
+```
 
-To select many points at once, drag a box. When you release an
-[`ROIInteractable`](@ref) with `selects`, it returns every point inside
-the box, in the field of the plot it selects from. With that list as
-`picks`, another cell can take those rows from your table with
-`df[picks, :]`, or create another plot from them.
-[Brush a region](@ref) shows how.
+## Where to go next
 
-For what each click, release, and drag sets in the value, see
-[How Masque works](@ref).
+[Use selections in other cells](@ref) uses the selected rows to update
+another plot or a table.

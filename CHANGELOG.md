@@ -19,7 +19,18 @@ All notable changes to this project are documented here. The format is based on
   recipe, under the same ids, so `masque(fig, interactables(c), ViewInteractable(ax);
   auto = false)` keeps a contour and adds a pan. Before, it raised an error.
 
+### Changed
+- A tooltip near the figure's edge can now extend past the figure onto the page around it,
+  instead of being pushed back over the plot. It still sits above the mark, and moves below
+  it or sideways only at the edge of the browser window. In browsers without the Popover API
+  (before Safari 17 and Firefox 125) it stays inside the figure as before.
+
 ### Fixed
+- On `backend = :webgl`, a line with gaps, such as a `contour!` or a `lines!` with `NaN`
+  points, breaks at each gap, and so does a zero on a log axis. Before, each gap drew a straight
+  line to the axis origin (#439).
+- A click on a colorbar or an axis readout now gives the value its tooltip shows. Before,
+  it could be off by up to half a pixel, such as `9.525` against a tooltip's `9.500` (#448).
 - A figure with a Makie `Button`, `Textbox` or `SliderGrid` now warns that masque shows it as
   a picture, so it won't respond to a click. Before, it looked live and did nothing (#426).
 - A Makie `Toggle` named in `masque` is drawn the way Makie draws it: a vertical or angled

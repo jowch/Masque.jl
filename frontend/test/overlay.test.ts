@@ -1480,6 +1480,47 @@ describe("tooltips (mount/showTip)", () => {
         expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("5.0")
     })
 
+    it("a readout click commits the value its tooltip shows, not the click's rounded position (#448)", () => {
+        // Chromium reports pointer events at fractional client px but rounds a click's to whole
+        // px, so the click lands half a px from the pointerup it follows.
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, tipDigits: 4,
+            transforms: {
+                cb1: { xlims: [0, 1], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                    viewport: [200, 100, 24, 400], xreversed: false, yreversed: false, valueaxis: "y" },
+                ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                    viewport: [400, 100, 400, 400], xreversed: false, yreversed: false },
+            },
+            layers: [
+                { id: "cb", kind: "axis", bond: "colorbar", geometry: [200, 100, 24, 400], payloads: [], axis: "cb1", events: ["click", "hover"] },
+                { id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["click", "hover"] },
+            ],
+        }, undefined, vi.fn(async () => ({})))
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        const press = (x: number, y: number) => {
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, bubbles: true }))
+            const shown = tip.innerHTML
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: x, clientY: y, button: 0, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: x, clientY: y, button: 0, bubbles: true }))
+            surface.dispatchEvent(new MouseEvent("click", { clientX: Math.round(x), clientY: Math.round(y), bubbles: true }))
+            return shown
+        }
+        const value = () => (host as unknown as { value: Record<string, { payload: Record<string, number> }> }).value
+        // client y 150.3 -> image y 300.6 -> 10 - 200.6/40 = 4.985; the rounded 150 would be 5.000
+        expect(press(110, 150.3)).toBe("4.985")
+        expect(value().cb.payload.value).toBeCloseTo(4.985, 6)
+        // client (300.4, 150.3) -> image (600.8, 300.6) -> x = 200.8/40 = 5.02, y = 4.985
+        expect(press(300.4, 150.3)).toContain("5.02")
+        expect(value().axis.payload.x).toBeCloseTo(5.02, 6)
+        expect(value().axis.payload.y).toBeCloseTo(4.985, 6)
+        // A click with no pointerup under it (a script's .click()) keeps its own position.
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 110, clientY: 200, bubbles: true }))
+        expect(value().cb.payload.value).toBeCloseTo(2.5, 6)
+    })
+
     it("cursor-following tooltip offset uses the surface's real rect, not the raw event offset, when one is available", () => {
         // tipOffset falls back to e.offsetX/e.offsetY only when the surface's own
         // getBoundingClientRect is degenerate (width/height 0, as happy-dom defaults to) — with
@@ -2825,6 +2866,76 @@ describe("overlay visual polish", () => {
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 0, bubbles: true }))
         await flushFrame()
         expect(tip.style.left).toBe("200px")
+    })
+
+    it("without the Popover API the tooltip stays in the figure and never asks for :popover-open", () => {
+        const { host, script } = setup()
+        mount(script, manifest)
+        const shadow = shadowOf(host)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect(tip.hasAttribute("popover")).toBe(false)
+        // An older browser rejects the selector outright.
+        const matches = tip.matches.bind(tip)
+        tip.matches = (sel: string) => {
+            if (sel.includes(":popover-open")) throw new SyntaxError(sel)
+            return matches(sel)
+        }
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+        expect(tip.classList.contains("show")).toBe(true)
+        expect(tip.style.left).not.toBe("")
+    })
+
+    it("with the Popover API the tooltip leaves the figure and follows it on scroll", () => {
+        // A stand-in for the browser's top layer: happy-dom has no Popover API.
+        const proto = HTMLElement.prototype as unknown as { showPopover?: () => void }
+        const had = proto.showPopover
+        proto.showPopover = function (this: HTMLElement) { this.dataset.open = "1" }
+        try {
+            const { host, img, script } = setup()
+            mount(script, {
+                width: 1200, height: 800, scaling: 2, transforms: {},
+                layers: [{ id: "pts", kind: "circles", geometry: [40, 40, 20], payloads: [{ i: 0 }],
+                    axis: "ax1", events: ["hover"] }],
+            })
+            const shadow = shadowOf(host)
+            const tip = shadow.querySelector(".masque-tip") as HTMLElement
+            const surface = shadow.querySelector(".surface") as HTMLElement
+            expect(tip.getAttribute("popover")).toBe("manual")
+            const matches = tip.matches.bind(tip)
+            tip.matches = (sel: string) => sel.includes(":popover-open") ? tip.dataset.open === "1" : matches(sel)
+            Object.defineProperty(tip, "offsetWidth", { configurable: true, value: 220 })
+            Object.defineProperty(tip, "offsetHeight", { configurable: true, value: 80 })
+            Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: 1000 })
+            Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: 900 })
+            let top = 300
+            img.getBoundingClientRect = surface.getBoundingClientRect = () => new DOMRect(100, top, 600, 400)
+            // Mark at css (20,20), its top edge at 10: inside the figure the box would flip below
+            // it; in window px (120,310) there is room above, so it stays above, past the edge.
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 120, clientY: 320, bubbles: true }))
+            expect(tip.dataset.open).toBe("1")
+            expect(tip.classList.contains("show")).toBe(true)
+            expect(tip.classList.contains("flip-y")).toBe(true)
+            expect(tip.style.left).toBe("10px") // 120 - 110, clear of the window's 8px edge gap
+            expect(tip.style.top).toBe("220px") // 310 - 10 - 80
+            top = 250
+            window.dispatchEvent(new Event("scroll"))
+            expect(tip.style.top).toBe("170px")
+            // Scrolled out of the window, the box leaves with its mark instead of pinning to the
+            // window's top: mark at window y -480, its top edge at -490.
+            top = -500
+            window.dispatchEvent(new Event("scroll"))
+            expect(tip.style.top).toBe("-580px") // -490 - 10 - 80
+            expect(tip.style.left).toBe("10px") // 120 - 110
+            top = 250
+            window.dispatchEvent(new Event("scroll"))
+            expect(tip.style.top).toBe("170px")
+        } finally {
+            if (had) proto.showPopover = had
+            else delete proto.showPopover
+            delete (document.documentElement as unknown as Record<string, unknown>).clientWidth
+            delete (document.documentElement as unknown as Record<string, unknown>).clientHeight
+        }
     })
 
     it("a rect (bar) tooltip anchors at its top-centre, not its centre", () => {

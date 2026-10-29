@@ -71,6 +71,7 @@ export function setDragHoverChrome(ctx: OverlayCtx, state: OverlayState, hit: Hi
 // aria-live is) — that's what keyboard.ts's separate live region is for; showTip/showTipAt just
 // give sighted keyboard users the same visual tooltip a mouse hover would.
 export function setTipVisible(ctx: OverlayCtx, visible: boolean): void {
+    if (visible) openTip(ctx.tip_)
     ctx.tip_.classList.toggle("show", visible)
     ctx.tip_.setAttribute("aria-hidden", visible ? "false" : "true")
 }
@@ -109,58 +110,105 @@ export function tipOffset(ctx: OverlayCtx, e: MouseEvent): { x: number; y: numbe
     return { x: e.offsetX || e.clientX, y: e.offsetY || e.clientY }
 }
 
+// The tooltip sits in the browser's top layer (a manual popover, set up in mount.ts) where the
+// browser has one, so a box near the figure's edge can use the page around it. Plain unclamping
+// would not do: Pluto's output cell clips anything past its own edge, and a `position: fixed`
+// box paints under the cell above. An escaped box is placed in window px and keeps clear of the
+// window's edges instead of the figure's; the placement rule itself is the same. It stays open
+// (opacity hides it) so it can be measured before it is shown.
+export function openTip(tip: HTMLElement): void {
+    if (!tip.hasAttribute("popover") || !tip.isConnected || tip.matches(":popover-open")) return
+    // A refusal would leave the UA's `[popover]:not(:popover-open) { display: none }` hiding the
+    // box for good, so it drops the attribute and falls back to the figure instead.
+    try { tip.showPopover() } catch { tip.removeAttribute("popover") }
+}
+
+interface TipFrame { dx: number; dy: number; w: number; h: number; escaped: boolean }
+
+// The box the placement math keeps the tooltip inside, and where its origin sits relative to
+// the surface: the surface itself, or the window for an escaped tooltip.
+function tipFrame(ctx: OverlayCtx, state: OverlayState): TipFrame {
+    if (!state.tipSized_) {
+        state.tipW_ = ctx.tip_.offsetWidth; state.tipH_ = ctx.tip_.offsetHeight
+        state.tipSized_ = state.tipW_ > 0 && state.tipH_ > 0
+    }
+    // hasAttribute first: a browser without the Popover API throws on `:popover-open`.
+    if (ctx.tip_.hasAttribute("popover") && ctx.tip_.matches(":popover-open")) {
+        const r = ctx.surface_.getBoundingClientRect()
+        const doc = document.documentElement
+        return { dx: r.left, dy: r.top, w: doc.clientWidth, h: doc.clientHeight, escaped: true }
+    }
+    if (!state.surfaceSized_) {
+        state.surfaceW_ = ctx.surface_.clientWidth; state.surfaceH_ = ctx.surface_.clientHeight
+        state.surfaceSized_ = state.surfaceW_ > 0 && state.surfaceH_ > 0
+    }
+    return { dx: 0, dy: 0, w: state.surfaceW_, h: state.surfaceH_, escaped: false }
+}
+
+// An escaped box whose point (window px) is outside the window is not clamped: clamped, it would
+// stay pinned to the window's edge with its mark gone. It keeps its unclamped place beside the
+// point instead, so it scrolls off with its mark.
+function offWindow(f: TipFrame, x: number, y: number): boolean {
+    return f.escaped && (x < 0 || y < 0 || x > f.w || y > f.h)
+}
+
+// Re-run the last placement after the page scrolls or the figure moves: an escaped box is in
+// window px, so it would otherwise stay put while its mark scrolls away.
+export function replaceTip(ctx: OverlayCtx, state: OverlayState): void {
+    if (ctx.tip_.classList.contains("show")) state.tipPlace_?.()
+}
+
 // The cursor-following kinds (axis, threshold, ROI, view) and the slice readout: the box sits
 // below the pointer and its caret points at the pointer, the point the readout describes. Near
 // the right edge the box shifts left and the caret moves with the pointer, as placeAnchored does
 // on a side-clip; near the bottom the box goes above the pointer with the caret underneath.
+// `ox`/`oy` are surface css px.
 export function placeTip(ctx: OverlayCtx, state: OverlayState, ox: number, oy: number): void {
-    if (!state.tipSized_) {
-        state.tipW_ = ctx.tip_.offsetWidth; state.tipH_ = ctx.tip_.offsetHeight
-        state.tipSized_ = state.tipW_ > 0 && state.tipH_ > 0
-    }
-    if (!state.surfaceSized_) {
-        state.surfaceW_ = ctx.surface_.clientWidth; state.surfaceH_ = ctx.surface_.clientHeight
-        state.surfaceSized_ = state.surfaceW_ > 0 && state.surfaceH_ > 0
-    }
-    const tw = state.tipW_, th = state.tipH_, hw = state.surfaceW_, hh = state.surfaceH_
+    state.tipPlace_ = () => placeTip(ctx, state, ox, oy)
+    const f = tipFrame(ctx, state)
+    const tw = state.tipW_, th = state.tipH_, hw = f.w, hh = f.h
+    const x = ox + f.dx, y = oy + f.dy
     ctx.tip_.classList.remove("flip-y")
     if (tw <= 0 || th <= 0 || hw <= 0 || hh <= 0) {
-        ctx.tip_.style.left = `${ox - CARET_INSET}px`
-        ctx.tip_.style.top = `${oy + TIP_OFFSET}px`
+        ctx.tip_.style.left = `${x - CARET_INSET}px`
+        ctx.tip_.style.top = `${y + TIP_OFFSET}px`
         ctx.tip_.style.setProperty("--masque-caret-x", `${CARET_INSET}px`)
         return
     }
-    let top = oy + TIP_OFFSET
+    if (offWindow(f, x, y)) {
+        ctx.tip_.style.left = `${x - CARET_INSET}px`
+        ctx.tip_.style.top = `${y + TIP_OFFSET}px`
+        ctx.tip_.style.setProperty("--masque-caret-x", `${CARET_INSET}px`)
+        return
+    }
+    let top = y + TIP_OFFSET
     const flipY = top + th > hh - TIP_GAP
-    if (flipY) { top = oy - th - TIP_OFFSET; ctx.tip_.classList.add("flip-y") }
-    const left = Math.max(TIP_GAP, Math.min(ox - CARET_INSET, hw - tw - TIP_GAP))
+    if (flipY) { top = y - th - TIP_OFFSET; ctx.tip_.classList.add("flip-y") }
+    const left = Math.max(TIP_GAP, Math.min(x - CARET_INSET, hw - tw - TIP_GAP))
     ctx.tip_.style.left = `${left}px`
     ctx.tip_.style.top = `${Math.max(TIP_GAP, Math.min(top, hh - th - TIP_GAP))}px`
-    ctx.tip_.style.setProperty("--masque-caret-x", `${Math.max(6, Math.min(tw - 6, ox - left))}px`)
+    ctx.tip_.style.setProperty("--masque-caret-x", `${Math.max(6, Math.min(tw - 6, x - left))}px`)
 }
 
-// Places the tooltip above (or, if that clips the surface's top, below) a mark's anchor point —
+// Places the tooltip above (or, if that clips the frame's top, below) a mark's anchor point —
 // used for every kind except the cursor-following four (geometry.ts's CURSOR_FOLLOWING_KINDS).
 // Shared by showTip (pointer) and showTipAt/restoreFocus (keyboard) so both paths place
-// identically; `anchor` is already in css px (state.ts's cssAnchor).
+// identically; `anchor` is already in surface css px (state.ts's cssAnchor).
 export function placeAnchored(ctx: OverlayCtx, state: OverlayState, anchor: Anchor): void {
-    if (!state.tipSized_) {
-        state.tipW_ = ctx.tip_.offsetWidth; state.tipH_ = ctx.tip_.offsetHeight
-        state.tipSized_ = state.tipW_ > 0 && state.tipH_ > 0
-    }
-    if (!state.surfaceSized_) {
-        state.surfaceW_ = ctx.surface_.clientWidth; state.surfaceH_ = ctx.surface_.clientHeight
-        state.surfaceSized_ = state.surfaceW_ > 0 && state.surfaceH_ > 0
-    }
-    const tw = state.tipW_, th = state.tipH_, sw = state.surfaceW_, sh = state.surfaceH_
+    state.tipPlace_ = () => placeAnchored(ctx, state, anchor)
+    const f = tipFrame(ctx, state)
+    const tw = state.tipW_, th = state.tipH_, sw = f.w, sh = f.h
+    const a = f.escaped ? { x: anchor.x + f.dx, y: anchor.y + f.dy, top: anchor.top + f.dy } : anchor
     if (tw <= 0 || th <= 0 || sw <= 0 || sh <= 0) {
-        ctx.tip_.style.left = `${anchor.x}px`
-        ctx.tip_.style.top = `${Math.max(0, anchor.top - ANCHOR_GAP)}px`
+        ctx.tip_.style.left = `${a.x}px`
+        ctx.tip_.style.top = `${Math.max(0, a.top - ANCHOR_GAP)}px`
         ctx.tip_.style.removeProperty("--masque-caret-x")
         ctx.tip_.classList.remove("flip-y")
         return
     }
-    const p = computeAnchoredPlacement(anchor, tw, th, sw, sh)
+    const p = offWindow(f, a.x, a.y)
+        ? { left: a.x - tw / 2, top: a.top - ANCHOR_GAP - th, caretX: tw / 2, below: false }
+        : computeAnchoredPlacement(a, tw, th, sw, sh)
     ctx.tip_.style.left = `${p.left}px`
     ctx.tip_.style.top = `${p.top}px`
     ctx.tip_.style.setProperty("--masque-caret-x", `${p.caretX}px`)
