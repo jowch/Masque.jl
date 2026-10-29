@@ -32,9 +32,10 @@ end
 )
 ```
 
-Click a few points: the red
-line moves to fit the points you picked. `w.pts` holds the same picks for
-other cells.
+Click a few points: the red line moves to fit the points you selected.
+With `select = :many`, each click adds a point to the selection, as
+[Select several marks](@ref) describes, and `w.pts` holds the same points
+for other cells.
 
 ```@raw html
 <video id="masque-onchange-clip" title="Clicking points one at a time while the red line refits to them, then clicking one again to take it out, with CairoMakie"
@@ -50,8 +51,9 @@ other cells.
 </script>
 ```
 
-`state` has one field for each plot you can pick from and each control,
-with the same names and values as the `@bind` value. The function runs once
+`state` has one field for each plot you can select from and each control,
+with the same names and values as the `@bind` value
+([What the `@bind` value holds](@ref)). The function runs once
 when the cell runs, before the figure first shows, and then after every
 change the reader makes. While the reader
 drags a threshold line or a box, it runs as the control moves; to wait for
@@ -68,6 +70,11 @@ maskplot[1] = newmatrix                      # one argument
 update!(maskplot; visible = state.show)      # an attribute
 ```
 
+To change one color, size or marker per point, create the plot with one
+per point from the start, such as `color = fill(:gray70, length(xs))`: a
+scatter created with a single color raises an error when `onchange` gives
+it a list of colors.
+
 Adding a plot or deleting one inside `onchange` raises an error that names
 the plot. To show a plot only sometimes, create it at the start and switch
 its `visible` attribute. A hidden plot shows no tooltip and takes no clicks.
@@ -80,9 +87,28 @@ stay selected on its other plots. The group's rows are cleared when its
 plots' rows change: a different number of marks or, with `key`, the keys
 in a different order.
 
+## Remember things between changes
+
+The function sees only the widget's current state. When it needs to
+remember something from one change to the next, such as the class each
+point was given, keep it in a `Dict` or a `Ref` created in another cell,
+and change it inside the function:
+
+```julia
+labels = Dict{Int, String}()
+```
+
+The `Dict` keeps its contents while the reader works the widget. When the
+`masque` cell runs again, the widget starts with nothing selected, so the
+first run of the function sees no selection; [Keep the labels when the
+cell runs again](@ref) shows how to start the new widget where the reader
+left off. [Label points into classes](@ref) builds a whole widget this
+way.
+
 ## Keep a field out of the value
 
-`bind` chooses what the `@bind` value holds, and `onchange` still sees
+`bind` chooses what the `@bind` value holds
+([Choose the fields with `bind`](@ref)), and `onchange` still sees
 every field. So a threshold that only drives the figure can stay out of the
 value that other cells use:
 
@@ -120,5 +146,7 @@ full error to the cell's log.
 stays as it was last drawn, while clicks, the threshold, and the `@bind`
 value still work.
 
-Next: [Linked views](@ref) uses the value in other cells to drive more
-plots, and [Pan, zoom and orbit](@ref) moves the view the same way.
+## Where to go next
+
+[Sliders, toggles and menus](@ref) lays out controls the function can
+read, and [Label points into classes](@ref) puts the parts together.

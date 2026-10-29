@@ -61,12 +61,14 @@ makedocs(;
                 "Brush a region" => "roi.md",
                 "Heatmaps and images" => "grids.md",
                 "Legend" => "legend.md",
+                "Linked views" => "linked-views.md",
+                "Use selections in other cells" => "use-selections.md",
             ],
             "Build a widget" => [
                 "Build a widget" => "widgets.md",
-                "Sliders, toggles and menus" => "controls.md",
                 "Update the figure" => "onchange.md",
-                "Linked views" => "linked-views.md",
+                "Sliders, toggles and menus" => "controls.md",
+                "Label points into classes" => "label-points.md",
             ],
             "Move around a figure" => [
                 "Explore a 3D figure" => "explore-3d.md",

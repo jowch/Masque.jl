@@ -48,6 +48,22 @@ Main.masque_fallback("legend_lines"; segment = "fade")
 You can use `pick.label` the same way to filter a table, choose which
 series to fit, or update any other cell.
 
+## Highlight a series on every panel
+
+A legend entry picks out its series on every axis where the series
+appears, not only the axis the legend sits on. Hover an entry below and
+both panels highlight its points:
+
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-lv-legend-wash" data-masque-embed="linked_legend_wash" title="Two scatter panels with a legend. Hover an entry to highlight its series on both." style="width:100%;height:720px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
+```
+
+```@eval
+Main.masque_fallback("linked_legend_wash")
+```
+
 ## Choose which plots an entry highlights
 
 Each entry is linked to the plots Makie made it for: the line for a
@@ -97,7 +113,5 @@ it as `interactables(l1)`, where `l1` is what `lines!` returned:
 
 See [Selection](@ref).
 
-A legend can also highlight series on other axes of the same figure;
-[Linked views](@ref) shows this across two panels. You can also reach
-legend entries with the keyboard; see
+You can also reach legend entries with the keyboard; see
 [Keyboard and screen readers](@ref).
