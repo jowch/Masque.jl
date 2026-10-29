@@ -5,7 +5,7 @@ between its marks and Enter or Space to select one. A screen reader
 announces each mark as you move to it. A `masque` widget needs no extra
 setup for this.
 
-## Keys
+## Keyboard shortcuts
 
 | Key | What it does |
 |---|---|
@@ -73,7 +73,7 @@ On a categorical axis, a threshold line moves one category at a time.
 Panning, zooming, and rotating never change the `@bind` value, as with the
 pointer.
 
-## What gets announced
+## What a screen reader announces
 
 When you move to a mark, a screen reader announces the layer's name,
 the mark's position in its layer, and the text its tooltip shows. A

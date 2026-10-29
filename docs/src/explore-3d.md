@@ -41,7 +41,7 @@ empty space, so the last cell can read `pick.name` and `pick.height`.
 Only the stations take clicks into `pick`: hovering the surface shows
 its height, but a click on it does not change `pick`.
 
-## Turn the view
+## Orbit the view
 
 To let the reader turn the plot, add a [`ViewInteractable`](@ref) for
 the axis and pass it to the same `masque` call:
@@ -55,7 +55,7 @@ Dragging then turns the camera, and the stations keep their tooltips and
 clicks at every angle. [Pan, zoom and orbit](@ref) has the zoom and pan
 controls, and how to turn several panels together with `linkcameras!`.
 
-## What it can't do
+## Limitations
 
 - The example on this page can't turn, since a turn needs Julia to
   draw the figure again; see [Pan and orbit preview](@ref). To try it,
@@ -66,7 +66,7 @@ controls, and how to turn several panels together with `linkcameras!`.
   the axis box, even if part of it still shows. Zoom out, or turn the
   view, to bring it back.
 
-## Next
+## Where to go next
 
 - [Pan, zoom and orbit](@ref) for every way to move the view.
 - [Supported plots and axes](@ref) for which 3D plots respond.

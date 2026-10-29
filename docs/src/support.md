@@ -8,7 +8,7 @@ the plot types `masque(fig)` makes interactive.
 
 Hovering and clicking marks works on all three axis types, but `Axis3`
 and `PolarAxis` support only some plot types
-([Recipes masque(fig) extracts](@ref) says which). Reading coordinates,
+([Plots `masque(fig)` makes interactive](@ref) says which). Reading coordinates,
 dragging a threshold or a box, sampling a series, and panning turn a
 pointer position into a data value, so they need a 2D `Axis`. A
 `PolarAxis` can read the angle and radius under the pointer.
@@ -52,13 +52,13 @@ even its legend and colorbar. For interactive 3D, use an `Axis3`.
 [Keyboard and screen readers](@ref) lists which marks the keyboard
 reaches.
 
-## Recipes masque(fig) extracts
+## Plots `masque(fig)` makes interactive
 
 `masque(fig)` makes these plots interactive and skips any other plot
 with a warning that names it. Every recipe here except `surface!` works
 on a 2D `Axis`, and the last two columns say which also work on `Axis3`
 and `PolarAxis`. Constructor signatures and default fields are in
-[Constructors](@ref) and [Plot-object defaults](@ref).
+[Constructors](@ref) and [Fields each plot reports](@ref).
 
 | Recipe | Layer `id` | Kind | Axis3 | PolarAxis |
 |---|---|---|---|---|
@@ -131,7 +131,7 @@ them. If Masque can't make one plot
 interactive, it skips that plot with a warning and the rest of the
 figure still responds. To make a recipe of your own
 respond as one mark, see [Your own plot types](@ref), and to add hit
-shapes where nothing is drawn, see [Custom hits](@ref).
+shapes where nothing is drawn, see [Custom shapes](@ref).
 
 Bars or cells turned with `rotate!` are skipped with a warning. To make
 rotated bars respond, draw them with `poly!`.

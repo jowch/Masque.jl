@@ -155,7 +155,7 @@ or system setting. This is the same chart drawn with Makie's
 Main.masque_fallback("tooltips_stars_dark")
 ```
 
-## Accent color
+## Border color
 
 When Masque knows a mark's color, its tooltip gets a 3px border in that
 color. The color comes from:

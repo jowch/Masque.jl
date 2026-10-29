@@ -74,7 +74,7 @@ makedocs(;
             ],
             "Extend Masque" => [
                 "Your own plot types" => "recipes.md",
-                "Custom hits" => "custom.md",
+                "Custom shapes" => "custom.md",
             ],
         ],
         "Examples" => [
@@ -101,7 +101,7 @@ makedocs(;
             "Publish outside Pluto" => "publish.md",
             "Keyboard and screen readers" => "accessibility.md",
             "Performance" => "performance.md",
-            "Current design and rough edges" => "design.md",
+            "Design and limitations" => "design.md",
             "Troubleshooting" => "troubleshooting.md",
             "Upgrading" => "upgrading.md",
         ],

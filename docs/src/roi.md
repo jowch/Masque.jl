@@ -30,7 +30,7 @@ lists the stations inside:
 Main.masque_fallback("roi_table"; segment = "table")
 ```
 
-## Pick the points inside a box
+## Select the points inside a box
 
 An [`ROIInteractable`](@ref) adds the box, and `selects` names the plot
 whose points it collects. To give each point its row of data, pass the
@@ -79,7 +79,7 @@ Name a heatmap or image in `selects` instead, and the box returns
 one [`GridWindowEvent`](@ref) for the block of cells it covers.
 [Brush a block of cells](@ref) shows how to read it.
 
-## Read the box itself
+## Read the box's bounds
 
 Leave out `selects`, and the box's field holds only the box: a
 [`BoundsEvent`](@ref) with `xmin`, `xmax`, `ymin`, and `ymax`. It starts
@@ -95,7 +95,7 @@ box = ROIInteractable(ax; bounds = (2.0, 5.0, 0.0, 1.0))
 To start one widget's box where another's was released, pass that
 widget's `BoundsEvent` as `bounds`.
 
-## Moving and resizing
+## Move and resize the box
 
 Drag inside the box to move it, or drag a corner to resize it in both
 directions. Dragging the middle of an edge moves only that edge, and
@@ -106,7 +106,7 @@ box has focus: the arrow keys move it, Alt with an arrow grows the side
 that arrow points to, and Alt+Shift with an arrow shrinks it. See
 [Keyboard and screen readers](@ref) for the rest.
 
-## Where it works
+## Plots a box can select
 
 `selects` can name a plot of points, such as a scatter, or a heatmap or
 image. A plot that draws both lines and points, such as `scatterlines`,

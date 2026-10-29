@@ -24,7 +24,7 @@ Main.masque_fallback("widgets_value")
 holds, and [Choose the fields with `bind`](@ref) shows how to keep a
 field out of the value.
 
-## Let picks add up
+## Add each click to the selection
 
 A widget that builds something up, such as a set of labeled points,
 needs every click to add to what the reader has already picked rather
@@ -52,7 +52,7 @@ class = Menu(fig[2, 1]; options = ["good", "bad", "unsure"])
 `w.class` is then the option chosen, and changing it leaves the picks as
 they were. [Sliders, toggles and menus](@ref) lists the controls you can use.
 
-## Change the figure and keep state
+## Remember state between changes
 
 With `onchange`, a function you write runs after every change the reader
 makes and can update the plots, so the figure answers without the cell

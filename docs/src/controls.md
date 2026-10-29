@@ -30,7 +30,7 @@ The slider and the toggle look like Makie's and sit where the figure's
 layout put them. Moving one changes `w` when you let go, so cells that use
 `w` respond.
 
-## Redraw the figure as the reader moves a control
+## Redraw the figure from a control
 
 With [`onchange`](onchange.md), the figure follows the controls without
 running the cell again. Change your plots with Makie's `update!`, then

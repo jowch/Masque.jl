@@ -1,23 +1,23 @@
 # Troubleshooting
 
-Each entry starts with what you tried or the start of the error you
-saw, then gives the cause and the fix. For constructor signatures, see
+Each entry names what you did or what you saw, then gives the cause
+and the fix. For constructor signatures, see
 [Constructors](@ref).
 
 ## Most common
 
 - No Makie backend loaded: see
-  [Tried `masque` with no Makie backend](@ref).
+  [No Makie backend loaded](@ref).
 - `type NamedTuple has no field index`: see
-  [Tried `sel.index` and got "has no field"](@ref troubleshooting-no-field).
+  [`sel.index` has no field](@ref troubleshooting-no-field).
 - Pluto reports cyclic references for `selected=sel.scatter`: see
-  [Tried feeding this widget's bond into the same call's `selected=`](@ref).
+  [Cyclic references from `selected=`](@ref).
 - Hover does not update `pick`: see
-  [Tried reading pick on hover](@ref).
+  [Hovering doesn't change the `@bind` value](@ref).
 
 ## Errors from `masque()` / interactable constructors
 
-### Tried `masque` with no Makie backend
+### No Makie backend loaded
 
 **Error prefix:** `masque(fig) needs a rendering backend loaded`
 
@@ -28,7 +28,7 @@ saw, then gives the cause and the fix. For constructor signatures, see
 `masque`. Loading both is fine: `masque` without `backend=` then uses
 CairoMakie. For more information, see [Backends](@ref).
 
-### Tried a `backend=` that is not loaded
+### `backend=` names a backend that isn't loaded
 
 **Error prefix:** `` masque: `backend = :webgl` needs `using WGLMakie` first `` /
 `masque: unknown backend`
@@ -40,7 +40,7 @@ name other than `:cairo` and `:webgl`.
 `:cairo`), or leave `backend=` out to use whichever is loaded. See
 [Choose a backend](@ref).
 
-### Tried `tooltip = true`
+### `tooltip = true`
 
 **Error prefix:** `tooltip = true is not meaningful`
 
@@ -51,7 +51,7 @@ them: leave `tooltip` out for the default table of names and values,
 pass `masque"..."` for a template, or pass `tooltip = false` to hide the
 tooltip. For more information, see [Tooltips](@ref).
 
-### Tried `payloads` of the wrong length
+### `payloads` of the wrong length
 
 **Error prefix:** `payloads has N entries, expected M`
 
@@ -63,7 +63,7 @@ message says `rows` instead of `entries`.
 **Fix:** give one entry per mark, or omit `payloads` on constructors
 that have a default.
 
-### Tried two interactables with the same id
+### Two interactables with the same id
 
 **Error prefix:** `masque: two interactables use the layer id`
 
@@ -74,9 +74,9 @@ on their default id are numbered instead (`:view`, `:view_2`).
 **Fix:** pass a distinct `id` to one of them. An interactable whose id
 matches a layer that `masque(fig)` builds on its own replaces that
 layer instead of raising this error; see
-[Adding to what `masque(fig)` builds](@ref).
+[Add to what `masque(fig)` builds](@ref).
 
-### Tried giving one plot or interactable two names
+### One plot or interactable with two names
 
 **Error prefix:** `masque: … is named both`
 
@@ -88,7 +88,7 @@ as in `masque(fig, (a = thr,); bind = (b = thr,))`.
 it. To refer to a name you already gave, put the name in `bind` as a
 symbol: `bind = (:a,)`.
 
-### Tried several indices in `selected=` for one plot
+### Several indices in `selected=` for one plot
 
 **Error prefix:** `selected: :scatter holds one pick`
 
@@ -101,7 +101,7 @@ To start with several marks selected, pass the plot with
 `select = :many`, as in `interactables(sc; select = :many)`, so its
 field holds a list; see [Select several marks](@ref).
 
-### Tried `selected=` on a line, a control, or a plot left out of `bind`
+### `selected=` on a line, a control, or a plot left out of `bind`
 
 **Error prefix:** `takes no picks` / `isn't in bind` / `is a control`
 
@@ -113,7 +113,7 @@ and a threshold or a box starts at its own `value` or `bounds`.
 **Fix:** name the line in `bind`, add the plot to `bind`, or set the
 control's `value` or `bounds` in its constructor instead.
 
-### Passed a keyword your plot type's `interactables` method does not take
+### A keyword your plot type's `interactables` method does not take
 
 **Error prefix:** `masque: the interactables method for`
 
@@ -124,7 +124,7 @@ written as `Masque.interactables(ax, p::MyPlot)` takes none of them.
 **Fix:** add `; kwargs...` to the method's signature and pass
 `kwargs...` on to the constructors; see [Writing the method](@ref).
 
-### Tried `mode` or `orientation` other than the two valid symbols
+### An unknown `mode` or `orientation`
 
 **Error prefix:** `mode must be :polyline or :pairs` /
 `orientation must be :horizontal or :vertical`
@@ -136,7 +136,7 @@ written as `Masque.interactables(ax, p::MyPlot)` takes none of them.
 (separate segments). For `orientation`, use `:horizontal` (a line at
 constant y, dragged up and down) or `:vertical`.
 
-### Tried `unit = :line` with `mode = :pairs`
+### `unit = :line` with `mode = :pairs`
 
 **Error prefix:** `unit=:line applies only to mode=:polyline`
 
@@ -147,7 +147,7 @@ constant y, dragged up and down) or `:vertical`.
 one element), or keep `mode = :polyline`. `lines!`, `stairs!`, and
 `series!` already pass `unit = :line`.
 
-### Tried ROI `bounds` that are not a 4-tuple in order
+### ROI `bounds` that are not a 4-tuple in order
 
 **Error prefix:** `ROIInteractable: bounds must be (xmin, xmax, ymin, ymax)` /
 `need xmin < xmax and ymin < ymax`
@@ -157,7 +157,7 @@ one element), or keep `mode = :polyline`. `lines!`, `stairs!`, and
 **Fix:** pass `bounds = (xmin, xmax, ymin, ymax)` with `xmin < xmax`
 and `ymin < ymax`.
 
-### Tried an unknown Region kind, or `selected=` on the base Region id
+### An unknown Region kind, or `selected=` on the base Region id
 
 **Error prefix:** `RegionInteractable: unknown region kind` /
 `RegionInteractable: payloads has N entries, expected M`
@@ -167,10 +167,10 @@ and `ymin < ymax`.
 `selected = (cells = 1,)` with `id = :cells` also fails when the
 regions mix kinds of shape, because each kind is a part of `:cells`.
 
-**Fix:** check the region tuples against [Custom hits](@ref). Name the
+**Fix:** check the region tuples against [Custom shapes](@ref). Name the
 part in `selected=`, as in `selected = (cells = (circles = 1,),)`.
 
-### Tried a scale Masque cannot invert in the browser
+### A scale Masque cannot invert in the browser
 
 **Error prefix:** `is not invertible client-side` /
 `needs client-side invertible`
@@ -186,7 +186,7 @@ for marks (`PointInteractable`, `SegmentInteractable`, …) instead. The
 full list of what each interaction needs is in
 [Supported plots and axes](@ref).
 
-### Tried `AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, or `SliceInteractable` on Axis3
+### `AxisInteractable`, `ThresholdInteractable`, `ROIInteractable`, or `SliceInteractable` on Axis3
 
 **Error prefix:** `continuous pixel→data readout is undefined on an Axis3` /
 `undefined on an Axis3`
@@ -199,7 +199,7 @@ data value. On an `Axis3`, a point on the screen is a ray through the
 segments. To orbit an `Axis3`, pass `ViewInteractable(ax)`, which is
 accepted there.
 
-### Tried a threshold, box, slice, or pan on PolarAxis
+### A threshold, box, slice, or pan on PolarAxis
 
 **Error prefix:** `not supported on PolarAxis` /
 `PolarAxis view gestures are not supported`
@@ -214,7 +214,7 @@ changes its angle and radius limits, which Masque does not do.
 segments, which respond to hover and click. See
 [Supported plots and axes](@ref).
 
-### [Tried `heatmap!` or `barplot!` on PolarAxis](@id polar-skipped-plots)
+### [`heatmap!` and `barplot!` are skipped on PolarAxis](@id polar-skipped-plots)
 
 **Cause:** `masque(fig)` skips those plots on a `PolarAxis` with a
 warning, because their rectangles would not line up with the polar
@@ -226,7 +226,7 @@ wrong place.
 `scatterlines!`, and `series!` plots work. Use a Cartesian `Axis` for
 the rest. See [Supported plots and axes](@ref).
 
-### Tried ROI or View pan on a categorical 2D axis
+### ROI or View pan on a categorical 2D axis
 
 **Error prefix:** `bounds need continuous axes` /
 `pan needs continuous numeric axes` /
@@ -240,7 +240,7 @@ axis.
 **Fix:** use `AxisInteractable`, which reads the category, or plot
 against a numeric axis. See [Supported plots and axes](@ref).
 
-### Tried an `LScene` figure
+### An `LScene` figure
 
 **Error prefix:** ```Masque supports `Makie.Axis`, `Makie.Axis3`, and `Makie.PolarAxis`; found unsupported```
 
@@ -253,7 +253,7 @@ a normal `Axis`.
 support. To show an `LScene` without interaction, display the figure
 itself instead of `masque(fig)`.
 
-### Tried `selected=` on a layer that cannot start selected
+### `selected=` on a layer that cannot start selected
 
 **Error prefix:** `does not support pre-highlight` /
 `out of range`
@@ -284,7 +284,7 @@ version that worked.
 
 Code written for an earlier version of Masque: see [Upgrading](@ref).
 
-### [Tried `sel.index` and got "has no field"](@id troubleshooting-no-field)
+### [`sel.index` has no field](@id troubleshooting-no-field)
 
 **Error prefix:** `type NamedTuple has no field index`
 
@@ -301,7 +301,7 @@ value the event itself:
 Here `s` is what `scatter!` returned. See
 [What the `@bind` value holds](@ref).
 
-### Tried `CairoMakie.activate!(type = "svg")` and the widget is a PNG
+### The widget is a PNG after `activate!(type = "svg")`
 
 **Cause:** `type = "svg"` chooses how a bare `Figure` displays, but
 `masque` always shows a PNG on CairoMakie, or a canvas on WGLMakie,
@@ -312,9 +312,9 @@ still writes SVG, because the file extension decides the format.
 return a `Figure`, and write the SVG file with
 `save("figure.svg", fig)`. In the cell that should show the interactive
 figure, return `masque(fig)`. For more information, see
-[Makie's settings don't change the widget](@ref makie-settings).
+[Makie's display settings](@ref makie-settings).
 
-### Tried showing a widget outside Pluto and hover does nothing
+### Hover does nothing outside Pluto
 
 **Cause:** the display doesn't run the page's scripts, or the page
 can't reach jsDelivr to load Masque's script. A CairoMakie widget then
@@ -327,7 +327,7 @@ with an internet connection, or open the notebook in Pluto. To read a
 page offline, use `backend = :cairo`. For what works outside Pluto, see
 [Documenter and other web pages](@ref outside-pluto).
 
-### Tried feeding this widget's bond into the same call's `selected=`
+### Cyclic references from `selected=`
 
 **Pluto says:** cyclic references.
 
@@ -338,7 +338,7 @@ page offline, use `backend = :cairo`. For what works outside Pluto, see
 carry a selection through a rebuild, see
 [Keep a selection when the figure rebuilds](@ref).
 
-### Tried reading pick on hover
+### Hovering doesn't change the `@bind` value
 
 **Cause:** hovering shows the tooltip and highlight in the browser
 without changing the `@bind` value.
@@ -354,7 +354,7 @@ on macOS. That press does not start a drag or change the `@bind`
 value. For what each gesture changes, see
 [How interactions work](@ref).
 
-### Tried a click and nothing happened
+### A click does nothing
 
 Check, in order:
 
@@ -368,7 +368,7 @@ Check, in order:
    unsupported plot type with a warning in the notebook log, not an
    error, so its marks do not respond, as with a
    [heatmap or bar plot on a `PolarAxis`](@ref polar-skipped-plots).
-   [Recipes masque(fig) extracts](@ref) lists the supported plots.
+   [Plots `masque(fig)` makes interactive](@ref) lists the supported plots.
 4. Did you click a line, or a plot left out of `bind`? A line shows its
    tooltip but takes no clicks until you name it in `bind`, a plot that
    `bind` leaves out takes no clicks, and neither does the plot a box
@@ -376,7 +376,7 @@ Check, in order:
 5. Are you reading the right field? A click on a bar sets `sel.bars`,
    not `sel.scatter`, and each plot keeps its own selection.
 
-### Tried a tooltip and saw `[object Object]`
+### A tooltip shows `[object Object]`
 
 **Cause:** the default tooltip table, or a `$(field)` template, is
 showing a payload value that is itself a nested `Dict` or array. The
@@ -386,7 +386,7 @@ browser turns that value into the text `[object Object]`.
 before it goes into `payloads`, or reference a pre-formatted string
 field with `masque"$(that_field)"`.
 
-### Tried reading `pick` after a pan or orbit
+### Panning doesn't change the `@bind` value
 
 **Cause:** dragging with `ViewInteractable` changes the view, not the
 `@bind` value.
@@ -402,7 +402,7 @@ there with WGLMakie usually means the installed `WGLMakie` is a release
 newer than Masque was tested with. See [Backends](@ref). Report any other
 console error as a bug, even when the widget otherwise works.
 
-### Tried WGLMakie and the spinner never stops
+### The WGLMakie spinner never stops
 
 **Cause:** the cell displayed a WGLMakie `Figure` rather than a
 `masque` widget. WGLMakie's own display draws only after the browser
@@ -421,7 +421,7 @@ To keep WGLMakie's own display working remotely, forward port 9384 as
 well, or point Bonito at an address the browser can reach with
 `Bonito.configure_server!`.
 
-### Tried WGLMakie and the canvas is blank
+### The WGLMakie canvas is blank
 
 **Cause:** usually the installed `WGLMakie` is a release newer than
 Masque was tested with, or the figure has no plot that `masque(fig)`
