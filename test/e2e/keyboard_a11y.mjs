@@ -107,7 +107,7 @@ try {
   // Browser: focusing a figure scrolls it into view, and on :webgl the context pool
   // (frontend/src/wgl-shim.ts) then snapshots the plots that left the viewport and starts the
   // ones that entered: about 3 s of main-thread work on SwiftShader, which delays the value's
-  // message just the same. The pool is idle when nothing is starting and nothing is queued.
+  // message just the same. The pool is idle once no swap is queued (`timer`): a swap itself runs synchronously.
   const settle = async (what) => {
     const t0 = Date.now();
     for (let prompt = 0; prompt < 3;) {
@@ -123,7 +123,7 @@ try {
         // Two frames, so an IntersectionObserver record from a scroll has been delivered.
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         const p = window.__MasqueWGL?.contextPool;
-        return !p || (!p.busy && !p.timer);
+        return !p || !p.timer;
       });
       idle = quiet ? idle + 1 : 0;
     }
