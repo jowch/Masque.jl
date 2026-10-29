@@ -23,9 +23,11 @@ const root = normalize(rootArg);
 
 // Phones up to the widest column. Documenter shows the sidebar from 1056 px; past 1280 the
 // column stops growing.
-const WIDTHS = [360, 390, 430, 520, 640, 800, 1056, 1280];
+const WIDTHS = [360, 390, 430, 520, 600, 640, 800, 1056, 1280];
 const SETTLE_MS = 1500;
 const TIMEOUT_MS = 45000;
+// A player still resizing this late may have settled short of its height: say so.
+const LATE_MS = 20000;
 const STYLE_ID = "masque-player-heights";
 
 function htmlFiles(dir) {
@@ -65,7 +67,8 @@ async function measure(file, width) {
     await page.goto(urlOf(file), { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
     const got = await page.evaluate(async ({ SETTLE_MS, TIMEOUT_MS }) => {
       const frames = Array.from(document.querySelectorAll("iframe[data-masque-embed]"));
-      const deadline = performance.now() + TIMEOUT_MS;
+      const t0 = performance.now();
+      const deadline = t0 + TIMEOUT_MS;
       const settled = (f) => {
         const doc = f.contentDocument;
         return doc && doc.URL !== "about:blank" && doc.querySelector("pluto-notebook") &&
@@ -92,10 +95,13 @@ async function measure(file, width) {
         const wrap = f.closest(".masque-embed-wrap");
         if (!f.id) throw new Error(`a ${f.dataset.masqueEmbed} player has no id`);
         if (!wrap || getComputedStyle(wrap).display === "none") throw new Error(`${f.id} showed its text twin`);
-        return [f.id, wrap.clientWidth, Math.ceil(f.getBoundingClientRect().height)];
+        return [f.id, wrap.clientWidth, Math.ceil(f.getBoundingClientRect().height), last.get(f).since - t0];
       });
     }, { SETTLE_MS, TIMEOUT_MS });
-    for (const [id, w, h] of got) {
+    for (const [id, w, h, settledAt] of got) {
+      if (settledAt > LATE_MS) {
+        console.warn(`${relative(root, file)} at ${width} px: ${id} last resized at ${(settledAt / 1000).toFixed(1)} s, its height may be short`);
+      }
       if (!heights.has(id)) heights.set(id, new Map());
       heights.get(id).set(w, h);
     }
@@ -110,7 +116,11 @@ try {
   const workers = Array.from({ length: 4 }, async () => {
     while (jobs.length) {
       const [file, width] = jobs.shift();
+      // One retry, so one slow boot of Pluto's frontend doesn't hold back the deploy.
       await measure(file, width).catch((e) => {
+        console.warn(`${relative(root, file)} at ${width} px: ${e.message}; trying once more`);
+        return measure(file, width);
+      }).catch((e) => {
         throw new Error(`${relative(root, file)} at ${width} px: ${e.message}`);
       });
     }
