@@ -22,6 +22,9 @@ All notable changes to this project are documented here. The format is based on
   toggle (`orientation`) stands the right way, and `length`, `markersize`, `rimfraction` and
   `toggleduration` carry over. Before, every toggle was a horizontal pill stretched over its
   box (#427).
+- A Makie `Menu` named in `masque` shows its own `prompt` before a choice, instead of
+  "Select…", and its `fontsize`, `textcolor`, `textpadding` and
+  `selection_cell_color_inactive` carry over to the closed menu (#429).
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
   out, as in `bind = :picked`. Before, the click did nothing.
 - On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down

@@ -6804,6 +6804,23 @@ describe("block controls (#345)", () => {
         expect(val(host).show).toEqual({ layer: "show", index: 0, payload: true })
     })
 
+    it("a menu shows Makie's prompt before a choice, in its font size and colours (#429)", () => {
+        const m = controlsManifest()
+        Object.assign(m.layers[3].geometry as object, { value: -1, prompt: "Pick a colour", fontsize: 32, padding: 16, text: "rgb(9,9,9)", off: "rgb(200,200,200)" })
+        m.initial!.pick = { layer: "pick", index: 0, payload: -1 }
+        const { host, script } = setup()
+        mount(script, m)
+        const box = ctl(host, "pick")
+        const select = box.querySelector("select") as HTMLSelectElement
+        expect(select.options[0].textContent).toBe("Pick a colour")
+        expect(select.options[0].disabled).toBe(true)
+        expect(select.value).toBe("-1")
+        expect(select.style.getPropertyValue("--fs")).toBe(`${(100 * 32) / 200}cqw`)
+        expect(select.style.getPropertyValue("--pad")).toBe(`${(100 * 16) / 200}cqw`)
+        expect(select.style.getPropertyValue("--masque-ctl-text")).toBe("rgb(9,9,9)")
+        expect(box.style.getPropertyValue("--masque-ctl-off")).toBe("rgb(200,200,200)")
+    })
+
     it("a release commits the field; moving alone doesn't", () => {
         const m = controlsManifest()
         const { host, script } = setup()

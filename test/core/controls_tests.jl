@@ -234,6 +234,19 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test Masque.initial_bond(w).level == "mid"
     end
 
+    @testset "a menu ships Makie's prompt, font size, padding and colours (#429)" begin
+        fig = Figure(); Axis(fig[1, 1])
+        menu = Menu(fig[2, 1]; options = ["a", "b"], prompt = "Pick one", fontsize = 20, textcolor = :red, selection_cell_color_inactive = :blue)
+        w = masque(fig, (pick = menu,))
+        g = _layer(w.manifest, "pick")["geometry"]
+        s = w.manifest["scaling"]
+        @test g["prompt"] == "Pick one"
+        @test g["fontsize"] ≈ 20s
+        @test g["padding"] ≈ menu.textpadding[][1] * s
+        @test g["text"] == Masque._css_color(Makie.to_color(:red))
+        @test g["off"] == Masque._css_color(Makie.to_color(:blue))
+    end
+
     @testset "a menu with nothing chosen holds nothing" begin
         fig = Figure()
         menu = Menu(fig[1, 1]; options = ["a", "b"], default = nothing)

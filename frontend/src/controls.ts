@@ -90,8 +90,8 @@ export const CONTROLS_STYLE = `
 .masque-control:hover .masque-toggle-knob { scale: 1.15; }
 .masque-toggle:focus-visible ~ .masque-toggle-track { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 .masque-check { width: 100cqmin; height: 100cqmin; accent-color: var(--masque-ctl); cursor: pointer; }
-.masque-select { width: 100%; height: 100%; font-family: system-ui, sans-serif; font-size: 50cqh; padding: 0 0.5em; border: none; border-radius: 0;
-  background: #f0f0f0; color: #000000; cursor: pointer; }
+.masque-select { width: 100%; height: 100%; font-family: system-ui, sans-serif; border: none; border-radius: 0; cursor: pointer;
+  font-size: var(--fs, 50cqh); padding: 0 0 0 var(--pad, 0.5em); background: var(--masque-ctl-off, #f0f0f0); color: var(--masque-ctl-text, #000000); }
 @media (prefers-reduced-motion: reduce) { .masque-toggle-track, .masque-toggle-knob { transition: none; } }
 `
 
@@ -187,7 +187,7 @@ function toggleParts(g: ControlGeometry, el: HTMLInputElement): { parts_: HTMLEl
 function shape(g: ControlGeometry): string {
     // A range arrives as a typed array off the kernel and as a plain one from a docs player's
     // JSON frame; the same range is the same shape either way.
-    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob])
+    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.prompt])
 }
 
 // The knob index under a pointer at (x, y) on a slider's box.
@@ -302,13 +302,17 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
         case "menu": {
             const el = document.createElement("select")
             el.className = "masque-select"
+            // Image px as a share of the box's width, so the text scales with the figure.
+            if (g.fontsize !== undefined) el.style.setProperty("--fs", `${(100 * g.fontsize) / g.w}cqw`)
+            if (g.padding !== undefined) el.style.setProperty("--pad", `${(100 * g.padding) / g.w}cqw`)
+            if (g.text) el.style.setProperty("--masque-ctl-text", g.text)
             el.setAttribute("aria-label", label)
             const k = Number(g.value)
             if (k < 0) {
                 // Makie's menu with nothing chosen yet shows its prompt.
                 const o = document.createElement("option")
                 o.value = "-1"
-                o.textContent = "Select…"
+                o.textContent = g.prompt ?? "Select…"
                 o.disabled = true
                 el.append(o)
             }
