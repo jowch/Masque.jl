@@ -6878,10 +6878,11 @@ describe("block controls (#345)", () => {
         const m = controlsManifest()
         m.layers.push({ id: "grid", kind: "control", axis: "", events: ["change"], payloads: [], label: "grid",
             geometry: { control: "slidergrid", x: 100, y: 500, w: 600, h: 100, value: [2, [1, 3]], sliders: [
-                { control: "slider", x: 200, y: 500, w: 400, h: 20, value: 2, n: 5, horizontal: true, range: [0, 0.5],
+                { control: "slider", x: 200, y: 500, w: 400, h: 20, value: 2, n: 5, horizontal: true, range: [0, 0.5], name: "freq",
                     valueLabel: { x: 620, y: 500, w: 80, h: 20, fontsize: 28, color: "rgb(7,7,7)", labels: ["0 Hz", "0.5 Hz", "1 Hz", "1.5 Hz", "2 Hz"] } },
                 { control: "intervalslider", x: 200, y: 560, w: 400, h: 20, value: [1, 3], n: 4, horizontal: true, range: [1, 1],
-                    valueLabel: { x: 620, y: 560, w: 80, h: 20, fontsize: 28, color: "rgb(7,7,7)" } },
+                    valueLabel: { x: 620, y: 560, w: 80, h: 20, fontsize: 28, color: "rgb(7,7,7)",
+                        pairs: ["p11", "p12", "p13", "p14", "p22", "p23", "p24", "p33", "p34", "p44"] } },
             ] } })
         m.fields = [...(m.fields ?? []), "grid"]
         m.initial!.grid = { layer: "grid", index: 0, payload: [2, [1, 3]] }
@@ -6894,7 +6895,10 @@ describe("block controls (#345)", () => {
         expect(kids[0].style.left).toBe(`${(100 * 100) / 600}%`)
         expect(kids[1].style.top).toBe(`${(100 * 60) / 100}%`)
         const labels = [...grid.querySelectorAll(".masque-vlabel")] as HTMLElement[]
-        expect(labels.map((l) => l.textContent)).toEqual(["1 Hz", "(2, 4)"])
+        expect(labels.map((l) => l.textContent)).toEqual(["1 Hz", "p24"])
+        // A slider is named by its own label; one without falls back to the field and its place.
+        expect(kids[0].querySelector("input")!.getAttribute("aria-label")).toBe("freq")
+        expect(kids[1].querySelector("input")!.getAttribute("aria-label")).toBe("grid 2, low")
         expect(labels[0].style.getPropertyValue("--fs")).toBe(`${(100 * 28) / 600}cqw`)
         const range = kids[0].querySelector("input") as HTMLInputElement
         range.value = "4"
@@ -6906,7 +6910,7 @@ describe("block controls (#345)", () => {
         hi.value = "2"
         hi.dispatchEvent(new Event("change", { bubbles: true }))
         expect(val(host).grid).toEqual({ layer: "grid", index: 0, payload: [4, [1, 2]] })
-        expect(labels[1].textContent).toBe("(2, 3)")
+        expect(labels[1].textContent).toBe("p23")
     })
 
     it("a release commits the field; moving alone doesn't", () => {

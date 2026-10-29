@@ -1,4 +1,4 @@
-using Test, Masque, CairoMakie, Makie, FileIO
+using Test, Masque, CairoMakie, Makie, FileIO, JSON3
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
 # Makie blocks as controls (#345): a named block is a field holding its plain value, drawn by
@@ -187,8 +187,10 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         sl, isl = g["sliders"]
         @test sl["control"] == "slider" && sl["n"] == 7 && isl["control"] == "intervalslider"
         @test sl["valueLabel"]["labels"] == ["0.0 Hz", "0.5 Hz", "1.0 Hz", "1.5 Hz", "2.0 Hz", "2.5 Hz", "3.0 Hz"]
-        @test length(isl["valueLabel"]["pairs"]) == 25
-        @test isl["valueLabel"]["pairs"][1 * 5 + 3 + 1] == "(2, 4)"
+        @test sl["name"] == "freq" && isl["name"] == "span"
+        # Only lo ≤ hi pairs, row-major: (2, 4) is lo = 2's second pair, after lo = 1's five.
+        @test length(isl["valueLabel"]["pairs"]) == 15
+        @test isl["valueLabel"]["pairs"][5 + 2 + 1] == "(2, 4)"
         # Each slider sits inside the grid's box, its value label to its right.
         @test g["x"] <= sl["x"] && sl["x"] + sl["w"] <= sl["valueLabel"]["x"] + 1
         v = Masque.bond_from_js(w, Dict("grid" => _env("grid", Any[6, Any[0, 4]])))
@@ -201,6 +203,16 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         hidden = Masque._block_plots(sg)
         @test !isempty(hidden)
         @test !any(p -> p in hidden, Masque._block_plots(sg.labels[1]))
+        # A fine slider ships no labels, so its frames stay small; the browser writes the value.
+        # An author's own `lift` on the slider's value is never called to find the format.
+        fig = Figure(); Axis(fig[1, 1])
+        fine = SliderGrid(fig[2, 1], (label = "fine", range = 0:0.001:10, format = "{:.3f}"))
+        calls = Ref(0)
+        lift(v -> (calls[] += 1; string(v)), fine.sliders[1].value)
+        before = calls[]
+        g = _layer(masque(fig, (fine = fine,)).manifest, "fine")["geometry"]
+        @test !haskey(only(g["sliders"])["valueLabel"], "labels") && calls[] == before
+        @test length(JSON3.write(g)) < 2000
     end
 
     @testset "the picture leaves the block's box empty, and the figure keeps its drawing" begin

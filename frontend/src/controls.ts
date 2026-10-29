@@ -60,7 +60,7 @@ export const CONTROLS_STYLE = `
 .masque-range::-webkit-slider-thumb { -webkit-appearance: none; width: 100cqmin; height: 100cqmin; }
 .masque-range::-moz-range-thumb { width: 100cqmin; height: 100cqmin; border: none; }
 .masque-range:focus-visible { outline: none; }
-.masque-control:has(.masque-range:focus-visible) .masque-knob { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
+.masque-ctl-slider:has(.masque-range:focus-visible) .masque-knob, .masque-ctl-intervalslider:has(.masque-range:focus-visible) .masque-knob { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 .masque-track { position: absolute; inset: 0; pointer-events: none; --span: calc(100% - 100cqmin); }
 .masque-bar, .masque-fill, .masque-knob { position: absolute; }
 .masque-bar { border-radius: 100cqmin; background: var(--masque-ctl-off, #f0f0f0); }
@@ -243,7 +243,8 @@ function toggleParts(g: ControlGeometry, el: HTMLInputElement): { parts_: HTMLEl
 function shape(g: ControlGeometry): string {
     // A range arrives as a typed array off the kernel and as a plain one from a docs player's
     // JSON frame; the same range is the same shape either way.
-    if (g.sliders) return JSON.stringify([g.control, g.sliders.map(shape), g.sliders.map((c) => [c.valueLabel?.labels?.length, c.valueLabel?.pairs?.length])])
+    // A grid is built again when anything inside it moves or changes colour.
+    if (g.sliders) return JSON.stringify([g.control, g.w, g.h, g.sliders.map(shape), g.sliders.map((c) => [c.x - g.x, c.y - g.y, c.w, c.h, c.name, c.valueLabel])])
     return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt, g.size, g.radius, g.stroke, g.mark, g.markSize, g.next])
 }
 
@@ -413,7 +414,7 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             const labels: [HTMLElement, ControlGeometry, ValueLabel | undefined][] = []
             ;(g.sliders ?? []).forEach((cg, i) => {
                 const kg = { ...cg, x: cg.x - g.x, y: cg.y - g.y }
-                const kid = build({ ...layer, id: `${id}-${i}`, label: `${label} ${i + 1}`, geometry: kg }, local, kidHooks)
+                const kid = build({ ...layer, id: `${id}-${i}`, label: cg.name || `${label} ${i + 1}`, geometry: kg }, local, kidHooks)
                 if (!kid) return
                 kids.push(kid)
                 box.append(kid.box_)
@@ -435,7 +436,9 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
                 const v = kids[i]?.get_()
                 if (Array.isArray(v)) {
                     const [a, b] = v as number[]
-                    el.textContent = vl?.pairs?.[a * (cg.n ?? 0) + b] ?? `(${valueText(cg, a, hooks.digits_)}, ${valueText(cg, b, hooks.digits_)})`
+                    // lo ≤ hi pairs, row-major: lo's run starts after the a runs before it.
+                    const n = cg.n ?? 0
+                    el.textContent = vl?.pairs?.[a * n - (a * (a - 1)) / 2 + (b - a)] ?? `(${valueText(cg, a, hooks.digits_)}, ${valueText(cg, b, hooks.digits_)})`
                 } else {
                     el.textContent = vl?.labels?.[Number(v)] ?? valueText(cg, Number(v), hooks.digits_)
                 }

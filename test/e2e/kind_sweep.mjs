@@ -895,8 +895,11 @@ try {
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         sr.querySelector(".masque-controls").style.visibility = "hidden";
       }, key);
-      for (const id of ["level", "show", "span", "fine", "pick", "tall"]) {
-        const g = geo(id);
+      // The grid's name labels stay in the picture, so its sliders and value labels are
+      // checked box by box.
+      const boxes = ["level", "show", "span", "fine", "pick", "tall"].map((id) => [id, geo(id)]);
+      geo("grid").sliders.forEach((s, i) => boxes.push([`grid-${i}`, s], [`grid-${i}-value`, s.valueLabel]));
+      for (const [id, g] of boxes) {
         const png = PNG.sync.read(await page.screenshot({ clip: { x: s0.left + g.x * s0.sc + 1, y: s0.top + g.y * s0.sc + 1, width: Math.max(1, g.w * s0.sc - 2), height: Math.max(1, g.h * s0.sc - 2) } }));
         let ink = 0;
         for (let o = 0; o < png.data.length; o += 4) if (png.data[o] < 235 || png.data[o + 1] < 235 || png.data[o + 2] < 235) ink++;
@@ -998,6 +1001,18 @@ try {
         if ((await lab.textContent()) !== "2 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 2 dB`);
         await ctl("grid", "input").focus();
         await page.keyboard.press("ArrowRight");
+        // Focus rings only the focused slider's knob, not every knob in the figure.
+        const ringed = await page.evaluate(() => {
+          const out = [];
+          for (const h of document.querySelectorAll(".ip-host")) h.querySelectorAll("*").forEach((el) => {
+            if (!el.shadowRoot) return;
+            el.shadowRoot.querySelectorAll(".masque-knob").forEach((k) => {
+              if (getComputedStyle(k).outlineStyle !== "none") out.push(k.closest("[data-masque-control]").dataset.masqueControl);
+            });
+          });
+          return out;
+        });
+        if (ringed.length !== 1 || ringed[0] !== "grid-0") throw new Error(`${key}/grid: focus ring on ${JSON.stringify(ringed)}, want only grid-0`);
         v = await bondHas(/grid = \(3,\)/, v, "grid");
         if ((await lab.textContent()) !== "3 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 3 dB`);
         passed.push(`${key}/slider-grid`);

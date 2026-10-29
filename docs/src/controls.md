@@ -1,10 +1,11 @@
 # Sliders, toggles and menus
 
-Lay out Makie's own `Slider`, `Toggle`, `Checkbox`, `IntervalSlider` or
-`Menu` in the figure, name it in `masque`, and the reader can use it in the
+Lay out Makie's own `Slider`, `Toggle`, `Checkbox`, `IntervalSlider`,
+`Menu` or `SliderGrid` in the figure, name it in `masque`, and the reader can use it in the
 notebook. Each one becomes a field of the `@bind` value that holds its
 plain value: a number from the slider's range, `true` or `false`, a
-`(low, high)` pair, or the option chosen from the menu.
+`(low, high)` pair, the option chosen from the menu, or a tuple of a grid's
+slider values.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -64,8 +65,10 @@ out of the figure.
 
 Buttons and text boxes are pictures for now, and `masque` warns when the
 figure has one, since the reader could click it and nothing would happen.
-A `SliderGrid` works like the other blocks: its field holds a tuple of its
-sliders' values.
+A `SliderGrid` that `masque` isn't given only warns, because figures with
+one worked before `masque` could draw it. Its value labels use the grid's
+own `format` for sliders of up to 101 values (20 for an interval slider);
+past that, the browser writes the plain value.
 
 With WGLMakie loaded, `Slider` also names a slider from Bonito, so Julia
 asks which one you mean; write `Makie.Slider` instead.

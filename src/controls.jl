@@ -103,17 +103,25 @@ function _control_geometry(b, ctx)
     elseif b isa Makie.Checkbox
         _checkbox_geometry!(g, b, ctx)
     elseif b isa Makie.SliderGrid
-        g["sliders"] = Any[_grid_slider_geometry(sl, vl, ctx) for (sl, vl) in zip(_grid_sliders(b), _grid_valuelabels(b))]
+        g["sliders"] = Any[
+            _grid_slider_geometry(sl, name, vl, ctx)
+                for (sl, name, vl) in zip(_grid_sliders(b), _grid_labels(b), _grid_valuelabels(b))
+        ]
     end
     return g
 end
 
-# One slider of a `SliderGrid`, with the value label beside it: its box, text size and colour,
-# and the text for each value. The text comes from the grid's own `format`, run once per value
-# in Julia, so the label follows the slider in a static export too. An interval slider's label
-# covers every pair while there are at most 40 values; past that the browser writes "(lo, hi)".
-function _grid_slider_geometry(sl, vl, ctx)
+# One slider of a `SliderGrid`, with its name and the value label beside it: the label's box,
+# text size and colour, and the text for each value. The text comes from the grid's own
+# `format`, run in Julia, so the label follows the slider in a static export too. A fine slider
+# would ship a string per value on every frame, so labels stop at `_GRID_LABELS` values (an
+# interval slider's at `_GRID_PAIRS` lo ≤ hi pairs, 20 values); past that the browser writes the
+# value. Sizes are in docs/dev/perf-findings.md.
+const _GRID_LABELS = 101
+const _GRID_PAIRS = 210
+function _grid_slider_geometry(sl, name, vl, ctx)
     g = _control_geometry(sl, ctx)
+    g["name"] = string(name.text[])
     x, y, w, h = _block_rect(vl, ctx)
     lab = Dict{String, Any}(
         "x" => x, "y" => y, "w" => w, "h" => h,
@@ -121,11 +129,13 @@ function _grid_slider_geometry(sl, vl, ctx)
     )
     fmt = _valuelabel_format(sl, vl)
     rng = sl.range[]
+    n = length(rng)
     if fmt !== nothing
         if sl isa Makie.Slider
-            lab["labels"] = String[string(fmt(v)) for v in rng]
-        elseif length(rng) <= 40
-            lab["pairs"] = String[string(fmt((a, b))) for a in rng for b in rng]
+            n <= _GRID_LABELS && (lab["labels"] = String[string(fmt(v)) for v in rng])
+        elseif n * (n + 1) ÷ 2 <= _GRID_PAIRS
+            # Row-major over lo ≤ hi: lo = 0's pairs first, then lo = 1's, and so on.
+            lab["pairs"] = String[string(fmt((rng[i], rng[j]))) for i in 1:n for j in i:n]
         end
     end
     g["valueLabel"] = lab
