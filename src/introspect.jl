@@ -298,17 +298,17 @@ end
 function SegmentInteractable(ax, p::Makie.Lines; id = :lines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
     data = _conv(p)[1]
     i = SegmentInteractable(ax, data; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
-    return _with_samples(i, nothing, [[_pt3d(v) for v in data]])
+    return _with_linewidth(_with_samples(i, nothing, [[_pt3d(v) for v in data]]), p)
 end
 SegmentInteractable(ax, p::Makie.LineSegments; id = :segments, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p)) =
-    SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol, tooltip, label)
+    _with_linewidth(SegmentInteractable(ax, _conv(p)[1]; mode = :pairs, id, payloads, tol, tooltip, label), p)
 
 # The rendered edges live in the child LineSegments' converted (DATA space), including
 # mesh-triangulation diagonals a grid-edge reconstruction would miss. Makie outlines every
 # quad (or triangle), so an edge two faces share is drawn twice; `_unique_edges` keeps one
 # copy so each drawn edge is one element (#316).
 SegmentInteractable(ax, p::Makie.Wireframe; id = :wireframe, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p)) =
-    SegmentInteractable(ax, _unique_edges(_conv(_childof(p, Makie.LineSegments))[1]); mode = :pairs, id, payloads, tol, tooltip, label)
+    _with_linewidth(SegmentInteractable(ax, _unique_edges(_conv(_childof(p, Makie.LineSegments))[1]); mode = :pairs, id, payloads, tol, tooltip, label), p)
 
 # Drop repeated `:pairs` edges, in either direction, keeping each edge's first occurrence and
 # its order. Endpoints compare with `isequal`, so a NaN gap edge still matches its own copy.
@@ -341,6 +341,15 @@ function _line_tol(p)
         end
     end
     return max(6.0, w / 2)
+end
+
+# The drawn line width in logical px (the widest of a per-element vector), or nothing.
+function _line_width(p)
+    hasproperty(p, :linewidth) || return nothing
+    v = p.linewidth[]
+    v isa Real && return Float64(v)
+    v isa AbstractVector{<:Real} && !isempty(v) && return Float64(maximum(v))
+    return nothing
 end
 
 _bcast(v, k) = length(v) == 1 ? v[1] : v[k]
@@ -772,10 +781,14 @@ end
 # step mode.
 function SegmentInteractable(ax, p::Makie.Stairs; id = :stairs, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
     i = SegmentInteractable(ax, _converted(_childof(p, Makie.Lines))[1]; mode = :polyline, unit = :line, id, payloads, tol, tooltip, label)
-    return _with_samples(i, p.step[], [[_pt3d(v) for v in _converted(p)[1]]])
+    return _with_linewidth(_with_samples(i, p.step[], [[_pt3d(v) for v in _converted(p)[1]]]), p)
 end
 _with_samples(i::SegmentInteractable, step, paths) = SegmentInteractable(
-    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, (step, paths), i.select,
+    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, (step, paths), i.select, i.linewidth,
+)
+# The plot's drawn line width, carried for the overlay's line fade.
+_with_linewidth(i::SegmentInteractable, p) = SegmentInteractable(
+    i.ax, i.vertices, i.mode, i.id, i.payloads, i.tol, i.tooltip, i.resolve, i.label, i.unit, i.paths, i.samples, i.select, _line_width(p),
 )
 
 # Each child line (or a ScatterLines child's line, when markers are on) is one element.
@@ -808,7 +821,7 @@ function SegmentInteractable(ax, p::Makie.Series; id = :series, payloads = nothi
     paths = [_conv(_series_line(c))[1] for c in children]
     pl = _merge_payloads(_series_payloads(_series_labels(p, children)), payloads, "SegmentInteractable")
     i = _whole_lines(ax, paths, id, pl, tol, label; tooltip)
-    return _with_samples(i, nothing, [[_pt3d(v) for v in path] for path in paths])
+    return _with_linewidth(_with_samples(i, nothing, [[_pt3d(v) for v in path] for path in paths]), p)
 end
 
 # Errorbars `converted` is Vec4 (x, y, low, high) with low/high RELATIVE offsets; Rangebars is
@@ -834,9 +847,9 @@ function _rangebar_pairs(p)
     return vs
 end
 SegmentInteractable(ax, p::Makie.Errorbars; id = :errorbars, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p)) =
-    SegmentInteractable(ax, _errorbar_pairs(p); mode = :pairs, id, payloads, tol, tooltip, label)
+    _with_linewidth(SegmentInteractable(ax, _errorbar_pairs(p); mode = :pairs, id, payloads, tol, tooltip, label), p)
 SegmentInteractable(ax, p::Makie.Rangebars; id = :rangebars, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p)) =
-    SegmentInteractable(ax, _rangebar_pairs(p); mode = :pairs, id, payloads, tol, tooltip, label)
+    _with_linewidth(SegmentInteractable(ax, _rangebar_pairs(p); mode = :pairs, id, payloads, tol, tooltip, label), p)
 
 # `xmin`/`xmax` (HLines) and `ymin`/`ymax` (VLines) are fractions of the axis in relative
 # units. Default 0 and 1 is the full limits. Makie applies the fraction on the transformed
@@ -887,13 +900,13 @@ function SegmentInteractable(ax, p::Makie.HLines; id = :hlines, payloads = nothi
     vs = _span_pairs(ax, p, true)
     nseg = length(vs) ÷ 2
     pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
-    return _segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, true); tooltip, label)
+    return _with_linewidth(_segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, true); tooltip, label), p)
 end
 function SegmentInteractable(ax, p::Makie.VLines; id = :vlines, payloads = nothing, tol = _line_tol(p), tooltip = nothing, label = _plot_label(p))
     vs = _span_pairs(ax, p, false)
     nseg = length(vs) ÷ 2
     pl = payloads === nothing ? Any[(; segment_index = k) for k in 1:nseg] : _check_payloads(payloads, nseg, "SegmentInteractable")
-    return _segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, false); tooltip, label)
+    return _with_linewidth(_segment_with_resolve(ax, vs, :pairs, id, pl, tol, _ax -> _span_pairs(_ax, p, false); tooltip, label), p)
 end
 
 # Spy renders nonzeros as a child Scatter with markerspace=:data, so markersize IS the cell
@@ -1265,7 +1278,7 @@ function _place(i::SegmentInteractable, f)
     res = i.resolve === nothing ? nothing : (ax -> map(f.place, i.resolve(ax)))
     paths = i.paths === nothing ? nothing : [map(f.place, path) for path in i.paths]
     return SegmentInteractable(
-        i.ax, map(f.place, i.vertices), i.mode, i.id, i.payloads, i.tol, i.tooltip, res, i.label, i.unit, paths, i.samples, i.select,
+        i.ax, map(f.place, i.vertices), i.mode, i.id, i.payloads, i.tol, i.tooltip, res, i.label, i.unit, paths, i.samples, i.select, i.linewidth,
     )
 end
 _place(i::PolygonInteractable, f) = PolygonInteractable(

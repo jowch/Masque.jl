@@ -690,6 +690,13 @@ end
         tols = Dict(l["id"] => get(l, "tol", nothing) for l in m["layers"])
         @test tols["bars"] == round(Int, 4 * m["scaling"]) && tols["bars_2"] === nothing
         @test tols["poly"] == round(Int, 5 * m["scaling"])
+        # line layers ship their drawn width, image px, for the overlay's line fade
+        lws = Dict(l["id"] => get(l, "linewidth", nothing) for l in m["layers"])
+        @test lws["lines_2"] == 20 * m["scaling"]
+        @test lws["segments"] == 30 * m["scaling"]  # the widest of a per-segment vector
+        @test lws["hlines"] == 16 * m["scaling"]
+        @test lws["lines"] == built(a, thin).linewidth * m["scaling"]
+        @test lws["bars"] === nothing && lws["poly"] === nothing
     end
 
     @testset "placement attributes move the hit target with the mark (#245)" begin

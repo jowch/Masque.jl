@@ -5,6 +5,9 @@ import type { Manifest } from "../src/types"
 import { withFields } from "./fields"
 import { fadeKept } from "./fadekeys"
 
+// A halo's ink core (highlight.ts's haloOf wraps it in its casing bands); any other element is itself.
+const coreOf = (el: Element | null): Element | null => (el?.classList.contains("masque-halo") ? el.querySelector(":scope > .masque-hi") : el)
+
 function setup(manifest: Manifest) {
     const host = document.createElement("div")
     const img = document.createElement("img")
@@ -512,11 +515,11 @@ describe("keyboard navigation", () => {
         const { surface, shadow, host } = setup(gappedManifest)
         surface.focus()
         down(surface, "ArrowRight") // must land on segment 0 (valid)
-        let ring = shadow.querySelector(".hi > *") as SVGLineElement
+        let ring = coreOf(shadow.querySelector(".hi > *")) as SVGLineElement
         expect(ring.getAttribute("x1")).toBe("0")
         expect(ring.getAttribute("x2")).toBe("50")
         down(surface, "ArrowRight") // must skip segments 1 and 2 (both touch the NaN vertex) straight to 3
-        ring = shadow.querySelector(".hi > *") as SVGLineElement
+        ring = coreOf(shadow.querySelector(".hi > *")) as SVGLineElement
         expect(ring.getAttribute("x1")).toBe("100")
         expect(ring.getAttribute("x2")).toBe("200")
         down(surface, "Enter")

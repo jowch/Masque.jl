@@ -112,6 +112,7 @@ const _OVERLAY_STYLE_KEYS = (
     ring_halo_opacity = ("--masque-ring-halo-opacity", :opacity),
     cross_opacity = ("--masque-cross-opacity", :opacity),
     unpicked_opacity = ("--masque-unpicked-opacity", :opacity),
+    preview_opacity = ("--masque-preview-opacity", :opacity),
 )
 
 function _overlay_style_value(k, kind, v)
@@ -184,6 +185,10 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
     if L.kind in (:segments, :polyline, :lines, :rects, :polygons)
         t = hit_tol(i)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))
+    end
+    if L.kind in (:segments, :polyline, :lines)
+        w = line_width(i)
+        w === nothing || (d["linewidth"] = round(w * ctx.scaling; digits = 2))
     end
     s = selects(i)
     s === nothing || (d["selects"] = string(s))

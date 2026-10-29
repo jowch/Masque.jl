@@ -9,72 +9,99 @@ This playbook is **interaction and visual**. Both halves are required. Do not tr
 
 ## Visual language (settled)
 
-Recipes: highlight is a split — a brightening color-dodge fill plus a flat chrome stroke, not a
-mark-derived colour — `colors` (today `scatter!`'s `color=`) feeds only the tooltip accent and
-the selected look's repaint and outline (below), never the hover highlight. The shadow root holds
+Two cues, each with one meaning (since 0.4.2): **a fade means a set is
+in focus** (a line, which is a whole series; a legend entry; the picks of a plot), and **the halo
+means "this one"** (a point, bar, cell or region, a line's sample, keyboard focus). Hovering one
+point, bar or cell never fades the rest: it would strobe while skimming, hide the cells a heatmap
+is for, and redraw on every pointer move.
+
+Recipes: hover highlight is a split, a brightening color-dodge fill plus the halo, not a
+mark-derived colour. `colors` (today `scatter!`'s `color=`) feeds only the tooltip accent and the
+selected look's repaint and outline (below), never the hover highlight. The shadow root holds
 THREE sibling top-level overlay svgs with identical box/viewBox, each with its own `g.hi`/`g.sel`:
 `svg.masque-fill` (`mix-blend-mode: color-dodge`, both light and dark figures) draws the fill
 half of a hover highlight and of a grid cell's or region's selected highlight
 (`masque-hi masque-fillshape`, computed fill `rgb(20, 20, 20)` / `#141414`, fill-opacity 1, no
-stroke); `svg.masque-edge` (no blend) draws the stroke half (`masque-hi masque-hover` at 1.5px
-hover, `masque-hi masque-wash` at 2px selected, no fill) in one flat chrome grey — `#7a7a7a` on a
-light figure, `#c8c8c8` on a dark one, the same colour for hover and selected — Firefox only
-honours `mix-blend-mode` on a top-level svg, not nested SVG content, which is why the dodge fill
-is its own sibling svg; the edge svg stays a sibling so the stroke paints above that fill and
-below the plain chrome. Dodge against the near-black `#141414` source was, across a measured
-10-colour palette, the only fill candidate that never rotated hue more than 8° and never dimmed
-a mark (`bar_blue` is the limiting case for hue rotation, so the source stays deliberately
-conservative); a single darkening layer alone made a highlighted mark read muddy on a light figure,
-which is why the highlight split into two layers. Per geometry: a hovered closed mark
-(circle/rect/polygon) draws BOTH shapes, identical geometry; an open seg (a line has no interior)
-draws the edge shape only, no fill shape; a `selects`-ROI's grid cell-block union rect
-(`"rectfill"` geom tag) draws the fill shape only, since the ROI box itself is already the
-rect's outline. A `select = :many` grid's held cells (`"mask"` geom tag, one hit per field) draw
-ONE fill shape over every held cell (a path of row-run rects, so touching cells paint as one
-area) and an edge shape on the selection's OUTLINE only, 2px wash with square caps, so the block
-reads as one region, not a lattice. A picked point on a bound line draws the selected-seg ring
-around a circle at that data point, radius the line's hit slack (`tol`); the line itself is not
-ringed, and hovering it still draws its hover outline. The third svg, `svg.masque-plain`
-(unblended), holds ROI/threshold, the selected-seg ring (inner 2px + outer 4px @ 0.25, chrome
-grey), and hover highlights (and a grid cell's selected one) for a layer with an explicit
-`hoverstyle` stroke — single element, stroke verbatim + 18%/35% tint in that colour, open shapes
-staying stroke-only there (no `masque-hover`, `fill: none`); browsers without `mix-blend-mode`
-draw the fill as chrome grey at 0.18 opacity, and the edge stroke stays the flat chrome grey. A
-scatter circle's highlight `r` is the marker's DRAWN radius, not `markersize / 2` — flush against
-the visible disc (default `:circle` marker ≈0.3525×`markersize`; a `Circle`/`Rect` geometry
-marker draws at `markersize`; anything else falls back to `markersize / 2`; the fill and edge
-shapes share identical geometry, so `r` is checked on both). Hover is not selected. Motion is an
-80–120 ms opacity fade on tip / highlight — a plain opacity fade on each shape itself (the blend
-lives on `svg.masque-fill`, so a fading child doesn't isolate it); no pulse on a same-hit remount.
+stroke); `svg.masque-edge` (no blend) draws the halo. Firefox only honours `mix-blend-mode` on a
+top-level svg, not nested SVG content, which is why the dodge fill is its own sibling svg; the
+edge svg stays a sibling so the halo paints above that fill and below the plain chrome. Dodge
+against the near-black `#141414` source was, across a measured 10-colour palette, the only fill
+candidate that never rotated hue more than 8° and never dimmed a mark.
 
-Selected closed marks (circles, rects, polygons; #394, option E of the selection-look design):
-once a plot holds a pick (one or many, from the first pick), its unpicked marks fade toward the
-plot area's colour (the axis background over the figure's; the manifest's transform `fill`, else
-`background`) and the picks keep the image's own pixels. Nothing goes in `g.sel`: each axis
-has a `div.masque-fade[data-axis]` under the three svgs with two canvases in image px, each
-covering only the axis viewport and clipped to it (a mark past the limits is never drawn). The
-`canvas.masque-dim` covers every unpicked mark of the plot (grown 1.5 image px) in that colour,
-punches the picks back out (grown 0.5), and shows at CSS opacity
-`1 - --masque-unpicked-opacity` (default 0.2 left showing; overlaystyle `unpicked_opacity`). The
-`canvas.masque-top` repaints, in the mark's own `colors`, only a pick that an unpicked mark drawn
-after it covers (a pick nothing covers keeps its stroke and marker shape), and draws a 1 CSS px
-outline on a lone pick: one with no other pick whose box is within one of its own radii (two
-equal circles: centres 3 radii apart). The outline is the layer's `hoverstyle` stroke or the figure's
+The halo is a `g.masque-halo` of three strokes of the mark's own geometry: a casing band
+(`masque-halo-case masque-halo-outer`), the ink core (`masque-hi masque-hover` for hover and
+focus, `masque-hi masque-wash` for a pick), and an inner casing band (`masque-halo-inner`). The
+ink is Pluto's off-black `#1f1f1f` (hsl 0 0% 12%) on a light plot area and off-white `#fafafa`
+(hsl 0 0% 98%) on a dark one, the casing the other; it stays at least 3.97:1 against any colour,
+where any single grey falls to 1:1 somewhere on every colormap. overlaystyle `color` sets the
+core; a layer's `hoverstyle` stroke still takes the plain path below. Each band is
+`--masque-halo-u` = `max(1 / devicePixelRatio, 0.5)` CSS px (one device pixel; a resolution
+media query keeps it current on zoom or a move to another screen). Hover and focus are 1/1/1
+bands (casing, ink, casing), a pick 1/2/1: hover 1.5 px and pick 2 px on a 2× screen, 3 and 4 px
+on 1×. overlaystyle `hover_width` and `selected_width` set the core. Where the bands sit follows
+the element: **inside** an area's edge (cell, bar, polygon, region; `masque-halo-in`, clipped to
+the shape), so neighbouring outlines never overlap; **outside** a point's (`masque-halo-out`,
+masked off the mark), so a small marker keeps its own colour; **centred** on an area under 12
+image px on a side (`masque-halo-mid`); and **outside a line's drawn width** on both sides
+(`masque-halo-line`, masked off the line's stroke, sized in image px from the manifest's
+`linewidth` and `--masque-k`), so the series keeps its colour.
+
+Per geometry: a hovered closed mark (circle/rect/polygon) draws the fill shape and the halo; an
+open seg draws the halo only; a `selects`-ROI's grid cell-block union rect (`"rectfill"` geom
+tag) draws the fill shape only, since the ROI box itself is already its outline. A
+`select = :many` grid's held cells (`"mask"` geom tag, one hit per field) draw ONE fill shape over
+every held cell and a halo on the selection's OUTLINE only, inside it, so the block reads as one
+region, not a lattice. A picked point on a bound line draws a pick halo outside a circle at that
+data point, radius the line's hit slack (`tol`). Hovering a line (`kind = :lines` with samples)
+draws a hover halo outside a dot at the sample the tooltip reads out (radius the larger of 0.75
+`tol` and the line width), never a stroke along the line, and fades the axis's other lines
+(below); a line with no sample on screen is cased along its length. The third svg,
+`svg.masque-plain` (unblended), holds ROI/threshold and hover highlights (and a grid cell's
+selected one) for a layer with an explicit `hoverstyle` stroke: single element, stroke verbatim
++ 18%/35% tint in that colour, open shapes staying stroke-only there (no `masque-hover`,
+`fill: none`). Browsers without `mix-blend-mode` draw the fill as chrome grey at 0.18 opacity. A
+scatter circle's highlight `r` is the marker's DRAWN radius, not `markersize / 2` (default
+`:circle` marker ≈0.3525×`markersize`; a `Circle`/`Rect` geometry marker draws at `markersize`;
+anything else falls back to `markersize / 2`; the fill and halo share identical geometry, so `r`
+is checked on both). Hover is not selected. Motion is an 80–120 ms opacity fade on tip /
+highlight, on the halo group as one unit; no pulse on a same-hit remount.
+
+Selected closed marks and lines (circles, rects, polygons, #394; lines, 0.4.2): once a plot holds
+a pick (one or many, from the first pick), its unpicked marks fade toward the plot area's colour
+(the axis background over the figure's; the manifest's transform `fill`, else `background`) and
+the picks keep the image's own pixels. Nothing goes in `g.sel`: each axis has a
+`div.masque-fade[data-axis]` under the three svgs with two canvases in image px, each covering
+only the axis viewport and clipped to it (a mark past the limits is never drawn). The
+`canvas.masque-dim` covers every unpicked mark of the plot (grown 1.5 image px; a line is stroked
+at its `linewidth` grown the same) in that colour, punches the picks back out (grown 0.5), and
+shows at CSS opacity `1 - --masque-unpicked-opacity` (default 0.2 left showing; overlaystyle
+`unpicked_opacity`). The `canvas.masque-top` repaints, in the mark's own `colors`, only a pick
+that an unpicked mark drawn after it covers (a pick nothing covers keeps its stroke and marker
+shape), and draws a 1 CSS px outline on a lone pick of the selection (never a preview's marks,
+never a line): one with no other pick whose box is within one of its own radii (two equal
+circles: centres 3 radii apart). The outline is the layer's `hoverstyle` stroke or the figure's
 overlaystyle `color` when one is set, else the mark's colour moved 45% toward black on a light
 plot area or white on a dark one, else (no `colors`) the chrome grey. Other plots in the axis,
 grid lines and text keep their look, except where a faded mark's cover lies over them; a legend's
-pick fades every series that legend names. Known gaps: only a covered circle pick is repainted
-(a picked bar or polygon under a later unpicked one stays faded where they overlap), and a
-non-circular scatter marker (`:rect`, `:diamond`) is covered and punched as a circle. Hover is unchanged and draws over a pick like any
-mark (the pick has no stroke for it to thin); hovering or focusing a faded mark lifts its fade
-while it is hovered. A legend entry's hover previews its series the same way (kept, the legend's
-other series faded; a legend with one closed series fades nothing, as a click on it does); its
-linked lines keep the ring in `g.link`. A plot with every mark picked fades nothing either, and
-only lone picks show their outline. The canvases move and clip with
-a live photograph like the axis's svg homes. **Hovering a mark drawn with an SVG selected
-recipe (a line's ring, a grid cell, a region) still draws no highlight**: a 1.5px hover stroke
-over the 2px selected stroke would read as weaker, not stronger; the tooltip and `@bind` still
-fire. Lines, picked points on a line, grid cells and regions keep the recipes above.
+pick fades every series that legend names, lines included, and the picked line keeps its own
+colour (no wash). A whole line picked with no other line in scope to fade (a lone line on an
+Axis3) keeps a pick halo along it instead. Known gaps: only a covered circle pick is repainted (a
+picked bar or polygon under a later unpicked one stays faded where they overlap; lines carry no
+`colors`, so a faded line crossing a picked one shows unfaded at the crossing), and a
+non-circular scatter marker (`:rect`, `:diamond`) is covered and punched as a circle.
+
+Previews fade the same way, but leave more showing: `1 - --masque-preview-opacity` (default 0.35
+left showing; overlaystyle `preview_opacity`; the wrapper carries `masque-preview`) on an axis
+holding no picks, and the pick strength on one that does. A legend entry's hover previews its
+series (kept, the legend's other series faded, no outlines on its members; a legend with one
+series fades nothing, as a click on it does), and hovering a line previews it against the axis's
+other lines. Hover draws over a pick like any mark (the pick has no stroke for it to thin);
+hovering or focusing a faded mark lifts its fade while it is hovered. A plot with every mark
+picked fades nothing either, and only lone picks show their outline. The canvases move and clip
+with a live photograph like the axis's svg homes. **Hovering a mark drawn with an SVG selected
+recipe (a line's picked point, a grid cell, a region) still draws no highlight**: the thinner
+hover core over the pick's would read as weaker, not stronger; the tooltip and `@bind` still
+fire.
 
 Tooltip theme is derived from the FIGURE's own background (CSS relative-colour syntax,
 `--masque-fig-bg`), not just OS `prefers-color-scheme` — official Pluto has **no notebook

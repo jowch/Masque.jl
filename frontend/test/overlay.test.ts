@@ -62,6 +62,8 @@ const plainHiGroup = (shadow: ShadowRoot): SVGGElement => hiGroupEls(shadow).fin
 const fillSelGroup = (shadow: ShadowRoot): SVGGElement => selGroupEls(shadow).find((g) => g.closest("svg")!.classList.contains("masque-fill"))!
 const edgeSelGroup = (shadow: ShadowRoot): SVGGElement => selGroupEls(shadow).find((g) => g.closest("svg")!.classList.contains("masque-edge"))!
 const plainSelGroup = (shadow: ShadowRoot): SVGGElement => selGroupEls(shadow).find((g) => g.closest("svg")!.classList.contains("masque-plain"))!
+// A halo's ink core (highlight.ts's haloOf wraps it in its casing bands); any other element is itself.
+const coreOf = (el: Element | null): SVGElement => (el?.classList.contains("masque-halo") ? el.querySelector(":scope > .masque-hi") : el) as SVGElement
 
 // onDrag/onMove are rAF-coalesced: a second pointermove dispatched before the browser has painted
 // a frame only updates the pending event, it doesn't apply synchronously. Tests that need to see
@@ -1600,7 +1602,7 @@ describe("tooltips (mount/showTip)", () => {
         expect(selChildren(shadow).length).toBe(0)
     })
 
-    it("a starting pick on segments draws a ring (open-kind fallback)", () => {
+    it("a starting pick on segments draws a halo along it (open-kind fallback)", () => {
         const { host, script } = setup()
         const segs: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
@@ -1612,12 +1614,13 @@ describe("tooltips (mount/showTip)", () => {
             initial: { segs: { layer: "segs", index: 0 } },
         }
         mount(script, segs)
-        // Selected open geometry always renders as the unblended ring, in svg.masque-plain.
-        const node = plainSelGroup(shadowOf(host)).firstElementChild as SVGElement
-        expect(node.querySelectorAll("line").length).toBe(2)
+        // Selected open geometry is a halo cased along the line, in svg.masque-edge.
+        const node = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        expect(node.classList.contains("masque-halo-line")).toBe(true)
+        expect(coreOf(node).tagName).toBe("line")
     })
 
-    it("a starting pick on polyline counts vertices-1 (not 0) and draws a ring", () => {
+    it("a starting pick on polyline counts vertices-1 (not 0) and draws a halo", () => {
         const { host, script } = setup()
         // 3 vertices → 2 segments; Julia `_layer_n_elements(:polyline)` is length÷2 - 1
         const poly: Manifest = {
@@ -1630,27 +1633,26 @@ describe("tooltips (mount/showTip)", () => {
             initial: { line: { layer: "line", index: 0 } },
         }
         mount(script, poly)
-        const node = plainSelGroup(shadowOf(host)).firstElementChild as SVGElement
-        expect(node.querySelectorAll("line").length).toBe(2)
+        const node = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        expect(coreOf(node).tagName).toBe("line")
     })
 
-    it("a starting pick on lines draws one ring for the whole path, NaN gap included", () => {
+    it("a starting pick on a lone line halos the whole path, NaN gap included", () => {
         const { host, script } = setup()
         const lines: Manifest = {
             width: 1200, height: 800, scaling: 2, transforms: {},
             layers: [{
                 id: "curves", kind: "lines",
-                geometry: [[0, 0, 100, 0, NaN, NaN, 100, 80], [0, 200, 50, 200]],
-                payloads: [{ i: 0 }, { i: 1 }], axis: "ax1", events: ["click", "hover"],
+                geometry: [[0, 0, 100, 0, NaN, NaN, 100, 80]],
+                payloads: [{ i: 0 }], axis: "ax1", events: ["click", "hover"],
             }],
             fields: ["curves"],
             initial: { curves: { layer: "curves", index: 0 } },
         }
         mount(script, lines)
-        const node = plainSelGroup(shadowOf(host)).firstElementChild as SVGElement
-        const paths = [...node.querySelectorAll("path")]
-        expect(paths.length).toBe(2)
-        expect(paths[0].getAttribute("d")).toBe("M0 0L100 0M100 80")
+        // Alone on its axis it has no other line to fade, so it keeps a halo.
+        const node = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        expect(coreOf(node).getAttribute("d")).toBe("M0 0L100 0M100 80")
         expect(node.querySelector("line")).toBeNull()
     })
 
@@ -2419,7 +2421,7 @@ describe("frame swap keeps a line's picked point (#335)", () => {
             const shadow = shadowOf(host)
             const surface = shadow.querySelector(".surface") as HTMLElement
             surface.dispatchEvent(new MouseEvent("click", { clientX: 300, clientY: 300, bubbles: true })) // sample 1
-            const ring = () => shadow.querySelector("svg.masque-plain circle.masque-ring-inner")
+            const ring = () => shadow.querySelector("svg.masque-edge g.sel .masque-halo > circle.masque-hi")
             expect(ring()?.getAttribute("cx")).toBe("600")
             surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, clientY: 200, bubbles: true }))
             surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 200, bubbles: true }))
@@ -2506,7 +2508,7 @@ describe("overlay visual polish", () => {
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
         const fillEl = fillHiGroup(shadowOf(host)).firstElementChild as SVGElement
-        const edgeEl = edgeHiGroup(shadowOf(host)).firstElementChild as SVGElement
+        const edgeEl = coreOf(edgeHiGroup(shadowOf(host)).firstElementChild)
         expect(fillEl.tagName.toLowerCase()).toBe("circle")
         expect(edgeEl.tagName.toLowerCase()).toBe("circle")
         expect(fillEl.style.getPropertyValue("--masque-hi-stroke")).toBe("")
@@ -2530,14 +2532,15 @@ describe("overlay visual polish", () => {
         expect(hiChildren(shadow).length).toBe(0)
     })
 
-    it("hover on a closed mark splits into a fill shape (svg.masque-fill) and a stroke shape (svg.masque-edge), no colour/fill attributes, 1.5px, opaque", () => {
+    it("hover on a closed mark splits into a fill shape (svg.masque-fill) and a halo (svg.masque-edge), no colour/fill attributes, opaque", () => {
         const { host, script } = setup()
         mount(script, manifest)
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
         const fillEl = fillHiGroup(shadow).firstElementChild as SVGElement
-        const edgeEl = edgeHiGroup(shadow).firstElementChild as SVGElement
+        const halo = edgeHiGroup(shadow).firstElementChild as SVGElement
+        const edgeEl = coreOf(halo)
         expect(fillEl.tagName.toLowerCase()).toBe("circle")
         expect(fillEl.classList.contains("masque-hi")).toBe(true)
         expect(fillEl.classList.contains("masque-fillshape")).toBe(true)
@@ -2550,8 +2553,15 @@ describe("overlay visual polish", () => {
         expect(edgeEl.classList.contains("masque-wash")).toBe(false)
         expect(edgeEl.getAttribute("stroke")).toBeNull() // colour comes from the stylesheet, not a presentation attribute
         expect(edgeEl.getAttribute("stroke-width")).toBeNull() // the stylesheet's --masque-hover-width
-        expect(getComputedStyle(edgeEl).strokeWidth).toBe("1.5")
         expect(edgeEl.getAttribute("stroke-opacity")).toBeNull() // fully opaque
+        // A point: the bands sit outside its edge (a mask cuts the mark), casing, ink, casing.
+        expect(["masque-halo", "masque-halo-out", "masque-halo-hover"].every((c) => halo.classList.contains(c))).toBe(true)
+        const bands = [...halo.children].filter((c) => c.tagName !== "mask")
+        expect(bands.map((b) => b.classList.contains("masque-halo-case") ? "case" : "ink")).toEqual(["case", "ink", "case"])
+        expect(bands.every((b) => b.getAttribute("r") === "20")).toBe(true)
+        const mask = halo.querySelector("mask")!
+        expect(halo.getAttribute("mask")).toBe(`url(#${mask.id})`)
+        expect(mask.querySelector("circle")!.getAttribute("fill")).toBe("black")
         // The stroke lives in svg.masque-edge; that svg does not blend.
         expect(edgeEl.closest("svg")!.classList.contains("masque-edge")).toBe(true)
     })
@@ -2567,12 +2577,16 @@ describe("overlay visual polish", () => {
         })
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 125, clientY: 75, bubbles: true }))
-        const el = edgeHiGroup(shadowOf(host)).firstElementChild as SVGElement
+        const halo = edgeHiGroup(shadowOf(host)).firstElementChild as SVGElement
+        const el = coreOf(halo)
         expect(el.tagName.toLowerCase()).toBe("line")
         expect(el.classList.contains("masque-hi")).toBe(true)
         expect(el.classList.contains("masque-hover")).toBe(true)
         expect(el.getAttribute("fill")).toBeNull()
-        expect(getComputedStyle(el).strokeWidth).toBe("1.5")
+        // Cased on both sides, outside the line's own drawn width, which the mask cuts out.
+        expect(halo.classList.contains("masque-halo-line")).toBe(true)
+        expect(halo.style.getPropertyValue("--masque-lw")).toBe("1.5")
+        expect(halo.querySelector("mask > line")!.getAttribute("stroke-width")).toBe("1.5")
         expect(fillHiGroup(shadowOf(host)).children.length).toBe(0) // no fill shape for an open mark
     })
 
@@ -2627,7 +2641,7 @@ describe("overlay visual polish", () => {
         mount(script, manifest)
         const surface = shadowOf(host).querySelector(".surface") as HTMLElement
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
-        const el = edgeHiGroup(shadowOf(host)).firstElementChild as SVGElement
+        const el = coreOf(edgeHiGroup(shadowOf(host)).firstElementChild)
         expect(el.getAttribute("r")).toBe("20") // geometry r=20, on the mark edge (no +2)
         expect(el.getAttribute("cx")).toBe("600")
         expect(el.getAttribute("cy")).toBe("400")
@@ -2685,7 +2699,7 @@ describe("overlay visual polish", () => {
         })
     })
 
-    it("selected open geometry gets a ring (inner 2px + outer ~4px, class-based colour, fill none)", () => {
+    it("selected open geometry gets a selected halo along it (class-based colour, fill none)", () => {
         const { host, script } = setup()
         mount(script, {
             width: 1200, height: 800, scaling: 2, transforms: {},
@@ -2696,19 +2710,14 @@ describe("overlay visual polish", () => {
             fields: ["segs"],
             initial: { segs: { layer: "segs", index: 0 } },
         })
-        // Selected open geometry always renders as the unblended ring, in svg.masque-plain.
-        const node = plainSelGroup(shadowOf(host)).firstElementChild as SVGElement
-        const lines = node.tagName.toLowerCase() === "g"
-            ? [...node.querySelectorAll("line")]
-            : [node]
-        expect(lines.length).toBe(2)
-        expect(lines.every((ln) => ln.classList.contains("masque-hi"))).toBe(true)
+        expect(plainSelGroup(shadowOf(host)).children.length).toBe(0)
+        const node = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        expect(["masque-halo", "masque-halo-line", "masque-halo-selected"].every((c) => node.classList.contains(c))).toBe(true)
+        const lines = [...node.children].filter((c) => c.tagName === "line")
+        expect(lines.length).toBe(3)
         expect(lines.every((ln) => ln.getAttribute("fill") === null)).toBe(true)
         expect(lines.every((ln) => ln.getAttribute("stroke") === null)).toBe(true)
-        const widths = lines.map((ln) => getComputedStyle(ln).strokeWidth).sort()
-        expect(widths).toEqual(["2", "4"])
-        const outer = lines.find((ln) => getComputedStyle(ln).strokeWidth === "4")!
-        expect(Number(getComputedStyle(outer).strokeOpacity)).toBeCloseTo(0.25)
+        expect(coreOf(node).classList.contains("masque-wash")).toBe(true)
     })
 
     it("threshold line gets masque-hi with no explicit --masque-hi-stroke when style is missing", () => {
@@ -3077,7 +3086,7 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             (shadowOf(host).querySelector(".surface") as HTMLElement)
                 .dispatchEvent(new MouseEvent("click", { clientX: x / 2, clientY: y / 2, bubbles: true }))
         const ringAt = (host: HTMLElement) => {
-            const c = shadowOf(host).querySelector("svg.masque-plain .masque-ring-inner") as SVGCircleElement | null
+            const c = shadowOf(host).querySelector("svg.masque-edge g.sel .masque-halo > .masque-hi") as SVGCircleElement | null
             return c && c.tagName === "circle" ? [Number(c.getAttribute("cx")), Number(c.getAttribute("cy"))] : null
         }
         const valueOf = (host: HTMLElement) => (host as unknown as { value: Record<string, unknown> }).value
@@ -3097,8 +3106,8 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             clickAt(host, 280, 402)
             expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0, sample: 1 } })
             expect(ringAt(host)).toEqual([300, 400])
-            // The line itself carries no selected ring.
-            expect(shadowOf(host).querySelector("svg.masque-plain path.masque-ring-inner")).toBeNull()
+            // The line itself carries no selected halo.
+            expect(shadowOf(host).querySelector("svg.masque-edge g.sel path.masque-hi")).toBeNull()
         })
 
         it("another point moves the pick, and the same point again takes it back", () => {
@@ -3113,14 +3122,17 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             expect(ringAt(host)).toBeNull()
         })
 
-        it("hovering a line whose point is picked still outlines the line", () => {
+        it("hovering a line whose point is picked still marks the hovered sample", () => {
             const { host, script } = setup()
             mount(script, lineManifest())
             clickAt(host, 280, 402)
             const shadow = shadowOf(host)
             ;(shadow.querySelector(".surface") as HTMLElement)
                 .dispatchEvent(new PointerEvent("pointermove", { clientX: 60, clientY: 200, bubbles: true }))
-            expect(shadow.querySelector("svg.masque-edge path.masque-hi")).not.toBeNull()
+            // The hover is a dot on the sample (100, 400), outside it, not a stroke along the line.
+            const dot = shadow.querySelector("svg.masque-edge g.hi .masque-halo-out > circle.masque-hi")
+            expect([dot?.getAttribute("cx"), dot?.getAttribute("cy")]).toEqual(["100", "400"])
+            expect(shadow.querySelector("svg.masque-edge g.hi path.masque-hi")).toBeNull()
         })
 
         it("on a layer of several lines the pick names the line and the point", () => {
@@ -3139,7 +3151,8 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
             mount(script, lineManifest({ points: undefined }))
             clickAt(host, 280, 402)
             expect(valueOf(host)).toEqual({ lines: { layer: "lines", index: 0 } })
-            expect(shadowOf(host).querySelector("svg.masque-plain path.masque-ring-inner")).not.toBeNull()
+            // Alone on its axis, the picked line keeps a halo along its length.
+            expect(shadowOf(host).querySelector("svg.masque-edge g.sel .masque-halo-line > path.masque-hi")).not.toBeNull()
         })
 
         it("a starting value with a sample rings that point", () => {
@@ -3422,9 +3435,14 @@ describe("coverage gaps: grid-value tooltip, drag-target hover cursor, rects/pol
         // image (5, 5), inside the outer ring and outside the hole -> client (2.5, 2.5)
         ;(shadowOf(host).querySelector(".surface") as HTMLElement)
             .dispatchEvent(new PointerEvent("pointermove", { clientX: 2.5, clientY: 2.5, bubbles: true }))
-        const edge = edgeHiGroup(shadowOf(host)).firstElementChild as SVGElement
+        const halo = edgeHiGroup(shadowOf(host)).firstElementChild as SVGElement
+        const edge = coreOf(halo)
         const fill = fillHiGroup(shadowOf(host)).firstElementChild as SVGElement
-        for (const el of [edge, fill]) {
+        // An area: the halo sits inside its edge, clipped to the shape, holes and all.
+        expect(halo.classList.contains("masque-halo-in")).toBe(true)
+        const clip = halo.querySelector("clipPath > path")!
+        expect(clip.getAttribute("clip-rule")).toBe("evenodd")
+        for (const el of [edge, fill, clip]) {
             expect(el.tagName.toLowerCase()).toBe("path")
             expect(el.getAttribute("fill-rule")).toBe("evenodd")
             expect(el.getAttribute("d")).toBe("M0 0L40 0L40 40L0 40ZM10 10L30 10L30 30L10 30Z")
@@ -3577,7 +3595,7 @@ describe("click-echo (#103)", () => {
         expect(edgeHiGroup(shadow).children.length).toBe(1)
     })
 
-    it("a picked open mark still draws no hover chrome over its selected ring (drawHi's selKeys_ guard)", async () => {
+    it("a picked open mark still draws no hover chrome over its selected halo (drawHi's selKeys_ guard)", async () => {
         const { host, script } = setup()
         mount(script, {
             width: 1200, height: 800, scaling: 2, transforms: {},
@@ -3588,7 +3606,7 @@ describe("click-echo (#103)", () => {
         })
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        expect(plainSelGroup(shadow).children.length).toBe(1) // the selected ring
+        expect(edgeSelGroup(shadow).children.length).toBe(1) // the selected halo
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 125, clientY: 75, bubbles: true }))
         await flushFrame()
         expect(hiChildren(shadow).length).toBe(0)
@@ -5355,8 +5373,12 @@ describe("chrome metrics are custom properties (#180)", () => {
         mount(script, { ...manifest, layers: [grid], ...picked })
         const shadow = shadowOf(host)
         shadowHostOf(host).style.setProperty("--masque-selected-width", "5")
+        // jsdom resolves no calc(): check the halo's core reads the property, inside the cell
+        // (twice as wide, half clipped), with the one-device-pixel band of a 1x screen.
         const edge = edgeSelGroup(shadow).firstElementChild as SVGElement
-        expect(getComputedStyle(edge).strokeWidth).toBe("5")
+        expect(edge.classList.contains("masque-halo-in")).toBe(true)
+        expect(shadowHostOf(host).style.getPropertyValue("--masque-halo-u")).toBe("1px")
+        expect(getComputedStyle(coreOf(edge)).strokeWidth).toBe("calc(2 * var(--masque-selected-width, calc(2 * 1px)) + 2 * 1px)")
         const plain = { ...manifest, ...picked, layers: [{ ...grid, style: { stroke: "#123456", width: 2 } }] }
         const { host: host2, script: script2 } = setup()
         mount(script2, plain)
@@ -5373,8 +5395,8 @@ describe("chrome metrics are custom properties (#180)", () => {
         const shadow = shadowOf(host)
         shadowHostOf(host).style.setProperty("--masque-hover-width", "3")
         surfaceHover(shadow, 300, 200)
-        const edge = edgeHiGroup(shadow).firstElementChild as SVGElement
-        expect(getComputedStyle(edge).strokeWidth).toBe("3")
+        const edge = coreOf(edgeHiGroup(shadow).firstElementChild)
+        expect(getComputedStyle(edge).strokeWidth).toBe("calc(2 * 3 + 2 * 1px)")
     })
 
     it("ROI outline and grips read the host's properties, and a hoverstyle width still wins", () => {
@@ -5438,8 +5460,10 @@ describe("overlayStyle from Julia (#181)", () => {
         const shadow = shadowOf(host)
         ;(shadow.querySelector(".surface") as HTMLElement)
             .dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
-        const edge = edgeHiGroup(shadow).firstElementChild as SVGElement
-        expect(getComputedStyle(edge).strokeWidth).toBe("3px")
+        const edge = coreOf(edgeHiGroup(shadow).firstElementChild)
+        expect(getComputedStyle(edge).strokeWidth).toBe("calc(2 * 3px + 2 * 1px)")
+        // overlaystyle `color` is the halo's core too.
+        expect(sh.style.getPropertyValue("--masque-halo-ink")).toBe("rgb(0,0,255)")
     })
 
     it("no overlayStyle leaves the host with only the derived colours", () => {
@@ -5499,7 +5523,7 @@ describe("select = :many and clearing picks (#335)", () => {
         mount(script, m)
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        const rings = () => [...shadow.querySelectorAll("svg.masque-plain circle.masque-ring-inner")].map((c) => c.getAttribute("cx"))
+        const rings = () => [...shadow.querySelectorAll("svg.masque-edge g.sel .masque-halo > circle.masque-hi")].map((c) => c.getAttribute("cx"))
         click(surface, 110, 200) // nearest point 0
         expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 0 }] })
         click(surface, 490, 200) // adds point 2
@@ -5511,7 +5535,7 @@ describe("select = :many and clearing picks (#335)", () => {
 
         const restored = setup()
         mount(restored.script, { ...m, initial: { fit: { items: [{ layer: "fit", index: 0, sample: 1 }, { layer: "fit", index: 0, sample: 7 }] } } })
-        const r = [...shadowOf(restored.host).querySelectorAll("svg.masque-plain circle.masque-ring-inner")].map((c) => c.getAttribute("cx"))
+        const r = [...shadowOf(restored.host).querySelectorAll("svg.masque-edge g.sel .masque-halo > circle.masque-hi")].map((c) => c.getAttribute("cx"))
         expect(r).toEqual(["600"]) // a point the line doesn't have is dropped
     })
 
@@ -6280,7 +6304,7 @@ describe("a grid with select = :many holds a cell mask (#335)", () => {
         const fill = fillSelGroup(shadow).querySelector("path")!
         expect(fill.getAttribute("d")).toBe("M0 0H600V200H0Z")
         expect(fill.classList.contains("masque-fillshape")).toBe(true)
-        const edge = selGroupEls(shadow).find((g) => g.closest("svg")!.classList.contains("masque-edge"))!.querySelector("path")!
+        const edge = coreOf(selGroupEls(shadow).find((g) => g.closest("svg")!.classList.contains("masque-edge"))!.firstElementChild)
         // The outline only: no side between the two cells.
         expect(edge.getAttribute("d")).toBe("M0 0H600M0 200H600M0 0V200M600 0V200")
         expect(edge.classList.contains("masque-w-selected")).toBe(true)
@@ -6810,13 +6834,14 @@ describe("a grid with regions picks and outlines whole regions (#359)", () => {
     it("hover outlines the whole region, keeps one highlight across it, and names it", async () => {
         const { shadow, surface } = mounted(grid())
         move(surface, ...at(0, 0))
-        const edge = edgeHiGroup(shadow).firstElementChild as SVGElement
+        const halo = edgeHiGroup(shadow).firstElementChild as SVGElement
+        const edge = coreOf(halo)
         // Region 1: cells (0,0), (1,0), (0,1).
         expect(edge.getAttribute("d")).toBe("M0 0H600M300 200H600M0 400H300M600 0V200M0 0V400M300 200V400")
         expect(edge.classList.contains("masque-w-hover")).toBe(true)
         move(surface, ...at(1, 0))
         await flushFrame()
-        expect(edgeHiGroup(shadow).firstElementChild).toBe(edge)
+        expect(edgeHiGroup(shadow).firstElementChild).toBe(halo)
         expect((shadow.querySelector(".masque-tip") as HTMLElement).textContent).toBe("region 1")
     })
 

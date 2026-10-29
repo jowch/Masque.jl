@@ -15,10 +15,17 @@ import type { Hit, HitLayer, Manifest } from "./types"
 // outline in a shade of its own colour, so a few picks in a dense plot can still be found while
 // a crowd of picks reads by its colour alone. An explicit overlay colour (the layer's hoverstyle
 // stroke, the figure's overlaystyle `color`) outlines instead, and a mark whose colour is unknown
-// is outlined in the chrome grey. Lines, picked points on a line, grid cells and
-// regions keep their SVG recipes (highlight.ts).
+// is outlined in the chrome grey.
+//
+// Lines fade the same way, since a line is a whole series: a picked line (a legend's pick, or a
+// line with no samples to pick) keeps its own colour while the other lines fade, and hovering a
+// line previews that (`hover_`). A line has no lone-pick outline. Picked points on a line, grid
+// cells and regions keep their SVG recipes (highlight.ts).
 
-export const FADE_KINDS = new Set(["circles", "rects", "polygons"])
+export const FADE_KINDS = new Set(["circles", "rects", "polygons", "lines"])
+
+// A line's drawn width, image px: the manifest's, else Makie's default line width.
+export const lineWidthOf = (layer: HitLayer, scaling = 1): number => layer.linewidth ?? 1.5 * scaling
 
 // Image px a mark's cover reaches past its edge (antialiasing, a thin outline), and a pick's
 // punch-out of the cover, which stays small so a neighbour's covered edge stays faded. How much
@@ -35,7 +42,24 @@ const OUTLINE_MIX = 0.45
 export function fadeLook(hit: Hit): boolean {
     if (!FADE_KINDS.has(hit.layer.kind) || layoutSpaceLayer(hit.layer)) return false
     const g = hit.geom_
-    return !!g && (g[0] === "circle" || g[0] === "rect" || g[0] === "poly")
+    return !!g && (g[0] === "circle" || g[0] === "rect" || g[0] === "poly" || (g[0] === "path" && hit.sample_ === undefined))
+}
+
+// Whether keeping `hits` fades anything in `scope`: some drawn element of it is not among them.
+// A line picked or hovered alone on its axis has nothing to fade, so it keeps its halo.
+export function fadesOthers(scope: HitLayer[], hits: Hit[]): boolean {
+    const kept = new Map<HitLayer, Set<number>>()
+    for (const h of hits) {
+        let s = kept.get(h.layer)
+        if (!s) kept.set(h.layer, (s = new Set()))
+        s.add(h.index)
+    }
+    return scope.some((l) => drawnOrder(l).some((k) => !kept.get(l)?.has(k)))
+}
+
+// The line layers drawn on `axis`, which hovering one of them fades.
+export function lineScope(manifest: Manifest, axis: string): HitLayer[] {
+    return manifest.layers.filter((l) => l.kind === "lines" && l.axis === axis && !l.hidden && fadeLayer(l))
 }
 
 const fadeLayer = (l: HitLayer | undefined): l is HitLayer => !!l && FADE_KINDS.has(l.kind) && !layoutSpaceLayer(l)
@@ -123,6 +147,8 @@ export interface Fade {
     // A legend entry's hover preview (`key` names the entry), drawn with the selection. The
     // same key again changes nothing; null ends it.
     preview_(key: string | null, hits: Hit[] | null, scope: HitLayer[]): void
+    // A hovered line's preview, the same way: the axis's other lines fade.
+    hover_(key: string | null, hits: Hit[] | null, scope: HitLayer[]): void
     // Hovering or focusing a faded mark shows it at full strength while it is hovered, with
     // the partners a linked mark's hover outlines.
     lift_(hit: Hit | null, partners?: Hit[]): void
@@ -153,13 +179,14 @@ function extentOf(m: Manifest, axis: string): Extent {
     return [x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0)]
 }
 
+interface Slot { key: string | null; kept: Map<HitLayer, Set<number>> | null; scope: HitLayer[] }
+
 export function createFade(host: FadeHost): Fade {
     const homes = new Map<string, AxisHome>()
     let selKept = new Map<HitLayer, Set<number>>()
     let selScope: HitLayer[] = []
-    let preKept: Map<HitLayer, Set<number>> | null = null
-    let preScope: HitLayer[] = []
-    let preKey: string | null = null
+    // The two previews: a legend entry's hover, and a hovered line.
+    const slots: Record<"legend" | "line", Slot> = { legend: { key: null, kept: null, scope: [] }, line: { key: null, kept: null, scope: [] } }
     // What is drawn now, by axis: each faded layer with the elements it keeps.
     let drawn = new Map<string, Map<HitLayer, Set<number>>>()
     let lifted: { layer: HitLayer; index: number }[] = []
@@ -219,10 +246,21 @@ export function createFade(host: FadeHost): Fade {
         }
     }
 
+    const widthOf = (layer: HitLayer): number => lineWidthOf(layer, host.manifest_().scaling || 1)
+
     // Element k's bounding box, or null when it is not drawn.
     const boxOf = (layer: HitLayer, k: number): Box | null => {
         if (isGapElement(layer, k)) return null
         const g = layer.geometry as number[]
+        if (layer.kind === "lines") {
+            const v = (layer.geometry as number[][])[k] ?? [], w = widthOf(layer) / 2
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+            for (let i = 0; i + 1 < v.length; i += 2) {
+                if (!Number.isFinite(v[i]) || !Number.isFinite(v[i + 1])) continue
+                x0 = Math.min(x0, v[i]); x1 = Math.max(x1, v[i]); y0 = Math.min(y0, v[i + 1]); y1 = Math.max(y1, v[i + 1])
+            }
+            return x0 <= x1 ? [x0 - w, y0 - w, x1 + w, y1 + w] : null
+        }
         if (layer.kind === "circles") {
             const x = g[3 * k], y = g[3 * k + 1], r = g[3 * k + 2]
             return [x - r, y - r, x + r, y + r]
@@ -277,8 +315,29 @@ export function createFade(host: FadeHost): Fade {
         }
     }
 
+    // Lines `ks` stroked at their drawn width grown by `pad` each side, in the fill style. A
+    // non-finite vertex starts a new subpath (a NaN gap).
+    const strokeLines = (c: CanvasRenderingContext2D, layer: HitLayer, ks: Iterable<number>, pad: number): void => {
+        c.strokeStyle = c.fillStyle
+        c.lineWidth = widthOf(layer) + 2 * pad
+        c.lineCap = "round"
+        c.lineJoin = "round"
+        c.beginPath()
+        for (const k of ks) {
+            const v = (layer.geometry as number[][])[k] ?? []
+            let open = false
+            for (let i = 0; i + 1 < v.length; i += 2) {
+                if (!Number.isFinite(v[i]) || !Number.isFinite(v[i + 1])) { open = false; continue }
+                if (open) c.lineTo(v[i], v[i + 1])
+                else { c.moveTo(v[i], v[i + 1]); open = true }
+            }
+        }
+        c.stroke()
+    }
+
     // Fills elements `ks` of a layer, grown by `pad`, in the current fill style and composite.
     const fillShapes = (c: CanvasRenderingContext2D, layer: HitLayer, ks: Iterable<number>, pad: number): void => {
+        if (layer.kind === "lines") { strokeLines(c, layer, ks, pad); return }
         if (layer.kind === "polygons") {
             c.strokeStyle = c.fillStyle
             for (const k of ks) if (!isGapElement(layer, k)) fillPoly(c, layer, k, pad)
@@ -357,12 +416,14 @@ export function createFade(host: FadeHost): Fade {
         return out
     }
 
-    // The picks on an axis with no other pick within LONE_GAP of their own radii.
+    // The selection's picks on an axis with no other pick within LONE_GAP of their own radii. A
+    // preview's marks are not picks, and a line has no outline.
     const lonePicks = (kept: Map<HitLayer, Set<number>>): Array<{ layer: HitLayer; k: number; box: Box }> => {
         const all: Array<{ layer: HitLayer; k: number; box: Box; rho: number }> = []
         let span = 0
-        for (const [layer, ks] of kept) {
-            for (const k of ks) {
+        for (const layer of kept.keys()) {
+            if (layer.kind === "lines") continue
+            for (const k of selKept.get(layer) ?? []) {
                 const box = boxOf(layer, k)
                 if (!box) continue
                 const w = box[2] - box[0], h = box[3] - box[1]
@@ -431,8 +492,8 @@ export function createFade(host: FadeHost): Fade {
 
     // Each axis's cover of every drawn mark of a set of layers in the plot area's colour, drawn
     // once and copied onto the dim canvas on each redraw, so a click costs the picks it punches
-    // out, not the plot's marks. The last two sets are kept per axis (a legend's preview and the
-    // selection); a new manifest starts over.
+    // out, not the plot's marks. The last three sets are kept per axis (the selection, and it with
+    // a legend's or a line's preview); a new manifest starts over.
     // Keyed by layer object, not id: a frame brings new layers under the same ids, and a cover
     // drawn from the old geometry must not be found for the new.
     const serials = new WeakMap<HitLayer, number>()
@@ -459,7 +520,7 @@ export function createFade(host: FadeHost): Fade {
         if (!c) return null
         c.fillStyle = bg
         for (const layer of layers) fillShapes(c, layer, drawnOrder(layer), PAD_DIM)
-        covers.set(axis, [{ key, cv }, ...list].slice(0, 2))
+        covers.set(axis, [{ key, cv }, ...list].slice(0, 3))
         return cv
     }
 
@@ -546,6 +607,8 @@ export function createFade(host: FadeHost): Fade {
         h.wrap.dataset.lone = String(lone.length)
         h.wrap.dataset.raised = String(raised)
         delete h.wrap.dataset.lift
+        // A preview alone on its axis leaves more showing than a pick (overlaystyle `preview_opacity`).
+        h.wrap.classList.toggle("masque-preview", !selScope.some((l) => l.axis === axis))
     }
 
     const clearAxis = (axis: string): void => {
@@ -559,10 +622,11 @@ export function createFade(host: FadeHost): Fade {
     }
 
     const redraw = (): void => {
-        const layers = new Set<HitLayer>([...selScope, ...(preKept ? preScope : [])])
+        const live = Object.values(slots).filter((s) => s.kept)
+        const layers = new Set<HitLayer>([...selScope, ...live.flatMap((s) => s.scope)])
         const next = new Map<string, Map<HitLayer, Set<number>>>()
         for (const layer of layers) {
-            const ks = new Set<number>([...(selKept.get(layer) ?? []), ...(preKept?.get(layer) ?? [])])
+            const ks = new Set<number>([...(selKept.get(layer) ?? []), ...live.flatMap((s) => [...(s.kept?.get(layer) ?? [])])])
             let byAxis = next.get(layer.axis)
             if (!byAxis) next.set(layer.axis, (byAxis = new Map()))
             byAxis.set(layer, ks)
@@ -626,19 +690,22 @@ export function createFade(host: FadeHost): Fade {
         }
     }
 
+    function preview(s: Slot, key: string | null, hits: Hit[] | null, scope: HitLayer[]): void {
+        if (key === s.key && (key === null || s.kept)) return
+        s.key = hits ? key : null
+        s.kept = hits ? keptBy(hits) : null
+        s.scope = hits ? scope : []
+        redraw()
+    }
+
     return {
         select_(hits, scope) {
             selKept = keptBy(hits)
             selScope = scope
             redraw()
         },
-        preview_(key, hits, scope) {
-            if (key === preKey && (key === null || preKept)) return
-            preKey = hits ? key : null
-            preKept = hits ? keptBy(hits) : null
-            preScope = hits ? scope : []
-            redraw()
-        },
+        preview_(key, hits, scope) { preview(slots.legend, key, hits, scope) },
+        hover_(key, hits, scope) { preview(slots.line, key, hits, scope) },
         lift_(hit, partners = []) {
             const marks = hit ? [hit, ...partners] : []
             lift(marks.filter(fadeLook).map((h) => ({ layer: h.layer, index: h.index })))

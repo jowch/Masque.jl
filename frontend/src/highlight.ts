@@ -1,8 +1,8 @@
-import { pathData, polygonRings, ringsPathData, screenFixedLayer } from "./geometry"
+import { pathData, polygonRings, ringsPathData, samplePoint, screenFixedLayer, SEG_TOL } from "./geometry"
 import { hitKey, prefersReducedMotion, selectedHits, MOTION_MS } from "./state"
 import type { HiGroups, HiSet, OverlayCtx, OverlayState } from "./state"
 import { regionCells } from "./regions"
-import { fadeLook, previewScope, selectionScope } from "./fade"
+import { fadeLook, fadesOthers, lineScope, lineWidthOf, previewScope, selectionScope } from "./fade"
 import { layerColor } from "./color"
 import type { Hit, HitLayer, LayerStyle } from "./types"
 
@@ -57,13 +57,115 @@ export interface HiResult {
     plain?: SVGElement
 }
 
+// --- the halo: the stroke that marks one element ---
+// Three bands of one geometry, light-dark-light: an ink core with a casing of the opposite
+// tone on either side, so it reads against any colour under it. The band widths are device
+// pixels (mount.ts sets --masque-halo-u). Where the bands sit follows the element: inside an
+// area's edge (a cell, a bar, a polygon, a region), so neighbouring outlines never overlap and
+// nothing spills onto the next mark; outside a point's (a marker, a line's dot or picked
+// point), whose own colour stays visible inside the ring; centred on a thin area's edge, which
+// has no room inside. A line is cased on both sides, outside its drawn width.
+type HaloAlign = "mid" | "in" | "out" | "line"
+// An area narrower than this (image px) is outlined on its edge, not inside it.
+const INSET_MIN = 12
+let haloSeq = 0
+
+function haloAlign(g: unknown[], layer: HitLayer): HaloAlign {
+    const kind = g[0]
+    if (kind === "circle" || kind === "point" || kind === "dot") return "out"
+    if (kind === "seg" || kind === "path") return "line"
+    let side = Infinity
+    if (kind === "rect") side = Math.min(Math.abs(g[3] as number), Math.abs(g[4] as number))
+    else if (kind === "poly") {
+        const ring = polygonRings(g[1] as number[] | number[][])[0] ?? []
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+        for (let i = 0; i + 1 < ring.length; i += 2) {
+            x0 = Math.min(x0, ring[i]); x1 = Math.max(x1, ring[i]); y0 = Math.min(y0, ring[i + 1]); y1 = Math.max(y1, ring[i + 1])
+        }
+        side = Math.min(x1 - x0, y1 - y0)
+    } else if (kind === "mask") side = gridCell(layer)
+    return side >= INSET_MIN ? "in" : "mid"
+}
+
+// A grid's smallest cell side, image px.
+const cellCache = new WeakMap<HitLayer, number>()
+function gridCell(layer: HitLayer): number {
+    let s = cellCache.get(layer)
+    if (s !== undefined) return s
+    s = Infinity
+    const g = layer.geometry as { xedges?: number[]; yedges?: number[] } | null
+    for (const e of [g?.xedges ?? [], g?.yedges ?? []]) for (let i = 1; i < e.length; i++) s = Math.min(s, Math.abs(e[i] - e[i - 1]))
+    cellCache.set(layer, s)
+    return s
+}
+
+// Wraps `core` (already classed masque-hi …) in its casing. `shape` is what the bands keep
+// inside ("in") or outside ("out", "line"): the mark itself, a region's fill path, or a line,
+// whose drawn width `lw` (image px) the mask cuts.
+function haloOf(core: SVGElement, shape: SVGElement, align: HaloAlign, mode: HiMode, lw = 0): SVGGElement {
+    const g = document.createElementNS(SVG_NS, "g")
+    g.classList.add("masque-halo", `masque-halo-${align}`, mode === "hover" ? "masque-halo-hover" : "masque-halo-selected")
+    // A line's bands are sized in image px around its drawn width (mount.ts's --masque-k turns
+    // CSS px into image px); every other halo is a non-scaling stroke in CSS px.
+    if (align === "line") g.style.setProperty("--masque-lw", String(lw))
+    else core.setAttribute("vector-effect", "non-scaling-stroke")
+    core.removeAttribute("fill")
+    const band = (cls: string): SVGElement => {
+        const b = core.cloneNode(false) as SVGElement
+        b.removeAttribute("class")
+        b.removeAttribute("style")
+        b.classList.add("masque-halo-case", cls)
+        return b
+    }
+    // The bands paint first, so a query for the mark's shape finds a band, not the clip or mask
+    // definition that follows them.
+    g.append(band("masque-halo-outer"), core)
+    if (align !== "mid") {
+        g.appendChild(band("masque-halo-inner"))
+        const id = `masque-halo-${++haloSeq}`
+        const cut = shape.cloneNode(false) as SVGElement
+        for (const a of ["class", "style", "vector-effect"]) cut.removeAttribute(a)
+        if (align === "in") {
+            const cp = document.createElementNS(SVG_NS, "clipPath")
+            cp.id = id
+            const rule = cut.getAttribute("fill-rule")
+            if (rule) cut.setAttribute("clip-rule", rule)
+            cp.appendChild(cut)
+            g.setAttribute("clip-path", `url(#${id})`)
+            g.appendChild(cp)
+        } else {
+            // Everything but the shape (or the line's own stroke) shows.
+            const m = document.createElementNS(SVG_NS, "mask")
+            m.id = id
+            const all = document.createElementNS(SVG_NS, "rect")
+            for (const el of [m, all]) {
+                el.setAttribute("x", "-100000"); el.setAttribute("y", "-100000")
+                el.setAttribute("width", "200000"); el.setAttribute("height", "200000")
+            }
+            m.setAttribute("maskUnits", "userSpaceOnUse")
+            all.setAttribute("fill", "white")
+            if (align === "line") {
+                cut.setAttribute("fill", "none")
+                cut.setAttribute("stroke", "black")
+                cut.setAttribute("stroke-width", String(lw))
+                cut.setAttribute("stroke-linecap", "round")
+                cut.setAttribute("stroke-linejoin", "round")
+            } else cut.setAttribute("fill", "black")
+            m.append(all, cut)
+            g.setAttribute("mask", `url(#${id})`)
+            g.appendChild(m)
+        }
+    }
+    return g
+}
+
 export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null {
     if (!hit.geom_) return null
     const st = hit.layer.style ?? DEFAULT_STYLE
-    if (hit.geom_[0] === "mask") return maskElements(hit.geom_ as [string, string, string], st.stroke, mode)
+    if (hit.geom_[0] === "mask") return maskElements(hit.geom_ as [string, string, string], st.stroke, mode, hit.layer)
     const g = hit.geom_ as [string, ...number[]] | [string, number[]]
     let el: SVGElement | null = null
-    if (g[0] === "circle" || g[0] === "point") {
+    if (g[0] === "circle" || g[0] === "point" || g[0] === "dot") {
         el = document.createElementNS(SVG_NS, "circle")
         el.setAttribute("cx", String(g[1])); el.setAttribute("cy", String(g[2])); el.setAttribute("r", String(g[3]))
     } else if (g[0] === "rect" || g[0] === "rectfill") {
@@ -98,7 +200,8 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
     }
     if (!el) return null
     // A picked point on a line is open too: a ring around the point, the line showing through.
-    const open = g[0] === "seg" || g[0] === "path" || g[0] === "point"
+    // So is a line's hover dot (drawHover below).
+    const open = g[0] === "seg" || g[0] === "path" || g[0] === "point" || g[0] === "dot"
     const rectfill = g[0] === "rectfill"
 
     // Explicit hoverstyle stroke: today's single unblended element in svg.masque-plain, unchanged.
@@ -118,23 +221,19 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
         return { plain: el }
     }
 
-    // Selected open geometry always renders as the unblended ring, in svg.masque-plain, whether
-    // or not this layer would otherwise split — a bare stroke ring reads fine unblended, and
-    // mount.ts's ring rules never gained a fill/edge variant.
-    if (mode === "selected" && open) return { plain: makeRing(el, undefined) }
+    // Open geometry (a line, a picked point on one, a line's hover dot) has no interior to
+    // brighten: the halo alone marks it, the line's own colour showing through.
+    if (open) {
+        el.classList.add("masque-hi", ...(mode === "hover" ? ["masque-hover", "masque-w-hover"] : ["masque-wash", "masque-w-selected"]))
+        const align = haloAlign(g, hit.layer)
+        return { edge: haloOf(el, el.cloneNode(false) as SVGElement, align, mode, align === "line" ? lineWidthOf(hit.layer) : 0) }
+    }
 
     if (rectfill) {
         // Fill only: the ROI box itself already draws the outline, so an edge shape here would
         // double it into two parallel edges that persist after release.
         el.classList.add("masque-hi", "masque-fillshape")
         return { fill: el }
-    }
-
-    if (open) {
-        // A line has no interior — hover is edge (stroke) only, no fill shape.
-        el.classList.add("masque-hi", "masque-hover", "masque-w-hover")
-        el.setAttribute("vector-effect", "non-scaling-stroke")
-        return { edge: el }
     }
 
     // Closed geometry: two shapes of identical geometry, cloned before either is modified — a
@@ -144,20 +243,19 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
     const edgeEl = el.cloneNode(true) as SVGElement
     fillEl.classList.add("masque-hi", "masque-fillshape")
     edgeEl.classList.add("masque-hi")
-    edgeEl.setAttribute("vector-effect", "non-scaling-stroke")
     if (mode === "hover") {
         edgeEl.classList.add("masque-hover", "masque-w-hover")
     } else {
         edgeEl.classList.add("masque-wash", "masque-w-selected")
     }
-    return { fill: fillEl, edge: edgeEl }
+    return { fill: fillEl, edge: haloOf(edgeEl, fillEl.cloneNode(false) as SVGElement, haloAlign(g, hit.layer), mode) }
 }
 
 // A grid's selected cells (gridmask.ts's maskHit), or a hovered region (regions.ts): the
 // closed-mark recipe, with the fill over the cells and the edge on the outline only, so the
 // cells inside the area show no grid lines. Square caps close the corners where a row side
 // meets a column side. Hover draws the hover edge (1.5px), a selection the selected one (2px).
-function maskElements(g: [string, string, string], stroke: string | undefined, mode: HiMode): HiResult {
+function maskElements(g: [string, string, string], stroke: string | undefined, mode: HiMode, layer: HitLayer): HiResult {
     const edgeClasses = mode === "hover" ? ["masque-hover", "masque-w-hover"] : ["masque-wash", "masque-w-selected"]
     const fill = document.createElementNS(SVG_NS, "path")
     fill.setAttribute("d", g[1])
@@ -177,7 +275,7 @@ function maskElements(g: [string, string, string], stroke: string | undefined, m
     }
     fill.classList.add("masque-hi", "masque-fillshape")
     edge.classList.add("masque-hi", ...edgeClasses)
-    return { fill, edge }
+    return { fill, edge: haloOf(edge, fill.cloneNode(false) as SVGElement, haloAlign(["mask"], layer), mode) }
 }
 
 // --- highlight/selection DOM-lifecycle: keyed by OverlayState.hiKey_ / selKeys_ ---
@@ -271,16 +369,35 @@ export function drawHi(state: OverlayState, hiGroups: HiSet, hit: Hit, also?: Hi
 // Screen-fixed chrome (legend, colorbar, axis) is drawn outside the photograph clip.
 // Data marks stay in the clipped, transformed groups so the ring slides with them.
 // A faded mark under the pointer or the focus shows at full strength while it is hovered.
+// A line is a whole series: hovering it fades the axis's other lines, and the halo marks only
+// the sample the tooltip reads out, as a dot. A line hovered with no sample to name is cased
+// along its length; one alone on its axis fades nothing.
 export function drawHover(ctx: OverlayCtx, state: OverlayState, hit: Hit): void {
     const fixed = screenFixedLayer(hit.layer)
-    drawHi(state, fixed ? ctx.hiFixed_ : ctx.hiGroup_, hit, fixed ? ctx.hiGroup_ : ctx.hiFixed_)
+    const line = hit.layer.kind === "lines" && hit.geom_?.[0] === "path" && !fixed
+    drawHi(state, fixed ? ctx.hiFixed_ : ctx.hiGroup_, line ? lineDot(ctx, hit) : hit, fixed ? ctx.hiGroup_ : ctx.hiFixed_)
+    if (line) {
+        const scope = lineScope(ctx.manifest_, hit.layer.axis)
+        ctx.fade_.hover_(hitKey(hit), fadesOthers(scope, [hit]) ? [hit] : null, scope)
+    } else ctx.fade_.hover_(null, null, [])
     // A linked mark is lifted with its partners (drawPartners), which follow every drawHover.
     if (hit.layer.group === undefined) ctx.fade_.lift_(hit)
+}
+
+// The dot on line `hit` at its read-out sample, keyed by that sample so it follows the pointer.
+// The line itself when there is no sample on screen.
+function lineDot(ctx: OverlayCtx, hit: Hit): Hit {
+    const s = hit.pt_?.[0]
+    const p = s === undefined ? null : samplePoint(hit.layer, hit.index, s, ctx.manifest_.transforms[hit.layer.axis], true)
+    if (s === undefined || !p) return hit
+    const r = Math.max(0.75 * (hit.layer.tol ?? SEG_TOL), lineWidthOf(hit.layer, ctx.manifest_.scaling || 1))
+    return { layer: hit.layer, index: hit.index, sample_: s, geom_: ["dot", p.x, p.y, r], pt_: hit.pt_ }
 }
 
 export function clearHover(ctx: OverlayCtx, state: OverlayState, fade = false): void {
     clearHi(state, ctx.hiGroup_, fade, ctx.hiFixed_)
     ctx.fade_.lift_(null)
+    ctx.fade_.hover_(null, null, [])
 }
 
 // --- g.link lifecycle: a legend entry's linked highlight, keyed by the SOURCE hit (not the
@@ -336,11 +453,21 @@ export function drawLink(state: OverlayState, linkGroups: HiSet, key: string, hi
 // other series (fade.ts), and any other linked mark gets the selected recipe in g.link. A legend
 // whose only closed series is the hovered one fades nothing, as a click on it does.
 export function drawLegendLink(ctx: OverlayCtx, state: OverlayState, legend: Hit, hits: Hit[]): void {
-    const closed = hits.filter(fadeLook)
-    const svg = hits.filter((h) => !fadeLook(h))
+    const scope = previewScope(ctx.manifest_, legend.layer)
+    const closed = splitFaded(hits, scope)
+    const svg = hits.filter((h) => !closed.includes(h))
     if (svg.length) drawLink(state, ctx.linkGroup_, hitKey(legend), svg)
     else clearLinkImmediate(state, ctx.linkGroup_)
-    ctx.fade_.preview_(hitKey(legend), closed.length ? closed : null, previewScope(ctx.manifest_, legend.layer))
+    ctx.fade_.preview_(hitKey(legend), closed.length ? closed : null, scope)
+}
+
+// The hits of `hits` the fade draws: the closed marks, and the lines when some other line in
+// `scope` is left to fade (a line alone keeps its halo).
+function splitFaded(hits: Hit[], scope: HitLayer[]): Hit[] {
+    const faded = hits.filter(fadeLook)
+    const lines = faded.filter((h) => h.layer.kind === "lines")
+    if (!lines.length || fadesOthers(scope.filter((l) => l.kind === "lines"), lines)) return faded
+    return faded.filter((h) => h.layer.kind !== "lines")
 }
 
 // A linked plot's hovered or focused mark (#346): the other marks of its row, in every plot of
@@ -388,8 +515,10 @@ export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
     const fixed: Hit[] = []
     const faded: Hit[] = []
     const all = selectedHits(state)
-    for (const h of all) (fadeLook(h) ? faded : screenFixedLayer(h.layer) ? fixed : data).push(h)
-    ctx.fade_.select_(faded, selectionScope(ctx.manifest_, state.sel_))
+    const scope = selectionScope(ctx.manifest_, state.sel_)
+    const fades = new Set(splitFaded(all, scope))
+    for (const h of all) (fades.has(h) ? faded : screenFixedLayer(h.layer) ? fixed : data).push(h)
+    ctx.fade_.select_(faded, scope)
     const hits = [...data, ...fixed]
     const next = new Set(hits.map(hitKey))
     const entering = new Set<string>()

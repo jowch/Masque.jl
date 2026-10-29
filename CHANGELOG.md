@@ -18,12 +18,26 @@ All notable changes to this project are documented here. The format is based on
   `contour!`, `tricontourf!` or `rainclouds!`. It returns the layers `masque(fig)` gives the
   recipe, under the same ids, so `masque(fig, interactables(c), ViewInteractable(ax);
   auto = false)` keeps a contour and adds a pan. Before, it raised an error.
+- overlaystyle `preview_opacity` sets how much a hover preview leaves showing.
 
 ### Changed
 - A tooltip near the figure's edge can now extend past the figure onto the page around it,
   instead of being pushed back over the plot. It still sits above the mark, and moves below
   it or sideways only at the edge of the browser window. In browsers without the Popover API
   (before Safari 17 and Firefox 125) it stays inside the figure as before.
+- Highlights read on any colour. The outline on a hovered or picked mark, a focused mark, a
+  picked heatmap cell or region, and a picked point on a line is now a dark line between two
+  light ones (light between dark on a dark figure), where it was one grey that vanished on
+  mid-tone cells. It sits inside a cell, bar or shape, so neighbouring outlines never overlap,
+  and outside a marker, so the marker keeps its colour. It is one screen pixel per band:
+  1.5 px for hover and 2 px for a pick on a high-density screen, 3 and 4 px on a standard one.
+  overlaystyle `color`, `hover_width` and `selected_width` still set it.
+- Lines fade like other plots. Hovering a line fades the other lines and marks the point the
+  tooltip reads out, instead of drawing grey over the whole line. Hovering or picking a legend
+  entry fades the other lines too, and the picked line keeps its own colour instead of a grey
+  wash. Hovering a legend entry no longer outlines each of its points.
+- A hover preview (a legend entry's or a line's) fades the rest less than a pick does: 35%
+  of them still shows, against 20% for a pick.
 
 ### Fixed
 - On `backend = :webgl`, a line with gaps, such as a `contour!` or a `lines!` with `NaN`

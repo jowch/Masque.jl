@@ -141,15 +141,16 @@ pixels, and opacities run from 0 to 1. Colors take the same forms as in
 
 | Key | Default | Changes | Custom property |
 |---|---|---|---|
-| `color` | `#7a7a7a` on a light figure, `#c8c8c8` on a dark one | highlight, selection, ROI, and threshold stroke; when set, also the outline of a selected point, bar, or shape that has no selected neighbour, which otherwise takes a shade of the mark's own color | `--masque-chrome` |
+| `color` | `#1f1f1f` on a light figure, `#fafafa` on a dark one, between two bands of the other | middle line of the highlight outline; also the ROI and threshold stroke (otherwise `#7a7a7a` on a light figure, `#c8c8c8` on a dark one), and the outline of a selected point, bar, or shape that has no selected neighbour, which otherwise takes a shade of the mark's own color | `--masque-chrome` |
 | `dodge_fill` | `#141414` | how strongly a highlight brightens the mark; lighter is stronger | `--masque-hi-fill` |
-| `hover_width` | `1.5` | outline of the hovered mark | `--masque-hover-width` |
-| `unpicked_opacity` | `0.2` | how much of a plot's unpicked points, bars, or shapes still shows once it holds picks; `1` turns the fading off | `--masque-unpicked-opacity` |
-| `selected_width` | `2` | outline of a selected heatmap cell or region; a selected line uses the ring below | `--masque-selected-width` |
+| `hover_width` | one screen pixel | middle line of the hovered mark's outline | `--masque-hover-width` |
+| `unpicked_opacity` | `0.2` | how much of a plot's unpicked points, bars, shapes, or lines still shows once it holds picks; `1` turns the fading off | `--masque-unpicked-opacity` |
+| `preview_opacity` | `0.35` | the same while you hover a line or a legend entry and nothing is picked | `--masque-preview-opacity` |
+| `selected_width` | two screen pixels | middle line of the outline on a selected heatmap cell, region, or point on a line | `--masque-selected-width` |
 | `hover_fill_opacity` | `0.18` | fill of a hovered mark with a `hoverstyle` stroke | `--masque-hover-fill-opacity` |
 | `selected_fill_opacity` | `0.35` | fill of a selected heatmap cell with a `hoverstyle` stroke | `--masque-selected-fill-opacity` |
-| `ring_width` | `2` | ring around a selected line | `--masque-ring-width` |
-| `ring_halo_width` | `4` | soft band around that ring | `--masque-ring-halo-width` |
+| `ring_width` | `selected_width` | middle line of the outline on a selected line or point on a line; with a `hoverstyle` stroke, that ring's width (`2`) | `--masque-ring-width` |
+| `ring_halo_width` | `4` | soft band around that ring, on a layer with a `hoverstyle` stroke | `--masque-ring-halo-width` |
 | `ring_halo_opacity` | `0.25` | that band's opacity | `--masque-ring-halo-opacity` |
 | `roi_width` | `1` | ROI box outline | `--masque-roi-width` |
 | `handle_width` | `1` | ROI corner grip outline | `--masque-handle-width` |

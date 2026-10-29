@@ -13,7 +13,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   assertNoAlertRed, assertNoTeal, assertWash, assertRing, assertHoverRecipe, assertCircleR,
-  assertRemountStable, assertLeaveFade, assertTooltipColorScheme, assertCaretAtAnchor,
+  assertRemountStable, assertLeaveFade, assertTooltipColorScheme, assertCaretAtAnchor, HALO_CAPTURE,
 } from "./visual_assert.mjs";
 import { installRecorder, logCursor, logSince, pollLog } from "./transient_log.mjs";
 
@@ -113,7 +113,8 @@ try {
   }
   if (!ready) throw new Error(`${backend} timed out`);
 
-  const inspect = (key) => page.evaluate((k) => {
+  const inspect = (key) => page.evaluate(([k, haloCapture]) => {
+    const haloOf = new Function("g", haloCapture);
     const span = document.querySelector(`#coords_${k}`);
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -132,8 +133,22 @@ try {
     const bb = baseEl.getBoundingClientRect();
     const hb = host.getBoundingClientRect();
     const sbFill = svgFill.getBoundingClientRect(), sbEdge = svgEdge.getBoundingClientRect(), sbPlain = svgPlain.getBoundingClientRect();
-    const kidsOf = (svg, layerName) => [...(svg?.querySelectorAll("g.masque-photo > g.sel") ?? [])].flatMap((g) => [...g.children]).map((el) => {
-      if (el.tagName.toLowerCase() === "g") {
+    const kidsOf = (svg, layerName) => [...(svg?.querySelectorAll("g.masque-photo > g.sel") ?? [])].flatMap((g) => [...g.children]).map((top) => {
+      // A halo is read as its ink core: a point's or a line's as the "ring" open geometry
+      // draws, an area's as the closed edge shape, with the bands' strokes alongside.
+      const halo = haloOf(top);
+      const el = halo?.core ?? top;
+      if (halo && (halo.align === "out" || halo.align === "line")) {
+        const cs = getComputedStyle(el), tag = el.tagName.toLowerCase();
+        const info = {
+          className: el.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
+          width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
+          cx: el.getAttribute("cx"), cy: el.getAttribute("cy"), r: el.getAttribute("r"), d: el.getAttribute("d"),
+        };
+        return { layer: layerName, kind: "ring", halo: { ...halo, core: undefined },
+          lines: tag === "line" ? [info] : [], circles: tag === "circle" ? [info] : [], paths: tag === "path" ? [info] : [] };
+      }
+      if (!halo && el.tagName.toLowerCase() === "g") {
         return {
           layer: layerName, kind: "ring",
           lines: [...el.querySelectorAll("line")].map((ln) => {
@@ -163,6 +178,7 @@ try {
       }
       const cs = getComputedStyle(el);
       return {
+        halo: halo && { ...halo, core: undefined },
         layer: layerName, kind: "closed", tag: el.tagName.toLowerCase(),
         className: el.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
         width: String(parseFloat(cs.strokeWidth)), r: el.getAttribute("r"),
@@ -190,11 +206,12 @@ try {
       sel: count("g.sel") + 2 * fadeOf(sr).picked.length,
       ...fadeOf(sr),
     };
-  }, key);
+  }, [key, HALO_CAPTURE]);
 
   const layersOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#coords_${k}`).innerText), key);
 
-  const hoverAt = (key, x, y) => page.evaluate(([k, ix, iy]) => {
+  const hoverAt = (key, x, y) => page.evaluate(([k, ix, iy, haloCapture]) => {
+    const haloOf = new Function("g", haloCapture);
     const span = document.querySelector(`#coords_${k}`);
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -218,14 +235,19 @@ try {
     };
     const childCount = (svg, sel) => [...(svg?.querySelectorAll(sel) ?? [])].reduce((n, g) => n + g.children.length, 0);
     const capture = (svg, layerName) => {
-      const el = groupWithChild(svg, "g.hi")?.firstElementChild;
-      if (!el) return null;
+      const top = groupWithChild(svg, "g.hi")?.firstElementChild;
+      if (!top) return null;
+      // A halo is captured as its ink core, with the bands' strokes alongside; the fade class
+      // sits on the halo group.
+      const halo = haloOf(top);
+      const el = halo?.core ?? top;
       const cs = getComputedStyle(el);
       return {
+        halo: halo && { ...halo, core: undefined },
         layer: layerName, className: el.getAttribute("class"), tag: el.tagName.toLowerCase(),
         fill: cs.fill, stroke: cs.stroke, fillOpacity: cs.fillOpacity,
         width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
-        r: el.getAttribute("r"), enter: el.classList.contains("masque-enter"), points: el.getAttribute("points"),
+        r: el.getAttribute("r"), enter: top.classList.contains("masque-enter"), points: el.getAttribute("points"),
         blend: layerName === "plain" ? null : getComputedStyle(svg).mixBlendMode,
       };
     };
@@ -238,7 +260,7 @@ try {
       sel: childCount(svgFill, "g.sel") + childCount(svgEdge, "g.sel") + childCount(svgPlain, "g.sel") + 2 * fadeOf(sr).picked.length,
       ...fadeOf(sr),
     };
-  }, [key, x, y]);
+  }, [key, x, y, HALO_CAPTURE]);
 
   const expectBase = backend === "webgl" ? "canvas" : "img";
   const pin = (m, key) => {
@@ -634,7 +656,9 @@ try {
       const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
       const style = (svg, sel) => {
-        const el = [...sr.querySelectorAll(`svg.${svg} ${sel} circle`)].find((e) => !e.classList.contains("masque-leave"));
+        // A shape's halo, read as its ink core (the fill shape stays bare); one leaving fades as a group.
+        const el = [...sr.querySelectorAll(`svg.${svg} ${sel} > *`)].filter((e) => !e.classList.contains("masque-leave"))
+          .map((e) => (e.classList.contains("masque-halo") ? e.querySelector(":scope > circle.masque-hi") : e.tagName === "circle" ? e : null)).find(Boolean);
         if (!el) return null;
         const cs = getComputedStyle(el);
         return { fill: cs.fill, stroke: cs.stroke, width: parseFloat(cs.strokeWidth), blend: getComputedStyle(sr.querySelector(`svg.${svg}`)).mixBlendMode, cx: Number(el.getAttribute("cx")) };

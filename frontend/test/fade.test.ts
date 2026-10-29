@@ -121,7 +121,14 @@ describe("the fade (closed-mark selected look)", () => {
         expect(css).toContain("opacity: calc(1 - var(--masque-unpicked-opacity, 0.2))")
     })
 
-    it("keeps grid cells and lines on their SVG recipes", () => {
+    it("sets a preview's strength from the preview_opacity overlaystyle key", () => {
+        const { shadowHost } = setup({ ...pts([2]), overlayStyle: { "--masque-preview-opacity": "0.5" } })
+        expect(shadowHost.style.getPropertyValue("--masque-preview-opacity")).toBe("0.5")
+        const css = shadowHost.shadowRoot!.querySelector("style")!.textContent!
+        expect(css).toContain(".masque-fade.masque-preview canvas.masque-dim { opacity: calc(1 - var(--masque-preview-opacity, 0.35)); }")
+    })
+
+    it("keeps grid cells and line segments on their SVG recipes", () => {
         const { shadow, wrap } = setup({
             width: 1200, height: 800, scaling: 2,
             transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
@@ -135,7 +142,7 @@ describe("the fade (closed-mark selected look)", () => {
             initial: { g: { layer: "g", index: 0 }, segs: { layer: "segs", index: 0 } },
         })
         expect(wrap()).toBeNull()
-        expect(shadow.querySelectorAll("g.sel > *").length).toBe(3) // the cell's fill + edge, the segment's ring
+        expect(shadow.querySelectorAll("g.sel > *").length).toBe(3) // the cell's fill + halo, the segment's halo
     })
 
     it("fades toward the axis's own plot area colour when it has one, else the figure's", () => {
@@ -220,5 +227,101 @@ describe("the lone pick's outline colour", () => {
         fig.overlayStyle = { "--masque-chrome": "#ff8800" }
         expect(outlines(setup(fig).shadow)).toEqual(["#ff8800"])
         expect(outlines(setup(pts([3])).shadow)).toEqual(["#7a7a7a"])
+    })
+})
+
+// Lines are series: hovering one, or a legend entry's hover or pick, fades the other lines.
+describe("lines join the fade", () => {
+    const t1 = { xlims: [0, 10] as [number, number], ylims: [0, 10] as [number, number], xscale: "identity" as const, yscale: "identity" as const,
+        viewport: [0, 0, 1200, 800] as [number, number, number, number], xreversed: false, yreversed: false }
+    // Three lines on one axis, one point each at x = 100, 300, 500 image px; a legend for them.
+    const lines = (extra: Partial<Manifest> = {}): Manifest => ({
+        width: 1200, height: 800, scaling: 2, transforms: { ax1: t1 },
+        layers: [
+            { id: "a", kind: "lines", geometry: [[100, 200, 300, 200, 500, 200]], points: [[1, 1, 2, 1, 3, 1]], linewidth: 3,
+                payloads: [{}], axis: "ax1", events: ["click", "hover"] },
+            { id: "b", kind: "lines", geometry: [[100, 400, 300, 400, 500, 400]], points: [[1, 2, 2, 2, 3, 2]], linewidth: 3,
+                payloads: [{}], axis: "ax1", events: ["click", "hover"] },
+            { id: "c", kind: "lines", geometry: [[100, 600, 300, 600, 500, 600]], points: [[1, 3, 2, 3, 3, 3]], linewidth: 3,
+                payloads: [{}], axis: "ax1", events: ["click", "hover"] },
+            { id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"], geometry: [1000, 100, 40, 20, 1000, 150, 40, 20],
+                payloads: [{}, {}], links: [["a"], ["b"]] },
+        ],
+        ...extra,
+    } as Manifest)
+
+    it("hovering a line fades the other lines and marks its sample with a dot outside it", async () => {
+        const { shadow, surface, wrap } = setup(lines())
+        move(surface, 150, 201) // line b, near sample 1 (300, 400)
+        await frame()
+        expect(fadeKept(shadow)).toEqual(["b:0"])
+        expect(wrap()!.dataset.faded).toBe("2")
+        expect(wrap()!.classList.contains("masque-preview")).toBe(true)
+        const dot = shadow.querySelector("svg.masque-edge g.hi .masque-halo-out > circle.masque-hi")!
+        expect([dot.getAttribute("cx"), dot.getAttribute("cy")]).toEqual(["300", "400"])
+        // No stroke along the line itself.
+        expect(shadow.querySelector("svg.masque-edge g.hi path")).toBeNull()
+        // The dot follows the pointer from sample to sample.
+        move(surface, 250, 201)
+        await frame()
+        const next = shadow.querySelector("svg.masque-edge g.hi .masque-halo-out > circle.masque-hi")!
+        expect(next.getAttribute("cx")).toBe("500")
+        // Leaving ends the preview.
+        surface.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }))
+        expect(wrap()!.style.display).toBe("none")
+    })
+
+    it("a line alone on its axis fades nothing: the dot alone marks it", async () => {
+        const one = lines()
+        one.layers = one.layers.filter((l) => l.id === "a")
+        const { shadow, surface, wrap } = setup(one)
+        move(surface, 150, 101)
+        await frame()
+        expect(wrap()).toBeNull()
+        expect(shadow.querySelector("svg.masque-edge g.hi .masque-halo-out > circle.masque-hi")).not.toBeNull()
+    })
+
+    it("a legend entry's hover fades the other lines, and draws no outline on the kept one", async () => {
+        const { shadow, surface, wrap } = setup(lines())
+        move(surface, 500, 50) // legend entry 0 → line a
+        await frame()
+        expect(fadeKept(shadow)).toEqual(["a:0"])
+        expect(fadeLone(shadow)).toEqual([])
+        expect(shadow.querySelectorAll("g.link > *").length).toBe(0)
+        expect(wrap()!.classList.contains("masque-preview")).toBe(true)
+    })
+
+    it("a legend pick fades the other lines at the pick's strength, and puts no wash on the picked line", () => {
+        const { shadow, wrap } = setup(lines({ fields: ["legend"], initial: { legend: { layer: "legend", index: 1 } } }))
+        expect(fadeKept(shadow)).toEqual(["b:0"])
+        expect(fadeLone(shadow)).toEqual([]) // a line has no lone-pick outline
+        expect(wrap()!.classList.contains("masque-preview")).toBe(false)
+        expect(shadow.querySelector("g.sel path")).toBeNull()
+    })
+
+    it("hovering a line while a legend pick holds another keeps both at full strength", async () => {
+        const { shadow, surface, wrap } = setup(lines({ fields: ["legend"], initial: { legend: { layer: "legend", index: 1 } } }))
+        move(surface, 150, 301) // line c
+        await frame()
+        expect(fadeKept(shadow).sort()).toEqual(["b:0", "c:0"])
+        expect(wrap()!.classList.contains("masque-preview")).toBe(false)
+    })
+})
+
+describe("a legend's hover on closed marks (D4)", () => {
+    it("fades the other series and outlines none of the hovered one's marks", async () => {
+        const { shadow, surface } = setup({
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [
+                { id: "p", kind: "circles", geometry: [200, 200, 20, 800, 600, 20], payloads: [{}, {}], axis: "ax1", events: ["hover"] },
+                { id: "q", kind: "circles", geometry: [600, 200, 20], payloads: [{}], axis: "ax1", events: ["hover"] },
+                { id: "legend", kind: "rects", axis: "ax1", events: ["hover"], geometry: [1000, 100, 40, 20, 1000, 150, 40, 20],
+                    payloads: [{}, {}], links: [["p"], ["q"]] },
+            ],
+        } as Manifest)
+        move(surface, 500, 50)
+        await frame()
+        expect(fadeKept(shadow)).toEqual(["p:0", "p:1"])
+        expect(fadeLone(shadow)).toEqual([])
     })
 })

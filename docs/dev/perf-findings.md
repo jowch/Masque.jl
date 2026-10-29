@@ -194,6 +194,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | Field | Where | Cost |
 |-------|-------|------|
 | `tol` | each `:segments`/`:polyline`/`:lines` layer | 1–3 B |
+| `linewidth` | each line layer built from a plot (0.4.2) | 19 B (key 10 B + a float64) |
 | `label` | a layer with `label` set | key 6 B + the string (`"Scatter"` is 14 B total) |
 | `background` | once per manifest | 28 B for `"rgb(255,255,255)"` |
 | `colors`, uniform | a `Scatter`-derived `:circles` layer | ~22 B |
