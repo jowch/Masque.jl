@@ -36,7 +36,7 @@ by position.
 
 A field holds `nothing` until the reader clicks, and a vector field
 starts empty. Check for that before you index, so the cell shows a
-message or an empty table instead of an error:
+message or an empty table until the reader selects something:
 
 ```julia
 isempty(picks) ? df[1:0, :] : df[picks, :]
