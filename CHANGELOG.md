@@ -14,6 +14,10 @@ All notable changes to this project are documented here. The format is based on
   stands for every plot on it. With `select = :many` the field holds several rows, and a box
   or a legend entry picks many at once. `selected=` takes the rows, and
   `interactables(plot; key = vector)` gives a plot keys of its own (#346).
+- `interactables(plot)` works on a recipe Masque builds from the plots it draws, such as
+  `contour!`, `tricontourf!` or `rainclouds!`. It returns the layers `masque(fig)` gives the
+  recipe, under the same ids, so `masque(fig, interactables(c), ViewInteractable(ax);
+  auto = false)` keeps a contour and adds a pan. Before, it raised an error.
 
 ### Fixed
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend

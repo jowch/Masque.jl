@@ -99,6 +99,35 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
         @test_throws ArgumentError assemble(f, interactables(st; payloads = ["a", "b", "c"]))
     end
 
+    @testset "interactables(recipe) for a recipe built from its parts" begin
+        # `contour!` has no default of its own; `masque(fig)` builds the `lines!` it draws.
+        f = Figure(); ax = Axis(f[1, 1])
+        z = [sin(i / 2) * cos(j / 2) for i in 1:8, j in 1:8]
+        image!(ax, z); c = contour!(ax, z; levels = 3)
+        @test ids(assemble(f)) == [:lines, :cells]
+        tip = masque"level"
+        out = assemble(f, interactables(c; tooltip = tip), ViewInteractable(ax))
+        @test ids(out) == [:lines, :cells, :view]
+        @test out[1].tooltip === tip
+        @test ids(assemble(f, interactables(c), ViewInteractable(ax); auto = false)) == [:lines, :view]
+        @test ids(assemble(f, interactables(c; id = :iso); auto = false)) == [:iso]
+        @test ids(interactables(ax, c)) == [:lines]
+        @test ids(interactables(ax, c; id = :iso)) == [:iso]
+        @test only(assemble(f, interactables(c; select = :many); auto = false)).select === :many
+        w = masque(f; bind = c)
+        @test w.manifest["fields"] == ["lines"]
+        # Several parts keep their default ids, or nest under one you give.
+        f = Figure(); ax = Axis(f[1, 1])
+        rc = rainclouds!(ax, repeat(["a", "b"], 5), randn(10))
+        @test ids(assemble(f)) == [:boxplot, :scatter, :violin]
+        @test ids(assemble(f, interactables(rc; label = "rain"))) == [:boxplot, :scatter, :violin]
+        @test ids(assemble(f, interactables(rc); auto = false)) == [:boxplot, :scatter, :violin]
+        @test ids(assemble(f, interactables(rc; id = :rain); auto = false)) ==
+            Symbol.(["rain.boxplot", "rain.scatter", "rain.violin"])
+        @test ids(interactables(ax, rc)) == [:boxplot, :scatter, :violin]
+        @test masque(f; bind = rc).manifest["fields"] == ["boxplot", "scatter", "violin"]
+    end
+
     @testset "an interactable with a default's id replaces it" begin
         f = Figure(); ax = Axis(f[1, 1])
         scatter!(ax, xs, ys); lines!(ax, xs, ys)
