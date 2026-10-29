@@ -16,74 +16,43 @@ macro bind(def, element)
     #! format: on
 end
 
+# ╔═╡ c0a10004-0001-4000-8000-000000000001
+using CairoMakie, Masque
 
-# ╔═╡ a1410002-0001-4000-8000-000000000001
-using Masque, CairoMakie
-
-# ╔═╡ a1410002-0001-4000-8000-000000000009
+# ╔═╡ c0a10004-0001-4000-8000-000000000020
 md"""
-Click a point on the left, and the plot on the right highlights the same sample, plotted against `z`.
+Click near either line to pick its nearest point. Each line keeps its own pick in `sel`.
 """
 
-# ╔═╡ a1410002-0001-4000-8000-000000000002
+# ╔═╡ c0a10004-0001-4000-8000-000000000002
 begin
-    xs = [1.0, 2.0, 3.0, 4.0, 5.0]
-    ys = [1.0, 2.0, 1.5, 2.5, 1.2]
-    zs = [3.2, 2.1, 2.8, 1.4, 2.6]
-    fig_l = Figure(size = (420, 300))
-    ax_l = Axis(fig_l[1, 1]; ylabel = "y", title = "click to select")
-    s_left = scatter!(ax_l, xs, ys; color = :teal, markersize = 20)
+    fig = Figure(size = (560, 360))
+    ax = Axis(fig[1, 1])
+    xs = 0:0.5:10
+    l1 = lines!(ax, xs, sin.(xs))
+    l2 = lines!(ax, xs, cos.(xs))
     nothing
 end
 
-# ╔═╡ a1410002-0001-4000-8000-000000000003
-@bind pick masque(fig_l; bind = s_left)
+# ╔═╡ c0a10004-0001-4000-8000-000000000003
+@bind sel masque(fig; bind = (sine = l1, cosine = l2))
 
-# ╔═╡ a1410002-0001-4000-8000-000000000011
-md"""
-This cell responds to the click, and so does the figure below, because it uses `pick` too.
-"""
-
-# ╔═╡ a1410002-0001-4000-8000-000000000004
-if isnothing(pick)
-    "click a point"
-else
-    "point $(pick.index) selected"
-end
-
-# ╔═╡ a1410002-0001-4000-8000-000000000012
-md"""
-Plot `z` for the same samples in the same order, so `selected` can highlight the one you clicked.
-"""
-
-# ╔═╡ a1410002-0001-4000-8000-000000000005
-begin
-    fig_r = Figure(size = (420, 300))
-    ax_r = Axis(fig_r[1, 1]; ylabel = "z", title = "the same sample, against z")
-    s_right = scatter!(ax_r, xs, zs; color = :teal, markersize = 20)
-    held = isnothing(pick) ? Int[] : Int[pick.index]
-    nothing
-end
-
-# ╔═╡ a1410002-0001-4000-8000-000000000006
-@bind right_click masque(fig_r; selected = held)
+# ╔═╡ c0a10004-0001-4000-8000-000000000004
+sel
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
-bond = "pick"
+bond = "sel"
 show_code = true
 pluto_html = true
+pairs = true
 
 cells = [
-  "a1410002-0001-4000-8000-000000000009",
-  "a1410002-0001-4000-8000-000000000002",
-  "a1410002-0001-4000-8000-000000000003",
-  "a1410002-0001-4000-8000-000000000011",
-  "a1410002-0001-4000-8000-000000000004",
-  "a1410002-0001-4000-8000-000000000012",
-  "a1410002-0001-4000-8000-000000000005",
-  "a1410002-0001-4000-8000-000000000006",
+    "c0a10004-0001-4000-8000-000000000020",
+    "c0a10004-0001-4000-8000-000000000002",
+    "c0a10004-0001-4000-8000-000000000003",
+    "c0a10004-0001-4000-8000-000000000004"
 ]
 """
 
@@ -1731,15 +1700,11 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1410002-0001-4000-8000-000000000001
-# ╟─a1410002-0001-4000-8000-000000000009
-# ╠═a1410002-0001-4000-8000-000000000002
-# ╠═a1410002-0001-4000-8000-000000000003
-# ╟─a1410002-0001-4000-8000-000000000011
-# ╠═a1410002-0001-4000-8000-000000000004
-# ╟─a1410002-0001-4000-8000-000000000012
-# ╠═a1410002-0001-4000-8000-000000000005
-# ╠═a1410002-0001-4000-8000-000000000006
+# ╠═c0a10004-0001-4000-8000-000000000001
+# ╟─c0a10004-0001-4000-8000-000000000020
+# ╠═c0a10004-0001-4000-8000-000000000002
+# ╠═c0a10004-0001-4000-8000-000000000003
+# ╠═c0a10004-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

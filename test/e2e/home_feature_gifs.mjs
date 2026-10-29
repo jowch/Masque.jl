@@ -197,27 +197,32 @@ try {
       const a = hitPoint(legend, 0);
       const b = hitPoint(legend, 2);
       const [ptA, ptB] = await Promise.all([toCss(a.x, a.y), toCss(b.x, b.y)]);
-      const imgTail = () => page.evaluate(() => (document.querySelector(".ip-host img")?.src || "").slice(-32));
+      // The fade is the overlay's (fade.ts): the layers it dims, from every axis's fade canvas.
+      const fadedLayers = () => page.evaluate(() => {
+        let sr = null;
+        document.querySelector(".ip-host")?.querySelectorAll("*").forEach((n) => { if (n.shadowRoot) sr = n.shadowRoot; });
+        return [...(sr?.querySelectorAll(".masque-fade") ?? [])].flatMap((w) => (w.dataset.layers ? w.dataset.layers.split(",") : [])).join(",");
+      });
       await sleep(350);
       await moveTo(ptA, 450);
       await sleep(800);
       await moveTo(ptB, 400);
       await sleep(200);
       const before = await outText();
-      const beforePng = await imgTail();
+
       await page.mouse.down();
       await sleep(40);
       await page.mouse.up();
       let after = before;
-      let afterPng = beforePng;
+      let faded = "";
       for (let i = 0; i < 40; i++) {
         after = await outText();
-        afterPng = await imgTail();
-        if (after !== before && /gentoo/i.test(after) && afterPng !== beforePng) break;
+        faded = await fadedLayers();
+        if (after !== before && /gentoo/i.test(after) && faded) break;
         await sleep(80);
       }
       if (!/gentoo/i.test(after)) throw new Error(`legend: readout did not update — ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
-      if (afterPng === beforePng) throw new Error("legend: PNG did not remount (fade missing)");
+      if (!faded) throw new Error("legend: the click faded no series");
       console.error(`OK  legend: ${after}`);
       await moveTo({ x: clip.x + 24, y: clip.y + 24 }, 400);
       await sleep(900);
