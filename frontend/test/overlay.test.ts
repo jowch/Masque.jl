@@ -6777,6 +6777,33 @@ describe("block controls (#345)", () => {
         expect(select.value).toBe("0")
     })
 
+    it("a toggle draws Makie's turned track and slides its knob between the ends (#427)", () => {
+        // A vertical toggle: Makie's track starts at the bottom and turns a quarter, and the
+        // knob sits at the bottom when off and the top when on.
+        const m = controlsManifest()
+        m.layers[1].geometry = {
+            control: "toggle", x: 600, y: 640, w: 36, h: 64, value: false,
+            theta: Math.PI / 2, track: [18, 46, 64, 36], knobOff: [18, 46], knobOn: [18, 18], knob: 24, duration: 0.3,
+        }
+        m.initial!.show = { layer: "show", index: 0, payload: false }
+        const { host, script } = setup()
+        mount(script, m)
+        const box = ctl(host, "show")
+        const track = box.querySelector(".masque-toggle-track") as HTMLElement
+        const knob = box.querySelector(".masque-toggle-knob") as HTMLElement
+        const v = (el: HTMLElement, name: string) => el.style.getPropertyValue(`--${name}`)
+        expect(v(track, "u")).toBe(`${100 / 36}cqw`)
+        expect(["x", "y", "len", "th", "turn"].map((n) => v(track, n))).toEqual(["0", "28", "64", "36", `${-Math.PI / 2}rad`])
+        expect(v(knob, "d")).toBe("24")
+        expect([v(knob, "x"), v(knob, "y")]).toEqual(["18", "46"])
+        expect(v(knob, "dur")).toBe("0.3s")
+        const input = box.querySelector("input") as HTMLInputElement
+        input.checked = true
+        input.dispatchEvent(new Event("change", { bubbles: true }))
+        expect([v(knob, "x"), v(knob, "y")]).toEqual(["18", "18"])
+        expect(val(host).show).toEqual({ layer: "show", index: 0, payload: true })
+    })
+
     it("a release commits the field; moving alone doesn't", () => {
         const m = controlsManifest()
         const { host, script } = setup()
