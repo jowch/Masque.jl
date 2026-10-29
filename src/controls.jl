@@ -199,10 +199,14 @@ end
 # The blocks of `fig` drawn as controls, in layout order, nested layouts included.
 _figure_blocks(fig) = Any[c for c in fig.content if c isa _CONTROL_BLOCKS]
 
+# Makie's input blocks that masque doesn't draw as controls yet: they stay pictures (#425).
+const _PICTURE_BLOCKS = Union{Makie.Button, Makie.Textbox, Makie.SliderGrid}
+
 # A block in the figure that this call doesn't name would look live and do nothing, so it is an
-# error (a warning in 0.3.1). A `SliderGrid`'s sliders aren't in `fig.content`, so the grid
-# stays a picture.
+# error (a warning in 0.3.1). A block masque can't draw yet looks just as live, so it is a
+# warning. A `SliderGrid`'s sliders aren't in `fig.content`, so only the grid itself counts.
 function _check_unnamed_blocks(fig, interactables)
+    _warn_picture_blocks(fig)
     named = Base.IdSet{Any}(i.block for i in interactables if i isa BlockControl)
     left = [b for b in _figure_blocks(fig) if !(b in named)]
     isempty(left) && return nothing
@@ -216,4 +220,14 @@ function _check_unnamed_blocks(fig, interactables)
                 "control, `masque(fig, (name = block,))`, or take it out of the figure",
         ),
     )
+end
+
+function _warn_picture_blocks(fig)
+    left = Any[c for c in fig.content if c isa _PICTURE_BLOCKS]
+    isempty(left) && return nothing
+    kinds = join(unique(string(nameof(typeof(b))) for b in left), ", ")
+    @warn "masque: this figure has $(kinds), which masque shows as a picture for now, so the " *
+        "reader can click it and nothing happens. Take it out of the figure, or use a control " *
+        "outside it, such as PlutoUI's Button or TextField."
+    return nothing
 end

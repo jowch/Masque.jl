@@ -16,6 +16,8 @@ All notable changes to this project are documented here. The format is based on
   `interactables(plot; key = vector)` gives a plot keys of its own (#346).
 
 ### Fixed
+- A figure with a Makie `Button`, `Textbox` or `SliderGrid` now warns that masque shows it as
+  a picture, so it won't respond to a click. Before, it looked live and did nothing (#426).
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
   out, as in `bind = :picked`. Before, the click did nothing.
 - On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down
