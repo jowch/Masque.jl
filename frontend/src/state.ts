@@ -209,6 +209,9 @@ export interface OverlayCtx {
 export interface OverlayState {
     drag_: Drag | null
     justDragged_: boolean
+    // The last primary pointerup, in client px. Chromium rounds a click's clientX/Y to whole
+    // px but not a pointer event's, so onClick reads this to commit the value hover showed (#448).
+    lastUp_: { x: number, y: number } | null
     // Hover chrome still in g.hi, live or mid-leave. Null once those nodes are gone.
     // drawSelection reads it to drop a ring whose key just entered the selection (#97).
     hiKey_: string | null
@@ -285,6 +288,7 @@ export function createOverlayState(): OverlayState {
     return {
         drag_: null,
         justDragged_: false,
+        lastUp_: null,
         hiKey_: null,
         selKeys_: new Set(),
         sel_: new Map(),

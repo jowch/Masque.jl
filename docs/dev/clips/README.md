@@ -25,9 +25,12 @@ be a player, so their page shows a clip of the live notebook instead:
 | `docs/src/assets/grid-many.mp4` | Heatmaps and images › Select several cells | `grid_many_notebook.jl` | `test/e2e/docs_clip.mjs grid-many` |
 | `docs/src/assets/grid-regions.mp4` | Heatmaps and images › Select whole regions | `grid_regions_notebook.jl` | `test/e2e/docs_clip.mjs grid-regions` |
 | `docs/src/assets/grid-brush.mp4` | Heatmaps and images › Brush a block of cells | `grid_brush_notebook.jl` | `test/e2e/docs_clip.mjs grid-brush` |
-| `docs/src/assets/widgets-classes.mp4` | Build a widget › Example: label points into classes | `classes_notebook.jl` | `test/e2e/docs_clip.mjs classes` |
+| `docs/src/assets/widgets-classes.mp4` | Build a widget (top); Label points into classes › Build the widget | `classes_notebook.jl` | `test/e2e/docs_clip.mjs classes` |
 | `docs/src/assets/view-pan.mp4` | Pan, zoom and orbit (top) | `view_pan_notebook.jl` | `test/e2e/docs_clip.mjs view-pan` |
 | `docs/src/assets/view-orbit.mp4` | Pan, zoom and orbit › Orbit an `Axis3` | `view_orbit_notebook.jl` | `test/e2e/docs_clip.mjs view-orbit` |
+| `docs/src/assets/readout-colorbar.mp4` | Read coordinates › Read a colorbar value | `colorbar_notebook.jl` | `test/e2e/docs_clip.mjs colorbar` |
+| `docs/src/assets/readout-threshold.mp4` | Read coordinates › Drag a threshold | `readout_threshold_notebook.jl` | `test/e2e/docs_clip.mjs readout-threshold` |
+| `docs/src/assets/readout-band.mp4` | Read coordinates › Set a range with two thresholds | `band_notebook.jl` | `test/e2e/docs_clip.mjs band` |
 
 The Home page's four loops have their own recorders: see `docs/dev/home-gifs/README.md`. The
 README loop is `docs_clip.mjs readme`: see `docs/dev/readme-demo/README.md`.
@@ -72,3 +75,20 @@ last frame holds (1500 ms, or 40 for the `view-*` loops, which end where they st
 `docs_clip.mjs` aims from the widget's manifest, which each guide notebook writes into a
 hidden cell, and after each move it waits until Julia has redrawn the figure or the readout
 below it. Its notebooks keep the guide page's code, with a title that says what to do.
+
+## Warm-up
+
+Julia compiles each redraw the first time it runs, so on a fresh kernel the first click or
+drag takes seconds to answer, and a clip recorded cold opens on a figure that seems stuck.
+Every live recorder (`docs_clip.mjs`, `cluster_clip.mjs`, `home_orbit_gif.mjs`) therefore
+makes its moves once with capture off, then reruns the figure cell (cell 2 in every clip
+notebook) through its hidden run button and waits for the widget to mount again
+(`test/e2e/clip_warmup.mjs`). The recorded take starts from the notebook's first state on a
+kernel that has compiled every redraw in it; the recorder stops if the reset brings back a
+different figure or readout. Each answer's wait is logged, `warm-up: …` for the cold pass
+and `clip: …` for the take, so a log shows what the warm-up saved: after a click the wait for
+the redraw (`answered in … ms`), and in a drag the wait for the first frame (`first frame
+after … ms`). A slow first answer in the take means the warm-up missed a compile.
+
+A new clip needs nothing extra as long as its notebook keeps the figure, its interactables
+and the widget in cell 2, so that rerunning that cell resets everything the clip changes.

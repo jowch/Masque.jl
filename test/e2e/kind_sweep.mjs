@@ -2210,7 +2210,9 @@ try {
           })()
           : [[p.x + 80, p.y], [p.x - 80, p.y]];
       let after = before;
+      let released = null;
       for (const [x1, y1] of ends) {
+        released = [x1, y1];
         await page.evaluate((k) => {
           const span = document.querySelector(`#coords_${k}`);
           const hosts = [...document.querySelectorAll(".ip-host")];
@@ -2229,6 +2231,52 @@ try {
       const re = spec.layerKind === "roi" ? /:roi|ElementEvent\[|BoundsEvent/i : /:threshold|:thr|ThresholdEvent/i;
       if (!re.test(after)) throw new Error(`${key}-drag: readout mismatch ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/drag-bind`);
+      // A real mouse released at a fractional client position commits the value there, the one
+      // the drag's tooltip showed (#448 is the click's rounding; a release reads the pointerup).
+      if (spec.layerKind === "threshold" && !catTarget) {
+        const horiz = layer.geometry.orientation === "h";
+        const frame = await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const b = host.querySelector("img, canvas").getBoundingClientRect();
+          return { left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+        }, key);
+        // Grab the line where the drag above released it, then release 20.45 px further on.
+        const sx = frame.left + released[0] * frame.s, sy = frame.top + released[1] * frame.s;
+        const ex = horiz ? sx : Math.round(sx + 20) + 0.45, ey = horiz ? Math.round(sy + 20) + 0.45 : sy;
+        await page.mouse.move(sx, sy);
+        await page.mouse.down();
+        await page.mouse.move((sx + ex) / 2, (sy + ey) / 2, { steps: 4 });
+        await page.mouse.move(ex, ey, { steps: 4 });
+        await page.waitForTimeout(150);
+        const tipText = await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          return sr.querySelector(".masque-tip")?.textContent ?? "";
+        }, key);
+        await page.mouse.up();
+        const tipNum = /(-?\d+(?:\.(\d+))?)\s*$/.exec(tipText.trim());
+        if (!tipNum) throw new Error(`${key}/release-fractional: no value in the drag tooltip ${JSON.stringify(tipText)}`);
+        const tipVal = Number(tipNum[1]), tipTol = 0.5 * 10 ** -(tipNum[2]?.length ?? 0) + 1e-9;
+        const prev = after;
+        let got = null, t = prev;
+        for (let i = 0; i < 40; i++) {
+          t = await textOf(`#out_${key}`);
+          got = Number(/value\s*=\s*(-?[\d.]+(?:e-?\d+)?)/.exec(t)?.[1]);
+          if (t !== prev && Number.isFinite(got)) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        if (t === prev || !Number.isFinite(got) || Math.abs(got - tipVal) > tipTol) {
+          throw new Error(`${key}/release-fractional: committed ${JSON.stringify(t)}, want the tooltip's ${JSON.stringify(tipText)}`);
+        }
+        passed.push(`${key}/release-fractional`);
+        console.error(`OK  ${key}/release-fractional — tooltip ${JSON.stringify(tipText)}, committed ${got}`);
+        after = t;
+      }
       // A `selects` box's release sets both of its fields (#335): its bounds (#out) and its
       // target's, which now holds what the moved box contains (points (1, 1) and (3, 3) here,
       // where it started with (3, 3) and (5, 5)).
@@ -2613,6 +2661,48 @@ try {
       }
       passed.push(`${key}/fields-kept`);
       console.error(`OK  ${key}/colorbar-click — ${cbAfter.slice(0, 110)}`);
+
+      // A real mouse at a fractional client position (#448): Chromium rounds the click event's
+      // clientX/Y to whole px but not the pointer events', so the click must commit the value
+      // at the pointer's own position, the one the tooltip shows, not at the rounded one.
+      const frame = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        return { left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+      }, key);
+      const cbClientX = Math.round(frame.left + cbPt.x * frame.s) + 0.45;
+      const cbClientY = Math.round(frame.top + cbPt.y * frame.s) + 0.45;
+      const cbFracVal = invertAxisJs(cbT, (cbClientX - frame.left) / frame.s, (cbClientY - frame.top) / frame.s)[cbValKey];
+      const cbPxVal = Math.abs(cbLims[1] - cbLims[0]) / cbSpan; // one image px of value
+      await page.mouse.move(cbClientX, cbClientY);
+      await page.waitForTimeout(150);
+      const fracTip = parseValueTip(await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        return sr.querySelector(".masque-tip")?.textContent ?? "";
+      }, key));
+      await page.mouse.down();
+      await page.mouse.up();
+      let fracBond = null;
+      for (let i = 0; i < 30; i++) {
+        const t = await textOf(`#out_${key}`);
+        fracBond = parseBondValue(t);
+        if (fracBond !== null && Math.abs(fracBond - cbFracVal) <= 0.1 * cbPxVal) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (fracBond === null || Math.abs(fracBond - cbFracVal) > 0.1 * cbPxVal) {
+        throw new Error(`${key}/colorbar-click-fractional: committed ${fracBond}, want ${cbFracVal} (the value at client y ${cbClientY}; tooltip ${fracTip})`);
+      }
+      if (fracTip === null || Math.abs(fracTip - fracBond) > 0.1 * cbPxVal + 1e-9 + Math.abs(fracTip) * 1e-3) {
+        throw new Error(`${key}/colorbar-click-fractional: tooltip ${fracTip} but committed ${fracBond}`);
+      }
+      passed.push(`${key}/colorbar-click-fractional`);
+      console.error(`OK  ${key}/colorbar-click-fractional — tooltip ${fracTip}, committed ${fracBond}`);
       continue;
     }
 

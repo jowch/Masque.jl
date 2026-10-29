@@ -26,7 +26,8 @@ again. Double-clicking does not reset it. See [Pan, zoom and orbit](@ref).
 
 Each widget knows only its own figure. To have a click in one plot
 highlight the same observation in another, connect the two in Pluto
-cells. See [Linked views](@ref).
+cells, as [Use selections in other cells](@ref) shows. Plots in one
+figure can share a selection; see [Linked views](@ref).
 
 ## Overlapping marks
 
