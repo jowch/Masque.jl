@@ -16,60 +16,43 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000001
-using Masque, CairoMakie
+# ╔═╡ c0a10005-0001-4000-8000-000000000001
+using CairoMakie, Masque
 
-# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000009
+# ╔═╡ c0a10005-0001-4000-8000-000000000020
 md"""
-Click a point in the xy plot, and the same sample is selected in the xz plot. Hover stays on the plot under the pointer.
+Move the slider or flip the toggle, and the last cell shows both values.
 """
 
-# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000010
-md"""
-Plot the same samples, in the same order, in two figures.
-"""
-
-# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000002
+# ╔═╡ c0a10005-0001-4000-8000-000000000002
 begin
-    xs = [1.0, 2.0, 3.0, 4.0]
-    ys = [2.0, 1.5, 3.0, 2.2]
-    zs = [0.8, 2.5, 1.2, 3.1]
-    fig_xy = Figure(size = (420, 280))
-    ax_xy = Axis(fig_xy[1, 1]; xlabel = "x", ylabel = "y", title = "xy")
-    s_xy = scatter!(ax_xy, xs, ys; markersize = 18)
+    xs = range(0, 2π; length = 200)
+    fig = Figure(size = (560, 380))
+    ax = Axis(fig[1, 1:2])
+    wave = lines!(ax, xs, sin.(xs))
+    freq = Slider(fig[2, 1]; range = 1:0.5:5, startvalue = 1)
+    dots = Toggle(fig[2, 2]; active = false)
     nothing
 end
 
-# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000003
-@bind pick masque(fig_xy; bind = s_xy)
+# ╔═╡ c0a10005-0001-4000-8000-000000000003
+@bind w masque(fig, (freq = freq, dots = dots))
 
-# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000011
-md"""
-This cell uses `pick` and passes the clicked index as `selected`, so the xz plot highlights the sample you clicked.
-"""
-
-# ╔═╡ a1b2c3d4-00a1-4000-8000-000000000004
-begin
-    fig_xz = Figure(size = (420, 280))
-    ax_xz = Axis(fig_xz[1, 1]; xlabel = "x", ylabel = "z", title = "xz")
-    scatter!(ax_xz, xs, zs; markersize = 18)
-    masque(fig_xz; selected = isnothing(pick) ? Int[] : [pick.index])
-end
+# ╔═╡ c0a10005-0001-4000-8000-000000000004
+w.freq, w.dots
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
-bond = "pick"
+bond = "w"
 show_code = true
 pluto_html = true
 
 cells = [
-  "a1b2c3d4-00a1-4000-8000-000000000009",
-  "a1b2c3d4-00a1-4000-8000-000000000010",
-  "a1b2c3d4-00a1-4000-8000-000000000002",
-  "a1b2c3d4-00a1-4000-8000-000000000003",
-  "a1b2c3d4-00a1-4000-8000-000000000011",
-  "a1b2c3d4-00a1-4000-8000-000000000004",
+    "c0a10005-0001-4000-8000-000000000020",
+    "c0a10005-0001-4000-8000-000000000002",
+    "c0a10005-0001-4000-8000-000000000003",
+    "c0a10005-0001-4000-8000-000000000004"
 ]
 """
 
@@ -1717,13 +1700,11 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1b2c3d4-00a1-4000-8000-000000000001
-# ╟─a1b2c3d4-00a1-4000-8000-000000000009
-# ╟─a1b2c3d4-00a1-4000-8000-000000000010
-# ╠═a1b2c3d4-00a1-4000-8000-000000000002
-# ╠═a1b2c3d4-00a1-4000-8000-000000000003
-# ╟─a1b2c3d4-00a1-4000-8000-000000000011
-# ╠═a1b2c3d4-00a1-4000-8000-000000000004
+# ╠═c0a10005-0001-4000-8000-000000000001
+# ╟─c0a10005-0001-4000-8000-000000000020
+# ╠═c0a10005-0001-4000-8000-000000000002
+# ╠═c0a10005-0001-4000-8000-000000000003
+# ╠═c0a10005-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
