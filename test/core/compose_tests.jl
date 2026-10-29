@@ -126,6 +126,12 @@ assemble(fig, xs...; auto = true) = Masque._assemble(fig, xs; auto)
             Symbol.(["rain.boxplot", "rain.scatter", "rain.violin"])
         @test ids(interactables(ax, rc)) == [:boxplot, :scatter, :violin]
         @test masque(f; bind = rc).manifest["fields"] == ["boxplot", "scatter", "violin"]
+        # A recipe whose parts all give no layer errors, as one with no known parts does.
+        f = Figure(); ax = Axis(f[1, 1])
+        b = bracket!(ax, 1, 0, 2, 0; text = "gap")
+        @test_throws ArgumentError interactables(ax, b)
+        @test_throws ArgumentError assemble(f, interactables(b); auto = false)
+        @test_throws ArgumentError assemble(f, interactables(b))
     end
 
     @testset "an interactable with a default's id replaces it" begin
