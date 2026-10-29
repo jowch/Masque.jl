@@ -39,7 +39,7 @@ A slice is for reading values, so hovering does not change the `@bind`
 value. Each axis takes one slice, so to read several lines, pass them
 all to the same slice.
 
-## How a slice differs from other interactables
+## Slice, threshold, or box
 
 A slice, a threshold, and a brush all draw something across the plot,
 but they do different jobs. The slice follows the pointer and sends
@@ -57,7 +57,7 @@ your notebook gets their value:
 So use a slice to look across your series, and a brush to pick out a
 part of your data and work with it.
 
-## Keep a position
+## Save a position with a click
 
 To keep the `x` you are reading, add an [`AxisInteractable`](@ref) to
 the same widget, as `readout` in the example above. Hovering still
@@ -83,7 +83,7 @@ This site doesn't record clicks on a position
 ([Examples on this site](@ref this-site)), so here the cell stays as it
 starts.
 
-## What it reads
+## Choose what the slice reads
 
 By default, a vertical line follows the pointer, and the tooltip shows
 each series' `y` at the pointer's `x`. `orientation = :horizontal` reads
@@ -99,7 +99,7 @@ The tooltip is a table of the sampled values. To change what it shows,
 pass a `masque"..."` template over the same fields, or pass
 `tooltip = false` to turn it off. See [Tooltips](@ref).
 
-## Series from data
+## Read from data instead of a plot
 
 To read values from data rather than from a plot, pass each series as
 `(; x, y)`, with an optional `id`, `label`, and `color`. For a vertical
@@ -109,7 +109,7 @@ slice, `x` must be increasing, and for a horizontal slice, `y` must be.
 probe = SliceInteractable(ax; series = [(; id = :wide, x = xs, y = ys)])
 ```
 
-## Next to other interactables
+## Use a slice with other interactions
 
 A marker or colorbar in the same widget keeps its own tooltip, and
 hovering a marker hides the slice's line. A slice replaces the hover

@@ -122,7 +122,7 @@ dark values, the browser picks one by the system's color scheme:
 | `--masque-tip-padding` | `8px 12px` | CSS only |
 | `--masque-tip-shadow` | `0 2px 4px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)` / `0 2px 4px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3)` | CSS only |
 | `--masque-tip-maxwidth` | `320px` | CSS only |
-| `--masque-mark-border` | *(unset: plain 1px border)* | none; set from the mark's `colors` (see [Accent color](@ref)) |
+| `--masque-mark-border` | *(unset: plain 1px border)* | none; set from the mark's `colors` (see [Border color](@ref)) |
 
 ## Overlay styling
 
@@ -169,7 +169,7 @@ can be set only from CSS.
 
 ## Custom-hit interface
 
-For usage, see [Custom hits](@ref).
+For usage, see [Custom shapes](@ref).
 
 ```@docs
 AbstractInteractable

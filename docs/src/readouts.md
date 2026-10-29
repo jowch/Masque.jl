@@ -152,7 +152,7 @@ write its number as `value` in the figure code. Writing
 `value = level.value` there does not work, for the same reason a widget
 cannot take its own value as `selected=`; see [Selection](@ref).
 
-## Where these work
+## Supported axes
 
 The axis readout and the threshold need a 2D `Axis`; see
 [Supported plots and axes](@ref) for which axes and scales.

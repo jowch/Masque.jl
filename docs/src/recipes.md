@@ -160,4 +160,4 @@ end
 ```
 
 To make a click return a type of your own instead of an
-[`ElementEvent`](@ref), see [A custom interactable](@ref).
+[`ElementEvent`](@ref), see [Return your own type from a click](@ref).

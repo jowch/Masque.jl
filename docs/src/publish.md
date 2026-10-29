@@ -94,7 +94,7 @@ need a running Pluto notebook. A display that doesn't run the page's
 scripts shows the plain CairoMakie figure, or an empty box for
 WGLMakie.
 
-## A picture or a summary for tools
+## Show a widget to tools without a browser
 
 A tool that reads a notebook without a browser, such as an AI agent,
 can ask a CairoMakie widget for its figure as a PNG,

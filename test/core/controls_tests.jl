@@ -107,10 +107,22 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test_logs masque(fig, (degree = sl,))
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
         @test_logs masque(fig)
-        # A `SliderGrid` is a picture, sliders included, so it isn't an error.
+    end
+
+    @testset "a block masque shows as a picture is a warning naming its kind (#426)" begin
+        # A `SliderGrid`, `Button` or `Textbox` would look live and do nothing too, but figures
+        # with one worked before, so it warns instead of failing.
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
         SliderGrid(fig[2, 1], (label = "a", range = 1:3))
-        @test_logs masque(fig)
+        Button(fig[3, 1]; label = "Go")
+        Textbox(fig[4, 1])
+        @test_logs (:warn, r"has a SliderGrid, a Button and a Textbox, which masque shows as a picture.*separate Makie `Slider`s.*PlutoUI's Button"s) masque(fig)
+        fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
+        Button(fig[2, 1])
+        @test_logs (:warn, r"has a Button, which.*PlutoUI's Button") masque(fig)
+        fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
+        SliderGrid(fig[2, 1], (label = "a", range = 1:3))
+        @test_logs (:warn, r"^(?!.*PlutoUI).*separate Makie `Slider`s"s) masque(fig)
     end
 
     @testset "the picture leaves the block's box empty, and the figure keeps its drawing" begin

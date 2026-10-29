@@ -9,7 +9,7 @@ To have plots that draw the same rows select them together, link them
 with [`linked`](@ref), as in
 [Select the same rows on every panel](@ref).
 
-## Drive a second plot from a click
+## Update another plot from a click
 
 Give each payload a key that identifies its row, such as an id or a
 name, and use the key in other cells. Here, clicking a city on a map
@@ -137,7 +137,7 @@ See [Legend](@ref).
 Main.masque_fallback("linked_legend_wash")
 ```
 
-## Filter a table from a region
+## Filter a table with a box
 
 To select many points at once, drag a box. When you release an
 [`ROIInteractable`](@ref) with `selects`, it returns every point inside

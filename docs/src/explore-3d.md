@@ -41,7 +41,7 @@ empty space, so the last cell can read `pick.name` and `pick.height`.
 Only the stations take clicks into `pick`: hovering the surface shows
 its height, but a click on it does not change `pick`.
 
-## Turn the view
+## Orbit the view
 
 To let the reader turn the plot, add a [`ViewInteractable`](@ref) for
 the axis and pass it to the same `masque` call:
@@ -60,7 +60,7 @@ draw the figure again, and this site has no Julia running behind it
 (see [Pan and orbit preview](@ref)). To try turning it, download the
 notebook, add the `orbit` line, and pass `orbit` to `masque` as above.
 
-## What it can't do
+## Limitations
 
 - A surface responds only on an `Axis3`. On a 2D `Axis`, draw the same
   matrix with `heatmap` to read its values; see [Heatmaps and images](@ref).
@@ -68,7 +68,7 @@ notebook, add the `orbit` line, and pass `orbit` to `masque` as above.
   the axis box, even if part of it still shows. Zoom out, or turn the
   view, to bring it back.
 
-## Next
+## Where to go next
 
 - [Pan, zoom and orbit](@ref) for every way to move the view.
 - [Supported plots and axes](@ref) for which 3D plots respond.
