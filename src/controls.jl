@@ -199,7 +199,7 @@ end
 # The blocks of `fig` drawn as controls, in layout order, nested layouts included.
 _figure_blocks(fig) = Any[c for c in fig.content if c isa _CONTROL_BLOCKS]
 
-# Makie's input blocks that masque doesn't draw as controls yet: they stay pictures (#425).
+# Makie's input blocks that masque doesn't draw as controls yet: they stay pictures (#426).
 const _PICTURE_BLOCKS = Union{Makie.Button, Makie.Textbox, Makie.SliderGrid}
 
 # A block in the figure that this call doesn't name would look live and do nothing, so it is an
@@ -225,9 +225,15 @@ end
 function _warn_picture_blocks(fig)
     left = Any[c for c in fig.content if c isa _PICTURE_BLOCKS]
     isempty(left) && return nothing
-    kinds = join(unique(string(nameof(typeof(b))) for b in left), ", ")
-    @warn "masque: this figure has $(kinds), which masque shows as a picture for now, so the " *
-        "reader can click it and nothing happens. Take it out of the figure, or use a control " *
-        "outside it, such as PlutoUI's Button or TextField."
+    kinds = unique(string(nameof(typeof(b))) for b in left)
+    names = ["a " * k for k in kinds]
+    list = length(names) == 1 ? only(names) : join(names[1:(end - 1)], ", ") * " and " * names[end]
+    instead = String[]
+    any(b -> b isa Makie.SliderGrid, left) &&
+        push!(instead, "For a grid of sliders, lay out separate Makie `Slider`s, which masque makes live.")
+    any(b -> b isa Union{Makie.Button, Makie.Textbox}, left) &&
+        push!(instead, "For a button or a text box, use a control outside the figure, such as PlutoUI's Button or TextField.")
+    @warn "masque: this figure has $(list), which masque shows as a picture for now, so the " *
+        "reader can click it and nothing happens. $(join(instead, " "))"
     return nothing
 end
