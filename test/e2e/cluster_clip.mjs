@@ -6,10 +6,12 @@
 //
 //   node cluster_clip.mjs <pluto-url> <notebook-abs-path> <frames-dir>
 //
-// then docs/dev/clips/assemble_mp4.sh <frames-dir> docs/src/assets/example-cluster.mp4
+// then docs/dev/clips/assemble_mp4.sh <frames-dir> docs/src/assets/example-cluster.mp4. The
+// drags run once unrecorded first (clip_warmup.mjs), so the clip shows a warm kernel.
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync, copyFileSync } from "node:fs";
 import { paintCursor } from "./clip_frames.mjs";
+import { resetFigure } from "./clip_warmup.mjs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -20,6 +22,7 @@ if (!base || !notebook || !framesDir) {
 }
 mkdirSync(framesDir, { recursive: true });
 
+const ID_FIGURE = "a1420001-0001-4000-8000-000000000002";
 const ID_WIDGET = "a1420001-0001-4000-8000-000000000003";
 const ID_HIST = "a1420001-0001-4000-8000-000000000004";
 // The notebook's resting ROI, `bounds = (5.2, 9.2, 4.4, 7.8)`: its on-screen rect fixes the
@@ -72,20 +75,23 @@ try {
     pluto-cell { margin: 0 0 8px 0 !important; }
     ::-webkit-scrollbar { display: none !important; }
   ` });
-  await page.evaluate((id) => document.getElementById(id)?.scrollIntoView({ block: "start" }), ID_WIDGET);
-  await sleep(500);
-
-  const clip = await page.evaluate(([a, b]) => {
-    const r1 = document.getElementById(a).getBoundingClientRect();
-    const r2 = document.getElementById(b).getBoundingClientRect();
-    const m = 12;
-    const left = Math.min(r1.left, r2.left) - m, top = Math.min(r1.top, r2.top) - m;
-    const right = Math.max(r1.right, r2.right) + m, bottom = Math.max(r1.bottom, r2.bottom) + m;
-    return { x: Math.max(0, Math.round(left)), y: Math.max(0, Math.round(top)), width: Math.round(right - left), height: Math.round(bottom - top) };
-  }, [ID_WIDGET, ID_HIST]);
+  // Measured again after the warm-up's reset, which redraws every cell.
+  const measure = async () => {
+    await page.evaluate((id) => document.getElementById(id)?.scrollIntoView({ block: "start" }), ID_WIDGET);
+    await sleep(500);
+    return page.evaluate(([a, b]) => {
+      const r1 = document.getElementById(a).getBoundingClientRect();
+      const r2 = document.getElementById(b).getBoundingClientRect();
+      const m = 12;
+      const left = Math.min(r1.left, r2.left) - m, top = Math.min(r1.top, r2.top) - m;
+      const right = Math.max(r1.right, r2.right) + m, bottom = Math.max(r1.bottom, r2.bottom) + m;
+      return { x: Math.max(0, Math.round(left)), y: Math.max(0, Math.round(top)), width: Math.round(right - left), height: Math.round(bottom - top) };
+    }, [ID_WIDGET, ID_HIST]);
+  };
+  const clip = await measure();
   console.error(`clip: ${JSON.stringify(clip)}`);
 
-  const roiRect = await page.evaluate(() => {
+  const roiRect = () => page.evaluate(() => {
     const host = document.querySelector(".ip-host");
     let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
     const rects = [...sr.querySelectorAll("svg.masque-plain rect")].map((e) => e.getBoundingClientRect()).filter((q) => q.width > 20 && q.height > 20);
@@ -93,14 +99,77 @@ try {
     const q = rects[0];
     return { x: q.x, y: q.y, w: q.width, h: q.height };
   });
-  const sx = roiRect.w / (REST.xmax - REST.xmin), sy = roiRect.h / (REST.ymax - REST.ymin);
-  const css = (x, y) => ({ x: roiRect.x + (x - REST.xmin) * sx, y: roiRect.y + (REST.ymax - y) * sy });
+  const box0 = await roiRect();
+  const sx = box0.w / (REST.xmax - REST.xmin), sy = box0.h / (REST.ymax - REST.ymin);
+  const css = (x, y) => ({ x: box0.x + (x - REST.xmin) * sx, y: box0.y + (REST.ymax - y) * sy });
 
   const histSrc = () => page.evaluate((id) => document.getElementById(id)?.querySelector("img")?.src ?? "", ID_HIST);
+  const figSrc = () => page.evaluate((id) => document.getElementById(id)?.querySelector("img")?.src ?? "", ID_WIDGET);
+
+  const home = css(10.2, 2.0);
+  let cur = { ...home };
+  let warming = false;
+
+  const glide = async (to, ms, steps = 24) => {
+    const from = { ...cur };
+    for (let k = 1; k <= steps; k++) {
+      cur = { x: from.x + (to.x - from.x) * k / steps, y: from.y + (to.y - from.y) * k / steps };
+      await page.mouse.move(cur.x, cur.y);
+      await sleep(ms / steps);
+    }
+  };
+  // Release, then hold until Julia has redrawn the histogram, plus a beat to read it. In the
+  // warm-up the first redraw is the compile, so it waits longer and the hold is short.
+  const releaseAndWait = async (hold = 1400) => {
+    const before = await histSrc();
+    await page.mouse.up();
+    const t = Date.now();
+    const until = t + (warming ? 120000 : 30000);
+    while ((await histSrc()) === before && Date.now() < until) await sleep(100);
+    if ((await histSrc()) === before && !warming) throw new Error("the histogram never redrew after a release");
+    console.error(`${warming ? "warm-up" : "clip"}: histogram redrew in ${Date.now() - t} ms`);
+    await sleep(warming ? 300 : hold);
+  };
+
+  const moves = async () => {
+    // 1. Grab the resting box over the upper cluster and set it down: the histogram shows it.
+    const mid = css((REST.xmin + REST.xmax) / 2, (REST.ymin + REST.ymax) / 2);
+    await glide(mid, 700);
+    await page.mouse.down();
+    await glide({ x: mid.x + 6, y: mid.y + 4 }, 250, 6);
+    await releaseAndWait();
+    console.error("phase: upper cluster");
+    // 2. Drag the box onto the lower cluster.
+    await page.mouse.down();
+    const lower = { x: mid.x + (3.3 - 7.2) * sx, y: mid.y - (3.0 - 6.1) * sy };
+    await glide(lower, 2200, 60);
+    await releaseAndWait();
+    console.error("phase: lower cluster");
+    // 3. Pull the top-right corner in to half the cluster.
+    const box = await roiRect();
+    await glide({ x: box.x + box.w, y: box.y }, 700);
+    await page.mouse.down();
+    await glide({ x: box.x + box.w * 0.5, y: box.y + box.h * 0.35 }, 1600, 45);
+    await releaseAndWait(1800);
+    console.error("phase: half cluster");
+  };
+
+  // The warm-up: the drags once, unrecorded, then the figure cell again.
+  const start = [await figSrc(), await histSrc()].join("#");
+  await page.mouse.move(cur.x, cur.y);
+  warming = true;
+  await moves();
+  await glide(home, 300);
+  warming = false;
+  await resetFigure(page, ID_FIGURE);
+  if (JSON.stringify(await measure()) !== JSON.stringify(clip) || JSON.stringify(await roiRect()) !== JSON.stringify(box0)) {
+    throw new Error("the reset moved the figure or the box");
+  }
+  if ([await figSrc(), await histSrc()].join("#") !== start) throw new Error("the reset did not bring back the notebook's first state");
+  console.error("phase: warmed up");
 
   const frames = [];
   const t0 = Date.now();
-  let cur = css(10.2, 2.0);
   let done = false;
   const capture = (async () => {
     for (let i = 0; !done; i++) {
@@ -116,53 +185,9 @@ try {
     }
   })();
 
-  const glide = async (to, ms, steps = 24) => {
-    const from = { ...cur };
-    for (let k = 1; k <= steps; k++) {
-      cur = { x: from.x + (to.x - from.x) * k / steps, y: from.y + (to.y - from.y) * k / steps };
-      await page.mouse.move(cur.x, cur.y);
-      await sleep(ms / steps);
-    }
-  };
-  // Release, then hold until Julia has redrawn the histogram, plus a beat to read it.
-  const releaseAndWait = async (hold = 1400) => {
-    const before = await histSrc();
-    await page.mouse.up();
-    const until = Date.now() + 30000;
-    while ((await histSrc()) === before && Date.now() < until) await sleep(100);
-    if ((await histSrc()) === before) throw new Error("the histogram never redrew after a release");
-    await sleep(hold);
-  };
-
   await page.mouse.move(cur.x, cur.y);
   await sleep(900);
-  // 1. Grab the resting box over the upper cluster and set it down: the histogram shows it.
-  const mid = css((REST.xmin + REST.xmax) / 2, (REST.ymin + REST.ymax) / 2);
-  await glide(mid, 700);
-  await page.mouse.down();
-  await glide({ x: mid.x + 6, y: mid.y + 4 }, 250, 6);
-  await releaseAndWait();
-  console.error("phase: upper cluster");
-  // 2. Drag the box onto the lower cluster.
-  await page.mouse.down();
-  const lower = { x: mid.x + (3.3 - 7.2) * sx, y: mid.y - (3.0 - 6.1) * sy };
-  await glide(lower, 2200, 60);
-  await releaseAndWait();
-  console.error("phase: lower cluster");
-  // 3. Pull the top-right corner in to half the cluster.
-  const box = await page.evaluate(() => {
-    const host = document.querySelector(".ip-host");
-    let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-    const rects = [...sr.querySelectorAll("svg.masque-plain rect")].map((e) => e.getBoundingClientRect()).filter((q) => q.width > 20 && q.height > 20);
-    rects.sort((p, q) => q.width * q.height - p.width * p.height);
-    const q = rects[0];
-    return { x: q.x, y: q.y, w: q.width, h: q.height };
-  });
-  await glide({ x: box.x + box.w, y: box.y }, 700);
-  await page.mouse.down();
-  await glide({ x: box.x + box.w * 0.5, y: box.y + box.h * 0.35 }, 1600, 45);
-  await releaseAndWait(1800);
-  console.error("phase: half cluster");
+  await moves();
 
   done = true;
   await capture;

@@ -20,10 +20,10 @@
 
 # Node / TypeScript (`frontend/`). The built bundles assets/overlay.js and
 # assets/masque-webgl.js ARE committed.
-frontend/node_modules/
+frontend/node_modules
 frontend/dist/
 frontend/coverage/
-test/e2e/node_modules/
+test/e2e/node_modules
 test/e2e/package-lock.json
 *.tsbuildinfo
 npm-debug.log*

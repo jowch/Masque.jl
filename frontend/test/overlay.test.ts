@@ -1480,6 +1480,47 @@ describe("tooltips (mount/showTip)", () => {
         expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("5.0")
     })
 
+    it("a readout click commits the value its tooltip shows, not the click's rounded position (#448)", () => {
+        // Chromium reports pointer events at fractional client px but rounds a click's to whole
+        // px, so the click lands half a px from the pointerup it follows.
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, tipDigits: 4,
+            transforms: {
+                cb1: { xlims: [0, 1], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                    viewport: [200, 100, 24, 400], xreversed: false, yreversed: false, valueaxis: "y" },
+                ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                    viewport: [400, 100, 400, 400], xreversed: false, yreversed: false },
+            },
+            layers: [
+                { id: "cb", kind: "axis", bond: "colorbar", geometry: [200, 100, 24, 400], payloads: [], axis: "cb1", events: ["click", "hover"] },
+                { id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["click", "hover"] },
+            ],
+        }, undefined, vi.fn(async () => ({})))
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        const press = (x: number, y: number) => {
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, bubbles: true }))
+            const shown = tip.innerHTML
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: x, clientY: y, button: 0, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: x, clientY: y, button: 0, bubbles: true }))
+            surface.dispatchEvent(new MouseEvent("click", { clientX: Math.round(x), clientY: Math.round(y), bubbles: true }))
+            return shown
+        }
+        const value = () => (host as unknown as { value: Record<string, { payload: Record<string, number> }> }).value
+        // client y 150.3 -> image y 300.6 -> 10 - 200.6/40 = 4.985; the rounded 150 would be 5.000
+        expect(press(110, 150.3)).toBe("4.985")
+        expect(value().cb.payload.value).toBeCloseTo(4.985, 6)
+        // client (300.4, 150.3) -> image (600.8, 300.6) -> x = 200.8/40 = 5.02, y = 4.985
+        expect(press(300.4, 150.3)).toContain("5.02")
+        expect(value().axis.payload.x).toBeCloseTo(5.02, 6)
+        expect(value().axis.payload.y).toBeCloseTo(4.985, 6)
+        // A click with no pointerup under it (a script's .click()) keeps its own position.
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 110, clientY: 200, bubbles: true }))
+        expect(value().cb.payload.value).toBeCloseTo(2.5, 6)
+    })
+
     it("cursor-following tooltip offset uses the surface's real rect, not the raw event offset, when one is available", () => {
         // tipOffset falls back to e.offsetX/e.offsetY only when the surface's own
         // getBoundingClientRect is degenerate (width/height 0, as happy-dom defaults to) — with
@@ -6802,6 +6843,42 @@ describe("block controls (#345)", () => {
         input.dispatchEvent(new Event("change", { bubbles: true }))
         expect([v(knob, "x"), v(knob, "y")]).toEqual(["18", "18"])
         expect(val(host).show).toEqual({ layer: "show", index: 0, payload: true })
+    })
+
+    it("a menu shows Makie's prompt before a choice, in its font size and colours (#429)", () => {
+        const m = controlsManifest()
+        Object.assign(m.layers[3].geometry as object, { value: -1, prompt: "Pick a colour", fontsize: 32, padding: 16, text: "rgb(9,9,9)", off: "rgb(200,200,200)" })
+        m.initial!.pick = { layer: "pick", index: 0, payload: -1 }
+        const { host, script } = setup()
+        mount(script, m)
+        const box = ctl(host, "pick")
+        const select = box.querySelector("select") as HTMLSelectElement
+        expect(select.options[0].textContent).toBe("Pick a colour")
+        expect(select.options[0].disabled).toBe(true)
+        expect(select.value).toBe("-1")
+        expect(box.style.getPropertyValue("--fs")).toBe(`${(100 * 32) / 200}cqw`)
+        expect(box.style.getPropertyValue("--pad")).toBe(`${(100 * 16) / 200}cqw`)
+        expect(box.style.getPropertyValue("--masque-ctl-text")).toBe("rgb(9,9,9)")
+        expect(box.style.getPropertyValue("--masque-ctl-off")).toBe("rgb(200,200,200)")
+    })
+
+    it("a menu restyled in onchange takes its new text colour and size (#429)", async () => {
+        const m = controlsManifest({ onchange: true })
+        Object.assign(m.layers[3].geometry as object, { fontsize: 32, padding: 16, text: "rgb(9,9,9)", off: "rgb(200,200,200)" })
+        const after = controlsManifest({ onchange: true })
+        Object.assign(after.layers[3].geometry as object, { fontsize: 20, padding: 16, text: "rgb(0,128,0)", off: "rgb(1,1,1)" })
+        after.layers[1].geometry = { ...(after.layers[1].geometry as ControlGeometry), value: false }
+        const { host, img, script } = setup()
+        mount(script, m, undefined, vi.fn(frame(after)))
+        const toggle = ctl(host, "show").querySelector("input") as HTMLInputElement
+        toggle.checked = false
+        toggle.dispatchEvent(new Event("change", { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+        img.dispatchEvent(new Event("load"))
+        const box = ctl(host, "pick")
+        expect(box.style.getPropertyValue("--masque-ctl-text")).toBe("rgb(0,128,0)")
+        expect(box.style.getPropertyValue("--fs")).toBe(`${(100 * 20) / 200}cqw`)
+        expect(box.style.getPropertyValue("--masque-ctl-off")).toBe("rgb(1,1,1)")
     })
 
     it("a release commits the field; moving alone doesn't", () => {

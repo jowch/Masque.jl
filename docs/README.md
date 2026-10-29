@@ -41,6 +41,12 @@ search indexes the tutorial code and a reader still gets it when Pluto's fronten
 from jsDelivr (`assets/masque-embed.js` then hides the iframe and opens the twin). Harvest adds
 the idle figure and plain-text readouts as `<name>.png` / `<name>.fallback.toml`.
 
+Every player iframe needs an `id`. Before it deploys, the CI docs build opens each page with
+players at several window widths and writes each player's height for the column it sits in
+(`test/e2e/measure_players.mjs`, run by `docs/make.jl` when `MASQUE_MEASURE_PLAYERS=true`).
+It fails on an iframe without an `id`. The `height:` in the Markdown is only a first guess,
+and a local build keeps it.
+
 | Doc | What it covers |
 |---|---|
 | [`architecture.md`](dev/architecture.md) | The design contract: `AbstractBackend`/`AbstractInteractable`, the geometry primitives between them, the manifest shape, tooltips wire format. |

@@ -61,12 +61,14 @@ makedocs(;
                 "Brush a region" => "roi.md",
                 "Heatmaps and images" => "grids.md",
                 "Legend" => "legend.md",
+                "Linked views" => "linked-views.md",
+                "Use selections in other cells" => "use-selections.md",
             ],
             "Build a widget" => [
                 "Build a widget" => "widgets.md",
-                "Sliders, toggles and menus" => "controls.md",
                 "Update the figure" => "onchange.md",
-                "Linked views" => "linked-views.md",
+                "Sliders, toggles and menus" => "controls.md",
+                "Label points into classes" => "label-points.md",
             ],
             "Move around a figure" => [
                 "Explore a 3D figure" => "explore-3d.md",
@@ -110,6 +112,13 @@ makedocs(;
     checkdocs = :exports,
     warnonly = false,
 )
+
+# Reserve each player's height at every column width, so pages don't move as players load
+# (test/e2e/measure_players.mjs, which needs its npm install). The docs job sets
+# MASQUE_MEASURE_PLAYERS; a local build keeps the iframe heights in the Markdown.
+if get(ENV, "MASQUE_MEASURE_PLAYERS", "") == "true"
+    run(Cmd(`node measure_players.mjs $DOCS_BUILD`; dir = joinpath(@__DIR__, "..", "test", "e2e")))
+end
 
 deploydocs(;
     repo = "github.com/jowch/Masque.jl",

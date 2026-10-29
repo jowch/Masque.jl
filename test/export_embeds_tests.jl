@@ -120,6 +120,18 @@ end
     @test occursin("if (cur != null) patch(cur);", src)
 end
 
+@testset "a player's page stays put while it loads" begin
+    # A `#segment=` fragment made Pluto's frontend scroll the docs page to the iframe, and
+    # sizing the iframe before Pluto drew its notebook grew it a few px every frame.
+    src = read(joinpath(@__DIR__, "..", "docs", "pluto_html_export.jl"), String)
+    embed = read(joinpath(@__DIR__, "..", "docs", "src", "assets", "masque-embed.js"), String)
+    @test occursin("exec(location.search)", src)
+    @test !occursin("location.hash", src)
+    @test occursin("\"?segment=\"", embed)
+    @test !occursin("#segment=", embed)
+    @test occursin("if (!nb) return;", src)
+end
+
 @testset "player_states: idle, every click, then hand-listed drags" begin
     man = Dict{String, Any}(
         "layers" => Any[
@@ -616,7 +628,7 @@ end
     @test_throws ErrorException seg(Dict("top" => ["a"], "two" => ["a"]))  # one cell, two segments
     @test_throws ErrorException seg(Dict("top" => ["a", "b", "c"]))       # d is in no segment
     @test_throws ErrorException seg(Dict("top" => String[]))
-    @test_throws ErrorException seg(Dict("Top" => ["a"]))                  # goes in a URL hash
+    @test_throws ErrorException seg(Dict("Top" => ["a"]))                  # goes in a URL
     @test_throws ErrorException seg(["a"])
     @test_throws ErrorException player_segments(Dict("cells" => ids, "segments" => Dict("top" => ["a"])))
 

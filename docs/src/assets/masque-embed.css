@@ -5,7 +5,10 @@
 .content > p:has(+ .masque-embed-wrap) {
   margin-bottom: 0 !important;
 }
+/* The docs build writes each player's height for the wrap's width as container queries
+   (test/e2e/measure_players.mjs), so the page holds the player's space while it loads. */
 .masque-embed-wrap {
+  container-type: inline-size;
   border-radius: 4px;
   overflow: hidden;
   margin-block: 1em;
@@ -145,4 +148,10 @@ html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latt
 }
 .masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-body {
   padding: 0.5em 0 0;
+}
+
+/* Home pictures carry their width and height so the page keeps their space while they load;
+   `height: auto` scales them with the column. */
+.content img[width][height] {
+  height: auto;
 }
