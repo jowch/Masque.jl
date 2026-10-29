@@ -116,6 +116,11 @@ function place(box: HTMLElement, g: ControlGeometry, m: Manifest): void {
     if (g.color) box.style.setProperty("--masque-ctl", g.color)
     if (g.fill) box.style.setProperty("--masque-ctl-fill", g.fill)
     if (g.off) box.style.setProperty("--masque-ctl-off", g.off)
+    // A menu's text, which `onchange` can restyle: image px as a share of the box's width, so it
+    // scales with the figure.
+    if (g.text) box.style.setProperty("--masque-ctl-text", g.text)
+    if (g.fontsize !== undefined) box.style.setProperty("--fs", `${(100 * g.fontsize) / g.w}cqw`)
+    if (g.padding !== undefined) box.style.setProperty("--pad", `${(100 * g.padding) / g.w}cqw`)
 }
 
 function rangeInput(g: ControlGeometry, k: number, label: string, digits: number): HTMLInputElement {
@@ -304,10 +309,6 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
         case "menu": {
             const el = document.createElement("select")
             el.className = "masque-select"
-            // Image px as a share of the box's width, so the text scales with the figure.
-            if (g.fontsize !== undefined) el.style.setProperty("--fs", `${(100 * g.fontsize) / g.w}cqw`)
-            if (g.padding !== undefined) el.style.setProperty("--pad", `${(100 * g.padding) / g.w}cqw`)
-            if (g.text) el.style.setProperty("--masque-ctl-text", g.text)
             el.setAttribute("aria-label", label)
             const k = Number(g.value)
             if (k < 0) {
