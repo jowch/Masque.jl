@@ -3,11 +3,15 @@
 // Overlay-only harvest cannot do this. Run from test/e2e:
 //
 //   node home_orbit_gif.mjs <pluto-url> <notebook-abs-path> <frames-dir>
+//
+// It orbits there and back once unrecorded first (clip_warmup.mjs), so the loop shows a warm
+// kernel, not the first drag's compile.
 import { chromium } from "playwright";
 import { PNG } from "pngjs";
 import { mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { gestureStamp as lastFrame, resetFigure, waitReleaseFrame } from "./clip_warmup.mjs";
 
 const [base, notebook, framesDir] = process.argv.slice(2);
 if (!base || !notebook || !framesDir) {
@@ -16,6 +20,7 @@ if (!base || !notebook || !framesDir) {
 }
 mkdirSync(framesDir, { recursive: true });
 
+const ID_FIGURE = "a1000000-0000-0000-0000-000000000002";
 const ID_MASQUE = "a1000000-0000-0000-0000-000000000003";
 const runNotebook = join(tmpdir(), `masque-home-orbit-${Date.now()}-${process.pid}.jl`);
 copyFileSync(notebook, runNotebook);
@@ -170,10 +175,42 @@ try {
     `,
   });
 
-  await page.evaluate((id) => {
-    document.getElementById(id)?.scrollIntoView({ block: "start", inline: "nearest" });
-  }, ID_MASQUE);
-  await sleep(300);
+  const scroll = async () => {
+    await page.evaluate((id) => {
+      document.getElementById(id)?.scrollIntoView({ block: "start", inline: "nearest" });
+    }, ID_MASQUE);
+    await sleep(300);
+  };
+  await scroll();
+
+  // The warm-up: the same sweep there and back, unrecorded, then the figure cell again.
+  {
+    const b = await page.evaluate(() => {
+      const r = document.querySelector(".ip-host").querySelector("img, canvas").getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height };
+    });
+    const a = { x: b.x + b.w * 0.18, y: b.y + b.h * 0.62 };
+    const z = { x: b.x + b.w * 0.82, y: b.y + b.h * 0.36 };
+    const src = () => page.evaluate(() => document.querySelector(".ip-host img")?.src ?? "");
+    const first = await src();
+    const stamp0 = await lastFrame(page);
+    const w0 = Date.now();
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    for (const [p, q] of [[a, z], [z, a]]) {
+      for (let i = 1; i <= 40; i++) {
+        await page.mouse.move(p.x + (q.x - p.x) * i / 40, p.y + (q.y - p.y) * i / 40);
+        await sleep(2300 / 40);
+      }
+    }
+    await page.mouse.up();
+    const s = await waitReleaseFrame(page, stamp0);
+    console.error(`warm-up: release frame after ${Date.now() - w0} ms (${s.n} frames)`);
+    await resetFigure(page, ID_FIGURE);
+    await scroll();
+    if ((await src()) !== first) throw new Error("the reset did not bring back the notebook's first view");
+    console.error(`phase: warmed up in ${((Date.now() - w0) / 1000).toFixed(1)}s`);
+  }
 
   const rect = await page.evaluate((id) => {
     const cell = document.getElementById(id);

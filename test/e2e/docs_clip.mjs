@@ -10,17 +10,20 @@
 // then docs/dev/clips/assemble_mp4.sh <frames-dir> docs/src/assets/<clip>.mp4. <clip> is a
 // key of CLIPS below; its notebook is docs/dev/clips/<notebook> in the same table. The
 // `readme` clip is the exception, a WebP from its own notebook: see docs/dev/readme-demo/README.md.
+// The recorder makes a clip's moves once unrecorded first (clip_warmup.mjs), so the clip shows
+// a kernel that has already compiled its redraws.
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { paintCursor } from "./clip_frames.mjs";
 import { shutdownOpenSession } from "./fresh_session.mjs";
+import { gestureStamp, resetFigure, waitReleaseFrame } from "./clip_warmup.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Each clip: the notebook's cell-id prefix (`c1d500NN`, cells 3 = widget, 4 = readout,
-// 5 = the hidden manifest the recorder aims from) and the moves it makes.
+// Each clip: the notebook's cell-id prefix (`c1d500NN`, cells 2 = figure, 3 = widget,
+// 4 = readout, 5 = the hidden manifest the recorder aims from) and the moves it makes.
 const CLIPS = {
   "onchange": {
     notebook: "onchange_notebook.jl", nn: 2,
@@ -313,6 +316,7 @@ if (!base || !notebook || !framesDir || !spec) {
 }
 mkdirSync(framesDir, { recursive: true });
 const cellId = (k) => `c1d500${String(spec.nn).padStart(2, "0")}-0001-4000-8000-00000000000${k}`;
+const ID_FIGURE = cellId(2);
 const ID_WIDGET = cellId(3);
 const ID_READOUT = cellId(4);
 const runNotebook = join(tmpdir(), `masque-clip-${name}-${Date.now()}-${process.pid}.jl`);
@@ -366,26 +370,39 @@ try {
     pluto-output pre { font-size: 15px !important; }
     ::-webkit-scrollbar { display: none !important; }
   ` });
-  await page.evaluate((id) => document.getElementById(id)?.scrollIntoView({ block: "start" }), ID_WIDGET);
-  await sleep(600);
-
   // A clip shows the widget's cell and the readout's; a `figure` clip shows only the figure.
-  const clip = await page.evaluate(([ids, figure]) => {
-    const rs = figure
-      ? [document.getElementById(ids[0]).querySelector(".ip-host img, .ip-host canvas").getBoundingClientRect()]
-      : ids.map((id) => document.getElementById(id).getBoundingClientRect());
-    const m = figure ? 0 : 12;
-    const left = Math.min(...rs.map((r) => r.left)) - m, top = Math.min(...rs.map((r) => r.top)) - m;
-    const right = Math.max(...rs.map((r) => r.right)) + m, bottom = Math.max(...rs.map((r) => r.bottom)) + m;
-    return { x: Math.max(0, Math.round(left)), y: Math.max(0, Math.round(top)), width: Math.round(right - left), height: Math.round(bottom - top) };
-  }, [shown, !!spec.figure]);
+  // Measured again after the warm-up's reset, which redraws every cell.
+  const measure = async () => {
+    await page.evaluate((id) => document.getElementById(id)?.scrollIntoView({ block: "start" }), ID_WIDGET);
+    await sleep(600);
+    const clip = await page.evaluate(([ids, figure]) => {
+      const rs = figure
+        ? [document.getElementById(ids[0]).querySelector(".ip-host img, .ip-host canvas").getBoundingClientRect()]
+        : ids.map((id) => document.getElementById(id).getBoundingClientRect());
+      const m = figure ? 0 : 12;
+      const left = Math.min(...rs.map((r) => r.left)) - m, top = Math.min(...rs.map((r) => r.top)) - m;
+      const right = Math.max(...rs.map((r) => r.right)) + m, bottom = Math.max(...rs.map((r) => r.bottom)) + m;
+      return { x: Math.max(0, Math.round(left)), y: Math.max(0, Math.round(top)), width: Math.round(right - left), height: Math.round(bottom - top) };
+    }, [shown, !!spec.figure]);
+    const mf = await page.evaluate(() => JSON.parse(document.getElementById("clip_manifest").textContent));
+    const imgRect = await page.evaluate((id) => {
+      const r = document.getElementById(id).querySelector(".ip-host img, .ip-host canvas").getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width };
+    }, ID_WIDGET);
+    const ctrlBoxes = await page.evaluate((id) => {
+      const host = document.getElementById(id).querySelector(".ip-host");
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const out = {};
+      sr.querySelectorAll("[data-masque-control]").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        out[el.dataset.masqueControl] = { x: r.x, y: r.y, w: r.width, h: r.height };
+      });
+      return out;
+    }, ID_WIDGET);
+    return { clip, mf, imgRect, ctrlBoxes };
+  };
+  const { clip, mf, imgRect, ctrlBoxes } = await measure();
   console.error(`clip: ${JSON.stringify(clip)}`);
-
-  const mf = await page.evaluate(() => JSON.parse(document.getElementById("clip_manifest").textContent));
-  const imgRect = await page.evaluate((id) => {
-    const r = document.getElementById(id).querySelector(".ip-host img, .ip-host canvas").getBoundingClientRect();
-    return { x: r.x, y: r.y, w: r.width };
-  }, ID_WIDGET);
   const k = imgRect.w / mf.width;
   const layerOf = (id) => {
     const L = mf.layers.find((l) => l.id === id);
@@ -394,16 +411,6 @@ try {
   };
   // Every target below is in image px (the manifest's units), then CSS.
   const px = (x, y) => ({ x: imgRect.x + x * k, y: imgRect.y + y * k });
-  const ctrlBoxes = await page.evaluate((id) => {
-    const host = document.getElementById(id).querySelector(".ip-host");
-    let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-    const out = {};
-    sr.querySelectorAll("[data-masque-control]").forEach((el) => {
-      const r = el.getBoundingClientRect();
-      out[el.dataset.masqueControl] = { x: r.x, y: r.y, w: r.width, h: r.height };
-    });
-    return out;
-  }, ID_WIDGET);
   const c = {
     page, mf, px,
     circle(id, i) {
@@ -473,13 +480,71 @@ try {
     return (img?.src?.length ?? 0) + ":" + (img?.src?.slice(-64) ?? "") + "|" + (el?.querySelector("pluto-output")?.innerText ?? "");
   }).join("#"), shown);
 
-  const frames = [];
-  const t0 = Date.now();
   const rest = spec.grab
     ? px(mf.width * spec.grab[0], mf.height * spec.grab[1])
     : { x: clip.x + clip.width - 30, y: clip.y + clip.height - 20 };
   c.rest = rest;
   let cur = { ...rest };
+
+  c.glide = async (to, ms, steps = 24) => {
+    const from = { ...cur };
+    for (let s = 1; s <= steps; s++) {
+      cur = { x: from.x + (to.x - from.x) * s / steps, y: from.y + (to.y - from.y) * s / steps };
+      await page.mouse.move(cur.x, cur.y);
+      await sleep(ms / steps);
+    }
+  };
+  const startSig = await signature();
+  let lastSig = startSig;
+  let warming = false;
+  c.click = async (at) => {
+    cur = { ...at };
+    await page.mouse.move(at.x, at.y);
+    await page.mouse.down();
+    await sleep(90);
+    await page.mouse.up();
+  };
+  // Hold until Julia has answered the last move (a new frame or readout), plus `hold` to read it.
+  // In the warm-up a first answer can take many seconds (that is the compile), and a move that
+  // redraws nothing only costs the warm-up its coverage, so it waits longer and doesn't throw.
+  c.settle = async (hold) => {
+    const t = Date.now();
+    const until = t + (warming ? 120000 : 30000);
+    let sig = await signature();
+    while (sig === lastSig && Date.now() < until) { await sleep(100); sig = await signature(); }
+    if (sig === lastSig && !warming) throw new Error("nothing redrew after the last move");
+    console.error(`${warming ? "warm-up" : "clip"}: answered in ${Date.now() - t} ms`);
+    await sleep(300);
+    lastSig = await signature();
+    await sleep(warming ? Math.min(hold, 300) : hold);
+  };
+
+  // The warm-up: the clip's moves once, unrecorded, then the figure cell again.
+  await page.mouse.move(cur.x, cur.y);
+  warming = true;
+  const stamp0 = await gestureStamp(page);
+  const w0 = Date.now();
+  await spec.run(c);
+  if (spec.grab) {
+    const s = await waitReleaseFrame(page, stamp0);
+    console.error(`warm-up: release frame after ${Date.now() - w0} ms (${s.n} frames)`);
+  } else {
+    await c.glide(rest, 300);
+  }
+  await c.keycap(null);
+  warming = false;
+  await resetFigure(page, ID_FIGURE);
+  const again = await measure();
+  if (JSON.stringify(again.clip) !== JSON.stringify(clip) || JSON.stringify(again.imgRect) !== JSON.stringify(imgRect)) {
+    throw new Error(`the reset moved the figure: ${JSON.stringify(again.clip)} vs ${JSON.stringify(clip)}`);
+  }
+  Object.assign(ctrlBoxes, again.ctrlBoxes);
+  lastSig = await signature();
+  if (lastSig !== startSig) throw new Error("the reset did not bring back the notebook's first state");
+  console.error(`phase: warmed up in ${((Date.now() - w0) / 1000).toFixed(1)}s`);
+
+  const frames = [];
+  const t0 = Date.now();
   let done = false;
   stopCapture = () => { done = true; };
   const capture = (async () => {
@@ -493,33 +558,6 @@ try {
       if (gap > 0) await sleep(gap);
     }
   })().catch((e) => { if (!done) throw e; });
-
-  c.glide = async (to, ms, steps = 24) => {
-    const from = { ...cur };
-    for (let s = 1; s <= steps; s++) {
-      cur = { x: from.x + (to.x - from.x) * s / steps, y: from.y + (to.y - from.y) * s / steps };
-      await page.mouse.move(cur.x, cur.y);
-      await sleep(ms / steps);
-    }
-  };
-  let lastSig = await signature();
-  c.click = async (at) => {
-    cur = { ...at };
-    await page.mouse.move(at.x, at.y);
-    await page.mouse.down();
-    await sleep(90);
-    await page.mouse.up();
-  };
-  // Hold until Julia has answered the last move (a new frame or readout), plus `hold` to read it.
-  c.settle = async (hold) => {
-    const until = Date.now() + 30000;
-    let sig = await signature();
-    while (sig === lastSig && Date.now() < until) { await sleep(100); sig = await signature(); }
-    if (sig === lastSig) throw new Error("nothing redrew after the last move");
-    await sleep(300);
-    lastSig = await signature();
-    await sleep(hold);
-  };
 
   await page.mouse.move(cur.x, cur.y);
   if (spec.grab) {

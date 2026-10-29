@@ -71,3 +71,18 @@ last frame holds (1500 ms, or 40 for the `view-*` loops, which end where they st
 `docs_clip.mjs` aims from the widget's manifest, which each guide notebook writes into a
 hidden cell, and after each move it waits until Julia has redrawn the figure or the readout
 below it. Its notebooks keep the guide page's code, with a title that says what to do.
+
+## Warm-up
+
+Julia compiles each redraw the first time it runs, so on a fresh kernel the first click or
+drag takes seconds to answer, and a clip recorded cold opens on a figure that seems stuck.
+Every live recorder (`docs_clip.mjs`, `cluster_clip.mjs`, `home_orbit_gif.mjs`) therefore
+makes its moves once with capture off, then reruns the figure cell (cell 2 in every clip
+notebook) through its hidden run button and waits for the widget to mount again
+(`test/e2e/clip_warmup.mjs`). The recorded take starts from the notebook's first state on a
+kernel that has compiled every redraw in it; the recorder stops if the reset brings back a
+different figure or readout. Each answer's wait is logged, `warm-up: answered in … ms` for
+the cold pass and `clip: …` for the take, so a log shows what the warm-up saved.
+
+A new clip needs nothing extra as long as its notebook keeps the figure, its interactables
+and the widget in cell 2, so that rerunning that cell resets everything the clip changes.
