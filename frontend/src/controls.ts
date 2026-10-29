@@ -78,15 +78,17 @@ export const CONTROLS_STYLE = `
    The <input> sits on top, invisible, and takes the pointer and keys. */
 .masque-toggle { -webkit-appearance: none; appearance: none; position: absolute; inset: 0; width: 100%; height: 100%;
   margin: 0; opacity: 0; cursor: pointer; }
-.masque-toggle-track, .masque-toggle-knob { position: absolute; pointer-events: none; }
+/* Makie eases the slide and the colour with sineio(), and its knob grows by 15% under the
+   pointer at once. */
+.masque-toggle-track, .masque-toggle-knob { position: absolute; pointer-events: none; --sineio: cubic-bezier(0.37, 0, 0.63, 1); }
 .masque-toggle-track { left: calc(var(--u) * var(--x)); top: calc(var(--u) * var(--y)); width: calc(var(--u) * var(--len));
   height: calc(var(--u) * var(--th)); border-radius: calc(var(--u) * var(--th) * 0.499); rotate: var(--turn);
   transform-origin: calc(var(--u) * var(--th) / 2) calc(var(--u) * var(--th) / 2);
-  background: var(--masque-ctl-off, #f0f0f0); transition: background var(--dur, 0.15s) ease-in-out; }
+  background: var(--masque-ctl-off, #f0f0f0); transition: background var(--dur, 0.15s) var(--sineio); }
 .masque-toggle:checked ~ .masque-toggle-track { background: var(--masque-ctl-fill, color-mix(in srgb, var(--masque-ctl) 50%, #ffffff)); }
 .masque-toggle-knob { left: calc(var(--u) * var(--x)); top: calc(var(--u) * var(--y)); width: calc(var(--u) * var(--d));
   height: calc(var(--u) * var(--d)); border-radius: 50%; background: var(--masque-ctl); translate: -50% -50%;
-  transition: left var(--dur, 0.15s) ease-in-out, top var(--dur, 0.15s) ease-in-out, scale 0.1s; }
+  transition: left var(--dur, 0.15s) var(--sineio), top var(--dur, 0.15s) var(--sineio); }
 .masque-control:hover .masque-toggle-knob { scale: 1.15; }
 .masque-toggle:focus-visible ~ .masque-toggle-track { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 .masque-check { width: 100cqmin; height: 100cqmin; accent-color: var(--masque-ctl); cursor: pointer; }
@@ -187,7 +189,7 @@ function toggleParts(g: ControlGeometry, el: HTMLInputElement): { parts_: HTMLEl
 function shape(g: ControlGeometry): string {
     // A range arrives as a typed array off the kernel and as a plain one from a docs player's
     // JSON frame; the same range is the same shape either way.
-    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.prompt])
+    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt])
 }
 
 // The knob index under a pointer at (x, y) on a slider's box.
