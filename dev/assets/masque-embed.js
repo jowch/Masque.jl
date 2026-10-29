@@ -107,7 +107,7 @@
     var base = typeof documenterBaseURL === "string" ? documenterBaseURL : ".";
     var segment = el.getAttribute("data-masque-segment");
     el.src = base + "/embeds/" + el.getAttribute("data-masque-embed") + ".html" +
-      (segment ? "#segment=" + encodeURIComponent(segment) : "");
+      (segment ? "?segment=" + encodeURIComponent(segment) : "");
   }
 
   // Embed name => the last value its widget posted, as { value }.
