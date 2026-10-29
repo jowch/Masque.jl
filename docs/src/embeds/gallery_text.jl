@@ -22,7 +22,7 @@ using Masque, CairoMakie
 
 # ╔═╡ a1410006-0001-4000-8000-000000000009
 md"""
-Click a label, including the tilted one and the annotation, and the last cell quotes it.
+Click a label, including the tilted one and the annotation, and the last cell names it.
 """
 
 # ╔═╡ a1410006-0001-4000-8000-000000000010
@@ -36,35 +36,32 @@ begin
     ax = Axis(fig[1, 1]; title = "click a label")
     pts = [(1.0, 1.0), (2.0, 3.0), (3.0, 2.0)]
     scatter!(ax, first.(pts), last.(pts); markersize = 16)
-    text!(
+    labels = text!(
         ax, first.(pts), last.(pts);
         text = ["Alpha", "Beta", "Gamma"], offset = (8, 8), fontsize = 18,
     )
-    text!(ax, [2.2], [1.4]; text = ["Tilted"], rotation = 0.5, fontsize = 18)
-    annotation!(ax, [3.3], [3.2]; text = ["Annotated"])
+    tilted = text!(ax, [2.2], [1.4]; text = ["Tilted"], rotation = 0.5, fontsize = 18)
+    note = annotation!(ax, [3.3], [3.2]; text = ["Annotated"])
     nothing
 end
 
 # ╔═╡ a1410006-0001-4000-8000-000000000011
 md"""
-`@bind sel` stores the clicks, with one field per plot: `sel.text` for the three point labels, `sel.text_2` for the tilted one, `sel.annotation` for the annotation, and `sel.scatter` for the markers.
+`@bind sel` stores the clicks, and `bind` names one field per plot: `sel.labels` for the three point labels, `sel.tilted` for the tilted one, and `sel.note` for the annotation.
 """
 
 # ╔═╡ a1410006-0001-4000-8000-000000000003
-@bind sel masque(fig)
+@bind sel masque(fig; bind = (labels = labels, tilted = tilted, note = note))
 
 # ╔═╡ a1410006-0001-4000-8000-000000000012
 md"""
-This cell responds to the click, and quotes each label that is selected.
+This cell responds to the click, and names each label that is selected.
 """
 
 # ╔═╡ a1410006-0001-4000-8000-000000000004
 begin
-    quoted = String[]
-    for label in (sel.text, sel.text_2, sel.annotation)
-        isnothing(label) || push!(quoted, "\"$(label.text)\"")
-    end
-    isempty(quoted) ? "click a label" : join(quoted, ", ")
+    picked = filter(!isnothing, [sel.labels, sel.tilted, sel.note])
+    isempty(picked) ? "click a label" : join([l.text for l in picked], ", ") * " selected"
 end
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001

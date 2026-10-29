@@ -5,7 +5,7 @@ counts the points inside by group and averages their coordinates.
 
 `bind = s` makes `picks` the scatter's value, which the box fills: a
 `Vector{ElementEvent}` with one event per point inside the
-box, carrying that point's payload (`group`, `x`, `y`), so
+box, carrying the point's `x` and `y` and its payload's `group`, so
 `count(e -> e.group == "A", picks)` counts one group. The events also
 work as indices into your data, so `xs[picks]` is the `x` of the points
 in the box. An empty box gives `[]` rather than `nothing`. See
