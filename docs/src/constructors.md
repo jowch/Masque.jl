@@ -60,11 +60,21 @@ plots are, in the order you pass them, so a pan on each of two axes is
 ```
 
 Two layers with an id you chose, such as two `id = :pan`, raise an
-error. To overlay only what you pass, add `auto = false`:
+error.
+
+Arguments add to the defaults, so a plot you don't list keeps its
+hover. To overlay only what you pass, add `auto = false`. Here a
+contour over an image keeps its hover and gains a pan, and the image
+gets none:
 
 ```julia
-@bind sel masque(fig, PointInteractable(ax, s); auto = false)
+image!(ax, z)
+c = contour!(ax, z)
+@bind sel masque(fig, interactables(c), ViewInteractable(ax); auto = false)
 ```
+
+`interactables(c)` works on a plot like `contour!` that Masque builds
+from the lines it draws, and gives the same layer, `:lines`.
 
 A recipe of your own gets layers from the plots it draws. To give it
 its own, define a method of [`interactables`](@ref) for its type; see
