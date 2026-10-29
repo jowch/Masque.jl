@@ -39,12 +39,8 @@ begin
     fig = Figure(size = (560, 380))
     ax = Axis(fig[1, 1]; title = "drag the box")
     s = scatter!(ax, xs, ys; color = map(g -> g == "A" ? :steelblue : :darkorange, grp), markersize = 14)
-    pts = interactables(
-        s;
-        id = :pts,
-        payloads = [(; group = grp[i], x = xs[i], y = ys[i]) for i in eachindex(xs)],
-    )
-    roi = ROIInteractable(ax; bounds = (3.0, 6.0, 1.5, 5.5), selects = :pts)
+    pts = interactables(s; payloads = [(; group = g) for g in grp])
+    roi = ROIInteractable(ax; bounds = (3.0, 6.0, 1.5, 5.5), selects = s)
     nothing
 end
 

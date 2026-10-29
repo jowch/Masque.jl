@@ -94,6 +94,30 @@ const CLIPS = {
       await c.settle(2000);
     },
   },
+  "selection-replace": {
+    notebook: "selection_replace_notebook.jl", nn: 16,
+    async run(c) {
+      // Click Tokyo, then Lagos, which replaces it; click Lagos again to clear it. Pick Lima
+      // and clear it with a click on empty space, then pick Delhi and clear it with Escape.
+      for (const k of [0, 2, 2, 3]) {
+        await c.glide(c.circle("cities", k), 800);
+        await c.click(c.circle("cities", k));
+        await c.settle(1100);
+      }
+      const empty = c.data("cities", 60, -15);
+      await c.glide(empty, 900);
+      await c.click(empty);
+      await c.settle(1300);
+      await c.glide(c.circle("cities", 1), 800);
+      await c.click(c.circle("cities", 1));
+      await c.settle(1100);
+      await c.keycap("Esc");
+      await c.page.keyboard.press("Escape");
+      await c.settle(1300);
+      await c.keycap(null);
+      await sleep(600);
+    },
+  },
   "readme": {
     notebook: "../readme-demo/notebook.jl", nn: 12, code: true,
     async run(c) {

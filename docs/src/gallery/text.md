@@ -5,10 +5,11 @@ Click a label and its event's `text` is its string. `masque(fig)` makes
 The event is an `ElementEvent` that also has the label's `index`, `x`,
 and `y`.
 
-Each `text!` call, the `annotation!`, and the scatter on the same axis
-get their own field in `sel`, so the last cell reads the three label
-fields, `sel.text`, `sel.text_2`, and `sel.annotation`, and quotes each
-label that is selected. A marker click goes to `sel.scatter`.
+Each `text!` call and the `annotation!` get their own field in `sel`,
+named by `bind`, so the last cell reads `sel.labels`, `sel.tilted`, and
+`sel.note`, and names each label that is selected. Without `bind`, the
+fields are named after the plots, such as `sel.text` and `sel.text_2`,
+and the markers get `sel.scatter`.
 
 ```@raw html
 <div class="masque-embed-wrap">
