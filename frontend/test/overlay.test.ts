@@ -2880,13 +2880,14 @@ describe("overlay visual polish", () => {
             top = 250
             window.dispatchEvent(new Event("scroll"))
             expect(tip.style.top).toBe("170px")
-            // Scrolled out of the window, the box hides instead of pinning to the window's top.
+            // Scrolled out of the window, the box leaves with its mark instead of pinning to the
+            // window's top: mark at window y -480, its top edge at -490.
             top = -500
             window.dispatchEvent(new Event("scroll"))
-            expect(tip.style.visibility).toBe("hidden")
+            expect(tip.style.top).toBe("-580px") // -490 - 10 - 80
+            expect(tip.style.left).toBe("10px") // 120 - 110
             top = 250
             window.dispatchEvent(new Event("scroll"))
-            expect(tip.style.visibility).toBe("")
             expect(tip.style.top).toBe("170px")
         } finally {
             if (had) proto.showPopover = had

@@ -145,12 +145,11 @@ function tipFrame(ctx: OverlayCtx, state: OverlayState): TipFrame {
     return { dx: 0, dy: 0, w: state.surfaceW_, h: state.surfaceH_, escaped: false }
 }
 
-// An escaped box whose point (window px) has scrolled out of the window is hidden rather than
-// clamped: clamped, it would stay pinned to the window's edge with its mark gone.
-function offWindow(ctx: OverlayCtx, f: TipFrame, x: number, y: number): boolean {
-    const off = f.escaped && (x < 0 || y < 0 || x > f.w || y > f.h)
-    ctx.tip_.style.visibility = off ? "hidden" : ""
-    return off
+// An escaped box whose point (window px) is outside the window is not clamped: clamped, it would
+// stay pinned to the window's edge with its mark gone. It keeps its unclamped place beside the
+// point instead, so it scrolls off with its mark.
+function offWindow(f: TipFrame, x: number, y: number): boolean {
+    return f.escaped && (x < 0 || y < 0 || x > f.w || y > f.h)
 }
 
 // Re-run the last placement after the page scrolls or the figure moves: an escaped box is in
@@ -176,7 +175,12 @@ export function placeTip(ctx: OverlayCtx, state: OverlayState, ox: number, oy: n
         ctx.tip_.style.setProperty("--masque-caret-x", `${CARET_INSET}px`)
         return
     }
-    if (offWindow(ctx, f, x, y)) return
+    if (offWindow(f, x, y)) {
+        ctx.tip_.style.left = `${x - CARET_INSET}px`
+        ctx.tip_.style.top = `${y + TIP_OFFSET}px`
+        ctx.tip_.style.setProperty("--masque-caret-x", `${CARET_INSET}px`)
+        return
+    }
     let top = y + TIP_OFFSET
     const flipY = top + th > hh - TIP_GAP
     if (flipY) { top = y - th - TIP_OFFSET; ctx.tip_.classList.add("flip-y") }
@@ -202,8 +206,9 @@ export function placeAnchored(ctx: OverlayCtx, state: OverlayState, anchor: Anch
         ctx.tip_.classList.remove("flip-y")
         return
     }
-    if (offWindow(ctx, f, a.x, a.y)) return
-    const p = computeAnchoredPlacement(a, tw, th, sw, sh)
+    const p = offWindow(f, a.x, a.y)
+        ? { left: a.x - tw / 2, top: a.top - ANCHOR_GAP - th, caretX: tw / 2, below: false }
+        : computeAnchoredPlacement(a, tw, th, sw, sh)
     ctx.tip_.style.left = `${p.left}px`
     ctx.tip_.style.top = `${p.top}px`
     ctx.tip_.style.setProperty("--masque-caret-x", `${p.caretX}px`)
