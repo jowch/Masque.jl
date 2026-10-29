@@ -69,6 +69,20 @@ end
 @bind pick masque(fig; bind = cbint)
 ```
 
+```@raw html
+<video id="masque-readout-colorbar-clip" title="Hovering a colorbar, then clicking two values while the readout shows each, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-readout-colorbar-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "readout-colorbar.mp4";
+})();
+</script>
+```
+
 `pick` is `nothing` until the first click on the colorbar. The cells
 still show their tooltips, but clicking them does not change `pick`.
 
@@ -108,6 +122,20 @@ the line after a drag:
 "$(count(>(level.value), ys)) of $(length(ys)) points above $(round(level.value; digits = 2))"
 ```
 
+```@raw html
+<video id="masque-readout-threshold-clip" title="Dragging a horizontal threshold down and then up while the readout counts the points above it, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-readout-threshold-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "readout-threshold.mp4";
+})();
+</script>
+```
+
 On a categorical axis, the line shows the category while you drag.
 When you release it, it snaps onto that category, `level.value` is the
 category's position, and `level.category` is its label.
@@ -137,6 +165,20 @@ field is which:
 low = ThresholdInteractable(ax; orientation = :horizontal, value = 0.2)
 high = ThresholdInteractable(ax; orientation = :horizontal, value = 0.8)
 @bind band masque(fig; bind = (low = low, high = high))
+```
+
+```@raw html
+<video id="masque-readout-band-clip" title="Dragging the lower line up and the upper line down while the readout counts the points between them, with CairoMakie"
+       controls muted loop playsinline autoplay
+       style="width:100%;max-width:640px;height:auto;border:0;background:transparent;"></video>
+<script>
+(function () {
+  var pretty = /\/$/.test(location.pathname) || /\/index\.html$/.test(location.pathname);
+  var el = document.getElementById("masque-readout-band-clip");
+  if (!el) return;
+  el.src = (pretty ? "../assets/" : "assets/") + "readout-band.mp4";
+})();
+</script>
 ```
 
 Then `band.low.value` and `band.high.value` are the two lines'
