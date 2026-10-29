@@ -62,13 +62,15 @@ block in the figure that `masque` isn't given would look live and do
 nothing, so `masque` raises an error naming its kind. Name it, or take it
 out of the figure.
 
-Buttons and text boxes are pictures for now, and `masque` warns when the
-figure has one, since the reader could click it and nothing would happen.
-A `SliderGrid` works like the other blocks: its field holds a tuple of its
-sliders' values.
+Text boxes are pictures for now, and `masque` warns when the figure has
+one, since the reader could click it and nothing would happen. A
+`SliderGrid` works like the other blocks: its field holds a tuple of its
+sliders' values. A `Button`'s field counts its clicks, and code that
+listens to the button's `clicks` runs on each one.
 
-With WGLMakie loaded, `Slider` also names a slider from Bonito, so Julia
-asks which one you mean; write `Makie.Slider` instead.
+With WGLMakie loaded, `Slider` and `Button` also name controls from
+Bonito, so Julia asks which one you mean; write `Makie.Slider` and
+`Makie.Button` instead.
 
 In a static HTML export the controls still set the `@bind` value; only
 `onchange` needs a running notebook.

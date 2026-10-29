@@ -1506,8 +1506,10 @@ function build_kind_sweep()
         tall = Toggle(fig[1, 3]; orientation = :vertical, active = false)
         # A slider grid (#430): its value label follows the slider in the browser.
         grid = SliderGrid(fig[5, 1:2], (label = "gain", range = 1:5, format = "{} dB", startvalue = 2))
+        # A button (#431): its field counts clicks.
+        go = Makie.Button(fig[4:5, 3]; label = "Go")   # WGLMakie also exports Bonito's `Button`
         masque(
-            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick, tall = tall, grid = grid);
+            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick, tall = tall, grid = grid, go = go);
             onchange = st -> begin
                 update!(level, [0.0, 10.0], fill(Float64(st.level), 2); visible = st.show)
                 # A dependent menu: the checkbox swaps the menu's options.

@@ -100,6 +100,17 @@ export const CONTROLS_STYLE = `
 .masque-check-art .mark { visibility: hidden; }
 .masque-check:checked ~ .masque-check-art .mark, .masque-control:hover .masque-check-art .mark { visibility: visible; }
 .masque-check:focus-visible ~ .masque-check-art .box { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
+/* Button, as Makie draws it: a rounded box with its label in the middle, in one colour pair at
+   rest, another under the pointer and a third while pressed. Makie centres the outline on the
+   box's edge and clips it to the box, so it is drawn half inside and half out, and the box
+   clips it. */
+.masque-ctl-button { overflow: hidden; }
+.masque-control .masque-button { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: none; cursor: pointer;
+  font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; white-space: nowrap;
+  border-radius: var(--r, 0); box-shadow: 0 0 0 var(--sw, 0) var(--sc, transparent), inset 0 0 0 var(--sw, 0) var(--sc, transparent);
+  background: var(--b0); color: var(--t0); }
+.masque-control .masque-button:hover { background: var(--b1); color: var(--t1); }
+.masque-control .masque-button:active { background: var(--b2); color: var(--t2); }
 .masque-vlabel { position: absolute; display: flex; align-items: center; justify-content: flex-end; white-space: nowrap;
   pointer-events: none; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; }
 .masque-control .masque-select { width: 100%; height: 100%; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; border: none; border-radius: 0; cursor: pointer;
@@ -245,6 +256,20 @@ function shape(g: ControlGeometry): string {
     // JSON frame; the same range is the same shape either way.
     if (g.sliders) return JSON.stringify([g.control, g.sliders.map(shape), g.sliders.map((c) => [c.valueLabel?.labels?.length, c.valueLabel?.pairs?.length])])
     return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt, g.size, g.radius, g.stroke, g.mark, g.markSize, g.next])
+}
+
+// A button's label and colours, which `onchange` can change without building it again. Lengths
+// are image px as a share of the box's width, so they scale with the figure.
+function styleButton(el: HTMLButtonElement, g: ControlGeometry): void {
+    el.textContent = g.caption ?? ""
+    const set = (name: string, v: string | undefined) => { if (v !== undefined) el.style.setProperty(`--${name}`, v) }
+    const px = (v: number | undefined) => v === undefined ? undefined : `${(100 * v) / g.w}cqw`
+    set("fs", px(g.fontsize))
+    set("r", px(g.radius))
+    set("sw", px(g.stroke === undefined ? undefined : g.stroke / 2))
+    set("sc", g.strokeColor)
+    g.colors?.forEach((c, i) => set(`b${i}`, c))
+    g.textColors?.forEach((c, i) => set(`t${i}`, c))
 }
 
 // The knob index under a pointer at (x, y) on a slider's box.
@@ -395,6 +420,24 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             return {
                 layer_: layer, shape_: shape(g), box_: box, get_: () => Number(el.value),
                 set_: (p) => { if (typeof p === "number") el.value = String(p) },
+            }
+        }
+        case "button": {
+            // The field counts clicks, as Makie's `clicks` does.
+            const el = document.createElement("button")
+            el.type = "button"
+            el.className = "masque-button"
+            styleButton(el, g)
+            let clicks = Number(g.value) || 0
+            el.addEventListener("click", () => {
+                clicks += 1
+                hooks.commit_(id, envelope(id, clicks))
+            })
+            box.append(el)
+            return {
+                layer_: layer, shape_: shape(g), box_: box, get_: () => clicks,
+                set_: (p) => { if (typeof p === "number") clicks = p },
+                restyle_: (ng) => styleButton(el, ng),
             }
         }
         case "slidergrid": {

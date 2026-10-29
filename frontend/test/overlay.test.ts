@@ -6874,6 +6874,26 @@ describe("block controls (#345)", () => {
         expect(val(host).fine).toEqual({ layer: "fine", index: 0, payload: true })
     })
 
+    it("a button draws Makie's box and label, and counts its clicks (#431)", () => {
+        const m = controlsManifest()
+        m.layers.push({ id: "go", kind: "control", axis: "", events: ["change"], payloads: [], label: "go",
+            geometry: { control: "button", x: 100, y: 700, w: 200, h: 50, value: 2, caption: "Go", fontsize: 28, radius: 8, stroke: 2,
+                strokeColor: "rgb(9,9,9)", colors: ["rgb(1,1,1)", "rgb(2,2,2)", "rgb(3,3,3)"], textColors: ["rgb(4,4,4)", "rgb(5,5,5)", "rgb(6,6,6)"] } })
+        m.fields = [...(m.fields ?? []), "go"]
+        m.initial!.go = { layer: "go", index: 0, payload: 2 }
+        const { host, script } = setup()
+        mount(script, m)
+        const el = ctl(host, "go").querySelector("button") as HTMLButtonElement
+        expect(el.textContent).toBe("Go")
+        const v = (name: string) => el.style.getPropertyValue(`--${name}`)
+        expect([v("fs"), v("r"), v("sw"), v("sc")]).toEqual(["14cqw", "4cqw", "0.5cqw", "rgb(9,9,9)"])
+        expect([v("b0"), v("b1"), v("b2"), v("t0"), v("t2")]).toEqual(["rgb(1,1,1)", "rgb(2,2,2)", "rgb(3,3,3)", "rgb(4,4,4)", "rgb(6,6,6)"])
+        el.click()
+        expect(val(host).go).toEqual({ layer: "go", index: 0, payload: 3 })
+        el.click()
+        expect(val(host).go).toEqual({ layer: "go", index: 0, payload: 4 })
+    })
+
     it("a slider grid draws each slider and its value label, and commits all its values together (#430)", () => {
         const m = controlsManifest()
         m.layers.push({ id: "grid", kind: "control", axis: "", events: ["change"], payloads: [], label: "grid",

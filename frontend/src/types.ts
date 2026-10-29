@@ -72,9 +72,9 @@ export interface ROIGeometry {
 
 // A Makie block drawn as an HTML control. `value` is the block's state as the wire carries it:
 // a 0-based index (slider, menu; -1 for a menu with nothing chosen), a pair of them (interval
-// slider), or a Bool (toggle, checkbox).
+// slider), a Bool (toggle, checkbox), or a click count (button).
 export interface ControlGeometry {
-    control: "slider" | "intervalslider" | "toggle" | "checkbox" | "menu" | "slidergrid"
+    control: "slider" | "intervalslider" | "toggle" | "checkbox" | "menu" | "slidergrid" | "button"
     x: number // the block's box, image px, top-left origin
     y: number
     w: number
@@ -114,6 +114,12 @@ export interface ControlGeometry {
     prompt?: string         // shown before a choice
     fontsize?: number       // image px
     padding?: number        // image px from the box's left edge to the text
+    // Button: a rounded box filling the block's box, its label in the middle; `radius`,
+    // `stroke` and `fontsize` above. Colours at rest, under the pointer, and pressed.
+    caption?: string
+    strokeColor?: string
+    colors?: [string, string, string]
+    textColors?: [string, string, string]
 }
 
 // The label beside a grid's slider that shows its value: its box (image px), text size and
