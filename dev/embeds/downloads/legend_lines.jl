@@ -39,15 +39,11 @@ end
 @bind pick masque(fig; bind = :legend)
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-if pick isa LegendEvent
-    "$(pick.label) selected"
-else
-    "click a legend entry"
-end
+isnothing(pick) ? "click a legend entry" : "$(pick.label) selected"
 
 # ╔═╡ a1b2c3d4-0001-4000-8000-000000000005
 begin
-    focus = pick isa LegendEvent ? pick.label : nothing
+    focus = isnothing(pick) ? nothing : pick.label
     fig2 = Figure(size = (560, 360))
     ax2 = Axis(fig2[1, 1])
     for (label, f) in (("a", sin), ("b", cos))

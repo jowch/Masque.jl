@@ -31,13 +31,13 @@ begin
 end
 
 # ╔═╡ a1b2c3d4-0002-4000-8000-000000000003
-@bind w2 masque(
+@bind w masque(
     fig, (freq = freq, dots = dots);
     onchange = state -> update!(wave, xs, sin.(state.freq .* xs); linestyle = state.dots ? :dot : :solid)
 )
 
 # ╔═╡ a1b2c3d4-0002-4000-8000-000000000004
-w2.freq, w2.dots
+w.freq, w.dots
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

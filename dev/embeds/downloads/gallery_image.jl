@@ -37,27 +37,21 @@ begin
     R = clamp01.([0.5 + 0.45 * sin(i / 1.4) * cos(j / 1.2) for i in 1:nx, j in 1:ny])
     G = clamp01.([0.5 + 0.4 * cos(i / 1.7) for i in 1:nx, j in 1:ny])
     B = clamp01.([0.5 + 0.45 * (j / ny) for i in 1:nx, j in 1:ny])
-    rgb = [RGBf(R[i, j], G[i, j], B[i, j]) for i in 1:nx, j in 1:ny]
+    rgb = RGBf.(R, G, B)
     fig = Figure(size = (560, 400))
     ax = Axis(fig[1, 1]; title = "drag the box to select a region")
-    image!(ax, 0 .. Float64(nx), 0 .. Float64(ny), rgb)
-    xe = collect(0.0:1.0:nx)
-    ye = collect(0.0:1.0:ny)
-    lum = [0.299 * R[i, j] + 0.587 * G[i, j] + 0.114 * B[i, j] for i in 1:nx, j in 1:ny]
-    ints = [
-        GridInteractable(ax, xe, ye, lum; id = :img),
-        ROIInteractable(ax; bounds = (2.0, 5.0, 1.0, 4.0), selects = :img),
-    ]
+    img = image!(ax, 0 .. nx, 0 .. ny, rgb)
+    box = ROIInteractable(ax; bounds = (2.0, 5.0, 1.0, 4.0), selects = img)
     nothing
 end
 
 # ╔═╡ a1410008-0001-4000-8000-000000000011
 md"""
-`@bind region` stores the pixel ranges inside the box when you release it, and `bind = :img` makes `region` the value of the grid the box selects from. `auto = false` leaves out the image's own cells, so the pointer reaches only the brightness grid and the box.
+`@bind region` stores the pixel ranges inside the box when you release it, and `bind = img` makes `region` the value of the image the box selects from.
 """
 
 # ╔═╡ a1410008-0001-4000-8000-000000000003
-@bind region masque(fig, ints; auto = false, bind = :img)
+@bind region masque(fig, box; bind = img)
 
 # ╔═╡ a1410008-0001-4000-8000-000000000012
 md"""
