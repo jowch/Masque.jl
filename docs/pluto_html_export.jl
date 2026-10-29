@@ -70,7 +70,7 @@ preamble,
 .present_one_cell_at_a_time {
   display: none !important;
 }
-body > div {
+body > div:not(.masque-bar):not(.masque-miss) {
   min-height: 0 !important;
   display: block !important;
 }
@@ -232,9 +232,11 @@ const PLUTO_EXPORT_SEGMENT_JS = raw"""
   window.masqueSegment = ids;
   var css = "pluto-cell" + ids.map(function (id) { return ':not([id="' + id + '"])'; }).join("") +
     " { display: none !important; }";
+  // A segment without the widget hides the chip bar and its 40px gap. The leading `html`
+  // outranks the gap rule, which Pluto's export loads after this style.
   if (ids.indexOf("@@WIDGET@@") === -1) {
     css += " .masque-bar { display: none !important; }" +
-      " body:has(.masque-bar) pluto-editor > main, body:has(.masque-bar) pluto-editor.disable_ui > main { padding-top: 10px !important; }";
+      " html body:has(.masque-bar) pluto-editor > main, html body:has(.masque-bar) pluto-editor.disable_ui > main { padding-top: 10px !important; }";
   }
   var style = document.createElement("style");
   style.textContent = css;

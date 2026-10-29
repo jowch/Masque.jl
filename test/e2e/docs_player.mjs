@@ -290,6 +290,18 @@ try {
     throw new Error(`window.Masque.mount is ${mountType}, expected function`);
   }
 
+  // The export's `body > div` reset once forced the chip bar to block layout, which set
+  // its two chips at different heights, and showed the hidden "no recording" note.
+  const chrome = await frame.evaluate(() => {
+    const tops = [...document.querySelectorAll(".masque-bar > *")].map((e) => Math.round(e.getBoundingClientRect().top));
+    const miss = document.querySelector(".masque-miss");
+    return { tops, missShown: !!miss && miss.hidden && getComputedStyle(miss).display !== "none" };
+  });
+  if (chrome.tops.length !== 2 || chrome.tops[0] !== chrome.tops[1]) {
+    throw new Error(`player chips not aligned: tops ${JSON.stringify(chrome.tops)}`);
+  }
+  if (chrome.missShown) throw new Error("the hidden no-recording note takes up space");
+
   const idle = await waitReadout(frame, (t) => t === "click a point");
   if (idle !== "click a point") {
     throw new Error(`idle readout was ${JSON.stringify(idle)}`);

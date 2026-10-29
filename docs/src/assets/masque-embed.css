@@ -107,3 +107,39 @@ html[class*="theme--"]:not(.theme--documenter-light):not(.theme--catppuccin-latt
   height: auto;
   max-width: 720px;
 }
+
+/* The text twin under a working player is for search and for readers who want the
+   code as text, so it sits as one quiet line. When the player fails, masque-embed.js
+   adds `masque-fallback-active` and the twin keeps Documenter's full admonition look. */
+.masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  margin-top: -0.6em;
+}
+.masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-header {
+  background: transparent;
+  color: #888;
+  font-size: 0.8em;
+  font-weight: 400;
+  padding: 0.2em 0;
+}
+.masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-header::before {
+  content: none;
+}
+.masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-header::after {
+  content: "▸";
+  margin-left: 0.35em;
+}
+.masque-embed-wrap + details.admonition.is-details[open]:not(.masque-fallback-active) > .admonition-header::after {
+  content: "▾";
+}
+.masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-header:hover {
+  color: #4363d8;
+}
+.masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-header .admonition-anchor {
+  display: none;
+}
+.masque-embed-wrap + details.admonition.is-details:not(.masque-fallback-active) > .admonition-body {
+  padding: 0.5em 0 0;
+}
