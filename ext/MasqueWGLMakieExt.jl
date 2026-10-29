@@ -113,7 +113,8 @@ end
 #   Observable -> {__obs__: v}   1-D buffer -> {__t__, d}   N-D array -> {array, size}
 # Symbols -> strings, closures -> dropped. Non-finite floats pass through: a NaN in a position
 # buffer is how a line breaks (a contour's levels, a gapped `lines!`), and as 0 it would draw a
-# stroke to the origin (#439). Both transports carry it: published_to_js packs the bytes, and
+# stroke to the origin (#439). Every axis scene's decorations carry NaN too, so a strict JSON
+# writer can't take any scene. Both transports carry it: published_to_js packs the bytes, and
 # `_scene_js` writes them as base64.
 function _plain(x)
     if x isa Observable

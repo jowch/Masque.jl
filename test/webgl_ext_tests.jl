@@ -68,7 +68,8 @@ end
     lines!(Axis(fig[1, 1]), [1.0, 2.0, NaN, 3.0, 4.0], [1.0, 2.0, NaN, 2.0, 1.0])
     @test has_nan(fig)
 
-    # The page outside Pluto carries the bytes, NaN included.
+    # The page outside Pluto carries the bytes, NaN included. This guards the transport; it
+    # passed before the fix too.
     d = Float32[1, NaN, 2]
     js = _WGLExt._scene_js(Dict{String, Any}("p" => Dict{String, Any}("__t__" => "f32", "d" => d)))
     @test occursin(Masque.base64encode(reinterpret(UInt8, d)), js)
