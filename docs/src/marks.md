@@ -9,7 +9,7 @@ types; see [How Masque works](@ref).
 
 The example on this page passes the plot as `bind`, so `pick` is the
 clicked mark's event itself rather than a named tuple of fields (see
-[What the `@bind` value holds](@ref)). [Plot-object defaults](@ref)
+[What the `@bind` value holds](@ref)). [Fields each plot reports](@ref)
 lists the fields each plot type reports, and
 [Supported plots and axes](@ref) lists which plots work on which axes.
 

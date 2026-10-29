@@ -48,7 +48,7 @@ Main.masque_fallback("legend_lines"; segment = "fade")
 You can use `pick.label` the same way to filter a table, choose which
 series to fit, or update any other cell.
 
-## Which marks an entry highlights
+## Choose which plots an entry highlights
 
 Each entry is linked to the plots Makie made it for: the line for a
 `lines!` entry, both the points and the line for `scatterlines!` and
@@ -71,7 +71,7 @@ its entries, so an entry can still be clicked but highlights nothing.
 To link them, give the elements Makie's own `plots=` keyword, or pass
 `targets=`.
 
-## A tooltip for each entry
+## Add a tooltip to each entry
 
 Legend entries show no tooltip by default, because the label is already
 on screen and a tooltip would cover the neighboring entries. To add

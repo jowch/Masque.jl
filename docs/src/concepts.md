@@ -14,7 +14,7 @@ top. A figure with several axes still needs only one `masque` call.
 ```
 
 On its own, `masque(fig)` makes every plot it recognizes interactive,
-along with every legend and colorbar. [Recipes masque(fig) extracts](@ref)
+along with every legend and colorbar. [Plots `masque(fig)` makes interactive](@ref)
 lists the plots it knows. To attach your own data to a plot, or to add
 something Makie did not draw, such as a draggable threshold, pass your
 own interactables after `fig`, and the other plots stay interactive. To
@@ -50,7 +50,7 @@ tooltip, pass a template that names them; see [Tooltips](@ref). A
 payload that isn't a named tuple, `DataFrame` row, or `Dict`, such as a
 bare string, is shown as it is.
 
-## Tooltips are templates
+## Tooltip templates
 
 A tooltip shows the payload of the mark under the pointer, by default as
 a small table of the payload's fields. A `masque"..."` template

@@ -81,7 +81,7 @@ clicks, and a click takes one out like any other.
 `selected` also takes a `GridSelection` or the positions `findall` gives,
 and a matrix of a different size from `img` raises an `ArgumentError`.
 
-## Pick whole regions
+## Select whole regions
 
 When the cells of an image stand for larger things, such as the objects
 of a segmentation or the small patches an image is cut into, pass
@@ -125,7 +125,7 @@ carries `region`, the clicked object's id, and the whole object stays
 highlighted. The tooltip names the region, and a `masque"…"` template
 can use `$(region)`.
 
-## Label cells
+## Show your own data for each cell
 
 To show your own data for each cell, such as the names along each side
 of a contact map or correlation matrix, pass `payloads`: a function of the
