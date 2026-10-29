@@ -322,6 +322,7 @@ export function onDown(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): v
 
 export function onUp(ctx: OverlayCtx, state: OverlayState, e: PointerEvent): void {
     cancelPendingMove(state)
+    state.lastUp_ = e.button === 0 ? { x: e.clientX, y: e.clientY } : null
     const d = state.drag_
     // Ignore a pointer that isn't the one that owns this drag (e.g. a second touch lifting
     // first) — without this, any pointer's up committed and ended whichever drag happened
@@ -743,11 +744,22 @@ function axesAt(ctx: OverlayCtx, x: number, y: number): string[] {
     return out
 }
 
+// Where a click landed. Chromium rounds a click's clientX/Y to whole px, while the pointer
+// events hover reads keep the fraction, so a readout click off its pointerup would commit up to
+// half a px from the value the tooltip shows (#448). The pointerup this click follows keeps it.
+function clickPoint(state: OverlayState, e: MouseEvent): { x: number, y: number } {
+    const up = state.lastUp_
+    state.lastUp_ = null
+    if (up && Math.abs(up.x - e.clientX) < 1 && Math.abs(up.y - e.clientY) < 1) return up
+    return { x: e.clientX, y: e.clientY }
+}
+
 export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): void {
+    const at = clickPoint(state, e)
     if (state.justDragged_) { state.justDragged_ = false; return }
     // Chromium still dispatches click after a Mac ctrl-click.
     if (isMacContextClick(e)) return
-    const layout = layoutImagePx(ctx.base_, ctx.manifest_, e.clientX, e.clientY)
+    const layout = layoutImagePx(ctx.base_, ctx.manifest_, at.x, at.y)
     const hit = hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "click", state.photoViewId_)
     if (!hit) {
         // A click on an empty part of a plot clears the one-pick fields there; a `many` field
