@@ -215,14 +215,15 @@ $PARENT_IS_DOC_DARK_JS
 </script>
 """
 
-# `#segment=<name>` in the URL shows only that segment's cells (`player_segments.jl`). It
+# `?segment=<name>` in the URL shows only that segment's cells (`player_segments.jl`). It
 # runs in `<head>`, before Pluto draws a cell, so a hidden cell never shows. The chip and the
-# download link stay with the widget.
+# download link stay with the widget. Not `#segment=`: Pluto's frontend scrolls to a URL
+# fragment through the iframe into the page, so the page jumped to the player as it loaded.
 const PLUTO_EXPORT_SEGMENT_JS = raw"""
 <script>
 (function () {
   var SEGMENTS = @@SEGMENTS@@;
-  var m = /[#&]segment=([a-z0-9_-]+)/.exec(location.hash);
+  var m = /[?&]segment=([a-z0-9_-]+)/.exec(location.search);
   if (!m) return;
   var ids = SEGMENTS[m[1]];
   if (!ids) {
@@ -306,10 +307,24 @@ const PLUTO_EXPORT_SIM_JS = raw"""
     miss.hidden = !on;
     sizeFrame();
   }
+  // Until Pluto draws the notebook, the page is as tall as the iframe, so sizing then grew the
+  // iframe a few px each frame. Keep the height the page reserved until the notebook and its
+  // pictures are in.
   function sizeFrame() {
     if (!window.frameElement) return;
     const nb = document.querySelector("pluto-notebook");
-    let bottom = nb ? nb.getBoundingClientRect().bottom : document.documentElement.scrollHeight;
+    if (!nb) return;
+    const loading = Array.prototype.filter.call(nb.querySelectorAll("img"), function (img) {
+      return !img.complete && img.offsetParent !== null;
+    });
+    if (loading.length) {
+      loading.forEach(function (img) {
+        img.addEventListener("load", sizeFrame, { once: true });
+        img.addEventListener("error", sizeFrame, { once: true });
+      });
+      return;
+    }
+    let bottom = nb.getBoundingClientRect().bottom;
     if (miss && !miss.hidden) bottom = Math.max(bottom, miss.getBoundingClientRect().bottom);
     window.frameElement.style.height = Math.max(1, Math.ceil(bottom + 8)) + "px";
   }
