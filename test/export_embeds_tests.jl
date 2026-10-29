@@ -9,7 +9,6 @@ using Test
 
 include(joinpath(@__DIR__, "..", "docs", "player_pipeline.jl"))
 
-const GS_NB = joinpath(@__DIR__, "..", "docs", "src", "embeds", "getting_started.jl")
 const OVERLAY_JS = joinpath(@__DIR__, "..", "assets", "overlay.js")
 
 @testset "julia source highlight uses Pluto token classes" begin
@@ -277,7 +276,7 @@ end
         end
         n += 1
     end
-    @test n >= 28
+    @test n >= 25
 end
 
 @testset "the player shows the latest change when two fields differ" begin
@@ -484,10 +483,8 @@ end
     @test !isdir(joinpath(root, "gallery"))
     @test !isfile(joinpath(root, "docs", "export_notebooks.jl"))
     @test !isfile(joinpath(root, "docs", "src", "examples.md"))
-    @test isfile(joinpath(root, "docs", "src", "embeds", "getting_started.jl"))
 
     names = [
-        "gallery_selection",
         "gallery_bars",
         "gallery_polygons",
         "gallery_text",
@@ -511,15 +508,10 @@ end
         end
     end
 
-    sel = parse_player_toml(joinpath(root, "docs", "src", "embeds", "gallery_selection.jl"))
-    @test length(sel["cells"]) >= 5
-    @test any(endswith(id, "0005") for id in sel["cells"])
-    @test any(endswith(id, "0006") for id in sel["cells"])
-
     guides = [
         "marks_bars", "legend_lines", "roi_table",
         "tooltips_stars", "tooltips_stars_default", "tooltips_stars_dark", "grids_heatmap", "readouts_axis",
-        "custom_regions", "recipes_dumbbell", "linked_click", "linked_legend_wash",
+        "custom_regions", "recipes_dumbbell", "linked_legend_wash",
         "selection_start", "slice_spectra", "widgets_value", "explore_3d",
     ]
     for name in guides
@@ -699,7 +691,7 @@ end
     @test !occursin("e1be0000-0000-4000-8000-000000000001", out)
     @test !occursin("00000000-0000-0000-0000-000000000002", out)
     @test occursin("PLUTO_PROJECT_TOML_CONTENTS", out)
-    @test occursin("@bind w2 masque(\n    fig, (freq = freq, dots = dots);", out)
+    @test occursin("@bind w masque(\n    fig, (freq = freq, dots = dots);", out)
     @test occursin("# ╠═a1b2c3d4-0002-4000-8000-000000000004\n", out)
     @test download_notebook(out) == out
 end

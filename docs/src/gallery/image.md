@@ -6,10 +6,9 @@ channel.
 
 `region` is a [`GridWindowEvent`](@ref) that holds the pixel ranges
 inside the box, not the pixel values, so you index your own arrays with
-it: `R[region]` is the block of `R` under the box. A
-[`GridInteractable`](@ref) over the image gives the box pixels to
-select, `selects = :img` ties the box to it, and `bind = :img` makes
-`region` that grid's value. See
+it: `R[region]` is the block of `R` under the box. `selects = img` ties
+the box to the image, and `bind = img` makes `region` the image's value.
+See
 [Heatmaps and images](@ref) and [Brush a region](@ref).
 
 ```@raw html

@@ -31,18 +31,18 @@ begin
 end
 
 # ╔═╡ a1b2c3d4-0002-4000-8000-000000000003
-@bind w2 masque(
+@bind w masque(
     fig, (freq = freq, dots = dots);
     onchange = state -> update!(wave, xs, sin.(state.freq .* xs); linestyle = state.dots ? :dot : :solid)
 )
 
 # ╔═╡ a1b2c3d4-0002-4000-8000-000000000004
-w2.freq, w2.dots
+w.freq, w.dots
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
-bond = "w2"
+bond = "w"
 show_code = true
 pluto_html = true
 
