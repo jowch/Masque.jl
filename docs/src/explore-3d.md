@@ -58,7 +58,7 @@ controls, and how to turn several panels together with `linkcameras!`.
 The example at the top of this page does not turn: each turn has Julia
 draw the figure again, and this site has no Julia running behind it
 (see [Pan and orbit preview](@ref)). To try turning it, download the
-notebook and add the two lines above.
+notebook, add the `orbit` line, and pass `orbit` to `masque` as above.
 
 ## What it can't do
 

@@ -8,7 +8,7 @@ plain value: a number from the slider's range, `true` or `false`, a
 
 ```@raw html
 <div class="masque-embed-wrap">
-<iframe id="masque-controls-values" data-masque-embed="controls_values" title="A sine wave with a slider and a toggle. Move either and the last cell shows its value." style="width:100%;height:820px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+<iframe id="masque-controls-values" data-masque-embed="controls_values" title="A sine wave with a slider and a toggle. Move either and the last cell shows their values." style="width:100%;height:820px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
 </div>
 ```
 

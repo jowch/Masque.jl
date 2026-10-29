@@ -19,6 +19,11 @@ end
 # ╔═╡ c0a10006-0001-4000-8000-000000000001
 using CairoMakie, Masque
 
+# ╔═╡ c0a10006-0001-4000-8000-000000000020
+md"""
+Hover a cell to see the two names and the value, or click it.
+"""
+
 # ╔═╡ c0a10006-0001-4000-8000-000000000002
 begin
     contacts = [1.0 0.31 0.08; 0.31 1.0 0.54; 0.08 0.54 1.0]
@@ -26,13 +31,16 @@ begin
     names = ["F17", "I24", "K31"]
     ax = Axis(fig[1, 1]; xticks = (1:3, names), yticks = (1:3, names))
     p = heatmap!(ax, 1:3, 1:3, contacts)
+    labeled = interactables(
+        p;
+        payloads = (i, j) -> (; x = names[i], y = names[j]),
+        tooltip = masque"($(x), $(y)) = $(value)",
+    )
     nothing
 end
 
 # ╔═╡ c0a10006-0001-4000-8000-000000000003
-@bind pick masque(fig, interactables(p;
-    payloads = (i, j) -> (; x = names[i], y = names[j]),
-    tooltip = masque"($(x), $(y)) = $(value)"); bind = p)
+@bind pick masque(fig, labeled; bind = p)
 
 # ╔═╡ c0a10006-0001-4000-8000-000000000004
 isnothing(pick) ? "click a cell" : "$(pick.x) and $(pick.y): $(pick.value)"
@@ -43,10 +51,13 @@ PLUTO_PLAYER_TOML_CONTENTS = """
 bond = "pick"
 show_code = true
 pluto_html = true
-cells = ["c0a10006-0001-4000-8000-000000000002", "c0a10006-0001-4000-8000-000000000003", "c0a10006-0001-4000-8000-000000000004"]
 
-[player.segments]
-widget = ["c0a10006-0001-4000-8000-000000000002", "c0a10006-0001-4000-8000-000000000003", "c0a10006-0001-4000-8000-000000000004"]
+cells = [
+    "c0a10006-0001-4000-8000-000000000020",
+    "c0a10006-0001-4000-8000-000000000002",
+    "c0a10006-0001-4000-8000-000000000003",
+    "c0a10006-0001-4000-8000-000000000004"
+]
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1694,6 +1705,7 @@ version = "4.1.0+0"
 
 # ╔═╡ Cell order:
 # ╠═c0a10006-0001-4000-8000-000000000001
+# ╟─c0a10006-0001-4000-8000-000000000020
 # ╠═c0a10006-0001-4000-8000-000000000002
 # ╠═c0a10006-0001-4000-8000-000000000003
 # ╠═c0a10006-0001-4000-8000-000000000004
