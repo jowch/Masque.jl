@@ -308,6 +308,8 @@ function discrete_states(manifest::AbstractDict)
         id = string(L["id"])
         "click" in string.(L["events"]) || continue
         haskey(L, "brush") && continue
+        # A member of a `linked(...)` group posts its group's rows: `group_states`.
+        get(L, "group", nothing) === nothing || continue
         bond = get(L, "bond", "none")
         pts = get(L, "points", nothing)
         if bond == "element" && string(L["kind"]) == "lines" && pts !== nothing
@@ -335,6 +337,28 @@ function discrete_states(manifest::AbstractDict)
         end
     end
     return states
+end
+
+"""
+    group_states(manifest) -> Vector{Pair{String, Dict{String, Any}}}
+
+Every single-click value of each `linked(...)` group, as `field => envelope` in the shape
+`groupEnvelope` (frontend/src/linked.ts) posts: `{row}` for each row, or `{rows = [row]}`
+for a group that holds several. A click on any member's mark of that row posts the same.
+"""
+function group_states(manifest::AbstractDict)
+    out = Pair{String, Dict{String, Any}}[]
+    groups = get(manifest, "groups", Any[])
+    # The player keys an envelope without its field, so two groups' rows would collide.
+    length(groups) > 1 && error("a player records one `linked(...)` group; this widget has $(length(groups))")
+    for g in groups
+        id = string(_field(g, "id"))
+        many = _field(g, "many") === true
+        for r in 0:(Int(_field(g, "n")) - 1)
+            push!(out, id => (many ? Dict{String, Any}("rows" => [r]) : Dict{String, Any}("row" => r)))
+        end
+    end
+    return out
 end
 
 # Largest brush state space a player may enumerate. Each state is one Julia evaluation at
@@ -454,6 +478,12 @@ function player_states(player::AbstractDict, manifest::AbstractDict)
         k in seen && continue
         push!(seen, k)
         push!(out, (; key = k, value = whole(string(v["layer"]), v)))
+    end
+    for (f, v) in group_states(manifest)
+        k = snapshot_key(v)
+        k in seen && continue
+        push!(seen, k)
+        push!(out, (; key = k, value = whole(f, v)))
     end
     # `pairs = true`: a reader who clicks one plot and then another holds two picks, so
     # record every click on one field with every click on another, keyed the way `keyOf`
