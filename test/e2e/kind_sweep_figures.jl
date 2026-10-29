@@ -1504,8 +1504,10 @@ function build_kind_sweep()
         pick = Menu(fig[4, 1:2]; options = ["a", "b", "c"], default = "a")
         # A vertical toggle (#427): its track stands up, off at the bottom.
         tall = Toggle(fig[1, 3]; orientation = :vertical, active = false)
+        # A checkbox with its own click rule (#428): once ticked, a click leaves it ticked.
+        sure = Checkbox(fig[3, 3]; checked = false, onchange = _ -> true)
         masque(
-            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick, tall = tall);
+            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick, tall = tall, sure = sure);
             onchange = st -> begin
                 update!(level, [0.0, 10.0], fill(Float64(st.level), 2); visible = st.show)
                 # A dependent menu: the checkbox swaps the menu's options.

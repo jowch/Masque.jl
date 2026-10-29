@@ -125,7 +125,8 @@ function _checkbox_geometry!(g, b::Makie.Checkbox, ctx)
     for v in (false, true)
         n = try
             b.onchange[](v)
-        catch
+        catch e
+            e isa InterruptException && rethrow()
             !v
         end
         push!(next, n isa Bool ? n : !v)

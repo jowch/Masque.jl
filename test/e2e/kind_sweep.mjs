@@ -876,7 +876,7 @@ try {
 
       // Each control sits on its block's box.
       const s0 = await screenOf();
-      for (const id of ["level", "show", "span", "fine", "pick", "tall"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall", "sure"]) {
         const g = geo(id);
         if (layers.find((l) => l.id === id)?.kind !== "control") throw new Error(`${key}: no control layer ${id}`);
         const bb = await page.locator(`[data-masque-control="${id}"]`).boundingBox();
@@ -895,7 +895,7 @@ try {
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         sr.querySelector(".masque-controls").style.visibility = "hidden";
       }, key);
-      for (const id of ["level", "show", "span", "fine", "pick", "tall"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall", "sure"]) {
         const g = geo(id);
         const png = PNG.sync.read(await page.screenshot({ clip: { x: s0.left + g.x * s0.sc + 1, y: s0.top + g.y * s0.sc + 1, width: Math.max(1, g.w * s0.sc - 2), height: Math.max(1, g.h * s0.sc - 2) } }));
         let ink = 0;
@@ -992,6 +992,23 @@ try {
       await ctl("pick", "select").selectOption("2");
       v = await bondHas(/level = 10, show = false, span = \(1, 5\), fine = true, pick = "z"/, v, "menu");
       passed.push(`${key}/interval-checkbox-menu`);
+      // A checkbox drawn as Makie draws it, following its own `onchange` rule (#428): a click
+      // ticks it and fills the box in its checked colour; a second click leaves it ticked and
+      // the value as it was.
+      {
+        const rect = ctl("sure", "svg rect");
+        const fill = () => rect.getAttribute("fill");
+        if ((await fill()) !== geo("sure").off) throw new Error(`${key}/checkbox-rule: fill ${await fill()}, want ${geo("sure").off}`);
+        await ctl("sure").click();
+        v = await bondHas(/sure = true/, v, "checkbox-rule");
+        if ((await fill()) !== geo("sure").color) throw new Error(`${key}/checkbox-rule: fill ${await fill()}, want ${geo("sure").color}`);
+        await ctl("sure").click();
+        await page.waitForTimeout(1500);
+        if (!(await ctl("sure").isChecked())) throw new Error(`${key}/checkbox-rule: second click unticked it`);
+        const after = await textOf(`#bond_${key}`);
+        if (after !== v) throw new Error(`${key}/checkbox-rule: second click changed the value to ${JSON.stringify(after)}`);
+        passed.push(`${key}/checkbox-rule`);
+      }
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);
       continue;
     }
