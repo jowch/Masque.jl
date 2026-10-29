@@ -14,6 +14,11 @@ All notable changes to this project are documented here. The format is based on
   hover and pressed colours. Its field counts the clicks. With `onchange`, each click also sets
   the button's `clicks`, so code listening to it runs. A button that `masque` isn't given warns,
   as before (#431).
+- A Makie `Textbox` named in `masque` works in the notebook, drawn as Makie draws it. Its field
+  holds the text the reader last entered with Enter, or `nothing` before any. A `Regex` or
+  number-type `validator` and the `restriction` are checked as the reader types; a function
+  `validator` is checked on Enter, and text it refuses leaves the field as it was. A text box
+  that `masque` isn't given warns, as before (#433).
 - `linked(plots...)` makes plots that draw the same rows one selection: clicking a mark in
   any of them selects its row in all of them, and hovering a mark outlines the same row on the
   others. The `@bind` field holds the row's position, or with `key = :id` the `id` of its

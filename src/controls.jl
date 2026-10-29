@@ -4,6 +4,7 @@
 
 const _CONTROL_BLOCKS = Union{
     Makie.Slider, Makie.IntervalSlider, Makie.Toggle, Makie.Checkbox, Makie.Menu, Makie.SliderGrid, Makie.Button,
+    Makie.Textbox,
 }
 
 # The wire name of each block type, the `control` entry of its layer's geometry.
@@ -14,15 +15,17 @@ _control_name(::Makie.Checkbox) = "checkbox"
 _control_name(::Makie.Menu) = "menu"
 _control_name(::Makie.SliderGrid) = "slidergrid"
 _control_name(::Makie.Button) = "button"
+_control_name(::Makie.Textbox) = "textbox"
 
 """
     BlockControl(block, id)
 
 A Makie block drawn as an HTML control: `Slider`, `IntervalSlider`, `Toggle`, `Checkbox`,
-`Menu`, `SliderGrid` or `Button`. [`masque`](@ref) builds one for each block named in its arguments or
+`Menu`, `SliderGrid`, `Button` or `Textbox`. [`masque`](@ref) builds one for each block named in its arguments or
 `bind` (`masque(fig, (degree = sl,))`); there is no need to build it by hand. Its field holds
 the block's plain value: the slider's value, `(lo, hi)`, `true`/`false`, the menu's selection,
-a tuple of a grid's slider values, in order, or the number of times a button was clicked.
+a tuple of a grid's slider values, in order, the number of times a button was clicked, or the
+text last entered in a text box (`nothing` before any).
 """
 struct BlockControl <: AbstractInteractable
     block::_CONTROL_BLOCKS
@@ -67,6 +70,7 @@ _control_wire(b::Makie.Toggle) = Bool(b.active[])
 _control_wire(b::Makie.Checkbox) = Bool(b.checked[])
 _control_wire(b::Makie.Menu) = Int(b.i_selected[]) - 1
 _control_wire(b::Makie.Button) = Int(b.clicks[])
+_control_wire(b::Makie.Textbox) = b.stored_string[] === nothing ? nothing : string(b.stored_string[])
 _control_wire(b::Makie.SliderGrid) = Any[_control_wire(sl) for sl in _grid_sliders(b)]
 
 hitlayers(i::BlockControl, ctx) =
@@ -108,6 +112,8 @@ function _control_geometry(b, ctx)
         _checkbox_geometry!(g, b, ctx)
     elseif b isa Makie.Button
         _button_geometry!(g, b, ctx)
+    elseif b isa Makie.Textbox
+        _textbox_geometry!(g, b, ctx)
     elseif b isa Makie.SliderGrid
         g["sliders"] = Any[_grid_slider_geometry(sl, vl, ctx) for (sl, vl) in zip(_grid_sliders(b), _grid_valuelabels(b))]
     end
@@ -127,6 +133,62 @@ function _button_geometry!(g, b::Makie.Button, ctx)
     g["colors"] = [_css_color(b.buttoncolor[]), _css_color(b.buttoncolor_hover[]), _css_color(b.buttoncolor_active[])]
     g["textColors"] = [_css_color(b.labelcolor[]), _css_color(b.labelcolor_hover[]), _css_color(b.labelcolor_active[])]
     return g
+end
+
+# Makie's text box (Makie/src/makielayout/blocks/textbox.jl): a rounded box whose border and fill
+# take one colour at rest, another under the pointer, a third while typing, and a fourth while
+# the text typed fails the validator. Enter stores the text if it is valid. Lengths are image px;
+# colours run (at rest, under the pointer, typing, typing invalid text).
+function _textbox_geometry!(g, b::Makie.Textbox, ctx)
+    s = ctx.scaling
+    g["placeholder"] = string(b.placeholder[])
+    g["fontsize"] = Float64(b.fontsize[]) * s
+    g["pad"] = Float64[p * s for p in b.textpadding[]]   # left, right, bottom, top
+    g["radius"] = Float64(b.cornerradius[]) * s
+    g["stroke"] = Float64(b.borderwidth[]) * s
+    g["colors"] = [_css_color(b.boxcolor[]), _css_color(b.boxcolor_hover[]), _css_color(b.boxcolor_focused[]), _css_color(b.boxcolor_focused_invalid[])]
+    g["borders"] = [_css_color(b.bordercolor[]), _css_color(b.bordercolor_hover[]), _css_color(b.bordercolor_focused[]), _css_color(b.bordercolor_focused_invalid[])]
+    g["text"] = _css_color(b.textcolor[])
+    g["placeholderColor"] = _css_color(b.textcolor_placeholder[])
+    g["cursor"] = _css_color(b.cursorcolor[])
+    b.reset_on_defocus[] === true && (g["resetOnBlur"] = true)
+    b.defocus_on_submit[] === true || (g["keepFocus"] = true)
+    check = _textbox_check(b.validator[])
+    check === nothing || (g["check"] = check)
+    allowed = _textbox_allowed(b.restriction[])
+    allowed === nothing || (g["allowed"] = allowed)
+    return g
+end
+
+# The validator as the browser can run it while the reader types: a pattern (a `Regex`, or the
+# numbers `tryparse` reads for a number type) and its flags. A validator the browser can't run
+# (a function of the author's) ships nothing: Julia checks the text when the reader presses Enter.
+const _INT_PATTERN = raw"\s*[+-]?(?:\d+|0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+)\s*"
+const _FLOAT_PATTERN = raw"\s*[+-]?(?:(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?|inf|infinity|nan)\s*"
+function _textbox_check(v)
+    v isa Regex && return _regex_check(v)
+    v isa Type && v <: Integer && !(v <: Bool) && return Dict{String, Any}("pattern" => _INT_PATTERN, "flags" => "")
+    v isa Type && v <: AbstractFloat && return Dict{String, Any}("pattern" => _FLOAT_PATTERN, "flags" => "i")
+    return nothing
+end
+function _regex_check(r::Regex)
+    flags = ""
+    r.compile_options & Base.PCRE.CASELESS != 0 && (flags *= "i")
+    r.compile_options & Base.PCRE.MULTILINE != 0 && (flags *= "m")
+    r.compile_options & Base.PCRE.DOTALL != 0 && (flags *= "s")
+    # Extended syntax (`x`) has no JavaScript form.
+    r.compile_options & Base.PCRE.EXTENDED != 0 && return nothing
+    return Dict{String, Any}("pattern" => r.pattern, "flags" => flags)
+end
+
+# Makie's own validator accepts everything; any other function is the author's.
+_accepts_all(v) = v isa Function && parentmodule(typeof(v)) === Makie
+
+# A `restriction` as the characters it allows among the printable ASCII ones; the browser drops
+# any other of those as the reader types. Characters past ASCII are left to Julia.
+function _textbox_allowed(r)
+    r === nothing && return nothing
+    return String([c for c in ' ':'~' if Makie.is_allowed(c, r)])
 end
 
 # One slider of a `SliderGrid`, with the value label beside it: its box, text size and colour,
@@ -234,6 +296,21 @@ function _control_value(::Makie.Button, id, p)
     p isa Integer && !(p isa Bool) && p >= 0 || throw(ArgumentError("bond: control :$id expected a click count, got $(repr(p))"))
     return Int(p)
 end
+# A text that fails the validator, or holds a character the restriction refuses, leaves the
+# field at the last text the box stored: the browser checks a pattern as the reader types, but
+# a function only Julia can run.
+function _control_value(b::Makie.Textbox, id, p)
+    p === nothing && return nothing
+    p isa AbstractString || throw(ArgumentError("bond: control :$id expected a text or nothing, got $(repr(p))"))
+    _textbox_takes(b, p) && return String(p)
+    return _control_wire(b)
+end
+function _textbox_takes(b::Makie.Textbox, p)
+    r = b.restriction[]
+    r === nothing || all(c -> Makie.is_allowed(c, r), p) || return false
+    v = b.validator[]
+    return _accepts_all(v) || Makie.validate_textbox(p, v)::Bool
+end
 function _control_value(::Union{Makie.Toggle, Makie.Checkbox}, id, p)
     p isa Bool || throw(ArgumentError("bond: control :$id expected true or false, got $(repr(p))"))
     return p
@@ -274,6 +351,14 @@ function _set_control!(b::Makie.IntervalSlider, p)
     return nothing
 end
 _set_control!(b::Makie.Button, p) = (b.clicks[] == p || (b.clicks[] = Int(p)); nothing)
+function _set_control!(b::Makie.Textbox, p)
+    p === nothing && return nothing
+    _textbox_takes(b, p) || return nothing
+    b.stored_string[] == p && return nothing
+    b.displayed_string[] = String(p)
+    b.stored_string[] = String(p)
+    return nothing
+end
 _set_control!(b::Makie.Toggle, p) = (b.active[] == p || (b.active[] = p); nothing)
 _set_control!(b::Makie.Checkbox, p) = (b.checked[] == p || (b.checked[] = p); nothing)
 function _set_control!(b::Makie.SliderGrid, p)
@@ -343,16 +428,12 @@ _figure_blocks(fig) = Any[c for c in fig.content if c isa _CONTROL_BLOCKS && !(c
 
 # Blocks masque began drawing in a patch release. One left out warns (`_warn_unnamed_later`):
 # before, a figure with one worked, so it can't become an error in a patch release.
-const _LATER_BLOCKS = Union{Makie.SliderGrid, Makie.Button}
-
-# Makie's input blocks that masque doesn't draw as controls yet: they stay pictures (#426).
-const _PICTURE_BLOCKS = Union{Makie.Textbox}
+const _LATER_BLOCKS = Union{Makie.SliderGrid, Makie.Button, Makie.Textbox}
 
 # A block in the figure that this call doesn't name would look live and do nothing, so it is an
-# error (a warning in 0.3.1). A block masque can't draw yet looks just as live, so it is a
-# warning. A `SliderGrid`'s sliders aren't in `fig.content`, so only the grid itself counts.
+# error (a warning in 0.3.1). A `SliderGrid`'s sliders aren't in `fig.content`, so only the grid
+# itself counts.
 function _check_unnamed_blocks(fig, interactables)
-    _warn_picture_blocks(fig)
     named = Base.IdSet{Any}(i.block for i in interactables if i isa BlockControl)
     _warn_unnamed_later(fig, named)
     left = [b for b in _figure_blocks(fig) if !(b in named)]
@@ -367,18 +448,6 @@ function _check_unnamed_blocks(fig, interactables)
                 "control, `masque(fig, (name = block,))`, or take it out of the figure",
         ),
     )
-end
-
-function _warn_picture_blocks(fig)
-    left = Any[c for c in fig.content if c isa _PICTURE_BLOCKS]
-    isempty(left) && return nothing
-    kinds = unique(string(nameof(typeof(b))) for b in left)
-    names = ["a " * k for k in kinds]
-    list = length(names) == 1 ? only(names) : join(names[1:(end - 1)], ", ") * " and " * names[end]
-    instead = "For a text box, use a control outside the figure, such as PlutoUI's TextField."
-    @warn "masque: this figure has $(list), which masque shows as a picture for now, so the " *
-        "reader can click it and nothing happens. $(instead)"
-    return nothing
 end
 
 function _warn_unnamed_later(fig, named)

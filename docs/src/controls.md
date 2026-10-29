@@ -62,12 +62,14 @@ block in the figure that `masque` isn't given would look live and do
 nothing, so `masque` raises an error naming its kind. Name it, or take it
 out of the figure.
 
-Text boxes are pictures for now, and `masque` warns when the figure has
-one, since the reader could click it and nothing would happen. A
-`SliderGrid` works like the other blocks: its field holds a tuple of its
+A `SliderGrid` works like the other blocks: its field holds a tuple of its
 sliders' values. A `Button`'s field counts its clicks. With `onchange`,
 Masque sets the button's `clicks` before calling your function, so code
-listening to it with `on(b.clicks)` runs too.
+listening to it with `on(b.clicks)` runs too. A `Textbox`'s field holds
+the text the reader last entered with Enter, or `nothing` before any. A
+`validator` that is a `Regex` or a number type turns the box red as the
+reader types, as in Makie; one that is a function runs when they press
+Enter, and text it refuses leaves the field as it was.
 
 With WGLMakie loaded, `Slider` and `Button` also name controls from
 Bonito, so Julia asks which one you mean; write `Makie.Slider` and

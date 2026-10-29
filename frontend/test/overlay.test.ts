@@ -6894,6 +6894,39 @@ describe("block controls (#345)", () => {
         expect(val(host).go).toEqual({ layer: "go", index: 0, payload: 4 })
     })
 
+    it("a text box stores its text on Enter, checks it as the reader types, and drops refused characters (#433)", () => {
+        const m = controlsManifest()
+        m.layers.push({ id: "word", kind: "control", axis: "", events: ["change"], payloads: [], label: "word",
+            geometry: { control: "textbox", x: 100, y: 700, w: 200, h: 40, value: null, placeholder: "Type…", fontsize: 32, pad: [16, 16, 8, 8],
+                radius: 10, stroke: 2, colors: ["rgb(1,1,1)", "rgb(2,2,2)", "rgb(3,3,3)", "rgb(4,4,4)"],
+                borders: ["rgb(5,5,5)", "rgb(6,6,6)", "rgb(7,7,7)", "rgb(8,8,8)"], text: "rgb(9,9,9)", placeholderColor: "rgb(10,10,10)",
+                cursor: "rgb(11,11,11)", check: { pattern: "\\d+", flags: "" }, allowed: "0123456789x" } })
+        m.fields = [...(m.fields ?? []), "word"]
+        m.initial!.word = { layer: "word", index: 0, payload: null }
+        const { host, script } = setup()
+        mount(script, m)
+        const el = ctl(host, "word").querySelector("input") as HTMLInputElement
+        expect(el.placeholder).toBe("Type…")
+        const v = (name: string) => el.style.getPropertyValue(`--${name}`)
+        expect([v("fs"), v("pl"), v("pt"), v("r"), v("sw")]).toEqual(["16cqw", "8cqw", "4cqw", "5cqw", "0.5cqw"])
+        expect([v("b3"), v("e2"), v("tx"), v("ph"), v("cc")]).toEqual(["rgb(4,4,4)", "rgb(7,7,7)", "rgb(9,9,9)", "rgb(10,10,10)", "rgb(11,11,11)"])
+        const type = (text: string) => { el.value = text; el.dispatchEvent(new Event("input", { bubbles: true })) }
+        const enter = () => el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        // A refused character is dropped; one the check fails turns the box invalid, and Enter
+        // stores nothing.
+        type("1a2x")
+        expect(el.value).toBe("12x")
+        expect(el.classList.contains("invalid")).toBe(true)
+        enter()
+        expect(val(host).word).toEqual({ layer: "word", index: 0, payload: null })
+        type("12")
+        expect(el.classList.contains("invalid")).toBe(false)
+        expect(el.classList.contains("unstored")).toBe(true)
+        enter()
+        expect(val(host).word).toEqual({ layer: "word", index: 0, payload: "12" })
+        expect(el.classList.contains("unstored")).toBe(false)
+    })
+
     it("a slider grid draws each slider and its value label, and commits all its values together (#430)", () => {
         const m = controlsManifest()
         m.layers.push({ id: "grid", kind: "control", axis: "", events: ["change"], payloads: [], label: "grid",

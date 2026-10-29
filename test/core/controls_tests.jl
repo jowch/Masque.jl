@@ -157,19 +157,55 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test_logs masque(fig)
     end
 
-    @testset "a block masque shows as a picture is a warning naming its kind (#426)" begin
-        # A `Textbox` would look live and do nothing too, but figures with one worked before, so
-        # it warns instead of failing.
-        fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
-        Textbox(fig[2, 1])
-        @test_logs (:warn, r"has a Textbox, which masque shows as a picture.*PlutoUI's TextField"s) masque(fig)
-        # A grid or a button masque isn't given is a warning too, not the error other blocks get:
-        # masque began drawing them in a patch release (#430, #431).
+    @testset "a grid, button or text box masque isn't given is a warning naming its kind (#426)" begin
+        # They would look live and do nothing too, but masque began drawing them in a patch
+        # release and figures with one worked before, so it warns instead of failing.
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
         SliderGrid(fig[2, 1], (label = "a", range = 1:3))
         @test_logs (:warn, r"a SliderGrid that masque wasn't given.*Name it to make it live"s) masque(fig)
         Button(fig[3, 1])
-        @test_logs (:warn, r"a SliderGrid and a Button that masque wasn't given, so they show as pictures.*Name each one"s) masque(fig)
+        Textbox(fig[4, 1])
+        @test_logs (:warn, r"a SliderGrid, a Button and a Textbox that masque wasn't given, so they show as pictures.*Name each one"s) masque(fig)
+    end
+
+    @testset "a text box is a field holding the text last entered, checked as Makie checks it (#433)" begin
+        fig = Figure(); Axis(fig[1, 1])
+        plain = Textbox(fig[2, 1]; placeholder = "name", textpadding = (4, 4, 2, 2), borderwidth = 2, boxcolor = :yellow)
+        num = Textbox(fig[3, 1]; validator = Float64, stored_string = "1.5", restriction = c -> isdigit(c) || c == '.')
+        pat = Textbox(fig[4, 1]; validator = r"[a-c]+"i, reset_on_defocus = true, defocus_on_submit = false)
+        odd = Textbox(fig[5, 1]; validator = s -> length(s) == 3)
+        w = @test_logs masque(fig, (plain = plain, num = num, pat = pat, odd = odd))
+        @test Masque.initial_bond(w) == (plain = nothing, num = "1.5", pat = nothing, odd = nothing)
+        s = w.manifest["scaling"]
+        g = _layer(w.manifest, "plain")["geometry"]
+        @test g["control"] == "textbox" && g["value"] === nothing && g["placeholder"] == "name"
+        @test g["pad"] ≈ [4s, 4s, 2s, 2s] && g["stroke"] ≈ 2s && g["radius"] ≈ 5s
+        @test g["colors"][1] == Masque._css_color(Makie.to_color(:yellow)) && length(g["borders"]) == 4
+        @test !haskey(g, "check") && !haskey(g, "allowed") && !haskey(g, "resetOnBlur") && !haskey(g, "keepFocus")
+        g = _layer(w.manifest, "num")["geometry"]
+        @test g["value"] == "1.5" && g["allowed"] == ".0123456789"
+        rx = Regex("^(?:" * g["check"]["pattern"] * ")\$", "i")
+        for t in ["1", " 2.5e3 ", ".5", "inf", "x", "1,5", ""]
+            @test occursin(rx, t) == (tryparse(Float64, t) !== nothing)
+        end
+        g = _layer(w.manifest, "pat")["geometry"]
+        @test g["check"] == Dict("pattern" => "[a-c]+", "flags" => "i") && g["resetOnBlur"] && g["keepFocus"]
+        @test !haskey(_layer(w.manifest, "odd")["geometry"], "check")   # a function: Julia checks it
+        # The text the browser sends, unless the validator or restriction refuses it: then the
+        # field keeps what the box stored.
+        bond(js) = Masque.bond_from_js(w, js)
+        @test bond(Dict("odd" => _env("odd", "abc"))).odd == "abc"
+        @test bond(Dict("odd" => _env("odd", "ab"))).odd === nothing
+        @test bond(Dict("num" => _env("num", "2x"))).num == "1.5"
+        @test bond(Dict("num" => _env("num", "2.25"))).num == "2.25"
+        @test_throws ArgumentError bond(Dict("odd" => _env("odd", 3)))
+        # Enter reaches the block's own `stored_string`, so code listening to it runs.
+        heard = String[]
+        on(t -> push!(heard, t), odd.stored_string)
+        Masque._sync_controls!([Masque.BlockControl(odd, :odd)], Dict("odd" => _env("odd", "xyz")))
+        @test odd.stored_string[] == "xyz" && odd.displayed_string[] == "xyz" && heard == ["xyz"]
+        Masque._sync_controls!([Masque.BlockControl(odd, :odd)], Dict("odd" => _env("odd", "toolong")))
+        @test odd.stored_string[] == "xyz" && heard == ["xyz"]
     end
 
     @testset "a slider grid is a field holding a tuple of its slider values (#430)" begin

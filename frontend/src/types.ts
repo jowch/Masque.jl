@@ -72,14 +72,15 @@ export interface ROIGeometry {
 
 // A Makie block drawn as an HTML control. `value` is the block's state as the wire carries it:
 // a 0-based index (slider, menu; -1 for a menu with nothing chosen), a pair of them (interval
-// slider), a Bool (toggle, checkbox), or a click count (button).
+// slider), a Bool (toggle, checkbox), a click count (button), or the stored text (text box;
+// null before any).
 export interface ControlGeometry {
-    control: "slider" | "intervalslider" | "toggle" | "checkbox" | "menu" | "slidergrid" | "button"
+    control: "slider" | "intervalslider" | "toggle" | "checkbox" | "menu" | "slidergrid" | "button" | "textbox"
     x: number // the block's box, image px, top-left origin
     y: number
     w: number
     h: number
-    value: number | number[] | boolean | (number | number[])[]
+    value: number | number[] | boolean | (number | number[])[] | string | null
     n?: number              // slider and menu: how many values
     horizontal?: boolean    // slider: false for a vertical one
     range?: [number, number] // slider over a numeric range: start and step, for the read-out value
@@ -118,8 +119,19 @@ export interface ControlGeometry {
     // `stroke` and `fontsize` above. Colours at rest, under the pointer, and pressed.
     caption?: string
     strokeColor?: string
-    colors?: [string, string, string]
+    colors?: string[]       // button: 3, text box: 4
     textColors?: [string, string, string]
+    // Text box: `colors` and `borders` at rest, under the pointer, typing, and typing invalid
+    // text; `radius`, `stroke`, `fontsize` and `text` above.
+    placeholder?: string
+    pad?: [number, number, number, number] // image px: left, right, bottom, top
+    borders?: [string, string, string, string]
+    placeholderColor?: string
+    cursor?: string
+    resetOnBlur?: true      // leaving the box puts back the stored text
+    keepFocus?: true        // Enter stores the text and leaves the box focused
+    check?: { pattern: string; flags: string } // the text must match all of it; absent, any text
+    allowed?: string        // the printable ASCII characters the box takes; absent, any
 }
 
 // The label beside a grid's slider that shows its value: its box (image px), text size and
