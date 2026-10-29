@@ -11,15 +11,15 @@
 // frames, and the notebook downloads. Players load the overlay script, pictures and state
 // tables from shared files. The Backends
 // page's two `@example` widgets, shown without Pluto, must hover to a tooltip, mount when
-// their script runs from `<head>`, and show their figure with scripts off.
+// their script runs from `<head>`, and show their figure with scripts off. On a phone-wide
+// window, the getting started page must not scroll or move while its players load.
 //
 //   node docs_player.mjs <docs/build>
 
 import { chromium } from "playwright";
-import { createServer } from "node:http";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { homedir } from "node:os";
-import { extname, join, normalize, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, normalize } from "node:path";
+import { localPlutoAsset, PLUTO_FRONTEND, serve } from "./docs_site.mjs";
 
 const rootArg = process.argv[2];
 if (!rootArg) {
@@ -28,16 +28,6 @@ if (!rootArg) {
 }
 const root = normalize(rootArg);
 
-const MIME = {
-  ".html": "text/html; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".json": "application/json",
-  ".woff2": "font/woff2",
-  ".woff": "font/woff",
-};
 
 const POINTS = [
   { name: "one", y: "2.0" },
@@ -52,62 +42,8 @@ function gettingStartedPath() {
   throw new Error(`no getting-started page under ${root}`);
 }
 
-function serve(dir) {
-  return createServer((req, res) => {
-    let p = decodeURIComponent(new URL(req.url, "http://127.0.0.1").pathname);
-    if (p.endsWith("/")) p += "index.html";
-    const file = normalize(join(dir, p));
-    const prefix = dir.endsWith(sep) ? dir : dir + sep;
-    if (file !== dir && !file.startsWith(prefix)) {
-      res.writeHead(403); res.end(); return;
-    }
-    if (!existsSync(file) || statSync(file).isDirectory()) {
-      res.writeHead(404); res.end(); return;
-    }
-    res.setHeader("content-type", MIME[extname(file)] || "application/octet-stream");
-    res.end(readFileSync(file));
-  });
-}
-
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-// Pluto's static export loads its editor from jsDelivr. On the docs CI runner
-// that document reaches readyState "complete" and still never creates
-// .ip-host. The same file boots when those scripts load. Serve the copy
-// already in the Julia depot (the harvest that wrote the HTML used it).
-function plutoFrontendDirs() {
-  const depots = (process.env.JULIA_DEPOT_PATH || join(homedir(), ".julia")).split(":");
-  const dirs = [];
-  for (const depot of depots) {
-    if (!depot) continue;
-    const root = join(depot, "packages", "Pluto");
-    if (!existsSync(root)) continue;
-    for (const slug of readdirSync(root)) {
-      const dist = join(root, slug, "frontend-dist");
-      if (existsSync(dist)) dirs.push(dist);
-    }
-  }
-  return dirs;
-}
-
-const plutoDists = plutoFrontendDirs();
-
-function localPlutoAsset(url) {
-  const marker = "/frontend-dist/";
-  const i = url.indexOf(marker);
-  if (i < 0) return null;
-  let name = url.slice(i + marker.length).split("?")[0].split("#")[0];
-  try { name = decodeURIComponent(name); } catch { return null; }
-  if (!name || name.split("/").includes("..")) return null;
-  for (const dir of plutoDists) {
-    const file = normalize(join(dir, name));
-    const prefix = dir.endsWith(sep) ? dir : dir + sep;
-    if (file !== dir && !file.startsWith(prefix)) continue;
-    if (existsSync(file) && statSync(file).isFile()) return file;
-  }
-  return null;
 }
 
 function mountSnapshot() {
@@ -260,7 +196,7 @@ try {
     if (!u.includes("jsdelivr") && !u.includes("frontend-dist")) return;
     netLog.push(`failed ${u} ${req.failure()?.errorText || ""}`);
   });
-  await page.route(/https:\/\/cdn\.jsdelivr\.net\/gh\/JuliaPluto\/Pluto\.jl@[^/]+\/frontend-dist\//, async (route) => {
+  await page.route(PLUTO_FRONTEND, async (route) => {
     const file = localPlutoAsset(route.request().url());
     if (!file) {
       netLog.push(`cdn miss ${route.request().url()}`);
@@ -793,6 +729,38 @@ try {
     if (widths.length !== 2 || !widths.every((w) => w > 0)) throw new Error(`@example widgets with scripts off: image widths ${JSON.stringify(widths)}`);
     console.log("E2E OK [docs @example] — with scripts off, both widgets show their figure");
   }
+
+  // The page stays where the reader is while its players load. A `#segment=` address once
+  // made Pluto's frontend scroll the page to the player, and a player's height written by
+  // hand moved the text when it drew; the build now reserves it (measure_players.mjs).
+  const still = await browser.newContext({ locale: "en-US", timezoneId: "UTC", viewport: { width: 390, height: 844 } });
+  const page4 = await still.newPage();
+  await page4.route(PLUTO_FRONTEND, async (route) => {
+    const file = localPlutoAsset(route.request().url());
+    if (file) await route.fulfill({ path: file });
+    else await route.continue();
+  });
+  await page4.addInitScript(() => {
+    window.masqueScrolls = [];
+    window.masqueShift = 0;
+    addEventListener("scroll", () => window.masqueScrolls.push(Math.round(scrollY)));
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) if (!e.hadRecentInput) window.masqueShift += e.value;
+    }).observe({ type: "layout-shift", buffered: true });
+  });
+  await page4.goto(url, { waitUntil: "domcontentloaded" });
+  await page4.waitForFunction(() => [...document.querySelectorAll("iframe[data-masque-embed]")].every((f) => {
+    const d = f.contentDocument;
+    return d && d.querySelector("pluto-notebook pluto-cell");
+  }), null, { timeout: 30000 }).catch(() => {
+    throw new Error("the getting started players never drew");
+  });
+  await sleep(2000);
+  const settle = await page4.evaluate(() => ({ scrolls: window.masqueScrolls, shift: window.masqueShift }));
+  await still.close();
+  if (settle.scrolls.length) throw new Error(`the page scrolled itself while its players loaded: ${settle.scrolls.join(", ")}`);
+  if (settle.shift > 0.1) throw new Error(`the page moved by ${settle.shift.toFixed(3)} (layout shift) while its players loaded`);
+  console.log(`E2E OK [docs layout] — the page stays put while its players load (layout shift ${settle.shift.toFixed(3)})`);
 
   // Pluto's frontend unreachable: the iframe never draws a cell, so the page hides it and
   // opens the text twin, whose code, idle figure, and readout need no CDN.

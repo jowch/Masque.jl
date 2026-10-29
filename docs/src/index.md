@@ -6,14 +6,20 @@ notebook can respond. [Ready to get started?](getting-started.md)
 
 ## [Tooltips](@id home-tooltips)
 
-![Hovering over a star shows its name, spectral type, and distance](assets/home/hover.webp)
+```@raw html
+<img src="assets/home/hover.webp" width="1168" height="768"
+     alt="Hovering over a star shows its name, spectral type, and distance">
+```
 
 Hover over a point, bar, heatmap cell, or polygon to see its data in a
 tooltip. You choose what the tooltip says. See [Tooltips](@ref).
 
 ## Select marks
 
-![Clicking Lagos, São Paulo and Tokyo on a map of cities, dragging a box over Europe to add its cities, then pressing Ctrl-Z to take the box back, while the cell below lists the picked cities](assets/demo.webp)
+```@raw html
+<img src="assets/demo.webp" width="1448" height="834"
+     alt="Clicking Lagos, São Paulo and Tokyo on a map of cities, dragging a box over Europe to add its cities, then pressing Ctrl-Z to take the box back, while the cell below lists the picked cities">
+```
 
 Click a mark to send it to your notebook. With `select = :many`, each
 click adds a mark, and dragging a box picks every mark inside it.
@@ -47,7 +53,10 @@ either. See [Pan, zoom and orbit](@ref).
 
 ## Highlight from the legend
 
-![Clicking a species in the legend keeps that class and fades the others](assets/home/legend.webp)
+```@raw html
+<img src="assets/home/legend.webp" width="1188" height="878"
+     alt="Clicking a species in the legend keeps that class and fades the others">
+```
 
 Click a legend entry to keep the points it labels and fade the rest,
 and the entry goes to your notebook. See [Legend](@ref).

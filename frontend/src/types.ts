@@ -86,8 +86,20 @@ export interface ControlGeometry {
     labels?: string[]       // menu options, or the slider's values when the range isn't numeric
     color?: string          // the block's accent colour: a slider's knob, a toggle's knob, a checked box
     fill?: string           // a slider's filled stretch, an active toggle's frame
-    off?: string            // the empty bar, an inactive toggle's frame
+    off?: string            // the empty bar, an inactive toggle's frame, a closed menu's box
     settleOnly?: true       // `update_while_dragging = false`: `onchange` runs on release only
+    // Toggle, as Makie draws it; points are image px from the box's top-left corner.
+    theta?: number          // the track's turn, radians counterclockwise (0 horizontal, π/2 vertical)
+    track?: [number, number, number, number] // the track's start-end centre (x, y), its length and thickness
+    knobOff?: [number, number] // the knob's centre when off, and when on
+    knobOn?: [number, number]
+    knob?: number           // the knob's diameter
+    duration?: number       // seconds the knob takes to slide
+    // Menu: the closed menu as Makie draws it, its box colour in `off`.
+    text?: string           // the text colour
+    prompt?: string         // shown before a choice
+    fontsize?: number       // image px
+    padding?: number        // image px from the box's left edge to the text
 }
 
 export interface SliceSeries {

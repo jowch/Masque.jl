@@ -1502,8 +1502,10 @@ function build_kind_sweep()
         span = IntervalSlider(fig[3, 1]; range = 1:5, startvalues = (2, 4))
         fine = Checkbox(fig[3, 2]; checked = false)
         pick = Menu(fig[4, 1:2]; options = ["a", "b", "c"], default = "a")
+        # A vertical toggle (#427): its track stands up, off at the bottom.
+        tall = Toggle(fig[1, 3]; orientation = :vertical, active = false)
         masque(
-            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick);
+            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick, tall = tall);
             onchange = st -> begin
                 update!(level, [0.0, 10.0], fill(Float64(st.level), 2); visible = st.show)
                 # A dependent menu: the checkbox swaps the menu's options.
