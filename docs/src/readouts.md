@@ -152,10 +152,7 @@ write its number as `value` in the figure code. Writing
 `value = level.value` there does not work, for the same reason a widget
 cannot take its own value as `selected=`; see [Selection](@ref).
 
-## Supported axes
-
-The axis readout and the threshold need a 2D `Axis`; see
-[Supported plots and axes](@ref) for which axes and scales.
+## Set a range with two thresholds
 
 One widget can hold several thresholds, boxes, and plots you click, each
 in its own field. Give each a name with a named tuple, so you know which
@@ -165,6 +162,10 @@ field is which:
 low = ThresholdInteractable(ax; orientation = :horizontal, value = 0.2)
 high = ThresholdInteractable(ax; orientation = :horizontal, value = 0.8)
 @bind band masque(fig; bind = (low = low, high = high))
+```
+
+```julia
+"$(count(y -> band.low.value < y < band.high.value, ys)) of $(length(ys)) points between $(round(band.low.value; digits = 2)) and $(round(band.high.value; digits = 2))"
 ```
 
 ```@raw html
@@ -185,3 +186,8 @@ Then `band.low.value` and `band.high.value` are the two lines'
 positions, and moving one leaves the other's field as it was.
 
 To drag a box instead of a line, see [Brush a region](@ref).
+
+## Supported axes
+
+The axis readout and the threshold need a 2D `Axis`; see
+[Supported plots and axes](@ref) for which axes and scales.

@@ -45,10 +45,10 @@ begin
 end;
 
 # ╔═╡ c1d50019-0001-4000-8000-000000000003
-@bind level wid
+@bind pick wid
 
 # ╔═╡ c1d50019-0001-4000-8000-000000000004
-Base.Text(isnothing(level) ? "click the colorbar" : "value = $(round(level.value; digits = 2))")
+Base.Text(isnothing(pick) ? "click the colorbar" : "value = $(round(pick.value; digits = 2))")
 
 # ╔═╡ c1d50019-0001-4000-8000-000000000005
 HTML(

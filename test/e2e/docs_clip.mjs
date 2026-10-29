@@ -333,7 +333,12 @@ const CLIPS = {
     async run(c) {
       const t = c.mf.transforms[String(c.mf.layers.find((l) => l.id === "colorbar").axis)];
       const [vx, vy, vw, vh] = t.viewport;
-      const at = (v) => c.px(vx + vw / 2, vy + (1 - (v - t.ylims[0]) / (t.ylims[1] - t.ylims[0])) * vh);
+      // Whole CSS pixels: a click reports whole pixels while a hover reports fractions
+      // (#448), so a fractional target would show a tooltip a hair off the value.
+      const at = (v) => {
+        const q = c.px(vx + vw / 2, vy + (1 - (v - t.ylims[0]) / (t.ylims[1] - t.ylims[0])) * vh);
+        return { x: Math.round(q.x), y: Math.round(q.y) };
+      };
       await c.glide(at(6), 900);
       await c.glide(at(12), 1400);
       await c.click(at(12));

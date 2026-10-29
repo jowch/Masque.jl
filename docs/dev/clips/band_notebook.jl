@@ -45,10 +45,10 @@ begin
 end;
 
 # ╔═╡ c1d50018-0001-4000-8000-000000000003
-@bind level wid
+@bind band wid
 
 # ╔═╡ c1d50018-0001-4000-8000-000000000004
-Base.Text("$(count(y -> level.low.value < y < level.high.value, ys)) of $(length(ys)) points between $(round(level.low.value; digits = 2)) and $(round(level.high.value; digits = 2))")
+Base.Text("$(count(y -> band.low.value < y < band.high.value, ys)) of $(length(ys)) points between $(round(band.low.value; digits = 2)) and $(round(band.high.value; digits = 2))")
 
 # ╔═╡ c1d50018-0001-4000-8000-000000000005
 HTML(
