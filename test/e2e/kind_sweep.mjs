@@ -933,10 +933,24 @@ try {
       await expectLevel(10, "drag");
       passed.push(`${key}/slider-drag`);
 
-      // The toggle hides the line.
+      // The toggle hides the line, and its knob slides to Makie's off end (#427).
+      const knobAt = async (want, what) => {
+        const g = geo("show"), sc = (await screenOf()).sc;
+        const bb = await page.locator(`[data-masque-control="show"]`).boundingBox();
+        for (let i = 0; i < 20; i++) {
+          const kb = await ctl("show", ".masque-toggle-knob").boundingBox();
+          // The knob grows by 15% under the pointer, around its centre.
+          const cx = kb.x + kb.width / 2 - bb.x, cy = kb.y + kb.height / 2 - bb.y;
+          if (Math.abs(cx - want[0] * sc) <= 2 && Math.abs(cy - want[1] * sc) <= 2) return;
+          if (i === 19) throw new Error(`${key}/${what}: toggle knob centre (${cx}, ${cy}), want ${JSON.stringify(want.map((c) => c * sc))} (${JSON.stringify(g)})`);
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      };
+      await knobAt(geo("show").knobOn, "toggle-knob-on");
       await ctl("show").click();
       v = await bondHas(/show = false,/, v, "toggle");
       await expectLevel(null, "toggle");
+      await knobAt(geo("show").knobOff, "toggle-knob-off");
       passed.push(`${key}/toggle`);
 
       // The interval slider's high knob, the checkbox and the menu change only their own field.
