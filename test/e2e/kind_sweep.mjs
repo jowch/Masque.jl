@@ -992,22 +992,30 @@ try {
       await ctl("pick", "select").selectOption("2");
       v = await bondHas(/level = 10, show = false, span = \(1, 5\), fine = true, pick = "z"/, v, "menu");
       passed.push(`${key}/interval-checkbox-menu`);
-      // A checkbox drawn as Makie draws it, following its own `onchange` rule (#428): a click
-      // ticks it and fills the box in its checked colour; a second click leaves it ticked and
-      // the value as it was.
+      // A checkbox drawn as Makie draws it (#428): its square is `size` across in the middle of
+      // the box, filled in its checked colour with the mark showing once ticked; Space unticks it.
       {
+        const g = geo("sure");
+        const s1 = await screenOf();
+        const art = ctl("sure", "svg");
+        const bb = await art.boundingBox();
+        const want = { x: s1.left + (g.x + (g.w - g.size) / 2) * s1.sc, y: s1.top + (g.y + (g.h - g.size) / 2) * s1.sc, w: g.size * s1.sc };
+        if (!bb || Math.abs(bb.x - want.x) > 1.5 || Math.abs(bb.y - want.y) > 1.5 || Math.abs(bb.width - want.w) > 1.5 || Math.abs(bb.height - want.w) > 1.5) {
+          throw new Error(`${key}/checkbox-drawn: square ${JSON.stringify(bb)}, want ${JSON.stringify(want)}`);
+        }
         const rect = ctl("sure", "svg rect");
-        const fill = () => rect.getAttribute("fill");
-        if ((await fill()) !== geo("sure").off) throw new Error(`${key}/checkbox-rule: fill ${await fill()}, want ${geo("sure").off}`);
+        const markShown = () => ctl("sure", "svg .mark").evaluate((el) => getComputedStyle(el).visibility === "visible");
+        if ((await rect.getAttribute("fill")) !== g.off) throw new Error(`${key}/checkbox-drawn: fill ${await rect.getAttribute("fill")}, want ${g.off}`);
+        await page.mouse.move(0, 0);
+        if (await markShown()) throw new Error(`${key}/checkbox-drawn: mark shows before the box is ticked`);
         await ctl("sure").click();
-        v = await bondHas(/sure = true/, v, "checkbox-rule");
-        if ((await fill()) !== geo("sure").color) throw new Error(`${key}/checkbox-rule: fill ${await fill()}, want ${geo("sure").color}`);
-        await ctl("sure").click();
-        await page.waitForTimeout(1500);
-        if (!(await ctl("sure").isChecked())) throw new Error(`${key}/checkbox-rule: second click unticked it`);
-        const after = await textOf(`#bond_${key}`);
-        if (after !== v) throw new Error(`${key}/checkbox-rule: second click changed the value to ${JSON.stringify(after)}`);
-        passed.push(`${key}/checkbox-rule`);
+        v = await bondHas(/sure = true/, v, "checkbox-drawn");
+        if ((await rect.getAttribute("fill")) !== g.color) throw new Error(`${key}/checkbox-drawn: fill ${await rect.getAttribute("fill")}, want ${g.color}`);
+        await page.mouse.move(0, 0);
+        if (!(await markShown())) throw new Error(`${key}/checkbox-drawn: mark hidden on a ticked box`);
+        await page.keyboard.press("Space");
+        v = await bondHas(/sure = false/, v, "checkbox-space");
+        passed.push(`${key}/checkbox-drawn`);
       }
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);
       continue;

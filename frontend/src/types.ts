@@ -106,7 +106,7 @@ export interface ControlGeometry {
     markOff?: string
     markSize?: number       // the checkmark's size; its path is in units of it, y up
     mark?: string           // an SVG path; absent, a plain tick
-    next?: [boolean, boolean] // `onchange`: the state a click gives from unchecked, and from checked
+    markChar?: string       // a character drawn as the checkmark instead of a path
     // Menu: the closed menu as Makie draws it, its box colour in `off`.
     text?: string           // the text colour
     prompt?: string         // shown before a choice

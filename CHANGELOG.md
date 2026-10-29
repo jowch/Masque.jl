@@ -42,8 +42,9 @@ All notable changes to this project are documented here. The format is based on
   `selection_cell_color_inactive` carry over to the closed menu (#429).
 - A Makie `Checkbox` named in `masque` is drawn the way Makie draws it: its `size`,
   `roundness`, stroke, both box and checkmark colours and its `checkmark` marker carry over,
-  and the checkmark shows in its unchecked colour under the pointer. A click follows the
-  checkbox's `onchange` rule, so `onchange = _ -> true` makes one that only turns on (#428).
+  and the checkmark shows in its unchecked colour under the pointer. Only the square takes the
+  pointer, as in Makie. A checkbox with its own `onchange` warns that `masque` doesn't run it
+  yet, so a click flips the box (#428, #457).
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
   out, as in `bind = :picked`. Before, the click did nothing.
 - On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down
