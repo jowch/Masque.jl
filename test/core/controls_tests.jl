@@ -69,6 +69,29 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["h"] ≈ bb.widths[2] * s
     end
 
+    @testset "a toggle ships Makie's track and knob, turned by its orientation (#427)" begin
+        fig = Figure(size = (300, 300))
+        Axis(fig[1, 1])
+        flat = Toggle(fig[2, 1]; active = true)
+        tall = Toggle(fig[1, 2]; orientation = :vertical, length = 40, markersize = 20, rimfraction = 0.25, toggleduration = 0.3)
+        w = masque(fig, (flat = flat, tall = tall))
+        s = w.manifest["scaling"]
+        g = _layer(w.manifest, "flat")["geometry"]
+        @test g["theta"] == 0
+        # Makie's default: a 32-long, 18-thick track, the knob off at the left end, on at the right.
+        @test g["track"] ≈ [9s, 9s, 32s, 18s]
+        @test g["knobOff"] ≈ [9s, 9s] && g["knobOn"] ≈ [g["w"] - 9s, 9s]
+        @test g["knob"] ≈ 18 * (1 - 0.33) * s
+        g = _layer(w.manifest, "tall")["geometry"]
+        @test g["theta"] ≈ pi / 2
+        @test g["w"] ≈ 20s && g["h"] ≈ 40s
+        # Vertical: the track starts at the bottom; the knob is off at the bottom, on at the top.
+        @test g["track"] ≈ [10s, 30s, 40s, 20s]
+        @test g["knobOff"] ≈ [10s, 30s] && g["knobOn"] ≈ [10s, 10s]
+        @test g["knob"] ≈ 15s
+        @test g["duration"] == 0.3
+    end
+
     @testset "named through bind, and a bare bind" begin
         (; fig, sc, sl) = _controls_fixture((:sl,))
         w = masque(fig; bind = (degree = sl, pts = sc))

@@ -18,6 +18,10 @@ All notable changes to this project are documented here. The format is based on
 ### Fixed
 - A figure with a Makie `Button`, `Textbox` or `SliderGrid` now warns that masque shows it as
   a picture, so it won't respond to a click. Before, it looked live and did nothing (#426).
+- A Makie `Toggle` named in `masque` is drawn the way Makie draws it: a vertical or angled
+  toggle (`orientation`) stands the right way, and `length`, `markersize`, `rimfraction` and
+  `toggleduration` carry over. Before, every toggle was a horizontal pill stretched over its
+  box (#427).
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
   out, as in `bind = :picked`. Before, the click did nothing.
 - On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down
