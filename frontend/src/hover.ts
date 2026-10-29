@@ -118,7 +118,9 @@ export function tipOffset(ctx: OverlayCtx, e: MouseEvent): { x: number; y: numbe
 // (opacity hides it) so it can be measured before it is shown.
 export function openTip(tip: HTMLElement): void {
     if (!tip.hasAttribute("popover") || !tip.isConnected || tip.matches(":popover-open")) return
-    try { tip.showPopover() } catch { /* already open, or not in a document */ }
+    // A refusal would leave the UA's `[popover]:not(:popover-open) { display: none }` hiding the
+    // box for good, so it drops the attribute and falls back to the figure instead.
+    try { tip.showPopover() } catch { tip.removeAttribute("popover") }
 }
 
 interface TipFrame { dx: number; dy: number; w: number; h: number; escaped: boolean }
