@@ -290,6 +290,32 @@ try {
     throw new Error(`window.Masque.mount is ${mountType}, expected function`);
   }
 
+  // The export's `body > div` reset once forced the chip bar to block layout, which set
+  // its two chips at different heights, and showed the hidden "no recording" note.
+  const chrome = await frame.evaluate(() => {
+    const tops = [...document.querySelectorAll("body > .masque-bar > *")].map((e) => Math.round(e.getBoundingClientRect().top));
+    const miss = document.querySelector("body > .masque-miss");
+    return { tops, missShown: !!miss && miss.hidden && getComputedStyle(miss).display !== "none" };
+  });
+  if (chrome.tops.length !== 2 || chrome.tops[0] !== chrome.tops[1]) {
+    throw new Error(`player chips not aligned: tops ${JSON.stringify(chrome.tops)}`);
+  }
+  if (chrome.missShown) throw new Error("the hidden no-recording note takes up space");
+  // A segment without the widget hides the chip bar and its gap. Its override outranks the
+  // gap rule by specificity alone, since Pluto's export loads its styles after it.
+  const figEl = page.locator("#masque-gs-figure");
+  await figEl.evaluate((el) => { el.loading = "eager"; const src = el.getAttribute("src"); if (src) el.src = src; });
+  let pad = null;
+  for (let i = 0; i < 100 && pad !== "10px"; i++) {
+    const fr = await (await figEl.elementHandle()).contentFrame();
+    pad = fr && await fr.evaluate(() => {
+      const main = document.querySelector("pluto-editor > main");
+      return main && document.querySelector("pluto-cell") ? getComputedStyle(main).paddingTop : null;
+    }).catch(() => null);
+    if (pad !== "10px") await new Promise((r) => setTimeout(r, 200));
+  }
+  if (pad !== "10px") throw new Error(`the figure segment keeps the chip bar's gap: padding-top ${pad}`);
+
   const idle = await waitReadout(frame, (t) => t === "click a point");
   if (idle !== "click a point") {
     throw new Error(`idle readout was ${JSON.stringify(idle)}`);
@@ -648,7 +674,7 @@ try {
     if (frameReqs.length) throw new Error(`controls_wave fetched frames before any control moved: ${frameReqs[0]}`);
     const valueText = () => v.evaluate(() => [...document.querySelectorAll("pluto-output")].filter((o) => o.offsetParent !== null).map((o) => o.innerText.replace(/\s+/g, " ").trim()).join(" | "));
     const picture = () => w.evaluate(() => document.querySelector(".ip-host img").src.slice(0, 40));
-    const missShown = (frame) => frame.evaluate(() => { const m = document.querySelector(".masque-miss"); return !!m && !m.hidden; });
+    const missShown = (frame) => frame.evaluate(() => { const m = document.querySelector("body > .masque-miss"); return !!m && !m.hidden; });
     const waitFor = async (what, read, pred, ms = 8000) => {
       let got = await read();
       for (const deadline = Date.now() + ms; Date.now() < deadline && !pred(got);) {
