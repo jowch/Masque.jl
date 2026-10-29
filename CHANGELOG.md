@@ -15,6 +15,12 @@ All notable changes to this project are documented here. The format is based on
   or a legend entry picks many at once. `selected=` takes the rows, and
   `interactables(plot; key = vector)` gives a plot keys of its own (#346).
 
+### Changed
+- A tooltip near the figure's edge can now extend past the figure onto the page around it,
+  instead of being pushed back over the plot. It still sits above the mark, and moves below
+  it or sideways only at the edge of the browser window. In browsers without the Popover API
+  (before Safari 17 and Firefox 125) it stays inside the figure as before.
+
 ### Fixed
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
   out, as in `bind = :picked`. Before, the click did nothing.

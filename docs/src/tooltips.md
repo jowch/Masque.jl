@@ -134,8 +134,9 @@ unless you trust every URL in it: the link goes wherever the data says.
 
 ## Where the tooltip appears
 
-The tooltip sits above the hovered mark, and moves below it or inward
-near the figure's edges. Axis readouts, boxes, and other interactions
+The tooltip sits above the hovered mark. Near the figure's edges it can
+reach past the figure onto the page, and it moves below the mark or
+inward only at the edge of the browser window. Axis readouts, boxes, and other interactions
 without a single mark show their tooltip at the pointer.
 
 ## Dark figures

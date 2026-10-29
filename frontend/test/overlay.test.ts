@@ -2827,6 +2827,49 @@ describe("overlay visual polish", () => {
         expect(tip.style.left).toBe("200px")
     })
 
+    it("with the Popover API the tooltip leaves the figure and follows it on scroll", () => {
+        // A stand-in for the browser's top layer: happy-dom has no Popover API.
+        const proto = HTMLElement.prototype as unknown as { showPopover?: () => void }
+        const had = proto.showPopover
+        proto.showPopover = function (this: HTMLElement) { this.dataset.open = "1" }
+        try {
+            const { host, img, script } = setup()
+            mount(script, {
+                width: 1200, height: 800, scaling: 2, transforms: {},
+                layers: [{ id: "pts", kind: "circles", geometry: [40, 40, 20], payloads: [{ i: 0 }],
+                    axis: "ax1", events: ["hover"] }],
+            })
+            const shadow = shadowOf(host)
+            const tip = shadow.querySelector(".masque-tip") as HTMLElement
+            const surface = shadow.querySelector(".surface") as HTMLElement
+            expect(tip.getAttribute("popover")).toBe("manual")
+            const matches = tip.matches.bind(tip)
+            tip.matches = (sel: string) => sel.includes(":popover-open") ? tip.dataset.open === "1" : matches(sel)
+            Object.defineProperty(tip, "offsetWidth", { configurable: true, value: 220 })
+            Object.defineProperty(tip, "offsetHeight", { configurable: true, value: 80 })
+            Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: 1000 })
+            Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: 900 })
+            let top = 300
+            img.getBoundingClientRect = surface.getBoundingClientRect = () => new DOMRect(100, top, 600, 400)
+            // Mark at css (20,20), its top edge at 10: inside the figure the box would flip below
+            // it; in window px (120,310) there is room above, so it stays above, past the edge.
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 120, clientY: 320, bubbles: true }))
+            expect(tip.dataset.open).toBe("1")
+            expect(tip.classList.contains("show")).toBe(true)
+            expect(tip.classList.contains("flip-y")).toBe(true)
+            expect(tip.style.left).toBe("10px") // 120 - 110, clear of the window's 8px edge gap
+            expect(tip.style.top).toBe("220px") // 310 - 10 - 80
+            top = 250
+            window.dispatchEvent(new Event("scroll"))
+            expect(tip.style.top).toBe("170px")
+        } finally {
+            if (had) proto.showPopover = had
+            else delete proto.showPopover
+            delete (document.documentElement as unknown as Record<string, unknown>).clientWidth
+            delete (document.documentElement as unknown as Record<string, unknown>).clientHeight
+        }
+    })
+
     it("a rect (bar) tooltip anchors at its top-centre, not its centre", () => {
         const { host, script } = setup()
         mount(script, {

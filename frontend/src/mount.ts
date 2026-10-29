@@ -1,7 +1,7 @@
 import { SVG_NS, renderSelection, clearHiImmediate, clearLinkImmediate } from "./highlight"
 import { hitLayerByIndex, keptPicks, linePointHit, picksPoints, sameValue, surfaceSelection } from "./selection"
 import { emptyMask, maskHit } from "./gridmask"
-import { applyMove, onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip } from "./hover"
+import { applyMove, onLeave, hideTip, setTipText, setTipVisible, placeTip, tipOffset, syncFocusTip, replaceTip } from "./hover"
 import { buildCross, hideCross } from "./cross"
 import { isApplePlatform, onDown, onUp, onCancel, onLostCapture, onClick, onPointerMove } from "./bond"
 import { buildFocusable, computeLayerStarts, focusTo, handleKeydown } from "./keyboard"
@@ -193,6 +193,9 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: non
        max-width: var(--masque-tip-maxwidth, 320px); white-space: normal;
        transition: opacity ${MOTION_MS}ms ease-out; }
 .masque-tip.show { opacity: 1; }
+/* hover.ts's openTip: in the top layer the box is placed in window px. Undo the UA popover
+   box (centred by inset/margin, scrolling, clipping the caret) so it lays out as before. */
+.masque-tip[popover] { position: fixed; inset: auto; margin: 0; overflow: visible; }
 /* left's containing block is .masque-tip's PADDING box (absolute-position offsets are measured
    from the padding edge, CSS 2.1 §10.1), 1px inside its own 1px border — and the 5px transparent
    left/right borders below put the visible apex at the horizontal CENTRE of this element's own
@@ -390,6 +393,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     tip.className = "masque-tip"
     tip.setAttribute("role", "tooltip")
     tip.setAttribute("aria-hidden", "true")
+    // The top layer lets the box spill past the figure (hover.ts's openTip); without the
+    // Popover API it stays inside the figure.
+    if (typeof tip.showPopover === "function") tip.setAttribute("popover", "manual")
 
     // Keyboard nav needs the surface to be a real focus stop; role="application" (over the
     // safer "group") because NVDA/JAWS's default browse mode intercepts arrow keys before a
@@ -937,6 +943,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         roiDrag.syncHandleDraw(ctx.roiBoxes_, ctx.manifest_.width, br.width, ctx.manifest_.scaling)
         ctx.fade_.refresh_()
         state.surfaceSized_ = false
+        replaceTip(ctx, state)
     }
     // The axis frame (spines, ticks, labels) stays on the untransformed base. A copy of the
     // same pixels, clipped to the pan view's viewport, carries the matrix, so only the data
@@ -1086,6 +1093,9 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         paintPhoto(state.photo_)
     }
     window.addEventListener("resize", syncOverlayToBase)
+    // Capture: the scroll that moves the figure can be any ancestor's, not just the window's.
+    const onScroll = () => replaceTip(ctx, state)
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true })
     let overlayFrames = 0
     const overlayTick = () => {
         syncOverlayToBase()
@@ -1248,6 +1258,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         surface.removeEventListener("focusout", focusout)
         dragStops?.cleanup_()
         window.removeEventListener("resize", syncOverlayToBase)
+        window.removeEventListener("scroll", onScroll, { capture: true })
         overlayRO?.disconnect()
         overlayFrames = 24
         cancelPendingMove(state)
