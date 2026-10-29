@@ -29,7 +29,6 @@ const CARDS = [
   { out: "text", embed: "gallery_text", moves: [["click", 0, 0.53, 0.155], ["leave"]] },
   { out: "boxselect", embed: "gallery_boxselect", moves: [["hover", 0, 0.196, 0.47]] },
   { out: "image", embed: "gallery_image", moves: [["hover", 0, 0.46, 0.57]] },
-  { out: "selection", embed: "gallery_selection", hosts: [0, 1], moves: [["click", 0, 0.743, 0.156]] },
 ];
 
 const browser = await chromium.launch({ headless: true });
