@@ -54,9 +54,18 @@
                     100
                 ]
             ],
+            "tol": 12,
+            "linewidth": 3,
+            "axis": "ax1",
+            "style": {
+                "width": 2
+            },
+            "events": [
+                "click",
+                "hover"
+            ],
             "kind": "lines",
             "id": "lines",
-            "tol": 12,
             "geometry": [
                 [
                     152,
@@ -72,15 +81,7 @@
                     "index": 1
                 }
             ],
-            "axis": "ax1",
-            "style": {
-                "width": 2
-            },
-            "bond": "element",
-            "events": [
-                "click",
-                "hover"
-            ]
+            "bond": "element"
         }
     ],
     "initial": {
