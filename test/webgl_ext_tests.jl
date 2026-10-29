@@ -6,6 +6,14 @@ import JSON3
 
 const _WGLExt = Base.get_extension(Masque, :MasqueWGLMakieExt)
 
+# Before any widget is shown: the precompile workload's `show` must not leave its cached shim,
+# bundle or CDN pick in the pkgimage, or an edited `assets/masque-webgl.js` would not be read.
+@testset "a session starts with empty script caches" begin
+    @test isempty(_WGLExt._SHIM_TEXT[])
+    @test isempty(_WGLExt._BUNDLE_TEXT[])
+    @test _WGLExt._WGL_CDN[] === missing
+end
+
 # Smoke tests for the serialization bridge (no browser). The browser render is covered by
 # the spikes; these guard the Julia-side encoder + the version-coupled serialize_scene path.
 

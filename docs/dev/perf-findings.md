@@ -662,31 +662,34 @@ settle here are a p50 of 5, not the best of 20 in the tables above.
 ### First use in a session
 
 `bench/first_use.jl`, 2026-10-29, Julia 1.13.3, cloud (4 cores), one fresh process per backend,
-no browser. Each step is the first of its kind in the process; the workload is the
-`@compile_workload` each backend extension runs from `src/precompile.jl`. Seconds; nearly all of
-each "before" figure is compile (96–100%).
+no browser, on base `2e31b72` ("before") and with PR #456 ("after"). Each step is the first of
+its kind in the process; the workload is the `@compile_workload` each backend extension runs
+from `src/precompile.jl`. Seconds, as the range of two runs: the higher "before" figures came
+from a run with other work on the machine, the lower from a back-to-back rerun on an idle one.
+Nearly all of each "before" figure is compile (96–100%).
 
 | step | cairo before | cairo after | webgl before | webgl after |
 |---|---:|---:|---:|---:|
-| `using Masque, <backend>` | 7.1 | 7.8–8.2 | 7.9 | 8.8–9.0 |
-| first `masque` (a pick) | 24.0 | 0.5–0.7 | 27.1 | 0.6–0.8 |
-| first `show` | 1.2 | 0.01 | 2.5 | 0.05 |
-| first bond value (a pick) | 1.5 | 0.1–0.4 | 1.3 | 0.1 |
-| view warmup, pan + orbit | 8.5 | 0.4–0.5 | 8.8 | 0.4 |
+| `using Masque, <backend>` | 4.8–7.1 | 4.7–8.2 | 4.8–7.9 | 5.4–9.0 |
+| first `masque` (a pick) | 15.5–24.0 | 0.4–0.7 | 16.4–27.1 | 0.4–0.8 |
+| first `show` | 0.5–1.2 | 0.01 | 1.0–2.5 | 0.02–0.05 |
+| first bond value (a pick) | 0.9–1.5 | 0.1–0.4 | 0.8–1.3 | 0.1 |
+| view warmup, pan + orbit | 5.6–8.5 | 0.3–0.5 | 4.8–8.8 | 0.2–0.4 |
 | first `onchange` frame | 0.9 | 0.5 | 0.4 | 0.3–0.4 |
 | any step, second figure | ≤ 0.24 | ≤ 0.24 | ≤ 0.22 | ≤ 0.22 |
 
 Makie's own first render of the same figure is 1.8 s, so the "before" column is Masque's own
 compile. Plot kinds the workload does not build still compile on first use: a figure that adds
 stairs, violin and image to kinds it does build took 31 s before and 5.4 s after (Cairo; WebGL
-the same).
-The kind-sweep notebook outside Pluto builds all its cells in 264 s before and 181 s after, and
-its 11 view warmups, run back to back as the server does after the last cell, take 10.1 s before
-and 3.1 s after on Cairo (10.5 s and 2.4 s on WebGL).
+the same). The kind-sweep notebook outside Pluto builds all its cells in 264 s before and 181 s
+after, and its 11 view warmups, run back to back as the server does after the last cell, take
+10.1 s before and 3.1 s after on Cairo (10.5 s and 2.4 s on WebGL). These three are from the
+busier run only.
 
-The cost: each backend extension precompiles in ~2 min instead of 9–10 s (the two run in
-parallel), its pkgimage grows from 0.06–0.2 MB to 47–49 MB, and loading is ~1 s slower (mean of
-three runs, ±0.7 s).
+The cost: each backend extension precompiles in 1.5–2.5 min instead of 9–10 s (the two run in
+parallel), its pkgimage grows from 0.06–0.2 MB to 47–50 MB (about the size of CairoMakie's own,
+38 MB, and WGLMakie's, 60 MB), and loading is 0–1 s slower. The `precompile_workload` preference
+on Masque turns the workload off.
 
 ## Axis3 projection hinge (2026-07-01, 2026-07-02)
 

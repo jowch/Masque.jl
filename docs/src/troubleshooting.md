@@ -280,6 +280,24 @@ so the problem is in Masque and not in your code.
 versions. To keep working until it is fixed, pin those packages to a
 version that worked.
 
+### Masque fails to precompile with CairoMakie or WGLMakie
+
+**Cause:** when Masque is installed next to a backend, it draws a small
+figure so your first widget of a session shows without a wait. A new
+Makie version can break that figure, and then `using Masque` with that
+backend fails.
+
+**Fix:** file an issue with your Makie, CairoMakie, and WGLMakie
+versions. To keep working until it is fixed, turn the warm-up off: add
+the Preferences package to your environment, run the code below once,
+and restart Julia. Your first widget of each session then takes longer
+to show.
+
+```julia
+using Preferences, Masque
+set_preferences!(Masque, "precompile_workload" => false; force = true)
+```
+
 ## Not errors, but surprising
 
 Code written for an earlier version of Masque: see [Upgrading](@ref).

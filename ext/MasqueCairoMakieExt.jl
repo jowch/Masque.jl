@@ -81,6 +81,8 @@ Masque.make_widget(b::CairoBackend, result::RenderResult, manifest, display_css,
     Masque._view_render_frame(b, fig, interactables, ppu, max_width),
 )
 
-PrecompileTools.@compile_workload Masque._precompile_workload(:cairo)
+if Masque._PRECOMPILE_WORKLOAD
+    PrecompileTools.@compile_workload Masque._precompile_workload(:cairo)
+end
 
 end # module MasqueCairoMakieExt

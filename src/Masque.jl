@@ -28,6 +28,7 @@ using Base64: base64decode, base64encode
 using SHA: sha384
 using HypertextLiteral: HypertextLiteral, @htl
 import AbstractPlutoDingetjes
+import Preferences
 const APD = AbstractPlutoDingetjes
 
 # Every deprecation warns through here. Plain `Base.depwarn` logs only under `--depwarn=yes`,

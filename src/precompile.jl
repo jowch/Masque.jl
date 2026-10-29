@@ -1,8 +1,13 @@
 # A notebook's first widget, first pick and first drag each compile Masque's code for the
-# figure's plot types, which took ~24 s, ~1.5 s and ~8 s before this ran at precompile time.
+# figure's plot types, which took 15-25 s, ~1 s and 5-9 s before this ran at precompile time.
 # Each backend extension calls `_precompile_workload` inside its `@compile_workload`, so the
 # Makie types it builds are those the backend sees. Keep it to the common kinds; a rare one
 # compiles on first use, as before.
+#
+# `PrecompileTools`' own per-package switch doesn't reach an extension, so Masque reads the same
+# `precompile_workload` preference itself; a change recompiles Masque and both extensions.
+const _PRECOMPILE_WORKLOAD = Preferences.@load_preference("precompile_workload", true)::Bool
+
 function _precompile_figure()
     xs = collect(1.0:8.0)
     ys = sin.(xs)

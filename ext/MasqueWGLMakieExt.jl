@@ -376,6 +376,16 @@ function _wgl_cdn(dir, makie_version, js)
     return (; urls, integrity = "sha384-" * Masque.base64encode(Masque.sha384(js)), makie = makie_version)
 end
 
+# The precompile workload's `show` fills these caches, and an extension's globals are saved in
+# its pkgimage. Start each session empty, so a rebuilt `assets/masque-webgl.js` (not a
+# precompile dependency) is read from disk again, and the ~1 MB bundle stays out of the image.
+function __init__()
+    _BUNDLE_TEXT[] = ""
+    _SHIM_TEXT[] = ""
+    _WGL_CDN[] = missing
+    return nothing
+end
+
 const _WGL_OFFLINE_NOTE = "This WebGL figure couldn't load WGLMakie's script. Outside Pluto it needs an internet connection."
 _wgl_mismatch_note(makie) = "This WebGL figure couldn't load WGLMakie's script: the copy published with Makie v$(makie) differs from the one installed here. Show it in Pluto, or use backend = :cairo."
 
@@ -516,6 +526,8 @@ end
 APD.Bonds.initial_value(w::WebGLWidget) = Masque.initial_bond(w)
 APD.Bonds.transform_value(w::WebGLWidget, js) = Masque.bond_from_js(w, js)
 
-PrecompileTools.@compile_workload Masque._precompile_workload(:webgl)
+if Masque._PRECOMPILE_WORKLOAD
+    PrecompileTools.@compile_workload Masque._precompile_workload(:webgl)
+end
 
 end # module MasqueWGLMakieExt
