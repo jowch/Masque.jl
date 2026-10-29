@@ -81,8 +81,10 @@ makes its moves once with capture off, then reruns the figure cell (cell 2 in ev
 notebook) through its hidden run button and waits for the widget to mount again
 (`test/e2e/clip_warmup.mjs`). The recorded take starts from the notebook's first state on a
 kernel that has compiled every redraw in it; the recorder stops if the reset brings back a
-different figure or readout. Each answer's wait is logged, `warm-up: answered in … ms` for
-the cold pass and `clip: …` for the take, so a log shows what the warm-up saved.
+different figure or readout. Each answer's wait is logged, `warm-up: …` for the cold pass
+and `clip: …` for the take, so a log shows what the warm-up saved: after a click the wait for
+the redraw (`answered in … ms`), and in a drag the wait for the first frame (`first frame
+after … ms`). A slow first answer in the take means the warm-up missed a compile.
 
 A new clip needs nothing extra as long as its notebook keeps the figure, its interactables
 and the widget in cell 2, so that rerunning that cell resets everything the clip changes.

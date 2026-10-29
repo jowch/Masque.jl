@@ -11,7 +11,7 @@ import { PNG } from "pngjs";
 import { mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { gestureStamp as lastFrame, resetFigure, waitReleaseFrame } from "./clip_warmup.mjs";
+import { firstFrameMs, gestureStamp as lastFrame, resetFigure, waitReleaseFrame } from "./clip_warmup.mjs";
 
 const [base, notebook, framesDir] = process.argv.slice(2);
 if (!base || !notebook || !framesDir) {
@@ -196,6 +196,7 @@ try {
     const stamp0 = await lastFrame(page);
     const w0 = Date.now();
     await page.mouse.move(a.x, a.y);
+    const firstWarm = firstFrameMs(page, stamp0);
     await page.mouse.down();
     for (const [p, q] of [[a, z], [z, a]]) {
       for (let i = 1; i <= 40; i++) {
@@ -205,6 +206,7 @@ try {
     }
     await page.mouse.up();
     const s = await waitReleaseFrame(page, stamp0);
+    console.error(`warm-up: first frame after ${await firstWarm} ms`);
     console.error(`warm-up: release frame after ${Date.now() - w0} ms (${s.n} frames)`);
     await resetFigure(page, ID_FIGURE);
     await scroll();
@@ -307,6 +309,7 @@ try {
   const timeline = async () => {
     await sleep(80);
     const stamp0 = await gestureStamp();
+    const first = firstFrameMs(page, await lastFrame(page));
     await page.mouse.down();
     await moveTo(end, 4600, 80);
     await page.mouse.up();
@@ -319,6 +322,7 @@ try {
     if (!stamp1 || stamp1 === stamp0) {
       throw new Error(`orbit drag produced no gesture frame (stamp stayed ${JSON.stringify(stamp0)})`);
     }
+    console.error(`clip: first frame after ${await first} ms`);
     console.error(`OK  orbit gesture-frame ${stamp0} → ${stamp1}`);
     const light = await page.evaluate((id) => {
       const cell = document.getElementById(id);

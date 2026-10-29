@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { paintCursor } from "./clip_frames.mjs";
 import { shutdownOpenSession } from "./fresh_session.mjs";
-import { gestureStamp, resetFigure, waitReleaseFrame } from "./clip_warmup.mjs";
+import { firstFrameMs, gestureStamp, resetFigure, waitReleaseFrame } from "./clip_warmup.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -524,8 +524,10 @@ try {
   warming = true;
   const stamp0 = await gestureStamp(page);
   const w0 = Date.now();
+  const firstWarm = spec.grab ? firstFrameMs(page, stamp0) : null;
   await spec.run(c);
   if (spec.grab) {
+    console.error(`warm-up: first frame after ${await firstWarm} ms`);
     const s = await waitReleaseFrame(page, stamp0);
     console.error(`warm-up: release frame after ${Date.now() - w0} ms (${s.n} frames)`);
   } else {
@@ -562,7 +564,9 @@ try {
   await page.mouse.move(cur.x, cur.y);
   if (spec.grab) {
     await sleep(500);
+    const first = firstFrameMs(page, await gestureStamp(page));
     await spec.run(c);
+    console.error(`clip: first frame after ${await first} ms`);
     await sleep(500);
   } else {
     await sleep(900);

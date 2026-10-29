@@ -24,6 +24,19 @@ export async function waitReleaseFrame(page, before, timeout = 120000) {
   }
 }
 
+// How long Julia takes to send the first gesture frame newer than `before`, polled alongside a
+// drag. A first answer that is slow in the take, not only in the warm-up, means the warm-up
+// missed a compile (or `show`'s own warm-up below was still running).
+export async function firstFrameMs(page, before, timeout = 120000) {
+  const t = Date.now();
+  while (Date.now() - t < timeout) {
+    const s = await gestureStamp(page);
+    if (s && s.n > (before?.n ?? 0)) return Date.now() - t;
+    await sleep(50);
+  }
+  return Infinity;
+}
+
 // Rerun the cell `cellId` (the figure cell) and wait until every cell has finished and every
 // widget has mounted again. Pluto hides the cell's run button in a clip, but `click()` still
 // reaches it.
