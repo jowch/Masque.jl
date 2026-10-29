@@ -74,7 +74,7 @@ makedocs(;
             ],
             "Extend Masque" => [
                 "Your own plot types" => "recipes.md",
-                "Custom hits" => "custom.md",
+                "Custom shapes" => "custom.md",
             ],
         ],
         "Examples" => [
@@ -84,7 +84,6 @@ makedocs(;
             "Annotate a segmentation" => "gallery/segmentation.md",
             "Filter one plot from another" => "gallery/linked.md",
             "From a heatmap cell to its trace" => "gallery/heatmap-trace.md",
-            "Selection round-trip" => "gallery/selection.md",
             "Box-select scatter" => "gallery/boxselect.md",
             "Image ROI" => "gallery/image.md",
             "Plot types" => [
@@ -101,7 +100,7 @@ makedocs(;
             "Publish outside Pluto" => "publish.md",
             "Keyboard and screen readers" => "accessibility.md",
             "Performance" => "performance.md",
-            "Current design and rough edges" => "design.md",
+            "Design and limitations" => "design.md",
             "Troubleshooting" => "troubleshooting.md",
             "Upgrading" => "upgrading.md",
         ],

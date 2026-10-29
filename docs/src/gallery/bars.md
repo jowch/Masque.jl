@@ -21,7 +21,7 @@ Main.masque_fallback("gallery_bars")
 ## Variations
 
 The same call also covers the other bar-like recipes in
-[Recipes masque(fig) extracts](@ref). For a recipe that is not in that
-table, add an interactable yourself; see [Custom hits](@ref).
+[Plots `masque(fig)` makes interactive](@ref). For a recipe that is not in that
+table, add an interactable yourself; see [Custom shapes](@ref).
 
 Next, [Polygons](polygons.md) covers filled areas.

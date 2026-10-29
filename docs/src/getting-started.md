@@ -61,7 +61,7 @@ isnothing(pick) ? "click a point" : "point $(pick.index) at x = $(pick.x)"
 field, see [What the `@bind` value holds](@ref).
 
 `masque(fig)` works on scatters, lines, bars, heatmaps, polygons, text,
-legends, and colorbars. [Recipes masque(fig) extracts](@ref) has the
+legends, and colorbars. [Plots `masque(fig)` makes interactive](@ref) has the
 full list.
 
 ## Show your own data

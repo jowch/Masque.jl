@@ -41,7 +41,7 @@ Two `masque` keywords work the same on both backends:
 masque(fig; max_width = 500, px_per_unit = 3)
 ```
 
-## [Makie's settings don't change the widget](@id makie-settings)
+## [Makie's display settings](@id makie-settings)
 
 Masque's settings belong to the widget. `CairoMakie.activate!` and
 `WGLMakie.activate!` (`type`, `px_per_unit`, and the rest) change how a

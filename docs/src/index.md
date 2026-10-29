@@ -58,9 +58,8 @@ either. See [Pan, zoom and orbit](@ref).
      alt="Clicking a species in the legend keeps that class and fades the others">
 ```
 
-Click a legend entry to highlight the traces it labels, and a cell that
-uses the selection can fade the others, as in this example. See
-[Legend](@ref).
+Click a legend entry to keep the points it labels and fade the rest,
+and the entry goes to your notebook. See [Legend](@ref).
 
 ## [Publish outside Pluto](@id home-publish)
 

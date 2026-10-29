@@ -16,52 +16,44 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000001
-using Masque, CairoMakie
+# ╔═╡ c0a10003-0001-4000-8000-000000000001
+using CairoMakie, Masque
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000002
+# ╔═╡ c0a10003-0001-4000-8000-000000000020
+md"""
+Click a point in either panel, and the same sample is selected in both. The last cell names it.
+"""
+
+# ╔═╡ c0a10003-0001-4000-8000-000000000002
 begin
-    cities_data = [
-        (city = "Tokyo", pop_m = 37.4, pop = 37_400_000, gdp = 1600),
-        (city = "Delhi", pop_m = 32.9, pop = 32_900_000, gdp = 370),
-        (city = "Shanghai", pop_m = 28.5, pop = 28_500_000, gdp = 780),
-        (city = "São Paulo", pop_m = 22.4, pop = 22_400_000, gdp = 430),
-        (city = "Mexico City", pop_m = 22.1, pop = 22_100_000, gdp = 411),
-        (city = "Cairo", pop_m = 21.3, pop = 21_300_000, gdp = 165),
-        (city = "Mumbai", pop_m = 20.7, pop = 20_700_000, gdp = 310),
-        (city = "Beijing", pop_m = 21.5, pop = 21_500_000, gdp = 700),
-    ]
-    city_colors = [
-        "#e6194b", "#3cb44b", "#4363d8", "#f58231",
-        "#911eb4", "#0e9aa7", "#f032e6", "#9a8b00",
-    ]
-    xs = Float64[c.pop_m for c in cities_data]
-    ys = Float64[c.gdp for c in cities_data]
-
-    fig = Figure(size = (560, 360))
-    ax = Axis(fig[1, 1]; xlabel = "Population (millions)", ylabel = "GDP (US\$bn)")
-    markersize = 18
-    s = scatter!(ax, xs, ys; color = city_colors, markersize)
-    # Passing the scatter gives each tooltip a border in that city's color.
-    cities = interactables(
-        s;
-        id = :cities,
-        payloads = [(; city = c.city, pop = c.pop) for c in cities_data],
-        tooltip = masque"<b>$(city)</b><br>pop $(pop:,)",
-    )
+    xs = [1.0, 2.0, 3.0, 4.0]
+    ys = [2.0, 1.5, 3.0, 2.2]
+    zs = [0.8, 2.5, 1.2, 3.1]
+    fig = Figure(size = (640, 300))
+    p_xy = scatter!(Axis(fig[1, 1]; xlabel = "x", ylabel = "y", title = "xy"), xs, ys; markersize = 18)
+    p_xz = scatter!(Axis(fig[1, 2]; xlabel = "x", ylabel = "z", title = "xz"), xs, zs; markersize = 18)
     nothing
 end
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000003
-@bind pick masque(fig, cities; bind = s)
+# ╔═╡ c0a10003-0001-4000-8000-000000000003
+@bind row masque(fig; bind = linked(p_xy, p_xz))
 
-# ╔═╡ a1b2c3d4-0001-4000-8000-000000000004
-isnothing(pick) ? md"*Hover over a city, then click one.*" : md"**$(pick.city)** selected, index $(pick.index)"
+# ╔═╡ c0a10003-0001-4000-8000-000000000004
+isnothing(row) ? "click a point" : "sample $(row): x = $(xs[row]), y = $(ys[row]), z = $(zs[row])"
 
 # ╔═╡ e1be0000-0000-4000-8000-000000000001
 PLUTO_PLAYER_TOML_CONTENTS = """
 [player]
-bond = "pick"
+bond = "row"
+show_code = true
+pluto_html = true
+
+cells = [
+    "c0a10003-0001-4000-8000-000000000020",
+    "c0a10003-0001-4000-8000-000000000002",
+    "c0a10003-0001-4000-8000-000000000003",
+    "c0a10003-0001-4000-8000-000000000004"
+]
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1708,10 +1700,11 @@ version = "4.1.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═a1b2c3d4-0001-4000-8000-000000000001
-# ╠═a1b2c3d4-0001-4000-8000-000000000002
-# ╠═a1b2c3d4-0001-4000-8000-000000000003
-# ╠═a1b2c3d4-0001-4000-8000-000000000004
+# ╠═c0a10003-0001-4000-8000-000000000001
+# ╟─c0a10003-0001-4000-8000-000000000020
+# ╠═c0a10003-0001-4000-8000-000000000002
+# ╠═c0a10003-0001-4000-8000-000000000003
+# ╠═c0a10003-0001-4000-8000-000000000004
 # ╟─e1be0000-0000-4000-8000-000000000001
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

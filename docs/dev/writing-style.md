@@ -72,10 +72,21 @@ what "the other two" are.
 
 ## Formatting
 
-18. **Headings name the topic plainly.** "How interactions work", not a row of verbs like
-    "Hover, click, and drag", and not an adjective pitch like "Rich tooltips".
+18. **Headings name what the reader wants, in their words.** A guide section is a task: a
+    verb and the thing the reader acts on, such as "Select several marks" or "Choose which
+    plots an entry highlights". A reference or explanation section is a noun phrase, such as
+    "Keyboard shortcuts" or "Supported axes", or a "What …" or "How …" phrase that reads as
+    a clear question, such as "What a click returns" or "How interactions work". Don't write
+    an idiom ("Let picks add up"), a claim ("Tooltips are templates"), a fragment that
+    misreads ("Which marks an entry highlights"), a row of verbs ("Hover, click, and drag"),
+    or a pitch ("Rich tooltips"), and use the terms table, so *select*, not *pick*. Give the
+    same kind of section the same name on every page: "Supported axes", "Limitations",
+    "Where to go next". In Troubleshooting, name the error or the symptom: "A click does
+    nothing".
     A heading that matches another page's title breaks every `[Title](@ref)` link to that
-    page; give it an explicit id: `## [Backends](@id home-backends)`.
+    page; give it an explicit id: `## [Backends](@id home-backends)`. Renaming a heading
+    breaks every `[Heading](@ref)` link to it, so search `docs/src` and `src` for the old
+    text.
 19. **No bold labels at the start of list items.** Use a plain list, or a table when each
     item has a name and a description. Bold is for a term's first use or a UI label.
 20. **Use short paragraphs, not bullets, when each item needs a reason or a way around it.**
@@ -108,6 +119,7 @@ what "the other two" are.
 | move to, reach | land on |
 | create a figure | draw a figure |
 | click | make a deliberate choice, commit |
+| select (a mark) | pick, in prose and headings (`pick` as a variable name is fine) |
 | shows | surfaces |
 
 ## Words to avoid
@@ -127,7 +139,7 @@ Source: [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia
 | Draw the figure the way you normally would. | Create a figure the way you normally would. |
 | `pick === nothing ? … : …` | `isnothing(pick) ? … : …` |
 | `pick.index` is 1-based, and `pick` indexes your data directly. | `pick.index` is the clicked point's position in the data you plotted, so `ys[pick]` is its `y`. |
-| Tooltips are templates, not functions | Tooltips are templates |
+| Tooltips are templates, not functions | Tooltip templates |
 | A `masque"..."` template arranges them your way. | A `masque"..."` template lets you customize what it says. |
 | Hover, click, and drag | How interactions work |
 | Clicking a mark sets the `@bind` variable, and every cell that uses it re-runs. | Clicking a mark updates the `@bind` variable, and cells that use the variable respond to the change. |
