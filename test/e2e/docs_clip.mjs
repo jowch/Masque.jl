@@ -330,6 +330,59 @@ const CLIPS = {
       await c.settle(1800);
     },
   },
+  // Read coordinates: hover a colorbar and click two values.
+  "colorbar": {
+    notebook: "colorbar_notebook.jl", nn: 19,
+    async run(c) {
+      const t = c.mf.transforms[String(c.mf.layers.find((l) => l.id === "colorbar").axis)];
+      const [vx, vy, vw, vh] = t.viewport;
+      // Whole CSS pixels: a click reports whole pixels while a hover reports fractions
+      // (#448), so a fractional target would show a tooltip a hair off the value.
+      const at = (v) => {
+        const q = c.px(vx + vw / 2, vy + (1 - (v - t.ylims[0]) / (t.ylims[1] - t.ylims[0])) * vh);
+        return { x: Math.round(q.x), y: Math.round(q.y) };
+      };
+      await c.glide(at(6), 900);
+      await c.glide(at(12), 1400);
+      await c.click(at(12));
+      await c.settle(1000);
+      await c.glide(at(7), 1200);
+      await c.click(at(7));
+      await c.settle(1600);
+    },
+  },
+  // Read coordinates: drag a cutoff down, then up.
+  "readout-threshold": {
+    notebook: "readout_threshold_notebook.jl", nn: 17,
+    async run(c) {
+      const t = c.mf.transforms[String(c.mf.layers.find((l) => l.id === "cutoff").axis)];
+      const x = t.xlims[0] + (t.xlims[1] - t.xlims[0]) * 0.15;
+      let from = 0.5;
+      for (const [to, ms] of [[0.25, 1500], [0.75, 2200]]) {
+        await c.glide(c.data("cutoff", x, from), 800);
+        await c.page.mouse.down();
+        await c.glide(c.data("cutoff", x, to), ms, 45);
+        await c.page.mouse.up();
+        await c.settle(1300);
+        from = to;
+      }
+    },
+  },
+  // Read coordinates: narrow a band from both sides.
+  "band": {
+    notebook: "band_notebook.jl", nn: 18,
+    async run(c) {
+      const t = c.mf.transforms[String(c.mf.layers.find((l) => l.id === "low").axis)];
+      const x = t.xlims[0] + (t.xlims[1] - t.xlims[0]) * 0.15;
+      for (const [id, from, to] of [["low", 0.2, 0.35], ["high", 0.8, 0.65]]) {
+        await c.glide(c.data(id, x, from), 900);
+        await c.page.mouse.down();
+        await c.glide(c.data(id, x, to), 1500, 40);
+        await c.page.mouse.up();
+        await c.settle(1400);
+      }
+    },
+  },
 };
 
 const [base, notebook, framesDir, name] = process.argv.slice(2);
