@@ -62,9 +62,10 @@ block in the figure that `masque` isn't given would look live and do
 nothing, so `masque` raises an error naming its kind. Name it, or take it
 out of the figure.
 
-Buttons, text boxes and `SliderGrid` are pictures for now, and `masque`
-warns when the figure has one, since the reader could click it and
-nothing would happen.
+Buttons and text boxes are pictures for now, and `masque` warns when the
+figure has one, since the reader could click it and nothing would happen.
+A `SliderGrid` works like the other blocks: its field holds a tuple of its
+sliders' values.
 
 With WGLMakie loaded, `Slider` also names a slider from Bonito, so Julia
 asks which one you mean; write `Makie.Slider` instead.

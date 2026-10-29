@@ -876,7 +876,7 @@ try {
 
       // Each control sits on its block's box.
       const s0 = await screenOf();
-      for (const id of ["level", "show", "span", "fine", "pick", "tall"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall", "grid"]) {
         const g = geo(id);
         if (layers.find((l) => l.id === id)?.kind !== "control") throw new Error(`${key}: no control layer ${id}`);
         const bb = await page.locator(`[data-masque-control="${id}"]`).boundingBox();
@@ -888,7 +888,7 @@ try {
       passed.push(`${key}/controls-on-blocks`);
 
       // The picture under the controls is empty: with the HTML hidden, every pixel in each box
-      // is the figure's background.
+      // is the figure's background. (The grid's box keeps its slider's name in the picture.)
       await page.evaluate((k) => {
         const span = document.querySelector(`#coords_${k}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -992,6 +992,16 @@ try {
       await ctl("pick", "select").selectOption("2");
       v = await bondHas(/level = 10, show = false, span = \(1, 5\), fine = true, pick = "z"/, v, "menu");
       passed.push(`${key}/interval-checkbox-menu`);
+      // The slider grid's slider moves its field and its value label, which Julia formatted.
+      {
+        const lab = ctl("grid", ".masque-vlabel");
+        if ((await lab.textContent()) !== "2 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 2 dB`);
+        await ctl("grid", "input").focus();
+        await page.keyboard.press("ArrowRight");
+        v = await bondHas(/grid = \(3,\)/, v, "grid");
+        if ((await lab.textContent()) !== "3 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 3 dB`);
+        passed.push(`${key}/slider-grid`);
+      }
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);
       continue;
     }

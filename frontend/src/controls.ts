@@ -3,7 +3,7 @@
 // module puts a real <input>/<select> over that box. The element owns its own pointer and
 // keyboard input, so none of the overlay's gestures see it.
 import { fmtNum } from "./template"
-import type { ControlGeometry, HitLayer, Manifest } from "./types"
+import type { ControlGeometry, HitLayer, Manifest, ValueLabel } from "./types"
 
 // A field's envelope, as every control commits it. The payload is a 0-based index, a pair of
 // them, or a Bool; Julia turns it into the block's plain value.
@@ -100,6 +100,8 @@ export const CONTROLS_STYLE = `
 .masque-check-art .mark { visibility: hidden; }
 .masque-check:checked ~ .masque-check-art .mark, .masque-control:hover .masque-check-art .mark { visibility: visible; }
 .masque-check:focus-visible ~ .masque-check-art .box { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
+.masque-vlabel { position: absolute; display: flex; align-items: center; justify-content: flex-end; white-space: nowrap;
+  pointer-events: none; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; }
 .masque-control .masque-select { width: 100%; height: 100%; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; border: none; border-radius: 0; cursor: pointer;
   font-size: var(--fs, 50cqh); padding: 0 0 0 var(--pad, 0.5em); background: var(--masque-ctl-off, #f0f0f0); color: var(--masque-ctl-text, #000000); }
 @media (prefers-reduced-motion: reduce) { .masque-toggle-track, .masque-toggle-knob { transition: none; } }
@@ -241,6 +243,7 @@ function toggleParts(g: ControlGeometry, el: HTMLInputElement): { parts_: HTMLEl
 function shape(g: ControlGeometry): string {
     // A range arrives as a typed array off the kernel and as a plain one from a docs player's
     // JSON frame; the same range is the same shape either way.
+    if (g.sliders) return JSON.stringify([g.control, g.sliders.map(shape), g.sliders.map((c) => [c.valueLabel?.labels?.length, c.valueLabel?.pairs?.length])])
     return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt, g.size, g.radius, g.stroke, g.mark, g.markSize, g.next])
 }
 
@@ -392,6 +395,61 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             return {
                 layer_: layer, shape_: shape(g), box_: box, get_: () => Number(el.value),
                 set_: (p) => { if (typeof p === "number") el.value = String(p) },
+            }
+        }
+        case "slidergrid": {
+            // Each slider is built as a control of its own inside the grid's box, and the grid
+            // commits all of their values together. The value labels are drawn here too.
+            box.style.pointerEvents = "none"
+            const local = { width: g.w, height: g.h } as Manifest
+            const values = () => kids.map((k) => k.get_())
+            const kidHooks: ControlHooks = {
+                commit_: () => { showLabels(); hooks.commit_(id, envelope(id, values())) },
+                live_: () => hooks.live_(id, envelope(id, values())),
+                adopt_: () => {},
+                digits_: hooks.digits_,
+            }
+            const kids: ControlEl[] = []
+            const labels: [HTMLElement, ControlGeometry, ValueLabel | undefined][] = []
+            ;(g.sliders ?? []).forEach((cg, i) => {
+                const kg = { ...cg, x: cg.x - g.x, y: cg.y - g.y }
+                const kid = build({ ...layer, id: `${id}-${i}`, label: `${label} ${i + 1}`, geometry: kg }, local, kidHooks)
+                if (!kid) return
+                kids.push(kid)
+                box.append(kid.box_)
+                const vl = cg.valueLabel
+                const el = document.createElement("div")
+                el.className = "masque-vlabel"
+                if (vl) {
+                    el.style.left = `${(100 * (vl.x - g.x)) / g.w}%`
+                    el.style.top = `${(100 * (vl.y - g.y)) / g.h}%`
+                    el.style.width = `${(100 * vl.w) / g.w}%`
+                    el.style.height = `${(100 * vl.h) / g.h}%`
+                    el.style.setProperty("--fs", `${(100 * vl.fontsize) / g.w}cqw`)
+                    el.style.color = vl.color
+                    box.append(el)
+                }
+                labels.push([el, cg, vl])
+            })
+            const showLabels = () => labels.forEach(([el, cg, vl], i) => {
+                const v = kids[i]?.get_()
+                if (Array.isArray(v)) {
+                    const [a, b] = v as number[]
+                    el.textContent = vl?.pairs?.[a * (cg.n ?? 0) + b] ?? `(${valueText(cg, a, hooks.digits_)}, ${valueText(cg, b, hooks.digits_)})`
+                } else {
+                    el.textContent = vl?.labels?.[Number(v)] ?? valueText(cg, Number(v), hooks.digits_)
+                }
+            })
+            showLabels()
+            box.addEventListener("input", showLabels)
+            box.addEventListener("change", showLabels)
+            return {
+                layer_: layer, shape_: shape(g), box_: box, get_: values,
+                set_: (p) => {
+                    if (!Array.isArray(p)) return
+                    p.forEach((q, i) => kids[i]?.set_(q))
+                    showLabels()
+                },
             }
         }
         default:

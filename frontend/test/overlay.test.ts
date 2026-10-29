@@ -6874,6 +6874,41 @@ describe("block controls (#345)", () => {
         expect(val(host).fine).toEqual({ layer: "fine", index: 0, payload: true })
     })
 
+    it("a slider grid draws each slider and its value label, and commits all its values together (#430)", () => {
+        const m = controlsManifest()
+        m.layers.push({ id: "grid", kind: "control", axis: "", events: ["change"], payloads: [], label: "grid",
+            geometry: { control: "slidergrid", x: 100, y: 500, w: 600, h: 100, value: [2, [1, 3]], sliders: [
+                { control: "slider", x: 200, y: 500, w: 400, h: 20, value: 2, n: 5, horizontal: true, range: [0, 0.5],
+                    valueLabel: { x: 620, y: 500, w: 80, h: 20, fontsize: 28, color: "rgb(7,7,7)", labels: ["0 Hz", "0.5 Hz", "1 Hz", "1.5 Hz", "2 Hz"] } },
+                { control: "intervalslider", x: 200, y: 560, w: 400, h: 20, value: [1, 3], n: 4, horizontal: true, range: [1, 1],
+                    valueLabel: { x: 620, y: 560, w: 80, h: 20, fontsize: 28, color: "rgb(7,7,7)" } },
+            ] } })
+        m.fields = [...(m.fields ?? []), "grid"]
+        m.initial!.grid = { layer: "grid", index: 0, payload: [2, [1, 3]] }
+        const { host, script } = setup()
+        mount(script, m)
+        const grid = ctl(host, "grid")
+        const kids = [...grid.querySelectorAll(".masque-control")] as HTMLElement[]
+        expect(kids.length).toBe(2)
+        // Each slider sits in the grid's box at its own place.
+        expect(kids[0].style.left).toBe(`${(100 * 100) / 600}%`)
+        expect(kids[1].style.top).toBe(`${(100 * 60) / 100}%`)
+        const labels = [...grid.querySelectorAll(".masque-vlabel")] as HTMLElement[]
+        expect(labels.map((l) => l.textContent)).toEqual(["1 Hz", "(2, 4)"])
+        expect(labels[0].style.getPropertyValue("--fs")).toBe(`${(100 * 28) / 600}cqw`)
+        const range = kids[0].querySelector("input") as HTMLInputElement
+        range.value = "4"
+        range.dispatchEvent(new Event("input", { bubbles: true }))
+        expect(labels[0].textContent).toBe("2 Hz")
+        range.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).grid).toEqual({ layer: "grid", index: 0, payload: [4, [1, 3]] })
+        const hi = kids[1].querySelectorAll("input")[1] as HTMLInputElement
+        hi.value = "2"
+        hi.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).grid).toEqual({ layer: "grid", index: 0, payload: [4, [1, 2]] })
+        expect(labels[1].textContent).toBe("(2, 3)")
+    })
+
     it("a release commits the field; moving alone doesn't", () => {
         const m = controlsManifest()
         const { host, script } = setup()

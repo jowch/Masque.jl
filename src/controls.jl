@@ -2,7 +2,7 @@
 # … in the figure and names it in `masque`; masque leaves the block's box empty in the picture
 # and the browser draws a native HTML control over it. The block's field holds its plain value.
 
-const _CONTROL_BLOCKS = Union{Makie.Slider, Makie.IntervalSlider, Makie.Toggle, Makie.Checkbox, Makie.Menu}
+const _CONTROL_BLOCKS = Union{Makie.Slider, Makie.IntervalSlider, Makie.Toggle, Makie.Checkbox, Makie.Menu, Makie.SliderGrid}
 
 # The wire name of each block type, the `control` entry of its layer's geometry.
 _control_name(::Makie.Slider) = "slider"
@@ -10,14 +10,16 @@ _control_name(::Makie.IntervalSlider) = "intervalslider"
 _control_name(::Makie.Toggle) = "toggle"
 _control_name(::Makie.Checkbox) = "checkbox"
 _control_name(::Makie.Menu) = "menu"
+_control_name(::Makie.SliderGrid) = "slidergrid"
 
 """
     BlockControl(block, id)
 
-A Makie block drawn as an HTML control: `Slider`, `IntervalSlider`, `Toggle`, `Checkbox` or
-`Menu`. [`masque`](@ref) builds one for each block named in its arguments or `bind`
-(`masque(fig, (degree = sl,))`); there is no need to build it by hand. Its field holds the
-block's plain value: the slider's value, `(lo, hi)`, `true`/`false`, or the menu's selection.
+A Makie block drawn as an HTML control: `Slider`, `IntervalSlider`, `Toggle`, `Checkbox`,
+`Menu` or `SliderGrid`. [`masque`](@ref) builds one for each block named in its arguments or
+`bind` (`masque(fig, (degree = sl,))`); there is no need to build it by hand. Its field holds
+the block's plain value: the slider's value, `(lo, hi)`, `true`/`false`, the menu's selection,
+or a tuple of a grid's slider values, in order.
 """
 struct BlockControl <: AbstractInteractable
     block::_CONTROL_BLOCKS
@@ -61,9 +63,12 @@ _control_wire(b::Makie.IntervalSlider) = Int[_interval_indices(b)[]...] .- 1
 _control_wire(b::Makie.Toggle) = Bool(b.active[])
 _control_wire(b::Makie.Checkbox) = Bool(b.checked[])
 _control_wire(b::Makie.Menu) = Int(b.i_selected[]) - 1
+_control_wire(b::Makie.SliderGrid) = Any[_control_wire(sl) for sl in _grid_sliders(b)]
 
-function hitlayers(i::BlockControl, ctx)
-    b = i.block
+hitlayers(i::BlockControl, ctx) =
+    [HitLayer(i.id, :control, _control_geometry(i.block, ctx), Any[], Symbol(""), events(i), string(i.id))]
+
+function _control_geometry(b, ctx)
     x, y, w, h = _block_rect(b, ctx)
     g = Dict{String, Any}(
         "control" => _control_name(b), "x" => x, "y" => y, "w" => w, "h" => h,
@@ -97,9 +102,38 @@ function hitlayers(i::BlockControl, ctx)
         _toggle_geometry!(g, b, ctx)
     elseif b isa Makie.Checkbox
         _checkbox_geometry!(g, b, ctx)
+    elseif b isa Makie.SliderGrid
+        g["sliders"] = Any[_grid_slider_geometry(sl, vl, ctx) for (sl, vl) in zip(_grid_sliders(b), _grid_valuelabels(b))]
     end
-    return [HitLayer(i.id, :control, g, Any[], Symbol(""), events(i), string(i.id))]
+    return g
 end
+
+# One slider of a `SliderGrid`, with the value label beside it: its box, text size and colour,
+# and the text for each value. The text comes from the grid's own `format`, run once per value
+# in Julia, so the label follows the slider in a static export too. An interval slider's label
+# covers every pair while there are at most 40 values; past that the browser writes "(lo, hi)".
+function _grid_slider_geometry(sl, vl, ctx)
+    g = _control_geometry(sl, ctx)
+    x, y, w, h = _block_rect(vl, ctx)
+    lab = Dict{String, Any}(
+        "x" => x, "y" => y, "w" => w, "h" => h,
+        "fontsize" => Float64(vl.fontsize[]) * ctx.scaling, "color" => _css_color(vl.color[]),
+    )
+    fmt = _valuelabel_format(sl, vl)
+    rng = sl.range[]
+    if fmt !== nothing
+        if sl isa Makie.Slider
+            lab["labels"] = String[string(fmt(v)) for v in rng]
+        elseif length(rng) <= 40
+            lab["pairs"] = String[string(fmt((a, b))) for a in rng for b in rng]
+        end
+    end
+    g["valueLabel"] = lab
+    return g
+end
+
+initial_envelope(i::BlockControl, ctx, layers) =
+    Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => _control_wire(i.block))
 
 # Makie's checkbox (Makie/src/makielayout/blocks/checkbox.jl): a rounded square `size` across in
 # the middle of the box, filled and stroked in its checked or unchecked colours, and a checkmark
@@ -162,9 +196,6 @@ function _toggle_geometry!(g, b::Makie.Toggle, ctx)
     return g
 end
 
-initial_envelope(i::BlockControl, ctx, layers) =
-    Dict{String, Any}("layer" => string(i.id), "index" => 0, "payload" => _control_wire(i.block))
-
 # The wire value of `b` → the block's plain value.
 function _control_value(b::Makie.Slider, id, p)
     rng = b.range[]
@@ -186,6 +217,14 @@ function _control_value(b::Makie.Menu, id, p)
     p isa Integer && p == -1 && return nothing
     opts = collect(b.options[])
     return Makie.optionvalue(opts[_control_index(id, p, length(opts))])
+end
+
+function _control_value(b::Makie.SliderGrid, id, p)
+    sls = _grid_sliders(b)
+    p isa AbstractVector && length(p) == length(sls) || throw(
+        ArgumentError("bond: control :$id expected $(length(sls)) slider values, got $(repr(p))"),
+    )
+    return Tuple(_control_value(sl, id, q) for (sl, q) in zip(sls, p))
 end
 
 function _control_index(id, p, n)
@@ -211,6 +250,12 @@ function _set_control!(b::Makie.IntervalSlider, p)
 end
 _set_control!(b::Makie.Toggle, p) = (b.active[] == p || (b.active[] = p); nothing)
 _set_control!(b::Makie.Checkbox, p) = (b.checked[] == p || (b.checked[] = p); nothing)
+function _set_control!(b::Makie.SliderGrid, p)
+    for (sl, q) in zip(_grid_sliders(b), p)
+        _set_control!(sl, q)
+    end
+    return nothing
+end
 _set_control!(b::Makie.Menu, p) = (b.i_selected[] == p + 1 || (b.i_selected[] = Int(p) + 1); nothing)
 
 # Every named block takes its value from the state `js` (one envelope per field). Each value
@@ -231,10 +276,12 @@ function _sync_controls!(interactables, js)
     return nothing
 end
 
-# Every plot a block draws, in its scene and the scenes under it (Menu's dropdown).
+# Every plot a block draws, in its scene and the scenes under it (Menu's dropdown). A grid's
+# sliders and value labels are drawn in HTML; its name labels stay in the picture.
 function _block_plots(b)
     out = Any[]
-    stack = Any[_block_scene(b)]
+    stack = b isa Makie.SliderGrid ? Any[_block_scene(c) for c in vcat(_grid_sliders(b), _grid_valuelabels(b))] :
+        Any[_block_scene(b)]
     while !isempty(stack)
         sc = pop!(stack)
         append!(out, sc.plots)
@@ -265,11 +312,13 @@ function _with_blocks_hidden(f, interactables)
     end
 end
 
-# The blocks of `fig` drawn as controls, in layout order, nested layouts included.
-_figure_blocks(fig) = Any[c for c in fig.content if c isa _CONTROL_BLOCKS]
+# The blocks of `fig` drawn as controls, in layout order, nested layouts included. A `SliderGrid`
+# left out is a warning instead (`_warn_unnamed_grids`): before masque drew grids, a figure with
+# one worked, so it can't become an error in a patch release.
+_figure_blocks(fig) = Any[c for c in fig.content if c isa _CONTROL_BLOCKS && !(c isa Makie.SliderGrid)]
 
 # Makie's input blocks that masque doesn't draw as controls yet: they stay pictures (#426).
-const _PICTURE_BLOCKS = Union{Makie.Button, Makie.Textbox, Makie.SliderGrid}
+const _PICTURE_BLOCKS = Union{Makie.Button, Makie.Textbox}
 
 # A block in the figure that this call doesn't name would look live and do nothing, so it is an
 # error (a warning in 0.3.1). A block masque can't draw yet looks just as live, so it is a
@@ -277,6 +326,7 @@ const _PICTURE_BLOCKS = Union{Makie.Button, Makie.Textbox, Makie.SliderGrid}
 function _check_unnamed_blocks(fig, interactables)
     _warn_picture_blocks(fig)
     named = Base.IdSet{Any}(i.block for i in interactables if i isa BlockControl)
+    _warn_unnamed_grids(fig, named)
     left = [b for b in _figure_blocks(fig) if !(b in named)]
     isempty(left) && return nothing
     kinds = join(unique(string(nameof(typeof(b))) for b in left), ", ")
@@ -297,12 +347,16 @@ function _warn_picture_blocks(fig)
     kinds = unique(string(nameof(typeof(b))) for b in left)
     names = ["a " * k for k in kinds]
     list = length(names) == 1 ? only(names) : join(names[1:(end - 1)], ", ") * " and " * names[end]
-    instead = String[]
-    any(b -> b isa Makie.SliderGrid, left) &&
-        push!(instead, "For a grid of sliders, lay out separate Makie `Slider`s, which masque makes live.")
-    any(b -> b isa Union{Makie.Button, Makie.Textbox}, left) &&
-        push!(instead, "For a button or a text box, use a control outside the figure, such as PlutoUI's Button or TextField.")
+    instead = "For a button or a text box, use a control outside the figure, such as PlutoUI's Button or TextField."
     @warn "masque: this figure has $(list), which masque shows as a picture for now, so the " *
-        "reader can click it and nothing happens. $(join(instead, " "))"
+        "reader can click it and nothing happens. $(instead)"
+    return nothing
+end
+
+function _warn_unnamed_grids(fig, named)
+    any(c -> c isa Makie.SliderGrid && !(c in named), fig.content) || return nothing
+    @warn "masque: this figure has a SliderGrid that masque wasn't given, so it shows as a " *
+        "picture and the reader can drag it and nothing happens. Name it to make its sliders " *
+        "live, `masque(fig, (name = grid,))`, or take it out of the figure."
     return nothing
 end
