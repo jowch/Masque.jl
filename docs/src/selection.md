@@ -16,7 +16,7 @@ cities = interactables(s; id = :cities, payloads = rows)
 
 The `id` names the field, so the selected city is `sel.cities`.
 
-## What replaces a selection
+## Replace or clear a selection
 
 `sel.cities` starts as `nothing`, and clicking a city makes it that
 city's [`ElementEvent`](@ref). Clicking another city replaces it,
@@ -160,11 +160,11 @@ start selected, and so can the cells of a heatmap built with
 boxes, thresholds, and the view cannot. A
 box or a threshold line starts where its `bounds` or `value` puts it,
 so to start one somewhere else, set those instead; see
-[Read the box itself](@ref) and [Drag a threshold](@ref).
+[Read the box's bounds](@ref) and [Drag a threshold](@ref).
 
 A [`RegionInteractable`](@ref) with several kinds of shape makes one
 part per kind, so name the part in `selected=`, as in
-`selected = (cells = (circles = [1],),)` for the id `:cells`. See [Custom hits](@ref).
+`selected = (cells = (circles = [1],),)` for the id `:cells`. See [Custom shapes](@ref).
 
 ## Keep a selection when the figure rebuilds
 

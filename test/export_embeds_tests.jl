@@ -94,6 +94,24 @@ end
     end
 end
 
+@testset "group_states: a linked group's rows round-trip through bond_from_js" begin
+    fig = Figure(size = (400, 200))
+    a = scatter!(Axis(fig[1, 1]), [1, 2, 3], [1, 2, 3])
+    b = scatter!(Axis(fig[1, 2]), [1, 2, 3], [3, 2, 1])
+    w = masque(fig; bind = linked(a, b))
+    @test isempty(discrete_states(w.manifest))
+    states = group_states(w.manifest)
+    @test length(states) == 3
+    for (r, (f, v)) in enumerate(states)
+        @test Masque.bond_from_js(w, Dict(f => v)) == r
+    end
+    rows = player_states(Dict{String, Any}(), w.manifest)
+    @test [r.key for r in rows][2:end] == ["{\"row\":0}", "{\"row\":1}", "{\"row\":2}"]
+    many = masque(fig; bind = linked(a, b; select = :many))
+    f, v = group_states(many.manifest)[2]
+    @test Masque.bond_from_js(many, Dict(f => v)) == [2]
+end
+
 @testset "exported player opens on a selected= widget's seeded value" begin
     # A stored `nothing` bond would be restored over the value a `selected=` widget seeds at
     # mount, and the player must show that value's snapshot when it arms.
@@ -513,6 +531,7 @@ end
         "tooltips_stars", "tooltips_stars_default", "tooltips_stars_dark", "grids_heatmap", "readouts_axis",
         "custom_regions", "recipes_dumbbell", "linked_legend_wash",
         "selection_start", "slice_spectra", "widgets_value", "explore_3d",
+        "linked_city", "linked_rows", "marks_lines", "controls_values", "grids_labels", "grids_edges",
     ]
     for name in guides
         player = parse_player_toml(joinpath(root, "docs", "src", "embeds", name * ".jl"))

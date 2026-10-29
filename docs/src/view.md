@@ -197,7 +197,7 @@ end
 
 For an `Axis3`, set `azimuth`, `elevation`, and `limits` the same way.
 
-## Where it works
+## Supported axes
 
 Panning needs a 2D `Axis` and orbiting an `Axis3`; see
 [Supported plots and axes](@ref) for which axes and scales.

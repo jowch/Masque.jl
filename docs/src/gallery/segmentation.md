@@ -105,7 +105,7 @@ object that holds it, and hovering over a pixel outlines its object and
 names it. `select = :many` makes the picks add up, since you mark several
 objects before you count. `sel.objects.regions` lists the ids of the
 objects picked, the same numbers as in `labels`, so `areas[k]` and
-`labels .== k` reach each one. [Pick whole regions](@ref) has the rest.
+`labels .== k` reach each one. [Select whole regions](@ref) has the rest.
 
 A wrong click is easy to take back: with the figure focused, Ctrl-Z
 (Cmd-Z on a Mac) undoes the last change to the picks, and the next cell

@@ -20,7 +20,7 @@ cells don't take it yet.
 
 `masque(fig)` makes an interactable for every plot it knows on each
 axis, plus every `Colorbar` and `Legend`, and skips any other plot with
-a warning. [Recipes masque(fig) extracts](@ref) lists the plots it
+a warning. [Plots `masque(fig)` makes interactive](@ref) lists the plots it
 knows, and [`interactables(fig)`](@ref interactables) returns the same
 list.
 
@@ -30,7 +30,7 @@ shortened: `heatmap!` and `image!` are `:cells`, `barplot!` is `:bars`,
 and `linesegments!` is `:segments`. That id names the plot's field in
 the `@bind` value, as in `sel.scatter`, and `pick.layer` reports it.
 
-## Adding to what `masque(fig)` builds
+## Add to what `masque(fig)` builds
 
 `masque(fig)` doesn't add axis readouts, thresholds, boxes, panning, or
 slices. To use one, pass it after the figure, and the plots keep their
@@ -95,7 +95,7 @@ instead of one path, and `unit = :line` makes the whole path one mark.
 does not reach that polygon. `clamp_to_viewport = true` trims a
 rectangle that reaches past the axis edge.
 
-## Plot-object defaults
+## Fields each plot reports
 
 When you pass a plot object, the constructor reads its geometry from
 the plot. The table lists the fields each plot type reports when you
@@ -128,7 +128,7 @@ don't pass `payloads`, and the id `masque(fig)` gives it.
 | `BoxPlot` | `interactables(p)` | `q1`, `median`, `q3` (the box only) | `:boxplot` |
 | `Annotation` | `interactables(p)` | the text's fields | `:annotation` |
 
-## Axis, legend, and drag
+## Axes, legends, and draggable tools
 
 | Constructor | Signature | Its field holds | Guide |
 |---|---|---|---|
@@ -148,14 +148,14 @@ legend links each entry to the layers its plots have in the same
 [Supported plots and axes](@ref) lists which of these work on which
 axes.
 
-## Custom
+## Custom shapes and types
 
 | Constructor | Signature | Its field holds | Guide |
 |---|---|---|---|
-| [`RegionInteractable`](@ref) | `(ax, regions; payloads, id=:region)` | [`ElementEvent`](@ref), in one field per kind of shape | [Custom hits](@ref) |
-| [`FunctionInteractable`](@ref) | `(f; events=(:click, :hover))` | [`ElementEvent`](@ref), by default | [Custom hits](@ref) |
+| [`RegionInteractable`](@ref) | `(ax, regions; payloads, id=:region)` | [`ElementEvent`](@ref), in one field per kind of shape | [Custom shapes](@ref) |
+| [`FunctionInteractable`](@ref) | `(f; events=(:click, :hover))` | [`ElementEvent`](@ref), by default | [Custom shapes](@ref) |
 
 To return an event type of your own, subtype
-[`AbstractInteractable`](@ref). See [A custom interactable](@ref).
+[`AbstractInteractable`](@ref). See [Return your own type from a click](@ref).
 
 Full docstrings for every exported name are on the [API](@ref) page.

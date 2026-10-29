@@ -1,4 +1,4 @@
-# Current design and rough edges
+# Design and limitations
 
 Masque works differently from other interactive plotting libraries in
 a few places, and a few features are not finished yet. Below is how
@@ -74,7 +74,7 @@ not decide which mark you reach. A mark on the far side of the scene
 can be reached through a nearer mark created before it, and a nearer
 mark can be blocked by a farther one created after it.
 
-## Rough edges today
+## Known limitations
 
 - In a static HTML export, tooltips and highlights still work, but other
   cells do not respond to a click and the view does not pan or orbit. See

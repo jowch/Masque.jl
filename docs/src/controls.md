@@ -6,31 +6,21 @@ notebook. Each one becomes a field of the `@bind` value that holds its
 plain value: a number from the slider's range, `true` or `false`, a
 `(low, high)` pair, or the option chosen from the menu.
 
-```julia
-begin
-    xs = range(0, 2π; length = 200)
-    fig = Figure(size = (560, 380))
-    ax = Axis(fig[1, 1:2])
-    wave = lines!(ax, xs, sin.(xs))
-    freq = Slider(fig[2, 1]; range = 1:0.5:5, startvalue = 1)
-    dots = Toggle(fig[2, 2]; active = false)
-    nothing
-end
+```@raw html
+<div class="masque-embed-wrap">
+<iframe id="masque-controls-values" data-masque-embed="controls_values" title="A sine wave with a slider and a toggle. Move either and the last cell shows their values." style="width:100%;height:820px;border:0;background:transparent;overflow:hidden;" scrolling="no" loading="lazy"></iframe>
+</div>
 ```
 
-```julia
-@bind w masque(fig, (freq = freq, dots = dots))
-```
-
-```julia
-w.freq, w.dots      # (1.0, false) to start
+```@eval
+Main.masque_fallback("controls_values")
 ```
 
 The slider and the toggle look like Makie's and sit where the figure's
 layout put them. Moving one changes `w` when you let go, so cells that use
 `w` respond.
 
-## Redraw the figure as the reader moves a control
+## Redraw the figure from a control
 
 With [`onchange`](onchange.md), the figure follows the controls without
 running the cell again. Change your plots with Makie's `update!`, then

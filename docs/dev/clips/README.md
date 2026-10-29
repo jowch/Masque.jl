@@ -23,7 +23,7 @@ be a player, so their page shows a clip of the live notebook instead:
 | `docs/src/assets/selection-replace.mp4` | Selection › What replaces a selection | `selection_replace_notebook.jl` | `test/e2e/docs_clip.mjs selection-replace` |
 | `docs/src/assets/selection-many.mp4` | Selection › Select several marks | `selection_many_notebook.jl` | `test/e2e/docs_clip.mjs selection-many` |
 | `docs/src/assets/grid-many.mp4` | Heatmaps and images › Select several cells | `grid_many_notebook.jl` | `test/e2e/docs_clip.mjs grid-many` |
-| `docs/src/assets/grid-regions.mp4` | Heatmaps and images › Pick whole regions | `grid_regions_notebook.jl` | `test/e2e/docs_clip.mjs grid-regions` |
+| `docs/src/assets/grid-regions.mp4` | Heatmaps and images › Select whole regions | `grid_regions_notebook.jl` | `test/e2e/docs_clip.mjs grid-regions` |
 | `docs/src/assets/grid-brush.mp4` | Heatmaps and images › Brush a block of cells | `grid_brush_notebook.jl` | `test/e2e/docs_clip.mjs grid-brush` |
 | `docs/src/assets/widgets-classes.mp4` | Build a widget › Example: label points into classes | `classes_notebook.jl` | `test/e2e/docs_clip.mjs classes` |
 | `docs/src/assets/view-pan.mp4` | Pan, zoom and orbit (top) | `view_pan_notebook.jl` | `test/e2e/docs_clip.mjs view-pan` |
