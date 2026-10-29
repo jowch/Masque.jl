@@ -246,6 +246,8 @@ export interface OverlayState {
     surfaceW_: number
     surfaceH_: number
     surfaceSized_: boolean
+    // hover.ts's last placeTip/placeAnchored call, re-run by replaceTip on scroll and resize.
+    tipPlace_: (() => void) | null
     // Keyboard focus (keyboard.ts). focusIdx indexes OverlayCtx.focusable; focusHit/focusTipHtml/
     // focusTipCss are hover.ts's cache to redraw the ring/tooltip after a pointer miss clears
     // g.hi — see restoreFocus in hover.ts — without hover.ts importing keyboard.ts (no cycle).
@@ -305,6 +307,7 @@ export function createOverlayState(): OverlayState {
         surfaceW_: 0,
         surfaceH_: 0,
         surfaceSized_: false,
+        tipPlace_: null,
         focusIdx_: null,
         focusHit_: null,
         focusTipHtml_: null,

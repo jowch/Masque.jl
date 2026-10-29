@@ -1001,15 +1001,33 @@ try {
 
   // The axis readout's cursor-following tooltip: the caret apex sits on the pointer, both in
   // open space and where the box clamps at the right edge (the caret then moves along the box).
+  // The box may extend past the figure and clamps at the window's edge instead, so the
+  // right-edge case scrolls the figure into view and slides its cell right until the pointer
+  // is 40px from that edge.
   // The bottom flip (.flip-y) leaves this horizontal apex unchanged; overlay.test.ts pins it. Before, it sat a fixed 14px into a box offset
   // 10px from the pointer, so it pointed beside the crosshair cursor.
+  // Park the real mouse off the figures: the scroll and slide below make the browser re-hit-test
+  // it, and a real pointer left over a figure would leave it and hide the tooltip.
+  await page.mouse.move(1, 1);
   for (const [fx, fy, where] of [[0.15, 0.25, "open"], [0.8, 0.25, "right-edge"]]) {
     const r = await page.evaluate(async ([fx, fy]) => {
       const span = document.querySelector("#coords_axis");
       const hosts = [...document.querySelectorAll(".ip-host")];
       const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
       let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
-      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      // On screen: a box whose pointer is outside the window is placed unclamped (hover.ts).
+      host.scrollIntoView({ block: "center", behavior: "instant" });
+      // Let the scroll and the browser's own pointer update after it settle before hovering.
+      await new Promise((res) => setTimeout(res, 300));
+      const cell = host.closest("pluto-cell");
+      cell.style.transform = "";
+      let b = host.querySelector("img, canvas").getBoundingClientRect();
+      if (fx > 0.5) {
+        const want = document.documentElement.clientWidth - 40;
+        cell.style.transform = `translateX(${want - (b.left + fx * b.width)}px)`;
+        b = host.querySelector("img, canvas").getBoundingClientRect();
+        if (Math.abs(b.left + fx * b.width - want) > 1) throw new Error(`axis/caret-right-edge: the slide did not move the figure (pointer at ${b.left + fx * b.width}, want ${want})`);
+      }
       const x = b.left + fx * b.width, y = b.top + fy * b.height;
       sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointermove", {
         bubbles: true, composed: true, cancelable: true, clientX: x, clientY: y,
@@ -1023,6 +1041,7 @@ try {
       const before = getComputedStyle(t, "::before");
       const apexX = tipRect.left + parseFloat(getComputedStyle(t).borderLeftWidth)
         + parseFloat(before.left) + parseFloat(before.borderLeftWidth);
+      cell.style.transform = "";
       return { show: t.classList.contains("show"), text: t.innerText, apexX, x, shifted: tipRect.left > x - 14 + 1 || tipRect.left < x - 14 - 1 };
     }, [fx, fy]);
     if (!r.show) throw new Error(`axis/caret-${where}: no tooltip at ${fx},${fy}`);
