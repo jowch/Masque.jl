@@ -1,0 +1,1182 @@
+<!DOCTYPE html><html><head>
+<!-- masque-pluto-export -->
+<script src="shared/8d927fefaa4fb85ec38a.js"></script>
+<script>
+function isDocDark() {
+  var c = (window.parent && window.parent.document.documentElement.className) || "";
+  if (!c) return false;
+  if (/(^|\s)theme--(documenter-light|catppuccin-latte)(\s|$)/.test(c)) return false;
+  return /(^|\s)theme--/.test(c);
+}
+(function () {
+  var framed = window.parent && window.parent !== window;
+  var dark = false;
+  if (framed) {
+    try { dark = isDocDark(); } catch (e) { dark = false; }
+  } else if (window.matchMedia) {
+    dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  document.documentElement.classList.toggle("pluto-dark", dark);
+  if (framed && window.matchMedia) {
+    var native = window.matchMedia.bind(window);
+    window.matchMedia = function (q) {
+      var s = String(q);
+      if (s.indexOf("prefers-color-scheme") === -1) return native(q);
+      var wantsDark = s.indexOf("dark") !== -1;
+      var matches = wantsDark ? dark : !dark;
+      return {
+        matches: matches,
+        media: s,
+        onchange: null,
+        addListener: function () {},
+        removeListener: function () {},
+        addEventListener: function () {},
+        removeEventListener: function () {},
+        dispatchEvent: function () { return false; },
+      };
+    };
+  }
+})();
+</script>
+
+
+<script>
+window.masquePlayer = { table: {"controls":[],"initial":{"band":null,"boxplot":null,"contourf":null,"density":null,"violin":null,"voronoiplot":null},"keyed":["band","density","contourf","violin","voronoiplot","boxplot"],"keys":{"band:0":0,"boxplot:0":0,"boxplot:1":0,"contourf:0":0,"contourf:1":0,"contourf:10":0,"contourf:11":0,"contourf:12":0,"contourf:13":0,"contourf:14":0,"contourf:15":0,"contourf:16":0,"contourf:17":0,"contourf:18":0,"contourf:19":0,"contourf:2":0,"contourf:3":0,"contourf:4":0,"contourf:5":0,"contourf:6":0,"contourf:7":0,"contourf:8":0,"contourf:9":0,"density:0":0,"null":0,"violin:0":0,"violin:1":0,"violin:2":0,"voronoiplot:0":0,"voronoiplot:1":0,"voronoiplot:10":0,"voronoiplot:11":0,"voronoiplot:12":0,"voronoiplot:13":0,"voronoiplot:14":0,"voronoiplot:2":0,"voronoiplot:3":0,"voronoiplot:4":0,"voronoiplot:5":0,"voronoiplot:6":0,"voronoiplot:7":0,"voronoiplot:8":0,"voronoiplot:9":0},"snaps":["shared/44c7bc0b2632caef71f0.json"]} };
+(function () {
+  const TABLE = window.masquePlayer.table;
+  const FRAMES = TABLE.frames;
+  if (!FRAMES) return;
+  function layerIndexKey(layer, index) {
+  return String(layer) + ":" + String(Number(index));
+}
+function pickKey(v) {
+  const k = layerIndexKey(v.layer, v.index);
+  return v.sample == null ? k : k + "@" + String(Number(v.sample));
+}
+function itemKey(it) {
+  const k = pickKey(it);
+  const p = it.payload;
+  if (!p || p.i0 == null) return k;
+  return k + "@" + p.i0 + "-" + p.i1 + "/" + p.j0 + "-" + p.j1;
+}
+function envKey(v) {
+  if (v == null) return "null";
+  if (Array.isArray(v.items)) return "items:" + v.items.map(itemKey).join(",");
+  if (v.layer != null && v.index != null && v.index !== "") {
+    return pickKey(v);
+  }
+  return JSON.stringify(v);
+}
+function stable(x) {
+  if (x === undefined) x = null;
+  if (x === null || typeof x !== "object") return JSON.stringify(x);
+  if (Array.isArray(x)) return "[" + x.map(stable).join(",") + "]";
+  return "{" + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(x[k]); }).join(",") + "}";
+}
+// A field keys the same as its starting value when it shows the same thing: a box released
+// where it started keeps its cells though its edges differ in the last float digit.
+function changed(table, v) {
+  const out = [];
+  const init = table.initial || {};
+  (table.keyed || []).forEach(function (f) {
+    const cur = v[f] === undefined ? null : v[f];
+    const start = init[f] === undefined ? null : init[f];
+    if (stable(cur) !== stable(start) && fieldKey(table, f, cur) !== fieldKey(table, f, start)) out.push([f, cur]);
+  });
+  return out;
+}
+function fieldKey(table, f, cur) {
+  if (cur == null) return "null@" + f;
+  if ((table.controls || []).indexOf(f) !== -1) return f + "=" + JSON.stringify(cur.payload);
+  return envKey(cur);
+}
+function keyOf(table, v) {
+  if (v == null) return "null";
+  const d = changed(table, v);
+  if (!d.length) return "null";
+  return d.map(function (p) { return fieldKey(table, p[0], p[1]); }).join("+");
+}
+function keysFor(table, v) {
+  const keys = [keyOf(table, v)];
+  const d = v == null ? [] : changed(table, v);
+  const one = d.length === 1 ? d[0][1] : null;
+  if (one && one.layer != null && one.index != null && one.index !== "") {
+    keys.push(String(one.layer) + ":" + String(one.index));
+    keys.push(String(one.layer) + ":" + String(one.index | 0));
+  }
+  return keys;
+}
+function find(table, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(table.keys, keys[i])) {
+      return table.snaps[table.keys[keys[i]]];
+    }
+  }
+  return null;
+}
+// Fetches each state file once and keeps it; a failed fetch is tried again next time.
+function jsonFiles() {
+  const loaded = new Map();
+  return function (file) {
+    if (!loaded.has(file)) {
+      loaded.set(file, fetch(file).then(function (r) {
+        if (!r.ok) throw new Error(file + ": " + r.status);
+        return r.json();
+      }).catch(function (e) {
+        loaded.delete(file);
+        throw e;
+      }));
+    }
+    return loaded.get(file);
+  };
+}
+// Shows each value's cells once its file loads, unless the reader reached a newer value first,
+// a miss included: a slow file never lands over a newer value's cells or its note.
+function latestOnly(load, apply, miss) {
+  let latest = 0;
+  return function (file) {
+    const n = ++latest;
+    miss(!file);
+    if (!file) return;
+    load(file).then(function (snap) {
+      if (n === latest) apply(snap);
+    }, function (e) {
+      console.warn("masque player: snapshot", e);
+      if (n === latest) miss(true);
+    });
+  };
+}
+// A reader who clicks one plot and then another changes two fields, a value the harvest never
+// recorded. Show the latest change on its own: the field that differs from the last value.
+function lookup(table, v) {
+  const prev = table.last_;
+  table.last_ = v;
+  let hit = find(table, keysFor(table, v));
+  // A moved control changes what every other field's snapshot would show, so a value the
+  // harvest skipped stays a miss rather than showing a snapshot taken at other settings.
+  const controlMoved = v != null && changed(table, v).some(function (p) { return (table.controls || []).indexOf(p[0]) !== -1; });
+  if (!hit && v != null && prev != null && !controlMoved) {
+    const moved = (table.keyed || []).filter(function (f) { return stable(v[f]) !== stable(prev[f]); });
+    if (moved.length === 0) return table.shown_ || null;
+    if (moved.length === 1) {
+      const alone = Object.assign({}, table.initial || {});
+      alone[moved[0]] = v[moved[0]];
+      hit = find(table, keysFor(table, alone));
+    }
+  }
+  if (hit) table.shown_ = hit;
+  return hit;
+}
+
+  const cache = new Map();
+  function get(url, read) {
+    if (!cache.has(url)) {
+      cache.set(url, fetch(url).then(function (r) {
+        if (!r.ok) throw new Error(url + ": " + r.status);
+        return r[read]();
+      }).catch(function (e) {
+        cache.delete(url);
+        throw e;
+      }));
+    }
+    return cache.get(url);
+  }
+  window.masqueReplayFrame = function (input) {
+    if (!input || input.onchange !== true) return Promise.resolve({});
+    const keys = keysFor(TABLE, input.state);
+    let hit = null;
+    for (let i = 0; i < keys.length && !hit; i++) {
+      if (Object.prototype.hasOwnProperty.call(FRAMES.keys, keys[i])) hit = FRAMES.keys[keys[i]];
+    }
+    if (!hit) return Promise.resolve({ error: "This wasn't computed for the docs. Download the notebook to try it." });
+    return Promise.all([get(FRAMES.dir + hit[0] + ".png", "arrayBuffer"), get(FRAMES.dir + hit[1] + ".json", "json")])
+      .then(function (r) { return Object.assign({}, r[1], { png: new Uint8Array(r[0]) }); })
+      .catch(function (e) {
+        console.warn("masque player: frame", e);
+        return { error: "This wasn't computed for the docs. Download the notebook to try it." };
+      });
+  };
+})();
+</script>
+
+<style>
+html:not(.pluto-dark) {
+        --image-filters: none;
+        --out-of-focus-opacity: 0.25;
+
+        /* Color scheme */
+        --main-bg-color: white;
+        --rule-color: rgba(0, 0, 0, 0.15);
+        --kbd-border-color: #b3b3b3;
+        --header-bg-color: white;
+        --header-border-color: rgba(0, 0, 0, 0.1);
+        --ui-button-color: #2a2a2b;
+        --cursor-color: black;
+
+        /* Cells */
+        --normal-cell: 0, 0, 0;
+        --code-differs: 160, 130, 28;
+        --error-color: 240, 168, 168;
+        --normal-cell-color: rgba(var(--normal-cell), 0.1);
+        --dark-normal-cell-color: rgba(var(--normal-cell), 0.2);
+        --selected-cell-color: rgba(40, 78, 189, 0.4);
+        --code-differs-cell-color: rgba(var(--code-differs), 0.68);
+        --error-cell-color: rgba(var(--error-color), 0.7);
+        --bright-error-cell-color: rgb(var(--error-color));
+        --light-error-cell-color: rgba(var(--error-color), 0.05);
+
+        /*Export styling*/
+        --export-bg-color: rgb(60, 67, 101);
+        --export-color: rgb(228, 228, 228);
+        --export-card-bg-color: rgba(255, 255, 255, 0.8);
+        --export-card-title-color: rgba(0, 0, 0, 0.7);
+        --export-card-text-color: rgba(0, 0, 0, 0.5);
+        --export-card-shadow-color: #00000029;
+
+        /*Frontmatter styling*/
+        --frontmatter-button-bg-color: white;
+        --frontmatter-outline-color: hsl(230, 14%, 11%);
+        --frontmatter-input-bg-color: #fbfbfb;
+        --frontmatter-input-border-color: hsl(207deg 24% 87%);
+
+        /* PlutoLand upload styling */
+        --plutoland-bg-color: white;
+        --plutoland-bigbutton-bg-color: white;
+        --plutoland-url-fg: #375bbd;
+        --plutoland-url-bg: #f7fbff;
+        --plutoland-or-bg-color: hsl(210 20% 83% / 1);
+
+        /*Pluto output styling */
+        --pluto-schema-types-color: rgba(0, 0, 0, 0.4);
+        --pluto-schema-types-border-color: rgba(0, 0, 0, 0.2);
+        /* --pluto-dim-output-color */
+        --pluto-output-color: hsl(0, 0%, 25%);
+        --pluto-output-h-color: hsl(0, 0%, 12%);
+        --pluto-output-bg-color: white;
+        --a-underline: #00000059;
+        --blockquote-color: #555;
+        --blockquote-bg: #f2f2f2;
+        --admonition-title-color: white;
+        --jl-message-color: rgb(219 233 212);
+        --jl-message-accent-color: rgb(158, 200, 137);
+        --jl-info-color: rgb(214 227 244);
+        --jl-info-accent-color: rgb(148, 182, 226);
+        --jl-warn-color: rgb(236 234 213);
+        --jl-warn-accent-color: rgb(207, 199, 138);
+        --jl-danger-color: rgb(245 218 215);
+        --jl-danger-accent-color: rgb(226, 157, 148);
+        --jl-debug-color: rgb(245 218 215);
+        --jl-debug-accent-color: rgb(226, 157, 148);
+        --footnote-border-color: rgba(23, 115, 119, 0.15);
+        --table-border-color: rgba(0, 0, 0, 0.2);
+        --table-bg-hover-color: rgba(159, 158, 224, 0.15);
+        --pluto-tree-color: rgb(0 0 0 / 38%);
+
+        /*pluto cell styling*/
+        --disabled-cell-bg-color: rgba(139, 139, 139, 0.25);
+        --selected-cell-bg-color: rgba(40, 78, 189, 0.24);
+        --hover-scrollbar-color-1: rgba(0, 0, 0, 0.15);
+        --hover-scrollbar-color-2: rgba(0, 0, 0, 0.05);
+        --skip-as-script-background-color: #ccc;
+        --depends-on-skip-as-script-background-color: #eee;
+
+        /* Pluto shoulders */
+        --shoulder-hover-bg-color: rgba(0, 0, 0, 0.05);
+
+        /* Logs */
+        --pluto-logs-bg-color: hsl(0deg 0% 98%);
+        --pluto-logs-key-color: rgb(0 0 0 / 51%);
+        --pluto-logs-progress-fill: #ffffff;
+        --pluto-logs-progress-bg: #e7e7e7;
+        --pluto-logs-progress-border: hsl(210deg 16% 74%);
+        --pluto-logs-info-color: white;
+        --pluto-logs-info-accent-color: inherit;
+        --pluto-logs-warn-color: rgb(236 234 213);
+        --pluto-logs-warn-accent-color: #665f26;
+        --pluto-logs-danger-color: rgb(245 218 215);
+        --pluto-logs-danger-accent-color: rgb(172 66 52);
+        --pluto-logs-debug-color: rgb(236 223 247);
+        --pluto-logs-debug-accent-color: rgb(100 50 179);
+
+        /*Top navbar styling*/
+        --nav-h1-text-color: black;
+        --nav-filepicker-color: #6f6f6f;
+        --nav-filepicker-border-color: #b2b2b2;
+        --nav-filepicker-suggest-color: rgba(129, 146, 160, 0.5);
+        --nav-process-status-bg-color: white;
+        --nav-process-status-color: var(--pluto-output-h-color);
+
+        /*header*/
+        --restart-recc-header-color: rgba(114, 192, 255, 0.56);
+        --restart-recc-accent-color: rgba(114, 192, 255);
+        --restart-req-header-color: rgba(170, 41, 32, 0.56);
+        --dead-process-header-color: rgb(230 88 46 / 38%);
+        --loading-header-color: hsla(290, 10%, 80%, 0.5);
+        --disconnected-header-color: rgba(255, 169, 114, 0.56);
+        --binder-loading-header-color: hsl(51deg 64% 90% / 50%);
+
+        /*loading bar*/
+        --loading-grad-color-1: #f1dba9;
+        --loading-grad-color-2: #d7d7d0;
+
+        /*saveall container*/
+        --overlay-button-bg: #ffffff;
+        --overlay-button-border: hsl(0 4% 91% / 1);
+        --overlay-button-border-save: #f3f2f2;
+        /* --overlay-button-color */
+
+        /*input_context_menu*/
+        --input-context-menu-border-color: rgba(0, 0, 0, 0.1);
+        --input-context-menu-bg-color: white;
+        --input-context-menu-soon-color: #55555544;
+        --input-context-menu-hover-bg-color: rgba(0, 0, 0, 0.1);
+        --input-context-menu-li-color: #1e1e1e;
+
+        /* ai features */
+        --ai-gradient-bg: linear-gradient(20deg, #f9ecff, #fff4f2);
+        --ai-prompt-bg: #fbffff;
+
+        /*Pkg status*/
+        --pkg-popup-bg: white;
+        --pkg-popup-border-color: #f0e4ee;
+        --pkg-popup-buttons-bg-color: white;
+        --pkg-version-color: #666;
+        --black: black;
+        --white: white;
+        --pkg-terminal-bg-color: #232433;
+        --pkg-terminal-border-color: #c3c3c3;
+
+        /* run area*/
+        --pluto-runarea-bg-color: hsl(0, 0, 97%);
+        --pluto-runarea-span-color: hsl(353, 5%, 64%);
+
+        /*drop ruler*/
+        --dropruler-bg-color: rgba(0, 0, 0, 0.5);
+
+        /* jlerror */
+        --jlerror-header-color: #4f1616;
+        --jlerror-mark-bg-color: rgb(243 243 243);
+        --jlerror-a-bg-color: #f5efd9;
+        --jlerror-a-border-left-color: #704141;
+        --jlerror-mark-color: black;
+
+        /* helpbox */
+        --helpbox-bg-color: white;
+        --helpbox-box-shadow-color: #00000010;
+        --helpbox-header-bg-color: hsl(0deg 0% 92%);
+        --helpbox-header-tab-bg-color: white;
+        --helpbox-header-color: hsl(230, 14%, 11%);
+        --helpbox-search-bg-color: #fbfbfb;
+        --helpbox-search-border-color: hsl(207deg 24% 87%);
+        --helpbox-notfound-search-color: rgb(139, 139, 139);
+        --helpbox-text-color: black;
+        --code-section-bg-color: whitesmoke;
+        --code-section-bg-color: #f3f3f3; /* TODO: Should this be `-border-color`? */
+        --process-item-bg: #f2f2f2;
+        --process-busy: #ffcd70;
+        --process-finished: hsl(126deg 30% 60%);
+        --process-undefined: rgb(151, 151, 151);
+        --process-failed: hsl(0deg 72.62% 64.6%);
+        --process-notify-bg: hsl(44.86deg 50% 94%);
+
+        /*footer*/
+        --footer-color: #333333;
+        --footer-bg-color: #d7dcd3;
+        --footer-atag-color: black;
+        --footer-input-border-color: #818181;
+        --footer-filepicker-button-color: white;
+        --footer-filepicker-focus-color: #896c6c;
+        --footnote-border-color: rgba(23, 115, 119, 0.15);
+        --settings-bg-color: hsl(328 100% 98% / 1);
+        --settings-p2-color: #717070;
+        --settings-header-bg-color: #f9dadf;
+
+        /* undo delete cell*/
+        --undo-delete-box-shadow-color: #0000000f;
+
+        /*codemirror hints*/
+        --cm-color-editor-tooltip-border: rgba(0, 0, 0, 0.2);
+        --cm-color-editor-li-aria-selected-bg: #16659d;
+        --cm-color-editor-li-aria-selected: white;
+        --cm-color-editor-li-notexported: rgba(0, 0, 0, 0.5);
+        --code-background: hsla(46, 90%, 98%, 1);
+        --cm-color-code-differs-gutters: rgba(214, 172, 35, 0.2);
+        --cm-color-line-numbers: #8d86875e;
+        --cm-selection-background: hsl(214deg 100% 73% / 48%);
+        --cm-selection-background-blurred: hsl(214deg 0% 73% / 48%);
+        --cm-highlighted: #cbceb668;
+
+        /* code highlighting */
+        --cm-color-editor-text: oklch(30% 0% 0deg);
+        --cm-color-comment: oklch(45% 60% 0deg);
+        --cm-color-keyword: oklch(45% 80% 30deg);
+        --cm-color-definition: oklch(28.455% 0.11677 29.223);
+        --cm-color-control-operator: oklch(56.456% 0.23502 350.694);
+        --cm-color-symbol: oklch(45% 80% 90deg);
+        --cm-color-command: oklch(35% 100% 120deg);
+        --cm-color-macro: oklch(45% 80% 150deg);
+        --cm-color-string: oklch(35% 100% 180deg);
+        --cm-color-variable: oklch(45% 40% 270deg);
+        --cm-color-typedef-shadow: oklch(0.91 0.09 72.03);
+        --cm-color-literal: oklch(45% 60% 330deg);
+        --cm-filter-type: brightness(150%) saturate(50%);
+        --cm-color-builtin: #5e7ad3;
+        --cm-color-function: #cc80ac;
+        --cm-color-link: #815ba4;
+        --cm-color-bracket: #41323f;
+        --cm-color-matchingBracket: black;
+        --cm-color-matchingBracket-bg: #1b4bbb21;
+        --cm-color-placeholder-text: rgba(0, 0, 0, 0.2);
+        --cm-color-clickable-underline: #ced2ef;
+
+        /* Mixed parsers */
+        --cm-color-html: #48b685;
+        --cm-color-html-accent: #00ab85;
+        --cm-color-css: #876800;
+        --cm-color-css-accent: #696200;
+        --cm-css-why-doesnt-codemirror-highlight-all-the-text-aaa: #3b3700;
+        --cm-color-md: #005a9b;
+        --cm-color-md-accent: #00a9d1;
+
+        /*autocomplete menu*/
+        --autocomplete-menu-bg-color: white;
+
+        /* Landing colors */
+        --index-text-color: hsl(0, 0, 60);
+        --index-light-text-color: #838383;
+        --index-clickable-text-color: black;
+        --docs-binding-bg: #8383830a;
+        --index-card-bg: white;
+        --welcome-mywork-bg: hsl(35deg 66% 93%);
+        --welcome-newnotebook-bg: whitesmoke;
+        --welcome-recentnotebook-bg: white;
+        --welcome-recentnotebook-border: #dfdfdf;
+        --welcome-open-bg: #fbfbfb;
+        --welcome-card-author-backdrop: #ffffffb0;
+
+        /* confirm-before-long-runtime dialog */
+        --confirm-runtime-bg: linear-gradient(180deg, #ffffff, #fdf8e9);
+        --confirm-runtime-bonus-bg: #ffffff;
+        --confirm-runtime-bonus-border: #dadaf1;
+        --confirm-runtime-button-bg: #f4f4f4;
+        --confirm-runtime-button-border: #c1c1c1;
+        --confirm-runtime-yes-bg: black;
+        --confirm-runtime-yes-color: #fff;
+        --confirm-runtime-yes-border: #9b9b9b;
+        --confirm-runtime-yes-progress: linear-gradient(90deg, black, #757575);
+    }
+html.pluto-dark {
+        --image-filters: invert(1) hue-rotate(180deg) contrast(0.8);
+        --out-of-focus-opacity: 0.5;
+
+        /* Color scheme */
+        --main-bg-color: hsl(0deg 0% 12%);
+        --rule-color: rgba(255, 255, 255, 0.15);
+        --kbd-border-color: #a3a1a1;
+        --header-bg-color: hsl(30deg 3% 16%);
+        --header-border-color: transparent;
+        --ui-button-color: rgb(255, 255, 255);
+        --cursor-color: white;
+
+        /* Cells */
+        --normal-cell: 100, 100, 100;
+        /* --code-differs */
+        --error-color: 255, 125, 125;
+        --normal-cell-color: rgba(var(--normal-cell), 0.2);
+        --dark-normal-cell-color: rgba(var(--normal-cell), 0.4);
+        --selected-cell-color: rgb(40 147 189 / 65%);
+        --code-differs-cell-color: #9b906c;
+        --error-cell-color: rgba(var(--error-color), 0.6);
+        --bright-error-cell-color: rgba(var(--error-color), 0.9);
+        --light-error-cell-color: rgba(var(--error-color), 0);
+
+        /*Export styling*/
+        --export-bg-color: hsl(225deg 17% 18%);
+        --export-color: rgb(255 255 255 / 84%);
+        --export-card-bg-color: rgb(73 73 73);
+        --export-card-title-color: rgba(255, 255, 255, 0.85);
+        --export-card-text-color: rgb(255 255 255 / 70%);
+        --export-card-shadow-color: #0000001c;
+
+        /*Frontmatter styling*/
+        --frontmatter-button-bg-color: #554e4e;
+        --frontmatter-outline-color: rgb(255 248 235);
+        --frontmatter-input-bg-color: #2c2c2c;
+        --frontmatter-input-border-color: #757575;
+
+        /* PlutoLand upload styling */
+        --plutoland-bg-color: var(--main-bg-color);
+        --plutoland-bigbutton-bg-color: #5b5858;
+        --plutoland-url-fg: #c0cdee;
+        --plutoland-url-bg: #02376f;
+        --plutoland-or-bg-color: #323334;
+
+        /*Pluto output styling */
+        --pluto-schema-types-color: hsl(0deg 0% 63%);
+        --pluto-schema-types-border-color: rgba(255, 255, 255, 0.2);
+        --pluto-dim-output-color: hsl(0, 0, 70%);
+        --pluto-output-color: hsl(0deg 0% 77%);
+        --pluto-output-h-color: hsl(0, 0%, 90%);
+        --pluto-output-bg-color: var(--main-bg-color);
+        --a-underline: #ffffff69;
+        --blockquote-color: inherit;
+        --blockquote-bg: #2e2e2e;
+        --admonition-title-color: black;
+        --jl-message-color: rgb(38 90 32);
+        --jl-message-accent-color: rgb(131 191 138);
+        --jl-info-color: rgb(42 73 115);
+        --jl-info-accent-color: rgb(92 140 205);
+        --jl-warn-color: rgb(96 90 34);
+        --jl-warn-accent-color: rgb(221 212 100);
+        --jl-danger-color: rgb(100 47 39);
+        --jl-danger-accent-color: rgb(255, 117, 98);
+        --jl-debug-color: hsl(288deg 33% 27%);
+        --jl-debug-accent-color: hsl(283deg 59% 69%);
+        /* --footnote-border-color */
+        --table-border-color: rgba(255, 255, 255, 0.2);
+        --table-bg-hover-color: rgba(193, 192, 235, 0.15);
+        --pluto-tree-color: rgb(209 207 207 / 61%);
+
+        /*pluto cell styling*/
+        --disabled-cell-bg-color: rgba(139, 139, 139, 0.25);
+        --selected-cell-bg-color: rgb(42 115 205 / 78%);
+        --hover-scrollbar-color-1: rgba(0, 0, 0, 0.15);
+        --hover-scrollbar-color-2: rgba(0, 0, 0, 0.05);
+        --skip-as-script-background-color: #888;
+        --depends-on-skip-as-script-background-color: #666;
+
+        /* Pluto shoulders */
+        --shoulder-hover-bg-color: rgba(255, 255, 255, 0.05);
+
+        /* Logs */
+        --pluto-logs-bg-color: hsl(0deg 0% 17%);
+        --pluto-logs-key-color: rgba(255, 255, 255, 0.6);
+        --pluto-logs-progress-fill: #5f7f5b;
+        --pluto-logs-progress-bg: #3d3d3d;
+        --pluto-logs-progress-border: hsl(210deg 35% 72%);
+        --pluto-logs-info-color: #484848;
+        --pluto-logs-info-accent-color: inherit;
+        --pluto-logs-warn-color: rgb(80 76 38);
+        --pluto-logs-warn-accent-color: rgb(239 231 135);
+        --pluto-logs-danger-color: rgb(100 47 39);
+        --pluto-logs-danger-accent-color: rgb(255 147 132);
+        --pluto-logs-debug-color: hsl(288deg 19% 25%);
+        --pluto-logs-debug-accent-color: hsl(283deg 56% 79%);
+
+        /*Top navbar styling*/
+        --nav-h1-text-color: white;
+        --nav-filepicker-color: #b6b6b6;
+        --nav-filepicker-border-color: #c7c7c7;
+        --nav-filepicker-suggest-color: rgba(107, 125, 140, 0.796);
+        --nav-process-status-bg-color: rgb(82, 82, 82);
+        --nav-process-status-color: var(--pluto-output-h-color);
+
+        /*header*/
+        --restart-recc-header-color: rgb(44 106 157 / 56%);
+        --restart-recc-accent-color: rgb(44 106 157);
+        --restart-req-header-color: rgb(145 66 60 / 56%);
+        --dead-process-header-color: rgba(250, 75, 21, 0.473);
+        --loading-header-color: hsl(0deg 0% 20% / 50%);
+        --disconnected-header-color: rgba(255, 169, 114, 0.56);
+        --binder-loading-header-color: hsl(51deg 64% 90% / 50%);
+
+        /*loading bar*/
+        --loading-grad-color-1: #a9d4f1;
+        --loading-grad-color-2: #d0d4d7;
+
+        /*saveall container*/
+        --overlay-button-bg: #2c2c2c;
+        --overlay-button-border: #9e9e9e70;
+        --overlay-button-border-save: #c7a74670;
+        --overlay-button-color: white;
+
+        /*input_context_menu*/
+        --input-context-menu-border-color: rgba(255, 255, 255, 0.1);
+        --input-context-menu-bg-color: rgb(39, 40, 47);
+        --input-context-menu-soon-color: #b1b1b144;
+        --input-context-menu-hover-bg-color: rgba(255, 255, 255, 0.1);
+        --input-context-menu-li-color: #c7c7c7;
+
+        /* ai features */
+        --ai-gradient-bg: linear-gradient(20deg, #371d43, #613c35);
+        --ai-prompt-bg: #3a3a3a;
+
+        /*Pkg status*/
+        --pkg-popup-bg: #3d2f44;
+        --pkg-popup-border-color: #574f56;
+        --pkg-popup-buttons-bg-color: var(--input-context-menu-bg-color);
+        --pkg-version-color: #bbb;
+        --black: white;
+        --white: black;
+        --pkg-terminal-bg-color: #252627;
+        --pkg-terminal-border-color: #c3c3c388;
+
+        /* run area*/
+        --pluto-runarea-bg-color: rgb(43, 43, 43);
+        --pluto-runarea-span-color: hsl(353, 5%, 64%);
+
+        /*drop ruler*/
+        --dropruler-bg-color: rgba(255, 255, 255, 0.1);
+
+        /* jlerror */
+        --jlerror-header-color: #d9baba;
+        --jlerror-mark-bg-color: rgb(0 0 0 / 18%);
+        --jlerror-a-bg-color: hsl(65.82deg 17.14% 27.45%);
+        --jlerror-a-border-left-color: hsl(66 27% 35% / 1);
+        --jlerror-mark-color: #b1a9a9;
+
+        /* helpbox */
+        --helpbox-bg-color: rgb(30 34 31);
+        --helpbox-box-shadow-color: #00000017;
+        --helpbox-header-bg-color: #2c3e36;
+        --helpbox-header-tab-bg-color: #554e4e;
+        --helpbox-header-color: rgb(255 248 235);
+        --helpbox-search-bg-color: #2c2c2c;
+        --helpbox-search-border-color: #757575;
+        --helpbox-notfound-search-color: rgb(139, 139, 139);
+        --helpbox-text-color: rgb(230, 230, 230);
+        --code-section-bg-color: rgb(44, 44, 44);
+        --code-section-border-color: #555a64;
+        --process-item-bg: #443d44;
+        --process-busy: #ffcd70;
+        --process-finished: hsl(126deg 30% 60%);
+        --process-undefined: rgb(151, 151, 151);
+        --process-failed: hsl(4, 30%, 60%);
+        --process-notify-bg: hsl(0 0% 21%);
+
+        /*footer*/
+        --footer-color: #cacaca;
+        --footer-bg-color: var(--header-bg-color);
+        --footer-atag-color: rgb(114, 161, 223);
+        --footer-input-border-color: #6c6c6c;
+        --footer-filepicker-button-color: black;
+        --footer-filepicker-focus-color: #c1c1c1;
+        --footnote-border-color: rgba(114, 225, 231, 0.15);
+        --settings-bg-color: rgb(30 34 31);
+        --settings-p2-color: #898989;
+        --settings-header-bg-color: #f9dadf;
+
+        /* undo delete cell*/
+        --undo-delete-box-shadow-color: rgb(0 0 0 / 6%);
+
+        /*codemirror hints*/
+        --cm-color-editor-tooltip-border: rgba(0, 0, 0, 0.2);
+        --cm-color-editor-li-aria-selected-bg: #3271e7;
+        --cm-color-editor-li-aria-selected: white;
+        --cm-color-editor-li-notexported: rgba(255, 255, 255, 0.5);
+        --code-background: hsl(222deg 16% 19%);
+        --cm-color-code-differs-gutters: rgb(235 213 28 / 11%);
+        --cm-color-line-numbers: #8d86875e;
+        --cm-selection-background: hsl(215deg 64% 59% / 48%);
+        --cm-selection-background-blurred: hsl(215deg 0% 59% / 48%);
+        --cm-highlighted: #cbceb629;
+
+        /* code highlighting */
+        --cm-color-editor-text: oklch(90% 3% 0deg);
+        --cm-color-comment: oklch(80% 30% 0deg);
+        --cm-color-keyword: oklch(70% 40% 30deg);
+        --cm-color-definition: oklch(72.266% 0.04982 26.319);
+        --cm-color-control-operator: oklch(0.72 0.19 353.17);
+        --cm-color-symbol: oklch(80% 30% 60deg);
+        --cm-color-macro: oklch(80% 30% 150deg);
+        --cm-color-command: oklch(80% 10% 120deg);
+        --cm-color-string: oklch(80% 10% 180deg);
+        --cm-color-variable: oklch(80% 10% 270deg);
+        --cm-color-typedef-shadow: oklch(0.44 0.11 63.6);
+        --cm-color-literal: oklch(80% 30% 330deg);
+        --cm-filter-type: brightness(80%) saturate(80%);
+        --cm-color-builtin: #5e7ad3;
+        --cm-color-function: #f99b15;
+        --cm-color-link: #815ba4;
+        --cm-color-bracket: #b8ab87;
+        --cm-color-matchingBracket: white;
+        --cm-color-matchingBracket-bg: #c58c237a;
+        --cm-color-placeholder-text: rgb(255 255 255 / 20%);
+        --cm-color-clickable-underline: #5d5f70;
+
+        /* Mixed parsers */
+        --cm-color-html: #00ab85;
+        --cm-color-html-accent: #00e7b4;
+        --cm-color-css: #ebd073;
+        --cm-color-css-accent: #fffed2;
+        --cm-css-why-doesnt-codemirror-highlight-all-the-text-aaa: #ffffea;
+        --cm-color-md: #a2c9d5;
+        --cm-color-md-accent: #00a9d1;
+
+        /*autocomplete menu*/
+        --autocomplete-menu-bg-color: var(--input-context-menu-bg-color);
+
+        /* Landing colors */
+        --index-text-color: rgb(199, 199, 199);
+        --index-light-text-color: rgb(199, 199, 199);
+        --index-clickable-text-color: rgb(235, 235, 235);
+        --docs-binding-bg: #323431;
+        --index-card-bg: #313131;
+        --welcome-mywork-bg: var(--header-bg-color);
+        --welcome-newnotebook-bg: rgb(68 72 102);
+        --welcome-recentnotebook-bg: #3b3b3b;
+        --welcome-recentnotebook-border: #6e6e6e;
+        --welcome-open-bg: hsl(233deg 20% 33%);
+        --welcome-card-author-backdrop: #0000006b;
+
+        /* confirm-before-long-runtime dialog */
+        --confirm-runtime-bg: linear-gradient(180deg, hsl(0 0% 19% / 1), hsl(243 14% 23% / 1));
+        --confirm-runtime-bonus-bg: hsl(0deg 0% 12.85%);
+        --confirm-runtime-bonus-border: #636363;
+        --confirm-runtime-button-bg: #3a3a3a;
+        --confirm-runtime-button-border: #5a5a5a;
+        --confirm-runtime-yes-bg: #ddd1d6;
+        --confirm-runtime-yes-color: #000;
+        --confirm-runtime-yes-border: #9f9f9f;
+        --confirm-runtime-yes-progress: linear-gradient(90deg, #f0f0f0, #9a9a9a);
+    }
+
+    @media (prefers-contrast: more) {
+        html.pluto-dark {
+            --cm-color-line-numbers: #b3b3b3;
+        }
+    }
+header#pluto-nav,
+footer,
+pluto-runarea,
+pluto-shoulder,
+pluto-cell > button,
+#helpbox-wrapper,
+.floating_back_button,
+.loading-bar,
+#binder_spinners,
+nav#undo_delete,
+.edit_or_run,
+preamble,
+.present_one_cell_at_a_time {
+  display: none !important;
+}
+body > div:not(.masque-bar):not(.masque-miss) {
+  min-height: 0 !important;
+  display: block !important;
+}
+pluto-editor,
+pluto-editor.fullscreen,
+pluto-editor.loading {
+  min-height: 0 !important;
+  height: auto !important;
+}
+pluto-editor > main,
+pluto-editor.disable_ui > main {
+  margin-top: 0 !important;
+  padding-top: 10px !important;
+  padding-bottom: 14px !important;
+}
+/* The bar sits top right over the first cell: start the cells below it. */
+body:has(.masque-bar) pluto-editor > main,
+body:has(.masque-bar) pluto-editor.disable_ui > main {
+  padding-top: 40px !important;
+}
+html, body {
+  background: var(--main-bg-color);
+}
+.masque-bar {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.masque-download,
+.masque-sim-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 28%, transparent);
+  background: color-mix(in srgb, var(--main-bg-color) 82%, transparent);
+  color: var(--pluto-output-color);
+  font-family: var(--lato-ui-font-stack, system-ui, sans-serif);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  cursor: help;
+  user-select: none;
+}
+.masque-download {
+  cursor: pointer;
+  text-decoration: none;
+}
+.masque-download:hover,
+.masque-download:focus-visible {
+  border-color: color-mix(in srgb, var(--pluto-output-color) 55%, transparent);
+}
+.masque-miss {
+  margin: 0 8px 10px 25px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 28%, transparent);
+  background: var(--pluto-output-bg-color, var(--main-bg-color));
+  color: var(--pluto-output-color);
+  font-family: var(--lato-ui-font-stack, system-ui, sans-serif);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+.masque-miss[hidden] { display: none; }
+.masque-miss a { color: inherit; }
+.masque-sim-chip-icon { width: 13px; height: 13px; flex: 0 0 auto; }
+.masque-sim-chip-label code {
+  font-family: var(--julia-mono-font-stack, ui-monospace, monospace);
+  font-size: 0.92em;
+  font-weight: 600;
+}
+.masque-sim-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: max-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--pluto-output-color) 22%, transparent);
+  background: var(--pluto-output-bg-color, var(--main-bg-color));
+  color: var(--pluto-output-color);
+  box-shadow: 0 6px 18px color-mix(in srgb, #000 16%, transparent);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-align: left;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.masque-sim-chip:hover .masque-sim-tip,
+.masque-sim-chip:focus-visible .masque-sim-tip {
+  opacity: 1;
+  visibility: visible;
+}
+
+</style>
+<script type="importmap">{"imports":{"aVc6E":"./firebase-firestore.7f842f36.js","bEDS4":"./firebase-app.b603aaa4.js"}}</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.ca0dbe6e.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.a7d04aac.css"><script type="module" src="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/frontend.4541b03a.js"></script>
+    <meta name="viewport" content="width=device-width">
+    <meta charset="utf-8">
+
+    
+<meta name="pluto-insertion-spot-meta">
+
+
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#2a2928">
+    <meta name="color-scheme" content="light dark">
+
+    <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/favicon-16x16.fe7feca6.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/favicon-32x32.4cb27571.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/favicon-96x96.d3e6b4f5.png">
+    <link rel="pluto-external-source" id="pluto-logo-big" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/logo.103597bc.svg">
+    <link rel="pluto-external-source" id="pluto-logo-small" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/favicon_unsaturated.9ed3a6f6.svg">
+
+    <script defer="">console.log("Pluto.jl, by Fons van der Plas (https://github.com/fonsp), Mikołaj Bochenski (https://github.com/malyvsen), Michiel Dral (https://github.com/dralletje), Παναγιώτης (Panagiotis) Γεωργακόπουλος (https://github.com/pankgeorg), Paul Berg (https://github.com/Pangoraw) and friends 🌈");</script>
+
+    <script src="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.2f9fc277.js" defer=""></script>
+
+    <!-- This doesn't do anything unless activated, and it makes sure parcel bundles this -->
+    <script id="iframe-resizer-content-window-script" src="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.7a04a462.js" crossorigin="anonymous" defer=""></script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.f6933b66.css" type="text/css">
+
+    <meta rel="pluto-cdn-root" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/">
+    <script data-pluto-file="launch-parameters">
+window.pluto_notebook_id = undefined;
+window.pluto_isolated_cell_ids = undefined;
+window.pluto_notebookfile = undefined;
+window.pluto_disable_ui = true;
+window.pluto_slider_server_url = undefined;
+window.pluto_binder_url = undefined;
+window.pluto_statefile = "data:;base64,3gATpHBhdGjZSS9ob21lL3J1bm5lci93b3JrL01hc3F1ZS5qbC9NYXNxdWUuamwvZG9jcy9zcmMvZW1iZWRzL2dhbGxlcnlfcG9seWdvbnMuamyobWV0YWRhdGGArGNlbGxfcmVzdWx0c4bZJGUxYmUwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMYqncnVubmluZ8KncnVudGltZc1GLLhkZXBlbmRzX29uX3NraXBwZWRfY2VsbHPCtXB1Ymxpc2hlZF9vYmplY3Rfa2V5c5CnZXJyb3JlZMKnY2VsbF9pZNkkZTFiZTAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxuWRlcGVuZHNfb25fZGlzYWJsZWRfY2VsbHPCpnF1ZXVlZMKkbG9nc5Cmb3V0cHV0hqRib2R52gEUIltwbGF5ZXJdXG5ib25kID0gXCJwaWNrXCJcbnNob3dfY29kZSA9IHRydWVcbnBsdXRvX2h0bWwgPSB0cnVlXG5jaGlwID0gZmFsc2VcblxuY2VsbHMgPSBbXG4gIFwiYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDA5XCIsXG4gIFwiYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDEwXCIsXG4gIFwiYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAyXCIsXG4gIFwiYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAzXCIsXG5dXG4ipG1pbWWqdGV4dC9wbGFpbqxyb290YXNzaWduZWW6UExVVE9fUExBWUVSX1RPTUxfQ09OVEVOVFOybGFzdF9ydW5fdGltZXN0YW1wy0HauQdkuGNesHBlcnNpc3RfanNfc3RhdGXCt2hhc19wbHV0b19ob29rX2ZlYXR1cmVzwtkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAziqdydW5uaW5nwqdydW50aW1lzgJX3dC4ZGVwZW5kc19vbl9za2lwcGVkX2NlbGxzwrVwdWJsaXNoZWRfb2JqZWN0X2tleXOR2TU5ZTIwNDcyMi1kNDFhLTExZjEtYjM4NC1hMTQwYjkzZWJkY2UvY2I1ZGIzMjRiODQ0NDcyOKdlcnJvcmVkwqdjZWxsX2lk2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDO5ZGVwZW5kc19vbl9kaXNhYmxlZF9jZWxsc8KmcXVldWVkwqRsb2dzkKZvdXRwdXSGpGJvZHnaAkY8Ym9uZCBkZWY9InBpY2siIHVuaXF1ZV9pZD0idnl2bnd4cnhpb2twIj48ZGl2IGNsYXNzPSJpcC1ob3N0IiBzdHlsZT0icG9zaXRpb246cmVsYXRpdmU7IGRpc3BsYXk6aW5saW5lLWJsb2NrOyB3aWR0aDoxMDAlOyBtYXgtd2lkdGg6NzAwcHg7Ij4KICA8aW1nIHNyYz0ic2hhcmVkL2RhZTI1ZDYyMmE3MmViNTIzOGYwLnBuZyIgc3R5bGU9ImRpc3BsYXk6YmxvY2s7IHdpZHRoOjEwMCU7IGhlaWdodDphdXRvOyIgZHJhZ2dhYmxlPSJmYWxzZSI+CiAgPHNjcmlwdD4KICAgIAogICAgY29uc3QgbWFuaWZlc3QgPSAvKiBTZWUgdGhlIGRvY3VtZW50YXRpb24gZm9yIEFic3RyYWN0UGx1dG9EaW5nZXRqZXMuRGlzcGxheS5wdWJsaXNoZWRfdG9fanMgKi8gZ2V0UHVibGlzaGVkT2JqZWN0KCI5ZTIwNDcyMi1kNDFhLTExZjEtYjM4NC1hMTQwYjkzZWJkY2UvY2I1ZGIzMjRiODQ0NDcyOCIpOwogICAgY29uc3QgcmVxdWVzdEZyYW1lID0gbnVsbDsKICAgIHdpbmRvdy5NYXNxdWUubW91bnQoY3VycmVudFNjcmlwdCwgbWFuaWZlc3QsIGludmFsaWRhdGlvbiwgcmVxdWVzdEZyYW1lKTsKICA8L3NjcmlwdD4KPC9kaXY+CjwvYm9uZD6kbWltZal0ZXh0L2h0bWyscm9vdGFzc2lnbmVlwLJsYXN0X3J1bl90aW1lc3RhbXDLQdq5B2TIWHWwcGVyc2lzdF9qc19zdGF0ZcK3aGFzX3BsdXRvX2hvb2tfZmVhdHVyZXPC2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDGKp3J1bm5pbmfCp3J1bnRpbWXOAAhHrLhkZXBlbmRzX29uX3NraXBwZWRfY2VsbHPCtXB1Ymxpc2hlZF9vYmplY3Rfa2V5c5CnZXJyb3JlZMKnY2VsbF9pZNkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAxuWRlcGVuZHNfb25fZGlzYWJsZWRfY2VsbHPCpnF1ZXVlZMKkbG9nc5Cmb3V0cHV0hqRib2R5oKRtaW1lqnRleHQvcGxhaW6scm9vdGFzc2lnbmVlwLJsYXN0X3J1bl90aW1lc3RhbXDLQdq5B1eI9P2wcGVyc2lzdF9qc19zdGF0ZcK3aGFzX3BsdXRvX2hvb2tfZmVhdHVyZXPC2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDKKp3J1bm5pbmfCp3J1bnRpbWXPAAAACbYiUI64ZGVwZW5kc19vbl9za2lwcGVkX2NlbGxzwrVwdWJsaXNoZWRfb2JqZWN0X2tleXOQp2Vycm9yZWTCp2NlbGxfaWTZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwMrlkZXBlbmRzX29uX2Rpc2FibGVkX2NlbGxzwqZxdWV1ZWTCpGxvZ3OQpm91dHB1dIakYm9keaCkbWltZap0ZXh0L3BsYWlurHJvb3Rhc3NpZ25lZcCybGFzdF9ydW5fdGltZXN0YW1wy0HauQdiB9KNsHBlcnNpc3RfanNfc3RhdGXCt2hhc19wbHV0b19ob29rX2ZlYXR1cmVzwtkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDA5iqdydW5uaW5nwqdydW50aW1lzgAE6aK4ZGVwZW5kc19vbl9za2lwcGVkX2NlbGxzwrVwdWJsaXNoZWRfb2JqZWN0X2tleXOQp2Vycm9yZWTCp2NlbGxfaWTZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwOblkZXBlbmRzX29uX2Rpc2FibGVkX2NlbGxzwqZxdWV1ZWTCpGxvZ3OQpm91dHB1dIakYm9kedl3PGRpdiBjbGFzcz0ibWFya2Rvd24iPjxwPkhvdmVyIG92ZXIgYSBiYW5kLCBhIGRlbnNpdHksIGEgZmlsbGVkIGNvbnRvdXIsIGEgdmlvbGluLCBhIFZvcm9ub2kgY2VsbCwgb3IgYSBib3guPC9wPgo8L2Rpdj6kbWltZal0ZXh0L2h0bWyscm9vdGFzc2lnbmVlwLJsYXN0X3J1bl90aW1lc3RhbXDLQdq5B1eJSuCwcGVyc2lzdF9qc19zdGF0ZcK3aGFzX3BsdXRvX2hvb2tfZmVhdHVyZXPC2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMTCKp3J1bm5pbmfCp3J1bnRpbWXOAAOXvLhkZXBlbmRzX29uX3NraXBwZWRfY2VsbHPCtXB1Ymxpc2hlZF9vYmplY3Rfa2V5c5CnZXJyb3JlZMKnY2VsbF9pZNkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDEwuWRlcGVuZHNfb25fZGlzYWJsZWRfY2VsbHPCpnF1ZXVlZMKkbG9nc5Cmb3V0cHV0hqRib2R52Yw8ZGl2IGNsYXNzPSJtYXJrZG93biI+PHA+Q3JlYXRlIHRoZSBwYW5lbHMgdGhlIHdheSB5b3Ugbm9ybWFsbHkgd291bGQsIGFuZCA8Y29kZT5tYXNxdWU8L2NvZGU+IG1ha2VzIGVhY2ggZmlsbGVkIHNoYXBlIGNsaWNrYWJsZS48L3A+CjwvZGl2PqRtaW1lqXRleHQvaHRtbKxyb290YXNzaWduZWXAsmxhc3RfcnVuX3RpbWVzdGFtcMtB2rkHV4lqL7BwZXJzaXN0X2pzX3N0YXRlwrdoYXNfcGx1dG9faG9va19mZWF0dXJlc8KxcHVibGlzaGVkX29iamVjdHOB2TU5ZTIwNDcyMi1kNDFhLTExZjEtYjM4NC1hMTQwYjkzZWJkY2UvY2I1ZGIzMjRiODQ0NDcyOIimaGVpZ2h0zQMppmxheWVyc5aIpGtpbmSocG9seWdvbnOiaWSkYmFuZKhnZW9tZXRyeZHcAChkzQFVzIvNAT3Mss0BJMzYzQELzP/M8s0BJszazQFNzMHNAXTMqM0BmsyQzQHBd80BwUbNAZpezQF0d80BTcyQzQEmzKjM/8zBzNjM2syyzPLMi80BC2TNASSocGF5bG9hZHORgaVpbmRleAGkYXhpc6NheDGlc3R5bGWBpXdpZHRoAqRib25kp2VsZW1lbnSmZXZlbnRzkqVjbGlja6Vob3Zlcoika2luZKhwb2x5Z29uc6JpZKdkZW5zaXR5qGdlb21ldHJ5kdwDIM0CLM0BVc0CLs0BVc0CL80BVc0CMc0BVc0CM80BVc0CNc0BVc0CNs0BVc0COM0BVc0COs0BVc0CPM0BVc0CPc0BVc0CP80BVc0CQc0BVc0CQ80BVc0CRM0BVc0CRs0BVc0CSM0BVc0CSs0BVc0CS80BVc0CTc0BVc0CT80BVc0CUc0BVc0CU80BVc0CVM0BVc0CVs0BVc0CWM0BVc0CWs0BVc0CW80BVc0CXc0BVc0CX80BVc0CYc0BVc0CYs0BVc0CZM0BVc0CZs0BVc0CaM0BVc0Cac0BVc0Ca80BVc0Cbc0BVc0Cb80BVc0CcM0BVc0Ccs0BVc0CdM0BVc0Cds0BVc0CeM0BVc0Cec0BVc0Ce80BVc0Cfc0BVc0Cf80BVc0CgM0BVc0Cgs0BVc0ChM0BVc0Chs0BVc0Ch80BVc0Cic0BVc0Ci80BVc0Cjc0BVc0Cjs0BVc0CkM0BVc0Cks0BVc0ClM0BVc0Clc0BVc0Cl80BVc0Cmc0BVc0Cm80BVc0Cnc0BVc0Cns0BVc0CoM0BVc0Cos0BVc0CpM0BVc0Cpc0BVc0Cp80BVc0Cqc0BVc0Cq80BVc0CrM0BVc0Crs0BVc0CsM0BVc0Css0BVc0Cs80BVc0Ctc0BVc0Ct80BVc0Cuc0BVc0Cu80BVc0CvM0BVc0Cvs0BVc0CwM0BVc0Cws0BVc0Cw80BVc0Cxc0BVc0Cx80BVc0Cyc0BVc0Cys0BVc0CzM0BVc0Czs0BVc0C0M0BVc0C0c0BVc0C080BVc0C1c0BVc0C180BVc0C2M0BVc0C2s0BVc0C3M0BVc0C3s0BVc0C4M0BVc0C4c0BVc0C480BVc0C5c0BVc0C580BVc0C6M0BVc0C6s0BVc0C7M0BVc0C7s0BVc0C780BVc0C8c0BVc0C880BVc0C9c0BVc0C9s0BVc0C+M0BVc0C+s0BVc0C/M0BVc0C/c0BVc0C/80BVc0DAc0BVc0DA80BVc0DBc0BVc0DBs0BVc0DCM0BVc0DCs0BVc0DDM0BVc0DDc0BVc0DD80BVc0DEc0BVc0DE80BVc0DFM0BVc0DFs0BVc0DGM0BVc0DGs0BVc0DG80BVc0DHc0BVc0DH80BVc0DIc0BVc0DIs0BVc0DJM0BVc0DJs0BVc0DKM0BVc0DKs0BVc0DK80BVc0DLc0BVc0DL80BVc0DMc0BVc0DMs0BVc0DNM0BVc0DNs0BVc0DOM0BVc0DOc0BVc0DO80BVc0DPc0BVc0DP80BVc0DQM0BVc0DQs0BVc0DRM0BVc0DRs0BVc0DR80BVc0DSc0BVc0DS80BVc0DTc0BVc0DT80BVc0DUM0BVc0DUs0BVc0DVM0BVc0DVs0BVc0DV80BVc0DWc0BVc0DW80BVc0DXc0BVc0DXs0BVc0DYM0BVc0DYs0BVc0DZM0BVc0DZc0BVc0DZ80BVc0Dac0BVc0Da80BVc0Dbc0BVc0Dbs0BVc0DcM0BVc0Dcs0BVc0DdM0BVc0Ddc0BVc0Dd80BVc0Dec0BVc0De80BVc0DfM0BVc0Dfs0BVc0DgM0BVc0Dgs0BVc0Dg80BVc0Dhc0BVc0Dh80BVc0Dic0BVc0Dis0BVc0Dis0BVc0Dic0BVc0Dh80BVc0Dhc0BVc0Dg80BVc0Dgs0BVc0DgM0BVc0Dfs0BVc0DfM0BVc0De80BVc0Dec0BVc0Dd80BVc0Ddc0BVc0DdM0BVM0Dcs0BVM0DcM0BVM0Dbs0BU80Dbc0BU80Da80BUs0Dac0BUc0DZ80BUM0DZc0BTs0DZM0BTc0DYs0BS80DYM0BSc0DXs0BRs0DXc0BRM0DW80BQc0DWc0BPs0DV80BPM0DVs0BOc0DVM0BNs0DUs0BM80DUM0BMM0DT80BLc0DTc0BK80DS80BKM0DSc0BJs0DR80BJM0DRs0BIc0DRM0BH80DQs0BHM0DQM0BGc0DP80BFs0DPc0BE80DO80BD80DOc0BC80DOM0BBs0DNs0BAc0DNMz7zQMyzPTNAzHM7s0DL8zmzQMtzN/NAyvM180DKszPzQMozMfNAybMv80DJMy4zQMizLDNAyHMqc0DH8yizQMdzJvNAxvMlc0DGsyPzQMYzInNAxbMhM0DFH/NAxN6zQMRdc0DD3DNAw1rzQMMZs0DCmLNAwhdzQMGWc0DBVXNAwNRzQMBTs0C/0vNAv1JzQL8SM0C+kfNAvhGzQL2Rs0C9UbNAvNGzQLxR80C70fNAu5IzQLsSM0C6kjNAuhIzQLnR80C5UfNAuNGzQLhRs0C4EbNAt5GzQLcR80C2kjNAthLzQLXTs0C1VHNAtNWzQLRW80C0GHNAs5ozQLMbs0CynXNAsl8zQLHzIPNAsXMic0Cw8yQzQLCzJXNAsDMm80CvsygzQK8zKXNArvMqs0CucyuzQK3zLLNArXMts0Cs8y6zQKyzL3NArDMwc0C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P8y0zQI+zLTNAj3Ms80CO8yzzQI6zLLNAjnMss0COMyxzQI2zLDNAjXMsM0CNMyvzQIzzK7NAjHMrc0CMMyszQIvzKvNAi3Mqs0CLMypzQIrzKjNAirMp80CKMymzQInzKXNAibMpM0CJcyjzQIjzKPNAiLMos0CIcyhzQIfzKHNAh7MoM0CHcyfzQIczJ/NAhrMns0CGcyezQIYzJ3NAhfMnc0CFcyczQIUzJzNAhPMm80CEsybzQIQzJrNAg/Mms0CDsyZzQIMzJjNAgvMmM0CCsyXzQIJzJfNAgfMls0CBsyWzQIFzJXNAgTMlc0CAsyUzQIBzJTNAgDMk80B/8yTzQH9zJPNAfzMks0B+8ySzQH5zJLNAfjMks0B98yRzQH2zJHNAfTMkc0B88yRzQHyzJHNAfHMkc0B78yRzQHuzJHNAe3Mkc0B68yRzQHqzJHNAenMkM0B6MyQzQHmzJDNAeXMkM0B5MyQzQHjzJDNAeHMkM0B4MyQzQHfzJDNAd7MkM0B3MyQzQHbzJDNAdrMkM0B2MyQzQHXzJDNAdbMkM0B1cyQzQHTzJDNAdPMkM0B08yQzQHVzJDNAdbMkM0B18yQzQHYzJDNAdrMkM0B28yQzQHczJDNAd7MkM0B38yQzQHgzJDNAeHMkM0B48yQzQHkzJDNAeXMkM0B5syQzQHozJDNAenMkM0B6syQzQHrzJDNAe3MkM0B7syQzQHvzJDNAfHMkM0B8syQzQHzzI/NAfTMj80B9syPzQH3zI/NAfjMj80B+cyOzQH7zI7NAfzMjs0B/cyNzQH/zI3NAgDMjc0CAcyMzQICzIzNAgTMi80CBcyLzQIGzIrNAgfMic0CCcyJzQIKzIjNAgvMiM0CDMyHzQIOzIfNAg/Mhs0CEMyGzQISzIXNAhPMhM0CFMyEzQIVzIPNAhfMg80CGMyCzQIZzILNAhrMgc0CHMyBzQIdzIDNAh5/zQIff80CIX7NAiJ9zQIjfM0CJXzNAiZ7zQInes0CKHnNAip4zQIrd80CLHbNAi11zQIvdM0CMHPNAjFyzQIzcc0CNHDNAjVwzQI2b80COG/NAjluzQI6bs0CO23NAj1tzQI+bM0CP2zNAkBrzQJCa80CQ2rNAkRqzQJGac0CR2nNAkhozQJJaM0CS2fNAkxnzQJNZs0CTmbNAlBlzQJRZc0CUmXNAlNkzQJVZM0CVmTNAldkzQJZZM0CWmTNAltkzQJcZc0CXmXNAl9mzQJgZ80CYWjNAmNpzQJkas0CZWvNAmZszQJobc0CaW/NAmpwzQJscc0CbXPNAm50zQJvds0CcXfNAnJ4zQJzec0CdHrNAnZ7zQJ3fM0CeH3NAnp+zQJ7f80CfMyAzQJ9zIDNAn/Mgc0CgMyBzQKBzILNAoLMgs0ChMyDzQKFzIPNAobMhM0Ch8yEzQKJzIXNAorMhc0Ci8yGzQKNzIbNAo7Mh80Cj8yHzQKQzIjNApLMiM0Ck8yJzQKUzInNApXMis0Cl8yKzQKYzIvNApnMi80CmsyMzQKczIzNAp3MjM0CnsyNzQKgzI3NAqHMjc0CosyOzQKjzI7NAqXMjs0CpsyOzQKnzI/NAqjMj80CqsyPzQKrzI/NAqzMj80CrsyQzQKvzJDNArDMkM0CscyQzQKzzJDNArTMkM0CtcyQzQK2zJDNArjMkM0CucyQzQK6zJDNArvMkM0CvcyQzQK+zJDNAr/MkM0CwcyQzQLCzJDNAsPMkM0CxMyQzQLGzJDNAsfMkM0CyMyQzQLJzJDNAsvMkM0CzMyQzQLNzJDNAs7MkM0C0NwDJM0BD80C380BD80C380BD80C3c0BD80C3M0BD80C280BD80C2c0BD80C2M0BD80C180BD80C1c0BD80C1M0BD80C0s0BD80C0c0BD80C0M0BD80Czs0BD80Czc0BD80CzM0BD80Cys0BEM0Cyc0BEM0CyM0BEM0Cxs0BEM0Cxc0BEM0Cw80BEM0Cws0BEM0Cwc0BEM0Cv80BEM0Cvs0BEM0Cvc0BEM0Cu80BEM0Cus0BEM0Cuc0BEc0Ct80BEc0Cts0BEc0CtM0BEc0Cs80BEc0Css0BEc0CsM0BEc0Cr80BEs0Crs0BEs0CrM0BEs0Cq80BEs0Cqs0BEs0CqM0BEs0Cp80BE80Cpc0BE80CpM0BE80Co80BE80Coc0BFM0CoM0BFM0Cn80BFM0Cnc0BFc0CnM0BFc0Cm80BFs0Cmc0BFs0CmM0BF80Cls0BF80Clc0BGM0ClM0BGM0Cks0BGc0Ckc0BGc0CkM0BGs0Cjs0BG80Cjc0BHM0CjM0BHc0Cis0BHs0Cic0BH80Ch80BIM0Chs0BIs0Chc0BI80Cg80BJM0Cgs0BJs0Cgc0BJ80Cf80BKM0Cfs0BKc0Cfc0BKs0Ce80BK80Ces0BLM0CeM0BLc0Cd80BLs0Cds0BLs0CdM0BLs0Cc80BLs0Ccs0BL80CcM0BL80Cb80BL80Cbs0BLs0CbM0BLs0Ca80BLs0Cac0BLs0CaM0BLs0CZ80BLs0CZc0BL80CZM0BL80CY80BMM0CYc0BMM0CYM0BMc0CX80BMs0CXc0BM80CXM0BM80CWs0BNM0CWc0BNc0CWM0BNs0CVs0BN80CVc0BOM0CVM0BOc0CUs0BOs0CUc0BO80CT80BO80CTs0BPM0CTc0BPM0CS80BPM0CSs0BPc0CSc0BPc0CR80BPM0CRs0BPM0CRc0BPM0CQ80BPM0CQs0BO80CQM0BOs0CP80BOs0CPs0BOc0CPM0BOM0CO80BN80COs0BNs0COM0BNc0CN80BNM0CNs0BMs0CNM0BMc0CM80BL80CMc0BLs0CMM0BLM0CL80BK80CLc0BKc0CLM0BJ80CK80BJs0CKc0BJM0CKM0BIs0CJ80BIc0CJc0BH80CJM0BHs0CIs0BHM0CIc0BG80CIM0BGs0CHs0BGc0CHc0BGM0CHM0BF80CGs0BFs0CGc0BFc0CGM0BFM0CFs0BFM0CFc0BE80CE80BE80CEs0BE80CEc0BE80CD80BEs0CDs0BEs0CDc0BEs0CC80BEs0CCs0BEs0CCc0BEs0CB80BEs0CBs0BEs0CBM0BEs0CA80BEs0CAs0BEs0CAM0BEs0B/80BEs0B/s0BEc0B/M0BEc0B+80BEc0B+s0BEc0B+M0BEc0B980BEc0B9c0BEc0B9M0BEM0B880BEM0B8c0BEM0B8M0BEM0B780BEM0B7c0BEM0B7M0BEM0B680BEM0B6c0BEM0B6M0BEM0B5s0BEM0B5c0BEM0B5M0BD80B4s0BD80B4c0BD80B4M0BD80B3s0BD80B3c0BD80B3M0BD80B2s0BD80B2c0BD80B180BD80B1s0BD80B1c0BD80B080BD80B0s0BD80B0c0BD80Bz80BD80Bz80BD80Bz80BD80B0c0BD80B0s0BD80B080BD80B1c0BD80B1s0BD80B180BD80B2c0BD80B2s0BD80B3M0BD80B3c0BD80B3s0BD80B4M0BD80B4c0BD80B4s0BD80B5M0BD80B5c0BD80B5s0BD80B6M0BD80B6c0BD80B680BD80B7M0BD80B7c0BD80B780BD80B8M0BDs0B8c0BDs0B880BDs0B9M0BDs0B9c0BDs0B980BDs0B+M0BDs0B+s0BDc0B+80BDc0B/M0BDc0B/s0BDc0B/80BDc0CAM0BDc0CAs0BDc0CA80BDc0CBM0BDc0CBs0BDc0CB80BDc0CCc0BDc0CCs0BDc0CC80BDc0CDc0BDM0CDs0BDM0CD80BDM0CEc0BDM0CEs0BC80CE80BC80CFc0BCs0CFs0BCs0CGM0BCc0CGc0BCM0CGs0BB80CHM0BBs0CHc0BBc0CHs0BBM0CIM0BA80CIc0BAc0CIs0BAM0CJMz+zQIlzP3NAifM+80CKMz5zQIpzPjNAivM9s0CLMz0zQItzPPNAi/M8c0CMMzvzQIxzO7NAjPM7c0CNMzrzQI2zOrNAjfM6c0COMzozQI6zOfNAjvM5s0CPMzlzQI+zOTNAj/M5M0CQMzjzQJCzOPNAkPM480CRczizQJGzOLNAkfM4s0CSczizQJKzOPNAkvM480CTczjzQJOzOTNAk/M5c0CUczmzQJSzObNAlTM580CVczozQJWzOnNAljM6s0CWczrzQJazOzNAlzM7c0CXczuzQJfzO/NAmDM780CYczwzQJjzPDNAmTM8M0CZczwzQJnzPDNAmjM8M0CaczwzQJrzPDNAmzM8M0CbszwzQJvzPDNAnDM8M0CcszwzQJzzPHNAnTM8c0CdszyzQJ3zPPNAnjM880Cesz0zQJ7zPXNAn3M980Cfsz4zQJ/zPnNAoHM+s0Cgsz8zQKDzP3NAoXM/s0Chs0BAM0Ch80BAc0Cic0BAs0Cis0BA80CjM0BBM0Cjc0BBc0Cjs0BBc0CkM0BBs0Ckc0BB80Cks0BB80ClM0BCM0Clc0BCM0Cls0BCc0CmM0BCc0Cmc0BCs0Cm80BCs0CnM0BCs0Cnc0BC80Cn80BC80CoM0BC80Coc0BDM0Co80BDM0CpM0BDM0Cpc0BDM0Cp80BDc0CqM0BDc0Cqs0BDc0Cq80BDc0CrM0BDc0Crs0BDc0Cr80BDs0CsM0BDs0Css0BDs0Cs80BDs0CtM0BDs0Cts0BDs0Ct80BDs0Cuc0BDs0Cus0BD80Cu80BD80Cvc0BD80Cvs0BD80Cv80BD80Cwc0BD80Cws0BD80Cw80BD80Cxc0BD80Cxs0BD80CyM0BD80Cyc0BD80Cys0BD80CzM0BD80Czc0BD80Czs0BD80C0M0BD80C0c0BD80C0s0BD80C1M0BD80C1c0BD80C180BD80C2M0BD80C2c0BD80C280BD80C3M0BD80C3c0BD80C39wDJM0Bjs0Czc0Bjs0Czc0Bjs0CzM0Bjs0Cy80Bjs0Cyc0Bjs0CyM0Bjs0Cx80Bjs0Cxs0Bjs0CxM0Bjs0Cw80Bjs0Cws0Bjs0Cwc0Bjs0Cv80Bjs0Cvs0Bj80Cvc0Bj80CvM0Bj80Cus0Bj80Cuc0Bj80CuM0Bj80Cts0Bj80Ctc0Bj80CtM0Bj80Cs80Bj80Csc0BkM0CsM0BkM0Cr80BkM0Crs0BkM0CrM0BkM0Cq80Bkc0Cqs0Bkc0Cqc0Bkc0Cp80Bkc0Cps0Bks0Cpc0Bks0CpM0Bks0Cos0Bks0Coc0Bk80CoM0Bk80Cns0Bk80Cnc0Bk80CnM0Bk80Cm80BlM0Cmc0BlM0CmM0BlM0Cl80BlM0Cls0Blc0ClM0Blc0Ck80Blc0Cks0Bls0Ckc0Bls0Cj80Bl80Cjs0Bl80Cjc0BmM0CjM0BmM0Cis0Bmc0Cic0Bmc0CiM0Bms0Chs0Bms0Chc0Bm80ChM0Bm80Cg80BnM0Cgc0BnM0CgM0Bnc0Cf80Bnc0Cfs0Bnc0CfM0Bns0Ce80Bns0Ces0Bn80Cec0Bn80Cd80BoM0Cds0Boc0Cdc0Boc0CdM0Bos0Ccs0Bo80Ccc0BpM0CcM0Bpc0Cbs0Bp80Cbc0BqM0CbM0Bqc0Ca80Bq80Cac0BrM0CaM0Brs0CZ80BsM0CZs0Bsc0CZM0Bs80CY80Btc0CYs0Bts0CYc0BuM0CX80Bus0CXs0Bu80CXc0BvM0CXM0Bvs0CWs0Bv80CWc0Bv80CWM0BwM0CVs0Bwc0CVc0Bwc0CVM0Bwc0CU80Bwc0CUc0Bwc0CUM0BwM0CT80BwM0CTs0Bv80CTM0Bvs0CS80Bvc0CSs0BvM0CSc0Bu80CR80Bus0CRs0Buc0CRc0Bt80CRM0Bts0CQs0Btc0CQc0BtM0CQM0Bss0CP80Bsc0CPc0BsM0CPM0Br80CO80Brc0COc0BrM0COM0Bq80CN80Bqs0CNs0Bqs0CNM0Bqc0CM80BqM0CMs0Bp80CMc0Bp80CL80Bps0CLs0Bps0CLc0Bpc0CLM0Bpc0CKs0Bpc0CKc0BpM0CKM0BpM0CJ80BpM0CJc0BpM0CJM0BpM0CI80Bo80CIc0Bo80CIM0Bo80CH80Bo80CHs0Bos0CHM0Bos0CG80Boc0CGs0Boc0CGc0BoM0CF80Bn80CFs0Bn80CFc0Bns0CFM0Bnc0CEs0BnM0CEc0Bm80CEM0Bms0CD80Bmc0CDc0BmM0CDM0Bl80CC80Bls0CCc0Blc0CCM0BlM0CB80Bk80CBs0Bk80CBM0Bks0CA80Bks0CAs0Bks0CAc0Bkc0B/80Bkc0B/s0Bkc0B/c0Bkc0B/M0BkM0B+s0BkM0B+c0BkM0B+M0BkM0B980BkM0B9c0BkM0B9M0BkM0B880Bj80B8c0Bj80B8M0Bj80B780Bj80B7s0Bj80B7M0Bj80B680Bj80B6s0Bj80B6c0Bj80B580Bj80B5s0Bj80B5c0Bj80B5M0Bjs0B4s0Bjs0B4c0Bjs0B4M0Bjs0B380Bjs0B3c0Bjs0B3M0Bjs0B280Bjs0B2c0Bjs0B2M0Bjs0B180Bjs0B1s0Bjs0B1M0Bjs0B080Bjs0B0s0Bjs0B0s0Bjs0B0s0Bjs0B080Bjs0B1M0Bjs0B1s0Bjs0B180Bjs0B2M0Bjs0B2c0Bjs0B280Bjs0B3M0Bjs0B3c0Bjs0B380Bjs0B4M0Bjs0B4c0Bjs0B4s0Bjs0B5M0Bjs0B5c0Bjs0B5s0Bjs0B580Bjs0B6c0Bjs0B6s0Bjs0B680Bjs0B7M0Bjs0B7s0Bjs0B780Bjs0B8M0Bjc0B8c0Bjc0B880Bjc0B9M0Bjc0B9c0Bjc0B980Bjc0B+M0Bjc0B+c0BjM0B+s0BjM0B/M0BjM0B/c0BjM0B/s0BjM0B/80Bi80CAc0Bi80CAs0Bis0CA80Bis0CBM0Bic0CBs0Bic0CB80BiM0CCM0Bh80CCc0Bhs0CC80Bhc0CDM0BhM0CDc0Bg80CD80Bgs0CEM0Bgc0CEc0BgM0CEs0Bf80CFM0Bfs0CFc0Bfc0CFs0Bfc0CF80BfM0CGc0Be80CGs0Be80CG80Be80CHM0Bes0CHs0Bes0CH80Bes0CIM0Bec0CIc0Bec0CI80Bec0CJM0Bec0CJc0Bec0CJ80BeM0CKM0BeM0CKc0BeM0CKs0Bd80CLM0Bd80CLc0Bd80CLs0Bds0CL80Bdc0CMc0Bdc0CMs0BdM0CM80Bc80CNM0Bcs0CNs0Bcc0CN80BcM0COM0Bb80COc0Bbs0CO80Bbc0CPM0BbM0CPc0Ba80CP80Bac0CQM0BaM0CQc0BZ80CQs0BZc0CRM0BZM0CRc0BY80CRs0BYs0CR80BYc0CSc0BX80CSs0BX80CS80BXs0CTM0BXc0CTs0BXM0CT80BXM0CUM0BXM0CUc0BXM0CU80BXM0CVM0BXM0CVc0BXc0CVs0BXc0CWM0BXs0CWc0BX80CWs0BYM0CXM0BYs0CXc0BY80CXs0BZc0CX80BZs0CYc0BaM0CYs0Bas0CY80Ba80CZM0Bbc0CZs0Bb80CZ80BcM0CaM0Bcs0Cac0Bc80Ca80Bdc0CbM0Bds0Cbc0Bd80Cbs0Bec0CcM0Bes0Ccc0Be80Ccs0Be80CdM0BfM0Cdc0Bfc0Cds0Bfc0Cd80Bfs0Cec0Bfs0Ces0Bf80Ce80Bf80CfM0BgM0Cfs0BgM0Cf80Bgc0CgM0Bgc0Cgc0Bgs0Cg80Bgs0ChM0Bg80Chc0Bg80Chs0BhM0CiM0BhM0Cic0Bhc0Cis0Bhc0CjM0Bhs0Cjc0Bhs0Cjs0Bh80Cj80Bh80Ckc0Bh80Cks0BiM0Ck80BiM0ClM0BiM0Cls0Bic0Cl80Bic0CmM0Bic0Cmc0Bic0Cm80Bis0CnM0Bis0Cnc0Bis0Cns0Bis0CoM0Bis0Coc0Bi80Cos0Bi80CpM0Bi80Cpc0Bi80Cps0BjM0Cp80BjM0Cqc0BjM0Cqs0BjM0Cq80Bjc0CrM0Bjc0Crs0Bjc0Cr80Bjc0CsM0Bjc0Csc0Bjs0Cs80Bjs0CtM0Bjs0Ctc0Bjs0Cts0Bjs0CuM0Bjs0Cuc0Bjs0Cus0Bjs0CvM0Bjs0Cvc0Bjs0Cvs0Bjs0Cv80Bjs0Cwc0Bjs0Cws0Bjs0Cw80Bjs0CxM0Bjs0Cxs0Bjs0Cx80Bjs0CyM0Bjs0Cyc0Bjs0Cy80Bjs0CzM0Bjs0CzahwYXlsb2Fkc5OBoXjLP/AAAAAAAACBoXjLQAAAAAAAAACBoXjLQAgAAAAAAACkYXhpc6NheDSlc3R5bGWBpXdpZHRoAqRib25kp2VsZW1lbnSmZXZlbnRzkqVjbGlja6Vob3Zlcomka2luZKhwb2x5Z29uc6JpZKt2b3Jvbm9pcGxvdKN0b2wBqGdlb21ldHJ5n5zNA5zNAcLNA2TNAcLNAuzNAfXNA1PNAirNA5zNAhvNA5zNAcKczQMEzQKhzQNEzQKmzQNGzQKjzQMIzQJLzQLtzQJQzQMEzQKh3AAQzQK6zQJKzQKEzQHizQJ6zQHpzQIazQJYzQIazQJnzQJ0zQJ3zQJ7zQJ2zQK6zQJKns0Ce80Cds0Cy80Cx80DBM0Coc0C7c0CUM0Cwc0CSc0Cus0CSs0Ce80CdprNAhrNAuzNAmXNAuzNAmTNAt3NAhrNArfNAhrNAuyezQJ0zQJ3zQJkzQLdzQJlzQLszQLPzQLszQLLzQLHzQJ7zQJ2zQJ0zQJ3nM0DRM0Cps0DT80C7M0DnM0C7M0DnM0CZ80DRs0Co80DRM0CppzNAoTNAeLNAo/NAcLNAhrNAcLNAhrNAfPNAnrNAenNAoTNAeKczQNGzQKjzQOczQJnzQOczQIbzQNTzQIqzQMIzQJLzQNGzQKjmM0CGs0CWM0Ces0B6c0CGs0B880CGs0CWJrNAhrNAmfNAhrNArfNAmTNAt3NAnTNAnfNAhrNAmeazQLBzQHCzQLrzQH1zQLszQH1zQNkzQHCzQLBzQHCns0DCM0CS80DU80CKs0C7M0B9c0C680B9c0Cwc0CSc0C7c0CUM0DCM0CS57NArrNAkrNAsHNAknNAuvNAfXNAsHNAcLNAo/NAcLNAoTNAeLNArrNAkqczQMEzQKhzQLLzQLHzQLPzQLszQNPzQLszQNEzQKmzQMEzQKhqHBheWxvYWRzn4GlaW5kZXgBgaVpbmRleAKBpWluZGV4A4GlaW5kZXgEgaVpbmRleAWBpWluZGV4BoGlaW5kZXgHgaVpbmRleAiBpWluZGV4CYGlaW5kZXgKgaVpbmRleAuBpWluZGV4DIGlaW5kZXgNgaVpbmRleA6BpWluZGV4D6RheGlzo2F4NaVzdHlsZYGld2lkdGgCpGJvbmSnZWxlbWVudKZldmVudHOSpWNsaWNrpWhvdmVyiKRraW5kpXJlY3Rzomlkp2JveHBsb3SoZ2VvbWV0cnmYzQQ+zQJbzJs/zQUAzQJbzJtCqHBheWxvYWRzkoOicTHLv+QFZ689kyumbWVkaWFuyz+4NIiJvPIkonEzyz/mdm3GHFSFg6JxMcu/5PPZP6tr6KZtZWRpYW7LP6coS57m1a2icTPLP+fbYeQmL3ykYXhpc6NheDalc3R5bGWBpXdpZHRoAqRib25kp2VsZW1lbnSmZXZlbnRzkqVjbGlja6Vob3Zlcqdpbml0aWFshqRiYW5kwKt2b3Jvbm9pcGxvdMCnYm94cGxvdMCoY29udG91cmbAp2RlbnNpdHnApnZpb2xpbsCqdHJhbnNmb3Jtc4ajYXg1jaZ4c2NhbGWoaWRlbnRpdHmleWxpbXPYGAAAAEBqeKC/AAAAjl8+8D+leGxpbXPYGAAAAEDdxbC/AAAA7Isv8T+pdmFsdWVheGlzwKVwb2xhcsCkaXMzZMKpeHJldmVyc2VkwqV5Y2F0c8CleGNhdHPAqXlyZXZlcnNlZMKmeXNjYWxlqGlkZW50aXR5qHZpZXdwb3J0xyAYHcdxHMfRgECrqqqqqhp8QMdxHMdxHHhAq6qqqqqqckCnaXNwb2xhcsKjYXgzjaZ4c2NhbGWoaWRlbnRpdHmleWxpbXPYGAAAAAAAAPA/AAAAAAAANECleGxpbXPYGAAAAAAAAPA/AAAAAAAANECpdmFsdWVheGlzwKVwb2xhcsCkaXMzZMKpeHJldmVyc2VkwqV5Y2F0c8CleGNhdHPAqXlyZXZlcnNlZMKmeXNjYWxlqGlkZW50aXR5qHZpZXdwb3J0xyAYchzHcRz3jkDgOI7jOA5MQDmO4ziOA3hAq6qqqqqqckCnaXNwb2xhcsKjYXgxjaZ4c2NhbGWoaWRlbnRpdHmleWxpbXPYGAAAAOCZmam/AADgmZkZKECleGxpbXPYGAAAAJaZmeE/AACgZmbmJECpdmFsdWVheGlzwKVwb2xhcsCkaXMzZMKpeHJldmVyc2VkwqV5Y2F0c8CleGNhdHPAqXlyZXZlcnNlZMKmeXNjYWxlqGlkZW50aXR5qHZpZXdwb3J0xyAYx3Ecx3GcVEDgOI7jOA5MQDmO4ziOA3hAq6qqqqqqckCnaXNwb2xhcsKjYXg2jaZ4c2NhbGWoaWRlbnRpdHmleWxpbXPYGAI4X3XKKgjAAjhf1Q8qCkCleGxpbXPYGBSuR4/rUeA/exQuLIXrA0CpdmFsdWVheGlzwKVwb2xhcsCkaXMzZMKpeHJldmVyc2VkwqV5Y2F0c8CleGNhdHPAqXlyZXZlcnNlZMKmeXNjYWxlqGlkZW50aXR5qHZpZXdwb3J0xyAYchzHcRz3jkCrqqqqqhp8QDmO4ziOA3hAq6qqqqqqckCnaXNwb2xhcsKjYXg0jaZ4c2NhbGWoaWRlbnRpdHmleWxpbXPYGJBVlOMbIhHAkFWUA7RBEECleGxpbXPYGLAvs4s/ZeA/FDQTXdBMDECpdmFsdWVheGlzwKVwb2xhcsCkaXMzZMKpeHJldmVyc2VkwqV5Y2F0c8CleGNhdHPAqXlyZXZlcnNlZMKmeXNjYWxlqGlkZW50aXR5qHZpZXdwb3J0xyAYx3Ecx3GcVECrqqqqqhp8QDmO4ziOA3hAq6qqqqqqckCnaXNwb2xhcsKjYXgyjaZ4c2NhbGWoaWRlbnRpdHmleWxpbXPYGMG/B29ljpG//Ks9HOUK1z+leGxpbXPYGMAx/PmG9BHAgGP4c4zfD0CpdmFsdWVheGlzwKVwb2xhcsCkaXMzZMKpeHJldmVyc2VkwqV5Y2F0c8CleGNhdHPAqXlyZXZlcnNlZMKmeXNjYWxlqGlkZW50aXR5qHZpZXdwb3J0xyAYHcdxHMfRgEDgOI7jOA5MQMdxHMdxHHhAq6qqqqqqckCnaXNwb2xhcsKld2lkdGjNBXinc2NhbGluZ8s/+OOOOOOOOapiYWNrZ3JvdW5ksHJnYigyNTUsMjU1LDI1NSmmZmllbGRzlqRiYW5kp2RlbnNpdHmoY29udG91cmamdmlvbGluq3Zvcm9ub2lwbG90p2JveHBsb3SlYm9uZHOAtGNlbGxfZXhlY3V0aW9uX29yZGVyltkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAx2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDnZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAxMNkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAy2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDPZJGUxYmUwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMa5wcm9jZXNzX3N0YXR1c6VyZWFkea1qdWxpYV92ZXJzaW9up3YxLjEzLjOrc3RhdHVzX3RyZWWFqHN1YnRhc2tzg6l3b3Jrc3BhY2WFqHN1YnRhc2tzgqxpbml0X3Byb2Nlc3OFqHN1YnRhc2tzhKEzhahzdWJ0YXNrc4CkbmFtZaEzq2ZpbmlzaGVkX2F0y0HauQdXUSogp3N1Y2Nlc3PDqnN0YXJ0ZWRfYXTLQdq5B1dRKhOhNIWoc3VidGFza3OApG5hbWWhNKtmaW5pc2hlZF9hdMtB2rkHV1FUeqdzdWNjZXNzw6pzdGFydGVkX2F0y0HauQdXUSogoTGFqHN1YnRhc2tzgKRuYW1loTGrZmluaXNoZWRfYXTLQdq5B1dRJWync3VjY2Vzc8Oqc3RhcnRlZF9hdMtB2rkHV1ENhKEyhahzdWJ0YXNrc4CkbmFtZaEyq2ZpbmlzaGVkX2F0y0HauQdXUSoPp3N1Y2Nlc3PDqnN0YXJ0ZWRfYXTLQdq5B1dRJXCkbmFtZaxpbml0X3Byb2Nlc3OrZmluaXNoZWRfYXTLQdq5B1dRVH6nc3VjY2Vzc8Oqc3RhcnRlZF9hdMtB2rkHV1ENeK5jcmVhdGVfcHJvY2Vzc4Woc3VidGFza3OApG5hbWWuY3JlYXRlX3Byb2Nlc3OrZmluaXNoZWRfYXTLQdq5B1dRDXSnc3VjY2Vzc8Oqc3RhcnRlZF9hdMtB2rkHV1EIr6RuYW1lqXdvcmtzcGFjZatmaW5pc2hlZF9hdMtB2rkHV1FUgqdzdWNjZXNzw6pzdGFydGVkX2F0y0HauQdXUQiio3BrZ4Woc3VidGFza3OBqGFuYWx5c2lzhahzdWJ0YXNrc4CkbmFtZahhbmFseXNpc6tmaW5pc2hlZF9hdMtB2rkHZMWG7KdzdWNjZXNzw6pzdGFydGVkX2F0y0HauQdkxWSVpG5hbWWjcGtnq2ZpbmlzaGVkX2F0y0HauQdkxYbsp3N1Y2Nlc3PDqnN0YXJ0ZWRfYXTLQdq5B2TFZJGjcnVuhahzdWJ0YXNrc4KoZXZhbHVhdGWFqHN1YnRhc2tzgaExhahzdWJ0YXNrc4CkbmFtZaExq2ZpbmlzaGVkX2F0y0HauQdkyFjFp3N1Y2Nlc3PDqnN0YXJ0ZWRfYXTLQdq5B2TFqoKkbmFtZahldmFsdWF0ZatmaW5pc2hlZF9hdMtB2rkHZMhY76dzdWNjZXNzw6pzdGFydGVkX2F0y0HauQdkxZVfsHJlc29sdmVfdG9wb2xvZ3mFqHN1YnRhc2tzgKRuYW1lsHJlc29sdmVfdG9wb2xvZ3mrZmluaXNoZWRfYXTLQdq5B2TFlV+nc3VjY2Vzc8Oqc3RhcnRlZF9hdMtB2rkHZMWRxaRuYW1lo3J1bqtmaW5pc2hlZF9hdMtB2rkHZMhY76dzdWNjZXNzw6pzdGFydGVkX2F0y0HauQdkxZHBpG5hbWWobm90ZWJvb2urZmluaXNoZWRfYXTAp3N1Y2Nlc3PAqnN0YXJ0ZWRfYXTLQdq5B1dPCdmqY2VsbF9vcmRlcpTZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwOdkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDEw2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDLZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwM6tjZWxsX2lucHV0c4bZJGUxYmUwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMYSobWV0YWRhdGGDqGRpc2FibGVkwqlzaG93X2xvZ3PDrnNraXBfYXNfc2NyaXB0wqdjZWxsX2lk2SRlMWJlMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDGrY29kZV9mb2xkZWTDpGNvZGXaASBQTFVUT19QTEFZRVJfVE9NTF9DT05URU5UUyA9ICIiIgpbcGxheWVyXQpib25kID0gInBpY2siCnNob3dfY29kZSA9IHRydWUKcGx1dG9faHRtbCA9IHRydWUKY2hpcCA9IGZhbHNlCgpjZWxscyA9IFsKICAiYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDA5IiwKICAiYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDEwIiwKICAiYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAyIiwKICAiYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAzIiwKXQoiIiLZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwM4SobWV0YWRhdGGDqGRpc2FibGVkwqlzaG93X2xvZ3PDrnNraXBfYXNfc2NyaXB0wqdjZWxsX2lk2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDOrY29kZV9mb2xkZWTCpGNvZGW1QGJpbmQgcGljayBtYXNxdWUocGYp2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDGEqG1ldGFkYXRhg6hkaXNhYmxlZMKpc2hvd19sb2dzw65za2lwX2FzX3NjcmlwdMKnY2VsbF9pZNkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAxq2NvZGVfZm9sZGVkwqRjb2Rl2SB1c2luZyBNYXNxdWUsIENhaXJvTWFraWUsIFJhbmRvbdkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAyhKhtZXRhZGF0YYOoZGlzYWJsZWTCqXNob3dfbG9nc8Ouc2tpcF9hc19zY3JpcHTCp2NlbGxfaWTZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwMqtjb2RlX2ZvbGRlZMKkY29kZdoCmGJlZ2luCiAgICBybmcgPSBYb3NoaXJvKDEpCiAgICBwZiA9IEZpZ3VyZShzaXplID0gKDkwMCwgNTIwKSkKICAgIGJhbmQhKEF4aXMocGZbMSwgMV07IHRpdGxlID0gImJhbmQiKSwgMToxMCwgKDE6MTApIC4tIDAuNSwgKDE6MTApIC4rIDEuNSkKICAgIGRlbnNpdHkhKEF4aXMocGZbMSwgMl07IHRpdGxlID0gImRlbnNpdHkiKSwgcmFuZG4ocm5nLCA0MDApKQogICAgY29udG91cmYhKAogICAgICAgIEF4aXMocGZbMSwgM107IHRpdGxlID0gImNvbnRvdXJmIiksCiAgICAgICAgMToyMCwKICAgICAgICAxOjIwLAogICAgICAgIFtzaW4oaSAvIDMpICogY29zKGogLyAzKSBmb3IgaSBpbiAxOjIwLCBqIGluIDE6MjBdOwogICAgICAgIGxldmVscyA9IDYsCiAgICApCiAgICB2aW9saW4hKEF4aXMocGZbMiwgMV07IHRpdGxlID0gInZpb2xpbiIpLCByZXBlYXQoWzEsIDIsIDNdLCBpbm5lciA9IDEwMCksIHJhbmRuKHJuZywgMzAwKSkKICAgIHZvcm9ub2lwbG90IShBeGlzKHBmWzIsIDJdOyB0aXRsZSA9ICJ2b3Jvbm9pIiksIHJhbmQocm5nLCAxNSksIHJhbmQocm5nLCAxNSkpCiAgICBib3hwbG90IShBeGlzKHBmWzIsIDNdOyB0aXRsZSA9ICJib3hwbG90IiksIHJlcGVhdChbMSwgMl0sIGlubmVyID0gMTIwKSwgcmFuZG4ocm5nLCAyNDApKQogICAgbm90aGluZwplbmTZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwOYSobWV0YWRhdGGDqGRpc2FibGVkwqlzaG93X2xvZ3PDrnNraXBfYXNfc2NyaXB0wqdjZWxsX2lk2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDmrY29kZV9mb2xkZWTDpGNvZGXZXW1kIiIiCkhvdmVyIG92ZXIgYSBiYW5kLCBhIGRlbnNpdHksIGEgZmlsbGVkIGNvbnRvdXIsIGEgdmlvbGluLCBhIFZvcm9ub2kgY2VsbCwgb3IgYSBib3guCiIiItkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDEwhKhtZXRhZGF0YYOoZGlzYWJsZWTCqXNob3dfbG9nc8Ouc2tpcF9hc19zY3JpcHTCp2NlbGxfaWTZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAxMKtjb2RlX2ZvbGRlZMOkY29kZdlnbWQiIiIKQ3JlYXRlIHRoZSBwYW5lbHMgdGhlIHdheSB5b3Ugbm9ybWFsbHkgd291bGQsIGFuZCBgbWFzcXVlYCBtYWtlcyBlYWNoIGZpbGxlZCBzaGFwZSBjbGlja2FibGUuCiIiIrRsYXN0X2hvdF9yZWxvYWRfdGltZcsAAAAAAAAAALFjZWxsX2RlcGVuZGVuY2llc4bZJGUxYmUwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMYS0cHJlY2VkZW5jZV9oZXVyaXN0aWMJp2NlbGxfaWTZJGUxYmUwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDAwMbRkb3duc3RyZWFtX2NlbGxzX21hcIG6UExVVE9fUExBWUVSX1RPTUxfQ09OVEVOVFOQsnVwc3RyZWFtX2NlbGxzX21hcIDZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwM4S0cHJlY2VkZW5jZV9oZXVyaXN0aWMJp2NlbGxfaWTZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwM7Rkb3duc3RyZWFtX2NlbGxzX21hcIGkcGlja5CydXBzdHJlYW1fY2VsbHNfbWFwiaRCYXNlkKJwZpHZJGExNDEwMDA0LTAwMDEtNDAwMC04MDAwLTAwMDAwMDAwMDAwMqVAYmluZJCoQmFzZS5nZXSQq1BsdXRvUnVubmVykKZtYXNxdWWQr0NvcmUuYXBwbGljYWJsZZCkQ29yZZC3UGx1dG9SdW5uZXIuY3JlYXRlX2JvbmSQ2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDGEtHByZWNlZGVuY2VfaGV1cmlzdGljB6djZWxsX2lk2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDG0ZG93bnN0cmVhbV9jZWxsc19tYXCDqkNhaXJvTWFraWWQplJhbmRvbZCmTWFzcXVlkLJ1cHN0cmVhbV9jZWxsc19tYXCA2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDKEtHByZWNlZGVuY2VfaGV1cmlzdGljCadjZWxsX2lk2SRhMTQxMDAwNC0wMDAxLTQwMDAtODAwMC0wMDAwMDAwMDAwMDK0ZG93bnN0cmVhbV9jZWxsc19tYXCConBmkdkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDAzo3JuZ5CydXBzdHJlYW1fY2VsbHNfbWFw3gAUoSqQpXJhbmRukKEvkKE6kKZyZXBlYXSQqWNvbnRvdXJmIZClYmFuZCGQoS2QrHZvcm9ub2lwbG90IZCndmlvbGluIZCmRmlndXJlkKNzaW6QoSuQqGRlbnNpdHkhkKRBeGlzkKRyYW5kkKdub3RoaW5nkKdYb3NoaXJvkKNjb3OQqGJveHBsb3QhkNkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDA5hLRwcmVjZWRlbmNlX2hldXJpc3RpYwmnY2VsbF9pZNkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDA5tGRvd25zdHJlYW1fY2VsbHNfbWFwgLJ1cHN0cmVhbV9jZWxsc19tYXCCp0BtZF9zdHKQqGdldGluZGV4kNkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDEwhLRwcmVjZWRlbmNlX2hldXJpc3RpYwmnY2VsbF9pZNkkYTE0MTAwMDQtMDAwMS00MDAwLTgwMDAtMDAwMDAwMDAwMDEwtGRvd25zdHJlYW1fY2VsbHNfbWFwgLJ1cHN0cmVhbV9jZWxsc19tYXCCp0BtZF9zdHKQqGdldGluZGV4kKlzaG9ydHBhdGizZ2FsbGVyeV9wb2x5Z29ucy5qbK5sYXN0X3NhdmVfdGltZctB2rkHV08J4atub3RlYm9va19pZNkkOWUyMDQ3MjItZDQxYS0xMWYxLWIzODQtYTE0MGI5M2ViZGNlpW5icGtniq1idXN5X3BhY2thZ2VzkNksd2FpdGluZ19mb3JfcGVybWlzc2lvbl9idXRfcHJvYmFibHlfZGlzYWJsZWTCp2VuYWJsZWTDsHRlcm1pbmFsX291dHB1dHOCplJhbmRvbdoDRAobWzBtG1sxbUFkZGluZyBwYWNrYWdlcy4uLhtbMjJtChtbOTBtPT09G1szOW0KG1szMm0bWzFtICAgIFVwZGF0aW5nG1syMm0bWzM5bSBgfi8uanVsaWEvc2NyYXRjaHNwYWNlcy9jM2U0YjBmOC01NWNiLTExZWEtMjkyNi0xNTI1NmJiYTU3ODEvcGtnX2VudnMvZW52X29mdHlra3VwcnUvUHJvamVjdC50b21sYAogIBtbOTBtWzlhM2Y4Mjg0XSAbWzM5bRtbOTJtKyBSYW5kb20bWzM5bQobWzM2bRtbMW0gICAgTWFuaWZlc3QbWzIybRtbMzltIE5vIHBhY2thZ2VzIGFkZGVkIHRvIG9yIHJlbW92ZWQgZnJvbSBgfi8uanVsaWEvc2NyYXRjaHNwYWNlcy9jM2U0YjBmOC01NWNiLTExZWEtMjkyNi0xNTI1NmJiYTU3ODEvcGtnX2VudnMvZW52X29mdHlra3VwcnUvTWFuaWZlc3QudG9tbGAKG1szMm0bWzFtTG9hZGluZxtbMjJtG1szOW0gcGFja2FnZXMuLi4KChtbMG0bWzFtSW5zdGFudGlhdGluZy4uLhtbMjJtChtbOTBtPT09G1szOW0KG1szM20bWzFt4pSMIBtbMjJtG1szOW0bWzMzbRtbMW1XYXJuaW5nOiAbWzIybRtbMzltVGhlIGFjdGl2ZSBtYW5pZmVzdCBmaWxlIGhhcyBkZXBlbmRlbmNpZXMgdGhhdCB3ZXJlIHJlc29sdmVkIHdpdGggYSBkaWZmZXJlbnQganVsaWEgdmVyc2lvbiAoMS4xMC4xMikuIFVuZXhwZWN0ZWQgYmVoYXZpb3IgbWF5IG9jY3VyLgobWzMzbRtbMW3ilJQgG1syMm0bWzM5bRtbOTBtQCB+Ly5qdWxpYS9zY3JhdGNoc3BhY2VzL2MzZTRiMGY4LTU1Y2ItMTFlYS0yOTI2LTE1MjU2YmJhNTc4MS9wa2dfZW52cy9lbnZfb2Z0eWtrdXBydS9NYW5pZmVzdC50b21sOjAbWzM5bQoKG1swbRtbMW1QcmVjb21waWxpbmcuLi4bWzIybQobWzkwbT09PRtbMzltqm5icGtnX3N5bmPaA0QKG1swbRtbMW1BZGRpbmcgcGFja2FnZXMuLi4bWzIybQobWzkwbT09PRtbMzltChtbMzJtG1sxbSAgICBVcGRhdGluZxtbMjJtG1szOW0gYH4vLmp1bGlhL3NjcmF0Y2hzcGFjZXMvYzNlNGIwZjgtNTVjYi0xMWVhLTI5MjYtMTUyNTZiYmE1NzgxL3BrZ19lbnZzL2Vudl9vZnR5a2t1cHJ1L1Byb2plY3QudG9tbGAKICAbWzkwbVs5YTNmODI4NF0gG1szOW0bWzkybSsgUmFuZG9tG1szOW0KG1szNm0bWzFtICAgIE1hbmlmZXN0G1syMm0bWzM5bSBObyBwYWNrYWdlcyBhZGRlZCB0byBvciByZW1vdmVkIGZyb20gYH4vLmp1bGlhL3NjcmF0Y2hzcGFjZXMvYzNlNGIwZjgtNTVjYi0xMWVhLTI5MjYtMTUyNTZiYmE1NzgxL3BrZ19lbnZzL2Vudl9vZnR5a2t1cHJ1L01hbmlmZXN0LnRvbWxgChtbMzJtG1sxbUxvYWRpbmcbWzIybRtbMzltIHBhY2thZ2VzLi4uCgobWzBtG1sxbUluc3RhbnRpYXRpbmcuLi4bWzIybQobWzkwbT09PRtbMzltChtbMzNtG1sxbeKUjCAbWzIybRtbMzltG1szM20bWzFtV2FybmluZzogG1syMm0bWzM5bVRoZSBhY3RpdmUgbWFuaWZlc3QgZmlsZSBoYXMgZGVwZW5kZW5jaWVzIHRoYXQgd2VyZSByZXNvbHZlZCB3aXRoIGEgZGlmZmVyZW50IGp1bGlhIHZlcnNpb24gKDEuMTAuMTIpLiBVbmV4cGVjdGVkIGJlaGF2aW9yIG1heSBvY2N1ci4KG1szM20bWzFt4pSUIBtbMjJtG1szOW0bWzkwbUAgfi8uanVsaWEvc2NyYXRjaHNwYWNlcy9jM2U0YjBmOC01NWNiLTExZWEtMjkyNi0xNTI1NmJiYTU3ODEvcGtnX2VudnMvZW52X29mdHlra3VwcnUvTWFuaWZlc3QudG9tbDowG1szOW0KChtbMG0bWzFtUHJlY29tcGlsaW5nLi4uG1syMm0KG1s5MG09PT0bWzM5bbZ3YWl0aW5nX2Zvcl9wZXJtaXNzaW9uwrdyZXN0YXJ0X3JlY29tbWVuZGVkX21zZ8C0cmVzdGFydF9yZXF1aXJlZF9tc2fAsmluc3RhbGxlZF92ZXJzaW9uc4WqQ2Fpcm9NYWtpZadub3RoaW5nuF9faW50ZXJuYWxfanVsaWFfdmVyc2lvbqYxLjEzLjOmUmFuZG9tpnN0ZGxpYqZNYXNxdWWnbm90aGluZ9khX19pbnRlcm5hbF9qdWxpYV9tYW5pZmVzdF92ZXJzaW9upzEuMTAuMTKvaW5zdGFsbF90aW1lX25zzjKfSAisaW5zdGFudGlhdGVkw61wbHV0b192ZXJzaW9upnYxLjAuM6tpbl90ZW1wX2RpcsI=";
+window.pluto_preamble_html = undefined;
+window.pluto_recording_url = undefined;
+window.pluto_recording_audio_url = undefined;
+</script>
+
+<meta name="pluto-insertion-spot-parameters">
+
+    <script src="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/editor.9e3719ed.js" type="module" defer=""></script>
+    <script src="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/frontend.ae6e0116.js"></script>
+
+    <link rel="pluto-external-source" id="vmsg-wasm" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/vmsg.56bb9389.wasm">
+    <!-- This script will be enabled by JS after the notebook has initialized to prevent taking up bandwidth during the initial load. -->
+    <link rel="pluto-external-source" id="MathJax-script" href="https://cdn.jsdelivr.net/gh/JuliaPluto/Pluto.jl@1.0.3/frontend-dist/tex-svg-full.b78c0ac1.js" type="text/javascript">
+    
+    
+<meta name="pluto-insertion-spot-preload">
+
+</head>
+
+<body class="no-MαθJax">
+    <div style="min-height:100vh;display:flex">
+        <pluto-editor class="loading fullscreen" translate="no">
+            <progress style="filter:grayscale()" class="statefile-fetch-progress delete-me-when-live" max="100"></progress>
+        </pluto-editor>
+    </div>
+
+
+
+<div class="masque-bar">
+<a class="masque-download" href="downloads/gallery_polygons.jl" download="gallery_polygons.jl">Download notebook</a>
+</div>
+<div class="masque-miss" role="status" hidden>This wasn't computed for the docs. <a href="downloads/gallery_polygons.jl" download="gallery_polygons.jl">Download the notebook</a> to try it.</div>
+<script>
+{
+  const TABLE = window.masquePlayer.table;
+  const WIDGET_ID = "a1410004-0001-4000-8000-000000000003";
+  function layerIndexKey(layer, index) {
+  return String(layer) + ":" + String(Number(index));
+}
+function pickKey(v) {
+  const k = layerIndexKey(v.layer, v.index);
+  return v.sample == null ? k : k + "@" + String(Number(v.sample));
+}
+function itemKey(it) {
+  const k = pickKey(it);
+  const p = it.payload;
+  if (!p || p.i0 == null) return k;
+  return k + "@" + p.i0 + "-" + p.i1 + "/" + p.j0 + "-" + p.j1;
+}
+function envKey(v) {
+  if (v == null) return "null";
+  if (Array.isArray(v.items)) return "items:" + v.items.map(itemKey).join(",");
+  if (v.layer != null && v.index != null && v.index !== "") {
+    return pickKey(v);
+  }
+  return JSON.stringify(v);
+}
+function stable(x) {
+  if (x === undefined) x = null;
+  if (x === null || typeof x !== "object") return JSON.stringify(x);
+  if (Array.isArray(x)) return "[" + x.map(stable).join(",") + "]";
+  return "{" + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(x[k]); }).join(",") + "}";
+}
+// A field keys the same as its starting value when it shows the same thing: a box released
+// where it started keeps its cells though its edges differ in the last float digit.
+function changed(table, v) {
+  const out = [];
+  const init = table.initial || {};
+  (table.keyed || []).forEach(function (f) {
+    const cur = v[f] === undefined ? null : v[f];
+    const start = init[f] === undefined ? null : init[f];
+    if (stable(cur) !== stable(start) && fieldKey(table, f, cur) !== fieldKey(table, f, start)) out.push([f, cur]);
+  });
+  return out;
+}
+function fieldKey(table, f, cur) {
+  if (cur == null) return "null@" + f;
+  if ((table.controls || []).indexOf(f) !== -1) return f + "=" + JSON.stringify(cur.payload);
+  return envKey(cur);
+}
+function keyOf(table, v) {
+  if (v == null) return "null";
+  const d = changed(table, v);
+  if (!d.length) return "null";
+  return d.map(function (p) { return fieldKey(table, p[0], p[1]); }).join("+");
+}
+function keysFor(table, v) {
+  const keys = [keyOf(table, v)];
+  const d = v == null ? [] : changed(table, v);
+  const one = d.length === 1 ? d[0][1] : null;
+  if (one && one.layer != null && one.index != null && one.index !== "") {
+    keys.push(String(one.layer) + ":" + String(one.index));
+    keys.push(String(one.layer) + ":" + String(one.index | 0));
+  }
+  return keys;
+}
+function find(table, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(table.keys, keys[i])) {
+      return table.snaps[table.keys[keys[i]]];
+    }
+  }
+  return null;
+}
+// Fetches each state file once and keeps it; a failed fetch is tried again next time.
+function jsonFiles() {
+  const loaded = new Map();
+  return function (file) {
+    if (!loaded.has(file)) {
+      loaded.set(file, fetch(file).then(function (r) {
+        if (!r.ok) throw new Error(file + ": " + r.status);
+        return r.json();
+      }).catch(function (e) {
+        loaded.delete(file);
+        throw e;
+      }));
+    }
+    return loaded.get(file);
+  };
+}
+// Shows each value's cells once its file loads, unless the reader reached a newer value first,
+// a miss included: a slow file never lands over a newer value's cells or its note.
+function latestOnly(load, apply, miss) {
+  let latest = 0;
+  return function (file) {
+    const n = ++latest;
+    miss(!file);
+    if (!file) return;
+    load(file).then(function (snap) {
+      if (n === latest) apply(snap);
+    }, function (e) {
+      console.warn("masque player: snapshot", e);
+      if (n === latest) miss(true);
+    });
+  };
+}
+// A reader who clicks one plot and then another changes two fields, a value the harvest never
+// recorded. Show the latest change on its own: the field that differs from the last value.
+function lookup(table, v) {
+  const prev = table.last_;
+  table.last_ = v;
+  let hit = find(table, keysFor(table, v));
+  // A moved control changes what every other field's snapshot would show, so a value the
+  // harvest skipped stays a miss rather than showing a snapshot taken at other settings.
+  const controlMoved = v != null && changed(table, v).some(function (p) { return (table.controls || []).indexOf(p[0]) !== -1; });
+  if (!hit && v != null && prev != null && !controlMoved) {
+    const moved = (table.keyed || []).filter(function (f) { return stable(v[f]) !== stable(prev[f]); });
+    if (moved.length === 0) return table.shown_ || null;
+    if (moved.length === 1) {
+      const alone = Object.assign({}, table.initial || {});
+      alone[moved[0]] = v[moved[0]];
+      hit = find(table, keysFor(table, alone));
+    }
+  }
+  if (hit) table.shown_ = hit;
+  return hit;
+}
+
+  // A value the harvest didn't record leaves the cells as they were, and says so in each part
+  // that shows one of those cells. The widget's own part has the overlay's note for its picture.
+  const miss = window.masqueSegment && !window.masqueSegment.some(function (id) { return id !== WIDGET_ID; })
+    ? null : document.querySelector(".masque-miss");
+  function showMiss(on) {
+    if (!miss || miss.hidden === !on) return;
+    miss.hidden = !on;
+    sizeFrame();
+  }
+  // Until Pluto draws the notebook, the page is as tall as the iframe, so sizing then grew the
+  // iframe a few px each frame. Keep the height the page reserved until the notebook and its
+  // pictures are in.
+  function sizeFrame() {
+    if (!window.frameElement) return;
+    const nb = document.querySelector("pluto-notebook");
+    if (!nb) return;
+    const loading = Array.prototype.filter.call(nb.querySelectorAll("img"), function (img) {
+      return !img.complete && img.offsetParent !== null;
+    });
+    if (loading.length) {
+      loading.forEach(function (img) {
+        img.addEventListener("load", sizeFrame, { once: true });
+        img.addEventListener("error", sizeFrame, { once: true });
+      });
+      return;
+    }
+    let bottom = nb.getBoundingClientRect().bottom;
+    if (miss && !miss.hidden) bottom = Math.max(bottom, miss.getBoundingClientRect().bottom);
+    window.frameElement.style.height = Math.max(1, Math.ceil(bottom + 8)) + "px";
+  }
+  // The segments of one notebook share its value: the iframe showing the widget posts each
+  // value to the page, and the page passes it to the notebook's other iframes
+  // (`assets/masque-embed.js`), which patch their own cells.
+  const framed = window.parent && window.parent !== window;
+  const showsWidget = !window.masqueSegment || window.masqueSegment.indexOf(WIDGET_ID) !== -1;
+  function announce(v) {
+    if (framed && showsWidget) window.parent.postMessage({ masque: "bond", value: v }, "*");
+  }
+  let pending;
+  let hasPending = false;
+  window.addEventListener("message", function (e) {
+    const d = e.data;
+    if (e.source !== window.parent || !d || d.masque !== "bond-relay") return;
+    if (armed) patch(d.value);
+    else {
+      pending = d.value;
+      hasPending = true;
+    }
+  });
+  let stamp = Date.now();
+  function nextStamp() {
+    stamp = Math.max(Date.now(), stamp + 1);
+    return stamp;
+  }
+  // Each state's cells are a file the page fetches the first time the reader reaches it.
+  const load = jsonFiles();
+  const show = latestOnly(load, apply, showMiss);
+  function patch(v) {
+    if (!window.editor_state_set) return;
+    const file = lookup(TABLE, v);
+    if (!file) console.warn("masque player: no snapshot for", keyOf(TABLE, v));
+    show(file);
+  }
+  function apply(snap) {
+    const t = nextStamp();
+    window.editor_state_set(function (state) {
+      const nb = state.notebook;
+      const cell_results = Object.assign({}, nb.cell_results);
+      Object.keys(snap.cells).forEach(function (id) {
+        const prev = cell_results[id];
+        if (!prev || !prev.output) return;
+        const next = snap.cells[id];
+        cell_results[id] = Object.assign({}, prev, {
+          output: Object.assign({}, prev.output, {
+            body: next.body,
+            mime: next.mime,
+            last_run_timestamp: t,
+            persist_js_state: false,
+          }),
+        });
+      });
+      return { notebook: Object.assign({}, nb, { cell_results: cell_results }) };
+    }).then(sizeFrame);
+  }
+  let armed = null;
+  function tryArm() {
+    const cell = document.getElementById(WIDGET_ID);
+    const host = cell && cell.querySelector(".ip-host");
+    if (!host || typeof window.editor_state_set !== "function") return false;
+    if (armed === host) return true;
+    armed = host;
+    let cur = host.value;
+    Object.defineProperty(host, "value", {
+      configurable: true,
+      enumerable: true,
+      get: function () { return cur; },
+      set: function (v) {
+        cur = v;
+        patch(v);
+        announce(v);
+      },
+    });
+    host.addEventListener("input", function () {
+      patch(host.value);
+      announce(host.value);
+    });
+    // A widget built with `selected=` starts with a value; the export shows the idle
+    // (`nothing`) outputs, so swap in that value's snapshot now.
+    if (cur != null) patch(cur);
+    if (hasPending) patch(pending);
+    // Ask the page for a value another segment set before this one loaded.
+    if (framed) window.parent.postMessage({ masque: "ready" }, "*");
+    return true;
+  }
+  function boot() {
+    if (!tryArm()) {
+      setTimeout(boot, 80);
+      return;
+    }
+    sizeFrame();
+  }
+  boot();
+  window.addEventListener("load", sizeFrame);
+  new ResizeObserver(sizeFrame).observe(document.documentElement);
+}
+</script>
+
+</body></html>

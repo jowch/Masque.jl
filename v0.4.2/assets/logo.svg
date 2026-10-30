@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160" width="200" height="160" role="img" aria-label="Masque.jl logo: a grey scatter plot with a gold selection box whose points are colored red, green and purple like the Julia logo">
+  <path fill="none" stroke="#A3A098" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" d="M 12 10 L 12 148 L 192 148"/>
+  <g fill="#ABA8A0">
+    <circle cx="34" cy="122" r="6"/><circle cx="44" cy="104" r="6"/><circle cx="60" cy="124" r="6"/>
+    <circle cx="30" cy="56" r="6"/><circle cx="52" cy="38" r="6"/><circle cx="84" cy="124" r="6"/>
+    <circle cx="130" cy="130" r="6"/><circle cx="172" cy="120" r="6"/><circle cx="184" cy="94" r="6"/>
+    <circle cx="170" cy="36" r="6"/><circle cx="178" cy="18" r="6"/><circle cx="100" cy="26" r="6"/>
+    <circle cx="58" cy="82" r="6"/><circle cx="156" cy="30" r="6"/><circle cx="132" cy="30" r="6"/>
+  </g>
+  <rect x="76" y="46" width="78" height="66" fill="#B8893A" fill-opacity="0.10" stroke="#B8893A" stroke-width="3.5"/>
+  <circle cx="90" cy="96" r="6.5" fill="#9558B2"/>
+  <circle cx="104" cy="74" r="6.5" fill="#CB3C33"/>
+  <circle cx="120" cy="60" r="6.5" fill="#389826"/>
+  <circle cx="136" cy="86" r="6.5" fill="#9558B2"/>
+  <circle cx="116" cy="100" r="6.5" fill="#389826"/>
+  <circle cx="140" cy="62" r="6.5" fill="#CB3C33"/>
+  <g fill="#FFFFFF" stroke="#B8893A" stroke-width="3">
+    <rect x="70" y="40" width="12" height="12" rx="2"/>
+    <rect x="148" y="40" width="12" height="12" rx="2"/>
+    <rect x="70" y="106" width="12" height="12" rx="2"/>
+    <rect x="148" y="106" width="12" height="12" rx="2"/>
+  </g>
+</svg>
