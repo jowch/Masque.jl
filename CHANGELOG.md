@@ -21,8 +21,10 @@ All notable changes to this project are documented here. The format is based on
   sat on the edge and spilled onto the neighbouring cells. Lone cells and one-cell-wide strokes
   stay outlined on their edge, so their colour still shows (#463).
 - A mark hidden under a legend stays hidden: its hover ring, pick outline and fade no longer
-  draw over the legend. A legend with no background, or a mostly see-through one, still shows
-  the highlights of the marks under it (#437).
+  draw over the legend, and the pointer inside the legend no longer shows its tooltip, picks it,
+  or reads the axis under the legend. The keyboard and a box selection still reach it. A legend
+  with no background, or a mostly see-through one, still shows the marks under it and lets the
+  pointer reach them (#437, #472).
 - The text of a `Menu`, `Button`, `Textbox` or `SliderGrid` value label is in the font Makie
   draws it in, so it matches the rest of the figure. Before, it was in Helvetica or Arial. For
   Makie's own fonts the browser downloads the font file once, about 33 KB, and only on a page

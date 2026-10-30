@@ -768,6 +768,8 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
         // Cmd/Ctrl-click that misses keeps the picks, as a modified miss does in a file browser.
         if (isToggleClick(e)) return
         if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_)) return
+        // A click inside an opaque legend that takes no clicks is on the legend too (#472).
+        if (ctx.manifest_.occluders?.some(([bx, by, bw, bh]) => layout.x >= bx && layout.x <= bx + bw && layout.y >= by && layout.y <= by + bh)) return
         const axes = axesAt(ctx, layout.x, layout.y)
         if (axes.length > 0) clearPicks(ctx, state, axes, false)
         return

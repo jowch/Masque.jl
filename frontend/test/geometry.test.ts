@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
-    anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, previewWindows, lineReadout, samplePoint,
+    anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, occludedAt, previewWindows, lineReadout, samplePoint,
     closestPointOnPath,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
@@ -876,6 +876,44 @@ describe("hitTestAt through each axis's own frame (#379)", () => {
         // draw the line at x = 2*300 - 50 = 550, outside every window.
         expect(hitTestAt(m(thr), 300, 120, photo, "drag", "v")?.layer.id).toBe("thr")
         expect(hitTestAt(m(thr), 550, 120, photo, "drag", "v")?.layer.id).not.toBe("thr")
+    })
+})
+
+describe("a legend Makie draws over the marks (#472)", () => {
+    // An opaque legend's box [80, 0, 40, 40] hides the dot at (100, 20) and half of the one at (120, 20).
+    const dot = (id: string, x: number, y: number): HitLayer =>
+        ({ id, kind: "circles", axis: "ax", events: ["click", "hover"], payloads: [{ id }], geometry: [x, y, 6] }) as HitLayer
+    const entry = { id: "leg", kind: "rects", axis: "legend", bond: "legend", events: ["click", "hover"], payloads: [{}],
+        geometry: [100, 20, 30, 10] } as unknown as HitLayer
+    const thr = { id: "thr", kind: "threshold", axis: "ax", events: ["drag"], payloads: [],
+        geometry: { orientation: "v", pos: 100, span: [0, 100] } } as unknown as HitLayer
+    const m = (...layers: HitLayer[]): Manifest =>
+        ({ width: 200, height: 100, transforms: {}, layers, occluders: [[80, 0, 40, 40]] }) as unknown as Manifest
+    const still = { s: 1, tx: 0, ty: 0 }
+
+    it("takes no hover or click for a mark under the legend's box", () => {
+        for (const ev of ["hover", "click"]) {
+            expect(hitTestAt(m(dot("a", 100, 20)), 100, 20, still, ev)).toBeNull()
+            expect(hitTest(m(dot("a", 100, 20)), 100, 20, ev)).toBeNull()
+        }
+        expect(occludedAt(m(), dot("a", 100, 20), 100, 20)).toBe(true)
+    })
+    it("still hits the part of a mark that shows outside the box", () => {
+        expect(hitTestAt(m(dot("b", 120, 20)), 124, 20, still, "hover")?.layer.id).toBe("b")
+        expect(hitTestAt(m(dot("b", 120, 20)), 118, 20, still, "hover")).toBeNull()
+    })
+    it("hits the legend's own entries and Masque's tools inside the box", () => {
+        expect(hitTestAt(m(dot("a", 100, 20), entry), 100, 20, still, "hover")?.layer.id).toBe("leg")
+        expect(hitTestAt(m(thr), 100, 20, still, "drag")?.layer.id).toBe("thr")
+    })
+    it("reads no axis readout inside the box: the pointer is on the legend", () => {
+        const readout = { id: "ro", kind: "axis", axis: "ax", events: ["click", "hover"], payloads: [], geometry: null } as unknown as HitLayer
+        expect(hitTestAt(m(readout), 100, 20, still, "hover")).toBeNull()
+        expect(hitTestAt(m(readout), 100, 60, still, "hover")?.layer.id).toBe("ro")
+    })
+    it("hits everything when the manifest has no occluders", () => {
+        const man = { ...m(dot("a", 100, 20)), occluders: undefined } as Manifest
+        expect(hitTestAt(man, 100, 20, still, "hover")?.layer.id).toBe("a")
     })
 })
 
