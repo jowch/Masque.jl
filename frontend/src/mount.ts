@@ -360,6 +360,39 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     // Every axis home made so far, with its clip and photo groups per svg, for `paintAxis`.
     const axisHomes = new Map<string, { clips: Array<[SVGGElement, string]>; photos: SVGGElement[] }>()
     let paintAxis: (axis: string, m?: PhotoMatrix) => void = () => {}
+    // The photo groups of the highlight homes (not g.chrome: Masque's own tools stay on top),
+    // each with its svg's kind. Each leaves out the boxes Makie draws over the plots, a legend,
+    // as the picture hides the marks under them (#437). The clip sits in the photo group's own
+    // space, so a live photograph moves it with the marks, as it moves the legend's pixels.
+    const occludable: Array<[SVGGElement, string]> = []
+    let occluded = false
+    const occlude = (g: SVGGElement, kind: string) => {
+        if (occluded) g.setAttribute("clip-path", `url(#masque-occluders-${kind})`)
+        else g.removeAttribute("clip-path")
+    }
+    const paintOccluders = (m: Manifest) => {
+        const boxes = m.occluders ?? []
+        occluded = boxes.length > 0
+        overlaySvgs.forEach((svg, i) => {
+            const id = `masque-occluders-${svgKinds[i]}`
+            let cp = svg.querySelector(`#${id}`) as SVGClipPathElement | null
+            if (!boxes.length) { cp?.remove(); return }
+            if (!cp) {
+                cp = document.createElementNS(SVG_NS, "clipPath")
+                cp.id = id
+                cp.appendChild(document.createElementNS(SVG_NS, "path"))
+                svg.insertBefore(cp, svg.firstChild)
+            }
+            // Everything a photograph can move a mark to, less each box: even-odd cuts them out.
+            const W = m.width, H = m.height
+            const d = [`M${-10 * W} ${-10 * H}h${21 * W}v${21 * H}h${-21 * W}z`, ...boxes.map(([x, y, w, h]) => `M${x} ${y}h${w}v${h}h${-w}z`)]
+            const path = cp.firstElementChild as SVGPathElement
+            path.setAttribute("d", d.join(""))
+            path.setAttribute("clip-rule", "evenodd")
+        })
+        for (const [g, kind] of occludable) occlude(g, kind)
+    }
+    paintOccluders(manifest)
     const homeSet = (role: (typeof roles)[number]): HiSet => {
         const made = new Map<string, HiGroups>()
         return {
@@ -378,6 +411,10 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
                     clip.dataset.axis = axis
                     svg.insertBefore(clip, roleEnds[i][roles.indexOf(role)])
                     const photo = makeGroup(clip, "masque-photo")
+                    if (role !== "chrome") {
+                        occludable.push([photo, svgKinds[i]])
+                        occlude(photo, svgKinds[i])
+                    }
                     home.clips.push([clip, `masque-clip-${svgKinds[i]}-${n}`])
                     home.photos.push(photo)
                     return makeGroup(photo, role)
@@ -818,6 +855,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
             replaceDraggedChrome(newManifest)
         }
         ctx.manifest_ = newManifest
+        paintOccluders(newManifest)
         controls.update_(newManifest, onchangeFrame && input.state && typeof input.state === "object" ? input.state as Record<string, unknown> : null)
         // Drop a cross that described the previous frame. The hair stays on the plain svg;
         // the next readout puts the dots back over the chrome just rebuilt (`placeCrossDots`).

@@ -343,3 +343,61 @@ describe("a legend's hover on closed marks (D4)", () => {
         expect(fadeLone(shadow)).toEqual([])
     })
 })
+
+// A legend Makie draws over the plot hides the marks under it, so the overlay leaves its box
+// (`occluders`) out of every mark's highlight and fade, but not out of Masque's own tools (#437).
+describe("a legend over the plot", () => {
+    const realGetContext = HTMLCanvasElement.prototype.getContext
+    afterEach(() => { HTMLCanvasElement.prototype.getContext = realGetContext })
+    // A stand-in context that records each clearRect.
+    const stub = () => {
+        const cleared: number[][] = []
+        const noop = () => {}
+        HTMLCanvasElement.prototype.getContext = function () {
+            const t: Record<string, unknown> = { fillStyle: "#000000", strokeStyle: "#000000", lineWidth: 1, globalCompositeOperation: "source-over",
+                clearRect: (...a: number[]) => cleared.push(a) }
+            return new Proxy(t, { get: (o, k) => (k in o ? o[k as string] : noop) })
+        } as unknown as typeof realGetContext
+        return cleared
+    }
+    const box: [number, number, number, number] = [880, 60, 200, 100] // over "other" at (900, 100)
+    const covered = (initial: number[]): Manifest => ({ ...pts(initial), occluders: [box] })
+
+    it("empties the legend's box on both canvases after each draw", () => {
+        const cleared = stub()
+        setup(covered([2]))
+        expect(cleared.filter((a) => a.join() === box.join()).length).toBe(2)
+    })
+
+    it("empties it again when a lifted mark's fade is put back", async () => {
+        const cleared = stub()
+        const { surface } = setup(covered([2]))
+        move(surface, 500, 300) // pts 3, unpicked: lifted
+        await frame()
+        const before = cleared.filter((a) => a.join() === box.join()).length
+        move(surface, 5, 395) // nothing: pts 3's fade goes back
+        await frame()
+        expect(cleared.filter((a) => a.join() === box.join()).length).toBe(before + 1)
+    })
+
+    it("clips the marks' highlights to leave the box out, and not Masque's own tools", () => {
+        const { shadow } = setup(covered([2]))
+        for (const kind of ["fill", "edge", "plain"]) {
+            const svg = shadow.querySelector(`svg.masque-${kind}`)!
+            const path = svg.querySelector(`clipPath#masque-occluders-${kind} > path`)!
+            expect(path.getAttribute("clip-rule")).toBe("evenodd")
+            expect(path.getAttribute("d")).toContain("M880 60h200v100h-200z")
+            for (const role of ["sel", "link", "hi"]) {
+                const photo = svg.querySelector(`g.masque-photo:has(> g.${role})`)!
+                expect(photo.getAttribute("clip-path")).toBe(`url(#masque-occluders-${kind})`)
+            }
+            expect(svg.querySelector("g.masque-photo:has(> g.chrome)")!.hasAttribute("clip-path")).toBe(false)
+        }
+    })
+
+    it("clips nothing when no legend covers the plot", () => {
+        const { shadow } = setup(pts([2]))
+        expect(shadow.querySelector("clipPath[id^=masque-occluders]")).toBeNull()
+        expect(shadow.querySelector("g.masque-photo[clip-path]")).toBeNull()
+    })
+})

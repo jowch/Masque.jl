@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- A mark hidden under a legend stays hidden: its hover ring, pick outline and fade no longer
+  draw over the legend. A legend with no background, or a mostly see-through one, still shows
+  the highlights of the marks under it (#437).
+
 ## [0.4.2] - 2026-10-30
 
 ### Added
