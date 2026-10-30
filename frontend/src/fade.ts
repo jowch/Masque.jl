@@ -130,6 +130,69 @@ function drawnOrder(layer: HitLayer): number[] {
     return ks
 }
 
+type Box = [number, number, number, number] // x0, y0, x1, y1
+const meets = (a: Box, b: Box): boolean => a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1]
+
+// Each element's place in its layer's paint order, kept per layer like drawnOrder.
+const rankCache = new WeakMap<HitLayer, Map<number, number>>()
+function paintRank(layer: HitLayer): Map<number, number> {
+    let r = rankCache.get(layer)
+    if (!r) {
+        r = new Map()
+        drawnOrder(layer).forEach((k, i) => r!.set(k, i))
+        rankCache.set(layer, r)
+    }
+    return r
+}
+
+// One step of punching an axis's kept marks out of its cover: punch a kept element out, or put
+// a faded one's cover back.
+export interface PunchStep { layer: HitLayer; k: number; keep: boolean }
+
+// The steps that punch `kept` out of a cover of every mark of its layers, bottom first. A kept
+// element punched out shows the image's pixels, which hold whatever the backend drew over it, so
+// a faded line drawn over a kept mark would show at full strength where they meet (#462): such a
+// faded element's cover is put back after the kept one is punched, as the backend drew it. Only
+// pairs with a line in them are put back; a closed pick under a later faded closed mark is
+// repainted instead (a circle) or stays a known gap. `layers` is the manifest's layers, which
+// list the plot drawn last on an axis first, as the hit test reads them (first match is the mark
+// on top); with `within`, only kept elements whose box meets it.
+export function punchSteps(
+    layers: HitLayer[], kept: Map<HitLayer, Set<number>>, boxOf: (layer: HitLayer, k: number) => Box | null,
+    pad: number, within?: Box,
+): PunchStep[] {
+    const z = new Map<HitLayer, number>()
+    layers.forEach((l, i) => z.set(l, layers.length - i))
+    const scope = [...kept.keys()].sort((a, b) => (z.get(a) ?? 0) - (z.get(b) ?? 0))
+    const keeps: Array<PunchStep & { box: Box }> = []
+    for (const layer of scope) {
+        for (const k of kept.get(layer) ?? []) {
+            const box = boxOf(layer, k)
+            if (box && (!within || meets(box, within))) keeps.push({ layer, k, keep: true, box })
+        }
+    }
+    const over = new Map<HitLayer, Set<number>>()
+    for (const K of keeps) {
+        const zk = z.get(K.layer) ?? 0, rk = paintRank(K.layer).get(K.k) ?? 0
+        for (const layer of scope) {
+            const zl = z.get(layer) ?? 0
+            if (zl < zk || (layer.kind !== "lines" && K.layer.kind !== "lines")) continue
+            const ks = kept.get(layer)!, rank = paintRank(layer)
+            for (const j of drawnOrder(layer)) {
+                if (ks.has(j) || (zl === zk && (rank.get(j) ?? 0) <= rk)) continue
+                const b = boxOf(layer, j)
+                if (!b || !meets([b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad], K.box)) continue
+                let s = over.get(layer)
+                if (!s) over.set(layer, (s = new Set()))
+                s.add(j)
+            }
+        }
+    }
+    const steps: PunchStep[] = keeps.map(({ layer, k }) => ({ layer, k, keep: true }))
+    for (const [layer, ks] of over) for (const k of ks) steps.push({ layer, k, keep: false })
+    return steps.sort((a, b) => (z.get(a.layer) ?? 0) - (z.get(b.layer) ?? 0) || (paintRank(a.layer).get(a.k) ?? 0) - (paintRank(b.layer).get(b.k) ?? 0))
+}
+
 // The colour faded marks go toward: the axis's empty plot area, which is the figure's
 // background unless the axis has its own.
 const plotFill = (m: Manifest, axis: string): string => m.transforms[axis]?.fill ?? m.background ?? "#ffffff"
@@ -165,7 +228,6 @@ export interface Fade {
 export type FadeEl = HTMLDivElement & { masqueFade?: { kept: string[]; picked: string[]; pickedAt?: number[][]; lone: string[]; outlines?: string[]; draws: number } }
 
 interface AxisHome { wrap: HTMLDivElement; dim: HTMLCanvasElement; top: HTMLCanvasElement }
-type Box = [number, number, number, number] // x0, y0, x1, y1
 // The image-px rectangle an axis's canvases cover, x, y, w, h: its viewport, whole pixels.
 type Extent = [number, number, number, number]
 
@@ -532,7 +594,7 @@ export function createFade(host: FadeHost): Fade {
         place(axis, host.frame_(axis))
         const e = extentOf(m, axis)
         const bg = plotFill(m, axis)
-        let faded = 0, nkept = 0, raised = 0
+        let faded = 0, nkept = 0, raised = 0, covered = 0
         const outlines: string[] = []
         for (const [layer, ks] of kept) {
             nkept += ks.size
@@ -548,10 +610,7 @@ export function createFade(host: FadeHost): Fade {
             dc.globalCompositeOperation = "source-over"
             const cover = coverOf(axis, [...kept.keys()], m, bg)
             if (cover) dc.drawImage(cover, e[0], e[1])
-            dc.globalCompositeOperation = "destination-out"
-            dc.fillStyle = "#000000"
-            for (const [layer, ks] of kept) fillShapes(dc, layer, ks, PAD_KEEP)
-            dc.globalCompositeOperation = "source-over"
+            covered = punch(dc, m, kept, bg)
 
             tc.clearRect(e[0], e[1], e[2], e[3])
             for (const [layer, ks] of kept) {
@@ -586,6 +645,7 @@ export function createFade(host: FadeHost): Fade {
             }
         } else {
             for (const [layer, ks] of kept) raised += coveredPicks(layer, ks).length
+            covered = punchSteps(m.layers, kept, boxOf, PAD_DIM).filter((s) => !s.keep).length
         }
         // What the canvases hold, for tests and the e2e drivers (the pixels are not inspectable
         // in every environment): the counts as attributes, the keys as a property.
@@ -607,6 +667,7 @@ export function createFade(host: FadeHost): Fade {
         h.wrap.dataset.kept = String(nkept)
         h.wrap.dataset.lone = String(lone.length)
         h.wrap.dataset.raised = String(raised)
+        h.wrap.dataset.covered = String(covered)
         delete h.wrap.dataset.lift
         // A preview alone on its axis leaves more showing than a pick (overlaystyle `preview_opacity`).
         h.wrap.classList.toggle("masque-preview", !selScope.some((l) => l.axis === axis))
@@ -618,7 +679,7 @@ export function createFade(host: FadeHost): Fade {
         h.wrap.style.display = "none"
         // Emptied, not cleared: a canvas holds its memory until it is sized down.
         for (const cv of [h.dim, h.top]) cv.width = cv.height = 0
-        for (const k of ["layers", "fill", "faded", "kept", "lone", "raised", "lift"]) delete h.wrap.dataset[k]
+        for (const k of ["layers", "fill", "faded", "kept", "lone", "raised", "covered", "lift"]) delete h.wrap.dataset[k]
         ;(h.wrap as FadeEl).masqueFade = { kept: [], picked: [], lone: [], draws: (h.wrap as FadeEl).masqueFade?.draws ?? 0 }
     }
 
@@ -640,20 +701,19 @@ export function createFade(host: FadeHost): Fade {
         lift(was)
     }
 
-    // The elements the axis keeps whose box meets `box`, punched back out after a lifted mark's
-    // cover is put back.
-    const repunch = (c: CanvasRenderingContext2D, axis: string, box: Box): void => {
-        c.globalCompositeOperation = "destination-out"
-        c.fillStyle = "#000000"
-        for (const [layer, ks] of drawn.get(axis) ?? []) {
-            const near: number[] = []
-            for (const k of ks) {
-                const b = boxOf(layer, k)
-                if (b && b[0] <= box[2] && b[2] >= box[0] && b[1] <= box[3] && b[3] >= box[1]) near.push(k)
-            }
-            if (near.length) fillShapes(c, layer, near, PAD_KEEP)
+    // Punches the kept marks out of an axis's cover (all of them, or those whose box meets
+    // `within`), putting back the cover of a faded line drawn over one (punchSteps). Returns how
+    // many faded elements' covers were put back.
+    const punch = (c: CanvasRenderingContext2D, m: Manifest, kept: Map<HitLayer, Set<number>>, bg: string, within?: Box): number => {
+        let back = 0
+        for (const s of punchSteps(m.layers, kept, boxOf, PAD_DIM, within)) {
+            c.globalCompositeOperation = s.keep ? "destination-out" : "source-over"
+            c.fillStyle = s.keep ? "#000000" : bg
+            fillShapes(c, s.layer, [s.k], s.keep ? PAD_KEEP : PAD_DIM)
+            if (!s.keep) back++
         }
         c.globalCompositeOperation = "source-over"
+        return back
     }
 
     // Lifts the fade off `next` (a hovered mark, and the partners of a linked one), putting back
@@ -665,10 +725,11 @@ export function createFade(host: FadeHost): Fade {
             const c = h?.dim.getContext("2d")
             const box = boxOf(layer, index)
             if (h && c && box) {
+                const m = host.manifest_(), bg = plotFill(m, layer.axis)
                 c.globalCompositeOperation = "source-over"
-                c.fillStyle = plotFill(host.manifest_(), layer.axis)
+                c.fillStyle = bg
                 fillShapes(c, layer, [index], PAD_DIM)
-                repunch(c, layer.axis, [box[0] - PAD_DIM, box[1] - PAD_DIM, box[2] + PAD_DIM, box[3] + PAD_DIM])
+                punch(c, m, drawn.get(layer.axis) ?? new Map(), bg, [box[0] - PAD_DIM, box[1] - PAD_DIM, box[2] + PAD_DIM, box[3] + PAD_DIM])
             }
             if (h) delete h.wrap.dataset.lift
         }

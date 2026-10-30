@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- A faded line stays faded where it crosses a line or mark that stays in focus. It used to show at
+  full strength at each crossing (#462).
+
 ## [0.4.2] - 2026-10-30
 
 ### Added
