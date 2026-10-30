@@ -1,4 +1,4 @@
-using Test, Masque, CairoMakie, Makie, FileIO
+using Test, Masque, CairoMakie, Makie, FileIO, JSON3
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
 # Makie blocks as controls (#345): a named block is a field holding its plain value, drawn by
@@ -92,29 +92,39 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["duration"] == 0.3
     end
 
-    @testset "a checkbox ships Makie's square, checkmark and onchange rule (#428)" begin
+    @testset "a checkbox ships Makie's square and checkmark, and leaves its onchange alone (#428)" begin
         fig = Figure(); Axis(fig[1, 1])
         plain = Checkbox(fig[2, 1])
         odd = Checkbox(
             fig[3, 1]; size = 20, roundness = 1, checkboxstrokewidth = 2, checkmark = :circle, checkmarksize = 0.5,
-            checkboxcolor_unchecked = :yellow, checkmarkcolor_unchecked = :gray, onchange = _ -> true,
+            checkboxcolor_unchecked = :yellow, checkmarkcolor_unchecked = :gray,
         )
-        w = masque(fig, (plain = plain, odd = odd))
+        w = @test_logs masque(fig, (plain = plain, odd = odd))
         s = w.manifest["scaling"]
         g = _layer(w.manifest, "plain")["geometry"]
         @test g["size"] ≈ 11s && g["radius"] ≈ 0.15 * 11 / 2 * s && g["stroke"] ≈ 1.5s
         @test g["markSize"] ≈ 11 * 0.85 * s
         @test startswith(g["mark"], "M") && endswith(g["mark"], "Z")
-        @test !haskey(g, "next")                      # Makie's default `!` needs no rule
         g = _layer(w.manifest, "odd")["geometry"]
         @test g["size"] ≈ 20s && g["radius"] ≈ 10s && g["stroke"] ≈ 2s && g["markSize"] ≈ 10s
         @test g["off"] == Masque._css_color(Makie.to_color(:yellow))
         @test g["markOff"] == Masque._css_color(Makie.to_color(:gray))
         @test startswith(g["mark"], "M")              # `:circle` resolves to Makie's path
-        @test g["next"] == [true, true]
-        # A checkmark that isn't a path (a Char) leaves the browser's plain tick.
+        # A character checkmark ships as the character.
         fig = Figure(); Axis(fig[1, 1]); cb = Checkbox(fig[2, 1]; checkmark = 'x')
-        @test !haskey(_layer(masque(fig, (cb = cb,)).manifest, "cb")["geometry"], "mark")
+        g = _layer(masque(fig, (cb = cb,)).manifest, "cb")["geometry"]
+        @test g["markChar"] == "x" && !haskey(g, "mark")
+        # A radio rule: its side effects untick the other boxes. Drawing the widget runs none of
+        # it, and masque says once that a click flips the box instead (#457).
+        fig = Figure(); Axis(fig[1, 1])
+        rs = [Checkbox(fig[2, i]; checked = i == 1) for i in 1:3]
+        calls = Ref(0)
+        for r in rs
+            r.onchange[] = v -> (calls[] += 1; foreach(o -> o === r || (o.checked[] = false), rs); true)
+        end
+        w = @test_logs (:warn, r"checkbox :r1 has its own `onchange`.*#457"s) match_mode = :any masque(fig, (r1 = rs[1], r2 = rs[2], r3 = rs[3]))
+        @test calls[] == 0 && [r.checked[] for r in rs] == [true, false, false]
+        @test Masque.initial_bond(w) == (r1 = true, r2 = false, r3 = false)
     end
 
     @testset "named through bind, and a bare bind" begin
@@ -186,8 +196,10 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         sl, isl = g["sliders"]
         @test sl["control"] == "slider" && sl["n"] == 7 && isl["control"] == "intervalslider"
         @test sl["valueLabel"]["labels"] == ["0.0 Hz", "0.5 Hz", "1.0 Hz", "1.5 Hz", "2.0 Hz", "2.5 Hz", "3.0 Hz"]
-        @test length(isl["valueLabel"]["pairs"]) == 25
-        @test isl["valueLabel"]["pairs"][1 * 5 + 3 + 1] == "(2, 4)"
+        @test sl["name"] == "freq" && isl["name"] == "span"
+        # Only lo ≤ hi pairs, row-major: (2, 4) is lo = 2's second pair, after lo = 1's five.
+        @test length(isl["valueLabel"]["pairs"]) == 15
+        @test isl["valueLabel"]["pairs"][5 + 2 + 1] == "(2, 4)"
         # Each slider sits inside the grid's box, its value label to its right.
         @test g["x"] <= sl["x"] && sl["x"] + sl["w"] <= sl["valueLabel"]["x"] + 1
         v = Masque.bond_from_js(w, Dict("grid" => _env("grid", Any[6, Any[0, 4]])))
@@ -200,6 +212,16 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         hidden = Masque._block_plots(sg)
         @test !isempty(hidden)
         @test !any(p -> p in hidden, Masque._block_plots(sg.labels[1]))
+        # A fine slider ships no labels, so its frames stay small; the browser writes the value.
+        # An author's own `lift` on the slider's value is never called to find the format.
+        fig = Figure(); Axis(fig[1, 1])
+        fine = SliderGrid(fig[2, 1], (label = "fine", range = 0:0.001:10, format = "{:.3f}"))
+        calls = Ref(0)
+        lift(v -> (calls[] += 1; string(v)), fine.sliders[1].value)
+        before = calls[]
+        g = _layer(masque(fig, (fine = fine,)).manifest, "fine")["geometry"]
+        @test !haskey(only(g["sliders"])["valueLabel"], "labels") && calls[] == before
+        @test length(JSON3.write(g)) < 2000
     end
 
     @testset "a button is a field counting its clicks, drawn as Makie draws it (#431)" begin

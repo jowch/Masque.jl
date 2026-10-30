@@ -109,7 +109,10 @@ function _control_geometry(b, ctx)
     elseif b isa Makie.Button
         _button_geometry!(g, b, ctx)
     elseif b isa Makie.SliderGrid
-        g["sliders"] = Any[_grid_slider_geometry(sl, vl, ctx) for (sl, vl) in zip(_grid_sliders(b), _grid_valuelabels(b))]
+        g["sliders"] = Any[
+            _grid_slider_geometry(sl, name, vl, ctx)
+                for (sl, name, vl) in zip(_grid_sliders(b), _grid_labels(b), _grid_valuelabels(b))
+        ]
     end
     return g
 end
@@ -129,12 +132,17 @@ function _button_geometry!(g, b::Makie.Button, ctx)
     return g
 end
 
-# One slider of a `SliderGrid`, with the value label beside it: its box, text size and colour,
-# and the text for each value. The text comes from the grid's own `format`, run once per value
-# in Julia, so the label follows the slider in a static export too. An interval slider's label
-# covers every pair while there are at most 40 values; past that the browser writes "(lo, hi)".
-function _grid_slider_geometry(sl, vl, ctx)
+# One slider of a `SliderGrid`, with its name and the value label beside it: the label's box,
+# text size and colour, and the text for each value. The text comes from the grid's own
+# `format`, run in Julia, so the label follows the slider in a static export too. A fine slider
+# would ship a string per value on every frame, so labels stop at `_GRID_LABELS` values (an
+# interval slider's at `_GRID_PAIRS` lo ≤ hi pairs, 20 values); past that the browser writes the
+# value. Sizes are in docs/dev/perf-findings.md.
+const _GRID_LABELS = 101
+const _GRID_PAIRS = 210
+function _grid_slider_geometry(sl, name, vl, ctx)
     g = _control_geometry(sl, ctx)
+    g["name"] = string(name.text[])
     x, y, w, h = _block_rect(vl, ctx)
     lab = Dict{String, Any}(
         "x" => x, "y" => y, "w" => w, "h" => h,
@@ -142,11 +150,13 @@ function _grid_slider_geometry(sl, vl, ctx)
     )
     fmt = _valuelabel_format(sl, vl)
     rng = sl.range[]
+    n = length(rng)
     if fmt !== nothing
         if sl isa Makie.Slider
-            lab["labels"] = String[string(fmt(v)) for v in rng]
-        elseif length(rng) <= 40
-            lab["pairs"] = String[string(fmt((a, b))) for a in rng for b in rng]
+            n <= _GRID_LABELS && (lab["labels"] = String[string(fmt(v)) for v in rng])
+        elseif n * (n + 1) ÷ 2 <= _GRID_PAIRS
+            # Row-major over lo ≤ hi: lo = 0's pairs first, then lo = 1's, and so on.
+            lab["pairs"] = String[string(fmt((rng[i], rng[j]))) for i in 1:n for j in i:n]
         end
     end
     g["valueLabel"] = lab
@@ -159,8 +169,8 @@ initial_envelope(i::BlockControl, ctx, layers) =
 # Makie's checkbox (Makie/src/makielayout/blocks/checkbox.jl): a rounded square `size` across in
 # the middle of the box, filled and stroked in its checked or unchecked colours, and a checkmark
 # `size·checkmarksize` across that shows when checked, or in its unchecked colour under the
-# pointer. A click sets `checked` to `onchange(checked)`; both answers ship, so the browser
-# follows the same rule. Lengths are image px.
+# pointer. Lengths are image px. A click flips it: the block's own `onchange` isn't run (see
+# `_warn_checkbox_rule`).
 function _checkbox_geometry!(g, b::Makie.Checkbox, ctx)
     s = ctx.scaling
     sz = Float64(b.size[])
@@ -174,19 +184,27 @@ function _checkbox_geometry!(g, b::Makie.Checkbox, ctx)
     g["markOn"] = _css_color(b.checkmarkcolor_checked[])
     g["markOff"] = _css_color(b.checkmarkcolor_unchecked[])
     g["markSize"] = sz * Float64(b.checkmarksize[]) * s
-    path = _marker_svg_path(b.checkmark[])
-    path === nothing || (g["mark"] = path)
-    next = Bool[]
-    for v in (false, true)
-        n = try
-            b.onchange[](v)
-        catch
-            !v
-        end
-        push!(next, n isa Bool ? n : !v)
+    mark = b.checkmark[]
+    if mark isa AbstractChar
+        g["markChar"] = string(mark)
+    else
+        path = _marker_svg_path(mark)
+        path === nothing || (g["mark"] = path)
     end
-    next == [true, false] || (g["next"] = next)
     return g
+end
+
+# Makie's `onchange` decides what a click turns a checkbox into, and is meant for radio buttons,
+# whose rule unticks the others. Running it ahead of a click would run those side effects when
+# the widget is drawn, so masque leaves it out and a click flips the box; it says so once.
+function _warn_checkbox_rule(interactables)
+    for i in interactables
+        i isa BlockControl && i.block isa Makie.Checkbox || continue
+        i.block.onchange[] === (!) && continue
+        @warn "masque: checkbox :$(i.id) has its own `onchange`, which masque doesn't run yet, " *
+            "so a click flips it. Set the box from your own code instead (see #457)." maxlog = 1
+    end
+    return nothing
 end
 
 # Makie's toggle (Makie/src/makielayout/blocks/toggle.jl): a rounded track `length` long and
@@ -353,6 +371,7 @@ const _PICTURE_BLOCKS = Union{Makie.Textbox}
 # warning. A `SliderGrid`'s sliders aren't in `fig.content`, so only the grid itself counts.
 function _check_unnamed_blocks(fig, interactables)
     _warn_picture_blocks(fig)
+    _warn_checkbox_rule(interactables)
     named = Base.IdSet{Any}(i.block for i in interactables if i isa BlockControl)
     _warn_unnamed_later(fig, named)
     left = [b for b in _figure_blocks(fig) if !(b in named)]

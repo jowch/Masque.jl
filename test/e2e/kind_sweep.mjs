@@ -876,7 +876,7 @@ try {
 
       // Each control sits on its block's box.
       const s0 = await screenOf();
-      for (const id of ["level", "show", "span", "fine", "pick", "tall", "grid", "go"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall", "grid", "go", "sure"]) {
         const g = geo(id);
         if (layers.find((l) => l.id === id)?.kind !== "control") throw new Error(`${key}: no control layer ${id}`);
         const bb = await page.locator(`[data-masque-control="${id}"]`).boundingBox();
@@ -895,8 +895,11 @@ try {
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         sr.querySelector(".masque-controls").style.visibility = "hidden";
       }, key);
-      for (const id of ["level", "show", "span", "fine", "pick", "tall", "go"]) {
-        const g = geo(id);
+      // The grid's name labels stay in the picture, so its sliders and value labels are
+      // checked box by box.
+      const boxes = ["level", "show", "span", "fine", "pick", "tall", "sure", "go"].map((id) => [id, geo(id)]);
+      geo("grid").sliders.forEach((s, i) => boxes.push([`grid-${i}`, s], [`grid-${i}-value`, s.valueLabel]));
+      for (const [id, g] of boxes) {
         const png = PNG.sync.read(await page.screenshot({ clip: { x: s0.left + g.x * s0.sc + 1, y: s0.top + g.y * s0.sc + 1, width: Math.max(1, g.w * s0.sc - 2), height: Math.max(1, g.h * s0.sc - 2) } }));
         let ink = 0;
         for (let o = 0; o < png.data.length; o += 4) if (png.data[o] < 235 || png.data[o + 1] < 235 || png.data[o + 2] < 235) ink++;
@@ -998,6 +1001,18 @@ try {
         if ((await lab.textContent()) !== "2 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 2 dB`);
         await ctl("grid", "input").focus();
         await page.keyboard.press("ArrowRight");
+        // Focus rings only the focused slider's knob, not every knob in the figure.
+        const ringed = await page.evaluate(() => {
+          const out = [];
+          for (const h of document.querySelectorAll(".ip-host")) h.querySelectorAll("*").forEach((el) => {
+            if (!el.shadowRoot) return;
+            el.shadowRoot.querySelectorAll(".masque-knob").forEach((k) => {
+              if (getComputedStyle(k).outlineStyle !== "none") out.push(k.closest("[data-masque-control]").dataset.masqueControl);
+            });
+          });
+          return out;
+        });
+        if (ringed.length !== 1 || ringed[0] !== "grid-0") throw new Error(`${key}/grid: focus ring on ${JSON.stringify(ringed)}, want only grid-0`);
         v = await bondHas(/grid = \(3,\)/, v, "grid");
         if ((await lab.textContent()) !== "3 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 3 dB`);
         passed.push(`${key}/slider-grid`);
@@ -1011,6 +1026,31 @@ try {
         await b.click();
         v = await bondHas(/go = 2\b/, v, "button");
         passed.push(`${key}/button`);
+      }
+      // A checkbox drawn as Makie draws it (#428): its square is `size` across in the middle of
+      // the box, filled in its checked colour with the mark showing once ticked; Space unticks it.
+      {
+        const g = geo("sure");
+        const s1 = await screenOf();
+        const art = ctl("sure", "svg");
+        const bb = await art.boundingBox();
+        const want = { x: s1.left + (g.x + (g.w - g.size) / 2) * s1.sc, y: s1.top + (g.y + (g.h - g.size) / 2) * s1.sc, w: g.size * s1.sc };
+        if (!bb || Math.abs(bb.x - want.x) > 1.5 || Math.abs(bb.y - want.y) > 1.5 || Math.abs(bb.width - want.w) > 1.5 || Math.abs(bb.height - want.w) > 1.5) {
+          throw new Error(`${key}/checkbox-drawn: square ${JSON.stringify(bb)}, want ${JSON.stringify(want)}`);
+        }
+        const rect = ctl("sure", "svg rect");
+        const markShown = () => ctl("sure", "svg .mark").evaluate((el) => getComputedStyle(el).visibility === "visible");
+        if ((await rect.getAttribute("fill")) !== g.off) throw new Error(`${key}/checkbox-drawn: fill ${await rect.getAttribute("fill")}, want ${g.off}`);
+        await page.mouse.move(0, 0);
+        if (await markShown()) throw new Error(`${key}/checkbox-drawn: mark shows before the box is ticked`);
+        await ctl("sure").click();
+        v = await bondHas(/sure = true/, v, "checkbox-drawn");
+        if ((await rect.getAttribute("fill")) !== g.color) throw new Error(`${key}/checkbox-drawn: fill ${await rect.getAttribute("fill")}, want ${g.color}`);
+        await page.mouse.move(0, 0);
+        if (!(await markShown())) throw new Error(`${key}/checkbox-drawn: mark hidden on a ticked box`);
+        await page.keyboard.press("Space");
+        v = await bondHas(/sure = false/, v, "checkbox-space");
+        passed.push(`${key}/checkbox-drawn`);
       }
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);
       continue;
@@ -2230,7 +2270,9 @@ try {
           })()
           : [[p.x + 80, p.y], [p.x - 80, p.y]];
       let after = before;
+      let released = null;
       for (const [x1, y1] of ends) {
+        released = [x1, y1];
         await page.evaluate((k) => {
           const span = document.querySelector(`#coords_${k}`);
           const hosts = [...document.querySelectorAll(".ip-host")];
@@ -2249,6 +2291,52 @@ try {
       const re = spec.layerKind === "roi" ? /:roi|ElementEvent\[|BoundsEvent/i : /:threshold|:thr|ThresholdEvent/i;
       if (!re.test(after)) throw new Error(`${key}-drag: readout mismatch ${JSON.stringify(after).slice(0, 200)}`);
       passed.push(`${key}/drag-bind`);
+      // A real mouse released at a fractional client position commits the value there, the one
+      // the drag's tooltip showed (#448 is the click's rounding; a release reads the pointerup).
+      if (spec.layerKind === "threshold" && !catTarget) {
+        const horiz = layer.geometry.orientation === "h";
+        const frame = await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          const b = host.querySelector("img, canvas").getBoundingClientRect();
+          return { left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+        }, key);
+        // Grab the line where the drag above released it, then release 20.45 px further on.
+        const sx = frame.left + released[0] * frame.s, sy = frame.top + released[1] * frame.s;
+        const ex = horiz ? sx : Math.round(sx + 20) + 0.45, ey = horiz ? Math.round(sy + 20) + 0.45 : sy;
+        await page.mouse.move(sx, sy);
+        await page.mouse.down();
+        await page.mouse.move((sx + ex) / 2, (sy + ey) / 2, { steps: 4 });
+        await page.mouse.move(ex, ey, { steps: 4 });
+        await page.waitForTimeout(150);
+        const tipText = await page.evaluate((k) => {
+          const span = document.querySelector(`#coords_${k}`);
+          const hosts = [...document.querySelectorAll(".ip-host")];
+          const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+          let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+          return sr.querySelector(".masque-tip")?.textContent ?? "";
+        }, key);
+        await page.mouse.up();
+        const tipNum = /(-?\d+(?:\.(\d+))?)\s*$/.exec(tipText.trim());
+        if (!tipNum) throw new Error(`${key}/release-fractional: no value in the drag tooltip ${JSON.stringify(tipText)}`);
+        const tipVal = Number(tipNum[1]), tipTol = 0.5 * 10 ** -(tipNum[2]?.length ?? 0) + 1e-9;
+        const prev = after;
+        let got = null, t = prev;
+        for (let i = 0; i < 40; i++) {
+          t = await textOf(`#out_${key}`);
+          got = Number(/value\s*=\s*(-?[\d.]+(?:e-?\d+)?)/.exec(t)?.[1]);
+          if (t !== prev && Number.isFinite(got)) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        if (t === prev || !Number.isFinite(got) || Math.abs(got - tipVal) > tipTol) {
+          throw new Error(`${key}/release-fractional: committed ${JSON.stringify(t)}, want the tooltip's ${JSON.stringify(tipText)}`);
+        }
+        passed.push(`${key}/release-fractional`);
+        console.error(`OK  ${key}/release-fractional — tooltip ${JSON.stringify(tipText)}, committed ${got}`);
+        after = t;
+      }
       // A `selects` box's release sets both of its fields (#335): its bounds (#out) and its
       // target's, which now holds what the moved box contains (points (1, 1) and (3, 3) here,
       // where it started with (3, 3) and (5, 5)).
@@ -2633,6 +2721,48 @@ try {
       }
       passed.push(`${key}/fields-kept`);
       console.error(`OK  ${key}/colorbar-click — ${cbAfter.slice(0, 110)}`);
+
+      // A real mouse at a fractional client position (#448): Chromium rounds the click event's
+      // clientX/Y to whole px but not the pointer events', so the click must commit the value
+      // at the pointer's own position, the one the tooltip shows, not at the rounded one.
+      const frame = await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        const b = host.querySelector("img, canvas").getBoundingClientRect();
+        return { left: b.left, top: b.top, s: b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width };
+      }, key);
+      const cbClientX = Math.round(frame.left + cbPt.x * frame.s) + 0.45;
+      const cbClientY = Math.round(frame.top + cbPt.y * frame.s) + 0.45;
+      const cbFracVal = invertAxisJs(cbT, (cbClientX - frame.left) / frame.s, (cbClientY - frame.top) / frame.s)[cbValKey];
+      const cbPxVal = Math.abs(cbLims[1] - cbLims[0]) / cbSpan; // one image px of value
+      await page.mouse.move(cbClientX, cbClientY);
+      await page.waitForTimeout(150);
+      const fracTip = parseValueTip(await page.evaluate((k) => {
+        const span = document.querySelector(`#coords_${k}`);
+        const hosts = [...document.querySelectorAll(".ip-host")];
+        const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+        let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+        return sr.querySelector(".masque-tip")?.textContent ?? "";
+      }, key));
+      await page.mouse.down();
+      await page.mouse.up();
+      let fracBond = null;
+      for (let i = 0; i < 30; i++) {
+        const t = await textOf(`#out_${key}`);
+        fracBond = parseBondValue(t);
+        if (fracBond !== null && Math.abs(fracBond - cbFracVal) <= 0.1 * cbPxVal) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (fracBond === null || Math.abs(fracBond - cbFracVal) > 0.1 * cbPxVal) {
+        throw new Error(`${key}/colorbar-click-fractional: committed ${fracBond}, want ${cbFracVal} (the value at client y ${cbClientY}; tooltip ${fracTip})`);
+      }
+      if (fracTip === null || Math.abs(fracTip - fracBond) > 0.1 * cbPxVal + 1e-9 + Math.abs(fracTip) * 1e-3) {
+        throw new Error(`${key}/colorbar-click-fractional: tooltip ${fracTip} but committed ${fracBond}`);
+      }
+      passed.push(`${key}/colorbar-click-fractional`);
+      console.error(`OK  ${key}/colorbar-click-fractional — tooltip ${fracTip}, committed ${fracBond}`);
       continue;
     }
 

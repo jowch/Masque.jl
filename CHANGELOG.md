@@ -26,7 +26,18 @@ All notable changes to this project are documented here. The format is based on
   recipe, under the same ids, so `masque(fig, interactables(c), ViewInteractable(ax);
   auto = false)` keeps a contour and adds a pan. Before, it raised an error.
 
+### Changed
+- A tooltip near the figure's edge can now extend past the figure onto the page around it,
+  instead of being pushed back over the plot. It still sits above the mark, and moves below
+  it or sideways only at the edge of the browser window. In browsers without the Popover API
+  (before Safari 17 and Firefox 125) it stays inside the figure as before.
+
 ### Fixed
+- On `backend = :webgl`, a line with gaps, such as a `contour!` or a `lines!` with `NaN`
+  points, breaks at each gap, and so does a zero on a log axis. Before, each gap drew a straight
+  line to the axis origin (#439).
+- A click on a colorbar or an axis readout now gives the value its tooltip shows. Before,
+  it could be off by up to half a pixel, such as `9.525` against a tooltip's `9.500` (#448).
 - A figure with a Makie `Button` or `Textbox`, or a `SliderGrid` that `masque` isn't given,
   now warns that it shows as a picture and won't respond. Before, it looked live and did
   nothing (#426).
@@ -39,8 +50,9 @@ All notable changes to this project are documented here. The format is based on
   `selection_cell_color_inactive` carry over to the closed menu (#429).
 - A Makie `Checkbox` named in `masque` is drawn the way Makie draws it: its `size`,
   `roundness`, stroke, both box and checkmark colours and its `checkmark` marker carry over,
-  and the checkmark shows in its unchecked colour under the pointer. A click follows the
-  checkbox's `onchange` rule, so `onchange = _ -> true` makes one that only turns on (#428).
+  and the checkmark shows in its unchecked colour under the pointer. Only the square takes the
+  pointer, as in Makie. A checkbox with its own `onchange` warns that `masque` doesn't run it
+  yet, so a click flips the box (#428, #457).
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
   out, as in `bind = :picked`. Before, the click did nothing.
 - On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down

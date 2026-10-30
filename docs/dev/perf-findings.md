@@ -628,6 +628,24 @@ rebuild of the plan. Each frame sends the whole picture and manifest even when o
 2-point line changed: on `:webgl` that is about 2.5 MB per click. That is the settled
 pipeline; sending only what changed is on the roadmap.
 
+### Slider grid layer
+
+A `SliderGrid`'s `:control` layer (#430) carries each slider's geometry plus its value label's
+text for every value, written by the grid's `format` in Julia. That text rides every
+`onchange` frame, so it stops at 101 values for a slider and 210 lo ≤ hi pairs (20 values)
+for an interval slider; past that the browser writes the value. Measured on the PR #454 fix
+commit (Julia 1.13.1, cloud box) as the layer's geometry in compact JSON, one slider per grid:
+
+| slider | geometry |
+|---|---:|
+| 21 values, default format | 654 B |
+| 101 values, format string | 1436 B |
+| 10 001 values (past the cap) | 521 B |
+| interval, 20 values (210 pairs) | 2663 B |
+| interval, 21 values (past the cap) | 532 B |
+
+Before the cap, one `0:0.001:10` slider made the manifest about 100 KB.
+
 ### View warmup
 
 `bench/view_warmup.jl`, 2026-09-22, Julia 1.10.12, `OPENBLAS_NUM_THREADS=1`, two fresh processes
