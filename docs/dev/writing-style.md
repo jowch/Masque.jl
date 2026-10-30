@@ -38,7 +38,19 @@ does and sees. Use US spelling ("color"), matching the API's keywords.
     does not do, say what happens, then how to get what they wanted, in the same paragraph:
     "A click selects one mark and replaces the previous selection. To select several marks
     at once, drag a box over them." A limit on its own reads as a refusal.
-11. **End with where to go next,** as a link.
+11. **Say what the reader does and sees in prose, and keep the API detail in tables.** A
+    paragraph that walks through type names, keywords and return values in the order the code
+    handles them reads as a changelog. Open with what the reader does and what they get, and
+    put each type with what it takes and what it returns in a table they can scan.
+12. **Keep each note next to what it is about.** A limit of the docs player (a clip that
+    can't run Julia, a control the player doesn't draw) sits beside that player, not in the
+    page's limitations. A limitations section covers only the package, so a reader can trust
+    that everything in it applies to their own notebook.
+13. **Introduce each concept once, in reading order.** The first page a reader meets a
+    concept on explains it; later pages use it with a short backlink for readers who land
+    there directly: "With `onchange` (see [Update the figure](@ref)), …". Don't explain it
+    again, and don't use it on a page before the one that introduces it.
+14. **End with where to go next,** as a link.
 
 ## Wording
 
@@ -47,32 +59,32 @@ sentence a person would say. Deleting words in place leaves fragments
 like "Pass the other two yourself.", where the reader has to work out
 what "the other two" are.
 
-12. **Keep a cause and its effect in one sentence.** Join them with "so", "and", or a colon
+15. **Keep a cause and its effect in one sentence.** Join them with "so", "and", or a colon
     rather than splitting every clause into its own sentence. "Tooltips and highlights
     respond in the browser without Julia, so they are instant" reads as one thought;
     "Tooltips work in the browser. They are instant." reads as two facts the reader has to
     connect. A paragraph of short sentences is choppy, not plain: plain is about the words,
     not the sentence length.
-13. **Write it the way you would say it to someone sitting next to you.** Use full sentences
+16. **Write it the way you would say it to someone sitting next to you.** Use full sentences
     with their articles and linking words, and open an instruction with what it is for:
     "To reach the points, pass in your own list of the interactables you want, with the
     scatter before the polygon." Shorthand like "Pass the interactables yourself, points
     first:" and formal words like "desired" make the page read like a spec, even when every
     fact in it is right.
-14. **Use the reader's word, and one word per concept.** See the terms table below. A word
+17. **Use the reader's word, and one word per concept.** See the terms table below. A word
    that only makes sense if you know Masque's internals (chrome, echo, wash, "lands",
    "authoritative") is one of ours, not the reader's; name what they see instead.
-15. **Don't list three things when one or two carry the point.** No row of parallel verbs
+18. **Don't list three things when one or two carry the point.** No row of parallel verbs
     describing a component's duties, and no third item added for rhythm.
-16. **Keep the main point out of asides.** If it matters, give it its own sentence. In prose,
+19. **Keep the main point out of asides.** If it matters, give it its own sentence. In prose,
     end the sentence or use a colon instead of an em dash; em dashes are only for empty
     table cells.
-17. **Avoid the words in the list below.** They are the most common signs of LLM-written
+20. **Avoid the words in the list below.** They are the most common signs of LLM-written
     text, and each has a plainer word.
 
 ## Formatting
 
-18. **Headings name what the reader wants, in their words.** A guide section is a task: a
+21. **Headings name what the reader wants, in their words.** A guide section is a task: a
     verb and the thing the reader acts on, such as "Select several marks" or "Choose which
     plots an entry highlights". A reference or explanation section is a noun phrase, such as
     "Keyboard shortcuts" or "Supported axes", or a "What …" or "How …" phrase that reads as
@@ -87,20 +99,20 @@ what "the other two" are.
     page; give it an explicit id: `## [Backends](@id home-backends)`. Renaming a heading
     breaks every `[Heading](@ref)` link to it, so search `docs/src` and `src` for the old
     text.
-19. **No bold labels at the start of list items.** Use a plain list, or a table when each
+22. **No bold labels at the start of list items.** Use a plain list, or a table when each
     item has a name and a description. Bold is for a term's first use or a UI label.
-20. **Use short paragraphs, not bullets, when each item needs a reason or a way around it.**
+23. **Use short paragraphs, not bullets, when each item needs a reason or a way around it.**
     A bullet invites a clipped fragment; a paragraph of two or three sentences has room for
     what happens and what to do about it. Keep lists for short, parallel items that need no
     explanation, such as a set of known gaps each followed by a link.
 
 ## Examples
 
-21. **Show it in code, in code a new Julia user can read.** When a sentence tells the reader
+24. **Show it in code, in code a new Julia user can read.** When a sentence tells the reader
     to do something in Julia, follow it with the snippet. Use literal values over
     comprehensions, splats, and chained calls: the example teaches Masque, not Julia.
     Write the idiom the reader already uses (`isnothing(x)`, not `x === nothing`).
-22. **Frame a fix with what the reader sees.** Before the snippet, say what goes wrong in
+25. **Frame a fix with what the reader sees.** Before the snippet, say what goes wrong in
     terms of the screen ("hovering a point shows the polygon's tooltip"). After it, say
     what is different now, and any catch the change brings with it ("only the plots you
     list are interactive"). A snippet introduced by an instruction alone ("Pass the
