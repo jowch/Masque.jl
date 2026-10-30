@@ -166,6 +166,8 @@ end
 # The validator as the browser can run it while the reader types: a pattern (a `Regex`, or the
 # numbers `tryparse` reads for a number type) and its flags. A validator the browser can't run
 # (a function of the author's) ships nothing: Julia checks the text when the reader presses Enter.
+# The number patterns are the shapes `tryparse` reads, not its range: a 20-digit `Int`, or a
+# minus sign for an unsigned type, looks valid here and Julia refuses it on Enter.
 const _INT_PATTERN = raw"\s*[+-]?(?:\d+|0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+)\s*"
 const _FLOAT_PATTERN = raw"\s*[+-]?(?:(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?|inf|infinity|nan)\s*"
 function _textbox_check(v)
@@ -266,6 +268,24 @@ function _warn_checkbox_rule(interactables)
         @warn "masque: checkbox :$(i.id) has its own `onchange`, which does nothing in masque: " *
             "a click always flips the box. For one choice of several, use a `Menu`, or set the " *
             "other boxes in `masque`'s own `onchange`." maxlog = 1
+    end
+    return nothing
+end
+
+# A validator the browser can't run (a function, a type other than a number, an extended
+# `Regex`) runs only in Julia, when the reader presses Enter. With `onchange`, the frame that
+# follows puts back the text it refused; without one nothing comes back, so the box keeps
+# showing text the field didn't take, and masque says so once.
+function _warn_textbox_check(interactables, onchange)
+    onchange === nothing || return nothing
+    for i in interactables
+        i isa BlockControl && i.block isa Makie.Textbox || continue
+        v = i.block.validator[]
+        (_accepts_all(v) || _textbox_check(v) !== nothing) && continue
+        @warn "masque: textbox :$(i.id) checks its text only in Julia, when the reader presses " *
+            "Enter: text it refuses leaves the field as it was, but the box still shows it. Use a " *
+            "`Regex` or a number type to check as the reader types, or give `masque` an " *
+            "`onchange`, which puts the stored text back." maxlog = 1
     end
     return nothing
 end

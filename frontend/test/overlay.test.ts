@@ -7025,8 +7025,12 @@ describe("block controls (#345)", () => {
         const v = (name: string) => el.style.getPropertyValue(`--${name}`)
         expect([v("fs"), v("pl"), v("pt"), v("r"), v("sw")]).toEqual(["16cqw", "8cqw", "4cqw", "5cqw", "0.5cqw"])
         expect([v("b3"), v("e2"), v("tx"), v("ph"), v("cc")]).toEqual(["rgb(4,4,4)", "rgb(7,7,7)", "rgb(9,9,9)", "rgb(10,10,10)", "rgb(11,11,11)"])
-        const type = (text: string) => { el.value = text; el.dispatchEvent(new Event("input", { bubbles: true })) }
+        const type = (text: string) => { el.value = text; el.dispatchEvent(new Event("input", { bubbles: true, composed: true })) }
         const enter = () => el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        // Pluto sends the bond on every `input` the host sees: typing must not reach it, only a
+        // commit's own event does.
+        let sent = 0
+        host.addEventListener("input", () => { sent += 1 })
         // A refused character is dropped; one the check fails turns the box invalid, and Enter
         // stores nothing.
         type("1a2x")
@@ -7034,12 +7038,14 @@ describe("block controls (#345)", () => {
         expect(el.classList.contains("invalid")).toBe(true)
         enter()
         expect(val(host).word).toEqual({ layer: "word", index: 0, payload: null })
+        expect(sent).toBe(0)
         type("12")
         expect(el.classList.contains("invalid")).toBe(false)
         expect(el.classList.contains("unstored")).toBe(true)
         enter()
         expect(val(host).word).toEqual({ layer: "word", index: 0, payload: "12" })
         expect(el.classList.contains("unstored")).toBe(false)
+        expect(sent).toBe(1)
     })
 
     it("a slider grid draws each slider and its value label, and commits all its values together (#430)", () => {

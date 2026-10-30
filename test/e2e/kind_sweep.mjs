@@ -873,6 +873,13 @@ try {
         if (!re.test(v)) throw new Error(`${key}/${what}: value ${JSON.stringify(v)} doesn't match ${re}`);
         return v;
       };
+      // Two quick key presses commit twice, and the cell can show the first before the second.
+      const bondReaches = async (re, before, what) => {
+        let v = await waitChange(`#bond_${key}`, before, `${key}/${what}`);
+        for (let i = 0; i < 5 && !re.test(v); i++) v = await waitChange(`#bond_${key}`, v, `${key}/${what}`);
+        if (!re.test(v)) throw new Error(`${key}/${what}: value ${JSON.stringify(v)} doesn't match ${re}`);
+        return v;
+      };
 
       // Each control sits on its block's box.
       const s0 = await screenOf();
@@ -921,7 +928,7 @@ try {
       await ctl("level").focus();
       await page.keyboard.press("ArrowRight");
       await page.keyboard.press("ArrowRight");
-      v = await bondHas(/level = 5,/, v, "keyboard");
+      v = await bondReaches(/level = 5,/, v, "keyboard");
       await expectLevel(5, "keyboard");
       passed.push(`${key}/slider-keyboard`);
 
@@ -1031,8 +1038,12 @@ try {
       {
         const t = ctl("word", "input");
         await t.click();
+        // Typing sends nothing until Enter: the cell reading the bond doesn't run again.
+        const ran = await textOf(`#ran_${key}`);
         await page.keyboard.type("ab1");
         if (!(await t.evaluate((el) => el.classList.contains("invalid")))) throw new Error(`${key}/textbox: "ab1" not marked invalid`);
+        await page.waitForTimeout(1500);
+        if ((await textOf(`#ran_${key}`)) !== ran) throw new Error(`${key}/textbox: typing re-ran the cell reading the bond`);
         await page.keyboard.press("Enter");
         await page.waitForTimeout(1500);
         if (!/word = nothing/.test(await textOf(`#bond_${key}`))) throw new Error(`${key}/textbox: invalid text was stored`);

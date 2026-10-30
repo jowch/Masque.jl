@@ -184,7 +184,9 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         num = Textbox(fig[3, 1]; validator = Float64, stored_string = "1.5", restriction = c -> isdigit(c) || c == '.')
         pat = Textbox(fig[4, 1]; validator = r"[a-c]+"i, reset_on_defocus = true, defocus_on_submit = false)
         odd = Textbox(fig[5, 1]; validator = s -> length(s) == 3)
-        w = @test_logs masque(fig, (plain = plain, num = num, pat = pat, odd = odd))
+        # Only Julia can run a function, and without `onchange` nothing tells the box what it
+        # refused: masque says so once.
+        w = @test_logs (:warn, r"textbox :odd checks its text only in Julia.*onchange"s) masque(fig, (plain = plain, num = num, pat = pat, odd = odd))
         @test Masque.initial_bond(w) == (plain = nothing, num = "1.5", pat = nothing, odd = nothing)
         s = w.manifest["scaling"]
         g = _layer(w.manifest, "plain")["geometry"]
@@ -216,6 +218,14 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test odd.stored_string[] == "xyz" && odd.displayed_string[] == "xyz" && heard == ["xyz"]
         Masque._sync_controls!([Masque.BlockControl(odd, :odd)], Dict("odd" => _env("odd", "toolong")))
         @test odd.stored_string[] == "xyz" && heard == ["xyz"]
+        # With `onchange` there is no warning, and the frame after a refused Enter carries the
+        # stored text, which the browser puts back in the box.
+        fig = Figure(); Axis(fig[1, 1]); odd = Textbox(fig[2, 1]; validator = s -> length(s) == 3)
+        w = @test_logs masque(fig, (odd = odd,); onchange = st -> nothing)
+        Masque._sync_view_warmup!(w.render_frame)
+        frame(t) = w.render_frame(Dict{String, Any}("onchange" => true, "settle" => true, "state" => Dict("odd" => _env("odd", t))))
+        @test _layer(frame("abc")["manifest"], "odd")["geometry"]["value"] == "abc"
+        @test _layer(frame("ab")["manifest"], "odd")["geometry"]["value"] == "abc"
     end
 
     @testset "a slider grid is a field holding a tuple of its slider values (#430)" begin

@@ -73,7 +73,11 @@ it with `on(b.clicks)` runs too. A `Textbox`'s field holds the text the
 reader last entered with Enter, or `nothing` before any. A `validator`
 that is a `Regex` or a number type turns the box red as the reader types,
 as in Makie; one that is a function runs when they press Enter, and text
-it refuses leaves the field as it was.
+it refuses leaves the field as it was. With `onchange`, the box then goes
+back to the stored text; without it, the box still shows what they typed,
+and `masque` warns. A box as wide as its placeholder, Makie's default,
+keeps that width as the reader types and scrolls its text, where Makie
+widens it.
 
 A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
 does nothing in a notebook: a click always flips the box, and `masque`

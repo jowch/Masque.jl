@@ -326,7 +326,9 @@ function styleTextbox(el: HTMLInputElement, g: ControlGeometry): void {
 }
 
 // The validator as a whole-text match, or null for one that takes any text. A Julia pattern
-// JavaScript can't read takes any text here; Julia still checks it on Enter.
+// JavaScript can't read takes any text here; Julia still checks it on Enter. Makie compares
+// the leftmost match with the text, so `r"a|ab"` refuses "ab" there while this takes it; Julia
+// has the last word on Enter.
 function textCheck(g: ControlGeometry): RegExp | null {
     if (!g.check) return null
     for (const extra of ["u", ""]) {
@@ -618,6 +620,10 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
 export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manifest, hooks: ControlHooks): Controls {
     const layer = document.createElement("div")
     layer.className = "masque-controls"
+    // A native `input` event leaves the shadow root, and Pluto sends the bond on every one it
+    // sees on the widget: typing in a text box would re-run the notebook's cells per keystroke.
+    // The controls commit through the host's own event, so theirs stop here, past every box.
+    layer.addEventListener("input", (e) => e.stopPropagation())
     const els = new Map<string, ControlEl>()
     // The control the reader is dragging: a frame leaves it alone until the release's frame.
     let held: string | null = null

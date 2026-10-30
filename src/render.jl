@@ -783,6 +783,7 @@ function masque(fig, xs...; auto::Bool = true, bind = nothing, onchange = nothin
     _check_unnamed_blocks(fig, plan)
     auto && isempty(plan) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
     _check_onchange(onchange)
+    _warn_textbox_check(plan, onchange)
     onchange === nothing || (plan = _with_onchange(plan, onchange, () -> _bind_call(fig, xs, bind; auto)))
     return _masque(fig, plan; onchange, kwargs...)
 end
