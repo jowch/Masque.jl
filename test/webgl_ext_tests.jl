@@ -55,6 +55,41 @@ end
     @test found_buf[]   # {__t__}
 end
 
+# A NaN in a position buffer is a line break. Scrubbed to 0, it drew a stroke from each break
+# to the data origin (#439).
+@testset "scene keeps NaN line breaks (#439)" begin
+    function f32s(x, acc = Vector{Float32}[])
+        if x isa AbstractDict
+            get(x, "__t__", nothing) == "f32" ? push!(acc, x["d"]) : foreach(v -> f32s(v, acc), values(x))
+        elseif x isa Vector{Any}
+            foreach(v -> f32s(v, acc), x)
+        end
+        return acc
+    end
+    has_nan(fig) = any(d -> any(isnan, d), f32s(masque(fig; backend = :webgl).scene))
+
+    fig = Figure(; size = (300, 200))
+    contour!(Axis(fig[1, 1]), [sin(x / 5) * cos(y / 7) for x in 1:50, y in 1:40]; levels = 5)
+    @test has_nan(fig)
+
+    fig = Figure(; size = (300, 200))
+    lines!(Axis(fig[1, 1]), [1.0, 2.0, NaN, 3.0, 4.0], [1.0, 2.0, NaN, 2.0, 1.0])
+    @test has_nan(fig)
+
+    # A zero on a log axis transforms to -Inf; it breaks the line, as in Cairo.
+    fig = Figure(; size = (300, 200))
+    lines!(Axis(fig[1, 1]; yscale = log10), 1:6, [1.0, 2.0, 0.0, 4.0, 8.0, 16.0])
+    bufs = f32s(masque(fig; backend = :webgl).scene)
+    @test any(d -> any(isnan, d), bufs)
+    @test !any(d -> any(isinf, d), bufs)
+
+    # The page outside Pluto carries the bytes, NaN included. This guards the transport; it
+    # passed before the fix too.
+    d = Float32[1, NaN, 2]
+    js = _WGLExt._scene_js(Dict{String, Any}("p" => Dict{String, Any}("__t__" => "f32", "d" => d)))
+    @test occursin(Masque.base64encode(reinterpret(UInt8, d)), js)
+end
+
 @testset "Axis3 serializes (what CairoBackend rejects)" begin
     fig = Figure(; size = (400, 300))
     ax = Axis3(fig[1, 1])
@@ -81,15 +116,15 @@ end
     @test wv isa _WGLExt.WebGLWidget
     @test wv.render_frame isa Function
 
-    # scene must be JSON3-safe (Makie can emit NaN in transformed-position buffers; _plain scrubs them)
-    @test JSON3.write(w.scene) isa String
+    # The scene keeps NaN line breaks (#439), so JSON needs `allow_inf`; Pluto packs the bytes.
+    @test JSON3.write(w.scene; allow_inf = true) isa String
 
     # self-contained HTML (inline JSON instead of published_to_js) — the integration points
     html = sprint(
         show, MIME"text/html"(),
         _WGLExt._widget_html(
             w;
-            scene_expr = JavaScript(JSON3.write(w.scene)),
+            scene_expr = JavaScript(JSON3.write(w.scene; allow_inf = true)),
             manifest_expr = JavaScript(JSON3.write(w.manifest)),
             bundle_js = JavaScript(JSON3.write("/*bundle*/")),
             shim_js = JavaScript(JSON3.write("/*shim*/")),
@@ -106,14 +141,14 @@ end
     @test occursin("requestFrame", html)
 end
 
-@testset "PolarAxis scene is JSON3-safe (pagepolar e2e)" begin
+@testset "PolarAxis scene serializes (pagepolar e2e)" begin
     import JSON3
     fig = Figure(; size = (400, 300))
     ax = PolarAxis(fig[1, 1])
     scatter!(ax, Point2f[(0.0, 1.0), (π / 2, 2.0)]; markersize = 14, color = :red)
     w = masque(fig; backend = :webgl)
     @test w.manifest["transforms"]["ax1"]["ispolar"] === true
-    @test JSON3.write(w.scene) isa String
+    @test JSON3.write(w.scene; allow_inf = true) isa String
     @test JSON3.write(w.manifest) isa String
 end
 
@@ -413,7 +448,7 @@ end
         show, MIME"text/html"(),
         _WGLExt._widget_html(
             w;
-            scene_expr = JavaScript(JSON3.write(w.scene)),
+            scene_expr = JavaScript(JSON3.write(w.scene; allow_inf = true)),
             manifest_expr = JavaScript(JSON3.write(w.manifest)),
             bundle_js = JavaScript(JSON3.write("/*bundle*/")),
             shim_js = JavaScript(JSON3.write("/*shim*/")),
@@ -448,7 +483,7 @@ end
     @test !occursin(_WGLExt._bundle_text()[1:2000], html)
     @test all(u -> occursin(u, html), cdn.urls) && occursin(cdn.integrity, html)
     # Smaller than the scene's JSON, which Pluto publishes as is.
-    @test sizeof(html) < sizeof(JSON3.write(w.scene))
+    @test sizeof(html) < sizeof(JSON3.write(w.scene; allow_inf = true))
     # The note tells a copy that fails the hash apart from being offline, and names the Makie.
     @test occursin("needs an internet connection", html)
     @test occursin("published with Makie v$(cdn.makie) differs", html)

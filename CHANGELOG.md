@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- A Makie `SliderGrid` named in `masque` works in the notebook: its field holds a tuple of its
+  sliders' values, in order, and each value label follows its slider, written with the grid's
+  own `format`. A grid that `masque` isn't given warns, as before (#430).
+- A Makie `Button` named in `masque` works in the notebook, drawn as Makie draws it, with its
+  hover and pressed colours. Its field counts the clicks. With `onchange`, each click also sets
+  the button's `clicks`, so code listening to it runs. A button that `masque` isn't given warns,
+  as before (#431).
 - `linked(plots...)` makes plots that draw the same rows one selection: clicking a mark in
   any of them selects its row in all of them, and hovering a mark outlines the same row on the
   others. The `@bind` field holds the row's position, or with `key = :id` the `id` of its
@@ -30,10 +37,14 @@ All notable changes to this project are documented here. The format is based on
   backend. To turn this off, see the troubleshooting page.
 
 ### Fixed
+- On `backend = :webgl`, a line with gaps, such as a `contour!` or a `lines!` with `NaN`
+  points, breaks at each gap, and so does a zero on a log axis. Before, each gap drew a straight
+  line to the axis origin (#439).
 - A click on a colorbar or an axis readout now gives the value its tooltip shows. Before,
   it could be off by up to half a pixel, such as `9.525` against a tooltip's `9.500` (#448).
-- A figure with a Makie `Button`, `Textbox` or `SliderGrid` now warns that masque shows it as
-  a picture, so it won't respond to a click. Before, it looked live and did nothing (#426).
+- A figure with a Makie `Button` or `Textbox`, or a `SliderGrid` that `masque` isn't given,
+  now warns that it shows as a picture and won't respond. Before, it looked live and did
+  nothing (#426).
 - A Makie `Toggle` named in `masque` is drawn the way Makie draws it: a vertical or angled
   toggle (`orientation`) stands the right way, and `length`, `markersize`, `rimfraction` and
   `toggleduration` carry over. Before, every toggle was a horizontal pill stretched over its
@@ -41,6 +52,11 @@ All notable changes to this project are documented here. The format is based on
 - A Makie `Menu` named in `masque` shows its own `prompt` before a choice, instead of
   "Select…", and its `fontsize`, `textcolor`, `textpadding` and
   `selection_cell_color_inactive` carry over to the closed menu (#429).
+- A Makie `Checkbox` named in `masque` is drawn the way Makie draws it: its `size`,
+  `roundness`, stroke, both box and checkmark colours and its `checkmark` marker carry over,
+  and the checkmark shows in its unchecked colour under the pointer. Only the square takes the
+  pointer, as in Makie. A checkbox with its own `onchange` warns that `masque` doesn't run it
+  yet, so a click flips the box (#428, #457).
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
   out, as in `bind = :picked`. Before, the click did nothing.
 - On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down

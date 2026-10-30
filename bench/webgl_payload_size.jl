@@ -100,7 +100,7 @@ for (name, mk) in cases
     atlas = atlas_bytes(scene)
     blob = numeric_blob!(UInt8[], scene)
     tiles = atlas_tiles(scene)
-    jsonstr = JSON3.write(scene)
+    jsonstr = JSON3.write(scene; allow_inf = true)
     println(
         "  ", rpad(name, 24),
         "packed ", packed, " B (", mb(packed), " MB)",
@@ -145,7 +145,7 @@ for (name, mk) in outside
         Masque._OVERLAY_CDN[], _WGLExt._WGL_CDN[] = old_overlay, old_wgl
     end
     println(
-        "  ", rpad(name, 28), "scene JSON ", kb(sizeof(JSON3.write(w.scene))), " KB",
+        "  ", rpad(name, 28), "scene JSON ", kb(sizeof(JSON3.write(w.scene; allow_inf = true))), " KB",
         "  scene JS ", kb(sizeof(_WGLExt._scene_js(w.scene))), " KB",
         "  page ", kb(page), " KB  checkout ", kb(checkout), " KB",
     )

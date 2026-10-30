@@ -45,7 +45,7 @@ function bench_scene(name, fig, ints; input, trials = 20)
         packed_bytes(r_gesture["scene"]) / 1024, packed_bytes(r_settle["scene"]) / 1024,
         packed_bytes(r_gesture) / 1024, packed_bytes(r_settle) / 1024,
         numeric_bytes(r_gesture["scene"]) / 1024,
-        length(JSON3.write(r_gesture["scene"])) / 1024,
+        length(JSON3.write(r_gesture["scene"]; allow_inf = true)) / 1024,
     )
     return (; gesture_ms, settle_ms)
 end

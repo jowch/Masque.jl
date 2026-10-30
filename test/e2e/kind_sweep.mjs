@@ -876,7 +876,7 @@ try {
 
       // Each control sits on its block's box.
       const s0 = await screenOf();
-      for (const id of ["level", "show", "span", "fine", "pick", "tall"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall", "grid", "go", "sure"]) {
         const g = geo(id);
         if (layers.find((l) => l.id === id)?.kind !== "control") throw new Error(`${key}: no control layer ${id}`);
         const bb = await page.locator(`[data-masque-control="${id}"]`).boundingBox();
@@ -888,15 +888,18 @@ try {
       passed.push(`${key}/controls-on-blocks`);
 
       // The picture under the controls is empty: with the HTML hidden, every pixel in each box
-      // is the figure's background.
+      // is the figure's background. (The grid's box keeps its slider's name in the picture.)
       await page.evaluate((k) => {
         const span = document.querySelector(`#coords_${k}`);
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         sr.querySelector(".masque-controls").style.visibility = "hidden";
       }, key);
-      for (const id of ["level", "show", "span", "fine", "pick", "tall"]) {
-        const g = geo(id);
+      // The grid's name labels stay in the picture, so its sliders and value labels are
+      // checked box by box.
+      const boxes = ["level", "show", "span", "fine", "pick", "tall", "sure", "go"].map((id) => [id, geo(id)]);
+      geo("grid").sliders.forEach((s, i) => boxes.push([`grid-${i}`, s], [`grid-${i}-value`, s.valueLabel]));
+      for (const [id, g] of boxes) {
         const png = PNG.sync.read(await page.screenshot({ clip: { x: s0.left + g.x * s0.sc + 1, y: s0.top + g.y * s0.sc + 1, width: Math.max(1, g.w * s0.sc - 2), height: Math.max(1, g.h * s0.sc - 2) } }));
         let ink = 0;
         for (let o = 0; o < png.data.length; o += 4) if (png.data[o] < 235 || png.data[o + 1] < 235 || png.data[o + 2] < 235) ink++;
@@ -992,6 +995,63 @@ try {
       await ctl("pick", "select").selectOption("2");
       v = await bondHas(/level = 10, show = false, span = \(1, 5\), fine = true, pick = "z"/, v, "menu");
       passed.push(`${key}/interval-checkbox-menu`);
+      // The slider grid's slider moves its field and its value label, which Julia formatted.
+      {
+        const lab = ctl("grid", ".masque-vlabel");
+        if ((await lab.textContent()) !== "2 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 2 dB`);
+        await ctl("grid", "input").focus();
+        await page.keyboard.press("ArrowRight");
+        // Focus rings only the focused slider's knob, not every knob in the figure.
+        const ringed = await page.evaluate(() => {
+          const out = [];
+          for (const h of document.querySelectorAll(".ip-host")) h.querySelectorAll("*").forEach((el) => {
+            if (!el.shadowRoot) return;
+            el.shadowRoot.querySelectorAll(".masque-knob").forEach((k) => {
+              if (getComputedStyle(k).outlineStyle !== "none") out.push(k.closest("[data-masque-control]").dataset.masqueControl);
+            });
+          });
+          return out;
+        });
+        if (ringed.length !== 1 || ringed[0] !== "grid-0") throw new Error(`${key}/grid: focus ring on ${JSON.stringify(ringed)}, want only grid-0`);
+        v = await bondHas(/grid = \(3,\)/, v, "grid");
+        if ((await lab.textContent()) !== "3 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 3 dB`);
+        passed.push(`${key}/slider-grid`);
+      }
+      // The button counts clicks, as Makie's `clicks` does.
+      {
+        const b = ctl("go", "button");
+        if ((await b.textContent()) !== "Go") throw new Error(`${key}/button: label ${await b.textContent()}, want Go`);
+        await b.click();
+        v = await bondHas(/go = 1\b/, v, "button");
+        await b.click();
+        v = await bondHas(/go = 2\b/, v, "button");
+        passed.push(`${key}/button`);
+      }
+      // A checkbox drawn as Makie draws it (#428): its square is `size` across in the middle of
+      // the box, filled in its checked colour with the mark showing once ticked; Space unticks it.
+      {
+        const g = geo("sure");
+        const s1 = await screenOf();
+        const art = ctl("sure", "svg");
+        const bb = await art.boundingBox();
+        const want = { x: s1.left + (g.x + (g.w - g.size) / 2) * s1.sc, y: s1.top + (g.y + (g.h - g.size) / 2) * s1.sc, w: g.size * s1.sc };
+        if (!bb || Math.abs(bb.x - want.x) > 1.5 || Math.abs(bb.y - want.y) > 1.5 || Math.abs(bb.width - want.w) > 1.5 || Math.abs(bb.height - want.w) > 1.5) {
+          throw new Error(`${key}/checkbox-drawn: square ${JSON.stringify(bb)}, want ${JSON.stringify(want)}`);
+        }
+        const rect = ctl("sure", "svg rect");
+        const markShown = () => ctl("sure", "svg .mark").evaluate((el) => getComputedStyle(el).visibility === "visible");
+        if ((await rect.getAttribute("fill")) !== g.off) throw new Error(`${key}/checkbox-drawn: fill ${await rect.getAttribute("fill")}, want ${g.off}`);
+        await page.mouse.move(0, 0);
+        if (await markShown()) throw new Error(`${key}/checkbox-drawn: mark shows before the box is ticked`);
+        await ctl("sure").click();
+        v = await bondHas(/sure = true/, v, "checkbox-drawn");
+        if ((await rect.getAttribute("fill")) !== g.color) throw new Error(`${key}/checkbox-drawn: fill ${await rect.getAttribute("fill")}, want ${g.color}`);
+        await page.mouse.move(0, 0);
+        if (!(await markShown())) throw new Error(`${key}/checkbox-drawn: mark hidden on a ticked box`);
+        await page.keyboard.press("Space");
+        v = await bondHas(/sure = false/, v, "checkbox-space");
+        passed.push(`${key}/checkbox-drawn`);
+      }
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);
       continue;
     }
