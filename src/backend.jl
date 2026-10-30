@@ -316,3 +316,20 @@ function _legend_transform(id, leg, scaling, out_h)
         vpx, false, false, nothing, nothing, nothing, false, false
     )
 end
+
+# The image-px box [x, y, w, h] a legend's background covers, or `nothing` when what is under
+# it shows through. Makie draws the background (and frame) inside the margin, its stroke
+# centred on that edge, over the axes' plots, so a mark under it is hidden and the overlay
+# must not draw its highlight there (#437). `framevisible = false` hides the background too.
+# A background less than half opaque leaves the marks readable, so it hides nothing.
+function _legend_occluder(leg, scaling, out_h)
+    leg.framevisible[] || return nothing
+    Makie.alpha(Makie.to_color(leg.backgroundcolor[])) >= 0.5 || return nothing
+    bb = Makie.round_to_IRect2D(_legend_bbox(leg))
+    l, r, b, t = leg.margin[]
+    half = leg.framewidth[] / 2
+    x0, y0 = bb.origin[1] + l - half, bb.origin[2] + b - half
+    w, h = bb.widths[1] - l - r + 2half, bb.widths[2] - b - t + 2half
+    (w > 0 && h > 0) || return nothing
+    return [x0 * scaling, out_h - (y0 + h) * scaling, w * scaling, h * scaling]
+end

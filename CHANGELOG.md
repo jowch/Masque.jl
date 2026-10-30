@@ -11,6 +11,9 @@ All notable changes to this project are documented here. The format is based on
   other area 12 px or more across. Before, the outline went by the grid's smallest cell, so it
   sat on the edge and spilled onto the neighbouring cells. Lone cells and one-cell-wide strokes
   stay outlined on their edge, so their colour still shows (#463).
+- A mark hidden under a legend stays hidden: its hover ring, pick outline and fade no longer
+  draw over the legend. A legend with no background, or a mostly see-through one, still shows
+  the highlights of the marks under it (#437).
 
 ## [0.4.2] - 2026-10-30
 

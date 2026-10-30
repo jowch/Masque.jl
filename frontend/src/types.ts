@@ -307,6 +307,9 @@ export interface Manifest {
     overlayStyle?: Record<string, string> // figure-level overlay chrome custom properties (overlaystyle)
     tipDigits?: number // tooltip_sigdigits; absent means the frontend default (4)
     background?: string // the figure's background colour (CSS string) — drives the tooltip's light/dark theme
+    // Image-px boxes [x, y, w, h] Makie draws over the axes' plots (an opaque legend). A data
+    // mark's highlight and fade leave them out, as the picture hides the marks under them (#437).
+    occluders?: Array<[number, number, number, number]>
     // The layer ids whose commits make the `@bind` value, one field each. Every other layer
     // takes no clicks. The browser sends `{field: envelope}` for all of them on every commit.
     fields?: string[]

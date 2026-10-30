@@ -20,6 +20,11 @@ the surface below shows the height under the pointer:
 Main.masque_fallback("explore_3d")
 ```
 
+This example doesn't turn when you drag it, because each turn has Julia
+draw the figure again and this site has no Julia running behind it (see
+[Pan and orbit preview](@ref)). To try turning it, download the notebook
+and add the two lines from [Orbit the view](@ref).
+
 ## Name the stations
 
 A station is a point in a scatter, so on its own its tooltip shows only
@@ -55,18 +60,13 @@ Dragging then turns the camera, and the stations keep their tooltips and
 clicks at every angle. [Pan, zoom and orbit](@ref) has the zoom and pan
 controls, and how to turn several panels together with `linkcameras!`.
 
-The example at the top of this page does not turn: each turn has Julia
-draw the figure again, and this site has no Julia running behind it
-(see [Pan and orbit preview](@ref)). To try turning it, download the
-notebook, add the `orbit` line, and pass `orbit` to `masque` as above.
-
 ## Limitations
 
 - A surface responds only on an `Axis3`. On a 2D `Axis`, draw the same
   matrix with `heatmap` to read its values; see [Heatmaps and images](@ref).
 - A sphere from `meshscatter` stops responding once its center leaves
-  the axis box, even if part of it still shows. Zoom out, or turn the
-  view, to bring it back.
+  the axis box. Zoom out, or turn the view, to bring it back; see
+  [Orbit an `Axis3`](@ref).
 
 ## Where to go next
 
