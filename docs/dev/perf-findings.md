@@ -340,6 +340,51 @@ two separate `:many` segment fields 163 / 509 and 143 / 2 053 ms, and one 61 / 1
 about 2 500 marks: a legend click that picks one cluster of a keyed group (1 229 rows) reaches
 the value cell in about 0.1 s on `:cairo`, as fast as the unlinked legend's 2 458 events.
 
+### Fading lines on hover (#464)
+
+Since #459, hovering a line fades the axis's other lines, and the fade redraws whenever the
+pointer moves onto a different line; moving along one line redraws nothing. Headless Chromium
+against a live Pluto kernel on the warmed env, `deviceScaleFactor` 1, at `253d372` (0.4.2),
+measured 2026-10-30 on the cloud container. `bench/line_fade/hover.mjs` reproduces the table
+(how to run it is at its top). *swap* moves the pointer onto a line from another one (the fade
+redraws), *along* moves it one pixel along a line (no redraw: no run of any row redrew), *off*
+moves it off the plot (the fade is taken away); each is the handler's median of 6, ending on
+the last line plotted, which is the slower end for separate plots (below). *sweep* moves the
+pointer across every line, one move per frame for 60 frames: the handler's median and worst
+time, and how many frames' handlers took longer than a 60 Hz frame (16.7 ms).
+
+| Figure | vertices | `:cairo` swap / along / off | `:webgl` swap / along / off | `:cairo` sweep | `:webgl` sweep |
+|--------|---:|---:|---:|---:|---:|
+| `series!`, 10 lines × 100 | 1 000 | 2.2 / 0.6 / 2.0 ms | 2.5 / 0.4 / 2.7 ms | 0.8 / 10 ms, 0 | 0.8 / 24 ms, 3 |
+| `series!`, 10 × 1 000 | 10 000 | 3.5 / 2.5 / 2.2 ms | 4.0 / 4.1 / 3.9 ms | 1.9 / 12 ms, 0 | 3.0 / 18 ms, 3 |
+| `series!`, 100 × 100 | 10 000 | 3.7 / 0.9 / 2.4 ms | 3.0 / 1.3 / 3.1 ms | 2.8 / 9 ms, 0 | 3.9 / 19 ms, 1 |
+| `lines!` ×10, 1 000 each | 10 000 | 3.6 / 3.0 / 2.2 ms | 4.4 / 3.9 / 4.7 ms | 1.7 / 12 ms, 0 | 2.5 / 21 ms, 2 |
+| `series!`, 10 × 10 000 | 100 000 | 8.3 / 8.1 / 6.3 ms | 11.9 / 17.0 / 15.3 ms | 7.2 / 23 ms, 2 | 9.7 / 25 ms, 9 |
+| `series!`, 100 × 1 000 | 100 000 | 7.7 / 10.2 / 6.3 ms | 13.1 / 13.6 / 8.7 ms | 8.1 / 13 ms, 0 | 8.8 / 32 ms, 7 |
+| `series!`, 1 000 × 100 | 100 000 | 10.5 / 6.5 / 7.0 ms | 11.9 / 10.2 / 10.4 ms | 7.4 / 18 ms, 1 | 12.0 / 35 ms, 11 |
+| `lines!` ×100, 1 000 each | 100 000 | 8.8 / 9.4 / 6.8 ms | 13.4 / 10.0 / 7.9 ms | 6.8 / 13 ms, 0 | 6.8 / 14 ms, 0 |
+
+Up to 10 000 vertices a hover takes under 5 ms on both backends, well inside a frame. At 100 000
+vertices it takes 6 to 17 ms whether the fade redraws or not. That cost is finding the line
+under the pointer and reading out its sample, which predates the fade: the `:lines` hit test
+measures the distance to every edge of every path in the layer, and the manifest lists
+separate plots in order, so on the first of 100 `lines!` plots it stops after one plot
+(2.8 / 1.8 ms on `:cairo`, 3.7 / 2.5 ms on `:webgl`) and on the last it has tested them all.
+The fade's own cost, *swap* less *along* at the same end, is up to about 3 ms below 100 000
+vertices and a few ms at 100 000, as large as the run-to-run noise there (*along* came out
+above *swap* in five rows, two on `:cairo` and three on `:webgl`); the largest gap is the 1 000-line `series!` on
+`:cairo`, 4 to 7 ms. Crossing lines on a 100 000-vertex figure then drops a frame now and then.
+Across the table, the slow frames were mostly frames in which the fade redrew: 3 of 3 on `:cairo` and 30
+of 36 on `:webgl`. The `:webgl` sweep has slow frames even at 1 000 vertices, where the whole
+handler takes under 3 ms, so part of its count is the page's other work, not the hover. The
+fix that keeps the 100 000-vertex figures inside a frame is the hit test (#469), not the fade.
+
+Run-to-run noise on the container is large: across three runs the 100 000-vertex handler
+times moved by up to 2 times, and the slow-frame counts more. The `:webgl` handler times
+follow `:cairo`'s, as they should with the same overlay code; its frames are slow for another
+reason, headless Chromium drawing the WGLMakie canvas in software, which puts each pair of
+frames near 1 s and is not part of a hover.
+
 ## Stress — where it stops being render-bound
 
 **Live round trip against payload.** Same method as above with a heavier downstream cell:
