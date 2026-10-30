@@ -372,7 +372,7 @@ separate plots in order, so on the first of 100 `lines!` plots it stops after on
 (2.8 / 1.8 ms on `:cairo`, 3.7 / 2.5 ms on `:webgl`) and on the last it has tested them all.
 The fade's own cost, *swap* less *along* at the same end, is up to about 3 ms below 100 000
 vertices and a few ms at 100 000, as large as the run-to-run noise there (*along* came out
-above *swap* in four rows, two per backend); the largest gap is the 1 000-line `series!` on
+above *swap* in five rows, two on `:cairo` and three on `:webgl`); the largest gap is the 1 000-line `series!` on
 `:cairo`, 4 to 7 ms. Crossing lines on a 100 000-vertex figure then drops a frame now and then.
 Across the table, the slow frames were mostly frames in which the fade redrew: 3 of 3 on `:cairo` and 30
 of 36 on `:webgl`. The `:webgl` sweep has slow frames even at 1 000 vertices, where the whole
