@@ -26,7 +26,8 @@ julia bench/encoding_experiment.jl                          # own temp env (MsgP
 `payload_envelope.jl` and `stress.jl` both `seed!(0)`, so their PNG and manifest sizes reproduce
 exactly; render milliseconds are wall-clock and vary run to run. Three kinds of number here are
 one-off measurements with no committed harness, so they are dated snapshots: the live click
-round trip, the `@bind` view-commit baseline, and the WGL context-lifecycle sweep (a local e2e
+round trip (except "Click to value cell", which has `bench/value_roundtrip/`), the `@bind`
+view-commit baseline, and the WGL context-lifecycle sweep (a local e2e
 tool, `test/e2e/ctx_growth.mjs`, not CI).
 
 **When to re-run** (the standing practice in `CLAUDE.md`): on every manifest-shape change (a new
@@ -304,6 +305,45 @@ The round trip is the Julia render floor (~45–70 ms) plus a few tens of ms of 
 and paint: render time, not the browser, is the bottleneck. Localhost only, so no network
 latency. Re-highlighting a selection is cheaper still, since the overlay draws it with no round
 trip.
+
+### Click to value cell (#479)
+
+A real click on a plain 5-point scatter, timed until the `@bind` value cell shows the new value,
+on both backends, with a plain HTML slider (no Masque) as the control. Headless Chromium against
+a live Pluto 1 kernel (notebooks in a worker) on the warmed env, the clicked widget in view,
+fresh session per notebook, medians of 10, measured 2026-10-30 on the cloud container, where
+WebGL is SwiftShader (software). `bench/value_roundtrip/roundtrip.mjs` reproduces the table (how
+to run it is at its top). Times are ms after the click: *commit* when the overlay fires `input`,
+*send* Pluto's first websocket send, *julia* the `time()` the value cell stamps as it runs (same
+machine clock), *recv* the first websocket message after it, *dom* the stamp in the page,
+*paint* two frames later. The `:cairo` page loads CairoMakie only; the `:webgl` page loads both,
+with three WebGL canvases below its `:cairo` widgets.
+
+| Page | Case | commit | send | julia | recv | dom | paint |
+|------|------|---:|---:|---:|---:|---:|---:|
+| `:cairo` | slider | 0.1 | 5 | 12 | 15 | 22 | **26** |
+| `:cairo` | click, value cell | 3.3 | 10 | 18 | 22 | 27 | **43** |
+| `:cairo` | click, cell re-renders a `:cairo` figure | 3.3 | 10 | 63 | 70 | 99 | **105** |
+| `:webgl` | slider, WebGL canvases off screen | 0.1 | 5 | 14 | 18 | 26 | **29** |
+| `:webgl` | `:cairo` click, value cell | 3.0 | 9 | 19 | 23 | 30 | **49** |
+| `:webgl` | slider, a WebGL canvas on screen | 0.1 | 37 | 48 | 58 | 152 | **185** |
+| `:webgl` | `:webgl` click, value cell | 3.2 | 50 | 64 | 109 | 277 | **307** |
+| `:webgl` | `:webgl` click, cell re-renders a `:webgl` figure | 3.0 | 55 | 107 | 133 | 599 | **660** |
+
+The overlay's share is the commit, 3 ms on both backends. Everything a `:webgl` click adds comes
+after it, and the slider pays nearly the same once a WebGL canvas is on screen (29 to 185 ms):
+Pluto's send and the patch coming back wait behind the frames headless Chromium draws in
+software. With one canvas in view the page drew 106 frames in 5 s and spent 2.9 s in long tasks
+in this run, and 187 frames with 0.28 s of long tasks in a review rerun, against 60 fps and none
+with the canvases off screen. The kernel's part, *send* to *julia*, is 7 to 14 ms in every row
+that doesn't re-render a figure; the re-render rows add about 45 ms for drawing it. The `:webgl`
+rows vary by up to about 2 times run to run on SwiftShader: the review rerun of the same bench
+gave 206, 218 and 381 ms for the last three rows, with the commit still 3 ms. The `:cairo` rows
+reproduced within a few ms. The first click of a fresh session takes 290 to 520 ms on `:cairo`
+(the value path compiling once) and about 400 ms on `:webgl`; the worst single sample of any
+case was 717 ms. A click on the kind-sweep notebook's scatter, with 78 canvases on the page,
+took 76 to 445 ms over 8 clicks (`bench/value_roundtrip/kind_sweep_click.mjs`). An earlier,
+unrecorded 8 to 16 s for a `:webgl` click did not reproduce in any of these.
 
 ### Re-drawing a selection (#394)
 
