@@ -111,6 +111,21 @@ export const CONTROLS_STYLE = `
 .masque-control .masque-button:hover { background: var(--b1); color: var(--t1); }
 .masque-control .masque-button:active { background: var(--b2); color: var(--t2); }
 .masque-control:has(.masque-button:focus-visible) { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
+/* Text box, as Makie draws it: a rounded box whose fill and border change under the pointer,
+   while typing, and while the text typed fails the validator; the border is the focus mark, as
+   in Makie, so the shared ring stays off. Makie centres the border on the box's edge: --sw is
+   half its width, drawn inside and out. Text typed and not yet stored (no Enter) is grey once
+   the reader leaves the box, as in Makie. */
+.masque-control .masque-textbox { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box;
+  font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1;
+  padding: var(--pt, 0) var(--pr, 0) var(--pb, 0) var(--pl, 0); border-radius: var(--r, 0);
+  border: none; box-shadow: 0 0 0 var(--sw, 0) var(--e0), inset 0 0 0 var(--sw, 0) var(--e0); background: var(--b0); color: var(--tx); caret-color: var(--cc, auto); }
+.masque-control .masque-textbox::placeholder { color: var(--ph); opacity: 1; }
+.masque-control .masque-textbox:hover { background: var(--b1); box-shadow: 0 0 0 var(--sw, 0) var(--e1), inset 0 0 0 var(--sw, 0) var(--e1); }
+.masque-control .masque-textbox:focus { background: var(--b2); box-shadow: 0 0 0 var(--sw, 0) var(--e2), inset 0 0 0 var(--sw, 0) var(--e2); }
+.masque-control .masque-textbox.invalid:focus { background: var(--b3); box-shadow: 0 0 0 var(--sw, 0) var(--e3), inset 0 0 0 var(--sw, 0) var(--e3); }
+.masque-control .masque-textbox.unstored:not(:focus) { color: var(--ph); }
+.masque-control input.masque-textbox:focus-visible { outline: none; }
 .masque-vlabel { position: absolute; display: flex; align-items: center; justify-content: flex-end; white-space: nowrap;
   pointer-events: none; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; }
 .masque-control .masque-select { width: 100%; height: 100%; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; border: none; border-radius: 0; cursor: pointer;
@@ -293,6 +308,35 @@ function styleButton(el: HTMLButtonElement, g: ControlGeometry): void {
     g.textColors?.forEach((c, i) => set(`t${i}`, c))
 }
 
+// A text box's placeholder and colours, which `onchange` can change without building it again.
+function styleTextbox(el: HTMLInputElement, g: ControlGeometry): void {
+    el.placeholder = g.placeholder ?? ""
+    const set = (name: string, v: string | undefined) => { if (v !== undefined) el.style.setProperty(`--${name}`, v) }
+    const px = (v: number | undefined) => v === undefined ? undefined : `${(100 * v) / g.w}cqw`
+    set("fs", px(g.fontsize))
+    set("r", px(g.radius))
+    set("sw", px(g.stroke === undefined ? undefined : g.stroke / 2))
+    const [l, r, b, t] = g.pad ?? [0, 0, 0, 0]
+    set("pl", px(l)); set("pr", px(r)); set("pb", px(b)); set("pt", px(t))
+    g.colors?.forEach((c, i) => set(`b${i}`, c))
+    g.borders?.forEach((c, i) => set(`e${i}`, c))
+    set("tx", g.text)
+    set("ph", g.placeholderColor)
+    set("cc", g.cursor)
+}
+
+// The validator as a whole-text match, or null for one that takes any text. A Julia pattern
+// JavaScript can't read takes any text here; Julia still checks it on Enter. Makie compares
+// the leftmost match with the text, so `r"a|ab"` refuses "ab" there while this takes it; Julia
+// has the last word on Enter.
+function textCheck(g: ControlGeometry): RegExp | null {
+    if (!g.check) return null
+    for (const extra of ["u", ""]) {
+        try { return new RegExp(`^(?:${g.check.pattern})$`, g.check.flags + extra) } catch { /* next */ }
+    }
+    return null
+}
+
 // The knob index under a pointer at (x, y) on a slider's box.
 function indexAt(box: HTMLElement, g: ControlGeometry, x: number, y: number): number {
     const r = box.getBoundingClientRect()
@@ -454,6 +498,63 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
                 restyle_: (ng) => styleButton(el, ng),
             }
         }
+        case "textbox": {
+            // The field holds the text last stored with Enter, as Makie's `stored_string` does.
+            const el = document.createElement("input")
+            el.type = "text"
+            el.className = "masque-textbox"
+            el.setAttribute("aria-label", label)
+            el.spellcheck = false
+            styleTextbox(el, g)
+            const check = textCheck(g)
+            let stored: string | null = typeof g.value === "string" ? g.value : null
+            el.value = stored ?? ""
+            const valid = () => check === null || check.test(el.value)
+            const show = () => {
+                el.classList.toggle("invalid", !valid())
+                el.classList.toggle("unstored", el.value !== (stored ?? ""))
+            }
+            const reset = () => { el.value = stored ?? ""; show() }
+            el.addEventListener("input", () => {
+                // Drop the characters the restriction refuses, keeping the caret where it was.
+                if (g.allowed !== undefined) {
+                    const at = el.selectionStart ?? el.value.length
+                    const keep = (c: string) => c > "~" || c < " " || g.allowed!.includes(c)
+                    const before = [...el.value.slice(0, at)].filter(keep).join("")
+                    const kept = before + [...el.value.slice(at)].filter(keep).join("")
+                    if (kept !== el.value) {
+                        el.value = kept
+                        el.setSelectionRange(before.length, before.length)
+                    }
+                }
+                show()
+            })
+            el.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault()
+                    if (!valid()) return
+                    stored = el.value
+                    show()
+                    hooks.commit_(id, envelope(id, stored))
+                    if (!g.keepFocus) el.blur()
+                } else if (e.key === "Escape") {
+                    if (g.resetOnBlur) reset()
+                    el.blur()
+                }
+            })
+            el.addEventListener("blur", () => { if (g.resetOnBlur) reset() })
+            show()
+            box.append(el)
+            return {
+                layer_: layer, shape_: shape(g), box_: box, get_: () => stored,
+                set_: (p) => {
+                    if (p !== null && typeof p !== "string") return
+                    stored = p
+                    reset()
+                },
+                restyle_: (ng) => styleTextbox(el, ng),
+            }
+        }
         case "slidergrid": {
             // Each slider is built as a control of its own inside the grid's box, and the grid
             // commits all of their values together. The value labels are drawn here too.
@@ -519,6 +620,10 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
 export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manifest, hooks: ControlHooks): Controls {
     const layer = document.createElement("div")
     layer.className = "masque-controls"
+    // A native `input` event leaves the shadow root, and Pluto sends the bond on every one it
+    // sees on the widget: typing in a text box would re-run the notebook's cells per keystroke.
+    // The controls commit through the host's own event, so theirs stop here, past every box.
+    layer.addEventListener("input", (e) => e.stopPropagation())
     const els = new Map<string, ControlEl>()
     // The control the reader is dragging: a frame leaves it alone until the release's frame.
     let held: string | null = null

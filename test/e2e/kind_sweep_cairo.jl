@@ -703,7 +703,8 @@ HTML(
     "<span id=\"out_controls\">CONTROLS=$(sweep_field("controls", ev_controls))</span>" *
         "<span id=\"bond_controls\" style=\"display:none\">$(repr(ev_controls))</span>" *
         "<span id=\"coords_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["layers"]))</span>" *
-        "<span id=\"axes_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["transforms"]))</span>",
+        "<span id=\"axes_controls\" style=\"display:none\">$(JSON3.write(sweep.controls.manifest["transforms"]))</span>" *
+        "<span id=\"ran_controls\" style=\"display:none\">$(time_ns())</span>",
 )
 
 # ╔═╡ c1000000-0000-0000-0000-000000000129

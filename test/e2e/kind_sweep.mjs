@@ -898,10 +898,17 @@ try {
         if (!re.test(v)) throw new Error(`${key}/${what}: value ${JSON.stringify(v)} doesn't match ${re}`);
         return v;
       };
+      // Two quick key presses commit twice, and the cell can show the first before the second.
+      const bondReaches = async (re, before, what) => {
+        let v = await waitChange(`#bond_${key}`, before, `${key}/${what}`);
+        for (let i = 0; i < 5 && !re.test(v); i++) v = await waitChange(`#bond_${key}`, v, `${key}/${what}`);
+        if (!re.test(v)) throw new Error(`${key}/${what}: value ${JSON.stringify(v)} doesn't match ${re}`);
+        return v;
+      };
 
       // Each control sits on its block's box.
       const s0 = await screenOf();
-      for (const id of ["level", "show", "span", "fine", "pick", "tall", "grid", "go", "sure"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall", "grid", "go", "word", "sure"]) {
         const g = geo(id);
         if (layers.find((l) => l.id === id)?.kind !== "control") throw new Error(`${key}: no control layer ${id}`);
         const bb = await page.locator(`[data-masque-control="${id}"]`).boundingBox();
@@ -922,7 +929,7 @@ try {
       }, key);
       // The grid's name labels stay in the picture, so its sliders and value labels are
       // checked box by box.
-      const boxes = ["level", "show", "span", "fine", "pick", "tall", "sure", "go"].map((id) => [id, geo(id)]);
+      const boxes = ["level", "show", "span", "fine", "pick", "tall", "sure", "go", "word"].map((id) => [id, geo(id)]);
       geo("grid").sliders.forEach((s, i) => boxes.push([`grid-${i}`, s], [`grid-${i}-value`, s.valueLabel]));
       for (const [id, g] of boxes) {
         const png = PNG.sync.read(await page.screenshot({ clip: { x: s0.left + g.x * s0.sc + 1, y: s0.top + g.y * s0.sc + 1, width: Math.max(1, g.w * s0.sc - 2), height: Math.max(1, g.h * s0.sc - 2) } }));
@@ -946,7 +953,7 @@ try {
       await ctl("level").focus();
       await page.keyboard.press("ArrowRight");
       await page.keyboard.press("ArrowRight");
-      v = await bondHas(/level = 5,/, v, "keyboard");
+      v = await bondReaches(/level = 5,/, v, "keyboard");
       await expectLevel(5, "keyboard");
       passed.push(`${key}/slider-keyboard`);
 
@@ -1051,6 +1058,25 @@ try {
         await b.click();
         v = await bondHas(/go = 2\b/, v, "button");
         passed.push(`${key}/button`);
+      }
+      // The text box checks the text as the reader types and stores it on Enter.
+      {
+        const t = ctl("word", "input");
+        await t.click();
+        // Typing sends nothing until Enter: the cell reading the bond doesn't run again.
+        const ran = await textOf(`#ran_${key}`);
+        await page.keyboard.type("ab1");
+        if (!(await t.evaluate((el) => el.classList.contains("invalid")))) throw new Error(`${key}/textbox: "ab1" not marked invalid`);
+        await page.waitForTimeout(1500);
+        if ((await textOf(`#ran_${key}`)) !== ran) throw new Error(`${key}/textbox: typing re-ran the cell reading the bond`);
+        await page.keyboard.press("Enter");
+        await page.waitForTimeout(1500);
+        if (!/word = nothing/.test(await textOf(`#bond_${key}`))) throw new Error(`${key}/textbox: invalid text was stored`);
+        await page.keyboard.press("Backspace");
+        await page.keyboard.type("c");
+        await page.keyboard.press("Enter");
+        v = await bondHas(/word = "abc"/, v, "textbox");
+        passed.push(`${key}/textbox`);
       }
       // A checkbox drawn as Makie draws it (#428): its square is `size` across in the middle of
       // the box, filled in its checked colour with the mark showing once ticked; Space unticks it.

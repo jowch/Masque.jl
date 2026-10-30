@@ -1494,7 +1494,7 @@ function build_kind_sweep()
     end
 
     controls = let
-        fig = Figure(size = (480, 380))
+        fig = Figure(size = (480, 420))
         ax = Axis(fig[1, 1:2]; title = "controls", limits = (0, 10, 0, 10))
         level = lines!(ax, [0.0, 10.0], [3.0, 3.0]; color = :red, linewidth = 4)
         sl = Makie.Slider(fig[2, 1]; range = 0:10, startvalue = 3)   # WGLMakie also exports Bonito's `Slider`
@@ -1511,8 +1511,10 @@ function build_kind_sweep()
         sure = Checkbox(fig[3, 3]; checked = false, size = 18, checkboxcolor_checked = :darkorange, width = 40, tellwidth = false)
         # A button (#431): its field counts clicks.
         go = Makie.Button(fig[4:5, 3]; label = "Go")   # WGLMakie also exports Bonito's `Button`
+        # A text box (#433): lower-case letters only, stored on Enter.
+        word = Textbox(fig[6, 1:3]; placeholder = "a word", validator = r"[a-z]+", width = 200)
         masque(
-            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick, tall = tall, grid = grid, go = go, sure = sure);
+            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick, tall = tall, grid = grid, go = go, word = word, sure = sure);
             onchange = st -> begin
                 update!(level, [0.0, 10.0], fill(Float64(st.level), 2); visible = st.show)
                 # A dependent menu: the checkbox swaps the menu's options.

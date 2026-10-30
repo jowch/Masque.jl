@@ -63,19 +63,26 @@ block in the figure that `masque` isn't given would look live and do
 nothing, so `masque` raises an error naming its kind. Name it, or take it
 out of the figure.
 
-Text boxes are pictures for now, and `masque` warns when the figure has
-one, since the reader could click it and nothing would happen. A
-`SliderGrid` or `Button` that `masque` isn't given only warns, because
-figures with one worked before `masque` could draw it. A grid's value
-labels use its own `format` for sliders of up to 101 values (20 for an
-interval slider); past that, the browser writes the plain value. A
-`Button`'s field counts its clicks. With `onchange`, Masque sets the
-button's `clicks` before calling your function, so code listening to it
-with `on(b.clicks)` runs too.
+A `SliderGrid`, `Button` or `Textbox` that `masque` isn't given only
+warns, because figures with one worked before `masque` could draw it. A
+grid's value labels use its own `format` for sliders of up to 101 values
+(20 for an interval slider); past that, the browser writes the plain
+value. A `Button`'s field counts its clicks. With `onchange`, Masque sets
+the button's `clicks` before calling your function, so code listening to
+it with `on(b.clicks)` runs too. A `Textbox`'s field holds the text the
+reader last entered with Enter, or `nothing` before any. A `validator`
+that is a `Regex` or a number type turns the box red as the reader types,
+as in Makie; one that is a function runs when they press Enter, and text
+it refuses leaves the field as it was. With `onchange`, the box then goes
+back to the stored text; without it, the box still shows what they typed,
+and `masque` warns. A box as wide as its placeholder, Makie's default,
+keeps that width as the reader types and scrolls its text, where Makie
+widens it.
 
 A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
-doesn't run yet: a click flips the box, and `masque` warns when a named
-checkbox has one.
+does nothing in a notebook: a click always flips the box, and `masque`
+warns when a named checkbox has one. For one choice of several, use a
+`Menu`, or set the other boxes in `masque`'s own `onchange`.
 
 With WGLMakie loaded, `Slider` and `Button` also name controls from
 Bonito, so Julia asks which one you mean; write `Makie.Slider` and

@@ -14,6 +14,12 @@ All notable changes to this project are documented here. The format is based on
   hover and pressed colours. Its field counts the clicks. With `onchange`, each click also sets
   the button's `clicks`, so code listening to it runs. A button that `masque` isn't given warns,
   as before (#431).
+- A Makie `Textbox` named in `masque` works in the notebook, drawn as Makie draws it. Its field
+  holds the text the reader last entered with Enter, or `nothing` before any. A `Regex` or
+  number-type `validator` and the `restriction` are checked as the reader types; a function
+  `validator` is checked on Enter, and text it refuses leaves the field as it was; without
+  `onchange` the box can't learn that, so `masque` warns. A text box that `masque` isn't given
+  warns, as before (#433).
 - `linked(plots...)` makes plots that draw the same rows one selection: clicking a mark in
   any of them selects its row in all of them, and hovering a mark outlines the same row on the
   others. The `@bind` field holds the row's position, or with `key = :id` the `id` of its
@@ -70,8 +76,9 @@ All notable changes to this project are documented here. The format is based on
 - A Makie `Checkbox` named in `masque` is drawn the way Makie draws it: its `size`,
   `roundness`, stroke, both box and checkmark colours and its `checkmark` marker carry over,
   and the checkmark shows in its unchecked colour under the pointer. Only the square takes the
-  pointer, as in Makie. A checkbox with its own `onchange` warns that `masque` doesn't run it
-  yet, so a click flips the box (#428, #457).
+  pointer, as in Makie. Makie's `onchange` on a checkbox does nothing in `masque`, where a
+  click always flips the box, and `masque` warns once when a named checkbox has one (#428,
+  #457).
 - A legend entry over `select = :many` plots picks their marks when `bind` leaves the legend
   out, as in `bind = :picked`. Before, the click did nothing.
 - On a focused figure, Cmd or Ctrl or Alt with an arrow key, Home, End, Page Up or Page Down
