@@ -1064,6 +1064,20 @@ try {
         if ((await ctl("pick", "input").inputValue()) !== "y") throw new Error(`${key}/menu-click: box shows ${await ctl("pick", "input").inputValue()}, want y`);
       }
       passed.push(`${key}/interval-checkbox-menu`);
+      // The menu, button, text box and grid value label are in Makie's font, fetched once for the
+      // page (#476).
+      {
+        const fam = async (sel) => ctl(sel[0], sel[1]).evaluate((el) => getComputedStyle(el).fontFamily);
+        for (const sel of [["pick", "input"], ["go", "button"], ["word", "input"], ["grid", ".masque-vlabel"]]) {
+          const f = await fam(sel);
+          if (!f.startsWith('"TeX Gyre Heros Makie"')) throw new Error(`${key}/font: ${sel.join(" ")} is in ${f}, want "TeX Gyre Heros Makie" first`);
+        }
+        const loaded = await page.waitForFunction(() =>
+          [...document.fonts].filter((f) => f.family.replace(/"/g, "") === "TeX Gyre Heros Makie" && f.status === "loaded").length,
+          null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => 0);
+        if (loaded !== 1) throw new Error(`${key}/font: ${loaded} loaded TeX Gyre Heros Makie faces, want 1`);
+        passed.push(`${key}/font`);
+      }
       // The slider grid's slider moves its field and its value label, which Julia formatted.
       {
         const lab = ctl("grid", ".masque-vlabel");

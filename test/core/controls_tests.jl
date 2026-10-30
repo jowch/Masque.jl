@@ -394,6 +394,38 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["off"] == Masque._css_color(Makie.to_color(:blue))
     end
 
+    @testset "a control's text ships the font Makie draws it in (#476)" begin
+        regular = joinpath(Makie.assetpath("fonts"), "TeXGyreHerosMakie-Regular.otf")
+        bold = joinpath(Makie.assetpath("fonts"), "TeXGyreHerosMakie-Bold.otf")
+        hash(path) = "sha384-" * Masque.base64encode(Masque.sha384(read(path)))
+        fig = Figure(); Axis(fig[1, 1])
+        menu = Menu(fig[2, 1]; options = ["a", "b"])
+        b = Button(fig[3, 1]; label = "Go", font = :bold)
+        tb = Textbox(fig[4, 1]; font = "TeX Gyre Heros Makie Italic")
+        sg = SliderGrid(fig[5, 1], (label = "f", range = 1:3))
+        w = masque(fig, (pick = menu, go = b, text = tb, grid = sg))
+        geom(id) = _layer(w.manifest, id)["geometry"]
+        # Makie's own fonts name where the installed file is online, and its hash.
+        f = geom("pick")["font"]
+        @test f["family"] == "TeX Gyre Heros Makie" && !haskey(f, "weight") && !haskey(f, "style")
+        @test f["integrity"] == hash(regular)
+        @test f["src"] == [
+            "https://cdn.jsdelivr.net/gh/MakieOrg/Makie.jl@v0.21.0/assets/fonts/TeXGyreHerosMakie-Regular.otf",
+            "https://raw.githubusercontent.com/MakieOrg/Makie.jl/v0.21.0/assets/fonts/TeXGyreHerosMakie-Regular.otf",
+        ]
+        f = geom("go")["font"]
+        @test f["weight"] == 700 && f["integrity"] == hash(bold) && endswith(f["src"][1], "/TeXGyreHerosMakie-Bold.otf")
+        @test geom("text")["font"]["style"] == "italic"
+        @test only(geom("grid")["sliders"])["valueLabel"]["font"]["integrity"] == hash(regular)
+        # A figure's own `fonts` reach the menu, which has no `font` of its own.
+        fig = Figure(fonts = (; regular = "TeX Gyre Heros Makie Bold")); Axis(fig[1, 1])
+        menu = Menu(fig[2, 1]; options = ["a", "b"])
+        @test _layer(masque(fig, (pick = menu,)).manifest, "pick")["geometry"]["font"]["weight"] == 700
+        # The weight comes from the style's name.
+        @test Masque._font_weight("SemiBold Italic") == 600 && Masque._font_weight("Extra-Light") == 200
+        @test Masque._font_weight("Regular") == 400 && Masque._font_weight("Bold") == 700
+    end
+
     @testset "a menu ships Makie's list: cells, colours, arrow, direction and search (#429)" begin
         fig = Figure(); Axis(fig[1, 1])
         menu = Menu(

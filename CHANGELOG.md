@@ -23,6 +23,11 @@ All notable changes to this project are documented here. The format is based on
 - A mark hidden under a legend stays hidden: its hover ring, pick outline and fade no longer
   draw over the legend. A legend with no background, or a mostly see-through one, still shows
   the highlights of the marks under it (#437).
+- The text of a `Menu`, `Button`, `Textbox` or `SliderGrid` value label is in the font Makie
+  draws it in, so it matches the rest of the figure. Before, it was in Helvetica or Arial. For
+  Makie's own fonts the browser downloads the font file once, about 33 KB, and only on a page
+  showing one of these controls; offline it keeps Helvetica or Arial. A font of your own is
+  used if the reader has it installed (#476).
 - Hovering a line plot with many points keeps up with the pointer: a figure of 100 000 points
   no longer drops frames as the pointer crosses its lines (#469).
 - A faded line stays faded where it crosses a line or mark that stays in focus. It used to show at

@@ -52,6 +52,64 @@ function _block_rect(b, ctx)
     return (Float64(o[1] * s), Float64(ctx.height - (o[2] + w[2]) * s), Float64(w[1] * s), Float64(w[2] * s))
 end
 
+# The font Makie draws a control's text in (#476), so the browser's text matches the figure's:
+# its family name, and its weight and style when not 400 and upright. For one of Makie's own
+# fonts it also names where the same file is online and the installed copy's `sha384`; the
+# browser fetches it only when it draws a control with text, and only if the hash matches.
+# Makie's repo moved the fonts out of its tree after v0.21.0, whose files are byte-identical to
+# the ones the assets artifact installs. jsDelivr serves the repo's cached files only (it is past
+# jsDelivr's size limit), so GitHub's raw copy comes second. A font of the author's sends its
+# name alone: the reader's browser uses it if installed.
+const _MAKIE_FONT_TAG = "v0.21.0"
+const _MAKIE_FONT_FILES = Dict(
+    "tex gyre heros makie regular" => "TeXGyreHerosMakie-Regular.otf",
+    "tex gyre heros makie bold" => "TeXGyreHerosMakie-Bold.otf",
+    "tex gyre heros makie italic" => "TeXGyreHerosMakie-Italic.otf",
+    "tex gyre heros makie bold italic" => "TeXGyreHerosMakie-BoldItalic.otf",
+)
+const _FONT_HASHES = Dict{String, String}()
+const _FONT_HASHES_LOCK = ReentrantLock()
+const _FONT_WEIGHTS = (
+    "thin" => 100, "extralight" => 200, "ultralight" => 200, "light" => 300, "medium" => 500,
+    "semibold" => 600, "demibold" => 600, "extrabold" => 800, "ultrabold" => 800, "black" => 900,
+    "heavy" => 900, "bold" => 700,
+)
+
+function _font_weight(style::AbstractString)
+    st = replace(lowercase(style), r"[\s-]" => "")
+    for (name, w) in _FONT_WEIGHTS
+        occursin(name, st) && return w
+    end
+    return 400
+end
+
+function _font_hash(path)
+    return lock(_FONT_HASHES_LOCK) do
+        get!(() -> "sha384-" * base64encode(sha384(read(path))), _FONT_HASHES, path)
+    end
+end
+
+# `f` is the block's `font`: a name, a path, a font, or a `Symbol` the figure's `fonts` holds.
+function _control_font(b, f)
+    t = Makie.theme(b.blockscene)
+    font = Makie.to_font(haskey(t, :fonts) ? t[:fonts] : Makie.theme(:fonts), f)
+    style = string(font.style_name)
+    d = Dict{String, Any}("family" => string(font.family_name))
+    w = _font_weight(style)
+    w == 400 || (d["weight"] = w)
+    occursin(r"italic|oblique"i, style) && (d["style"] = "italic")
+    file = get(_MAKIE_FONT_FILES, lowercase(font.fontname), nothing)
+    path = file === nothing ? nothing : Makie.assetpath("fonts", file)
+    if path !== nothing && isfile(path)
+        d["src"] = String[
+            "https://cdn.jsdelivr.net/gh/MakieOrg/Makie.jl@$(_MAKIE_FONT_TAG)/assets/fonts/$file",
+            "https://raw.githubusercontent.com/MakieOrg/Makie.jl/$(_MAKIE_FONT_TAG)/assets/fonts/$file",
+        ]
+        d["integrity"] = _font_hash(path)
+    end
+    return d
+end
+
 # A numeric range ships as its start and step, so a fine slider costs nothing; anything else
 # ships every value's label.
 function _range_geometry!(g, rng)
@@ -128,6 +186,8 @@ function _menu_geometry!(g, b::Makie.Menu, ctx)
     l, r, bot, top = Float64.(b.textpadding[])
     g["prompt"] = string(b.prompt[])
     g["fontsize"] = Float64(b.fontsize[]) * s
+    # Makie's menu has no `font`: its text takes the figure's regular font.
+    g["font"] = _control_font(b, :regular)
     g["padding"] = l * s
     g["text"] = _css_color(b.textcolor[])
     g["off"] = _css_color(b.selection_cell_color_inactive[])
@@ -175,6 +235,7 @@ function _button_geometry!(g, b::Makie.Button, ctx)
     s = ctx.scaling
     g["caption"] = string(b.label[])
     g["fontsize"] = Float64(b.fontsize[]) * s
+    g["font"] = _control_font(b, b.font[])
     g["radius"] = Float64(b.cornerradius[]) * s
     g["stroke"] = Float64(b.strokewidth[]) * s
     g["strokeColor"] = _css_color(b.strokecolor[])
@@ -191,6 +252,7 @@ function _textbox_geometry!(g, b::Makie.Textbox, ctx)
     s = ctx.scaling
     g["placeholder"] = string(b.placeholder[])
     g["fontsize"] = Float64(b.fontsize[]) * s
+    g["font"] = _control_font(b, b.font[])
     g["pad"] = Float64[p * s for p in b.textpadding[]]   # left, right, bottom, top
     g["radius"] = Float64(b.cornerradius[]) * s
     g["stroke"] = Float64(b.borderwidth[]) * s
@@ -255,7 +317,8 @@ function _grid_slider_geometry(sl, name, vl, ctx)
     x, y, w, h = _block_rect(vl, ctx)
     lab = Dict{String, Any}(
         "x" => x, "y" => y, "w" => w, "h" => h,
-        "fontsize" => Float64(vl.fontsize[]) * ctx.scaling, "color" => _css_color(vl.color[]),
+        "fontsize" => Float64(vl.fontsize[]) * ctx.scaling, "font" => _control_font(vl, vl.font[]),
+        "color" => _css_color(vl.color[]),
     )
     fmt = _valuelabel_format(sl, vl)
     rng = sl.range[]
