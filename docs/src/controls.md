@@ -30,7 +30,7 @@ field of the `@bind` value, which holds:
 | [`IntervalSlider`](https://docs.makie.org/stable/reference/blocks/intervalslider) | a `(low, high)` pair from its `range` |
 | [`Toggle`](https://docs.makie.org/stable/reference/blocks/toggle) | `true` when it is on |
 | [`Checkbox`](https://docs.makie.org/stable/reference/blocks/checkbox) | `true` when it is ticked |
-| [`Menu`](https://docs.makie.org/stable/reference/blocks/menu) | the option chosen, or its value for a `label => value` option; `nothing` before a choice |
+| [`Menu`](https://docs.makie.org/stable/reference/blocks/menu) | the option chosen, or its value for a `label => value` option; the first option until the reader picks, or `nothing` with `default = nothing` |
 | [`SliderGrid`](https://docs.makie.org/stable/reference/blocks/slidergrid) | a tuple of its sliders' values, in order |
 | [`Button`](https://docs.makie.org/stable/reference/blocks/button) | the number of clicks so far |
 | [`Textbox`](https://docs.makie.org/stable/reference/blocks/textbox) | the text last entered with Enter, or `nothing` before any |
@@ -38,7 +38,8 @@ field of the `@bind` value, which holds:
 Each control takes the colors, sizes and labels you give the block, so
 it looks as it does in Makie. A `Textbox` checks its `validator` and
 `restriction` as Makie does: the box turns red while the text fails, and
-Enter stores only text that passes.
+Enter stores only text that passes. A few exceptions are listed under
+[Differences from Makie](@ref).
 
 In a static HTML export the controls still set the `@bind` value; only
 `onchange` below needs a running notebook.
@@ -95,7 +96,7 @@ Bonito, so Julia asks which one you mean. Write `Makie.Slider` and
 ## Differences from Makie
 
 A few things work differently in a notebook, because the browser draws
-each control.
+each control and runs it without Julia.
 
 A `Menu` opens the browser's own list, so the list doesn't take the
 block's colors or font, and typing doesn't filter it. The closed menu
@@ -106,12 +107,14 @@ does nothing: a click always flips the box, and `masque` warns when a
 named checkbox has one. For one choice of several, use a `Menu`, or set
 the other boxes in `masque`'s own `onchange`.
 
-A `Textbox` `validator` that is a function, or a type other than a
-number, runs only when the reader presses Enter, so the box doesn't turn
+A `Textbox` `validator` that is a function, a type other than a number
+(`Bool` counts as other), or a `Regex` with the `x` flag runs only when
+the reader presses Enter, so the box doesn't turn
 red as they type. Text it refuses leaves the field as it was. With
 `onchange`, the box then goes back to the stored text; without it, the
 box still shows what they typed, and `masque` warns. To check as the
-reader types, use a `Regex` or a number type.
+reader types, use a plain `Regex` or a number type such as `Int` or
+`Float64`.
 
 A `Textbox` as wide as its placeholder, Makie's default, keeps that width
 as the reader types and scrolls its text, where Makie widens the box. To
