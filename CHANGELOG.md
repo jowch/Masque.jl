@@ -25,6 +25,8 @@ All notable changes to this project are documented here. The format is based on
   the highlights of the marks under it (#437).
 - Hovering a line plot with many points keeps up with the pointer: a figure of 100 000 points
   no longer drops frames as the pointer crosses its lines (#469).
+- A faded line stays faded where it crosses a line or mark that stays in focus. It used to show at
+  full strength at each crossing (#462).
 
 ## [0.4.2] - 2026-10-30
 

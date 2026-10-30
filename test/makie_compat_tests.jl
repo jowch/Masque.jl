@@ -27,6 +27,17 @@
         @test Masque._converted(sc3) isa Tuple
     end
 
+    @testset "_painted_atoms + _atomic_parts (the fade's drawing order, #462)" begin
+        atoms = Masque._painted_atoms(fig)
+        @test atoms isa AbstractVector
+        @test sc in atoms && ln in atoms
+        @test findfirst(a -> a === sc, atoms) < findfirst(a -> a === ln, atoms)
+        @test issorted(Makie.zvalue2d.(atoms))
+        @test Masque._atomic_parts(ln) == [ln]
+        parts = Masque._atomic_parts(cf)
+        @test parts isa AbstractVector && !isempty(parts) && all(a -> a in atoms, parts)
+    end
+
     @testset "_child_plots" begin
         top = Masque._child_plots(ax.scene)
         @test top isa AbstractVector

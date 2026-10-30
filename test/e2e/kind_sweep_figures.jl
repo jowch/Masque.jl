@@ -488,9 +488,13 @@ kind_sweep_meta() = [
         # A legend entry's linked highlight isn't wash/ring on the legend layer itself (that
         # meta stays `selected = nothing`, like heatmap/grid) — it's g.link on OTHER layers.
         # "cases" checks two fan-out kinds: a polyline entry (ring) and a circles entry (wash).
+        # `quad` and `lin` cross at x = 2, and `lin` is drawn after `quad`: hovering `quad`
+        # puts `lin`'s cover back over it there, so `lin` stays faded at the crossing (#462).
+        # `coveredOver` is the least count of faded marks put back (`pts`, drawn after `quad`
+        # inside its box, may count too).
         "links" => Dict(
             "cases" => [
-                Dict("index" => 0, "label" => "quad"),
+                Dict("index" => 0, "label" => "quad", "coveredOver" => 1),
                 Dict("index" => 2, "label" => "pts"),
             ],
         ),

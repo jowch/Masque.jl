@@ -85,10 +85,16 @@ plot area or white on a dark one, else (no `colors`) the chrome grey. Other plot
 grid lines and text keep their look, except where a faded mark's cover lies over them; a legend's
 pick fades every series that legend names, lines included, and the picked line keeps its own
 colour (no wash). A whole line picked with no other line in scope to fade (a lone line on an
-Axis3) keeps a pick halo along it instead. Known gaps: only a covered circle pick is repainted (a
-picked bar or polygon under a later unpicked one stays faded where they overlap; lines carry no
-`colors`, so a faded line crossing a picked one shows unfaded at the crossing), and a
-non-circular scatter marker (`:rect`, `:diamond`) is covered and punched as a circle.
+Axis3) keeps a pick halo along it instead. The picks are punched out in drawing order (each
+layer's `draw`, its plot's place in the backend's order), and a faded line drawn after a kept
+mark it meets (or any faded mark drawn after a kept line) has its cover put back over it, so a
+faded line stays faded where it crosses a kept one (#462); a line drawn under a kept one is
+already hidden by it in the image. Layers listed by hand with `auto = false` carry no `draw`, and
+then only a layer's own elements are put back over each other. On an Axis3 nothing is put back:
+the backend's depth test, not the drawing order, decides which line is in front there. Known gaps: only a covered circle pick is
+repainted (a picked bar or polygon under a later unpicked one stays faded where they overlap; on
+an Axis3 a faded line in front of a kept one shows unfaded where they cross),
+and a non-circular scatter marker (`:rect`, `:diamond`) is covered and punched as a circle.
 
 Previews fade the same way, but leave more showing: `1 - --masque-preview-opacity` (default 0.35
 left showing; overlaystyle `preview_opacity`; the wrapper carries `masque-preview`) on an axis
