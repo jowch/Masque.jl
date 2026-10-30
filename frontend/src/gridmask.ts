@@ -102,8 +102,8 @@ export function decodeMask(layer: HitLayer, env: unknown): GridMask | null {
 // The highlight for a mask, as one hit: ["mask", fill path, edge path, side]. The fill is the
 // selected cells, one rect per run (one path, so touching rows paint as one area with no
 // seams); the edge is the outline, each cell side that borders an unselected cell or the grid's
-// edge, joined along a row or column; the side is the shorter side of the selected cells'
-// bounding box, image px. Index -1 keeps its key apart from every cell's.
+// edge, joined along a row or column; the side is how thin the selection gets (maskPaths).
+// Index -1 keeps its key apart from every cell's.
 export function maskHit(layer: HitLayer, mask: GridMask): Hit | null {
     const gg = layer.geometry as GridGeometry
     if (mask.length !== gg.ncols * gg.nrows) return null
@@ -112,15 +112,16 @@ export function maskHit(layer: HitLayer, mask: GridMask): Hit | null {
 }
 
 // The fill and edge paths of `mask`, an `nc` × `nr` row-major block of cells whose edges are
-// `xe` (nc + 1) and `ye` (nr + 1), and the shorter side of its bounding box; null when it holds
-// no cell. A region's outline passes the
-// block around the region alone (regions.ts), so it walks that block, not the whole grid.
+// `xe` (nc + 1) and `ye` (nr + 1), and the selection's thinnest span, image px: the shortest
+// unbroken run of selected cells along any row or down any column. So a lone cell, a scatter
+// of them, or a one-cell-wide arm measures as thin as its cells, however far the picks spread.
+// Null when it holds no cell. A region's outline passes the block around the region alone
+// (regions.ts), so it walks that block, not the whole grid.
 export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<number>, ye: ArrayLike<number>): [string, string, number] | null {
     // Walks the typed array directly (no per-cell closure): a click on a photo-sized grid walks
-    // every cell three times here.
+    // every cell four times here.
     let fill = ""
-    // The bounding box in cell indices: the first and last selected row, the outermost columns.
-    let ilo = nc, ihi = -1, jlo = -1, jhi = -1
+    let thin = Infinity
     for (let j = 0; j < nr; j++) {
         const row = j * nc
         let i = 0
@@ -129,13 +130,20 @@ export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<
             const i0 = i
             while (i < nc && mask[row + i]) i++
             fill += `M${xe[i0]} ${ye[j]}H${xe[i]}V${ye[j + 1]}H${xe[i0]}Z`
-            if (jlo < 0) jlo = j
-            jhi = j
-            ilo = Math.min(ilo, i0)
-            ihi = Math.max(ihi, i)
+            thin = Math.min(thin, Math.abs(xe[i] - xe[i0]))
         }
     }
     if (fill === "") return null
+    // Runs down each column: start[i] is the row column i's current run began at.
+    const start = new Int32Array(nc).fill(-1)
+    for (let j = 0; j <= nr; j++) {
+        const row = j * nc
+        for (let i = 0; i < nc; i++) {
+            const on = j < nr && mask[row + i]
+            if (on && start[i] < 0) start[i] = j
+            else if (!on && start[i] >= 0) { thin = Math.min(thin, Math.abs(ye[j] - ye[start[i]])); start[i] = -1 }
+        }
+    }
     let edge = ""
     // Horizontal sides: the line y = ye[j] between rows j-1 and j, for j in 0..nr (a row
     // outside the grid counts as unselected), joined along the row.
@@ -163,5 +171,5 @@ export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<
         }
     }
     for (let i = 0; i <= nc; i++) if (open[i] >= 0) vside(i, open[i], nr)
-    return [fill, edge, Math.min(Math.abs(xe[ihi] - xe[ilo]), Math.abs(ye[jhi + 1] - ye[jlo]))]
+    return [fill, edge, thin]
 }

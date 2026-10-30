@@ -7,9 +7,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Fixed
-- A large region picked on a grid of small cells is outlined inside its edge, like any other
-  area of 12 px or more. Before, the outline went by the grid's smallest cell, so it sat on the
-  edge and spilled onto the neighbouring cells (#463).
+- A large block of cells picked on a grid of small cells is outlined inside its edge, like any
+  other area 12 px or more across. Before, the outline went by the grid's smallest cell, so it
+  sat on the edge and spilled onto the neighbouring cells. Lone cells and one-cell-wide strokes
+  stay outlined on their edge, so their colour still shows (#463).
 
 ## [0.4.2] - 2026-10-30
 

@@ -7327,9 +7327,12 @@ describe("a grid pick is inset or centred by its own size, not the grid's smalle
         expect(align(grid([2, 4, 10, 3, 4, 10, 4, 4, 10, 5, 4, 10]))).toBe("in")
     })
 
-    it("a region thinner than 12 px on either side is centred", () => {
+    it("a pick thinner than 12 px anywhere is centred", () => {
         expect(align(grid([3, 4, 1]))).toBe("mid") // one 6 px cell
         expect(align(grid([3, 0, 40]))).toBe("mid") // a whole row: 240 × 6
+        expect(align(grid([3, 4, 1, 7, 30, 1]))).toBe("mid") // two lone cells far apart
+        // An L of one-cell-wide arms: column 4 down rows 2..7, then row 7 out to column 13.
+        expect(align(grid([2, 4, 1, 3, 4, 1, 4, 4, 1, 5, 4, 1, 6, 4, 1, 7, 4, 10]))).toBe("mid")
     })
 
     it("one thin cell elsewhere on the grid leaves a large cell inset", () => {
