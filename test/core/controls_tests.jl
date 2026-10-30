@@ -1,4 +1,4 @@
-using Test, Masque, CairoMakie, Makie, FileIO
+using Test, Masque, CairoMakie, Makie, FileIO, JSON3
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
 # Makie blocks as controls (#345): a named block is a field holding its plain value, drawn by
@@ -168,19 +168,61 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
     end
 
     @testset "a block masque shows as a picture is a warning naming its kind (#426)" begin
-        # A `SliderGrid`, `Button` or `Textbox` would look live and do nothing too, but figures
-        # with one worked before, so it warns instead of failing.
+        # A `Button` or `Textbox` would look live and do nothing too, but figures with one
+        # worked before, so it warns instead of failing.
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
-        SliderGrid(fig[2, 1], (label = "a", range = 1:3))
-        Button(fig[3, 1]; label = "Go")
-        Textbox(fig[4, 1])
-        @test_logs (:warn, r"has a SliderGrid, a Button and a Textbox, which masque shows as a picture.*separate Makie `Slider`s.*PlutoUI's Button"s) masque(fig)
+        Button(fig[2, 1]; label = "Go")
+        Textbox(fig[3, 1])
+        @test_logs (:warn, r"has a Button and a Textbox, which masque shows as a picture.*PlutoUI's Button"s) masque(fig)
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
         Button(fig[2, 1])
         @test_logs (:warn, r"has a Button, which.*PlutoUI's Button") masque(fig)
+        # A grid masque isn't given is a warning too, not the error other blocks get (#430).
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
         SliderGrid(fig[2, 1], (label = "a", range = 1:3))
-        @test_logs (:warn, r"^(?!.*PlutoUI).*separate Makie `Slider`s"s) masque(fig)
+        @test_logs (:warn, r"SliderGrid that masque wasn't given.*Name it to make its sliders live"s) masque(fig)
+    end
+
+    @testset "a slider grid is a field holding a tuple of its slider values (#430)" begin
+        fig = Figure(size = (500, 400)); Axis(fig[1, 1])
+        sg = SliderGrid(
+            fig[2, 1],
+            (label = "freq", range = 0:0.5:3, format = "{:.1f} Hz", startvalue = 1.0),
+            (label = "span", range = 1:5, type = IntervalSlider, startvalues = (2, 4)),
+        )
+        w = @test_logs masque(fig, (grid = sg,))
+        @test Masque.initial_bond(w).grid == (1.0, (2, 4))
+        g = _layer(w.manifest, "grid")["geometry"]
+        @test g["control"] == "slidergrid" && g["value"] == Any[2, [1, 3]]
+        sl, isl = g["sliders"]
+        @test sl["control"] == "slider" && sl["n"] == 7 && isl["control"] == "intervalslider"
+        @test sl["valueLabel"]["labels"] == ["0.0 Hz", "0.5 Hz", "1.0 Hz", "1.5 Hz", "2.0 Hz", "2.5 Hz", "3.0 Hz"]
+        @test sl["name"] == "freq" && isl["name"] == "span"
+        # Only lo ≤ hi pairs, row-major: (2, 4) is lo = 2's second pair, after lo = 1's five.
+        @test length(isl["valueLabel"]["pairs"]) == 15
+        @test isl["valueLabel"]["pairs"][5 + 2 + 1] == "(2, 4)"
+        # Each slider sits inside the grid's box, its value label to its right.
+        @test g["x"] <= sl["x"] && sl["x"] + sl["w"] <= sl["valueLabel"]["x"] + 1
+        v = Masque.bond_from_js(w, Dict("grid" => _env("grid", Any[6, Any[0, 4]])))
+        @test v.grid == (3.0, (1, 5))
+        @test_throws ArgumentError Masque.bond_from_js(w, Dict("grid" => _env("grid", Any[6])))
+        # The browser's values reach the sliders themselves before `onchange`.
+        Masque._sync_controls!([Masque.BlockControl(sg, :grid)], Dict("grid" => _env("grid", Any[0, Any[2, 3]])))
+        @test sg.sliders[1].value[] == 0.0 && sg.sliders[2].interval[] == (3, 4)
+        # The picture hides the sliders and their value labels, and keeps the names.
+        hidden = Masque._block_plots(sg)
+        @test !isempty(hidden)
+        @test !any(p -> p in hidden, Masque._block_plots(sg.labels[1]))
+        # A fine slider ships no labels, so its frames stay small; the browser writes the value.
+        # An author's own `lift` on the slider's value is never called to find the format.
+        fig = Figure(); Axis(fig[1, 1])
+        fine = SliderGrid(fig[2, 1], (label = "fine", range = 0:0.001:10, format = "{:.3f}"))
+        calls = Ref(0)
+        lift(v -> (calls[] += 1; string(v)), fine.sliders[1].value)
+        before = calls[]
+        g = _layer(masque(fig, (fine = fine,)).manifest, "fine")["geometry"]
+        @test !haskey(only(g["sliders"])["valueLabel"], "labels") && calls[] == before
+        @test length(JSON3.write(g)) < 2000
     end
 
     @testset "the picture leaves the block's box empty, and the figure keeps its drawing" begin

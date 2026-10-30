@@ -448,6 +448,52 @@ function _marker_svg_path(marker)
     return String(take!(io))
 end
 
+# Wraps `sg.sliders` and `sg.valuelabels`, a `SliderGrid`'s sliders and the labels showing
+# their values, in row order.
+function _grid_sliders(sg)
+    v = try
+        sg.sliders
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("SliderGrid.sliders", "a SliderGrid to expose `.sliders`")
+    end
+    return collect(v)
+end
+function _grid_labels(sg)
+    v = try
+        sg.labels
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("SliderGrid.labels", "a SliderGrid to expose `.labels`")
+    end
+    return collect(v)
+end
+function _grid_valuelabels(sg)
+    v = try
+        sg.valuelabels
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("SliderGrid.valuelabels", "a SliderGrid to expose `.valuelabels`")
+    end
+    return collect(v)
+end
+
+# The function a `SliderGrid` formats a slider's value label with: the `lift` that feeds `vl`'s
+# text from the slider's value. Makie keeps no other handle on `format`, so it is found among
+# the value's listeners as the one-argument map that gives the label's current text. `nothing`
+# when none does.
+function _valuelabel_format(sl, vl)
+    obs = sl isa Makie.IntervalSlider ? sl.interval : sl.value
+    now = vl.text[]
+    for (_, l) in obs.listeners
+        isdefined(Makie.Observables, :MapCallback) && l isa Makie.Observables.MapCallback || continue
+        # Only Makie's own formatter: a `lift` of the author's on the same value never runs here.
+        length(l.args) == 1 && parentmodule(typeof(l.f)) === Makie && l.result[] == now || continue
+        return l.f
+    end
+    return nothing
+end
+
 # Wraps `sl.selected_index`, the 1-based index into `sl.range[]` that `sl.value` follows.
 # `set_close_to!` is public but snaps by value, which can't tell repeated range values apart.
 function _slider_index(sl)

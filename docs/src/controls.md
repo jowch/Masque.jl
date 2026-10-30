@@ -1,10 +1,11 @@
 # Sliders, toggles and menus
 
-Lay out Makie's own `Slider`, `Toggle`, `Checkbox`, `IntervalSlider` or
-`Menu` in the figure, name it in `masque`, and the reader can use it in the
+Lay out Makie's own `Slider`, `Toggle`, `Checkbox`, `IntervalSlider`,
+`Menu` or `SliderGrid` in the figure, name it in `masque`, and the reader can use it in the
 notebook. Each one becomes a field of the `@bind` value that holds its
 plain value: a number from the slider's range, `true` or `false`, a
-`(low, high)` pair, or the option chosen from the menu.
+`(low, high)` pair, the option chosen from the menu, or a tuple of a grid's
+slider values.
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -62,9 +63,12 @@ block in the figure that `masque` isn't given would look live and do
 nothing, so `masque` raises an error naming its kind. Name it, or take it
 out of the figure.
 
-Buttons, text boxes and `SliderGrid` are pictures for now, and `masque`
-warns when the figure has one, since the reader could click it and
-nothing would happen.
+Buttons and text boxes are pictures for now, and `masque` warns when the
+figure has one, since the reader could click it and nothing would happen.
+A `SliderGrid` that `masque` isn't given only warns, because figures with
+one worked before `masque` could draw it. Its value labels use the grid's
+own `format` for sliders of up to 101 values (20 for an interval slider);
+past that, the browser writes the plain value.
 
 A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
 doesn't run yet: a click flips the box, and `masque` warns when a named

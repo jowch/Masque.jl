@@ -1494,7 +1494,7 @@ function build_kind_sweep()
     end
 
     controls = let
-        fig = Figure(size = (480, 340))
+        fig = Figure(size = (480, 380))
         ax = Axis(fig[1, 1:2]; title = "controls", limits = (0, 10, 0, 10))
         level = lines!(ax, [0.0, 10.0], [3.0, 3.0]; color = :red, linewidth = 4)
         sl = Makie.Slider(fig[2, 1]; range = 0:10, startvalue = 3)   # WGLMakie also exports Bonito's `Slider`
@@ -1504,11 +1504,13 @@ function build_kind_sweep()
         pick = Menu(fig[4, 1:2]; options = ["a", "b", "c"], default = "a")
         # A vertical toggle (#427): its track stands up, off at the bottom.
         tall = Toggle(fig[1, 3]; orientation = :vertical, active = false)
+        # A slider grid (#430): its value label follows the slider in the browser.
+        grid = SliderGrid(fig[5, 1:2], (label = "gain", range = 1:5, format = "{} dB", startvalue = 2))
         # A checkbox drawn as Makie draws it (#428): its square, in its own colours, sits in the
         # middle of a box wider than it.
         sure = Checkbox(fig[3, 3]; checked = false, size = 18, checkboxcolor_checked = :darkorange, width = 40, tellwidth = false)
         masque(
-            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick, tall = tall, sure = sure);
+            fig, (level = sl, show = tg, span = span, fine = fine, pick = pick, tall = tall, sure = sure, grid = grid);
             onchange = st -> begin
                 update!(level, [0.0, 10.0], fill(Float64(st.level), 2); visible = st.show)
                 # A dependent menu: the checkbox swaps the menu's options.
