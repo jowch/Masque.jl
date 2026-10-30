@@ -54,18 +54,28 @@ end
 
 # The font Makie draws a control's text in (#476), so the browser's text matches the figure's:
 # its family name, and its weight and style when not 400 and upright. For one of Makie's own
-# fonts it also names where the same file is online and the installed copy's `sha384`; the
-# browser fetches it only when it draws a control with text, and only if the hash matches.
-# Makie's repo moved the fonts out of its tree after v0.21.0, whose files are byte-identical to
-# the ones the assets artifact installs. jsDelivr serves the repo's cached files only (it is past
-# jsDelivr's size limit), so GitHub's raw copy comes second. A font of the author's sends its
-# name alone: the reader's browser uses it if installed.
+# fonts it also names where the same file is online and its `sha384`; the browser fetches it only
+# when it draws a control with text, and only if the hash matches. Makie's repo moved the fonts
+# out of its tree after v0.21.0; each file there is pinned by its hash, and the URLs ship only
+# while the installed file hashes the same, so a Makie release that changes a font sends its
+# name alone instead of two fetches the browser must refuse (a Core test fails first). jsDelivr
+# serves only the files it has cached from the repo (it is past jsDelivr's size limit), so
+# GitHub's raw copy comes second. A font of the author's sends its name alone: the reader's
+# browser uses it if installed.
 const _MAKIE_FONT_TAG = "v0.21.0"
 const _MAKIE_FONT_FILES = Dict(
-    "tex gyre heros makie regular" => "TeXGyreHerosMakie-Regular.otf",
-    "tex gyre heros makie bold" => "TeXGyreHerosMakie-Bold.otf",
-    "tex gyre heros makie italic" => "TeXGyreHerosMakie-Italic.otf",
-    "tex gyre heros makie bold italic" => "TeXGyreHerosMakie-BoldItalic.otf",
+    "tex gyre heros makie regular" => (
+        "TeXGyreHerosMakie-Regular.otf", "sha384-fBdC6O9bQ4HAvEIX9anUFnhkJGqY5o02hwunPUspjrVMbQAtq1mYrobDC1QUmNSa",
+    ),
+    "tex gyre heros makie bold" => (
+        "TeXGyreHerosMakie-Bold.otf", "sha384-ZiXjOxc3Tni81XxFmMdQt+58qtMMNaDvYgLTUl2iZ/tdy0ZTiBdlaWKpEMNFoPvK",
+    ),
+    "tex gyre heros makie italic" => (
+        "TeXGyreHerosMakie-Italic.otf", "sha384-Sjko4OJQ5jGK7lHyG7bR2+Oyd7+VmV49n5vdK47599Guw6CNcR0mlQv+h03/nOKH",
+    ),
+    "tex gyre heros makie bold italic" => (
+        "TeXGyreHerosMakie-BoldItalic.otf", "sha384-F6Gr9PhOujeX1JGK/4eFj3vWAWxXnBhlDbI75ovvhbpmuLvQE/S2D3S9jO9QRup9",
+    ),
 )
 const _FONT_HASHES = Dict{String, String}()
 const _FONT_HASHES_LOCK = ReentrantLock()
@@ -98,14 +108,16 @@ function _control_font(b, f)
     w = _font_weight(style)
     w == 400 || (d["weight"] = w)
     occursin(r"italic|oblique"i, style) && (d["style"] = "italic")
-    file = get(_MAKIE_FONT_FILES, lowercase(font.fontname), nothing)
-    path = file === nothing ? nothing : Makie.assetpath("fonts", file)
-    if path !== nothing && isfile(path)
+    pinned = get(_MAKIE_FONT_FILES, lowercase(font.fontname), nothing)
+    pinned === nothing && return d
+    file, hash = pinned
+    path = Makie.assetpath("fonts", file)
+    if isfile(path) && _font_hash(path) == hash
         d["src"] = String[
             "https://cdn.jsdelivr.net/gh/MakieOrg/Makie.jl@$(_MAKIE_FONT_TAG)/assets/fonts/$file",
             "https://raw.githubusercontent.com/MakieOrg/Makie.jl/$(_MAKIE_FONT_TAG)/assets/fonts/$file",
         ]
-        d["integrity"] = _font_hash(path)
+        d["integrity"] = hash
     end
     return d
 end

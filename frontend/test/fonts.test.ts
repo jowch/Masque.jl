@@ -51,10 +51,40 @@ describe("control fonts", () => {
         useFont(document.createElement("div"), MAKIE)
         await settle()
         expect(fetchMock).toHaveBeenCalledTimes(1)
-        expect(fetchMock).toHaveBeenCalledWith(MAKIE.src[0], { integrity: MAKIE.integrity })
+        expect(fetchMock).toHaveBeenCalledWith(MAKIE.src[0], expect.objectContaining({ integrity: MAKIE.integrity }))
         expect(added).toHaveLength(1)
         expect(faces[0].family).toBe("TeX Gyre Heros Makie")
         expect(faces[0].desc).toEqual({ weight: "400", style: "normal" })
+    })
+
+    it("registers a bold italic face as bold italic, so the browser doesn't fake either", async () => {
+        const { faces } = stubFonts()
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(4)) }))
+        useFont(document.createElement("div"), { ...MAKIE, integrity: "sha384-bi", weight: 700, style: "italic" })
+        await settle()
+        expect(faces[0].desc).toEqual({ weight: "700", style: "italic" })
+    })
+
+    it("gives up on a copy that doesn't answer and tries the next", async () => {
+        stubFonts()
+        // Each fetch's timeout, aborted here by hand.
+        const timers: AbortController[] = []
+        vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+            expect(ms).toBe(5000)
+            const c = new AbortController()
+            timers.push(c)
+            return c.signal
+        })
+        const fetchMock = vi.fn((_url: string, init: RequestInit) => new Promise((_res, rej) =>
+            init.signal?.addEventListener("abort", () => rej(new DOMException("timeout", "TimeoutError")))))
+        vi.stubGlobal("fetch", fetchMock)
+        useFont(document.createElement("div"), MAKIE)
+        await settle()
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        timers[0].abort()
+        await settle()
+        expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(MAKIE.src)
+        vi.restoreAllMocks()
     })
 
     it("tries the next copy, and gives up quietly when none loads", async () => {
@@ -70,5 +100,11 @@ describe("control fonts", () => {
         expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(MAKIE.src)
         expect(added).toHaveLength(0)
         expect(el.style.getPropertyValue("--ff")).toBe('"TeX Gyre Heros Makie", Helvetica, Arial, sans-serif')
+        // A failed load is forgotten, so the next widget on the page tries again.
+        fetchMock.mockResolvedValue({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(4)) })
+        useFont(document.createElement("div"), MAKIE)
+        await settle()
+        expect(fetchMock).toHaveBeenCalledTimes(3)
+        expect(added).toHaveLength(1)
     })
 })

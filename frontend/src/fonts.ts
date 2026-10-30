@@ -9,28 +9,34 @@ import type { ControlFont } from "./types"
 const FALLBACK = "Helvetica, Arial, sans-serif"
 
 // One load per file per page, shared by every widget on it (each widget runs its own copy of
-// the bundle), keyed by the file's hash.
-function loads(): Map<string, Promise<void>> {
-    const w = window as unknown as { __masqueFonts?: Map<string, Promise<void>> }
+// the bundle), keyed by the file's hash. A load that fails is forgotten, so a later widget
+// tries again (a page left open across a moment offline).
+function loads(): Map<string, Promise<boolean>> {
+    const w = window as unknown as { __masqueFonts?: Map<string, Promise<boolean>> }
     return (w.__masqueFonts ??= new Map())
 }
 
-async function load(f: ControlFont & { src: string[]; integrity: string }): Promise<void> {
-    if (typeof FontFace === "undefined" || !document.fonts) return
+// A copy that doesn't answer in this long (a host that drops the request) gives way to the next.
+const FETCH_MS = 5000
+
+async function load(f: ControlFont & { src: string[]; integrity: string }): Promise<boolean> {
+    if (typeof FontFace === "undefined" || !document.fonts) return false
     for (const url of f.src) {
         try {
-            const res = await fetch(url, { integrity: f.integrity })
+            const signal = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(FETCH_MS) : undefined
+            const res = await fetch(url, { integrity: f.integrity, signal })
             if (!res.ok) continue
             const face = new FontFace(f.family, await res.arrayBuffer(), {
                 weight: String(f.weight ?? 400), style: f.style ?? "normal",
             })
             await face.load()
             document.fonts.add(face)
-            return
+            return true
         } catch {
-            // Offline, blocked, or not the installed file: try the next copy, then the fallback.
+            // Offline, blocked, slow, or not the installed file: try the next copy, then the fallback.
         }
     }
+    return false
 }
 
 // A CSS family name, quoted.
@@ -47,7 +53,12 @@ export function useFont(el: HTMLElement, f: ControlFont | undefined): void {
     el.style.setProperty("--fst", f.style ?? "normal")
     if (f.src && f.integrity && typeof window !== "undefined") {
         const all = loads()
-        if (!all.has(f.integrity)) all.set(f.integrity, load({ ...f, src: f.src, integrity: f.integrity }))
+        const key = f.integrity
+        if (!all.has(key)) {
+            const p = load({ ...f, src: f.src, integrity: key })
+            all.set(key, p)
+            void p.then((ok) => { if (!ok && all.get(key) === p) all.delete(key) })
+        }
     }
 }
 

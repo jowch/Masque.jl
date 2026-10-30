@@ -1072,10 +1072,17 @@ try {
           const f = await fam(sel);
           if (!f.startsWith('"TeX Gyre Heros Makie"')) throw new Error(`${key}/font: ${sel.join(" ")} is in ${f}, want "TeX Gyre Heros Makie" first`);
         }
-        const loaded = await page.waitForFunction(() =>
-          [...document.fonts].filter((f) => f.family.replace(/"/g, "") === "TeX Gyre Heros Makie" && f.status === "loaded").length,
-          null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => 0);
-        if (loaded !== 1) throw new Error(`${key}/font: ${loaded} loaded TeX Gyre Heros Makie faces, want 1`);
+        const w = await ctl("go", "button").evaluate((el) => getComputedStyle(el).fontWeight);
+        if (w !== "700") throw new Error(`${key}/font: the bold button's weight is ${w}, want 700`);
+        // Two faces: the regular one, and the button's bold one.
+        const want = "400 normal,700 normal";
+        const faces = await page.waitForFunction((want) => {
+          const f = [...document.fonts].filter((f) => f.family.replace(/"/g, "") === "TeX Gyre Heros Makie" && f.status === "loaded")
+            .map((f) => `${f.weight} ${f.style}`).sort().join(",");
+          return f === want && f;
+        }, want, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => page.evaluate(() =>
+          [...document.fonts].map((f) => `${f.family} ${f.weight} ${f.style} ${f.status}`).join(", ")));
+        if (faces !== want) throw new Error(`${key}/font: faces ${faces}, want TeX Gyre Heros Makie ${want}`);
         passed.push(`${key}/font`);
       }
       // The slider grid's slider moves its field and its value label, which Julia formatted.

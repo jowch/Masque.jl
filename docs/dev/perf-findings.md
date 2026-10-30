@@ -731,9 +731,11 @@ A `Menu`, `Button`, `Textbox` or grid value label also carries the font Makie dr
 for a font of the author's (family only). The font file itself never rides the manifest: the
 browser fetches it once per page, only when it draws one of these controls. Measured with Makie
 0.24.16 (2026-10-30): `TeXGyreHerosMakie-Regular.otf` is 171 KB raw, 44 KB gzip, 33 KB brotli
-as jsDelivr serves it; Bold, Italic and Bold Italic are 172–179 KB raw each. jsDelivr serves
-only Regular and Italic from Makie's repo (past its 50 MB limit), so Bold comes from GitHub
-raw, uncompressed. Hashing the file in Julia is cached per file; a later call is 0.2 ms.
+as jsDelivr serves it; Bold, Italic and Bold Italic are 172–179 KB raw each, and each is a
+separate fetch (a bold button next to a regular menu loads two). Makie's repo is past
+jsDelivr's 50 MB limit, so jsDelivr serves only the files it has cached: on 2026-10-30 that
+was Regular and Italic, then also Bold, and never Bold Italic. A file it refuses comes from
+GitHub raw, uncompressed. Hashing the file in Julia is cached per file; a later call is 0.2 ms.
 WGLMakie sends no font file of its own (figure text is a glyph atlas built in Julia), so there
 is none on the page to reuse.
 
