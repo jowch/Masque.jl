@@ -34,6 +34,11 @@ All notable changes to this project are documented here. The format is based on
   no longer drops frames as the pointer crosses its lines (#469).
 - A faded line stays faded where it crosses a line or mark that stays in focus. It used to show at
   full strength at each crossing (#462).
+- A plot holding thousands of picked segments, line points or polyline pieces stays quick to
+  click and to hover. Since 0.4.2 each pick's outline carried its own mask, so with 5 000
+  segments held a click took about a second and hovering could stall the page for seconds. A
+  click now changes only the outline of the pick it adds or takes out. Where two picked lines
+  cross, one's outline no longer paints over the other (#478).
 
 ## [0.4.2] - 2026-10-30
 

@@ -1615,7 +1615,7 @@ describe("tooltips (mount/showTip)", () => {
         }
         mount(script, segs)
         // Selected open geometry is a halo cased along the line, in svg.masque-edge.
-        const node = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        const node = edgeSelGroup(shadowOf(host)).querySelector(".masque-halo") as SVGElement
         expect(node.classList.contains("masque-halo-line")).toBe(true)
         expect(coreOf(node).tagName).toBe("line")
     })
@@ -1633,7 +1633,7 @@ describe("tooltips (mount/showTip)", () => {
             initial: { line: { layer: "line", index: 0 } },
         }
         mount(script, poly)
-        const node = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        const node = edgeSelGroup(shadowOf(host)).querySelector(".masque-halo") as SVGElement
         expect(coreOf(node).tagName).toBe("line")
     })
 
@@ -1651,7 +1651,7 @@ describe("tooltips (mount/showTip)", () => {
         }
         mount(script, lines)
         // Alone on its axis it has no other line to fade, so it keeps a halo.
-        const node = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        const node = edgeSelGroup(shadowOf(host)).querySelector(".masque-halo") as SVGElement
         expect(coreOf(node).getAttribute("d")).toBe("M0 0L100 0M100 80")
         expect(node.querySelector("line")).toBeNull()
     })
@@ -2479,9 +2479,9 @@ describe("overlay visual polish", () => {
         // rAF-coalesced: this second move lands on the trailing frame from the first, not synchronously.
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 135, clientY: 125, bubbles: true }))
         await flushFrame()
+        // The picked cells are the same, so the element is kept as it is: nothing is redrawn.
         const b = fillSelGroup(shadow).firstElementChild as SVGElement
-        expect(b).not.toBe(a)
-        expect(b.classList.contains("masque-enter")).toBe(false)
+        expect(b).toBe(a)
         surface.dispatchEvent(new PointerEvent("pointerup", { clientX: 135, clientY: 125, bubbles: true }))
     })
 
@@ -2711,7 +2711,7 @@ describe("overlay visual polish", () => {
             initial: { segs: { layer: "segs", index: 0 } },
         })
         expect(plainSelGroup(shadowOf(host)).children.length).toBe(0)
-        const node = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        const node = edgeSelGroup(shadowOf(host)).querySelector(".masque-halo") as SVGElement
         expect(["masque-halo", "masque-halo-line", "masque-halo-selected"].every((c) => node.classList.contains(c))).toBe(true)
         const lines = [...node.children].filter((c) => c.tagName === "line")
         expect(lines.length).toBe(3)
@@ -3595,6 +3595,42 @@ describe("click-echo (#103)", () => {
         expect(edgeHiGroup(shadow).children.length).toBe(1)
     })
 
+    it("held open picks share one mask, and a click adds or takes out only its own pick (#478)", () => {
+        const { host, script } = setup()
+        // Three segments, scaling 2: client (x, y) is image (2x, 2y). 0 and 1 are held.
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, transforms: {},
+            layers: [{ id: "segs", kind: "segments", geometry: [100, 100, 300, 100, 100, 300, 300, 300, 100, 500, 300, 500],
+                payloads: [{}, {}, {}], axis: "ax1", events: ["click", "hover"], many: true }],
+            fields: ["segs"],
+            initial: { segs: { items: [{ layer: "segs", index: 0 }, { layer: "segs", index: 1 }] } },
+        })
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const edge = () => edgeSelGroup(shadow)
+        const halos = () => [...edge().querySelectorAll(".masque-halo")]
+        const shared = () => shadow.querySelector(edge().getAttribute("mask")!.slice(4, -1))!
+        const cuts = () => [...shared().querySelectorAll(":scope > line")].map((l) => l.getAttribute("y1"))
+        expect(halos().length).toBe(2)
+        expect(edge().children.length).toBe(2) // the group holds only the halos
+        expect(halos().every((h) => !h.hasAttribute("mask") && !h.querySelector("mask"))).toBe(true)
+        expect(cuts()).toEqual(["100", "300"])
+        const [first, second] = halos()
+        const click = (x: number, y: number) => surface.dispatchEvent(new MouseEvent("click", { clientX: x, clientY: y, bubbles: true }))
+        click(100, 250) // adds segment 2
+        expect(halos().length).toBe(3)
+        expect(halos().slice(0, 2)).toEqual([first, second])
+        expect(halos()[2].classList.contains("masque-enter")).toBe(true)
+        expect(cuts()).toEqual(["100", "300", "500"])
+        click(100, 50) // takes segment 0 out, with its cut
+        expect(halos()).toEqual([second, expect.anything()])
+        expect(cuts()).toEqual(["300", "500"])
+        click(100, 150)
+        click(100, 250) // nothing held: the group drops the mask
+        expect(halos().length).toBe(0)
+        expect(edge().hasAttribute("mask")).toBe(false)
+    })
+
     it("a picked open mark still draws no hover chrome over its selected halo (drawHi's selKeys_ guard)", async () => {
         const { host, script } = setup()
         mount(script, {
@@ -3606,7 +3642,7 @@ describe("click-echo (#103)", () => {
         })
         const shadow = shadowOf(host)
         const surface = shadow.querySelector(".surface") as HTMLElement
-        expect(edgeSelGroup(shadow).children.length).toBe(1) // the selected halo
+        expect(edgeSelGroup(shadow).querySelectorAll(".masque-halo").length).toBe(1) // the selected halo
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 125, clientY: 75, bubbles: true }))
         await flushFrame()
         expect(hiChildren(shadow).length).toBe(0)
