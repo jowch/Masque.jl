@@ -100,22 +100,22 @@ end
 
 ## How it works
 
-`regions = labels` turns a click on any pixel into a pick of the whole
+`regions = labels` makes a click on any pixel select the whole
 object that holds it, and hovering over a pixel outlines its object and
-names it. `select = :many` makes the picks add up, since you mark several
+names it. `select = :many` lets the selection grow, since you mark several
 objects before you count. `sel.objects.regions` lists the ids of the
-objects picked, the same numbers as in `labels`, so `areas[k]` and
+objects selected, the same numbers as in `labels`, so `areas[k]` and
 `labels .== k` reach each one. [Select whole regions](@ref) has the rest.
 
 A wrong click is easy to take back: with the figure focused, Ctrl-Z
-(Cmd-Z on a Mac) undoes the last change to the picks, and the next cell
+(Cmd-Z on a Mac) undoes the last change to the selection, and the next cell
 runs again. See [Undo a change](@ref).
 
 ## Variations
 
 - Keep the objects you click instead of leaving them out: use
   `sel.objects.regions` as the kept list.
-- Show the picture in colour by object with `heatmap!(ax, labels)` and a
+- Show the picture in color by object with `heatmap!(ax, labels)` and a
   categorical colormap, so the reader sees where the segmentation split
   and merged.
 - Click with a reason: add a Makie `Menu` of reasons ("merged",

@@ -46,19 +46,26 @@ of their fields, followed by the star's `x` and `y`
 Main.masque_fallback("tooltips_stars_default")
 ```
 
-Without `payloads`, a scatter's tooltip shows the point's `index`, `x`,
-and `y`. On a categorical or
-date axis, `x` and `y` in the tooltip and in the clicked mark's event
-are text: the
-category's label, such as `"b"`, or the date or time you plotted, such
-as `"2024-01-02"`, `"2024-01-01T01:00:00"`, or `"01:00:00"`.
+What the default tooltip shows depends on what you hover:
 
-Hovering a line from `lines!`, `stairs!`, `series!`, or `scatterlines!`
-adds `x` and `y` of the point you plotted nearest the pointer along the
-line. In a template you can also use `i`, that point's position in the
-line's data, so `$(i)` is `3` over `xs[3], ys[3]`. A click on a line
-picks that point once you name the line in `bind`; see
-[What each mark returns](@ref). A line on an `Axis3` shows only its payload.
+| Hovering | The default tooltip shows |
+|---|---|
+| a mark with `payloads` | the payload's fields, then the mark's own fields, such as a point's `x` and `y`; see [What each mark returns](@ref) |
+| a scatter point without `payloads` | its `index`, `x` and `y` |
+| a line from `lines!`, `stairs!`, `series!` or `scatterlines!` on an `Axis` | its payload, then `x` and `y` of the point you plotted nearest the pointer |
+| a line on an `Axis3` | only its payload |
+| a legend entry | nothing, because its label is already next to the swatch; to add a tooltip, pass a template, as [Legend](@ref) shows |
+| a [`SliceInteractable`](@ref) | the series values at the pointer |
+
+On a line, a template can also use `i`, the nearest point's position in
+the line's data, so `$(i)` is `3` over `xs[3], ys[3]`. A click on a line
+selects that point once you name the line in `bind`; see
+[What each mark returns](@ref).
+
+On a categorical or date axis, `x` and `y` in the tooltip and in the
+clicked mark's event are text: the category's label, such as `"b"`, or
+the date or time you plotted, such as `"2024-01-02"`,
+`"2024-01-01T01:00:00"`, or `"01:00:00"`.
 
 Numbers show up to four significant figures, so `0.30000000000000004`
 reads `0.3` and `2.71828` reads `2.718`. Whole numbers show in full. To
@@ -69,11 +76,6 @@ show more or fewer figures, pass `tooltip_sigdigits` to `masque`:
 ```
 
 The `@bind` value keeps every digit; only the tooltip is rounded.
-
-Two interactables work differently. A legend entry shows no tooltip by
-default, because its label is already next to the swatch. To add one,
-pass a template, as [Legend](@ref) shows. A [`SliceInteractable`](@ref)
-shows the series values at the pointer instead of a payload.
 
 ## Write a template
 
