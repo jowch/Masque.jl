@@ -79,6 +79,14 @@ and `masque` warns. A box as wide as its placeholder, Makie's default,
 keeps that width as the reader types and scrolls its text, where Makie
 widens it.
 
+A `Menu` opens Makie's list of options, under it or over it as in Makie,
+and the reader can also work it with the arrow keys, Enter and Escape.
+Makie's menus are searchable: typing in an open menu keeps the options
+whose label holds the text, ignoring case. A menu's own `filter` can't
+run in the browser, which uses that rule instead, and `masque` warns; to
+narrow the options another way, set the menu's `options` in `masque`'s
+`onchange`.
+
 A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
 does nothing in a notebook: a click always flips the box, and `masque`
 warns when a named checkbox has one. For one choice of several, use a

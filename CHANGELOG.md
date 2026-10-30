@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- A Makie `Menu` named in `masque` is drawn the way Makie draws it, in place of the browser's
+  own list: a press opens Makie's list of options under the menu, or over it when there is
+  more room above or `direction = :up`, in its cell and text colours, with its pale arrow.
+  Makie's menu is `searchable` by default, so typing in the open menu keeps the options whose
+  label holds the text, ignoring case, with its `search_placeholder`; a menu with its own
+  `filter` warns that the browser uses this rule instead. Arrow keys, Home, End, Enter, Escape
+  and typing a label's first letters work it from the keyboard (#429).
+
 ## [0.4.2] - 2026-10-30
 
 ### Added

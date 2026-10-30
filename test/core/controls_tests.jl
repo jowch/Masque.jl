@@ -394,6 +394,43 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["off"] == Masque._css_color(Makie.to_color(:blue))
     end
 
+    @testset "a menu ships Makie's list: cells, colours, arrow, direction and search (#429)" begin
+        fig = Figure(); Axis(fig[1, 1])
+        menu = Menu(
+            fig[2, 1]; options = ["a", "b", "c"], fontsize = 20, textpadding = (6, 12, 4, 5),
+            cell_color_active = :red, cell_color_hover = :green, cell_color_inactive_odd = :white,
+            cell_color_inactive_even = :gray, textcolor_active = :yellow, textcolor_hover = :blue,
+            dropdown_arrow_size = 14, direction = :up, search_placeholder = "Find...",
+        )
+        w = masque(fig, (pick = menu,))
+        g = _layer(w.manifest, "pick")["geometry"]
+        s = w.manifest["scaling"]
+        c(x) = Masque._css_color(Makie.to_color(x))
+        @test g["cellColors"] == [c(:green), c(:red), c(:white), c(:gray)]
+        @test g["optionText"] == [c(:blue), c(:yellow)]
+        # A cell is its text's height plus the bottom and top padding, as Makie sizes it.
+        @test 20s < g["cell"] < (20 * 1.5 + 9) * s
+        @test g["direction"] == "up"
+        @test g["arrow"]["size"] ≈ 14s && g["arrow"]["inset"] ≈ 12s
+        @test startswith(g["arrow"]["path"], "M") && g["arrow"]["path"] != g["arrow"]["flip"]
+        @test g["search"] == "Find..."
+        @test haskey(g, "placeholderColor")
+        # Not searchable: no search box; automatic direction: none shipped.
+        fig2 = Figure()
+        m2 = Menu(fig2[1, 1]; options = ["a", "b"], searchable = false)
+        g2 = _layer(masque(fig2, (pick = m2,)).manifest, "pick")["geometry"]
+        @test !haskey(g2, "search") && !haskey(g2, "direction")
+    end
+
+    @testset "a menu with its own filter warns that the browser runs Makie's rule (#429)" begin
+        fig = Figure()
+        menu = Menu(fig[1, 1]; options = ["a", "b"], filter = (q, s) -> startswith(s, q))
+        @test_logs (:warn, r"menu :pick has its own `filter`") match_mode = :any masque(fig, (pick = menu,))
+        fig2 = Figure()
+        m2 = Menu(fig2[1, 1]; options = ["a", "b"])
+        @test_logs min_level = Base.CoreLogging.Warn masque(fig2, (pick = m2,))
+    end
+
     @testset "a menu with nothing chosen holds nothing" begin
         fig = Figure()
         menu = Menu(fig[1, 1]; options = ["a", "b"], default = nothing)

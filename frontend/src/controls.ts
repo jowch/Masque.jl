@@ -128,8 +128,34 @@ export const CONTROLS_STYLE = `
 .masque-control input.masque-textbox:focus-visible { outline: none; }
 .masque-vlabel { position: absolute; display: flex; align-items: center; justify-content: flex-end; white-space: nowrap;
   pointer-events: none; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; }
-.masque-control .masque-select { width: 100%; height: 100%; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; border: none; border-radius: 0; cursor: pointer;
-  font-size: var(--fs, 50cqh); padding: 0 0 0 var(--pad, 0.5em); background: var(--masque-ctl-off, #f0f0f0); color: var(--masque-ctl-text, #000000); }
+/* Menu, as Makie draws it: a box showing the choice (or the prompt) with a pale triangle at its
+   right, which opens a list of cells under it, or over it with less room below. Each cell is
+   --ch high, in the odd or even colour; the one under the pointer or the keys, and the chosen
+   one, take their own cell and text colours. The list is as long as its cells and stops at the
+   figure's edge (--lmax), scrolling past that. The box is an <input>: read-only, or with
+   with searchable the text that filters the list. An open menu sits over the other controls. */
+.masque-control.masque-ctl-menu.open { z-index: 1; }
+.masque-control .masque-menu-box { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; border: none; border-radius: 0;
+  font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs, 50cqh); line-height: 1; cursor: pointer;
+  padding: 0 var(--pr, 0) 0 var(--pad, 0.5em); background: var(--masque-ctl-off, #f0f0f0); color: var(--masque-ctl-text, #000000);
+  caret-color: transparent; text-overflow: clip; }
+.masque-control .masque-menu-box:hover { background: var(--c0, var(--masque-ctl-off, #f0f0f0)); }
+.masque-ctl-menu.open .masque-menu-box { background: var(--masque-ctl-off, #f0f0f0); }
+.masque-ctl-menu.open.search .masque-menu-box { cursor: text; caret-color: var(--masque-ctl-text, #000000); }
+.masque-control .masque-menu-box::placeholder { color: var(--ph, currentColor); opacity: 1; }
+.masque-control .masque-menu-box.by-pointer:focus-visible { outline: none; }
+.masque-menu-arrow { position: absolute; inset: 50% var(--ai, 0) auto auto; width: var(--as, 0); height: var(--as, 0); translate: 50% -50%; overflow: visible; pointer-events: none; }
+.masque-menu-list { position: absolute; left: 0; width: 100%; max-height: var(--lmax, none); overflow-y: auto; overscroll-behavior: contain;
+  font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs, 50cqh); line-height: 1; scrollbar-width: thin; }
+.masque-menu-list[hidden] { display: none; }
+.masque-menu-list.down { top: 100%; }
+.masque-menu-list.up { bottom: 100%; }
+.masque-menu-list [role="option"] { box-sizing: border-box; height: var(--ch, 2em); display: flex; align-items: center; white-space: nowrap; overflow: hidden;
+  padding-left: var(--pad, 0.5em); cursor: pointer; background: var(--c2, #f7f7f7); color: var(--masque-ctl-text, #000000); }
+.masque-menu-list [role="option"][hidden] { display: none; }
+.masque-menu-list [role="option"].even { background: var(--c3, #f7f7f7); }
+.masque-menu-list [role="option"].act { background: var(--c0, #f0f0f0); color: var(--o0, var(--masque-ctl-text, #000000)); }
+.masque-menu-list [role="option"][aria-selected="true"] { background: var(--c1, #4e7fb4); color: var(--o1, #ffffff); }
 @media (prefers-reduced-motion: reduce) { .masque-toggle-track, .masque-toggle-knob { transition: none; } }
 `
 
@@ -291,7 +317,7 @@ function shape(g: ControlGeometry): string {
     // JSON frame; the same range is the same shape either way.
     // A grid is built again when anything inside it moves or changes colour.
     if (g.sliders) return JSON.stringify([g.control, g.w, g.h, g.sliders.map(shape), g.sliders.map((c) => [c.x - g.x, c.y - g.y, c.w, c.h, c.name, c.valueLabel])])
-    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt, g.size, g.radius, g.stroke, g.mark, g.markChar, g.markSize])
+    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt, g.search, g.direction, g.arrow?.path, g.arrow?.flip, g.size, g.radius, g.stroke, g.mark, g.markChar, g.markSize])
 }
 
 // A button's label and colours, which `onchange` can change without building it again. Lengths
@@ -323,6 +349,239 @@ function styleTextbox(el: HTMLInputElement, g: ControlGeometry): void {
     set("tx", g.text)
     set("ph", g.placeholderColor)
     set("cc", g.cursor)
+}
+
+// A menu's colours, lengths and arrow, which `onchange` can change without building it again.
+// Lengths are image px as a share of the box: across for the text and arrow, down for the cells.
+function styleMenu(box: HTMLElement, g: ControlGeometry, m: Manifest): void {
+    const set = (name: string, v: string | undefined) => { if (v !== undefined) box.style.setProperty(`--${name}`, v) }
+    g.cellColors?.forEach((c, i) => set(`c${i}`, c))
+    g.optionText?.forEach((c, i) => set(`o${i}`, c))
+    set("ph", g.placeholderColor)
+    if (g.cell !== undefined) set("ch", `${(100 * g.cell) / g.h}cqh`)
+    if (g.arrow) {
+        set("as", `${(100 * g.arrow.size) / g.w}cqw`)
+        set("ai", `${(100 * g.arrow.inset) / g.w}cqw`)
+        // The text stops short of the arrow, as Makie's box is sized to leave it room.
+        set("pr", `${(100 * (g.arrow.inset + g.arrow.size / 2)) / g.w}cqw`)
+    }
+    // The list stops at the figure's edge on the side it opens to.
+    const below = m.height - (g.y + g.h), above = g.y
+    const listH = (g.cell ?? g.h) * (g.labels?.length ?? 0)
+    const down = g.direction ? g.direction === "down" : below >= listH || below > above
+    box.dataset.direction = down ? "down" : "up"
+    set("lmax", `${(100 * Math.max(0, down ? below : above)) / g.h}cqh`)
+}
+
+// Makie's menu (Makie/src/makielayout/blocks/menu.jl), as a combobox over a listbox: the
+// pointer opens it and picks an option, as in Makie, and so do the keys: arrows, Home and End
+// move through the options, Enter or Space picks one (Space types with `searchable`), Escape
+// and Tab close it, and typing jumps to an option whose label starts with what was typed. With
+// `searchable`, typing in the open menu keeps the options whose label holds the text, ignoring
+// case, as Makie's default `filter` does.
+function buildMenu(layer: HitLayer, g: ControlGeometry, m: Manifest, box: HTMLElement, label: string, hooks: ControlHooks): ControlEl {
+    const id = layer.id
+    const labels = g.labels ?? []
+    const searchable = g.search !== undefined
+    let chosen = Number(g.value)
+    let open = false
+    // The options showing (all, or those the search keeps), and the one under the pointer or keys.
+    let shown: number[] = labels.map((_, i) => i)
+    let act = -1
+    const listId = `masque-menu-${id}-${Math.random().toString(36).slice(2, 8)}`
+    const input = document.createElement("input")
+    input.type = "text"
+    input.className = "masque-menu-box"
+    input.readOnly = !searchable
+    input.spellcheck = false
+    input.autocomplete = "off"
+    input.setAttribute("role", "combobox")
+    input.setAttribute("aria-label", label)
+    input.setAttribute("aria-haspopup", "listbox")
+    input.setAttribute("aria-expanded", "false")
+    input.setAttribute("aria-controls", listId)
+    if (searchable) input.setAttribute("aria-autocomplete", "list")
+    const list = document.createElement("div")
+    list.className = "masque-menu-list"
+    list.id = listId
+    list.setAttribute("role", "listbox")
+    list.setAttribute("aria-label", label)
+    list.hidden = true
+    // A press in the list, on an option or its scrollbar, keeps the focus on the box.
+    list.addEventListener("pointerdown", (e) => e.preventDefault())
+    const cells = labels.map((text, i) => {
+        const o = document.createElement("div")
+        o.setAttribute("role", "option")
+        o.id = `${listId}-${i}`
+        o.textContent = text
+        o.addEventListener("pointermove", () => { if (act !== i) activate(i, false) })
+        o.addEventListener("click", () => pick(i))
+        return o
+    })
+    list.append(...cells)
+    const arrow = document.createElementNS(SVG, "svg")
+    arrow.setAttribute("class", "masque-menu-arrow")
+    arrow.setAttribute("viewBox", "-0.5 -0.5 1 1")
+    const tri = document.createElementNS(SVG, "path")
+    tri.setAttribute("transform", "scale(1 -1)")
+    if (g.arrow) tri.setAttribute("fill", g.arrow.color)
+    arrow.append(tri)
+    box.classList.toggle("search", searchable)
+    box.append(input, arrow, list)
+    styleMenu(box, g, m)
+
+    const text = () => (chosen >= 0 && chosen < labels.length ? labels[chosen] : (g.prompt ?? "Select..."))
+    const show = () => {
+        cells.forEach((o, i) => o.setAttribute("aria-selected", String(i === chosen)))
+        if (!open) input.value = text()
+        // Makie's triangle points down when closed and up when open.
+        const d = open ? g.arrow?.flip : g.arrow?.path
+        if (d) tri.setAttribute("d", d)
+        else tri.removeAttribute("d")
+    }
+    const layout = () => {
+        // Odd and even count the options showing, from the first, as Makie's colours do.
+        const keep = new Set(shown)
+        let k = 0
+        cells.forEach((o, i) => {
+            o.hidden = !keep.has(i)
+            if (!o.hidden) o.classList.toggle("even", k++ % 2 === 1)
+        })
+    }
+    const activate = (i: number, scroll: boolean) => {
+        if (act >= 0) cells[act]?.classList.remove("act")
+        act = i
+        if (i >= 0) {
+            cells[i].classList.add("act")
+            input.setAttribute("aria-activedescendant", cells[i].id)
+            if (scroll) cells[i].scrollIntoView?.({ block: "nearest" })
+        } else {
+            input.removeAttribute("aria-activedescendant")
+        }
+    }
+    const setOpen = (on: boolean) => {
+        if (open === on) return
+        open = on
+        box.classList.toggle("open", on)
+        list.className = `masque-menu-list ${box.dataset.direction ?? "down"}`
+        list.hidden = !on
+        input.setAttribute("aria-expanded", String(on))
+        if (on) {
+            shown = labels.map((_, i) => i)
+            layout()
+            // Makie opens its list at the top.
+            list.scrollTop = 0
+            if (searchable) {
+                input.value = ""
+                input.placeholder = g.search ?? ""
+            }
+        } else {
+            activate(-1, false)
+            input.placeholder = ""
+        }
+        show()
+    }
+    const pick = (i: number) => {
+        setOpen(false)
+        if (i === chosen) return
+        chosen = i
+        show()
+        hooks.commit_(id, envelope(id, i))
+    }
+    // Move the active option `by` places among those showing, or to the first or last. With
+    // none active, the chosen one comes first (or the first or last showing).
+    const step = (by: number | "first" | "last") => {
+        if (!shown.length) return
+        const at = shown.indexOf(act)
+        let k: number
+        if (by === "first") k = 0
+        else if (by === "last") k = shown.length - 1
+        else if (at >= 0) k = at + by
+        else if (shown.includes(chosen)) k = shown.indexOf(chosen)
+        else k = by > 0 ? 0 : shown.length - 1
+        activate(shown[Math.max(0, Math.min(shown.length - 1, k))], true)
+    }
+    // Type-ahead: the first option, from the one after the active, whose label starts with
+    // what was typed within the last half second.
+    let typed = ""
+    let typedAt = 0
+    const typeAhead = (ch: string) => {
+        const now = Date.now()
+        typed = now - typedAt > 500 ? ch : typed + ch
+        typedAt = now
+        const q = typed.toLowerCase()
+        const from = Math.max(0, shown.indexOf(act) + (typed.length === 1 ? 1 : 0))
+        const order = [...shown.slice(from), ...shown.slice(0, from)]
+        const hit = order.find((i) => labels[i].toLowerCase().startsWith(q))
+        if (hit !== undefined) {
+            setOpen(true)
+            activate(hit, true)
+        }
+    }
+
+    input.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return
+        input.classList.add("by-pointer")
+        // Makie's box opens the list and closes it again; with `searchable` a press in the open
+        // box places the caret.
+        if (!open) setOpen(true)
+        else if (!searchable) {
+            e.preventDefault()
+            setOpen(false)
+        }
+    })
+    input.addEventListener("input", () => {
+        // `searchable`: the options whose label holds the text, ignoring case.
+        const q = input.value.toLowerCase()
+        shown = labels.map((_, i) => i).filter((i) => q === "" || labels[i].toLowerCase().includes(q))
+        layout()
+        if (!shown.includes(act)) activate(-1, false)
+    })
+    // A box focused by a press shows no focus ring, as a clicked native control doesn't; one
+    // reached with Tab does.
+    input.addEventListener("blur", () => input.classList.remove("by-pointer"))
+    input.addEventListener("keydown", (e) => {
+        const key = e.key
+        if (key === "ArrowDown" || key === "ArrowUp") {
+            e.preventDefault()
+            setOpen(true)
+            if (e.altKey) return
+            step(key === "ArrowDown" ? 1 : -1)
+        } else if ((key === "Home" || key === "End") && (open || !searchable)) {
+            e.preventDefault()
+            setOpen(true)
+            step(key === "Home" ? "first" : "last")
+        } else if (key === "Enter" || (key === " " && !searchable)) {
+            e.preventDefault()
+            if (!open) setOpen(true)
+            // Enter with no option active closes the list, as Makie's does.
+            else if (act >= 0) pick(act)
+            else setOpen(false)
+        } else if (key === "Escape") {
+            if (open) e.preventDefault()
+            setOpen(false)
+        } else if (key === "Tab") {
+            setOpen(false)
+        } else if (!searchable && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault()
+            typeAhead(key)
+        } else if (searchable && !open && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            // Typing in the closed box opens it and starts the search.
+            setOpen(true)
+        }
+    })
+    input.addEventListener("blur", () => setOpen(false))
+    show()
+    return {
+        layer_: layer, shape_: shape(g), box_: box, get_: () => chosen,
+        set_: (p) => { if (typeof p === "number") { chosen = p; show() } },
+        restyle_: (ng) => {
+            g = ng
+            if (ng.arrow) tri.setAttribute("fill", ng.arrow.color)
+            styleMenu(box, ng, m)
+            show()
+        },
+    }
 }
 
 // The validator as a whole-text match, or null for one that takes any text. A Julia pattern
@@ -453,33 +712,8 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
                 restyle_: art?.restyle_,
             }
         }
-        case "menu": {
-            const el = document.createElement("select")
-            el.className = "masque-select"
-            el.setAttribute("aria-label", label)
-            const k = Number(g.value)
-            if (k < 0) {
-                // Makie's menu with nothing chosen yet shows its prompt.
-                const o = document.createElement("option")
-                o.value = "-1"
-                o.textContent = g.prompt ?? "Select…"
-                o.disabled = true
-                el.append(o)
-            }
-            ;(g.labels ?? []).forEach((text, i) => {
-                const o = document.createElement("option")
-                o.value = String(i)
-                o.textContent = text
-                el.append(o)
-            })
-            el.value = String(k)
-            el.addEventListener("change", () => hooks.commit_(id, envelope(id, Number(el.value))))
-            box.append(el)
-            return {
-                layer_: layer, shape_: shape(g), box_: box, get_: () => Number(el.value),
-                set_: (p) => { if (typeof p === "number") el.value = String(p) },
-            }
-        }
+        case "menu":
+            return buildMenu(layer, g, m, box, label, hooks)
         case "button": {
             // The field counts clicks, as Makie's `clicks` does.
             const el = document.createElement("button")

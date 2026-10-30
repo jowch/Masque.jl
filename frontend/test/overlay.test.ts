@@ -6908,9 +6908,10 @@ describe("block controls (#345)", () => {
         const [lo, hi] = [...ctl(host, "span").querySelectorAll("input")] as HTMLInputElement[]
         expect([lo.value, hi.value]).toEqual(["1", "4"])
         expect(hi.getAttribute("aria-valuetext")).toBe("e")
-        const select = ctl(host, "pick").querySelector("select") as HTMLSelectElement
-        expect([...select.options].map((o) => o.textContent)).toEqual(["red", "blue"])
-        expect(select.value).toBe("0")
+        const menu = ctl(host, "pick").querySelector("input") as HTMLInputElement
+        expect(menu.getAttribute("role")).toBe("combobox")
+        expect([...ctl(host, "pick").querySelectorAll("[role=option]")].map((o) => o.textContent)).toEqual(["red", "blue"])
+        expect(menu.value).toBe("red")
     })
 
     it("a toggle draws Makie's turned track and slides its knob between the ends (#427)", () => {
@@ -6947,10 +6948,9 @@ describe("block controls (#345)", () => {
         const { host, script } = setup()
         mount(script, m)
         const box = ctl(host, "pick")
-        const select = box.querySelector("select") as HTMLSelectElement
-        expect(select.options[0].textContent).toBe("Pick a colour")
-        expect(select.options[0].disabled).toBe(true)
-        expect(select.value).toBe("-1")
+        const menu = box.querySelector("input") as HTMLInputElement
+        expect(menu.value).toBe("Pick a colour")
+        expect(box.querySelectorAll("[role=option][aria-selected=true]").length).toBe(0)
         expect(box.style.getPropertyValue("--fs")).toBe(`${(100 * 32) / 200}cqw`)
         expect(box.style.getPropertyValue("--pad")).toBe(`${(100 * 16) / 200}cqw`)
         expect(box.style.getPropertyValue("--masque-ctl-text")).toBe("rgb(9,9,9)")
@@ -6974,6 +6974,123 @@ describe("block controls (#345)", () => {
         expect(box.style.getPropertyValue("--masque-ctl-text")).toBe("rgb(0,128,0)")
         expect(box.style.getPropertyValue("--fs")).toBe(`${(100 * 20) / 200}cqw`)
         expect(box.style.getPropertyValue("--masque-ctl-off")).toBe("rgb(1,1,1)")
+    })
+
+    // A menu as Makie draws it (#429): three options, cells 40 px high, the second chosen.
+    const menuManifest = (geo: Partial<ControlGeometry> = {}): Manifest => {
+        const m = controlsManifest()
+        Object.assign(m.layers[3].geometry as object, {
+            y: 300, labels: ["Apple", "Banana", "cherry"], n: 3, value: 1, cell: 40, fontsize: 32, padding: 16,
+            cellColors: ["rgb(1,1,1)", "rgb(2,2,2)", "rgb(3,3,3)", "rgb(4,4,4)"], optionText: ["rgb(5,5,5)", "rgb(6,6,6)"],
+            arrow: { path: "M0 -0.5L0.5 0.5Z", flip: "M0 0.5L0.5 -0.5Z", size: 20, inset: 20, color: "rgba(0,0,0,0.2)" },
+            ...geo,
+        })
+        m.initial!.pick = { layer: "pick", index: 0, payload: 1 }
+        return m
+    }
+    const menuParts = (host: HTMLElement) => {
+        const box = ctl(host, "pick")
+        const input = box.querySelector("input") as HTMLInputElement
+        const list = box.querySelector("[role=listbox]") as HTMLElement
+        const options = [...box.querySelectorAll("[role=option]")] as HTMLElement[]
+        return { box, input, list, options }
+    }
+    const key = (el: HTMLElement, k: string) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }))
+
+    it("a menu opens Makie's list of cells under its box and picks the option clicked (#429)", () => {
+        const { host, script } = setup()
+        mount(script, menuManifest())
+        const { box, input, list, options } = menuParts(host)
+        expect(input.value).toBe("Banana")
+        expect(input.readOnly).toBe(true)
+        expect(list.hidden).toBe(true)
+        // Lengths: cells as a share of the box's 40 px height, text and arrow of its 200 px width.
+        expect(box.style.getPropertyValue("--ch")).toBe("100cqh")
+        expect(box.style.getPropertyValue("--as")).toBe(`${(100 * 20) / 200}cqw`)
+        expect(box.style.getPropertyValue("--c1")).toBe("rgb(2,2,2)")
+        expect(box.style.getPropertyValue("--o1")).toBe("rgb(6,6,6)")
+        // Room below (800 − 340 = 460 px) for the list's 120: it opens down, stopping at the edge.
+        expect(box.style.getPropertyValue("--lmax")).toBe(`${(100 * 460) / 40}cqh`)
+        input.dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true }))
+        expect(list.hidden).toBe(false)
+        expect(list.classList.contains("down")).toBe(true)
+        expect(box.classList.contains("open")).toBe(true)
+        expect(input.getAttribute("aria-expanded")).toBe("true")
+        // The arrow turns up while the list is open.
+        expect(box.querySelector("svg path")!.getAttribute("d")).toBe("M0 0.5L0.5 -0.5Z")
+        expect(options.map((o) => o.getAttribute("aria-selected"))).toEqual(["false", "true", "false"])
+        // Odd and even cells, counted from the first.
+        expect(options.map((o) => o.classList.contains("even"))).toEqual([false, true, false])
+        options[2].dispatchEvent(new PointerEvent("pointermove", { bubbles: true }))
+        expect(options[2].classList.contains("act")).toBe(true)
+        options[2].click()
+        expect(list.hidden).toBe(true)
+        expect(input.value).toBe("cherry")
+        expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: 2 })
+    })
+
+    it("a menu opens up when there is less room below, or as `direction` says (#429)", () => {
+        const { host, script } = setup()
+        mount(script, menuManifest({ y: 700 }))
+        expect(menuParts(host).box.dataset.direction).toBe("up")
+        expect(menuParts(host).box.style.getPropertyValue("--lmax")).toBe(`${(100 * 700) / 40}cqh`)
+        const b = setup()
+        mount(b.script, menuManifest({ direction: "up" }))
+        expect(menuParts(b.host).box.dataset.direction).toBe("up")
+    })
+
+    it("a menu is a listbox the keys work: arrows, Enter, Escape and type-ahead (#429)", () => {
+        const { host, script } = setup()
+        mount(script, menuManifest())
+        const { input, list, options } = menuParts(host)
+        // ArrowDown opens on the chosen option, and again moves on.
+        key(input, "ArrowDown")
+        expect(list.hidden).toBe(false)
+        expect(input.getAttribute("aria-activedescendant")).toBe(options[1].id)
+        key(input, "ArrowDown")
+        expect(input.getAttribute("aria-activedescendant")).toBe(options[2].id)
+        key(input, "Home")
+        expect(input.getAttribute("aria-activedescendant")).toBe(options[0].id)
+        key(input, "Enter")
+        expect(list.hidden).toBe(true)
+        expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: 0 })
+        // Escape closes without a pick.
+        key(input, "ArrowUp")
+        key(input, "Escape")
+        expect(list.hidden).toBe(true)
+        expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: 0 })
+        // Typing a letter jumps to the option it starts, ignoring case.
+        key(input, "c")
+        expect(input.getAttribute("aria-activedescendant")).toBe(options[2].id)
+        key(input, " ")
+        expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: 2 })
+    })
+
+    it("a searchable menu filters its options by what the reader types, ignoring case (#429)", () => {
+        const { host, script } = setup()
+        mount(script, menuManifest({ search: "Search...", placeholderColor: "rgba(0,0,0,0.4)" }))
+        const { input, list, options } = menuParts(host)
+        expect(input.readOnly).toBe(false)
+        input.dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true }))
+        expect(input.value).toBe("")
+        expect(input.placeholder).toBe("Search...")
+        input.value = "AN"
+        input.dispatchEvent(new Event("input", { bubbles: true }))
+        expect(options.map((o) => o.hidden)).toEqual([true, false, true])
+        // The cells showing count odd and even afresh.
+        expect(options[1].classList.contains("even")).toBe(false)
+        // Enter with no option active closes the list, as Makie's does, and picks nothing.
+        key(input, "Enter")
+        expect(list.hidden).toBe(true)
+        expect(input.value).toBe("Banana")
+        expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: 1 })
+        input.dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true }))
+        input.value = "ch"
+        input.dispatchEvent(new Event("input", { bubbles: true }))
+        key(input, "ArrowDown")
+        expect(input.getAttribute("aria-activedescendant")).toBe(options[2].id)
+        key(input, "Enter")
+        expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: 2 })
     })
 
     it("a checkbox draws Makie's square and checkmark on the square alone (#428)", () => {
@@ -7129,9 +7246,7 @@ describe("block controls (#345)", () => {
         toggle.checked = false
         toggle.dispatchEvent(new Event("change", { bubbles: true }))
         expect(val(host).show).toEqual({ layer: "show", index: 0, payload: false })
-        const select = ctl(host, "pick").querySelector("select") as HTMLSelectElement
-        select.value = "1"
-        select.dispatchEvent(new Event("change", { bubbles: true }))
+        ;(ctl(host, "pick").querySelectorAll("[role=option]")[1] as HTMLElement).click()
         expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: 1 })
         expect(inputs).toBe(3)
     })
@@ -7262,9 +7377,9 @@ describe("block controls (#345)", () => {
         toggle.dispatchEvent(new Event("change", { bubbles: true }))
         await new Promise((r) => setTimeout(r, 0))
         img.dispatchEvent(new Event("load"))
-        const select = ctl(host, "pick").querySelector("select") as HTMLSelectElement
-        expect([...select.options].filter((o) => !o.disabled).map((o) => o.textContent)).toEqual(["kale", "leek"])
-        expect(select.value).toBe("-1")
+        const box = ctl(host, "pick")
+        expect([...box.querySelectorAll("[role=option]")].map((o) => o.textContent)).toEqual(["kale", "leek"])
+        expect((box.querySelector("input") as HTMLInputElement).value).toBe("Select...")
         expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: -1 })
         // The toggle the reader clicked keeps its value; the frame echoes it.
         expect(val(host).show).toEqual({ layer: "show", index: 0, payload: false })
