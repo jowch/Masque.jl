@@ -5814,6 +5814,14 @@ describe("marquee and legend picks under select = :many (#335)", () => {
         expect(val(host).pts).toEqual(items(0, 1, 2))
     })
 
+    it("a marquee can start inside an opaque legend, which hides marks but isn't a plot area (#472)", () => {
+        const m = many()
+        m.occluders = [[0, 0, 300, 300]] // over point 0
+        const { host, surface } = mounted(m)
+        drag(surface, [50, 50], [350, 250])
+        expect(val(host).pts).toEqual(items(0, 1))
+    })
+
     it("a marquee, with or without Ctrl, adds; one that starts on a picked mark takes out what it covers", () => {
         const { host, surface } = mounted(many())
         drag(surface, [50, 50], [150, 150])

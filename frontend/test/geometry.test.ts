@@ -905,6 +905,11 @@ describe("a legend Makie draws over the marks (#472)", () => {
         expect(hitTestAt(m(dot("a", 100, 20), entry), 100, 20, still, "hover")?.layer.id).toBe("leg")
         expect(hitTestAt(m(thr), 100, 20, still, "drag")?.layer.id).toBe("thr")
     })
+    it("reads no axis readout inside the box: the pointer is on the legend", () => {
+        const readout = { id: "ro", kind: "axis", axis: "ax", events: ["click", "hover"], payloads: [], geometry: null } as unknown as HitLayer
+        expect(hitTestAt(m(readout), 100, 20, still, "hover")).toBeNull()
+        expect(hitTestAt(m(readout), 100, 60, still, "hover")?.layer.id).toBe("ro")
+    })
     it("hits everything when the manifest has no occluders", () => {
         const man = { ...m(dot("a", 100, 20)), occluders: undefined } as Manifest
         expect(hitTestAt(man, 100, 20, still, "hover")?.layer.id).toBe("a")

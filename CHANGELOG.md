@@ -17,8 +17,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 - A mark hidden under a legend stays hidden: its hover ring, pick outline and fade no longer
-  draw over the legend, and the pointer inside the legend no longer shows its tooltip or picks
-  it. The keyboard still reaches it. A legend with no background, or a mostly see-through one,
+  draw over the legend, and the pointer inside the legend no longer shows its tooltip, picks it,
+  or reads the axis under the legend. The keyboard and a box selection still reach it. A legend with no background, or a mostly see-through one,
   still shows the marks under it and lets the pointer reach them (#437, #472).
 
 ## [0.4.2] - 2026-10-30

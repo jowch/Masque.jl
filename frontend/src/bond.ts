@@ -728,10 +728,8 @@ export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] 
 
 // The plot axes under image px (x, y): every axis whose plot area holds the point, so twin
 // axes and an inset's parent all count. A colorbar's readout is a hit, not a plot area, and a
-// click inside a legend's box, even on its padding, is on the legend, so it finds none, as does
-// one inside an opaque legend that takes no clicks (`occluders`, #472).
+// click inside a legend's box, even on its padding, is on the legend, so it finds none.
 function axesAt(ctx: OverlayCtx, x: number, y: number): string[] {
-    if (ctx.manifest_.occluders?.some(([bx, by, bw, bh]) => x >= bx && x <= bx + bw && y >= by && y <= by + bh)) return []
     const legends = new Set(ctx.manifest_.layers.filter((l) => l.bond === "legend").map((l) => l.axis))
     const inside = (t: { viewport: [number, number, number, number] }) => {
         const [vx, vy, vw, vh] = t.viewport
@@ -770,6 +768,8 @@ export function onClick(ctx: OverlayCtx, state: OverlayState, e: MouseEvent): vo
         // Cmd/Ctrl-click that misses keeps the picks, as a modified miss does in a file browser.
         if (isToggleClick(e)) return
         if (hitTestAt(ctx.manifest_, layout.x, layout.y, state.photo_, "hover", state.photoViewId_)) return
+        // A click inside an opaque legend that takes no clicks is on the legend too (#472).
+        if (ctx.manifest_.occluders?.some(([bx, by, bw, bh]) => layout.x >= bx && layout.x <= bx + bw && layout.y >= by && layout.y <= by + bh)) return
         const axes = axesAt(ctx, layout.x, layout.y)
         if (axes.length > 0) clearPicks(ctx, state, axes, false)
         return
