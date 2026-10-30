@@ -4,17 +4,20 @@ The tables below list every built-in interactable with its signature,
 what its field in the `@bind` value holds after a click or release, and
 the guide that shows it in use. For what each event holds, see [What the `@bind` value holds](@ref).
 
-Most constructors take the axis first and `id` as a keyword: the name
-of its field in the `@bind` value, which its events also report as
-`pick.layer`. Constructors for marks also
-take `payloads` (a vector or a `DataFrame`, one entry per mark) and
-`tooltip` (a `masque"..."` template, or `false`). Without `payloads`,
-each mark reports its `index` and coordinates, and `payloads` adds your
-fields to those coordinates. Points, bars, polygons, segments, lines,
-text, regions, `AxisInteractable` and `LegendInteractable` take
-`select = :many` too, which makes the field a vector of picks instead of
-one (see [Select several marks](@ref)); heatmap, image and surface
-cells don't take it yet.
+Most constructors take the axis first, then keywords. These are the
+ones most of them share:
+
+| Keyword | What it sets |
+|---|---|
+| `id` | the name of its field in the `@bind` value, which its events also report as `pick.layer` |
+| `payloads` | your data for each mark, as a vector or a `DataFrame` with one entry per mark; without it, each mark reports its `index` and coordinates, and with it, your fields come with the coordinates |
+| `tooltip` | a `masque"..."` template, or `false` for none; see [Tooltips](@ref) |
+| `select = :many` | makes the field a vector of selected marks instead of one; see [Select several marks](@ref) |
+
+`payloads` and `tooltip` are for constructors of marks. `select = :many`
+works on points, bars, polygons, segments, lines, text, regions,
+`AxisInteractable` and `LegendInteractable`, and not yet on heatmap,
+image and surface cells.
 
 ## What `masque(fig)` builds
 

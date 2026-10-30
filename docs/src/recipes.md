@@ -124,7 +124,7 @@ end
 
 `selected=` names a part the same way:
 `selected = (dumbbell = (ends = [2],),)` starts with the second end
-picked. A part can itself be a named tuple, for a recipe built from
+selected. A part can itself be a named tuple, for a recipe built from
 other recipes, and its parts nest one level deeper.
 
 Your plot as a whole takes its place among the other plots on the axis

@@ -39,7 +39,8 @@ end
 ```
 
 Then draw the picture with a mask over it, and its histogram with a
-cutoff line. `onchange` redraws the mask each time the line moves:
+cutoff line. `onchange`, from [Update the figure](@ref), redraws the mask
+each time the line moves:
 
 ```julia
 begin
@@ -72,7 +73,7 @@ Base.Text("$(round(100 * count(>(level.value), img) / length(img); digits = 1))%
 
 ## How it works
 
-The mask is a second heatmap of `true` and `false`, coloured clear
+The mask is a second heatmap of `true` and `false`, colored clear
 for `false` and see-through red for `true`. `colorrange = (0, 1)` keeps
 `false` clear even when no pixel passes. `onchange` gives it new
 data with `maskplot[1] = …`, so the picture redraws while the cell
@@ -86,7 +87,7 @@ the histogram would be too flat to see where they start.
 reach the bottom on a log axis.
 
 `bind = :cutoff` makes `level` the threshold's last value, a
-`ThresholdEvent`. The mask redraws as you drag, while `level` changes
+[`ThresholdEvent`](@ref). The mask redraws as you drag, while `level` changes
 only when you let go, so the cells that use it run once per release.
 
 ## Variations

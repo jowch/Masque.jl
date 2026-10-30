@@ -2,7 +2,7 @@
 
 Click a label and its event's `text` is its string. `masque(fig)` makes
 `text!` and `annotation!` labels clickable, including the tilted one.
-The event is an `ElementEvent` that also has the label's `index`, `x`,
+The event is an [`ElementEvent`](@ref) that also has the label's `index`, `x`,
 and `y`.
 
 Each `text!` call and the `annotation!` get their own field in `sel`,
