@@ -331,13 +331,18 @@ with three WebGL canvases below its `:cairo` widgets.
 | `:webgl` | `:webgl` click, cell re-renders a `:webgl` figure | 3.0 | 55 | 107 | 133 | 599 | **660** |
 
 The overlay's share is the commit, 3 ms on both backends. Everything a `:webgl` click adds comes
-after it, and the slider pays the same once a WebGL canvas is on screen (29 to 185 ms): with one
-in view the page drew 106 frames in 5 s and spent 2.9 s in long tasks, against 60 fps and none
-with the canvases off screen, so Pluto's send and the patch coming back wait behind software
-frames. The kernel's part, *send* to *julia*, is 10 to 15 ms in every row. The first click of a
-fresh session takes 290 to 520 ms on `:cairo` (the value path compiling once) and about 400 ms
-on `:webgl`; the worst single sample of any case was 717 ms. A click on the kind-sweep
-notebook's scatter, with 78 canvases on the page, took 76 to 445 ms over 8 clicks. An earlier,
+after it, and the slider pays nearly the same once a WebGL canvas is on screen (29 to 185 ms):
+Pluto's send and the patch coming back wait behind the frames headless Chromium draws in
+software. With one canvas in view the page drew 106 frames in 5 s and spent 2.9 s in long tasks
+in this run, and 187 frames with 0.28 s of long tasks in a review rerun, against 60 fps and none
+with the canvases off screen. The kernel's part, *send* to *julia*, is 7 to 14 ms in every row
+that doesn't re-render a figure; the re-render rows add about 45 ms for drawing it. The `:webgl`
+rows vary by up to about 2 times run to run on SwiftShader: the review rerun of the same bench
+gave 206, 218 and 381 ms for the last three rows, with the commit still 3 ms. The `:cairo` rows
+reproduced within a few ms. The first click of a fresh session takes 290 to 520 ms on `:cairo`
+(the value path compiling once) and about 400 ms on `:webgl`; the worst single sample of any
+case was 717 ms. A click on the kind-sweep notebook's scatter, with 78 canvases on the page,
+took 76 to 445 ms over 8 clicks (`bench/value_roundtrip/kind_sweep_click.mjs`). An earlier,
 unrecorded 8 to 16 s for a `:webgl` click did not reproduce in any of these.
 
 ### Re-drawing a selection (#394)

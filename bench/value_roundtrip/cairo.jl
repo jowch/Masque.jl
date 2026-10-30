@@ -19,7 +19,9 @@ end
 # ╔═╡ a4790000-0000-0000-0000-000000000001
 begin
     import Pkg
-    Pkg.activate(ENV["MASQUE_DEV_ENV"])
+    dev = get(ENV, "MASQUE_DEV_ENV", "")
+    isempty(dev) && error("set MASQUE_DEV_ENV to the env `scripts/cloud-warm.sh julia` builds")
+    Pkg.activate(dev)
     using Masque, CairoMakie
     import JSON3
 end

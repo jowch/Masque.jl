@@ -34,7 +34,7 @@ for (;;) {
     if (run && !window.__ran) { window.__ran = true; run.click(); }
     return { busy: document.querySelectorAll("pluto-cell.running, pluto-cell.queued").length,
       err: [...document.querySelectorAll("pluto-cell.errored")].map((c) => c.innerText).join("\n").slice(0, 2000),
-      c: !!document.querySelector("#coords"), hosts: document.querySelectorAll(".ip-host").length };
+      c: !!document.querySelector("#coords") };
   });
   if (s.err) { console.error("cell error:\n" + s.err); process.exit(1); }
   if (s.c && s.busy === 0) break;
