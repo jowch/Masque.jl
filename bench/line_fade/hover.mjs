@@ -7,7 +7,9 @@
 // and the same with webgl.jl. For each figure (figures.jl) it times, as medians of 12:
 //   swap   the pointer moves from one line to another, so the fade redraws;
 //   along  it moves one pixel along the same line, which redraws nothing (the baseline);
-//   off    it moves off the plot from a line, which takes the fade away.
+//   off    it moves off the plot from a line, which takes the fade away;
+// each half the time at the first line and half at the last (`first`, `last`: those medians;
+// `redraws`: the most fade redraws any run made).
 // `sync` is the event handler, `total` runs until two animation frames later. `sweep` moves the
 // pointer across every line, one move per animation frame for 60 frames, and gives the handler's
 // median and worst time and how many frames' handlers took longer than a 60 Hz frame (16.7 ms),
@@ -92,15 +94,19 @@ const med = (a) => { const b = [...a].sort((x, y) => x - y); return b[Math.floor
 const series = async (fn, n = 12) => {
   const r = [];
   for (let i = 0; i < n; i++) { r.push(await fn(i)); await page.waitForTimeout(150); }
-  return { sync: med(r.map((x) => x.sync)), total: med(r.map((x) => x.total)), redraws: med(r.map((x) => x.redraws)), runs: r };
+  // Odd runs end on the first line, even runs on the last (`end` below).
+  const at = (p) => med(r.filter((_, i) => i % 2 === p).map((x) => x.sync));
+  return { sync: med(r.map((x) => x.sync)), first: at(1), last: at(0), total: med(r.map((x) => x.total)), redraws: Math.max(...r.map((x) => x.redraws)), runs: r };
 };
 const out = { notebook, cases: [] };
 for (const [w, c] of C.entries()) {
-  const along = [c.a[0] + 1, c.a[1]];
+  // Every case ends on the first and the last line in turn: separate `lines!` plots are tested
+  // in order, so the hit test costs more on the last plot than on the first.
+  const end = (i) => i % 2 ? c.a : c.b, other = (i) => i % 2 ? c.b : c.a;
   const row = { name: c.name, vertices: c.vertices };
-  row.swap = await series((i) => i % 2 ? timed(w, c.b, c.a) : timed(w, c.a, c.b));
-  row.along = await series(() => timed(w, c.a, along));
-  row.off = await series(() => timed(w, c.a, [2, 2]));
+  row.swap = await series((i) => timed(w, other(i), end(i)));
+  row.along = await series((i) => timed(w, end(i), [end(i)[0] + 1, end(i)[1]]));
+  row.off = await series((i) => timed(w, end(i), [2, 2]));
   row.sweep = await sweep(w, c.a, c.b);
   out.cases.push(row);
   console.log(JSON.stringify(row, (k, v) => k === "runs" ? undefined : v));
