@@ -70,7 +70,7 @@ type HaloAlign = "mid" | "in" | "out" | "line"
 const INSET_MIN = 12
 let haloSeq = 0
 
-function haloAlign(g: unknown[], layer: HitLayer): HaloAlign {
+function haloAlign(g: unknown[]): HaloAlign {
     const kind = g[0]
     if (kind === "circle" || kind === "point" || kind === "dot") return "out"
     if (kind === "seg" || kind === "path") return "line"
@@ -83,20 +83,8 @@ function haloAlign(g: unknown[], layer: HitLayer): HaloAlign {
             x0 = Math.min(x0, ring[i]); x1 = Math.max(x1, ring[i]); y0 = Math.min(y0, ring[i + 1]); y1 = Math.max(y1, ring[i + 1])
         }
         side = Math.min(x1 - x0, y1 - y0)
-    } else if (kind === "mask") side = gridCell(layer)
+    } else if (kind === "mask") side = g[3] as number // the outlined cells' box, not the grid's cells
     return side >= INSET_MIN ? "in" : "mid"
-}
-
-// A grid's smallest cell side, image px.
-const cellCache = new WeakMap<HitLayer, number>()
-function gridCell(layer: HitLayer): number {
-    let s = cellCache.get(layer)
-    if (s !== undefined) return s
-    s = Infinity
-    const g = layer.geometry as { xedges?: number[]; yedges?: number[] } | null
-    for (const e of [g?.xedges ?? [], g?.yedges ?? []]) for (let i = 1; i < e.length; i++) s = Math.min(s, Math.abs(e[i] - e[i - 1]))
-    cellCache.set(layer, s)
-    return s
 }
 
 // Wraps `core` (already classed masque-hi …) in its casing. `shape` is what the bands keep
@@ -162,7 +150,7 @@ function haloOf(core: SVGElement, shape: SVGElement, align: HaloAlign, mode: HiM
 export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null {
     if (!hit.geom_) return null
     const st = hit.layer.style ?? DEFAULT_STYLE
-    if (hit.geom_[0] === "mask") return maskElements(hit.geom_ as [string, string, string], st.stroke, mode, hit.layer)
+    if (hit.geom_[0] === "mask") return maskElements(hit.geom_ as [string, string, string, number], st.stroke, mode)
     const g = hit.geom_ as [string, ...number[]] | [string, number[]]
     let el: SVGElement | null = null
     if (g[0] === "circle" || g[0] === "point" || g[0] === "dot") {
@@ -225,7 +213,7 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
     // brighten: the halo alone marks it, the line's own colour showing through.
     if (open) {
         el.classList.add("masque-hi", ...(mode === "hover" ? ["masque-hover", "masque-w-hover"] : ["masque-wash", "masque-w-selected"]))
-        const align = haloAlign(g, hit.layer)
+        const align = haloAlign(g)
         return { edge: haloOf(el, el.cloneNode(false) as SVGElement, align, mode, align === "line" ? lineWidthOf(hit.layer) : 0) }
     }
 
@@ -248,14 +236,14 @@ export function makeHiElement(hit: Hit, mode: HiMode = "hover"): HiResult | null
     } else {
         edgeEl.classList.add("masque-wash", "masque-w-selected")
     }
-    return { fill: fillEl, edge: haloOf(edgeEl, fillEl.cloneNode(false) as SVGElement, haloAlign(g, hit.layer), mode) }
+    return { fill: fillEl, edge: haloOf(edgeEl, fillEl.cloneNode(false) as SVGElement, haloAlign(g), mode) }
 }
 
 // A grid's selected cells (gridmask.ts's maskHit), or a hovered region (regions.ts): the
 // closed-mark recipe, with the fill over the cells and the edge on the outline only, so the
 // cells inside the area show no grid lines. Square caps close the corners where a row side
 // meets a column side. Hover draws the hover edge (1.5px), a selection the selected one (2px).
-function maskElements(g: [string, string, string], stroke: string | undefined, mode: HiMode, layer: HitLayer): HiResult {
+function maskElements(g: [string, string, string, number], stroke: string | undefined, mode: HiMode): HiResult {
     const edgeClasses = mode === "hover" ? ["masque-hover", "masque-w-hover"] : ["masque-wash", "masque-w-selected"]
     const fill = document.createElementNS(SVG_NS, "path")
     fill.setAttribute("d", g[1])
@@ -275,7 +263,7 @@ function maskElements(g: [string, string, string], stroke: string | undefined, m
     }
     fill.classList.add("masque-hi", "masque-fillshape")
     edge.classList.add("masque-hi", ...edgeClasses)
-    return { fill, edge: haloOf(edge, fill.cloneNode(false) as SVGElement, haloAlign(["mask"], layer), mode) }
+    return { fill, edge: haloOf(edge, fill.cloneNode(false) as SVGElement, haloAlign(g), mode) }
 }
 
 // --- highlight/selection DOM-lifecycle: keyed by OverlayState.hiKey_ / selKeys_ ---

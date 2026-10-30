@@ -99,24 +99,28 @@ export function decodeMask(layer: HitLayer, env: unknown): GridMask | null {
     return null
 }
 
-// The highlight for a mask, as one hit: ["mask", fill path, edge path]. The fill is the
+// The highlight for a mask, as one hit: ["mask", fill path, edge path, side]. The fill is the
 // selected cells, one rect per run (one path, so touching rows paint as one area with no
 // seams); the edge is the outline, each cell side that borders an unselected cell or the grid's
-// edge, joined along a row or column. Index -1 keeps its key apart from every cell's.
+// edge, joined along a row or column; the side is the shorter side of the selected cells'
+// bounding box, image px. Index -1 keeps its key apart from every cell's.
 export function maskHit(layer: HitLayer, mask: GridMask): Hit | null {
     const gg = layer.geometry as GridGeometry
     if (mask.length !== gg.ncols * gg.nrows) return null
     const paths = maskPaths(mask, gg.ncols, gg.nrows, gg.xedges, gg.yedges)
-    return paths ? { layer, index: -1, geom_: ["mask", paths[0], paths[1]] } : null
+    return paths ? { layer, index: -1, geom_: ["mask", ...paths] } : null
 }
 
 // The fill and edge paths of `mask`, an `nc` × `nr` row-major block of cells whose edges are
-// `xe` (nc + 1) and `ye` (nr + 1); null when it holds no cell. A region's outline passes the
+// `xe` (nc + 1) and `ye` (nr + 1), and the shorter side of its bounding box; null when it holds
+// no cell. A region's outline passes the
 // block around the region alone (regions.ts), so it walks that block, not the whole grid.
-export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<number>, ye: ArrayLike<number>): [string, string] | null {
+export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<number>, ye: ArrayLike<number>): [string, string, number] | null {
     // Walks the typed array directly (no per-cell closure): a click on a photo-sized grid walks
     // every cell three times here.
     let fill = ""
+    // The bounding box in cell indices: the first and last selected row, the outermost columns.
+    let ilo = nc, ihi = -1, jlo = -1, jhi = -1
     for (let j = 0; j < nr; j++) {
         const row = j * nc
         let i = 0
@@ -125,6 +129,10 @@ export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<
             const i0 = i
             while (i < nc && mask[row + i]) i++
             fill += `M${xe[i0]} ${ye[j]}H${xe[i]}V${ye[j + 1]}H${xe[i0]}Z`
+            if (jlo < 0) jlo = j
+            jhi = j
+            ilo = Math.min(ilo, i0)
+            ihi = Math.max(ihi, i)
         }
     }
     if (fill === "") return null
@@ -155,5 +163,5 @@ export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<
         }
     }
     for (let i = 0; i <= nc; i++) if (open[i] >= 0) vside(i, open[i], nr)
-    return [fill, edge]
+    return [fill, edge, Math.min(Math.abs(xe[ihi] - xe[ilo]), Math.abs(ye[jhi + 1] - ye[jlo]))]
 }

@@ -60,7 +60,18 @@ describe("grid masks (#335)", () => {
         expect(fill.split("Z").length - 1).toBe(4) // rows 0 and 2 whole, row 1 in two runs
         // Outer: 2 horizontal + 2 vertical; hole: 2 + 2.
         expect(edge.split("M").length - 1).toBe(8)
+        expect(h.geom_![3]).toBe(30) // the 30 × 30 box around it, hole or not
         expect(maskHit(L, emptyMask(L))).toBeNull()
+    })
+
+    it("give the shorter side of the selected cells' box, not of a cell (#463)", () => {
+        const L = layer(4, 3)
+        const m = emptyMask(L)
+        setBlock(m, 4, 1, 3, 1, 2, true) // columns 1..3, rows 1..2: 30 × 20
+        expect(maskHit(L, m)!.geom_![3]).toBe(20)
+        const one = emptyMask(L)
+        one[0] = one[7] = 1 // cells (0, 0) and (3, 1): a 40 × 20 box with a gap
+        expect(maskHit(L, one)!.geom_![3]).toBe(20)
     })
 
     it("marquee: add and subtract", () => {

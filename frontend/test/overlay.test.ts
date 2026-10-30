@@ -7301,3 +7301,41 @@ describe("block controls (#345)", () => {
         expect(shadow.querySelector(".masque-controls")).toBeNull()
     })
 })
+
+describe("a grid pick is inset or centred by its own size, not the grid's smallest cell (#463)", () => {
+    // A 40×10 grid of 6 px cells over a 240×60 image px plot, scaling 1, so every cell is
+    // narrower than the 12 px an area needs for an inset halo.
+    const n = 40, m = 10, w = 6
+    const grid = (runs: number[], xedges = Array.from({ length: n + 1 }, (_, k) => w * k)): Manifest => ({
+        width: 240, height: 60, scaling: 1,
+        transforms: { ax1: { xlims: [0, n], ylims: [0, m], xscale: "identity", yscale: "identity",
+            viewport: [0, 0, 240, 60], xreversed: false, yreversed: false } },
+        fields: ["cells"],
+        initial: { cells: { runs } },
+        layers: [{ id: "cells", kind: "grid", axis: "ax1", events: ["click", "hover"], payloads: [], many: true,
+            geometry: { xedges, yedges: Array.from({ length: m + 1 }, (_, k) => w * k), ncols: n, nrows: m } }],
+    })
+    const align = (man: Manifest): string => {
+        const { host, script } = setup()
+        mount(script, man)
+        const halo = edgeSelGroup(shadowOf(host)).firstElementChild as SVGElement
+        return ["in", "mid"].find((a) => halo.classList.contains(`masque-halo-${a}`))!
+    }
+
+    it("a large region of small cells is inset", () => {
+        // Rows 2..5, columns 4..13: 60 × 24 image px.
+        expect(align(grid([2, 4, 10, 3, 4, 10, 4, 4, 10, 5, 4, 10]))).toBe("in")
+    })
+
+    it("a region thinner than 12 px on either side is centred", () => {
+        expect(align(grid([3, 4, 1]))).toBe("mid") // one 6 px cell
+        expect(align(grid([3, 0, 40]))).toBe("mid") // a whole row: 240 × 6
+    })
+
+    it("one thin cell elsewhere on the grid leaves a large cell inset", () => {
+        // Column 0 is 2 px wide; the rest 6 px. Picks two rows of three columns: 18 × 12.
+        const xedges = [0, 2, ...Array.from({ length: n - 1 }, (_, k) => 2 + w * (k + 1))]
+        expect(align(grid([1, 5, 3, 2, 5, 3], xedges))).toBe("in")
+        expect(align(grid([1, 0, 1, 2, 0, 1], xedges))).toBe("mid") // the thin column itself
+    })
+})
