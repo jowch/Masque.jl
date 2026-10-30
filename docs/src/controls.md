@@ -1,11 +1,9 @@
 # Sliders, toggles and menus
 
-Lay out Makie's own `Slider`, `Toggle`, `Checkbox`, `IntervalSlider`,
-`Menu` or `SliderGrid` in the figure, name it in `masque`, and the reader can use it in the
-notebook. Each one becomes a field of the `@bind` value that holds its
-plain value: a number from the slider's range, `true` or `false`, a
-`(low, high)` pair, the option chosen from the menu, or a tuple of a grid's
-slider values.
+To give the reader a slider, a switch or a menu next to your plot, add
+Makie's own block to the figure and name it in `masque`. The reader
+drags, clicks or types in the notebook, and the control's value reaches
+your other cells through `@bind`. Move the slider or flip the toggle:
 
 ```@raw html
 <div class="masque-embed-wrap">
@@ -18,8 +16,35 @@ Main.masque_fallback("controls_values")
 ```
 
 The slider and the toggle look like Makie's and sit where the figure's
-layout put them. Moving one changes `w` when you let go, so cells that use
-`w` respond.
+layout put them. Moving one changes `w` when you let go, so `w.freq` is
+the frequency the reader chose and cells that use it respond.
+
+## Supported controls
+
+Every one of Makie's input blocks works. Its name in `masque` becomes a
+field of the `@bind` value, which holds:
+
+| Block | The field holds |
+|---|---|
+| [`Slider`](https://docs.makie.org/stable/reference/blocks/slider) | the value from its `range` |
+| [`IntervalSlider`](https://docs.makie.org/stable/reference/blocks/intervalslider) | a `(low, high)` pair from its `range` |
+| [`Toggle`](https://docs.makie.org/stable/reference/blocks/toggle) | `true` when it is on |
+| [`Checkbox`](https://docs.makie.org/stable/reference/blocks/checkbox) | `true` when it is ticked |
+| [`Menu`](https://docs.makie.org/stable/reference/blocks/menu) | the option chosen, or its value for a `label => value` option; the first option until the reader picks, or `nothing` with `default = nothing` |
+| [`SliderGrid`](https://docs.makie.org/stable/reference/blocks/slidergrid) | a tuple of its sliders' values, in order |
+| [`Button`](https://docs.makie.org/stable/reference/blocks/button) | the number of clicks so far |
+| [`Textbox`](https://docs.makie.org/stable/reference/blocks/textbox) | the text last entered with Enter, or `nothing` before any |
+
+Each control takes the colors, sizes and labels you give the block, so
+it looks as it does in Makie. A `Menu` opens Makie's list of options,
+which the reader can also work with the arrow keys, Enter and Escape, and
+typing in the open list filters it. A `Textbox` checks its `validator` and
+`restriction` as Makie does: the box turns red while the text fails, and
+Enter stores only text that passes. A few exceptions are listed under
+[Differences from Makie](@ref).
+
+In a static HTML export the controls still set the `@bind` value; only
+`onchange` below needs a running notebook.
 
 ## Redraw the figure from a control
 
@@ -53,7 +78,8 @@ Main.masque_fallback("controls_wave"; segment = "value")
 
 Masque also sets the block's own value before it calls your function, so
 `freq.value[]` agrees with `state.freq`, and code written for GLMakie with
-`on(freq.value)` or `@lift` keeps working.
+`on(freq.value)` or `@lift` keeps working. The same goes for a button's
+`clicks` and a text box's `stored_string`.
 
 ## Name every control
 
@@ -61,43 +87,49 @@ A block needs a name, which becomes its field. Pass it in a NamedTuple, as
 above, or in `bind`: `masque(fig; bind = (freq = freq, dots = dots))`. A
 block in the figure that `masque` isn't given would look live and do
 nothing, so `masque` raises an error naming its kind. Name it, or take it
-out of the figure.
-
-A `SliderGrid`, `Button` or `Textbox` that `masque` isn't given only
-warns, because figures with one worked before `masque` could draw it. A
-grid's value labels use its own `format` for sliders of up to 101 values
-(20 for an interval slider); past that, the browser writes the plain
-value. A `Button`'s field counts its clicks. With `onchange`, Masque sets
-the button's `clicks` before calling your function, so code listening to
-it with `on(b.clicks)` runs too. A `Textbox`'s field holds the text the
-reader last entered with Enter, or `nothing` before any. A `validator`
-that is a `Regex` or a number type turns the box red as the reader types,
-as in Makie; one that is a function runs when they press Enter, and text
-it refuses leaves the field as it was. With `onchange`, the box then goes
-back to the stored text; without it, the box still shows what they typed,
-and `masque` warns. A box as wide as its placeholder, Makie's default,
-keeps that width as the reader types and scrolls its text, where Makie
-widens it.
-
-A `Menu` opens Makie's list of options, under it or over it as in Makie,
-and the reader can also work it with the arrow keys, Enter and Escape.
-Makie's menus are searchable: typing in an open menu keeps the options
-whose label holds the text, ignoring case. A menu's own `filter` can't
-run in the browser, which uses that rule instead, and `masque` warns; to
-narrow the options another way, set the menu's `options` in `masque`'s
-`onchange`.
-
-A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
-does nothing in a notebook: a click always flips the box, and `masque`
-warns when a named checkbox has one. For one choice of several, use a
-`Menu`, or set the other boxes in `masque`'s own `onchange`.
+out of the figure. A `SliderGrid`, `Button` or `Textbox` that isn't named
+only gets a warning, because figures with one worked before `masque` could
+draw it.
 
 With WGLMakie loaded, `Slider` and `Button` also name controls from
-Bonito, so Julia asks which one you mean; write `Makie.Slider` and
+Bonito, so Julia asks which one you mean. Write `Makie.Slider` and
 `Makie.Button` instead.
 
-In a static HTML export the controls still set the `@bind` value; only
-`onchange` needs a running notebook.
+## Differences from Makie
+
+A few things work differently in a notebook, because the browser draws
+each control and runs it without Julia.
+
+A `Menu`'s own `filter` can't run in the browser. Typing in an open menu
+keeps the options whose label holds the text, ignoring case, as Makie's
+default does, and `masque` warns. To narrow the options another way, set
+the menu's `options` in `masque`'s own `onchange`.
+
+A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
+does nothing: a click always flips the box, and `masque` warns when a
+named checkbox has one. For one choice of several, use a `Menu`, or set
+the other boxes in `masque`'s own `onchange`.
+
+A `Textbox` `validator` that is a function, a type other than a number
+(`Bool` counts as other), or a `Regex` with the `x` flag runs only when
+the reader presses Enter, so the box doesn't turn
+red as they type. Text it refuses leaves the field as it was. With
+`onchange`, the box then goes back to the stored text; without it, the
+box still shows what they typed, and `masque` warns. To check as the
+reader types, use a plain `Regex` or a number type such as `Int` or
+`Float64`.
+
+A `Textbox` as wide as its placeholder, Makie's default, keeps that width
+as the reader types and scrolls its text, where Makie widens the box. To
+fit longer text, give it a `width`.
+
+A `Button` label written with `rich` loses its formatting, so a subscript
+or a colored word shows as plain text. Use a plain string for the label,
+or put the formatting in a `Label` beside the button.
+
+A `SliderGrid` writes its value labels with its own `format` for sliders
+of up to 101 values, or 20 for an interval slider. Past that, the label
+shows the plain value. To keep the format, use a coarser `range`.
 
 ## Where to go next
 
