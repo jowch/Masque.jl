@@ -225,10 +225,12 @@ try {
   await page.addInitScript(() => {
     window.fadeOf = (sr) => {
       const out = { picked: [], kept: [], lone: [], outlines: [] };
+      let covered = 0;
       for (const w of sr?.querySelectorAll(".masque-fade") ?? []) {
         for (const k of Object.keys(out)) out[k].push(...(w.masqueFade?.[k] ?? []));
+        if (w.style.display !== "none") covered += Number(w.dataset.covered ?? 0);
       }
-      return out;
+      return { ...out, covered };
     };
   });
   page.on("pageerror", (e) => {
@@ -3244,7 +3246,8 @@ try {
           .flatMap((svg) => [...(svg?.querySelectorAll("g.masque-photo > g.link") ?? [])])
           .find((g) => g.children.length > 0);
         const leaving = firstPopulated ? firstPopulated.firstElementChild.classList.contains("masque-leave") : null;
-        return { count, kids, sel, leaving, kept: f.kept };
+        // How many faded marks' covers were put back over a kept one (#462).
+        return { count, kids, sel, leaving, kept: f.kept, covered: f.covered };
       }, [k, HALO_CAPTURE]);
 
       for (const c of spec.links.cases) {
@@ -3407,6 +3410,14 @@ try {
           } else if (!li.kept.includes(`${tl0.id}:${idx0}`)) {
             throw new Error(`${key}/links[${c.index}]: line ${tl0.id}:${idx0} neither kept by the fade nor haloed ${JSON.stringify(li)}`);
           } else passed.push(`${key}/links[${c.index}]/line-fade`);
+          // A faded line drawn after the kept one and crossing it keeps its cover there (#462):
+          // the spec names the least count of faded marks put back over the kept one.
+          if (c.coveredOver !== undefined) {
+            if (!(li.covered >= c.coveredOver)) {
+              throw new Error(`${key}/links[${c.index}]: ${li.covered} faded covers put back over the kept line, want at least ${c.coveredOver} (a faded line drawn over it would show unfaded where they cross; each layer's \`draw\` must reach the manifest)`);
+            }
+            passed.push(`${key}/links[${c.index}]/crossing-covered`);
+          }
         }
         passed.push(`${key}/links[${c.index}]`);
       }
