@@ -1,4 +1,4 @@
-using Test, Masque, CairoMakie, Makie, FileIO
+using Test, Masque, CairoMakie, Makie, FileIO, JSON3
 include(joinpath(@__DIR__, "..", "testutils.jl"))
 
 # Makie blocks as controls (#345): a named block is a field holding its plain value, drawn by
@@ -92,6 +92,41 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["duration"] == 0.3
     end
 
+    @testset "a checkbox ships Makie's square and checkmark, and leaves its onchange alone (#428)" begin
+        fig = Figure(); Axis(fig[1, 1])
+        plain = Checkbox(fig[2, 1])
+        odd = Checkbox(
+            fig[3, 1]; size = 20, roundness = 1, checkboxstrokewidth = 2, checkmark = :circle, checkmarksize = 0.5,
+            checkboxcolor_unchecked = :yellow, checkmarkcolor_unchecked = :gray,
+        )
+        w = @test_logs masque(fig, (plain = plain, odd = odd))
+        s = w.manifest["scaling"]
+        g = _layer(w.manifest, "plain")["geometry"]
+        @test g["size"] ≈ 11s && g["radius"] ≈ 0.15 * 11 / 2 * s && g["stroke"] ≈ 1.5s
+        @test g["markSize"] ≈ 11 * 0.85 * s
+        @test startswith(g["mark"], "M") && endswith(g["mark"], "Z")
+        g = _layer(w.manifest, "odd")["geometry"]
+        @test g["size"] ≈ 20s && g["radius"] ≈ 10s && g["stroke"] ≈ 2s && g["markSize"] ≈ 10s
+        @test g["off"] == Masque._css_color(Makie.to_color(:yellow))
+        @test g["markOff"] == Masque._css_color(Makie.to_color(:gray))
+        @test startswith(g["mark"], "M")              # `:circle` resolves to Makie's path
+        # A character checkmark ships as the character.
+        fig = Figure(); Axis(fig[1, 1]); cb = Checkbox(fig[2, 1]; checkmark = 'x')
+        g = _layer(masque(fig, (cb = cb,)).manifest, "cb")["geometry"]
+        @test g["markChar"] == "x" && !haskey(g, "mark")
+        # A radio rule: its side effects untick the other boxes. Drawing the widget runs none of
+        # it, and masque says once that a click flips the box instead (#457).
+        fig = Figure(); Axis(fig[1, 1])
+        rs = [Checkbox(fig[2, i]; checked = i == 1) for i in 1:3]
+        calls = Ref(0)
+        for r in rs
+            r.onchange[] = v -> (calls[] += 1; foreach(o -> o === r || (o.checked[] = false), rs); true)
+        end
+        w = @test_logs (:warn, r"checkbox :r1 has its own `onchange`.*#457"s) match_mode = :any masque(fig, (r1 = rs[1], r2 = rs[2], r3 = rs[3]))
+        @test calls[] == 0 && [r.checked[] for r in rs] == [true, false, false]
+        @test Masque.initial_bond(w) == (r1 = true, r2 = false, r3 = false)
+    end
+
     @testset "named through bind, and a bare bind" begin
         (; fig, sc, sl) = _controls_fixture((:sl,))
         w = masque(fig; bind = (degree = sl, pts = sc))
@@ -133,19 +168,82 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
     end
 
     @testset "a block masque shows as a picture is a warning naming its kind (#426)" begin
-        # A `SliderGrid`, `Button` or `Textbox` would look live and do nothing too, but figures
-        # with one worked before, so it warns instead of failing.
+        # A `Textbox` would look live and do nothing too, but figures with one worked before, so
+        # it warns instead of failing.
+        fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
+        Textbox(fig[2, 1])
+        @test_logs (:warn, r"has a Textbox, which masque shows as a picture.*PlutoUI's TextField"s) masque(fig)
+        # A grid or a button masque isn't given is a warning too, not the error other blocks get:
+        # masque began drawing them in a patch release (#430, #431).
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
         SliderGrid(fig[2, 1], (label = "a", range = 1:3))
-        Button(fig[3, 1]; label = "Go")
-        Textbox(fig[4, 1])
-        @test_logs (:warn, r"has a SliderGrid, a Button and a Textbox, which masque shows as a picture.*separate Makie `Slider`s.*PlutoUI's Button"s) masque(fig)
-        fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
-        Button(fig[2, 1])
-        @test_logs (:warn, r"has a Button, which.*PlutoUI's Button") masque(fig)
-        fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
-        SliderGrid(fig[2, 1], (label = "a", range = 1:3))
-        @test_logs (:warn, r"^(?!.*PlutoUI).*separate Makie `Slider`s"s) masque(fig)
+        @test_logs (:warn, r"a SliderGrid that masque wasn't given.*Name it to make it live"s) masque(fig)
+        Button(fig[3, 1])
+        @test_logs (:warn, r"a SliderGrid and a Button that masque wasn't given, so they show as pictures.*Name each one"s) masque(fig)
+    end
+
+    @testset "a slider grid is a field holding a tuple of its slider values (#430)" begin
+        fig = Figure(size = (500, 400)); Axis(fig[1, 1])
+        sg = SliderGrid(
+            fig[2, 1],
+            (label = "freq", range = 0:0.5:3, format = "{:.1f} Hz", startvalue = 1.0),
+            (label = "span", range = 1:5, type = IntervalSlider, startvalues = (2, 4)),
+        )
+        w = @test_logs masque(fig, (grid = sg,))
+        @test Masque.initial_bond(w).grid == (1.0, (2, 4))
+        g = _layer(w.manifest, "grid")["geometry"]
+        @test g["control"] == "slidergrid" && g["value"] == Any[2, [1, 3]]
+        sl, isl = g["sliders"]
+        @test sl["control"] == "slider" && sl["n"] == 7 && isl["control"] == "intervalslider"
+        @test sl["valueLabel"]["labels"] == ["0.0 Hz", "0.5 Hz", "1.0 Hz", "1.5 Hz", "2.0 Hz", "2.5 Hz", "3.0 Hz"]
+        @test sl["name"] == "freq" && isl["name"] == "span"
+        # Only lo ≤ hi pairs, row-major: (2, 4) is lo = 2's second pair, after lo = 1's five.
+        @test length(isl["valueLabel"]["pairs"]) == 15
+        @test isl["valueLabel"]["pairs"][5 + 2 + 1] == "(2, 4)"
+        # Each slider sits inside the grid's box, its value label to its right.
+        @test g["x"] <= sl["x"] && sl["x"] + sl["w"] <= sl["valueLabel"]["x"] + 1
+        v = Masque.bond_from_js(w, Dict("grid" => _env("grid", Any[6, Any[0, 4]])))
+        @test v.grid == (3.0, (1, 5))
+        @test_throws ArgumentError Masque.bond_from_js(w, Dict("grid" => _env("grid", Any[6])))
+        # The browser's values reach the sliders themselves before `onchange`.
+        Masque._sync_controls!([Masque.BlockControl(sg, :grid)], Dict("grid" => _env("grid", Any[0, Any[2, 3]])))
+        @test sg.sliders[1].value[] == 0.0 && sg.sliders[2].interval[] == (3, 4)
+        # The picture hides the sliders and their value labels, and keeps the names.
+        hidden = Masque._block_plots(sg)
+        @test !isempty(hidden)
+        @test !any(p -> p in hidden, Masque._block_plots(sg.labels[1]))
+        # A fine slider ships no labels, so its frames stay small; the browser writes the value.
+        # An author's own `lift` on the slider's value is never called to find the format.
+        fig = Figure(); Axis(fig[1, 1])
+        fine = SliderGrid(fig[2, 1], (label = "fine", range = 0:0.001:10, format = "{:.3f}"))
+        calls = Ref(0)
+        lift(v -> (calls[] += 1; string(v)), fine.sliders[1].value)
+        before = calls[]
+        g = _layer(masque(fig, (fine = fine,)).manifest, "fine")["geometry"]
+        @test !haskey(only(g["sliders"])["valueLabel"], "labels") && calls[] == before
+        @test length(JSON3.write(g)) < 2000
+    end
+
+    @testset "a button is a field counting its clicks, drawn as Makie draws it (#431)" begin
+        fig = Figure(); Axis(fig[1, 1])
+        clicked = Ref(0)
+        b = Button(fig[2, 1]; label = "Go", cornerradius = 8, strokewidth = 1, strokecolor = :black, buttoncolor = :yellow)
+        on(n -> clicked[] = n, b.clicks)
+        w = @test_logs masque(fig, (go = b,))
+        @test Masque.initial_bond(w).go == 0
+        s = w.manifest["scaling"]
+        g = _layer(w.manifest, "go")["geometry"]
+        @test g["control"] == "button" && g["value"] == 0 && g["caption"] == "Go"
+        @test g["radius"] ≈ 8s && g["stroke"] ≈ 1s && g["fontsize"] ≈ b.fontsize[] * s
+        @test g["colors"][1] == Masque._css_color(Makie.to_color(:yellow))
+        @test g["strokeColor"] == Masque._css_color(Makie.to_color(:black))
+        @test length(g["textColors"]) == 3
+        @test Masque.bond_from_js(w, Dict("go" => _env("go", 2))).go == 2
+        @test_throws ArgumentError Masque.bond_from_js(w, Dict("go" => _env("go", -1)))
+        @test_throws ArgumentError Masque.bond_from_js(w, Dict("go" => _env("go", true)))
+        # A click reaches the block's own `clicks`, so code listening to it runs.
+        Masque._sync_controls!([Masque.BlockControl(b, :go)], Dict("go" => _env("go", 3)))
+        @test b.clicks[] == 3 && clicked[] == 3
     end
 
     @testset "the picture leaves the block's box empty, and the figure keeps its drawing" begin

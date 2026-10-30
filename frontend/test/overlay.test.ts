@@ -6976,6 +6976,103 @@ describe("block controls (#345)", () => {
         expect(box.style.getPropertyValue("--masque-ctl-off")).toBe("rgb(1,1,1)")
     })
 
+    it("a checkbox draws Makie's square and checkmark on the square alone (#428)", () => {
+        const m = controlsManifest()
+        m.layers.push({ id: "fine", kind: "control", axis: "", events: ["change"], payloads: [], label: "fine",
+            geometry: { control: "checkbox", x: 950, y: 700, w: 40, h: 30, value: false, size: 22, radius: 1.65, stroke: 3,
+                color: "rgb(1,1,1)", off: "rgb(2,2,2)", strokeOn: "rgb(3,3,3)", strokeOff: "rgb(4,4,4)",
+                markOn: "rgb(5,5,5)", markOff: "rgb(6,6,6)", markSize: 18.7, mark: "M0 0L1 1Z" } })
+        m.fields = [...(m.fields ?? []), "fine"]
+        m.initial!.fine = { layer: "fine", index: 0, payload: false }
+        m.layers.push({ id: "ex", kind: "control", axis: "", events: ["change"], payloads: [], label: "ex",
+            geometry: { control: "checkbox", x: 950, y: 750, w: 30, h: 30, value: true, size: 30, markSize: 20, markChar: "x",
+                color: "rgb(1,1,1)", off: "rgb(2,2,2)", markOn: "rgb(5,5,5)", markOff: "rgb(6,6,6)" } })
+        m.fields = [...(m.fields ?? []), "ex"]
+        m.initial!.ex = { layer: "ex", index: 0, payload: true }
+        const { host, script } = setup()
+        mount(script, m)
+        const box = ctl(host, "fine")
+        const svg = box.querySelector("svg") as SVGSVGElement
+        const rect = box.querySelector("svg rect") as SVGRectElement
+        const mark = box.querySelector("svg path") as SVGPathElement
+        const input = box.querySelector("input") as HTMLInputElement
+        // The square, 22 of the box's 40 × 30, sits in its middle, and the input covers it alone.
+        for (const el of [svg, input] as (HTMLElement | SVGElement)[]) {
+            expect([el.style.left, el.style.top, el.style.width, el.style.height]).toEqual(["22.5%", `${(50 * 8) / 30}%`, "55%", `${(100 * 22) / 30}%`])
+        }
+        expect([rect.getAttribute("width"), rect.getAttribute("rx")]).toEqual(["22", "1.65"])
+        expect([rect.getAttribute("fill"), rect.getAttribute("stroke"), rect.getAttribute("stroke-width")]).toEqual(["rgb(2,2,2)", "rgb(4,4,4)", "3"])
+        expect(mark.getAttribute("d")).toBe("M0 0L1 1Z")
+        expect(mark.getAttribute("transform")).toBe("translate(11 11) scale(18.7 -18.7)")
+        expect(mark.getAttribute("fill")).toBe("rgb(6,6,6)")
+        input.checked = true
+        input.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).fine).toEqual({ layer: "fine", index: 0, payload: true })
+        expect([rect.getAttribute("fill"), rect.getAttribute("stroke"), mark.getAttribute("fill")]).toEqual(["rgb(1,1,1)", "rgb(3,3,3)", "rgb(5,5,5)"])
+        // A character mark is drawn as text, in the mark's colour.
+        const text = ctl(host, "ex").querySelector("svg text") as SVGTextElement
+        expect([text.textContent, text.getAttribute("font-size"), text.getAttribute("fill")]).toEqual(["x", "20", "rgb(5,5,5)"])
+    })
+
+    it("a button draws Makie's box and label, and counts its clicks (#431)", () => {
+        const m = controlsManifest()
+        m.layers.push({ id: "go", kind: "control", axis: "", events: ["change"], payloads: [], label: "go",
+            geometry: { control: "button", x: 100, y: 700, w: 200, h: 50, value: 2, caption: "Go", fontsize: 28, radius: 8, stroke: 2,
+                strokeColor: "rgb(9,9,9)", colors: ["rgb(1,1,1)", "rgb(2,2,2)", "rgb(3,3,3)"], textColors: ["rgb(4,4,4)", "rgb(5,5,5)", "rgb(6,6,6)"] } })
+        m.fields = [...(m.fields ?? []), "go"]
+        m.initial!.go = { layer: "go", index: 0, payload: 2 }
+        const { host, script } = setup()
+        mount(script, m)
+        const el = ctl(host, "go").querySelector("button") as HTMLButtonElement
+        expect(el.textContent).toBe("Go")
+        const v = (name: string) => el.style.getPropertyValue(`--${name}`)
+        expect([v("fs"), v("r"), v("sw"), v("sc")]).toEqual(["14cqw", "4cqw", "0.5cqw", "rgb(9,9,9)"])
+        expect([v("b0"), v("b1"), v("b2"), v("t0"), v("t2")]).toEqual(["rgb(1,1,1)", "rgb(2,2,2)", "rgb(3,3,3)", "rgb(4,4,4)", "rgb(6,6,6)"])
+        el.click()
+        expect(val(host).go).toEqual({ layer: "go", index: 0, payload: 3 })
+        el.click()
+        expect(val(host).go).toEqual({ layer: "go", index: 0, payload: 4 })
+    })
+
+    it("a slider grid draws each slider and its value label, and commits all its values together (#430)", () => {
+        const m = controlsManifest()
+        m.layers.push({ id: "grid", kind: "control", axis: "", events: ["change"], payloads: [], label: "grid",
+            geometry: { control: "slidergrid", x: 100, y: 500, w: 600, h: 100, value: [2, [1, 3]], sliders: [
+                { control: "slider", x: 200, y: 500, w: 400, h: 20, value: 2, n: 5, horizontal: true, range: [0, 0.5], name: "freq",
+                    valueLabel: { x: 620, y: 500, w: 80, h: 20, fontsize: 28, color: "rgb(7,7,7)", labels: ["0 Hz", "0.5 Hz", "1 Hz", "1.5 Hz", "2 Hz"] } },
+                { control: "intervalslider", x: 200, y: 560, w: 400, h: 20, value: [1, 3], n: 4, horizontal: true, range: [1, 1],
+                    valueLabel: { x: 620, y: 560, w: 80, h: 20, fontsize: 28, color: "rgb(7,7,7)",
+                        pairs: ["p11", "p12", "p13", "p14", "p22", "p23", "p24", "p33", "p34", "p44"] } },
+            ] } })
+        m.fields = [...(m.fields ?? []), "grid"]
+        m.initial!.grid = { layer: "grid", index: 0, payload: [2, [1, 3]] }
+        const { host, script } = setup()
+        mount(script, m)
+        const grid = ctl(host, "grid")
+        const kids = [...grid.querySelectorAll(".masque-control")] as HTMLElement[]
+        expect(kids.length).toBe(2)
+        // Each slider sits in the grid's box at its own place.
+        expect(kids[0].style.left).toBe(`${(100 * 100) / 600}%`)
+        expect(kids[1].style.top).toBe(`${(100 * 60) / 100}%`)
+        const labels = [...grid.querySelectorAll(".masque-vlabel")] as HTMLElement[]
+        expect(labels.map((l) => l.textContent)).toEqual(["1 Hz", "p24"])
+        // A slider is named by its own label; one without falls back to the field and its place.
+        expect(kids[0].querySelector("input")!.getAttribute("aria-label")).toBe("freq")
+        expect(kids[1].querySelector("input")!.getAttribute("aria-label")).toBe("grid 2, low")
+        expect(labels[0].style.getPropertyValue("--fs")).toBe(`${(100 * 28) / 600}cqw`)
+        const range = kids[0].querySelector("input") as HTMLInputElement
+        range.value = "4"
+        range.dispatchEvent(new Event("input", { bubbles: true }))
+        expect(labels[0].textContent).toBe("2 Hz")
+        range.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).grid).toEqual({ layer: "grid", index: 0, payload: [4, [1, 3]] })
+        const hi = kids[1].querySelectorAll("input")[1] as HTMLInputElement
+        hi.value = "2"
+        hi.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).grid).toEqual({ layer: "grid", index: 0, payload: [4, [1, 2]] })
+        expect(labels[1].textContent).toBe("p23")
+    })
+
     it("a release commits the field; moving alone doesn't", () => {
         const m = controlsManifest()
         const { host, script } = setup()

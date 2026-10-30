@@ -3,7 +3,7 @@
 // module puts a real <input>/<select> over that box. The element owns its own pointer and
 // keyboard input, so none of the overlay's gestures see it.
 import { fmtNum } from "./template"
-import type { ControlGeometry, HitLayer, Manifest } from "./types"
+import type { ControlGeometry, HitLayer, Manifest, ValueLabel } from "./types"
 
 // A field's envelope, as every control commits it. The payload is a 0-based index, a pair of
 // them, or a Bool; Julia turns it into the block's plain value.
@@ -25,6 +25,8 @@ interface ControlEl {
     box_: HTMLElement
     get_: () => unknown
     set_: (payload: unknown) => void
+    // A new frame's colours for a control drawn here (a checkbox), without building it again.
+    restyle_?: (g: ControlGeometry) => void
 }
 
 export interface Controls {
@@ -58,7 +60,7 @@ export const CONTROLS_STYLE = `
 .masque-range::-webkit-slider-thumb { -webkit-appearance: none; width: 100cqmin; height: 100cqmin; }
 .masque-range::-moz-range-thumb { width: 100cqmin; height: 100cqmin; border: none; }
 .masque-range:focus-visible { outline: none; }
-.masque-control:has(.masque-range:focus-visible) .masque-knob { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
+.masque-ctl-slider:has(.masque-range:focus-visible) .masque-knob, .masque-ctl-intervalslider:has(.masque-range:focus-visible) .masque-knob { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
 .masque-track { position: absolute; inset: 0; pointer-events: none; --span: calc(100% - 100cqmin); }
 .masque-bar, .masque-fill, .masque-knob { position: absolute; }
 .masque-bar { border-radius: 100cqmin; background: var(--masque-ctl-off, #f0f0f0); }
@@ -91,7 +93,26 @@ export const CONTROLS_STYLE = `
   transition: left var(--dur, 0.15s) var(--sineio), top var(--dur, 0.15s) var(--sineio); }
 .masque-control:hover .masque-toggle-knob { scale: 1.15; }
 .masque-toggle:focus-visible ~ .masque-toggle-track { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
-.masque-check { width: 100cqmin; height: 100cqmin; accent-color: var(--masque-ctl); cursor: pointer; }
+/* Checkbox, as Makie draws it: an SVG square and checkmark under an invisible <input>, both on
+   the square alone, which is all Makie answers the pointer on. */
+.masque-check { -webkit-appearance: none; appearance: none; position: absolute; margin: 0; opacity: 0; cursor: pointer; }
+.masque-check-art { position: absolute; pointer-events: none; overflow: visible; }
+.masque-check-art .mark { visibility: hidden; }
+.masque-check:checked ~ .masque-check-art .mark, .masque-check:hover ~ .masque-check-art .mark { visibility: visible; }
+.masque-check:focus-visible ~ .masque-check-art { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
+/* Button, as Makie draws it: a rounded box with its label in the middle, in one colour pair at
+   rest, another under the pointer and a third while pressed. Makie centres the outline on the
+   box's edge and clips it to the box: --sw is half its width, drawn inside and out, and the
+   button clips itself to its box. The focus ring goes on the box, outside that clip. */
+.masque-control .masque-button { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: none; cursor: pointer;
+  font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; white-space: nowrap;
+  border-radius: var(--r, 0); box-shadow: 0 0 0 var(--sw, 0) var(--sc, transparent), inset 0 0 0 var(--sw, 0) var(--sc, transparent);
+  clip-path: inset(0); outline: none; background: var(--b0); color: var(--t0); }
+.masque-control .masque-button:hover { background: var(--b1); color: var(--t1); }
+.masque-control .masque-button:active { background: var(--b2); color: var(--t2); }
+.masque-control:has(.masque-button:focus-visible) { outline: 2px solid var(--masque-chrome, Highlight); outline-offset: 2px; }
+.masque-vlabel { position: absolute; display: flex; align-items: center; justify-content: flex-end; white-space: nowrap;
+  pointer-events: none; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; }
 .masque-control .masque-select { width: 100%; height: 100%; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; border: none; border-radius: 0; cursor: pointer;
   font-size: var(--fs, 50cqh); padding: 0 0 0 var(--pad, 0.5em); background: var(--masque-ctl-off, #f0f0f0); color: var(--masque-ctl-text, #000000); }
 @media (prefers-reduced-motion: reduce) { .masque-toggle-track, .masque-toggle-knob { transition: none; } }
@@ -162,6 +183,65 @@ function fillTrack(t: HTMLElement, g: ControlGeometry, lo: number, hi: number, k
     t.querySelectorAll<HTMLElement>(".masque-knob").forEach((el, i) => el.style.setProperty("--k", String(knobs[i] / last)))
 }
 
+const SVG = "http://www.w3.org/2000/svg"
+
+// Makie's checkbox square and checkmark, from the block's geometry (src/controls.jl). Without it
+// (an older manifest), a square filling the box's shorter side and a plain tick.
+function checkArt(g: ControlGeometry, el: HTMLInputElement): { svg_: SVGSVGElement; show_: () => void; restyle_: (g: ControlGeometry) => void } {
+    const svg = document.createElementNS(SVG, "svg")
+    svg.setAttribute("class", "masque-check-art")
+    const size = g.size ?? Math.min(g.w, g.h)
+    svg.setAttribute("viewBox", `0 0 ${size} ${size}`)
+    // The square sits in the middle of the box; the input covers it alone.
+    for (const part of [svg, el] as (HTMLElement | SVGElement)[]) {
+        part.style.left = `${(50 * (g.w - size)) / g.w}%`
+        part.style.top = `${(50 * (g.h - size)) / g.h}%`
+        part.style.width = `${(100 * size) / g.w}%`
+        part.style.height = `${(100 * size) / g.h}%`
+    }
+    const rect = document.createElementNS(SVG, "rect")
+    rect.setAttribute("class", "box")
+    rect.setAttribute("x", "0")
+    rect.setAttribute("y", "0")
+    rect.setAttribute("width", String(size))
+    rect.setAttribute("height", String(size))
+    rect.setAttribute("rx", String(g.radius ?? 0))
+    rect.setAttribute("stroke-width", String(g.stroke ?? 0))
+    const m = g.markSize ?? size * 0.85
+    let mark: SVGElement
+    if (g.markChar) {
+        // A character mark, as Makie's scatter draws one: centred, `markSize` high.
+        mark = document.createElementNS(SVG, "text")
+        mark.textContent = g.markChar
+        mark.setAttribute("x", String(size / 2))
+        mark.setAttribute("y", String(size / 2))
+        mark.setAttribute("font-size", String(m))
+        mark.setAttribute("text-anchor", "middle")
+        mark.setAttribute("dominant-baseline", "central")
+        mark.setAttribute("font-family", "TeX Gyre Heros, Helvetica, Arial, sans-serif")
+    } else {
+        mark = document.createElementNS(SVG, "path")
+        // The path is in marker units with y up; screen y points down.
+        mark.setAttribute("transform", `translate(${size / 2} ${size / 2}) scale(${m} ${-m})`)
+        mark.setAttribute("d", g.mark ?? "M-0.4 0L-0.12 -0.3L0.4 0.35")
+        if (!g.mark) {
+            mark.setAttribute("fill", "none")
+            mark.setAttribute("stroke-width", "0.12")
+        }
+    }
+    mark.setAttribute("class", "mark")
+    svg.append(rect, mark)
+    let c = g
+    const show = () => {
+        const on = el.checked
+        rect.setAttribute("fill", (on ? c.color : c.off) ?? (on ? "#4e7fb4" : "#ffffff"))
+        rect.setAttribute("stroke", (on ? c.strokeOn : c.strokeOff) ?? "#4e7fb4")
+        mark.setAttribute(c.mark || c.markChar ? "fill" : "stroke", (on ? c.markOn : c.markOff) ?? (on ? "#ffffff" : "transparent"))
+    }
+    show()
+    return { svg_: svg, show_: show, restyle_: (g2) => { c = g2; show() } }
+}
+
 // Makie's toggle track and knob, placed from the block's geometry (src/controls.jl). Without
 // it (an older manifest), a horizontal pill that fills the box.
 function toggleParts(g: ControlGeometry, el: HTMLInputElement): { parts_: HTMLElement[]; show_: () => void } {
@@ -194,7 +274,23 @@ function toggleParts(g: ControlGeometry, el: HTMLInputElement): { parts_: HTMLEl
 function shape(g: ControlGeometry): string {
     // A range arrives as a typed array off the kernel and as a plain one from a docs player's
     // JSON frame; the same range is the same shape either way.
-    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt])
+    // A grid is built again when anything inside it moves or changes colour.
+    if (g.sliders) return JSON.stringify([g.control, g.w, g.h, g.sliders.map(shape), g.sliders.map((c) => [c.x - g.x, c.y - g.y, c.w, c.h, c.name, c.valueLabel])])
+    return JSON.stringify([g.control, g.n, g.horizontal, g.range && Array.from(g.range), g.labels, g.settleOnly, g.theta, g.track, g.knobOff, g.knobOn, g.knob, g.duration, g.prompt, g.size, g.radius, g.stroke, g.mark, g.markChar, g.markSize])
+}
+
+// A button's label and colours, which `onchange` can change without building it again. Lengths
+// are image px as a share of the box's width, so they scale with the figure.
+function styleButton(el: HTMLButtonElement, g: ControlGeometry): void {
+    el.textContent = g.caption ?? ""
+    const set = (name: string, v: string | undefined) => { if (v !== undefined) el.style.setProperty(`--${name}`, v) }
+    const px = (v: number | undefined) => v === undefined ? undefined : `${(100 * v) / g.w}cqw`
+    set("fs", px(g.fontsize))
+    set("r", px(g.radius))
+    set("sw", px(g.stroke === undefined ? undefined : g.stroke / 2))
+    set("sc", g.strokeColor)
+    g.colors?.forEach((c, i) => set(`b${i}`, c))
+    g.textColors?.forEach((c, i) => set(`t${i}`, c))
 }
 
 // The knob index under a pointer at (x, y) on a slider's box.
@@ -297,13 +393,20 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             if (g.control === "toggle") el.setAttribute("role", "switch")
             el.checked = g.value === true
             el.setAttribute("aria-label", label)
-            el.addEventListener("change", () => hooks.commit_(id, envelope(id, el.checked)))
+            el.addEventListener("change", () => {
+                art?.show_()
+                tp?.show_()
+                hooks.commit_(id, envelope(id, el.checked))
+            })
             box.append(el)
             const tp = g.control === "toggle" ? toggleParts(g, el) : null
             if (tp) box.append(...tp.parts_)
+            const art = g.control === "checkbox" ? checkArt(g, el) : null
+            if (art) box.append(art.svg_)
             return {
                 layer_: layer, shape_: shape(g), box_: box, get_: () => el.checked,
-                set_: (p) => { if (typeof p === "boolean") { el.checked = p; tp?.show_() } },
+                set_: (p) => { if (typeof p === "boolean") { el.checked = p; tp?.show_(); art?.show_() } },
+                restyle_: art?.restyle_,
             }
         }
         case "menu": {
@@ -331,6 +434,81 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
             return {
                 layer_: layer, shape_: shape(g), box_: box, get_: () => Number(el.value),
                 set_: (p) => { if (typeof p === "number") el.value = String(p) },
+            }
+        }
+        case "button": {
+            // The field counts clicks, as Makie's `clicks` does.
+            const el = document.createElement("button")
+            el.type = "button"
+            el.className = "masque-button"
+            styleButton(el, g)
+            let clicks = Number(g.value) || 0
+            el.addEventListener("click", () => {
+                clicks += 1
+                hooks.commit_(id, envelope(id, clicks))
+            })
+            box.append(el)
+            return {
+                layer_: layer, shape_: shape(g), box_: box, get_: () => clicks,
+                set_: (p) => { if (typeof p === "number") clicks = p },
+                restyle_: (ng) => styleButton(el, ng),
+            }
+        }
+        case "slidergrid": {
+            // Each slider is built as a control of its own inside the grid's box, and the grid
+            // commits all of their values together. The value labels are drawn here too.
+            box.style.pointerEvents = "none"
+            const local = { width: g.w, height: g.h } as Manifest
+            const values = () => kids.map((k) => k.get_())
+            const kidHooks: ControlHooks = {
+                commit_: () => { showLabels(); hooks.commit_(id, envelope(id, values())) },
+                live_: () => hooks.live_(id, envelope(id, values())),
+                adopt_: () => {},
+                digits_: hooks.digits_,
+            }
+            const kids: ControlEl[] = []
+            const labels: [HTMLElement, ControlGeometry, ValueLabel | undefined][] = []
+            ;(g.sliders ?? []).forEach((cg, i) => {
+                const kg = { ...cg, x: cg.x - g.x, y: cg.y - g.y }
+                const kid = build({ ...layer, id: `${id}-${i}`, label: cg.name || `${label} ${i + 1}`, geometry: kg }, local, kidHooks)
+                if (!kid) return
+                kids.push(kid)
+                box.append(kid.box_)
+                const vl = cg.valueLabel
+                const el = document.createElement("div")
+                el.className = "masque-vlabel"
+                if (vl) {
+                    el.style.left = `${(100 * (vl.x - g.x)) / g.w}%`
+                    el.style.top = `${(100 * (vl.y - g.y)) / g.h}%`
+                    el.style.width = `${(100 * vl.w) / g.w}%`
+                    el.style.height = `${(100 * vl.h) / g.h}%`
+                    el.style.setProperty("--fs", `${(100 * vl.fontsize) / g.w}cqw`)
+                    el.style.color = vl.color
+                    box.append(el)
+                }
+                labels.push([el, cg, vl])
+            })
+            const showLabels = () => labels.forEach(([el, cg, vl], i) => {
+                const v = kids[i]?.get_()
+                if (Array.isArray(v)) {
+                    const [a, b] = v as number[]
+                    // lo ≤ hi pairs, row-major: lo's run starts after the a runs before it.
+                    const n = cg.n ?? 0
+                    el.textContent = vl?.pairs?.[a * n - (a * (a - 1)) / 2 + (b - a)] ?? `(${valueText(cg, a, hooks.digits_)}, ${valueText(cg, b, hooks.digits_)})`
+                } else {
+                    el.textContent = vl?.labels?.[Number(v)] ?? valueText(cg, Number(v), hooks.digits_)
+                }
+            })
+            showLabels()
+            box.addEventListener("input", showLabels)
+            box.addEventListener("change", showLabels)
+            return {
+                layer_: layer, shape_: shape(g), box_: box, get_: values,
+                set_: (p) => {
+                    if (!Array.isArray(p)) return
+                    p.forEach((q, i) => kids[i]?.set_(q))
+                    showLabels()
+                },
             }
         }
         default:
@@ -374,6 +552,7 @@ export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manife
                 if (sentValue === undefined || held === l.id) {
                     c.layer_ = l
                     place(c.box_, g, m)
+                    c.restyle_?.(g)
                     continue
                 }
                 if (shape(g) !== c.shape_) {
@@ -385,6 +564,7 @@ export function buildControls(parent: ShadowRoot | HTMLElement, manifest: Manife
                 } else {
                     c.layer_ = l
                     place(c.box_, g, m)
+                    c.restyle_?.(g)
                 }
                 // The author moved the block: the control and the field follow. Otherwise the
                 // frame echoes what was sent, and the control keeps what the reader has now.

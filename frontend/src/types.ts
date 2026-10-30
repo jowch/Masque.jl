@@ -72,14 +72,14 @@ export interface ROIGeometry {
 
 // A Makie block drawn as an HTML control. `value` is the block's state as the wire carries it:
 // a 0-based index (slider, menu; -1 for a menu with nothing chosen), a pair of them (interval
-// slider), or a Bool (toggle, checkbox).
+// slider), a Bool (toggle, checkbox), or a click count (button).
 export interface ControlGeometry {
-    control: "slider" | "intervalslider" | "toggle" | "checkbox" | "menu"
+    control: "slider" | "intervalslider" | "toggle" | "checkbox" | "menu" | "slidergrid" | "button"
     x: number // the block's box, image px, top-left origin
     y: number
     w: number
     h: number
-    value: number | number[] | boolean
+    value: number | number[] | boolean | (number | number[])[]
     n?: number              // slider and menu: how many values
     horizontal?: boolean    // slider: false for a vertical one
     range?: [number, number] // slider over a numeric range: start and step, for the read-out value
@@ -95,11 +95,46 @@ export interface ControlGeometry {
     knobOn?: [number, number]
     knob?: number           // the knob's diameter
     duration?: number       // seconds the knob takes to slide
+    // Checkbox, as Makie draws it; lengths are image px. `color` and `off` fill the box when
+    // checked and unchecked.
+    size?: number           // the square's side, centred in the box
+    radius?: number         // its corner radius
+    stroke?: number         // its outline width
+    strokeOn?: string
+    strokeOff?: string
+    markOn?: string         // the checkmark's colour when checked, and under the pointer when not
+    markOff?: string
+    markSize?: number       // the checkmark's size; its path is in units of it, y up
+    mark?: string           // an SVG path; absent, a plain tick
+    markChar?: string       // a character drawn as the checkmark instead of a path
+    // SliderGrid: each slider, in image px like the grid's own box, with its value label.
+    // `name` is the slider's own label, read to screen readers.
+    sliders?: (ControlGeometry & { name?: string; valueLabel?: ValueLabel })[]
     // Menu: the closed menu as Makie draws it, its box colour in `off`.
     text?: string           // the text colour
     prompt?: string         // shown before a choice
     fontsize?: number       // image px
     padding?: number        // image px from the box's left edge to the text
+    // Button: a rounded box filling the block's box, its label in the middle; `radius`,
+    // `stroke` and `fontsize` above. Colours at rest, under the pointer, and pressed.
+    caption?: string
+    strokeColor?: string
+    colors?: [string, string, string]
+    textColors?: [string, string, string]
+}
+
+// The label beside a grid's slider that shows its value: its box (image px), text size and
+// colour, and the text for each value (`labels`), or for each (lo, hi) pair of an interval
+// slider with lo ≤ hi, row-major (`pairs`). Without text for a value, the browser writes it.
+export interface ValueLabel {
+    x: number
+    y: number
+    w: number
+    h: number
+    fontsize: number
+    color: string
+    labels?: string[]
+    pairs?: string[]
 }
 
 export interface SliceSeries {
