@@ -491,6 +491,13 @@ export function createFade(host: FadeHost): Fade {
         return c
     }
 
+    // Empties the boxes Makie draws over the plots (a legend): a mark under one is hidden in
+    // the picture, so its fade and outline are too (#437). The canvases move with a live
+    // photograph, as the legend's pixels do.
+    const unocclude = (c: CanvasRenderingContext2D): void => {
+        for (const [x, y, w, h] of host.manifest_().occluders ?? []) c.clearRect(x, y, w, h)
+    }
+
     // Each axis's cover of every drawn mark of a set of layers in the plot area's colour, drawn
     // once and copied onto the dim canvas on each redraw, so a click costs the picks it punches
     // out, not the plot's marks. The last three sets are kept per axis (the selection, and it with
@@ -584,6 +591,8 @@ export function createFade(host: FadeHost): Fade {
                 outlines.push(ink)
                 strokeShape(tc, p.layer, p.k, p.box, lw)
             }
+            unocclude(dc)
+            unocclude(tc)
         } else {
             for (const [layer, ks] of kept) raised += coveredPicks(layer, ks).length
         }
@@ -669,6 +678,7 @@ export function createFade(host: FadeHost): Fade {
                 c.fillStyle = plotFill(host.manifest_(), layer.axis)
                 fillShapes(c, layer, [index], PAD_DIM)
                 repunch(c, layer.axis, [box[0] - PAD_DIM, box[1] - PAD_DIM, box[2] + PAD_DIM, box[3] + PAD_DIM])
+                unocclude(c)
             }
             if (h) delete h.wrap.dataset.lift
         }
