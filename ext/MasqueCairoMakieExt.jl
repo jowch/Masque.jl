@@ -4,6 +4,7 @@ using Masque: Masque, AbstractBackend, RenderResult, InteractionContext, AxisTra
 using CairoMakie
 using FileIO
 import Makie
+import PrecompileTools
 import Makie: Point2f
 
 """
@@ -79,5 +80,9 @@ Masque.make_widget(b::CairoBackend, result::RenderResult, manifest, display_css,
     Masque.base64encode(result.payload), manifest, display_css,
     Masque._view_render_frame(b, fig, interactables, ppu, max_width),
 )
+
+if Masque._PRECOMPILE_WORKLOAD
+    PrecompileTools.@compile_workload Masque._precompile_workload(:cairo)
+end
 
 end # module MasqueCairoMakieExt

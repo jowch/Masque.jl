@@ -244,6 +244,7 @@ export interface HitLayer {
     events: string[] // "click" | "hover" | "drag" | "change" (a control)
     style?: LayerStyle
     tol?: number // hit-test slack, image px: :segments/:polyline/:lines (absent → geometry.ts's SEG_TOL fallback); :rects/:polygons reach past the shape's edge (absent → none)
+    linewidth?: number // :segments/:polyline/:lines: the drawn line width, image px (absent → Makie's default, 1.5 logical px); fade.ts covers a line with it
     template?: TemplateSegment[] // masque"..." parsed once per layer; $() fields fill from payloads[]
     tooltip?: false              // explicit suppress; absent + no template → auto name/value table
     brush?: "elements" | "grid" // a `selects` box's target: its field holds what the box holds

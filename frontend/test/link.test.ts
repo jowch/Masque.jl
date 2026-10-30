@@ -215,7 +215,7 @@ describe("legend links: fan-out across kinds", () => {
 
 describe("legend links: id:k pins one element of a multi-path :lines layer", () => {
     // legend rect at image [80,120]x[90,110] -> client center (50,50); links to series element 2
-    // (Julia 1-based) of a 3-path :lines layer — must draw one ring, not three.
+    // (Julia 1-based) of a 3-path :lines layer — must keep one line, not three.
     const manifest: Manifest = {
         width: 1200, height: 800, scaling: 2, transforms: {},
         layers: [
@@ -233,16 +233,15 @@ describe("legend links: id:k pins one element of a multi-path :lines layer", () 
         ],
     }
 
-    it("draws one selected ring for the pinned path, not every series", () => {
+    it("keeps the pinned path and fades the layer's other series", () => {
         const { surface, shadow } = setup(manifest)
         move(surface, 50, 50)
-        // open :lines selected recipe is an unblended ring in svg.masque-plain (a <g> wrapping
-        // two <path>s) — one top-level g.link child.
-        expect(linkGroupSize(shadow)).toBe(1)
-        const ring = shadow.querySelector("svg.masque-plain g.link > g")
-        expect(ring).not.toBeNull()
-        const ds = [...ring!.querySelectorAll("path")].map((p) => p.getAttribute("d") || "")
-        expect(ds.some((d) => d.includes("M10 10") && d.includes("L60 60"))).toBe(true)
-        expect(ds.every((d) => !d.includes("M0 0") && !d.includes("M20 20"))).toBe(true)
+        // A line is a series: the legend's hover previews by fading the other lines, as it fades
+        // other closed marks, and draws nothing on the pinned one.
+        expect(linkGroupSize(shadow)).toBe(0)
+        expect(fadeKept(shadow)).toEqual(["series:1"])
+        expect(faded(shadow)).toBe(2)
+        // A preview on an axis that holds no picks leaves more of the rest showing.
+        expect(shadow.querySelector(".masque-fade")!.classList.contains("masque-preview")).toBe(true)
     })
 })

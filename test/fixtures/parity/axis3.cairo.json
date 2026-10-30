@@ -47,6 +47,7 @@
             ]
         },
         {
+            "linewidth": 3,
             "kind": "lines",
             "id": "lines",
             "tol": 12,

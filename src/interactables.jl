@@ -137,9 +137,10 @@ Optional (default shown; all non-exported — extend as `Masque.<name>`):
 - `Masque.hoverstyle(i) -> NamedTuple` — one `(; stroke, width)` hover outline style per *layer*
   (the manifest ships one style per layer, not per element). Default: `(; stroke = nothing,
   width = 2)` — `stroke = nothing` means the overlay draws its own split highlight: a
-  brightening `color-dodge` fill plus a flat grey edge stroke (`#7a7a7a` on a light figure,
-  `#c8c8c8` on a dark one; the stroke is not blended into the mark), instead of a stroke color,
-  so every layer brightens without Masque resolving the element's color; a CSS color string
+  brightening `color-dodge` fill plus a two-tone outline (an off-black line between two
+  off-white ones on a light figure, the reverse on a dark one; not blended into the mark),
+  instead of a stroke color, so every layer brightens without Masque resolving the element's
+  color; a CSS color string
   overrides it verbatim for that layer (no blend, single unblended element, the outline is
   exactly that color). `colors` (see [`HitLayer`](@ref)) no longer affects the hover/selection
   outline at all — it only drives the tooltip's accent border.
@@ -177,13 +178,16 @@ end
 # Per-layer: nothing = auto name/value table (default), Markup = template, false = suppress.
 tooltip_spec(::AbstractInteractable) = nothing
 # One hover style per LAYER (the manifest ships one `style` dict per layer, not per element).
-# stroke = nothing: the overlay draws its own split highlight — a color-dodge fill plus a flat
-# chrome edge stroke (#7a7a7a light figure, #c8c8c8 dark; not blended into the mark) — instead
+# stroke = nothing: the overlay draws its own split highlight — a color-dodge fill plus a
+# two-tone halo (#1f1f1f between #fafafa bands on a light figure, swapped on a dark one; not
+# blended into the mark) — instead
 # of a stroke colour; `colors` no longer feeds this, only the tooltip accent; a CSS colour
 # string here overrides it verbatim (no blend, single unblended element).
 hoverstyle(::AbstractInteractable) = (; stroke = nothing, width = 2)
 # Logical-px hit-test slack for :segments/:polyline/:lines layers; nothing omits the manifest field.
 hit_tol(::AbstractInteractable) = nothing
+# Logical-px drawn width of a :segments/:polyline/:lines layer's lines; nothing omits the field.
+line_width(::AbstractInteractable) = nothing
 
 """
     AbstractSelector
@@ -691,9 +695,14 @@ struct SegmentInteractable <: AbstractInteractable
     # drawn path, never these. `nothing` reads the samples from the path itself.
     samples::Union{Nothing, Tuple{Union{Nothing, Symbol}, Vector{Vector{Point3d}}}}
     select::Symbol
+    # The plot's drawn line width in logical px, which the overlay's fade covers a line with.
+    # `nothing` (a layer built from bare vertices) falls back to Makie's default width there.
+    linewidth::Union{Nothing, Float64}
 end
 SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples) =
     SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples, :one)
+SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples, select::Symbol) =
+    SegmentInteractable(ax, vertices, mode, id, payloads, tol, tooltip, resolve, label, unit, paths, samples, select, nothing)
 function SegmentInteractable(
         ax, vertices; mode = :polyline, unit = :segment, id = :segments,
         payloads = nothing, tol = 6, tooltip = nothing, label = nothing, select = :one,
@@ -751,6 +760,7 @@ function _whole_lines(ax, paths, id, payloads, tol, label; tooltip = nothing)
 end
 tooltip_spec(i::SegmentInteractable) = i.tooltip
 hit_tol(i::SegmentInteractable) = i.tol
+line_width(i::SegmentInteractable) = i.linewidth
 function _flat_px(ctx, ax, vs, box = _clipbox(ax))
     g = Real[]
     for v in vs

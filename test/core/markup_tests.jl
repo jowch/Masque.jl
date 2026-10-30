@@ -82,6 +82,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test length(d) == 4                                                   # unset keys omitted
         @test Masque.overlay_style_dict((; unpicked_opacity = 0.4))["--masque-unpicked-opacity"] == "0.4"
         @test_throws "opacity from 0 to 1" Masque.overlay_style_dict((; unpicked_opacity = 1.5))
+        @test Masque.overlay_style_dict((; preview_opacity = 0.5))["--masque-preview-opacity"] == "0.5"
         # Every key maps to its own --masque-* property.
         props = [first(v) for v in values(Masque._OVERLAY_STYLE_KEYS)]
         @test allunique(props) && all(startswith("--masque-"), props)

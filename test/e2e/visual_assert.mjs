@@ -1,34 +1,89 @@
 // Shared visual-fidelity asserts for kind_sweep.mjs + polish_verify.mjs.
-// Recipe (locked in CLAUDE.md's "Overlay recipes" paragraph — cite, do not reopen): the shadow
-// root holds THREE sibling top-level svgs, identical box/viewBox, in DOM order `svg.masque-fill`
-// (`mix-blend-mode: color-dodge`, both light and dark figures — a fixed `#141414` source
-// brightens without rotating hue, measured across a 10-colour palette), `svg.masque-edge`
-// (no blend — one flat chrome grey, so the state distinction — hover 1.5px vs. selected 2px —
-// is the stroke width), `svg.masque-plain` (no blend).
-// Firefox only honours `mix-blend-mode` on a top-level svg, not nested SVG content, which is why
-// there is no single wrapped svg with per-element blend classes. A closed mark (circle/rect/
-// polygon) hover or selected highlight is TWO shapes, identical geometry, one in each of
-// `masque-fill`/`masque-edge` (`masque-hi masque-fillshape` / `masque-hi masque-hover` or
-// `masque-wash`); an open seg (line has no interior) is edge-only; a `rectfill` (selects-ROI
-// grid cell-block union) is fill-only. `svg.masque-plain` holds ROI/threshold, the selected-open
-// ring (chrome grey), and a layer with an explicit Julia `hoverstyle` stroke — single element,
-// unblended, verbatim colour + 18%/35% tint (the pre-split recipe). Hovering a mark that is
-// already selected draws no highlight at all (both layers are already opaque from the wash; a
-// 1.5px hover stroke over a 2px selected stroke would read as weaker, not stronger) — the
-// tooltip and `@bind` still work for that hit. Remount fade is a plain opacity fade on each
-// shape (`masque-enter`/`masque-leave`, no wrapper to isolate), 80-120ms.
+// Recipe: the "Visual language (settled)" section of docs/dev/live-interaction-checklist.md
+// (cite, do not reopen). The shadow root holds THREE sibling top-level svgs, identical
+// box/viewBox, in DOM order `svg.masque-fill` (`mix-blend-mode: color-dodge`, a fixed `#141414`
+// source that brightens without rotating hue), `svg.masque-edge` (no blend: the halo, a
+// `g.masque-halo` of casing, ink core and inner casing; hover and selected differ by the core's
+// width), and `svg.masque-plain` (no blend). A closed mark's hover, and a grid cell's or region's
+// pick, is a fill shape plus a halo of identical geometry; an open seg or a line's sample dot is
+// the halo only; a `rectfill` (selects-ROI grid cell-block union) is fill-only. `svg.masque-plain`
+// holds ROI/threshold and a layer with an explicit Julia `hoverstyle` stroke: single element,
+// unblended, verbatim colour + 18%/35% tint (and the 2px/4px ring on its open picks). Hovering a
+// mark already picked in an SVG recipe draws no highlight. Remount fade is a plain opacity fade
+// (`masque-enter`/`masque-leave`) on each top-level element, 80-120ms.
 
 export const ALERT_RED = "#ff3b30";
 export const TEAL = "#3A6F7C";
 
 // The fill layer's source colour (`color-dodge` against this near-black brightens without
-// rotating hue — see mount.ts). The edge layer is one flat chrome grey per figure, the same
-// colour for hover and selected.
+// rotating hue — see mount.ts). The edge layer is the halo: an ink core between two casing bands,
+// Pluto's off-black and off-white, ink on a light plot area and swapped on a dark one, the same
+// colours for hover and selected (the core's width tells them apart). GREY is the control chrome
+// (ROI box, threshold), unchanged.
 export const DODGE_FILL = "rgb(20, 20, 20)";
 export const GREY = {
   light: { stroke: "rgb(122, 122, 122)" },
   dark: { stroke: "rgb(200, 200, 200)" },
 };
+export const HALO = {
+  light: { ink: "rgb(31, 31, 31)", casing: "rgb(250, 250, 250)" },
+  dark: { ink: "rgb(250, 250, 250)", casing: "rgb(31, 31, 31)" },
+};
+
+// Page-side capture of a halo (highlight.ts's haloOf): pass `HALO_CAPTURE` into page.evaluate
+// and rebuild it there with `new Function("g", HALO_CAPTURE)`. Returns null for anything that is
+// not a `g.masque-halo`; else its core element and the bands' computed strokes and widths.
+export const HALO_CAPTURE = `
+  if (!g || !g.classList || !g.classList.contains("masque-halo")) return null;
+  const sw = (el) => (el ? parseFloat(getComputedStyle(el).strokeWidth) : null);
+  const outer = g.querySelector(":scope > .masque-halo-outer"), inner = g.querySelector(":scope > .masque-halo-inner");
+  const host = g.getRootNode().host;
+  return {
+    core: g.querySelector(":scope > .masque-hi"),
+    align: [...g.classList].map((c) => /^masque-halo-(mid|in|out|line)$/.exec(c)).find(Boolean)?.[1] ?? null,
+    mode: g.classList.contains("masque-halo-hover") ? "hover" : "selected",
+    caseStroke: outer ? getComputedStyle(outer).stroke : null,
+    innerStroke: inner ? getComputedStyle(inner).stroke : null,
+    outer: sw(outer), inner: sw(inner),
+    u: host ? parseFloat(getComputedStyle(host).getPropertyValue("--masque-halo-u")) : null,
+    clip: g.getAttribute("clip-path"), mask: g.getAttribute("mask"),
+    classes: g.getAttribute("class"),
+  };
+`;
+
+// A captured shape whose `halo` (HALO_CAPTURE's fields, less `core`) is set: ink core in the
+// figure's tone with the opposite casing, the mode's class on the core, and the band widths the
+// alignment gives (one band `u` wide; the core one band for hover, two for a pick; inside or
+// outside an edge only half of each stroke shows, so those are twice as wide). `aligns` lists
+// the alignments the caller accepts.
+export function assertHalo(shape, where, mode, wantDark, aligns) {
+  const h = shape?.halo;
+  if (!h) throw new Error(`${where}: not a halo ${JSON.stringify(shape)}`);
+  if (h.mode !== mode) throw new Error(`${where}: halo mode ${h.mode} (want ${mode}) ${JSON.stringify(h)}`);
+  if (aligns && !aligns.includes(h.align)) throw new Error(`${where}: halo sits ${h.align} (want ${aligns.join("/")})`);
+  const want = wantDark ? HALO.dark : HALO.light;
+  if (shape.stroke !== want.ink) throw new Error(`${where}: halo core ${shape.stroke} (want ${want.ink})`);
+  if (h.caseStroke !== want.casing) throw new Error(`${where}: halo casing ${h.caseStroke} (want ${want.casing})`);
+  if (h.align !== "mid" && h.innerStroke !== want.casing) throw new Error(`${where}: inner casing ${h.innerStroke} (want ${want.casing})`);
+  if (!hasClass(shape.className, "masque-hi") || !hasClass(shape.className, mode === "hover" ? "masque-hover" : "masque-wash")) {
+    throw new Error(`${where}: halo core classes ${shape.className}`);
+  }
+  if (shape.fill !== "none") throw new Error(`${where}: halo core fill ${shape.fill} (want none)`);
+  const u = h.u, core = Number(shape.width), near = (a, b) => Math.abs(a - b) < 0.05;
+  if (!(u >= 0.5 && u <= 1)) throw new Error(`${where}: halo band ${u} (want max(1/dpr, 0.5) CSS px)`);
+  const c = mode === "hover" ? u : 2 * u;
+  if (h.align === "mid") {
+    if (!near(core, c) || !near(h.outer, c + 2 * u)) throw new Error(`${where}: centred halo widths core ${core} outer ${h.outer} (want ${c}, ${c + 2 * u})`);
+  } else if (h.align === "in" || h.align === "out") {
+    if (!near(core, 2 * c + 2 * u) || !near(h.outer, 2 * c + 4 * u) || !near(h.inner, 2 * u)) {
+      throw new Error(`${where}: ${h.align} halo widths ${h.outer}/${core}/${h.inner} (want ${2 * c + 4 * u}/${2 * c + 2 * u}/${2 * u})`);
+    }
+    if (h.align === "in" && !h.clip) throw new Error(`${where}: inset halo not clipped to its shape`);
+    if (h.align === "out" && !h.mask) throw new Error(`${where}: outset halo not masked off its mark`);
+  } else if (h.align === "line") {
+    if (!(h.outer > core && core > h.inner && h.inner > 0) || !h.mask) throw new Error(`${where}: line halo ${JSON.stringify(h)} core ${core}`);
+  }
+}
 
 // getComputedStyle serializes a colour back out in whatever functional notation the browser
 // picked for the value's colour space — not necessarily rgb(). A color-mix(in lch, …) result in
@@ -122,13 +177,8 @@ export function assertWash(wash, where, wantDark) {
   if (fill.stroke !== "none") throw new Error(`${where}: wash fill shape stroke ${fill.stroke} (want none)`);
   if (fill.blend !== "color-dodge") throw new Error(`${where}: wash fill blend ${fill.blend} (want color-dodge)`);
 
-  if (!hasClass(edge.className, "masque-hi") || !hasClass(edge.className, "masque-wash")) {
-    throw new Error(`${where}: wash edge shape missing masque-hi/masque-wash class ${JSON.stringify(edge)}`);
-  }
-  if (edge.width !== "2") throw new Error(`${where}: wash edge width ${edge.width} (want 2)`);
-  const g = wantDark ? GREY.dark : GREY.light;
-  if (edge.stroke !== g.stroke) throw new Error(`${where}: wash edge stroke ${edge.stroke} (want ${g.stroke})`);
-  if (edge.fill !== "none") throw new Error(`${where}: wash edge fill ${edge.fill} (want none)`);
+  // An area's halo sits inside it (centred when it is too small); a point's outside it.
+  assertHalo(edge, where, "selected", wantDark, edge.tag === "circle" ? ["out"] : ["in", "mid"]);
   if (edge.blend !== "normal") {
     throw new Error(`${where}: wash edge blend ${edge.blend} (want normal)`);
   }
@@ -136,9 +186,18 @@ export function assertWash(wash, where, wantDark) {
   assertNoTeal(wash, where);
 }
 
-// Selected-open-geometry ring: unblended, lives only in `svg.masque-plain`. Stroke is the
-// flat chrome grey (GREY.dark when wantDark). Same 2px/4px recipe as before the fill/edge split.
+// Selected open geometry: a picked point on a line, or a whole line or segment that has nothing
+// to fade, is a pick halo in svg.masque-edge, outside the point or cased along the line. A
+// capture with no `halo` is the ring a layer with an explicit `hoverstyle` stroke still draws in
+// svg.masque-plain (inner 2px + outer 4px @ 0.25).
 export function assertRing(ring, where, wantDark = false) {
+  if (ring?.halo) {
+    const core = ring.circles?.[0] ?? ring.paths?.[0] ?? ring.lines?.[0];
+    assertHalo({ ...core, halo: ring.halo }, where, "selected", wantDark, ring.circles?.length ? ["out"] : ["line"]);
+    assertNoAlertRed(ring, where);
+    assertNoTeal(ring, where);
+    return;
+  }
   // A per-segment ring is two <line>s; a whole-line ring is two <path>s; a picked point on a
   // line is two <circle>s. Same 2px/4px recipe.
   const strokes = ring?.paths?.length ? ring.paths : ring?.circles?.length ? ring.circles : ring?.lines;
@@ -208,16 +267,10 @@ export function assertHoverRecipe(hi, where, closed, wantDark) {
   if (closed && !fill) throw new Error(`${where}: closed hover missing fill shape ${JSON.stringify(hi)}`);
   if (!closed && fill) throw new Error(`${where}: open hover unexpectedly has a fill shape ${JSON.stringify(hi)}`);
 
-  if (!hasClass(edge.className, "masque-hi") || !hasClass(edge.className, "masque-hover")) {
-    throw new Error(`${where}: hover edge missing masque-hi/masque-hover class ${JSON.stringify(edge)}`);
-  }
-  if (edge.width !== "1.5" || edge.opacity !== null) {
-    throw new Error(`${where}: hover edge recipe ${JSON.stringify(edge)}`);
-  }
-  if (!realColor(edge.stroke)) throw new Error(`${where}: hover edge stroke not resolved ${JSON.stringify(edge)}`);
-  const g = wantDark ? GREY.dark : GREY.light;
-  if (edge.stroke !== g.stroke) throw new Error(`${where}: hover edge stroke ${edge.stroke} (want ${g.stroke})`);
-  if (edge.fill !== "none") throw new Error(`${where}: hover edge fill ${edge.fill} (want none)`);
+  if (edge.opacity !== null) throw new Error(`${where}: hover edge recipe ${JSON.stringify(edge)}`);
+  // A point (or a line's sample dot) is outset, an area inset or centred, a line cased.
+  const aligns = edge.tag === "circle" ? ["out"] : edge.tag === "line" || (!closed && edge.tag === "path") ? ["line"] : ["in", "mid"];
+  assertHalo(edge, where, "hover", wantDark, aligns);
   if (edge.blend !== "normal") {
     throw new Error(`${where}: hover edge blend ${edge.blend} (want normal)`);
   }
