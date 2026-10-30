@@ -1064,6 +1064,27 @@ try {
         if ((await ctl("pick", "input").inputValue()) !== "y") throw new Error(`${key}/menu-click: box shows ${await ctl("pick", "input").inputValue()}, want y`);
       }
       passed.push(`${key}/interval-checkbox-menu`);
+      // The menu, button, text box and grid value label are in Makie's font, fetched once for the
+      // page (#476).
+      {
+        const fam = async (sel) => ctl(sel[0], sel[1]).evaluate((el) => getComputedStyle(el).fontFamily);
+        for (const sel of [["pick", "input"], ["go", "button"], ["word", "input"], ["grid", ".masque-vlabel"]]) {
+          const f = await fam(sel);
+          if (!f.startsWith('"TeX Gyre Heros Makie"')) throw new Error(`${key}/font: ${sel.join(" ")} is in ${f}, want "TeX Gyre Heros Makie" first`);
+        }
+        const w = await ctl("go", "button").evaluate((el) => getComputedStyle(el).fontWeight);
+        if (w !== "700") throw new Error(`${key}/font: the bold button's weight is ${w}, want 700`);
+        // Two faces: the regular one, and the button's bold one.
+        const want = "400 normal,700 normal";
+        const faces = await page.waitForFunction((want) => {
+          const f = [...document.fonts].filter((f) => f.family.replace(/"/g, "") === "TeX Gyre Heros Makie" && f.status === "loaded")
+            .map((f) => `${f.weight} ${f.style}`).sort().join(",");
+          return f === want && f;
+        }, want, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => page.evaluate(() =>
+          [...document.fonts].map((f) => `${f.family} ${f.weight} ${f.style} ${f.status}`).join(", ")));
+        if (faces !== want) throw new Error(`${key}/font: faces ${faces}, want TeX Gyre Heros Makie ${want}`);
+        passed.push(`${key}/font`);
+      }
       // The slider grid's slider moves its field and its value label, which Julia formatted.
       {
         const lab = ctl("grid", ".masque-vlabel");

@@ -394,6 +394,63 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["off"] == Masque._css_color(Makie.to_color(:blue))
     end
 
+    @testset "a control's text ships the font Makie draws it in (#476)" begin
+        installed(file) = joinpath(Makie.assetpath("fonts"), file)
+        hash(path) = "sha384-" * Masque.base64encode(Masque.sha384(read(path)))
+        # Each of Makie's installed fonts is the file pinned at Makie's v0.21.0 tag; a Makie
+        # release that changes one fails here (and in the upstream canary) before pages notice.
+        for (file, pin) in values(Masque._MAKIE_FONT_FILES)
+            @test hash(installed(file)) == pin
+        end
+        src(file) = [
+            "https://cdn.jsdelivr.net/gh/MakieOrg/Makie.jl@v0.21.0/assets/fonts/$file",
+            "https://raw.githubusercontent.com/MakieOrg/Makie.jl/v0.21.0/assets/fonts/$file",
+        ]
+        fig = Figure(); Axis(fig[1, 1])
+        menu = Menu(fig[2, 1]; options = ["a", "b"])
+        b = Button(fig[3, 1]; label = "Go", font = :bold)
+        tb = Textbox(fig[4, 1]; font = "TeX Gyre Heros Makie Italic")
+        sg = SliderGrid(fig[5, 1], (label = "f", range = 1:3))
+        bi = Button(fig[6, 1]; label = "Both", font = :bold_italic)
+        own = Button(fig[7, 1]; label = "Own", font = installed("DejaVuSans.ttf"))
+        w = masque(fig, (pick = menu, go = b, text = tb, grid = sg, both = bi, own = own))
+        font(id) = _layer(w.manifest, id)["geometry"]["font"]
+        # Makie's own fonts name where the same file is online, and its hash.
+        f = font("pick")
+        @test f["family"] == "TeX Gyre Heros Makie" && !haskey(f, "weight") && !haskey(f, "style")
+        @test f["src"] == src("TeXGyreHerosMakie-Regular.otf") && f["integrity"] == hash(installed("TeXGyreHerosMakie-Regular.otf"))
+        f = font("go")
+        @test f["weight"] == 700 && !haskey(f, "style")
+        @test f["src"] == src("TeXGyreHerosMakie-Bold.otf") && f["integrity"] == hash(installed("TeXGyreHerosMakie-Bold.otf"))
+        f = font("text")
+        @test f["style"] == "italic" && !haskey(f, "weight")
+        @test f["src"] == src("TeXGyreHerosMakie-Italic.otf") && f["integrity"] == hash(installed("TeXGyreHerosMakie-Italic.otf"))
+        f = font("both")
+        @test f["weight"] == 700 && f["style"] == "italic"
+        @test f["src"] == src("TeXGyreHerosMakie-BoldItalic.otf") && f["integrity"] == hash(installed("TeXGyreHerosMakie-BoldItalic.otf"))
+        @test only(_layer(w.manifest, "grid")["geometry"]["sliders"])["valueLabel"]["font"] == font("pick")
+        # A font of the author's ships its name alone.
+        f = font("own")
+        @test f["family"] == "DejaVu Sans" && !haskey(f, "src") && !haskey(f, "integrity")
+        # An installed Makie font that no longer matches its pin ships its name alone too.
+        key = "tex gyre heros makie regular"
+        pinned = Masque._MAKIE_FONT_FILES[key]
+        try
+            Masque._MAKIE_FONT_FILES[key] = (pinned[1], "sha384-changed")
+            f = Masque._control_font(menu, :regular)
+            @test f == Dict{String, Any}("family" => "TeX Gyre Heros Makie")
+        finally
+            Masque._MAKIE_FONT_FILES[key] = pinned
+        end
+        # A figure's own `fonts` reach the menu, which has no `font` of its own.
+        fig = Figure(fonts = (; regular = "TeX Gyre Heros Makie Bold")); Axis(fig[1, 1])
+        menu = Menu(fig[2, 1]; options = ["a", "b"])
+        @test _layer(masque(fig, (pick = menu,)).manifest, "pick")["geometry"]["font"]["weight"] == 700
+        # The weight comes from the style's name.
+        @test Masque._font_weight("SemiBold Italic") == 600 && Masque._font_weight("Extra-Light") == 200
+        @test Masque._font_weight("Regular") == 400 && Masque._font_weight("Bold") == 700
+    end
+
     @testset "a menu ships Makie's list: cells, colours, arrow, direction and search (#429)" begin
         fig = Figure(); Axis(fig[1, 1])
         menu = Menu(

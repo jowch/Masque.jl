@@ -1531,8 +1531,8 @@ function build_kind_sweep()
         # A checkbox drawn as Makie draws it (#428): its square, in its own colours, sits in the
         # middle of a box wider than it.
         sure = Checkbox(fig[3, 3]; checked = false, size = 18, checkboxcolor_checked = :darkorange, width = 40, tellwidth = false)
-        # A button (#431): its field counts clicks.
-        go = Makie.Button(fig[4:5, 3]; label = "Go")   # WGLMakie also exports Bonito's `Button`
+        # A button (#431): its field counts clicks. Bold, so the page loads a second face (#476).
+        go = Makie.Button(fig[4:5, 3]; label = "Go", font = :bold)   # WGLMakie also exports Bonito's `Button`
         # A text box (#433): lower-case letters only, stored on Enter.
         word = Textbox(fig[6, 1:3]; placeholder = "a word", validator = r"[a-z]+", width = 200)
         masque(

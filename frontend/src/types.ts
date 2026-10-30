@@ -116,6 +116,7 @@ export interface ControlGeometry {
     text?: string           // the text colour
     prompt?: string         // shown before a choice
     fontsize?: number       // image px
+    font?: ControlFont      // menu, button, text box: the font Makie draws the text in
     padding?: number        // image px from the box's left edge to the text
     cell?: number           // an option's height in the open list
     cellColors?: [string, string, string, string] // under the pointer, the chosen one, the odd and the even options
@@ -151,9 +152,21 @@ export interface ValueLabel {
     w: number
     h: number
     fontsize: number
+    font?: ControlFont
     color: string
     labels?: string[]
     pairs?: string[]
+}
+
+// The font Makie draws a control's text in (#476), mirroring Julia's `_control_font`: its family
+// name, its weight and style when not 400 and normal, and, for one of Makie's own fonts, where
+// the file is online (`src`, tried in order) and the installed copy's `sha384` hash.
+export interface ControlFont {
+    family: string
+    weight?: number
+    style?: "italic"
+    src?: string[]
+    integrity?: string
 }
 
 export interface SliceSeries {

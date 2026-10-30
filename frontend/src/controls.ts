@@ -2,6 +2,7 @@
 // block's box empty in the picture and ships a :control layer with its box and state; this
 // module puts a real <input>/<select> over that box. The element owns its own pointer and
 // keyboard input, so none of the overlay's gestures see it.
+import { FONT_CSS, useFont } from "./fonts"
 import { fmtNum } from "./template"
 import type { ControlGeometry, HitLayer, Manifest, ValueLabel } from "./types"
 
@@ -105,7 +106,7 @@ export const CONTROLS_STYLE = `
    box's edge and clips it to the box: --sw is half its width, drawn inside and out, and the
    button clips itself to its box. The focus ring goes on the box, outside that clip. */
 .masque-control .masque-button { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: none; cursor: pointer;
-  font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; white-space: nowrap;
+  ${FONT_CSS} font-size: var(--fs); line-height: 1; white-space: nowrap;
   border-radius: var(--r, 0); box-shadow: 0 0 0 var(--sw, 0) var(--sc, transparent), inset 0 0 0 var(--sw, 0) var(--sc, transparent);
   clip-path: inset(0); outline: none; background: var(--b0); color: var(--t0); }
 .masque-control .masque-button:hover { background: var(--b1); color: var(--t1); }
@@ -117,7 +118,7 @@ export const CONTROLS_STYLE = `
    half its width, drawn inside and out. Text typed and not yet stored (no Enter) is grey once
    the reader leaves the box, as in Makie. */
 .masque-control .masque-textbox { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box;
-  font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1;
+  ${FONT_CSS} font-size: var(--fs); line-height: 1;
   padding: var(--pt, 0) var(--pr, 0) var(--pb, 0) var(--pl, 0); border-radius: var(--r, 0);
   border: none; box-shadow: 0 0 0 var(--sw, 0) var(--e0), inset 0 0 0 var(--sw, 0) var(--e0); background: var(--b0); color: var(--tx); caret-color: var(--cc, auto); }
 .masque-control .masque-textbox::placeholder { color: var(--ph); opacity: 1; }
@@ -127,7 +128,7 @@ export const CONTROLS_STYLE = `
 .masque-control .masque-textbox.unstored:not(:focus) { color: var(--ph); }
 .masque-control input.masque-textbox:focus-visible { outline: none; }
 .masque-vlabel { position: absolute; display: flex; align-items: center; justify-content: flex-end; white-space: nowrap;
-  pointer-events: none; font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs); line-height: 1; }
+  pointer-events: none; ${FONT_CSS} font-size: var(--fs); line-height: 1; }
 /* Menu, as Makie draws it: a box showing the choice (or the prompt) with a pale triangle at its
    right, which opens a list of cells under it, or over it with less room below. Each cell is
    --ch high, in the odd or even colour; the one under the pointer or the keys, and the chosen
@@ -136,7 +137,7 @@ export const CONTROLS_STYLE = `
    with searchable the text that filters the list. An open menu sits over the other controls. */
 .masque-control.masque-ctl-menu.open { z-index: 1; }
 .masque-control .masque-menu-box { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; border: none; border-radius: 0;
-  font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs, 50cqh); line-height: 1; cursor: pointer;
+  ${FONT_CSS} font-size: var(--fs, 50cqh); line-height: 1; cursor: pointer;
   padding: 0 var(--pr, 0) 0 var(--pad, 0.5em); background: var(--masque-ctl-off, #f0f0f0); color: var(--masque-ctl-text, #000000);
   caret-color: transparent; text-overflow: clip; }
 .masque-control .masque-menu-box:hover { background: var(--c0, var(--masque-ctl-off, #f0f0f0)); }
@@ -146,7 +147,7 @@ export const CONTROLS_STYLE = `
 .masque-control .masque-menu-box.by-pointer:focus-visible { outline: none; }
 .masque-menu-arrow { position: absolute; inset: 50% var(--ai, 0) auto auto; width: var(--as, 0); height: var(--as, 0); translate: 50% -50%; overflow: visible; pointer-events: none; }
 .masque-menu-list { position: absolute; left: 0; width: 100%; max-height: var(--lmax, none); overflow-y: auto; overscroll-behavior: contain;
-  font-family: "TeX Gyre Heros", Helvetica, Arial, sans-serif; font-size: var(--fs, 50cqh); line-height: 1; scrollbar-width: thin; }
+  ${FONT_CSS} font-size: var(--fs, 50cqh); line-height: 1; scrollbar-width: thin; }
 .masque-menu-list[hidden] { display: none; }
 .masque-menu-list.down { top: 100%; }
 .masque-menu-list.up { bottom: 100%; }
@@ -183,6 +184,7 @@ function place(box: HTMLElement, g: ControlGeometry, m: Manifest): void {
     if (g.text) box.style.setProperty("--masque-ctl-text", g.text)
     if (g.fontsize !== undefined) box.style.setProperty("--fs", `${(100 * g.fontsize) / g.w}cqw`)
     if (g.padding !== undefined) box.style.setProperty("--pad", `${(100 * g.padding) / g.w}cqw`)
+    useFont(box, g.font)
 }
 
 function rangeInput(g: ControlGeometry, k: number, label: string, digits: number): HTMLInputElement {
@@ -259,7 +261,7 @@ function checkArt(g: ControlGeometry, el: HTMLInputElement): { svg_: SVGSVGEleme
         mark.setAttribute("font-size", String(m))
         mark.setAttribute("text-anchor", "middle")
         mark.setAttribute("dominant-baseline", "central")
-        mark.setAttribute("font-family", "TeX Gyre Heros, Helvetica, Arial, sans-serif")
+        mark.setAttribute("font-family", "TeX Gyre Heros Makie, Helvetica, Arial, sans-serif")
     } else {
         mark = document.createElementNS(SVG, "path")
         // The path is in marker units with y up; screen y points down.
@@ -831,6 +833,7 @@ function build(layer: HitLayer, m: Manifest, hooks: ControlHooks): ControlEl | n
                     el.style.height = `${(100 * vl.h) / g.h}%`
                     el.style.setProperty("--fs", `${(100 * vl.fontsize) / g.w}cqw`)
                     el.style.color = vl.color
+                    useFont(el, vl.font)
                     box.append(el)
                 }
                 labels.push([el, cg, vl])

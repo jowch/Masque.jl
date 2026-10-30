@@ -25,6 +25,11 @@ All notable changes to this project are documented here. The format is based on
   or reads the axis under the legend. The keyboard and a box selection still reach it. A legend
   with no background, or a mostly see-through one, still shows the marks under it and lets the
   pointer reach them (#437, #472).
+- The text of a `Menu`, `Button`, `Textbox` or `SliderGrid` value label is in the font Makie
+  draws it in, so it matches the rest of the figure. Before, it was in Helvetica or Arial. For
+  Makie's own fonts the browser downloads each font file once, about 33 KB for the regular one,
+  and only on a page showing one of these controls; offline it keeps Helvetica or Arial. A font of your own is
+  used if the reader has it installed (#476).
 - Hovering a line plot with many points keeps up with the pointer: a figure of 100 000 points
   no longer drops frames as the pointer crosses its lines (#469).
 - A faded line stays faded where it crosses a line or mark that stays in focus. It used to show at
