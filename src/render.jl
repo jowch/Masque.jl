@@ -592,7 +592,8 @@ function build_manifest(
         end
     end
     # The boxes Makie draws over the axes' plots (an opaque legend over an axis): the overlay
-    # draws no data mark's highlight or fade inside them (#437).
+    # draws no data mark's highlight or fade inside them (#437), and a data mark takes no
+    # pointer there (#472).
     plots = [ctx.transforms[id].viewport for (blk, id) in ctx.ids if blk isa _SUPPORTED_AXES]
     meets((x, y, w, h), (vx, vy, vw, vh)) = x < vx + vw && vx < x + w && y < vy + vh && vy < y + h
     occluders = Vector{Float64}[]

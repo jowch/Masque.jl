@@ -768,11 +768,26 @@ function yieldsToOtherAxis(manifest: Manifest, layer: HitLayer, x: number, y: nu
         l.axis !== layer.axis && l.events.includes(event) && inside(l.axis))
 }
 
+// Masque's own tools (threshold lines, ROI boxes, the view) draw over a legend, and a legend's
+// entries are the legend, so a box Makie draws over the plots hides neither.
+const OVER_OCCLUDERS: ReadonlySet<Kind> = new Set(["threshold", "roi", "view", "control"])
+
+// Whether (x, y) on `layer`'s marks is inside a box Makie draws over the plots (an opaque
+// legend, `occluders`) that hides them. The picture shows the legend there, not the mark, so
+// the mark takes no hover or click there, as it draws no highlight or fade there (#437, #472).
+// Keyboard focus still reaches it.
+export function occludedAt(manifest: Manifest, layer: HitLayer, x: number, y: number): boolean {
+    if (!manifest.occluders?.length || OVER_OCCLUDERS.has(layer.kind)) return false
+    if (layer.kind !== "axis" && screenFixedLayer(layer)) return false
+    return manifest.occluders.some((r) => contains(r, x, y))
+}
+
 // first layer (in manifest order) with a hit for the given event; null if none
 export function hitTest(manifest: Manifest, px: number, py: number, event: string): Hit | null {
     for (const layer of manifest.layers) {
         if (!layer.events.includes(event)) continue
         if (yieldsToOtherAxis(manifest, layer, px, py, event)) continue
+        if (occludedAt(manifest, layer, px, py)) continue
         const h = hitLayer(layer, px, py, manifest.transforms[layer.axis])
         if (h) return { layer, ...h }
     }
@@ -916,6 +931,8 @@ export function hitTestAt(
         if (f && !insideFrame(f, x, y)) continue
         if (yieldsToOtherAxis(manifest, layer, x, y, event)) continue
         const p = f ? frameInverse(f, x, y) : { x, y }
+        // In the marks' own space: a live photograph moves the legend's pixels with them.
+        if (occludedAt(manifest, layer, p.x, p.y)) continue
         const h = hitLayer(layer, p.x, p.y, manifest.transforms[layer.axis])
         if (h) return { layer, ...h }
     }
