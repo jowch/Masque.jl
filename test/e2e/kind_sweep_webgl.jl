@@ -222,6 +222,17 @@ HTML(
         "<span id=\"coords_fade_pan\" style=\"display:none\">$(JSON3.write(sweep.fade_pan.manifest["layers"]))</span>",
 )
 
+# ╔═╡ d1000000-0000-0000-0000-0000000000e7
+@bind ev_legend_hidden sweep.legend_hidden
+
+# ╔═╡ d1000000-0000-0000-0000-0000000000e8
+HTML(
+    "<span id=\"out_legend_hidden\">LEGEND_HIDDEN=$(sweep_field("legend_hidden", ev_legend_hidden))</span>" *
+        "<span id=\"bond_legend_hidden\" style=\"display:none\">$(repr(ev_legend_hidden))</span>" *
+        "<span id=\"coords_legend_hidden\" style=\"display:none\">$(JSON3.write(sweep.legend_hidden.manifest["layers"]))</span>" *
+        "<span id=\"occluders_legend_hidden\" style=\"display:none\">$(JSON3.write(get(sweep.legend_hidden.manifest, "occluders", [])))</span>",
+)
+
 # ╔═╡ d1000000-0000-0000-0000-000000000072
 @bind ev_poly_shapes sweep.poly_shapes
 
@@ -880,6 +891,8 @@ HTML(
 # ╟─d1000000-0000-0000-0000-000000000071
 # ╠═d1000000-0000-0000-0000-0000000000e5
 # ╟─d1000000-0000-0000-0000-0000000000e6
+# ╠═d1000000-0000-0000-0000-0000000000e7
+# ╟─d1000000-0000-0000-0000-0000000000e8
 # ╠═d1000000-0000-0000-0000-000000000072
 # ╟─d1000000-0000-0000-0000-000000000073
 # ╠═d1000000-0000-0000-0000-000000000026

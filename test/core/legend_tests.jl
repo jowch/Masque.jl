@@ -437,4 +437,44 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         meta = Masque._legend_entries_meta(leg)
         @test only(meta).label == "bold "
     end
+
+    # A legend Makie draws over an axis hides the marks under it; the manifest ships its box so
+    # the overlay leaves it out of their highlights and fade (#437).
+    @testset "a legend over the plot ships its box as an occluder" begin
+        built(; kw...) = begin
+            fig = Figure(size = (600, 400)); ax = Axis(fig[1, 1])
+            scatter!(ax, 1:10, 1:10; label = "pts")
+            leg = axislegend(ax; framecolor = :red, framewidth = 2, kw...)
+            Makie.update_state_before_display!(fig)
+            _, _, ctx = ctx_for(fig)
+            fig, ctx, leg, build_manifest(interactables(fig), ctx)
+        end
+        fig, ctx, leg, m = built()
+        box = only(m["occluders"])
+        # inside the legend's whole bbox (its margin left out), and on the frame Makie drew
+        vp = ctx.transforms[axis_id(ctx, leg)].viewport
+        @test vp[1] - 1 <= box[1] && box[1] + box[3] <= vp[1] + vp[3] + 1
+        @test vp[2] - 1 <= box[2] && box[2] + box[4] <= vp[2] + vp[4] + 1
+        @test box[3] < vp[3] && box[4] < vp[4]
+        img = Makie.colorbuffer(fig; px_per_unit = ctx.scaling)
+        red(x, y) = (c = Makie.RGB(img[round(Int, y) + 1, round(Int, x) + 1]); c.r > 0.8 && c.g < 0.4 && c.b < 0.4)
+        half = ctx.scaling   # half the frame's 2-unit stroke, image px
+        midx, midy = box[1] + box[3] / 2, box[2] + box[4] / 2
+        @test red(box[1] + half, midy) && red(box[1] + box[3] - half, midy)
+        @test red(midx, box[2] + half) && red(midx, box[2] + box[4] - half)
+        @test !red(box[1] - 2, midy) && !red(box[1] + box[3] + 2, midy)
+
+        # what is under it shows through: no box
+        @test !haskey(built(; framevisible = false)[4], "occluders")
+        @test !haskey(built(; backgroundcolor = (:white, 0.3))[4], "occluders")
+        @test haskey(built(; backgroundcolor = (:white, 0.8))[4], "occluders")
+
+        # a legend beside the axes covers none of them
+        fig = Figure(size = (600, 400)); ax = Axis(fig[1, 1])
+        scatter!(ax, 1:10, 1:10; label = "pts")
+        Legend(fig[1, 2], ax)
+        Makie.update_state_before_display!(fig)
+        _, _, ctx = ctx_for(fig)
+        @test !haskey(build_manifest(interactables(fig), ctx), "occluders")
+    end
 end
