@@ -154,15 +154,21 @@ export interface PunchStep { layer: HitLayer; k: number; keep: boolean }
 // a faded line drawn over a kept mark would show at full strength where they meet (#462): such a
 // faded element's cover is put back after the kept one is punched, as the backend drew it. Only
 // pairs with a line in them are put back; a closed pick under a later faded closed mark is
-// repainted instead (a circle) or stays a known gap. `layers` is the manifest's layers, which
-// list the plot drawn last on an axis first, as the hit test reads them (first match is the mark
-// on top); with `within`, only kept elements whose box meets it.
+// repainted instead (a circle) or stays a known gap. A layer's `draw` says where the backend
+// draws its plot; without it on every layer in scope (a figure's layers listed by hand, with
+// `auto = false`) only a layer's own elements are put back over each other, since the
+// manifest's order is the hit test's, not the drawing's. With `within`, only kept elements
+// whose box meets it.
 export function punchSteps(
     layers: HitLayer[], kept: Map<HitLayer, Set<number>>, boxOf: (layer: HitLayer, k: number) => Box | null,
     pad: number, within?: Box,
 ): PunchStep[] {
     const z = new Map<HitLayer, number>()
-    layers.forEach((l, i) => z.set(l, layers.length - i))
+    const drawn = [...kept.keys()].every((l) => l.draw !== undefined)
+    layers.forEach((l, i) => z.set(l, drawn ? l.draw! : layers.length - i))
+    // Which of two layers is on top is known only from `draw`; within a layer, from its order.
+    const above = (l: HitLayer, j: number, K: HitLayer, k: number): boolean =>
+        l === K ? (paintRank(l).get(j) ?? 0) > (paintRank(K).get(k) ?? 0) : drawn && (z.get(l) ?? 0) > (z.get(K) ?? 0)
     const scope = [...kept.keys()].sort((a, b) => (z.get(a) ?? 0) - (z.get(b) ?? 0))
     const keeps: Array<PunchStep & { box: Box }> = []
     for (const layer of scope) {
@@ -172,15 +178,23 @@ export function punchSteps(
         }
     }
     const over = new Map<HitLayer, Set<number>>()
+    // A line's box walks its vertices: found once, not once per kept mark.
+    const lineBoxes = new Map<HitLayer, Map<number, Box | null>>()
+    const boxAt = (layer: HitLayer, j: number): Box | null => {
+        if (layer.kind !== "lines") return boxOf(layer, j)
+        let b = lineBoxes.get(layer)
+        if (!b) lineBoxes.set(layer, (b = new Map()))
+        if (!b.has(j)) b.set(j, boxOf(layer, j))
+        return b.get(j)!
+    }
     for (const K of keeps) {
-        const zk = z.get(K.layer) ?? 0, rk = paintRank(K.layer).get(K.k) ?? 0
         for (const layer of scope) {
-            const zl = z.get(layer) ?? 0
-            if (zl < zk || (layer.kind !== "lines" && K.layer.kind !== "lines")) continue
-            const ks = kept.get(layer)!, rank = paintRank(layer)
+            if (layer.kind !== "lines" && K.layer.kind !== "lines") continue
+            if (layer !== K.layer && !above(layer, -1, K.layer, K.k)) continue
+            const ks = kept.get(layer)!, done = over.get(layer)
             for (const j of drawnOrder(layer)) {
-                if (ks.has(j) || (zl === zk && (rank.get(j) ?? 0) <= rk)) continue
-                const b = boxOf(layer, j)
+                if (ks.has(j) || done?.has(j) || !above(layer, j, K.layer, K.k)) continue
+                const b = boxAt(layer, j)
                 if (!b || !meets([b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad], K.box)) continue
                 let s = over.get(layer)
                 if (!s) over.set(layer, (s = new Set()))
@@ -706,11 +720,15 @@ export function createFade(host: FadeHost): Fade {
     // many faded elements' covers were put back.
     const punch = (c: CanvasRenderingContext2D, m: Manifest, kept: Map<HitLayer, Set<number>>, bg: string, within?: Box): number => {
         let back = 0
-        for (const s of punchSteps(m.layers, kept, boxOf, PAD_DIM, within)) {
-            c.globalCompositeOperation = s.keep ? "destination-out" : "source-over"
-            c.fillStyle = s.keep ? "#000000" : bg
-            fillShapes(c, s.layer, [s.k], s.keep ? PAD_KEEP : PAD_DIM)
-            if (!s.keep) back++
+        const steps = punchSteps(m.layers, kept, boxOf, PAD_DIM, within)
+        // A run of steps on one layer the same way is one path, so a crowd of picks is one fill.
+        for (let i = 0; i < steps.length;) {
+            const { layer, keep } = steps[i], ks: number[] = []
+            for (; i < steps.length && steps[i].layer === layer && steps[i].keep === keep; i++) ks.push(steps[i].k)
+            c.globalCompositeOperation = keep ? "destination-out" : "source-over"
+            c.fillStyle = keep ? "#000000" : bg
+            fillShapes(c, layer, ks, keep ? PAD_KEEP : PAD_DIM)
+            if (!keep) back += ks.length
         }
         c.globalCompositeOperation = "source-over"
         return back

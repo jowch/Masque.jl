@@ -346,8 +346,8 @@ describe("a legend's hover on closed marks (D4)", () => {
 })
 
 // A faded line drawn over a kept mark stays faded where they meet (#462): punching the kept mark
-// out shows the image's pixels, which there are the faded line's, so its cover is put back. The
-// manifest lists the plot drawn last first.
+// out shows the image's pixels, which there are the faded line's, so its cover is put back. Each
+// layer's `draw` says which is on top.
 describe("a faded line crossing a kept mark", () => {
     // Four lines: s1 and s4 run across, s2 and s3 run down through both; drawn s1, s2, s3, s4.
     const line = (id: string, geometry: number[]) => ({ id, kind: "lines" as const, geometry: [geometry], points: [[0, 0]],
@@ -355,14 +355,13 @@ describe("a faded line crossing a kept mark", () => {
     const four = () => [
         line("s1", [100, 200, 900, 200]), line("s2", [300, 100, 300, 700]),
         line("s3", [600, 100, 600, 700]), line("s4", [100, 500, 900, 500]),
-    ]
+    ].map((l, i) => ({ ...l, draw: i + 1 }))
     const box = (l: Manifest["layers"][number]): [number, number, number, number] => {
         const v = (l.geometry as number[][])[0]
         return [Math.min(v[0], v[2]) - 1.5, Math.min(v[1], v[3]) - 1.5, Math.max(v[0], v[2]) + 1.5, Math.max(v[1], v[3]) + 1.5]
     }
-    // `layers` bottom first here; the manifest lists them top first.
     const steps = (layers: Manifest["layers"], keep: string[], within?: [number, number, number, number]) =>
-        punchSteps([...layers].reverse(), new Map(layers.map((l) => [l, new Set(keep.includes(l.id) ? [0] : [])])), (l) => box(l), 1.5, within)
+        punchSteps(layers, new Map(layers.map((l) => [l, new Set(keep.includes(l.id) ? [0] : [])])), (l) => box(l), 1.5, within)
             .map((s) => `${s.keep ? "punch" : "cover"} ${s.layer.id}`)
 
     it("puts back the cover of the faded lines drawn after a kept one, in paint order", () => {
@@ -372,23 +371,39 @@ describe("a faded line crossing a kept mark", () => {
     })
 
     it("puts back nothing when every kept line is drawn over the faded ones", () => {
-        const ls = four()
-        expect(steps([ls[0], ls[3], ls[1], ls[2]], ["s2", "s3"])).toEqual(["punch s2", "punch s3"])
+        const ls = [0, 3, 1, 2].map((i, k) => ({ ...four()[i], draw: k + 1 }))
+        expect(steps(ls, ["s2", "s3"])).toEqual(["punch s2", "punch s3"])
     })
 
     it("puts back nothing a kept line does not meet", () => {
         const ls = four()
-        ls[3] = line("s4", [700, 600, 900, 600]) // right of s3, below s1: crosses no kept line
+        ls[3] = { ...line("s4", [700, 600, 900, 600]), draw: 4 } // right of s3, below s1: crosses no kept line
         expect(steps(ls, ["s2"])).toEqual(["punch s2"])
     })
 
     it("puts back a faded line between two kept ones, then punches the later kept one over it", () => {
-        const ls = four()
-        expect(steps([ls[1], ls[0], ls[2], ls[3]], ["s2", "s3"])).toEqual(["punch s2", "cover s1", "punch s3", "cover s4"])
+        const ls = [1, 0, 2, 3].map((i, k) => ({ ...four()[i], draw: k + 1 }))
+        expect(steps(ls, ["s2", "s3"])).toEqual(["punch s2", "cover s1", "punch s3", "cover s4"])
     })
 
     it("with a box, only the kept marks that meet it, and what is drawn over them", () => {
         expect(steps(four(), ["s2", "s3"], [580, 480, 620, 520])).toEqual(["punch s3", "cover s4"])
+    })
+
+    it("reads which layer is on top from `draw`, never from the manifest's order", () => {
+        // The manifest lists s1 first: `draw` says s4 is on top all the same.
+        expect(steps(four(), ["s2"])).toEqual(["punch s2", "cover s4"])
+        expect(steps([...four()].reverse(), ["s2"])).toEqual(["punch s2", "cover s4"])
+        // Without `draw` (layers listed by hand), no layer is put back over another.
+        const bare = four().map(({ draw: _, ...l }) => l)
+        expect(steps(bare, ["s2"])).toEqual(["punch s2"])
+        const ls = four()
+        // A scatter drawn over the lines keeps its markers where a faded line crosses them.
+        const pts: Manifest["layers"][number] = { id: "p", kind: "circles", geometry: [300, 200, 20], payloads: [{}], axis: "ax1",
+            events: ["hover"], draw: 5 }
+        const withPts = new Map([...ls.map((l) => [l, new Set<number>()] as const), [pts, new Set([0])]])
+        expect(punchSteps([...ls, pts], withPts, (l) => l === pts ? [280, 180, 320, 220] : box(l), 1.5).map((s) => s.keep))
+            .toEqual([true])
     })
 
     it("leaves closed marks over closed marks alone", () => {
@@ -403,7 +418,7 @@ describe("a faded line crossing a kept mark", () => {
             width: 1200, height: 800, scaling: 2,
             transforms: { ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity", viewport: [0, 0, 1200, 800],
                 xreversed: false, yreversed: false } },
-            layers: [...four().reverse(), { id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"],
+            layers: [...four(), { id: "legend", kind: "rects", axis: "ax1", events: ["click", "hover"],
                 geometry: [1000, 100, 40, 20, 1000, 150, 40, 20, 1000, 200, 40, 20, 1000, 250, 40, 20],
                 payloads: [{}, {}, {}, {}], links: [["s1"], ["s2"], ["s3"], ["s4"]] }],
             fields: ["legend"], initial: { legend: { layer: "legend", index: 1 } },
