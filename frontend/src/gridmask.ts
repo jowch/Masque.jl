@@ -102,7 +102,7 @@ export function decodeMask(layer: HitLayer, env: unknown): GridMask | null {
 // The highlight for a mask, as one hit: ["mask", fill path, edge path, side]. The fill is the
 // selected cells, one rect per run (one path, so touching rows paint as one area with no
 // seams); the edge is the outline, each cell side that borders an unselected cell or the grid's
-// edge, joined along a row or column; the side is how thin the selection gets (maskPaths).
+// edge, joined along a row or column; the side is how wide the selection is (pieceWidth).
 // Index -1 keeps its key apart from every cell's.
 export function maskHit(layer: HitLayer, mask: GridMask): Hit | null {
     const gg = layer.geometry as GridGeometry
@@ -112,16 +112,13 @@ export function maskHit(layer: HitLayer, mask: GridMask): Hit | null {
 }
 
 // The fill and edge paths of `mask`, an `nc` × `nr` row-major block of cells whose edges are
-// `xe` (nc + 1) and `ye` (nr + 1), and the selection's thinnest span, image px: the shortest
-// unbroken run of selected cells along any row or down any column. So a lone cell, a scatter
-// of them, or a one-cell-wide arm measures as thin as its cells, however far the picks spread.
-// Null when it holds no cell. A region's outline passes the block around the region alone
-// (regions.ts), so it walks that block, not the whole grid.
+// `xe` (nc + 1) and `ye` (nr + 1), and its width (pieceWidth); null when it holds no cell. A
+// region's outline passes the block around the region alone (regions.ts), so it walks that
+// block, not the whole grid.
 export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<number>, ye: ArrayLike<number>): [string, string, number] | null {
     // Walks the typed array directly (no per-cell closure): a click on a photo-sized grid walks
     // every cell four times here.
     let fill = ""
-    let thin = Infinity
     for (let j = 0; j < nr; j++) {
         const row = j * nc
         let i = 0
@@ -130,20 +127,9 @@ export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<
             const i0 = i
             while (i < nc && mask[row + i]) i++
             fill += `M${xe[i0]} ${ye[j]}H${xe[i]}V${ye[j + 1]}H${xe[i0]}Z`
-            thin = Math.min(thin, Math.abs(xe[i] - xe[i0]))
         }
     }
     if (fill === "") return null
-    // Runs down each column: start[i] is the row column i's current run began at.
-    const start = new Int32Array(nc).fill(-1)
-    for (let j = 0; j <= nr; j++) {
-        const row = j * nc
-        for (let i = 0; i < nc; i++) {
-            const on = j < nr && mask[row + i]
-            if (on && start[i] < 0) start[i] = j
-            else if (!on && start[i] >= 0) { thin = Math.min(thin, Math.abs(ye[j] - ye[start[i]])); start[i] = -1 }
-        }
-    }
     let edge = ""
     // Horizontal sides: the line y = ye[j] between rows j-1 and j, for j in 0..nr (a row
     // outside the grid counts as unselected), joined along the row.
@@ -171,5 +157,44 @@ export function maskPaths(mask: GridMask, nc: number, nr: number, xe: ArrayLike<
         }
     }
     for (let i = 0; i <= nc; i++) if (open[i] >= 0) vside(i, open[i], nr)
-    return [fill, edge, thin]
+    return [fill, edge, pieceWidth(mask, nc, nr, xe, ye)]
+}
+
+// How wide a selection is, image px: of its pieces (cells joined side to side), the narrowest,
+// each measured by the largest square of selected cells inside it. A lone cell or a scatter of
+// them is as wide as one cell however far apart they sit, an arm one cell wide keeps its piece
+// one cell wide, and a disk or a blob is as wide as the square that fits in it, whatever its
+// ragged edge. One pass: the square ending at each cell (the classic min of left, up and
+// up-left, plus one), with a union-find joining each cell to its left and upper neighbours.
+function pieceWidth(mask: GridMask, nc: number, nr: number, xe: ArrayLike<number>, ye: ArrayLike<number>): number {
+    const parent = new Int32Array(nc * nr).fill(-1)
+    const best = new Float64Array(nc * nr)
+    const find = (k: number): number => {
+        while (parent[k] !== k) k = parent[k] = parent[parent[k]]
+        return k
+    }
+    const join = (a: number, b: number) => {
+        a = find(a); b = find(b)
+        if (a !== b) { parent[b] = a; best[a] = Math.max(best[a], best[b]) }
+    }
+    let up = new Int32Array(nc), cur = new Int32Array(nc)
+    for (let j = 0; j < nr; j++) {
+        const row = j * nc
+        for (let i = 0; i < nc; i++) {
+            if (!mask[row + i]) { cur[i] = 0; continue }
+            const k = row + i
+            const n = 1 + Math.min(i > 0 ? cur[i - 1] : 0, up[i], i > 0 ? up[i - 1] : 0)
+            cur[i] = n
+            parent[k] = k
+            if (i > 0 && mask[k - 1]) join(k - 1, k)
+            if (j > 0 && mask[k - nc]) join(k - nc, k)
+            const r = find(k)
+            const side = Math.min(Math.abs(xe[i + 1] - xe[i + 1 - n]), Math.abs(ye[j + 1] - ye[j + 1 - n]))
+            best[r] = Math.max(best[r], side)
+        }
+        ;[up, cur] = [cur, up]
+    }
+    let w = Infinity
+    for (let k = 0; k < nc * nr; k++) if (parent[k] === k) w = Math.min(w, best[k])
+    return w
 }

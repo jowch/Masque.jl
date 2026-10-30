@@ -83,7 +83,7 @@ function haloAlign(g: unknown[]): HaloAlign {
             x0 = Math.min(x0, ring[i]); x1 = Math.max(x1, ring[i]); y0 = Math.min(y0, ring[i + 1]); y1 = Math.max(y1, ring[i + 1])
         }
         side = Math.min(x1 - x0, y1 - y0)
-    } else if (kind === "mask") side = g[3] as number // the picked cells' thinnest span, not the grid's cells
+    } else if (kind === "mask") side = g[3] as number // the picked cells' own width, not the grid's cells
     return side >= INSET_MIN ? "in" : "mid"
 }
 
