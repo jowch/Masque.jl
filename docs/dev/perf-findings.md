@@ -340,6 +340,44 @@ two separate `:many` segment fields 163 / 509 and 143 / 2 053 ms, and one 61 / 1
 about 2 500 marks: a legend click that picks one cluster of a keyed group (1 229 rows) reaches
 the value cell in about 0.1 s on `:cairo`, as fast as the unlinked legend's 2 458 events.
 
+### Fading lines on hover (#464)
+
+Since #459, hovering a line fades the axis's other lines, and the fade redraws whenever the
+pointer moves onto a different line; moving along one line redraws nothing. Headless Chromium
+against a live Pluto kernel on the warmed env, `deviceScaleFactor` 1, at `253d372` (0.4.2),
+measured 2026-10-30 on the cloud container. `bench/line_fade/hover.mjs` reproduces the table
+(how to run it is at its top). *swap* moves the pointer from one line to another (the fade
+redraws), *along* moves it one pixel along the same line (no redraw), each the handler's
+median of 12. *sweep* moves the pointer across every line, one move per frame for 60 frames:
+the handler's median and worst time, and how many frames' handlers took longer than a 60 Hz
+frame (16.7 ms).
+
+| Figure | vertices | `:cairo` swap / along | `:webgl` swap / along | `:cairo` sweep | `:webgl` sweep |
+|--------|---:|---:|---:|---:|---:|
+| `series!`, 10 lines × 100 | 1 000 | 2.4 / 0.6 ms | 2.7 / 0.5 ms | 0.7 / 18 ms, 1 slow | 0.8 / 14 ms, 0 slow |
+| `series!`, 10 × 1 000 | 10 000 | 3.7 / 3.1 ms | 3.6 / 3.9 ms | 2.2 / 15 ms, 0 | 2.5 / 18 ms, 1 |
+| `series!`, 100 × 100 | 10 000 | 3.2 / 1.3 ms | 3.7 / 1.5 ms | 2.8 / 20 ms, 1 | 3.7 / 13 ms, 0 |
+| `lines!` ×10, 1 000 each | 10 000 | 3.0 / 2.5 ms | 3.1 / 2.4 ms | 1.9 / 51 ms, 2 | 2.6 / 24 ms, 1 |
+| `series!`, 10 × 10 000 | 100 000 | 12.0 / 10.6 ms | 10.5 / 10.3 ms | 8.1 / 24 ms, 8 | 8.1 / 35 ms, 9 |
+| `series!`, 100 × 1 000 | 100 000 | 9.8 / 7.9 ms | 13.8 / 11.7 ms | 10.5 / 26 ms, 2 | 11.6 / 40 ms, 12 |
+| `series!`, 1 000 × 100 | 100 000 | 10.4 / 8.1 ms | 12.2 / 10.2 ms | 10.6 / 16 ms, 0 | 10.5 / 37 ms, 7 |
+| `lines!` ×100, 1 000 each | 100 000 | 8.4 / 2.2 ms | 8.6 / 2.2 ms | 6.6 / 22 ms, 1 | 7.6 / 20 ms, 3 |
+
+The fade's own cost is the gap between *swap* and *along*: up to about 2 ms for one `series!` at
+any size measured, and about 6 ms for 100 separate `lines!` plots at 100 000 vertices, where each
+plot is its own layer to cover. Up to 10 000 vertices a hover stays far inside a frame on both
+backends. At 100 000 vertices the move handler takes about 8 to 12 ms whether the fade redraws
+or not, so most of the cost is finding the line under the pointer and reading out its sample,
+which predates the fade; crossing lines then drops a frame now and then (the slow column, of
+60). Of the 48 slow frames in the table, 46 were frames in which the fade redrew, so the fade
+is what tips a handler already near the budget over it.
+
+Run-to-run noise on the container is large: a first run, before the container restarted, timed
+every 100 000-vertex case 1.5 to 2 times faster, with no slow frame on `:cairo`. The `:webgl`
+handler times match `:cairo`'s, as they should with the same overlay code; its frames are slow
+for another reason, headless Chromium drawing the WGLMakie canvas in software, which puts each
+pair of frames near 1 s and is not part of a hover.
+
 ## Stress — where it stops being render-bound
 
 **Live round trip against payload.** Same method as above with a heavier downstream cell:
