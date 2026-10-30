@@ -16,6 +16,10 @@ All notable changes to this project are documented here. The format is based on
   and typing a label's first letters work it from the keyboard (#429).
 
 ### Fixed
+- A large block of cells picked on a grid of small cells is outlined inside its edge, like any
+  other area 12 px or more across. Before, the outline went by the grid's smallest cell, so it
+  sat on the edge and spilled onto the neighbouring cells. Lone cells and one-cell-wide strokes
+  stay outlined on their edge, so their colour still shows (#463).
 - A mark hidden under a legend stays hidden: its hover ring, pick outline and fade no longer
   draw over the legend, and the pointer inside the legend no longer shows its tooltip, picks it,
   or reads the axis under the legend. The keyboard and a box selection still reach it. A legend with no background, or a mostly see-through one,
