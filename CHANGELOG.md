@@ -23,6 +23,8 @@ All notable changes to this project are documented here. The format is based on
 - A mark hidden under a legend stays hidden: its hover ring, pick outline and fade no longer
   draw over the legend. A legend with no background, or a mostly see-through one, still shows
   the highlights of the marks under it (#437).
+- Hovering a line plot with many points keeps up with the pointer: a figure of 100 000 points
+  no longer drops frames as the pointer crosses its lines (#469).
 - A faded line stays faded where it crosses a line or mark that stays in focus. It used to show at
   full strength at each crossing (#462).
 
