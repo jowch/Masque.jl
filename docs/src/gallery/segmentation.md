@@ -115,7 +115,7 @@ runs again. See [Undo a change](@ref).
 
 - Keep the objects you click instead of leaving them out: use
   `sel.objects.regions` as the kept list.
-- Show the picture in colour by object with `heatmap!(ax, labels)` and a
+- Show the picture in color by object with `heatmap!(ax, labels)` and a
   categorical colormap, so the reader sees where the segmentation split
   and merged.
 - Click with a reason: add a Makie `Menu` of reasons ("merged",

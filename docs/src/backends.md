@@ -27,15 +27,14 @@ says which one to load.
 
 Two `masque` keywords work the same on both backends:
 
-- `max_width` is the widest the plot shows on the page, in CSS pixels.
-  The default, 700, is the width of Pluto's column. A wider figure
-  shrinks to fit.
-- `px_per_unit` is how many image pixels each unit of the figure's
-  `size` gets. By default, CairoMakie draws the PNG at twice the width
-  it shows at, and WGLMakie draws 2 pixels per unit, so a wide figure
-  that `max_width` shrinks is sharper on WGLMakie. A larger number
-  gives a sharper picture when the reader zooms the page, and a heavier
-  page to load.
+| Keyword | What it sets | Default |
+|---|---|---|
+| `max_width` | the widest the plot shows on the page, in CSS pixels; a wider figure shrinks to fit | 700, the width of Pluto's column |
+| `px_per_unit` | how many image pixels each unit of the figure's `size` gets | CairoMakie: twice the width the PNG shows at; WGLMakie: 2 |
+
+Because of those defaults, a wide figure that `max_width` shrinks is
+sharper on WGLMakie. A larger `px_per_unit` gives a sharper picture when
+the reader zooms the page, and a heavier page to load.
 
 ```julia
 masque(fig; max_width = 500, px_per_unit = 3)

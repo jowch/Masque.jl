@@ -94,7 +94,8 @@ orders and split them differently, `key = :id` says which points are
 the same car. Without `key`, a row is a point's position, and every
 member must be one plot with the same number of points.
 
-`select = :many` lets the picks add up: a click adds a car or takes it
+`select = :many` lets the picks add up, as in
+[Select several marks](@ref): a click adds a car or takes it
 out, a box adds every car inside it, and a legend entry stands for its
 cars, so Ctrl-click (Cmd-click on a Mac) adds them all. A plain click
 on an entry picks its cars in place of the others. `bind = :picked`

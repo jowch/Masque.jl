@@ -86,18 +86,19 @@ starts.
 ## Choose what the slice reads
 
 By default, a vertical line follows the pointer, and the tooltip shows
-each series' `y` at the pointer's `x`. `orientation = :horizontal` reads
-`x` at the pointer's `y` instead. `crosshair = false` keeps the dots and
-the tooltip but draws no line.
+each series' `y` at the pointer's `x`. These keywords change that:
+
+| To | Pass |
+|---|---|
+| read `x` at the pointer's `y` | `orientation = :horizontal` |
+| keep the dots and the tooltip but draw no line | `crosshair = false` |
+| change what the tooltip shows | a `masque"..."` template over the same fields as `tooltip`; see [Tooltips](@ref) |
+| turn the tooltip off | `tooltip = false` |
 
 You can pass a `Lines`, `Stairs`, `Series`, `Band`, or `Density` plot,
 or a vector of them. The slice reads each curve as drawn, so `Stairs`
 keeps its steps, and `Band` and `Density` give their upper curve. A
 `Band` or `Density` with `direction = :y` is read horizontally.
-
-The tooltip is a table of the sampled values. To change what it shows,
-pass a `masque"..."` template over the same fields, or pass
-`tooltip = false` to turn it off. See [Tooltips](@ref).
 
 ## Read from data instead of a plot
 
