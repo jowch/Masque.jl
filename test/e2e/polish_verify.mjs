@@ -630,6 +630,80 @@ try {
     passed.push(`${key}/pan`);
   }
 
+  // A legend over marks (#437): Makie draws the legend over two `hid` points, so with `hid`
+  // faded, and with the pointer on a hidden point (its ring drawn and its fade lifted), every
+  // pixel of the legend's box stays as it was at rest. A visible point's fade and ring still
+  // show, so the screenshots do see the overlay.
+  {
+    const key = "legend_hidden";
+    const boxes = await page.evaluate((k) => JSON.parse(document.querySelector(`#occluders_${k}`).innerText), key);
+    if (boxes.length !== 1) throw new Error(`${key}: want one occluder, got ${JSON.stringify(boxes)}`);
+    const [bx, by, bw, bh] = boxes[0];
+    const hid = (await layersOf(key)).find((l) => l.id === "hid").geometry;
+    const at = (k) => [hid[3 * k], hid[3 * k + 1]];
+    for (const k of [2, 3]) {
+      const [x, y] = at(k);
+      if (!(x > bx && x < bx + bw && y > by && y < by + bh)) throw new Error(`${key}: hid ${k} at ${[x, y]} is not under the legend ${boxes[0]}`);
+    }
+    // The first screenshot pixel inside the box (1 image px in from its edge) that moved from `a`.
+    const moved = (a, b) => {
+      for (let j = Math.ceil((by + 1) * a.perImg); j < (by + bh - 1) * a.perImg; j++) {
+        for (let i = Math.ceil((bx + 1) * a.perImg); i < (bx + bw - 1) * a.perImg; i++) {
+          const o = 4 * (j * a.w + i);
+          if ([0, 1, 2].some((c) => Math.abs(a.data[o + c] - b.data[o + c]) > 8)) {
+            return { x: i / a.perImg, y: j / a.perImg, was: a.data.slice(o, o + 3), now: b.data.slice(o, o + 3) };
+          }
+        }
+      }
+      return null;
+    };
+    const clickAt = (x, y) => page.evaluate(([k, ix, iy]) => {
+      const span = document.querySelector(`#coords_${k}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const b = host.querySelector("img, canvas").getBoundingClientRect();
+      const s = b.width / sr.querySelector("svg.masque-plain").viewBox.baseVal.width;
+      const o = { bubbles: true, composed: true, cancelable: true, clientX: b.left + ix * s, clientY: b.top + iy * s, pointerId: 1, pointerType: "mouse", isPrimary: true };
+      const surface = sr.querySelector(".surface");
+      for (const t of ["pointermove", "pointerdown", "pointerup"]) surface.dispatchEvent(new PointerEvent(t, o));
+      surface.dispatchEvent(new MouseEvent("click", o));
+    }, [key, x, y]);
+    const away = () => hoverAt(key, 2, 2);
+    const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const r = hid[2];
+
+    await away();
+    const rest = await screenOf(key);
+    await clickAt(...at(0));
+    const mp = await inspect(key);
+    if (!mp.picked.includes("hid:0")) throw new Error(`${key}: clicking hid 0 picked ${JSON.stringify(mp.picked)}`);
+    const picked = await screenOf(key);
+    const restOne = lum(rest.mean(...at(1), 0.4 * r)), fadedOne = lum(picked.mean(...at(1), 0.4 * r));
+    if (fadedOne - restOne < 0.4 * (255 - restOne)) throw new Error(`${key}/fade: hid 1 reads ${fadedOne.toFixed(0)} with hid 0 picked (${restOne.toFixed(0)} at rest), want it faded`);
+    let bad = moved(rest, picked);
+    if (bad) throw new Error(`${key}/fade: the fade drew over the legend at ${JSON.stringify(bad)}`);
+    passed.push(`${key}/fade-off-legend`);
+
+    const h = await hoverAt(key, ...at(2));
+    if (!h.hi.fill && !h.hi.edge && !h.hi.plain) throw new Error(`${key}/hover: no ring for the hidden point hid 2`);
+    const hovered = await screenOf(key);
+    bad = moved(rest, hovered);
+    if (bad) throw new Error(`${key}/hover: the hidden point's ring or lifted fade drew over the legend at ${JSON.stringify(bad)}`);
+    await away();
+    bad = moved(rest, await screenOf(key));
+    if (bad) throw new Error(`${key}/unhover: the fade put back over the hidden point drew over the legend at ${JSON.stringify(bad)}`);
+    passed.push(`${key}/hover-off-legend`);
+
+    // A visible point's ring does show, so a screenshot taken this way sees the overlay.
+    await hoverAt(key, ...at(1));
+    const ringed = await screenOf(key);
+    const edge = [at(1)[0] + r + 1, at(1)[1]];
+    if (Math.abs(lum(ringed.mean(...edge, 1)) - lum(picked.mean(...edge, 1))) < 30) throw new Error(`${key}/control: no ring visible around hid 1`);
+    await away();
+    await clickAt(...at(0)); // deselect
+    passed.push(`${key}/control-ring-visible`);
+  }
+
   // Linked selections (#346): a pick in the left panel is drawn picked in both panels, and the
   // rest of each panel fades. Hovering an unpicked mark in the right panel outlines its partner
   // on the left with the same hover recipe as the hovered mark (dodge fill half, chrome edge)

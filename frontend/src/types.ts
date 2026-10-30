@@ -111,11 +111,18 @@ export interface ControlGeometry {
     // SliderGrid: each slider, in image px like the grid's own box, with its value label.
     // `name` is the slider's own label, read to screen readers.
     sliders?: (ControlGeometry & { name?: string; valueLabel?: ValueLabel })[]
-    // Menu: the closed menu as Makie draws it, its box colour in `off`.
+    // Menu, as Makie draws it: its box colour in `off`, the text colour in `text`, and the
+    // option list that opens under or over it; lengths are image px.
     text?: string           // the text colour
     prompt?: string         // shown before a choice
     fontsize?: number       // image px
     padding?: number        // image px from the box's left edge to the text
+    cell?: number           // an option's height in the open list
+    cellColors?: [string, string, string, string] // under the pointer, the chosen one, the odd and the even options
+    optionText?: [string, string] // the text of the option under the pointer, and of the chosen one
+    direction?: "up" | "down" // the list opens this way; absent, down unless there is more room above
+    arrow?: { path: string; flip: string; size: number; inset: number; color: string } // Makie's triangle, closed and open; `inset` from the right edge to its centre
+    search?: string         // `searchable`: typing in the open menu filters the options; the empty box's placeholder
     // Button: a rounded box filling the block's box, its label in the middle; `radius`,
     // `stroke` and `fontsize` above. Colours at rest, under the pointer, and pressed.
     caption?: string
@@ -308,6 +315,9 @@ export interface Manifest {
     overlayStyle?: Record<string, string> // figure-level overlay chrome custom properties (overlaystyle)
     tipDigits?: number // tooltip_sigdigits; absent means the frontend default (4)
     background?: string // the figure's background colour (CSS string) — drives the tooltip's light/dark theme
+    // Image-px boxes [x, y, w, h] Makie draws over the axes' plots (an opaque legend). A data
+    // mark's highlight and fade leave them out, as the picture hides the marks under them (#437).
+    occluders?: Array<[number, number, number, number]>
     // The layer ids whose commits make the `@bind` value, one field each. Every other layer
     // takes no clicks. The browser sends `{field: envelope}` for all of them on every commit.
     fields?: string[]

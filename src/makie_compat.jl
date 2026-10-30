@@ -418,6 +418,32 @@ function _block_scene(b)
     return sc
 end
 
+# Wraps `m.searchable[]` (Makie 0.24's type-to-filter); a Makie without it has no search.
+function _menu_searchable(m)
+    return try
+        m.searchable[] === true
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        false
+    end
+end
+
+# The height of one option's text in a `Menu`'s list, as Makie measures it to size the list's
+# cells: the text plot in the menu's list scene, `fast_string_boundingboxes`. Without it, the
+# font size.
+function _menu_text_height(m)
+    h = try
+        sc = only(_block_scene(m).children)
+        t = only(p for p in sc.plots if p isa Makie.Text)
+        bbs = Makie.fast_string_boundingboxes(t)
+        isempty(bbs) ? nothing : maximum(bb -> Float64(Makie.widths(bb)[2]), bbs)
+    catch e
+        e isa Union{_MAKIE_SHAPE_ERRORS, ArgumentError} || rethrow()
+        nothing
+    end
+    return h === nothing ? Float64(m.fontsize[]) : h
+end
+
 # A scatter marker as an SVG path in marker units (a markersize-1 marker spans about -0.5..0.5,
 # y up), or `nothing` for a marker that isn't a path (a `Char`, an image). A symbol such as
 # `:circle` resolves through Makie's own marker table. Arcs become cubic curves, as Makie does

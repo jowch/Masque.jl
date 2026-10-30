@@ -1023,11 +1023,46 @@ try {
         if (i > 120) throw new Error(`${key}/checkbox: value ${JSON.stringify(v)}, want fine = true, pick = nothing`);
         await new Promise((r) => setTimeout(r, 250));
       }
-      const opts = await page.locator(`[data-masque-control="pick"] option:not([disabled])`).allTextContents();
+      const opts = await page.locator(`[data-masque-control="pick"] [role=option]`).allTextContents();
       if (opts.join(",") !== "x,y,z") throw new Error(`${key}/menu-follows: options ${JSON.stringify(opts)}, want x,y,z`);
       passed.push(`${key}/menu-follows-onchange`);
-      await ctl("pick", "select").selectOption("2");
-      v = await bondHas(/level = 10, show = false, span = \(1, 5\), fine = true, pick = "z"/, v, "menu");
+      // The menu drawn as Makie draws it (#429): a press opens its list of cells under the box,
+      // each `cell` high, in Makie's odd and hover colours.
+      {
+        const g = geo("pick"), sc = (await screenOf()).sc;
+        const rgb = (css) => css.match(/[\d.]+/g).slice(0, 3).map(Number);
+        const near = (a, b) => rgb(a).every((c, i) => Math.abs(c - rgb(b)[i]) <= 2);
+        await ctl("pick", "input").click();
+        const list = ctl("pick", "[role=listbox]");
+        await list.waitFor({ state: "visible" });
+        const bb = await page.locator(`[data-masque-control="pick"]`).boundingBox();
+        const lb = await list.boundingBox();
+        if (Math.abs(lb.y - (bb.y + bb.height)) > 2 || Math.abs(lb.width - bb.width) > 2) {
+          throw new Error(`${key}/menu-list: list ${JSON.stringify(lb)}, want under the box ${JSON.stringify(bb)}`);
+        }
+        const cells = page.locator(`[data-masque-control="pick"] [role=option]`);
+        const cb = await cells.nth(0).boundingBox();
+        if (Math.abs(cb.height - g.cell * sc) > 1.5) throw new Error(`${key}/menu-list: cell ${cb.height} px high, want ${g.cell * sc}`);
+        const bg = (i) => cells.nth(i).evaluate((el) => getComputedStyle(el).backgroundColor);
+        if (!near(await bg(0), g.cellColors[2])) throw new Error(`${key}/menu-list: first cell ${await bg(0)}, want ${g.cellColors[2]}`);
+        await cells.nth(1).hover();
+        if (!near(await bg(1), g.cellColors[0])) throw new Error(`${key}/menu-list: hovered cell ${await bg(1)}, want ${g.cellColors[0]}`);
+        passed.push(`${key}/menu-list`);
+        // Makie's menu is searchable by default: typing keeps the options holding the text.
+        await page.keyboard.type("Z");
+        const left = await cells.evaluateAll((els) => els.filter((el) => !el.hidden).map((el) => el.textContent));
+        if (left.join(",") !== "z") throw new Error(`${key}/menu-search: options left ${JSON.stringify(left)}, want z`);
+        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("Enter");
+        v = await bondHas(/level = 10, show = false, span = \(1, 5\), fine = true, pick = "z"/, v, "menu");
+        if (await list.isVisible()) throw new Error(`${key}/menu-search: list still open after Enter`);
+        passed.push(`${key}/menu-search`);
+        // A click on an option picks it.
+        await ctl("pick", "input").click();
+        await cells.nth(1).click();
+        v = await bondHas(/pick = "y"/, v, "menu-click");
+        if ((await ctl("pick", "input").inputValue()) !== "y") throw new Error(`${key}/menu-click: box shows ${await ctl("pick", "input").inputValue()}, want y`);
+      }
       passed.push(`${key}/interval-checkbox-menu`);
       // The slider grid's slider moves its field and its value label, which Julia formatted.
       {

@@ -591,6 +591,17 @@ function build_manifest(
             fill == m["background"] || (t["fill"] = fill)
         end
     end
+    # The boxes Makie draws over the axes' plots (an opaque legend over an axis): the overlay
+    # draws no data mark's highlight or fade inside them (#437).
+    plots = [ctx.transforms[id].viewport for (blk, id) in ctx.ids if blk isa _SUPPORTED_AXES]
+    meets((x, y, w, h), (vx, vy, vw, vh)) = x < vx + vw && vx < x + w && y < vy + vh && vy < y + h
+    occluders = Vector{Float64}[]
+    for (blk, _) in ctx.ids
+        blk isa Makie.Legend || continue
+        box = _legend_occluder(blk, ctx.scaling, ctx.height)
+        box === nothing || any(v -> meets(box, v), plots) && push!(occluders, box)
+    end
+    isempty(occluders) || (m["occluders"] = sort!(occluders))
     if owners_out !== nothing
         owners = Dict{String, LayerOwner}()
         for (i, L, _) in built

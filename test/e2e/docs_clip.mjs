@@ -519,12 +519,19 @@ try {
       const knob = Math.min(b.w, b.h);
       return { x: b.x + knob / 2 + (i / Math.max(1, n - 1)) * (b.w - knob), y: b.y + b.h / 2 };
     },
-    // Move to a menu and choose option k (0-based). A headless page doesn't draw the open
-    // list, so the clip shows the menu's label change.
+    // Move to a menu, open it, and choose option k (0-based) from its list.
     async choose(id, k) {
       await c.glide(c.control(id), 900);
       await sleep(300);
-      await page.locator(`[data-masque-control="${id}"] select`).selectOption(String(k));
+      await page.mouse.down();
+      await page.mouse.up();
+      await sleep(500);
+      const opt = page.locator(`[data-masque-control="${id}"] [role=option]`).nth(k);
+      const b = await opt.boundingBox();
+      await c.glide({ x: b.x + b.width / 2, y: b.y + b.height / 2 }, 600);
+      await sleep(300);
+      await page.mouse.down();
+      await page.mouse.up();
       await sleep(1200);
     },
     roiRect: () => page.evaluate((id) => {
