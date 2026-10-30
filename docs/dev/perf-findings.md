@@ -378,13 +378,30 @@ above *swap* in five rows, two on `:cairo` and three on `:webgl`); the largest g
 Across the table, the slow frames were mostly frames in which the fade redrew: 3 of 3 on `:cairo` and 30
 of 36 on `:webgl`. The `:webgl` sweep has slow frames even at 1 000 vertices, where the whole
 handler takes under 3 ms, so part of its count is the page's other work, not the hover. The
-fix that keeps the 100 000-vertex figures inside a frame is the hit test (#469), not the fade.
+fix that keeps the 100 000-vertex figures inside a frame is the hit test (#469), not the fade;
+see below.
 
 Run-to-run noise on the container is large: across three runs the 100 000-vertex handler
 times moved by up to 2 times, and the slow-frame counts more. The `:webgl` handler times
 follow `:cairo`'s, as they should with the same overlay code; its frames are slow for another
 reason, headless Chromium drawing the WGLMakie canvas in software, which puts each pair of
 frames near 1 s and is not part of a hover.
+
+**After #469.** The `:lines` hit test now keeps a bounding box for each run of 64 edges of a
+path and skips any run farther from the pointer than the nearest edge found so far, or than the
+layer's `tol`; the sample readout and the tooltip's walk along the hovered line use the same
+boxes. The same run, same container, on the 100 000-vertex rows (the smaller rows did not
+change beyond noise):
+
+| Figure | vertices | `:cairo` swap / along / off | `:webgl` swap / along / off | `:cairo` sweep | `:webgl` sweep |
+|--------|---:|---:|---:|---:|---:|
+| `series!`, 10 × 10 000 | 100 000 | 3.5 / 2.8 / 2.9 ms | 5.8 / 3.5 / 3.1 ms | 1.9 / 12 ms, 0 | 1.8 / 23 ms, 1 |
+| `series!`, 100 × 1 000 | 100 000 | 2.8 / 2.4 / 2.2 ms | 3.1 / 5.4 / 3.6 ms | 2.9 / 10 ms, 0 | 2.4 / 23 ms, 1 |
+| `series!`, 1 000 × 100 | 100 000 | 3.2 / 0.9 / 3.1 ms | 2.8 / 1.3 / 2.6 ms | 3.2 / 11 ms, 0 | 5.0 / 15 ms, 0 |
+| `lines!` ×100, 1 000 each | 100 000 | 4.1 / 2.9 / 2.5 ms | 4.1 / 5.2 / 2.5 ms | 3.4 / 10 ms, 0 | 3.2 / 13 ms, 0 |
+
+A hover on these figures now takes 1 to 6 ms, the same as on a 10 000-vertex one, and the
+sweeps have 0 slow frames on `:cairo` and 1 or 0 on `:webgl`, against 0 to 11 before.
 
 ## Stress — where it stops being render-bound
 

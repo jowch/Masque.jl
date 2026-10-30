@@ -28,18 +28,59 @@ function finitePair(x: number, y: number): boolean {
     return Number.isFinite(x) && Number.isFinite(y)
 }
 
-// Nearest point on a polyline (flat [x,y,…], NaN/Inf = gap). null when the path has no finite edge.
-// `edge` is the index of the edge it lies on, from vertex `edge` to vertex `edge + 1`.
-export function closestPointOnPath(px: number, py: number, verts: number[]): { x: number; y: number; dist: number; edge: number } | null {
-    let best: { x: number; y: number; dist: number; edge: number } | null = null
-    for (let i = 0; i < verts.length / 2 - 1; i++) {
-        const x0 = verts[2 * i], y0 = verts[2 * i + 1], x1 = verts[2 * i + 2], y1 = verts[2 * i + 3]
-        if (!finitePair(x0, y0) || !finitePair(x1, y1)) continue
-        const p = closestPointOnSegment(px, py, x0, y0, x1, y1)
-        const dist = Math.hypot(px - p.x, py - p.y)
-        if (!best || dist < best.dist) best = { x: p.x, y: p.y, dist, edge: i }
+// Bounding boxes of a path's runs of RUN edges, [x0, y0, x1, y1] per run, built once per
+// vertex array: a run whose box is farther from the pointer than the best edge so far holds no
+// nearer edge, so a long path is searched a run at a time (#469). A run with no finite vertex
+// gets an empty box (x0 > x1), which every search skips.
+const RUN = 64
+const runBoxes = new WeakMap<number[], Float64Array>()
+function boxesOf(verts: number[]): Float64Array {
+    let b = runBoxes.get(verts)
+    if (b) return b
+    const edges = Math.max(0, verts.length / 2 - 1)
+    b = new Float64Array(4 * Math.ceil(edges / RUN))
+    for (let r = 0; 4 * r < b.length; r++) {
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+        for (let i = r * RUN, end = Math.min(edges, (r + 1) * RUN); i <= end; i++) {
+            const x = verts[2 * i], y = verts[2 * i + 1]
+            if (!finitePair(x, y)) continue
+            if (x < x0) x0 = x
+            if (x > x1) x1 = x
+            if (y < y0) y0 = y
+            if (y > y1) y1 = y
+        }
+        b[4 * r] = x0; b[4 * r + 1] = y0; b[4 * r + 2] = x1; b[4 * r + 3] = y1
     }
-    return best
+    runBoxes.set(verts, b)
+    return b
+}
+
+// Nearest point on a polyline (flat [x,y,…], NaN/Inf = gap). null when the path has no finite edge.
+// `edge` is the index of the edge it lies on, from vertex `edge` to vertex `edge + 1`. With `cut`,
+// edges farther than `cut` may be skipped: the result is then the nearest point if one lies within
+// `cut`, and otherwise some point farther than `cut`, or null. The first of equally near edges wins.
+export function closestPointOnPath(px: number, py: number, verts: number[], cut = Infinity): { x: number; y: number; dist: number; edge: number } | null {
+    const boxes = boxesOf(verts)
+    const edges = verts.length / 2 - 1
+    let bx = 0, by = 0, bd2 = Infinity, be = -1
+    for (let r = 0; 4 * r < boxes.length; r++) {
+        const dx = Math.max(boxes[4 * r] - px, 0, px - boxes[4 * r + 2])
+        const dy = Math.max(boxes[4 * r + 1] - py, 0, py - boxes[4 * r + 3])
+        const box2 = dx * dx + dy * dy
+        // A box as near as the best edge so far holds no edge strictly nearer.
+        if (boxes[4 * r] > boxes[4 * r + 2] || box2 > cut * cut || box2 >= bd2) continue
+        for (let i = r * RUN, end = Math.min(edges, (r + 1) * RUN); i < end; i++) {
+            const x0 = verts[2 * i], y0 = verts[2 * i + 1], x1 = verts[2 * i + 2], y1 = verts[2 * i + 3]
+            if (!finitePair(x0, y0) || !finitePair(x1, y1)) continue
+            // closestPointOnSegment, inlined: this loop runs for every edge near the pointer.
+            const ex = x1 - x0, ey = y1 - y0, len2 = ex * ex + ey * ey
+            const t = len2 ? Math.max(0, Math.min(1, ((px - x0) * ex + (py - y0) * ey) / len2)) : 0
+            const qx = x0 + t * ex, qy = y0 + t * ey
+            const d2 = (px - qx) * (px - qx) + (py - qy) * (py - qy)
+            if (d2 < bd2) { bx = qx; by = qy; bd2 = d2; be = i }
+        }
+    }
+    return be < 0 ? null : { x: bx, y: by, dist: Math.sqrt(bd2), edge: be }
 }
 
 // The data sample a hover on line `index` of a :lines layer reads out, at image px (px, py):
@@ -387,7 +428,7 @@ export function hitLayer(layer: HitLayer, px: number, py: number, t?: AxisTransf
             const tol = layer.tol ?? SEG_TOL
             let best = -1, bd = Infinity
             for (let k = 0; k < paths.length; k++) {
-                const hit = closestPointOnPath(px, py, paths[k])
+                const hit = closestPointOnPath(px, py, paths[k], Math.min(bd, tol))
                 if (hit && hit.dist < bd) { bd = hit.dist; best = k }
             }
             if (bd <= tol && best >= 0) {
