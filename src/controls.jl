@@ -96,13 +96,7 @@ function _control_geometry(b, ctx)
         opts = collect(b.options[])
         g["n"] = length(opts)
         g["labels"] = String[Makie.optionlabel(o) for o in opts]
-        # What the closed menu shows: Makie's prompt before a choice, in its font size, text
-        # colour and box colour, with the label `textpadding[1]` in from the left.
-        g["prompt"] = string(b.prompt[])
-        g["fontsize"] = Float64(b.fontsize[]) * ctx.scaling
-        g["padding"] = Float64(b.textpadding[][1]) * ctx.scaling
-        g["text"] = _css_color(b.textcolor[])
-        g["off"] = _css_color(b.selection_cell_color_inactive[])
+        _menu_geometry!(g, b, ctx)
     elseif b isa Makie.Toggle
         g["color"] = _css_color(b.buttoncolor[])
         g["fill"] = _css_color(b.framecolor_active[])
@@ -121,6 +115,57 @@ function _control_geometry(b, ctx)
         ]
     end
     return g
+end
+
+# Makie's menu (Makie/src/makielayout/blocks/menu.jl): a box showing the choice, or the prompt
+# before one, with the label `textpadding[1]` in from the left and a pale triangle
+# `textpadding[2]` in from the right; a press opens a list of cells, each as high as its text
+# plus the top and bottom padding, under the box or over it. Lengths are image px. With
+# `searchable`, typing in the open box filters the options; the browser runs Makie's default
+# rule, so an author's own `filter` warns (`_warn_menu_filter`).
+function _menu_geometry!(g, b::Makie.Menu, ctx)
+    s = ctx.scaling
+    l, r, bot, top = Float64.(b.textpadding[])
+    g["prompt"] = string(b.prompt[])
+    g["fontsize"] = Float64(b.fontsize[]) * s
+    g["padding"] = l * s
+    g["text"] = _css_color(b.textcolor[])
+    g["off"] = _css_color(b.selection_cell_color_inactive[])
+    g["cell"] = (_menu_text_height(b) + bot + top) * s
+    g["cellColors"] = [
+        _css_color(b.cell_color_hover[]), _css_color(b.cell_color_active[]),
+        _css_color(b.cell_color_inactive_odd[]), _css_color(b.cell_color_inactive_even[]),
+    ]
+    g["optionText"] = [_css_color(b.textcolor_hover[]), _css_color(b.textcolor_active[])]
+    dir = b.direction[]
+    dir in (:up, :down) && (g["direction"] = string(dir))
+    down, up = _marker_svg_path(:dtriangle), _marker_svg_path(:utriangle)
+    if down !== nothing && up !== nothing
+        g["arrow"] = Dict{String, Any}(
+            "path" => down, "flip" => up, "size" => Float64(b.dropdown_arrow_size[]) * s,
+            "inset" => r * s, "color" => _css_color(Makie.to_color(b.dropdown_arrow_color[])),
+        )
+    end
+    if _menu_searchable(b)
+        g["search"] = string(b.search_placeholder[])
+        g["placeholderColor"] = _css_color(Makie.to_color((b.textcolor[], 0.4f0)))
+    end
+    return g
+end
+
+# Makie's default `filter` (case-insensitive substring) is a closure in Makie; any other
+# function is the author's, which the browser can't run.
+function _warn_menu_filter(interactables)
+    for i in interactables
+        i isa BlockControl && i.block isa Makie.Menu || continue
+        _menu_searchable(i.block) || continue
+        f = i.block.filter[]
+        f isa Function && parentmodule(typeof(f)) === Makie && continue
+        @warn "masque: menu :$(i.id) has its own `filter`, which the browser can't run: typing in " *
+            "the open menu keeps the options whose label holds the text, ignoring case, as " *
+            "Makie's default does." maxlog = 1
+    end
+    return nothing
 end
 
 # Makie's button (Makie/src/makielayout/blocks/button.jl): a rounded box filling the block's box,
@@ -474,6 +519,7 @@ const _LATER_BLOCKS = Union{Makie.SliderGrid, Makie.Button, Makie.Textbox}
 # itself counts.
 function _check_unnamed_blocks(fig, interactables)
     _warn_checkbox_rule(interactables)
+    _warn_menu_filter(interactables)
     named = Base.IdSet{Any}(i.block for i in interactables if i isa BlockControl)
     _warn_unnamed_later(fig, named)
     left = [b for b in _figure_blocks(fig) if !(b in named)]
