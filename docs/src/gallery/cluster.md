@@ -95,4 +95,5 @@ changes when you release the box. Index your data with it:
   selected points only.
 
 Next, see [Brush a region](@ref) for more on the box, and
-[Linked views](@ref) for updating other plots from a selection.
+[Use selections in other cells](@ref) for updating other plots from a
+selection.

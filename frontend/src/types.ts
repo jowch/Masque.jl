@@ -107,9 +107,10 @@ export interface ControlGeometry {
     markOff?: string
     markSize?: number       // the checkmark's size; its path is in units of it, y up
     mark?: string           // an SVG path; absent, a plain tick
-    next?: [boolean, boolean] // `onchange`: the state a click gives from unchecked, and from checked
+    markChar?: string       // a character drawn as the checkmark instead of a path
     // SliderGrid: each slider, in image px like the grid's own box, with its value label.
-    sliders?: (ControlGeometry & { valueLabel?: ValueLabel })[]
+    // `name` is the slider's own label, read to screen readers.
+    sliders?: (ControlGeometry & { name?: string; valueLabel?: ValueLabel })[]
     // Menu: the closed menu as Makie draws it, its box colour in `off`.
     text?: string           // the text colour
     prompt?: string         // shown before a choice
@@ -136,7 +137,7 @@ export interface ControlGeometry {
 
 // The label beside a grid's slider that shows its value: its box (image px), text size and
 // colour, and the text for each value (`labels`), or for each (lo, hi) pair of an interval
-// slider, row-major (`pairs`). Without text for a value, the browser writes it.
+// slider with lo ≤ hi, row-major (`pairs`). Without text for a value, the browser writes it.
 export interface ValueLabel {
     x: number
     y: number

@@ -459,6 +459,15 @@ function _grid_sliders(sg)
     end
     return collect(v)
 end
+function _grid_labels(sg)
+    v = try
+        sg.labels
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return _makie_compat_error("SliderGrid.labels", "a SliderGrid to expose `.labels`")
+    end
+    return collect(v)
+end
 function _grid_valuelabels(sg)
     v = try
         sg.valuelabels
@@ -475,16 +484,12 @@ end
 # when none does.
 function _valuelabel_format(sl, vl)
     obs = sl isa Makie.IntervalSlider ? sl.interval : sl.value
-    now = string(vl.text[])
+    now = vl.text[]
     for (_, l) in obs.listeners
-        isdefined(Makie.Observables, :MapCallback) && l isa Makie.Observables.MapCallback && length(l.args) == 1 || continue
-        f = l.f
-        out = try
-            string(f(obs[]))
-        catch
-            continue
-        end
-        out == now && return f
+        isdefined(Makie.Observables, :MapCallback) && l isa Makie.Observables.MapCallback || continue
+        # Only Makie's own formatter: a `lift` of the author's on the same value never runs here.
+        length(l.args) == 1 && parentmodule(typeof(l.f)) === Makie && l.result[] == now || continue
+        return l.f
     end
     return nothing
 end

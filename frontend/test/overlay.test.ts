@@ -1480,6 +1480,47 @@ describe("tooltips (mount/showTip)", () => {
         expect((shadow.querySelector(".masque-tip") as HTMLElement).innerHTML).toBe("5.0")
     })
 
+    it("a readout click commits the value its tooltip shows, not the click's rounded position (#448)", () => {
+        // Chromium reports pointer events at fractional client px but rounds a click's to whole
+        // px, so the click lands half a px from the pointerup it follows.
+        const { host, script } = setup()
+        mount(script, {
+            width: 1200, height: 800, scaling: 2, tipDigits: 4,
+            transforms: {
+                cb1: { xlims: [0, 1], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                    viewport: [200, 100, 24, 400], xreversed: false, yreversed: false, valueaxis: "y" },
+                ax1: { xlims: [0, 10], ylims: [0, 10], xscale: "identity", yscale: "identity",
+                    viewport: [400, 100, 400, 400], xreversed: false, yreversed: false },
+            },
+            layers: [
+                { id: "cb", kind: "axis", bond: "colorbar", geometry: [200, 100, 24, 400], payloads: [], axis: "cb1", events: ["click", "hover"] },
+                { id: "axis", kind: "axis", geometry: null, payloads: [], axis: "ax1", events: ["click", "hover"] },
+            ],
+        }, undefined, vi.fn(async () => ({})))
+        const shadow = shadowOf(host)
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        const press = (x: number, y: number) => {
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, bubbles: true }))
+            const shown = tip.innerHTML
+            surface.dispatchEvent(new PointerEvent("pointerdown", { clientX: x, clientY: y, button: 0, bubbles: true }))
+            surface.dispatchEvent(new PointerEvent("pointerup", { clientX: x, clientY: y, button: 0, bubbles: true }))
+            surface.dispatchEvent(new MouseEvent("click", { clientX: Math.round(x), clientY: Math.round(y), bubbles: true }))
+            return shown
+        }
+        const value = () => (host as unknown as { value: Record<string, { payload: Record<string, number> }> }).value
+        // client y 150.3 -> image y 300.6 -> 10 - 200.6/40 = 4.985; the rounded 150 would be 5.000
+        expect(press(110, 150.3)).toBe("4.985")
+        expect(value().cb.payload.value).toBeCloseTo(4.985, 6)
+        // client (300.4, 150.3) -> image (600.8, 300.6) -> x = 200.8/40 = 5.02, y = 4.985
+        expect(press(300.4, 150.3)).toContain("5.02")
+        expect(value().axis.payload.x).toBeCloseTo(5.02, 6)
+        expect(value().axis.payload.y).toBeCloseTo(4.985, 6)
+        // A click with no pointerup under it (a script's .click()) keeps its own position.
+        surface.dispatchEvent(new MouseEvent("click", { clientX: 110, clientY: 200, bubbles: true }))
+        expect(value().cb.payload.value).toBeCloseTo(2.5, 6)
+    })
+
     it("cursor-following tooltip offset uses the surface's real rect, not the raw event offset, when one is available", () => {
         // tipOffset falls back to e.offsetX/e.offsetY only when the surface's own
         // getBoundingClientRect is degenerate (width/height 0, as happy-dom defaults to) — with
@@ -2825,6 +2866,76 @@ describe("overlay visual polish", () => {
         surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 0, bubbles: true }))
         await flushFrame()
         expect(tip.style.left).toBe("200px")
+    })
+
+    it("without the Popover API the tooltip stays in the figure and never asks for :popover-open", () => {
+        const { host, script } = setup()
+        mount(script, manifest)
+        const shadow = shadowOf(host)
+        const tip = shadow.querySelector(".masque-tip") as HTMLElement
+        const surface = shadow.querySelector(".surface") as HTMLElement
+        expect(tip.hasAttribute("popover")).toBe(false)
+        // An older browser rejects the selector outright.
+        const matches = tip.matches.bind(tip)
+        tip.matches = (sel: string) => {
+            if (sel.includes(":popover-open")) throw new SyntaxError(sel)
+            return matches(sel)
+        }
+        surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200, bubbles: true }))
+        expect(tip.classList.contains("show")).toBe(true)
+        expect(tip.style.left).not.toBe("")
+    })
+
+    it("with the Popover API the tooltip leaves the figure and follows it on scroll", () => {
+        // A stand-in for the browser's top layer: happy-dom has no Popover API.
+        const proto = HTMLElement.prototype as unknown as { showPopover?: () => void }
+        const had = proto.showPopover
+        proto.showPopover = function (this: HTMLElement) { this.dataset.open = "1" }
+        try {
+            const { host, img, script } = setup()
+            mount(script, {
+                width: 1200, height: 800, scaling: 2, transforms: {},
+                layers: [{ id: "pts", kind: "circles", geometry: [40, 40, 20], payloads: [{ i: 0 }],
+                    axis: "ax1", events: ["hover"] }],
+            })
+            const shadow = shadowOf(host)
+            const tip = shadow.querySelector(".masque-tip") as HTMLElement
+            const surface = shadow.querySelector(".surface") as HTMLElement
+            expect(tip.getAttribute("popover")).toBe("manual")
+            const matches = tip.matches.bind(tip)
+            tip.matches = (sel: string) => sel.includes(":popover-open") ? tip.dataset.open === "1" : matches(sel)
+            Object.defineProperty(tip, "offsetWidth", { configurable: true, value: 220 })
+            Object.defineProperty(tip, "offsetHeight", { configurable: true, value: 80 })
+            Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: 1000 })
+            Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: 900 })
+            let top = 300
+            img.getBoundingClientRect = surface.getBoundingClientRect = () => new DOMRect(100, top, 600, 400)
+            // Mark at css (20,20), its top edge at 10: inside the figure the box would flip below
+            // it; in window px (120,310) there is room above, so it stays above, past the edge.
+            surface.dispatchEvent(new PointerEvent("pointermove", { clientX: 120, clientY: 320, bubbles: true }))
+            expect(tip.dataset.open).toBe("1")
+            expect(tip.classList.contains("show")).toBe(true)
+            expect(tip.classList.contains("flip-y")).toBe(true)
+            expect(tip.style.left).toBe("10px") // 120 - 110, clear of the window's 8px edge gap
+            expect(tip.style.top).toBe("220px") // 310 - 10 - 80
+            top = 250
+            window.dispatchEvent(new Event("scroll"))
+            expect(tip.style.top).toBe("170px")
+            // Scrolled out of the window, the box leaves with its mark instead of pinning to the
+            // window's top: mark at window y -480, its top edge at -490.
+            top = -500
+            window.dispatchEvent(new Event("scroll"))
+            expect(tip.style.top).toBe("-580px") // -490 - 10 - 80
+            expect(tip.style.left).toBe("10px") // 120 - 110
+            top = 250
+            window.dispatchEvent(new Event("scroll"))
+            expect(tip.style.top).toBe("170px")
+        } finally {
+            if (had) proto.showPopover = had
+            else delete proto.showPopover
+            delete (document.documentElement as unknown as Record<string, unknown>).clientWidth
+            delete (document.documentElement as unknown as Record<string, unknown>).clientHeight
+        }
     })
 
     it("a rect (bar) tooltip anchors at its top-centre, not its centre", () => {
@@ -6840,38 +6951,42 @@ describe("block controls (#345)", () => {
         expect(box.style.getPropertyValue("--masque-ctl-off")).toBe("rgb(1,1,1)")
     })
 
-    it("a checkbox draws Makie's square and checkmark, and follows its onchange rule (#428)", () => {
+    it("a checkbox draws Makie's square and checkmark on the square alone (#428)", () => {
         const m = controlsManifest()
-        // `onchange = _ -> true`: a click turns it on, and a click on a ticked box does nothing.
         m.layers.push({ id: "fine", kind: "control", axis: "", events: ["change"], payloads: [], label: "fine",
             geometry: { control: "checkbox", x: 950, y: 700, w: 40, h: 30, value: false, size: 22, radius: 1.65, stroke: 3,
                 color: "rgb(1,1,1)", off: "rgb(2,2,2)", strokeOn: "rgb(3,3,3)", strokeOff: "rgb(4,4,4)",
-                markOn: "rgb(5,5,5)", markOff: "rgb(6,6,6)", markSize: 18.7, mark: "M0 0L1 1Z", next: [true, true] } })
+                markOn: "rgb(5,5,5)", markOff: "rgb(6,6,6)", markSize: 18.7, mark: "M0 0L1 1Z" } })
         m.fields = [...(m.fields ?? []), "fine"]
         m.initial!.fine = { layer: "fine", index: 0, payload: false }
+        m.layers.push({ id: "ex", kind: "control", axis: "", events: ["change"], payloads: [], label: "ex",
+            geometry: { control: "checkbox", x: 950, y: 750, w: 30, h: 30, value: true, size: 30, markSize: 20, markChar: "x",
+                color: "rgb(1,1,1)", off: "rgb(2,2,2)", markOn: "rgb(5,5,5)", markOff: "rgb(6,6,6)" } })
+        m.fields = [...(m.fields ?? []), "ex"]
+        m.initial!.ex = { layer: "ex", index: 0, payload: true }
         const { host, script } = setup()
         mount(script, m)
         const box = ctl(host, "fine")
+        const svg = box.querySelector("svg") as SVGSVGElement
         const rect = box.querySelector("svg rect") as SVGRectElement
         const mark = box.querySelector("svg path") as SVGPathElement
-        expect([rect.getAttribute("x"), rect.getAttribute("y"), rect.getAttribute("width"), rect.getAttribute("rx")]).toEqual(["9", "4", "22", "1.65"])
+        const input = box.querySelector("input") as HTMLInputElement
+        // The square, 22 of the box's 40 × 30, sits in its middle, and the input covers it alone.
+        for (const el of [svg, input] as (HTMLElement | SVGElement)[]) {
+            expect([el.style.left, el.style.top, el.style.width, el.style.height]).toEqual(["22.5%", `${(50 * 8) / 30}%`, "55%", `${(100 * 22) / 30}%`])
+        }
+        expect([rect.getAttribute("width"), rect.getAttribute("rx")]).toEqual(["22", "1.65"])
         expect([rect.getAttribute("fill"), rect.getAttribute("stroke"), rect.getAttribute("stroke-width")]).toEqual(["rgb(2,2,2)", "rgb(4,4,4)", "3"])
         expect(mark.getAttribute("d")).toBe("M0 0L1 1Z")
-        expect(mark.getAttribute("transform")).toBe("translate(20 15) scale(18.7 -18.7)")
+        expect(mark.getAttribute("transform")).toBe("translate(11 11) scale(18.7 -18.7)")
         expect(mark.getAttribute("fill")).toBe("rgb(6,6,6)")
-        const input = box.querySelector("input") as HTMLInputElement
         input.checked = true
         input.dispatchEvent(new Event("change", { bubbles: true }))
         expect(val(host).fine).toEqual({ layer: "fine", index: 0, payload: true })
         expect([rect.getAttribute("fill"), rect.getAttribute("stroke"), mark.getAttribute("fill")]).toEqual(["rgb(1,1,1)", "rgb(3,3,3)", "rgb(5,5,5)"])
-        // The browser unticks it; the rule ticks it again, and the field doesn't change.
-        let inputs = 0
-        host.addEventListener("input", () => { inputs += 1 })
-        input.checked = false
-        input.dispatchEvent(new Event("change", { bubbles: true }))
-        expect(input.checked).toBe(true)
-        expect(inputs).toBe(0)
-        expect(val(host).fine).toEqual({ layer: "fine", index: 0, payload: true })
+        // A character mark is drawn as text, in the mark's colour.
+        const text = ctl(host, "ex").querySelector("svg text") as SVGTextElement
+        expect([text.textContent, text.getAttribute("font-size"), text.getAttribute("fill")]).toEqual(["x", "20", "rgb(5,5,5)"])
     })
 
     it("a button draws Makie's box and label, and counts its clicks (#431)", () => {
@@ -6931,10 +7046,11 @@ describe("block controls (#345)", () => {
         const m = controlsManifest()
         m.layers.push({ id: "grid", kind: "control", axis: "", events: ["change"], payloads: [], label: "grid",
             geometry: { control: "slidergrid", x: 100, y: 500, w: 600, h: 100, value: [2, [1, 3]], sliders: [
-                { control: "slider", x: 200, y: 500, w: 400, h: 20, value: 2, n: 5, horizontal: true, range: [0, 0.5],
+                { control: "slider", x: 200, y: 500, w: 400, h: 20, value: 2, n: 5, horizontal: true, range: [0, 0.5], name: "freq",
                     valueLabel: { x: 620, y: 500, w: 80, h: 20, fontsize: 28, color: "rgb(7,7,7)", labels: ["0 Hz", "0.5 Hz", "1 Hz", "1.5 Hz", "2 Hz"] } },
                 { control: "intervalslider", x: 200, y: 560, w: 400, h: 20, value: [1, 3], n: 4, horizontal: true, range: [1, 1],
-                    valueLabel: { x: 620, y: 560, w: 80, h: 20, fontsize: 28, color: "rgb(7,7,7)" } },
+                    valueLabel: { x: 620, y: 560, w: 80, h: 20, fontsize: 28, color: "rgb(7,7,7)",
+                        pairs: ["p11", "p12", "p13", "p14", "p22", "p23", "p24", "p33", "p34", "p44"] } },
             ] } })
         m.fields = [...(m.fields ?? []), "grid"]
         m.initial!.grid = { layer: "grid", index: 0, payload: [2, [1, 3]] }
@@ -6947,7 +7063,10 @@ describe("block controls (#345)", () => {
         expect(kids[0].style.left).toBe(`${(100 * 100) / 600}%`)
         expect(kids[1].style.top).toBe(`${(100 * 60) / 100}%`)
         const labels = [...grid.querySelectorAll(".masque-vlabel")] as HTMLElement[]
-        expect(labels.map((l) => l.textContent)).toEqual(["1 Hz", "(2, 4)"])
+        expect(labels.map((l) => l.textContent)).toEqual(["1 Hz", "p24"])
+        // A slider is named by its own label; one without falls back to the field and its place.
+        expect(kids[0].querySelector("input")!.getAttribute("aria-label")).toBe("freq")
+        expect(kids[1].querySelector("input")!.getAttribute("aria-label")).toBe("grid 2, low")
         expect(labels[0].style.getPropertyValue("--fs")).toBe(`${(100 * 28) / 600}cqw`)
         const range = kids[0].querySelector("input") as HTMLInputElement
         range.value = "4"
@@ -6959,7 +7078,7 @@ describe("block controls (#345)", () => {
         hi.value = "2"
         hi.dispatchEvent(new Event("change", { bubbles: true }))
         expect(val(host).grid).toEqual({ layer: "grid", index: 0, payload: [4, [1, 2]] })
-        expect(labels[1].textContent).toBe("(2, 3)")
+        expect(labels[1].textContent).toBe("p23")
     })
 
     it("a release commits the field; moving alone doesn't", () => {
