@@ -54,13 +54,18 @@ shows where one is. To show them all the time, draw their outlines with
 Makie.
 
 When the regions mix kinds of shape, each kind is a part of the
-`@bind` value. With `id = :cells`, circles are `sel.cells.circles`,
-rectangles are `sel.cells.rects`, and polygons are
-`sel.cells.polygons`. A pick on one says `pick.layer == :cells` and
-`pick.part == (:circles,)`. Each part holds its own selection, so a
-circle and a rectangle can be selected at once. Regions of one kind
-are just `sel.cells`. To have
-one selection across every region, make them all the same kind, such as
+`@bind` value, as the parts of a recipe are in
+[Your own plot types](@ref). With `id = :cells`:
+
+| Shape | Its field | A click on one says |
+|---|---|---|
+| circles | `sel.cells.circles` | `pick.layer == :cells`, `pick.part == (:circles,)` |
+| rectangles | `sel.cells.rects` | `pick.layer == :cells`, `pick.part == (:rects,)` |
+| polygons | `sel.cells.polygons` | `pick.layer == :cells`, `pick.part == (:polygons,)` |
+
+Each part holds its own selection, so a circle and a rectangle can be
+selected at once. Regions of one kind are just `sel.cells`. To have one
+selection across every region, make them all the same kind, such as
 polygons.
 
 ## Compute the shapes yourself
@@ -134,11 +139,16 @@ returns an [`ElementEvent`](@ref) with that entry's fields.
 
 To make a click return a struct of your own, subtype
 [`AbstractInteractable`](@ref) and implement three methods:
-[`hitlayers`](@ref) (the shapes, as above), [`bondtype`](@ref) (the
-type a click produces), and [`transform_bond`](@ref) (build that value
-from the clicked element). Make your event type a subtype of
-[`InteractionEvent`](@ref). Put the type definitions in their own cell,
-so rebuilding the figure does not redefine them:
+
+| Method | Returns |
+|---|---|
+| [`hitlayers`](@ref) | the shapes, as above |
+| [`bondtype`](@ref) | the type a click produces |
+| [`transform_bond`](@ref) | that value, built from the clicked element |
+
+Make your event type a subtype of [`InteractionEvent`](@ref). Put the
+type definitions in their own cell, so rebuilding the figure does not
+redefine them:
 
 ```julia
 begin
