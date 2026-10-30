@@ -373,12 +373,12 @@ function styleMenu(box: HTMLElement, g: ControlGeometry, m: Manifest): void {
     set("lmax", `${(100 * Math.max(0, down ? below : above)) / g.h}cqh`)
 }
 
-// Makie's menu (Makie/src/makielayout/blocks/menu.jl), as a combobox over a listbox: the
-// pointer opens it and picks an option, as in Makie, and so do the keys: arrows, Home and End
-// move through the options, Enter or Space picks one (Space types with `searchable`), Escape
-// and Tab close it, and typing jumps to an option whose label starts with what was typed. With
-// `searchable`, typing in the open menu keeps the options whose label holds the text, ignoring
-// case, as Makie's default `filter` does.
+// Makie's menu (Makie/src/makielayout/blocks/menu.jl), as a combobox over a listbox. The
+// pointer opens it and picks an option, as in Makie, and so do the keys: the arrows move
+// through the options, as do Home and End unless they move the caret of a search; Enter picks
+// one, and so does Space unless it types; Escape and Tab close it. Without `searchable`, typing
+// jumps to an option whose label starts with what was typed. With it, typing in the open menu
+// keeps the options whose label holds the text, ignoring case, as Makie's default `filter` does.
 function buildMenu(layer: HitLayer, g: ControlGeometry, m: Manifest, box: HTMLElement, label: string, hooks: ControlHooks): ControlEl {
     const id = layer.id
     const labels = g.labels ?? []
@@ -547,7 +547,7 @@ function buildMenu(layer: HitLayer, g: ControlGeometry, m: Manifest, box: HTMLEl
             setOpen(true)
             if (e.altKey) return
             step(key === "ArrowDown" ? 1 : -1)
-        } else if ((key === "Home" || key === "End") && (open || !searchable)) {
+        } else if ((key === "Home" || key === "End") && !searchable) {
             e.preventDefault()
             setOpen(true)
             step(key === "Home" ? "first" : "last")
