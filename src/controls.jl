@@ -256,15 +256,16 @@ function _checkbox_geometry!(g, b::Makie.Checkbox, ctx)
     return g
 end
 
-# Makie's `onchange` decides what a click turns a checkbox into, and is meant for radio buttons,
-# whose rule unticks the others. Running it ahead of a click would run those side effects when
-# the widget is drawn, so masque leaves it out and a click flips the box; it says so once.
+# Makie's `onchange` decides what a click turns a checkbox into, and is meant for radio buttons.
+# In masque the browser owns the click and can't run a Julia function, so the rule is a no-op: a
+# click flips the box, and masque says so once (#457).
 function _warn_checkbox_rule(interactables)
     for i in interactables
         i isa BlockControl && i.block isa Makie.Checkbox || continue
         i.block.onchange[] === (!) && continue
-        @warn "masque: checkbox :$(i.id) has its own `onchange`, which masque doesn't run yet, " *
-            "so a click flips it. Set the box from your own code instead (see #457)." maxlog = 1
+        @warn "masque: checkbox :$(i.id) has its own `onchange`, which does nothing in masque: " *
+            "a click always flips the box. For one choice of several, use a `Menu`, or set the " *
+            "other boxes in `masque`'s own `onchange`." maxlog = 1
     end
     return nothing
 end

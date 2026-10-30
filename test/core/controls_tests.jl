@@ -122,7 +122,7 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         for r in rs
             r.onchange[] = v -> (calls[] += 1; foreach(o -> o === r || (o.checked[] = false), rs); true)
         end
-        w = @test_logs (:warn, r"checkbox :r1 has its own `onchange`.*#457"s) match_mode = :any masque(fig, (r1 = rs[1], r2 = rs[2], r3 = rs[3]))
+        w = @test_logs (:warn, r"checkbox :r1 has its own `onchange`, which does nothing in masque.*Menu"s) match_mode = :any masque(fig, (r1 = rs[1], r2 = rs[2], r3 = rs[3]))
         @test calls[] == 0 && [r.checked[] for r in rs] == [true, false, false]
         @test Masque.initial_bond(w) == (r1 = true, r2 = false, r3 = false)
     end

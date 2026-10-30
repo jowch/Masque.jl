@@ -76,8 +76,9 @@ as in Makie; one that is a function runs when they press Enter, and text
 it refuses leaves the field as it was.
 
 A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
-doesn't run yet: a click flips the box, and `masque` warns when a named
-checkbox has one.
+does nothing in a notebook: a click always flips the box, and `masque`
+warns when a named checkbox has one. For one choice of several, use a
+`Menu`, or set the other boxes in `masque`'s own `onchange`.
 
 With WGLMakie loaded, `Slider` and `Button` also name controls from
 Bonito, so Julia asks which one you mean; write `Makie.Slider` and
