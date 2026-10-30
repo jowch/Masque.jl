@@ -630,9 +630,9 @@ try {
     passed.push(`${key}/pan`);
   }
 
-  // A legend over marks (#437): Makie draws the legend over two `hid` points, so with `hid`
-  // faded, and with the pointer on a hidden point (its ring drawn and its fade lifted), every
-  // pixel of the legend's box stays as it was at rest. A visible point's fade and ring still
+  // A legend over marks (#437): Makie draws the legend over two `hid` points and part of a
+  // third, so with `hid` faded, and with the pointer on a hidden point, every pixel of the
+  // legend's box stays as it was at rest. A visible point's fade and ring still
   // show, so the screenshots do see the overlay.
   {
     const key = "legend_hidden";
@@ -684,10 +684,28 @@ try {
     if (bad) throw new Error(`${key}/fade: the fade drew over the legend at ${JSON.stringify(bad)}`);
     passed.push(`${key}/fade-off-legend`);
 
-    const h = await hoverAt(key, ...at(2));
-    if (!h.hi.fill && !h.hi.edge && !h.hi.plain) throw new Error(`${key}/hover: no ring for the hidden point hid 2`);
-    const hovered = await screenOf(key);
-    bad = moved(rest, hovered);
+    // The pointer on a hidden point, inside the legend, reaches the legend and not the point
+    // (#472): no ring, nothing on screen moves, and a click picks nothing.
+    // A ring still leaving from the last hover is not a hit.
+    const ringOf = (h) => [h.hi.fill, h.hi.edge, h.hi.plain].some((c) => c && !/masque-leave/.test(c.className ?? ""));
+    for (const k of [2, 3]) {
+      await away(); await page.waitForTimeout(600); // let the last ring finish leaving
+      if (ringOf(await hoverAt(key, ...at(k)))) throw new Error(`${key}/hover: the pointer reached hid ${k} through the legend`);
+      bad = moved(rest, await screenOf(key));
+      if (bad) throw new Error(`${key}/hover: hovering hid ${k} under the legend drew over it at ${JSON.stringify(bad)}`);
+      await clickAt(...at(k));
+      const after = (await inspect(key)).picked;
+      if (after.includes(`hid:${k}`)) throw new Error(`${key}/click: clicking hid ${k} through the legend picked it: ${JSON.stringify(after)}`);
+    }
+    passed.push(`${key}/no-hover-through-legend`);
+
+    // hid 4 shows past the legend's bottom edge: that part still takes the pointer, and its ring
+    // and lifted fade stay out of the legend's box (#437).
+    const [ex, ey] = [at(4)[0], by + bh + 0.3 * (at(4)[1] + r - by - bh)];
+    if (!(at(4)[1] < by + bh && at(4)[1] + r > by + bh + 2)) throw new Error(`${key}: hid 4 at ${at(4)} doesn't straddle the legend's bottom edge (box ${boxes[0]}, r ${r})`);
+    await away(); await page.waitForTimeout(600);
+    if (!ringOf(await hoverAt(key, ex, ey))) throw new Error(`${key}/hover: no ring for the part of hid 4 below the legend`);
+    bad = moved(rest, await screenOf(key));
     if (bad) throw new Error(`${key}/hover: the hidden point's ring or lifted fade drew over the legend at ${JSON.stringify(bad)}`);
     await away();
     bad = moved(rest, await screenOf(key));

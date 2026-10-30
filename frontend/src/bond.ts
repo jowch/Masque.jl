@@ -728,8 +728,10 @@ export function clearPicks(ctx: OverlayCtx, state: OverlayState, axes: string[] 
 
 // The plot axes under image px (x, y): every axis whose plot area holds the point, so twin
 // axes and an inset's parent all count. A colorbar's readout is a hit, not a plot area, and a
-// click inside a legend's box, even on its padding, is on the legend, so it finds none.
+// click inside a legend's box, even on its padding, is on the legend, so it finds none, as does
+// one inside an opaque legend that takes no clicks (`occluders`, #472).
 function axesAt(ctx: OverlayCtx, x: number, y: number): string[] {
+    if (ctx.manifest_.occluders?.some(([bx, by, bw, bh]) => x >= bx && x <= bx + bw && y >= by && y <= by + bh)) return []
     const legends = new Set(ctx.manifest_.layers.filter((l) => l.bond === "legend").map((l) => l.axis))
     const inside = (t: { viewport: [number, number, number, number] }) => {
         const [vx, vy, vw, vh] = t.viewport

@@ -944,7 +944,7 @@ function build_kind_sweep()
     legend_hidden = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "legend-hidden", limits = (0, 10, 0, 10))
-        hid = scatter!(ax, [1.0, 2.5, 8.6, 9.2], [2.0, 6.0, 9.0, 8.4]; color = :orange, markersize = 18, label = "hid")
+        hid = scatter!(ax, [1.0, 2.5, 8.6, 9.2, 8.6], [2.0, 6.0, 9.0, 8.4, 6.8]; color = :orange, markersize = 18, label = "hid")
         seen = scatter!(ax, [4.0, 6.0], [3.0, 5.0]; color = :steelblue, markersize = 18, label = "seen")
         axislegend(ax; position = :rt)
         masque(

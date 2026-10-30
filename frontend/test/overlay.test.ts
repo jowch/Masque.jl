@@ -5625,6 +5625,23 @@ describe("select = :many and clearing picks (#335)", () => {
         expect(val(host)).toEqual({ pts: { items: [{ layer: "pts", index: 0 }] }, one: null, legend: { layer: "legend", index: 0 } })
     })
 
+    it("a click inside an opaque legend that takes no clicks reaches no mark under it, and clears nothing (#472)", () => {
+        const { host, script } = setup()
+        const m = many()
+        m.occluders = [[900, 500, 200, 200]] // over `one` at (1000, 600)
+        m.initial = { pts: { items: [] }, one: { layer: "one", index: 0 } }
+        mount(script, m)
+        const surface = shadowOf(host).querySelector(".surface") as HTMLElement
+        click(surface, 500, 300) // on `one`, under the legend
+        expect(val(host).one).toEqual({ layer: "one", index: 0 })
+        click(surface, 460, 260) // the legend's empty part
+        expect(val(host).one).toEqual({ layer: "one", index: 0 })
+        click(surface, 200, 350) // the plot area clears it
+        expect(val(host).one).toBeNull()
+        click(surface, 500, 300)
+        expect(val(host).one).toBeNull()
+    })
+
     it("Escape and an empty click leave a threshold and a box's target alone", () => {
         const { host, script } = setup()
         const m = many()
