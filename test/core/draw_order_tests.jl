@@ -149,4 +149,28 @@ midpoint(a, b) = ((a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
         @test right > 10_000
         @test wrong < 0.02 * (right + wrong)
     end
+
+    @testset "each layer carries its plot's place in the drawing order (#462)" begin
+        # The fade reads `draw` to tell which of two crossing marks is on top. The manifest's
+        # own order is the hit-test precedence: the plot drawn last first, or as a list names them.
+        draw(m) = Dict(d["id"] => get(d, "draw", nothing) for d in m["layers"])
+        fig = Figure(; size = (400, 300))
+        ax = Axis(fig[1, 1])
+        xs = 0:0.5:3
+        l1 = lines!(ax, xs, xs .^ 2; label = "quad")
+        l2 = lines!(ax, xs, 2 .* xs; label = "lin")
+        sc = scatter!(ax, [0.5, 1.5], [1.0, 3.0]; label = "pts")
+        axislegend(ax)
+        auto = draw(masque(fig).manifest)
+        @test auto["lines"] < auto["lines_2"] < auto["scatter"]
+        ints = [SegmentInteractable(ax, l1; id = :lines), SegmentInteractable(ax, l2; id = :lines_2), PointInteractable(ax, sc; id = :scatter)]
+        d = draw(masque(fig, ints).manifest)
+        @test d["lines"] < d["lines_2"] < d["scatter"]
+        # Layers listed by hand with `auto = false` name no plots: no `draw`, and the fade puts
+        # no layer back over another.
+        @test all(isnothing, values(draw(masque(fig, ints; auto = false).manifest)))
+        # A z translation draws a plot over those added after it.
+        translate!(l1, 0, 0, 1)
+        @test draw(masque(fig).manifest)["lines"] > draw(masque(fig).manifest)["scatter"]
+    end
 end

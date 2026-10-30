@@ -22,8 +22,13 @@ All notable changes to this project are documented here. The format is based on
   stay outlined on their edge, so their colour still shows (#463).
 - A mark hidden under a legend stays hidden: its hover ring, pick outline and fade no longer
   draw over the legend, and the pointer inside the legend no longer shows its tooltip, picks it,
-  or reads the axis under the legend. The keyboard and a box selection still reach it. A legend with no background, or a mostly see-through one,
-  still shows the marks under it and lets the pointer reach them (#437, #472).
+  or reads the axis under the legend. The keyboard and a box selection still reach it. A legend
+  with no background, or a mostly see-through one, still shows the marks under it and lets the
+  pointer reach them (#437, #472).
+- Hovering a line plot with many points keeps up with the pointer: a figure of 100 000 points
+  no longer drops frames as the pointer crosses its lines (#469).
+- A faded line stays faded where it crosses a line or mark that stays in focus. It used to show at
+  full strength at each crossing (#462).
 
 ## [0.4.2] - 2026-10-30
 

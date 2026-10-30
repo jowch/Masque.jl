@@ -25,7 +25,8 @@ _Binding() = _Binding(nothing, false, Set{Symbol}())
 # built, so after `onchange` changes a plot its layers are built afresh. `mount` holds the
 # mount manifest and the layer owners once `masque` has built them, so the gesture closure
 # decodes the state the same way the first render did; each frame then puts its own there.
-# `hidden` holds the layer ids of plots drawn with `visible = false` when the plan was built.
+# `hidden` holds the layer ids of plots drawn with `visible = false` when the plan was built,
+# and `draw` each layer's place in the order the backend draws its plot (`_draw_order`).
 struct _Plan <: AbstractVector{AbstractInteractable}
     ints::Vector{AbstractInteractable}
     binding::_Binding
@@ -33,8 +34,9 @@ struct _Plan <: AbstractVector{AbstractInteractable}
     rebuild::Union{Nothing, Function}
     mount::Base.RefValue{Any}
     hidden::Set{Symbol}
+    draw::Dict{Symbol, Int}
 end
-_Plan(ints, binding, onchange, rebuild, mount) = _Plan(ints, binding, onchange, rebuild, mount, Set{Symbol}())
+_Plan(ints, binding, onchange, rebuild, mount, hidden = Set{Symbol}()) = _Plan(ints, binding, onchange, rebuild, mount, hidden, Dict{Symbol, Int}())
 _Plan(ints, binding) = _Plan(ints, binding, nothing, nothing, Ref{Any}(nothing))
 Base.size(p::_Plan) = size(p.ints)
 Base.getindex(p::_Plan, k::Int) = p.ints[k]
@@ -44,7 +46,7 @@ _binding(p::_Plan) = p.binding
 _binding(_) = _Binding()
 _onchange(p::_Plan) = p.onchange
 _onchange(_) = nothing
-_with_onchange(p::_Plan, f, rebuild = p.rebuild) = _Plan(p.ints, p.binding, f, rebuild, p.mount, p.hidden)
+_with_onchange(p::_Plan, f, rebuild = p.rebuild) = _Plan(p.ints, p.binding, f, rebuild, p.mount, p.hidden, p.draw)
 function _with_onchange(p, f, rebuild = nothing)
     f === nothing && return p
     ints = collect(AbstractInteractable, p)
@@ -57,7 +59,7 @@ function _rebuilt(p::_Plan)
     fresh = Base.CoreLogging.with_logger(Base.CoreLogging.NullLogger()) do
         p.rebuild()
     end
-    return _Plan(fresh.ints, p.binding, p.onchange, p.rebuild, p.mount, fresh.hidden)
+    return _Plan(fresh.ints, p.binding, p.onchange, p.rebuild, p.mount, fresh.hidden, fresh.draw)
 end
 
 # The object a name belongs to: a plot for `interactables(plot)`, else the interactable.
@@ -206,7 +208,30 @@ function _bind_call(fig, xs, bind; auto::Bool)
         ]
     end
     hidden = Set{Symbol}(id for (p, ids) in built.plotmap if !_shown(p) for id in ids)
-    return _Plan(built.ints, _Binding(resolved, bare, built.defaults, groups), nothing, nothing, Ref{Any}(nothing), hidden)
+    draw = _draw_order(fig, built.plotmap)
+    return _Plan(built.ints, _Binding(resolved, bare, built.defaults, groups), nothing, nothing, Ref{Any}(nothing), hidden, draw)
+end
+
+# Each layer's place in the order the backend draws the figure: the figure's atomic plots in
+# plot order, then sorted by their z translation, as CairoMakie draws them. A layer takes the
+# place of its plot's last atomic part, the one drawn on top. The overlay's fade reads it to
+# tell which of two crossing marks is on top (#462); the manifest's own order is the hit-test
+# precedence, which a hand-written list sets.
+function _draw_order(fig, plotmap)
+    out = Dict{Symbol, Int}()
+    atoms = _painted_atoms(fig)
+    atoms === nothing && return out
+    place = IdDict{Any, Int}(a => k for (k, a) in enumerate(atoms))
+    for (p, ids) in plotmap
+        parts = p isa Makie.AbstractPlot ? _atomic_parts(p) : nothing
+        parts === nothing && continue
+        k = maximum((get(place, a, 0) for a in parts); init = 0)
+        k == 0 && continue
+        for id in ids
+            occursin(':', string(id)) || (out[id] = k)
+        end
+    end
+    return out
 end
 
 _shown(p) = try
@@ -216,6 +241,8 @@ catch
 end
 _hidden(p::_Plan) = p.hidden
 _hidden(_) = Set{Symbol}()
+_draw(p::_Plan) = p.draw
+_draw(_) = Dict{Symbol, Int}()
 
 _resolve_ref(r::Symbol, built, renamed) = ":$r" => Symbol[r]
 function _resolve_ref(p::Makie.AbstractPlot, built, renamed)

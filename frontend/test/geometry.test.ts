@@ -3,6 +3,7 @@ import {
     distToSegment, pointInPolygon, findBin, invertAxis, projectAxis, sampleSlice, viewportUnder,
     hitLayer, hitTest, hitTestAt, resolvePayload, panLimits, matrixLimits, orbitAngles, zoomLimits3, panLimits3,
     anchorFor, axisFrame, computeAnchoredPlacement, layerPoint, occludedAt, previewWindows, lineReadout, samplePoint,
+    closestPointOnPath,
 } from "../src/geometry"
 import { begin as beginThreshold, end as endThreshold, move as moveThreshold } from "../src/drag/threshold"
 import { begin as beginView, tip as viewTip, limitsTip, view3Base, rememberView3, seedView3Homes, zoom3 } from "../src/drag/view"
@@ -1228,6 +1229,88 @@ describe("drag labels follow tooltip_sigdigits and keep trailing zeros", () => {
     })
     it("limitsTip formats each bound at the given digits", () => {
         expect(limitsTip({ xmin: 0.123456, xmax: 2, ymin: -3.5, ymax: 40 }, 2)).toBe("x:[0.12, 2.0] y:[-3.5, 40]")
+    })
+})
+
+describe("closestPointOnPath: runs of edges skipped by their box match the full scan (#469)", () => {
+    // The oracle is the scan this replaces: every finite edge, the first of equally near ones.
+    function closestLinear(px: number, py: number, v: number[]): { dist: number; edge: number } | null {
+        let best: { dist: number; edge: number } | null = null
+        for (let i = 0; i < v.length / 2 - 1; i++) {
+            const [x0, y0, x1, y1] = [v[2 * i], v[2 * i + 1], v[2 * i + 2], v[2 * i + 3]]
+            if (![x0, y0, x1, y1].every(Number.isFinite)) continue
+            const d = distToSegment(px, py, x0, y0, x1, y1)
+            if (!best || d < best.dist) best = { dist: d, edge: i }
+        }
+        return best
+    }
+    function mulberry32(seed: number): () => number {
+        let a = seed
+        return () => {
+            a |= 0; a = (a + 0x6D2B79F5) | 0
+            let t = Math.imul(a ^ (a >>> 15), 1 | a)
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+        }
+    }
+    // A random walk across the plot, with NaN gaps and a few runs that are all gap.
+    function walk(rng: () => number, n: number): number[] {
+        const v: number[] = []
+        let y = rng() * 400
+        for (let i = 0; i < n; i++) {
+            y += (rng() - 0.5) * 20
+            const gap = rng() < 0.03 || (i >= 60 && i < 200 && n > 400)
+            v.push(gap ? NaN : (i * 600) / n, gap ? NaN : y)
+        }
+        return v
+    }
+
+    it("finds the same nearest edge as the full scan", () => {
+        const rng = mulberry32(469)
+        for (let trial = 0; trial < 60; trial++) {
+            const v = walk(rng, 2 + Math.floor(rng() * 1000))
+            for (let q = 0; q < 40; q++) {
+                const px = rng() * 700 - 50, py = rng() * 500 - 50
+                const want = closestLinear(px, py, v), got = closestPointOnPath(px, py, v)
+                if (!want) { expect(got).toBeNull(); continue }
+                expect(got?.edge).toBe(want.edge)
+                expect(got?.dist).toBeCloseTo(want.dist, 9)
+            }
+        }
+    })
+
+    it("with a cut, still finds the nearest edge whenever it lies within the cut", () => {
+        const rng = mulberry32(4690)
+        for (let trial = 0; trial < 60; trial++) {
+            const v = walk(rng, 2 + Math.floor(rng() * 1000))
+            for (let q = 0; q < 40; q++) {
+                const px = rng() * 700 - 50, py = rng() * 500 - 50, cut = rng() * 30
+                const want = closestLinear(px, py, v), got = closestPointOnPath(px, py, v, cut)
+                if (want && want.dist <= cut) {
+                    expect(got?.edge).toBe(want.edge)
+                } else if (got) expect(got.dist).toBeGreaterThan(cut)
+            }
+        }
+    })
+
+    it("keeps the first of equally near edges, across runs", () => {
+        // 200 edges along y = 0, then the same 200 edges again: every point is as near to both.
+        const once = Array.from({ length: 201 }, (_, i) => [i, 0]).flat()
+        const v = [...once, NaN, NaN, ...once]
+        expect(closestPointOnPath(150.5, 3, v)?.edge).toBe(150)
+        expect(closestPointOnPath(150.5, 3, v, 5)?.edge).toBe(150)
+    })
+
+    it("a :lines hover picks the same line as the full scan", () => {
+        const rng = mulberry32(46900)
+        const paths = Array.from({ length: 40 }, () => walk(rng, 300))
+        const L: HitLayer = { id: "l", kind: "lines", geometry: paths, payloads: paths.map(() => ({})), axis: "ax1", events: ["hover"], tol: 6 }
+        for (let q = 0; q < 400; q++) {
+            const px = rng() * 600, py = rng() * 400
+            let best = -1, bd = Infinity
+            paths.forEach((p, k) => { const h = closestLinear(px, py, p); if (h && h.dist < bd) { bd = h.dist; best = k } })
+            expect(hitLayer(L, px, py)?.index ?? -1).toBe(bd <= 6 ? best : -1)
+        }
     })
 })
 

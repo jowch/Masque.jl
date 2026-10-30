@@ -545,6 +545,11 @@ function build_manifest(
             d["hidden"] = true
         end
     end
+    draw = _draw(plan)
+    for (_, L, d) in built
+        k = get(draw, L.id, nothing)
+        k === nothing || (d["draw"] = k)
+    end
     initial = with_initial ? _initial_value(built, fields, roles, binding, selected, ctx, layers, groups, tables) : nothing
     # Precedence for the frontend's first-match-in-manifest-order `hitTest` (geometry.ts):
     # `LegendInteractable` layers sort FIRST (a legend drawn over plot geometry must win the
@@ -1056,7 +1061,7 @@ function _view_render_frame(backend::AbstractBackend, fig, interactables, ppu, m
         manifest, _ = interactables.mount[]
         # Frames rebuild and move the controls in their own plan; the widget's stays as built.
         live = _LiveFigure(
-            _Plan(copy(interactables.ints), interactables.binding, onchange, interactables.rebuild, interactables.mount, interactables.hidden),
+            _Plan(copy(interactables.ints), interactables.binding, onchange, interactables.rebuild, interactables.mount, interactables.hidden, interactables.draw),
             manifest, _pick_counts(manifest), "",
         )
         start = mount_envelope(manifest)

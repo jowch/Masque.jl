@@ -544,3 +544,28 @@ function _interval_indices(isl)
     obs isa Makie.Observable || return _makie_compat_error("selected_indices", "`.selected_indices` to be an Observable")
     return obs
 end
+
+# Wraps `Makie.collect_atomic_plots` and `Makie.zvalue2d`, both internal: the figure's atomic
+# plots in the order CairoMakie paints them (plot order, then a stable sort by z translation).
+# `nothing` when either changed shape: the manifest then ships no `draw`, and the fade puts no
+# layer back over another, as before #462.
+function _painted_atoms(fig)
+    try
+        atoms = Makie.collect_atomic_plots(fig.scene)
+        return atoms[sortperm(Makie.zvalue2d.(atoms); alg = Base.Sort.DEFAULT_STABLE)]
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return nothing
+    end
+end
+
+# Wraps `Makie.collect_atomic_plots(p)`: the atomic plots a plot draws with (itself, when it is
+# one). `nothing` when it changed shape.
+function _atomic_parts(p)
+    try
+        return Makie.collect_atomic_plots(p)
+    catch e
+        e isa _MAKIE_SHAPE_ERRORS || rethrow()
+        return nothing
+    end
+end
