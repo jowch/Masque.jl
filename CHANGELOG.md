@@ -47,7 +47,7 @@ All notable changes to this project are documented here. The format is based on
   mid-tone cells. It sits inside a cell, bar or shape, so neighbouring outlines never overlap,
   and outside a marker, so the marker keeps its colour. It is one screen pixel per band:
   1.5 px for hover and 2 px for a pick on a high-density screen, 3 and 4 px on a standard one.
-  overlaystyle `color`, `hover_width` and `selected_width` still set it.
+  `overlaystyle` `color`, `hover_width` and `selected_width` still set it.
 - Lines fade like other plots. Hovering a line fades the other lines and marks the point the
   tooltip reads out, instead of drawing grey over the whole line. Hovering or picking a legend
   entry fades the other lines too, and the picked line keeps its own colour instead of a grey
