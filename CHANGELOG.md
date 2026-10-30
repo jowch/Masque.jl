@@ -46,6 +46,10 @@ All notable changes to this project are documented here. The format is based on
   `hoverstyle` stroke gets that colour on the dot, not along the whole line.
 - A hover preview (a legend entry's or a line's) fades the rest less than a pick does: 35%
   of them still shows, against 20% for a pick.
+- The first widget in a session shows in under a second instead of after 15 to 25 s, and
+  its first pick, pan or orbit answers right away instead of after several seconds. Masque
+  now compiles that work when it is installed, which takes about 2 minutes longer, once per
+  backend. To turn this off, see the troubleshooting page.
 
 ### Fixed
 - On `backend = :webgl`, a line with gaps, such as a `contour!` or a `lines!` with `NaN`
