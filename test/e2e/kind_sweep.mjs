@@ -129,7 +129,9 @@ function hitPoint(layer, index) {
     for (let i = 0; i < a.length / 2 - 1; i++) {
       const x0 = a[2 * i], y0 = a[2 * i + 1], x1 = a[2 * i + 2], y1 = a[2 * i + 3];
       if (![x0, y0, x1, y1].every(Number.isFinite)) continue;
-      return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, x1: x0, y1: y0, x2: x1, y2: y1 };
+      // A quarter along, not halfway: the hover dot marks the vertex nearest the pointer, and
+      // a midpoint is a tie a 1px nudge would flip to the other sample.
+      return { x: x0 + (x1 - x0) / 4, y: y0 + (y1 - y0) / 4, x1: x0, y1: y0, x2: x1, y2: y1 };
     }
     throw new Error(`lines path ${index} has no finite segment`);
   }
@@ -2926,9 +2928,21 @@ try {
     // already-selected mark, which draws no highlight. The series row (several whole lines)
     // is what exercises the hover stroke.
     const closedHover = layer.kind !== "polyline" && layer.kind !== "segments" && layer.kind !== "lines";
-    // A picked point is not its line: hovering the line still outlines it.
-    // A fade-drawn pick has no selected stroke, so hovering it draws the hover recipe.
-    const hoverIsSelected = !!(spec.selected && spec.selected !== "point" && !selFaded && hoverIndex === spec.selectedIndex);
+    // Hovering a line marks the sample the tooltip reads out with a dot, the vertex nearest the
+    // pointer (a tie keeps the earlier one); a dot on the picked point itself draws nothing over
+    // that point's pick halo. A fade-drawn pick has no selected stroke, so hovering it draws the
+    // hover recipe.
+    let hoverSample = null;
+    if (layer.kind === "lines" && Array.isArray(layer.points?.[hoverIndex])) {
+      const v = layer.geometry[hoverIndex], hp = hitPoint(layer, hoverIndex);
+      let bd = Infinity;
+      for (let s = 0; s < v.length / 2; s++) {
+        const d = Math.hypot(v[2 * s] - hp.x, v[2 * s + 1] - hp.y);
+        if (d < bd - 1e-9) { bd = d; hoverSample = s; }
+      }
+    }
+    const hoverIsSelected = !!(spec.selected && !selFaded && hoverIndex === spec.selectedIndex
+      && (spec.selected !== "point" || hoverSample === spec.selectedSample));
     if (hoverIsSelected) {
       assertNoHighlight(tip.hi, `${key}/hover-on-selected`);
       if (tip.sel < 1) throw new Error(`${key}: g.sel gone while hovering the selected mark`);
@@ -2936,7 +2950,13 @@ try {
       passed.push(`${key}/hover-on-selected-noop`);
     } else {
     assertHoverRecipe(tip.hi, key, closedHover, wantDark);
-    if (layer.kind === "lines") {
+    if (layer.kind === "lines" && hoverSample !== null) {
+      // A dot outside the hovered sample, not a stroke along the line.
+      const v = layer.geometry[hoverIndex], e = tip.hi.edge;
+      if (e?.tag !== "circle" || Math.abs(Number(e.cx) - v[2 * hoverSample]) > 1.2 || Math.abs(Number(e.cy) - v[2 * hoverSample + 1]) > 1.2) {
+        throw new Error(`${key}: line hover ${JSON.stringify(e)}, want a dot on sample ${hoverSample}`);
+      }
+    } else if (layer.kind === "lines") {
       if (tip.hi.edge?.tag !== "path") {
         throw new Error(`${key}: whole-line hover is not a path ${JSON.stringify(tip.hi.edge)}`);
       }
@@ -3194,6 +3214,14 @@ try {
               `give the target layer a resolvable \`colors\` or a matching \`meta\` entry with \`tintColor\``,
             );
           }
+          // The previous entry's preview may still fade this series (a line's entry fades the
+          // legend's other series): leave first, so the baseline is the mark's own colour.
+          await page.evaluate((k) => {
+            const span = document.querySelector(`#coords_${k}`);
+            const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+            let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+            sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+          }, key);
           lumBefore = meanLuminance(PNG.sync.read(
             await stableClipShot(key, hp0.x, hp0.y, { expectLum }),
           ));
@@ -3207,12 +3235,14 @@ try {
         // frame (hover.ts). Leave first so the previous g.link is not this case's answer,
         // then wait until the linked geometry is the pin for this entry.
         const linkLanded = (li) => {
+          // A line beside other lines is previewed by the fade, kept; a lone line keeps a halo.
           if (tl0.kind === "lines") {
-            const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
+            if (li.kept.includes(`${tl0.id}:${idx0}`)) return true;
+            const ringKid = li.kids.find((kk) => kk.kind === "ring");
             return pathCoverError(ringKid?.paths?.[0]?.d, tl0.geometry[idx0]) === null;
           }
           if (tl0.kind === "polyline" || tl0.kind === "segments") {
-            const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
+            const ringKid = li.kids.find((kk) => kk.kind === "ring");
             const ln = ringKid?.lines?.[0];
             return !!ln && Math.abs(Number(ln.x1) - hp0.x1) <= 1.2 && Math.abs(Number(ln.y1) - hp0.y1) <= 1.2;
           }
@@ -3509,11 +3539,11 @@ try {
       // exactly the clicked hit's own recipe (2 shapes — fill+edge — for a closed kind, 1 ring
       // for an open one), independent of whatever `selected=` hydration was there before — a
       // spec that bakes a `selected=` index no longer "grows" g.sel on click, it's simply reset.
-      // A picked point keeps its line's hover outline under the pointer; a closed mark's pick
-      // is drawn by the fade and keeps its hover fill and edge (#394); any other pick is the
-      // hovered mark itself, which draws no hover chrome once selected.
+      // A closed mark's pick is drawn by the fade and keeps its hover fill and halo (#394); any
+      // other pick, a picked point on a line included, is the hovered mark itself (the line's
+      // hover dot sits on the sample just picked), which draws no hover chrome once selected.
       const fadePick = echo.picked.includes(`${layer.id}:${clickIdx}`);
-      const wantHi = fadePick ? 2 : clickSample === null ? 0 : 1;
+      const wantHi = fadePick ? 2 : 0;
       if (echo.hi !== wantHi) throw new Error(`${key}/click-echo: g.hi=${echo.hi} over the echo, expected ${wantHi}`);
       const expectSel = closedHover ? 2 : 1;
       if (echo.sel !== expectSel) {

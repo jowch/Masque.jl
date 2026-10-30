@@ -539,7 +539,10 @@ try {
     if (sTip.hi.edge) break;
     await new Promise((r) => setTimeout(r, 200));
   }
-  if (!sTip?.hi.edge || sTip.hi.edge.stroke !== STYLED || sTip.hi.edge.width !== "3" || !sTip.hi.fill) {
+  // The halo's core band is `hover_width` wide; outside a marker only half its stroke shows, so
+  // the stroke is twice the band plus the inner casing.
+  const e = sTip?.hi.edge, band = e?.halo?.align === "out" ? (Number(e.width) - 2 * e.halo.u) / 2 : Number(e?.width);
+  if (!e || e.stroke !== STYLED || Math.abs(band - 3) > 0.05 || !sTip.hi.fill) {
     throw new Error(`scatter_styled: hover ${JSON.stringify(sTip?.hi)} (want edge ${STYLED} at width 3, plus the fill)`);
   }
   passed.push("overlaystyle");
