@@ -63,19 +63,23 @@ block in the figure that `masque` isn't given would look live and do
 nothing, so `masque` raises an error naming its kind. Name it, or take it
 out of the figure.
 
-Buttons and text boxes are pictures for now, and `masque` warns when the
-figure has one, since the reader could click it and nothing would happen.
-A `SliderGrid` that `masque` isn't given only warns, because figures with
-one worked before `masque` could draw it. Its value labels use the grid's
-own `format` for sliders of up to 101 values (20 for an interval slider);
-past that, the browser writes the plain value.
+Text boxes are pictures for now, and `masque` warns when the figure has
+one, since the reader could click it and nothing would happen. A
+`SliderGrid` or `Button` that `masque` isn't given only warns, because
+figures with one worked before `masque` could draw it. A grid's value
+labels use its own `format` for sliders of up to 101 values (20 for an
+interval slider); past that, the browser writes the plain value. A
+`Button`'s field counts its clicks. With `onchange`, Masque sets the
+button's `clicks` before calling your function, so code listening to it
+with `on(b.clicks)` runs too.
 
 A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
 doesn't run yet: a click flips the box, and `masque` warns when a named
 checkbox has one.
 
-With WGLMakie loaded, `Slider` also names a slider from Bonito, so Julia
-asks which one you mean; write `Makie.Slider` instead.
+With WGLMakie loaded, `Slider` and `Button` also name controls from
+Bonito, so Julia asks which one you mean; write `Makie.Slider` and
+`Makie.Button` instead.
 
 In a static HTML export the controls still set the `@bind` value; only
 `onchange` needs a running notebook.

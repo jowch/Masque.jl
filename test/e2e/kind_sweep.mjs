@@ -876,7 +876,7 @@ try {
 
       // Each control sits on its block's box.
       const s0 = await screenOf();
-      for (const id of ["level", "show", "span", "fine", "pick", "tall", "grid", "sure"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall", "grid", "go", "sure"]) {
         const g = geo(id);
         if (layers.find((l) => l.id === id)?.kind !== "control") throw new Error(`${key}: no control layer ${id}`);
         const bb = await page.locator(`[data-masque-control="${id}"]`).boundingBox();
@@ -897,7 +897,7 @@ try {
       }, key);
       // The grid's name labels stay in the picture, so its sliders and value labels are
       // checked box by box.
-      const boxes = ["level", "show", "span", "fine", "pick", "tall", "sure"].map((id) => [id, geo(id)]);
+      const boxes = ["level", "show", "span", "fine", "pick", "tall", "sure", "go"].map((id) => [id, geo(id)]);
       geo("grid").sliders.forEach((s, i) => boxes.push([`grid-${i}`, s], [`grid-${i}-value`, s.valueLabel]));
       for (const [id, g] of boxes) {
         const png = PNG.sync.read(await page.screenshot({ clip: { x: s0.left + g.x * s0.sc + 1, y: s0.top + g.y * s0.sc + 1, width: Math.max(1, g.w * s0.sc - 2), height: Math.max(1, g.h * s0.sc - 2) } }));
@@ -1016,6 +1016,16 @@ try {
         v = await bondHas(/grid = \(3,\)/, v, "grid");
         if ((await lab.textContent()) !== "3 dB") throw new Error(`${key}/grid: value label ${await lab.textContent()}, want 3 dB`);
         passed.push(`${key}/slider-grid`);
+      }
+      // The button counts clicks, as Makie's `clicks` does.
+      {
+        const b = ctl("go", "button");
+        if ((await b.textContent()) !== "Go") throw new Error(`${key}/button: label ${await b.textContent()}, want Go`);
+        await b.click();
+        v = await bondHas(/go = 1\b/, v, "button");
+        await b.click();
+        v = await bondHas(/go = 2\b/, v, "button");
+        passed.push(`${key}/button`);
       }
       // A checkbox drawn as Makie draws it (#428): its square is `size` across in the middle of
       // the box, filled in its checked colour with the mark showing once ticked; Space unticks it.

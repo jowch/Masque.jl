@@ -168,19 +168,18 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
     end
 
     @testset "a block masque shows as a picture is a warning naming its kind (#426)" begin
-        # A `Button` or `Textbox` would look live and do nothing too, but figures with one
-        # worked before, so it warns instead of failing.
+        # A `Textbox` would look live and do nothing too, but figures with one worked before, so
+        # it warns instead of failing.
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
-        Button(fig[2, 1]; label = "Go")
-        Textbox(fig[3, 1])
-        @test_logs (:warn, r"has a Button and a Textbox, which masque shows as a picture.*PlutoUI's Button"s) masque(fig)
-        fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
-        Button(fig[2, 1])
-        @test_logs (:warn, r"has a Button, which.*PlutoUI's Button") masque(fig)
-        # A grid masque isn't given is a warning too, not the error other blocks get (#430).
+        Textbox(fig[2, 1])
+        @test_logs (:warn, r"has a Textbox, which masque shows as a picture.*PlutoUI's TextField"s) masque(fig)
+        # A grid or a button masque isn't given is a warning too, not the error other blocks get:
+        # masque began drawing them in a patch release (#430, #431).
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
         SliderGrid(fig[2, 1], (label = "a", range = 1:3))
-        @test_logs (:warn, r"SliderGrid that masque wasn't given.*Name it to make its sliders live"s) masque(fig)
+        @test_logs (:warn, r"a SliderGrid that masque wasn't given.*Name it to make it live"s) masque(fig)
+        Button(fig[3, 1])
+        @test_logs (:warn, r"a SliderGrid and a Button that masque wasn't given, so they show as pictures.*Name each one"s) masque(fig)
     end
 
     @testset "a slider grid is a field holding a tuple of its slider values (#430)" begin
@@ -223,6 +222,28 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         g = _layer(masque(fig, (fine = fine,)).manifest, "fine")["geometry"]
         @test !haskey(only(g["sliders"])["valueLabel"], "labels") && calls[] == before
         @test length(JSON3.write(g)) < 2000
+    end
+
+    @testset "a button is a field counting its clicks, drawn as Makie draws it (#431)" begin
+        fig = Figure(); Axis(fig[1, 1])
+        clicked = Ref(0)
+        b = Button(fig[2, 1]; label = "Go", cornerradius = 8, strokewidth = 1, strokecolor = :black, buttoncolor = :yellow)
+        on(n -> clicked[] = n, b.clicks)
+        w = @test_logs masque(fig, (go = b,))
+        @test Masque.initial_bond(w).go == 0
+        s = w.manifest["scaling"]
+        g = _layer(w.manifest, "go")["geometry"]
+        @test g["control"] == "button" && g["value"] == 0 && g["caption"] == "Go"
+        @test g["radius"] ≈ 8s && g["stroke"] ≈ 1s && g["fontsize"] ≈ b.fontsize[] * s
+        @test g["colors"][1] == Masque._css_color(Makie.to_color(:yellow))
+        @test g["strokeColor"] == Masque._css_color(Makie.to_color(:black))
+        @test length(g["textColors"]) == 3
+        @test Masque.bond_from_js(w, Dict("go" => _env("go", 2))).go == 2
+        @test_throws ArgumentError Masque.bond_from_js(w, Dict("go" => _env("go", -1)))
+        @test_throws ArgumentError Masque.bond_from_js(w, Dict("go" => _env("go", true)))
+        # A click reaches the block's own `clicks`, so code listening to it runs.
+        Masque._sync_controls!([Masque.BlockControl(b, :go)], Dict("go" => _env("go", 3)))
+        @test b.clicks[] == 3 && clicked[] == 3
     end
 
     @testset "the picture leaves the block's box empty, and the figure keeps its drawing" begin
