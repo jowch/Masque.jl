@@ -697,6 +697,9 @@ end
         @test lws["hlines"] == 16 * m["scaling"]
         @test lws["lines"] == built(a, thin).linewidth * m["scaling"]
         @test lws["bars"] === nothing && lws["poly"] === nothing
+        # a layer from bare vertices ships Makie's default width
+        bare = SegmentInteractable(a, Point2f[(1, 1), (2, 2)]; mode = :polyline, id = :bare)
+        @test Masque.build_manifest([bare], c)["layers"][1]["linewidth"] == round(1.5 * c.scaling; digits = 2)
     end
 
     @testset "placement attributes move the hit target with the mark (#245)" begin

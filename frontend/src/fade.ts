@@ -45,8 +45,9 @@ export function fadeLook(hit: Hit): boolean {
     return !!g && (g[0] === "circle" || g[0] === "rect" || g[0] === "poly" || (g[0] === "path" && hit.sample_ === undefined))
 }
 
-// Whether keeping `hits` fades anything in `scope`: some drawn element of it is not among them.
-// A line picked or hovered alone on its axis has nothing to fade, so it keeps its halo.
+// Whether keeping `hits` fades anything in `scope`: some drawn element of it is not among them,
+// on any axis. A line picked or hovered with no other line in scope has nothing to fade, so it
+// keeps its halo.
 export function fadesOthers(scope: HitLayer[], hits: Hit[]): boolean {
     const kept = new Map<HitLayer, Set<number>>()
     for (const h of hits) {
@@ -691,7 +692,9 @@ export function createFade(host: FadeHost): Fade {
     }
 
     function preview(s: Slot, key: string | null, hits: Hit[] | null, scope: HitLayer[]): void {
-        if (key === s.key && (key === null || s.kept)) return
+        // Nothing previewed before or now (a lone line hovered move after move): no redraw.
+        if (!hits && !s.kept) { s.key = key; return }
+        if (key !== null && key === s.key && s.kept) return
         s.key = hits ? key : null
         s.kept = hits ? keptBy(hits) : null
         s.scope = hits ? scope : []

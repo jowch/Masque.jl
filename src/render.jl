@@ -187,8 +187,8 @@ function _layer_dict(i, L::HitLayer, ctx::InteractionContext)
         t === nothing || (d["tol"] = round(Int, t * ctx.scaling))
     end
     if L.kind in (:segments, :polyline, :lines)
-        w = line_width(i)
-        w === nothing || (d["linewidth"] = round(w * ctx.scaling; digits = 2))
+        # A layer built from bare vertices has no plot to read: Makie's default line width.
+        d["linewidth"] = round(something(line_width(i), 1.5) * ctx.scaling; digits = 2)
     end
     s = selects(i)
     s === nothing || (d["selects"] = string(s))

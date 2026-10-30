@@ -42,7 +42,8 @@ All notable changes to this project are documented here. The format is based on
 - Lines fade like other plots. Hovering a line fades the other lines and marks the point the
   tooltip reads out, instead of drawing grey over the whole line. Hovering or picking a legend
   entry fades the other lines too, and the picked line keeps its own colour instead of a grey
-  wash. Hovering a legend entry no longer outlines each of its points.
+  wash. Hovering a legend entry no longer outlines each of its points. A line with a
+  `hoverstyle` stroke gets that colour on the dot, not along the whole line.
 - A hover preview (a legend entry's or a line's) fades the rest less than a pick does: 35%
   of them still shows, against 20% for a pick.
 

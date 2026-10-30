@@ -7,7 +7,7 @@ import { afterEach, describe, it, expect, vi } from "vitest"
 import { mount } from "../src/overlay"
 import type { Manifest } from "../src/types"
 import { withFields } from "./fields"
-import { fadeKept, fadeLone } from "./fadekeys"
+import { fadeDraws, fadeKept, fadeLone } from "./fadekeys"
 import type { FadeEl } from "../src/fade"
 
 const cleanups: Array<() => void> = []
@@ -279,6 +279,24 @@ describe("lines join the fade", () => {
         await frame()
         expect(wrap()).toBeNull()
         expect(shadow.querySelector("svg.masque-edge g.hi .masque-halo-out > circle.masque-hi")).not.toBeNull()
+    })
+
+    it("moving along a lone line beside held picks never redraws the fade", async () => {
+        const m = lines()
+        m.layers = [m.layers[0], { id: "pts", kind: "circles", geometry: [900, 700, 20, 1000, 700, 20], payloads: [{}, {}],
+            axis: "ax1", events: ["click", "hover"], many: true }]
+        m.fields = ["pts"]
+        m.initial = { pts: { items: [{ layer: "pts", index: 0 }] } }
+        const { shadow, surface } = setup(m)
+        // Past the overlay's first frames, which re-place (and here, with no 2D canvas, redraw) it.
+        for (let k = 0; k < 30; k++) await frame()
+        const before = fadeDraws(shadow)
+        for (const x of [60, 80, 120, 160, 200, 240]) {
+            move(surface, x, 101)
+            await frame()
+        }
+        expect(fadeDraws(shadow)).toBe(before)
+        expect(shadow.querySelector("svg.masque-edge g.hi .masque-halo-out")).not.toBeNull()
     })
 
     it("a legend entry's hover fades the other lines, and draws no outline on the kept one", async () => {

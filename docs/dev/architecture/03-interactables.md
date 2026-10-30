@@ -84,11 +84,10 @@ Geometry layout by `kind` (all coords image-px, top-left origin):
 | `:polygons` | one flat ring per element, or a list of rings when that element has holes (exterior, then each hole) | even-odd across that element's rings, last element first, else the nearest element within `tol` of a ring | element index |
 | `:axis` | `nothing` (unbounded, `AxisInteractable`) or `Real[x,y,w,h]` bbox (bounded, `ColorbarInteractable`) | absent geometry = always-hit; bbox present = point-in-bbox; invert pixel via `AxisTransform` | `-1` (continuous); `valueaxis ≠ nothing` → 1-D `(; value)` |
 
-`linewidth` is an optional per-layer manifest field on `:segments`/`:polyline`/`:lines` layers:
-the plot's drawn line width (the widest of a per-element vector) in image px, present when the
-layer was built from a plot. The overlay's fade covers and keeps a line at that width, and a
-line's halo sits just outside it. A layer built from bare vertices has none; the fade then
-assumes Makie's default 1.5 logical px.
+`linewidth` is a per-layer manifest field on every `:segments`/`:polyline`/`:lines` layer: the
+plot's drawn line width (the widest of a per-element vector) in image px, or Makie's default 1.5
+logical px for a layer built from bare vertices. The overlay's fade covers and keeps a line at
+that width, and a line's halo sits just outside it.
 
 `tol` (the hit-test slack above) is an optional per-layer manifest field, `"tol"` (image px),
 present only when `hit_tol(i) !== nothing`. `SegmentInteractable` sets it from its `tol`
