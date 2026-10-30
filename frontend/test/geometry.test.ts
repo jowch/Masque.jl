@@ -1194,7 +1194,6 @@ describe("drag labels follow tooltip_sigdigits and keep trailing zeros", () => {
     })
 })
 
-// #262: a line hover reads out the nearest real sample, never an interpolated point.
 describe("closestPointOnPath: runs of edges skipped by their box match the full scan (#469)", () => {
     // The oracle is the scan this replaces: every finite edge, the first of equally near ones.
     function closestLinear(px: number, py: number, v: number[]): { dist: number; edge: number } | null {
@@ -1277,6 +1276,7 @@ describe("closestPointOnPath: runs of edges skipped by their box match the full 
     })
 })
 
+// #262: a line hover reads out the nearest real sample, never an interpolated point.
 describe("lineReadout", () => {
     const layer = (geometry: number[][], points: number[][], step?: HitLayer["step"]): HitLayer => ({
         id: "l", kind: "lines", geometry, payloads: [{ index: 1 }], axis: "ax1", events: ["hover"], points, ...(step ? { step } : {}),

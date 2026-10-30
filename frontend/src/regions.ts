@@ -12,7 +12,7 @@ type RegionIndex = {
     ids_: Int32Array
     cells_: Map<number, number[]>
     box_: Map<number, [number, number, number, number]> // i0, i1, j0, j1, inclusive
-    shapes_: Map<number, [string, string] | null>
+    shapes_: Map<number, [string, string, number] | null>
 }
 
 const indexes = new WeakMap<HitLayer, RegionIndex | null>()
@@ -74,7 +74,7 @@ export function regionCells(layer: HitLayer, id: number): readonly number[] {
     return (id !== 0 && regionIndex(layer)?.cells_.get(id)) || []
 }
 
-// Region `id`'s outline as a mask geometry, ["mask", fill, edge], built over the block of
+// Region `id`'s outline as a mask geometry, ["mask", fill, edge, side], built over the block of
 // cells around the region only, so a region on a photo-sized grid costs its own size.
 export function regionGeom(layer: HitLayer, id: number): unknown[] | null {
     const ri = regionIndex(layer)
@@ -93,7 +93,7 @@ export function regionGeom(layer: HitLayer, id: number): unknown[] | null {
         paths = maskPaths(sub, w, h, gg.xedges.slice(i0, i1 + 2), gg.yedges.slice(j0, j1 + 2))
         ri.shapes_.set(id, paths)
     }
-    return paths ? ["mask", paths[0], paths[1]] : null
+    return paths ? ["mask", ...paths] : null
 }
 
 // `hit` on a grid cell, standing for the cell's whole region when it has one: drawn as the

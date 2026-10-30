@@ -60,7 +60,23 @@ describe("grid masks (#335)", () => {
         expect(fill.split("Z").length - 1).toBe(4) // rows 0 and 2 whole, row 1 in two runs
         // Outer: 2 horizontal + 2 vertical; hole: 2 + 2.
         expect(edge.split("M").length - 1).toBe(8)
+        expect(h.geom_![3]).toBe(10) // a ring one cell wide: no 2 × 2 square fits in it
         expect(maskHit(L, emptyMask(L))).toBeNull()
+    })
+
+    it("give the width of the selection's narrowest piece, by the largest square in it (#463)", () => {
+        const L = layer(4, 3)
+        const m = emptyMask(L)
+        setBlock(m, 4, 1, 3, 1, 2, true) // columns 1..3, rows 1..2: 30 × 20
+        expect(maskHit(L, m)!.geom_![3]).toBe(20)
+        const apart = emptyMask(L)
+        apart[0] = apart[7] = 1 // cells (0, 0) and (3, 1), far apart: each one cell
+        expect(maskHit(L, apart)!.geom_![3]).toBe(10)
+        m[0] = 1 // the block plus a lone cell in the corner
+        expect(maskHit(L, m)!.geom_![3]).toBe(10)
+        m[0] = 0
+        m[3] = 1 // a bump below the block's right end, touching it: one piece, still 20 wide
+        expect(maskHit(L, m)!.geom_![3]).toBe(20)
     })
 
     it("marquee: add and subtract", () => {

@@ -36,7 +36,10 @@ field of the `@bind` value, which holds:
 | [`Textbox`](https://docs.makie.org/stable/reference/blocks/textbox) | the text last entered with Enter, or `nothing` before any |
 
 Each control takes the colors, sizes and labels you give the block, so
-it looks as it does in Makie. A `Textbox` checks its `validator` and
+it looks as it does in Makie. A `Menu` opens Makie's list of options,
+which the reader can also work with the arrow keys, Enter and Escape, and
+typing in the open list filters it unless the menu has
+`searchable = false`. A `Textbox` checks its `validator` and
 `restriction` as Makie does: the box turns red while the text fails, and
 Enter stores only text that passes. A few exceptions are listed under
 [Differences from Makie](@ref).
@@ -98,9 +101,10 @@ Bonito, so Julia asks which one you mean. Write `Makie.Slider` and
 A few things work differently in a notebook, because the browser draws
 each control and runs it without Julia.
 
-A `Menu` opens the browser's own list, so the list doesn't take the
-block's colors or font, and typing doesn't filter it. The closed menu
-looks as it does in Makie.
+A `Menu`'s own `filter` can't run in the browser. Typing in an open menu
+keeps the options whose label holds the text, ignoring case, as Makie's
+default does, and `masque` warns. To narrow the options another way, set
+the menu's `options` in `masque`'s own `onchange`.
 
 A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
 does nothing: a click always flips the box, and `masque` warns when a

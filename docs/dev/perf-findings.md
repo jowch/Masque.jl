@@ -710,6 +710,19 @@ commit (Julia 1.13.1, cloud box) as the layer's geometry in compact JSON, one sl
 
 Before the cap, one `0:0.001:10` slider made the manifest about 100 KB.
 
+### Menu layer
+
+A `Menu`'s `:control` layer (#429) carries what Makie draws for the open list: the cell height,
+four cell and two text colours, the arrow's two paths, size and colour, and the search
+placeholder. That adds about 410 B per menu whatever its length, on every `onchange` frame.
+Measured on the PR's first commit (fc185e8, Julia 1.13.1, cloud box) as the layer's geometry in
+compact JSON, before and after:
+
+| menu | before | after |
+|---|---:|---:|
+| 3 options | 238 B | 645 B |
+| 100 options | 1399 B | 1806 B |
+
 ### View warmup
 
 `bench/view_warmup.jl`, 2026-09-22, Julia 1.10.12, `OPENBLAS_NUM_THREADS=1`, two fresh processes
