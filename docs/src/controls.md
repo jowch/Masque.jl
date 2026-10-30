@@ -66,6 +66,10 @@ Buttons, text boxes and `SliderGrid` are pictures for now, and `masque`
 warns when the figure has one, since the reader could click it and
 nothing would happen.
 
+A `Checkbox`'s own `onchange`, the rule for what a click turns it into,
+doesn't run yet: a click flips the box, and `masque` warns when a named
+checkbox has one.
+
 With WGLMakie loaded, `Slider` also names a slider from Bonito, so Julia
 asks which one you mean; write `Makie.Slider` instead.
 

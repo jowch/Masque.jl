@@ -6951,6 +6951,44 @@ describe("block controls (#345)", () => {
         expect(box.style.getPropertyValue("--masque-ctl-off")).toBe("rgb(1,1,1)")
     })
 
+    it("a checkbox draws Makie's square and checkmark on the square alone (#428)", () => {
+        const m = controlsManifest()
+        m.layers.push({ id: "fine", kind: "control", axis: "", events: ["change"], payloads: [], label: "fine",
+            geometry: { control: "checkbox", x: 950, y: 700, w: 40, h: 30, value: false, size: 22, radius: 1.65, stroke: 3,
+                color: "rgb(1,1,1)", off: "rgb(2,2,2)", strokeOn: "rgb(3,3,3)", strokeOff: "rgb(4,4,4)",
+                markOn: "rgb(5,5,5)", markOff: "rgb(6,6,6)", markSize: 18.7, mark: "M0 0L1 1Z" } })
+        m.fields = [...(m.fields ?? []), "fine"]
+        m.initial!.fine = { layer: "fine", index: 0, payload: false }
+        m.layers.push({ id: "ex", kind: "control", axis: "", events: ["change"], payloads: [], label: "ex",
+            geometry: { control: "checkbox", x: 950, y: 750, w: 30, h: 30, value: true, size: 30, markSize: 20, markChar: "x",
+                color: "rgb(1,1,1)", off: "rgb(2,2,2)", markOn: "rgb(5,5,5)", markOff: "rgb(6,6,6)" } })
+        m.fields = [...(m.fields ?? []), "ex"]
+        m.initial!.ex = { layer: "ex", index: 0, payload: true }
+        const { host, script } = setup()
+        mount(script, m)
+        const box = ctl(host, "fine")
+        const svg = box.querySelector("svg") as SVGSVGElement
+        const rect = box.querySelector("svg rect") as SVGRectElement
+        const mark = box.querySelector("svg path") as SVGPathElement
+        const input = box.querySelector("input") as HTMLInputElement
+        // The square, 22 of the box's 40 × 30, sits in its middle, and the input covers it alone.
+        for (const el of [svg, input] as (HTMLElement | SVGElement)[]) {
+            expect([el.style.left, el.style.top, el.style.width, el.style.height]).toEqual(["22.5%", `${(50 * 8) / 30}%`, "55%", `${(100 * 22) / 30}%`])
+        }
+        expect([rect.getAttribute("width"), rect.getAttribute("rx")]).toEqual(["22", "1.65"])
+        expect([rect.getAttribute("fill"), rect.getAttribute("stroke"), rect.getAttribute("stroke-width")]).toEqual(["rgb(2,2,2)", "rgb(4,4,4)", "3"])
+        expect(mark.getAttribute("d")).toBe("M0 0L1 1Z")
+        expect(mark.getAttribute("transform")).toBe("translate(11 11) scale(18.7 -18.7)")
+        expect(mark.getAttribute("fill")).toBe("rgb(6,6,6)")
+        input.checked = true
+        input.dispatchEvent(new Event("change", { bubbles: true }))
+        expect(val(host).fine).toEqual({ layer: "fine", index: 0, payload: true })
+        expect([rect.getAttribute("fill"), rect.getAttribute("stroke"), mark.getAttribute("fill")]).toEqual(["rgb(1,1,1)", "rgb(3,3,3)", "rgb(5,5,5)"])
+        // A character mark is drawn as text, in the mark's colour.
+        const text = ctl(host, "ex").querySelector("svg text") as SVGTextElement
+        expect([text.textContent, text.getAttribute("font-size"), text.getAttribute("fill")]).toEqual(["x", "20", "rgb(5,5,5)"])
+    })
+
     it("a release commits the field; moving alone doesn't", () => {
         const m = controlsManifest()
         const { host, script } = setup()

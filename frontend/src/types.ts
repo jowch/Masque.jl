@@ -95,6 +95,18 @@ export interface ControlGeometry {
     knobOn?: [number, number]
     knob?: number           // the knob's diameter
     duration?: number       // seconds the knob takes to slide
+    // Checkbox, as Makie draws it; lengths are image px. `color` and `off` fill the box when
+    // checked and unchecked.
+    size?: number           // the square's side, centred in the box
+    radius?: number         // its corner radius
+    stroke?: number         // its outline width
+    strokeOn?: string
+    strokeOff?: string
+    markOn?: string         // the checkmark's colour when checked, and under the pointer when not
+    markOff?: string
+    markSize?: number       // the checkmark's size; its path is in units of it, y up
+    mark?: string           // an SVG path; absent, a plain tick
+    markChar?: string       // a character drawn as the checkmark instead of a path
     // Menu: the closed menu as Makie draws it, its box colour in `off`.
     text?: string           // the text colour
     prompt?: string         // shown before a choice

@@ -876,7 +876,7 @@ try {
 
       // Each control sits on its block's box.
       const s0 = await screenOf();
-      for (const id of ["level", "show", "span", "fine", "pick", "tall"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall", "sure"]) {
         const g = geo(id);
         if (layers.find((l) => l.id === id)?.kind !== "control") throw new Error(`${key}: no control layer ${id}`);
         const bb = await page.locator(`[data-masque-control="${id}"]`).boundingBox();
@@ -895,7 +895,7 @@ try {
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         sr.querySelector(".masque-controls").style.visibility = "hidden";
       }, key);
-      for (const id of ["level", "show", "span", "fine", "pick", "tall"]) {
+      for (const id of ["level", "show", "span", "fine", "pick", "tall", "sure"]) {
         const g = geo(id);
         const png = PNG.sync.read(await page.screenshot({ clip: { x: s0.left + g.x * s0.sc + 1, y: s0.top + g.y * s0.sc + 1, width: Math.max(1, g.w * s0.sc - 2), height: Math.max(1, g.h * s0.sc - 2) } }));
         let ink = 0;
@@ -992,6 +992,31 @@ try {
       await ctl("pick", "select").selectOption("2");
       v = await bondHas(/level = 10, show = false, span = \(1, 5\), fine = true, pick = "z"/, v, "menu");
       passed.push(`${key}/interval-checkbox-menu`);
+      // A checkbox drawn as Makie draws it (#428): its square is `size` across in the middle of
+      // the box, filled in its checked colour with the mark showing once ticked; Space unticks it.
+      {
+        const g = geo("sure");
+        const s1 = await screenOf();
+        const art = ctl("sure", "svg");
+        const bb = await art.boundingBox();
+        const want = { x: s1.left + (g.x + (g.w - g.size) / 2) * s1.sc, y: s1.top + (g.y + (g.h - g.size) / 2) * s1.sc, w: g.size * s1.sc };
+        if (!bb || Math.abs(bb.x - want.x) > 1.5 || Math.abs(bb.y - want.y) > 1.5 || Math.abs(bb.width - want.w) > 1.5 || Math.abs(bb.height - want.w) > 1.5) {
+          throw new Error(`${key}/checkbox-drawn: square ${JSON.stringify(bb)}, want ${JSON.stringify(want)}`);
+        }
+        const rect = ctl("sure", "svg rect");
+        const markShown = () => ctl("sure", "svg .mark").evaluate((el) => getComputedStyle(el).visibility === "visible");
+        if ((await rect.getAttribute("fill")) !== g.off) throw new Error(`${key}/checkbox-drawn: fill ${await rect.getAttribute("fill")}, want ${g.off}`);
+        await page.mouse.move(0, 0);
+        if (await markShown()) throw new Error(`${key}/checkbox-drawn: mark shows before the box is ticked`);
+        await ctl("sure").click();
+        v = await bondHas(/sure = true/, v, "checkbox-drawn");
+        if ((await rect.getAttribute("fill")) !== g.color) throw new Error(`${key}/checkbox-drawn: fill ${await rect.getAttribute("fill")}, want ${g.color}`);
+        await page.mouse.move(0, 0);
+        if (!(await markShown())) throw new Error(`${key}/checkbox-drawn: mark hidden on a ticked box`);
+        await page.keyboard.press("Space");
+        v = await bondHas(/sure = false/, v, "checkbox-space");
+        passed.push(`${key}/checkbox-drawn`);
+      }
       console.error(`OK  ${key} — ${v.slice(0, 120)}`);
       continue;
     }

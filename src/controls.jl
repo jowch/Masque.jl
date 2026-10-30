@@ -96,9 +96,50 @@ function hitlayers(i::BlockControl, ctx)
         g["off"] = _css_color(b.framecolor_inactive[])
         _toggle_geometry!(g, b, ctx)
     elseif b isa Makie.Checkbox
-        g["color"] = _css_color(b.checkboxcolor_checked[])
+        _checkbox_geometry!(g, b, ctx)
     end
     return [HitLayer(i.id, :control, g, Any[], Symbol(""), events(i), string(i.id))]
+end
+
+# Makie's checkbox (Makie/src/makielayout/blocks/checkbox.jl): a rounded square `size` across in
+# the middle of the box, filled and stroked in its checked or unchecked colours, and a checkmark
+# `size·checkmarksize` across that shows when checked, or in its unchecked colour under the
+# pointer. Lengths are image px. A click flips it: the block's own `onchange` isn't run (see
+# `_warn_checkbox_rule`).
+function _checkbox_geometry!(g, b::Makie.Checkbox, ctx)
+    s = ctx.scaling
+    sz = Float64(b.size[])
+    g["size"] = sz * s
+    g["radius"] = Float64(b.roundness[]) * sz / 2 * s
+    g["stroke"] = Float64(b.checkboxstrokewidth[]) * s
+    g["color"] = _css_color(b.checkboxcolor_checked[])
+    g["off"] = _css_color(b.checkboxcolor_unchecked[])
+    g["strokeOn"] = _css_color(b.checkboxstrokecolor_checked[])
+    g["strokeOff"] = _css_color(b.checkboxstrokecolor_unchecked[])
+    g["markOn"] = _css_color(b.checkmarkcolor_checked[])
+    g["markOff"] = _css_color(b.checkmarkcolor_unchecked[])
+    g["markSize"] = sz * Float64(b.checkmarksize[]) * s
+    mark = b.checkmark[]
+    if mark isa AbstractChar
+        g["markChar"] = string(mark)
+    else
+        path = _marker_svg_path(mark)
+        path === nothing || (g["mark"] = path)
+    end
+    return g
+end
+
+# Makie's `onchange` decides what a click turns a checkbox into, and is meant for radio buttons,
+# whose rule unticks the others. Running it ahead of a click would run those side effects when
+# the widget is drawn, so masque leaves it out and a click flips the box; it says so once.
+function _warn_checkbox_rule(interactables)
+    for i in interactables
+        i isa BlockControl && i.block isa Makie.Checkbox || continue
+        i.block.onchange[] === (!) && continue
+        @warn "masque: checkbox :$(i.id) has its own `onchange`, which masque doesn't run yet, " *
+            "so a click flips it. Set the box from your own code instead (see #457)." maxlog = 1
+    end
+    return nothing
 end
 
 # Makie's toggle (Makie/src/makielayout/blocks/toggle.jl): a rounded track `length` long and
@@ -243,6 +284,7 @@ const _PICTURE_BLOCKS = Union{Makie.Button, Makie.Textbox, Makie.SliderGrid}
 # warning. A `SliderGrid`'s sliders aren't in `fig.content`, so only the grid itself counts.
 function _check_unnamed_blocks(fig, interactables)
     _warn_picture_blocks(fig)
+    _warn_checkbox_rule(interactables)
     named = Base.IdSet{Any}(i.block for i in interactables if i isa BlockControl)
     left = [b for b in _figure_blocks(fig) if !(b in named)]
     isempty(left) && return nothing
