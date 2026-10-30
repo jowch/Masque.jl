@@ -218,16 +218,14 @@ end
 # tell which of two crossing marks is on top (#462); the manifest's own order is the hit-test
 # precedence, which a hand-written list sets.
 function _draw_order(fig, plotmap)
-    atoms = try
-        Makie.collect_atomic_plots(fig.scene)
-    catch
-        return Dict{Symbol, Int}()
-    end
-    atoms = atoms[sortperm(Makie.zvalue2d.(atoms); alg = Base.Sort.DEFAULT_STABLE)]
-    place = IdDict{Any, Int}(a => k for (k, a) in enumerate(atoms))
     out = Dict{Symbol, Int}()
+    atoms = _painted_atoms(fig)
+    atoms === nothing && return out
+    place = IdDict{Any, Int}(a => k for (k, a) in enumerate(atoms))
     for (p, ids) in plotmap
-        k = p isa Makie.AbstractPlot ? maximum((get(place, a, 0) for a in Makie.collect_atomic_plots(p)); init = 0) : 0
+        parts = p isa Makie.AbstractPlot ? _atomic_parts(p) : nothing
+        parts === nothing && continue
+        k = maximum((get(place, a, 0) for a in parts); init = 0)
         k == 0 && continue
         for id in ids
             occursin(':', string(id)) || (out[id] = k)

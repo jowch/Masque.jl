@@ -406,6 +406,12 @@ describe("a faded line crossing a kept mark", () => {
             .toEqual([true])
     })
 
+    it("puts nothing back on a 3D axis, where depth decides which line is in front", () => {
+        const ls = four()
+        const kept = new Map(ls.map((l) => [l, new Set(l.id === "s2" ? [0] : [])]))
+        expect(punchSteps(ls, kept, (l) => box(l), 1.5, undefined, true).map((s) => s.keep)).toEqual([true])
+    })
+
     it("leaves closed marks over closed marks alone", () => {
         const pts: Manifest["layers"][number] = { id: "p", kind: "circles", geometry: [200, 200, 20, 210, 200, 20], payloads: [{}, {}],
             axis: "ax1", events: ["click"] }

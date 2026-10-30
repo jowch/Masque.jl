@@ -145,6 +145,9 @@ function paintRank(layer: HitLayer): Map<number, number> {
     return r
 }
 
+// A line's box walks its vertices: found once per line, as a layer's geometry never changes.
+const lineBoxes = new WeakMap<HitLayer, Map<number, Box | null>>()
+
 // One step of punching an axis's kept marks out of its cover: punch a kept element out, or put
 // a faded one's cover back.
 export interface PunchStep { layer: HitLayer; k: number; keep: boolean }
@@ -154,14 +157,15 @@ export interface PunchStep { layer: HitLayer; k: number; keep: boolean }
 // a faded line drawn over a kept mark would show at full strength where they meet (#462): such a
 // faded element's cover is put back after the kept one is punched, as the backend drew it. Only
 // pairs with a line in them are put back; a closed pick under a later faded closed mark is
-// repainted instead (a circle) or stays a known gap. A layer's `draw` says where the backend
+// repainted instead (a circle) or stays a known gap, as does any crossing on a 3D axis
+// (`depth`). A layer's `draw` says where the backend
 // draws its plot; without it on every layer in scope (a figure's layers listed by hand, with
 // `auto = false`) only a layer's own elements are put back over each other, since the
 // manifest's order is the hit test's, not the drawing's. With `within`, only kept elements
 // whose box meets it.
 export function punchSteps(
     layers: HitLayer[], kept: Map<HitLayer, Set<number>>, boxOf: (layer: HitLayer, k: number) => Box | null,
-    pad: number, within?: Box,
+    pad: number, within?: Box, depth = false,
 ): PunchStep[] {
     const z = new Map<HitLayer, number>()
     const drawn = [...kept.keys()].every((l) => l.draw !== undefined)
@@ -178,8 +182,9 @@ export function punchSteps(
         }
     }
     const over = new Map<HitLayer, Set<number>>()
-    // A line's box walks its vertices: found once, not once per kept mark.
-    const lineBoxes = new Map<HitLayer, Map<number, Box | null>>()
+    // On a 3D axis the backend's depth test, not the paint order, decides which line is in
+    // front, so nothing is put back there (#462 stays a known gap on Axis3).
+    if (depth) return keeps.map(({ layer, k }) => ({ layer, k, keep: true }))
     const boxAt = (layer: HitLayer, j: number): Box | null => {
         if (layer.kind !== "lines") return boxOf(layer, j)
         let b = lineBoxes.get(layer)
@@ -659,7 +664,7 @@ export function createFade(host: FadeHost): Fade {
             }
         } else {
             for (const [layer, ks] of kept) raised += coveredPicks(layer, ks).length
-            covered = punchSteps(m.layers, kept, boxOf, PAD_DIM).filter((s) => !s.keep).length
+            covered = punchSteps(m.layers, kept, boxOf, PAD_DIM, undefined, !!m.transforms[axis]?.is3d).filter((s) => !s.keep).length
         }
         // What the canvases hold, for tests and the e2e drivers (the pixels are not inspectable
         // in every environment): the counts as attributes, the keys as a property.
@@ -720,7 +725,8 @@ export function createFade(host: FadeHost): Fade {
     // many faded elements' covers were put back.
     const punch = (c: CanvasRenderingContext2D, m: Manifest, kept: Map<HitLayer, Set<number>>, bg: string, within?: Box): number => {
         let back = 0
-        const steps = punchSteps(m.layers, kept, boxOf, PAD_DIM, within)
+        const axis = kept.keys().next().value?.axis
+        const steps = punchSteps(m.layers, kept, boxOf, PAD_DIM, within, !!(axis && m.transforms[axis]?.is3d))
         // A run of steps on one layer the same way is one path, so a crowd of picks is one fill.
         for (let i = 0; i < steps.length;) {
             const { layer, keep } = steps[i], ks: number[] = []

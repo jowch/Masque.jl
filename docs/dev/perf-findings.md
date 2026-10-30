@@ -206,6 +206,7 @@ sets them, so each was measured by inspecting a built manifest with the same Msg
 | `fields`, `initial` | once per manifest (#335) | ~10–20 B per field: its id twice, plus its start (`null` for a pick; a box's four bounds) |
 | `brush` | the target of a `selects` box | ~15 B |
 | `many` | each `select = :many` layer (#335) | 13 B (`payload_envelope.jl` §K) |
+| `draw` | each layer whose plot `masque` knows (#462) | 6–8 B (key 5 B + a small integer); `payload_envelope.jl` at `d31f6e1` moved only the 1 000-point scatter manifest, by 6 B, and the two `:many` scatters by 0.1 KB |
 | `groups`, `group` | once per `linked(...)` group, and a tag on each member layer (#346) | under 0.1 KB by position; with `key`, `rows` adds one small integer per mark (`payload_envelope.jl` §M) |
 | `regions` | each grid layer given `regions = R` (#359) | `[id, n, …]` runs over the row-major cells, one pair per region edge crossed along a row (`payload_envelope.jl` §L) |
 
