@@ -7023,7 +7023,9 @@ describe("block controls (#345)", () => {
         expect(options.map((o) => o.classList.contains("even"))).toEqual([false, true, false])
         options[2].dispatchEvent(new PointerEvent("pointermove", { bubbles: true }))
         expect(options[2].classList.contains("act")).toBe(true)
-        options[2].click()
+        // A press on one option released on another picks the second, as in Makie.
+        options[0].dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true }))
+        options[2].dispatchEvent(new PointerEvent("pointerup", { button: 0, bubbles: true }))
         expect(list.hidden).toBe(true)
         expect(input.value).toBe("cherry")
         expect(val(host).pick).toEqual({ layer: "pick", index: 0, payload: 2 })

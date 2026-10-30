@@ -38,7 +38,8 @@ field of the `@bind` value, which holds:
 Each control takes the colors, sizes and labels you give the block, so
 it looks as it does in Makie. A `Menu` opens Makie's list of options,
 which the reader can also work with the arrow keys, Enter and Escape, and
-typing in the open list filters it. A `Textbox` checks its `validator` and
+typing in the open list filters it unless the menu has
+`searchable = false`. A `Textbox` checks its `validator` and
 `restriction` as Makie does: the box turns red while the text fails, and
 Enter stores only text that passes. A few exceptions are listed under
 [Differences from Makie](@ref).

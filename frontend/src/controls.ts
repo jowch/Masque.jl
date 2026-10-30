@@ -408,7 +408,19 @@ function buildMenu(layer: HitLayer, g: ControlGeometry, m: Manifest, box: HTMLEl
     list.setAttribute("aria-label", label)
     list.hidden = true
     // A press in the list, on an option or its scrollbar, keeps the focus on the box.
-    list.addEventListener("pointerdown", (e) => e.preventDefault())
+    // Makie picks the option under the release of a press that began on the list, so a press
+    // can slide to another option before it lets go.
+    let pressed = false
+    list.addEventListener("pointerdown", (e) => {
+        e.preventDefault()
+        pressed = e.button === 0
+    })
+    list.addEventListener("pointerup", (e) => {
+        if (!pressed) return
+        pressed = false
+        const i = cells.indexOf((e.target as Element).closest?.("[role=option]") as HTMLDivElement)
+        if (i >= 0) pick(i)
+    })
     const cells = labels.map((text, i) => {
         const o = document.createElement("div")
         o.setAttribute("role", "option")

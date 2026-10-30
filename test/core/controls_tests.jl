@@ -408,8 +408,9 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         c(x) = Masque._css_color(Makie.to_color(x))
         @test g["cellColors"] == [c(:green), c(:red), c(:white), c(:gray)]
         @test g["optionText"] == [c(:blue), c(:yellow)]
-        # A cell is its text's height plus the bottom and top padding, as Makie sizes it.
-        @test 20s < g["cell"] < (20 * 1.5 + 9) * s
+        # A cell is its text's height plus the bottom and top padding, as Makie sizes it: more
+        # than the font size, which is what a failed measurement falls back to.
+        @test (20 + 9) * s < g["cell"] < (20 * 1.5 + 9) * s
         @test g["direction"] == "up"
         @test g["arrow"]["size"] ≈ 14s && g["arrow"]["inset"] ≈ 12s
         @test startswith(g["arrow"]["path"], "M") && g["arrow"]["path"] != g["arrow"]["flip"]
