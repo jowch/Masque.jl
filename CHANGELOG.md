@@ -31,6 +31,10 @@ All notable changes to this project are documented here. The format is based on
   instead of being pushed back over the plot. It still sits above the mark, and moves below
   it or sideways only at the edge of the browser window. In browsers without the Popover API
   (before Safari 17 and Firefox 125) it stays inside the figure as before.
+- The first widget in a session shows in under a second instead of after 15 to 25 s, and
+  its first pick, pan or orbit answers right away instead of after several seconds. Masque
+  now compiles that work when it is installed, which takes about 2 minutes longer, once per
+  backend. To turn this off, see the troubleshooting page.
 
 ### Fixed
 - On `backend = :webgl`, a line with gaps, such as a `contour!` or a `lines!` with `NaN`
