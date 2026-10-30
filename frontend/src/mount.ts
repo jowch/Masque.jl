@@ -37,21 +37,25 @@ const HOVER_FILL_OPACITY = 0.18
 const SELECTED_FILL_OPACITY = 0.35
 // How much of a plot's unpicked marks still shows once it holds picks (fade.ts).
 const UNPICKED_OPACITY = 0.2
+// What a preview (a legend entry's or a line's hover) leaves of the marks it fades: more than a pick.
+const PREVIEW_OPACITY = 0.35
 
 // Fill/edge split highlight (highlight.ts's makeHiElement, the default for every layer without
 // an explicit hoverstyle stroke). The fill BRIGHTENS (color-dodge, source #141414 — measured
 // across a 10-colour palette as the only candidate that never rotated hue >8° and never dimmed
-// a mark). The edge stroke is its own flat colour, not blended into the mark: the same chrome
-// grey for hover and selected, so only the width (1.5 vs 2) separates the two states. Control
-// chrome (ROI outline, threshold, selected-open ring) uses that same grey; ROI grips are a
-// white square with a 1px chrome stroke (.masque-handle). One source here; mount() below picks
-// light vs dark from the figure's own background and writes it onto the shadow host.
+// a mark). The edge is the halo (highlight.ts's haloOf), not blended into the mark: an ink core
+// between two bands of the opposite tone, Pluto's off-black (hsl 0 0% 12%) and off-white
+// (hsl 0 0% 98%), ink on a light plot area and swapped on a dark one, so it shows against any
+// colour (3.97:1 at worst). Hover and selected differ by the core's width. Control chrome (ROI
+// outline, threshold) uses the chrome grey; ROI grips are a white square with a 1px chrome
+// stroke (.masque-handle). One source here; mount() below picks light vs dark from the
+// figure's own background and writes it onto the shadow host.
 const HI_STYLE = {
     // `cross` is a step quieter than `chrome` (the selection edge). Light moves toward white,
     // dark moves toward black by the same amount, so the hairline is not the same ink as a
     // selected mark.
-    light: { chrome: "#7a7a7a", fillSrc: "#141414", cross: "#b0b0b0" },
-    dark: { chrome: "#c8c8c8", fillSrc: "#141414", cross: "#929292" },
+    light: { chrome: "#7a7a7a", fillSrc: "#141414", cross: "#b0b0b0", ink: "#1f1f1f", casing: "#fafafa" },
+    dark: { chrome: "#c8c8c8", fillSrc: "#141414", cross: "#929292", ink: "#fafafa", casing: "#1f1f1f" },
 }
 
 const STYLE = `
@@ -173,7 +177,30 @@ svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: n
 svg.masque-fill { mix-blend-mode: color-dodge; }
 svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-hi-fill); fill-opacity: 1; stroke: none; }
 svg.masque-edge .masque-hi.masque-hover,
-svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: none; }
+svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-halo-ink, var(--masque-chrome)); fill: none; }
+/* The halo (highlight.ts's haloOf): an ink core between two casing bands, each band
+   --masque-halo-u wide (one device pixel, at least half a CSS px; mount() tracks the screen's
+   density). Hover's core is one band and a pick's two (overlaystyle hover_width and
+   selected_width set it). Centred (mid) the strokes sit on the edge; inside an area (in, a
+   clip) or outside a point (out, a mask) only half of each stroke shows, so they are twice as
+   wide. A line's (line) sit outside its drawn width --masque-lw, image px, so they are sized in
+   image px: --masque-k is image px per CSS px. */
+.masque-halo { --masque-u: var(--masque-halo-u, 0.5px); }
+.masque-halo-hover { --masque-core: var(--masque-hover-width, var(--masque-u)); }
+.masque-halo-selected { --masque-core: var(--masque-selected-width, calc(2 * var(--masque-u))); }
+/* A picked line or point on one takes overlaystyle ring_width, which once sized its ring. */
+.masque-halo-line.masque-halo-selected, .masque-halo-out.masque-halo-selected { --masque-core: var(--masque-ring-width, var(--masque-selected-width, calc(2 * var(--masque-u)))); }
+.masque-halo .masque-halo-case { stroke: var(--masque-halo-case, #fafafa); fill: none; vector-effect: non-scaling-stroke; }
+.masque-halo-mid .masque-halo-outer { stroke-width: calc(var(--masque-core) + 2 * var(--masque-u)); }
+.masque-halo-mid .masque-hi { stroke-width: var(--masque-core); }
+.masque-halo-in .masque-halo-outer, .masque-halo-out .masque-halo-outer { stroke-width: calc(2 * var(--masque-core) + 4 * var(--masque-u)); }
+.masque-halo-in .masque-hi, .masque-halo-out .masque-hi { stroke-width: calc(2 * var(--masque-core) + 2 * var(--masque-u)); }
+.masque-halo-in .masque-halo-inner, .masque-halo-out .masque-halo-inner { stroke-width: calc(2 * var(--masque-u)); }
+.masque-halo-line .masque-halo-case { vector-effect: none; stroke-linecap: round; stroke-linejoin: round; }
+.masque-halo-line .masque-hi { stroke-linecap: round; stroke-linejoin: round; }
+.masque-halo-line .masque-halo-outer { stroke-width: calc(var(--masque-lw) * 1px + (2 * var(--masque-core) + 4 * var(--masque-u)) * var(--masque-k, 2)); }
+.masque-halo-line .masque-hi { stroke-width: calc(var(--masque-lw) * 1px + (2 * var(--masque-core) + 2 * var(--masque-u)) * var(--masque-k, 2)); }
+.masque-halo-line .masque-halo-inner { stroke-width: calc(var(--masque-lw) * 1px + 2 * var(--masque-u) * var(--masque-k, 2)); }
 .masque-handle { fill: var(--masque-handle-fill, #ffffff); stroke: var(--masque-hi-stroke, var(--masque-chrome)); stroke-width: var(--masque-handle-width, 1); vector-effect: non-scaling-stroke; }
 @supports not (mix-blend-mode: color-dodge) {
   svg.masque-fill .masque-hi.masque-fillshape { fill: var(--masque-chrome); fill-opacity: var(--masque-noblend-fill-opacity, 0.18); }
@@ -183,6 +210,8 @@ svg.masque-edge .masque-hi.masque-wash { stroke: var(--masque-chrome); fill: non
 .masque-fades, .masque-fade { position: absolute; inset: 0; pointer-events: none; }
 .masque-fade canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; }
 .masque-fade canvas.masque-dim { opacity: calc(1 - var(--masque-unpicked-opacity, ${UNPICKED_OPACITY})); }
+/* A preview (a legend entry's or a line's hover) on an axis holding no picks leaves more showing. */
+.masque-fade.masque-preview canvas.masque-dim { opacity: calc(1 - var(--masque-preview-opacity, ${PREVIEW_OPACITY})); }
 .masque-tip { position: absolute; opacity: 0; pointer-events: none; z-index: 10;
        padding: var(--masque-tip-padding, 8px 12px); border-radius: var(--masque-tip-radius, 4px);
        background: var(--masque-tip-bg-resolved); color: var(--masque-tip-color-resolved);
@@ -467,9 +496,23 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
     shadowHost.style.setProperty("--masque-chrome", hiStyle.chrome)
     shadowHost.style.setProperty("--masque-hi-fill", hiStyle.fillSrc)
     shadowHost.style.setProperty("--masque-cross", hiStyle.cross)
+    shadowHost.style.setProperty("--masque-halo-case", hiStyle.casing)
     // overlaystyle from Julia: written after the derived greys so a colour key wins over them.
-    // Per-layer hoverstyle values sit inline on their own elements and still win there.
+    // Per-layer hoverstyle values sit inline on their own elements and still win there. Its
+    // `color` (--masque-chrome) is the halo's core too.
     if (manifest.overlayStyle) for (const [k, v] of Object.entries(manifest.overlayStyle)) shadowHost.style.setProperty(k, v)
+    shadowHost.style.setProperty("--masque-halo-ink", manifest.overlayStyle?.["--masque-chrome"] ?? hiStyle.ink)
+    // The halo's band is one device pixel, at least half a CSS px. A zoom or a move to another
+    // screen changes the density, which the media query for the current one reports.
+    let dprQuery: MediaQueryList | null = null
+    const trackDensity = (): void => {
+        const d = window.devicePixelRatio || 1
+        shadowHost.style.setProperty("--masque-halo-u", `${Math.max(1 / d, 0.5)}px`)
+        dprQuery?.removeEventListener("change", trackDensity)
+        dprQuery = typeof window.matchMedia === "function" ? window.matchMedia(`(resolution: ${d}dppx)`) : null
+        dprQuery?.addEventListener?.("change", trackDensity)
+    }
+    trackDensity()
 
     // Threshold lines and ROI boxes move with their own axis's pixels. The hair stays on the
     // plain svg, after every home, so the first <line> in the shadow is still a threshold line.
@@ -802,6 +845,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         clearHiImmediate(state, ctx.hiGroup_, ctx.hiFixed_)
         clearLinkImmediate(state, ctx.linkGroup_)
         ctx.fade_.preview_(null, null, [])
+        ctx.fade_.hover_(null, null, [])
         // A frame that lands mid-pan, mid-wheel, or mid-key would wipe the readout the gesture is
         // still showing. Pointer-up, the wheel idle timer, and the key's settle frame hide it.
         if (state.drag_?.kind !== "view" && state.wheelTimer_ === null && !state.keyView_) hideTip(ctx, state)
@@ -940,6 +984,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         shadowHost.style.top = `${br.top - hr.top}px`
         shadowHost.style.width = `${br.width}px`
         shadowHost.style.height = `${br.height}px`
+        shadowHost.style.setProperty("--masque-k", String(ctx.manifest_.width / br.width))
         roiDrag.syncHandleDraw(ctx.roiBoxes_, ctx.manifest_.width, br.width, ctx.manifest_.scaling)
         ctx.fade_.refresh_()
         state.surfaceSized_ = false
@@ -1259,6 +1304,7 @@ export function mount(scriptEl: HTMLElement, manifest: Manifest, invalidation?: 
         dragStops?.cleanup_()
         window.removeEventListener("resize", syncOverlayToBase)
         window.removeEventListener("scroll", onScroll, { capture: true })
+        dprQuery?.removeEventListener?.("change", trackDensity)
         overlayRO?.disconnect()
         overlayFrames = 24
         cancelPendingMove(state)

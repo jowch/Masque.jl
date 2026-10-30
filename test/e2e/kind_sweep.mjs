@@ -12,7 +12,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PNG } from "pngjs";
 import {
-  assertNoAlertRed, assertNoTeal, assertWash, assertRing, assertHoverRecipe, assertNoHighlight,
+  assertNoAlertRed, assertNoTeal, assertWash, assertRing, assertHoverRecipe, assertNoHighlight, HALO_CAPTURE,
   assertCircleR, assertRemountStable, assertLeaveFade, assertTooltipColorScheme,
   meanLuminance, assertTintApplied,
 } from "./visual_assert.mjs";
@@ -129,7 +129,9 @@ function hitPoint(layer, index) {
     for (let i = 0; i < a.length / 2 - 1; i++) {
       const x0 = a[2 * i], y0 = a[2 * i + 1], x1 = a[2 * i + 2], y1 = a[2 * i + 3];
       if (![x0, y0, x1, y1].every(Number.isFinite)) continue;
-      return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, x1: x0, y1: y0, x2: x1, y2: y1 };
+      // A quarter along, not halfway: the hover dot marks the vertex nearest the pointer, and
+      // a midpoint is a tie a 1px nudge would flip to the other sample.
+      return { x: x0 + (x1 - x0) / 4, y: y0 + (y1 - y0) / 4, x1: x0, y1: y0, x2: x1, y2: y1 };
     }
     throw new Error(`lines path ${index} has no finite segment`);
   }
@@ -323,7 +325,8 @@ try {
     r.bond = f === "*" ? r.bondAll : (r.bondAll?.[f] ?? null);
     return r;
   };
-  const inspectRaw = (key) => page.evaluate((k) => {
+  const inspectRaw = (key) => page.evaluate(([k, haloCapture]) => {
+    const haloOf = new Function("g", haloCapture);
     const span = document.querySelector(`#coords_${k}`);
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -342,8 +345,24 @@ try {
     const bb = baseEl.getBoundingClientRect();
     const hb = host.getBoundingClientRect();
     const sbFill = svgFill.getBoundingClientRect(), sbEdge = svgEdge.getBoundingClientRect(), sbPlain = svgPlain.getBoundingClientRect();
-    const kidsOf = (svg, layerName) => [...(svg?.querySelectorAll("g.masque-photo > g.sel") ?? [])].flatMap((g) => [...g.children]).map((el) => {
-      if (el.tagName.toLowerCase() === "g") {
+    const kidsOf = (svg, layerName) => [...(svg?.querySelectorAll("g.masque-photo > g.sel") ?? [])].flatMap((g) => [...g.children]).map((top) => {
+      // A halo is read as its ink core: a point's or a line's as the "ring" open geometry
+      // draws, an area's as the closed edge shape, with the bands' strokes alongside.
+      const halo = haloOf(top);
+      const el = halo?.core ?? top;
+      if (halo && (halo.align === "out" || halo.align === "line")) {
+        const cs = getComputedStyle(el), tag = el.tagName.toLowerCase();
+        const info = {
+          className: el.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
+          width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
+          cx: el.getAttribute("cx"), cy: el.getAttribute("cy"), r: el.getAttribute("r"),
+          x1: el.getAttribute("x1"), y1: el.getAttribute("y1"), x2: el.getAttribute("x2"), y2: el.getAttribute("y2"),
+          d: el.getAttribute("d"),
+        };
+        return { layer: layerName, kind: "ring", halo: { ...halo, core: undefined },
+          lines: tag === "line" ? [info] : [], circles: tag === "circle" ? [info] : [], paths: tag === "path" ? [info] : [] };
+      }
+      if (!halo && el.tagName.toLowerCase() === "g") {
         return {
           layer: layerName, kind: "ring",
           lines: [...el.querySelectorAll("line")].map((ln) => {
@@ -375,6 +394,7 @@ try {
       }
       const cs = getComputedStyle(el);
       return {
+        halo: halo && { ...halo, core: undefined },
         layer: layerName, kind: "closed", tag: el.tagName.toLowerCase(),
         className: el.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
         width: String(parseFloat(cs.strokeWidth)),
@@ -406,7 +426,7 @@ try {
       // The overlay's own bond value, read before any kernel round-trip.
       bondAll: host.value ?? null,
     };
-  }, key);
+  }, [key, HALO_CAPTURE]);
 
   const layersOf = (key) => page.evaluate((k) => JSON.parse(document.querySelector(`#coords_${k}`).textContent), key);
   const findLayer = (layers, spec) => {
@@ -448,7 +468,7 @@ try {
     return null;
   };
 
-  const dispatchAt = async (key, x, y, type, mod = {}) => page.evaluate(async ([k, ix, iy, typ, md]) => {
+  const dispatchAt = async (key, x, y, type, mod = {}) => page.evaluate(async ([k, ix, iy, typ, md, haloCapture]) => {
     const span = document.querySelector(`#coords_${k}`);
     const hosts = [...document.querySelectorAll(".ip-host")];
     const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
@@ -485,11 +505,16 @@ try {
       return groups.find((g) => g.firstElementChild) ?? groups[0] ?? null;
     };
     const childCount = (svg, sel) => [...(svg?.querySelectorAll(sel) ?? [])].reduce((n, g) => n + g.children.length, 0);
+    const haloOf = new Function("g", haloCapture);
     const capture = (svg, layerName) => {
-      const el = groupWithChild(svg, "g.hi")?.firstElementChild;
-      if (!el) return null;
+      const top = groupWithChild(svg, "g.hi")?.firstElementChild;
+      if (!top) return null;
+      // A halo is captured as its ink core, with the bands' strokes alongside.
+      const halo = haloOf(top);
+      const el = halo?.core ?? top;
       const cs = getComputedStyle(el);
       return {
+        halo: halo && { ...halo, core: undefined },
         layer: layerName, tag: el.tagName.toLowerCase(), className: el.getAttribute("class"),
         fill: cs.fill, stroke: cs.stroke, fillOpacity: cs.fillOpacity,
         width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
@@ -509,7 +534,7 @@ try {
       ...fadeOf(sr),
       cross: sr.querySelector(".masque-cross")?.classList.contains("is-on") ?? false,
     };
-  }, [key, x, y, type, mod]);
+  }, [key, x, y, type, mod, HALO_CAPTURE]);
 
   const textOf = (sel) => page.evaluate((q) => document.querySelector(q)?.innerText ?? "", sel);
 
@@ -1175,8 +1200,8 @@ try {
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const d = (svg) => sr.querySelector(`svg.${svg} g.sel path`)?.getAttribute("d") ?? null;
-        const edge = sr.querySelector("svg.masque-edge g.sel path");
-        return { fill: d("masque-fill"), edge: d("masque-edge"), edgeWidth: edge ? getComputedStyle(edge).strokeWidth : null };
+        const halo = sr.querySelector("svg.masque-edge g.sel > .masque-halo");
+        return { fill: d("masque-fill"), edge: d("masque-edge"), halo: halo?.getAttribute("class") ?? null };
       }, key);
       const step = async (what, before, act, wantCount, wantRuns, wantSel) => {
         const r = await act();
@@ -1194,7 +1219,7 @@ try {
       const p = await selPaths();
       if ((p.fill?.match(/M/g) ?? []).length !== 1) throw new Error(`${key}: fill path ${p.fill}, want one rect for the two cells`);
       if ((p.edge?.match(/M/g) ?? []).length !== 4) throw new Error(`${key}: edge path ${p.edge}, want the outline only (4 sides)`);
-      if (parseFloat(p.edgeWidth) !== 2) throw new Error(`${key}: edge stroke ${p.edgeWidth}, want the 2px selected width`);
+      if (!/masque-halo-in\b/.test(p.halo ?? "") || !/masque-halo-selected/.test(p.halo)) throw new Error(`${key}: outline ${p.halo}, want a pick halo inside the cells`);
       passed.push(`${key}/outline-only`);
       const hov = await dispatchAt(key, at(1, 1).x, at(1, 1).y, "pointermove");
       if (hov.hi.fill || hov.hi.edge || hov.hi.plain) throw new Error(`${key}: hovering a selected cell drew ${JSON.stringify(hov.hi)}`);
@@ -1405,12 +1430,13 @@ try {
         const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const live = (sel) => [...sr.querySelectorAll(sel)].filter((e) => !e.classList.contains("masque-leave"));
-        const circles = live("svg.masque-edge g.link circle").map((c) => {
+        // Each partner's halo, read as its ink core; one leaving fades as a group.
+        const circles = live("svg.masque-edge g.link > .masque-halo").map((h) => h.querySelector(":scope > circle.masque-hi")).filter(Boolean).map((c) => {
           const cs = getComputedStyle(c);
           return { cx: Number(c.getAttribute("cx")), cy: Number(c.getAttribute("cy")), stroke: cs.stroke, width: parseFloat(cs.strokeWidth) };
         });
         const fills = live("svg.masque-fill g.link > *").length;
-        const rects = live("svg.masque-edge g.link rect").length;
+        const rects = live("svg.masque-edge g.link > .masque-halo").filter((h) => h.querySelector(":scope > rect.masque-hi")).length;
         const lift = [...sr.querySelectorAll(".masque-fade")].flatMap((w) => (w.dataset.lift ? w.dataset.lift.split(" ") : []));
         return { circles, fills, rects, lift: lift.sort() };
       }, key);
@@ -2962,9 +2988,21 @@ try {
     // already-selected mark, which draws no highlight. The series row (several whole lines)
     // is what exercises the hover stroke.
     const closedHover = layer.kind !== "polyline" && layer.kind !== "segments" && layer.kind !== "lines";
-    // A picked point is not its line: hovering the line still outlines it.
-    // A fade-drawn pick has no selected stroke, so hovering it draws the hover recipe.
-    const hoverIsSelected = !!(spec.selected && spec.selected !== "point" && !selFaded && hoverIndex === spec.selectedIndex);
+    // Hovering a line marks the sample the tooltip reads out with a dot, the vertex nearest the
+    // pointer (a tie keeps the earlier one); a dot on the picked point itself draws nothing over
+    // that point's pick halo. A fade-drawn pick has no selected stroke, so hovering it draws the
+    // hover recipe.
+    let hoverSample = null;
+    if (layer.kind === "lines" && Array.isArray(layer.points?.[hoverIndex])) {
+      const v = layer.geometry[hoverIndex], hp = hitPoint(layer, hoverIndex);
+      let bd = Infinity;
+      for (let s = 0; s < v.length / 2; s++) {
+        const d = Math.hypot(v[2 * s] - hp.x, v[2 * s + 1] - hp.y);
+        if (d < bd - 1e-9) { bd = d; hoverSample = s; }
+      }
+    }
+    const hoverIsSelected = !!(spec.selected && !selFaded && hoverIndex === spec.selectedIndex
+      && (spec.selected !== "point" || hoverSample === spec.selectedSample));
     if (hoverIsSelected) {
       assertNoHighlight(tip.hi, `${key}/hover-on-selected`);
       if (tip.sel < 1) throw new Error(`${key}: g.sel gone while hovering the selected mark`);
@@ -2972,7 +3010,13 @@ try {
       passed.push(`${key}/hover-on-selected-noop`);
     } else {
     assertHoverRecipe(tip.hi, key, closedHover, wantDark);
-    if (layer.kind === "lines") {
+    if (layer.kind === "lines" && hoverSample !== null) {
+      // A dot outside the hovered sample, not a stroke along the line.
+      const v = layer.geometry[hoverIndex], e = tip.hi.edge;
+      if (e?.tag !== "circle" || Math.abs(Number(e.cx) - v[2 * hoverSample]) > 1.2 || Math.abs(Number(e.cy) - v[2 * hoverSample + 1]) > 1.2) {
+        throw new Error(`${key}: line hover ${JSON.stringify(e)}, want a dot on sample ${hoverSample}`);
+      }
+    } else if (layer.kind === "lines") {
       if (tip.hi.edge?.tag !== "path") {
         throw new Error(`${key}: whole-line hover is not a path ${JSON.stringify(tip.hi.edge)}`);
       }
@@ -3104,14 +3148,30 @@ try {
       // ring) — mirror `inspect()`'s existing `kidsOf` fan-out (tagged `layer: "fill"|"edge"|
       // "plain"`) instead of reading a single `g.link` (which would only ever see svg.masque-
       // fill's group, in DOM order first, and be empty for any ring-only case).
-      const linkInspect = (k) => page.evaluate((kk) => {
+      const linkInspect = (k) => page.evaluate(([kk, haloCapture]) => {
+        const haloOf = new Function("g", haloCapture);
         const span = document.querySelector(`#coords_${kk}`);
         const hosts = [...document.querySelectorAll(".ip-host")];
         const host = hosts.filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
         let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
         const svgFill = sr.querySelector("svg.masque-fill"), svgEdge = sr.querySelector("svg.masque-edge"), svgPlain = sr.querySelector("svg.masque-plain");
-        const kidsOf = (svg, layerName) => [...(svg?.querySelectorAll("g.masque-photo > g.link") ?? [])].flatMap((g) => [...g.children]).map((el) => {
-          if (el.tagName.toLowerCase() === "g") {
+        const kidsOf = (svg, layerName) => [...(svg?.querySelectorAll("g.masque-photo > g.link") ?? [])].flatMap((g) => [...g.children]).map((top) => {
+          // A halo is read as its ink core (see inspect's kidsOf).
+          const halo = haloOf(top);
+          const el = halo?.core ?? top;
+          if (halo && (halo.align === "out" || halo.align === "line")) {
+            const cs = getComputedStyle(el), tag = el.tagName.toLowerCase();
+            const info = {
+              className: el.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
+              width: String(parseFloat(cs.strokeWidth)), opacity: (cs.strokeOpacity === "1" ? null : cs.strokeOpacity),
+              cx: el.getAttribute("cx"), cy: el.getAttribute("cy"), r: el.getAttribute("r"),
+              x1: el.getAttribute("x1"), y1: el.getAttribute("y1"), x2: el.getAttribute("x2"), y2: el.getAttribute("y2"),
+              d: el.getAttribute("d"),
+            };
+            return { layer: layerName, kind: "ring", halo: { ...halo, core: undefined },
+              lines: tag === "line" ? [info] : [], circles: tag === "circle" ? [info] : [], paths: tag === "path" ? [info] : [] };
+          }
+          if (!halo && el.tagName.toLowerCase() === "g") {
             return {
               layer: layerName, kind: "ring",
               lines: [...el.querySelectorAll("line")].map((ln) => {
@@ -3135,6 +3195,7 @@ try {
           }
           const cs = getComputedStyle(el);
           return {
+            halo: halo && { ...halo, core: undefined },
             layer: layerName, kind: "closed", tag: el.tagName.toLowerCase(),
             className: el.getAttribute("class"), stroke: cs.stroke, fill: cs.fill, fillOpacity: cs.fillOpacity,
             width: String(parseFloat(cs.strokeWidth)),
@@ -3145,11 +3206,11 @@ try {
         const kFill = kidsOf(svgFill, "fill"), kEdge = kidsOf(svgEdge, "edge"), kPlain = kidsOf(svgPlain, "plain");
         const kids = [...kFill, ...kEdge, ...kPlain];
         // Element count: a closed target draws fill+edge PAIRS (count once via fill), an open
-        // target draws a single plain ring per element — same convention as layerElementCount.
-        // A closed series beside another closed series is previewed by the fade (#394), not in
-        // g.link: its marks kept beyond the picks count one each.
+        // target draws a single halo (or, with a hoverstyle stroke, a plain ring) per element —
+        // same convention as layerElementCount. A closed series or line beside another is
+        // previewed by the fade (#394), not in g.link: its marks kept beyond the picks count one each.
         const f = fadeOf(sr);
-        const count = kFill.filter((x) => x.kind === "closed").length + kPlain.filter((x) => x.kind === "ring").length
+        const count = kFill.filter((x) => x.kind === "closed").length + [...kEdge, ...kPlain].filter((x) => x.kind === "ring").length
           + f.kept.length - f.picked.length;
         const sel = [svgFill, svgEdge, svgPlain]
           .reduce((n, svg) => n + (svg?.querySelectorAll("g.masque-photo > g.sel > *").length ?? 0), 0) + 2 * f.picked.length;
@@ -3158,7 +3219,7 @@ try {
           .find((g) => g.children.length > 0);
         const leaving = firstPopulated ? firstPopulated.firstElementChild.classList.contains("masque-leave") : null;
         return { count, kids, sel, leaving, kept: f.kept };
-      }, k);
+      }, [k, HALO_CAPTURE]);
 
       for (const c of spec.links.cases) {
         const targetIds = (layer.links && layer.links[c.index]) || [];
@@ -3213,6 +3274,14 @@ try {
               `give the target layer a resolvable \`colors\` or a matching \`meta\` entry with \`tintColor\``,
             );
           }
+          // The previous entry's preview may still fade this series (a line's entry fades the
+          // legend's other series): leave first, so the baseline is the mark's own colour.
+          await page.evaluate((k) => {
+            const span = document.querySelector(`#coords_${k}`);
+            const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+            let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+            sr.querySelector(".surface").dispatchEvent(new PointerEvent("pointerleave", { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true }));
+          }, key);
           lumBefore = meanLuminance(PNG.sync.read(
             await stableClipShot(key, hp0.x, hp0.y, { expectLum }),
           ));
@@ -3226,12 +3295,14 @@ try {
         // frame (hover.ts). Leave first so the previous g.link is not this case's answer,
         // then wait until the linked geometry is the pin for this entry.
         const linkLanded = (li) => {
+          // A line beside other lines is previewed by the fade, kept; a lone line keeps a halo.
           if (tl0.kind === "lines") {
-            const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
+            if (li.kept.includes(`${tl0.id}:${idx0}`)) return true;
+            const ringKid = li.kids.find((kk) => kk.kind === "ring");
             return pathCoverError(ringKid?.paths?.[0]?.d, tl0.geometry[idx0]) === null;
           }
           if (tl0.kind === "polyline" || tl0.kind === "segments") {
-            const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
+            const ringKid = li.kids.find((kk) => kk.kind === "ring");
             const ln = ringKid?.lines?.[0];
             return !!ln && Math.abs(Number(ln.x1) - hp0.x1) <= 1.2 && Math.abs(Number(ln.y1) - hp0.y1) <= 1.2;
           }
@@ -3293,7 +3364,7 @@ try {
           }
           passed.push(`${key}/links[${c.index}]/kept`);
         } else if (tl0.kind === "polyline" || tl0.kind === "segments") {
-          const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
+          const ringKid = li.kids.find((kk) => kk.kind === "ring");
           if (!ringKid) throw new Error(`${key}/links[${c.index}]: no ring in g.link`);
           assertRing(ringKid, `${key}/links[${c.index}]/ring`, wantDark);
           const ln = ringKid.lines[0];
@@ -3301,10 +3372,15 @@ try {
             throw new Error(`${key}/links[${c.index}]: link ring off-mark ${JSON.stringify(ln)} vs ${JSON.stringify(hp0)}`);
           }
         } else if (tl0.kind === "lines") {
-          const ringKid = li.kids.find((kk) => kk.layer === "plain" && kk.kind === "ring");
-          if (!ringKid) throw new Error(`${key}/links[${c.index}]: no ring in g.link`);
-          assertRing(ringKid, `${key}/links[${c.index}]/ring`, wantDark);
-          assertPathCovers(ringKid.paths[0].d, tl0.geometry[idx0], `${key}/links[${c.index}]/ring`);
+          // A line is a series: the legend's hover fades the other lines and keeps this one,
+          // drawing nothing on it. A line with no other line to fade keeps a halo along it.
+          const ringKid = li.kids.find((kk) => kk.kind === "ring");
+          if (ringKid) {
+            assertRing(ringKid, `${key}/links[${c.index}]/ring`, wantDark);
+            assertPathCovers(ringKid.paths[0].d, tl0.geometry[idx0], `${key}/links[${c.index}]/ring`);
+          } else if (!li.kept.includes(`${tl0.id}:${idx0}`)) {
+            throw new Error(`${key}/links[${c.index}]: line ${tl0.id}:${idx0} neither kept by the fade nor haloed ${JSON.stringify(li)}`);
+          } else passed.push(`${key}/links[${c.index}]/line-fade`);
         }
         passed.push(`${key}/links[${c.index}]`);
       }
@@ -3523,11 +3599,11 @@ try {
       // exactly the clicked hit's own recipe (2 shapes — fill+edge — for a closed kind, 1 ring
       // for an open one), independent of whatever `selected=` hydration was there before — a
       // spec that bakes a `selected=` index no longer "grows" g.sel on click, it's simply reset.
-      // A picked point keeps its line's hover outline under the pointer; a closed mark's pick
-      // is drawn by the fade and keeps its hover fill and edge (#394); any other pick is the
-      // hovered mark itself, which draws no hover chrome once selected.
+      // A closed mark's pick is drawn by the fade and keeps its hover fill and halo (#394); any
+      // other pick, a picked point on a line included, is the hovered mark itself (the line's
+      // hover dot sits on the sample just picked), which draws no hover chrome once selected.
       const fadePick = echo.picked.includes(`${layer.id}:${clickIdx}`);
-      const wantHi = fadePick ? 2 : clickSample === null ? 0 : 1;
+      const wantHi = fadePick ? 2 : 0;
       if (echo.hi !== wantHi) throw new Error(`${key}/click-echo: g.hi=${echo.hi} over the echo, expected ${wantHi}`);
       const expectSel = closedHover ? 2 : 1;
       if (echo.sel !== expectSel) {

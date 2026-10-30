@@ -57,7 +57,7 @@ const drag = (s: HTMLElement, from: [number, number], to: [number, number], mod:
 const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
 // The marks g.link draws, as their centres in image px.
 const linkCentres = (shadow: ShadowRoot) =>
-    [...shadow.querySelectorAll("svg.masque-edge g.link circle")].map((c) => `${c.getAttribute("cx")},${c.getAttribute("cy")}`)
+    [...shadow.querySelectorAll("svg.masque-edge g.link .masque-halo > circle.masque-hi")].map((c) => `${c.getAttribute("cx")},${c.getAttribute("cy")}`)
 
 describe("linked selections (#346)", () => {
     it("a click in either panel picks the row in both; select = :many adds and takes out rows", () => {
@@ -141,7 +141,7 @@ describe("linked selections (#346)", () => {
         expect(linkCentres(shadow)).toEqual(["900,500"])
         ptr(surface, "pointermove", 350, 50) // empty
         await frame()
-        const left = [...shadow.querySelectorAll("svg.masque-edge g.link circle")]
+        const left = [...shadow.querySelectorAll("svg.masque-edge g.link > .masque-halo")]
         expect(left.every((c) => c.classList.contains("masque-leave"))).toBe(true)
     })
 
@@ -268,7 +268,7 @@ describe("linked selections (#346)", () => {
         expect(linkCentres(shadow)).toEqual(["1100,700"])
         click(surface, 50, 50)
         await frame()
-        const left = [...shadow.querySelectorAll("svg.masque-edge g.link circle")]
+        const left = [...shadow.querySelectorAll("svg.masque-edge g.link > .masque-halo")]
         expect(left.every((c) => c.classList.contains("masque-leave"))).toBe(true)
     })
 
@@ -280,7 +280,7 @@ describe("linked selections (#346)", () => {
         expect(linkCentres(shadow).length).toBe(2)
         ptr(surface, "pointermove", 250, 250) // a:2, none
         await frame()
-        const left = [...shadow.querySelectorAll("svg.masque-edge g.link circle")]
+        const left = [...shadow.querySelectorAll("svg.masque-edge g.link > .masque-halo")]
         expect(left.length).toBe(2)
         expect(left.every((c) => c.classList.contains("masque-leave"))).toBe(true)
     })

@@ -152,8 +152,10 @@ try {
     // A miss fades the previous highlight for ~100ms and drops the tooltip's `show` class
     // without clearing its text or setting display:none. A fading node is not a hit.
     const hi = (svgName) => {
-      const el = sr.querySelector(svgName)?.querySelector("g.hi")?.firstElementChild;
-      if (!el || el.classList.contains("masque-leave")) return null;
+      const top = sr.querySelector(svgName)?.querySelector("g.hi")?.firstElementChild;
+      if (!top || top.classList.contains("masque-leave")) return null;
+      // A halo is read as its ink core.
+      const el = top.classList.contains("masque-halo") ? top.querySelector(":scope > .masque-hi") : top;
       return {
         tag: el.tagName.toLowerCase(),
         fillRule: el.getAttribute("fill-rule"),

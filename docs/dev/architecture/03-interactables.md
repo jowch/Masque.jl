@@ -17,8 +17,8 @@ events(::AbstractInteractable)::Tuple = (:click, :hover)   # which events the ov
 tooltip_spec(::AbstractInteractable) = nothing
 # hoverstyle is per-LAYER too — the manifest ships one `style` per layer, not per element.
 # stroke=nothing (default) omits "stroke" from the manifest; the overlay then draws its own
-# split highlight — a color-dodge fill (brightens) plus a flat chrome edge stroke
-# (#7a7a7a light figure, #c8c8c8 dark; not blended into the mark). `colors` does not feed the
+# split highlight — a color-dodge fill (brightens) plus a two-tone halo (#1f1f1f between
+# #fafafa bands on a light figure, swapped on a dark one; not blended into the mark). `colors` does not feed the
 # highlight, only the tooltip accent. An explicit stroke is used verbatim (no blend, one element).
 hoverstyle(::AbstractInteractable)::NamedTuple = (; stroke=nothing, width=2)
 # logical-px hit slack for :segments/:polyline/:lines; nothing omits the manifest field
@@ -83,6 +83,11 @@ Geometry layout by `kind` (all coords image-px, top-left origin):
 | `:surface` | a projected vertex grid: `ni`, `nj`, source `i`/`j` per shipped row/column, `xy` (image px, row-major, NaN = not drawn), `order` (quads front to back), data `x`/`y`/`z`[/`value`] arrays | quads in `order`, point-in-quad as two triangles; the first hit answers with its corner nearest the pointer | `b*ni+a`, the shipped point |
 | `:polygons` | one flat ring per element, or a list of rings when that element has holes (exterior, then each hole) | even-odd across that element's rings, last element first, else the nearest element within `tol` of a ring | element index |
 | `:axis` | `nothing` (unbounded, `AxisInteractable`) or `Real[x,y,w,h]` bbox (bounded, `ColorbarInteractable`) | absent geometry = always-hit; bbox present = point-in-bbox; invert pixel via `AxisTransform` | `-1` (continuous); `valueaxis ≠ nothing` → 1-D `(; value)` |
+
+`linewidth` is a per-layer manifest field on every `:segments`/`:polyline`/`:lines` layer: the
+plot's drawn line width (the widest of a per-element vector) in image px, or Makie's default 1.5
+logical px for a layer built from bare vertices. The overlay's fade covers and keeps a line at
+that width, and a line's halo sits just outside it.
 
 `tol` (the hit-test slack above) is an optional per-layer manifest field, `"tol"` (image px),
 present only when `hit_tol(i) !== nothing`. `SegmentInteractable` sets it from its `tol`
