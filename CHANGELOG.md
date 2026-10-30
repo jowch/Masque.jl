@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-30
+
 ### Added
 - A Makie `SliderGrid` named in `masque` works in the notebook: its field holds a tuple of its
   sliders' values, in order, and each value label follows its slider, written with the grid's
@@ -31,7 +33,8 @@ All notable changes to this project are documented here. The format is based on
   `contour!`, `tricontourf!` or `rainclouds!`. It returns the layers `masque(fig)` gives the
   recipe, under the same ids, so `masque(fig, interactables(c), ViewInteractable(ax);
   auto = false)` keeps a contour and adds a pan. Before, it raised an error.
-- overlaystyle `preview_opacity` sets how much a hover preview leaves showing.
+- `overlaystyle` takes `preview_opacity`, how much of the other marks still shows while you
+  hover a line or a legend entry and nothing is picked, from 0 to 1 (default 0.35).
 
 ### Changed
 - A tooltip near the figure's edge can now extend past the figure onto the page around it,
@@ -63,8 +66,8 @@ All notable changes to this project are documented here. The format is based on
   line to the axis origin (#439).
 - A click on a colorbar or an axis readout now gives the value its tooltip shows. Before,
   it could be off by up to half a pixel, such as `9.525` against a tooltip's `9.500` (#448).
-- A figure with a Makie `Button` or `Textbox`, or a `SliderGrid` that `masque` isn't given,
-  now warns that it shows as a picture and won't respond. Before, it looked live and did
+- A figure with a Makie `Button`, `Textbox` or `SliderGrid` that `masque` isn't given now
+  warns that it shows as a picture and won't respond. Before, it looked live and did
   nothing (#426).
 - A Makie `Toggle` named in `masque` is drawn the way Makie draws it: a vertical or angled
   toggle (`orientation`) stands the right way, and `length`, `markersize`, `rimfraction` and
@@ -696,7 +699,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/jowch/Masque.jl/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/jowch/Masque.jl/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/jowch/Masque.jl/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/jowch/Masque.jl/compare/v0.3.0...v0.3.1
