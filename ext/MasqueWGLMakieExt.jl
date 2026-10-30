@@ -531,6 +531,9 @@ APD.Bonds.transform_value(w::WebGLWidget, js) = Masque.bond_from_js(w, js)
 if Masque._PRECOMPILE_WORKLOAD
     PrecompileTools.@compile_workload Masque._precompile_workload(:webgl)
     _reset_script_caches!()
+    # A WebGL widget's session starts Bonito's HTTP server. Julia 1.11+ closes it before the
+    # pkgimage is written; on 1.10 the open socket hangs precompilation until it is closed.
+    isdefined(Bonito, :cleanup_globals) && Bonito.cleanup_globals()
 end
 
 end # module MasqueWGLMakieExt
