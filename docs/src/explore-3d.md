@@ -23,7 +23,7 @@ Main.masque_fallback("explore_3d")
 This example doesn't turn when you drag it, because each turn has Julia
 draw the figure again and this site has no Julia running behind it (see
 [Pan and orbit preview](@ref)). To try turning it, download the notebook
-and add the `orbit` line from [Orbit the view](@ref).
+and add the two lines from [Orbit the view](@ref).
 
 ## Name the stations
 
@@ -65,8 +65,7 @@ controls, and how to turn several panels together with `linkcameras!`.
 - A surface responds only on an `Axis3`. On a 2D `Axis`, draw the same
   matrix with `heatmap` to read its values; see [Heatmaps and images](@ref).
 - A sphere from `meshscatter` stops responding once its center leaves
-  the axis box, even if part of it still shows. Zoom out, or turn the
-  view, to bring it back; see [Orbit an `Axis3`](@ref).
+  the axis box; see [Orbit an `Axis3`](@ref).
 
 ## Where to go next
 

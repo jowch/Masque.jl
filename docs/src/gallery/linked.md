@@ -94,13 +94,13 @@ orders and split them differently, `key = :id` says which points are
 the same car. Without `key`, a row is a point's position, and every
 member must be one plot with the same number of points.
 
-`select = :many` lets the picks add up, as in
+`select = :many` lets the selection grow, as in
 [Select several marks](@ref): a click adds a car or takes it
 out, a box adds every car inside it, and a legend entry stands for its
 cars, so Ctrl-click (Cmd-click on a Mac) adds them all. A plain click
-on an entry picks its cars in place of the others. `bind = :picked`
-makes `picked` the group's value: the ids of the cars picked, in the
-order you picked them.
+on an entry selects its cars in place of the others. `bind = :picked`
+makes `picked` the group's value: the ids of the cars selected, in the
+order you selected them.
 
 Hovering a point outlines the same car on the other panel, so you can
 find one car in both views before you pick anything.

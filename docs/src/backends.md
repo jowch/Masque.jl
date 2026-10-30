@@ -30,7 +30,7 @@ Two `masque` keywords work the same on both backends:
 | Keyword | What it sets | Default |
 |---|---|---|
 | `max_width` | the widest the plot shows on the page, in CSS pixels; a wider figure shrinks to fit | 700, the width of Pluto's column |
-| `px_per_unit` | how many image pixels each unit of the figure's `size` gets | CairoMakie: twice the width the PNG shows at; WGLMakie: 2 |
+| `px_per_unit` | how many image pixels each unit of the figure's `size` gets | CairoMakie: enough to draw the PNG at twice the width it shows at; WGLMakie: 2 |
 
 Because of those defaults, a wide figure that `max_width` shrinks is
 sharper on WGLMakie. A larger `px_per_unit` gives a sharper picture when

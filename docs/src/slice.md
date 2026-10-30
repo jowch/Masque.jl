@@ -92,7 +92,7 @@ each series' `y` at the pointer's `x`. These keywords change that:
 |---|---|
 | read `x` at the pointer's `y` | `orientation = :horizontal` |
 | keep the dots and the tooltip but draw no line | `crosshair = false` |
-| change what the tooltip shows | a `masque"..."` template over the same fields as `tooltip`; see [Tooltips](@ref) |
+| change what the tooltip shows | `tooltip = masque"..."`, over the sampled values; see [Tooltips](@ref) |
 | turn the tooltip off | `tooltip = false` |
 
 You can pass a `Lines`, `Stairs`, `Series`, `Band`, or `Density` plot,
