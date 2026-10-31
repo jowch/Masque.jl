@@ -319,6 +319,35 @@ describe("lines join the fade", () => {
         expect(shadow.querySelector("g.sel path")).toBeNull()
     })
 
+    it("a hidden line takes no fade: a legend pick or a line hover leaves its path alone (#484)", async () => {
+        const hide = (m: Manifest): Manifest => {
+            m.layers[1] = { ...m.layers[1], events: [], hidden: true }
+            m.layers[3] = { ...m.layers[3], geometry: [1000, 100, 40, 20, 1000, 150, 40, 20, 1000, 200, 40, 20],
+                payloads: [{}, {}, {}], links: [["a"], ["b"], ["c"]] }
+            return m
+        }
+        // Line a picked: b is hidden, so only c fades.
+        const picked = setup(hide(lines({ fields: ["legend"], initial: { legend: { layer: "legend", index: 0 } } })))
+        expect(fadeKept(picked.shadow)).toEqual(["a:0"])
+        expect(picked.wrap()!.dataset.faded).toBe("1")
+        // The hidden line's own entry picked: the shown lines fade, nothing is kept.
+        const own = setup(hide(lines({ fields: ["legend"], initial: { legend: { layer: "legend", index: 1 } } })))
+        expect(fadeKept(own.shadow)).toEqual([])
+        expect(own.wrap()!.dataset.faded).toBe("2")
+        expect(own.shadow.querySelectorAll("g.sel > *").length).toBe(0) // no ring along the hidden line
+        // Hovering the hidden line's entry outlines nothing along it either.
+        const entry = setup(hide(lines()))
+        move(entry.surface, 500, 75) // legend entry 1 → line b
+        await frame()
+        expect(entry.shadow.querySelectorAll("g.link > *").length).toBe(0)
+        // Hovering line c fades a, not b.
+        const hover = setup(hide(lines()))
+        move(hover.surface, 150, 301)
+        await frame()
+        expect(fadeKept(hover.shadow)).toEqual(["c:0"])
+        expect(hover.wrap()!.dataset.faded).toBe("1")
+    })
+
     it("hovering a line while a legend pick holds another keeps both at full strength", async () => {
         const { shadow, surface, wrap } = setup(lines({ fields: ["legend"], initial: { legend: { layer: "legend", index: 1 } } }))
         move(surface, 150, 301) // line c

@@ -232,6 +232,16 @@ HTML(
         "<span id=\"occluders_legend_hidden\" style=\"display:none\">$(JSON3.write(get(sweep.legend_hidden.manifest, "occluders", [])))</span>",
 )
 
+# ╔═╡ c1000000-0000-0000-0000-0000000000e9
+@bind ev_hidden_plot sweep.hidden_plot
+
+# ╔═╡ c1000000-0000-0000-0000-0000000000ea
+HTML(
+    "<span id=\"out_hidden_plot\">HIDDEN_PLOT=$(sweep_field("hidden_plot", ev_hidden_plot))</span>" *
+        "<span id=\"bond_hidden_plot\" style=\"display:none\">$(repr(ev_hidden_plot))</span>" *
+        "<span id=\"coords_hidden_plot\" style=\"display:none\">$(JSON3.write(sweep.hidden_plot.manifest["layers"]))</span>",
+)
+
 # ╔═╡ c1000000-0000-0000-0000-000000000072
 @bind ev_poly_shapes sweep.poly_shapes
 
@@ -892,6 +902,8 @@ HTML(
 # ╟─c1000000-0000-0000-0000-0000000000e6
 # ╠═c1000000-0000-0000-0000-0000000000e7
 # ╟─c1000000-0000-0000-0000-0000000000e8
+# ╠═c1000000-0000-0000-0000-0000000000e9
+# ╟─c1000000-0000-0000-0000-0000000000ea
 # ╠═c1000000-0000-0000-0000-000000000072
 # ╟─c1000000-0000-0000-0000-000000000073
 # ╠═c1000000-0000-0000-0000-000000000026

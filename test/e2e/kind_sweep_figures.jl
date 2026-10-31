@@ -959,6 +959,19 @@ function build_kind_sweep()
         )
     end
 
+    # A plot drawn with `visible = false` (#484): picking a legend entry fades the shown lines and
+    # leaves the hidden line's path alone, so the gridlines under it stay whole. The legend
+    # sits beside the axis, off every line. Not in kind_sweep_meta(); polish_verify.mjs checks it.
+    hidden_plot = let
+        fig = Figure(size = (480, 260))
+        ax = Axis(fig[1, 1]; title = "hidden-plot", limits = (0, 10, 0, 10))
+        lines!(ax, [0.5, 9.5], [2.0, 2.0]; label = "a", linewidth = 4)
+        lines!(ax, [0.5, 9.5], [5.0, 5.0]; label = "b", linewidth = 4, visible = false)
+        lines!(ax, [0.5, 9.5], [8.0, 8.0]; label = "c", linewidth = 4)
+        Legend(fig[1, 2], ax)
+        masque(fig; bind = :legend)
+    end
+
     scatter_sizes = let
         fig = Figure(size = (480, 260))
         ax = Axis(fig[1, 1]; title = "scatter-sizes")
@@ -1679,7 +1692,7 @@ function build_kind_sweep()
 
     return (;
         scatter, lines, series, segments, heatmap, image, image_rgb, heatmap_labels, barplot, poly, poly_shapes, regions,
-        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, arrows3d, arrows3d_shared, scatterlines3d,
+        polar, axis_polar, scatter_dark, scatter_sizes, scatter_styled, fade_pan, legend_hidden, hidden_plot, arrows3d, arrows3d_shared, scatterlines3d,
         scatter3d, lines3d, meshscatter3d, wireframe3d, surface3d, overlap3d, text3d, text, scatter_overlap, text_overlap, poly_overlap, spheres3d, datashader, violin, stairs, arrows2d, band_y, hexbin, scatter_data, scatter_moved, bar_stroke, scatter_dates, hlines, threshold, colorbar_owner, roi_bounds, threshold_cat, axis_cat, roi, roi_grid, view, view_linked, view_twin, view_twin_linked, view3d, view3d_linked, legend, series_legend,
         legend_overlap, legend_template, axis, composite, onchange, controls, many, many_grid, many_grid_seeded, many_grid_regions, linked_pos, linked_keys, linked_one, marquee, slice_lines, slice_density, slice_auto, slice_gap,
     )

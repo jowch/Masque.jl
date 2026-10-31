@@ -487,8 +487,9 @@ export function drawLink(state: OverlayState, linkGroups: HiSet, key: string, hi
     clearLinkImmediate(state, linkGroups)
     // A hit already pinned in g.sel would double the fill/stroke opacity if drawn again here
     // (same reasoning as drawHi's guard).
+    // A plot drawn with `visible = false` has nothing to outline (#484).
     for (const h of hits) {
-        if (state.selKeys_.has(hitKey(h))) continue
+        if (state.selKeys_.has(hitKey(h)) || h.layer.hidden) continue
         const made = makeHiElement(h, mode)
         if (made) placeMade(linkGroups.at_(h.layer.axis), made, true, mode === "selected")
     }
@@ -547,7 +548,7 @@ function placeSel(selGroups: HiSet, hits: Hit[], entering: Set<string>): void {
         placedSel.set(selGroups, placed)
     }
     const next = new Map<string, Hit>()
-    for (const h of hits) next.set(hitKey(h), h)
+    for (const h of hits) if (!h.layer.hidden) next.set(hitKey(h), h)
     for (const [key, p] of placed) {
         const h = next.get(key)
         if (h && h.layer === p.layer_ && sameGeom(h.geom_, p.geom_)) continue
@@ -585,7 +586,9 @@ export function renderSelection(ctx: OverlayCtx, state: OverlayState): void {
     const data: Hit[] = []
     const fixed: Hit[] = []
     const faded: Hit[] = []
-    const all = selectedHits(state)
+    // A plot drawn with `visible = false` holds its picks unseen: a legend entry or a linked
+    // row can name it, but nothing is drawn along it (#484).
+    const all = selectedHits(state).filter((h) => !h.layer.hidden)
     const scope = selectionScope(ctx.manifest_, state.sel_)
     const fades = new Set(splitFaded(all, scope))
     for (const h of all) (fades.has(h) ? faded : screenFixedLayer(h.layer) ? fixed : data).push(h)

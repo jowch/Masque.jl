@@ -535,15 +535,14 @@ function build_manifest(
         haskey(d, "links") && clicks[L.id] && !("click" in d["events"]) || continue
         any(ids -> any(s -> _link_reaches_pick(s, by_id), ids), d["links"]) && push!(d["events"], "click")
     end
-    # With `onchange`, hiding a plot is how a figure shows it only sometimes: a hidden plot
-    # takes no hover and no clicks, and keeps its field, with nothing to pick.
-    if stateful
-        hidden = _hidden(plan)
-        for (_, L, d) in built
-            L.id in hidden || continue
-            empty!(d["events"])
-            d["hidden"] = true
-        end
+    # A plot drawn with `visible = false` has no marks: it takes no hover, no clicks and no
+    # fade (#484), and keeps its field, with nothing to pick. With `onchange`, hiding a plot is
+    # how a figure shows it only sometimes.
+    hidden = _hidden(plan)
+    for (_, L, d) in built
+        L.id in hidden || continue
+        empty!(d["events"])
+        d["hidden"] = true
     end
     draw = _draw(plan)
     for (_, L, d) in built
