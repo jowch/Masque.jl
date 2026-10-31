@@ -143,7 +143,8 @@ describe("the fade (closed-mark selected look)", () => {
             initial: { g: { layer: "g", index: 0 }, segs: { layer: "segs", index: 0 } },
         })
         expect(wrap()).toBeNull()
-        expect(shadow.querySelectorAll("g.sel > *").length).toBe(3) // the cell's fill + halo, the segment's halo
+        expect(shadow.querySelectorAll("g.sel .masque-fillshape").length).toBe(1) // the cell's fill
+        expect(shadow.querySelectorAll("g.sel .masque-halo").length).toBe(2) // the cell's halo, the segment's
     })
 
     it("fades toward the axis's own plot area colour when it has one, else the figure's", () => {

@@ -285,15 +285,72 @@ function firstHiChild(set: HiSet): Element | null {
 }
 
 function emptyAll(set: HiSet): void {
-    for (const g of hiNodes(set)) while (g.firstChild) g.removeChild(g.firstChild)
+    for (const g of hiNodes(set)) {
+        while (g.firstChild) g.removeChild(g.firstChild)
+        const mask = sharedMasks.get(g)
+        while (mask && mask.childElementCount > 1) mask.lastElementChild!.remove()
+        syncSharedMask(g)
+    }
 }
 
-function placeMade(groups: HiGroups, made: HiResult, enter: boolean): void {
+// `share` moves a line halo's cut (a segment, a polyline piece, a picked line) into one mask on
+// its whole group (sharedMask), so a plot holding thousands of them has one mask, not one per
+// pick (#478). A point's halo keeps its own mask: under a shared one, overlapping picked points
+// would merge into one ragged outline instead of each keeping its ring.
+function placeMade(groups: HiGroups, made: HiResult, enter: boolean, share = false): void {
     for (const [el, g] of [[made.fill, groups.fill_], [made.edge, groups.edge_], [made.plain, groups.plain_]] as const) {
         if (!el) continue
         if (enter) el.classList.add("masque-enter")
+        const mask = share && el.classList.contains("masque-halo-line") ? el.querySelector(":scope > mask") : null
+        if (mask) {
+            const cut = mask.lastElementChild as SVGElement
+            mask.remove()
+            el.removeAttribute("mask")
+            sharedMask(g).appendChild(cut)
+            cutOf.set(el, cut)
+            g.setAttribute("mask", `url(#${sharedMask(g).id})`)
+        }
         g.appendChild(el)
     }
+}
+
+// A group's shared mask: everything shows but the cut shapes of its halos. Each halo's bands are
+// then kept off every held mark's shape, not only its own, which shows only where two held
+// marks cross. It sits at the top of the group's svg, as the occluders' clip does, so the group
+// holds only its marks; the group carries it while it has a cut.
+const sharedMasks = new WeakMap<SVGGElement, SVGMaskElement>()
+const cutOf = new WeakMap<Element, SVGElement>()
+function sharedMask(g: SVGGElement): SVGMaskElement {
+    const cur = sharedMasks.get(g)
+    if (cur) return cur
+    const mask = document.createElementNS(SVG_NS, "mask")
+    mask.id = `masque-halo-${++haloSeq}`
+    const all = document.createElementNS(SVG_NS, "rect")
+    for (const el of [mask, all]) {
+        el.setAttribute("x", "-100000"); el.setAttribute("y", "-100000")
+        el.setAttribute("width", "200000"); el.setAttribute("height", "200000")
+    }
+    mask.setAttribute("maskUnits", "userSpaceOnUse")
+    all.setAttribute("fill", "white")
+    mask.appendChild(all)
+    const svg = g.ownerSVGElement ?? g
+    svg.insertBefore(mask, svg.firstChild)
+    sharedMasks.set(g, mask)
+    return mask
+}
+
+// Drops the group's mask once no halo of it has a cut there.
+function syncSharedMask(g: SVGGElement): void {
+    const mask = sharedMasks.get(g)
+    if (mask && mask.childElementCount <= 1) g.removeAttribute("mask")
+}
+
+// Takes out one placed element, and its cut from its group's shared mask.
+function removeMade(el: Element): void {
+    const g = el.parentNode as SVGGElement | null
+    cutOf.get(el)?.remove()
+    el.remove()
+    if (g) syncSharedMask(g)
 }
 
 // `also` is the other hover home (data vs screen-fixed). A ring only lives in one of them,
@@ -332,6 +389,7 @@ export function clearHi(state: OverlayState, hiGroups: HiSet, fade = false, also
 
 export function clearSel(selGroups: HiSet): void {
     emptyAll(selGroups)
+    placedSel.delete(selGroups)
 }
 
 // Hovering an already-selected mark draws no hover chrome at all: both layers are opaque, so a
@@ -432,7 +490,7 @@ export function drawLink(state: OverlayState, linkGroups: HiSet, key: string, hi
     for (const h of hits) {
         if (state.selKeys_.has(hitKey(h))) continue
         const made = makeHiElement(h, mode)
-        if (made) placeMade(linkGroups.at_(h.layer.axis), made, true)
+        if (made) placeMade(linkGroups.at_(h.layer.axis), made, true, mode === "selected")
     }
     state.linkKey_ = key
 }
@@ -472,11 +530,36 @@ export function clearLegendLink(ctx: OverlayCtx, state: OverlayState, fade = fal
     ctx.fade_.preview_(null, null, [])
 }
 
+// What each held pick of a set has placed, by key, so a click adds and takes out only the picks
+// it changes rather than redrawing them all (#478). A pick is drawn again when its layer
+// (a frame brings new layers) or its geometry changed under the same key, such as a grid mask.
+interface Placed { layer_: HitLayer; geom_: unknown[] | undefined; els_: Element[] }
+const placedSel = new WeakMap<HiSet, Map<string, Placed>>()
+
+const sameGeom = (a: unknown[] | undefined, b: unknown[] | undefined): boolean =>
+    a === b || (!!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]))
+
 function placeSel(selGroups: HiSet, hits: Hit[], entering: Set<string>): void {
-    clearSel(selGroups)
-    for (const h of hits) {
+    let placed = placedSel.get(selGroups)
+    if (!placed || [...placed.values()].some((p) => p.els_.some((el) => !el.isConnected))) {
+        clearSel(selGroups)
+        placed = new Map()
+        placedSel.set(selGroups, placed)
+    }
+    const next = new Map<string, Hit>()
+    for (const h of hits) next.set(hitKey(h), h)
+    for (const [key, p] of placed) {
+        const h = next.get(key)
+        if (h && h.layer === p.layer_ && sameGeom(h.geom_, p.geom_)) continue
+        for (const el of p.els_) removeMade(el)
+        placed.delete(key)
+    }
+    for (const [key, h] of next) {
+        if (placed.has(key)) continue
         const made = makeHiElement(h, "selected")
-        if (made) placeMade(selGroups.at_(h.layer.axis), made, entering.has(hitKey(h)))
+        if (!made) continue
+        placeMade(selGroups.at_(h.layer.axis), made, entering.has(key), true)
+        placed.set(key, { layer_: h.layer, geom_: h.geom_, els_: [made.fill, made.edge, made.plain].filter((el): el is SVGElement => !!el) })
     }
 }
 

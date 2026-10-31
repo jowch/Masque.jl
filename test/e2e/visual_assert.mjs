@@ -46,7 +46,8 @@ export const HALO_CAPTURE = `
     innerStroke: inner ? getComputedStyle(inner).stroke : null,
     outer: sw(outer), inner: sw(inner),
     u: host ? parseFloat(getComputedStyle(host).getPropertyValue("--masque-halo-u")) : null,
-    clip: g.getAttribute("clip-path"), mask: g.getAttribute("mask"),
+    // A held pick's cut is in its group's shared mask (#478), a hover's in its own.
+    clip: g.getAttribute("clip-path"), mask: g.getAttribute("mask") ?? g.parentNode?.getAttribute?.("mask") ?? null,
     classes: g.getAttribute("class"),
   };
 `;
