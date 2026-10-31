@@ -155,7 +155,8 @@ jobs:
     # in a worker process, as users run it. The kind sweep runs its notebooks in the server
     # process (see test/e2e/serve.jl), so the Pluto 1 leg is CI's one check that published data
     # crosses the worker boundary to the page and a bound value comes back. The 0.20 leg is the
-    # one remaining 0.20 check; drop it at 0.5.0. Both cover the WebGL round-trip only.
+    # one remaining 0.20 check; drop it at 0.5.0. Both cover the WebGL round-trip; the Pluto 1
+    # leg also runs the two WebGL page checks that need no Pluto (click.mjs, standalone_webgl.mjs).
     name: WGLMakie bind E2E (Pluto ${{ matrix.pluto }})
     needs: setup-lts
     strategy:
@@ -206,6 +207,8 @@ jobs:
           julia --color=yes --project="$MASQUE_DEV_ENV" test/e2e/standalone_webgl.jl "$RUNNER_TEMP/standalone-webgl"
           cd test/e2e && node standalone_webgl.mjs "$RUNNER_TEMP/standalone-webgl"
       - name: Through-Pluto bind round-trip
+        # Runs even when a page check above failed, so the two results stay independent.
+        if: ${{ !cancelled() }}
         working-directory: test/e2e
         env:
           PLUTO: ${{ matrix.pluto }}
