@@ -14,4 +14,3 @@ body:
     attributes:
       label: What it could look like
       description: How you would like it to work, as code or as what a reader would see. Leave blank if you are not sure.
-      render: julia
