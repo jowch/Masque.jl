@@ -176,8 +176,10 @@ Masque.interactables(ax, p::SeedHeatParts) = (
     end
 
     @testset "propertynames lists a Dict or struct payload's names (#493)" begin
-        d = ElementEvent(:pts, 1, Dict(:city => "Delhi", "pop" => 32, 7 => "seven"))
+        d = ElementEvent(:pts, 1, Dict(:city => "Delhi", "pop" => 32, 7 => "seven", "layer" => "x"))
         @test Set(propertynames(d)) == Set([:layer, :index, :payload, :city, :pop])
+        # A payload key that is also an event field is listed once.
+        @test count(==(:layer), propertynames(d)) == 1
         struct_pl = ElementEvent(:pts, 1, 1 + 2im)
         @test (:re, :im) ⊆ propertynames(struct_pl)
         @test struct_pl.re == 1
