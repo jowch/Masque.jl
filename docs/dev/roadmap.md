@@ -55,7 +55,13 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 - *idea* — double-click resets the view to the figure's limits or camera.
 - *idea* — Escape aborts a drag and restores its start.
 - *idea* — links across layers and across figures; across widgets this needs a registry.
-- *idea* — range select on a colorbar; lasso select beside the box ROI.
+- #499 — drag a threshold on a `Colorbar`.
+- #500 — `SpanInteractable`: a two-handle `(lo, hi)` interval on an axis or a colorbar.
+- *idea* — lasso select beside the box ROI.
+- *idea* — more controls: a line profile (two ends, an ImageJ-style profile), a point handle
+  (one `(x, y)` that always has a value), a persistent polygon, a circle, an angle, and a
+  multi-level threshold.
+- *idea* — default a threshold's `value` and an ROI's `bounds` from the axis limits.
 - *idea* — nearest-mark snapping within a radius.
 - *idea* — a 2D profile probe on a heatmap cell; a delta readout between two parked probes.
 
@@ -73,6 +79,7 @@ waits for a real use, and gets an issue when one appears. Items are additive unl
 ### Plot coverage
 - #91 — tracking issue for the recipes `masque(fig)` does not extract yet. Tick it and
   update `docs/src/support.md` when `_plotbase` grows a branch.
+- #502 — hovering a line on an `Axis3` shows the nearest point's `x`, `y` and `z`.
 - *idea* — informative default payloads for `density!`, `band!`, and `voronoiplot!`.
 - *idea* — a legend entry that targets a `:grid` layer.
 - *idea* — `heatmap!`/`image!` and `surface!` designed together as dense cell fields;
