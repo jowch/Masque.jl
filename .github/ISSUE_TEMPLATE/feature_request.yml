@@ -1,0 +1,17 @@
+name: Feature request
+description: Suggest a new interaction, plot type, or option.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What you want to do
+      description: What you are trying to do in your notebook, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What it could look like
+      description: How you would like it to work, as code or as what a reader would see. Leave blank if you are not sure.
+      render: julia
