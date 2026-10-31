@@ -67,8 +67,17 @@ const series = async (name, fn, n = 12) => {
   out[name] = { sync: med(r.map((x) => x.sync)), total: med(r.map((x) => x.total)), masks: r.at(-1).masks, runs: r };
 };
 await series("linked_click", () => timed(0, C.linked[0], C.linked[1], "click"));
-// Hover an unheld segment, then off it, in turn: the plot repaints with every pick still drawn.
-await series("linked_hover", async (i) => i % 2 ? timed(0, 2, 2, "hover") : timed(0, C.linked_hover[0], C.linked_hover[1], "hover"));
+// Hover onto an unheld segment, then off it, in turn: the plot repaints with every pick still
+// drawn. The two moves are reported apart.
+const hoverRuns = [];
+for (let i = 0; i < 24; i++) {
+  hoverRuns.push({ on: i % 2 === 0, ...(i % 2 ? await timed(0, 2, 2, "hover") : await timed(0, C.linked_hover[0], C.linked_hover[1], "hover")) });
+  await page.waitForTimeout(250);
+}
+for (const [name, on] of [["linked_hover_on", true], ["linked_hover_off", false]]) {
+  const r = hoverRuns.filter((x) => x.on === on);
+  out[name] = { sync: med(r.map((x) => x.sync)), total: med(r.map((x) => x.total)), masks: r.at(-1).masks, runs: r };
+}
 await series("two_click", () => timed(1, C.two[0], C.two[1], "click"));
 await series("one_click", () => timed(2, C.one[0], C.one[1], "click"));
 await series("scatter_linked_click", () => timed(3, C.scatter[0], C.scatter[1], "click"));

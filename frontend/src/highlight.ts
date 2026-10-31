@@ -293,13 +293,15 @@ function emptyAll(set: HiSet): void {
     }
 }
 
-// `share` moves an outside or line halo's cut into one mask on its whole group (sharedMask),
-// so a plot holding thousands of open picks has one mask, not one per pick (#478).
+// `share` moves a line halo's cut (a segment, a polyline piece, a picked line) into one mask on
+// its whole group (sharedMask), so a plot holding thousands of them has one mask, not one per
+// pick (#478). A point's halo keeps its own mask: under a shared one, overlapping picked points
+// would merge into one ragged outline instead of each keeping its ring.
 function placeMade(groups: HiGroups, made: HiResult, enter: boolean, share = false): void {
     for (const [el, g] of [[made.fill, groups.fill_], [made.edge, groups.edge_], [made.plain, groups.plain_]] as const) {
         if (!el) continue
         if (enter) el.classList.add("masque-enter")
-        const mask = share && el.hasAttribute("mask") ? el.querySelector(":scope > mask") : null
+        const mask = share && el.classList.contains("masque-halo-line") ? el.querySelector(":scope > mask") : null
         if (mask) {
             const cut = mask.lastElementChild as SVGElement
             mask.remove()

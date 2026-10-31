@@ -377,21 +377,23 @@ cover is drawn once and the picks are punched out of it.
 Held segments are drawn as SVG, a halo per pick (highlight.ts). Since #459 (0.4.2) each
 halo carried its own mask, which made a click cost every held shape again and every repaint of
 the plot raster thousands of masks. Since #478 a click adds and takes out only the picks it
-changes, and the held halos of a group share one mask. `bench/segment_picks/click.mjs` times it
-with 5 000 rows held per panel (2026-10-30, cloud container, sync / total):
+changes, and the held halos of segments and polyline pieces in a group share one mask (a picked
+point keeps its own, so overlapping points keep separate rings). `bench/segment_picks/click.mjs`
+times it with 5 000 rows held per panel (2026-10-31, cloud container, sync / total):
 
 | Case | `:cairo` 0.4.2 | `:cairo` #478 | `:webgl` 0.4.2 | `:webgl` #478 |
 |------|---:|---:|---:|---:|
-| linked click, 2 panels | 896 / 1 915 ms | 36 / 170 ms | 670 / 5 260 ms | 45 / 2 790 ms |
-| two separate `:many` fields, click | 857 / 1 890 ms | 33 / 157 ms | 709 / 5 087 ms | 48 / 2 794 ms |
-| one `:many` field, click | 320 / 945 ms | 20 / 100 ms | 300 / 3 282 ms | 26 / 2 704 ms |
-| hover an unheld segment, linked panels | 4 / 17 775 ms | 3 / 98 ms | 3 / 2 832 ms | 2 / 2 714 ms |
-| scatter linked click (closed marks, the baseline) | 62 / 223 ms | 62 / 151 ms | 116 / 2 849 ms | 87 / 2 703 ms |
+| linked click, 2 panels | 896 / 1 915 ms | 33 / 164 ms | 670 / 5 260 ms | 39 / 2 744 ms |
+| two separate `:many` fields, click | 857 / 1 890 ms | 26 / 122 ms | 709 / 5 087 ms | 46 / 2 825 ms |
+| one `:many` field, click | 320 / 945 ms | 17 / 119 ms | 300 / 3 282 ms | 25 / 2 608 ms |
+| hover onto an unheld segment, linked panels | 9 / 17 978 ms | 3 / 74 ms | 14 / 6 988 ms | 3 / 2 691 ms |
+| hover off it | 3 / 142 ms | 2 / 116 ms | 3 / 2 596 ms | 2 / 2 648 ms |
+| scatter linked click (closed marks, the baseline) | 62 / 223 ms | 61 / 157 ms | 116 / 2 849 ms | 84 / 2 805 ms |
 
-On 0.4.2 every hover onto a segment took about 18 s on `:cairo` (moving off was 0.1 s), spent
-rastering the 10 000 masks in software. The review of #417, before the halo, timed the linked
-click at 127 / 281 ms on `:cairo` and 204 / 2 100 ms on `:webgl`. On `:webgl` the totals now
-match the scatter baseline, which is the WGLMakie canvas drawn in software.
+On 0.4.2 the hover onto a segment went to rastering the 10 000 masks in software. The review of
+#417, before the halo, timed the linked click at 127 / 281 ms on `:cairo` and 204 / 2 100 ms on
+`:webgl`. On `:webgl` the totals now match the scatter baseline, which is the WGLMakie canvas
+drawn in software.
 
 The same review of #417 timed the round trip that #346's spike put at 6 to 7 s for about
 2 500 marks: a legend click that picks one cluster of a keyed group (1 229 rows) reaches

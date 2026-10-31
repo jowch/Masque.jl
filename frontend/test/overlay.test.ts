@@ -5565,6 +5565,13 @@ describe("select = :many and clearing picks (#335)", () => {
         click(surface, 490, 200) // adds point 2
         expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 0 }, { layer: "fit", index: 0, sample: 2 }] })
         expect(rings().sort()).toEqual(["1000", "200"])
+        // Each picked point keeps its own ring and mask: a mask shared with the group (#478)
+        // would merge overlapping points into one outline.
+        const sel = shadow.querySelector("svg.masque-edge g.sel")!
+        const halos = [...sel.querySelectorAll(".masque-halo-out")]
+        expect(halos.length).toBe(2)
+        expect(halos.every((h) => h.getAttribute("mask") === `url(#${h.querySelector(":scope > mask")!.id})`)).toBe(true)
+        expect(sel.hasAttribute("mask")).toBe(false)
         click(surface, 110, 200) // takes point 0 out, keeps the same line's point 2
         expect(val(host).fit).toEqual({ items: [{ layer: "fit", index: 0, sample: 2 }] })
         expect(rings()).toEqual(["1000"])
