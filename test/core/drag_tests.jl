@@ -107,12 +107,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test !haskey(L3.geometry, "clip")   # orbit has no photographic preview
         @test !haskey(L3.geometry, "fill")
         # #102/§12.3: a view gesture commits nothing, so the frontend never sends a :view bond
-        # payload. A caller that reaches the decoder with one anyway, a pan's limits or an
-        # orbit's angles, is refused rather than converted.
-        vmanifest = Dict{String, Any}("layers" => [Dict{String, Any}("id" => "view", "kind" => "view", "bond" => "none", "payloads" => Any[])])
-        w = Masque.MasqueWidget("", vmanifest, 100)
-        @test_throws "ArgumentError: bond: layer :view commits nothing" commit_field(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("xmin" => 1.0, "xmax" => 5.0, "ymin" => 0.0, "ymax" => 10.0)))
-        @test_throws "ArgumentError: bond: layer :view commits nothing" commit_field(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("azimuth" => 0.9, "elevation" => 0.3)))
+        # payload. One that reaches the view's own decoder anyway, a pan's limits or an orbit's
+        # angles, is refused rather than converted. (The manifest-stamp route is checked with
+        # the other stamps below.)
+        vi = ViewInteractable(ax3)
+        @test_throws "ArgumentError: bond: layer :view is a view gesture and commits nothing" Masque.transform_bond(vi, L3, nothing, Dict("xmin" => 1.0, "xmax" => 5.0, "ymin" => 0.0, "ymax" => 10.0))
+        @test_throws "ArgumentError: bond: layer :view is a view gesture and commits nothing" Masque.transform_bond(vi, L3, nothing, Dict("azimuth" => 0.9, "elevation" => 0.3))
         # PolarAxis / Colorbar: view gestures rejected (no continuous polar inversion; colorbar is 1-D)
         fp = Figure(); axp = PolarAxis(fp[1, 1])
         scatter!(axp, [Point2f(0.0, 1.0), Point2f(π / 2, 2.0)])
@@ -214,14 +214,6 @@ end
     @test_throws "ArgumentError: bond: layer :L payload is missing `y`" tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => Dict("x" => 1.0)))
     @test_throws "ArgumentError: bond: layer :L payload is missing `j`" tvL(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1)))
     @test_throws "ArgumentError: bond: layer :L payload is missing `x`" tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
-    let err = try
-            tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
-            nothing
-        catch e
-            e
-        end
-        @test err isa ArgumentError && occursin(":L", err.msg)
-    end
     @test_throws "ArgumentError: bond: field :L holds a commit from layer :missing" tvL(wdg("axis", "axis"), Dict("layer" => "missing", "index" => -1, "payload" => Dict("x" => 1.0, "y" => 2.0)))
     @test_throws "ArgumentError: bond: this manifest has no layers" commit_field(Masque.MasqueWidget("", Dict{String, Any}(), 100), Dict("layer" => "L", "index" => 0))
 end
