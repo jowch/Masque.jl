@@ -26,9 +26,10 @@ grouped legend (`nothing` otherwise), and `pick.targets` lists the
 names of the plots the entry highlights, such as `["lines_2"]`. Click the entry again to
 clear the highlight, and `pick` is `nothing` again.
 
-In GLMakie, clicking a legend entry hides its series. Here the click
-picks the series out and every series stays on screen. To hide or fade
-the other series, use `pick` in another cell, as the next section does.
+In a Makie window, clicking a legend entry hides its series. In a
+`masque` figure the click selects the series instead: the other series
+fade, and nothing is hidden. To hide a series, create a second figure
+without it in a cell that uses `pick`, the way the next section does.
 
 A figure with a second legend gives `sel.legend_2` in the same way, and
 plots that take clicks keep their own fields.
