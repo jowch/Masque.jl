@@ -2106,7 +2106,8 @@ Its field in the `@bind` value starts as a [`ThresholdEvent`](@ref) at `value` (
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
 a data value — inversion is undefined), a `PolarAxis` (a straight line is neither a constant r nor
-a constant θ), or
+a constant θ), a `Colorbar` (use [`ColorbarInteractable`](@ref) to read a value off it, or put
+the threshold on an `Axis`, such as a histogram of the same values), or
 the dragged axis's scale isn't client-invertible (`:horizontal` needs the y-scale, `:vertical`
 the x-scale; supported: `identity`, `log10`, `log`).
 
@@ -2129,6 +2130,9 @@ end
 events(::ThresholdInteractable) = (:drag,)
 function validate(i::ThresholdInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ThresholdInteractable: ax is a Legend, not an Axis — a legend has no data-space scalar to drag."
+    i.ax isa Makie.Colorbar && return "ThresholdInteractable: ax is a Colorbar, not an Axis — a threshold " *
+        "can't be dragged on a colorbar yet. To read a value off the colorbar, use " *
+        "ColorbarInteractable(cb); to drag a cutoff, put the threshold on an Axis, such as a histogram of the same values."
     t = ctx.transforms[axis_id(ctx, i.ax)]
     t.is3d && return "ThresholdInteractable: drag inverts a pixel to a data scalar via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data value)."
@@ -2188,7 +2192,8 @@ target takes no clicks; every other layer keeps its own. `bounds=` accepts a `Bo
 `(xmin, xmax, ymin, ymax)` tuple.
 
 `masque` raises `ArgumentError` at build time if `ax` is an `Axis3` (a screen pixel is a ray, not
-a data point), a `PolarAxis` (a screen rectangle is not an annular sector), a categorical axis (bounds
+a data point), a `PolarAxis` (a screen rectangle is not an annular sector), a `Colorbar` (use
+[`ColorbarInteractable`](@ref) to read a value off it), a categorical axis (bounds
 need numeric limits), or either scale isn't client-invertible (supported: `identity`, `log10`,
 `log`).
 
@@ -2221,6 +2226,8 @@ compatible_kinds(::ROIInteractable) = (:circles, :grid)
 events(::ROIInteractable) = (:drag,)
 function validate(i::ROIInteractable, ctx::InteractionContext)
     i.ax isa Makie.Legend && return "ROIInteractable: ax is a Legend, not an Axis — a legend has no data-space bounds to drag."
+    i.ax isa Makie.Colorbar && return "ROIInteractable: ax is a Colorbar, not an Axis — a colorbar has no " *
+        "two-dimensional bounds to drag. To read a value off it, use ColorbarInteractable(cb)."
     t = ctx.transforms[axis_id(ctx, i.ax)]
     t.is3d && return "ROIInteractable: drag inverts pixel corners to data-space bounds via the axis " *
         "transform, which is undefined on an Axis3 (a screen pixel is a ray, not a data point)."

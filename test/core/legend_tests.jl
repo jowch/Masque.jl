@@ -364,6 +364,17 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test validate(Masque.ROIInteractable(leg; bounds = (0.0, 1.0, 0.0, 1.0)), ctx) isa String
     end
 
+    @testset "misuse: a threshold on a Colorbar fails loud, naming what works (#498)" begin
+        fig = Figure(); ax = Axis(fig[1, 1]); hm = heatmap!(ax, rand(4, 3))
+        cb = Colorbar(fig[1, 2], hm)
+        for o in (:horizontal, :vertical)
+            err = (@test_throws ArgumentError masque(fig, (cutoff = ThresholdInteractable(cb; orientation = o, value = 0.4),))).value
+            @test occursin("Colorbar", err.msg) && occursin("ColorbarInteractable", err.msg)
+        end
+        err = (@test_throws ArgumentError masque(fig, (box = ROIInteractable(cb; bounds = (0.0, 1.0, 0.0, 1.0)),))).value
+        @test occursin("Colorbar", err.msg) && occursin("ColorbarInteractable", err.msg)
+    end
+
     @testset "B5: grouped/titled legend" begin
         fig = Figure(); ax = Axis(fig[1, 1])
         l1 = lines!(ax, 1:3, Float64.(1:3); label = "a")

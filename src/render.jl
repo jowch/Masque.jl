@@ -694,6 +694,7 @@ end
     masque(fig, xs...; auto = true, bind = nothing, kwargs...) -> MasqueWidget
 
 Overlay `fig` with JS hit-testing and return a Pluto `@bind` source. `fig` is not mutated.
+`fig` is a `Figure`, or what `scatter(x, y)` or `scatter(fig[1, 1], …)` returns.
 
 `masque(fig)` overlays the figure's defaults, the list [`interactables(fig)`](@ref
 interactables) returns. Each argument after `fig` adds to them: an interactable, a vector of
@@ -800,6 +801,7 @@ s = scatter!(ax, first.(pts), last.(pts))
 ```
 """
 function masque(fig, xs...; auto::Bool = true, bind = nothing, onchange = nothing, kwargs...)
+    fig = _as_figure(fig)
     plan = _bind_call(fig, xs, bind; auto)
     _check_unnamed_blocks(fig, plan)
     auto && isempty(plan) && @warn "masque(fig): no introspectable plots found — overlaying nothing (static image only)"
@@ -808,6 +810,23 @@ function masque(fig, xs...; auto::Bool = true, bind = nothing, onchange = nothin
     onchange === nothing || (plan = _with_onchange(plan, onchange, () -> _bind_call(fig, xs, bind; auto)))
     return _masque(fig, plan; onchange, kwargs...)
 end
+
+# `scatter(x, y)` returns a FigureAxisPlot and `scatter(fig[1, 1], …)` an AxisPlot: both name
+# the figure they drew into, so take it (#501). Anything else that isn't a Figure is refused
+# here, before it fails deep in the stack.
+_as_figure(fig::Makie.Figure) = fig
+_as_figure(fap::Makie.FigureAxisPlot) = fap.figure
+function _as_figure(ap::Makie.AxisPlot)
+    fig = ap.axis.parent
+    fig isa Makie.Figure && return fig
+    throw(ArgumentError("masque: this plot's axis is not in a Figure; pass the Figure it was drawn in"))
+end
+_as_figure(x) = throw(
+    ArgumentError(
+        "masque: the first argument must be a Figure, or what `scatter(x, y)`-style calls return, " *
+            "got $(typeof(x)). For an axis or a plot, pass the Figure it is in."
+    ),
+)
 
 _check_onchange(f) = f === nothing || f isa Function || throw(
     ArgumentError("masque: `onchange` must be a function of the widget's state, `state -> …`, got $(typeof(f))"),
