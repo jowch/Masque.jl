@@ -333,6 +333,12 @@ describe("lines join the fade", () => {
         const own = setup(hide(lines({ fields: ["legend"], initial: { legend: { layer: "legend", index: 1 } } })))
         expect(fadeKept(own.shadow)).toEqual([])
         expect(own.wrap()!.dataset.faded).toBe("2")
+        expect(own.shadow.querySelectorAll("g.sel > *").length).toBe(0) // no ring along the hidden line
+        // Hovering the hidden line's entry outlines nothing along it either.
+        const entry = setup(hide(lines()))
+        move(entry.surface, 500, 75) // legend entry 1 → line b
+        await frame()
+        expect(entry.shadow.querySelectorAll("g.link > *").length).toBe(0)
         // Hovering line c fades a, not b.
         const hover = setup(hide(lines()))
         move(hover.surface, 150, 301)

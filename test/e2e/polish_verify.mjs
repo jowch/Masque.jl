@@ -738,8 +738,9 @@ try {
     if (!a) throw new Error(`${key}: legend entry 0 names ${JSON.stringify(legend.links[0])}, not a shown line`);
     const [x0, y, x1] = hidden[0].geometry[0];
     const [, cy] = c.geometry[0].slice(0, 2);
-    const lw = hidden[0].linewidth ?? 8;
-    // The first screenshot pixel along the hidden line's path, over its drawn width, that moved.
+    // Wide enough to take in the selected recipe's ring around the line, not only its stroke.
+    const lw = 3 * (hidden[0].linewidth ?? 8);
+    // The first screenshot pixel along the hidden line's path, out past its ring, that moved.
     const moved = (a, b) => {
       for (let j = Math.ceil((y - lw) * a.perImg); j < (y + lw) * a.perImg; j++) {
         for (let i = Math.ceil((x0 + 2) * a.perImg); i < (x1 - 2) * a.perImg; i++) {
@@ -788,6 +789,32 @@ try {
     passed.push(`${key}/no-hover-hidden`);
     await away();
     await clickLegend(0); // deselect
+
+    // The hidden line's own entry: hovering it and picking it draw nothing along the hidden
+    // line, no ring in g.link or g.sel, and the shown lines fade.
+    const chrome = () => page.evaluate((key) => {
+      const span = document.querySelector(`#coords_${key}`);
+      const host = [...document.querySelectorAll(".ip-host")].filter((h) => (h.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING)).at(-1);
+      let sr = null; host.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) sr = el.shadowRoot; });
+      const n = (sel) => [...sr.querySelectorAll(sel)].reduce((k, g) => k + [...g.children].filter((c) => !/masque-leave/.test(c.getAttribute("class") ?? "")).length, 0);
+      return { link: n("g.link"), sel: n("g.sel") };
+    }, key);
+    await page.waitForTimeout(600); // let the last ring finish leaving
+    await hoverAt(key, legend.geometry[4], legend.geometry[5]);
+    await page.waitForTimeout(200);
+    let ch = await chrome();
+    if (ch.link || ch.sel) throw new Error(`${key}/hover-hidden-entry: hovering entry "b" drew ${JSON.stringify(ch)}`);
+    await clickLegend(1);
+    await away();
+    await page.waitForTimeout(400);
+    ch = await chrome();
+    if (ch.link || ch.sel) throw new Error(`${key}/pick-hidden-entry: picking entry "b" drew ${JSON.stringify(ch)}`);
+    const own = await screenOf(key);
+    if (lum(own.mean(mid, cy, 1)) - cRest < 0.4 * (255 - cRest)) throw new Error(`${key}/pick-hidden-entry: line c is not faded with "b" picked`);
+    bad = moved(rest, own);
+    if (bad) throw new Error(`${key}/pick-hidden-entry: something drew along the hidden line's path at ${JSON.stringify(bad)}`);
+    passed.push(`${key}/hidden-entry-draws-nothing`);
+    await clickLegend(1); // deselect
   }
 
   // Linked selections (#346): a pick in the left panel is drawn picked in both panels, and the

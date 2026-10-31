@@ -208,9 +208,10 @@ function _bind_call(fig, xs, bind; auto::Bool)
         ]
     end
     # A layer is hidden when every plot it stands for is: a recipe's hidden child (`arrows3d`'s)
-    # shares the id of a parent that is drawn.
+    # shares the id of a parent that is drawn. Taken now, as the picture is rendered now; with
+    # `onchange` each frame's plan is built again (`_rebuilt`).
     shown = Set{Symbol}(id for (p, ids) in built.plotmap if _shown(p) for id in ids)
-    hidden = Set{Symbol}(id for (p, ids) in built.plotmap if !_shown(p) for id in ids if id ∉ shown)
+    hidden = setdiff(Set{Symbol}(id for (p, ids) in built.plotmap if !_shown(p) for id in ids), shown)
     draw = _draw_order(fig, built.plotmap)
     return _Plan(built.ints, _Binding(resolved, bare, built.defaults, groups), nothing, nothing, Ref{Any}(nothing), hidden, draw)
 end
