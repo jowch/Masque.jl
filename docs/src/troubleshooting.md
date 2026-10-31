@@ -30,7 +30,7 @@ CairoMakie. For more information, see [Backends](@ref).
 
 ### `backend=` names a backend that isn't loaded
 
-**Error prefix:** `` masque: `backend = :webgl` needs `using WGLMakie` first `` /
+**Error prefix:** ```masque: `backend = :webgl` needs `using WGLMakie` first``` /
 `masque: unknown backend`
 
 **Cause:** `backend=` names a backend whose package is not loaded, or a
