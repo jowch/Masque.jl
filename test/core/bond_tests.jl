@@ -361,6 +361,8 @@ Masque.interactables(ax, p::SeedHeatParts) = (
         end
         @test occursin("isn't in bind (fields: :left)", msg(() -> masque(fig; bind = (left = s1,), selected = (right = [1],))))
         @test occursin("as a tuple", msg(() -> masque(fig; bind = [s1, s2])))
+        # A Bool is an Integer in Julia; `true` must not pass for index 1.
+        @test occursin("must not be a Bool", msg(() -> masque(fig; bind = (left = s1,), selected = (left = true,))))
         # One object that builds several layers gives its parts.
         reg = RegionInteractable(ax, [(:circle, (1.0, 1.0), 0.5), (:rect, (5.0, 5.0), 1.0, 1.0)]; id = :cells)
         v = Masque.APD.Bonds.initial_value(masque(fig, reg; bind = reg))
