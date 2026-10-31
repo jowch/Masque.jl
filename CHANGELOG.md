@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-31
+
 ### Changed
 - A Makie `Menu` named in `masque` is drawn the way Makie draws it, in place of the browser's
   own list: a press opens Makie's list of options under the menu, or over it when there is
@@ -737,7 +739,8 @@ Masque index.
 
 Requires Julia 1.10 or later, Makie 0.24, and CairoMakie 0.15 or WGLMakie 0.13.
 
-[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/jowch/Masque.jl/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/jowch/Masque.jl/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/jowch/Masque.jl/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/jowch/Masque.jl/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/jowch/Masque.jl/compare/v0.3.1...v0.4.0
