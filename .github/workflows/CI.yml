@@ -155,7 +155,8 @@ jobs:
     # in a worker process, as users run it. The kind sweep runs its notebooks in the server
     # process (see test/e2e/serve.jl), so the Pluto 1 leg is CI's one check that published data
     # crosses the worker boundary to the page and a bound value comes back. The 0.20 leg is the
-    # one remaining 0.20 check; drop it at 0.5.0. Both cover the WebGL round-trip only.
+    # one remaining 0.20 check; drop it at 0.5.0. Both cover the WebGL round-trip; the Pluto 1
+    # leg also runs the two WebGL page checks that need no Pluto (click.mjs, standalone_webgl.mjs).
     name: WGLMakie bind E2E (Pluto ${{ matrix.pluto }})
     needs: setup-lts
     strategy:
@@ -187,7 +188,27 @@ jobs:
         run: |
           npm install
           npx playwright install --with-deps chromium
+      # These two WebGL pages need no Pluto session. They ride the Pluto 1 bind job, which is
+      # short, instead of the WebGL kind sweep, the slowest job in the run (#492).
+      # A self-contained :webgl widget page (no Pluto): click scatter marker 0 in Chromium, assert
+      # the overlay emits the right bond value, then feed that exact emission through
+      # transform_value.
+      - name: WebGL widget page click
+        if: matrix.pluto == '1'
+        run: |
+          julia --color=yes test/e2e/make_page.jl "$RUNNER_TEMP/e2e"
+          (cd test/e2e && node click.mjs "$RUNNER_TEMP/e2e")
+          julia --color=yes test/e2e/verify_capture.jl "$RUNNER_TEMP/e2e"
+      # A WebGL widget outside Pluto fetches WGLMakie's script from Makie's release tag; the
+      # driver serves the installed copy at those URLs (#300).
+      - name: WebGL page outside Pluto
+        if: matrix.pluto == '1'
+        run: |
+          julia --color=yes --project="$MASQUE_DEV_ENV" test/e2e/standalone_webgl.jl "$RUNNER_TEMP/standalone-webgl"
+          cd test/e2e && node standalone_webgl.mjs "$RUNNER_TEMP/standalone-webgl"
       - name: Through-Pluto bind round-trip
+        # Runs even when a page check above failed, so the two results stay independent.
+        if: ${{ !cancelled() }}
         working-directory: test/e2e
         env:
           PLUTO: ${{ matrix.pluto }}
@@ -261,22 +282,6 @@ jobs:
         run: |
           npm install
           npx playwright install --with-deps chromium
-      # A self-contained :webgl widget page (no Pluto): click scatter marker 0 in Chromium, assert
-      # the overlay emits the right bond value, then feed that exact emission through
-      # transform_value.
-      - name: WebGL widget page click
-        if: matrix.backend == 'webgl'
-        run: |
-          julia --color=yes test/e2e/make_page.jl "$RUNNER_TEMP/e2e"
-          (cd test/e2e && node click.mjs "$RUNNER_TEMP/e2e")
-          julia --color=yes test/e2e/verify_capture.jl "$RUNNER_TEMP/e2e"
-      # A WebGL widget outside Pluto fetches WGLMakie's script from Makie's release tag; the
-      # driver serves the installed copy at those URLs (#300).
-      - name: WebGL page outside Pluto
-        if: matrix.backend == 'webgl'
-        run: |
-          julia --color=yes --project="$MASQUE_DEV_ENV" test/e2e/standalone_webgl.jl "$RUNNER_TEMP/standalone-webgl"
-          cd test/e2e && node standalone_webgl.mjs "$RUNNER_TEMP/standalone-webgl"
       - name: Kind sweep + polish verify
         working-directory: test/e2e
         env:

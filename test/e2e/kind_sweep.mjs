@@ -6,6 +6,7 @@
 //
 //   node kind_sweep.mjs <base-url> <notebook-abs-path> <cairo|webgl> [artifact-dir]
 import { chromium } from "playwright";
+import { timedChecks } from "./check_timer.mjs";
 import { shutdownOpenSession } from "./fresh_session.mjs";
 import { surfacePoint } from "./kind_sweep_point.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -207,7 +208,7 @@ const browser = await chromium.launch({
   // the current count so the notebook has headroom to grow further.
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--max-active-webgl-contexts=64"],
 });
-const passed = [];
+const passed = timedChecks("kind_sweep");
 const unexpected = [];
 let failed = null;
 let context, page;
@@ -294,6 +295,7 @@ try {
     await new Promise((r) => setTimeout(r, 1000));
   }
   if (!ready) throw new Error(`${backend} timed out waiting for kind-sweep widgets`);
+  passed.mark("notebook ran");
   console.error(`phase: widgets mounted (${backend})`);
   // Diagnostic only (not an assertion): reports whether MASQUE_DEV_ENV propagated from serve.jl
   // into Pluto's notebook worker process, so a CI job log shows which Pkg path the run took.
