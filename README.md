@@ -11,6 +11,7 @@
   <a href="https://codecov.io/gh/jowch/Masque.jl"><img src="https://codecov.io/gh/jowch/Masque.jl/branch/main/graph/badge.svg" alt="codecov"></a>
   <a href="https://jowch.github.io/Masque.jl/stable"><img src="https://img.shields.io/badge/docs-stable-blue.svg" alt="Docs stable"></a>
   <a href="https://jowch.github.io/Masque.jl/dev"><img src="https://img.shields.io/badge/docs-dev-blue.svg" alt="Docs dev"></a>
+  <a href="https://juliapkgstats.com/pkg/Masque"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Fmonthly_downloads%2FMasque&amp;query=total_requests&amp;suffix=%2Fmonth&amp;label=Downloads" alt="Downloads"></a>
 </p>
 
 <p align="center">
