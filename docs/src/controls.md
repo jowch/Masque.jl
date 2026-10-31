@@ -30,7 +30,7 @@ field of the `@bind` value, which holds:
 | [`IntervalSlider`](https://docs.makie.org/stable/reference/blocks/intervalslider) | a `(low, high)` pair from its `range` |
 | [`Toggle`](https://docs.makie.org/stable/reference/blocks/toggle) | `true` when it is on |
 | [`Checkbox`](https://docs.makie.org/stable/reference/blocks/checkbox) | `true` when it is ticked |
-| [`Menu`](https://docs.makie.org/stable/reference/blocks/menu) | the option chosen, or its value for a `label => value` option; the first option until the reader picks, or `nothing` with `default = nothing` |
+| [`Menu`](https://docs.makie.org/stable/reference/blocks/menu) | the option chosen, or its value for a `(label, value)` option; the first option until the reader picks, or `nothing` with `default = nothing` |
 | [`SliderGrid`](https://docs.makie.org/stable/reference/blocks/slidergrid) | a tuple of its sliders' values, in order |
 | [`Button`](https://docs.makie.org/stable/reference/blocks/button) | the number of clicks so far |
 | [`Textbox`](https://docs.makie.org/stable/reference/blocks/textbox) | the text last entered with Enter, or `nothing` before any |
