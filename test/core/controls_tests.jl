@@ -53,8 +53,8 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test v2.span == (1, 7)
         @test v2.fine === true
         @test v2.color === :red
-        @test_throws ArgumentError Masque.bond_from_js(w, Dict("degree" => _env("degree", 11)))
-        @test_throws ArgumentError Masque.bond_from_js(w, Dict("show" => _env("show", 1)))
+        @test_throws "ArgumentError: bond: control :degree expected an index from 0 to 10, got 11" Masque.bond_from_js(w, Dict("degree" => _env("degree", 11)))
+        @test_throws "ArgumentError: bond: control :show expected true or false, got 1" Masque.bond_from_js(w, Dict("show" => _env("show", 1)))
     end
 
     @testset "the box sits on the block, in image px" begin
@@ -136,7 +136,7 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         w = masque(fig; bind = sl)
         @test Masque.initial_bond(w) == 1.0
         (; fig, sl) = _controls_fixture((:sl,))
-        @test_throws ArgumentError masque(fig, (a = sl,); bind = (b = sl,))
+        @test_throws "ArgumentError: masque: a Slider is named both :a and :b" masque(fig, (a = sl,); bind = (b = sl,))
     end
 
     @testset "a block passed without a name says how to name it" begin
@@ -156,11 +156,11 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         msg = sprint(showerror, err)
         @test occursin("(Toggle, IntervalSlider, Checkbox, Menu)", msg)
         @test occursin("`masque(fig, (name = block,))`", msg)
-        @test_throws ArgumentError masque(fig)                          # zero-config names none
+        @test_throws "ArgumentError: masque: this figure has blocks that masque wasn't given (Slider, Toggle" masque(fig)                          # zero-config names none
         fig2 = Figure(); Axis(fig2[1, 1]); Toggle(fig2[2, 1])
         msg1 = sprint(showerror, (@test_throws ArgumentError masque(fig2)).value)
         @test occursin("a block that masque wasn't given (Toggle)", msg1) && occursin("Name it to make it", msg1)
-        @test_throws ArgumentError masque(fig; bind = (degree = sl,))
+        @test_throws "ArgumentError: masque: this figure has blocks that masque wasn't given (Toggle" masque(fig; bind = (degree = sl,))
         (; fig, sl) = _controls_fixture((:sl,))
         @test_logs masque(fig, (degree = sl,))
         fig = Figure(); ax = Axis(fig[1, 1]); scatter!(ax, 1:3, 1:3)
@@ -210,7 +210,7 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test bond(Dict("odd" => _env("odd", "ab"))).odd === nothing
         @test bond(Dict("num" => _env("num", "2x"))).num == "1.5"
         @test bond(Dict("num" => _env("num", "2.25"))).num == "2.25"
-        @test_throws ArgumentError bond(Dict("odd" => _env("odd", 3)))
+        @test_throws "ArgumentError: bond: control :odd expected a text or nothing, got 3" bond(Dict("odd" => _env("odd", 3)))
         # Enter reaches the block's own `stored_string`, so code listening to it runs.
         heard = String[]
         on(t -> push!(heard, t), odd.stored_string)
@@ -250,7 +250,7 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["x"] <= sl["x"] && sl["x"] + sl["w"] <= sl["valueLabel"]["x"] + 1
         v = Masque.bond_from_js(w, Dict("grid" => _env("grid", Any[6, Any[0, 4]])))
         @test v.grid == (3.0, (1, 5))
-        @test_throws ArgumentError Masque.bond_from_js(w, Dict("grid" => _env("grid", Any[6])))
+        @test_throws "ArgumentError: bond: control :grid expected 2 slider values" Masque.bond_from_js(w, Dict("grid" => _env("grid", Any[6])))
         # The browser's values reach the sliders themselves before `onchange`.
         Masque._sync_controls!([Masque.BlockControl(sg, :grid)], Dict("grid" => _env("grid", Any[0, Any[2, 3]])))
         @test sg.sliders[1].value[] == 0.0 && sg.sliders[2].interval[] == (3, 4)
@@ -285,8 +285,8 @@ _layer(m, id) = only(l for l in m["layers"] if l["id"] == id)
         @test g["strokeColor"] == Masque._css_color(Makie.to_color(:black))
         @test length(g["textColors"]) == 3
         @test Masque.bond_from_js(w, Dict("go" => _env("go", 2))).go == 2
-        @test_throws ArgumentError Masque.bond_from_js(w, Dict("go" => _env("go", -1)))
-        @test_throws ArgumentError Masque.bond_from_js(w, Dict("go" => _env("go", true)))
+        @test_throws "ArgumentError: bond: control :go expected a click count, got -1" Masque.bond_from_js(w, Dict("go" => _env("go", -1)))
+        @test_throws "ArgumentError: bond: control :go expected a click count, got true" Masque.bond_from_js(w, Dict("go" => _env("go", true)))
         # A click reaches the block's own `clicks`, so code listening to it runs.
         Masque._sync_controls!([Masque.BlockControl(b, :go)], Dict("go" => _env("go", 3)))
         @test b.clicks[] == 3 && clicked[] == 3

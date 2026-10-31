@@ -30,7 +30,7 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         _, _, ctxs = ctx_for(fs)
         @test validate(ThresholdInteractable(axs; orientation = :horizontal, value = 1.0), ctxs) isa String
         @test validate(ThresholdInteractable(axs; orientation = :vertical, value = 1.0), ctxs) === nothing  # x is identity
-        @test_throws ArgumentError ThresholdInteractable(ax; orientation = :diagonal, value = 1.0)
+        @test_throws "ArgumentError: ThresholdInteractable: orientation must be :horizontal or :vertical" ThresholdInteractable(ax; orientation = :diagonal, value = 1.0)
         # end-to-end: the :threshold layer serializes through build_manifest (Dict geometry + drag event)
         mt = build_manifest([th], ctx)["layers"][1]
         @test mt["kind"] == "threshold" && mt["events"] == ["drag"]
@@ -107,15 +107,12 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         @test !haskey(L3.geometry, "clip")   # orbit has no photographic preview
         @test !haskey(L3.geometry, "fill")
         # #102/§12.3: a view gesture commits nothing, so the frontend never sends a :view bond
-        # payload anymore — `_computed_payload`'s :view branch retired with it. A caller that
-        # somehow reaches transform_value with one anyway (there is no such path in the shipped
-        # frontend) hits the same unrecognized-computed-payload-shape guard any other untaught
-        # kind/keys combination would, rather than silently converting it.
-        tv = Masque.APD.Bonds.transform_value
-        vmanifest = Dict{String, Any}("layers" => [Dict{String, Any}("id" => "view", "kind" => "view", "payloads" => Any[])])
+        # payload. A caller that reaches the decoder with one anyway, a pan's limits or an
+        # orbit's angles, is refused rather than converted.
+        vmanifest = Dict{String, Any}("layers" => [Dict{String, Any}("id" => "view", "kind" => "view", "bond" => "none", "payloads" => Any[])])
         w = Masque.MasqueWidget("", vmanifest, 100)
-        @test_throws ArgumentError tv(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("xmin" => 1.0, "xmax" => 5.0, "ymin" => 0.0, "ymax" => 10.0)))
-        @test_throws ArgumentError tv(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("azimuth" => 0.9, "elevation" => 0.3)))
+        @test_throws "ArgumentError: bond: layer :view commits nothing" commit_field(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("xmin" => 1.0, "xmax" => 5.0, "ymin" => 0.0, "ymax" => 10.0)))
+        @test_throws "ArgumentError: bond: layer :view commits nothing" commit_field(w, Dict("layer" => "view", "index" => 0, "payload" => Dict("azimuth" => 0.9, "elevation" => 0.3)))
         # PolarAxis / Colorbar: view gestures rejected (no continuous polar inversion; colorbar is 1-D)
         fp = Figure(); axp = PolarAxis(fp[1, 1])
         scatter!(axp, [Point2f(0.0, 1.0), Point2f(π / 2, 2.0)])
@@ -148,8 +145,8 @@ include(joinpath(@__DIR__, "..", "testutils.jl"))
         fs = Figure(); axs = Axis(fs[1, 1]; yscale = sqrt); scatter!(axs, [1.0, 2.0], [1.0, 2.0])
         _, _, ctxs = ctx_for(fs)
         @test validate(ROIInteractable(axs; bounds = (1.0, 2.0, 1.0, 2.0)), ctxs) isa String
-        @test_throws ArgumentError ROIInteractable(ax; bounds = (3.0, 1.0, 2.0, 8.0))   # xmin >= xmax
-        @test_throws ArgumentError ROIInteractable(ax; bounds = (1.0, 3.0, 8.0, 2.0))   # ymin >= ymax
+        @test_throws "ArgumentError: ROIInteractable: need xmin < xmax and ymin < ymax, got (3.0, 1.0, 2.0, 8.0)" ROIInteractable(ax; bounds = (3.0, 1.0, 2.0, 8.0))   # xmin >= xmax
+        @test_throws "ArgumentError: ROIInteractable: need xmin < xmax and ymin < ymax, got (1.0, 3.0, 8.0, 2.0)" ROIInteractable(ax; bounds = (1.0, 3.0, 8.0, 2.0))   # ymin >= ymax
         # xscale non-invertible also fails loud
         fxx = Figure(); axx = Axis(fxx[1, 1]; xscale = sqrt); scatter!(axx, [1.0, 2.0], [1.0, 2.0])
         _, _, ctxx = ctx_for(fxx)
@@ -206,17 +203,17 @@ end
     miss = tvL(gridw, Dict("items" => []))
     @test miss isa GridWindowEvent && isempty(miss.i1:miss.i2) && isempty(miss.j1:miss.j2)
     # a brushed grid's field holds the box's window: a single-cell envelope is refused
-    @test_throws ArgumentError tvL(gridw, Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1, "j" => 2)))
+    @test_throws "ArgumentError: bond: field :L holds the elements a box encloses" tvL(gridw, Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1, "j" => 2)))
 
     ev = tvL(wdg("roi", "bounds"), Dict("layer" => "L", "index" => 0, "payload" => Dict("xmin" => 0.0, "xmax" => 1.0, "ymin" => 2.0, "ymax" => 3.0)))
     @test ev isa BoundsEvent && (ev.xmin, ev.xmax, ev.ymin, ev.ymax) == (0.0, 1.0, 2.0, 3.0)
     ev = tvL(wdg("threshold", "threshold"), Dict("layer" => "L", "index" => 0, "payload" => 4.5))
     @test ev isa ThresholdEvent && ev.value === 4.5
 
-    @test_throws ArgumentError tvL(wdg("view", "none"), Dict("layer" => "L", "index" => 0, "payload" => Dict("azimuth" => 0.1)))
-    @test_throws ArgumentError tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => Dict("x" => 1.0)))
-    @test_throws ArgumentError tvL(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1)))
-    @test_throws ArgumentError tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
+    @test_throws "ArgumentError: bond: layer :L commits nothing" tvL(wdg("view", "none"), Dict("layer" => "L", "index" => 0, "payload" => Dict("azimuth" => 0.1)))
+    @test_throws "ArgumentError: bond: layer :L payload is missing `y`" tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => Dict("x" => 1.0)))
+    @test_throws "ArgumentError: bond: layer :L payload is missing `j`" tvL(wdg("grid", "gridcell"), Dict("layer" => "L", "index" => 0, "payload" => Dict("i" => 1)))
+    @test_throws "ArgumentError: bond: layer :L payload is missing `x`" tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
     let err = try
             tvL(wdg("axis", "axis"), Dict("layer" => "L", "index" => -1, "payload" => "not-a-dict"))
             nothing
@@ -225,8 +222,8 @@ end
         end
         @test err isa ArgumentError && occursin(":L", err.msg)
     end
-    @test_throws ArgumentError tvL(wdg("axis", "axis"), Dict("layer" => "missing", "index" => -1, "payload" => Dict("x" => 1.0, "y" => 2.0)))
-    @test_throws ArgumentError tv(Masque.MasqueWidget("", Dict{String, Any}(), 100), Dict("layer" => "L", "index" => 0))
+    @test_throws "ArgumentError: bond: field :L holds a commit from layer :missing" tvL(wdg("axis", "axis"), Dict("layer" => "missing", "index" => -1, "payload" => Dict("x" => 1.0, "y" => 2.0)))
+    @test_throws "ArgumentError: bond: this manifest has no layers" commit_field(Masque.MasqueWidget("", Dict{String, Any}(), 100), Dict("layer" => "L", "index" => 0))
 end
 
 @testset "SELECTED_KINDS parity: Julia _SELECTED_KINDS matches frontend selection.ts (#109)" begin
